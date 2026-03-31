@@ -1,37 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
-import { CanonicalDataAsset } from "../../../domain/dataset-studio/CanonicalDataAsset";
-import { createCanonicalRecordsShape, type CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
-import {
-  DataAssetRegistry,
-  DataAssetRegistrySpecializations,
-  type DataAssetRegistryEntry,
-} from "../../../application/dataset-studio/DataAssetRegistry";
-import {
-  resolveDataAssetConfigDefaults,
-} from "../../../application/dataset-studio/DataAssetConfiguration";
-import {
-  DefaultDataAssetExecutionFramework,
-  type DataAssetExecutionResult,
-} from "../../../application/dataset-studio/DataAssetExecutionFramework";
-import {
-  DataSourceReferenceKinds,
-} from "../../../application/dataset-studio/DataConverterContracts";
+import type { DataPreviewModel } from "../../../application/data-studio/DataPreviewEngine";
+import { BatchIngestionAssetId, BatchIngestionFramework, BatchIngestionStrategyKinds, BatchIngestorKinds } from "../../../application/dataset-studio/BatchIngestionFramework";
+import { resolveDataAssetConfigDefaults } from "../../../application/dataset-studio/DataAssetConfiguration";
+import { type DataAssetExecutionResult, DefaultDataAssetExecutionFramework } from "../../../application/dataset-studio/DataAssetExecutionFramework";
+import { DataAssetRegistrySpecializations, type DataAssetRegistryEntry } from "../../../application/dataset-studio/DataAssetRegistry";
+import { DataSourceReferenceKinds } from "../../../application/dataset-studio/DataConverterContracts";
+import { getDataStudioAssetRegistry } from "../../../application/dataset-studio/DataStudioAssetRegistryCatalog";
 import {
   DataStudioValidationSections,
   hasErrorIssues,
   validateDataAssetConfigValues,
   type DataStudioValidationIssue,
 } from "../../../application/dataset-studio/DataStudioValidation";
-import {
-  CsvIngestorAsset,
-  createCsvIngestorConfigSchema,
-} from "../../../application/dataset-studio/CsvIngestorAsset";
-import {
-  JsonIngestorAsset,
-  createJsonIngestorConfigSchema,
-} from "../../../application/dataset-studio/JsonIngestorAsset";
+import { CsvIngestorAsset } from "../../../application/dataset-studio/CsvIngestorAsset";
+import { DocumentPdfIngestorAsset, toDocumentPdfIngestorConfig } from "../../../application/dataset-studio/DocumentPdfIngestorAsset";
+import { type IngestionIssue } from "../../../application/dataset-studio/IngestionContracts";
+import { ImageIngestorAsset, toImageIngestorConfig } from "../../../application/dataset-studio/ImageIngestorAsset";
+import { JsonIngestorAsset } from "../../../application/dataset-studio/JsonIngestorAsset";
+import { SourceInputKinds } from "../../../application/dataset-studio/SourceLocatorInputAbstraction";
+import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
 import AssetConfigurationPanel from "./AssetConfigurationPanel";
 import DataPreviewPanel from "./DataPreviewPanel";
+import DataPreviewSurface from "./DataPreviewSurface";
 
 export interface DatasetStudioDraftPreviewPanelProps {
   readonly draftId?: string;
@@ -40,11 +30,42 @@ export interface DatasetStudioDraftPreviewPanelProps {
   readonly draftContent?: string;
 }
 
+type SourceMode = "in-memory" | "local-file" | "local-directory";
+
+function resolveSourceModes(entry: DataAssetRegistryEntry | undefined): ReadonlyArray<SourceMode> {
+  if (!entry) {
+    return Object.freeze(["in-memory"]);
+  }
+
+  const sourceKinds = entry.descriptor.inspectability.supportedSourceKinds;
+  const modes: SourceMode[] = [];
+  if (sourceKinds.includes("in-memory")) {
+    modes.push("in-memory");
+  }
+  if (sourceKinds.includes("local-file") || sourceKinds.includes("local-files")) {
+    modes.push("local-file");
+  }
+  if (sourceKinds.includes("local-directory")) {
+    modes.push("local-directory");
+  }
+  return Object.freeze(modes.length > 0 ? modes : ["in-memory"]);
+}
+
+function toDataValidationIssues(issues: ReadonlyArray<IngestionIssue>): ReadonlyArray<DataStudioValidationIssue> {
+  return Object.freeze(issues.map((issue) => Object.freeze({
+    code: issue.code,
+    section: DataStudioValidationSections.executionRequest,
+    severity: issue.severity,
+    message: issue.message,
+    path: issue.path,
+    details: issue.details as Readonly<Record<string, unknown>> | undefined,
+  } satisfies DataStudioValidationIssue)));
+}
+
 function toDelimiter(input: CanonicalRecordValue | undefined): "," | "\t" | ";" | "|" {
   if (input === "\t" || input === ";" || input === "|") {
     return input;
   }
-
   return ",";
 }
 
@@ -58,111 +79,76 @@ function toHeader(input: CanonicalRecordValue | undefined): boolean | "auto" {
   return "auto";
 }
 
-function createPreviewAsset(input: {
-  readonly assetId: string;
-  readonly title: string;
-  readonly config: Readonly<Record<string, CanonicalRecordValue>>;
-}): CanonicalDataAsset {
-  return new CanonicalDataAsset({
-    id: input.assetId,
-    name: input.title,
-    source: { type: "generated", workflowId: "dataset-studio-preview" },
-    location: { accessMethod: "virtual", location: `dataset://${input.assetId}` },
-    outputShape: createCanonicalRecordsShape({ records: [] }),
-    config: input.config,
-    semanticMetadata: {
-      description: "Dataset Studio preview source-to-records data asset.",
-      tags: ["dataset", "data-studio", "preview"],
-    },
-  });
+function splitPatterns(value: string): ReadonlyArray<string> {
+  const patterns = value.split(",").map((entry) => entry.trim()).filter(Boolean);
+  return Object.freeze(patterns.length > 0 ? patterns : ["**/*"]);
 }
 
-function createRegistry(input: {
-  readonly draftId?: string;
-  readonly draftAssetId?: string;
-  readonly draftTitle?: string;
-}): DataAssetRegistry {
-  const registry = new DataAssetRegistry();
-  const suffix = input.draftAssetId ?? `dataset-preview-${input.draftId ?? "draft"}`;
-  registry.register({
-    asset: createPreviewAsset({
-      assetId: CsvIngestorAsset.assetId,
-      title: "CSV Ingestor",
-      config: resolveDataAssetConfigDefaults(createCsvIngestorConfigSchema(`${suffix}-csv`)),
-    }),
-    specialization: DataAssetRegistrySpecializations.ingestion,
-    display: {
-      title: "CSV Ingestor",
-      summary: "Schema-driven CSV ingestion and canonical records preview.",
-      tags: ["dataset", "preview", "csv", "ingestion"],
-    },
-    configSchema: createCsvIngestorConfigSchema(`${suffix}-csv`),
-    assetFactory: (config) => createPreviewAsset({
-      assetId: CsvIngestorAsset.assetId,
-      title: "CSV Ingestor",
-      config,
-    }),
-  });
+function renderIssueList(issues: ReadonlyArray<DataStudioValidationIssue>): JSX.Element | null {
+  if (issues.length === 0) {
+    return null;
+  }
 
-  registry.register({
-    asset: createPreviewAsset({
-      assetId: JsonIngestorAsset.assetId,
-      title: "JSON Ingestor",
-      config: resolveDataAssetConfigDefaults(createJsonIngestorConfigSchema(`${suffix}-json`)),
-    }),
-    specialization: DataAssetRegistrySpecializations.ingestion,
-    display: {
-      title: "JSON Ingestor",
-      summary: "Schema-driven JSON ingestion and canonical records preview.",
-      tags: ["dataset", "preview", "json", "ingestion"],
-    },
-    configSchema: createJsonIngestorConfigSchema(`${suffix}-json`),
-    assetFactory: (config) => createPreviewAsset({
-      assetId: JsonIngestorAsset.assetId,
-      title: "JSON Ingestor",
-      config,
-    }),
-  });
-
-  return registry;
-}
-
-function mergePanelIssues(
-  configIssues: ReadonlyArray<DataStudioValidationIssue>,
-  execution?: DataAssetExecutionResult,
-): ReadonlyArray<DataStudioValidationIssue> {
-  const executionConfigIssues = execution?.validationIssues.filter((issue) => issue.section === DataStudioValidationSections.dataAssetConfig) ?? [];
-  return Object.freeze([...configIssues, ...executionConfigIssues]);
+  const errorCount = issues.filter((issue) => issue.severity === "error").length;
+  const warningCount = issues.filter((issue) => issue.severity === "warning").length;
+  return (
+    <section className="ui-card ui-card--padded ui-stack ui-stack--xs" data-testid="dataset-preview-ingestion-issues">
+      <div className="ui-row ui-row--between ui-row--wrap">
+        <strong>Ingestion Issues</strong>
+        <div className="ui-row ui-row--wrap">
+          {errorCount > 0 ? <span className="ui-badge ui-badge--danger">{errorCount} errors</span> : null}
+          {warningCount > 0 ? <span className="ui-badge ui-badge--warning">{warningCount} warnings</span> : null}
+        </div>
+      </div>
+      <ul className="ui-stack ui-stack--2xs">
+        {issues.slice(0, 10).map((issue, index) => (
+          <li key={`${issue.code}-${index}`}>
+            <span className={issue.severity === "error" ? "ui-text-danger" : "ui-subtle"}>
+              [{issue.section}] {issue.message}
+            </span>
+            {issue.path ? <span className="ui-subtle"> ({issue.path})</span> : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 export default function DatasetStudioDraftPreviewPanel({
   draftId,
-  draftAssetId,
-  draftTitle,
   draftContent,
 }: DatasetStudioDraftPreviewPanelProps): JSX.Element {
-  const registry = useMemo(() => createRegistry({ draftId, draftAssetId, draftTitle }), [draftAssetId, draftId, draftTitle]);
-  const executionFramework = useMemo(() => new DefaultDataAssetExecutionFramework(), []);
+  const registry = useMemo(() => getDataStudioAssetRegistry(), []);
+  const entries = useMemo(() => registry.list({
+    specialization: DataAssetRegistrySpecializations.ingestion,
+    category: "data-ingestion",
+    executable: true,
+  }), [registry]);
 
-  const entries = useMemo(() => registry.list({ executable: true }), [registry]);
+  const executionFramework = useMemo(() => new DefaultDataAssetExecutionFramework(), []);
+  const documentIngestor = useMemo(() => new DocumentPdfIngestorAsset(), []);
+  const imageIngestor = useMemo(() => new ImageIngestorAsset(), []);
+  const batchFramework = useMemo(() => new BatchIngestionFramework(), []);
+
   const [selectedAssetId, setSelectedAssetId] = useState(entries[0]?.descriptor.assetId);
+  const selectedEntry = useMemo(
+    () => entries.find((entry) => entry.descriptor.assetId === selectedAssetId),
+    [entries, selectedAssetId],
+  );
+
+  const supportedSourceModes = useMemo(() => resolveSourceModes(selectedEntry), [selectedEntry]);
+  const [sourceMode, setSourceMode] = useState<SourceMode>(supportedSourceModes[0] ?? "in-memory");
+  const [sourceReference, setSourceReference] = useState("");
+  const [sourcePatterns, setSourcePatterns] = useState("**/*");
+  const [sourcePayload, setSourcePayload] = useState(draftContent ?? "");
 
   useEffect(() => {
-    setSelectedAssetId((current) => {
-      if (current && entries.some((entry) => entry.descriptor.assetId === current)) {
-        return current;
-      }
-      return entries[0]?.descriptor.assetId;
-    });
-  }, [entries]);
+    setSourcePayload(draftContent ?? "");
+  }, [draftContent]);
 
-  const selectedEntry = useMemo(() => {
-    if (!selectedAssetId) {
-      return undefined;
-    }
-
-    return registry.get({ assetId: selectedAssetId });
-  }, [registry, selectedAssetId]);
+  useEffect(() => {
+    setSourceMode((current) => supportedSourceModes.includes(current) ? current : (supportedSourceModes[0] ?? "in-memory"));
+  }, [supportedSourceModes]);
 
   const schema = selectedEntry?.descriptor.configSchema;
   const [appliedConfig, setAppliedConfig] = useState<Readonly<Record<string, CanonicalRecordValue>>>(() =>
@@ -176,23 +162,25 @@ export default function DatasetStudioDraftPreviewPanel({
       setConfigValidationIssues(Object.freeze([]));
       return;
     }
-
     setAppliedConfig(resolveDataAssetConfigDefaults(schema, selectedEntry?.baseConfig));
     setConfigValidationIssues(Object.freeze([]));
   }, [schema, selectedEntry?.baseConfig]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [executionResult, setExecutionResult] = useState<DataAssetExecutionResult | undefined>();
+  const [previewModel, setPreviewModel] = useState<DataPreviewModel | undefined>();
+  const [previewIssues, setPreviewIssues] = useState<ReadonlyArray<DataStudioValidationIssue>>(Object.freeze([]));
+
   const panelIssues = useMemo(
-    () => mergePanelIssues(configValidationIssues, executionResult),
-    [configValidationIssues, executionResult],
+    () => Object.freeze([...configValidationIssues, ...previewIssues]),
+    [configValidationIssues, previewIssues],
   );
 
   useEffect(() => {
-    const content = draftContent?.trim();
-    if (!content || !selectedAssetId) {
+    if (!selectedAssetId || !selectedEntry) {
       setExecutionResult(undefined);
-      setIsLoading(false);
+      setPreviewModel(undefined);
+      setPreviewIssues(Object.freeze([]));
       return;
     }
 
@@ -201,58 +189,288 @@ export default function DatasetStudioDraftPreviewPanel({
 
     void (async () => {
       try {
-        const resolvedAsset = registry.resolveAsset({
-          assetId: selectedAssetId,
-          configOverride: appliedConfig,
-        });
-
-        if (!resolvedAsset) {
+        const issues = schema ? validateDataAssetConfigValues(appliedConfig, schema) : Object.freeze([]);
+        setConfigValidationIssues(issues);
+        if (hasErrorIssues(issues)) {
           setExecutionResult(undefined);
-          setIsLoading(false);
+          setPreviewModel(undefined);
+          setPreviewIssues(Object.freeze([]));
           return;
         }
 
-        const header = toHeader(appliedConfig.header);
+        if (selectedAssetId === CsvIngestorAsset.assetId || selectedAssetId === JsonIngestorAsset.assetId) {
+          if (sourceMode === "local-directory") {
+            setExecutionResult(undefined);
+            setPreviewModel(undefined);
+            setPreviewIssues(Object.freeze([Object.freeze({
+              code: "ingestion-source-mode-invalid",
+              section: DataStudioValidationSections.executionRequest,
+              severity: "error",
+              message: "This ingestor supports in-memory or local-file source modes.",
+              path: "source.mode",
+            })]));
+            return;
+          }
 
-        const result = await executionFramework.execute({
-          asset: resolvedAsset,
-          input: {
-            kind: "source-reference",
-            source: {
-              kind: DataSourceReferenceKinds.inMemory,
-              payload: content,
+          const runtimeAsset = registry.resolveAsset({
+            assetId: selectedAssetId,
+            versionId: selectedEntry.descriptor.versionId,
+            configOverride: appliedConfig,
+          });
+          if (!runtimeAsset) {
+            setExecutionResult(undefined);
+            setPreviewModel(undefined);
+            setPreviewIssues(Object.freeze([]));
+            return;
+          }
+
+          const source = sourceMode === "local-file"
+            ? {
+              kind: DataSourceReferenceKinds.localFile as const,
+              path: sourceReference.trim(),
+              formatHint: selectedAssetId === CsvIngestorAsset.assetId ? "csv" as const : "json" as const,
+            }
+            : {
+              kind: DataSourceReferenceKinds.inMemory as const,
+              payload: sourcePayload,
+              formatHint: selectedAssetId === CsvIngestorAsset.assetId ? "csv" as const : "json" as const,
+            };
+
+          if (source.kind === DataSourceReferenceKinds.localFile && !source.path) {
+            setExecutionResult(undefined);
+            setPreviewModel(undefined);
+            setPreviewIssues(Object.freeze([Object.freeze({
+              code: "ingestion-source-path-missing",
+              section: DataStudioValidationSections.executionRequest,
+              severity: "error",
+              message: "Local-file source mode requires a source path.",
+              path: "source.path",
+            })]));
+            return;
+          }
+
+          if (source.kind === DataSourceReferenceKinds.inMemory && !String(source.payload).trim()) {
+            setExecutionResult(undefined);
+            setPreviewModel(undefined);
+            setPreviewIssues(Object.freeze([Object.freeze({
+              code: "ingestion-source-payload-missing",
+              section: DataStudioValidationSections.executionRequest,
+              severity: "error",
+              message: "In-memory source mode requires payload content.",
+              path: "source.payload",
+            })]));
+            return;
+          }
+
+          const header = toHeader(appliedConfig.header);
+          const result = await executionFramework.execute({
+            asset: runtimeAsset,
+            input: {
+              kind: "source-reference",
+              source,
               formatHint: selectedAssetId === CsvIngestorAsset.assetId ? "csv" : "json",
+              delimiter: toDelimiter(appliedConfig.delimiter),
+              header,
+              hasHeaderRow: header === "auto" ? undefined : header,
+              encoding: typeof appliedConfig.encoding === "string" ? appliedConfig.encoding : "utf-8",
+              skipEmptyLines: typeof appliedConfig.skipEmptyLines === "boolean" ? appliedConfig.skipEmptyLines : true,
+              normalizeHeadersToLowercase: typeof appliedConfig.normalizeHeadersToLowercase === "boolean"
+                ? appliedConfig.normalizeHeadersToLowercase
+                : false,
+              flatten: typeof appliedConfig.flatten === "boolean" ? appliedConfig.flatten : false,
+              maxDepth: typeof appliedConfig.maxDepth === "number" ? appliedConfig.maxDepth : undefined,
             },
-            formatHint: selectedAssetId === CsvIngestorAsset.assetId ? "csv" : "json",
-            delimiter: toDelimiter(appliedConfig.delimiter),
-            header,
-            hasHeaderRow: header === "auto" ? undefined : header,
-            encoding: typeof appliedConfig.encoding === "string" ? appliedConfig.encoding : "utf-8",
-            skipEmptyLines: typeof appliedConfig.skipEmptyLines === "boolean" ? appliedConfig.skipEmptyLines : true,
-            normalizeHeadersToLowercase: typeof appliedConfig.normalizeHeadersToLowercase === "boolean"
-              ? appliedConfig.normalizeHeadersToLowercase
-              : false,
-            flatten: typeof appliedConfig.flatten === "boolean" ? appliedConfig.flatten : false,
-            maxDepth: typeof appliedConfig.maxDepth === "number" ? appliedConfig.maxDepth : undefined,
+            previewOptions: { maxItems: 25, maxColumns: 12, maxTextLength: 320 },
+            requestedBy: "dataset-studio-ingestion-preview",
+            context: {
+              operationId: draftId ? `ingestion-preview-${draftId}` : "ingestion-preview",
+              initiatedBy: "dataset-studio-ui",
+            },
+          });
+
+          if (disposed) {
+            return;
+          }
+          setExecutionResult(result);
+          setPreviewModel(undefined);
+          setPreviewIssues(Object.freeze([]));
+          return;
+        }
+
+        if (selectedAssetId === DocumentPdfIngestorAsset.assetId || selectedAssetId === ImageIngestorAsset.assetId) {
+          if (sourceMode === "local-directory") {
+            setExecutionResult(undefined);
+            setPreviewModel(undefined);
+            setPreviewIssues(Object.freeze([Object.freeze({
+              code: "ingestion-source-mode-invalid",
+              section: DataStudioValidationSections.executionRequest,
+              severity: "error",
+              message: "This ingestor supports in-memory or local-file source modes.",
+              path: "source.mode",
+            })]));
+            return;
+          }
+
+          const source = sourceMode === "local-file"
+            ? {
+              kind: DataSourceReferenceKinds.localFile as const,
+              path: sourceReference.trim(),
+            }
+            : {
+              kind: DataSourceReferenceKinds.inMemory as const,
+              payload: sourcePayload,
+              fileName: sourceReference.trim() || undefined,
+            };
+
+          if (source.kind === DataSourceReferenceKinds.localFile && !source.path) {
+            setExecutionResult(undefined);
+            setPreviewModel(undefined);
+            setPreviewIssues(Object.freeze([Object.freeze({
+              code: "ingestion-source-path-missing",
+              section: DataStudioValidationSections.executionRequest,
+              severity: "error",
+              message: "Local-file source mode requires a source path.",
+              path: "source.path",
+            })]));
+            return;
+          }
+
+          if (source.kind === DataSourceReferenceKinds.inMemory && !String(source.payload).trim()) {
+            setExecutionResult(undefined);
+            setPreviewModel(undefined);
+            setPreviewIssues(Object.freeze([Object.freeze({
+              code: "ingestion-source-payload-missing",
+              section: DataStudioValidationSections.executionRequest,
+              severity: "error",
+              message: "In-memory source mode requires payload content.",
+              path: "source.payload",
+            })]));
+            return;
+          }
+
+          if (selectedAssetId === DocumentPdfIngestorAsset.assetId) {
+            const result = await documentIngestor.resolveAndExecute({
+              source,
+              config: toDocumentPdfIngestorConfig(appliedConfig),
+            });
+            if (disposed) {
+              return;
+            }
+            setExecutionResult(undefined);
+            if (!result.ok) {
+              setPreviewModel(undefined);
+              setPreviewIssues(toDataValidationIssues(result.normalized.issues));
+              return;
+            }
+            setPreviewModel(result.preview.normalized.preview);
+            setPreviewIssues(toDataValidationIssues(result.preview.normalized.issues));
+            return;
+          }
+
+          const result = await imageIngestor.resolveAndExecute({
+            source,
+            config: toImageIngestorConfig(appliedConfig),
+          });
+          if (disposed) {
+            return;
+          }
+          setExecutionResult(undefined);
+          if (!result.ok) {
+            setPreviewModel(undefined);
+            setPreviewIssues(toDataValidationIssues(result.normalized.issues));
+            return;
+          }
+          setPreviewModel(result.preview.normalized.preview);
+          setPreviewIssues(toDataValidationIssues(result.preview.normalized.issues));
+          return;
+        }
+
+        if (selectedAssetId !== BatchIngestionAssetId) {
+          setExecutionResult(undefined);
+          setPreviewModel(undefined);
+          setPreviewIssues(Object.freeze([]));
+          return;
+        }
+
+        if (sourceMode === "in-memory") {
+          setExecutionResult(undefined);
+          setPreviewModel(undefined);
+          setPreviewIssues(Object.freeze([Object.freeze({
+            code: "batch-source-mode-invalid",
+            section: DataStudioValidationSections.executionRequest,
+            severity: "error",
+            message: "Batch ingestion preview requires local file or local directory source mode.",
+            path: "source.mode",
+          })]));
+          return;
+        }
+
+        const pathValue = sourceReference.trim();
+        if (!pathValue) {
+          setExecutionResult(undefined);
+          setPreviewModel(undefined);
+          setPreviewIssues(Object.freeze([Object.freeze({
+            code: "batch-source-path-missing",
+            section: DataStudioValidationSections.executionRequest,
+            severity: "error",
+            message: "Batch ingestion preview requires a source path.",
+            path: "source.path",
+          })]));
+          return;
+        }
+
+        const strategy = typeof appliedConfig.strategy === "string" && appliedConfig.strategy === BatchIngestionStrategyKinds.selected
+          ? {
+            kind: BatchIngestionStrategyKinds.selected as const,
+            ingestor: typeof appliedConfig.selectedIngestor === "string"
+              ? appliedConfig.selectedIngestor as typeof BatchIngestorKinds[keyof typeof BatchIngestorKinds]
+              : BatchIngestorKinds.csv,
+          }
+          : { kind: BatchIngestionStrategyKinds.routed as const };
+
+        const result = await batchFramework.previewBatch({
+          sourceRequest: {
+            input: sourceMode === "local-directory"
+              ? {
+                kind: SourceInputKinds.localDirectory,
+                path: pathValue,
+                patterns: splitPatterns(sourcePatterns),
+              }
+              : {
+                kind: SourceInputKinds.localFile,
+                path: pathValue,
+              },
           },
-          previewOptions: { maxItems: 25, maxColumns: 12, maxTextLength: 320 },
-          requestedBy: "dataset-studio-preview-panel",
-          context: {
-            operationId: draftId ? `preview-${draftId}` : "preview-draft",
-            initiatedBy: "dataset-studio-ui",
+          strategy,
+          config: {
+            continueOnError: typeof appliedConfig.continueOnError === "boolean" ? appliedConfig.continueOnError : true,
+            maxItems: typeof appliedConfig.maxItems === "number" ? appliedConfig.maxItems : undefined,
+            previewItemLimit: typeof appliedConfig.previewItemLimit === "number" ? appliedConfig.previewItemLimit : 10,
+            concurrency: typeof appliedConfig.concurrency === "number" ? appliedConfig.concurrency : undefined,
           },
         });
 
-        if (disposed) {
-          return;
-        }
-
-        setExecutionResult(result);
-      } catch {
         if (disposed) {
           return;
         }
         setExecutionResult(undefined);
+        setPreviewModel(result.preview.normalized.preview);
+        setPreviewIssues(toDataValidationIssues([
+          ...result.preview.normalized.issues,
+          ...result.warnings,
+        ]));
+      } catch (error) {
+        if (disposed) {
+          return;
+        }
+        setExecutionResult(undefined);
+        setPreviewModel(undefined);
+        setPreviewIssues(Object.freeze([Object.freeze({
+          code: "ingestion-preview-runtime-failure",
+          section: DataStudioValidationSections.executionRequest,
+          severity: "error",
+          message: error instanceof Error ? error.message : String(error),
+        })]));
       } finally {
         if (!disposed) {
           setIsLoading(false);
@@ -263,19 +481,32 @@ export default function DatasetStudioDraftPreviewPanel({
     return () => {
       disposed = true;
     };
-  }, [appliedConfig, draftContent, draftId, executionFramework, registry, selectedAssetId]);
+  }, [
+    appliedConfig,
+    batchFramework,
+    documentIngestor,
+    draftId,
+    executionFramework,
+    imageIngestor,
+    registry,
+    schema,
+    selectedAssetId,
+    selectedEntry,
+    sourceMode,
+    sourcePatterns,
+    sourcePayload,
+    sourceReference,
+  ]);
 
   const handleApplyConfig = (nextConfig: Readonly<Record<string, CanonicalRecordValue>>) => {
     if (!schema) {
       return;
     }
-
     const issues = validateDataAssetConfigValues(nextConfig, schema);
     setConfigValidationIssues(issues);
     if (hasErrorIssues(issues)) {
       return;
     }
-
     setAppliedConfig(nextConfig);
   };
 
@@ -283,13 +514,13 @@ export default function DatasetStudioDraftPreviewPanel({
     <section className="ui-stack ui-stack--sm" data-testid="dataset-studio-draft-preview-panel">
       {entries.length > 1 ? (
         <label className="ui-field" data-testid="dataset-preview-asset-selector">
-          <span className="ui-field__label">Data Asset</span>
+          <span className="ui-field__label">Ingestion Asset</span>
           <select
             className="ui-select"
             value={selectedAssetId}
             onChange={(event) => setSelectedAssetId(event.currentTarget.value)}
           >
-            {entries.map((entry: DataAssetRegistryEntry) => (
+            {entries.map((entry) => (
               <option key={`${entry.descriptor.assetId}:${entry.descriptor.versionId ?? "latest"}`} value={entry.descriptor.assetId}>
                 {entry.descriptor.display.title ?? entry.descriptor.name}
                 {entry.descriptor.versionId ? ` (${entry.descriptor.versionId})` : ""}
@@ -299,9 +530,90 @@ export default function DatasetStudioDraftPreviewPanel({
         </label>
       ) : null}
 
+      {selectedEntry ? (
+        <section className="ui-card ui-card--padded ui-stack ui-stack--xs" data-testid="dataset-preview-selected-asset-metadata">
+          <strong>{selectedEntry.descriptor.display.title ?? selectedEntry.descriptor.name}</strong>
+          <span className="ui-subtle">{selectedEntry.descriptor.display.summary ?? "No summary available."}</span>
+          <div className="ui-meta-grid">
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Category</div>
+              <div className="ui-meta-value">{selectedEntry.descriptor.category}</div>
+            </div>
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Output shape</div>
+              <div className="ui-meta-value">{selectedEntry.descriptor.outputShapeKind}</div>
+            </div>
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Version</div>
+              <div className="ui-meta-value">{selectedEntry.descriptor.versionId ?? "latest"}</div>
+            </div>
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Source support</div>
+              <div className="ui-meta-value">
+                {selectedEntry.descriptor.inspectability.supportedSourceKinds.join(", ") || "-"}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="ui-card ui-card--padded ui-stack ui-stack--xs" data-testid="dataset-preview-source-input-panel">
+        <strong>Source Input</strong>
+        <span className="ui-subtle">Select source mode and provide payload/path for ingestion preview.</span>
+        <label className="ui-field">
+          <span className="ui-field__label">Source mode</span>
+          <select
+            className="ui-select"
+            value={sourceMode}
+            onChange={(event) => setSourceMode(event.currentTarget.value as SourceMode)}
+          >
+            {supportedSourceModes.map((mode) => (
+              <option key={mode} value={mode}>{mode}</option>
+            ))}
+          </select>
+        </label>
+
+        {sourceMode === "in-memory" ? (
+          <label className="ui-field">
+            <span className="ui-field__label">In-memory payload</span>
+            <textarea
+              className="ui-textarea ui-text-mono"
+              value={sourcePayload}
+              onChange={(event) => setSourcePayload(event.currentTarget.value)}
+              placeholder="Paste CSV/JSON/text payload for preview."
+            />
+          </label>
+        ) : (
+          <label className="ui-field">
+            <span className="ui-field__label">{sourceMode === "local-directory" ? "Directory path" : "File path"}</span>
+            <input
+              className="ui-input"
+              type="text"
+              value={sourceReference}
+              onChange={(event) => setSourceReference(event.currentTarget.value)}
+              placeholder={sourceMode === "local-directory" ? "C:\\data\\ingestion" : "C:\\data\\ingestion\\sample.csv"}
+            />
+          </label>
+        )}
+
+        {sourceMode === "local-directory" ? (
+          <label className="ui-field">
+            <span className="ui-field__label">Directory patterns</span>
+            <input
+              className="ui-input"
+              type="text"
+              value={sourcePatterns}
+              onChange={(event) => setSourcePatterns(event.currentTarget.value)}
+              placeholder="**/*.csv, **/*.json"
+            />
+            <span className="ui-field__hint">Comma-separated glob patterns.</span>
+          </label>
+        ) : null}
+      </section>
+
       <AssetConfigurationPanel
         title="Asset Configuration"
-        subtitle="Apply schema-driven parsing and preview options for this data asset."
+        subtitle="Schema-driven ingestion configuration for the selected asset."
         schema={schema}
         initialConfig={appliedConfig}
         issues={panelIssues}
@@ -309,12 +621,27 @@ export default function DatasetStudioDraftPreviewPanel({
         onApply={handleApplyConfig}
       />
 
-      <DataPreviewPanel
-        title="Data Preview Panel"
-        isLoading={isLoading}
-        executionResult={executionResult}
-        emptyMessage="Draft content is empty. Add records to preview canonical output."
-      />
+      {executionResult ? (
+        <DataPreviewPanel
+          title="Ingestion Preview"
+          isLoading={isLoading}
+          executionResult={executionResult}
+          emptyMessage="Provide source input to preview ingestion output."
+        />
+      ) : null}
+
+      {!executionResult && previewModel ? (
+        <DataPreviewSurface preview={previewModel} title="Ingestion Preview" />
+      ) : null}
+
+      {!executionResult && !previewModel && !isLoading ? (
+        <section className="ui-card ui-card--padded ui-stack ui-stack--xs">
+          <strong>Ingestion Preview</strong>
+          <span className="ui-text-muted">Provide source input to preview ingestion output.</span>
+        </section>
+      ) : null}
+
+      {renderIssueList(previewIssues)}
     </section>
   );
 }

@@ -52,11 +52,32 @@ describe("DataAssetRegistry", () => {
     });
 
     expect(entry.descriptor.assetId).toBe("dataset-a");
+    expect(entry.descriptor.category).toBe("dataset");
     expect(entry.descriptor.versionId).toBe("v1");
     expect(entry.descriptor.version.scheme).toBe("label");
     expect(entry.descriptor.specialization).toBe("converter");
     expect(entry.descriptor.configSchema.schemaId).toBe("dataset-a.schema");
     expect(registry.get({ assetId: "dataset-a", versionId: "v1" })?.descriptor.assetId).toBe("dataset-a");
+  });
+
+  it("supports category and inspectability metadata for ingestion discovery", () => {
+    const registry = new DataAssetRegistry();
+    const entry = registry.register({
+      asset: createAsset({ id: "dataset-ingestor", version: "1.0.0" }),
+      specialization: DataAssetRegistrySpecializations.ingestion,
+      category: "data-ingestion",
+      inspectability: {
+        supportedSourceKinds: ["in-memory", "local-file"],
+        supportedFileExtensions: [".csv"],
+        keyConfigKeys: ["delimiter", "header"],
+        previewModes: ["sample-records"],
+        executionModes: ["execute", "preview"],
+      },
+    });
+
+    expect(entry.descriptor.inspectability.supportedSourceKinds).toEqual(["in-memory", "local-file"]);
+    expect(registry.list({ category: "data-ingestion" })).toHaveLength(1);
+    expect(registry.list({ category: "dataset" })).toHaveLength(0);
   });
 
   it("supports config-based loading with an asset factory", () => {

@@ -177,6 +177,13 @@ Current Direction 5 UI status:
   - apply-triggered execution/preview refresh through `DefaultDataAssetExecutionFramework`,
   - empty/loading/error/ready states rendered through existing preview panel patterns.
 
+- Dataset Studio ingestion authoring now uses shared registry discovery metadata in the same preview panel:
+  - ingestion asset selection is registry-driven (CSV/JSON/document/PDF/image/batch),
+  - source input mode controls (`in-memory`, `local-file`, `local-directory`) are rendered through shared field/form classes,
+  - schema-driven config remains in `AssetConfigurationPanel`,
+  - preview rendering reuses `DataPreviewPanel` / `DataPreviewSurface`,
+  - structured ingestion warnings/errors render from normalized ingestion issue contracts instead of raw exception text.
+
 Direction 5 Epic 11 final hardening status (stories 11.23-11.24):
 - UX consistency hardening now has shared policy/regression seams in `ui/routes/UxConsistencyPolicy.ts` and `ui/routes/IntentUxRegressionSuite.ts`, focused on intent-first terminology, taxonomy suppression in primary UX, and cross-surface route/origin continuity across Build/Explore/Run plus shell-adjacent surfaces.
 - Legacy UX cleanup is now explicitly policy-driven through `LegacyUxCleanupPlanner` in `ui/routes/LegacyNavigationSunset.ts`, keeping compatibility behavior tied to existing sunset controls instead of ad hoc route handling.

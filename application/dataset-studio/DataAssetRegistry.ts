@@ -46,11 +46,21 @@ export interface DataAssetRegistryCapabilities {
   readonly executable: boolean;
 }
 
+export interface DataAssetRegistryInspectabilityMetadata {
+  readonly supportedSourceKinds: ReadonlyArray<string>;
+  readonly supportedFileExtensions: ReadonlyArray<string>;
+  readonly supportedMediaTypes: ReadonlyArray<string>;
+  readonly keyConfigKeys: ReadonlyArray<string>;
+  readonly previewModes: ReadonlyArray<string>;
+  readonly executionModes: ReadonlyArray<string>;
+}
+
 export interface DataAssetRegistryDescriptor {
   readonly assetId: string;
   readonly versionId?: string;
   readonly version: DataAssetVersionDescriptor;
   readonly name: string;
+  readonly category: string;
   readonly taxonomy: CompositionTaxonomyDescriptor;
   readonly specialization: DataAssetRegistrySpecialization;
   readonly outputShapeKind: CanonicalDataShapeKind;
@@ -59,6 +69,7 @@ export interface DataAssetRegistryDescriptor {
   readonly contracts: DataAssetRegistryContractReferences;
   readonly capabilities: DataAssetRegistryCapabilities;
   readonly configSchema: DataAssetConfigSchema;
+  readonly inspectability: DataAssetRegistryInspectabilityMetadata;
 }
 
 export interface DataAssetRegistryEntry {
@@ -68,8 +79,10 @@ export interface DataAssetRegistryEntry {
 
 export interface RegisterDataAssetRequest {
   readonly asset: DataAssetBase;
+  readonly category?: string;
   readonly specialization?: DataAssetRegistrySpecialization;
   readonly display?: DataAssetRegistryDisplayMetadata;
+  readonly inspectability?: Partial<DataAssetRegistryInspectabilityMetadata>;
   readonly configSchema?: DataAssetConfigSchema;
   readonly configFields?: ReadonlyArray<DataAssetConfigFieldSchema>;
   readonly taxonomy?: CompositionTaxonomyDescriptor;
@@ -86,6 +99,7 @@ export interface ResolveDataAssetRequest extends DataAssetLookup {
 }
 
 export interface QueryDataAssets {
+  readonly category?: string;
   readonly specialization?: DataAssetRegistrySpecialization;
   readonly outputShapeKind?: CanonicalDataShapeKind;
   readonly previewable?: boolean;
@@ -106,6 +120,11 @@ function normalizeOptional(value?: string): string | undefined {
 
 function normalizeTags(tags?: ReadonlyArray<string>): ReadonlyArray<string> {
   const deduped = [...new Set((tags ?? []).map((entry) => entry.trim()).filter(Boolean))];
+  return Object.freeze(deduped);
+}
+
+function normalizeMetadataList(values?: ReadonlyArray<string>): ReadonlyArray<string> {
+  const deduped = [...new Set((values ?? []).map((entry) => entry.trim()).filter(Boolean))];
   return Object.freeze(deduped);
 }
 
@@ -131,17 +150,30 @@ function buildContractReferences(asset: DataAssetBase): DataAssetRegistryContrac
 
 function toDescriptor(input: {
   readonly asset: DataAssetBase;
+  readonly category: string;
   readonly specialization: DataAssetRegistrySpecialization;
   readonly display?: DataAssetRegistryDisplayMetadata;
+  readonly inspectability?: Partial<DataAssetRegistryInspectabilityMetadata>;
   readonly configSchema: DataAssetConfigSchema;
   readonly taxonomy: CompositionTaxonomyDescriptor;
 }): DataAssetRegistryDescriptor {
   const inspection = input.asset.inspect();
+  const inputShapeKind = inspection.metadata.contracts.input.kind;
+  const outputShapeKind = inspection.metadata.contracts.output.kind;
+  const inspectability = Object.freeze({
+    supportedSourceKinds: normalizeMetadataList(input.inspectability?.supportedSourceKinds),
+    supportedFileExtensions: normalizeMetadataList(input.inspectability?.supportedFileExtensions),
+    supportedMediaTypes: normalizeMetadataList(input.inspectability?.supportedMediaTypes),
+    keyConfigKeys: normalizeMetadataList(input.inspectability?.keyConfigKeys ?? inspection.metadata.configKeys),
+    previewModes: normalizeMetadataList(input.inspectability?.previewModes ?? ["preview"]),
+    executionModes: normalizeMetadataList(input.inspectability?.executionModes ?? ["execute"]),
+  } satisfies DataAssetRegistryInspectabilityMetadata);
   return Object.freeze({
     assetId: inspection.metadata.identity.assetId,
     versionId: inspection.metadata.identity.versionId,
     version: inspection.metadata.version,
     name: inspection.metadata.display.name,
+    category: input.category.trim() || "dataset",
     taxonomy: input.taxonomy,
     specialization: input.specialization,
     outputShapeKind: inspection.outputShapeKind,
@@ -154,6 +186,18 @@ function toDescriptor(input: {
     contracts: buildContractReferences(input.asset),
     capabilities: inspection.metadata.capabilities,
     configSchema: input.configSchema,
+    inspectability: Object.freeze({
+      ...inspectability,
+      previewModes: inspectability.previewModes.length > 0 ? inspectability.previewModes : Object.freeze(["preview"]),
+      executionModes: inspectability.executionModes.length > 0 ? inspectability.executionModes : Object.freeze(["execute"]),
+      keyConfigKeys: inspectability.keyConfigKeys.length > 0
+        ? inspectability.keyConfigKeys
+        : Object.freeze([
+          ...inspection.metadata.configKeys,
+          `input:${inputShapeKind}`,
+          `output:${outputShapeKind}`,
+        ]),
+    }),
   });
 }
 
@@ -185,8 +229,10 @@ export class DataAssetRegistry {
 
     const descriptor = toDescriptor({
       asset: input.asset,
+      category: normalizeOptional(input.category) ?? "dataset",
       specialization: input.specialization ?? DataAssetRegistrySpecializations.dataset,
       display: input.display,
+      inspectability: input.inspectability,
       configSchema,
       taxonomy: input.taxonomy ?? createDatasetStudioTaxonomy(),
     });
@@ -328,6 +374,10 @@ export class DataAssetRegistry {
   }
 
   private matchesQuery(entry: DataAssetRegistryEntry, query: QueryDataAssets): boolean {
+    if (query.category && entry.descriptor.category !== query.category) {
+      return false;
+    }
+
     if (query.specialization && entry.descriptor.specialization !== query.specialization) {
       return false;
     }

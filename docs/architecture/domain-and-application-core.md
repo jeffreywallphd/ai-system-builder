@@ -1312,3 +1312,14 @@ Explicitly later than this scope:
   - consistent structured failure issues for config/source/parse failures,
   - preview-time warning behavior (for example truncation and partial metadata availability).
 - Batch ingestion now propagates item-level structured normalized issues and exposes normalized batch preview envelopes with mixed-outcome/truncation warnings, preserving item-level error inspectability without leaking low-level exceptions.
+
+## Direction 5 update: Ingestion registry/discovery integration (stories 14.11-14.12)
+
+- Data Studio ingestion assets are now registered through one shared `DataAssetRegistry` catalog (`application/dataset-studio/DataStudioAssetRegistryCatalog.ts`) instead of panel-local ad hoc registration paths.
+- Registry descriptors for ingestion assets now expose inspectability/discovery metadata in addition to existing identity/version/contracts/config metadata:
+  - explicit category (`data-ingestion`),
+  - supported source kinds/extensions/media types,
+  - key config keys,
+  - preview and execution mode labels.
+- Registered ingestion set now includes CSV, JSON, document/PDF, image, and batch-ingestion framework assets through `registerDataStudioSampleAssets`.
+- Category + specialization registry filtering is now first-class for ingestion discovery (`category` query + existing specialization/capability filters), keeping discovery backend/application owned rather than UI-owned.

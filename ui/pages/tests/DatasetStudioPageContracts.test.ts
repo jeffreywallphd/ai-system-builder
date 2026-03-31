@@ -19,6 +19,8 @@ describe("DatasetStudioPage contracts", () => {
     expect(registrationSource).toContain("DatasetStudioDraftPreviewPanel");
     expect(registrationSource).toContain('id: "dataset-studio-data-preview-panel"');
     expect(previewPanelSource).toContain("AssetConfigurationPanel");
-    expect(previewPanelSource).toContain("DataAssetRegistry");
+    expect(previewPanelSource).toContain("getDataStudioAssetRegistry");
+    expect(previewPanelSource).toContain("Source Input");
+    expect(previewPanelSource).toContain("Ingestion Asset");
   });
 });

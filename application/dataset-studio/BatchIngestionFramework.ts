@@ -1,8 +1,10 @@
 /// <reference types="node" />
 import { promises as fs } from "node:fs";
 import { z } from "zod";
+import { AssetContractShapeKinds } from "../../domain/contracts/AssetContract";
+import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
+import { createCanonicalRecordsShape, type CanonicalDataShape, type CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
 import { DataPreviewEngine, type DataPreviewModel } from "../data-studio/DataPreviewEngine";
-import type { CanonicalDataShape } from "../../domain/dataset-studio/CanonicalDataShapes";
 import {
   DataConverterCore,
 } from "./DataConverterCore";
@@ -47,6 +49,11 @@ import {
   type SourceLocatorRequest,
   type SourceLocatorResolutionResult,
 } from "./SourceLocatorInputAbstraction";
+import {
+  DataAssetConfigFieldKinds,
+  createDataAssetConfigSchema,
+  type DataAssetConfigSchema,
+} from "./DataAssetConfiguration";
 
 export const BatchIngestionStrategyKinds = Object.freeze({
   routed: "routed",
@@ -177,6 +184,9 @@ export interface ExecuteBatchIngestionRequest {
 export interface PreviewBatchIngestionRequest extends ExecuteBatchIngestionRequest {
   readonly previewOnly?: boolean;
 }
+
+export const BatchIngestionAssetId = "batch-ingestion-framework";
+export const BatchIngestionAssetVersion = "1.0.0";
 
 function normalizeExtension(value?: string): string | undefined {
   const normalized = value?.trim().toLowerCase();
@@ -981,4 +991,105 @@ export class BatchIngestionFramework {
     }
     return fs.readFile(descriptor.normalizedReference, "utf-8");
   }
+}
+
+export function createBatchIngestionConfigSchema(assetId: string): DataAssetConfigSchema {
+  return createDataAssetConfigSchema({
+    schemaId: `data-asset.${assetId}.config`,
+    version: "1.0.0",
+    fields: Object.freeze([
+      {
+        key: "continueOnError",
+        label: "Continue on error",
+        kind: DataAssetConfigFieldKinds.boolean,
+        defaultValue: true,
+      },
+      {
+        key: "maxItems",
+        label: "Max items",
+        kind: DataAssetConfigFieldKinds.number,
+        min: 1,
+      },
+      {
+        key: "previewItemLimit",
+        label: "Preview item limit",
+        kind: DataAssetConfigFieldKinds.number,
+        defaultValue: 10,
+        min: 1,
+        max: 100,
+      },
+      {
+        key: "concurrency",
+        label: "Concurrency",
+        kind: DataAssetConfigFieldKinds.number,
+        min: 1,
+        max: 16,
+      },
+      {
+        key: "strategy",
+        label: "Strategy",
+        kind: DataAssetConfigFieldKinds.select,
+        defaultValue: BatchIngestionStrategyKinds.routed,
+        options: Object.freeze([
+          { value: BatchIngestionStrategyKinds.routed, label: "Auto route by source type" },
+          { value: BatchIngestionStrategyKinds.selected, label: "Use one ingestor" },
+        ]),
+      },
+      {
+        key: "selectedIngestor",
+        label: "Selected ingestor",
+        kind: DataAssetConfigFieldKinds.select,
+        defaultValue: BatchIngestorKinds.csv,
+        options: Object.freeze([
+          { value: BatchIngestorKinds.csv, label: "CSV" },
+          { value: BatchIngestorKinds.json, label: "JSON" },
+          { value: BatchIngestorKinds.documentPdf, label: "Document/PDF" },
+          { value: BatchIngestorKinds.image, label: "Image" },
+        ]),
+      },
+    ]),
+  });
+}
+
+export function createBatchIngestionDataAsset(
+  config: Readonly<Record<string, CanonicalRecordValue>>,
+): CanonicalDataAsset {
+  return new CanonicalDataAsset({
+    id: BatchIngestionAssetId,
+    name: "Batch Ingestion Framework",
+    version: BatchIngestionAssetVersion,
+    source: { type: "generated", workflowId: "dataset-studio-ingestors" },
+    location: { accessMethod: "virtual", location: "dataset://batch-ingestion-framework" },
+    outputShape: createCanonicalRecordsShape({
+      records: Object.freeze([]),
+      metadata: {
+        schemaVersion: "1.0.0",
+        source: {
+          format: "batch-ingestion",
+        },
+      },
+    }),
+    contracts: {
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Source locator requests plus strategy/shared batch ingestion configuration.",
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Batch summary records and canonical outputs from routed ingestion.",
+      },
+    },
+    config,
+    versionMetadata: {
+      schemaVersion: "1.0.0",
+      contractVersion: "1.0.0",
+      revision: 1,
+      publishedVersionId: BatchIngestionAssetVersion,
+    },
+    semanticMetadata: {
+      description: "First-class batch ingestion asset for mixed-source ingestion preview and execution.",
+      tags: ["dataset", "ingestion", "batch", "orchestration"],
+    },
+  });
 }
