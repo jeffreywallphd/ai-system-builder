@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DataPreviewModel } from "../../../application/data-studio/DataPreviewEngine";
-import { DataPreviewEngine } from "../../../application/data-studio/DataPreviewEngine";
 import { BatchIngestionAssetId, BatchIngestionFramework, BatchIngestionStrategyKinds, BatchIngestorKinds } from "../../../application/dataset-studio/BatchIngestionFramework";
 import { resolveDataAssetConfigDefaults } from "../../../application/dataset-studio/DataAssetConfiguration";
 import { type DataAssetExecutionResult, DefaultDataAssetExecutionFramework } from "../../../application/dataset-studio/DataAssetExecutionFramework";
@@ -21,6 +20,7 @@ import { JsonIngestorAsset } from "../../../application/dataset-studio/JsonInges
 import { resolveUnifiedIngestionConfiguration } from "../../../application/dataset-studio/UnifiedIngestionConfiguration";
 import { UnifiedIngestionOrchestrationService } from "../../../application/dataset-studio/UnifiedIngestionOrchestrationService";
 import { UnifiedIngestionAssetId } from "../../../application/dataset-studio/UnifiedIngestionAsset";
+import type { UnifiedIngestionPreviewSuccessResult } from "../../../application/dataset-studio/UnifiedIngestionPreviewService";
 import { SourceInputKinds } from "../../../application/dataset-studio/SourceLocatorInputAbstraction";
 import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
 import { UnifiedIngestionReferenceKinds } from "../../../domain/dataset-studio/UnifiedIngestionDomain";
@@ -162,7 +162,6 @@ export default function DatasetStudioDraftPreviewPanel({
   }), [registry]);
 
   const executionFramework = useMemo(() => new DefaultDataAssetExecutionFramework(), []);
-  const previewEngine = useMemo(() => new DataPreviewEngine(), []);
   const unifiedIngestionService = useMemo(() => new UnifiedIngestionOrchestrationService(), []);
   const documentIngestor = useMemo(() => new DocumentPdfIngestorAsset(), []);
   const imageIngestor = useMemo(() => new ImageIngestorAsset(), []);
@@ -185,13 +184,7 @@ export default function DatasetStudioDraftPreviewPanel({
     [entries, selectedAssetId],
   );
   const [unifiedMode, setUnifiedMode] = useState<AssetConfigurationMode>("simple");
-  const [unifiedDetectionSummary, setUnifiedDetectionSummary] = useState<{
-    readonly detectedKind: string;
-    readonly confidence: string;
-    readonly routePolicy?: string;
-    readonly routeAssetId?: string;
-    readonly routeHandler?: string;
-  } | undefined>();
+  const [unifiedPreviewSummary, setUnifiedPreviewSummary] = useState<UnifiedIngestionPreviewSuccessResult | undefined>();
 
   const supportedSourceModes = useMemo(() => resolveSourceModes(selectedEntry), [selectedEntry]);
   const [sourceMode, setSourceMode] = useState<SourceMode>(supportedSourceModes[0] ?? "in-memory");
@@ -263,7 +256,7 @@ export default function DatasetStudioDraftPreviewPanel({
         if (hasErrorIssues(issues)) {
           setExecutionResult(undefined);
           setPreviewModel(undefined);
-          setUnifiedDetectionSummary(undefined);
+          setUnifiedPreviewSummary(undefined);
           setPreviewIssues(Object.freeze([]));
           return;
         }
@@ -272,7 +265,7 @@ export default function DatasetStudioDraftPreviewPanel({
           if (sourceMode === "local-directory") {
             setExecutionResult(undefined);
             setPreviewModel(undefined);
-            setUnifiedDetectionSummary(undefined);
+            setUnifiedPreviewSummary(undefined);
             setPreviewIssues(Object.freeze([Object.freeze({
               code: "unified-ingestion-source-mode-invalid",
               section: DataStudioValidationSections.executionRequest,
@@ -287,7 +280,7 @@ export default function DatasetStudioDraftPreviewPanel({
           if (sourceMode === "local-file" && !normalizedReference) {
             setExecutionResult(undefined);
             setPreviewModel(undefined);
-            setUnifiedDetectionSummary(undefined);
+            setUnifiedPreviewSummary(undefined);
             setPreviewIssues(Object.freeze([Object.freeze({
               code: "unified-ingestion-source-path-missing",
               section: DataStudioValidationSections.executionRequest,
@@ -301,7 +294,7 @@ export default function DatasetStudioDraftPreviewPanel({
           if (sourceMode === "in-memory" && !String(sourcePayload).trim()) {
             setExecutionResult(undefined);
             setPreviewModel(undefined);
-            setUnifiedDetectionSummary(undefined);
+            setUnifiedPreviewSummary(undefined);
             setPreviewIssues(Object.freeze([Object.freeze({
               code: "unified-ingestion-source-payload-missing",
               section: DataStudioValidationSections.executionRequest,
@@ -319,7 +312,7 @@ export default function DatasetStudioDraftPreviewPanel({
           if (configurationResolution.issues.some((issue) => issue.severity === "error")) {
             setExecutionResult(undefined);
             setPreviewModel(undefined);
-            setUnifiedDetectionSummary(undefined);
+            setUnifiedPreviewSummary(undefined);
             setPreviewIssues(Object.freeze(configurationResolution.issues.map((issue) => Object.freeze({
               code: issue.code,
               section: DataStudioValidationSections.executionRequest,
@@ -339,7 +332,7 @@ export default function DatasetStudioDraftPreviewPanel({
             displayName: sourceMode === "local-file" ? normalizedReference.split(/[\\/]/).at(-1) : undefined,
             extension: sourceMode === "local-file" ? toExtensionFromReference(normalizedReference) : undefined,
           });
-          const ingestionResult = await unifiedIngestionService.ingest({
+          const ingestionResult = await unifiedIngestionService.ingestWithPreview({
             source: unifiedSource,
             payload: sourceMode === "in-memory" ? sourcePayload : undefined,
             configuration: configurationResolution.configuration,
@@ -356,37 +349,19 @@ export default function DatasetStudioDraftPreviewPanel({
           if (!ingestionResult.ok) {
             setExecutionResult(undefined);
             setPreviewModel(undefined);
-            setUnifiedDetectionSummary(ingestionResult.detection
-              ? Object.freeze({
-                detectedKind: ingestionResult.detection.detectedKind,
-                confidence: ingestionResult.detection.confidence,
-              })
-              : undefined);
+            setUnifiedPreviewSummary(undefined);
             setPreviewIssues(toUnifiedIngestionIssues(ingestionResult.issues));
             return;
           }
 
-          const preview = previewEngine.buildFromCanonicalShape(ingestionResult.output, {
-            maxItems: typeof configurationResolution.configuration.previewSampleLimit === "number"
-              ? configurationResolution.configuration.previewSampleLimit
-              : 25,
-            maxColumns: 12,
-            maxTextLength: 320,
-          });
           setExecutionResult(undefined);
-          setPreviewModel(preview);
-          setUnifiedDetectionSummary(Object.freeze({
-            detectedKind: ingestionResult.detection.detectedKind,
-            confidence: ingestionResult.detection.confidence,
-            routePolicy: ingestionResult.route.policy,
-            routeAssetId: ingestionResult.route.assetId,
-            routeHandler: ingestionResult.route.handlerKind,
-          }));
-          setPreviewIssues(toUnifiedIngestionIssues(ingestionResult.issues));
+          setPreviewModel(ingestionResult.preview.preview);
+          setUnifiedPreviewSummary(ingestionResult.preview);
+          setPreviewIssues(toUnifiedIngestionIssues(ingestionResult.preview.issues));
           return;
         }
 
-        setUnifiedDetectionSummary(undefined);
+        setUnifiedPreviewSummary(undefined);
 
         if (selectedAssetId === CsvIngestorAsset.assetId || selectedAssetId === JsonIngestorAsset.assetId) {
           if (sourceMode === "local-directory") {
@@ -690,7 +665,6 @@ export default function DatasetStudioDraftPreviewPanel({
     draftId,
     executionFramework,
     imageIngestor,
-    previewEngine,
     registry,
     schema,
     selectedAssetId,
@@ -879,22 +853,48 @@ export default function DatasetStudioDraftPreviewPanel({
         onApply={handleApplyConfig}
       />
 
-      {selectedAssetId === UnifiedIngestionAssetId && unifiedDetectionSummary ? (
+      {selectedAssetId === UnifiedIngestionAssetId && unifiedPreviewSummary ? (
         <section className="ui-card ui-card--padded ui-stack ui-stack--xs" data-testid="dataset-preview-unified-detection-summary">
-          <strong>Detected Source</strong>
-          <div className="ui-row ui-row--wrap">
-            <span className="ui-badge ui-badge--neutral">{unifiedDetectionSummary.detectedKind}</span>
-            <span className="ui-badge ui-badge--neutral">{unifiedDetectionSummary.confidence} confidence</span>
-            {unifiedDetectionSummary.routeHandler ? (
-              <span className="ui-badge ui-badge--neutral">handler: {unifiedDetectionSummary.routeHandler}</span>
-            ) : null}
-            {unifiedDetectionSummary.routePolicy ? (
-              <span className="ui-badge ui-badge--neutral">policy: {unifiedDetectionSummary.routePolicy}</span>
-            ) : null}
+          <strong>Unified Preview Summary</strong>
+          <div className="ui-meta-grid">
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Output kind</div>
+              <div className="ui-meta-value">{unifiedPreviewSummary.outputKind}</div>
+            </div>
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Rows/items</div>
+              <div className="ui-meta-value">{unifiedPreviewSummary.summary.sampleCount} / {unifiedPreviewSummary.summary.totalCount}</div>
+            </div>
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Detected kind</div>
+              <div className="ui-meta-value">{unifiedPreviewSummary.detectionSummary.detectedKind}</div>
+            </div>
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Route handler</div>
+              <div className="ui-meta-value">{unifiedPreviewSummary.routeSummary.handlerKind}</div>
+            </div>
           </div>
-          {unifiedDetectionSummary.routeAssetId ? (
-            <span className="ui-subtle">Route asset: {unifiedDetectionSummary.routeAssetId}</span>
-          ) : null}
+          <div className="ui-row ui-row--wrap">
+            <span className="ui-badge ui-badge--neutral">{unifiedPreviewSummary.detectionSummary.confidence} confidence</span>
+            <span className="ui-badge ui-badge--neutral">policy: {unifiedPreviewSummary.routeSummary.policy}</span>
+            {unifiedPreviewSummary.summary.truncated ? <span className="ui-badge ui-badge--warning">sampled</span> : null}
+          </div>
+          <span className="ui-subtle">Route asset: {unifiedPreviewSummary.routeSummary.assetId}</span>
+          <details>
+            <summary className="ui-text-small">Diagnostics and Samples</summary>
+            <div className="ui-stack ui-stack--xs">
+              {unifiedPreviewSummary.samples.length > 0 ? (
+                <pre className="ui-text-mono">{JSON.stringify(unifiedPreviewSummary.samples, null, 2)}</pre>
+              ) : (
+                <span className="ui-subtle">No preview samples available.</span>
+              )}
+              {unifiedPreviewSummary.issues.length > 0 ? (
+                <pre className="ui-text-mono">{JSON.stringify(unifiedPreviewSummary.issues, null, 2)}</pre>
+              ) : (
+                <span className="ui-subtle">No preview issues.</span>
+              )}
+            </div>
+          </details>
         </section>
       ) : null}
 

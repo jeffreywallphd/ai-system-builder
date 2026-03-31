@@ -1,4 +1,4 @@
-import type { CanonicalDataShapeKind } from "./CanonicalDataShapes";
+import type { CanonicalDataShape, CanonicalDataShapeKind } from "./CanonicalDataShapes";
 
 export const UnifiedIngestionContractVersion = "1.0.0";
 
@@ -86,6 +86,10 @@ export const UnifiedIngestionIssueCodes = Object.freeze({
   ingestionFailed: "ingestion-failed",
   conversionFailed: "conversion-failed",
   sourceReadFailed: "source-read-failed",
+  normalizationFailed: "normalization-failed",
+  previewGenerationFailed: "preview-generation-failed",
+  emptyNormalizedOutput: "empty-normalized-output",
+  partialNormalizedOutput: "partial-normalized-output",
 } as const);
 
 export type UnifiedIngestionIssueCode = typeof UnifiedIngestionIssueCodes[keyof typeof UnifiedIngestionIssueCodes];
@@ -189,6 +193,38 @@ export interface UnifiedIngestionIssue {
   readonly message: string;
   readonly sourceId?: string;
   readonly details?: Readonly<Record<string, unknown>>;
+}
+
+export const UnifiedIngestionNormalizationVersion = "1.0.0";
+
+export interface UnifiedIngestionNormalizedOutput {
+  readonly contractVersion: typeof UnifiedIngestionContractVersion;
+  readonly normalizationVersion: typeof UnifiedIngestionNormalizationVersion;
+  readonly canonicalOutputKind: CanonicalDataShapeKind;
+  readonly normalizedPayload: CanonicalDataShape;
+  readonly metadata: {
+    readonly outputTarget: UnifiedIngestionOutputTargetKind;
+    readonly configurationMode: UnifiedIngestionConfigMode;
+    readonly sourceId: string;
+    readonly sourceReference: string;
+    readonly sourceAssetId?: string;
+    readonly sourceVersionId?: string;
+    readonly totalCount: number;
+    readonly isEmpty: boolean;
+  };
+  readonly detectionSummary: {
+    readonly detectedKind: UnifiedIngestionSourceKind;
+    readonly confidence: UnifiedIngestionDetectionConfidenceLevel;
+    readonly evidenceCount: number;
+  };
+  readonly routeSummary: {
+    readonly handlerKind: UnifiedIngestionRouteHandlerKind;
+    readonly assetId: string;
+    readonly assetVersion?: string;
+    readonly policy: UnifiedIngestionRoutePolicyKind;
+    readonly fallbackUsed: boolean;
+  };
+  readonly warnings: ReadonlyArray<UnifiedIngestionIssue>;
 }
 
 export interface UnifiedIngestionExecutionSuccess {

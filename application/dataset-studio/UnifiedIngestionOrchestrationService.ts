@@ -10,6 +10,7 @@ import {
   type IUnifiedIngestionSourceTypeDetector,
   type UnifiedIngestionConfiguration,
   type UnifiedIngestionIssue,
+  type UnifiedIngestionNormalizedOutput,
   type UnifiedIngestionRouteResolution,
   type UnifiedIngestionSourceReference,
 } from "../../domain/dataset-studio/UnifiedIngestionDomain";
@@ -25,6 +26,13 @@ import { DocumentPdfIngestorAsset, type DocumentPdfIngestorExecutionResult } fro
 import { ImageIngestorAsset, type ImageIngestorExecutionResult } from "./ImageIngestorAsset";
 import { JsonIngestorAsset, type JsonIngestorExecutionResult } from "./JsonIngestorAsset";
 import { resolveUnifiedIngestionConfiguration } from "./UnifiedIngestionConfiguration";
+import {
+  UnifiedIngestionNormalizationPipeline,
+} from "./UnifiedIngestionNormalizationPipeline";
+import {
+  UnifiedIngestionPreviewService,
+  type UnifiedIngestionPreviewSuccessResult,
+} from "./UnifiedIngestionPreviewService";
 import { createUnifiedIngestionRoutingService } from "./UnifiedIngestionRoutingService";
 import { createUnifiedSourceTypeDetectionService } from "./UnifiedSourceTypeDetectionService";
 
@@ -48,6 +56,7 @@ export interface UnifiedIngestionSuccessResult {
   readonly detection: Awaited<ReturnType<IUnifiedIngestionSourceTypeDetector["detect"]>>;
   readonly route: UnifiedIngestionRouteResolution;
   readonly output: CanonicalDataShape;
+  readonly normalized: UnifiedIngestionNormalizedOutput;
   readonly conversion: {
     readonly operation: DataConverterSuccessResult["operation"];
     readonly inputBoundary: DataConverterSuccessResult["contract"]["inputBoundary"];
@@ -59,13 +68,19 @@ export interface UnifiedIngestionFailureResult {
   readonly contractVersion: typeof UnifiedIngestionContractVersion;
   readonly ok: false;
   readonly source: UnifiedIngestionSourceReference;
-  readonly stage: "configuration" | "source-read" | "detection" | "routing" | "ingestion" | "conversion";
+  readonly stage: "configuration" | "source-read" | "detection" | "routing" | "ingestion" | "conversion" | "normalization" | "preview";
   readonly detection?: Awaited<ReturnType<IUnifiedIngestionSourceTypeDetector["detect"]>>;
   readonly route?: UnifiedIngestionRouteResolution;
   readonly issues: ReadonlyArray<UnifiedIngestionIssue>;
 }
 
 export type UnifiedIngestionResult = UnifiedIngestionSuccessResult | UnifiedIngestionFailureResult;
+
+export interface UnifiedIngestionPreviewSuccess extends UnifiedIngestionSuccessResult {
+  readonly preview: UnifiedIngestionPreviewSuccessResult;
+}
+
+export type UnifiedIngestionPreviewResult = UnifiedIngestionPreviewSuccess | UnifiedIngestionFailureResult;
 
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
@@ -120,6 +135,8 @@ export class UnifiedIngestionOrchestrationService {
   private readonly jsonIngestor: JsonIngestorAsset;
   private readonly documentIngestor: DocumentPdfIngestorAsset;
   private readonly imageIngestor: ImageIngestorAsset;
+  private readonly normalizationPipeline: UnifiedIngestionNormalizationPipeline;
+  private readonly previewService: UnifiedIngestionPreviewService;
 
   constructor(options?: {
     readonly detector?: IUnifiedIngestionSourceTypeDetector;
@@ -129,6 +146,8 @@ export class UnifiedIngestionOrchestrationService {
     readonly jsonIngestor?: JsonIngestorAsset;
     readonly documentIngestor?: DocumentPdfIngestorAsset;
     readonly imageIngestor?: ImageIngestorAsset;
+    readonly normalizationPipeline?: UnifiedIngestionNormalizationPipeline;
+    readonly previewService?: UnifiedIngestionPreviewService;
   }) {
     this.detector = options?.detector ?? createUnifiedSourceTypeDetectionService();
     this.router = options?.router ?? createUnifiedIngestionRoutingService();
@@ -137,6 +156,8 @@ export class UnifiedIngestionOrchestrationService {
     this.jsonIngestor = options?.jsonIngestor ?? new JsonIngestorAsset();
     this.documentIngestor = options?.documentIngestor ?? new DocumentPdfIngestorAsset();
     this.imageIngestor = options?.imageIngestor ?? new ImageIngestorAsset();
+    this.normalizationPipeline = options?.normalizationPipeline ?? new UnifiedIngestionNormalizationPipeline();
+    this.previewService = options?.previewService ?? new UnifiedIngestionPreviewService();
   }
 
   public async ingest(request: UnifiedIngestionRequest): Promise<UnifiedIngestionResult> {
@@ -277,6 +298,25 @@ export class UnifiedIngestionOrchestrationService {
     }
 
     const outputTarget = mapRouteKindToOutputTarget(route, configuration);
+    const normalization = this.normalizationPipeline.normalize({
+      source: request.source,
+      detection,
+      route,
+      outputTarget,
+      configurationMode: configuration.mode,
+      output: conversion.result.output,
+    });
+    if (!normalization.ok) {
+      return Object.freeze({
+        contractVersion: UnifiedIngestionContractVersion,
+        ok: false,
+        source: request.source,
+        stage: "normalization",
+        detection,
+        route,
+        issues: normalization.issues,
+      });
+    }
     return Object.freeze({
       contractVersion: UnifiedIngestionContractVersion,
       ok: true,
@@ -284,21 +324,47 @@ export class UnifiedIngestionOrchestrationService {
       outputTarget,
       detection,
       route,
-      output: conversion.result.output,
+      output: normalization.normalized.normalizedPayload,
+      normalized: normalization.normalized,
       conversion: Object.freeze({
         operation: conversion.result.operation,
         inputBoundary: conversion.result.contract.inputBoundary,
       }),
-      issues: Object.freeze(route.fallbackUsed ? [buildIssue({
-        code: UnifiedIngestionIssueCodes.routingUnsupported,
-        severity: UnifiedIngestionIssueSeverities.warning,
-        sourceId: request.source.sourceId,
-        message: route.reason,
-        details: Object.freeze({
-          fallbackUsed: true,
-          policy: route.policy,
-        }),
-      })] : []),
+      issues: normalization.issues,
+    });
+  }
+
+  public async ingestWithPreview(request: UnifiedIngestionRequest): Promise<UnifiedIngestionPreviewResult> {
+    const ingestion = await this.ingest(request);
+    if (!ingestion.ok) {
+      return ingestion;
+    }
+
+    const resolvedConfiguration = resolveUnifiedIngestionConfiguration({
+      mode: request.configuration?.mode,
+      base: request.configuration,
+    });
+    const preview = this.previewService.generate({
+      source: ingestion.source,
+      normalized: ingestion.normalized,
+      issues: ingestion.issues,
+      sampleLimit: resolvedConfiguration.configuration.previewSampleLimit,
+    });
+    if (!preview.ok) {
+      return Object.freeze({
+        contractVersion: UnifiedIngestionContractVersion,
+        ok: false,
+        source: ingestion.source,
+        stage: "preview",
+        detection: ingestion.detection,
+        route: ingestion.route,
+        issues: preview.issues,
+      });
+    }
+
+    return Object.freeze({
+      ...ingestion,
+      preview,
     });
   }
 
