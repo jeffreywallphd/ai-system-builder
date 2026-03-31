@@ -217,4 +217,28 @@ describe("WorkflowRunHistoryService", () => {
       },
     })).rejects.toBeInstanceOf(WorkflowRunHistoryNotFoundError);
   });
+
+  it("captures rerun lineage mode and reason from execution input parameters", async () => {
+    const repository = new InMemoryWorkflowRunSummaryRepository();
+    const service = new WorkflowRunHistoryService(repository, () => new Date("2026-03-31T00:00:00.000Z"));
+
+    const started = await service.recordRunStarted({
+      runId: "run:rerun-lineage",
+      input: {
+        workflow: {
+          id: "workflow:rerun",
+          metadata: { name: "Workflow Rerun" },
+        },
+        parameters: {
+          parentRunId: "run:source-1",
+          rerunMode: "edited",
+          rerunReason: "Updated input constraints",
+        },
+      } as never,
+    });
+
+    expect(started.correlation.parentRunId).toBe("run:source-1");
+    expect(started.correlation.rerunMode).toBe("edited");
+    expect(started.correlation.rerunReason).toBe("Updated input constraints");
+  });
 });

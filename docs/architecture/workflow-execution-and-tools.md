@@ -482,3 +482,7 @@ Audit schema now records administrative approval transitions plus decision denia
 - Epic 12 stories 12.7-12.8 now extend that same canonical run-history surface (without introducing a separate observability subsystem):
   - run detail includes ordered step inspection with expandable per-step status/timing/input-output/error summaries sourced directly from persisted `stepRuns`;
   - run summaries/details now include structured diagnostics (category/severity/scope/location/summary/detail/remediation), and run list/detail present failure-location cues from those diagnostics.
+- Epic 12 stories 12.9-12.10 now extend that same canonical run-history surface for iteration loops:
+  - rerun and edit-and-rerun launch new execution instances from persisted historical execution context (never by mutating historical runs);
+  - derived runs persist explicit lineage metadata (`parentRunId`, `rerunMode`, optional `rerunReason`) so related-run queries and UI projections stay deterministic;
+  - edit-and-rerun starts from historical context, applies bounded user overrides before launch, and persists the final merged execution context on the new run detail record.

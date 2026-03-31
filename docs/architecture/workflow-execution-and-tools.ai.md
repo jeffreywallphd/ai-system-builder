@@ -121,6 +121,10 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
 - Epic 12 stories 12.7-12.8 now extend that same contract surface (no parallel observability model):
   - run detail includes ordered step inspection with expandable per-step status/timing/input-output/error summaries sourced from persisted `stepRuns`;
   - run summaries/details now carry structured diagnostics (category/severity/scope/location/summary/detail/remediation), and run list/detail render failure-location cues from those canonical diagnostics.
+- Epic 12 stories 12.9-12.10 now extend the same canonical run-history model for workflow improvement loops:
+  - rerun and edit-and-rerun launch new execution instances from persisted historical execution context (not by mutating historical records);
+  - reruns persist lineage metadata on the new run (`parentRunId`, `rerunMode`, optional `rerunReason`) so run relationships remain queryable in list/detail read models;
+  - edited reruns reuse historical context as the starting point, allow bounded input/config overrides before launch, and persist the final merged execution context on the derived run detail record.
 
 ## What is not migrated yet
 - Broader MCP tool/discovery orchestration, scheduling, and distributed execution are still outside this slice even though plan-backed workflow runs, dataset generation runs, model-preparation runs, truthful local model-training runs, and narrow MCP server-operation runs are now durable.

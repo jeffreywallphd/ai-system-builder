@@ -39,14 +39,27 @@ import {
 } from "../../../application/workflow-persistence/WorkflowPersistenceErrors";
 import { WorkflowLifecycleStates, deserializeWorkflowDraft } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
+  createWorkflowRunDetailRecord,
+  createWorkflowRunSummaryRecord,
+  deriveWorkflowRunDiagnostics,
+  createWorkflowStepRunStats,
+  WorkflowRunStatuses,
+  WorkflowRunRerunModes,
   WorkflowRunDiagnosticScopes,
   type WorkflowRunDetailRecord,
   type WorkflowRunDiagnosticRecord,
+  type WorkflowRunExecutionContextRecord,
+  type WorkflowRunOutputRecord,
+  type WorkflowStepRunRecord,
   type WorkflowRunStatus,
   type WorkflowRunSummaryRecord,
   type WorkflowRunTriggerSource,
 } from "../../../domain/workflow-studio/WorkflowRunHistoryDomain";
 import { WorkflowExecutionTriggerSourceKinds, type WorkflowExecutionTriggerSourceKind } from "../../../application/workflow-studio/WorkflowExecutionAlignmentContracts";
+import type {
+  RunWorkflowDraftManualResult,
+  WorkflowExecutionFailureDetail,
+} from "../../../application/workflow-studio/WorkflowStudioApplicationService";
 
 export interface StudioShellApiError {
   readonly code:
@@ -269,6 +282,38 @@ export interface ListWorkflowStudioRunsRequest {
   readonly limit?: number;
 }
 
+export interface WorkflowRunRerunOverrides {
+  readonly target?: Readonly<Record<string, unknown>>;
+  readonly parameters?: Readonly<Record<string, unknown>>;
+  readonly executionMetadata?: Readonly<Record<string, unknown>>;
+  readonly propertyOverrides?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  readonly triggerSource?: WorkflowRunTriggerSource;
+  readonly triggerActivation?: {
+    readonly triggerId?: string;
+    readonly sourceKind?: WorkflowExecutionTriggerSourceKind;
+    readonly triggerType?: string;
+    readonly activationType?: string;
+    readonly payload?: Readonly<Record<string, unknown>>;
+  };
+}
+
+export interface StartWorkflowRunRerunRequest {
+  readonly sourceRunId: string;
+  readonly mode?: "as-is" | "edited";
+  readonly rerunReason?: string;
+  readonly overrides?: WorkflowRunRerunOverrides;
+}
+
+export interface WorkflowRunRerunLaunchReadModel {
+  readonly sourceRunId: string;
+  readonly runId: string;
+  readonly mode: "as-is" | "edited";
+  readonly status: WorkflowRunStatus;
+  readonly executionId: string;
+  readonly launchStatus: "blocked" | "launched" | "failed";
+  readonly failureMessage?: string;
+}
+
 export interface WorkflowRunFailureLocationReadModel {
   readonly scope: "workflow" | "step";
   readonly stepId?: string;
@@ -306,6 +351,8 @@ export interface WorkflowRunSummaryReadModel {
   readonly executionFlowId?: string;
   readonly triggerEventId?: string;
   readonly parentRunId?: string;
+  readonly rerunMode?: "as-is" | "edited";
+  readonly rerunReason?: string;
   readonly stepRunStats?: WorkflowRunSummaryRecord["stepRunStats"];
   readonly diagnostics?: ReadonlyArray<WorkflowRunDiagnosticReadModel>;
   readonly primaryDiagnostic?: WorkflowRunDiagnosticReadModel;
@@ -332,12 +379,17 @@ export class StudioShellBackendApi {
   private readonly duplicatePersistedWorkflowUseCase?: DuplicatePersistedWorkflowUseCase;
   private readonly listWorkflowRunSummariesUseCase?: ListWorkflowRunSummariesUseCase;
   private readonly getWorkflowRunDetailUseCase?: GetWorkflowRunDetailUseCase;
+  private readonly workflowRunSummaryRepository?: IWorkflowRunSummaryRepository;
+  private readonly now: () => Date;
 
   constructor(
     private readonly repository: IStudioShellRepository,
     workflowPersistenceRepository?: IWorkflowPersistenceRepository,
     workflowRunSummaryRepository?: IWorkflowRunSummaryRepository,
+    now: () => Date = () => new Date(),
   ) {
+    this.now = now;
+    this.workflowRunSummaryRepository = workflowRunSummaryRepository;
     this.service = new DefaultStudioShellApplicationService(repository);
     this.workflowStudioService = new WorkflowStudioApplicationService(
       this.service,
@@ -673,6 +725,178 @@ export class StudioShellBackendApi {
     });
   }
 
+  public async startWorkflowRunRerun(
+    request: StartWorkflowRunRerunRequest,
+  ): Promise<StudioShellApiResponse<WorkflowRunRerunLaunchReadModel>> {
+    return this.wrap(async () => {
+      if (!this.getWorkflowRunDetailUseCase || !this.workflowRunSummaryRepository) {
+        throw new StudioShellInvalidRequestError("Workflow run history integration is unavailable.");
+      }
+      if (!this.getPersistedWorkflowUseCase) {
+        throw new StudioShellInvalidRequestError("Workflow persistence integration is unavailable.");
+      }
+
+      const sourceRunId = request.sourceRunId?.trim();
+      if (!sourceRunId) {
+        throw new StudioShellInvalidRequestError("sourceRunId is required.");
+      }
+
+      const sourceDetail = await this.getWorkflowRunDetailUseCase.execute(sourceRunId);
+      if (!sourceDetail) {
+        throw new WorkflowPersistenceError(
+          WorkflowPersistenceErrorCodes.notFound,
+          `Workflow run '${sourceRunId}' was not found.`,
+        );
+      }
+
+      const sourceExecutionInputRaw = this.assertRecord(
+        sourceDetail.executionContext?.executionInput,
+        "Workflow run execution context is unavailable for rerun.",
+      );
+      const persistedWorkflow = await this.getPersistedWorkflowUseCase.execute(sourceDetail.summary.workflow.workflowId);
+      if (!persistedWorkflow) {
+        throw new WorkflowPersistenceError(
+          WorkflowPersistenceErrorCodes.notFound,
+          `Persisted workflow '${sourceDetail.summary.workflow.workflowId}' was not found for rerun.`,
+        );
+      }
+
+      const mode = request.mode === WorkflowRunRerunModes.edited
+        ? WorkflowRunRerunModes.edited
+        : WorkflowRunRerunModes.asIs;
+      const rerunReason = request.rerunReason?.trim() || undefined;
+      const baseTarget = this.toOptionalRecord(sourceExecutionInputRaw.target);
+      const baseParameters = this.toOptionalRecord(sourceExecutionInputRaw.parameters) ?? Object.freeze({});
+      const baseExecutionMetadata = this.toOptionalRecord(sourceExecutionInputRaw.executionMetadata);
+      const basePropertyOverrides = this.toOptionalNestedRecord(sourceExecutionInputRaw.propertyOverrides);
+
+      const overrides = request.overrides;
+      const mergedTarget = overrides?.target ?? baseTarget;
+      const mergedParameters = Object.freeze({
+        ...baseParameters,
+        ...(overrides?.parameters ?? {}),
+        parentRunId: sourceRunId,
+        rerunMode: mode,
+        rerunReason,
+      } satisfies Readonly<Record<string, unknown>>);
+      const mergedExecutionMetadata = Object.freeze({
+        ...(baseExecutionMetadata ?? {}),
+        ...(overrides?.executionMetadata ?? {}),
+      } satisfies Readonly<Record<string, unknown>>);
+      const mergedPropertyOverrides = Object.freeze({
+        ...(basePropertyOverrides ?? {}),
+        ...(overrides?.propertyOverrides ?? {}),
+      } satisfies Readonly<Record<string, Readonly<Record<string, unknown>>>>);
+
+      const historicalTriggerContext = this.toOptionalRecord(sourceDetail.executionContext?.resolvedTriggerContext);
+      const triggerActivationRecord = this.toOptionalRecord(historicalTriggerContext?.triggerActivation);
+      const triggerEntry = Object.freeze({
+        sourceKind: overrides?.triggerActivation?.sourceKind
+          ?? this.toTriggerSourceKind(overrides?.triggerSource ?? sourceDetail.summary.triggerSource),
+        triggerId: this.toOptionalString(overrides?.triggerActivation?.triggerId)
+          ?? this.toOptionalString(triggerActivationRecord?.triggerId),
+        triggerType: this.toOptionalString(overrides?.triggerActivation?.triggerType)
+          ?? this.toOptionalString(triggerActivationRecord?.triggerType),
+        activationType: this.toOptionalString(overrides?.triggerActivation?.activationType)
+          ?? this.toOptionalString(triggerActivationRecord?.activationType),
+        payload: this.toOptionalRecord(overrides?.triggerActivation?.payload)
+          ?? this.toOptionalRecord(triggerActivationRecord?.payload),
+      });
+
+      const runResult = await this.workflowStudioService.runWorkflowDraftTriggered({
+        content: persistedWorkflow.definition.serializedDraft,
+        trigger: triggerEntry,
+        context: {
+          inputValues: this.inferInputValues(mergedParameters),
+          triggerActivation: triggerEntry.triggerId
+            ? {
+              triggerId: triggerEntry.triggerId,
+              sourceKind: triggerEntry.sourceKind,
+              triggerType: triggerEntry.triggerType,
+              activationType: triggerEntry.activationType,
+              payload: triggerEntry.payload,
+            }
+            : undefined,
+          metadata: mergedExecutionMetadata,
+        },
+      });
+
+      const rerunRunId = this.createRerunRunId(sourceDetail.summary.workflow.workflowId);
+      const rerunStepRuns = this.toRerunStepRuns(runResult);
+      const diagnostics = this.toRerunDiagnostics(runResult, rerunStepRuns);
+      const startedAt = runResult.executionStatus.transitions[0]?.occurredAt ?? this.now().toISOString();
+      const terminalAt = runResult.executionStatus.state === WorkflowRunStatuses.running
+        ? undefined
+        : runResult.executionStatus.transitions[runResult.executionStatus.transitions.length - 1]?.occurredAt
+          ?? this.now().toISOString();
+      const status = this.toRerunWorkflowStatus(runResult);
+
+      const summary = createWorkflowRunSummaryRecord({
+        runId: rerunRunId,
+        status,
+        triggerSource: overrides?.triggerSource ?? sourceDetail.summary.triggerSource,
+        workflow: sourceDetail.summary.workflow,
+        correlation: {
+          executionRunId: rerunRunId,
+          workflowExecutionId: runResult.executionStatus.executionId,
+          executionFlowId: sourceDetail.summary.correlation.executionFlowId,
+          triggerEventId: sourceDetail.summary.correlation.triggerEventId,
+          parentRunId: sourceRunId,
+          rerunMode: mode,
+          rerunReason,
+        },
+        timestamps: {
+          startedAt,
+          endedAt: terminalAt,
+          updatedAt: runResult.executionStatus.transitions[runResult.executionStatus.transitions.length - 1]?.occurredAt
+            ?? this.now().toISOString(),
+        },
+        errorMessage: runResult.failureMessage ?? runResult.executionStatus.failure?.message,
+        stepRunStats: createWorkflowStepRunStats(rerunStepRuns),
+        diagnostics,
+      });
+
+      const detail = createWorkflowRunDetailRecord({
+        runId: rerunRunId,
+        summary,
+        stepRuns: rerunStepRuns,
+        diagnostics,
+        executionContext: Object.freeze({
+          executionInput: Object.freeze({
+            target: mergedTarget,
+            parameters: mergedParameters,
+            executionMetadata: mergedExecutionMetadata,
+            propertyOverrides: mergedPropertyOverrides,
+          }),
+          resolvedTriggerContext: Object.freeze({
+            triggerSource: summary.triggerSource,
+            triggerActivation: triggerEntry,
+          }),
+          runtimeContext: runResult.runtimeResult
+            ? Object.freeze({
+              status: runResult.runtimeResult.status,
+              issueCount: runResult.runtimeResult.issues.length,
+              outputDeliveryIssueCount: runResult.runtimeResult.outputDelivery.issues.length,
+            })
+            : undefined,
+        } satisfies WorkflowRunExecutionContextRecord),
+        outputs: this.toRerunOutputs(runResult),
+      });
+
+      await this.workflowRunSummaryRepository.upsertDetail(detail);
+
+      return Object.freeze({
+        sourceRunId,
+        runId: rerunRunId,
+        mode,
+        status: summary.status,
+        executionId: runResult.executionStatus.executionId,
+        launchStatus: runResult.launchStatus,
+        failureMessage: runResult.failureMessage ?? runResult.executionStatus.failure?.message,
+      } satisfies WorkflowRunRerunLaunchReadModel);
+    });
+  }
+
   public async getPersistedWorkflow(
     workflowId: string,
   ): Promise<StudioShellApiResponse<PersistedWorkflowReadModel>> {
@@ -750,6 +974,8 @@ export class StudioShellBackendApi {
       executionFlowId: summary.correlation.executionFlowId,
       triggerEventId: summary.correlation.triggerEventId,
       parentRunId: summary.correlation.parentRunId,
+      rerunMode: summary.correlation.rerunMode,
+      rerunReason: summary.correlation.rerunReason,
       stepRunStats: summary.stepRunStats,
       diagnostics,
       primaryDiagnostic: diagnostics?.[0],
@@ -830,6 +1056,167 @@ export class StudioShellBackendApi {
     return Object.freeze({
       scope: "workflow",
     } satisfies WorkflowRunFailureLocationReadModel);
+  }
+
+  private createRerunRunId(workflowId: string): string {
+    const normalized = workflowId.trim().replace(/[^a-zA-Z0-9:_-]/g, "-");
+    return `run:${normalized}:rerun:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  private assertRecord(value: unknown, message: string): Readonly<Record<string, unknown>> {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new StudioShellInvalidRequestError(message);
+    }
+    return value as Readonly<Record<string, unknown>>;
+  }
+
+  private toOptionalRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return undefined;
+    }
+    return value as Readonly<Record<string, unknown>>;
+  }
+
+  private toOptionalNestedRecord(value: unknown): Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined {
+    const top = this.toOptionalRecord(value);
+    if (!top) {
+      return undefined;
+    }
+
+    const normalized: Record<string, Readonly<Record<string, unknown>>> = {};
+    for (const [key, entry] of Object.entries(top)) {
+      const record = this.toOptionalRecord(entry);
+      if (record) {
+        normalized[key] = record;
+      }
+    }
+    return Object.keys(normalized).length > 0 ? Object.freeze(normalized) : undefined;
+  }
+
+  private toOptionalString(value: unknown): string | undefined {
+    return typeof value === "string" && value.trim() ? value.trim() : undefined;
+  }
+
+  private toTriggerSourceKind(source?: WorkflowRunTriggerSource): WorkflowExecutionTriggerSourceKind {
+    switch (source) {
+      case "schedule":
+        return WorkflowExecutionTriggerSourceKinds.temporal;
+      case "event":
+      case "system":
+        return WorkflowExecutionTriggerSourceKinds.stateData;
+      case "api":
+        return WorkflowExecutionTriggerSourceKinds.manualUser;
+      default:
+        return WorkflowExecutionTriggerSourceKinds.manualUser;
+    }
+  }
+
+  private inferInputValues(parameters: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+    const explicit = this.toOptionalRecord(parameters.inputValues);
+    if (explicit) {
+      return explicit;
+    }
+
+    const ignored = new Set([
+      "triggerSource",
+      "triggerEventId",
+      "triggerActivation",
+      "triggerContext",
+      "workflowDefinitionAssetId",
+      "workflowDefinitionVersionId",
+      "parentRunId",
+      "rerunMode",
+      "rerunReason",
+      "executionFlowId",
+    ]);
+    const inferred = Object.fromEntries(
+      Object.entries(parameters).filter(([key]) => !ignored.has(key)),
+    );
+    return Object.freeze(inferred);
+  }
+
+  private toRerunWorkflowStatus(runResult: RunWorkflowDraftManualResult): WorkflowRunStatus {
+    if (runResult.executionStatus.state === WorkflowRunStatuses.completed) {
+      return WorkflowRunStatuses.completed;
+    }
+    if (runResult.executionStatus.state === WorkflowRunStatuses.running) {
+      return WorkflowRunStatuses.running;
+    }
+    return WorkflowRunStatuses.failed;
+  }
+
+  private toRerunStepRuns(runResult: RunWorkflowDraftManualResult): ReadonlyArray<WorkflowStepRunRecord> {
+    if (!runResult.runtimeResult) {
+      return Object.freeze([]);
+    }
+
+    const ordered = runResult.validation.plan?.orderedStepIds ?? [];
+    const indexByStepId = new Map<string, number>(ordered.map((stepId, index) => [stepId, index]));
+    return Object.freeze(runResult.runtimeResult.traces.map((trace, index) => {
+      const status = trace.status === "completed"
+        ? "completed"
+        : trace.status === "skipped"
+          ? "skipped"
+          : trace.status === "paused"
+            ? "running"
+            : "failed";
+      const stepIndex = indexByStepId.get(trace.stepId) ?? index;
+      const updatedAt = runResult.executionStatus.transitions[runResult.executionStatus.transitions.length - 1]?.occurredAt
+        ?? this.now().toISOString();
+      return Object.freeze({
+        stepRunId: `${runResult.executionStatus.executionId}:${trace.stepId}:${index + 1}`,
+        stepId: trace.stepId,
+        stepIndex,
+        attempt: 1,
+        stepName: trace.stepId,
+        stepType: trace.elementType,
+        actionType: trace.invocationSource,
+        status,
+        timestamps: {
+          startedAt: updatedAt,
+          endedAt: status === "running" ? undefined : updatedAt,
+          updatedAt,
+        },
+        summary: trace.detail,
+        error: trace.status === "failed"
+          ? Object.freeze({
+            message: trace.detail ?? "Step failed during rerun execution.",
+          })
+          : undefined,
+        metadata: Object.freeze({
+          loop: trace.loop,
+          output: trace.output,
+        }),
+      } satisfies WorkflowStepRunRecord);
+    }));
+  }
+
+  private toRerunDiagnostics(
+    runResult: RunWorkflowDraftManualResult,
+    stepRuns: ReadonlyArray<WorkflowStepRunRecord>,
+  ): ReadonlyArray<WorkflowRunDiagnosticRecord> | undefined {
+    return deriveWorkflowRunDiagnostics({
+      status: this.toRerunWorkflowStatus(runResult),
+      errorMessage: runResult.failureMessage ?? runResult.executionStatus.failure?.message,
+      stepRuns,
+    });
+  }
+
+  private toRerunOutputs(runResult: RunWorkflowDraftManualResult): WorkflowRunOutputRecord | undefined {
+    if (!runResult.runtimeResult) {
+      return undefined;
+    }
+
+    const deliveredAssetIds = runResult.runtimeResult.outputDelivery.results
+      .filter((entry) => entry.status === "delivered" && entry.persistedAssetId)
+      .map((entry) => entry.persistedAssetId!);
+
+    return Object.freeze({
+      outputAssetIds: Object.freeze(deliveredAssetIds),
+      outputCount: runResult.runtimeResult.outputDelivery.results.length,
+      resultMessages: Object.freeze(runResult.runtimeResult.issues.map((issue) => issue.message)),
+      outputValues: runResult.runtimeResult.stepOutputs,
+    } satisfies WorkflowRunOutputRecord);
   }
 
   public async duplicatePersistedWorkflow(

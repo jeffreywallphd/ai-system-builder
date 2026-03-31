@@ -8,6 +8,8 @@ import { SystemStudioBackendApi } from "../../../infrastructure/api/system-studi
 import { SystemRuntimeBackendApi } from "../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import { SqliteStudioShellRepository } from "../../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
 import { SqliteSystemRuntimeExecutionStore } from "../../../infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
+import { InMemoryStudioShellRepository } from "../../../infrastructure/studio-shell/InMemoryStudioShellRepository";
+import { InMemoryWorkflowPersistenceRepository } from "../../../infrastructure/workflows/InMemoryWorkflowPersistenceRepository";
 import { AssetDraftLifecycleStatuses } from "../../../domain/studio-shell/StudioShellDomain";
 import {
   WorkflowDraftOutputDestinationTypes,
@@ -94,6 +96,9 @@ function installBridge(
     },
     getWorkflowRunDetail(runId: string) {
       return api.getWorkflowRunDetail(runId).then((response) => JSON.stringify(response));
+    },
+    startWorkflowRunRerun(requestJson: string) {
+      return api.startWorkflowRunRerun(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
     listSystemChildComponents(requestJson: string) {
       if (!systemApi) {
@@ -351,6 +356,244 @@ describe("StudioShellService integration", () => {
     expect(detail.data?.executionContext?.resolvedTriggerContext).toEqual({
       triggerSource: "manual",
     });
+  });
+
+  it("starts workflow rerun from historical context through service -> bridge -> backend and records lineage", async () => {
+    const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
+    const workflowPersistenceRepository = new InMemoryWorkflowPersistenceRepository();
+    const studioRepository = new InMemoryStudioShellRepository();
+    const backendApi = new StudioShellBackendApi(
+      studioRepository,
+      workflowPersistenceRepository,
+      workflowRunRepository,
+    );
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const initialized = await service.initializeStudio("studio-rerun-history", "Workflow Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+    const created = await service.createDraft({
+      studioId: "studio-rerun-history",
+      sessionId,
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      metadata: {
+        title: "service-rerun-workflow",
+        tags: ["workflow", "rerun"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "workflow-studio",
+        },
+      },
+    });
+    const workflowId = created.data!.draft!.assetId;
+
+    await workflowRunRepository.upsertDetail(createWorkflowRunDetailRecord({
+      runId: "run:service-rerun-source",
+      summary: createWorkflowRunSummaryRecord({
+        runId: "run:service-rerun-source",
+        status: WorkflowRunStatuses.completed,
+        triggerSource: WorkflowRunTriggerSources.manual,
+        workflow: {
+          workflowId,
+          workflowName: "service-rerun-workflow",
+        },
+        correlation: {
+          executionRunId: "run:service-rerun-source",
+        },
+        timestamps: {
+          startedAt: "2026-03-31T15:00:00.000Z",
+          endedAt: "2026-03-31T15:00:02.000Z",
+          updatedAt: "2026-03-31T15:00:02.000Z",
+        },
+      }),
+      executionContext: {
+        executionInput: {
+          parameters: {
+            inputValues: {
+              prompt: "historical",
+            },
+          },
+          executionMetadata: {
+            actorId: "user:integration",
+          },
+        },
+        resolvedTriggerContext: {
+          triggerSource: "manual",
+        },
+      },
+    }));
+
+    const launched = await service.startWorkflowRunRerun({
+      sourceRunId: "run:service-rerun-source",
+      mode: "as-is",
+    });
+
+    expect(launched.ok).toBeTrue();
+    expect(launched.data?.mode).toBe("as-is");
+    expect(launched.data?.sourceRunId).toBe("run:service-rerun-source");
+
+    const rerunDetail = await service.getWorkflowRunDetail(launched.data!.runId);
+    expect(rerunDetail.ok).toBeTrue();
+    expect(rerunDetail.data?.summary.parentRunId).toBe("run:service-rerun-source");
+    expect(rerunDetail.data?.summary.rerunMode).toBe("as-is");
+    expect(rerunDetail.data?.executionContext?.executionInput).toEqual(expect.objectContaining({
+      parameters: expect.objectContaining({
+        parentRunId: "run:service-rerun-source",
+        rerunMode: "as-is",
+      }),
+    }));
+  });
+
+  it("supports edited rerun overrides through service flow with traceable edited lineage", async () => {
+    const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
+    const workflowPersistenceRepository = new InMemoryWorkflowPersistenceRepository();
+    const studioRepository = new InMemoryStudioShellRepository();
+    const backendApi = new StudioShellBackendApi(
+      studioRepository,
+      workflowPersistenceRepository,
+      workflowRunRepository,
+    );
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const initialized = await service.initializeStudio("studio-rerun-edit", "Workflow Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+    const created = await service.createDraft({
+      studioId: "studio-rerun-edit",
+      sessionId,
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      metadata: {
+        title: "service-edit-rerun-workflow",
+        tags: ["workflow", "rerun"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "workflow-studio",
+        },
+      },
+    });
+    const workflowId = created.data!.draft!.assetId;
+
+    await workflowRunRepository.upsertDetail(createWorkflowRunDetailRecord({
+      runId: "run:service-edit-source",
+      summary: createWorkflowRunSummaryRecord({
+        runId: "run:service-edit-source",
+        status: WorkflowRunStatuses.completed,
+        triggerSource: WorkflowRunTriggerSources.manual,
+        workflow: {
+          workflowId,
+          workflowName: "service-edit-rerun-workflow",
+        },
+        correlation: {
+          executionRunId: "run:service-edit-source",
+        },
+        timestamps: {
+          startedAt: "2026-03-31T16:00:00.000Z",
+          endedAt: "2026-03-31T16:00:02.000Z",
+          updatedAt: "2026-03-31T16:00:02.000Z",
+        },
+      }),
+      executionContext: {
+        executionInput: {
+          parameters: {
+            inputValues: {
+              prompt: "original",
+            },
+          },
+          propertyOverrides: {
+            stepA: {
+              timeoutMs: 1000,
+            },
+          },
+        },
+      },
+    }));
+
+    const launched = await service.startWorkflowRunRerun({
+      sourceRunId: "run:service-edit-source",
+      mode: "edited",
+      rerunReason: "Changed prompt and timeout",
+      overrides: {
+        parameters: {
+          inputValues: {
+            prompt: "edited",
+          },
+        },
+        propertyOverrides: {
+          stepA: {
+            timeoutMs: 2000,
+          },
+        },
+      },
+    });
+
+    expect(launched.ok).toBeTrue();
+    expect(launched.data?.mode).toBe("edited");
+
+    const rerunDetail = await service.getWorkflowRunDetail(launched.data!.runId);
+    expect(rerunDetail.ok).toBeTrue();
+    expect(rerunDetail.data?.summary.parentRunId).toBe("run:service-edit-source");
+    expect(rerunDetail.data?.summary.rerunMode).toBe("edited");
+    expect(rerunDetail.data?.summary.rerunReason).toBe("Changed prompt and timeout");
+    expect(rerunDetail.data?.executionContext?.executionInput).toEqual(expect.objectContaining({
+      parameters: expect.objectContaining({
+        inputValues: {
+          prompt: "edited",
+        },
+      }),
+      propertyOverrides: expect.objectContaining({
+        stepA: {
+          timeoutMs: 2000,
+        },
+      }),
+    }));
   });
 
   it("uses browser fallback backend when desktop bridge is unavailable", async () => {

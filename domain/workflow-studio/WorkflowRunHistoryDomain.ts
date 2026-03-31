@@ -231,6 +231,14 @@ export const WorkflowRunTriggerSources = Object.freeze({
 export type WorkflowRunTriggerSource =
   typeof WorkflowRunTriggerSources[keyof typeof WorkflowRunTriggerSources];
 
+export const WorkflowRunRerunModes = Object.freeze({
+  asIs: "as-is",
+  edited: "edited",
+});
+
+export type WorkflowRunRerunMode =
+  typeof WorkflowRunRerunModes[keyof typeof WorkflowRunRerunModes];
+
 export const WorkflowStepRunStatuses = Object.freeze({
   pending: "pending",
   running: "running",
@@ -298,6 +306,8 @@ export interface WorkflowRunCorrelationIds {
   readonly executionFlowId?: string;
   readonly triggerEventId?: string;
   readonly parentRunId?: string;
+  readonly rerunMode?: WorkflowRunRerunMode;
+  readonly rerunReason?: string;
 }
 
 export interface WorkflowDefinitionReference {
@@ -531,12 +541,22 @@ function normalizeWorkflowReference(reference: WorkflowDefinitionReference): Wor
 }
 
 function normalizeCorrelation(correlation: WorkflowRunCorrelationIds): WorkflowRunCorrelationIds {
+  const rerunMode = correlation.rerunMode?.trim();
+  let normalizedRerunMode: WorkflowRunRerunMode | undefined;
+  if (rerunMode === WorkflowRunRerunModes.asIs) {
+    normalizedRerunMode = WorkflowRunRerunModes.asIs;
+  } else if (rerunMode === WorkflowRunRerunModes.edited) {
+    normalizedRerunMode = WorkflowRunRerunModes.edited;
+  }
+
   return Object.freeze({
     executionRunId: normalizeRequired(correlation.executionRunId, "Workflow run execution run id"),
     workflowExecutionId: normalizeOptional(correlation.workflowExecutionId),
     executionFlowId: normalizeOptional(correlation.executionFlowId),
     triggerEventId: normalizeOptional(correlation.triggerEventId),
     parentRunId: normalizeOptional(correlation.parentRunId),
+    rerunMode: normalizedRerunMode,
+    rerunReason: normalizeOptional(correlation.rerunReason),
   } satisfies WorkflowRunCorrelationIds);
 }
 

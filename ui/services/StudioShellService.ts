@@ -10,11 +10,13 @@ import type {
   DuplicatePersistedWorkflowRequest,
   ListWorkflowStudioRunsRequest,
   RunWorkflowStudioDraftReadModel,
+  StartWorkflowRunRerunRequest,
   RunWorkflowStudioDraftRequest,
   StudioShellApiResponse,
   StudioShellSnapshotReadModel,
   StudioShellValidationIssue,
   WorkflowRunDetailReadModel,
+  WorkflowRunRerunLaunchReadModel,
   WorkflowRunSummaryReadModel,
   WorkflowExecutionReadinessReadModel,
   PersistedWorkflowReadModel,
@@ -127,6 +129,13 @@ export class StudioShellService {
   public async getWorkflowRunDetail(runId: string): Promise<StudioShellApiResponse<WorkflowRunDetailReadModel>> {
     const raw = await this.requireBridge().getWorkflowRunDetail(runId);
     return JSON.parse(raw) as StudioShellApiResponse<WorkflowRunDetailReadModel>;
+  }
+
+  public async startWorkflowRunRerun(
+    request: StartWorkflowRunRerunRequest,
+  ): Promise<StudioShellApiResponse<WorkflowRunRerunLaunchReadModel>> {
+    const raw = await this.requireBridge().startWorkflowRunRerun(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<WorkflowRunRerunLaunchReadModel>;
   }
 
   public async listSystemChildComponents(request: ListSystemChildComponentsRequest): Promise<SystemStudioApiResponse<ReadonlyArray<SystemStudioChildComponentReadModel>>> {

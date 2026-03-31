@@ -184,6 +184,9 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     getWorkflowRunDetail(runId: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:workflow-runs:get-detail", runId) as Promise<string>;
     },
+    startWorkflowRunRerun(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:workflow-runs:start-rerun", requestJson) as Promise<string>;
+    },
     listSystemChildComponents(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-components:list", requestJson) as Promise<string>;
     },

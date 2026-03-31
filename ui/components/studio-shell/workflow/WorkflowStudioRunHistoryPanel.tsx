@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   WorkflowRunDiagnosticScopes,
   WorkflowRunDiagnosticSeverities,
@@ -23,6 +23,15 @@ import { ROUTE_PATHS } from "../../../routes/RouteConfig";
 
 type WorkflowRunSortOrder = "recency" | "duration" | "status";
 type WorkflowRunStatusFilter = WorkflowRunStatus | "all";
+type WorkflowRerunMode = "as-is" | "edited";
+
+interface WorkflowRerunEditableForm {
+  readonly targetJson: string;
+  readonly parametersJson: string;
+  readonly executionMetadataJson: string;
+  readonly propertyOverridesJson: string;
+  readonly rerunReason: string;
+}
 
 export interface WorkflowStudioRunHistoryPanelProps {
   readonly workflowId?: string;
@@ -136,6 +145,45 @@ function formatStructuredJson(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function parseStructuredJson(value: string, label: string): Readonly<Record<string, unknown>> {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error(`${label} must be a JSON object.`);
+    }
+    return parsed as Readonly<Record<string, unknown>>;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "invalid JSON";
+    throw new Error(`${label} is invalid: ${detail}`);
+  }
+}
+
+function parseNestedStructuredJson(
+  value: string,
+  label: string,
+): Readonly<Record<string, Readonly<Record<string, unknown>>>> {
+  const parsed = parseStructuredJson(value, label);
+  const normalized: Record<string, Readonly<Record<string, unknown>>> = {};
+  for (const [key, entry] of Object.entries(parsed)) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new Error(`${label} must map keys to JSON objects.`);
+    }
+    normalized[key] = entry as Readonly<Record<string, unknown>>;
+  }
+  return Object.freeze(normalized);
+}
+
+function createRerunEditableForm(detail?: WorkflowRunDetailReadModel): WorkflowRerunEditableForm {
+  const executionInput = (detail?.executionContext?.executionInput ?? {}) as Record<string, unknown>;
+  return Object.freeze({
+    targetJson: formatStructuredJson((executionInput.target ?? {})),
+    parametersJson: formatStructuredJson((executionInput.parameters ?? {})),
+    executionMetadataJson: formatStructuredJson((executionInput.executionMetadata ?? {})),
+    propertyOverridesJson: formatStructuredJson((executionInput.propertyOverrides ?? {})),
+    rerunReason: "",
+  });
 }
 
 function normalizeTriggerSourceLabel(source: WorkflowRunSummaryReadModel["triggerSource"]): string {
@@ -300,6 +348,7 @@ export default function WorkflowStudioRunHistoryPanel({
   workflowName,
 }: WorkflowStudioRunHistoryPanelProps): JSX.Element {
   const service = useMemo(() => new StudioShellService(), []);
+  const navigate = useNavigate();
   const location = useLocation();
   const routeParams = useParams<{ runId?: string }>();
   const selectedRunId = routeParams.runId?.trim();
@@ -313,6 +362,10 @@ export default function WorkflowStudioRunHistoryPanel({
   const [detailError, setDetailError] = useState<string | undefined>();
   const [selectedDetail, setSelectedDetail] = useState<WorkflowRunDetailReadModel | undefined>();
   const [isDetailMissing, setIsDetailMissing] = useState(false);
+  const [isRerunPending, setIsRerunPending] = useState(false);
+  const [rerunFeedback, setRerunFeedback] = useState<string | undefined>();
+  const [isEditRerunOpen, setIsEditRerunOpen] = useState(false);
+  const [editRerunForm, setEditRerunForm] = useState<WorkflowRerunEditableForm>(() => createRerunEditableForm());
 
   useEffect(() => {
     if (!workflowId) {
@@ -360,6 +413,9 @@ export default function WorkflowStudioRunHistoryPanel({
       setSelectedDetail(undefined);
       setDetailError(undefined);
       setIsDetailMissing(false);
+      setRerunFeedback(undefined);
+      setIsEditRerunOpen(false);
+      setEditRerunForm(createRerunEditableForm(undefined));
       return;
     }
 
@@ -383,6 +439,7 @@ export default function WorkflowStudioRunHistoryPanel({
         return;
       }
       setSelectedDetail(response.data);
+      setEditRerunForm(createRerunEditableForm(response.data));
     }).catch((error: unknown) => {
       if (!active) {
         return;
@@ -407,6 +464,68 @@ export default function WorkflowStudioRunHistoryPanel({
   const orderedStepRuns = useMemo(() => {
     return orderStepRuns(selectedDetail?.stepRuns ?? []);
   }, [selectedDetail?.stepRuns]);
+
+  const reloadRuns = async (): Promise<void> => {
+    if (!workflowId) {
+      return;
+    }
+    setIsLoadingRuns(true);
+    try {
+      const response = await service.listWorkflowRuns({ workflowId, limit: 200 });
+      if (response.ok) {
+        setRuns(response.data ?? []);
+        setRunLoadError(undefined);
+        return;
+      }
+      setRunLoadError(response.error?.message ?? "Workflow run history could not be loaded.");
+    } catch (error) {
+      setRunLoadError(error instanceof Error ? error.message : "Workflow run history could not be loaded.");
+    } finally {
+      setIsLoadingRuns(false);
+    }
+  };
+
+  const startRerun = async (mode: WorkflowRerunMode): Promise<void> => {
+    if (!selectedRunId) {
+      return;
+    }
+
+    setIsRerunPending(true);
+    setRerunFeedback(undefined);
+    try {
+      const request = mode === "edited"
+        ? Object.freeze({
+          sourceRunId: selectedRunId,
+          mode,
+          rerunReason: editRerunForm.rerunReason.trim() || undefined,
+          overrides: Object.freeze({
+            target: parseStructuredJson(editRerunForm.targetJson, "Target JSON"),
+            parameters: parseStructuredJson(editRerunForm.parametersJson, "Parameters JSON"),
+            executionMetadata: parseStructuredJson(editRerunForm.executionMetadataJson, "Execution metadata JSON"),
+            propertyOverrides: parseNestedStructuredJson(editRerunForm.propertyOverridesJson, "Property overrides JSON"),
+          }),
+        })
+        : Object.freeze({
+          sourceRunId: selectedRunId,
+          mode,
+        });
+
+      const response = await service.startWorkflowRunRerun(request);
+      if (!response.ok || !response.data) {
+        setRerunFeedback(response.error?.message ?? "Failed to launch workflow rerun.");
+        return;
+      }
+
+      await reloadRuns();
+      setRerunFeedback(`Rerun started as ${response.data.runId}.`);
+      setIsEditRerunOpen(false);
+      navigate(buildWorkflowStudioRunDetailPath(response.data.runId));
+    } catch (error) {
+      setRerunFeedback(error instanceof Error ? error.message : "Failed to launch workflow rerun.");
+    } finally {
+      setIsRerunPending(false);
+    }
+  };
 
   if (!workflowId) {
     return (
@@ -443,17 +562,7 @@ export default function WorkflowStudioRunHistoryPanel({
             type="button"
             className="ui-button ui-button--ghost ui-button--sm"
             onClick={() => {
-              setIsLoadingRuns(true);
-              void service.listWorkflowRuns({ workflowId, limit: 200 }).then((response) => {
-                if (response.ok) {
-                  setRuns(response.data ?? []);
-                  setRunLoadError(undefined);
-                } else {
-                  setRunLoadError(response.error?.message ?? "Workflow run history could not be loaded.");
-                }
-              }).catch((error: unknown) => {
-                setRunLoadError(error instanceof Error ? error.message : "Workflow run history could not be loaded.");
-              }).finally(() => setIsLoadingRuns(false));
+              void reloadRuns();
             }}
           >
             Refresh runs
@@ -534,7 +643,14 @@ export default function WorkflowStudioRunHistoryPanel({
               <span>{formatTimestamp(run.endedAt)}</span>
               <span>{formatDuration(run.durationMs)}</span>
               <span>{normalizeTriggerSourceLabel(run.triggerSource)}</span>
-              <span>{run.workflowName}</span>
+              <span>
+                {run.workflowName}
+                {run.rerunMode ? (
+                  <span className="ui-workflow-run-history__lineage-label">
+                    {run.rerunMode === "edited" ? "Edited rerun" : "Rerun"}{run.parentRunId ? ` of ${run.parentRunId}` : ""}
+                  </span>
+                ) : null}
+              </span>
               <span className={run.primaryDiagnostic || run.errorMessage || run.isIncomplete ? "ui-text-secondary ui-text-small" : ""}>
                 {formatFailureCue(run)}
               </span>
@@ -602,6 +718,107 @@ export default function WorkflowStudioRunHistoryPanel({
                     <span className="ui-meta-label">Execution run id</span>
                     <span className="ui-meta-value">{selectedDetail.summary.executionRunId}</span>
                   </div>
+                  {selectedDetail.summary.parentRunId ? (
+                    <div className="ui-meta-item">
+                      <span className="ui-meta-label">Source run</span>
+                      <span className="ui-meta-value">{selectedDetail.summary.parentRunId}</span>
+                    </div>
+                  ) : null}
+                  {selectedDetail.summary.rerunMode ? (
+                    <div className="ui-meta-item">
+                      <span className="ui-meta-label">Rerun mode</span>
+                      <span className="ui-meta-value">{selectedDetail.summary.rerunMode}</span>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="ui-stack ui-stack--2xs" data-testid="workflow-run-rerun-actions">
+                  <strong>Rerun</strong>
+                  <div className="ui-row ui-row--wrap ui-workflow-run-history__actions">
+                    <button
+                      type="button"
+                      className="ui-button ui-button--primary ui-button--sm"
+                      disabled={isRerunPending}
+                      onClick={() => {
+                        void startRerun("as-is");
+                      }}
+                    >
+                      Rerun as-is
+                    </button>
+                    <button
+                      type="button"
+                      className="ui-button ui-button--ghost ui-button--sm"
+                      disabled={isRerunPending}
+                      onClick={() => setIsEditRerunOpen((current) => !current)}
+                    >
+                      {isEditRerunOpen ? "Hide edit rerun" : "Edit and rerun"}
+                    </button>
+                  </div>
+                  {rerunFeedback ? (
+                    <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">
+                      {rerunFeedback}
+                    </p>
+                  ) : null}
+                  {isEditRerunOpen ? (
+                    <div className="ui-stack ui-stack--xs ui-workflow-run-history__edit-rerun">
+                      <label className="ui-field">
+                        <span className="ui-field__label">Target JSON</span>
+                        <textarea
+                          className="ui-textarea"
+                          rows={4}
+                          value={editRerunForm.targetJson}
+                          onChange={(event) => setEditRerunForm((current) => ({ ...current, targetJson: event.target.value }))}
+                        />
+                      </label>
+                      <label className="ui-field">
+                        <span className="ui-field__label">Parameters JSON</span>
+                        <textarea
+                          className="ui-textarea"
+                          rows={6}
+                          value={editRerunForm.parametersJson}
+                          onChange={(event) => setEditRerunForm((current) => ({ ...current, parametersJson: event.target.value }))}
+                        />
+                      </label>
+                      <label className="ui-field">
+                        <span className="ui-field__label">Execution metadata JSON</span>
+                        <textarea
+                          className="ui-textarea"
+                          rows={4}
+                          value={editRerunForm.executionMetadataJson}
+                          onChange={(event) => setEditRerunForm((current) => ({ ...current, executionMetadataJson: event.target.value }))}
+                        />
+                      </label>
+                      <label className="ui-field">
+                        <span className="ui-field__label">Property overrides JSON</span>
+                        <textarea
+                          className="ui-textarea"
+                          rows={4}
+                          value={editRerunForm.propertyOverridesJson}
+                          onChange={(event) => setEditRerunForm((current) => ({ ...current, propertyOverridesJson: event.target.value }))}
+                        />
+                      </label>
+                      <label className="ui-field">
+                        <span className="ui-field__label">Rerun reason (optional)</span>
+                        <input
+                          className="ui-input"
+                          value={editRerunForm.rerunReason}
+                          onChange={(event) => setEditRerunForm((current) => ({ ...current, rerunReason: event.target.value }))}
+                        />
+                      </label>
+                      <div className="ui-row ui-row--wrap ui-workflow-run-history__actions">
+                        <button
+                          type="button"
+                          className="ui-button ui-button--primary ui-button--sm"
+                          disabled={isRerunPending}
+                          onClick={() => {
+                            void startRerun("edited");
+                          }}
+                        >
+                          Launch edited rerun
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="ui-stack ui-stack--2xs">

@@ -505,6 +505,10 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   ipcMain.handle("ai-loom-desktop-studio-shell:workflow-runs:get-detail", async (_event, runId: string) => {
     return JSON.stringify(await studioShellBackendApi.getWorkflowRunDetail(runId));
   });
+  ipcMain.handle("ai-loom-desktop-studio-shell:workflow-runs:start-rerun", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["startWorkflowRunRerun"]>[0];
+    return JSON.stringify(await studioShellBackendApi.startWorkflowRunRerun(request));
+  });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-components:list", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["listChildComponents"]>[0];
     return JSON.stringify(await systemStudioBackendApi.listChildComponents(request));

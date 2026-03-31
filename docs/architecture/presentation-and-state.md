@@ -114,6 +114,8 @@ Durable execution history now follows the same pattern through application-layer
 
 Workflow Studio run-history list/detail follows the same boundary style: `WorkflowStudioRunHistoryPanel` renders workflow-scoped run summaries and detail sections, while data is loaded through `StudioShellService` (`listWorkflowRuns`, `getWorkflowRunDetail`) from backend-owned run-history projections instead of UI-layer repository access.
 The panel now keeps disclosure bounded in that same seam: run-level summary first, expandable step-by-step inspection second, and structured diagnostics/failure-location cues rendered from backend read models rather than UI-side parsing/inference.
+The same panel now also hosts rerun UX on those backend contracts: `Rerun as-is` and `Edit and rerun` both route through `StudioShellService.startWorkflowRunRerun`, start from canonical persisted execution context, and navigate to the newly created derived run detail.
+Edit-and-rerun stays structured and user-facing (target/parameters/execution-metadata/property-overrides fields) rather than exposing raw log parsing or debug-only controls.
 
 Related-run lineage navigation now also flows through this same seam: the renderer asks `ExecutionHistoryService` for related-run clusters, and the execution detail panel can jump directly between runs in the same flow/plan grouping without introducing feature-specific linkage logic in page components.
 
