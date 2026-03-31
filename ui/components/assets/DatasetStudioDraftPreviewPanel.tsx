@@ -938,6 +938,24 @@ export default function DatasetStudioDraftPreviewPanel({
             {unifiedPreviewSummary.summary.truncated ? <span className="ui-badge ui-badge--warning">sampled</span> : null}
           </div>
           <span className="ui-subtle">Route asset: {unifiedPreviewSummary.routeSummary.assetId}</span>
+          <div className="ui-meta-grid">
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Output target</div>
+              <div className="ui-meta-value">{unifiedPreviewSummary.metadataSummary.outputTarget}</div>
+            </div>
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Config mode</div>
+              <div className="ui-meta-value">{unifiedPreviewSummary.metadataSummary.configurationMode}</div>
+            </div>
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Source asset</div>
+              <div className="ui-meta-value">{unifiedPreviewSummary.metadataSummary.sourceAssetId ?? "-"}</div>
+            </div>
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Source version</div>
+              <div className="ui-meta-value">{unifiedPreviewSummary.metadataSummary.sourceVersionId ?? "-"}</div>
+            </div>
+          </div>
           <details>
             <summary className="ui-text-small">Diagnostics and Samples</summary>
             <div className="ui-stack ui-stack--xs">
@@ -983,6 +1001,24 @@ export default function DatasetStudioDraftPreviewPanel({
               <span key={kind} className="ui-badge ui-badge--neutral">{kind}: {count}</span>
             ))}
           </div>
+          <div className="ui-meta-grid">
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Output target</div>
+              <div className="ui-meta-value">{unifiedBatchSummary.metadata.processing.outputTarget}</div>
+            </div>
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Config mode</div>
+              <div className="ui-meta-value">{unifiedBatchSummary.metadata.processing.configurationMode}</div>
+            </div>
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Records</div>
+              <div className="ui-meta-value">{unifiedBatchSummary.metadata.outputs.totalRecordCount}</div>
+            </div>
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Text items</div>
+              <div className="ui-meta-value">{unifiedBatchSummary.metadata.outputs.totalTextItemCount}</div>
+            </div>
+          </div>
           <details>
             <summary className="ui-text-small">Per-item Status</summary>
             <ul className="ui-stack ui-stack--2xs">
@@ -993,6 +1029,13 @@ export default function DatasetStudioDraftPreviewPanel({
                 </li>
               ))}
             </ul>
+          </details>
+          <details>
+            <summary className="ui-text-small">Lineage Details</summary>
+            <div className="ui-stack ui-stack--xs">
+              <span className="ui-subtle">Batch lineage: {unifiedBatchSummary.lineage.lineageId}</span>
+              <pre className="ui-text-mono">{JSON.stringify(unifiedBatchSummary.lineage.summary, null, 2)}</pre>
+            </div>
           </details>
         </section>
       ) : null}

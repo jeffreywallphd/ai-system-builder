@@ -1,11 +1,16 @@
 import type { CanonicalDataShape } from "../../domain/dataset-studio/CanonicalDataShapes";
 import type { DataPreviewModel } from "../data-studio/DataPreviewEngine";
 import {
+  UnifiedIngestionContractVersion,
   UnifiedIngestionIssueCodes,
   UnifiedIngestionIssueSeverities,
   UnifiedIngestionReferenceKinds,
+  type UnifiedIngestionBatchExecutionMetadata,
+  type UnifiedIngestionBatchLineageRecord,
   type UnifiedIngestionConfiguration,
+  type UnifiedIngestionExecutionMetadata,
   type UnifiedIngestionIssue,
+  type UnifiedIngestionLineageRecord,
   type UnifiedIngestionNormalizedOutput,
   type UnifiedIngestionRouteHandlerKind,
   type UnifiedIngestionSourceKind,
@@ -47,6 +52,8 @@ export interface UnifiedIngestionBatchItemResult {
   readonly output?: CanonicalDataShape;
   readonly normalized?: UnifiedIngestionNormalizedOutput;
   readonly preview?: UnifiedIngestionPreviewLike;
+  readonly metadata?: UnifiedIngestionExecutionMetadata;
+  readonly lineage?: UnifiedIngestionLineageRecord;
   readonly issues: ReadonlyArray<UnifiedIngestionIssue>;
   readonly stage?: string;
 }
@@ -71,6 +78,8 @@ export interface UnifiedIngestionBatchResult {
   readonly normalizedOutputs: ReadonlyArray<UnifiedIngestionNormalizedOutput>;
   readonly issues: ReadonlyArray<UnifiedIngestionIssue>;
   readonly sourceIssues: ReadonlyArray<SourceLocatorIssue>;
+  readonly metadata: UnifiedIngestionBatchExecutionMetadata;
+  readonly lineage: UnifiedIngestionBatchLineageRecord;
 }
 
 export interface UnifiedIngestionBatchRequest {
@@ -151,6 +160,14 @@ async function mapWithConcurrency<T, TResult>(
   return Object.freeze(results);
 }
 
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+function createBatchLineageId(): string {
+  return `unified-batch-lineage-${Date.now().toString(36)}`;
+}
+
 export class UnifiedIngestionBatchOrchestrationService {
   private readonly sourceLocator: SourceLocatorInputAbstraction;
   private readonly orchestration: UnifiedIngestionOrchestrationService;
@@ -175,12 +192,15 @@ export class UnifiedIngestionBatchOrchestrationService {
     request: UnifiedIngestionBatchRequest,
     preview: boolean,
   ): Promise<UnifiedIngestionBatchResult> {
+    const startedAt = nowIso();
+    const batchLineageId = createBatchLineageId();
     const sourceResolution = await this.resolveSources(request);
     const boundedSources = request.options?.maxItems && request.options.maxItems > 0
       ? sourceResolution.sources.slice(0, request.options.maxItems)
       : sourceResolution.sources;
 
     if (boundedSources.length === 0) {
+      const completedAt = nowIso();
       return Object.freeze({
         summary: Object.freeze({
           totalItems: 0,
@@ -202,6 +222,45 @@ export class UnifiedIngestionBatchOrchestrationService {
             severity: UnifiedIngestionIssueSeverities.error,
           }),
         ]),
+        metadata: Object.freeze({
+          contractVersion: UnifiedIngestionContractVersion,
+          metadataVersion: "1.0.0",
+          processing: Object.freeze({
+            startedAt,
+            completedAt,
+            outputTarget: request.configuration.outputTarget,
+            configurationMode: request.configuration.mode,
+            continueOnError: request.options?.continueOnError ?? true,
+            requestedConcurrency: request.options?.concurrency ?? 4,
+          }),
+          counts: Object.freeze({
+            totalItems: 0,
+            succeeded: 0,
+            failed: 0,
+            skipped: 0,
+            partialSuccess: false,
+            empty: true,
+          }),
+          outputs: Object.freeze({
+            normalizedOutputCount: 0,
+            totalRecordCount: 0,
+            totalTextItemCount: 0,
+            totalImageItemCount: 0,
+          }),
+        }),
+        lineage: Object.freeze({
+          contractVersion: UnifiedIngestionContractVersion,
+          lineageVersion: "1.0.0",
+          lineageId: batchLineageId,
+          capturedAt: completedAt,
+          itemLineages: Object.freeze([]),
+          summary: Object.freeze({
+            totalItems: 0,
+            succeeded: 0,
+            failed: 0,
+            skipped: 0,
+          }),
+        }),
       });
     }
 
@@ -245,6 +304,8 @@ export class UnifiedIngestionBatchOrchestrationService {
               status: UnifiedIngestionBatchItemStatuses.failed,
               detectionKind: result.detection?.detectedKind,
               routeHandler: result.route?.status === "resolved" ? result.route.handlerKind : undefined,
+              metadata: result.metadata,
+              lineage: result.lineage,
               issues: result.issues,
               stage: result.stage,
             } satisfies UnifiedIngestionBatchItemResult);
@@ -265,6 +326,8 @@ export class UnifiedIngestionBatchOrchestrationService {
                 truncated: result.preview.summary.truncated,
               }),
             }),
+            metadata: result.metadata,
+            lineage: result.lineage,
             issues: result.preview.issues,
           } satisfies UnifiedIngestionBatchItemResult);
         }
@@ -282,6 +345,8 @@ export class UnifiedIngestionBatchOrchestrationService {
             status: UnifiedIngestionBatchItemStatuses.failed,
             detectionKind: result.detection?.detectedKind,
             routeHandler: result.route?.status === "resolved" ? result.route.handlerKind : undefined,
+            metadata: result.metadata,
+            lineage: result.lineage,
             issues: result.issues,
             stage: result.stage,
           } satisfies UnifiedIngestionBatchItemResult);
@@ -293,6 +358,8 @@ export class UnifiedIngestionBatchOrchestrationService {
           routeHandler: result.route.handlerKind,
           output: result.output,
           normalized: result.normalized,
+          metadata: result.metadata,
+          lineage: result.lineage,
           issues: result.issues,
         } satisfies UnifiedIngestionBatchItemResult);
       },
@@ -333,6 +400,74 @@ export class UnifiedIngestionBatchOrchestrationService {
         message: `${skipped.length} batch item(s) were skipped due to fail-fast policy.`,
       }));
     }
+    const outputCountTotals = normalizedOutputs.reduce((accumulator, entry) => {
+      if (entry.canonicalOutputKind === "records") {
+        return Object.freeze({
+          ...accumulator,
+          totalRecordCount: accumulator.totalRecordCount + entry.metadata.totalCount,
+        });
+      }
+      if (entry.canonicalOutputKind === "text-items") {
+        return Object.freeze({
+          ...accumulator,
+          totalTextItemCount: accumulator.totalTextItemCount + entry.metadata.totalCount,
+        });
+      }
+      if (entry.canonicalOutputKind === "image-metadata-records") {
+        return Object.freeze({
+          ...accumulator,
+          totalImageItemCount: accumulator.totalImageItemCount + entry.metadata.totalCount,
+        });
+      }
+      return accumulator;
+    }, Object.freeze({
+      totalRecordCount: 0,
+      totalTextItemCount: 0,
+      totalImageItemCount: 0,
+    }));
+    const completedAt = nowIso();
+    const metadata: UnifiedIngestionBatchExecutionMetadata = Object.freeze({
+      contractVersion: UnifiedIngestionContractVersion,
+      metadataVersion: "1.0.0",
+      processing: Object.freeze({
+        startedAt,
+        completedAt,
+        outputTarget: request.configuration.outputTarget,
+        configurationMode: request.configuration.mode,
+        continueOnError,
+        requestedConcurrency: concurrency,
+      }),
+      counts: Object.freeze({
+        totalItems: itemResults.length,
+        succeeded: succeeded.length,
+        failed: failed.length,
+        skipped: skipped.length,
+        partialSuccess: succeeded.length > 0 && (failed.length > 0 || skipped.length > 0),
+        empty: itemResults.length === 0,
+      }),
+      outputs: Object.freeze({
+        normalizedOutputCount: normalizedOutputs.length,
+        totalRecordCount: outputCountTotals.totalRecordCount,
+        totalTextItemCount: outputCountTotals.totalTextItemCount,
+        totalImageItemCount: outputCountTotals.totalImageItemCount,
+      }),
+    });
+    const lineage: UnifiedIngestionBatchLineageRecord = Object.freeze({
+      contractVersion: UnifiedIngestionContractVersion,
+      lineageVersion: "1.0.0",
+      lineageId: batchLineageId,
+      capturedAt: completedAt,
+      itemLineages: Object.freeze(itemResults
+        .filter((item): item is UnifiedIngestionBatchItemResult & { readonly lineage: UnifiedIngestionLineageRecord } =>
+          Boolean(item.lineage))
+        .map((item) => item.lineage)),
+      summary: Object.freeze({
+        totalItems: itemResults.length,
+        succeeded: succeeded.length,
+        failed: failed.length,
+        skipped: skipped.length,
+      }),
+    });
 
     return Object.freeze({
       summary: Object.freeze({
@@ -349,6 +484,8 @@ export class UnifiedIngestionBatchOrchestrationService {
       normalizedOutputs,
       sourceIssues: sourceResolution.issues,
       issues: Object.freeze(batchIssues),
+      metadata,
+      lineage,
     });
   }
 

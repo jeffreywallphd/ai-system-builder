@@ -105,6 +105,8 @@ describe("UnifiedIngestionOrchestrationService", () => {
       expect(result.normalized.canonicalOutputKind).toBe("records");
       expect(result.route.assetId).toBe("csv-ingestor");
       expect(result.conversion.operation).toBe("source-to-records");
+      expect(result.metadata.source.sourceId).toBe("source-1");
+      expect(result.lineage.stages.some((stage) => stage.stage === "detection")).toBeTrue();
       expect(converterCalls).toEqual(["source-to-records"]);
     }
   });
@@ -140,6 +142,8 @@ describe("UnifiedIngestionOrchestrationService", () => {
       expect(result.issues[0]?.code).toBe("routing-unsupported");
       expect(result.failure.disposition).toBe("recoverable");
       expect(result.partial.detectionResolved).toBeTrue();
+      expect(result.metadata.route?.status).toBe("unsupported");
+      expect(result.lineage.stages.some((stage) => stage.stage === "routing" && stage.status === "failed")).toBeTrue();
     }
   });
 
@@ -253,6 +257,7 @@ describe("UnifiedIngestionOrchestrationService", () => {
     if (result.ok) {
       expect(result.output.kind).toBe("image-metadata-records");
       expect(result.conversion.operation).toBe("image-metadata-to-records");
+      expect(result.metadata.normalization?.imageItemCount).toBe(1);
     }
   });
 
@@ -314,6 +319,8 @@ describe("UnifiedIngestionOrchestrationService", () => {
       expect(result.preview.degraded).toBeFalse();
       expect(result.preview.outputKind).toBe("records");
       expect(result.preview.summary.totalCount).toBe(1);
+      expect(result.metadata.preview?.sampleCount).toBe(1);
+      expect(result.lineage.stages.some((stage) => stage.stage === "preview")).toBeTrue();
     }
   });
 
@@ -514,6 +521,33 @@ describe("UnifiedIngestionOrchestrationService", () => {
     if (!result.ok) {
       expect(result.stage).toBe("normalization");
       expect(result.issues[0]?.code).toBe("normalization-failed");
+      expect(result.lineage.stages.some((stage) => stage.stage === "normalization" && stage.status === "failed")).toBeTrue();
+    }
+  });
+
+  it("keeps failure metadata sanitized without raw stack traces", async () => {
+    const service = new UnifiedIngestionOrchestrationService({
+      detector: Object.freeze({
+        detect: async () => {
+          throw new Error("detector exploded");
+        },
+      }) as never,
+    });
+
+    const result = await service.ingest({
+      source: createSource(),
+      payload: "{\"id\":1}",
+      configuration: Object.freeze({
+        mode: "simple",
+        outputTarget: UnifiedIngestionOutputTargetKinds.records,
+      }),
+    });
+
+    expect(result.ok).toBeFalse();
+    if (!result.ok) {
+      const issueDetails = result.issues[0]?.details;
+      expect(issueDetails?.errorType).toBe("Error");
+      expect("stack" in (issueDetails ?? {})).toBeFalse();
     }
   });
 });
