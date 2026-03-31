@@ -84,7 +84,7 @@ describe("PipelineGraphConstructionService", () => {
   it("fails fast for incompatible stage adjacency", () => {
     const registry = new PipelineStageRegistry();
     const stageInstances = Object.freeze([
-      stageInstance(registry.getDefinition(PipelineStageIds.FeatureEngineering)),
+      stageInstance(registry.getDefinition(PipelineStageIds.Aggregation)),
       stageInstance(registry.getDefinition(PipelineStageIds.Chunking)),
     ]);
 

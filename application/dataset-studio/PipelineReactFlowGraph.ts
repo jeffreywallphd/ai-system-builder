@@ -9,6 +9,9 @@ import {
   type PipelineGraphNode,
 } from "../../domain/dataset-studio/PipelineGraphDomain";
 import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+import { PipelineStageIds } from "../../domain/dataset-studio/PipelineStageDomain";
+import { parseFeatureEngineeringStageConfigFromStageOptions } from "../../domain/dataset-studio/FeatureEngineeringStageDomain";
+import { parseLabelingStageConfigFromStageOptions } from "../../domain/dataset-studio/LabelingStageDomain";
 
 export interface StageNodeData {
   readonly nodeKind: "stage";
@@ -23,6 +26,14 @@ export interface StageNodeData {
     readonly stageId: string;
     readonly sourceReference?: string;
     readonly previewReference?: string;
+  };
+  readonly stageSpecialization?: {
+    readonly annotationOriented: boolean;
+    readonly featureEngineeringOriented: boolean;
+    readonly annotationMode?: string;
+    readonly annotationTarget?: string;
+    readonly featureStrategy?: string;
+    readonly featureOperationCount?: number;
   };
 }
 
@@ -91,6 +102,45 @@ function toReactFlowNode(
   const stageIndex = stageOrder(node) - 1;
 
   if (node.kind === PipelineGraphNodeKinds.stage) {
+    const stageOptions = node.data.config.options;
+    const stageSpecialization = (() => {
+      if (node.data.stageId === PipelineStageIds.Labeling) {
+        try {
+          const config = parseLabelingStageConfigFromStageOptions(stageOptions, node.data.config.declaredInputType);
+          return Object.freeze({
+            annotationOriented: true,
+            featureEngineeringOriented: false,
+            annotationMode: config.mode,
+            annotationTarget: config.target,
+          });
+        } catch {
+          return Object.freeze({
+            annotationOriented: true,
+            featureEngineeringOriented: false,
+          });
+        }
+      }
+
+      if (node.data.stageId === PipelineStageIds.FeatureEngineering) {
+        try {
+          const config = parseFeatureEngineeringStageConfigFromStageOptions(stageOptions);
+          return Object.freeze({
+            annotationOriented: false,
+            featureEngineeringOriented: true,
+            featureStrategy: config.strategy,
+            featureOperationCount: config.operations.length,
+          });
+        } catch {
+          return Object.freeze({
+            annotationOriented: false,
+            featureEngineeringOriented: true,
+          });
+        }
+      }
+
+      return undefined;
+    })();
+
     return Object.freeze({
       id: node.id,
       type: "stage",
@@ -112,6 +162,7 @@ function toReactFlowNode(
           sourceReference: node.data.metadata.sourceReference,
           previewReference: node.data.metadata.previewReference,
         }),
+        stageSpecialization,
       }),
     });
   }

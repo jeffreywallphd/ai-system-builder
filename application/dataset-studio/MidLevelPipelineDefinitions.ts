@@ -17,6 +17,17 @@ import {
   toEnrichmentStageOptions,
   type EnrichmentStageConfig,
 } from "../../domain/dataset-studio/EnrichmentStageDomain";
+import {
+  FeatureEngineeringStrategyKinds,
+  createFeatureEngineeringStageConfig,
+  toFeatureEngineeringStageOptions,
+} from "../../domain/dataset-studio/FeatureEngineeringStageDomain";
+import {
+  AnnotationModeKinds,
+  AnnotationTargetKinds,
+  createLabelingStageConfig,
+  toLabelingStageOptions,
+} from "../../domain/dataset-studio/LabelingStageDomain";
 import type { PipelineDefinition } from "../../domain/dataset-studio/PipelineDefinitionDomain";
 import { validatePipelineDefinition } from "../../domain/dataset-studio/PipelineDefinitionDomain";
 import {
@@ -56,6 +67,7 @@ const TabularStageIds = Object.freeze([
   PipelineStageIds.Normalization,
   PipelineStageIds.Cleaning,
   PipelineStageIds.Transformation,
+  PipelineStageIds.FeatureEngineering,
   PipelineStageIds.Aggregation,
 ] as const);
 
@@ -71,6 +83,7 @@ const DefaultTabularStageOrder = Object.freeze([
   PipelineStageIds.Normalization,
   PipelineStageIds.Cleaning,
   PipelineStageIds.Transformation,
+  PipelineStageIds.FeatureEngineering,
   PipelineStageIds.Aggregation,
 ] as const);
 
@@ -114,6 +127,7 @@ export type DocumentChunkingStrategyKind =
 export const TabularCleaningPipelineOptionsSchema = z.object({
   stageOrder: z.array(z.nativeEnum(PipelineStageIds)).optional(),
   includeTransformation: z.boolean().default(true),
+  includeFeatureEngineering: z.boolean().default(true),
   includeAggregation: z.boolean().default(false),
   tabularShape: TabularShapeSchema.default(CanonicalDataShapeKinds.records),
   stageConfigOverrides: z.record(z.nativeEnum(PipelineStageIds), z.record(z.any())).optional(),
@@ -203,6 +217,9 @@ function resolveTabularStageOrder(options: TabularCleaningPipelineOptions): Read
       if (stageId === PipelineStageIds.Transformation) {
         return options.includeTransformation;
       }
+      if (stageId === PipelineStageIds.FeatureEngineering) {
+        return options.includeFeatureEngineering;
+      }
       if (stageId === PipelineStageIds.Aggregation) {
         return options.includeAggregation;
       }
@@ -228,12 +245,22 @@ function resolveTabularStageOrder(options: TabularCleaningPipelineOptions): Read
   }
 
   const aggregationIndex = requested.indexOf(PipelineStageIds.Aggregation);
+  const featureEngineeringIndex = requested.indexOf(PipelineStageIds.FeatureEngineering);
+  if (featureEngineeringIndex >= 0) {
+    if (transformationIndex < 0) {
+      throw new Error("Tabular cleaning pipeline requires Transformation when FeatureEngineering is enabled.");
+    }
+    if (featureEngineeringIndex <= transformationIndex) {
+      throw new Error("Tabular cleaning pipeline requires FeatureEngineering to run after Transformation.");
+    }
+  }
   if (aggregationIndex >= 0) {
     if (aggregationIndex <= cleaningIndex) {
       throw new Error("Tabular cleaning pipeline requires Aggregation to run after Cleaning.");
     }
-    if (transformationIndex >= 0 && aggregationIndex <= transformationIndex) {
-      throw new Error("Tabular cleaning pipeline requires Aggregation to run after Transformation.");
+    const aggregationPivot = featureEngineeringIndex >= 0 ? featureEngineeringIndex : transformationIndex;
+    if (aggregationPivot >= 0 && aggregationIndex <= aggregationPivot) {
+      throw new Error("Tabular cleaning pipeline requires Aggregation to run after prior feature/transformation stages.");
     }
   }
 
@@ -383,6 +410,16 @@ function toPipelineDefinition(input: {
       defaultOptions.preserveUnmapped = true;
       defaultOptions.dropEmptyTargets = false;
     }
+    if (stageId === PipelineStageIds.FeatureEngineering) {
+      Object.assign(defaultOptions, toFeatureEngineeringStageOptions(createFeatureEngineeringStageConfig({
+        strategy: FeatureEngineeringStrategyKinds.structured,
+        outputFieldPrefix: "feature",
+        preserveSourceFields: true,
+        enforceTypeValidation: true,
+        operations: Object.freeze([]),
+      })));
+      defaultOptions.featureProjectionFields = Object.freeze([]);
+    }
     if (stageId === PipelineStageIds.Aggregation) {
       defaultOptions.groupByFields = Object.freeze([]);
       defaultOptions.nullHandlingMode = "exclude";
@@ -400,8 +437,19 @@ function toPipelineDefinition(input: {
       defaultOptions.tokenizerEncoding = input.documentOptions.tokenizerEncoding;
     }
     if (stageId === PipelineStageIds.Labeling) {
-      defaultOptions.labelingMode = "placeholder";
-      defaultOptions.emitRecordLevelTags = true;
+      const target = input.isDocument
+        ? AnnotationTargetKinds.chunk
+        : AnnotationTargetKinds.record;
+      Object.assign(defaultOptions, toLabelingStageOptions(createLabelingStageConfig({
+        mode: AnnotationModeKinds.automaticPlaceholder,
+        target,
+        attachmentMode: input.isDocument ? "associated" : "embedded",
+        allowMultiLabel: false,
+        allowFreeText: true,
+        confidenceEnabled: true,
+        emitManualNeeded: true,
+        emitStatusField: true,
+      })));
     }
     if (stageId === PipelineStageIds.Enrichment) {
       const enrichmentDefaults = toEnrichmentStageOptions(createEnrichmentStageConfig({
@@ -531,7 +579,18 @@ function toImagePipelineDefinition(input: {
       defaults.transformationEnabled = true;
     }
     if (stageId === PipelineStageIds.Labeling) {
-      defaults.labelingMode = "placeholder";
+      Object.assign(defaults, toLabelingStageOptions(createLabelingStageConfig({
+        mode: AnnotationModeKinds.automaticPlaceholder,
+        target: AnnotationTargetKinds.imageRecord,
+        attachmentMode: "embedded",
+        allowMultiLabel: true,
+        allowFreeText: true,
+        confidenceEnabled: true,
+        emitManualNeeded: true,
+        emitStatusField: true,
+        assistedSeedFromClassification: true,
+        assistanceProvider: "data-classification",
+      })));
       defaults.emitRecordLevelTags = true;
       defaults.emitImageTags = true;
     }
@@ -1015,6 +1074,69 @@ export const TabularCleaningStageCompositionDefinitions: ReadonlyArray<StageComp
     ]),
   }),
   Object.freeze({
+    stageId: PipelineStageIds.FeatureEngineering,
+    inspectable: true,
+    groups: Object.freeze([
+      Object.freeze({
+        id: "tabular-feature-normalization",
+        executionOrder: 1,
+        executionMode: "sequential",
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.typeNormalization,
+            version: "1.0.0",
+            role: "feature-input-normalization",
+            configMapping: Object.freeze([
+              { stageConfigKey: "trimStrings", assetConfigKey: "trimStrings", defaultValue: true },
+              { stageConfigKey: "emptyStringAsNull", assetConfigKey: "emptyStringAsNull", defaultValue: false },
+            ]),
+          }),
+        ]),
+      }),
+      Object.freeze({
+        id: "tabular-feature-generation",
+        executionOrder: 2,
+        executionMode: "sequential",
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "feature-generator",
+            configMapping: Object.freeze([
+              { stageConfigKey: "featureStrategy", assetConfigKey: "featureStrategy", defaultValue: "structured" },
+              { stageConfigKey: "featureOperations", assetConfigKey: "featureOperations", defaultValue: Object.freeze([]) },
+              { stageConfigKey: "featureOutputFieldPrefix", assetConfigKey: "outputFieldPrefix", defaultValue: "feature" },
+              { stageConfigKey: "featurePreserveSourceFields", assetConfigKey: "preserveSourceFields", defaultValue: true },
+            ]),
+          }),
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.dataValidation,
+            version: "1.0.0",
+            role: "feature-validator",
+            configMapping: Object.freeze([
+              { stageConfigKey: "featureEnforceTypeValidation", assetConfigKey: "enabled", defaultValue: true },
+            ]),
+          }),
+        ]),
+      }),
+      Object.freeze({
+        id: "tabular-feature-projection",
+        executionOrder: 3,
+        executionMode: "sequential",
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "feature-projection",
+            configMapping: Object.freeze([
+              { stageConfigKey: "featureProjectionFields", assetConfigKey: "selectedFields", defaultValue: Object.freeze([]) },
+            ]),
+          }),
+        ]),
+      }),
+    ]),
+  }),
+  Object.freeze({
     stageId: PipelineStageIds.Aggregation,
     inspectable: true,
     groups: Object.freeze([
@@ -1138,16 +1260,45 @@ export const DocumentPreparationStageCompositionDefinitions: ReadonlyArray<Stage
     inspectable: true,
     groups: Object.freeze([
       Object.freeze({
-        id: "document-labeling",
+        id: "document-annotation-target-preparation",
         executionOrder: 1,
         executionMode: "sequential",
         assets: Object.freeze([
           Object.freeze({
-            assetId: DatasetTransformationStageAssetIds.dataClassification,
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
             version: "1.0.0",
-            role: "labeling-placeholder",
+            role: "document-annotation-target-preparer",
             configMapping: Object.freeze([
-              { stageConfigKey: "labelingMode", assetConfigKey: "labelingMode", defaultValue: "placeholder" },
+              { stageConfigKey: "annotationTarget", assetConfigKey: "annotationTarget", defaultValue: "chunk" },
+              { stageConfigKey: "annotationAttachmentMode", assetConfigKey: "annotationAttachmentMode", defaultValue: "associated" },
+            ]),
+          }),
+        ]),
+      }),
+      Object.freeze({
+        id: "document-annotation-attach-and-validate",
+        executionOrder: 2,
+        executionMode: "sequential",
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "document-annotation-attacher",
+            configMapping: Object.freeze([
+              { stageConfigKey: "annotationRecords", assetConfigKey: "annotationRecords", defaultValue: Object.freeze([]) },
+              { stageConfigKey: "annotationAllowMultiLabel", assetConfigKey: "allowMultiLabel", defaultValue: false },
+              { stageConfigKey: "annotationAllowFreeText", assetConfigKey: "allowFreeText", defaultValue: true },
+              { stageConfigKey: "annotationAllowedLabels", assetConfigKey: "allowedLabels", defaultValue: Object.freeze([]) },
+              { stageConfigKey: "annotationConfidenceEnabled", assetConfigKey: "confidenceEnabled", defaultValue: true },
+              { stageConfigKey: "annotationSourceLabel", assetConfigKey: "sourceLabel", defaultValue: "manual" },
+            ]),
+          }),
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.dataValidation,
+            version: "1.0.0",
+            role: "document-annotation-validator",
+            configMapping: Object.freeze([
+              { stageConfigKey: "annotationEmitStatusField", assetConfigKey: "emitStatusField", defaultValue: true },
             ]),
           }),
         ]),
@@ -1243,17 +1394,101 @@ export const ImagePreparationStageCompositionDefinitions: ReadonlyArray<StageCom
     inspectable: true,
     groups: Object.freeze([
       Object.freeze({
-        id: "image-labeling",
+        id: "image-annotation-target-preparation",
         executionOrder: 1,
         executionMode: "sequential",
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "image-annotation-target-preparer",
+            configMapping: Object.freeze([
+              { stageConfigKey: "annotationTarget", assetConfigKey: "annotationTarget", defaultValue: "image-record" },
+              { stageConfigKey: "annotationAttachmentMode", assetConfigKey: "annotationAttachmentMode", defaultValue: "embedded" },
+            ]),
+          }),
+        ]),
+      }),
+      Object.freeze({
+        id: "image-annotation-assist-placeholder",
+        executionOrder: 2,
+        executionMode: "sequential",
+        condition: Object.freeze({ optionEquals: Object.freeze({ labelingMode: "assisted", annotationAssistedSeedFromClassification: false }) }),
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "image-assist-placeholder",
+            staticConfig: Object.freeze({
+              assistanceContract: "placeholder",
+            }),
+            configMapping: Object.freeze([
+              { stageConfigKey: "labelingMode", assetConfigKey: "labelingMode", defaultValue: "assisted" },
+            ]),
+          }),
+        ]),
+      }),
+      Object.freeze({
+        id: "image-annotation-assist-seed",
+        executionOrder: 2,
+        executionMode: "sequential",
+        condition: Object.freeze({ optionEquals: Object.freeze({ labelingMode: "assisted", annotationAssistedSeedFromClassification: true }) }),
         assets: Object.freeze([
           Object.freeze({
             assetId: DatasetTransformationStageAssetIds.dataClassification,
             version: "1.0.0",
             role: "image-labeling-placeholder",
             configMapping: Object.freeze([
-              { stageConfigKey: "labelingMode", assetConfigKey: "labelingMode", defaultValue: "placeholder" },
+              { stageConfigKey: "labelingMode", assetConfigKey: "labelingMode", defaultValue: "assisted" },
               { stageConfigKey: "emitImageTags", assetConfigKey: "emitImageTags", defaultValue: true },
+            ]),
+          }),
+        ]),
+      }),
+      Object.freeze({
+        id: "image-annotation-automatic-placeholder",
+        executionOrder: 2,
+        executionMode: "sequential",
+        condition: Object.freeze({ optionEquals: Object.freeze({ labelingMode: "automatic-placeholder" }) }),
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "image-automatic-annotation-placeholder",
+            staticConfig: Object.freeze({
+              assistanceContract: "automatic-placeholder",
+            }),
+            configMapping: Object.freeze([
+              { stageConfigKey: "annotationEmitManualNeeded", assetConfigKey: "emitManualNeeded", defaultValue: true },
+              { stageConfigKey: "annotationEmitStatusField", assetConfigKey: "emitStatusField", defaultValue: true },
+            ]),
+          }),
+        ]),
+      }),
+      Object.freeze({
+        id: "image-annotation-attach-and-validate",
+        executionOrder: 3,
+        executionMode: "sequential",
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "image-annotation-attacher",
+            configMapping: Object.freeze([
+              { stageConfigKey: "annotationRecords", assetConfigKey: "annotationRecords", defaultValue: Object.freeze([]) },
+              { stageConfigKey: "annotationAllowMultiLabel", assetConfigKey: "allowMultiLabel", defaultValue: true },
+              { stageConfigKey: "annotationAllowFreeText", assetConfigKey: "allowFreeText", defaultValue: true },
+              { stageConfigKey: "annotationAllowedLabels", assetConfigKey: "allowedLabels", defaultValue: Object.freeze([]) },
+              { stageConfigKey: "annotationConfidenceEnabled", assetConfigKey: "confidenceEnabled", defaultValue: true },
+              { stageConfigKey: "annotationSourceLabel", assetConfigKey: "sourceLabel", defaultValue: "manual" },
+            ]),
+          }),
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.dataValidation,
+            version: "1.0.0",
+            role: "image-annotation-validator",
+            configMapping: Object.freeze([
+              { stageConfigKey: "annotationEmitStatusField", assetConfigKey: "emitStatusField", defaultValue: true },
             ]),
           }),
         ]),

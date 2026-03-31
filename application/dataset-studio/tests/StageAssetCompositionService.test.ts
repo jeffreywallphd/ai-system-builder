@@ -66,6 +66,33 @@ describe("StageAssetCompositionService", () => {
     expect(resolved.groups[0]?.assets.some((asset) => asset.assetId === "unified-ingestion")).toBeTrue();
   });
 
+  it("maps feature engineering to ordered reusable multi-asset execution", () => {
+    const registry = new PipelineStageRegistry();
+    const service = new StageAssetCompositionService();
+
+    const resolved = service.resolve({
+      stage: registry.getDefinition(PipelineStageIds.FeatureEngineering),
+      config: {
+        mode: PipelineStageConfigModes.advanced,
+        declaredInputType: CanonicalDataShapeKinds.records,
+        options: Object.freeze({
+          featureStrategy: "structured",
+          featureOperations: Object.freeze([]),
+        }),
+      },
+    });
+
+    expect(resolved.groups.map((group) => group.id)).toEqual([
+      "feature-normalization",
+      "feature-generation",
+      "feature-projection",
+    ]);
+    expect(resolved.groups[1]?.assets.map((asset) => asset.assetId)).toEqual([
+      "field-mapping",
+      "data-validation",
+    ]);
+  });
+
   it("projects resolved composition to a React Flow compatible graph segment", () => {
     const registry = new PipelineStageRegistry();
     const service = new StageAssetCompositionService();
@@ -128,5 +155,28 @@ describe("StageAssetCompositionService", () => {
     });
 
     expect(metadataResolved.groups[0]?.assets.some((asset) => asset.role === "image-metadata-augmentation")).toBeTrue();
+  });
+
+  it("maps labeling assisted mode to placeholder contracts when no classifier seeding is configured", () => {
+    const registry = new PipelineStageRegistry();
+    const service = new StageAssetCompositionService();
+
+    const resolved = service.resolve({
+      stage: registry.getDefinition(PipelineStageIds.Labeling),
+      config: {
+        mode: PipelineStageConfigModes.advanced,
+        declaredInputType: CanonicalDataShapeKinds.textItems,
+        options: Object.freeze({
+          labelingMode: "assisted",
+          annotationAssistedSeedFromClassification: false,
+          annotationTarget: "chunk",
+        }),
+      },
+    });
+
+    const roleSet = new Set(resolved.groups.flatMap((group) => group.assets.map((asset) => asset.role)));
+    expect(roleSet.has("assisted-annotation-placeholder")).toBeTrue();
+    expect(roleSet.has("annotation-label-attacher")).toBeTrue();
+    expect(roleSet.has("annotation-validation")).toBeTrue();
   });
 });

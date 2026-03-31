@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   createCanonicalRecordsShape,
   createCanonicalTableShape,
+  createCanonicalTextItemsShape,
 } from "../../../domain/dataset-studio/CanonicalDataShapes";
 import { PipelineExecutionStatusKinds } from "../../../domain/dataset-studio/PipelineInspectionDomain";
 import {
@@ -147,5 +148,103 @@ describe("PipelineInspectionService", () => {
     expect(profiling?.metadata.summaryStats?.profiledFields).toBe(12);
     expect(cleaning?.metadata.summaryStats?.deduplicatedCount).toBe(8);
     expect(extraction?.metadata.summaryStats?.tokenCount).toBe(320);
+  });
+
+  it("surfaces feature-engineering and labeling inspection metadata for mode/status/count visibility", () => {
+    const registry = new PipelineStageRegistry();
+    const stageInstances = Object.freeze([
+      createPipelineStageInstance({
+        definition: registry.getDefinition(PipelineStageIds.Transformation),
+        config: {
+          mode: PipelineStageConfigModes.advanced,
+          declaredInputType: "records",
+          expectedOutputType: "records",
+          options: Object.freeze({}),
+        },
+      }),
+      createPipelineStageInstance({
+        definition: registry.getDefinition(PipelineStageIds.FeatureEngineering),
+        config: {
+          mode: PipelineStageConfigModes.advanced,
+          declaredInputType: "records",
+          expectedOutputType: "records",
+          options: Object.freeze({
+            featureStrategy: "structured",
+            featureOperations: Object.freeze([
+              Object.freeze({
+                kind: "derived-numeric",
+                operationId: "op-1",
+                targetField: "feature.margin",
+                method: "difference",
+                sourceFields: Object.freeze(["price", "cost"]),
+              }),
+            ]),
+          }),
+        },
+      }),
+      createPipelineStageInstance({
+        definition: registry.getDefinition(PipelineStageIds.Labeling),
+        config: {
+          mode: PipelineStageConfigModes.advanced,
+          declaredInputType: "records",
+          expectedOutputType: "records",
+          options: Object.freeze({
+            labelingMode: "assisted",
+            annotationTarget: "record",
+            annotationAttachmentMode: "embedded",
+            annotationAllowFreeText: true,
+            annotationEmitManualNeeded: true,
+            annotationAssistedSeedFromClassification: false,
+            annotationRecords: Object.freeze([
+              Object.freeze({
+                annotationId: "ann-1",
+                target: "record",
+                targetRef: "r-1",
+                label: "positive",
+                source: "seed",
+                status: "manual-needed",
+              }),
+            ]),
+          }),
+        },
+      }),
+    ]);
+
+    const graph = buildPipelineGraph({ stageInstances });
+    const transformationOutput = createCanonicalRecordsShape({
+      records: Object.freeze([
+        Object.freeze({ recordId: "r-1", fields: Object.freeze({ price: 12, cost: 3 }) }),
+      ]),
+    });
+    const featureOutput = createCanonicalRecordsShape({
+      records: Object.freeze([
+        Object.freeze({ recordId: "r-1", fields: Object.freeze({ price: 12, cost: 3, "feature.margin": 9 }) }),
+      ]),
+    });
+
+    const inspection = new PipelineInspectionService().inspectPipeline(graph, Object.freeze({
+      pipelineGraph: graph,
+      stageStatusById: Object.freeze({
+        [PipelineStageIds.FeatureEngineering]: PipelineExecutionStatusKinds.complete,
+        [PipelineStageIds.Labeling]: PipelineExecutionStatusKinds.running,
+      }),
+      stageOutputById: Object.freeze({
+        [PipelineStageIds.Transformation]: transformationOutput,
+        [PipelineStageIds.FeatureEngineering]: featureOutput,
+        [PipelineStageIds.Labeling]: createCanonicalTextItemsShape({
+          items: Object.freeze([
+            Object.freeze({ itemId: "chunk-1", text: "sample", sourceDocumentId: "doc-1" }),
+          ]),
+        }),
+      }),
+    }));
+
+    const featureStage = inspection.stages.find((stage) => stage.stageId === PipelineStageIds.FeatureEngineering);
+    const labelingStage = inspection.stages.find((stage) => stage.stageId === PipelineStageIds.Labeling);
+
+    expect(featureStage?.metadata.summaryStats?.["feature.operationCount"]).toBe(1);
+    expect(featureStage?.metadata.summaryStats?.["feature.beforeAfterPreviewAvailable"]).toBeTrue();
+    expect(labelingStage?.metadata.summaryStats?.["annotation.mode"]).toBe("assisted");
+    expect(labelingStage?.metadata.summaryStats?.["annotation.manualNeededCount"]).toBe(1);
   });
 });

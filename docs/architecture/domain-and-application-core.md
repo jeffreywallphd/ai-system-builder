@@ -1623,3 +1623,18 @@ Explicitly later than this scope:
   - image metadata previews (dimensions/format snapshots),
   - OCR text previews when extraction emits text items,
   - transform/enrichment summary stats surfaced through existing `PipelineInspectionService` hooks.
+
+## Direction 5 extension update: Feature engineering + labeling stage compositions (stories 17.11-17.12)
+
+- Dataset Studio now has dedicated stage-domain contracts for:
+  - `FeatureEngineeringStageConfig`, `FeatureEngineeringOperation`, and `FeatureEngineeringStrategy` (`domain/dataset-studio/FeatureEngineeringStageDomain.ts`),
+  - `LabelingStageConfig`, `AnnotationMode`, `AnnotationTarget`, and `AnnotationRecord` (`domain/dataset-studio/LabelingStageDomain.ts`).
+- Both contracts are zod-backed, serializable, and include stage-option parse/round-trip helpers for canonical stage config persistence and safe reconfiguration.
+- Stage-to-asset composition now supports richer reusable multi-asset mappings in `application/dataset-studio/StageAssetCompositionService.ts`:
+  - feature engineering expands to normalization -> generation -> validation -> projection patterns over reusable existing transformation assets,
+  - labeling expands to target preparation -> mode-aware assisted/placeholder seeding -> annotation attachment -> output validation using existing reusable assets.
+- Canonical-shape compatibility was expanded for feature engineering (`records`, `table`, `text-items`, `image-metadata-records`) while preserving stage typing/ordering constraints in the existing stage registry and graph-construction seams.
+- Pipeline graph + React Flow mapping now carry stage specialization metadata for annotation-oriented and feature-engineering-oriented nodes (`PipelineReactFlowGraph`), enabling future UI differentiation without introducing a parallel graph model.
+- Inspection integration now emits feature/annotation-specific metadata through existing inspection contracts (`PipelineInspectionService`), including before/after field visibility for feature stages and annotation mode/count/manual-needed status for labeling stages.
+- Editing integration remains on the existing 17.6 seam and now adds stage-configuration updates with stage-specific safe normalization for feature-engineering and labeling configurations (`PipelineEditingService.updateStageConfiguration(...)`).
+- Mid-level pipeline packages now include feature-engineering participation in tabular analytics flows and updated labeling option contracts for document/image preparation paths while reusing the same composition, graph, and inspection infrastructure.

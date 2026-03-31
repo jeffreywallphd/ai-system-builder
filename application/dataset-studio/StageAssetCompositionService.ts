@@ -522,8 +522,24 @@ const DefaultStageCompositionDefinitions: ReadonlyArray<StageCompositionDefiniti
     inspectable: true,
     groups: Object.freeze([
       {
-        id: "feature-engineering",
+        id: "feature-normalization",
         executionOrder: 1,
+        executionMode: "sequential",
+        assets: Object.freeze([
+          {
+            assetId: DatasetTransformationStageAssetIds.typeNormalization,
+            version: "1.0.0",
+            role: "feature-input-normalization",
+            configMapping: Object.freeze([
+              { stageConfigKey: "trimStrings", assetConfigKey: "trimStrings", defaultValue: true },
+              { stageConfigKey: "emptyStringAsNull", assetConfigKey: "emptyStringAsNull", defaultValue: false },
+            ]),
+          },
+        ]),
+      },
+      {
+        id: "feature-generation",
+        executionOrder: 2,
         executionMode: "sequential",
         assets: Object.freeze([
           {
@@ -531,7 +547,33 @@ const DefaultStageCompositionDefinitions: ReadonlyArray<StageCompositionDefiniti
             version: "1.0.0",
             role: "derived-field-generator",
             configMapping: Object.freeze([
-              { stageConfigKey: "featureSpec", assetConfigKey: "featureSpec" },
+              { stageConfigKey: "featureStrategy", assetConfigKey: "featureStrategy", defaultValue: "structured" },
+              { stageConfigKey: "featureOperations", assetConfigKey: "featureOperations", defaultValue: Object.freeze([]) },
+              { stageConfigKey: "featureOutputFieldPrefix", assetConfigKey: "outputFieldPrefix", defaultValue: "feature" },
+              { stageConfigKey: "featurePreserveSourceFields", assetConfigKey: "preserveSourceFields", defaultValue: true },
+            ]),
+          },
+          {
+            assetId: DatasetTransformationStageAssetIds.dataValidation,
+            version: "1.0.0",
+            role: "feature-validation",
+            configMapping: Object.freeze([
+              { stageConfigKey: "featureEnforceTypeValidation", assetConfigKey: "enabled", defaultValue: true },
+            ]),
+          },
+        ]),
+      },
+      {
+        id: "feature-projection",
+        executionOrder: 3,
+        executionMode: "sequential",
+        assets: Object.freeze([
+          {
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "feature-projection",
+            configMapping: Object.freeze([
+              { stageConfigKey: "featureProjectionFields", assetConfigKey: "selectedFields", defaultValue: Object.freeze([]) },
             ]),
           },
         ]),
@@ -619,16 +661,109 @@ const DefaultStageCompositionDefinitions: ReadonlyArray<StageCompositionDefiniti
     inspectable: true,
     groups: Object.freeze([
       {
-        id: "labeling",
+        id: "annotation-target-preparation",
         executionOrder: 1,
         executionMode: "sequential",
         assets: Object.freeze([
           {
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "annotation-target-preparer",
+            configMapping: Object.freeze([
+              { stageConfigKey: "annotationTarget", assetConfigKey: "annotationTarget", defaultValue: "record" },
+              { stageConfigKey: "annotationAttachmentMode", assetConfigKey: "annotationAttachmentMode", defaultValue: "embedded" },
+            ]),
+          },
+        ]),
+      },
+      {
+        id: "annotation-assisted-placeholder",
+        executionOrder: 2,
+        executionMode: "sequential",
+        condition: { optionEquals: Object.freeze({ labelingMode: "assisted", annotationAssistedSeedFromClassification: false }) },
+        assets: Object.freeze([
+          {
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "assisted-annotation-placeholder",
+            staticConfig: Object.freeze({
+              assistanceContract: "placeholder",
+              provider: "internal-placeholder",
+            }),
+            configMapping: Object.freeze([
+              { stageConfigKey: "labelingMode", assetConfigKey: "labelingMode", defaultValue: "assisted" },
+            ]),
+          },
+        ]),
+      },
+      {
+        id: "annotation-assisted-seeding",
+        executionOrder: 2,
+        executionMode: "sequential",
+        condition: { optionEquals: Object.freeze({ labelingMode: "assisted", annotationAssistedSeedFromClassification: true }) },
+        assets: Object.freeze([
+          {
             assetId: DatasetTransformationStageAssetIds.dataClassification,
             version: "1.0.0",
-            role: "annotation-labeling",
+            role: "assisted-annotation-seed",
             configMapping: Object.freeze([
               { stageConfigKey: "emitRecordLevelTags", assetConfigKey: "emitRecordLevelTags", defaultValue: true },
+              { stageConfigKey: "emitImageTags", assetConfigKey: "emitImageTags", defaultValue: true },
+            ]),
+          },
+        ]),
+      },
+      {
+        id: "annotation-automatic-placeholder",
+        executionOrder: 2,
+        executionMode: "sequential",
+        condition: { optionEquals: Object.freeze({ labelingMode: "automatic-placeholder" }) },
+        assets: Object.freeze([
+          {
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "automatic-annotation-placeholder",
+            staticConfig: Object.freeze({
+              assistanceContract: "automatic-placeholder",
+            }),
+            configMapping: Object.freeze([
+              { stageConfigKey: "annotationEmitManualNeeded", assetConfigKey: "emitManualNeeded", defaultValue: true },
+              { stageConfigKey: "annotationEmitStatusField", assetConfigKey: "emitStatusField", defaultValue: true },
+            ]),
+          },
+        ]),
+      },
+      {
+        id: "annotation-label-attachment",
+        executionOrder: 3,
+        executionMode: "sequential",
+        assets: Object.freeze([
+          {
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "annotation-label-attacher",
+            configMapping: Object.freeze([
+              { stageConfigKey: "annotationRecords", assetConfigKey: "annotationRecords", defaultValue: Object.freeze([]) },
+              { stageConfigKey: "annotationAllowMultiLabel", assetConfigKey: "allowMultiLabel", defaultValue: false },
+              { stageConfigKey: "annotationAllowFreeText", assetConfigKey: "allowFreeText", defaultValue: false },
+              { stageConfigKey: "annotationAllowedLabels", assetConfigKey: "allowedLabels", defaultValue: Object.freeze([]) },
+              { stageConfigKey: "annotationConfidenceEnabled", assetConfigKey: "confidenceEnabled", defaultValue: true },
+              { stageConfigKey: "annotationSourceLabel", assetConfigKey: "sourceLabel", defaultValue: "manual" },
+            ]),
+          },
+        ]),
+      },
+      {
+        id: "annotation-validation",
+        executionOrder: 4,
+        executionMode: "sequential",
+        assets: Object.freeze([
+          {
+            assetId: DatasetTransformationStageAssetIds.dataValidation,
+            version: "1.0.0",
+            role: "annotation-validation",
+            configMapping: Object.freeze([
+              { stageConfigKey: "annotationEmitStatusField", assetConfigKey: "emitStatusField", defaultValue: true },
             ]),
           },
         ]),

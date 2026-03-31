@@ -23,8 +23,11 @@ describe("PipelineStageRegistry", () => {
   it("exposes strongly typed stage definitions", () => {
     const registry = new PipelineStageRegistry();
     const extraction = registry.getDefinition(PipelineStageIds.Extraction);
+    const feature = registry.getDefinition(PipelineStageIds.FeatureEngineering);
 
     expect(extraction.supportsPreview).toBeTrue();
     expect(extraction.orderingConstraints.before).toContain(PipelineStageIds.Chunking);
+    expect(feature.allowedInputTypes).toContain("text-items");
+    expect(feature.allowedInputTypes).toContain("image-metadata-records");
   });
 });

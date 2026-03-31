@@ -118,4 +118,28 @@ describe("PipelineEditingService", () => {
     expect(regenerated.pipelineGraph.nodes.length).toBeGreaterThan(0);
     expect(regenerated.reactFlowGraph.edges.length).toBe(regenerated.pipelineGraph.edges.length);
   });
+
+  it("updates labeling stage configuration with safe mode replacement semantics", () => {
+    const service = new PipelineEditingService();
+    const base = createBaseDefinition();
+    const withLabeling = service.addStage(base, PipelineStageIds.Labeling, 4);
+
+    const updated = service.updateStageConfiguration(
+      withLabeling.definition,
+      PipelineStageIds.Labeling,
+      Object.freeze({
+        labelingMode: "assisted",
+        annotationTarget: "record",
+        annotationAttachmentMode: "embedded",
+        annotationAllowFreeText: true,
+        annotationEmitManualNeeded: true,
+        annotationAssistedSeedFromClassification: false,
+      }),
+    );
+
+    const labelingStage = updated.definition.stageInstances.find((stage) => stage.stageId === PipelineStageIds.Labeling);
+    expect(labelingStage?.config.options.labelingMode).toBe("assisted");
+    expect(labelingStage?.config.options.annotationTarget).toBe("record");
+    expect(updated.pipelineGraph.nodes.some((node) => node.id === "stage:Labeling")).toBeTrue();
+  });
 });
