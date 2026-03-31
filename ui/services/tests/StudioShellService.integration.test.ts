@@ -2190,7 +2190,8 @@ describe("StudioShellService integration", () => {
     createdRoots.push(root);
     const databasePath = path.join(root, "workflow-run-success.sqlite");
     const repository = new SqliteStudioShellRepository(databasePath);
-    const backendApi = new StudioShellBackendApi(repository);
+    const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
+    const backendApi = new StudioShellBackendApi(repository, undefined, workflowRunRepository);
     installBridge(backendApi);
 
     const service = new StudioShellService();
@@ -2242,6 +2243,11 @@ describe("StudioShellService integration", () => {
       target: "preview",
       status: "delivered",
     }));
+    expect(result.data?.run?.runId).toBeDefined();
+
+    const runDetail = await service.getWorkflowRunDetail(result.data!.run!.runId);
+    expect(runDetail.ok).toBeTrue();
+    expect(runDetail.data?.summary.workflowId).toContain("workflow:");
 
     repository.dispose();
   });

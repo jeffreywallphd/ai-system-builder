@@ -5,6 +5,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import {
   applyWorkflowRunFiltersAndSort,
   formatFailureCue,
+  isEditRerunSupported,
+  isRunRerunSupported,
   orderStepRuns,
   summarizeStepInputs,
   summarizeStepOutputs,
@@ -249,6 +251,38 @@ describe("WorkflowStudioRunHistoryPanel", () => {
     expect(cue).toContain("Tool execution failed");
   });
 
+  it("exposes rerun support guards for terminal and editable historical context", () => {
+    expect(isRunRerunSupported({
+      summary: {
+        status: "completed",
+      },
+    } as never)).toBeTrue();
+    expect(isRunRerunSupported({
+      summary: {
+        status: "running",
+      },
+    } as never)).toBeFalse();
+
+    expect(isEditRerunSupported({
+      summary: {
+        status: "failed",
+      },
+      executionContext: {
+        executionInput: {
+          parameters: {},
+        },
+      },
+    } as never)).toBeTrue();
+    expect(isEditRerunSupported({
+      summary: {
+        status: "failed",
+      },
+      executionContext: {
+        executionInput: undefined,
+      },
+    } as never)).toBeFalse();
+  });
+
   it("renders save guidance when no persisted workflow id is available", () => {
     installBridge();
     const html = renderToString(
@@ -278,6 +312,26 @@ describe("WorkflowStudioRunHistoryPanel", () => {
     );
 
     expect(html).toContain("Loading workflow runs...");
+  });
+
+  it("resolves workflow entry navigation links from run-route query context", () => {
+    installBridge({
+      listWorkflowRuns: async () => new Promise<string>(() => {
+        // Keep loading state to snapshot initial route-aware links.
+      }),
+    });
+
+    const html = renderToString(
+      <MemoryRouter initialEntries={["/studio-shell/workflow/runs?workflowId=workflow:persisted:1&workflowStatus=draft"]}>
+        <Routes>
+          <Route path="/studio-shell/workflow/runs" element={<WorkflowStudioRunHistoryPanel />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(html).toContain("Workflow editor");
+    expect(html).toContain("Run history");
+    expect(html).toContain("workflowEntry=resume-draft");
   });
 
   it("shows detail loading state when the route targets a specific run", () => {

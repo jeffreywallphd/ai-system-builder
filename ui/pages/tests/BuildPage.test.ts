@@ -8,6 +8,8 @@ describe("BuildPage", () => {
     expect(source).toContain("PersistedWorkflowEntryService");
     expect(source).toContain("Reuse a Saved Workflow");
     expect(source).toContain("buildWorkflowStudioOpenPath");
+    expect(source).toContain("buildWorkflowRunHistoryPath");
+    expect(source).toContain("View run history");
     expect(source).toContain('data-testid="build-persisted-workflow-list"');
   });
 });

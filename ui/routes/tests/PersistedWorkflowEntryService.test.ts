@@ -40,6 +40,9 @@ describe("PersistedWorkflowEntryService", () => {
     expect(service.buildWorkflowStudioOpenPath(entry)).toContain("workflowEntry=resume-draft");
     expect(service.buildRunWorkflowPath(entry)).toContain("context=workflow");
     expect(service.buildRunWorkflowPath(entry)).toContain("workflowId=workflow%3Apersisted%3A1");
+    expect(service.buildWorkflowRunHistoryPath(entry)).toContain("/studio-shell/workflow/runs");
+    expect(service.buildWorkflowRunHistoryPath(entry)).toContain("workflowEntry=resume-draft");
+    expect(service.buildWorkflowRunDetailPath(entry, "run:1")).toContain("run%3A1");
   });
 
   it("fails safely when explore retrieval fails", async () => {

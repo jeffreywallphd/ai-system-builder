@@ -186,6 +186,26 @@ function createRerunEditableForm(detail?: WorkflowRunDetailReadModel): WorkflowR
   });
 }
 
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+export function isRunRerunSupported(detail?: WorkflowRunDetailReadModel): boolean {
+  if (!detail) {
+    return false;
+  }
+  return detail.summary.status === WorkflowRunStatuses.completed
+    || detail.summary.status === WorkflowRunStatuses.failed
+    || detail.summary.status === WorkflowRunStatuses.cancelled;
+}
+
+export function isEditRerunSupported(detail?: WorkflowRunDetailReadModel): boolean {
+  if (!isRunRerunSupported(detail)) {
+    return false;
+  }
+  return isRecord(detail?.executionContext?.executionInput);
+}
+
 function normalizeTriggerSourceLabel(source: WorkflowRunSummaryReadModel["triggerSource"]): string {
   switch (source) {
     case WorkflowRunTriggerSources.manual:
@@ -351,9 +371,30 @@ export default function WorkflowStudioRunHistoryPanel({
   const navigate = useNavigate();
   const location = useLocation();
   const routeParams = useParams<{ runId?: string }>();
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const selectedRunId = routeParams.runId?.trim();
   const isRunHistoryRoute = location.pathname.startsWith(ROUTE_PATHS.workflowStudioRuns);
-  const [isLoadingRuns, setIsLoadingRuns] = useState(Boolean(workflowId));
+  const routeWorkflowId = workflowId
+    ?? searchParams.get("workflowId")?.trim()
+    ?? searchParams.get("assetId")?.trim()
+    ?? undefined;
+  const routeWorkflowStatus = searchParams.get("workflowStatus")?.trim() === "draft"
+    ? "draft"
+    : "saved";
+  const effectiveWorkflowId = workflowId ?? routeWorkflowId;
+  const runRouteOptions = effectiveWorkflowId
+    ? Object.freeze({
+      workflowId: effectiveWorkflowId,
+      workflowStatus: routeWorkflowStatus,
+    } as const)
+    : undefined;
+  const workflowEditorPath = buildWorkflowStudioRunHistoryPath({
+    workflowId: runRouteOptions?.workflowId,
+    workflowStatus: runRouteOptions?.workflowStatus,
+    basePath: ROUTE_PATHS.workflowStudio,
+  });
+  const runHistoryPath = buildWorkflowStudioRunHistoryPath(runRouteOptions);
+  const [isLoadingRuns, setIsLoadingRuns] = useState(Boolean(effectiveWorkflowId));
   const [runLoadError, setRunLoadError] = useState<string | undefined>();
   const [runs, setRuns] = useState<ReadonlyArray<WorkflowRunSummaryReadModel>>([]);
   const [statusFilter, setStatusFilter] = useState<WorkflowRunStatusFilter>("all");
@@ -368,7 +409,7 @@ export default function WorkflowStudioRunHistoryPanel({
   const [editRerunForm, setEditRerunForm] = useState<WorkflowRerunEditableForm>(() => createRerunEditableForm());
 
   useEffect(() => {
-    if (!workflowId) {
+    if (!effectiveWorkflowId) {
       setRuns([]);
       setRunLoadError(undefined);
       return;
@@ -379,7 +420,7 @@ export default function WorkflowStudioRunHistoryPanel({
     setRunLoadError(undefined);
 
     void service.listWorkflowRuns({
-      workflowId,
+      workflowId: effectiveWorkflowId,
       limit: 200,
     }).then((response) => {
       if (!active) {
@@ -406,7 +447,7 @@ export default function WorkflowStudioRunHistoryPanel({
     return () => {
       active = false;
     };
-  }, [service, workflowId]);
+  }, [effectiveWorkflowId, service]);
 
   useEffect(() => {
     if (!selectedRunId) {
@@ -464,14 +505,16 @@ export default function WorkflowStudioRunHistoryPanel({
   const orderedStepRuns = useMemo(() => {
     return orderStepRuns(selectedDetail?.stepRuns ?? []);
   }, [selectedDetail?.stepRuns]);
+  const canRerunSelected = isRunRerunSupported(selectedDetail);
+  const canEditRerunSelected = isEditRerunSupported(selectedDetail);
 
   const reloadRuns = async (): Promise<void> => {
-    if (!workflowId) {
+    if (!effectiveWorkflowId) {
       return;
     }
     setIsLoadingRuns(true);
     try {
-      const response = await service.listWorkflowRuns({ workflowId, limit: 200 });
+      const response = await service.listWorkflowRuns({ workflowId: effectiveWorkflowId, limit: 200 });
       if (response.ok) {
         setRuns(response.data ?? []);
         setRunLoadError(undefined);
@@ -487,6 +530,14 @@ export default function WorkflowStudioRunHistoryPanel({
 
   const startRerun = async (mode: WorkflowRerunMode): Promise<void> => {
     if (!selectedRunId) {
+      return;
+    }
+    if (mode === "as-is" && !canRerunSelected) {
+      setRerunFeedback("Rerun is available only after a run reaches a terminal status.");
+      return;
+    }
+    if (mode === "edited" && !canEditRerunSelected) {
+      setRerunFeedback("Edit and rerun is unavailable because historical execution input context is missing.");
       return;
     }
 
@@ -519,7 +570,7 @@ export default function WorkflowStudioRunHistoryPanel({
       await reloadRuns();
       setRerunFeedback(`Rerun started as ${response.data.runId}.`);
       setIsEditRerunOpen(false);
-      navigate(buildWorkflowStudioRunDetailPath(response.data.runId));
+      navigate(buildWorkflowStudioRunDetailPath(response.data.runId, runRouteOptions));
     } catch (error) {
       setRerunFeedback(error instanceof Error ? error.message : "Failed to launch workflow rerun.");
     } finally {
@@ -527,7 +578,7 @@ export default function WorkflowStudioRunHistoryPanel({
     }
   };
 
-  if (!workflowId) {
+  if (!effectiveWorkflowId) {
     return (
       <div className="ui-empty-state" data-testid="workflow-run-history-unavailable">
         <p className="ui-text-secondary">
@@ -547,14 +598,24 @@ export default function WorkflowStudioRunHistoryPanel({
           <p className="ui-text-secondary ui-text-small ui-workflow-run-history__subtitle">
             Durable run summaries, step-by-step inspection, and structured failure diagnostics.
           </p>
+          <p className="ui-text-secondary ui-text-small ui-workflow-run-history__subtitle">
+            <Link className="ui-link" to={workflowEditorPath}>Workflow editor</Link> {" / "}
+            <Link className="ui-link" to={runHistoryPath}>Run history</Link>
+            {selectedRunId ? (
+              <>
+                {" / "}
+                <span>{selectedRunId}</span>
+              </>
+            ) : null}
+          </p>
         </div>
         <div className="ui-row ui-row--wrap ui-workflow-run-history__actions">
           {isRunHistoryRoute ? (
-            <Link className="ui-button ui-button--ghost ui-button--sm" to={ROUTE_PATHS.workflowStudio}>
+            <Link className="ui-button ui-button--ghost ui-button--sm" to={workflowEditorPath}>
               Back to workflow editor
             </Link>
           ) : (
-            <Link className="ui-button ui-button--ghost ui-button--sm" to={buildWorkflowStudioRunHistoryPath()}>
+            <Link className="ui-button ui-button--ghost ui-button--sm" to={runHistoryPath}>
               Open run history view
             </Link>
           )}
@@ -612,7 +673,11 @@ export default function WorkflowStudioRunHistoryPanel({
       ) : null}
       {!isLoadingRuns && !runLoadError && filteredRuns.length === 0 ? (
         <div className="ui-empty-state" data-testid="workflow-run-history-empty">
-          <p className="ui-text-secondary">No persisted runs are available for this workflow yet.</p>
+          <p className="ui-text-secondary">
+            {statusFilter === "all"
+              ? "No persisted runs are available for this workflow yet."
+              : "No runs match the current filter. Try another status or clear filters."}
+          </p>
         </div>
       ) : null}
 
@@ -655,7 +720,7 @@ export default function WorkflowStudioRunHistoryPanel({
                 {formatFailureCue(run)}
               </span>
               <span>
-                <Link className="ui-button ui-button--ghost ui-button--sm" to={buildWorkflowStudioRunDetailPath(run.runId)}>
+                <Link className="ui-button ui-button--ghost ui-button--sm" to={buildWorkflowStudioRunDetailPath(run.runId, runRouteOptions)}>
                   View run
                 </Link>
               </span>
@@ -671,7 +736,7 @@ export default function WorkflowStudioRunHistoryPanel({
               <h4 className="ui-panel__title ui-workflow-run-history__panel-title">Run detail</h4>
               <p className="ui-panel__subtitle ui-workflow-run-history__panel-subtitle">{selectedRunId}</p>
             </div>
-            <Link className="ui-button ui-button--ghost ui-button--sm" to={buildWorkflowStudioRunHistoryPath()}>
+            <Link className="ui-button ui-button--ghost ui-button--sm" to={runHistoryPath}>
               Back to run list
             </Link>
           </div>
@@ -680,12 +745,26 @@ export default function WorkflowStudioRunHistoryPanel({
               <p className="ui-text-secondary" data-testid="workflow-run-detail-loading">Loading run detail...</p>
             ) : null}
             {!isLoadingDetail && detailError ? (
-              <p className="ui-text-danger" data-testid="workflow-run-detail-error">{detailError}</p>
+              <div className="ui-stack ui-stack--2xs" data-testid="workflow-run-detail-error">
+                <p className="ui-text-danger">{detailError}</p>
+                <div className="ui-row ui-row--wrap">
+                  <Link className="ui-button ui-button--ghost ui-button--sm" to={runHistoryPath}>
+                    Back to run history
+                  </Link>
+                </div>
+              </div>
             ) : null}
             {!isLoadingDetail && isDetailMissing ? (
-              <p className="ui-text-secondary" data-testid="workflow-run-detail-not-found">
-                The requested workflow run was not found.
-              </p>
+              <div className="ui-stack ui-stack--2xs" data-testid="workflow-run-detail-not-found">
+                <p className="ui-text-secondary">
+                  The requested workflow run was not found.
+                </p>
+                <div className="ui-row ui-row--wrap">
+                  <Link className="ui-button ui-button--ghost ui-button--sm" to={runHistoryPath}>
+                    Back to run history
+                  </Link>
+                </div>
+              </div>
             ) : null}
             {!isLoadingDetail && !detailError && !isDetailMissing && selectedDetail ? (
               <>
@@ -738,7 +817,7 @@ export default function WorkflowStudioRunHistoryPanel({
                     <button
                       type="button"
                       className="ui-button ui-button--primary ui-button--sm"
-                      disabled={isRerunPending}
+                      disabled={isRerunPending || !canRerunSelected}
                       onClick={() => {
                         void startRerun("as-is");
                       }}
@@ -748,12 +827,22 @@ export default function WorkflowStudioRunHistoryPanel({
                     <button
                       type="button"
                       className="ui-button ui-button--ghost ui-button--sm"
-                      disabled={isRerunPending}
+                      disabled={isRerunPending || !canEditRerunSelected}
                       onClick={() => setIsEditRerunOpen((current) => !current)}
                     >
                       {isEditRerunOpen ? "Hide edit rerun" : "Edit and rerun"}
                     </button>
                   </div>
+                  {!canRerunSelected ? (
+                    <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">
+                      Rerun becomes available after a run reaches a terminal status.
+                    </p>
+                  ) : null}
+                  {canRerunSelected && !canEditRerunSelected ? (
+                    <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">
+                      Edit and rerun is unavailable because structured historical execution input was not captured.
+                    </p>
+                  ) : null}
                   {rerunFeedback ? (
                     <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">
                       {rerunFeedback}

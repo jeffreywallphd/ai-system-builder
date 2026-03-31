@@ -4,6 +4,10 @@ import {
   buildWorkflowStudioOpenExistingPath,
   buildWorkflowStudioResumeDraftPath,
 } from "../studio-shell/workflow/WorkflowStudioEntryRouting";
+import {
+  buildWorkflowStudioRunDetailPath,
+  buildWorkflowStudioRunHistoryPath,
+} from "../studio-shell/workflow/WorkflowStudioRunRouting";
 import { RunContextKinds, RunInterfaceService } from "./RunInterface";
 
 export interface PersistedWorkflowEntry {
@@ -90,6 +94,20 @@ export class PersistedWorkflowEntryService {
       actionKind: "run",
       originPath: "/run",
       originLabel: "Run",
+    });
+  }
+
+  public buildWorkflowRunHistoryPath(entry: PersistedWorkflowEntry): string {
+    return buildWorkflowStudioRunHistoryPath({
+      workflowId: entry.workflowId,
+      workflowStatus: entry.status,
+    });
+  }
+
+  public buildWorkflowRunDetailPath(entry: PersistedWorkflowEntry, runId: string): string {
+    return buildWorkflowStudioRunDetailPath(runId, {
+      workflowId: entry.workflowId,
+      workflowStatus: entry.status,
     });
   }
 }
