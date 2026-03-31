@@ -429,8 +429,13 @@ const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Ob
     stageKind: DatasetPipelineStageKinds.normalization,
     assets: Object.freeze([
       Object.freeze({
-        assetId: DatasetIngestionStageAssetIds.unified,
+        assetId: DatasetTransformationStageAssetIds.typeNormalization,
         assetVersion: "1.0.0",
+        configDefaults: Object.freeze({
+          trimStrings: true,
+          emptyStringAsNull: false,
+          onConversionFailure: "preserve",
+        }),
       }),
     ]),
   }),
@@ -439,8 +444,14 @@ const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Ob
     stageKind: DatasetPipelineStageKinds.cleaning,
     assets: Object.freeze([
       Object.freeze({
-        assetId: DatasetIngestionStageAssetIds.unified,
+        assetId: DatasetTransformationStageAssetIds.missingValueHandling,
         assetVersion: "1.0.0",
+        configDefaults: Object.freeze({
+          strategy: "leave",
+          treatEmptyStringAsMissing: true,
+          treatWhitespaceAsMissing: false,
+          rowDropMode: "any",
+        }),
       }),
     ]),
   }),

@@ -7,10 +7,12 @@ import {
   DataProfilingAsset,
   executeTransformationPipeline,
   FieldMappingAsset,
+  MissingValueHandlingAsset,
   registerTransformationAssets,
   SchemaInferenceAsset,
   SchemaInferenceModes,
   SchemaInferenceTextKinds,
+  TypeNormalizationAsset,
 } from "../core/data/transformation";
 
 function createRecordsInput() {
@@ -128,9 +130,11 @@ describe("Transformation assets", () => {
 
   it("registers schema inference in transformation registry and runs as a pipeline step", async () => {
     const { registry, entries } = registerTransformationAssets();
-    expect(entries.length).toBeGreaterThanOrEqual(3);
+    expect(entries.length).toBeGreaterThanOrEqual(5);
     expect(entries.some((entry) => entry.descriptor.id === SchemaInferenceAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === DataProfilingAsset.assetId)).toBeTrue();
+    expect(entries.some((entry) => entry.descriptor.id === TypeNormalizationAsset.assetId)).toBeTrue();
+    expect(entries.some((entry) => entry.descriptor.id === MissingValueHandlingAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === FieldMappingAsset.assetId)).toBeTrue();
 
     const resolved = registry.get({ id: SchemaInferenceAsset.assetId });

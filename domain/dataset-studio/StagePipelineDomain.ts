@@ -74,6 +74,8 @@ export const DatasetIngestionStageAssetIds = Object.freeze({
 export const DatasetTransformationStageAssetIds = Object.freeze({
   schemaInference: "schema-inference",
   dataProfiling: "data-profiling",
+  typeNormalization: "type-normalization",
+  missingValueHandling: "missing-value-handling",
   fieldMapping: "field-mapping",
 } as const);
 
@@ -267,7 +269,7 @@ export function createUnifiedIngestionStagePipelineDefinition(): DatasetPipeline
           producedOutputShapeKinds: AllCanonicalShapeKinds,
         }),
         assetReferences: Object.freeze([
-          Object.freeze({ assetId: DatasetIngestionStageAssetIds.unified }),
+          Object.freeze({ assetId: DatasetTransformationStageAssetIds.typeNormalization }),
         ]),
         executionPolicy: Object.freeze({
           mode: DatasetPipelineStageExecutionModes.required,
