@@ -29,9 +29,20 @@ export interface WorkflowExecutionRequest {
 
 export interface WorkflowExecutionTriggerActivationPayload {
   readonly triggerId: string;
+  readonly sourceKind?: WorkflowExecutionTriggerSourceKind;
+  readonly triggerType?: string;
   readonly activationType?: string;
   readonly payload?: Readonly<Record<string, unknown>>;
 }
+
+export const WorkflowExecutionTriggerSourceKinds = Object.freeze({
+  manualUser: "manual-user",
+  temporal: "temporal",
+  stateData: "state-data",
+});
+
+export type WorkflowExecutionTriggerSourceKind =
+  typeof WorkflowExecutionTriggerSourceKinds[keyof typeof WorkflowExecutionTriggerSourceKinds];
 
 export interface WorkflowExecutionContext {
   readonly inputValues: Readonly<Record<string, unknown>>;
@@ -157,6 +168,38 @@ export type WorkflowExecutionControlFlowMapping =
   | WorkflowExecutionControlFlowLoopMapping
   | WorkflowExecutionControlFlowManualMapping;
 
+export const WorkflowExecutionAssetInvocationKinds = Object.freeze({
+  agentAssistant: "agent-assistant",
+});
+
+export type WorkflowExecutionAssetInvocationKind =
+  typeof WorkflowExecutionAssetInvocationKinds[keyof typeof WorkflowExecutionAssetInvocationKinds];
+
+export interface WorkflowExecutionAssetStepBinding {
+  readonly bindingId: string;
+  readonly stepId: string;
+  readonly stepType: WorkflowDraftStepType;
+  readonly stepKind?: WorkflowDraftStepKind;
+  readonly order: number;
+  readonly dependsOnStepIds: ReadonlyArray<string>;
+  readonly invocationKind: WorkflowExecutionAssetInvocationKind;
+  readonly asset: Readonly<{
+    readonly assetKind: string;
+    readonly assetId: string;
+    readonly versionId?: string;
+  }>;
+  readonly inputBinding: Readonly<{
+    readonly config?: Readonly<Record<string, unknown>>;
+    readonly resolvedInputValues: Readonly<Record<string, unknown>>;
+    readonly resolvedInputBindings: Readonly<Record<string, unknown>>;
+    readonly resolvedRuntimeInputs: Readonly<Record<string, unknown>>;
+    readonly triggerPayload?: Readonly<Record<string, unknown>>;
+    readonly triggerActivation?: WorkflowExecutionTriggerActivationPayload;
+    readonly sessionContext?: Readonly<Record<string, unknown>>;
+    readonly metadata?: Readonly<Record<string, unknown>>;
+  }>;
+}
+
 export interface WorkflowExecutionOutputBinding {
   readonly outputId: string;
   readonly outputType: WorkflowDraftOutputType;
@@ -240,6 +283,8 @@ export function normalizeWorkflowExecutionContext(
     triggerActivation: triggerId
       ? Object.freeze({
         triggerId,
+        sourceKind: context?.triggerActivation?.sourceKind,
+        triggerType: readTrimmedString(context?.triggerActivation?.triggerType),
         activationType: readTrimmedString(context?.triggerActivation?.activationType),
         payload: triggerPayload,
       })

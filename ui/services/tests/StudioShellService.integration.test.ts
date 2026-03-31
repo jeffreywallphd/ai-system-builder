@@ -271,6 +271,31 @@ async function runLifecycleScenario(
 }
 
 describe("StudioShellService integration", () => {
+  it("uses browser fallback backend when desktop bridge is unavailable", async () => {
+    const service = new StudioShellService();
+    const run = await service.runWorkflowDraft({
+      studioId: `studio-browser-fallback-${Date.now().toString(36)}`,
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+    });
+
+    expect(run.ok).toBeTrue();
+    expect(run.data?.launchStatus === "launched" || run.data?.launchStatus === "blocked").toBeTrue();
+  });
+
   it("keeps model/dataset/tool/prompt-template/embedding-index/config-profile lifecycle and persisted contract-taxonomy behavior consistent across shared seams", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-atomic-studio-consistency-"));
     createdRoots.push(root);

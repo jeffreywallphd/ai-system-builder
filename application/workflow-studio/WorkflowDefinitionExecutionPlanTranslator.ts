@@ -21,6 +21,7 @@ import {
   mapWorkflowDraftTriggersToExecutionTriggerPlan,
   type WorkflowExecutionTriggerPlan,
 } from "./WorkflowDraftTriggerExecutionPlanner";
+import { buildWorkflowAssetStepExecutionBindings } from "./WorkflowAssetStepExecutionBindingService";
 import {
   createTranslationFailureResult,
   createTranslationSuccessResult,
@@ -30,6 +31,7 @@ import {
   normalizeWorkflowExecutionRequest,
   WorkflowExecutionValidationStages,
   type WorkflowExecutionControlFlowMapping,
+  type WorkflowExecutionAssetStepBinding,
   type WorkflowExecutionOutputBinding,
   type WorkflowExecutionPlanTranslationRequest,
   type WorkflowExecutionPlanTranslationResult,
@@ -54,6 +56,7 @@ export interface WorkflowDraftExecutionPlan {
   readonly orderedStepIds: ReadonlyArray<string>;
   readonly stepSequencing: ReadonlyArray<WorkflowExecutionStepSequencingMetadata>;
   readonly controlFlowMappings: ReadonlyArray<WorkflowExecutionControlFlowMapping>;
+  readonly assetStepBindings: ReadonlyArray<WorkflowExecutionAssetStepBinding>;
   readonly elements: ReadonlyArray<WorkflowDraftExecutionPlanElement>;
   readonly outputs: ReadonlyArray<WorkflowDraftExecutionOutputPlan>;
   readonly outputBindings: ReadonlyArray<WorkflowExecutionOutputBinding>;
@@ -69,8 +72,8 @@ interface WorkflowDraftExecutionPlanElementBase {
 
 export interface WorkflowDraftActionExecutionPlanElement extends WorkflowDraftExecutionPlanElementBase {
   readonly elementType: "action-step";
-  readonly stepType: string;
-  readonly stepKind?: string;
+  readonly stepType: WorkflowDraftStep["type"];
+  readonly stepKind?: WorkflowDraftStep["kind"];
   readonly config?: Readonly<Record<string, unknown>>;
   readonly assetRef?: WorkflowDraftStep["assetRef"];
 }
@@ -502,6 +505,66 @@ function buildTriggerHandoff(input: {
   });
 }
 
+function collectTriggerActivationIssues(input: {
+  readonly triggerPlans: ReadonlyArray<WorkflowExecutionTriggerPlan>;
+  readonly triggerActivation?: ReturnType<typeof normalizeWorkflowExecutionContext>["triggerActivation"];
+}): ReadonlyArray<WorkflowExecutionTranslationIssue> {
+  const activation = input.triggerActivation;
+  if (!activation) {
+    return Object.freeze([]);
+  }
+
+  const matchingTrigger = input.triggerPlans.find((trigger) => trigger.triggerId === activation.triggerId);
+  if (!matchingTrigger) {
+    return Object.freeze([Object.freeze({
+      code: "trigger-activation-not-found",
+      stage: WorkflowExecutionValidationStages.preExecution,
+      severity: "error",
+      message: `Trigger activation '${activation.triggerId}' is not defined on the workflow draft.`,
+      path: "context.triggerActivation.triggerId",
+    })]);
+  }
+
+  if (
+    activation.sourceKind === "manual-user"
+    && matchingTrigger.runtimeKind !== "manual"
+  ) {
+    return Object.freeze([Object.freeze({
+      code: "trigger-activation-kind-mismatch",
+      stage: WorkflowExecutionValidationStages.preExecution,
+      severity: "error",
+      message: `Trigger activation '${activation.triggerId}' source kind 'manual-user' does not match trigger runtime kind '${matchingTrigger.runtimeKind}'.`,
+      path: "context.triggerActivation.sourceKind",
+    })]);
+  }
+  if (
+    activation.sourceKind === "temporal"
+    && matchingTrigger.runtimeKind !== "temporal"
+  ) {
+    return Object.freeze([Object.freeze({
+      code: "trigger-activation-kind-mismatch",
+      stage: WorkflowExecutionValidationStages.preExecution,
+      severity: "error",
+      message: `Trigger activation '${activation.triggerId}' source kind 'temporal' does not match trigger runtime kind '${matchingTrigger.runtimeKind}'.`,
+      path: "context.triggerActivation.sourceKind",
+    })]);
+  }
+  if (
+    activation.sourceKind === "state-data"
+    && matchingTrigger.runtimeKind !== "state"
+  ) {
+    return Object.freeze([Object.freeze({
+      code: "trigger-activation-kind-mismatch",
+      stage: WorkflowExecutionValidationStages.preExecution,
+      severity: "error",
+      message: `Trigger activation '${activation.triggerId}' source kind 'state-data' does not match trigger runtime kind '${matchingTrigger.runtimeKind}'.`,
+      path: "context.triggerActivation.sourceKind",
+    })]);
+  }
+
+  return Object.freeze([]);
+}
+
 export function translateWorkflowDefinitionToExecutionPlan(
   request: WorkflowExecutionPlanTranslationRequest,
 ): WorkflowExecutionPlanTranslationResult<WorkflowDraftExecutionPlan> {
@@ -537,10 +600,14 @@ export function translateWorkflowDefinitionToExecutionPlan(
       inputBindings,
       context: normalizedContext,
     });
+    const triggerActivationIssues = collectTriggerActivationIssues({
+      triggerPlans,
+      triggerActivation: assembledContext.context.triggerActivation,
+    });
     const assemblyBlockingIssues = assembledContext.issues.filter((issue) => issue.severity === "error");
-    if (assemblyBlockingIssues.length > 0) {
+    if (assemblyBlockingIssues.length > 0 || triggerActivationIssues.length > 0) {
       return createTranslationFailureResult({
-        issues: Object.freeze([...assembledContext.issues]),
+        issues: Object.freeze([...assembledContext.issues, ...triggerActivationIssues]),
         stage: WorkflowExecutionValidationStages.preExecution,
       });
     }
@@ -551,6 +618,19 @@ export function translateWorkflowDefinitionToExecutionPlan(
         .map((step) => toControlFlowMapping(step))
         .filter((mapping): mapping is WorkflowExecutionControlFlowMapping => Boolean(mapping)),
     );
+    const elements = Object.freeze(orderedSteps.map((step) => toPlanElement(step)));
+    const assetBindingsResult = buildWorkflowAssetStepExecutionBindings({
+      actionElements: elements
+        .filter((element): element is WorkflowDraftActionExecutionPlanElement => element.elementType === "action-step"),
+      stepSequencing,
+      executionContext: assembledContext.context,
+    });
+    if (assetBindingsResult.issues.some((issue) => issue.severity === "error")) {
+      return createTranslationFailureResult({
+        issues: Object.freeze([...assembledContext.issues, ...assetBindingsResult.issues]),
+        stage: WorkflowExecutionValidationStages.preExecution,
+      });
+    }
     const outputBindings = Object.freeze(orderedOutputs.map((output) => toOutputBinding(output)));
 
     const plan: WorkflowDraftExecutionPlan = Object.freeze({
@@ -566,12 +646,17 @@ export function translateWorkflowDefinitionToExecutionPlan(
       orderedStepIds: Object.freeze(orderedSteps.map((step) => step.id)),
       stepSequencing,
       controlFlowMappings,
-      elements: Object.freeze(orderedSteps.map((step) => toPlanElement(step))),
+      assetStepBindings: assetBindingsResult.bindings,
+      elements,
       outputs: Object.freeze(orderedOutputs.map((output) => toExecutionOutputPlan(output))),
       outputBindings,
     });
 
-    return createTranslationSuccessResult(plan, assembledContext.issues);
+    return createTranslationSuccessResult(plan, Object.freeze([
+      ...assembledContext.issues,
+      ...triggerActivationIssues,
+      ...assetBindingsResult.issues,
+    ]));
   } catch (error) {
     return createTranslationFailureResult({
       issues: Object.freeze([Object.freeze({

@@ -19,6 +19,7 @@ import {
   StudioShellErrorCodes,
   StudioShellInvalidRequestError,
 } from "../../../application/studio-shell/StudioShellApplicationErrors";
+import { WorkflowExecutionTriggerSourceKinds, type WorkflowExecutionTriggerSourceKind } from "../../../application/workflow-studio/WorkflowExecutionAlignmentContracts";
 
 export interface StudioShellApiError {
   readonly code: "not-found" | "conflict" | "invalid-request" | "invalid-lifecycle-transition" | "validation-failed" | "internal";
@@ -68,9 +69,19 @@ export interface RunWorkflowStudioDraftRequest {
   readonly studioId: string;
   readonly draftId?: string;
   readonly content: string;
+  readonly triggerEntry?: {
+    readonly sourceKind: WorkflowExecutionTriggerSourceKind;
+    readonly triggerId?: string;
+    readonly triggerType?: string;
+    readonly activationType?: string;
+    readonly payload?: Readonly<Record<string, unknown>>;
+    readonly metadata?: Readonly<Record<string, unknown>>;
+  };
   readonly inputValues?: Readonly<Record<string, unknown>>;
   readonly triggerActivation?: {
     readonly triggerId: string;
+    readonly sourceKind?: WorkflowExecutionTriggerSourceKind;
+    readonly triggerType?: string;
     readonly activationType?: string;
     readonly payload?: Readonly<Record<string, unknown>>;
   };
@@ -229,8 +240,30 @@ export class StudioShellBackendApi {
         }
       }
 
-      const runResult = await this.workflowStudioService.runWorkflowDraftManual({
+      const mappedTriggerEntry = request.triggerEntry
+        ? Object.freeze({
+          sourceKind: request.triggerEntry.sourceKind,
+          triggerId: request.triggerEntry.triggerId,
+          triggerType: request.triggerEntry.triggerType,
+          activationType: request.triggerEntry.activationType,
+          payload: request.triggerEntry.payload,
+          metadata: request.triggerEntry.metadata,
+        })
+        : request.triggerActivation
+          ? Object.freeze({
+            sourceKind: request.triggerActivation.sourceKind ?? WorkflowExecutionTriggerSourceKinds.manualUser,
+            triggerId: request.triggerActivation.triggerId,
+            triggerType: request.triggerActivation.triggerType,
+            activationType: request.triggerActivation.activationType,
+            payload: request.triggerActivation.payload,
+          })
+          : Object.freeze({
+            sourceKind: WorkflowExecutionTriggerSourceKinds.manualUser,
+          });
+
+      const runResult = await this.workflowStudioService.runWorkflowDraftTriggered({
         content: request.content,
+        trigger: mappedTriggerEntry,
         context: {
           inputValues: request.inputValues ?? {},
           triggerActivation: request.triggerActivation,

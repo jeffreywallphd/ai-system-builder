@@ -33,14 +33,12 @@ import type {
   UpdateSystemParametersRequest,
 } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import { resolveDesktopStudioShellBridge } from "../composition/DesktopStudioShellBridgeAdapter";
+import { resolveBrowserStudioShellBridgeFallback } from "../composition/BrowserStudioShellBridgeFallback";
 
 export class StudioShellService {
   private requireBridge() {
     const bridge = resolveDesktopStudioShellBridge();
-    if (!bridge) {
-      throw new Error("Desktop Studio Shell bridge is unavailable in this runtime.");
-    }
-    return bridge;
+    return bridge ?? resolveBrowserStudioShellBridgeFallback();
   }
 
   public async initializeStudio(studioId: string, name: string): Promise<StudioShellApiResponse<StudioShellSnapshotReadModel>> {

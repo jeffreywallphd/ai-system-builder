@@ -32,7 +32,12 @@ import {
   type WorkflowExecutionAssetReferenceResolver,
   type WorkflowPreExecutionValidationResult,
 } from "./WorkflowPreExecutionValidationPipeline";
-import type { WorkflowExecutionPlanTranslationRequest } from "./WorkflowExecutionAlignmentContracts";
+import {
+  WorkflowExecutionTriggerSourceKinds,
+  type WorkflowExecutionAssetStepBinding,
+  type WorkflowExecutionPlanTranslationRequest,
+} from "./WorkflowExecutionAlignmentContracts";
+import { applyTriggerExecutionEntryToContext, type WorkflowExecutionTriggerEntry } from "./WorkflowTriggerExecutionEntryService";
 
 export interface EnsureWorkflowStudioResult {
   readonly initialized: boolean;
@@ -82,6 +87,28 @@ export interface RunWorkflowDraftManualCommand extends ValidateWorkflowDraftExec
   readonly maxLoopIterations?: number;
 }
 
+export interface RunWorkflowDraftTriggeredCommand extends ValidateWorkflowDraftExecutionReadinessCommand {
+  readonly trigger: WorkflowExecutionTriggerEntry;
+  readonly inputs?: Readonly<Record<string, unknown>>;
+  readonly manualDecisionsByStepId?: Readonly<Record<string, WorkflowDraftRuntimeManualDecision | undefined>>;
+  readonly maxLoopIterations?: number;
+}
+
+export interface WorkflowAssetStepRuntimeInvoker {
+  readonly invoke: (
+    binding: WorkflowExecutionAssetStepBinding,
+    context: {
+      readonly inputs: Readonly<Record<string, unknown>>;
+      readonly stepOutputs: Readonly<Record<string, unknown>>;
+      readonly loop?: {
+        readonly loopStepId: string;
+        readonly iteration: number;
+        readonly item?: unknown;
+      };
+    },
+  ) => Promise<unknown> | unknown;
+}
+
 export interface RunWorkflowDraftManualResult {
   readonly launchStatus: "blocked" | "launched" | "failed";
   readonly validation: WorkflowPreExecutionValidationResult;
@@ -92,15 +119,18 @@ export interface RunWorkflowDraftManualResult {
 export class WorkflowStudioApplicationService {
   private readonly runtimeExecutor: WorkflowDraftExecutionRuntime;
   private readonly assetReferenceResolver?: WorkflowExecutionAssetReferenceResolver;
+  private readonly assetStepRuntimeInvoker?: WorkflowAssetStepRuntimeInvoker;
 
   constructor(
     private readonly studioShellService: StudioShellApplicationService,
     private readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy"> = new CompositionAssetContractResolver(),
     runtimeExecutor: WorkflowDraftExecutionRuntime = new WorkflowDraftExecutionRuntime(),
     assetReferenceResolver?: WorkflowExecutionAssetReferenceResolver,
+    assetStepRuntimeInvoker?: WorkflowAssetStepRuntimeInvoker,
   ) {
     this.runtimeExecutor = runtimeExecutor;
     this.assetReferenceResolver = assetReferenceResolver;
+    this.assetStepRuntimeInvoker = assetStepRuntimeInvoker;
   }
 
   public async ensureStudioInitialized(
@@ -254,10 +284,29 @@ export class WorkflowStudioApplicationService {
   public async runWorkflowDraftManual(
     command: RunWorkflowDraftManualCommand,
   ): Promise<RunWorkflowDraftManualResult> {
+    return this.runWorkflowDraftTriggered({
+      ...command,
+      trigger: {
+        sourceKind: WorkflowExecutionTriggerSourceKinds.manualUser,
+        triggerId: command.context?.triggerActivation?.triggerId,
+        triggerType: command.context?.triggerActivation?.triggerType,
+        activationType: command.context?.triggerActivation?.activationType,
+        payload: command.context?.triggerActivation?.payload,
+      },
+    });
+  }
+
+  public async runWorkflowDraftTriggered(
+    command: RunWorkflowDraftTriggeredCommand,
+  ): Promise<RunWorkflowDraftManualResult> {
+    const context = applyTriggerExecutionEntryToContext({
+      context: command.context,
+      entry: command.trigger,
+    });
     const validation = await this.validateWorkflowDraftExecutionReadiness({
       content: command.content,
       request: command.request,
-      context: command.context,
+      context,
     });
 
     if (!validation.ready || !validation.plan) {
@@ -273,6 +322,9 @@ export class WorkflowStudioApplicationService {
         inputs: command.inputs ?? validation.plan.executionContext.resolvedRuntimeInputs,
         manualDecisionsByStepId: command.manualDecisionsByStepId,
         maxLoopIterations: command.maxLoopIterations,
+        assetStepExecutor: this.assetStepRuntimeInvoker
+          ? (binding, runtimeContext) => this.assetStepRuntimeInvoker!.invoke(binding, runtimeContext)
+          : undefined,
       });
       return Object.freeze({
         launchStatus: "launched",
