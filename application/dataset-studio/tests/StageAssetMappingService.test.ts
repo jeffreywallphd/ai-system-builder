@@ -77,6 +77,20 @@ describe("StageAssetMappingService", () => {
     if (result.status === "resolved") {
       expect(result.assets[0]?.assetId).toBe("missing-value-handling");
       expect(result.assets[0]?.configDefaults?.strategy).toBe("leave");
+      expect(result.assets.some((asset) => asset.assetId === "deduplication")).toBeTrue();
+    }
+  });
+
+  it("resolves transformation stage to include data validation", () => {
+    const service = new StageAssetMappingService();
+    const result = service.resolveStage({
+      stageKind: DatasetPipelineStageKinds.transformation,
+    });
+
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.assets[0]?.assetId).toBe("field-mapping");
+      expect(result.assets.some((asset) => asset.assetId === "data-validation")).toBeTrue();
     }
   });
 

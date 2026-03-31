@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { CanonicalDataShapeKinds } from "../CanonicalDataShapes";
 import {
+  DatasetTransformationStageAssetIds,
   DatasetPipelineStageExecutionModes,
   DatasetPipelineStageKinds,
   createDatasetPipelineDefinition,
@@ -151,5 +152,10 @@ describe("StagePipelineDomain", () => {
     const normalization = pipeline.stages.find((stage) => stage.kind === DatasetPipelineStageKinds.normalization);
     expect(normalization).toBeDefined();
     expect(normalization?.assetReferences[0]?.assetId).toBe("type-normalization");
+  });
+
+  it("includes deduplication and data validation transformation asset identifiers", () => {
+    expect(DatasetTransformationStageAssetIds.deduplication).toBe("deduplication");
+    expect(DatasetTransformationStageAssetIds.dataValidation).toBe("data-validation");
   });
 });

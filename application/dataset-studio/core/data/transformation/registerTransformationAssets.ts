@@ -1,4 +1,6 @@
 import { DataProfilingAsset } from "./assets/DataProfilingAsset";
+import { DataValidationAsset } from "./assets/DataValidationAsset";
+import { DeduplicationAsset } from "./assets/DeduplicationAsset";
 import { FieldMappingAsset } from "./assets/FieldMappingAsset";
 import { MissingValueHandlingAsset } from "./assets/MissingValueHandlingAsset";
 import { SchemaInferenceAsset } from "./assets/SchemaInferenceAsset";
@@ -20,6 +22,8 @@ export function registerTransformationAssets(
   const dataProfilingEntry = registry.register(new DataProfilingAsset());
   const typeNormalizationEntry = registry.register(new TypeNormalizationAsset());
   const missingValueHandlingEntry = registry.register(new MissingValueHandlingAsset());
+  const deduplicationEntry = registry.register(new DeduplicationAsset());
+  const dataValidationEntry = registry.register(new DataValidationAsset());
   const fieldMappingEntry = registry.register(new FieldMappingAsset());
   return Object.freeze({
     registry,
@@ -28,6 +32,8 @@ export function registerTransformationAssets(
       dataProfilingEntry,
       typeNormalizationEntry,
       missingValueHandlingEntry,
+      deduplicationEntry,
+      dataValidationEntry,
       fieldMappingEntry,
     ]),
   });

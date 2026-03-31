@@ -5,6 +5,8 @@ import {
 } from "../../../domain/dataset-studio/CanonicalDataShapes";
 import {
   DataProfilingAsset,
+  DataValidationAsset,
+  DeduplicationAsset,
   executeTransformationPipeline,
   FieldMappingAsset,
   MissingValueHandlingAsset,
@@ -135,6 +137,8 @@ describe("Transformation assets", () => {
     expect(entries.some((entry) => entry.descriptor.id === DataProfilingAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === TypeNormalizationAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === MissingValueHandlingAsset.assetId)).toBeTrue();
+    expect(entries.some((entry) => entry.descriptor.id === DeduplicationAsset.assetId)).toBeTrue();
+    expect(entries.some((entry) => entry.descriptor.id === DataValidationAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === FieldMappingAsset.assetId)).toBeTrue();
 
     const resolved = registry.get({ id: SchemaInferenceAsset.assetId });
