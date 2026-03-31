@@ -13,7 +13,8 @@ describe("DatasetStudioDraftPreviewPanel", () => {
     }));
 
     expect(html).toContain("Asset Configuration");
-    expect(html).toContain("Header mode");
-    expect(html).toContain("Data Preview Panel");
+    expect(html).toContain("Ingestion Asset");
+    expect(html).toContain("Source Input");
+    expect(html).toContain("Ingestion Preview");
   });
 });

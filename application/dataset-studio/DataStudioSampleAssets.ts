@@ -31,6 +31,12 @@ import {
   createImageIngestorDataAsset,
 } from "./ImageIngestorAsset";
 import {
+  BatchIngestionAssetId,
+  BatchIngestorKinds,
+  createBatchIngestionConfigSchema,
+  createBatchIngestionDataAsset,
+} from "./BatchIngestionFramework";
+import {
   DataAssetConfigFieldKinds,
   createDataAssetConfigSchema,
   type DataAssetConfigSchema,
@@ -265,6 +271,7 @@ export function registerDataStudioSampleAssets(
   const jsonIngestorSchema = createJsonIngestorConfigSchema(JsonIngestorAsset.assetId);
   const documentPdfIngestorSchema = createDocumentPdfIngestorConfigSchema(DocumentPdfIngestorAsset.assetId);
   const imageIngestorSchema = createImageIngestorConfigSchema(ImageIngestorAsset.assetId);
+  const batchIngestionSchema = createBatchIngestionConfigSchema(BatchIngestionAssetId);
 
   const recordsEntry = registry.register({
     asset: createRecordsConverterAsset({
@@ -322,10 +329,19 @@ export function registerDataStudioSampleAssets(
       normalizeHeadersToLowercase: false,
     }),
     specialization: DataAssetRegistrySpecializations.ingestion,
+    category: "data-ingestion",
     display: {
       title: "CSV Ingestor",
       summary: "Ingests CSV and normalizes records for canonical conversion.",
       tags: ["ingestion", "csv"],
+    },
+    inspectability: {
+      supportedSourceKinds: ["in-memory", "local-file", "url"],
+      supportedFileExtensions: [".csv", ".tsv", ".txt"],
+      supportedMediaTypes: ["text/csv", "text/plain"],
+      keyConfigKeys: ["delimiter", "header", "encoding", "skipEmptyLines", "normalizeHeadersToLowercase"],
+      previewModes: ["sample-records"],
+      executionModes: ["execute", "preview"],
     },
     configSchema: csvIngestorSchema,
     assetFactory: (config) => createCsvIngestorDataAsset(config),
@@ -336,10 +352,19 @@ export function registerDataStudioSampleAssets(
       flatten: false,
     }),
     specialization: DataAssetRegistrySpecializations.ingestion,
+    category: "data-ingestion",
     display: {
       title: "JSON Ingestor",
       summary: "Ingests JSON object/array payloads into canonical records.",
       tags: ["ingestion", "json"],
+    },
+    inspectability: {
+      supportedSourceKinds: ["in-memory", "local-file", "url"],
+      supportedFileExtensions: [".json"],
+      supportedMediaTypes: ["application/json"],
+      keyConfigKeys: ["flatten", "maxDepth"],
+      previewModes: ["sample-records"],
+      executionModes: ["execute", "preview"],
     },
     configSchema: jsonIngestorSchema,
     assetFactory: (config) => createJsonIngestorDataAsset(config),
@@ -353,10 +378,19 @@ export function registerDataStudioSampleAssets(
       preservePageBoundaries: true,
     }),
     specialization: DataAssetRegistrySpecializations.ingestion,
+    category: "data-ingestion",
     display: {
       title: "PDF/Document Ingestor",
       summary: "Ingests PDF/text documents into canonical text-items with source/page metadata.",
       tags: ["ingestion", "pdf", "document", "text-items"],
+    },
+    inspectability: {
+      supportedSourceKinds: ["in-memory", "local-file", "url"],
+      supportedFileExtensions: [".pdf", ".txt", ".md"],
+      supportedMediaTypes: ["application/pdf", "text/plain", "text/markdown"],
+      keyConfigKeys: ["includePageText", "maxPages", "previewPageCount", "extractMetadata", "preservePageBoundaries"],
+      previewModes: ["page-excerpts", "metadata-summary"],
+      executionModes: ["execute", "preview"],
     },
     configSchema: documentPdfIngestorSchema,
     assetFactory: (config) => createDocumentPdfIngestorDataAsset(config),
@@ -370,13 +404,57 @@ export function registerDataStudioSampleAssets(
       includeFileStats: true,
     }),
     specialization: DataAssetRegistrySpecializations.ingestion,
+    category: "data-ingestion",
     display: {
       title: "Image Ingestor V1",
       summary: "Ingests supported image files into canonical image metadata records.",
       tags: ["ingestion", "image", "metadata", "multimodal"],
     },
+    inspectability: {
+      supportedSourceKinds: ["in-memory", "local-file", "url"],
+      supportedFileExtensions: [".png", ".jpg", ".jpeg", ".webp"],
+      supportedMediaTypes: ["image/png", "image/jpeg", "image/webp"],
+      keyConfigKeys: ["extractExif", "generatePreviewMetadata", "normalizeOrientation", "includeFileStats"],
+      previewModes: ["image-metadata-summary"],
+      executionModes: ["execute", "preview"],
+    },
     configSchema: imageIngestorSchema,
     assetFactory: (config) => createImageIngestorDataAsset(config),
+  });
+
+  const batchIngestionEntry = registry.register({
+    asset: createBatchIngestionDataAsset({
+      continueOnError: true,
+      previewItemLimit: 10,
+      strategy: "routed",
+      selectedIngestor: BatchIngestorKinds.csv,
+    }),
+    specialization: DataAssetRegistrySpecializations.ingestion,
+    category: "data-ingestion",
+    display: {
+      title: "Batch Ingestion Framework",
+      summary: "Routes mixed sources to CSV/JSON/document/image ingestors with bounded preview.",
+      tags: ["ingestion", "batch", "routing"],
+    },
+    inspectability: {
+      supportedSourceKinds: ["local-file", "local-files", "local-directory", "remote-file-descriptor"],
+      supportedFileExtensions: [".csv", ".json", ".pdf", ".txt", ".md", ".png", ".jpg", ".jpeg", ".webp"],
+      supportedMediaTypes: [
+        "text/csv",
+        "application/json",
+        "application/pdf",
+        "text/plain",
+        "text/markdown",
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+      ],
+      keyConfigKeys: ["continueOnError", "maxItems", "previewItemLimit", "concurrency", "strategy", "selectedIngestor"],
+      previewModes: ["batch-summary", "per-item-sample", "partial-failure-warnings"],
+      executionModes: ["execute-batch", "preview-batch"],
+    },
+    configSchema: batchIngestionSchema,
+    assetFactory: (config) => createBatchIngestionDataAsset(config),
   });
 
   return Object.freeze({
@@ -389,6 +467,7 @@ export function registerDataStudioSampleAssets(
       jsonIngestorEntry,
       documentPdfIngestorEntry,
       imageIngestorEntry,
+      batchIngestionEntry,
     ]),
   });
 }
