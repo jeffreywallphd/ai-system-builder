@@ -91,4 +91,42 @@ describe("StageAssetCompositionService", () => {
     expect(segment.edges.some((edge) => edge.data?.kind === "upstream-bridge")).toBeTrue();
     expect(segment.orderedNodeIds[0]?.startsWith("pipeline:segment:transformation")).toBeTrue();
   });
+
+  it("resolves composable enrichment strategy groups with lookup and metadata assets", () => {
+    const registry = new PipelineStageRegistry();
+    const service = new StageAssetCompositionService();
+
+    const lookupResolved = service.resolve({
+      stage: registry.getDefinition(PipelineStageIds.Enrichment),
+      config: {
+        mode: PipelineStageConfigModes.advanced,
+        declaredInputType: CanonicalDataShapeKinds.records,
+        options: Object.freeze({
+          enrichmentStrategy: "lookup",
+          lookupInputKey: "id",
+          lookupLookupKey: "id",
+        }),
+      },
+    });
+
+    expect(lookupResolved.groups[0]?.assets.map((asset) => asset.role)).toEqual([
+      "lookup-source",
+      "lookup-transform",
+      "lookup-merge",
+    ]);
+
+    const metadataResolved = service.resolve({
+      stage: registry.getDefinition(PipelineStageIds.Enrichment),
+      config: {
+        mode: PipelineStageConfigModes.advanced,
+        declaredInputType: CanonicalDataShapeKinds.imageMetadataRecords,
+        options: Object.freeze({
+          enrichmentStrategy: "metadata-augmentation",
+          metadataIncludeImageMetadata: true,
+        }),
+      },
+    });
+
+    expect(metadataResolved.groups[0]?.assets.some((asset) => asset.role === "image-metadata-augmentation")).toBeTrue();
+  });
 });

@@ -403,24 +403,115 @@ const DefaultStageCompositionDefinitions: ReadonlyArray<StageCompositionDefiniti
     inspectable: true,
     groups: Object.freeze([
       {
-        id: "enrichment",
+        id: "enrichment-derived",
         executionOrder: 1,
         executionMode: "sequential",
+        condition: { optionEquals: Object.freeze({ enrichmentStrategy: "derived" }) },
         assets: Object.freeze([
           {
-            assetId: DatasetIngestionStageAssetIds.unified,
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
             version: "1.0.0",
-            role: "external-join",
+            role: "derived-field-compute",
             configMapping: Object.freeze([
-              { stageConfigKey: "joinKey", assetConfigKey: "joinKey" },
-              { stageConfigKey: "joinSource", assetConfigKey: "joinSource" },
+              { stageConfigKey: "derivedFields", assetConfigKey: "derivedFields", defaultValue: Object.freeze([]) },
+              { stageConfigKey: "enrichedFieldPrefix", assetConfigKey: "outputFieldPrefix", defaultValue: "enriched" },
             ]),
           },
           {
             assetId: DatasetTransformationStageAssetIds.fieldMapping,
             version: "1.0.0",
-            role: "enrichment-transform",
-            configMapping: Object.freeze([]),
+            role: "derived-merge",
+            configMapping: Object.freeze([
+              { stageConfigKey: "enrichedFieldPrefix", assetConfigKey: "outputFieldPrefix", defaultValue: "enriched" },
+            ]),
+          },
+        ]),
+      },
+      {
+        id: "enrichment-lookup",
+        executionOrder: 1,
+        executionMode: "sequential",
+        condition: { optionEquals: Object.freeze({ enrichmentStrategy: "lookup" }) },
+        assets: Object.freeze([
+          {
+            assetId: DatasetIngestionStageAssetIds.unified,
+            version: "1.0.0",
+            role: "lookup-source",
+            configMapping: Object.freeze([
+              { stageConfigKey: "lookupSourceAssetId", assetConfigKey: "sourceAssetId" },
+              { stageConfigKey: "lookupSourceReference", assetConfigKey: "sourceReference" },
+              { stageConfigKey: "lookupInputKey", assetConfigKey: "inputKey", defaultValue: "id" },
+              { stageConfigKey: "lookupLookupKey", assetConfigKey: "lookupKey", defaultValue: "id" },
+              { stageConfigKey: "lookupJoinType", assetConfigKey: "joinType", defaultValue: "left" },
+              { stageConfigKey: "lookupPreserveUnmatched", assetConfigKey: "preserveUnmatched", defaultValue: true },
+            ]),
+          },
+          {
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "lookup-transform",
+            configMapping: Object.freeze([
+              { stageConfigKey: "lookupSelectedFields", assetConfigKey: "selectedFields", defaultValue: Object.freeze([]) },
+            ]),
+          },
+          {
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "lookup-merge",
+            configMapping: Object.freeze([
+              { stageConfigKey: "enrichedFieldPrefix", assetConfigKey: "outputFieldPrefix", defaultValue: "enriched" },
+            ]),
+          },
+        ]),
+      },
+      {
+        id: "enrichment-metadata",
+        executionOrder: 1,
+        executionMode: "sequential",
+        condition: { optionEquals: Object.freeze({ enrichmentStrategy: "metadata-augmentation" }) },
+        assets: Object.freeze([
+          {
+            assetId: DatasetTransformationStageAssetIds.dataProfiling,
+            version: "1.0.0",
+            role: "metadata-profiler",
+            configMapping: Object.freeze([
+              { stageConfigKey: "previewSampleSize", assetConfigKey: "sampleSize", defaultValue: 25 },
+              { stageConfigKey: "metadataIncludeProfiling", assetConfigKey: "enabled", defaultValue: true },
+            ]),
+          },
+          {
+            assetId: DatasetIngestionStageAssetIds.image,
+            version: "1.0.0",
+            role: "image-metadata-augmentation",
+            condition: { inputTypes: Object.freeze([CanonicalDataShapeKinds.imageMetadataRecords]) },
+            configMapping: Object.freeze([
+              { stageConfigKey: "metadataIncludeImageMetadata", assetConfigKey: "extractExif", defaultValue: true },
+              { stageConfigKey: "metadataIncludeImageMetadata", assetConfigKey: "generatePreviewMetadata", defaultValue: true },
+            ]),
+          },
+          {
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "metadata-merge",
+            configMapping: Object.freeze([
+              { stageConfigKey: "metadataStaticFields", assetConfigKey: "staticFields", defaultValue: Object.freeze({}) },
+              { stageConfigKey: "enrichedFieldPrefix", assetConfigKey: "outputFieldPrefix", defaultValue: "enriched" },
+            ]),
+          },
+        ]),
+      },
+      {
+        id: "enrichment-fallback",
+        executionOrder: 1,
+        executionMode: "sequential",
+        assets: Object.freeze([
+          {
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "enrichment-fallback-merge",
+            configMapping: Object.freeze([
+              { stageConfigKey: "enrichedFieldPrefix", assetConfigKey: "outputFieldPrefix", defaultValue: "enriched" },
+            ]),
           },
         ]),
       },
