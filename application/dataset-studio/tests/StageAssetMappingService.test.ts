@@ -54,6 +54,32 @@ describe("StageAssetMappingService", () => {
     }
   });
 
+  it("resolves normalization stage to the type normalization asset", () => {
+    const service = new StageAssetMappingService();
+    const result = service.resolveStage({
+      stageKind: DatasetPipelineStageKinds.normalization,
+    });
+
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.assets[0]?.assetId).toBe("type-normalization");
+      expect(result.assets[0]?.configDefaults?.trimStrings).toBeTrue();
+    }
+  });
+
+  it("resolves cleaning stage to the missing value handling asset", () => {
+    const service = new StageAssetMappingService();
+    const result = service.resolveStage({
+      stageKind: DatasetPipelineStageKinds.cleaning,
+    });
+
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.assets[0]?.assetId).toBe("missing-value-handling");
+      expect(result.assets[0]?.configDefaults?.strategy).toBe("leave");
+    }
+  });
+
   it("resolves raw-storage stage to storage asset defaults and metadata hooks", () => {
     const service = new StageAssetMappingService();
     const result = service.resolveStage({

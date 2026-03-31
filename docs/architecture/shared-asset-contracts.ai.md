@@ -126,7 +126,7 @@
   - bounded diagnostics counts + entries.
 - The serializer is intentionally thin over runtime read-model truth and does not duplicate orchestration logic.
 
-## Direction 5 extension update: Core transformation assets foundation (stories 16.1-16.4)
+## Direction 5 extension update: Core transformation assets foundation (stories 16.1-16.6)
 
 - Dataset Studio now has a dedicated transformation-asset seam in `application/dataset-studio/core/data/transformation/*` with explicit contracts:
   - `ITransformationAsset`
@@ -148,7 +148,11 @@
 - Transformation coverage now also includes:
   - `DataProfilingAsset` with bounded per-field profiling over canonical records/table inputs (row/null/distinct counts, inferred type reference, min/max, optional numeric summary stats, and short field samples),
   - `FieldMappingAsset` with deterministic one-to-one field mapping/rename behavior (preserve/drop unmapped controls and optional empty-target dropping),
+  - `TypeNormalizationAsset` with deterministic type normalization and coercion controls (field-targeted string/number/boolean/date conversion, string trimming, optional empty-string-to-null handling, inspectable conversion outcomes/failure posture),
+  - `MissingValueHandlingAsset` with deterministic missing-value strategy controls (leave, fill-default, fill-per-field, drop-row with any/all modes, and explicit empty/whitespace missing semantics),
   - framework-aligned preview outputs for both assets (summary + representative sampled rows) suitable for Wizard/Canvas inspection surfaces.
 - Transformation stage mapping now resolves stage-to-asset references for these capabilities:
   - `profiling -> data-profiling`,
+  - `normalization -> type-normalization`,
+  - `cleaning -> missing-value-handling`,
   - `transformation -> field-mapping`.

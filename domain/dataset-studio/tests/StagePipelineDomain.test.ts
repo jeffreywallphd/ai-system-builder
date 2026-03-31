@@ -145,4 +145,11 @@ describe("StagePipelineDomain", () => {
     expect(profiling).toBeDefined();
     expect(profiling?.assetReferences[0]?.assetId).toBe("data-profiling");
   });
+
+  it("maps normalization stage definitions to the type normalization transformation asset", () => {
+    const pipeline = createUnifiedIngestionStagePipelineDefinition();
+    const normalization = pipeline.stages.find((stage) => stage.kind === DatasetPipelineStageKinds.normalization);
+    expect(normalization).toBeDefined();
+    expect(normalization?.assetReferences[0]?.assetId).toBe("type-normalization");
+  });
 });
