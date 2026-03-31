@@ -187,7 +187,10 @@ export function createDefaultPipelineTemplates(): ReadonlyArray<PipelineTemplate
         order: 5,
         name: "Cleaning",
         description: "Applies deterministic cleanup and quality rules.",
-        assetIds: Object.freeze([DatasetTransformationStageAssetIds.missingValueHandling]),
+        assetIds: Object.freeze([
+          DatasetTransformationStageAssetIds.missingValueHandling,
+          DatasetTransformationStageAssetIds.deduplication,
+        ]),
       }),
       createStage({
         id: "transformation",
@@ -195,7 +198,10 @@ export function createDefaultPipelineTemplates(): ReadonlyArray<PipelineTemplate
         order: 6,
         name: "Transformation",
         description: "Transforms cleansed data into prepared datasets.",
-        assetIds: Object.freeze([DatasetTransformationStageAssetIds.fieldMapping]),
+        assetIds: Object.freeze([
+          DatasetTransformationStageAssetIds.fieldMapping,
+          DatasetTransformationStageAssetIds.dataValidation,
+        ]),
       }),
       createStage({ id: "prepared-storage", kind: DatasetPipelineStageKinds.preparedStorage, order: 7, name: "Prepared Storage", description: "Stores prepared outputs for downstream consumers." }),
     ]),
@@ -232,7 +238,10 @@ export function createDefaultPipelineTemplates(): ReadonlyArray<PipelineTemplate
         order: 6,
         name: "Transformation",
         description: "Transforms chunked content into prepared structures.",
-        assetIds: Object.freeze([DatasetTransformationStageAssetIds.fieldMapping]),
+        assetIds: Object.freeze([
+          DatasetTransformationStageAssetIds.fieldMapping,
+          DatasetTransformationStageAssetIds.dataValidation,
+        ]),
       }),
       createStage({ id: "prepared-storage", kind: DatasetPipelineStageKinds.preparedStorage, order: 7, name: "Prepared Storage", description: "Stores processed document outputs for retrieval and analytics." }),
     ]),
@@ -267,7 +276,11 @@ export function createDefaultPipelineTemplates(): ReadonlyArray<PipelineTemplate
         order: 5,
         name: "Cleaning",
         description: "Applies quality rules and missing-value handling.",
-        assetIds: Object.freeze([DatasetTransformationStageAssetIds.missingValueHandling]),
+        assetIds: Object.freeze([
+          DatasetTransformationStageAssetIds.missingValueHandling,
+          DatasetTransformationStageAssetIds.deduplication,
+          DatasetTransformationStageAssetIds.dataValidation,
+        ]),
       }),
       createStage({ id: "aggregation", kind: DatasetPipelineStageKinds.aggregation, order: 6, name: "Aggregation", description: "Aggregates clean records into analytics-ready metrics." }),
       createStage({ id: "prepared-storage", kind: DatasetPipelineStageKinds.preparedStorage, order: 7, name: "Prepared Storage", description: "Publishes analytics outputs to prepared storage." }),

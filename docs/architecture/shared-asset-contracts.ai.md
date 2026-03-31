@@ -150,9 +150,11 @@
   - `FieldMappingAsset` with deterministic one-to-one field mapping/rename behavior (preserve/drop unmapped controls and optional empty-target dropping),
   - `TypeNormalizationAsset` with deterministic type normalization and coercion controls (field-targeted string/number/boolean/date conversion, string trimming, optional empty-string-to-null handling, inspectable conversion outcomes/failure posture),
   - `MissingValueHandlingAsset` with deterministic missing-value strategy controls (leave, fill-default, fill-per-field, drop-row with any/all modes, and explicit empty/whitespace missing semantics),
-  - framework-aligned preview outputs for both assets (summary + representative sampled rows) suitable for Wizard/Canvas inspection surfaces.
+  - `DeduplicationAsset` with deterministic duplicate grouping/retention across exact-all, exact-fields, and fuzzy-fields modes (field-scoped matching controls, keep-first/last/best behavior, duplicate-group metadata, and preview row/group summaries),
+  - `DataValidationAsset` with deterministic row/field validation over required/type/enum/length/range/pattern rules plus configurable invalid-row handling (annotate-and-keep, drop-invalid, split-valid-invalid) and inspectable row-level issues,
+  - framework-aligned preview outputs for transformation assets (summary + representative sampled rows/groups/issues) suitable for Wizard/Canvas inspection surfaces.
 - Transformation stage mapping now resolves stage-to-asset references for these capabilities:
   - `profiling -> data-profiling`,
   - `normalization -> type-normalization`,
-  - `cleaning -> missing-value-handling`,
-  - `transformation -> field-mapping`.
+  - `cleaning -> missing-value-handling + deduplication`,
+  - `transformation -> field-mapping + data-validation`.

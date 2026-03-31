@@ -76,6 +76,8 @@ export const DatasetTransformationStageAssetIds = Object.freeze({
   dataProfiling: "data-profiling",
   typeNormalization: "type-normalization",
   missingValueHandling: "missing-value-handling",
+  deduplication: "deduplication",
+  dataValidation: "data-validation",
   fieldMapping: "field-mapping",
 } as const);
 

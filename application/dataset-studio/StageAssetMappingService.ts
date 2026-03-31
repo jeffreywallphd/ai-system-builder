@@ -453,6 +453,18 @@ const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Ob
           rowDropMode: "any",
         }),
       }),
+      Object.freeze({
+        assetId: DatasetTransformationStageAssetIds.deduplication,
+        assetVersion: "1.0.0",
+        configDefaults: Object.freeze({
+          mode: "exact-all",
+          keepStrategy: "keep-first",
+          maxDistance: 1,
+          caseSensitive: false,
+          trimStrings: true,
+          treatMissingAsNull: true,
+        }),
+      }),
     ]),
   }),
   Object.freeze({
@@ -465,6 +477,16 @@ const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Ob
         configDefaults: Object.freeze({
           preserveUnmapped: true,
           dropEmptyTargets: false,
+        }),
+      }),
+      Object.freeze({
+        assetId: DatasetTransformationStageAssetIds.dataValidation,
+        assetVersion: "1.0.0",
+        configDefaults: Object.freeze({
+          invalidRowStrategy: "annotate-and-keep",
+          annotationFieldName: "_validation",
+          treatEmptyStringAsMissing: true,
+          treatWhitespaceAsMissing: false,
         }),
       }),
     ]),
