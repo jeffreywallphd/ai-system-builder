@@ -239,6 +239,24 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Duplicate id allocation is now application-owned in `DuplicatePersistedWorkflowUseCase` when no explicit id is supplied (`<source>:copy`, then `:copy-<n>`), with conflict/not-found behavior preserved through existing typed persistence errors.
 - Persisted workflow rehydration now validates canonical revision/timestamp/payload consistency (`normalizePersistedWorkflowRecord`) in both SQLite and in-memory repositories, so malformed persisted revision/version metadata fails fast on load instead of silently round-tripping.
 
+## Direction 5 closeout: workflow persistence/reuse behavior contract (stories 11.13-11.14)
+
+- The persisted workflow model remains one canonical record contract (`PersistedWorkflowRecord`) over canonical workflow definitions: no parallel persistence shape for wizard vs canvas, and no UI-local persistence model.
+- Lifecycle semantics are intentionally lightweight and implemented as:
+  - `draft` persisted status for in-progress workflow authoring records,
+  - `saved` persisted status for validated/published workflow lifecycle states.
+- Repository and use-case behavior contracts remain `create`, `getById`, `update`, `list`, and `duplicate`, with query-time filtering by status/owner/studio/search/limit and deterministic typed error mapping for invalid requests, conflicts, not-found, and adapter failures.
+- Duplicate behavior remains lineage-preserving and non-mutating (`revision.duplicatedFromWorkflowId`), while resetting persistence/workflow revisions to first-write semantics for the duplicated record.
+- Workflow Studio initialization paths are service-backed and persistence-backed:
+  - `new` creates a new draft/session path,
+  - `open-existing` loads persisted workflow definitions via `getPersistedWorkflow`,
+  - `resume-draft` loads persisted draft definitions via the same retrieval contract.
+- Metadata editing and save-state behavior remain part of the same persistence path as shared draft content (name/summary/tags persist through the same save operation and update Explore/read-model projections).
+- Validation/error expectations stay backend-authoritative:
+  - malformed draft definitions and malformed persisted serialized payloads are rejected as invalid-request failures,
+  - missing workflow ids/records fail as not-found,
+  - persistence adapter faults fail as persistence-failed at backend API boundaries.
+
 ## Direction 5 update: Workflow built-in step taxonomy + registry foundation (stories 6.1-6.2)
 
 - Workflow-native built-in steps are now first-class inner-layer contracts in `domain/workflow-studio/WorkflowStudioDomain.ts` with canonical categories (`control-flow`, `temporal`, `human-interaction`, reserved `transformation`) and stable built-in step identities.
