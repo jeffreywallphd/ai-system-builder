@@ -1235,6 +1235,7 @@ Explicitly later than this scope:
   - local directory references with scanner-backed glob scanning,
   - remote file placeholders (descriptor-only extension seam for future connector work).
 - Directory scanning now runs through an explicit scanner seam (`ISourceDirectoryScanner`) with a `fast-glob` adapter loaded only at scan-time, so browser-hosted renderer bundles do not eagerly import Node-only glob internals.
+- Local filesystem dependencies in source-locator and batch payload reads now resolve through lazy Node runtime loading (inside execution methods) instead of module-top imports, so browser-mode UI composition can import ingestion contracts without triggering Vite `node:fs` externalization failures.
 - Source resolution now yields normalized source descriptors with bounded metadata suitable for ingestion contracts and preview surfaces:
   - stable source id,
   - original and normalized reference,

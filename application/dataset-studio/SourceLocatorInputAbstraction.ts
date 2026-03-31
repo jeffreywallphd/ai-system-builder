@@ -1,7 +1,4 @@
 /// <reference types="node" />
-import path from "node:path";
-import { promises as fs } from "node:fs";
-import { createHash } from "node:crypto";
 import { z } from "zod";
 
 export const SourceInputKinds = Object.freeze({
@@ -132,6 +129,44 @@ export interface SourceLocatorRequest {
   readonly config?: Partial<SourceLocatorConfig>;
 }
 
+interface NodePathRuntime {
+  resolve(...paths: string[]): string;
+  basename(path: string): string;
+}
+
+interface NodeFileStatsRuntime {
+  isFile(): boolean;
+  isDirectory(): boolean;
+  size: number;
+}
+
+interface NodeFsRuntime {
+  stat(path: string): Promise<NodeFileStatsRuntime>;
+}
+
+interface SourceLocatorNodeRuntime {
+  readonly path: NodePathRuntime;
+  readonly fs: NodeFsRuntime;
+}
+
+type SourceLocatorNodeRuntimeLoader = () => Promise<SourceLocatorNodeRuntime>;
+
+async function loadSourceLocatorNodeRuntime(): Promise<SourceLocatorNodeRuntime> {
+  const [pathModule, fsModule] = await Promise.all([
+    import("node:path"),
+    import("node:fs"),
+  ]);
+  const resolvedPath = ("default" in pathModule ? pathModule.default : pathModule) as NodePathRuntime;
+  const promises = fsModule.promises;
+  if (!promises) {
+    throw new Error("Node filesystem promises API is unavailable.");
+  }
+  return Object.freeze({
+    path: resolvedPath,
+    fs: promises as NodeFsRuntime,
+  });
+}
+
 type FastGlobMatcher = (
   patterns: ReadonlyArray<string>,
   options: {
@@ -191,9 +226,21 @@ function normalizeOptional(value?: string): string | undefined {
 }
 
 function inferExtension(fileNameOrPath: string): string | undefined {
-  const normalized = fileNameOrPath.trim().toLowerCase();
-  const extension = path.extname(normalized);
-  return extension || undefined;
+  const normalized = toDisplayName(fileNameOrPath).trim().toLowerCase();
+  const lastDot = normalized.lastIndexOf(".");
+  if (lastDot <= 0 || lastDot === normalized.length - 1) {
+    return undefined;
+  }
+  return normalized.slice(lastDot);
+}
+
+function toDisplayName(reference: string): string {
+  const normalized = reference.trim().replace(/[?#].*$/, "");
+  if (!normalized) {
+    return "";
+  }
+  const parts = normalized.split(/[\\/]/).filter(Boolean);
+  return parts.at(-1) ?? normalized;
 }
 
 function toMediaType(extension?: string): string | undefined {
@@ -221,7 +268,16 @@ function toMediaType(extension?: string): string | undefined {
 }
 
 function createSourceId(reference: string, groupId?: string): string {
-  const hash = createHash("sha1").update(`${groupId ?? ""}:${reference}`).digest("hex").slice(0, 16);
+  const value = `${groupId ?? ""}:${reference}`;
+  let hashA = 2166136261;
+  let hashB = 40343;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    hashA ^= code;
+    hashA = Math.imul(hashA, 16777619);
+    hashB = (Math.imul(hashB, 131) + code + index) >>> 0;
+  }
+  const hash = `${(hashA >>> 0).toString(16).padStart(8, "0")}${hashB.toString(16).padStart(8, "0")}`;
   return `src_${hash}`;
 }
 
@@ -246,9 +302,14 @@ function shouldIncludeExtension(extension: string | undefined, config: SourceLoc
 
 export class SourceLocatorInputAbstraction {
   private readonly directoryScanner: ISourceDirectoryScanner;
+  private readonly nodeRuntimeLoader: SourceLocatorNodeRuntimeLoader;
 
-  constructor(options?: { readonly directoryScanner?: ISourceDirectoryScanner }) {
+  constructor(options?: {
+    readonly directoryScanner?: ISourceDirectoryScanner;
+    readonly nodeRuntimeLoader?: SourceLocatorNodeRuntimeLoader;
+  }) {
     this.directoryScanner = options?.directoryScanner ?? new FastGlobSourceDirectoryScanner();
+    this.nodeRuntimeLoader = options?.nodeRuntimeLoader ?? loadSourceLocatorNodeRuntime;
   }
 
   public async resolve(request: SourceLocatorRequest): Promise<SourceLocatorResolutionResult> {
@@ -340,9 +401,24 @@ export class SourceLocatorInputAbstraction {
     config: SourceLocatorConfig,
     issues: SourceLocatorIssue[],
   ): Promise<SourceDescriptor | undefined> {
-    const normalizedPath = path.resolve(filePath.trim());
+    let runtime: SourceLocatorNodeRuntime;
     try {
-      const stats = await fs.stat(normalizedPath);
+      runtime = await this.nodeRuntimeLoader();
+    } catch (error) {
+      issues.push(Object.freeze({
+        code: SourceLocatorIssueCodes.unreadablePath,
+        message: "Local source references require a Node.js filesystem runtime.",
+        reference: filePath.trim(),
+        details: Object.freeze({
+          cause: error instanceof Error ? error.message : String(error),
+        }),
+      }));
+      return undefined;
+    }
+
+    const normalizedPath = runtime.path.resolve(filePath.trim());
+    try {
+      const stats = await runtime.fs.stat(normalizedPath);
       if (!stats.isFile()) {
         issues.push(Object.freeze({
           code: SourceLocatorIssueCodes.invalidReference,
@@ -368,7 +444,7 @@ export class SourceLocatorInputAbstraction {
         originalReference: filePath,
         normalizedReference: normalizedPath,
         sourceType: "file" as const,
-        displayName: path.basename(normalizedPath),
+        displayName: runtime.path.basename(normalizedPath),
         extension,
         mediaType: toMediaType(extension),
         sizeInBytes: stats.size,
@@ -394,9 +470,24 @@ export class SourceLocatorInputAbstraction {
     config: SourceLocatorConfig,
     issues: SourceLocatorIssue[],
   ): Promise<ReadonlyArray<SourceDescriptor>> {
-    const normalizedDirectory = path.resolve(directoryPath.trim());
+    let runtime: SourceLocatorNodeRuntime;
     try {
-      const stats = await fs.stat(normalizedDirectory);
+      runtime = await this.nodeRuntimeLoader();
+    } catch (error) {
+      issues.push(Object.freeze({
+        code: SourceLocatorIssueCodes.unreadablePath,
+        message: "Local directory sources require a Node.js filesystem runtime.",
+        reference: directoryPath.trim(),
+        details: Object.freeze({
+          cause: error instanceof Error ? error.message : String(error),
+        }),
+      }));
+      return Object.freeze([]);
+    }
+
+    const normalizedDirectory = runtime.path.resolve(directoryPath.trim());
+    try {
+      const stats = await runtime.fs.stat(normalizedDirectory);
       if (!stats.isDirectory()) {
         issues.push(Object.freeze({
           code: SourceLocatorIssueCodes.invalidReference,
@@ -471,7 +562,7 @@ export class SourceLocatorInputAbstraction {
       originalReference: input.reference,
       normalizedReference: reference,
       sourceType: "file" as const,
-      displayName: input.displayName ?? (path.basename(reference) || reference),
+      displayName: input.displayName ?? (toDisplayName(reference) || reference),
       extension,
       mediaType: input.mediaType ?? toMediaType(extension),
       groupId: normalizeOptional(input.groupId),
