@@ -35,6 +35,8 @@ export interface ExploreAssetSummary {
   readonly metadata: {
     readonly semanticRole?: TaxonomySemanticRole;
     readonly behaviorKind?: TaxonomyBehaviorKind;
+    readonly summary?: string;
+    readonly tags?: ReadonlyArray<string>;
     readonly sourceType?: string;
     readonly sourceLabel?: string;
     readonly creatorId?: string;
@@ -137,6 +139,8 @@ function matchesKeyword(asset: ExploreAssetSummary, keyword?: string): boolean {
     asset.metadata.sourceType,
     asset.metadata.sourceLabel,
     asset.metadata.creatorId,
+    asset.metadata.summary,
+    ...(asset.metadata.tags ?? []),
     asset.status,
     ...(asset.contract?.parameters ?? []).map((entry) => entry.id),
   ].map((entry) => normalizeText(entry));
@@ -293,6 +297,8 @@ export class ExploreAssetQueryService {
       metadata: Object.freeze({
         semanticRole,
         behaviorKind: taxonomy?.behaviorKind,
+        summary: undefined,
+        tags: undefined,
         sourceType: asset.provenance.sourceType,
         sourceLabel: asset.provenance.sourceLabel,
         creatorId: asset.provenance.creatorId,
@@ -322,6 +328,8 @@ export class ExploreAssetQueryService {
       metadata: Object.freeze({
         semanticRole: taxonomy.semanticRole,
         behaviorKind: taxonomy.behaviorKind,
+        summary: summary.metadata.summary,
+        tags: summary.metadata.tags,
         sourceType: "workflow-persistence",
         sourceLabel: summary.ownershipContext?.studioId ?? "workflow-studio",
         creatorId: summary.ownershipContext?.ownerId,

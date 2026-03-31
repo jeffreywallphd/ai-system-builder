@@ -110,6 +110,10 @@ describe("ExploreAssetQueryService", () => {
     id: "workflow:persisted-draft",
     name: "Draft Workflow",
     draft: createEmptyWorkflowDraft(),
+    metadata: {
+      summary: "Draft workflow summary",
+      tags: ["workflow", "draft-tag"],
+    },
     now: new Date("2026-03-30T00:00:00.000Z"),
   });
   const service = new ExploreAssetQueryService({
@@ -172,10 +176,30 @@ describe("ExploreAssetQueryService", () => {
     expect(result.assets).toHaveLength(1);
     expect(result.assets[0]?.id.assetId).toBe("workflow:persisted-draft");
     expect(result.assets[0]?.metadata.sourceType).toBe("workflow-persistence");
+    expect(result.assets[0]?.metadata.summary).toBe("Draft workflow summary");
+    expect(result.assets[0]?.metadata.tags).toEqual(["workflow", "draft-tag"]);
     expect(result.assets[0]?.metadata.persistenceRevision).toBe(1);
     expect(result.assets[0]?.metadata.workflowRevision).toBe(1);
     expect(result.assets[0]?.metadata.lastModifiedAt).toBe("2026-03-30T00:00:00.000Z");
     expect(result.assets[0]?.taxonomy?.semanticRole).toBe("workflow");
     expect(result.assets[0]?.status).toBe("draft");
+  });
+
+  it("matches persisted workflow metadata summary and tags in keyword search", async () => {
+    const summarySearch = await service.search({
+      keyword: "draft workflow summary",
+      filters: {
+        sourceTypes: ["workflow-persistence"],
+      },
+    });
+    expect(summarySearch.assets.map((entry) => entry.id.assetId)).toEqual(["workflow:persisted-draft"]);
+
+    const tagSearch = await service.search({
+      keyword: "draft-tag",
+      filters: {
+        sourceTypes: ["workflow-persistence"],
+      },
+    });
+    expect(tagSearch.assets.map((entry) => entry.id.assetId)).toEqual(["workflow:persisted-draft"]);
   });
 });

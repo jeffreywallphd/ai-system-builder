@@ -74,6 +74,12 @@ interface DraftDependencyInput {
   readonly versionId: string;
 }
 
+interface WorkflowCoreMetadataDraft {
+  readonly name: string;
+  readonly summary?: string;
+  readonly tags: ReadonlyArray<string>;
+}
+
 function parseJson<T>(value: string): JsonParseResult<T> {
   try {
     if (!value.trim()) {
@@ -119,6 +125,62 @@ function formatTags(tags?: ReadonlyArray<string>): string {
   return (tags ?? []).join(", ");
 }
 
+function toWorkflowCoreMetadataDraft(
+  metadataPatch: AssetMetadataPatch,
+  fallbackName: string,
+  fallbackTags: ReadonlyArray<string>,
+): WorkflowCoreMetadataDraft {
+  const normalizedName = (metadataPatch.title ?? fallbackName).trim();
+  const normalizedSummary = metadataPatch.summary === null
+    ? undefined
+    : metadataPatch.summary?.trim() || undefined;
+  const normalizedTags = parseTagsInput(formatTags(metadataPatch.tags ?? fallbackTags));
+
+  return Object.freeze({
+    name: normalizedName,
+    summary: normalizedSummary,
+    tags: normalizedTags,
+  });
+}
+
+function workflowCoreMetadataEquals(
+  left: WorkflowCoreMetadataDraft,
+  right: WorkflowCoreMetadataDraft,
+): boolean {
+  if (left.name !== right.name || left.summary !== right.summary) {
+    return false;
+  }
+  if (left.tags.length !== right.tags.length) {
+    return false;
+  }
+  for (let index = 0; index < left.tags.length; index += 1) {
+    if (left.tags[index] !== right.tags[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function buildMetadataPatchFromDraftMetadata(
+  metadata: NonNullable<StudioShellSnapshotReadModel["draft"]>["metadata"],
+): AssetMetadataPatch {
+  return Object.freeze({
+    title: metadata.title,
+    summary: metadata.summary,
+    tags: metadata.tags,
+    taxonomy: metadata.taxonomy,
+    contract: metadata.contract,
+    provenance: metadata.provenance,
+  });
+}
+
+function validateWorkflowCoreMetadataDraft(metadata: WorkflowCoreMetadataDraft): string | undefined {
+  if (!metadata.name.trim()) {
+    return "Workflow name is required.";
+  }
+  return undefined;
+}
+
 function getToolbarButtonClassName(action: StudioShellToolbarAction): string {
   if (action.tone === "primary") {
     return "ui-button ui-button--primary";
@@ -162,7 +224,7 @@ function isWorkflowStudioPath(pathname: string): boolean {
 }
 
 function getWorkflowStudioUnsavedPrompt(): string {
-  return "You have unsaved workflow draft changes. Click OK to save before leaving, or Cancel to leave without saving.";
+  return "You have unsaved workflow changes. Click OK to save before leaving, or Cancel to leave without saving.";
 }
 
 interface StudioShellPageProps {
@@ -272,6 +334,15 @@ export default function StudioShellPage({
   const [metadataPatchJson, setMetadataPatchJson] = useState(() => JSON.stringify(initialMetadataPatch, null, 2));
   const [isMetadataJsonMode, setIsMetadataJsonMode] = useState(false);
   const [metadataJsonError, setMetadataJsonError] = useState<string | undefined>();
+  const initialWorkflowCoreMetadata = useMemo(
+    () => toWorkflowCoreMetadataDraft(initialMetadataPatch, defaultDraftTitle, defaultDraftTags),
+    [defaultDraftTags, defaultDraftTitle, initialMetadataPatch],
+  );
+  const [workflowMetadataBaseline, setWorkflowMetadataBaseline] = useState<WorkflowCoreMetadataDraft>(
+    initialWorkflowCoreMetadata,
+  );
+  const [isWorkflowSavePending, setIsWorkflowSavePending] = useState(false);
+  const [workflowSaveError, setWorkflowSaveError] = useState<string | undefined>();
   const [dependencies, setDependencies] = useState<ReadonlyArray<DraftDependencyInput>>(initialDependencies);
   const [dependenciesJson, setDependenciesJson] = useState(() => JSON.stringify(toDependencyReferences(initialDependencies), null, 2));
   const [isDependenciesJsonMode, setIsDependenciesJsonMode] = useState(false);
@@ -289,6 +360,13 @@ export default function StudioShellPage({
   const automationPrefillAppliedRef = useRef(false);
   const lastRestoredWorkflowReturnSearchRef = useRef<string | undefined>(undefined);
   const lastAppliedWorkflowEntryRef = useRef<string | undefined>(undefined);
+  const lastWorkflowMetadataSyncKeyRef = useRef<string | undefined>(undefined);
+  const workflowCoreMetadataDraft = useMemo(
+    () => toWorkflowCoreMetadataDraft(metadataPatch, defaultDraftTitle, defaultDraftTags),
+    [defaultDraftTags, defaultDraftTitle, metadataPatch],
+  );
+  const hasWorkflowMetadataUnsavedChanges = isWorkflowStudio
+    && !workflowCoreMetadataEquals(workflowCoreMetadataDraft, workflowMetadataBaseline);
 
   const updateContent = (nextContent: string): void => {
     setContent(nextContent);
@@ -296,6 +374,7 @@ export default function StudioShellPage({
       setWorkflowRunFeedback(undefined);
       setWorkflowExecutionReadiness(undefined);
       setIsWorkflowReadinessPending(false);
+      setWorkflowSaveError(undefined);
     }
     workflowModeStore?.hydrateFromSerializedDraft(nextContent);
   };
@@ -317,6 +396,47 @@ export default function StudioShellPage({
 
     setContent(workflowModeState.draftEditorContent);
   }, [isWorkflowStudio, workflowModeState]);
+
+  useEffect(() => {
+    if (!isWorkflowStudio) {
+      return;
+    }
+
+    const sourceMetadataPatch = snapshot?.draft
+      ? buildMetadataPatchFromDraftMetadata(snapshot.draft.metadata)
+      : initialMetadataPatch;
+    const sourceWorkflowMetadata = toWorkflowCoreMetadataDraft(
+      sourceMetadataPatch,
+      defaultDraftTitle,
+      defaultDraftTags,
+    );
+    const syncKey = `${studioId}:${snapshot?.draft?.draftId ?? "new"}:${snapshot?.draft?.revision ?? 0}`;
+    const contextChanged = lastWorkflowMetadataSyncKeyRef.current !== syncKey;
+    const shouldSynchronize = contextChanged || !hasWorkflowMetadataUnsavedChanges;
+
+    if (shouldSynchronize) {
+      if (!workflowCoreMetadataEquals(workflowCoreMetadataDraft, sourceWorkflowMetadata)) {
+        setMetadataPatch(sourceMetadataPatch);
+        setMetadataPatchJson(JSON.stringify(sourceMetadataPatch, null, 2));
+      }
+      if (!workflowCoreMetadataEquals(workflowMetadataBaseline, sourceWorkflowMetadata)) {
+        setWorkflowMetadataBaseline(sourceWorkflowMetadata);
+      }
+      setWorkflowSaveError(undefined);
+    }
+
+    lastWorkflowMetadataSyncKeyRef.current = syncKey;
+  }, [
+    defaultDraftTags,
+    defaultDraftTitle,
+    hasWorkflowMetadataUnsavedChanges,
+    initialMetadataPatch,
+    isWorkflowStudio,
+    snapshot?.draft,
+    studioId,
+    workflowCoreMetadataDraft,
+    workflowMetadataBaseline,
+  ]);
 
   useEffect(() => {
     if (!workflowModeStore || !resolvedWorkflowModeId) {
@@ -427,6 +547,10 @@ export default function StudioShellPage({
     setMetadataPatchJson(JSON.stringify(initialMetadataPatch, null, 2));
     setIsMetadataJsonMode(false);
     setMetadataJsonError(undefined);
+    setWorkflowMetadataBaseline(initialWorkflowCoreMetadata);
+    setWorkflowSaveError(undefined);
+    setIsWorkflowSavePending(false);
+    lastWorkflowMetadataSyncKeyRef.current = undefined;
 
     setDependencies(initialDependencies);
     setDependenciesJson(JSON.stringify(toDependencyReferences(initialDependencies), null, 2));
@@ -435,7 +559,7 @@ export default function StudioShellPage({
     setWorkflowRunFeedback(undefined);
     setWorkflowExecutionReadiness(undefined);
     setIsWorkflowReadinessPending(false);
-  }, [initialDependencies, initialMetadataPatch]);
+  }, [initialDependencies, initialMetadataPatch, initialWorkflowCoreMetadata]);
 
   useEffect(() => {
     void refreshSnapshot();
@@ -631,17 +755,21 @@ export default function StudioShellPage({
 
   const runAndRefreshWithResult = async (
     action: () => Promise<{ ok: boolean; error?: { message: string } }>,
-  ): Promise<boolean> => {
+  ): Promise<{ readonly ok: boolean; readonly errorMessage?: string }> => {
     setIsBusy(true);
     try {
       const response = await action();
       if (!response.ok) {
-        setError(response.error?.message ?? "Studio shell operation failed.");
-        return false;
+        const errorMessage = response.error?.message ?? "Studio shell operation failed.";
+        setError(errorMessage);
+        return Object.freeze({
+          ok: false,
+          errorMessage,
+        });
       }
       await refreshSnapshot();
       setError(undefined);
-      return true;
+      return Object.freeze({ ok: true });
     } finally {
       setIsBusy(false);
     }
@@ -657,6 +785,9 @@ export default function StudioShellPage({
       setMetadataPatchJson(JSON.stringify(next, null, 2));
       return next;
     });
+    if (isWorkflowStudio) {
+      setWorkflowSaveError(undefined);
+    }
   };
 
   const updateDependenciesForm = (nextDependencies: ReadonlyArray<DraftDependencyInput>): void => {
@@ -665,6 +796,23 @@ export default function StudioShellPage({
   };
 
   const resolveMetadataPatchForSave = (): AssetMetadataPatch | undefined => {
+    if (isWorkflowStudio) {
+      const metadataValidationError = validateWorkflowCoreMetadataDraft(workflowCoreMetadataDraft);
+      if (metadataValidationError) {
+        setMetadataJsonError(metadataValidationError);
+        return undefined;
+      }
+      setMetadataJsonError(undefined);
+      return Object.freeze({
+        title: workflowCoreMetadataDraft.name,
+        summary: workflowCoreMetadataDraft.summary,
+        tags: workflowCoreMetadataDraft.tags,
+        taxonomy: metadataPatch.taxonomy,
+        contract: metadataPatch.contract,
+        provenance: metadataPatch.provenance,
+      });
+    }
+
     if (!isMetadataJsonMode) {
       return metadataPatch;
     }
@@ -787,17 +935,35 @@ export default function StudioShellPage({
   }, [inlineReturnPaths?.withAsset, navigate, selectorLaunchContext, snapshot?.draft?.assetId]);
   const workflowDraftContent = workflowModeState?.sharedDraftSerialized ?? content;
   const hasWorkflowDraftParseError = isWorkflowStudio && Boolean(workflowModeState?.draftParseError);
-  const hasWorkflowUnsavedChanges = isWorkflowStudio && Boolean(workflowModeState?.hasLocalDraftEdits);
+  const hasWorkflowUnsavedChanges = isWorkflowStudio
+    && (Boolean(workflowModeState?.hasLocalDraftEdits) || hasWorkflowMetadataUnsavedChanges);
   const workflowDraftStatusTone = hasWorkflowDraftParseError
     ? "danger"
-    : hasWorkflowUnsavedChanges
-      ? "warning"
-      : "success";
+    : isWorkflowSavePending
+      ? "neutral"
+      : workflowSaveError
+        ? "danger"
+        : hasWorkflowUnsavedChanges
+          ? "warning"
+          : "success";
   const workflowDraftStatusLabel = hasWorkflowDraftParseError
     ? "Draft parse error"
-    : hasWorkflowUnsavedChanges
-      ? "Unsaved changes"
-      : "All changes saved";
+    : isWorkflowSavePending
+      ? "Saving changes..."
+      : workflowSaveError
+        ? "Save failed"
+        : hasWorkflowUnsavedChanges
+          ? "Unsaved changes"
+          : "Saved";
+  const workflowDraftStatusDetail = hasWorkflowDraftParseError
+    ? "Workflow draft JSON has parse errors. Fix JSON before saving this draft."
+    : isWorkflowSavePending
+      ? "Saving workflow draft and metadata to studio persistence..."
+      : workflowSaveError
+        ? workflowSaveError
+        : hasWorkflowUnsavedChanges
+          ? "Workflow draft or metadata edits are unsaved. Save before leaving Workflow Studio to persist changes."
+          : "Workflow draft and metadata are synchronized with persisted storage.";
   const toolbarActions = studioRegistration?.shell?.toolbar?.actions ?? [];
   const workflowModeToolbarActions = toolbarActions.filter(
     (action): action is Extract<StudioShellToolbarAction, { kind: "set-workflow-mode" }> => (
@@ -850,28 +1016,49 @@ export default function StudioShellPage({
       return false;
     }
 
+    if (isWorkflowStudio) {
+      setIsWorkflowSavePending(true);
+      setWorkflowSaveError(undefined);
+    }
+
     const resolvedMetadataPatch = resolveMetadataPatchForSave();
     if (!resolvedMetadataPatch) {
+      if (isWorkflowStudio) {
+        setIsWorkflowSavePending(false);
+      }
       return false;
     }
 
+    let saveResult: { readonly ok: boolean; readonly errorMessage?: string };
     if (!draftId) {
       const metadata = buildCreateMetadata(defaultDraftTitle, defaultDraftTags, resolvedMetadataPatch);
-      return runAndRefreshWithResult(() => service.createDraft({
+      saveResult = await runAndRefreshWithResult(() => service.createDraft({
         studioId,
         sessionId,
         content: workflowDraftContent,
         metadata,
       }));
+    } else {
+      saveResult = await runAndRefreshWithResult(() => service.updateDraft({
+        studioId,
+        sessionId,
+        draftId,
+        content: workflowDraftContent,
+        metadataPatch: resolvedMetadataPatch,
+      }));
     }
 
-    return runAndRefreshWithResult(() => service.updateDraft({
-      studioId,
-      sessionId,
-      draftId,
-      content: workflowDraftContent,
-      metadataPatch: resolvedMetadataPatch,
-    }));
+    if (isWorkflowStudio) {
+      setIsWorkflowSavePending(false);
+      if (saveResult.ok) {
+        setWorkflowSaveError(undefined);
+        setWorkflowMetadataBaseline(workflowCoreMetadataDraft);
+      } else {
+        setWorkflowSaveError(saveResult.errorMessage ?? "Workflow save failed.");
+      }
+    }
+
+    return saveResult.ok;
   };
 
   const saveDraftFromAuthoring = (): void => {
@@ -1026,7 +1213,7 @@ export default function StudioShellPage({
       return isBusy;
     }
     if (action.kind === StudioShellToolbarActionKinds.saveDraft) {
-      return isBusy || !sessionId || hasWorkflowDraftParseError;
+      return isBusy || isWorkflowSavePending || !sessionId || hasWorkflowDraftParseError;
     }
     if (action.kind === StudioShellToolbarActionKinds.runValidation) {
       if (isWorkflowStudio) {
@@ -1277,19 +1464,9 @@ export default function StudioShellPage({
                 {workflowDraftStatusLabel}
               </span>
             </div>
-            {hasWorkflowDraftParseError ? (
-              <p className="ui-text-small ui-text-danger">
-                Workflow draft JSON has parse errors. Fix JSON before saving this draft.
-              </p>
-            ) : hasWorkflowUnsavedChanges ? (
-              <p className="ui-text-small ui-text-secondary">
-                Local workflow edits are unsaved. Save before leaving Workflow Studio to persist these changes in the draft session.
-              </p>
-            ) : (
-              <p className="ui-text-small ui-text-secondary">
-                Local and persisted workflow draft content are synchronized.
-              </p>
-            )}
+            <p className={hasWorkflowDraftParseError || workflowSaveError ? "ui-text-small ui-text-danger" : "ui-text-small ui-text-secondary"}>
+              {workflowDraftStatusDetail}
+            </p>
           </div>
         ) : null}
 
@@ -1354,7 +1531,7 @@ export default function StudioShellPage({
           <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row" }}>
             <button
               className="ui-button ui-button--primary"
-              disabled={isBusy || !sessionId || hasWorkflowDraftParseError}
+              disabled={isBusy || isWorkflowSavePending || !sessionId || hasWorkflowDraftParseError}
               onClick={saveDraftFromAuthoring}
             >
               {draftId
@@ -1445,8 +1622,56 @@ export default function StudioShellPage({
         </StudioShellPanel>
         {renderExtensions(extensionRegistry, StudioShellExtensionSlots.sessionContext, extensionContext)}
 
-        <StudioShellPanel title="Taxonomy / contract / provenance" subtitle="Form-first metadata editing with optional advanced JSON.">
-          <div className="ui-form-json-toggle">
+        <StudioShellPanel
+          title={isWorkflowStudio ? "Workflow metadata" : "Taxonomy / contract / provenance"}
+          subtitle={isWorkflowStudio
+            ? "Edit workflow name and core metadata used across persistence and Explore."
+            : "Form-first metadata editing with optional advanced JSON."}
+        >
+          {isWorkflowStudio ? (
+            <div className="ui-stack ui-stack--sm">
+              <div className="ui-form-grid">
+                <label className="ui-field">
+                  <span className="ui-field__label">Workflow name</span>
+                  <input
+                    className="ui-input"
+                    value={metadataPatch.title ?? ""}
+                    onChange={(event) => updateMetadataPatch((current) => ({
+                      ...current,
+                      title: event.target.value,
+                    }))}
+                    placeholder="Workflow name"
+                  />
+                </label>
+                <label className="ui-field">
+                  <span className="ui-field__label">Tags</span>
+                  <input
+                    className="ui-input"
+                    value={formatTags(metadataPatch.tags)}
+                    onChange={(event) => updateMetadataPatch((current) => ({
+                      ...current,
+                      tags: parseTagsInput(event.target.value),
+                    }))}
+                    placeholder="workflow, orchestration"
+                  />
+                </label>
+              </div>
+              <label className="ui-field">
+                <span className="ui-field__label">Summary</span>
+                <textarea
+                  className="ui-textarea"
+                  rows={4}
+                  value={metadataPatch.summary === null ? "" : (metadataPatch.summary ?? "")}
+                  onChange={(event) => updateMetadataPatch((current) => ({
+                    ...current,
+                    summary: event.target.value || undefined,
+                  }))}
+                />
+              </label>
+            </div>
+          ) : (
+            <>
+              <div className="ui-form-json-toggle">
             <button
               type="button"
               className="ui-button ui-button--ghost ui-button--sm"
@@ -1470,15 +1695,15 @@ export default function StudioShellPage({
             >
               {isMetadataJsonMode ? "Use Form Editor" : "Edit JSON"}
             </button>
-          </div>
+              </div>
 
-          {isMetadataJsonMode ? (
-            <label className="ui-stack ui-stack--2xs">
-              <span className="ui-text-small">Metadata patch JSON</span>
-              <textarea className="ui-textarea" rows={12} value={metadataPatchJson} onChange={(event) => setMetadataPatchJson(event.target.value)} />
-            </label>
-          ) : (
-            <div className="ui-stack ui-stack--sm">
+              {isMetadataJsonMode ? (
+                <label className="ui-stack ui-stack--2xs">
+                  <span className="ui-text-small">Metadata patch JSON</span>
+                  <textarea className="ui-textarea" rows={12} value={metadataPatchJson} onChange={(event) => setMetadataPatchJson(event.target.value)} />
+                </label>
+              ) : (
+                <div className="ui-stack ui-stack--sm">
               <div className="ui-form-grid">
                 <label className="ui-field">
                   <span className="ui-field__label">Title</span>
@@ -1699,7 +1924,9 @@ export default function StudioShellPage({
                   </label>
                 </div>
               </div>
-            </div>
+                </div>
+              )}
+            </>
           )}
           {metadataJsonError ? <p className="ui-text-muted">{metadataJsonError}</p> : null}
         </StudioShellPanel>
