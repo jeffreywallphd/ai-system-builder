@@ -20,7 +20,12 @@ import {
   type PipelinePreviewData,
   type StageInspectionResult,
 } from "../../domain/dataset-studio/PipelineInspectionDomain";
-import type { PipelineStageId } from "../../domain/dataset-studio/PipelineStageDomain";
+import {
+  PipelineStageIds,
+  type PipelineStageId,
+} from "../../domain/dataset-studio/PipelineStageDomain";
+import { FeatureEngineeringOperationKinds, parseFeatureEngineeringStageConfigFromStageOptions } from "../../domain/dataset-studio/FeatureEngineeringStageDomain";
+import { AnnotationStatusKinds, parseLabelingStageConfigFromStageOptions } from "../../domain/dataset-studio/LabelingStageDomain";
 
 export interface PipelineInspectionExecutionResult {
   readonly pipelineGraph?: PipelineGraph;
@@ -234,6 +239,150 @@ function sortAssetNodes(nodes: ReadonlyArray<PipelineGraphNode>): ReadonlyArray<
   );
 }
 
+function listShapeFields(shape: CanonicalDataShape): ReadonlyArray<string> {
+  switch (shape.kind) {
+    case CanonicalDataShapeKinds.records: {
+      const keys = new Set<string>();
+      for (const item of shape.records) {
+        Object.keys(item.fields).forEach((key) => keys.add(key));
+      }
+      return Object.freeze([...keys].sort());
+    }
+    case CanonicalDataShapeKinds.table:
+      return Object.freeze(shape.columns.map((column) => column.columnId).sort());
+    case CanonicalDataShapeKinds.textItems:
+      return Object.freeze([
+        "itemId",
+        "text",
+        "sourceDocumentId",
+        "startOffset",
+        "endOffset",
+        "metadata",
+      ]);
+    case CanonicalDataShapeKinds.imageMetadataRecords:
+      return Object.freeze([
+        "itemId",
+        "imageId",
+        "label",
+        "confidence",
+        "boundingBox",
+        "attributes",
+        "metadata",
+      ]);
+    default:
+      return Object.freeze([]);
+  }
+}
+
+function resolveUpstreamStageOutput(
+  graph: PipelineGraph,
+  stageId: PipelineStageId,
+  executionResult: PipelineInspectionExecutionResult,
+): CanonicalDataShape | undefined {
+  const upstreamStageIds = graph.edges
+    .filter((edge) => edge.kind === "stage-to-stage" && edge.targetStageId === stageId)
+    .map((edge) => edge.sourceStageId);
+
+  for (const upstreamStageId of upstreamStageIds) {
+    const output = executionResult.stageOutputById?.[upstreamStageId];
+    if (isCanonicalDataShape(output)) {
+      return output;
+    }
+  }
+
+  return undefined;
+}
+
+function deriveFeatureEngineeringMetadata(input: {
+  readonly stageNode: PipelineGraphStageNode;
+  readonly stageOutput?: CanonicalDataShape;
+  readonly upstreamOutput?: CanonicalDataShape;
+}): Partial<InspectionMetadata> | undefined {
+  try {
+    const config = parseFeatureEngineeringStageConfigFromStageOptions(input.stageNode.data.config.options);
+    const operationTypeCounts: Record<string, number> = {
+      [FeatureEngineeringOperationKinds.derivedNumeric]: 0,
+      [FeatureEngineeringOperationKinds.categoricalFlag]: 0,
+      [FeatureEngineeringOperationKinds.textSummary]: 0,
+      [FeatureEngineeringOperationKinds.bucketization]: 0,
+      [FeatureEngineeringOperationKinds.projection]: 0,
+    };
+    const engineeredFields = new Set<string>();
+    for (const operation of config.operations) {
+      operationTypeCounts[operation.kind] = (operationTypeCounts[operation.kind] ?? 0) + 1;
+      if ("targetField" in operation && typeof operation.targetField === "string") {
+        engineeredFields.add(operation.targetField);
+      }
+    }
+
+    const beforeFields = input.upstreamOutput ? listShapeFields(input.upstreamOutput) : Object.freeze([]);
+    const afterFields = input.stageOutput ? listShapeFields(input.stageOutput) : Object.freeze([]);
+    const beforeFieldSet = new Set(beforeFields);
+    const newlyCreatedFields = afterFields.filter((field) => !beforeFieldSet.has(field));
+
+    return Object.freeze({
+      summaryStats: Object.freeze({
+        "feature.strategy": config.strategy,
+        "feature.operationCount": config.operations.length,
+        "feature.derivedNumericCount": operationTypeCounts[FeatureEngineeringOperationKinds.derivedNumeric],
+        "feature.categoricalFlagCount": operationTypeCounts[FeatureEngineeringOperationKinds.categoricalFlag],
+        "feature.textSummaryCount": operationTypeCounts[FeatureEngineeringOperationKinds.textSummary],
+        "feature.bucketizationCount": operationTypeCounts[FeatureEngineeringOperationKinds.bucketization],
+        "feature.projectionCount": operationTypeCounts[FeatureEngineeringOperationKinds.projection],
+        "feature.engineeredFieldCount": engineeredFields.size,
+        "feature.newFieldCount": newlyCreatedFields.length,
+        "feature.newFields": Object.freeze(newlyCreatedFields),
+        "feature.beforeFieldCount": beforeFields.length,
+        "feature.afterFieldCount": afterFields.length,
+        "feature.beforeAfterPreviewAvailable": Boolean(input.upstreamOutput && input.stageOutput),
+      }),
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+function deriveLabelingMetadata(input: {
+  readonly stageNode: PipelineGraphStageNode;
+  readonly stageOutput?: CanonicalDataShape;
+}): Partial<InspectionMetadata> | undefined {
+  try {
+    const config = parseLabelingStageConfigFromStageOptions(
+      input.stageNode.data.config.options,
+      input.stageNode.data.config.declaredInputType,
+    );
+    const unresolvedCount = config.records.filter((record) => record.status === AnnotationStatusKinds.unresolved).length;
+    const manualNeededCount = config.records.filter((record) => record.status === AnnotationStatusKinds.manualNeeded).length;
+    const resolvedCount = config.records.filter((record) => record.status === AnnotationStatusKinds.resolved).length;
+    const stageItemCount = input.stageOutput?.kind === CanonicalDataShapeKinds.records
+      ? input.stageOutput.records.length
+      : input.stageOutput?.kind === CanonicalDataShapeKinds.table
+        ? input.stageOutput.rows.length
+        : input.stageOutput?.kind === CanonicalDataShapeKinds.textItems
+          ? input.stageOutput.items.length
+          : input.stageOutput?.kind === CanonicalDataShapeKinds.imageMetadataRecords
+            ? input.stageOutput.items.length
+            : 0;
+
+    return Object.freeze({
+      summaryStats: Object.freeze({
+        "annotation.mode": config.mode,
+        "annotation.target": config.target,
+        "annotation.attachmentMode": config.attachmentMode,
+        "annotation.recordCount": config.records.length,
+        "annotation.resolvedCount": resolvedCount,
+        "annotation.unresolvedCount": unresolvedCount,
+        "annotation.manualNeededCount": manualNeededCount,
+        "annotation.assistanceProvider": config.assistanceProvider,
+        "annotation.stageItemCount": stageItemCount,
+        "annotation.sampleLabeledOutputAvailable": Boolean(input.stageOutput),
+      }),
+    });
+  } catch {
+    return undefined;
+  }
+}
+
 export class PipelineInspectionService {
   private readonly previewOptions: PipelineInspectionPreviewOptions;
   private readonly hooks: PipelineInspectionHooks;
@@ -366,9 +515,26 @@ export class PipelineInspectionService {
     const stageOutput = executionResult.stageOutputById?.[stageNode.data.stageId];
     const stageStatus = executionResult.stageStatusById?.[stageNode.data.stageId]
       ?? PipelineExecutionStatusKinds.pending;
+    const graph = this.resolveGraph(executionResult);
+    const canonicalStageOutput = isCanonicalDataShape(stageOutput) ? stageOutput : undefined;
+    const upstreamOutput = resolveUpstreamStageOutput(graph, stageNode.data.stageId, executionResult);
+    const stageSpecificMetadata = stageNode.data.stageId === PipelineStageIds.FeatureEngineering
+      ? deriveFeatureEngineeringMetadata({
+        stageNode,
+        stageOutput: canonicalStageOutput,
+        upstreamOutput,
+      })
+      : stageNode.data.stageId === PipelineStageIds.Labeling
+        ? deriveLabelingMetadata({
+          stageNode,
+          stageOutput: canonicalStageOutput,
+        })
+        : undefined;
+
     const stageMetadata = mergeMetadata(
       isCanonicalDataShape(stageOutput) ? deriveMetadataFromCanonicalShape(stageOutput) : undefined,
       executionResult.stageMetadataById?.[stageNode.data.stageId],
+      stageSpecificMetadata,
       ...this.hooks.stage?.map((hook) => hook({
         stageNode,
         executionResult,
@@ -381,7 +547,7 @@ export class PipelineInspectionService {
       ? derivePreviewFromCanonicalShape(stageOutput, this.previewOptions)
       : undefined;
 
-    const assets = sortAssetNodes(this.resolveGraph(executionResult).nodes)
+    const assets = sortAssetNodes(graph.nodes)
       .filter((assetNode) => assetNode.data.stageId === stageNode.data.stageId)
       .map((assetNode) => this.inspectAssetNode(assetNode, executionResult));
 

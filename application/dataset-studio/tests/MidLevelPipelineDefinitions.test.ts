@@ -30,6 +30,7 @@ describe("MidLevelPipelineDefinitions", () => {
       PipelineStageIds.Normalization,
       PipelineStageIds.Cleaning,
       PipelineStageIds.Transformation,
+      PipelineStageIds.FeatureEngineering,
       PipelineStageIds.Aggregation,
     ]);
 

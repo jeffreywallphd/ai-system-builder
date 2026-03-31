@@ -147,15 +147,19 @@ const DefaultPipelineStageDefinitions: ReadonlyArray<PipelineStageDefinition> = 
   createPipelineStageDefinition({
     id: PipelineStageIds.FeatureEngineering,
     displayName: "Feature Engineering",
-    description: "Generates derived features for model-ready prepared datasets.",
+    description: "Generates engineered features across tabular/text/image-metadata canonical shapes.",
     category: PipelineStageCategories.featureEngineering,
     allowedInputTypes: Object.freeze([
       CanonicalDataShapeKinds.records,
       CanonicalDataShapeKinds.table,
+      CanonicalDataShapeKinds.textItems,
+      CanonicalDataShapeKinds.imageMetadataRecords,
     ]),
     producedOutputTypes: Object.freeze([
       CanonicalDataShapeKinds.records,
       CanonicalDataShapeKinds.table,
+      CanonicalDataShapeKinds.textItems,
+      CanonicalDataShapeKinds.imageMetadataRecords,
     ]),
     isOptional: true,
     defaultEnabled: false,

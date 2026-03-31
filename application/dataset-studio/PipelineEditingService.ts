@@ -8,6 +8,7 @@ import {
 import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
 import {
   createPipelineStageInstance,
+  PipelineStageIds,
   type PipelineStageConfig,
   type PipelineStageDefinition,
   type PipelineStageId,
@@ -24,6 +25,14 @@ import {
   StageAssetCompositionService,
   type StageCompositionDefinition,
 } from "./StageAssetCompositionService";
+import {
+  parseFeatureEngineeringStageConfigFromStageOptions,
+  toFeatureEngineeringStageOptions,
+} from "../../domain/dataset-studio/FeatureEngineeringStageDomain";
+import {
+  parseLabelingStageConfigFromStageOptions,
+  toLabelingStageOptions,
+} from "../../domain/dataset-studio/LabelingStageDomain";
 
 export const PipelineEditErrorCodes = Object.freeze({
   unknownStage: "unknown-stage",
@@ -366,6 +375,63 @@ export class PipelineEditingService {
       enabled,
     }));
 
+    const nextDefinition = validatePipelineDefinition(Object.freeze({
+      stageInstances: Object.freeze(stageInstances),
+      transitions: sanitizeTransitions(current, Object.freeze(stageInstances)),
+      explicitBranchingStageIds: sanitizeBranchingStageIds(current.explicitBranchingStageIds, Object.freeze(stageInstances)),
+    }));
+
+    return this.regenerate(nextDefinition);
+  }
+
+  public updateStageConfiguration(
+    definition: PipelineDefinition,
+    stageId: PipelineStageId,
+    optionPatch: Readonly<Record<string, CanonicalRecordValue>>,
+  ): PipelineEditResult {
+    const current = validatePipelineDefinition(definition);
+    const stageIndex = current.stageInstances.findIndex((stage) => stage.stageId === stageId);
+    if (stageIndex < 0) {
+      throw new PipelineEditError(
+        PipelineEditErrorCodes.stageNotInPipeline,
+        `Stage '${stageId}' is not present in this pipeline.`,
+      );
+    }
+
+    const currentStage = current.stageInstances[stageIndex];
+    if (!currentStage) {
+      throw new PipelineEditError(PipelineEditErrorCodes.invalidEdit, "Unable to resolve stage to configure.");
+    }
+
+    const mergedOptions = Object.freeze({
+      ...currentStage.config.options,
+      ...optionPatch,
+    });
+
+    const normalizedOptions = stageId === PipelineStageIds.Labeling
+      ? toLabelingStageOptions(
+        parseLabelingStageConfigFromStageOptions(mergedOptions, currentStage.config.declaredInputType),
+      )
+      : stageId === PipelineStageIds.FeatureEngineering
+        ? toFeatureEngineeringStageOptions(
+          parseFeatureEngineeringStageConfigFromStageOptions(mergedOptions),
+        )
+        : mergedOptions;
+
+    const replacement = createPipelineStageInstance({
+      definition: this.stageRegistry.getDefinition(stageId),
+      enabled: currentStage.enabled,
+      config: {
+        mode: currentStage.config.mode,
+        declaredInputType: currentStage.config.declaredInputType,
+        expectedOutputType: currentStage.config.expectedOutputType,
+        options: normalizedOptions,
+      },
+      metadata: currentStage.metadata,
+    });
+
+    const stageInstances = [...current.stageInstances];
+    stageInstances.splice(stageIndex, 1, replacement);
     const nextDefinition = validatePipelineDefinition(Object.freeze({
       stageInstances: Object.freeze(stageInstances),
       transitions: sanitizeTransitions(current, Object.freeze(stageInstances)),

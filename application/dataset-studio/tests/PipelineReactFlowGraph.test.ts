@@ -55,4 +55,43 @@ describe("PipelineReactFlowGraph", () => {
     expect(mappedA.edges.every((edge) => edge.source.length > 0 && edge.target.length > 0)).toBeTrue();
     expect(mappedA.edges.every((edge) => edge.data?.edgeKind !== undefined)).toBeTrue();
   });
+
+  it("exposes annotation/feature specialization metadata for future UI-oriented nodes", () => {
+    const registry = new PipelineStageRegistry();
+    const stageInstances = Object.freeze([
+      createPipelineStageInstance({
+        definition: registry.getDefinition(PipelineStageIds.Transformation),
+        config: { mode: PipelineStageConfigModes.simple, options: Object.freeze({}) },
+      }),
+      createPipelineStageInstance({
+        definition: registry.getDefinition(PipelineStageIds.FeatureEngineering),
+        config: {
+          mode: PipelineStageConfigModes.advanced,
+          options: Object.freeze({
+            featureStrategy: "structured",
+            featureOperations: Object.freeze([]),
+          }),
+        },
+      }),
+      createPipelineStageInstance({
+        definition: registry.getDefinition(PipelineStageIds.Labeling),
+        config: {
+          mode: PipelineStageConfigModes.advanced,
+          options: Object.freeze({
+            labelingMode: "manual",
+            annotationTarget: "record",
+          }),
+        },
+      }),
+    ]);
+
+    const graph = buildPipelineGraph({ stageInstances });
+    const reactFlow = buildReactFlowGraph(graph);
+    const featureNode = reactFlow.nodes.find((node) => node.type === "stage" && node.data.stageId === PipelineStageIds.FeatureEngineering);
+    const labelingNode = reactFlow.nodes.find((node) => node.type === "stage" && node.data.stageId === PipelineStageIds.Labeling);
+
+    expect(featureNode?.data.stageSpecialization?.featureEngineeringOriented).toBeTrue();
+    expect(labelingNode?.data.stageSpecialization?.annotationOriented).toBeTrue();
+    expect(labelingNode?.data.stageSpecialization?.annotationMode).toBe("manual");
+  });
 });
