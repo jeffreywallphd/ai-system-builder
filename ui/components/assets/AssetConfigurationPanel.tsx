@@ -201,7 +201,7 @@ export default function AssetConfigurationPanel({
     return normalizeRecord(resolveDataAssetConfigDefaults(schema, initialConfig));
   }, [initialConfig, schema]);
 
-  const [draftConfig, setDraftConfig] = useState<Readonly<Record<string, CanonicalRecordValue>>(normalizedInitial);
+  const [draftConfig, setDraftConfig] = useState<Readonly<Record<string, CanonicalRecordValue>>>(normalizedInitial);
   useEffect(() => {
     setDraftConfig(normalizedInitial);
   }, [normalizedInitial]);
