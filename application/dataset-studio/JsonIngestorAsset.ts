@@ -4,6 +4,7 @@ import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAss
 import { createCanonicalRecordsShape, type CanonicalRecordValue, type CanonicalRecordsShape } from "../../domain/dataset-studio/CanonicalDataShapes";
 import {
   DataAssetConfigFieldKinds,
+  DataAssetConfigFieldVisibilities,
   createDataAssetConfigSchema,
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
@@ -224,6 +225,10 @@ export class JsonIngestorAsset {
   });
 
   public execute(request: JsonIngestorExecutionRequest): JsonIngestorExecutionResult {
+    const assetIdentity = Object.freeze({
+      assetId: JsonIngestorAsset.assetId,
+      assetVersion: JsonIngestorAsset.assetVersion,
+    });
     const parsedRequest = JsonIngestorExecutionRequestSchema.safeParse(request);
     if (!parsedRequest.success) {
       const parsedContext = IngestionExecutionContextSchema.safeParse(request.context ?? {});
@@ -241,6 +246,8 @@ export class JsonIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: parsedContext.success ? parsedContext.data : IngestionExecutionContextSchema.parse({}),
           issues,
+          asset: assetIdentity,
+          configSummary: request.config,
         }),
       });
     }
@@ -275,6 +282,8 @@ export class JsonIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: ingestionContext,
           issues,
+          asset: assetIdentity,
+          configSummary: normalizedRequest.config,
         }),
       });
     }
@@ -304,6 +313,8 @@ export class JsonIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: ingestionContext,
           issues,
+          asset: assetIdentity,
+          configSummary: parsedConfig.success ? parsedConfig.data : normalizedRequest.config,
         }),
       });
     }
@@ -328,6 +339,8 @@ export class JsonIngestorAsset {
           normalized: buildIngestionFailureEnvelope({
             context: ingestionContext,
             issues,
+            asset: assetIdentity,
+            configSummary: parsedConfig.data,
           }),
         });
       }
@@ -351,6 +364,8 @@ export class JsonIngestorAsset {
           normalized: buildIngestionFailureEnvelope({
             context: ingestionContext,
             issues,
+            asset: assetIdentity,
+            configSummary: parsedConfig.data,
           }),
         });
       }
@@ -378,6 +393,8 @@ export class JsonIngestorAsset {
       normalized: buildIngestionSuccessEnvelope({
         output,
         context: ingestionContext,
+        asset: assetIdentity,
+        configSummary: config,
       }),
       diagnostics: Object.freeze([]),
     });
@@ -415,6 +432,11 @@ export class JsonIngestorAsset {
       normalized: buildIngestionPreviewEnvelope({
         ingestor: JsonIngestorAsset.assetId,
         context: result.normalized.context,
+        asset: Object.freeze({
+          assetId: JsonIngestorAsset.assetId,
+          assetVersion: JsonIngestorAsset.assetVersion,
+        }),
+        configSummary: result.config as Readonly<Record<string, unknown>>,
         totalCount: result.records.length,
         sampleCount: sample.length,
         preview: result.normalized.preview,
@@ -435,12 +457,14 @@ export function createJsonIngestorConfigSchema(assetId: string): DataAssetConfig
         key: "flatten",
         label: "Flatten nested objects",
         kind: DataAssetConfigFieldKinds.boolean,
+        visibility: DataAssetConfigFieldVisibilities.simple,
         defaultValue: false,
       },
       {
         key: "maxDepth",
         label: "Flatten max depth",
         kind: DataAssetConfigFieldKinds.number,
+        visibility: DataAssetConfigFieldVisibilities.advanced,
         min: 1,
       },
     ]),

@@ -16,10 +16,19 @@ export interface DataAssetConfigFieldOption {
   readonly label: string;
 }
 
+export const DataAssetConfigFieldVisibilities = Object.freeze({
+  simple: "simple",
+  advanced: "advanced",
+} as const);
+
+export type DataAssetConfigFieldVisibility =
+  typeof DataAssetConfigFieldVisibilities[keyof typeof DataAssetConfigFieldVisibilities];
+
 export interface DataAssetConfigFieldSchema {
   readonly key: string;
   readonly label: string;
   readonly kind: DataAssetConfigFieldKind;
+  readonly visibility?: DataAssetConfigFieldVisibility;
   readonly description?: string;
   readonly placeholder?: string;
   readonly required?: boolean;
@@ -82,6 +91,7 @@ function normalizeFieldSchema(field: DataAssetConfigFieldSchema): DataAssetConfi
     key,
     label,
     kind: field.kind,
+    visibility: field.visibility ?? DataAssetConfigFieldVisibilities.simple,
     description: normalizeOptional(field.description),
     placeholder: normalizeOptional(field.placeholder),
     required: Boolean(field.required),

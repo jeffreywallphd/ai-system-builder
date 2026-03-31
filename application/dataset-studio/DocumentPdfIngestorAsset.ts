@@ -6,6 +6,7 @@ import { DataSourceReferenceKinds, type DataSourceReference, type ResolvedDataSo
 import { DefaultDataSourceLocator, type IDataSourceLocator } from "./DataSourceLocator";
 import {
   DataAssetConfigFieldKinds,
+  DataAssetConfigFieldVisibilities,
   createDataAssetConfigSchema,
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
@@ -270,6 +271,7 @@ function toCanonicalRecordValue(value: unknown): CanonicalRecordValue {
 
 function buildPreview(input: {
   readonly ingestor: string;
+  readonly ingestorVersion?: string;
   readonly context: IngestionExecutionContext;
   readonly pageEntries: ReadonlyArray<{ readonly pageNumber: number; readonly text: string }>;
   readonly pageCount: number;
@@ -278,6 +280,7 @@ function buildPreview(input: {
   readonly metadata: Readonly<Record<string, unknown>>;
   readonly source: ResolvedDataSource;
   readonly format: "pdf" | "text";
+  readonly configSummary?: Readonly<Record<string, unknown>>;
   readonly issues?: ReadonlyArray<IngestionIssue>;
 }): DocumentPdfIngestorPreviewResult {
   const pageSample = input.pageEntries.slice(0, input.previewPageCount);
@@ -313,6 +316,11 @@ function buildPreview(input: {
     normalized: buildIngestionPreviewEnvelope({
       ingestor: input.ingestor,
       context: input.context,
+      asset: Object.freeze({
+        assetId: input.ingestor,
+        assetVersion: input.ingestorVersion,
+      }),
+      configSummary: input.configSummary,
       totalCount: input.pageEntries.length,
       sampleCount: pageSample.length,
       preview: {
@@ -376,6 +384,10 @@ export class DocumentPdfIngestorAsset {
   }
 
   public async resolveAndExecute(request: DocumentPdfIngestorResolveRequest): Promise<DocumentPdfIngestorExecutionResult> {
+    const assetIdentity = Object.freeze({
+      assetId: DocumentPdfIngestorAsset.assetId,
+      assetVersion: DocumentPdfIngestorAsset.assetVersion,
+    });
     try {
       const source = await this.sourceLocator.resolve({ source: request.source });
       return this.execute({
@@ -417,12 +429,18 @@ export class DocumentPdfIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context,
           issues,
+          asset: assetIdentity,
+          configSummary: request.config,
         }),
       });
     }
   }
 
   public async execute(request: DocumentPdfIngestorExecutionRequest): Promise<DocumentPdfIngestorExecutionResult> {
+    const assetIdentity = Object.freeze({
+      assetId: DocumentPdfIngestorAsset.assetId,
+      assetVersion: DocumentPdfIngestorAsset.assetVersion,
+    });
     const parsedConfig = DocumentPdfIngestorConfigSchema.safeParse(request.config ?? {});
     if (!parsedConfig.success) {
       const parsedContext = IngestionExecutionContextSchema.safeParse(request.context ?? {});
@@ -440,6 +458,8 @@ export class DocumentPdfIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: parsedContext.success ? parsedContext.data : IngestionExecutionContextSchema.parse({}),
           issues,
+          asset: assetIdentity,
+          configSummary: request.config,
         }),
       });
     }
@@ -475,6 +495,8 @@ export class DocumentPdfIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: ingestionContext,
           issues,
+          asset: assetIdentity,
+          configSummary: config,
         }),
       });
     }
@@ -501,6 +523,8 @@ export class DocumentPdfIngestorAsset {
           normalized: buildIngestionFailureEnvelope({
             context: ingestionContext,
             issues,
+            asset: assetIdentity,
+            configSummary: config,
           }),
         });
       }
@@ -549,6 +573,8 @@ export class DocumentPdfIngestorAsset {
         metadata: Object.freeze({}),
         source: request.source,
         format: "text",
+        ingestorVersion: DocumentPdfIngestorAsset.assetVersion,
+        configSummary: config,
       });
 
       return Object.freeze({
@@ -558,6 +584,8 @@ export class DocumentPdfIngestorAsset {
         normalized: buildIngestionSuccessEnvelope({
           output: normalizedOutput,
           context: ingestionContext,
+          asset: assetIdentity,
+          configSummary: config,
         }),
         fullText: normalizedText,
         pageCount: 1,
@@ -586,6 +614,8 @@ export class DocumentPdfIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: ingestionContext,
           issues,
+          asset: assetIdentity,
+          configSummary: config,
         }),
       });
     }
@@ -619,6 +649,8 @@ export class DocumentPdfIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: ingestionContext,
           issues,
+          asset: assetIdentity,
+          configSummary: config,
         }),
       });
     }
@@ -666,6 +698,8 @@ export class DocumentPdfIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: ingestionContext,
           issues,
+          asset: assetIdentity,
+          configSummary: config,
         }),
       });
     }
@@ -745,6 +779,8 @@ export class DocumentPdfIngestorAsset {
       metadata: extractedMetadata,
       source: request.source,
       format: "pdf",
+      ingestorVersion: DocumentPdfIngestorAsset.assetVersion,
+      configSummary: config,
       issues: previewIssues,
     });
 
@@ -755,6 +791,8 @@ export class DocumentPdfIngestorAsset {
       normalized: buildIngestionSuccessEnvelope({
         output: normalizedOutput,
         context: ingestionContext,
+        asset: assetIdentity,
+        configSummary: config,
       }),
       fullText,
       pageCount: parsedPdf.totalPages || pages.length,
@@ -782,18 +820,21 @@ export function createDocumentPdfIngestorConfigSchema(assetId: string): DataAsse
         key: "includePageText",
         label: "Include page text",
         kind: DataAssetConfigFieldKinds.boolean,
+        visibility: DataAssetConfigFieldVisibilities.simple,
         defaultValue: true,
       },
       {
         key: "maxPages",
         label: "Max pages",
         kind: DataAssetConfigFieldKinds.number,
+        visibility: DataAssetConfigFieldVisibilities.advanced,
         min: 1,
       },
       {
         key: "previewPageCount",
         label: "Preview pages",
         kind: DataAssetConfigFieldKinds.number,
+        visibility: DataAssetConfigFieldVisibilities.advanced,
         defaultValue: 3,
         min: 1,
         max: 10,
@@ -802,12 +843,14 @@ export function createDocumentPdfIngestorConfigSchema(assetId: string): DataAsse
         key: "extractMetadata",
         label: "Extract metadata",
         kind: DataAssetConfigFieldKinds.boolean,
+        visibility: DataAssetConfigFieldVisibilities.advanced,
         defaultValue: true,
       },
       {
         key: "preservePageBoundaries",
         label: "Preserve page boundaries",
         kind: DataAssetConfigFieldKinds.boolean,
+        visibility: DataAssetConfigFieldVisibilities.advanced,
         defaultValue: true,
       },
     ]),

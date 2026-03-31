@@ -16,6 +16,8 @@ describe("DataStudio sample assets harness", () => {
     expect(registry.list({ specialization: "ingestion" }).map((entry) => entry.descriptor.assetId))
       .toEqual(["batch-ingestion-framework", "csv-ingestor", "image-ingestor-v1", "json-ingestor", "document-pdf-ingestor"]);
     expect(registry.list({ category: "data-ingestion" })).toHaveLength(5);
+    const csvEntry = entries.find((entry) => entry.descriptor.assetId === "csv-ingestor");
+    expect(csvEntry?.descriptor.configSchema.fields.some((field) => field.visibility === "advanced")).toBeTrue();
   });
 
   it("executes source-reference -> records flow with lineage + preview + source locator integration", async () => {

@@ -10,7 +10,19 @@ import {
   type CanonicalRecordsShape,
   type CanonicalTextItemsShape,
 } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { IngestionExecutionContext, IngestionIssue } from "./IngestionContracts";
+import {
+  IngestionExecutionModes,
+  IngestionExecutionStatuses,
+  createIngestionLineageHook,
+  createIngestionLogRecord,
+  type IngestionAssetIdentity,
+  type IngestionExecutionContext,
+  type IngestionIssue,
+  type IngestionLineageHook,
+  type IngestionLineageSourceReference,
+  type IngestionLogRecord,
+  type IngestionOutputSummary,
+} from "./IngestionContracts";
 
 export interface IngestionMetadataContext extends IngestionExecutionContext {
   readonly formatHint?: string;
@@ -23,6 +35,8 @@ export interface IngestionSuccessEnvelope<TOutput extends CanonicalDataShape> {
   readonly preview: DataPreviewModel;
   readonly issues: ReadonlyArray<IngestionIssue>;
   readonly context: IngestionExecutionContext;
+  readonly lineage: IngestionLineageHook;
+  readonly log: IngestionLogRecord;
 }
 
 export interface IngestionFailureEnvelope {
@@ -30,6 +44,8 @@ export interface IngestionFailureEnvelope {
   readonly ok: false;
   readonly issues: ReadonlyArray<IngestionIssue>;
   readonly context: IngestionExecutionContext;
+  readonly lineage: IngestionLineageHook;
+  readonly log: IngestionLogRecord;
 }
 
 export interface IngestionPreviewEnvelope {
@@ -60,6 +76,8 @@ export interface IngestionPreviewEnvelope {
   }>;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly issues: ReadonlyArray<IngestionIssue>;
+  readonly lineage: IngestionLineageHook;
+  readonly log: IngestionLogRecord;
   readonly partialFailures?: ReadonlyArray<{
     readonly sourceId?: string;
     readonly sourceReference?: string;
@@ -183,30 +201,142 @@ export function normalizeImageMetadataOutput(input: {
 
 const previewEngine = new DataPreviewEngine();
 
+function summarizeOutput(output: CanonicalDataShape): IngestionOutputSummary {
+  if (output.kind === "records") {
+    return Object.freeze({
+      shapeKind: output.kind,
+      totalCount: output.records.length,
+      recordCount: output.records.length,
+    });
+  }
+  if (output.kind === "text-items") {
+    return Object.freeze({
+      shapeKind: output.kind,
+      totalCount: output.items.length,
+      textItemCount: output.items.length,
+      pageCount: output.items.length,
+    });
+  }
+  if (output.kind === "image-metadata-records") {
+    return Object.freeze({
+      shapeKind: output.kind,
+      totalCount: output.items.length,
+      imageItemCount: output.items.length,
+    });
+  }
+  return Object.freeze({
+    shapeKind: output.kind,
+  });
+}
+
+function resolveSources(context: IngestionExecutionContext): ReadonlyArray<IngestionLineageSourceReference> {
+  const source = Object.freeze({
+    sourceId: context.sourceId,
+    sourceReference: context.sourceReference,
+    sourceType: "file",
+    mediaType: context.mediaType ?? context.contentType,
+    fileName: context.fileName,
+    batchId: context.batchId,
+    batchItemId: context.batchItemId,
+  });
+  return Object.values(source).some((entry) => entry !== undefined)
+    ? Object.freeze([source])
+    : Object.freeze([]);
+}
+
 export function buildIngestionSuccessEnvelope<TOutput extends CanonicalDataShape>(input: {
   readonly output: TOutput;
   readonly context: IngestionExecutionContext;
   readonly issues?: ReadonlyArray<IngestionIssue>;
+  readonly asset?: IngestionAssetIdentity;
+  readonly executionId?: string;
+  readonly runId?: string;
+  readonly configSummary?: Readonly<Record<string, unknown>>;
+  readonly parentExecutionId?: string;
+  readonly childExecutionIds?: ReadonlyArray<string>;
 }): IngestionSuccessEnvelope<TOutput> {
+  const issues = input.issues ?? Object.freeze([]);
+  const asset = input.asset ?? Object.freeze({ assetId: "unknown-ingestor" });
+  const outputSummary = summarizeOutput(input.output);
+  const sources = resolveSources(input.context);
+  const lineage = createIngestionLineageHook({
+    producer: asset,
+    executionMode: input.context.executionMode,
+    executionId: input.executionId,
+    runId: input.runId,
+    sources,
+    output: outputSummary,
+    configSummary: input.configSummary,
+    parentExecutionId: input.parentExecutionId,
+    childExecutionIds: input.childExecutionIds,
+  });
+  const log = createIngestionLogRecord({
+    executionMode: input.context.executionMode,
+    status: IngestionExecutionStatuses.succeeded,
+    asset,
+    executionId: input.executionId,
+    runId: input.runId,
+    issues,
+    outputSummary,
+    sources,
+    configSummary: input.configSummary,
+    lineage,
+  });
   return Object.freeze({
     contractVersion: "1.0.0",
     ok: true,
     output: input.output,
     preview: previewEngine.buildFromCanonicalShape(input.output),
-    issues: input.issues ?? Object.freeze([]),
+    issues,
     context: input.context,
+    lineage,
+    log,
   });
 }
 
 export function buildIngestionFailureEnvelope(input: {
   readonly context: IngestionExecutionContext;
   readonly issues: ReadonlyArray<IngestionIssue>;
+  readonly asset?: IngestionAssetIdentity;
+  readonly executionId?: string;
+  readonly runId?: string;
+  readonly configSummary?: Readonly<Record<string, unknown>>;
+  readonly outputSummary?: IngestionOutputSummary;
+  readonly parentExecutionId?: string;
+  readonly childExecutionIds?: ReadonlyArray<string>;
 }): IngestionFailureEnvelope {
+  const asset = input.asset ?? Object.freeze({ assetId: "unknown-ingestor" });
+  const sources = resolveSources(input.context);
+  const lineage = createIngestionLineageHook({
+    producer: asset,
+    executionMode: input.context.executionMode,
+    executionId: input.executionId,
+    runId: input.runId,
+    sources,
+    output: input.outputSummary,
+    configSummary: input.configSummary,
+    parentExecutionId: input.parentExecutionId,
+    childExecutionIds: input.childExecutionIds,
+  });
+  const log = createIngestionLogRecord({
+    executionMode: input.context.executionMode,
+    status: IngestionExecutionStatuses.failed,
+    asset,
+    executionId: input.executionId,
+    runId: input.runId,
+    issues: input.issues,
+    outputSummary: input.outputSummary,
+    sources,
+    configSummary: input.configSummary,
+    lineage,
+  });
   return Object.freeze({
     contractVersion: "1.0.0",
     ok: false,
     issues: input.issues,
     context: input.context,
+    lineage,
+    log,
   });
 }
 
@@ -226,16 +356,62 @@ export function buildIngestionPreviewEnvelope(input: {
   }>;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly issues?: ReadonlyArray<IngestionIssue>;
+  readonly asset?: IngestionAssetIdentity;
+  readonly executionId?: string;
+  readonly runId?: string;
+  readonly configSummary?: Readonly<Record<string, unknown>>;
+  readonly parentExecutionId?: string;
+  readonly childExecutionIds?: ReadonlyArray<string>;
+  readonly sourceReferences?: ReadonlyArray<IngestionLineageSourceReference>;
   readonly partialFailures?: ReadonlyArray<{
     readonly sourceId?: string;
     readonly sourceReference?: string;
     readonly issue: IngestionIssue;
   }>;
 }): IngestionPreviewEnvelope {
+  const issues = input.issues ?? Object.freeze([]);
+  const executionMode = input.context.executionMode ?? IngestionExecutionModes.preview;
+  const asset = input.asset ?? Object.freeze({ assetId: input.ingestor });
+  const outputSummary = Object.freeze({
+    shapeKind: input.preview.kind,
+    totalCount: input.totalCount,
+    sourceCount: input.sourceCount,
+    successCount: input.successCount,
+    failureCount: input.failureCount,
+  } satisfies IngestionOutputSummary);
+  const sources = input.sourceReferences ?? resolveSources(input.context);
+  const lineage = createIngestionLineageHook({
+    producer: asset,
+    executionMode,
+    executionId: input.executionId,
+    runId: input.runId,
+    sources,
+    output: outputSummary,
+    configSummary: input.configSummary,
+    parentExecutionId: input.parentExecutionId,
+    childExecutionIds: input.childExecutionIds,
+  });
+  const status = (input.failureCount ?? 0) > 0 && (input.successCount ?? 0) > 0
+    ? IngestionExecutionStatuses.partial
+    : issues.some((issue) => issue.severity === "error")
+      ? IngestionExecutionStatuses.failed
+      : IngestionExecutionStatuses.succeeded;
+  const log = createIngestionLogRecord({
+    executionMode,
+    status,
+    asset,
+    executionId: input.executionId,
+    runId: input.runId,
+    issues,
+    outputSummary,
+    sources,
+    configSummary: input.configSummary,
+    lineage,
+  });
   return Object.freeze({
     contractVersion: "1.0.0",
     ingestor: input.ingestor,
-    ok: !input.issues?.some((issue) => issue.severity === "error"),
+    ok: !issues.some((issue) => issue.severity === "error"),
     context: input.context,
     source: Object.freeze({
       sourceId: input.context.sourceId,
@@ -256,7 +432,9 @@ export function buildIngestionPreviewEnvelope(input: {
     sample: input.sample,
     schema: input.schema,
     metadata: input.metadata,
-    issues: input.issues ?? Object.freeze([]),
+    issues,
+    lineage,
+    log,
     partialFailures: input.partialFailures,
   });
 }

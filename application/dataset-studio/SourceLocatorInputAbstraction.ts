@@ -404,7 +404,7 @@ export class SourceLocatorInputAbstraction {
       originalReference: input.reference,
       normalizedReference: reference,
       sourceType: "file" as const,
-      displayName: input.displayName ?? path.basename(reference) || reference,
+      displayName: input.displayName ?? (path.basename(reference) || reference),
       extension,
       mediaType: input.mediaType ?? toMediaType(extension),
       groupId: normalizeOptional(input.groupId),

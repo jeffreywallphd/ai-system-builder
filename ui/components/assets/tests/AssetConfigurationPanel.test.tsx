@@ -2,7 +2,11 @@ import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import AssetConfigurationPanel from "../AssetConfigurationPanel";
-import { DataAssetConfigFieldKinds, createDataAssetConfigSchema } from "../../../../application/dataset-studio/DataAssetConfiguration";
+import {
+  DataAssetConfigFieldKinds,
+  DataAssetConfigFieldVisibilities,
+  createDataAssetConfigSchema,
+} from "../../../../application/dataset-studio/DataAssetConfiguration";
 
 describe("AssetConfigurationPanel", () => {
   it("renders empty state when config schema is missing", () => {
@@ -49,5 +53,64 @@ describe("AssetConfigurationPanel", () => {
     expect(html).toContain("Input format");
     expect(html).toContain("Header row");
     expect(html).toContain("1 errors");
+  });
+
+  it("defaults to simple mode and hides advanced-only fields", () => {
+    const schema = createDataAssetConfigSchema({
+      schemaId: "ingestion.schema",
+      fields: [
+        {
+          key: "delimiter",
+          label: "Delimiter",
+          kind: DataAssetConfigFieldKinds.select,
+          visibility: DataAssetConfigFieldVisibilities.simple,
+          defaultValue: ",",
+          options: [{ value: ",", label: "Comma" }],
+        },
+        {
+          key: "encoding",
+          label: "Encoding",
+          kind: DataAssetConfigFieldKinds.string,
+          visibility: DataAssetConfigFieldVisibilities.advanced,
+          defaultValue: "utf-8",
+        },
+      ],
+    });
+
+    const html = renderToStaticMarkup(React.createElement(AssetConfigurationPanel, { schema }));
+    expect(html).toContain("Show advanced options");
+    expect(html).toContain("Delimiter");
+    expect(html).not.toContain("Encoding");
+  });
+
+  it("can render advanced mode fields when requested", () => {
+    const schema = createDataAssetConfigSchema({
+      schemaId: "ingestion.schema",
+      fields: [
+        {
+          key: "delimiter",
+          label: "Delimiter",
+          kind: DataAssetConfigFieldKinds.select,
+          visibility: DataAssetConfigFieldVisibilities.simple,
+          defaultValue: ",",
+          options: [{ value: ",", label: "Comma" }],
+        },
+        {
+          key: "encoding",
+          label: "Encoding",
+          kind: DataAssetConfigFieldKinds.string,
+          visibility: DataAssetConfigFieldVisibilities.advanced,
+          defaultValue: "utf-8",
+        },
+      ],
+    });
+
+    const html = renderToStaticMarkup(React.createElement(AssetConfigurationPanel, {
+      schema,
+      initialMode: "advanced",
+    }));
+    expect(html).toContain("Show simple options");
+    expect(html).toContain("Delimiter");
+    expect(html).toContain("Encoding");
   });
 });

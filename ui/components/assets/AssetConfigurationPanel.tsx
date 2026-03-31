@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
-import { DataAssetConfigFieldKinds, resolveDataAssetConfigDefaults, type DataAssetConfigFieldSchema, type DataAssetConfigSchema } from "../../../application/dataset-studio/DataAssetConfiguration";
+import {
+  DataAssetConfigFieldKinds,
+  DataAssetConfigFieldVisibilities,
+  resolveDataAssetConfigDefaults,
+  type DataAssetConfigFieldSchema,
+  type DataAssetConfigSchema,
+} from "../../../application/dataset-studio/DataAssetConfiguration";
 import type { DataStudioValidationIssue } from "../../../application/dataset-studio/DataStudioValidation";
 
 export interface AssetConfigurationPanelProps {
@@ -12,9 +18,12 @@ export interface AssetConfigurationPanelProps {
   readonly isApplying?: boolean;
   readonly disabled?: boolean;
   readonly emptyMessage?: string;
+  readonly initialMode?: AssetConfigurationMode;
   readonly onApply?: (config: Readonly<Record<string, CanonicalRecordValue>>) => void;
   readonly onConfigChange?: (config: Readonly<Record<string, CanonicalRecordValue>>) => void;
 }
+
+export type AssetConfigurationMode = "simple" | "advanced";
 
 function normalizeRecord(value: Readonly<Record<string, CanonicalRecordValue>>): Readonly<Record<string, CanonicalRecordValue>> {
   return Object.freeze(Object.fromEntries(
@@ -46,6 +55,20 @@ function createIssueMap(issues: ReadonlyArray<DataStudioValidationIssue>): Reado
   }
 
   return new Map([...grouped.entries()].map(([key, value]) => [key, Object.freeze(value)] as const));
+}
+
+function resolveVisibleFields(
+  schema: DataAssetConfigSchema | undefined,
+  mode: AssetConfigurationMode,
+): ReadonlyArray<DataAssetConfigFieldSchema> {
+  if (!schema || schema.fields.length === 0) {
+    return Object.freeze([]);
+  }
+  if (mode === "advanced") {
+    return schema.fields;
+  }
+  return Object.freeze(schema.fields.filter((field) =>
+    (field.visibility ?? DataAssetConfigFieldVisibilities.simple) !== DataAssetConfigFieldVisibilities.advanced));
 }
 
 function renderField(input: {
@@ -190,6 +213,7 @@ export default function AssetConfigurationPanel({
   isApplying = false,
   disabled = false,
   emptyMessage = "No configuration schema is available for this data asset.",
+  initialMode = "simple",
   onApply,
   onConfigChange,
 }: AssetConfigurationPanelProps): JSX.Element {
@@ -208,7 +232,23 @@ export default function AssetConfigurationPanel({
 
   const issueMap = useMemo(() => createIssueMap(issues), [issues]);
   const hasSchema = Boolean(schema && schema.fields.length > 0);
+  const hasAdvancedFields = Boolean(
+    schema?.fields.some((field) =>
+      (field.visibility ?? DataAssetConfigFieldVisibilities.simple) === DataAssetConfigFieldVisibilities.advanced),
+  );
+  const [mode, setMode] = useState<AssetConfigurationMode>(initialMode);
+  const visibleFields = useMemo(() => resolveVisibleFields(schema, mode), [schema, mode]);
   const isDirty = JSON.stringify(draftConfig) !== JSON.stringify(normalizedInitial);
+
+  useEffect(() => {
+    if (!hasAdvancedFields) {
+      setMode("simple");
+    }
+  }, [hasAdvancedFields]);
+
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
 
   if (!hasSchema) {
     return (
@@ -229,13 +269,28 @@ export default function AssetConfigurationPanel({
         <span className="ui-subtle">{subtitle}</span>
         <div className="ui-row ui-row--wrap">
           <span className="ui-badge ui-badge--neutral">{schema?.schemaId}</span>
+          {hasAdvancedFields ? (
+            <span className="ui-badge ui-badge--neutral" data-testid={`asset-config-mode-${mode}`}>{mode} mode</span>
+          ) : null}
           {errorCount > 0 ? <span className="ui-badge ui-badge--danger">{errorCount} errors</span> : null}
           {warningCount > 0 ? <span className="ui-badge ui-badge--warning">{warningCount} warnings</span> : null}
         </div>
+        {hasAdvancedFields ? (
+          <div className="ui-row ui-row--wrap">
+            <button
+              type="button"
+              className="ui-button ui-button--ghost"
+              onClick={() => setMode((current) => (current === "simple" ? "advanced" : "simple"))}
+              data-testid="asset-config-mode-toggle"
+            >
+              {mode === "simple" ? "Show advanced options" : "Show simple options"}
+            </button>
+          </div>
+        ) : null}
       </header>
 
       <div className="ui-form-grid ui-form-grid--single">
-        {(schema?.fields ?? []).map((field) => renderField({
+        {visibleFields.map((field) => renderField({
           field,
           value: draftConfig[field.key],
           disabled: disabled || isApplying,

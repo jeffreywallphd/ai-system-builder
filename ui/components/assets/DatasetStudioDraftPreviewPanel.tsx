@@ -140,6 +140,9 @@ export default function DatasetStudioDraftPreviewPanel({
   const [sourceMode, setSourceMode] = useState<SourceMode>(supportedSourceModes[0] ?? "in-memory");
   const [sourceReference, setSourceReference] = useState("");
   const [sourcePatterns, setSourcePatterns] = useState("**/*");
+  const [sourceExtensions, setSourceExtensions] = useState("");
+  const [sourceMaxFiles, setSourceMaxFiles] = useState("");
+  const [showAdvancedSourceOptions, setShowAdvancedSourceOptions] = useState(false);
   const [sourcePayload, setSourcePayload] = useState(draftContent ?? "");
 
   useEffect(() => {
@@ -428,6 +431,17 @@ export default function DatasetStudioDraftPreviewPanel({
           }
           : { kind: BatchIngestionStrategyKinds.routed as const };
 
+        const supportedExtensions = sourceExtensions
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+          .map((entry) => entry.startsWith(".") ? entry : `.${entry}`);
+        const maxFiles = Number(sourceMaxFiles);
+        const sourceRequestConfig = Object.freeze({
+          ...(supportedExtensions.length > 0 ? { supportedExtensions: Object.freeze(supportedExtensions) } : {}),
+          ...(Number.isFinite(maxFiles) && maxFiles > 0 ? { maxFiles } : {}),
+        });
+
         const result = await batchFramework.previewBatch({
           sourceRequest: {
             input: sourceMode === "local-directory"
@@ -440,6 +454,7 @@ export default function DatasetStudioDraftPreviewPanel({
                 kind: SourceInputKinds.localFile,
                 path: pathValue,
               },
+            config: sourceRequestConfig,
           },
           strategy,
           config: {
@@ -597,17 +612,52 @@ export default function DatasetStudioDraftPreviewPanel({
         )}
 
         {sourceMode === "local-directory" ? (
-          <label className="ui-field">
-            <span className="ui-field__label">Directory patterns</span>
-            <input
-              className="ui-input"
-              type="text"
-              value={sourcePatterns}
-              onChange={(event) => setSourcePatterns(event.currentTarget.value)}
-              placeholder="**/*.csv, **/*.json"
-            />
-            <span className="ui-field__hint">Comma-separated glob patterns.</span>
-          </label>
+          <button
+            type="button"
+            className="ui-button ui-button--ghost"
+            onClick={() => setShowAdvancedSourceOptions((current) => !current)}
+            data-testid="dataset-preview-source-advanced-toggle"
+          >
+            {showAdvancedSourceOptions ? "Hide advanced source options" : "Show advanced source options"}
+          </button>
+        ) : null}
+
+        {sourceMode === "local-directory" && showAdvancedSourceOptions ? (
+          <>
+            <label className="ui-field">
+              <span className="ui-field__label">Directory patterns</span>
+              <input
+                className="ui-input"
+                type="text"
+                value={sourcePatterns}
+                onChange={(event) => setSourcePatterns(event.currentTarget.value)}
+                placeholder="**/*.csv, **/*.json"
+              />
+              <span className="ui-field__hint">Comma-separated glob patterns.</span>
+            </label>
+            <label className="ui-field">
+              <span className="ui-field__label">Extension filter</span>
+              <input
+                className="ui-input"
+                type="text"
+                value={sourceExtensions}
+                onChange={(event) => setSourceExtensions(event.currentTarget.value)}
+                placeholder=".csv, .json, .pdf"
+              />
+              <span className="ui-field__hint">Optional list of allowed extensions.</span>
+            </label>
+            <label className="ui-field">
+              <span className="ui-field__label">Max source files</span>
+              <input
+                className="ui-input"
+                type="number"
+                min={1}
+                value={sourceMaxFiles}
+                onChange={(event) => setSourceMaxFiles(event.currentTarget.value)}
+                placeholder="100"
+              />
+            </label>
+          </>
         ) : null}
       </section>
 

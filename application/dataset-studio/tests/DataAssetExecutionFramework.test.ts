@@ -58,6 +58,8 @@ describe("DefaultDataAssetExecutionFramework", () => {
     expect(result.lineage.execution.requestId).toBe("req-1");
     expect(result.lineage.inputs.some((entry) => entry.assetId === "source-users")).toBeTrue();
     expect(result.lineage.steps.some((entry) => entry.kind === "resolve-source")).toBeTrue();
+    expect(result.ingestionLog.asset.assetId).toBe("dataset-exec-asset");
+    expect(result.ingestionLineage.producer.assetId).toBe("dataset-exec-asset");
   });
 
   it("supports converter-request execution paths", async () => {
@@ -122,6 +124,7 @@ describe("DefaultDataAssetExecutionFramework", () => {
     expect(result.preview.kind).toBe("error");
     expect(result.lineage.diagnostics?.[0]?.severity).toBe("error");
     expect(result.failure?.kind).toBe("validation");
+    expect(result.ingestionLog.status).toBe("failed");
   });
 
   it("can package preview-only execution from a data asset canonical output", async () => {
@@ -138,6 +141,7 @@ describe("DefaultDataAssetExecutionFramework", () => {
     expect(result.preview.kind).toBe("records");
     expect(result.lineage.steps.some((step) => step.status === "skipped")).toBeTrue();
     expect(result.failure).toBeUndefined();
+    expect(result.ingestionLog.preview).toBeTrue();
   });
 
   it("fails validation when preview-only execution is requested for non-previewable assets", async () => {
@@ -162,5 +166,6 @@ describe("DefaultDataAssetExecutionFramework", () => {
     expect(result.ok).toBeFalse();
     expect(result.diagnostics[0]?.code).toBe("preview_unsupported");
     expect(result.failure?.kind).toBe("validation");
+    expect(result.ingestionLog.status).toBe("failed");
   });
 });
