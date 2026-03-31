@@ -1383,3 +1383,25 @@ Explicitly later than this scope:
 - Advanced mode now supports explicit detection override and strategy override (`auto`/`csv`/`json`/`document`/`image`) while still executing through the same orchestration service (`UnifiedIngestionOrchestrationService`) and routing seam.
 - Contradictory advanced combinations are rejected before execution so advanced overrides do not bypass canonical validation or produce silent route/output mismatches.
 
+## Direction 5 update: Unified ingestion normalization pipeline + preview contracts (stories 15.7-15.8)
+
+- Unified ingestion now has an explicit post-routing/post-conversion normalization seam in `application/dataset-studio/UnifiedIngestionNormalizationPipeline.ts`.
+- Normalization contracts are now first-class in `domain/dataset-studio/UnifiedIngestionDomain.ts` through `UnifiedIngestionNormalizedOutput` and `UnifiedIngestionNormalizationVersion`.
+- Normalization behavior is centralized and composable through discrete stages (kind validation, output-target alignment, summary/warning synthesis), rather than ad hoc per-ingestor shaping.
+- Normalized unified outputs now carry one consistent inspectable envelope across source kinds:
+  - canonical output kind,
+  - canonical normalized payload,
+  - output/source/config metadata summary,
+  - detection summary,
+  - route summary,
+  - structured warnings (including empty output and fallback-route posture).
+- Unified orchestration now enforces normalization as an explicit stage and returns stage-aware failures for normalization and preview generation paths (`normalization`, `preview`) in addition to existing ingestion stages.
+- Unified ingestion preview is now centralized in `application/dataset-studio/UnifiedIngestionPreviewService.ts` and is generated from normalized outputs only (no raw format-specific preview bypass path).
+- Preview contracts now include:
+  - sampled row/item entries,
+  - metadata summary,
+  - detected kind/confidence summary,
+  - route/handler summary,
+  - structured warning/error propagation.
+- Dataset Studio unified preview UI now consumes `ingestWithPreview(...)` results from the shared orchestration path and renders high-signal summary first with progressive diagnostics/sample details.
+

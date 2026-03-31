@@ -102,6 +102,7 @@ describe("UnifiedIngestionOrchestrationService", () => {
     expect(result.ok).toBeTrue();
     if (result.ok) {
       expect(result.output.kind).toBe("records");
+      expect(result.normalized.canonicalOutputKind).toBe("records");
       expect(result.route.assetId).toBe("csv-ingestor");
       expect(result.conversion.operation).toBe("source-to-records");
       expect(converterCalls).toEqual(["source-to-records"]);
@@ -268,6 +269,87 @@ describe("UnifiedIngestionOrchestrationService", () => {
     if (!result.ok) {
       expect(result.stage).toBe("configuration");
       expect(result.issues[0]?.code).toBe("invalid-configuration");
+    }
+  });
+
+  it("returns preview contracts from normalized unified ingestion outputs", async () => {
+    const service = new UnifiedIngestionOrchestrationService({
+      detector: Object.freeze({
+        detect: async () => createDetection("json"),
+      }) as never,
+      router: Object.freeze({
+        route: () => Object.freeze({
+          status: "resolved" as const,
+          sourceKind: "json" as const,
+          handlerKind: "json" as const,
+          assetId: "json-ingestor",
+          policy: "detected-kind" as const,
+          fallbackUsed: false,
+          reason: "json route",
+        }),
+      }) as never,
+      jsonIngestor: {
+        execute: () => Object.freeze({
+          ok: true,
+          records: Object.freeze([Object.freeze({ id: 1, name: "Ada" })]),
+        }),
+      } as never,
+    });
+
+    const result = await service.ingestWithPreview({
+      source: createSource(),
+      payload: "{\"id\":1,\"name\":\"Ada\"}",
+      configuration: Object.freeze({
+        mode: "simple",
+        outputTarget: UnifiedIngestionOutputTargetKinds.records,
+      }),
+    });
+
+    expect(result.ok).toBeTrue();
+    if (result.ok) {
+      expect(result.preview.ok).toBeTrue();
+      expect(result.preview.outputKind).toBe("records");
+      expect(result.preview.summary.totalCount).toBe(1);
+    }
+  });
+
+  it("surfaces normalization failures when output target mismatches canonical output", async () => {
+    const service = new UnifiedIngestionOrchestrationService({
+      detector: Object.freeze({
+        detect: async () => createDetection("csv"),
+      }) as never,
+      router: Object.freeze({
+        route: () => Object.freeze({
+          status: "resolved" as const,
+          sourceKind: "csv" as const,
+          handlerKind: "csv" as const,
+          assetId: "csv-ingestor",
+          policy: "detected-kind" as const,
+          fallbackUsed: false,
+          reason: "csv route",
+        }),
+      }) as never,
+      csvIngestor: {
+        execute: () => Object.freeze({
+          ok: true,
+          records: Object.freeze([Object.freeze({ id: "1" })]),
+        }),
+      } as never,
+    });
+
+    const result = await service.ingest({
+      source: createSource(),
+      payload: "id\n1",
+      configuration: Object.freeze({
+        mode: "simple",
+        outputTarget: UnifiedIngestionOutputTargetKinds.textItems,
+      }),
+    });
+
+    expect(result.ok).toBeFalse();
+    if (!result.ok) {
+      expect(result.stage).toBe("normalization");
+      expect(result.issues[0]?.code).toBe("normalization-failed");
     }
   });
 });
