@@ -45,5 +45,20 @@ describe("JsonIngestorAsset", () => {
       throw new Error("Expected unsupported JSON shape to fail.");
     }
     expect(result.diagnostics[0]?.code).toBe("json-ingestor-unsupported-shape");
+    expect(result.normalized.issues[0]?.category).toBe("parse-extraction-failure");
+  });
+
+  it("returns bounded preview envelopes with truncation warnings", () => {
+    const ingestor = new JsonIngestorAsset();
+    const preview = ingestor.preview({
+      payload: JSON.stringify([{ id: 1 }, { id: 2 }, { id: 3 }]),
+    }, 2);
+
+    if ("ok" in preview && !preview.ok) {
+      throw new Error("Expected preview to succeed.");
+    }
+    expect(preview.normalized.summary.sampleCount).toBe(2);
+    expect(preview.normalized.summary.totalCount).toBe(3);
+    expect(preview.normalized.issues[0]?.code).toBe("json-ingestor-preview-truncated");
   });
 });

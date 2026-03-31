@@ -63,6 +63,7 @@ describe("ImageIngestorAsset", () => {
     expect(result.output.items).toHaveLength(1);
     expect(result.preview.width).toBe(1200);
     expect(result.preview.exifHighlights?.Make).toBe("Canon");
+    expect(result.preview.normalized.ingestor).toBe("image-ingestor-v1");
   });
 
   it("normalizes dimensions for rotated orientation when enabled", async () => {

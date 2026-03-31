@@ -1278,3 +1278,21 @@ Explicitly later than this scope:
 - Document/PDF and image ingestion now normalizes canonical outputs through the shared seam so source/provenance metadata is preserved consistently (source reference/id hints, media/file metadata, batch/group context, and lineage when source asset ids are present).
 - Batch ingestion now exports strategy/config contract schemas and propagates normalized context metadata into ingestion execution while preserving canonical output + preview aggregation behavior.
 - Converter integration remains converter-first and now preserves source identity/reference metadata in converter output attributes for downstream preview/lineage compatibility.
+
+## Direction 5 update: Ingestor preview contract + structured ingestion error layer (stories 14.9-14.10)
+
+- Ingestion contracts now include a first-class structured issue model in `application/dataset-studio/IngestionContracts.ts`:
+  - stable categories (`invalid-configuration`, `unsupported-source-type`, `unreadable-source`, `parse-extraction-failure`, `preview-failure`, `batch-partial-failure`, etc.),
+  - severity and recoverability semantics,
+  - source-association metadata (source id/reference, batch item metadata, file hints),
+  - reusable zod-to-ingestion-issue mapping and exception-to-issue translation helpers.
+- Ingestion preview is now a shared contract surface in `application/dataset-studio/IngestionCanonicalNormalization.ts`:
+  - reusable `IngestionPreviewEnvelope`,
+  - summary metadata (`totalCount`, `sampleCount`, `truncated`, and batch aggregate counts),
+  - canonical preview payload reuse via `DataPreviewEngine`,
+  - structured warning/error propagation for bounded previews.
+- CSV, JSON, document/PDF, and image ingestors now emit:
+  - bounded preview outputs with normalized preview envelopes,
+  - consistent structured failure issues for config/source/parse failures,
+  - preview-time warning behavior (for example truncation and partial metadata availability).
+- Batch ingestion now propagates item-level structured normalized issues and exposes normalized batch preview envelopes with mixed-outcome/truncation warnings, preserving item-level error inspectability without leaking low-level exceptions.

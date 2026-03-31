@@ -10,15 +10,22 @@ import {
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
 import {
+  IngestionIssueCategories,
+  IngestionIssueRecoverabilities,
   IngestionExecutionContextSchema,
+  contextToIssueSource,
+  createIngestionIssue,
+  toIngestionIssueFromError,
   toIngestionIssuesFromZodError,
   type IngestionExecutionContext,
 } from "./IngestionContracts";
 import {
   buildIngestionFailureEnvelope,
+  buildIngestionPreviewEnvelope,
   buildIngestionSuccessEnvelope,
   normalizeImageMetadataOutput,
   type IngestionFailureEnvelope,
+  type IngestionPreviewEnvelope,
   type IngestionSuccessEnvelope,
 } from "./IngestionCanonicalNormalization";
 
@@ -73,6 +80,7 @@ export interface ImageIngestorPreviewResult {
     readonly contentType?: string;
   };
   readonly exifHighlights?: Readonly<Record<string, CanonicalRecordValue>>;
+  readonly normalized: IngestionPreviewEnvelope;
 }
 
 export interface ImageIngestorExecutionSuccess {
@@ -303,10 +311,19 @@ export class ImageIngestorAsset {
       return this.execute({ source, config: request.config, imageId: request.imageId });
     } catch (error) {
       const context = IngestionExecutionContextSchema.parse({});
-      const issues = Object.freeze([Object.freeze({
+      const issues = Object.freeze([toIngestionIssueFromError({
         code: ImageIngestorErrorCodes.unreadableSource,
         message: "Unable to resolve image source reference.",
-        severity: "error" as const,
+        error,
+        category: IngestionIssueCategories.unreadableSource,
+        recoverability: IngestionIssueRecoverabilities.fixSource,
+        source: contextToIssueSource({
+          sourceReference: request.source.kind === DataSourceReferenceKinds.localFile
+            ? request.source.path
+            : request.source.kind === DataSourceReferenceKinds.url
+              ? request.source.url
+              : "in-memory",
+        }),
       })]);
       return Object.freeze({
         ok: false,
@@ -334,8 +351,11 @@ export class ImageIngestorAsset {
   public async execute(request: ImageIngestorExecutionRequest): Promise<ImageIngestorExecutionResult> {
     const parsedConfig = ImageIngestorConfigSchema.safeParse(request.config ?? {});
     if (!parsedConfig.success) {
-      const issues = toIngestionIssuesFromZodError(parsedConfig.error, ImageIngestorErrorCodes.invalidConfig);
       const parsedContext = IngestionExecutionContextSchema.safeParse(request.context ?? {});
+      const issues = toIngestionIssuesFromZodError(parsedConfig.error, ImageIngestorErrorCodes.invalidConfig, {
+        category: IngestionIssueCategories.invalidConfiguration,
+        source: contextToIssueSource(parsedContext.success ? parsedContext.data : request.context),
+      });
       return Object.freeze({
         ok: false,
         diagnostics: Object.freeze(parsedConfig.error.issues.map((issue) => Object.freeze({
@@ -360,10 +380,12 @@ export class ImageIngestorAsset {
       contentType: request.source.contentType,
     });
     if (!isSupportedImage(request.source)) {
-      const issues = Object.freeze([Object.freeze({
+      const issues = Object.freeze([createIngestionIssue({
         code: ImageIngestorErrorCodes.unsupportedType,
         message: "Image ingestor supports PNG, JPG/JPEG, and WEBP sources.",
-        severity: "error" as const,
+        category: IngestionIssueCategories.unsupportedSourceType,
+        recoverability: IngestionIssueRecoverabilities.fixSource,
+        source: contextToIssueSource(ingestionContext),
       })]);
       return Object.freeze({
         ok: false,
@@ -384,10 +406,12 @@ export class ImageIngestorAsset {
 
     const payload = toUint8Array(request.source.payload);
     if (!payload || payload.length === 0) {
-      const issues = Object.freeze([Object.freeze({
+      const issues = Object.freeze([createIngestionIssue({
         code: ImageIngestorErrorCodes.unreadableSource,
         message: "Image payload is missing or unreadable.",
-        severity: "error" as const,
+        category: IngestionIssueCategories.unreadableSource,
+        recoverability: IngestionIssueRecoverabilities.fixSource,
+        source: contextToIssueSource(ingestionContext),
       })]);
       return Object.freeze({
         ok: false,
@@ -407,10 +431,13 @@ export class ImageIngestorAsset {
     try {
       metadata = await this.metadataProbe.probe(payload);
     } catch (error) {
-      const issues = Object.freeze([Object.freeze({
+      const issues = Object.freeze([toIngestionIssueFromError({
         code: ImageIngestorErrorCodes.metadataExtractionFailed,
         message: "Image metadata extraction failed.",
-        severity: "error" as const,
+        error,
+        category: IngestionIssueCategories.parseExtractionFailure,
+        recoverability: IngestionIssueRecoverabilities.fixSource,
+        source: contextToIssueSource(ingestionContext),
       })]);
       return Object.freeze({
         ok: false,
@@ -491,6 +518,55 @@ export class ImageIngestorAsset {
         contentType: request.source.contentType,
       }),
       exifHighlights: config.generatePreviewMetadata ? exifHighlights : undefined,
+      normalized: buildIngestionPreviewEnvelope({
+        ingestor: ImageIngestorAsset.assetId,
+        context: ingestionContext,
+        totalCount: 1,
+        sampleCount: 1,
+        preview: buildIngestionSuccessEnvelope({
+          output: createCanonicalImageMetadataRecordsShape({
+            items: Object.freeze([Object.freeze({
+              itemId: `preview-image-${imageId}`,
+              imageId,
+              label: metadata.format,
+              attributes: Object.freeze({
+                width: normalizedDimensions.width,
+                height: normalizedDimensions.height,
+                format: metadata.format,
+              }),
+            })]),
+            metadata: {
+              schemaVersion: "1.0.0",
+              source: {
+                fileName: request.source.fileName,
+                contentType: request.source.contentType,
+                format: metadata.format,
+              },
+            },
+          }),
+          context: ingestionContext,
+        }).preview,
+        sample: Object.freeze([Object.freeze({
+          imageId,
+          width: normalizedDimensions.width,
+          height: normalizedDimensions.height,
+          format: metadata.format,
+        })]),
+        metadata: Object.freeze({
+          fileSizeInBytes: config.includeFileStats ? payload.byteLength : undefined,
+          orientation,
+        }),
+        issues: config.extractExif && !exifHighlights
+          ? Object.freeze([createIngestionIssue({
+            code: "image-ingestor-partial-exif",
+            message: "EXIF metadata was not available for this source.",
+            category: IngestionIssueCategories.previewFailure,
+            severity: "warning",
+            recoverability: IngestionIssueRecoverabilities.partial,
+            source: contextToIssueSource(ingestionContext),
+          })])
+          : Object.freeze([]),
+      }),
     } satisfies ImageIngestorPreviewResult);
 
     const normalizedOutput = normalizeImageMetadataOutput({

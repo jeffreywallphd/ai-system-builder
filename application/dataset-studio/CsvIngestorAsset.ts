@@ -9,16 +9,23 @@ import {
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
 import {
+  IngestionIssueCategories,
+  IngestionIssueRecoverabilities,
   IngestionExecutionContextSchema,
   Uint8ArraySchema,
+  contextToIssueSource,
+  createIngestionIssue,
+  toIngestionIssueFromError,
   toIngestionIssuesFromZodError,
   type IngestionExecutionContext,
 } from "./IngestionContracts";
 import {
   buildIngestionFailureEnvelope,
+  buildIngestionPreviewEnvelope,
   buildIngestionSuccessEnvelope,
   normalizeRecordsOutput,
   type IngestionFailureEnvelope,
+  type IngestionPreviewEnvelope,
   type IngestionSuccessEnvelope,
 } from "./IngestionCanonicalNormalization";
 
@@ -90,6 +97,7 @@ export interface CsvIngestorPreviewResult {
   readonly schema: ReadonlyArray<CsvIngestorFieldSchema>;
   readonly totalCount: number;
   readonly sampleCount: number;
+  readonly normalized: IngestionPreviewEnvelope;
 }
 
 const CsvIngestorExecutionRequestSchema = z.object({
@@ -194,8 +202,12 @@ export class CsvIngestorAsset {
   public execute(request: CsvIngestorExecutionRequest): CsvIngestorExecutionResult {
     const parsedRequest = CsvIngestorExecutionRequestSchema.safeParse(request);
     if (!parsedRequest.success) {
-      const issues = toIngestionIssuesFromZodError(parsedRequest.error, CsvIngestorErrorCodes.invalidConfig);
       const parsedContext = IngestionExecutionContextSchema.safeParse(request.context ?? {});
+      const issueSource = contextToIssueSource(parsedContext.success ? parsedContext.data : request.context);
+      const issues = toIngestionIssuesFromZodError(parsedRequest.error, CsvIngestorErrorCodes.invalidConfig, {
+        category: IngestionIssueCategories.invalidConfiguration,
+        source: issueSource,
+      });
       return Object.freeze({
         ok: false,
         diagnostics: Object.freeze(issues.map((issue) => Object.freeze({
@@ -226,7 +238,10 @@ export class CsvIngestorAsset {
 
     const parsedConfig = CsvIngestorConfigSchema.safeParse(normalizedRequest.config ?? {});
     if (!parsedConfig.success) {
-      const issues = toIngestionIssuesFromZodError(parsedConfig.error, CsvIngestorErrorCodes.invalidConfig);
+      const issues = toIngestionIssuesFromZodError(parsedConfig.error, CsvIngestorErrorCodes.invalidConfig, {
+        category: IngestionIssueCategories.invalidConfiguration,
+        source: contextToIssueSource(ingestionContext),
+      });
       return Object.freeze({
         ok: false,
         diagnostics: Object.freeze(parsedConfig.error.issues.map((issue) => Object.freeze({
@@ -246,14 +261,14 @@ export class CsvIngestorAsset {
     try {
       normalizedContent = decodePayload(normalizedRequest.payload, config.encoding);
     } catch (error) {
-      const issues = Object.freeze([Object.freeze({
+      const issues = Object.freeze([toIngestionIssueFromError({
         code: CsvIngestorErrorCodes.invalidEncoding,
         message: "CSV payload could not be decoded with the configured encoding.",
-        severity: "error" as const,
-        details: Object.freeze({
-          encoding: config.encoding,
-          cause: error instanceof Error ? error.message : String(error),
-        }),
+        error,
+        category: IngestionIssueCategories.unreadableSource,
+        recoverability: IngestionIssueRecoverabilities.fixSource,
+        retrySuggested: false,
+        source: contextToIssueSource(ingestionContext),
       })]);
       return Object.freeze({
         ok: false,
@@ -274,10 +289,12 @@ export class CsvIngestorAsset {
 
     const trimmed = normalizedContent.trim();
     if (!trimmed) {
-      const issues = Object.freeze([Object.freeze({
+      const issues = Object.freeze([createIngestionIssue({
         code: CsvIngestorErrorCodes.invalidCsv,
         message: "CSV content is empty.",
-        severity: "error" as const,
+        category: IngestionIssueCategories.parseExtractionFailure,
+        recoverability: IngestionIssueRecoverabilities.fixSource,
+        source: contextToIssueSource(ingestionContext),
       })]);
       return Object.freeze({
         ok: false,
@@ -376,10 +393,14 @@ export class CsvIngestorAsset {
       const code = message.includes("header")
         ? CsvIngestorErrorCodes.missingHeaders
         : CsvIngestorErrorCodes.invalidCsv;
-      const issues = Object.freeze([Object.freeze({
+      const issues = Object.freeze([toIngestionIssueFromError({
         code,
         message,
-        severity: "error" as const,
+        error,
+        category: IngestionIssueCategories.parseExtractionFailure,
+        recoverability: IngestionIssueRecoverabilities.fixSource,
+        retrySuggested: false,
+        source: contextToIssueSource(ingestionContext),
       })]);
       return Object.freeze({
         ok: false,
@@ -403,11 +424,37 @@ export class CsvIngestorAsset {
 
     const boundedMaxRows = Math.min(Math.max(1, maxRows), 50);
     const sample = result.records.slice(0, boundedMaxRows);
+    const schema = inferSchema(sample);
+    const previewIssues = sample.length < result.records.length
+      ? Object.freeze([createIngestionIssue({
+        code: "csv-ingestor-preview-truncated",
+        message: "Preview rows were truncated to keep preview execution bounded.",
+        category: IngestionIssueCategories.previewFailure,
+        severity: "warning",
+        recoverability: IngestionIssueRecoverabilities.partial,
+        source: contextToIssueSource(result.normalized.context),
+        details: Object.freeze({
+          totalCount: result.records.length,
+          sampleCount: sample.length,
+          maxRows: boundedMaxRows,
+        }),
+      })])
+      : Object.freeze([]);
     return Object.freeze({
       records: sample,
-      schema: inferSchema(sample),
+      schema,
       totalCount: result.records.length,
       sampleCount: sample.length,
+      normalized: buildIngestionPreviewEnvelope({
+        ingestor: CsvIngestorAsset.assetId,
+        context: result.normalized.context,
+        totalCount: result.records.length,
+        sampleCount: sample.length,
+        preview: result.normalized.preview,
+        sample: sample,
+        schema,
+        issues: previewIssues,
+      }),
     });
   }
 }

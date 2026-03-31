@@ -10,15 +10,23 @@ import {
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
 import {
+  IngestionIssueCategories,
+  IngestionIssueRecoverabilities,
   IngestionExecutionContextSchema,
+  contextToIssueSource,
+  createIngestionIssue,
+  toIngestionIssueFromError,
   toIngestionIssuesFromZodError,
   type IngestionExecutionContext,
+  type IngestionIssue,
 } from "./IngestionContracts";
 import {
   buildIngestionFailureEnvelope,
+  buildIngestionPreviewEnvelope,
   buildIngestionSuccessEnvelope,
   normalizeDocumentTextItemsOutput,
   type IngestionFailureEnvelope,
+  type IngestionPreviewEnvelope,
   type IngestionSuccessEnvelope,
 } from "./IngestionCanonicalNormalization";
 
@@ -177,6 +185,7 @@ export interface DocumentPdfIngestorPreviewResult {
     readonly contentType?: string;
     readonly format: "pdf" | "text";
   };
+  readonly normalized: IngestionPreviewEnvelope;
 }
 
 export interface DocumentPdfIngestorExecutionSuccess {
@@ -260,6 +269,8 @@ function toCanonicalRecordValue(value: unknown): CanonicalRecordValue {
 }
 
 function buildPreview(input: {
+  readonly ingestor: string;
+  readonly context: IngestionExecutionContext;
   readonly pageEntries: ReadonlyArray<{ readonly pageNumber: number; readonly text: string }>;
   readonly pageCount: number;
   readonly fullText: string;
@@ -267,8 +278,23 @@ function buildPreview(input: {
   readonly metadata: Readonly<Record<string, unknown>>;
   readonly source: ResolvedDataSource;
   readonly format: "pdf" | "text";
+  readonly issues?: ReadonlyArray<IngestionIssue>;
 }): DocumentPdfIngestorPreviewResult {
   const pageSample = input.pageEntries.slice(0, input.previewPageCount);
+  const previewIssues = input.pageEntries.length > pageSample.length
+    ? Object.freeze([createIngestionIssue({
+      code: "document-pdf-preview-truncated",
+      message: "Preview pages were truncated to keep preview execution bounded.",
+      category: IngestionIssueCategories.previewFailure,
+      severity: "warning",
+      recoverability: IngestionIssueRecoverabilities.partial,
+      source: contextToIssueSource(input.context),
+      details: Object.freeze({
+        pageCount: input.pageEntries.length,
+        sampleCount: pageSample.length,
+      }),
+    })])
+    : Object.freeze([]);
   return Object.freeze({
     pageCount: input.pageCount,
     fullTextExcerpt: clipText(input.fullText, 500),
@@ -283,6 +309,38 @@ function buildPreview(input: {
       fileName: input.source.fileName,
       contentType: input.source.contentType,
       format: input.format,
+    }),
+    normalized: buildIngestionPreviewEnvelope({
+      ingestor: input.ingestor,
+      context: input.context,
+      totalCount: input.pageEntries.length,
+      sampleCount: pageSample.length,
+      preview: {
+        kind: "text-items",
+        summary: {
+          totalCount: input.pageEntries.length,
+          sampleCount: pageSample.length,
+          truncated: pageSample.length < input.pageEntries.length,
+        },
+        metadata: {
+          schemaVersion: "1.0.0",
+          sourceFileName: input.source.fileName,
+          sourceFormat: input.format,
+          lineageCount: 0,
+        },
+        diagnostics: {
+          infoCount: 0,
+          warningCount: previewIssues.length,
+          errorCount: 0,
+          diagnostics: Object.freeze([]),
+        },
+        items: Object.freeze(pageSample.map((entry) => Object.freeze({
+          itemId: `preview-page-${entry.pageNumber}`,
+          text: clipText(entry.text, 180),
+        }))),
+      },
+      metadata: input.metadata,
+      issues: Object.freeze([...(input.issues ?? []), ...previewIssues]),
     }),
   });
 }
@@ -327,10 +385,19 @@ export class DocumentPdfIngestorAsset {
       });
     } catch (error) {
       const context = IngestionExecutionContextSchema.parse({});
-      const issues = Object.freeze([Object.freeze({
+      const issues = Object.freeze([toIngestionIssueFromError({
         code: DocumentPdfIngestorErrorCodes.unreadableSource,
         message: "Unable to resolve source reference for document ingestion.",
-        severity: "error" as const,
+        error,
+        category: IngestionIssueCategories.unreadableSource,
+        recoverability: IngestionIssueRecoverabilities.fixSource,
+        source: contextToIssueSource({
+          sourceReference: request.source.kind === DataSourceReferenceKinds.localFile
+            ? request.source.path
+            : request.source.kind === DataSourceReferenceKinds.url
+              ? request.source.url
+              : "in-memory",
+        }),
       })]);
       return Object.freeze({
         ok: false,
@@ -358,8 +425,11 @@ export class DocumentPdfIngestorAsset {
   public async execute(request: DocumentPdfIngestorExecutionRequest): Promise<DocumentPdfIngestorExecutionResult> {
     const parsedConfig = DocumentPdfIngestorConfigSchema.safeParse(request.config ?? {});
     if (!parsedConfig.success) {
-      const issues = toIngestionIssuesFromZodError(parsedConfig.error, DocumentPdfIngestorErrorCodes.invalidConfig);
       const parsedContext = IngestionExecutionContextSchema.safeParse(request.context ?? {});
+      const issues = toIngestionIssuesFromZodError(parsedConfig.error, DocumentPdfIngestorErrorCodes.invalidConfig, {
+        category: IngestionIssueCategories.invalidConfiguration,
+        source: contextToIssueSource(parsedContext.success ? parsedContext.data : request.context),
+      });
       return Object.freeze({
         ok: false,
         diagnostics: Object.freeze(parsedConfig.error.issues.map((issue) => Object.freeze({
@@ -385,10 +455,12 @@ export class DocumentPdfIngestorAsset {
     });
     const sourceFormat = inferSourceFormat(request.source);
     if (sourceFormat === "unsupported") {
-      const issues = Object.freeze([Object.freeze({
+      const issues = Object.freeze([createIngestionIssue({
         code: DocumentPdfIngestorErrorCodes.unsupportedType,
         message: "Document ingestor supports PDF and text sources only.",
-        severity: "error" as const,
+        category: IngestionIssueCategories.unsupportedSourceType,
+        recoverability: IngestionIssueRecoverabilities.fixSource,
+        source: contextToIssueSource(ingestionContext),
       })]);
       return Object.freeze({
         ok: false,
@@ -413,10 +485,12 @@ export class DocumentPdfIngestorAsset {
         : new TextDecoder("utf-8").decode(toUint8Array(request.source.payload) ?? new Uint8Array());
       const normalizedText = text.replace(/\r\n/g, "\n").trim();
       if (!normalizedText) {
-        const issues = Object.freeze([Object.freeze({
+        const issues = Object.freeze([createIngestionIssue({
           code: DocumentPdfIngestorErrorCodes.emptyExtraction,
           message: "Text source did not produce any extractable content.",
-          severity: "error" as const,
+          category: IngestionIssueCategories.parseExtractionFailure,
+          recoverability: IngestionIssueRecoverabilities.fixSource,
+          source: contextToIssueSource(ingestionContext),
         })]);
         return Object.freeze({
           ok: false,
@@ -466,6 +540,8 @@ export class DocumentPdfIngestorAsset {
         },
       });
       const preview = buildPreview({
+        ingestor: DocumentPdfIngestorAsset.assetId,
+        context: ingestionContext,
         pageEntries: Object.freeze([{ pageNumber: 1, text: normalizedText }]),
         pageCount: 1,
         fullText: normalizedText,
@@ -493,10 +569,12 @@ export class DocumentPdfIngestorAsset {
 
     const binaryPayload = toUint8Array(request.source.payload);
     if (!binaryPayload || binaryPayload.length === 0) {
-      const issues = Object.freeze([Object.freeze({
+      const issues = Object.freeze([createIngestionIssue({
         code: DocumentPdfIngestorErrorCodes.unreadableSource,
         message: "PDF source payload is missing or unreadable.",
-        severity: "error" as const,
+        category: IngestionIssueCategories.unreadableSource,
+        recoverability: IngestionIssueRecoverabilities.fixSource,
+        source: contextToIssueSource(ingestionContext),
       })]);
       return Object.freeze({
         ok: false,
@@ -520,10 +598,13 @@ export class DocumentPdfIngestorAsset {
         extractMetadata: config.extractMetadata,
       });
     } catch (error) {
-      const issues = Object.freeze([Object.freeze({
+      const issues = Object.freeze([toIngestionIssueFromError({
         code: DocumentPdfIngestorErrorCodes.pdfParseFailed,
         message: "PDF parsing failed.",
-        severity: "error" as const,
+        error,
+        category: IngestionIssueCategories.parseExtractionFailure,
+        recoverability: IngestionIssueRecoverabilities.fixSource,
+        source: contextToIssueSource(ingestionContext),
       })]);
       return Object.freeze({
         ok: false,
@@ -565,10 +646,12 @@ export class DocumentPdfIngestorAsset {
     }
 
     if (pages.length === 0) {
-      const issues = Object.freeze([Object.freeze({
+      const issues = Object.freeze([createIngestionIssue({
         code: DocumentPdfIngestorErrorCodes.emptyExtraction,
         message: "PDF did not produce any extractable text.",
-        severity: "error" as const,
+        category: IngestionIssueCategories.parseExtractionFailure,
+        recoverability: IngestionIssueRecoverabilities.fixSource,
+        source: contextToIssueSource(ingestionContext),
       })]);
       return Object.freeze({
         ok: false,
@@ -642,7 +725,19 @@ export class DocumentPdfIngestorAsset {
         sourceReference: request.source.reference,
       }),
     });
+    const previewIssues = config.extractMetadata && Object.keys(extractedMetadata).length === 0
+      ? Object.freeze([createIngestionIssue({
+        code: "document-pdf-metadata-missing",
+        message: "PDF metadata was not available from the parser.",
+        category: IngestionIssueCategories.previewFailure,
+        severity: "warning",
+        recoverability: IngestionIssueRecoverabilities.partial,
+        source: contextToIssueSource(ingestionContext),
+      })])
+      : Object.freeze([]);
     const preview = buildPreview({
+      ingestor: DocumentPdfIngestorAsset.assetId,
+      context: ingestionContext,
       pageEntries: Object.freeze(pages.map((page) => Object.freeze({ pageNumber: page.pageNumber, text: page.text }))),
       pageCount: parsedPdf.totalPages || pages.length,
       fullText,
@@ -650,6 +745,7 @@ export class DocumentPdfIngestorAsset {
       metadata: extractedMetadata,
       source: request.source,
       format: "pdf",
+      issues: previewIssues,
     });
 
     return Object.freeze({
