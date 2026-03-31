@@ -127,6 +127,7 @@ export interface DesktopStudioShellBridge {
   runWorkflowDraft(requestJson: string): Promise<string>;
   listWorkflowRuns(requestJson: string): Promise<string>;
   getWorkflowRunDetail(runId: string): Promise<string>;
+  startWorkflowRunRerun(requestJson: string): Promise<string>;
   listSystemChildComponents(requestJson: string): Promise<string>;
   addSystemChildComponent(requestJson: string): Promise<string>;
   removeSystemChildComponent(requestJson: string): Promise<string>;

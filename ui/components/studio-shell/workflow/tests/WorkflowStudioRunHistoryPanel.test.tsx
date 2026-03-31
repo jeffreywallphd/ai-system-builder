@@ -87,6 +87,7 @@ function installBridge(overrides: {
         runWorkflowDraft: async () => JSON.stringify({ ok: true }),
         listWorkflowRuns,
         getWorkflowRunDetail,
+        startWorkflowRunRerun: async () => JSON.stringify({ ok: true }),
         listSystemChildComponents: async () => JSON.stringify({ ok: true, data: [] }),
         addSystemChildComponent: async () => JSON.stringify({ ok: true }),
         removeSystemChildComponent: async () => JSON.stringify({ ok: true }),

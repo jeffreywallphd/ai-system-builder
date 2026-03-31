@@ -20,6 +20,7 @@ describe("StudioShellService", () => {
     expect(source).toContain("duplicatePersistedWorkflow(");
     expect(source).toContain("assessWorkflowExecutionReadiness(");
     expect(source).toContain("runWorkflowDraft(");
+    expect(source).toContain("startWorkflowRunRerun(");
     expect(source).toContain("listSystemChildComponents(");
     expect(source).toContain("addSystemChildComponent(");
     expect(source).toContain("removeSystemChildComponent(");

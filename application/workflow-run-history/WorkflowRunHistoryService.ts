@@ -203,6 +203,12 @@ export class WorkflowRunHistoryService {
         parentRunId: typeof request.input.parameters?.parentRunId === "string"
           ? request.input.parameters.parentRunId
           : undefined,
+        rerunMode: typeof request.input.parameters?.rerunMode === "string"
+          ? request.input.parameters.rerunMode
+          : undefined,
+        rerunReason: typeof request.input.parameters?.rerunReason === "string"
+          ? request.input.parameters.rerunReason
+          : undefined,
       },
       timestamps: {
         startedAt,
