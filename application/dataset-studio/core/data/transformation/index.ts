@@ -3,5 +3,8 @@ export * from "./TransformationContracts";
 export * from "./TransformationAssetRegistry";
 export * from "./TransformationPipeline";
 export * from "./TransformationSampling";
+export * from "./TransformationStatistics";
 export * from "./registerTransformationAssets";
+export * from "./assets/DataProfilingAsset";
+export * from "./assets/FieldMappingAsset";
 export * from "./assets/SchemaInferenceAsset";

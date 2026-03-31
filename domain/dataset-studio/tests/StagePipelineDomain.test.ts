@@ -138,4 +138,11 @@ describe("StagePipelineDomain", () => {
     expect(rawStorage).toBeDefined();
     expect(rawStorage?.assetReferences[0]?.assetId).toBe("raw-storage-stage");
   });
+
+  it("maps profiling stage definitions to the data profiling transformation asset", () => {
+    const pipeline = createUnifiedIngestionStagePipelineDefinition();
+    const profiling = pipeline.stages.find((stage) => stage.kind === DatasetPipelineStageKinds.profiling);
+    expect(profiling).toBeDefined();
+    expect(profiling?.assetReferences[0]?.assetId).toBe("data-profiling");
+  });
 });
