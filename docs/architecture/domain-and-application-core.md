@@ -1135,3 +1135,18 @@ Explicitly later than this scope:
 - Scope remains intentionally bounded:
   - lineage is modeled as metadata/provenance attached to execution results and assets, not a standalone graph engine,
   - no lineage visualization/editor UI or distributed orchestration pipeline was introduced in this slice.
+
+## Direction 5 update: Data Studio validation/error model + preview-panel integration seam (stories 13.9-13.10)
+
+- Data Studio now has a focused validation/error framework in `application/dataset-studio/DataStudioValidation.ts` that standardizes:
+  - issue sections across canonical-shape, converter-request/result, source-reference/resolved-source, data-asset-config, execution-request, and preview-model boundaries,
+  - warning vs error severities with path-level issue reporting,
+  - deterministic mapping from validation issues -> converter diagnostics for existing execution/preview contracts.
+- Converter/source/execution flows now consume that same framework:
+  - `DataConverterCore` performs contract-level request/result validation and emits structured diagnostics before/after conversion,
+  - `DataSourceLocator` validates source inputs + resolved outputs and returns typed locator failures with diagnostics,
+  - `DataAssetExecutionFramework` validates execution requests/output/preview and now returns explicit `validationIssues` plus structured `failure` metadata (`validation` vs `runtime`) in execution results.
+- Scope remains bounded and architecture-aligned:
+  - no parallel data taxonomy or parallel execution stack was introduced,
+  - validation remains explicit/result-driven (not exception-first control flow),
+  - data-layer diagnostics stay inspectable and reusable for UI surfaces.

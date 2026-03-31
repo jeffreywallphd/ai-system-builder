@@ -133,4 +133,16 @@ describe("DataConverterCore", () => {
       expect((error as DataConverterError).code).toBe("invalid_input");
     }
   });
+
+  it("returns contract-level validation diagnostics for invalid requests", () => {
+    const converter = new DataConverterCore();
+    const result = converter.convert({
+      operation: "document-to-text-items",
+      text: " ",
+    });
+
+    expect(result.ok).toBeFalse();
+    expect(result.diagnostics[0]?.code).toBe("document-text-missing");
+    expect(result.diagnostics[0]?.details?.section).toBe("converter-request");
+  });
 });

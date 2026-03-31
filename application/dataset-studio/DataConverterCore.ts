@@ -35,6 +35,12 @@ import {
   type ResolvedDataSource,
 } from "./DataConverterContracts";
 import { DefaultDataSourceLocator, DataSourceLocatorError, type IDataSourceLocator } from "./DataSourceLocator";
+import {
+  hasErrorIssues,
+  toDataConverterDiagnostics,
+  validateDataConverterRequest,
+  validateDataConverterResult,
+} from "./DataStudioValidation";
 
 export const DataConverterErrorCodes = Object.freeze({
   invalidInput: "invalid_input",
@@ -339,20 +345,54 @@ export class DataConverterCore {
 
   public convert(request: DataConverterRequest): DataConverterResult {
     const context = normalizeDataConverterContext(request.context);
+    const requestIssues = validateDataConverterRequest(request);
+    if (hasErrorIssues(requestIssues)) {
+      return buildFailureResult(request.operation, context, toDataConverterDiagnostics(requestIssues));
+    }
 
     try {
+      let result: DataConverterResult;
       switch (request.operation) {
         case DataConverterOperationKinds.sourceToRecords:
-          return this.convertSourceToRecordsRequest(request, context);
+          result = this.convertSourceToRecordsRequest(request, context);
+          break;
         case DataConverterOperationKinds.recordsToTable:
-          return this.convertRecordsToTableRequest(request, context);
+          result = this.convertRecordsToTableRequest(request, context);
+          break;
         case DataConverterOperationKinds.documentToTextItems:
-          return this.convertDocumentToTextItemsRequest(request, context);
+          result = this.convertDocumentToTextItemsRequest(request, context);
+          break;
         case DataConverterOperationKinds.imageMetadataToRecords:
-          return this.convertImageMetadataToRecordsRequest(request, context);
+          result = this.convertImageMetadataToRecordsRequest(request, context);
+          break;
         default:
           throw new DataConverterError(DataConverterErrorCodes.invalidRequest, `Unsupported data converter operation '${request.operation}'.`);
       }
+
+      const resultIssues = validateDataConverterResult(result);
+      if (resultIssues.length === 0) {
+        return result;
+      }
+
+      const issueDiagnostics = toDataConverterDiagnostics(resultIssues);
+      if (!result.ok || hasErrorIssues(resultIssues)) {
+        return buildFailureResult(
+          request.operation,
+          context,
+          Object.freeze([
+            ...result.diagnostics,
+            ...issueDiagnostics,
+          ]),
+        );
+      }
+
+      return Object.freeze({
+        ...result,
+        diagnostics: Object.freeze([
+          ...result.diagnostics,
+          ...issueDiagnostics,
+        ]),
+      });
     } catch (error) {
       if (error instanceof DataConverterError) {
         return buildFailureResult(

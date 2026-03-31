@@ -52,6 +52,8 @@ describe("DefaultDataAssetExecutionFramework", () => {
     expect(result.status).toBe(DataAssetExecutionStatuses.succeeded);
     expect(result.output?.kind).toBe("records");
     expect(result.preview.kind).toBe("records");
+    expect(result.validationIssues.length).toBe(0);
+    expect(result.failure).toBeUndefined();
     expect(result.context.executionId).toBe("exec-1");
     expect(result.lineage.execution.requestId).toBe("req-1");
     expect(result.lineage.inputs.some((entry) => entry.assetId === "source-users")).toBeTrue();
@@ -85,6 +87,8 @@ describe("DefaultDataAssetExecutionFramework", () => {
     expect(result.ok).toBeFalse();
     expect(result.status).toBe(DataAssetExecutionStatuses.failed);
     expect(result.diagnostics[0]?.code).toBe("output_shape_mismatch");
+    expect(result.validationIssues.some((issue) => issue.code === "output_shape_mismatch")).toBeTrue();
+    expect(result.failure?.kind).toBe("validation");
   });
 
   it("fails with structured diagnostics when converter result is unsuccessful", async () => {
@@ -117,6 +121,7 @@ describe("DefaultDataAssetExecutionFramework", () => {
     expect(result.status).toBe(DataAssetExecutionStatuses.failed);
     expect(result.preview.kind).toBe("error");
     expect(result.lineage.diagnostics?.[0]?.severity).toBe("error");
+    expect(result.failure?.kind).toBe("validation");
   });
 
   it("can package preview-only execution from a data asset canonical output", async () => {
@@ -132,6 +137,7 @@ describe("DefaultDataAssetExecutionFramework", () => {
     expect(result.ok).toBeTrue();
     expect(result.preview.kind).toBe("records");
     expect(result.lineage.steps.some((step) => step.status === "skipped")).toBeTrue();
+    expect(result.failure).toBeUndefined();
   });
 
   it("fails validation when preview-only execution is requested for non-previewable assets", async () => {
@@ -155,5 +161,6 @@ describe("DefaultDataAssetExecutionFramework", () => {
     const result = await framework.execute({ asset });
     expect(result.ok).toBeFalse();
     expect(result.diagnostics[0]?.code).toBe("preview_unsupported");
+    expect(result.failure?.kind).toBe("validation");
   });
 });

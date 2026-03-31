@@ -80,4 +80,23 @@ describe("DefaultDataSourceLocator", () => {
       return true;
     });
   });
+
+  it("returns invalid-reference diagnostics for malformed source references", async () => {
+    const locator = new DefaultDataSourceLocator();
+
+    await expect(locator.resolve({
+      source: {
+        kind: DataSourceReferenceKinds.url,
+        url: " ",
+      },
+    })).rejects.toSatisfy((error: unknown) => {
+      if (!(error instanceof DataSourceLocatorError)) {
+        return false;
+      }
+
+      expect(error.code).toBe(DataSourceLocatorErrorCodes.invalidReference);
+      expect(error.diagnostics[0]?.details?.section).toBe("source-reference");
+      return true;
+    });
+  });
 });
