@@ -1662,3 +1662,14 @@ Explicitly later than this scope:
   - deterministic graph reconstruction checks on rehydrate,
   - React Flow reconstruction from persisted canonical graph.
 - Inspection preview contracts now expose a normalized preview envelope (`version/kind/truncated/totalCount/payload`) in `domain/dataset-studio/PipelineInspectionDomain.ts` and `application/dataset-studio/PipelineInspectionService.ts` while preserving legacy preview payload access.
+
+## Direction 5 extension update: Data Studio unified preparation asset + stage-first abstraction (stories 18.1-18.2)
+
+- Data Studio now has a canonical unified preparation asset contract in `domain/dataset-studio/UnifiedPreparationAsset.ts` with explicit identity/versioning, upstream Epic 17 pipeline bindings, stage configuration (visibility + activation + config mode), output/storage hooks, lineage/reuse hooks, and preview/inspection metadata.
+- Unified preparation validation now enforces required stage coverage (`SourceSelection`, `UnifiedIngestion`, `StoragePrepared`), conditional-stage activation integrity, and normalized stage definitions via zod-backed schema parsing.
+- Stage-oriented preparation orchestration now has a dedicated application seam in `application/dataset-studio/UnifiedPreparationPipelineService.ts`:
+  - resolves unified preparation definitions into canonical `PipelineDefinition` stage instances,
+  - validates and projects through existing stage/graph seams (`PipelineValidationService`, `PipelineGraphConstructionService`, `StageAssetCompositionService`),
+  - emits explicit stage-to-asset-group mappings for Wizard/Canvas-ready stage reasoning,
+  - enforces bounded Epic 17 upstream binding compatibility.
+- A compact cross-studio authoring projection extension point now exists in `application/studio-shell/StudioAuthoringGraph.ts`, and unified preparation resolution emits this projection as a future Wizard/Canvas handoff hook without changing existing Workflow Studio semantics.
