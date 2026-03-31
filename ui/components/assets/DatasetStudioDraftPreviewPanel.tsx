@@ -222,7 +222,7 @@ export default function DatasetStudioDraftPreviewPanel({
   }, [registry, selectedAssetId]);
 
   const schema = selectedEntry?.descriptor.configSchema;
-  const [appliedConfig, setAppliedConfig] = useState<Readonly<Record<string, CanonicalRecordValue>>(() =>
+  const [appliedConfig, setAppliedConfig] = useState<Readonly<Record<string, CanonicalRecordValue>>>(() =>
     schema ? resolveDataAssetConfigDefaults(schema, selectedEntry?.baseConfig) : Object.freeze({}),
   );
   const [configValidationIssues, setConfigValidationIssues] = useState<ReadonlyArray<DataStudioValidationIssue>>(Object.freeze([]));
@@ -343,6 +343,7 @@ export default function DatasetStudioDraftPreviewPanel({
             {entries.map((entry: DataAssetRegistryEntry) => (
               <option key={`${entry.descriptor.assetId}:${entry.descriptor.versionId ?? "latest"}`} value={entry.descriptor.assetId}>
                 {entry.descriptor.display.title ?? entry.descriptor.name}
+                {entry.descriptor.versionId ? ` (${entry.descriptor.versionId})` : ""}
               </option>
             ))}
           </select>

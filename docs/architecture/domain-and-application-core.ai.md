@@ -1153,3 +1153,40 @@ Explicitly later than this scope:
   - no remote marketplace/auto-discovery/plugin-packaging architecture was introduced,
   - registry loading is explicit registration + optional config-aware asset factory functions,
   - taxonomy/asset identity remain anchored to existing shared asset + dataset foundations.
+
+## Direction 5 update: Data asset versioning + metadata integration (story 13.13)
+
+- Data Studio now has an explicit data-asset versioning seam in `domain/dataset-studio/DataAssetVersioning.ts`:
+  - normalized version descriptors (`semantic`, `label`, `unversioned`),
+  - compatibility-oriented comparability checks for deterministic latest-version resolution,
+  - explicit validation helpers for strict version metadata fields (`schemaVersion`, `contractVersion`, `publishedVersionId`) while allowing label versions for asset ids where needed.
+- Data asset inspection in `domain/dataset-studio/DataAssetBase.ts` now exposes a structured metadata snapshot:
+  - identity (`assetId`, optional `versionId`, category),
+  - display metadata (name/description/tags),
+  - version descriptor,
+  - input/output contract references + contract version,
+  - capability metadata (configurable/previewable/executable),
+  - composability and dependency metadata.
+- Registry integration in `application/dataset-studio/DataAssetRegistry.ts` now consumes that inspection metadata directly and resolves latest version by version precedence instead of registration order.
+- Dataset Studio preview UI now includes version labeling in the asset selector and fixes a TSX generic parsing defect that caused runtime `Readonly is not defined` errors in browser mode (`ui/components/assets/DatasetStudioDraftPreviewPanel.tsx`).
+- Scope remains intentionally bounded:
+  - no package-manager/plugin lifecycle framework,
+  - no remote compatibility negotiation or migration engine beyond local version metadata validation and matching.
+
+## Direction 5 update: Data Studio sample-asset test harness (story 13.14)
+
+- Data Studio now includes a reusable sample-asset harness in `application/dataset-studio/DataStudioSampleAssets.ts` with three representative assets:
+  - records converter sample,
+  - document text-items sample,
+  - image metadata records sample.
+- The harness registers assets through the existing `DataAssetRegistry` with schema-driven configuration, specialization metadata, and versioned metadata descriptors.
+- End-to-end harness coverage is now implemented in `application/dataset-studio/tests/DataStudioSampleAssetsHarness.test.ts` and validates:
+  - source reference resolution + converter operations,
+  - canonical shape outputs and preview generation,
+  - execution framework and lineage capture,
+  - schema-driven config validation behavior,
+  - registry discovery and metadata/version surfacing.
+- Additional focused coverage now includes `domain/dataset-studio/tests/DataAssetVersioning.test.ts` and updated `DataAssetBase`/registry tests for versioning + metadata behavior.
+- Scope remains intentionally bounded:
+  - harness assets are deterministic and in-memory,
+  - no separate testing runtime or production ingestion pipeline was introduced.

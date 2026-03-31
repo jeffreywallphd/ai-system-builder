@@ -19,6 +19,11 @@ import type {
   CanonicalDataShapeKind,
   CanonicalRecordValue,
 } from "./CanonicalDataShapes";
+import {
+  assertValidDataAssetVersion,
+  parseDataAssetVersion,
+  type DataAssetVersionDescriptor,
+} from "./DataAssetVersioning";
 
 export interface DataAssetDependencyReference {
   readonly assetId: string;
@@ -31,6 +36,41 @@ export interface DataAssetVersionMetadata {
   readonly contractVersion: string;
   readonly revision: number;
   readonly publishedVersionId?: string;
+}
+
+export interface DataAssetIdentityMetadata {
+  readonly assetId: string;
+  readonly versionId?: string;
+  readonly category: "dataset";
+}
+
+export interface DataAssetDisplayMetadata {
+  readonly name: string;
+  readonly description?: string;
+  readonly tags: ReadonlyArray<string>;
+}
+
+export interface DataAssetContractReferenceMetadata {
+  readonly input: AssetContractShapeDescriptor;
+  readonly output: AssetContractShapeDescriptor;
+  readonly contractVersion: string;
+}
+
+export interface DataAssetCapabilityMetadata {
+  readonly configurable: boolean;
+  readonly previewable: boolean;
+  readonly executable: boolean;
+}
+
+export interface DataAssetMetadataSnapshot {
+  readonly identity: DataAssetIdentityMetadata;
+  readonly display: DataAssetDisplayMetadata;
+  readonly version: DataAssetVersionDescriptor;
+  readonly contracts: DataAssetContractReferenceMetadata;
+  readonly capabilities: DataAssetCapabilityMetadata;
+  readonly configKeys: ReadonlyArray<string>;
+  readonly composableInputShapeKinds: ReadonlyArray<CanonicalDataShapeKind>;
+  readonly dependencies: ReadonlyArray<DataAssetDependencyReference>;
 }
 
 export interface DataAssetContracts {
@@ -46,19 +86,11 @@ export interface DataAssetConfigSurface {
 }
 
 export interface DataAssetInspection {
-  readonly assetId: string;
-  readonly name: string;
-  readonly version?: string;
+  readonly metadata: DataAssetMetadataSnapshot;
   readonly outputShapeKind: CanonicalDataShapeKind;
-  readonly inputContract: AssetContractShapeDescriptor;
-  readonly outputContract: AssetContractShapeDescriptor;
-  readonly contractVersion: string;
   readonly schemaVersion: string;
+  readonly contractVersion: string;
   readonly revision: number;
-  readonly configKeys: ReadonlyArray<string>;
-  readonly dependencies: ReadonlyArray<DataAssetDependencyReference>;
-  readonly supportsPreview: boolean;
-  readonly composableInputShapeKinds: ReadonlyArray<CanonicalDataShapeKind>;
 }
 
 function normalizeOptional(value?: string): string | undefined {
@@ -113,16 +145,21 @@ function normalizeVersionMetadata(
   const schemaVersion = normalizeOptional(metadata?.schemaVersion) ?? "1.0.0";
   const contractVersion = normalizeOptional(metadata?.contractVersion) ?? defaultContractVersion;
   const revision = metadata?.revision ?? 1;
+  const publishedVersionId = normalizeOptional(metadata?.publishedVersionId);
 
   if (!Number.isInteger(revision) || revision < 1) {
     throw new Error("DataAssetVersionMetadata.revision must be a positive integer.");
   }
 
+  assertValidDataAssetVersion(schemaVersion, "DataAssetVersionMetadata.schemaVersion");
+  assertValidDataAssetVersion(contractVersion, "DataAssetVersionMetadata.contractVersion");
+  assertValidDataAssetVersion(publishedVersionId, "DataAssetVersionMetadata.publishedVersionId");
+
   return Object.freeze({
     schemaVersion,
     contractVersion,
     revision,
-    publishedVersionId: normalizeOptional(metadata?.publishedVersionId),
+    publishedVersionId,
   });
 }
 
@@ -152,7 +189,9 @@ export abstract class DataAssetBase extends Asset {
     readonly relationships?: ReadonlyArray<IAssetRelationship>;
     readonly audit?: IAssetAuditInfo;
   }) {
+    assertValidDataAssetVersion(params.version, "DataAssetBase.version", { allowLabel: true });
     const contractVersion = normalizeOptional(params.contracts.version) ?? "1.0.0";
+    assertValidDataAssetVersion(contractVersion, "DataAssetContracts.version");
     const contract = createAssetContractDescriptor({
       version: contractVersion,
       input: params.contracts.input,
@@ -203,20 +242,43 @@ export abstract class DataAssetBase extends Asset {
 
   public inspect(): DataAssetInspection {
     const outputShape = this.toCanonicalDataShape();
+    const configKeys = Object.freeze(Object.keys(this.config.values));
+    const tags = Object.freeze([...(this.semanticMetadata?.tags ?? [])]);
+    const versionId = this.version;
+
+    const metadata = Object.freeze({
+      identity: Object.freeze({
+        assetId: this.id,
+        versionId,
+        category: "dataset",
+      } satisfies DataAssetIdentityMetadata),
+      display: Object.freeze({
+        name: this.name,
+        description: normalizeOptional(this.semanticMetadata?.description),
+        tags,
+      } satisfies DataAssetDisplayMetadata),
+      version: parseDataAssetVersion(versionId),
+      contracts: Object.freeze({
+        input: this.contract.input!,
+        output: this.contract.output!,
+        contractVersion: this.contract.version,
+      } satisfies DataAssetContractReferenceMetadata),
+      capabilities: Object.freeze({
+        configurable: configKeys.length > 0,
+        previewable: this.supportsPreview,
+        executable: true,
+      } satisfies DataAssetCapabilityMetadata),
+      configKeys,
+      composableInputShapeKinds: this.composableInputShapeKinds,
+      dependencies: this.dependencies,
+    } satisfies DataAssetMetadataSnapshot);
+
     return Object.freeze({
-      assetId: this.id,
-      name: this.name,
-      version: this.version,
+      metadata,
       outputShapeKind: outputShape.kind,
-      inputContract: this.contract.input!,
-      outputContract: this.contract.output!,
       contractVersion: this.contract.version,
       schemaVersion: this.versionMetadata.schemaVersion,
       revision: this.versionMetadata.revision,
-      configKeys: Object.freeze(Object.keys(this.config.values)),
-      dependencies: this.dependencies,
-      supportsPreview: this.supportsPreview,
-      composableInputShapeKinds: this.composableInputShapeKinds,
     });
   }
 }

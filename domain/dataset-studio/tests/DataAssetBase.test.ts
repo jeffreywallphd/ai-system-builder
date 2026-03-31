@@ -66,9 +66,10 @@ describe("DataAssetBase", () => {
     const asset = createSampleAsset();
     const inspection = asset.inspect();
 
-    expect(inspection.assetId).toBe("dataset-asset-1");
+    expect(inspection.metadata.identity.assetId).toBe("dataset-asset-1");
+    expect(inspection.metadata.version.scheme).toBe("label");
     expect(inspection.outputShapeKind).toBe("records");
-    expect(inspection.dependencies).toHaveLength(1);
+    expect(inspection.metadata.dependencies).toHaveLength(1);
 
     expect(asset.canComposeFrom({ outputShapeKind: "table" })).toBe(true);
     expect(asset.canComposeFrom({ outputShapeKind: "text-items" })).toBe(false);
@@ -87,6 +88,22 @@ describe("DataAssetBase", () => {
         },
       } as never,
     })).toThrow("explicit input and output contracts");
+  });
+
+  it("rejects invalid version metadata conventions", () => {
+    expect(() => new CanonicalDataAsset({
+      id: "invalid-version-asset",
+      name: "Invalid Version Asset",
+      version: "release-candidate",
+      source: { type: "generated", workflowId: "wf-1" },
+      location: { accessMethod: "virtual", location: "dataset://invalid-version-asset" },
+      outputShape: createCanonicalRecordsShape({
+        records: [{ recordId: "record-1", fields: { id: "1" } }],
+      }),
+      versionMetadata: {
+        schemaVersion: "schema-v1",
+      },
+    })).toThrow("DataAssetVersionMetadata.schemaVersion");
   });
 });
 

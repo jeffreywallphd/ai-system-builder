@@ -1,6 +1,11 @@
 import { createDatasetStudioTaxonomy } from "../../domain/dataset-studio/DatasetStudioDomain";
 import type { CanonicalDataShapeKind, CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
 import type { DataAssetBase } from "../../domain/dataset-studio/DataAssetBase";
+import type { DataAssetVersionDescriptor } from "../../domain/dataset-studio/DataAssetVersioning";
+import {
+  assertValidDataAssetVersion,
+  compareDataAssetVersions,
+} from "../../domain/dataset-studio/DataAssetVersioning";
 import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
 import {
   createDataAssetConfigSchema,
@@ -44,6 +49,7 @@ export interface DataAssetRegistryCapabilities {
 export interface DataAssetRegistryDescriptor {
   readonly assetId: string;
   readonly versionId?: string;
+  readonly version: DataAssetVersionDescriptor;
   readonly name: string;
   readonly taxonomy: CompositionTaxonomyDescriptor;
   readonly specialization: DataAssetRegistrySpecialization;
@@ -111,14 +117,6 @@ function normalizeConfigRecord(config: Readonly<Record<string, CanonicalRecordVa
   ));
 }
 
-function buildCapabilities(asset: DataAssetBase): DataAssetRegistryCapabilities {
-  return Object.freeze({
-    configurable: Object.keys(asset.config.values).length > 0,
-    previewable: asset.supportsPreview,
-    executable: true,
-  });
-}
-
 function buildContractReferences(asset: DataAssetBase): DataAssetRegistryContractReferences {
   const input = asset.getInputContract();
   const output = asset.getOutputContract();
@@ -138,22 +136,23 @@ function toDescriptor(input: {
   readonly configSchema: DataAssetConfigSchema;
   readonly taxonomy: CompositionTaxonomyDescriptor;
 }): DataAssetRegistryDescriptor {
-  const shape = input.asset.toCanonicalDataShape();
+  const inspection = input.asset.inspect();
   return Object.freeze({
-    assetId: input.asset.id,
-    versionId: normalizeOptional(input.asset.version),
-    name: input.asset.name,
+    assetId: inspection.metadata.identity.assetId,
+    versionId: inspection.metadata.identity.versionId,
+    version: inspection.metadata.version,
+    name: inspection.metadata.display.name,
     taxonomy: input.taxonomy,
     specialization: input.specialization,
-    outputShapeKind: shape.kind,
-    composableInputShapeKinds: input.asset.composableInputShapeKinds,
+    outputShapeKind: inspection.outputShapeKind,
+    composableInputShapeKinds: inspection.metadata.composableInputShapeKinds,
     display: Object.freeze({
-      title: normalizeOptional(input.display?.title) ?? input.asset.name,
-      summary: normalizeOptional(input.display?.summary),
-      tags: normalizeTags(input.display?.tags),
+      title: normalizeOptional(input.display?.title) ?? inspection.metadata.display.name,
+      summary: normalizeOptional(input.display?.summary) ?? inspection.metadata.display.description,
+      tags: normalizeTags(input.display?.tags ?? inspection.metadata.display.tags),
     }),
     contracts: buildContractReferences(input.asset),
-    capabilities: buildCapabilities(input.asset),
+    capabilities: inspection.metadata.capabilities,
     configSchema: input.configSchema,
   });
 }
@@ -169,6 +168,7 @@ export class DataAssetRegistry {
     }
 
     const versionId = normalizeOptional(input.asset.version);
+    assertValidDataAssetVersion(versionId, "DataAssetRegistryEntry.versionId", { allowLabel: true });
     const key = `${assetId}::${versionId ?? "latest"}`;
     if (this.registrationsByKey.has(key)) {
       throw new Error(`Data asset '${assetId}' version '${versionId ?? "latest"}' is already registered.`);
@@ -301,6 +301,7 @@ export class DataAssetRegistry {
     }
 
     const versionId = normalizeOptional(query.versionId);
+    assertValidDataAssetVersion(versionId, "DataAssetLookup.versionId", { allowLabel: true });
     if (versionId) {
       return `${assetId}::${versionId}`;
     }
@@ -310,7 +311,20 @@ export class DataAssetRegistry {
       return undefined;
     }
 
-    return assetKeys[assetKeys.length - 1];
+    return assetKeys
+      .map((key) => {
+        const registration = this.registrationsByKey.get(key);
+        if (!registration) {
+          return undefined;
+        }
+        return Object.freeze({
+          key,
+          version: registration.entry.descriptor.version,
+        });
+      })
+      .filter((entry): entry is { readonly key: string; readonly version: DataAssetVersionDescriptor } => Boolean(entry))
+      .sort((left, right) => compareDataAssetVersions(left.version.normalized, right.version.normalized))
+      .at(-1)?.key;
   }
 
   private matchesQuery(entry: DataAssetRegistryEntry, query: QueryDataAssets): boolean {
