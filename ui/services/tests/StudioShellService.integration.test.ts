@@ -70,6 +70,9 @@ function installBridge(
     validateDraft(requestJson: string) {
       return api.validateDraft(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
+    assessWorkflowExecutionReadiness(requestJson: string) {
+      return api.assessWorkflowExecutionReadiness(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
     runWorkflowDraft(requestJson: string) {
       return api.runWorkflowDraft(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
@@ -1806,6 +1809,60 @@ describe("StudioShellService integration", () => {
     repository.dispose();
   });
 
+  it("assesses workflow execution readiness through service -> bridge -> backend without launching runtime", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-workflow-readiness-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "workflow-readiness.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const blocked = await service.assessWorkflowExecutionReadiness({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalSchedule,
+          config: {},
+        }],
+        steps: [],
+      }),
+    });
+
+    expect(blocked.ok).toBeTrue();
+    expect(blocked.data?.ready).toBeFalse();
+    expect((blocked.data?.blockingIssueCount ?? 0) > 0).toBeTrue();
+    expect(blocked.data?.issues.some((issue) => issue.code === "trigger-malformed")).toBeTrue();
+
+    const ready = await service.assessWorkflowExecutionReadiness({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+    });
+
+    expect(ready.ok).toBeTrue();
+    expect(ready.data?.ready).toBeTrue();
+    expect(ready.data?.blockingIssueCount).toBe(0);
+
+    repository.dispose();
+  });
+
   it("launches workflow manual execution when canonical validation and translation succeed", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-workflow-run-success-"));
     createdRoots.push(root);
@@ -1857,6 +1914,139 @@ describe("StudioShellService integration", () => {
     expect(result.data?.validation.ready).toBeTrue();
     expect(result.data?.planSummary?.stepCount).toBe(1);
     expect(result.data?.runtime?.status === "completed" || result.data?.runtime?.status === "paused").toBeTrue();
+    expect(result.data?.runtime?.outputDelivery?.results[0]).toEqual(expect.objectContaining({
+      outputId: "output-1",
+      destinationType: WorkflowDraftOutputDestinationTypes.webViewer,
+      target: "preview",
+      status: "delivered",
+    }));
+
+    repository.dispose();
+  });
+
+  it("keeps execution readiness and launch feedback aligned for wizard-authored and canvas-authored drafts", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-workflow-mode-authored-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "workflow-mode-authored.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const wizardAuthoredDraft = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      triggers: [{
+        id: "trigger-manual",
+        kind: WorkflowDraftTriggerKinds.user,
+        type: WorkflowDraftTriggerTypes.userManual,
+        config: {},
+      }],
+      steps: [{
+        id: "step-wizard",
+        type: "action",
+        kind: "action",
+        order: 1,
+      }],
+      outputs: [{
+        id: "output-wizard",
+        type: "workflow-output",
+        order: 1,
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.json,
+        sourceStepId: "step-wizard",
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.webViewer,
+          target: "wizard-preview",
+          options: {
+            title: "Wizard preview",
+          },
+        },
+      }],
+    });
+    const canvasAuthoredDraft = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      triggers: [{
+        id: "trigger-state",
+        kind: WorkflowDraftTriggerKinds.state,
+        type: WorkflowDraftTriggerTypes.stateSystemEvent,
+        config: {
+          sourceType: "system",
+          eventCategory: "system-state-changed",
+          eventName: "record-updated",
+        },
+      }],
+      inputs: [{
+        id: "input-record-id",
+        type: "runtime-input",
+        sourceType: "runtime-parameter",
+        parameterKey: "recordId",
+        required: true,
+      }],
+      steps: [{
+        id: "step-canvas",
+        type: "action",
+        kind: "action",
+        order: 1,
+      }],
+      outputs: [{
+        id: "output-canvas",
+        type: "workflow-output",
+        order: 1,
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.json,
+        sourceStepId: "step-canvas",
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.webViewer,
+          target: "canvas-preview",
+          options: {
+            title: "Canvas preview",
+          },
+        },
+      }],
+    });
+
+    const wizardReadiness = await service.assessWorkflowExecutionReadiness({
+      studioId: "studio-workflows",
+      content: wizardAuthoredDraft,
+    });
+    expect(wizardReadiness.ok).toBeTrue();
+    expect(wizardReadiness.data?.ready).toBeTrue();
+
+    const wizardRun = await service.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: wizardAuthoredDraft,
+    });
+    expect(wizardRun.ok).toBeTrue();
+    expect(wizardRun.data?.launchStatus).toBe("launched");
+
+    const canvasReadiness = await service.assessWorkflowExecutionReadiness({
+      studioId: "studio-workflows",
+      content: canvasAuthoredDraft,
+      triggerActivation: {
+        triggerId: "trigger-state",
+        sourceKind: "state-data",
+        payload: {
+          recordId: "record-17",
+        },
+      },
+    });
+    expect(canvasReadiness.ok).toBeTrue();
+    expect(canvasReadiness.data?.ready).toBeTrue();
+
+    const canvasRun = await service.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: canvasAuthoredDraft,
+      triggerEntry: {
+        sourceKind: "state-data",
+        triggerId: "trigger-state",
+        payload: {
+          recordId: "record-17",
+        },
+      },
+    });
+    expect(canvasRun.ok).toBeTrue();
+    expect(canvasRun.data?.launchStatus).toBe("launched");
+    expect(canvasRun.data?.validation.ready).toBeTrue();
 
     repository.dispose();
   });

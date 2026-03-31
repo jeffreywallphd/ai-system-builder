@@ -90,6 +90,21 @@ export interface RunWorkflowStudioDraftRequest {
   readonly maxLoopIterations?: number;
 }
 
+export interface AssessWorkflowStudioExecutionReadinessRequest {
+  readonly studioId: string;
+  readonly draftId?: string;
+  readonly content: string;
+  readonly triggerActivation?: {
+    readonly triggerId: string;
+    readonly sourceKind?: WorkflowExecutionTriggerSourceKind;
+    readonly triggerType?: string;
+    readonly activationType?: string;
+    readonly payload?: Readonly<Record<string, unknown>>;
+  };
+  readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly inputValues?: Readonly<Record<string, unknown>>;
+}
+
 export interface WorkflowExecutionValidationIssueReadModel {
   readonly code: string;
   readonly stage: string;
@@ -120,6 +135,14 @@ export interface WorkflowExecutionReadinessReadModel {
   readonly issues: ReadonlyArray<WorkflowExecutionValidationIssueReadModel>;
   readonly blockingIssueCount: number;
   readonly warningIssueCount: number;
+}
+
+export interface WorkflowExecutionOutputDeliveryResultReadModel {
+  readonly outputId: string;
+  readonly destinationType: "web-viewer" | "file-export" | "system-entry" | "prompt-response-chat";
+  readonly target: string;
+  readonly status: "delivered" | "failed";
+  readonly detail?: string;
 }
 
 export interface RunWorkflowStudioDraftReadModel {
@@ -163,6 +186,7 @@ export interface RunWorkflowStudioDraftReadModel {
       readonly deliveredCount: number;
       readonly failedCount: number;
       readonly issueCount: number;
+      readonly results: ReadonlyArray<WorkflowExecutionOutputDeliveryResultReadModel>;
     };
   };
   readonly failureMessage?: string;
@@ -250,6 +274,64 @@ export class StudioShellBackendApi {
         throw new StudioShellInvalidRequestError(`Draft '${request.draftId}' is not the active draft for studio '${request.studioId}'.`);
       }
       return snapshot.validationIssues;
+    });
+  }
+
+  public async assessWorkflowExecutionReadiness(
+    request: AssessWorkflowStudioExecutionReadinessRequest,
+  ): Promise<StudioShellApiResponse<WorkflowExecutionReadinessReadModel>> {
+    return this.wrap(async () => {
+      if (!request.content?.trim()) {
+        throw new StudioShellInvalidRequestError("Workflow draft content is required for execution readiness validation.");
+      }
+
+      if (request.draftId?.trim()) {
+        const snapshot = await this.requireSnapshot(request.studioId);
+        if (snapshot.draft?.draftId !== request.draftId) {
+          throw new StudioShellInvalidRequestError(
+            `Draft '${request.draftId}' is not the active draft for studio '${request.studioId}'.`,
+          );
+        }
+      }
+
+      const readiness = await this.workflowStudioService.validateWorkflowDraftExecutionReadiness({
+        content: request.content,
+        context: {
+          inputValues: request.inputValues ?? {},
+          triggerActivation: request.triggerActivation,
+          metadata: request.metadata,
+        },
+      });
+      const issues = readiness.issues.map((issue) => Object.freeze({
+        code: issue.code,
+        stage: issue.stage,
+        severity: issue.severity,
+        category: issue.category,
+        blocking: issue.blocking,
+        message: issue.message,
+        path: issue.path,
+      }));
+      return Object.freeze({
+        ready: readiness.ready,
+        authoredValidation: Object.freeze({
+          ready: readiness.authoredValidation.ready,
+          blockingIssueCount: readiness.authoredValidation.blockingIssueCount,
+          warningIssueCount: readiness.authoredValidation.warningIssueCount,
+        }),
+        preExecutionValidation: Object.freeze({
+          ready: readiness.preExecutionValidation.ready,
+          blockingIssueCount: readiness.preExecutionValidation.blockingIssueCount,
+          warningIssueCount: readiness.preExecutionValidation.warningIssueCount,
+        }),
+        translationValidation: Object.freeze({
+          ready: readiness.translationValidation.ready,
+          blockingIssueCount: readiness.translationValidation.blockingIssueCount,
+          warningIssueCount: readiness.translationValidation.warningIssueCount,
+        }),
+        issues: Object.freeze(issues),
+        blockingIssueCount: readiness.blockingIssues.length,
+        warningIssueCount: readiness.warningIssues.length,
+      });
     });
   }
 
@@ -373,6 +455,13 @@ export class StudioShellBackendApi {
               deliveredCount: runResult.runtimeResult.outputDelivery.results.filter((entry) => entry.status === "delivered").length,
               failedCount: runResult.runtimeResult.outputDelivery.results.filter((entry) => entry.status === "failed").length,
               issueCount: runResult.runtimeResult.outputDelivery.issues.length,
+              results: Object.freeze(runResult.runtimeResult.outputDelivery.results.map((entry) => Object.freeze({
+                outputId: entry.outputId,
+                destinationType: entry.destinationType,
+                target: entry.target,
+                status: entry.status,
+                detail: entry.detail,
+              }))),
             }),
           })
           : undefined,

@@ -6,11 +6,13 @@ import type {
   UpdateAssetDraftDependenciesCommand,
 } from "../../application/studio-shell/contracts";
 import type {
+  AssessWorkflowStudioExecutionReadinessRequest,
   RunWorkflowStudioDraftReadModel,
   RunWorkflowStudioDraftRequest,
   StudioShellApiResponse,
   StudioShellSnapshotReadModel,
   StudioShellValidationIssue,
+  WorkflowExecutionReadinessReadModel,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import type {
   StartSystemRuntimeExecutionRequest,
@@ -84,6 +86,13 @@ export class StudioShellService {
   public async validateDraft(studioId: string, draftId: string): Promise<StudioShellApiResponse<ReadonlyArray<StudioShellValidationIssue>>> {
     const raw = await this.requireBridge().validateDraft(JSON.stringify({ studioId, draftId }));
     return JSON.parse(raw) as StudioShellApiResponse<ReadonlyArray<StudioShellValidationIssue>>;
+  }
+
+  public async assessWorkflowExecutionReadiness(
+    request: AssessWorkflowStudioExecutionReadinessRequest,
+  ): Promise<StudioShellApiResponse<WorkflowExecutionReadinessReadModel>> {
+    const raw = await this.requireBridge().assessWorkflowExecutionReadiness(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<WorkflowExecutionReadinessReadModel>;
   }
 
   public async runWorkflowDraft(request: RunWorkflowStudioDraftRequest): Promise<StudioShellApiResponse<RunWorkflowStudioDraftReadModel>> {

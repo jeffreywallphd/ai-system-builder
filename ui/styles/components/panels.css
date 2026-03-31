@@ -66,6 +66,12 @@
   border-color: var(--color-border-soft);
 }
 
+.ui-studio-shell__workflow-feedback {
+  display: grid;
+  gap: var(--space-sm);
+  border-color: var(--color-border-soft);
+}
+
 .ui-studio-shell__grid {
   align-items: flex-start;
 }

@@ -113,6 +113,7 @@ export interface DesktopStudioShellBridge {
   transitionLifecycle(requestJson: string): Promise<string>;
   publishVersion(requestJson: string): Promise<string>;
   validateDraft(requestJson: string): Promise<string>;
+  assessWorkflowExecutionReadiness(requestJson: string): Promise<string>;
   runWorkflowDraft(requestJson: string): Promise<string>;
   listSystemChildComponents(requestJson: string): Promise<string>;
   addSystemChildComponent(requestJson: string): Promise<string>;

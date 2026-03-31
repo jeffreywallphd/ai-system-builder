@@ -8,11 +8,14 @@ import {
 } from "react-router-dom";
 import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
 import type {
-  RunWorkflowStudioDraftReadModel,
   StudioShellSnapshotReadModel,
   StudioShellValidationIssue,
+  WorkflowExecutionReadinessReadModel,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import WorkflowStudioDraftAuthoringBoundary from "../components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary";
+import WorkflowStudioExecutionFeedbackPanel, {
+  type WorkflowStudioRunFeedback,
+} from "../components/studio-shell/workflow/WorkflowStudioExecutionFeedbackPanel";
 import { StudioShellService } from "../services/StudioShellService";
 import { StudioShellPanel } from "../components/studio-shell/StudioShellPanel";
 import { StudioShellValidationIssuesPanel } from "../components/studio-shell/StudioShellValidationIssuesPanel";
@@ -63,12 +66,6 @@ interface JsonParseResult<T> {
 interface DraftDependencyInput {
   readonly assetId: string;
   readonly versionId: string;
-}
-
-interface WorkflowRunFeedback {
-  readonly status: "running" | "blocked" | "launched" | "failed";
-  readonly message: string;
-  readonly result?: RunWorkflowStudioDraftReadModel;
 }
 
 function parseJson<T>(value: string): JsonParseResult<T> {
@@ -274,7 +271,9 @@ export default function StudioShellPage({
   const [workflowModeState, setWorkflowModeState] = useState<WorkflowStudioModeState | undefined>(
     () => workflowModeStore?.getState(),
   );
-  const [workflowRunFeedback, setWorkflowRunFeedback] = useState<WorkflowRunFeedback | undefined>();
+  const [workflowRunFeedback, setWorkflowRunFeedback] = useState<WorkflowStudioRunFeedback | undefined>();
+  const [workflowExecutionReadiness, setWorkflowExecutionReadiness] = useState<WorkflowExecutionReadinessReadModel | undefined>();
+  const [isWorkflowReadinessPending, setIsWorkflowReadinessPending] = useState(false);
   const leftDrawerConfiguration = studioRegistration?.shell?.drawers?.left;
   const rightDrawerConfiguration = studioRegistration?.shell?.drawers?.right;
   const [isLeftDrawerOpen, setIsLeftDrawerOpen] = useState(leftDrawerConfiguration?.defaultOpen ?? true);
@@ -286,6 +285,8 @@ export default function StudioShellPage({
     setContent(nextContent);
     if (isWorkflowStudio) {
       setWorkflowRunFeedback(undefined);
+      setWorkflowExecutionReadiness(undefined);
+      setIsWorkflowReadinessPending(false);
     }
     workflowModeStore?.hydrateFromSerializedDraft(nextContent);
   };
@@ -423,6 +424,8 @@ export default function StudioShellPage({
     setIsDependenciesJsonMode(false);
     setDependenciesJsonError(undefined);
     setWorkflowRunFeedback(undefined);
+    setWorkflowExecutionReadiness(undefined);
+    setIsWorkflowReadinessPending(false);
   }, [initialDependencies, initialMetadataPatch]);
 
   useEffect(() => {
@@ -708,6 +711,25 @@ export default function StudioShellPage({
   };
 
   const runValidationFromAuthoring = (): void => {
+    if (isWorkflowStudio) {
+      setIsWorkflowReadinessPending(true);
+      void (async () => {
+        const response = await service.assessWorkflowExecutionReadiness({
+          studioId,
+          draftId,
+          content: workflowDraftContent,
+        });
+        setIsWorkflowReadinessPending(false);
+        if (!response.ok || !response.data) {
+          setError(response.error?.message ?? "Failed to validate workflow execution readiness.");
+          return;
+        }
+        setWorkflowExecutionReadiness(response.data);
+        setError(undefined);
+      })();
+      return;
+    }
+
     if (!draftId) {
       return;
     }
@@ -730,6 +752,7 @@ export default function StudioShellPage({
       status: "running",
       message: "Running workflow validation and launch pipeline...",
     });
+    setIsWorkflowReadinessPending(false);
 
     void (async () => {
       const response = await service.runWorkflowDraft({
@@ -748,6 +771,7 @@ export default function StudioShellPage({
       }
 
       if (response.data.launchStatus === "blocked") {
+        setWorkflowExecutionReadiness(response.data.validation);
         setWorkflowRunFeedback({
           status: "blocked",
           message: "Workflow launch was blocked by pre-execution validation issues.",
@@ -757,6 +781,7 @@ export default function StudioShellPage({
       }
 
       if (response.data.launchStatus === "failed") {
+        setWorkflowExecutionReadiness(response.data.validation);
         setWorkflowRunFeedback({
           status: "failed",
           message: response.data.failureMessage ?? "Workflow launch failed during execution startup.",
@@ -766,6 +791,7 @@ export default function StudioShellPage({
       }
 
       const runtimeStatus = response.data.runtime?.status ?? "completed";
+      setWorkflowExecutionReadiness(response.data.validation);
       setWorkflowRunFeedback({
         status: "launched",
         message: `Workflow launch started successfully. Runtime status: ${runtimeStatus}.`,
@@ -835,13 +861,18 @@ export default function StudioShellPage({
       return isBusy || !sessionId || hasWorkflowDraftParseError;
     }
     if (action.kind === StudioShellToolbarActionKinds.runValidation) {
+      if (isWorkflowStudio) {
+        return isBusy || hasWorkflowDraftParseError || isWorkflowReadinessPending;
+      }
       return isBusy || !draftId;
     }
     if (action.kind === StudioShellToolbarActionKinds.runWorkflowDraft) {
       return isBusy
         || !isWorkflowStudio
         || hasWorkflowDraftParseError
-        || workflowRunFeedback?.status === "running";
+        || workflowRunFeedback?.status === "running"
+        || isWorkflowReadinessPending
+        || (workflowExecutionReadiness?.ready === false && workflowExecutionReadiness.blockingIssueCount > 0);
     }
     if (!isWorkflowStudio || !workflowModeState) {
       return true;
@@ -1094,39 +1125,12 @@ export default function StudioShellPage({
           </div>
         ) : null}
 
-        {isWorkflowStudio && workflowRunFeedback ? (
-          <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="studio-shell-workflow-run-feedback">
-            <div className="ui-row ui-row--between ui-row--wrap">
-              <strong>Workflow run feedback</strong>
-              <span
-                className={`ui-badge ui-badge--${workflowRunFeedback.status === "launched"
-                  ? "success"
-                  : workflowRunFeedback.status === "running"
-                    ? "warning"
-                    : "danger"}`}
-              >
-                {workflowRunFeedback.status}
-              </span>
-            </div>
-            <p className="ui-text-small ui-text-secondary">{workflowRunFeedback.message}</p>
-            {workflowRunFeedback.result ? (
-              <div className="ui-stack ui-stack--2xs ui-text-small ui-text-secondary">
-                <div>
-                  Validation: {workflowRunFeedback.result.validation.blockingIssueCount} blocking, {" "}
-                  {workflowRunFeedback.result.validation.warningIssueCount} warning issue(s).
-                </div>
-                {workflowRunFeedback.result.validation.issues.length > 0 ? (
-                  <ul className="ui-stack ui-stack--2xs">
-                    {workflowRunFeedback.result.validation.issues.slice(0, 5).map((issue) => (
-                      <li key={`${issue.code}-${issue.path ?? issue.message}`}>
-                        [{issue.severity}] {issue.code}: {issue.message}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
+        {isWorkflowStudio ? (
+          <WorkflowStudioExecutionFeedbackPanel
+            readiness={workflowExecutionReadiness}
+            isReadinessPending={isWorkflowReadinessPending}
+            runFeedback={workflowRunFeedback}
+          />
         ) : null}
 
         <StudioShellPanel title="Asset draft authoring" subtitle="Thin authoring surface over studio-shell draft contracts.">
