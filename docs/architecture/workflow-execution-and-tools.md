@@ -74,6 +74,7 @@ This keeps capability claims small and truthful: higher layers can reason about 
 - External start/invocation paths now apply an explicit bounded external retry policy: retryable classification is limited to transport/internal failures, while auth/validation/quota/rate-limit failures fail fast.
 - External replay/idempotency support is now bounded at start boundary, so repeated idempotency-key requests reuse the same execution identity instead of silently creating duplicate runs.
 - Callback delivery retries are bounded by callback registration max-attempt settings and audited as retry-attempted/retry-exhausted outcomes.
+- Callback signature generation is runtime-compatible (Web Crypto primary, Node crypto fallback) so browser-hosted runtime contracts do not depend on top-level Node crypto imports.
 - External entrypoint rate limiting is now centralized at runtime API boundaries (caller/tenant/source-operation windows), remains separate from execution quota policy, and returns structured `rate-limit-exceeded` errors.
 
 ### Direction 5 Epic 7 external runtime alignment snapshot (stories 7.1–7.24)

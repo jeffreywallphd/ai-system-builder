@@ -69,6 +69,7 @@ The renderer then uses `DesktopBridgeWorkflowRepository` for workflows and a des
 ### Browser/degraded path
 If the desktop workflow bridge is unavailable or the runtime mode is browser-oriented, the renderer can fall back to `BrowserStorageWorkflowRepository`, which stores workflow records in browser storage.
 `StudioShellService` now also follows this bounded fallback posture for Studio Shell operations through `ui/composition/BrowserStudioShellBridgeFallback.ts`, which reuses in-process backend APIs over `InMemoryStudioShellRepository` when the desktop preload Studio Shell bridge is absent.
+System-runtime callback delivery in that fallback path now signs callback payloads through a runtime-compatible HMAC seam (`ExecutionCallbackDispatcher` uses Web Crypto when available and falls back to Node crypto dynamically), which avoids browser bundle failures from top-level Node module imports.
 
 For the current Direction 3 MCP registry slice, installed MCP tool records are also intentionally persisted via browser `localStorage` (`LocalStorageMcpToolRegistryRepository`) to match the existing renderer-side fallback persistence pattern instead of introducing a new desktop-only storage seam yet.
 
