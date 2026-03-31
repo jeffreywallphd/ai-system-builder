@@ -1540,3 +1540,15 @@ Explicitly later than this scope:
   - single-asset, multi-asset, and conditional composition support,
   - React Flow-compatible asset-graph segment projection (`Node`/`Edge`) for canvas inspectability.
 - Composition definitions reuse existing ingestion/transformation asset ids from Epics 13-16 and keep orchestration logic in shared application/domain seams (no UI coupling and no duplicated asset execution logic).
+
+## Direction 5 extension update: Mid-level pipeline graph construction + canvas mapping (stories 17.3-17.4)
+
+- Mid-level stage pipelines now have a dedicated graph contract in `domain/dataset-studio/PipelineGraphDomain.ts` with typed stage/asset nodes, typed inter-node edges, zod-backed schema validation, and deterministic serialization/deserialization + inspection helpers.
+- Graph construction now lives in `application/dataset-studio/PipelineGraphConstructionService.ts` and reuses existing stage registry + stage-asset composition seams (`PipelineStageRegistry`, `StageAssetCompositionService`) instead of duplicating asset logic.
+- Construction enforces fail-fast graph correctness for:
+  - ordering constraints,
+  - stage input/output compatibility,
+  - required/optional stage enablement behavior,
+  - branching restrictions unless explicitly allowed.
+- React Flow projection now has a dedicated mapper in `application/dataset-studio/PipelineReactFlowGraph.ts` with strongly typed `stage`/`asset` node-data unions and typed edge data, plus deterministic horizontal stage-group layout and UI-ready metadata fields for preview/inspection hooks.
+- The graph + React Flow mappers are pure deterministic translators suitable for memoized canvas consumption and future custom node/edge extensions.
