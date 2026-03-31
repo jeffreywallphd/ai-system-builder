@@ -166,6 +166,67 @@ describe("SqliteWorkflowPersistenceRepository", () => {
     await expect(reopenedWithInvalidRevision.getById("workflow:sqlite:malformed")).rejects.toThrow();
     reopenedWithInvalidRevision.dispose();
   });
+
+  it("applies owner/studio/search/limit list queries over persisted rows in updated-at order", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-workflow-persistence-list-query-"));
+    createdRoots.push(root);
+    const repository = new SqliteWorkflowPersistenceRepository(path.join(root, "workflow-persistence.sqlite"));
+    const createAt1000 = new CreatePersistedWorkflowUseCase(repository, () => new Date("2026-03-30T10:00:00.000Z"));
+    const createAt1001 = new CreatePersistedWorkflowUseCase(repository, () => new Date("2026-03-30T10:01:00.000Z"));
+    const createAt1002 = new CreatePersistedWorkflowUseCase(repository, () => new Date("2026-03-30T10:02:00.000Z"));
+    const updateAt1003 = new UpdatePersistedWorkflowUseCase(repository, () => new Date("2026-03-30T10:03:00.000Z"));
+    const list = new ListPersistedWorkflowsUseCase(repository);
+
+    await createAt1000.execute({
+      id: "workflow:sqlite:list-a",
+      name: "Customers Intake",
+      draft: createValidDraft(),
+      metadata: { tags: ["crm", "customer"] },
+      ownershipContext: { ownerId: "user:a", studioId: "studio-workflows" },
+    });
+    await createAt1001.execute({
+      id: "workflow:sqlite:list-b",
+      name: "Leads Intake",
+      draft: createValidDraft(),
+      metadata: { tags: ["crm", "lead"] },
+      ownershipContext: { ownerId: "user:b", studioId: "studio-workflows" },
+    });
+    await createAt1002.execute({
+      id: "workflow:sqlite:list-c",
+      name: "Billing Export",
+      draft: createValidDraft(),
+      metadata: { tags: ["finance"] },
+      ownershipContext: { ownerId: "user:a", studioId: "studio-billing" },
+    });
+
+    await updateAt1003.execute({
+      id: "workflow:sqlite:list-a",
+      changes: {
+        lifecycleState: "saved",
+      },
+    });
+
+    const all = await list.execute();
+    expect(all.map((entry) => entry.id)).toEqual([
+      "workflow:sqlite:list-a",
+      "workflow:sqlite:list-c",
+      "workflow:sqlite:list-b",
+    ]);
+
+    const ownerFiltered = await list.execute({ ownerId: "user:a", studioId: "studio-workflows" });
+    expect(ownerFiltered.map((entry) => entry.id)).toEqual(["workflow:sqlite:list-a"]);
+
+    const searchFiltered = await list.execute({ searchText: " LEAD " });
+    expect(searchFiltered.map((entry) => entry.id)).toEqual(["workflow:sqlite:list-b"]);
+
+    const limited = await list.execute({ limit: 2 });
+    expect(limited.map((entry) => entry.id)).toEqual([
+      "workflow:sqlite:list-a",
+      "workflow:sqlite:list-c",
+    ]);
+
+    repository.dispose();
+  });
 });
 
 async function createBaselineRecord(repository: SqliteWorkflowPersistenceRepository): Promise<void> {
