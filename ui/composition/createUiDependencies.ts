@@ -138,6 +138,7 @@ import { PythonDelegatedWorkflowExecutionStrategy } from "../../infrastructure/p
 import {
   createExecutionApplicationInfrastructure,
   createExecutionRunRepository,
+  createWorkflowRunSummaryRepository,
 } from "../../infrastructure/execution/createExecutionInfrastructure";
 import { PythonRuntimeDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/PythonRuntimeDatasetGenerationService";
 import { OrchestratedDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/OrchestratedDatasetGenerationService";
@@ -154,6 +155,8 @@ import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models
 import { RuntimeDependencyIds, RuntimeDependencyOperationalStates, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
 import { CanonicalAssetManagementService } from "../services/CanonicalAssetManagementService";
 import { WorkflowConversationSessionService } from "../workflow-conversation/WorkflowConversationSessionService";
+import { resolveDesktopWorkflowRunSummaryBridge } from "./DesktopWorkflowRunSummaryBridgeAdapter";
+import { WorkflowRunHistoryService } from "../../application/workflow-run-history/WorkflowRunHistoryService";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
@@ -162,6 +165,7 @@ export function createUiDependencies(
   const desktopStorage = resolveDesktopStorageAdapter();
   const desktopWorkflowBridge = resolveDesktopWorkflowBridge();
   const desktopExecutionRunBridge = resolveDesktopExecutionRunBridge();
+  const desktopWorkflowRunSummaryBridge = resolveDesktopWorkflowRunSummaryBridge();
   const desktopModelFileBridge = resolveDesktopModelFileBridge();
   const durableDesktopStorage = desktopStorage;
   const settingsStore = new UiSettingsStore({
@@ -311,12 +315,18 @@ export function createUiDependencies(
     desktopExecutionRunBridge,
     storage: durableDesktopStorage,
   });
+  const workflowRunSummaryRepository = createWorkflowRunSummaryRepository({
+    desktopWorkflowRunSummaryBridge,
+    storage: durableDesktopStorage,
+  });
+  const workflowRunHistoryService = new WorkflowRunHistoryService(workflowRunSummaryRepository);
   const executionInfrastructure = createExecutionApplicationInfrastructure({
     workflowExecutor,
     executionRunRepository,
     datasetGenerationService,
     modelTrainingRuntime,
     mcpServerManager: mcpRuntimeIntegration.serverManager,
+    workflowRunHistoryService,
   });
   const executionHistoryService = new ExecutionHistoryService(
     executionInfrastructure.listExecutionRunsUseCase,

@@ -6,6 +6,7 @@ import type {
   DesktopModelFileBridge,
   DesktopRegistryBridge,
   DesktopStudioShellBridge,
+  DesktopWorkflowRunSummaryBridge,
   DesktopWorkflowBridge,
 } from "../../electron/shared/DesktopContracts";
 
@@ -28,6 +29,7 @@ declare global {
       };
       workflows: DesktopWorkflowBridge;
       executionRuns: DesktopExecutionRunBridge;
+      workflowRunSummaries?: DesktopWorkflowRunSummaryBridge;
       modelFiles: DesktopModelFileBridge;
       canonicalAssets?: DesktopCanonicalAssetBridge;
       agents?: DesktopAgentAuthoringBridge;

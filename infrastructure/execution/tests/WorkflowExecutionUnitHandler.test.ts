@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { ExecutionPlan, ExecutionStatuses, ExecutionUnitKinds } from "../../../domain/execution/ExecutionPlan";
 import { WorkflowExecutionUnitHandler } from "../WorkflowExecutionUnitHandler";
+import { WorkflowRunStatuses } from "../../../domain/workflow-studio/WorkflowRunHistoryDomain";
 
 describe("WorkflowExecutionUnitHandler", () => {
   it("wraps the existing workflow executor and preserves provenance", async () => {
@@ -49,6 +50,7 @@ describe("WorkflowExecutionUnitHandler", () => {
           id: "plan-1",
           units: [{ id: "workflow:wf-1", kind: ExecutionUnitKinds.workflow }],
         }),
+        runId: "workflow-plan-run-1",
         unit: { id: "workflow:wf-1", kind: ExecutionUnitKinds.workflow, dependsOn: [] },
         unitInputs: {
           "workflow:wf-1": {
@@ -65,5 +67,60 @@ describe("WorkflowExecutionUnitHandler", () => {
     expect(result.provenance?.classification).toBe("delegated");
     expect(result.artifacts?.[0]?.kind).toBe("workflow-result");
     expect(events).toEqual(["running:delegated"]);
+  });
+
+  it("records workflow run summary start and completion states through the history service seam", async () => {
+    const historyEvents: Array<{ readonly kind: string; readonly runId: string; readonly status?: string }> = [];
+    const handler = new WorkflowExecutionUnitHandler(
+      {
+        canExecute: () => true,
+        startExecution: async () => ({
+          executionId: "unused",
+          input: {} as never,
+          getProgress: async () => ({ executionId: "unused", status: "queued" }),
+          waitForCompletion: async () => ({ executionId: "unused", status: "completed", outputAssets: [] }),
+          cancel: async () => undefined,
+        }),
+        execute: async () => ({
+          executionId: "workflow-exec-2",
+          status: "completed",
+          outputAssets: [],
+        }),
+      },
+      undefined,
+      {
+        async recordRunStarted(request) {
+          historyEvents.push({ kind: "started", runId: request.runId, status: WorkflowRunStatuses.running });
+          return {} as never;
+        },
+        async recordRunCompleted(request) {
+          historyEvents.push({ kind: "completed", runId: request.runId, status: request.result.status });
+          return {} as never;
+        },
+      } as never,
+    );
+
+    const result = await handler.execute({
+      plan: new ExecutionPlan({
+        id: "plan-2",
+        units: [{ id: "workflow:wf-2", kind: ExecutionUnitKinds.workflow }],
+      }),
+      runId: "workflow-plan-run-2",
+      unit: { id: "workflow:wf-2", kind: ExecutionUnitKinds.workflow, dependsOn: [] },
+      unitInputs: {
+        "workflow:wf-2": {
+          workflow: {
+            id: "wf-2",
+            metadata: { name: "Workflow Two" },
+          },
+        },
+      },
+    });
+
+    expect(result.status).toBe(ExecutionStatuses.completed);
+    expect(historyEvents).toEqual([
+      { kind: "started", runId: "workflow-plan-run-2", status: WorkflowRunStatuses.running },
+      { kind: "completed", runId: "workflow-plan-run-2", status: "completed" },
+    ]);
   });
 });

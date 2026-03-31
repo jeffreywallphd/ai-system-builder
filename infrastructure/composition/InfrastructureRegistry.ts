@@ -88,6 +88,10 @@ import type { IMcpToolSecretRepository } from "../../application/ports/interface
 import type { IMcpToolExecutionAuditSink } from "../../application/ports/interfaces/IMcpToolExecutionAuditSink";
 import type { IAgentRepository } from "../../application/ports/interfaces/IAgentRepository";
 import type { IAgentExecutionSessionRepository } from "../../application/ports/interfaces/IAgentExecutionSessionRepository";
+import type { IWorkflowRunSummaryRepository } from "../../application/ports/interfaces/IWorkflowRunSummaryRepository";
+import { WorkflowRunHistoryService } from "../../application/workflow-run-history/WorkflowRunHistoryService";
+import { SqliteWorkflowRunSummaryRepository } from "../filesystem/SqliteWorkflowRunSummaryRepository";
+import { InMemoryWorkflowRunSummaryRepository } from "../workflows/InMemoryWorkflowRunSummaryRepository";
 
 export const TOKENS = Object.freeze({
   EnvironmentConfig: Symbol("EnvironmentConfig"),
@@ -116,6 +120,8 @@ export const TOKENS = Object.freeze({
   WorkflowSerializer: Symbol("WorkflowSerializer"),
   UnifiedExecutionEngine: Symbol("UnifiedExecutionEngine"),
   ExecutionRunRepository: Symbol("ExecutionRunRepository"),
+  WorkflowRunSummaryRepository: Symbol("WorkflowRunSummaryRepository"),
+  WorkflowRunHistoryService: Symbol("WorkflowRunHistoryService"),
   WorkflowRepository: Symbol("WorkflowRepository"),
   ContextPackageRepository: Symbol("ContextPackageRepository"),
   ContextRecipeRepository: Symbol("ContextRecipeRepository"),
@@ -502,11 +508,28 @@ export class InfrastructureRegistry {
       rootDirectory: options.paths.executionRunDatabasePath ? undefined : (options.paths.executionRunsDirectory ?? `${options.paths.workflowsDirectory}/../execution-runs`),
     }));
 
+    container.registerSingleton<IWorkflowRunSummaryRepository>(TOKENS.WorkflowRunSummaryRepository, () => {
+      if (options.paths.executionRunDatabasePath) {
+        return new SqliteWorkflowRunSummaryRepository(options.paths.executionRunDatabasePath);
+      }
+
+      return new SqliteWorkflowRunSummaryRepository(
+        `${options.paths.workflowsDirectory}/../execution-runs/workflow-run-history.sqlite`,
+      );
+    });
+
+    container.registerSingleton<WorkflowRunHistoryService>(TOKENS.WorkflowRunHistoryService, (c) => {
+      const repository = c.tryResolve<IWorkflowRunSummaryRepository>(TOKENS.WorkflowRunSummaryRepository)
+        ?? new InMemoryWorkflowRunSummaryRepository();
+      return new WorkflowRunHistoryService(repository);
+    });
+
     container.registerSingleton(TOKENS.ExecutionApplicationInfrastructure, (c) => createExecutionApplicationInfrastructure({
       workflowExecutor: c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor),
       executionRunRepository: c.resolve<IExecutionRunRepository>(TOKENS.ExecutionRunRepository),
       mcpServerManager: c.resolve<IMcpServerManager>(TOKENS.McpServerManager),
       executionAssetLineageRecorder: c.resolve<ExecutionAssetLineageRecorder>(TOKENS.ExecutionAssetLineageRecorder),
+      workflowRunHistoryService: c.resolve<WorkflowRunHistoryService>(TOKENS.WorkflowRunHistoryService),
     }));
 
     container.registerSingleton<UnifiedExecutionEngine>(
