@@ -1229,3 +1229,16 @@ Explicitly later than this scope:
 - Scope remains intentionally bounded:
   - no separate ingestion orchestration runtime was introduced,
   - ingestion remains a composable converter-adjacent asset seam producing canonical records for downstream conversion and preview.
+## Direction update: Dataset Studio document/image ingestion assets (stories 14.3-14.4)
+
+- Dataset Studio now includes first-class ingestion assets for document/PDF and image sources in `application/dataset-studio`:
+  - `DocumentPdfIngestorAsset` ingests PDF/text sources into canonical `text-items`, preserves page-aware structure, emits preview summaries, and exposes an explicit OCR extension strategy seam for image-only/scanned documents.
+  - `ImageIngestorAsset` ingests PNG/JPEG/WEBP sources into canonical `image-metadata-records`, extracts dimensions/format/orientation/file stats plus optional EXIF highlights, and emits preview-friendly metadata summaries.
+- Both assets follow the same asset-contract/config/versioning pattern used by existing CSV/JSON ingestors:
+  - zod-backed config validation,
+  - structured diagnostics for invalid config/source/type/parse failures,
+  - canonical output-shape compatibility with existing preview/execution seams.
+- Registry discoverability for ingestion assets now includes:
+  - `document-pdf-ingestor`,
+  - `image-ingestor-v1`,
+  alongside existing `csv-ingestor` and `json-ingestor` entries in `registerDataStudioSampleAssets`.

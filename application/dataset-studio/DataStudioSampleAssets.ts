@@ -21,6 +21,16 @@ import {
   createJsonIngestorDataAsset,
 } from "./JsonIngestorAsset";
 import {
+  DocumentPdfIngestorAsset,
+  createDocumentPdfIngestorConfigSchema,
+  createDocumentPdfIngestorDataAsset,
+} from "./DocumentPdfIngestorAsset";
+import {
+  ImageIngestorAsset,
+  createImageIngestorConfigSchema,
+  createImageIngestorDataAsset,
+} from "./ImageIngestorAsset";
+import {
   DataAssetConfigFieldKinds,
   createDataAssetConfigSchema,
   type DataAssetConfigSchema,
@@ -253,6 +263,8 @@ export function registerDataStudioSampleAssets(
   const imageSchema = createImageConfigSchema("sample-image-metadata");
   const csvIngestorSchema = createCsvIngestorConfigSchema(CsvIngestorAsset.assetId);
   const jsonIngestorSchema = createJsonIngestorConfigSchema(JsonIngestorAsset.assetId);
+  const documentPdfIngestorSchema = createDocumentPdfIngestorConfigSchema(DocumentPdfIngestorAsset.assetId);
+  const imageIngestorSchema = createImageIngestorConfigSchema(ImageIngestorAsset.assetId);
 
   const recordsEntry = registry.register({
     asset: createRecordsConverterAsset({
@@ -333,8 +345,50 @@ export function registerDataStudioSampleAssets(
     assetFactory: (config) => createJsonIngestorDataAsset(config),
   });
 
+  const documentPdfIngestorEntry = registry.register({
+    asset: createDocumentPdfIngestorDataAsset({
+      includePageText: true,
+      previewPageCount: 3,
+      extractMetadata: true,
+      preservePageBoundaries: true,
+    }),
+    specialization: DataAssetRegistrySpecializations.ingestion,
+    display: {
+      title: "PDF/Document Ingestor",
+      summary: "Ingests PDF/text documents into canonical text-items with source/page metadata.",
+      tags: ["ingestion", "pdf", "document", "text-items"],
+    },
+    configSchema: documentPdfIngestorSchema,
+    assetFactory: (config) => createDocumentPdfIngestorDataAsset(config),
+  });
+
+  const imageIngestorEntry = registry.register({
+    asset: createImageIngestorDataAsset({
+      extractExif: true,
+      generatePreviewMetadata: true,
+      normalizeOrientation: true,
+      includeFileStats: true,
+    }),
+    specialization: DataAssetRegistrySpecializations.ingestion,
+    display: {
+      title: "Image Ingestor V1",
+      summary: "Ingests supported image files into canonical image metadata records.",
+      tags: ["ingestion", "image", "metadata", "multimodal"],
+    },
+    configSchema: imageIngestorSchema,
+    assetFactory: (config) => createImageIngestorDataAsset(config),
+  });
+
   return Object.freeze({
     registry,
-    entries: Object.freeze([recordsEntry, documentEntry, imageEntry, csvIngestorEntry, jsonIngestorEntry]),
+    entries: Object.freeze([
+      recordsEntry,
+      documentEntry,
+      imageEntry,
+      csvIngestorEntry,
+      jsonIngestorEntry,
+      documentPdfIngestorEntry,
+      imageIngestorEntry,
+    ]),
   });
 }
