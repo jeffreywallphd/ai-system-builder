@@ -239,7 +239,9 @@ The clean-architecture story would be simpler if the renderer reused the generic
 
 Current Direction 5 UI status:
 - Fully implemented now in renderer: atomic studios + composite studios (Workflow, Context Bundle, Dataset Pipeline, Training Recipe, Tool Chain) on one shared `StudioShellPage` architecture.
-- Registry is now a first-class Studio Shell surface (`/studio-shell/registry`) routed through the same app shell/navigation and implemented as a thin renderer page over desktop registry bridge contracts (`RegistryService`), not a parallel UI system.
+- Registry is now a first-class Studio Shell surface (`/studio-shell/registry`) routed through the same app shell/navigation and implemented as a thin renderer page over bridge contracts (`RegistryService`) with desktop-preload-first and browser-fallback behavior, not a parallel UI system.
+- In browser development mode, registry calls now resolve through `BrowserRegistryBridgeFallback` instead of throwing on missing preload bridge contracts; this keeps `/explore` operational while preserving the same backend API response shape.
+- The registry fallback reuses the same in-memory workflow-persistence fallback repository as `StudioShellService`, so persisted-workflow discovery in Explore stays aligned with browser-hosted Workflow Studio authoring flows.
 - Registry browsing/filtering is API-driven and taxonomy-aligned (structural kind + progressive advanced semantic-role/behavior filters), keeping filter/business semantics backend-authoritative while reusing shared page/card/layout patterns.
 - Registry list/detail terminology is now normalized around **Structure / Role / Behavior** labels across list cards, summary badges, and filter groups.
 - Search + filter interaction is intentionally coherent: both inputs are active together, context is preserved in URL query params, and detail navigation retains return-context (`registryContext`) for list -> detail -> list continuity.
@@ -279,4 +281,5 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Workflow Studio entry initialization remains explicit and route-driven (`workflowEntry=new|open-existing|resume-draft|duplicate`) and reuses the same backend persistence contracts for opening/resuming persisted definitions.
 - Wizard and Canvas authoring continue to share one canonical draft state/persistence path (`WorkflowStudioModeStateStore` + shared save), so mode switches do not create persistence forks or parallel draft representations.
 - Workflow metadata editing (name/summary/tags) remains in the same unsaved/save-state contract as draft content and persists through the same save orchestration path into persistence/read-model surfaces.
+- Browser-hosted development now keeps Explore workflow-persistence reuse flows available by resolving registry queries through a bounded browser fallback bridge when desktop registry contracts are unavailable, using the same in-memory workflow-persistence fallback repository as Studio Shell.
 - Automated coverage now includes persistence contracts and SQLite adapter list-query behavior, persisted workflow discovery filtering for Explore/Build/Run entry cards, and existing studio/runtime integration coverage across create/open/resume/duplicate/readiness/run flows.

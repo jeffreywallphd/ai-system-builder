@@ -4,14 +4,12 @@ import type { ExploreSearchQuery, ExploreSearchResult, UnifiedExploreAssetLibrar
 import type { RegistryDependencyEndpointQuery, RegistryTraversalEndpointQuery, RegistryApiResponse, RegistryAssetDetailQuery, RegistrySearchQuery } from "../../infrastructure/api/registry/RegistryBackendApi";
 import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
 import { resolveDesktopRegistryBridge } from "../composition/DesktopRegistryBridgeAdapter";
+import { resolveBrowserRegistryBridgeFallback } from "../composition/BrowserRegistryBridgeFallback";
 
 export class RegistryService {
   private requireBridge() {
     const bridge = resolveDesktopRegistryBridge();
-    if (!bridge) {
-      throw new Error("Desktop registry bridge is unavailable in this runtime.");
-    }
-    return bridge;
+    return bridge ?? resolveBrowserRegistryBridgeFallback();
   }
 
   public async listAssets(limit?: number): Promise<RegistryApiResponse<ReadonlyArray<RegistryAsset>>> {

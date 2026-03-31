@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { RegistryService } from "../RegistryService";
+import { StudioShellService } from "../StudioShellService";
+import {
+  WorkflowDraftTriggerKinds,
+  WorkflowDraftTriggerTypes,
+  createEmptyWorkflowDraft,
+  serializeWorkflowDraft,
+} from "../../../domain/workflow-studio/WorkflowStudioDomain";
 
 describe("RegistryService", () => {
   const previousBridge = typeof window === "undefined" ? undefined : window.aiLoomDesktop;
@@ -59,5 +66,81 @@ describe("RegistryService", () => {
 
     expect(result.ok).toBeTrue();
     expect(result.data?.[0]?.taxonomy?.structuralKind).toBe("system");
+  });
+
+  it("uses browser fallback backend when desktop registry bridge is unavailable", async () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.aiLoomDesktop = {
+      ...(previousBridge ?? {}),
+      registry: undefined,
+    } as any;
+
+    const service = new RegistryService();
+    const result = await service.searchExploreAssets({
+      keyword: "workflow",
+      limit: 25,
+    });
+
+    expect(result.ok).toBeTrue();
+    expect(result.data).toBeDefined();
+    expect(Array.isArray(result.data?.assets)).toBeTrue();
+    expect(Array.isArray(result.data?.facets)).toBeTrue();
+  });
+
+  it("shares browser fallback workflow persistence with studio shell flows for explore listings", async () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.aiLoomDesktop = {
+      ...(previousBridge ?? {}),
+      registry: undefined,
+      studioShell: undefined,
+    } as any;
+
+    const studioService = new StudioShellService();
+    const initialized = await studioService.initializeStudio("studio-workflows", "Workflow Studio");
+    expect(initialized.ok).toBeTrue();
+    expect(initialized.data?.activeSessionId).toBeDefined();
+
+    const created = await studioService.createDraft({
+      studioId: "studio-workflows",
+      sessionId: initialized.data!.activeSessionId!,
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+      }),
+      metadata: {
+        title: "Fallback workflow",
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+        tags: [],
+      },
+      dependencies: [],
+    });
+    expect(created.ok).toBeTrue();
+
+    const registryService = new RegistryService();
+    const listed = await registryService.searchExploreAssets({
+      filters: {
+        semanticRoles: ["workflow"],
+        sourceTypes: ["workflow-persistence"],
+      },
+      limit: 25,
+    });
+    expect(listed.ok).toBeTrue();
+    expect((listed.data?.assets.length ?? 0) > 0).toBeTrue();
+    expect(listed.data?.assets.some((asset) => asset.displayName === "Fallback workflow")).toBeTrue();
   });
 });
