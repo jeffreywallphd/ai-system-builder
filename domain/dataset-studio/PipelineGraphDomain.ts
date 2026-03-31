@@ -3,6 +3,8 @@ import type {
   CanonicalDataShapeKind,
   CanonicalRecordValue,
 } from "./CanonicalDataShapes";
+import type { PipelineNodeInspectionMetadata } from "./PipelineInspectionDomain";
+import { PipelineNodeInspectionMetadataSchema } from "./PipelineInspectionDomain";
 import type {
   PipelineStageCategory,
   PipelineStageConfig,
@@ -38,6 +40,7 @@ export interface PipelineGraphStageNodeData {
   readonly inspectable: boolean;
   readonly config: PipelineStageConfig;
   readonly metadata: PipelineStageMetadata;
+  readonly inspection?: PipelineNodeInspectionMetadata;
 }
 
 export interface PipelineGraphAssetNodeData {
@@ -51,6 +54,7 @@ export interface PipelineGraphAssetNodeData {
   readonly assetOrder: number;
   readonly inspectable: boolean;
   readonly config: Readonly<Record<string, CanonicalRecordValue>>;
+  readonly inspection?: PipelineNodeInspectionMetadata;
 }
 
 export interface PipelineGraphStageNode {
@@ -105,6 +109,7 @@ const StageNodeDataSchema = z.object({
     sourceReference: z.string().trim().min(1).optional(),
     attributes: z.record(z.any()).optional(),
   }),
+  inspection: PipelineNodeInspectionMetadataSchema.optional(),
 });
 
 const AssetNodeDataSchema = z.object({
@@ -118,6 +123,7 @@ const AssetNodeDataSchema = z.object({
   assetOrder: z.number().int().min(1),
   inspectable: z.boolean(),
   config: z.record(z.any()),
+  inspection: PipelineNodeInspectionMetadataSchema.optional(),
 });
 
 export const PipelineGraphNodeSchema = z.discriminatedUnion("kind", [

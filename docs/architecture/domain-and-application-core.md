@@ -1568,3 +1568,16 @@ Explicitly later than this scope:
   - branching restrictions unless explicitly allowed.
 - React Flow projection now has a dedicated mapper in `application/dataset-studio/PipelineReactFlowGraph.ts` with strongly typed `stage`/`asset` node-data unions and typed edge data, plus deterministic horizontal stage-group layout and UI-ready metadata fields for preview/inspection hooks.
 - The graph + React Flow mappers are pure deterministic translators suitable for memoized canvas consumption and future custom node/edge extensions.
+
+## Direction 5 extension update: Mid-level pipeline inspection + editing orchestration (stories 17.5-17.6)
+
+- Mid-level pipeline inspection now has a dedicated canonical seam:
+  - domain inspection contracts in `domain/dataset-studio/PipelineInspectionDomain.ts` define typed pipeline/stage/asset inspection results, execution status, preview payload unions, metadata envelopes, and zod validation.
+  - stage/asset preview contracts are canonical-shape aligned (`records`, `table`, `text-items`, `image-metadata`) with bounded sample sizes for inspectability without heavy compute paths.
+  - application inspection orchestration in `application/dataset-studio/PipelineInspectionService.ts` maps execution outputs to inspection results, handles partial/missing outputs, supports extensible enrichment hooks, and attaches serializable inspection metadata to `PipelineGraph` nodes (non-UI).
+- Mid-level pipeline editing now has an immutable, validation-first orchestration seam in `application/dataset-studio/PipelineEditingService.ts`:
+  - edit API supports `addStage`, `removeStage`, `replaceStage`, `reorderStage`, and `toggleStage`.
+  - edits return a new pipeline definition (`domain/dataset-studio/PipelineDefinitionDomain.ts`) plus regenerated deterministic `PipelineGraph` and `PipelineReactFlowGraph` projections.
+  - validation enforces ordering/compatibility/required-stage constraints through existing stage registry + graph construction seams (no duplicated composition logic), with typed edit errors for deterministic callers.
+  - replacement edits preserve compatible config keys via stage-to-asset composition mappings and reset incompatible configuration/metadata fields using explicit preservation reports.
+  - serialized edited pipelines round-trip through version-safe definition serialization and rehydrate into graph/canvas projections.
