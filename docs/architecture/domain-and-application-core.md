@@ -1545,3 +1545,14 @@ Explicitly later than this scope:
   - stage-to-asset mapping references and graph reconstruction metadata.
 - Persistence reload/rehydration now reconstructs `WizardFlowEngine` from the same canonical stage/runtime contracts used for live-created flows, so Wizard and Canvas continue to share one source of truth after reload.
 - Persistence decoding now includes a bounded compatibility path for legacy unversioned payloads while rejecting unsupported future versions deterministically.
+
+## Direction 5 extension update: Mid-level pipeline stage domain + composition mapping foundation (stories 17.1-17.2)
+
+- Dataset Studio now has a dedicated mid-level stage domain seam in `domain/dataset-studio/PipelineStageDomain.ts` with explicit stage ids, definitions, instances, config, metadata, canonical-shape contracts, ordering constraints, and zod-backed validation.
+- A runtime-inspectable stage registry now exists in `domain/dataset-studio/PipelineStageRegistry.ts`, covering the full stage set (`SourceSelection` through `StoragePrepared`) with reusable stage definitions and no hardcoded pipeline-flow graph.
+- Stage-to-asset composition now has a dedicated application seam in `application/dataset-studio/StageAssetCompositionService.ts` with:
+  - explicit composition contracts (`AssetReference`, `AssetGroup`, `StageCompositionDefinition`),
+  - stage-config to asset-config mapping rules,
+  - single-asset, multi-asset, and conditional composition support,
+  - React Flow-compatible asset-graph segment projection (`Node`/`Edge`) for canvas inspectability.
+- Composition definitions reuse existing ingestion/transformation asset ids from Epics 13-16 and keep orchestration logic in shared application/domain seams (no UI coupling and no duplicated asset execution logic).
