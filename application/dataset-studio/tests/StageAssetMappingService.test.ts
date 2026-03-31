@@ -41,6 +41,19 @@ describe("StageAssetMappingService", () => {
     }
   });
 
+  it("resolves classification stage to the data classification transformation asset", () => {
+    const service = new StageAssetMappingService();
+    const result = service.resolveStage({
+      stageKind: DatasetPipelineStageKinds.classification,
+    });
+
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.assets[0]?.assetId).toBe("data-classification");
+      expect(result.assets[0]?.configDefaults?.emitFieldLevelTags).toBeTrue();
+    }
+  });
+
   it("resolves transformation stage to the field mapping asset", () => {
     const service = new StageAssetMappingService();
     const result = service.resolveStage({
@@ -78,6 +91,7 @@ describe("StageAssetMappingService", () => {
       expect(result.assets[0]?.assetId).toBe("missing-value-handling");
       expect(result.assets[0]?.configDefaults?.strategy).toBe("leave");
       expect(result.assets.some((asset) => asset.assetId === "deduplication")).toBeTrue();
+      expect(result.assets.some((asset) => asset.assetId === "filtering")).toBeTrue();
     }
   });
 
@@ -91,6 +105,7 @@ describe("StageAssetMappingService", () => {
     if (result.status === "resolved") {
       expect(result.assets[0]?.assetId).toBe("field-mapping");
       expect(result.assets.some((asset) => asset.assetId === "data-validation")).toBeTrue();
+      expect(result.assets.some((asset) => asset.assetId === "filtering")).toBeTrue();
     }
   });
 

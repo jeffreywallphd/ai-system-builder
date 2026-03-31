@@ -8,6 +8,7 @@ export const DatasetPipelineStageKinds = Object.freeze({
   extraction: "extraction",
   chunking: "chunking",
   profiling: "profiling",
+  classification: "classification",
   normalization: "normalization",
   cleaning: "cleaning",
   transformation: "transformation",
@@ -74,9 +75,11 @@ export const DatasetIngestionStageAssetIds = Object.freeze({
 export const DatasetTransformationStageAssetIds = Object.freeze({
   schemaInference: "schema-inference",
   dataProfiling: "data-profiling",
+  dataClassification: "data-classification",
   typeNormalization: "type-normalization",
   missingValueHandling: "missing-value-handling",
   deduplication: "deduplication",
+  filtering: "filtering",
   dataValidation: "data-validation",
   fieldMapping: "field-mapping",
 } as const);

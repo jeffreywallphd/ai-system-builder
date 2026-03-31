@@ -426,6 +426,22 @@ const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Ob
   }),
   Object.freeze({
     type: "static",
+    stageKind: DatasetPipelineStageKinds.classification,
+    assets: Object.freeze([
+      Object.freeze({
+        assetId: DatasetTransformationStageAssetIds.dataClassification,
+        assetVersion: "1.0.0",
+        configDefaults: Object.freeze({
+          sampleSize: 500,
+          emitFieldLevelTags: true,
+          emitRecordLevelTags: false,
+          useFieldNames: true,
+        }),
+      }),
+    ]),
+  }),
+  Object.freeze({
+    type: "static",
     stageKind: DatasetPipelineStageKinds.normalization,
     assets: Object.freeze([
       Object.freeze({
@@ -465,6 +481,18 @@ const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Ob
           treatMissingAsNull: true,
         }),
       }),
+      Object.freeze({
+        assetId: DatasetTransformationStageAssetIds.filtering,
+        assetVersion: "1.0.0",
+        configDefaults: Object.freeze({
+          mode: "include",
+          logicalOperator: "and",
+          conditions: Object.freeze([]),
+          caseSensitive: false,
+          trimStrings: true,
+          treatMissingAsNull: true,
+        }),
+      }),
     ]),
   }),
   Object.freeze({
@@ -487,6 +515,18 @@ const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Ob
           annotationFieldName: "_validation",
           treatEmptyStringAsMissing: true,
           treatWhitespaceAsMissing: false,
+        }),
+      }),
+      Object.freeze({
+        assetId: DatasetTransformationStageAssetIds.filtering,
+        assetVersion: "1.0.0",
+        configDefaults: Object.freeze({
+          mode: "include",
+          logicalOperator: "and",
+          conditions: Object.freeze([]),
+          caseSensitive: false,
+          trimStrings: true,
+          treatMissingAsNull: true,
         }),
       }),
     ]),
