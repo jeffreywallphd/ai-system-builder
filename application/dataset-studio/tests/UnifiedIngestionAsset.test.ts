@@ -158,4 +158,39 @@ describe("UnifiedIngestionAssetExecutionWrapper", () => {
     expect(result.mode).toBe("preview");
     expect(result.result.ok).toBeFalse();
   });
+
+  it("exposes unified batch preview through the same asset wrapper contract", async () => {
+    const wrapper = new UnifiedIngestionAssetExecutionWrapper({
+      batchOrchestration: {
+        previewBatch: async () => Object.freeze({
+          summary: Object.freeze({
+            totalItems: 2,
+            succeeded: 1,
+            failed: 1,
+            skipped: 0,
+            partialSuccess: true,
+            empty: false,
+            sourceKindDistribution: Object.freeze({ json: 1, csv: 1 }),
+          }),
+          items: Object.freeze([]),
+          outputs: Object.freeze([]),
+          normalizedOutputs: Object.freeze([]),
+          issues: Object.freeze([]),
+          sourceIssues: Object.freeze([]),
+        }),
+      } as never,
+    });
+
+    const result = await wrapper.previewBatch({
+      sources: Object.freeze([createSource()]),
+      configurationMode: "simple",
+      configurationValues: Object.freeze({
+        outputTarget: "canonical-records",
+      }),
+    });
+
+    expect(result.mode).toBe("preview-batch");
+    expect(result.assetId).toBe(UnifiedIngestionAssetId);
+    expect(result.result.summary.partialSuccess).toBeTrue();
+  });
 });

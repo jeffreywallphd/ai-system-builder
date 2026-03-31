@@ -22,6 +22,11 @@ import {
   type UnifiedIngestionPreviewResult,
   type UnifiedIngestionResult,
 } from "./UnifiedIngestionOrchestrationService";
+import {
+  UnifiedIngestionBatchOrchestrationService,
+  type UnifiedIngestionBatchResult,
+} from "./UnifiedIngestionBatchOrchestrationService";
+import type { SourceLocatorRequest } from "./SourceLocatorInputAbstraction";
 
 export const UnifiedIngestionAssetId = "unified-ingestion";
 export const UnifiedIngestionAssetVersion = "1.0.0";
@@ -55,11 +60,51 @@ export interface UnifiedIngestionAssetExecutionResult {
   readonly result: UnifiedIngestionResult | UnifiedIngestionPreviewResult;
 }
 
+export interface UnifiedIngestionBatchExecutionRequest {
+  readonly sourceRequest?: SourceLocatorRequest;
+  readonly sources?: ReadonlyArray<UnifiedIngestionSourceReference>;
+  readonly payloadBySourceId?: Readonly<Record<string, string | Uint8Array>>;
+  readonly configuration?: UnifiedIngestionConfiguration;
+  readonly configurationMode?: UnifiedIngestionConfigMode;
+  readonly configurationValues?: Readonly<Record<string, CanonicalRecordValue>>;
+  readonly converterContext?: {
+    readonly operationId?: string;
+    readonly initiatedBy?: string;
+    readonly requestId?: string;
+    readonly pipelineId?: string;
+    readonly stageId?: string;
+    readonly lineageAssetId?: string;
+  };
+  readonly options?: {
+    readonly continueOnError?: boolean;
+    readonly maxItems?: number;
+    readonly concurrency?: number;
+  };
+}
+
+export interface UnifiedIngestionAssetBatchExecutionResult {
+  readonly contractVersion: typeof UnifiedIngestionContractVersion;
+  readonly inputContractVersion: typeof UnifiedIngestionAssetInputContractVersion;
+  readonly outputContractVersion: typeof UnifiedIngestionAssetOutputContractVersion;
+  readonly assetId: typeof UnifiedIngestionAssetId;
+  readonly assetVersion: typeof UnifiedIngestionAssetVersion;
+  readonly mode: "execute-batch" | "preview-batch";
+  readonly configuration: UnifiedIngestionConfiguration;
+  readonly result: UnifiedIngestionBatchResult;
+}
+
 export class UnifiedIngestionAssetExecutionWrapper {
   private readonly orchestration: UnifiedIngestionOrchestrationService;
+  private readonly batchOrchestration: UnifiedIngestionBatchOrchestrationService;
 
-  constructor(options?: { readonly orchestration?: UnifiedIngestionOrchestrationService }) {
+  constructor(options?: {
+    readonly orchestration?: UnifiedIngestionOrchestrationService;
+    readonly batchOrchestration?: UnifiedIngestionBatchOrchestrationService;
+  }) {
     this.orchestration = options?.orchestration ?? new UnifiedIngestionOrchestrationService();
+    this.batchOrchestration = options?.batchOrchestration ?? new UnifiedIngestionBatchOrchestrationService({
+      orchestration: this.orchestration,
+    });
   }
 
   public async execute(request: UnifiedIngestionAssetExecutionRequest): Promise<UnifiedIngestionAssetExecutionResult> {
@@ -105,6 +150,62 @@ export class UnifiedIngestionAssetExecutionWrapper {
       assetId: UnifiedIngestionAssetId,
       assetVersion: UnifiedIngestionAssetVersion,
       mode: "preview",
+      configuration: configurationResolution.configuration,
+      result,
+    });
+  }
+
+  public async executeBatch(
+    request: UnifiedIngestionBatchExecutionRequest,
+  ): Promise<UnifiedIngestionAssetBatchExecutionResult> {
+    const configurationResolution = resolveUnifiedIngestionConfiguration({
+      mode: request.configurationMode,
+      values: request.configurationValues,
+      base: request.configuration,
+    });
+    const result = await this.batchOrchestration.executeBatch({
+      sourceRequest: request.sourceRequest,
+      sources: request.sources,
+      payloadBySourceId: request.payloadBySourceId,
+      configuration: configurationResolution.configuration,
+      converterContext: request.converterContext,
+      options: request.options,
+    });
+    return Object.freeze({
+      contractVersion: UnifiedIngestionContractVersion,
+      inputContractVersion: UnifiedIngestionAssetInputContractVersion,
+      outputContractVersion: UnifiedIngestionAssetOutputContractVersion,
+      assetId: UnifiedIngestionAssetId,
+      assetVersion: UnifiedIngestionAssetVersion,
+      mode: "execute-batch",
+      configuration: configurationResolution.configuration,
+      result,
+    });
+  }
+
+  public async previewBatch(
+    request: UnifiedIngestionBatchExecutionRequest,
+  ): Promise<UnifiedIngestionAssetBatchExecutionResult> {
+    const configurationResolution = resolveUnifiedIngestionConfiguration({
+      mode: request.configurationMode,
+      values: request.configurationValues,
+      base: request.configuration,
+    });
+    const result = await this.batchOrchestration.previewBatch({
+      sourceRequest: request.sourceRequest,
+      sources: request.sources,
+      payloadBySourceId: request.payloadBySourceId,
+      configuration: configurationResolution.configuration,
+      converterContext: request.converterContext,
+      options: request.options,
+    });
+    return Object.freeze({
+      contractVersion: UnifiedIngestionContractVersion,
+      inputContractVersion: UnifiedIngestionAssetInputContractVersion,
+      outputContractVersion: UnifiedIngestionAssetOutputContractVersion,
+      assetId: UnifiedIngestionAssetId,
+      assetVersion: UnifiedIngestionAssetVersion,
+      mode: "preview-batch",
       configuration: configurationResolution.configuration,
       result,
     });
