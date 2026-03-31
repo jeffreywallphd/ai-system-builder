@@ -8,16 +8,23 @@ import {
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
 import {
+  IngestionIssueCategories,
+  IngestionIssueRecoverabilities,
   IngestionExecutionContextSchema,
   Uint8ArraySchema,
+  contextToIssueSource,
+  createIngestionIssue,
+  toIngestionIssueFromError,
   toIngestionIssuesFromZodError,
   type IngestionExecutionContext,
 } from "./IngestionContracts";
 import {
   buildIngestionFailureEnvelope,
+  buildIngestionPreviewEnvelope,
   buildIngestionSuccessEnvelope,
   normalizeRecordsOutput,
   type IngestionFailureEnvelope,
+  type IngestionPreviewEnvelope,
   type IngestionSuccessEnvelope,
 } from "./IngestionCanonicalNormalization";
 
@@ -89,6 +96,7 @@ export interface JsonIngestorPreviewResult {
   readonly schema: ReadonlyArray<JsonIngestorFieldSchema>;
   readonly totalCount: number;
   readonly sampleCount: number;
+  readonly normalized: IngestionPreviewEnvelope;
 }
 
 const JsonRecordSchema = z.record(z.string(), z.unknown());
@@ -218,8 +226,11 @@ export class JsonIngestorAsset {
   public execute(request: JsonIngestorExecutionRequest): JsonIngestorExecutionResult {
     const parsedRequest = JsonIngestorExecutionRequestSchema.safeParse(request);
     if (!parsedRequest.success) {
-      const issues = toIngestionIssuesFromZodError(parsedRequest.error, JsonIngestorErrorCodes.invalidConfig);
       const parsedContext = IngestionExecutionContextSchema.safeParse(request.context ?? {});
+      const issues = toIngestionIssuesFromZodError(parsedRequest.error, JsonIngestorErrorCodes.invalidConfig, {
+        category: IngestionIssueCategories.invalidConfiguration,
+        source: contextToIssueSource(parsedContext.success ? parsedContext.data : request.context),
+      });
       return Object.freeze({
         ok: false,
         diagnostics: Object.freeze(issues.map((issue) => Object.freeze({
@@ -250,7 +261,10 @@ export class JsonIngestorAsset {
 
     const parsedConfig = JsonIngestorConfigSchema.safeParse(normalizedRequest.config ?? {});
     if (!parsedConfig.success) {
-      const issues = toIngestionIssuesFromZodError(parsedConfig.error, JsonIngestorErrorCodes.invalidConfig);
+      const issues = toIngestionIssuesFromZodError(parsedConfig.error, JsonIngestorErrorCodes.invalidConfig, {
+        category: IngestionIssueCategories.invalidConfiguration,
+        source: contextToIssueSource(ingestionContext),
+      });
       return Object.freeze({
         ok: false,
         diagnostics: Object.freeze(parsedConfig.error.issues.map((issue) => Object.freeze({
@@ -269,13 +283,14 @@ export class JsonIngestorAsset {
     try {
       normalized = normalizePayload(normalizedRequest.payload);
     } catch (error) {
-      const issues = Object.freeze([Object.freeze({
+      const issues = Object.freeze([toIngestionIssueFromError({
         code: JsonIngestorErrorCodes.invalidJson,
         message: "JSON parsing failed.",
-        severity: "error" as const,
-        details: Object.freeze({
-          cause: error instanceof Error ? error.message : String(error),
-        }),
+        error,
+        category: IngestionIssueCategories.parseExtractionFailure,
+        recoverability: IngestionIssueRecoverabilities.fixSource,
+        retrySuggested: false,
+        source: contextToIssueSource(ingestionContext),
       })]);
       return Object.freeze({
         ok: false,
@@ -297,10 +312,12 @@ export class JsonIngestorAsset {
     if (Array.isArray(normalized)) {
       const objectRecords = normalized.map((entry) => toPlainRecord(entry));
       if (objectRecords.some((entry) => !entry)) {
-        const issues = Object.freeze([Object.freeze({
+        const issues = Object.freeze([createIngestionIssue({
           code: JsonIngestorErrorCodes.unsupportedShape,
           message: "JSON arrays must contain only object entries.",
-          severity: "error" as const,
+          category: IngestionIssueCategories.parseExtractionFailure,
+          recoverability: IngestionIssueRecoverabilities.fixSource,
+          source: contextToIssueSource(ingestionContext),
         })]);
         return Object.freeze({
           ok: false,
@@ -318,10 +335,12 @@ export class JsonIngestorAsset {
     } else {
       const single = toPlainRecord(normalized);
       if (!single) {
-        const issues = Object.freeze([Object.freeze({
+        const issues = Object.freeze([createIngestionIssue({
           code: JsonIngestorErrorCodes.unsupportedShape,
           message: "JSON payload must be an object or array of objects.",
-          severity: "error" as const,
+          category: IngestionIssueCategories.parseExtractionFailure,
+          recoverability: IngestionIssueRecoverabilities.fixSource,
+          source: contextToIssueSource(ingestionContext),
         })]);
         return Object.freeze({
           ok: false,
@@ -372,11 +391,37 @@ export class JsonIngestorAsset {
 
     const boundedMaxRows = Math.min(Math.max(1, maxRows), 50);
     const sample = result.records.slice(0, boundedMaxRows);
+    const schema = inferSchema(sample);
+    const previewIssues = sample.length < result.records.length
+      ? Object.freeze([createIngestionIssue({
+        code: "json-ingestor-preview-truncated",
+        message: "Preview records were truncated to keep preview execution bounded.",
+        category: IngestionIssueCategories.previewFailure,
+        severity: "warning",
+        recoverability: IngestionIssueRecoverabilities.partial,
+        source: contextToIssueSource(result.normalized.context),
+        details: Object.freeze({
+          totalCount: result.records.length,
+          sampleCount: sample.length,
+          maxRows: boundedMaxRows,
+        }),
+      })])
+      : Object.freeze([]);
     return Object.freeze({
       records: sample,
-      schema: inferSchema(sample),
+      schema,
       totalCount: result.records.length,
       sampleCount: sample.length,
+      normalized: buildIngestionPreviewEnvelope({
+        ingestor: JsonIngestorAsset.assetId,
+        context: result.normalized.context,
+        totalCount: result.records.length,
+        sampleCount: sample.length,
+        preview: result.normalized.preview,
+        sample,
+        schema,
+        issues: previewIssues,
+      }),
     });
   }
 }

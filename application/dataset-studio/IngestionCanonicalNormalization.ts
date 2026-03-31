@@ -32,6 +32,41 @@ export interface IngestionFailureEnvelope {
   readonly context: IngestionExecutionContext;
 }
 
+export interface IngestionPreviewEnvelope {
+  readonly contractVersion: "1.0.0";
+  readonly ingestor: string;
+  readonly ok: boolean;
+  readonly context: IngestionExecutionContext;
+  readonly source: {
+    readonly sourceId?: string;
+    readonly sourceReference?: string;
+    readonly fileName?: string;
+    readonly contentType?: string;
+    readonly format?: string;
+  };
+  readonly summary: {
+    readonly totalCount: number;
+    readonly sampleCount: number;
+    readonly truncated: boolean;
+    readonly sourceCount?: number;
+    readonly successCount?: number;
+    readonly failureCount?: number;
+  };
+  readonly preview: DataPreviewModel;
+  readonly sample?: ReadonlyArray<unknown>;
+  readonly schema?: ReadonlyArray<{
+    readonly name: string;
+    readonly valueType: string;
+  }>;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly issues: ReadonlyArray<IngestionIssue>;
+  readonly partialFailures?: ReadonlyArray<{
+    readonly sourceId?: string;
+    readonly sourceReference?: string;
+    readonly issue: IngestionIssue;
+  }>;
+}
+
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
@@ -172,5 +207,56 @@ export function buildIngestionFailureEnvelope(input: {
     ok: false,
     issues: input.issues,
     context: input.context,
+  });
+}
+
+export function buildIngestionPreviewEnvelope(input: {
+  readonly ingestor: string;
+  readonly context: IngestionExecutionContext;
+  readonly totalCount: number;
+  readonly sampleCount: number;
+  readonly preview: DataPreviewModel;
+  readonly sourceCount?: number;
+  readonly successCount?: number;
+  readonly failureCount?: number;
+  readonly sample?: ReadonlyArray<unknown>;
+  readonly schema?: ReadonlyArray<{
+    readonly name: string;
+    readonly valueType: string;
+  }>;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly issues?: ReadonlyArray<IngestionIssue>;
+  readonly partialFailures?: ReadonlyArray<{
+    readonly sourceId?: string;
+    readonly sourceReference?: string;
+    readonly issue: IngestionIssue;
+  }>;
+}): IngestionPreviewEnvelope {
+  return Object.freeze({
+    contractVersion: "1.0.0",
+    ingestor: input.ingestor,
+    ok: !input.issues?.some((issue) => issue.severity === "error"),
+    context: input.context,
+    source: Object.freeze({
+      sourceId: input.context.sourceId,
+      sourceReference: input.context.sourceReference,
+      fileName: input.context.fileName,
+      contentType: input.context.contentType ?? input.context.mediaType,
+      format: input.context.mediaType,
+    }),
+    summary: Object.freeze({
+      totalCount: input.totalCount,
+      sampleCount: input.sampleCount,
+      truncated: input.sampleCount < input.totalCount,
+      sourceCount: input.sourceCount,
+      successCount: input.successCount,
+      failureCount: input.failureCount,
+    }),
+    preview: input.preview,
+    sample: input.sample,
+    schema: input.schema,
+    metadata: input.metadata,
+    issues: input.issues ?? Object.freeze([]),
+    partialFailures: input.partialFailures,
   });
 }

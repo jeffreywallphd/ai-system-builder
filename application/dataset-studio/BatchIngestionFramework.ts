@@ -13,8 +13,17 @@ import {
 } from "./DataConverterContracts";
 import type {
   IngestionFailureEnvelope,
+  IngestionPreviewEnvelope,
   IngestionSuccessEnvelope,
 } from "./IngestionCanonicalNormalization";
+import { buildIngestionPreviewEnvelope } from "./IngestionCanonicalNormalization";
+import {
+  IngestionExecutionContextSchema,
+  IngestionIssueCategories,
+  IngestionIssueRecoverabilities,
+  createIngestionIssue,
+  type IngestionIssue,
+} from "./IngestionContracts";
 import {
   CsvIngestorConfigSchema,
 } from "./CsvIngestorAsset";
@@ -86,6 +95,7 @@ export interface BatchIngestionItemFailure {
   readonly source: SourceDescriptor;
   readonly ingestor?: BatchIngestorKind;
   readonly normalized?: IngestionFailureEnvelope;
+  readonly normalizedIssue?: IngestionIssue;
   readonly error: BatchIngestionItemError;
   readonly diagnostics: ReadonlyArray<DataConverterDiagnostic>;
 }
@@ -106,6 +116,7 @@ export interface BatchIngestionPreviewPayload {
     readonly error?: BatchIngestionItemError;
   }>;
   readonly shapeSummary: Readonly<Record<string, number>>;
+  readonly normalized: IngestionPreviewEnvelope;
 }
 
 export interface BatchIngestionResult {
@@ -120,6 +131,7 @@ export interface BatchIngestionResult {
   }>;
   readonly items: ReadonlyArray<BatchIngestionItemResult>;
   readonly issues: ReadonlyArray<SourceLocatorIssue>;
+  readonly warnings: ReadonlyArray<IngestionIssue>;
   readonly preview: BatchIngestionPreviewPayload;
 }
 
@@ -181,6 +193,45 @@ function toDiagnosticsFromLocatorIssue(issue: SourceLocatorIssue): DataConverter
     message: issue.message,
     details: issue.details,
   });
+}
+
+function toBatchIssueCategory(code: BatchIngestionItemErrorCode): IngestionIssue["category"] {
+  if (code === BatchIngestionItemErrorCodes.invalidConfiguration) {
+    return IngestionIssueCategories.invalidConfiguration;
+  }
+  if (code === BatchIngestionItemErrorCodes.unsupportedBatchItem) {
+    return IngestionIssueCategories.unsupportedSourceType;
+  }
+  if (code === BatchIngestionItemErrorCodes.invalidSourceReference) {
+    return IngestionIssueCategories.sourceNotFound;
+  }
+  if (code === BatchIngestionItemErrorCodes.unreadableFile) {
+    return IngestionIssueCategories.unreadableSource;
+  }
+  if (code === BatchIngestionItemErrorCodes.ingestionFailed) {
+    return IngestionIssueCategories.parseExtractionFailure;
+  }
+  if (code === BatchIngestionItemErrorCodes.failFastStopped) {
+    return IngestionIssueCategories.batchPartialFailure;
+  }
+  return IngestionIssueCategories.unknownInternalFailure;
+}
+
+function toBatchIssueRecoverability(code: BatchIngestionItemErrorCode): IngestionIssue["recoverability"] {
+  if (code === BatchIngestionItemErrorCodes.invalidConfiguration) {
+    return IngestionIssueRecoverabilities.fixConfig;
+  }
+  if (
+    code === BatchIngestionItemErrorCodes.invalidSourceReference
+    || code === BatchIngestionItemErrorCodes.unreadableFile
+    || code === BatchIngestionItemErrorCodes.unsupportedBatchItem
+  ) {
+    return IngestionIssueRecoverabilities.fixSource;
+  }
+  if (code === BatchIngestionItemErrorCodes.failFastStopped) {
+    return IngestionIssueRecoverabilities.partial;
+  }
+  return IngestionIssueRecoverabilities.retryable;
 }
 
 async function mapWithConcurrency<T, TResult>(
@@ -319,6 +370,19 @@ export class BatchIngestionFramework {
         }));
       }
 
+      const invalidConfigIssue = createIngestionIssue({
+        code: BatchIngestionItemErrorCodes.invalidConfiguration,
+        message: diagnostics[0]?.message ?? "Invalid batch ingestion configuration.",
+        category: IngestionIssueCategories.invalidConfiguration,
+        recoverability: IngestionIssueRecoverabilities.fixConfig,
+        source: {
+          sourceReference: "batch",
+        },
+      });
+      const previewContext = IngestionExecutionContextSchema.parse({
+        executionMode: "preview",
+        sourceReference: "batch",
+      });
       return Object.freeze({
         strategy: BatchIngestionStrategyKinds.routed,
         itemCount: 0,
@@ -340,10 +404,12 @@ export class BatchIngestionFramework {
               code: BatchIngestionItemErrorCodes.invalidConfiguration,
               message: diagnostics[0]?.message ?? "Invalid batch ingestion configuration.",
             }),
+            normalizedIssue: invalidConfigIssue,
             diagnostics: Object.freeze(diagnostics),
           } satisfies BatchIngestionItemFailure),
         ]),
         issues: Object.freeze([]),
+        warnings: Object.freeze([]),
         preview: Object.freeze({
           itemCount: 0,
           successCount: 0,
@@ -361,6 +427,21 @@ export class BatchIngestionFramework {
             }),
           ]),
           shapeSummary: Object.freeze({}),
+          normalized: buildIngestionPreviewEnvelope({
+            ingestor: "batch-ingestion-framework",
+            context: previewContext,
+            totalCount: 1,
+            sampleCount: 1,
+            sourceCount: 1,
+            successCount: 0,
+            failureCount: 1,
+            preview: this.previewEngine.buildFromCanonicalShape({
+              kind: "records",
+              records: Object.freeze([]),
+              metadata: { schemaVersion: "1.0.0" },
+            }),
+            issues: Object.freeze([invalidConfigIssue]),
+          }),
         }),
       });
     }
@@ -387,6 +468,18 @@ export class BatchIngestionFramework {
     let failFastTriggered = false;
     const items = await mapWithConcurrency(shouldProcess, runConcurrency, async (descriptor, index) => {
       if (failFastTriggered) {
+        const failFastIssue = createIngestionIssue({
+          code: BatchIngestionItemErrorCodes.failFastStopped,
+          message: "Item was not processed because fail-fast mode stopped the batch.",
+          category: toBatchIssueCategory(BatchIngestionItemErrorCodes.failFastStopped),
+          recoverability: toBatchIssueRecoverability(BatchIngestionItemErrorCodes.failFastStopped),
+          severity: "warning",
+          source: {
+            sourceId: descriptor.sourceId,
+            sourceReference: descriptor.normalizedReference,
+            fileName: descriptor.displayName,
+          },
+        });
         return Object.freeze({
           ok: false,
           source: descriptor,
@@ -394,6 +487,7 @@ export class BatchIngestionFramework {
             code: BatchIngestionItemErrorCodes.failFastStopped,
             message: "Item was not processed because fail-fast mode stopped the batch.",
           }),
+          normalizedIssue: failFastIssue,
           diagnostics: Object.freeze([]),
         } satisfies BatchIngestionItemFailure);
       }
@@ -407,6 +501,11 @@ export class BatchIngestionFramework {
 
     const combinedItems: BatchIngestionItemResult[] = [...items];
     for (const issue of sourceIssues) {
+      const mappedCode = issue.code === SourceLocatorIssueCodes.unsupportedExtension
+        ? BatchIngestionItemErrorCodes.unsupportedBatchItem
+        : issue.code === SourceLocatorIssueCodes.unreadablePath
+          ? BatchIngestionItemErrorCodes.unreadableFile
+          : BatchIngestionItemErrorCodes.invalidSourceReference;
       combinedItems.push(Object.freeze({
         ok: false,
         source: Object.freeze({
@@ -418,12 +517,17 @@ export class BatchIngestionFramework {
           displayName: issue.reference ?? "unknown",
         }),
         error: Object.freeze({
-          code: issue.code === SourceLocatorIssueCodes.unsupportedExtension
-            ? BatchIngestionItemErrorCodes.unsupportedBatchItem
-            : issue.code === SourceLocatorIssueCodes.unreadablePath
-              ? BatchIngestionItemErrorCodes.unreadableFile
-              : BatchIngestionItemErrorCodes.invalidSourceReference,
+          code: mappedCode,
           message: issue.message,
+        }),
+        normalizedIssue: createIngestionIssue({
+          code: mappedCode,
+          message: issue.message,
+          category: toBatchIssueCategory(mappedCode),
+          recoverability: toBatchIssueRecoverability(mappedCode),
+          source: {
+            sourceReference: issue.reference,
+          },
         }),
         diagnostics: Object.freeze([toDiagnosticsFromLocatorIssue(issue)]),
       } satisfies BatchIngestionItemFailure));
@@ -438,6 +542,38 @@ export class BatchIngestionFramework {
     })));
 
     const previewItems = combinedItems.slice(0, config.previewItemLimit);
+    const batchWarnings: IngestionIssue[] = [];
+    if (previewItems.length < combinedItems.length) {
+      batchWarnings.push(createIngestionIssue({
+        code: "batch-preview-truncated",
+        message: "Batch preview was truncated to keep preview execution bounded.",
+        category: IngestionIssueCategories.batchPartialFailure,
+        severity: "warning",
+        recoverability: IngestionIssueRecoverabilities.partial,
+        details: Object.freeze({
+          totalCount: combinedItems.length,
+          sampleCount: previewItems.length,
+          previewItemLimit: config.previewItemLimit,
+        }),
+      }));
+    }
+    if (failureItems.length > 0 && successItems.length > 0) {
+      batchWarnings.push(createIngestionIssue({
+        code: "batch-partial-failure",
+        message: "Batch ingestion completed with mixed success/failure outcomes.",
+        category: IngestionIssueCategories.batchPartialFailure,
+        severity: "warning",
+        recoverability: IngestionIssueRecoverabilities.partial,
+        details: Object.freeze({
+          successCount: successItems.length,
+          failureCount: failureItems.length,
+        }),
+      }));
+    }
+    const previewContext = IngestionExecutionContextSchema.parse({
+      executionMode: request.previewOnly ? "preview" : "execute",
+      batchId: "batch-ingestion",
+    });
     const preview = Object.freeze({
       itemCount: combinedItems.length,
       successCount: successItems.length,
@@ -452,6 +588,35 @@ export class BatchIngestionFramework {
         error: item.ok ? undefined : item.error,
       }))),
       shapeSummary: summarizeShapes(combinedItems),
+      normalized: buildIngestionPreviewEnvelope({
+        ingestor: "batch-ingestion-framework",
+        context: previewContext,
+        totalCount: combinedItems.length,
+        sampleCount: previewItems.length,
+        sourceCount: combinedItems.length,
+        successCount: successItems.length,
+        failureCount: failureItems.length,
+        preview: this.previewEngine.buildFromCanonicalShape({
+          kind: "records",
+          records: Object.freeze(previewItems.map((item, index) => Object.freeze({
+            recordId: `batch-preview-${index + 1}`,
+            fields: Object.freeze({
+              sourceId: item.source.sourceId,
+              sourceLabel: item.source.displayName,
+              ingestor: item.ok ? item.ingestor : item.ingestor ?? null,
+              status: item.ok ? "succeeded" : "failed",
+            }),
+          }))),
+          metadata: { schemaVersion: "1.0.0" },
+        }),
+        issues: Object.freeze([
+          ...batchWarnings,
+          ...failureItems
+            .map((item) => item.normalizedIssue)
+            .filter((issue): issue is IngestionIssue => Boolean(issue))
+            .slice(0, config.previewItemLimit),
+        ]),
+      }),
     } satisfies BatchIngestionPreviewPayload);
 
     return Object.freeze({
@@ -462,6 +627,7 @@ export class BatchIngestionFramework {
       outputs,
       items: Object.freeze(combinedItems),
       issues: Object.freeze(sourceIssues),
+      warnings: Object.freeze(batchWarnings),
       preview,
     } satisfies BatchIngestionResult);
   }
@@ -497,6 +663,17 @@ export class BatchIngestionFramework {
     previewItemLimit: number,
   ): Promise<BatchIngestionItemResult> {
     if (descriptor.kind !== SourceDescriptorKinds.localFile) {
+      const invalidRefIssue = createIngestionIssue({
+        code: BatchIngestionItemErrorCodes.invalidSourceReference,
+        message: "Only local-file descriptors are currently executable for batch ingestion.",
+        category: toBatchIssueCategory(BatchIngestionItemErrorCodes.invalidSourceReference),
+        recoverability: toBatchIssueRecoverability(BatchIngestionItemErrorCodes.invalidSourceReference),
+        source: {
+          sourceId: descriptor.sourceId,
+          sourceReference: descriptor.normalizedReference,
+          fileName: descriptor.displayName,
+        },
+      });
       return Object.freeze({
         ok: false,
         source: descriptor,
@@ -504,6 +681,7 @@ export class BatchIngestionFramework {
           code: BatchIngestionItemErrorCodes.invalidSourceReference,
           message: "Only local-file descriptors are currently executable for batch ingestion.",
         }),
+        normalizedIssue: invalidRefIssue,
         diagnostics: Object.freeze([]),
       });
     }
@@ -512,6 +690,17 @@ export class BatchIngestionFramework {
     try {
       payload = await this.readPayload(descriptor);
     } catch (error) {
+      const unreadableIssue = createIngestionIssue({
+        code: BatchIngestionItemErrorCodes.unreadableFile,
+        message: `Unable to read source file '${descriptor.normalizedReference}'.`,
+        category: toBatchIssueCategory(BatchIngestionItemErrorCodes.unreadableFile),
+        recoverability: toBatchIssueRecoverability(BatchIngestionItemErrorCodes.unreadableFile),
+        source: {
+          sourceId: descriptor.sourceId,
+          sourceReference: descriptor.normalizedReference,
+          fileName: descriptor.displayName,
+        },
+      });
       return Object.freeze({
         ok: false,
         source: descriptor,
@@ -522,6 +711,7 @@ export class BatchIngestionFramework {
             cause: error instanceof Error ? error.message : String(error),
           }),
         }),
+        normalizedIssue: unreadableIssue,
         diagnostics: Object.freeze([]),
       });
     }
@@ -531,6 +721,17 @@ export class BatchIngestionFramework {
       : detectRoutedIngestor(descriptor);
 
     if (!ingestor) {
+      const unsupportedIssue = createIngestionIssue({
+        code: BatchIngestionItemErrorCodes.unsupportedBatchItem,
+        message: `Unable to route source '${descriptor.displayName}' to a supported ingestor.`,
+        category: toBatchIssueCategory(BatchIngestionItemErrorCodes.unsupportedBatchItem),
+        recoverability: toBatchIssueRecoverability(BatchIngestionItemErrorCodes.unsupportedBatchItem),
+        source: {
+          sourceId: descriptor.sourceId,
+          sourceReference: descriptor.normalizedReference,
+          fileName: descriptor.displayName,
+        },
+      });
       return Object.freeze({
         ok: false,
         source: descriptor,
@@ -542,11 +743,23 @@ export class BatchIngestionFramework {
             mediaType: descriptor.mediaType,
           }),
         }),
+        normalizedIssue: unsupportedIssue,
         diagnostics: Object.freeze([]),
       });
     }
 
     if ((ingestor === BatchIngestorKinds.csv || ingestor === BatchIngestorKinds.json) && !isTextLikeForCsvJson(descriptor.extension)) {
+      const unsupportedByIngestorIssue = createIngestionIssue({
+        code: BatchIngestionItemErrorCodes.unsupportedBatchItem,
+        message: `Ingestor '${ingestor}' does not support source '${descriptor.displayName}'.`,
+        category: toBatchIssueCategory(BatchIngestionItemErrorCodes.unsupportedBatchItem),
+        recoverability: toBatchIssueRecoverability(BatchIngestionItemErrorCodes.unsupportedBatchItem),
+        source: {
+          sourceId: descriptor.sourceId,
+          sourceReference: descriptor.normalizedReference,
+          fileName: descriptor.displayName,
+        },
+      });
       return Object.freeze({
         ok: false,
         source: descriptor,
@@ -555,6 +768,7 @@ export class BatchIngestionFramework {
           code: BatchIngestionItemErrorCodes.unsupportedBatchItem,
           message: `Ingestor '${ingestor}' does not support source '${descriptor.displayName}'.`,
         }),
+        normalizedIssue: unsupportedByIngestorIssue,
         diagnostics: Object.freeze([]),
       });
     }
@@ -577,6 +791,17 @@ export class BatchIngestionFramework {
       });
 
       if (!conversion.ok) {
+        const ingestionFailedIssue = createIngestionIssue({
+          code: BatchIngestionItemErrorCodes.ingestionFailed,
+          message: conversion.diagnostics[0]?.message ?? `Ingestion failed for ${descriptor.displayName}.`,
+          category: toBatchIssueCategory(BatchIngestionItemErrorCodes.ingestionFailed),
+          recoverability: toBatchIssueRecoverability(BatchIngestionItemErrorCodes.ingestionFailed),
+          source: {
+            sourceId: descriptor.sourceId,
+            sourceReference: descriptor.normalizedReference,
+            fileName: descriptor.displayName,
+          },
+        });
         return Object.freeze({
           ok: false,
           source: descriptor,
@@ -585,6 +810,7 @@ export class BatchIngestionFramework {
             code: BatchIngestionItemErrorCodes.ingestionFailed,
             message: conversion.diagnostics[0]?.message ?? `Ingestion failed for ${descriptor.displayName}.`,
           }),
+          normalizedIssue: ingestionFailedIssue,
           diagnostics: conversion.diagnostics,
         });
       }
@@ -629,6 +855,17 @@ export class BatchIngestionFramework {
       });
 
       if (!documentResult.ok) {
+        const ingestionFailedIssue = createIngestionIssue({
+          code: BatchIngestionItemErrorCodes.ingestionFailed,
+          message: documentResult.diagnostics[0]?.message ?? `Ingestion failed for ${descriptor.displayName}.`,
+          category: toBatchIssueCategory(BatchIngestionItemErrorCodes.ingestionFailed),
+          recoverability: toBatchIssueRecoverability(BatchIngestionItemErrorCodes.ingestionFailed),
+          source: {
+            sourceId: descriptor.sourceId,
+            sourceReference: descriptor.normalizedReference,
+            fileName: descriptor.displayName,
+          },
+        });
         return Object.freeze({
           ok: false,
           source: descriptor,
@@ -637,6 +874,7 @@ export class BatchIngestionFramework {
             code: BatchIngestionItemErrorCodes.ingestionFailed,
             message: documentResult.diagnostics[0]?.message ?? `Ingestion failed for ${descriptor.displayName}.`,
           }),
+          normalizedIssue: ingestionFailedIssue,
           diagnostics: Object.freeze(documentResult.diagnostics.map((entry) => Object.freeze({
             code: entry.code,
             severity: DataConverterDiagnosticSeverities.error,
@@ -685,6 +923,17 @@ export class BatchIngestionFramework {
     });
 
     if (!imageResult.ok) {
+      const ingestionFailedIssue = createIngestionIssue({
+        code: BatchIngestionItemErrorCodes.ingestionFailed,
+        message: imageResult.diagnostics[0]?.message ?? `Ingestion failed for ${descriptor.displayName}.`,
+        category: toBatchIssueCategory(BatchIngestionItemErrorCodes.ingestionFailed),
+        recoverability: toBatchIssueRecoverability(BatchIngestionItemErrorCodes.ingestionFailed),
+        source: {
+          sourceId: descriptor.sourceId,
+          sourceReference: descriptor.normalizedReference,
+          fileName: descriptor.displayName,
+        },
+      });
       return Object.freeze({
         ok: false,
         source: descriptor,
@@ -693,6 +942,7 @@ export class BatchIngestionFramework {
           code: BatchIngestionItemErrorCodes.ingestionFailed,
           message: imageResult.diagnostics[0]?.message ?? `Ingestion failed for ${descriptor.displayName}.`,
         }),
+        normalizedIssue: ingestionFailedIssue,
         diagnostics: Object.freeze(imageResult.diagnostics.map((entry) => Object.freeze({
           code: entry.code,
           severity: DataConverterDiagnosticSeverities.error,

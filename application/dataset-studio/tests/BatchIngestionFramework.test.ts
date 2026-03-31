@@ -72,6 +72,8 @@ describe("BatchIngestionFramework", () => {
     expect(result.successCount).toBe(2);
     expect(result.failureCount).toBeGreaterThan(0);
     expect(result.items.some((item) => !item.ok && item.error.code === BatchIngestionItemErrorCodes.unreadableFile)).toBeTrue();
+    expect(result.items.some((item) => !item.ok && item.normalizedIssue?.category === "unreadable-source")).toBeTrue();
+    expect(result.warnings.some((issue) => issue.code === "batch-partial-failure")).toBeTrue();
   });
 
   it("supports fail-fast behavior when continueOnError is false", async () => {
@@ -164,5 +166,7 @@ describe("BatchIngestionFramework", () => {
     expect(result.preview.previewedCount).toBe(2);
     expect(result.preview.truncated).toBeFalse();
     expect(result.itemCount).toBe(2);
+    expect(result.preview.normalized.ingestor).toBe("batch-ingestion-framework");
+    expect(result.preview.normalized.summary.sampleCount).toBe(2);
   });
 });

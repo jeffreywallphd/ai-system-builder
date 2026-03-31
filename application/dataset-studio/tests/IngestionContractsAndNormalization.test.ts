@@ -96,6 +96,7 @@ describe("Ingestion contracts + normalization", () => {
     }
     expect(result.diagnostics[0]?.code).toBe(CsvIngestorErrorCodes.invalidConfig);
     expect(result.normalized.ok).toBeFalse();
+    expect(result.normalized.issues[0]?.category).toBe("invalid-configuration");
   });
 
   it("rejects invalid JSON request contract with structured diagnostics", () => {
@@ -111,6 +112,7 @@ describe("Ingestion contracts + normalization", () => {
     }
     expect(result.diagnostics[0]?.code).toBe(JsonIngestorErrorCodes.invalidConfig);
     expect(result.normalized.ok).toBeFalse();
+    expect(result.normalized.issues[0]?.category).toBe("invalid-configuration");
   });
 
   it("preserves document source/extraction metadata in normalized output", async () => {
@@ -166,6 +168,61 @@ describe("Ingestion contracts + normalization", () => {
     expect(result.output.metadata.lineage?.[0]?.assetId).toBe("asset-image");
     expect(result.output.metadata.attributes?.sourceReference).toBe("image-source");
     expect(result.normalized.preview.kind).toBe("image-metadata-records");
+  });
+
+  it("emits consistent normalized preview envelopes across ingestors", async () => {
+    const csv = new CsvIngestorAsset().preview({
+      payload: "id,name\n1,Ada\n2,Lin",
+      config: { header: true },
+    }, 1);
+    if ("ok" in csv && !csv.ok) {
+      throw new Error("Expected CSV preview success.");
+    }
+
+    const json = new JsonIngestorAsset().preview({
+      payload: JSON.stringify([{ id: 1 }, { id: 2 }]),
+    }, 1);
+    if ("ok" in json && !json.ok) {
+      throw new Error("Expected JSON preview success.");
+    }
+
+    const doc = await new DocumentPdfIngestorAsset({
+      pdfParser: new StubPdfParser(),
+    }).preview({
+      source: {
+        kind: "in-memory",
+        reference: "doc-preview",
+        payload: new Uint8Array([5, 5]),
+        fileName: "doc.pdf",
+        contentType: "application/pdf",
+        diagnostics: Object.freeze([]),
+      },
+    });
+    if ("ok" in doc && !doc.ok) {
+      throw new Error("Expected document preview success.");
+    }
+
+    const image = await new ImageIngestorAsset({
+      metadataProbe: new StubMetadataProbe(),
+      exifReader: new StubExifReader(),
+    }).preview({
+      source: {
+        kind: "in-memory",
+        reference: "img-preview",
+        payload: new Uint8Array([7, 7]),
+        fileName: "photo.jpg",
+        contentType: "image/jpeg",
+        diagnostics: Object.freeze([]),
+      },
+    });
+    if ("ok" in image && !image.ok) {
+      throw new Error("Expected image preview success.");
+    }
+
+    expect(csv.normalized.contractVersion).toBe("1.0.0");
+    expect(json.normalized.contractVersion).toBe("1.0.0");
+    expect(doc.normalized.contractVersion).toBe("1.0.0");
+    expect(image.normalized.contractVersion).toBe("1.0.0");
   });
 });
 

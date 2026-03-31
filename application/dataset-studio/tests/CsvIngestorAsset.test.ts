@@ -40,6 +40,8 @@ describe("CsvIngestorAsset", () => {
     expect(preview.sampleCount).toBe(2);
     expect(preview.totalCount).toBe(3);
     expect(preview.schema.map((field) => field.name)).toEqual(["id", "name"]);
+    expect(preview.normalized.summary.truncated).toBeTrue();
+    expect(preview.normalized.issues[0]?.category).toBe("preview-failure");
   });
 
   it("returns structured diagnostics for malformed CSV", () => {
@@ -56,5 +58,6 @@ describe("CsvIngestorAsset", () => {
       throw new Error("Expected malformed CSV to fail.");
     }
     expect(result.diagnostics[0]?.code).toBe("csv-ingestor-invalid-csv");
+    expect(result.normalized.issues[0]?.category).toBe("parse-extraction-failure");
   });
 });

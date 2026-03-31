@@ -65,6 +65,7 @@ describe("DocumentPdfIngestorAsset", () => {
     expect(result.preview.pageCount).toBe(2);
     expect(result.preview.pages).toHaveLength(1);
     expect(result.fullText.includes("Second page text.")).toBeTrue();
+    expect(result.preview.normalized.ingestor).toBe("document-pdf-ingestor");
   });
 
   it("uses OCR strategy when parser yields no text", async () => {
