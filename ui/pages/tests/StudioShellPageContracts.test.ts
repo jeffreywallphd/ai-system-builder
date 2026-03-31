@@ -21,6 +21,8 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("InlineAssetReturnStatuses.noSelection");
     expect(source).toContain('data-testid="studio-shell-inline-return-no-selection"');
     expect(source).toContain("workflowModeRoute");
+    expect(source).toContain("workflowEntryRoute");
+    expect(source).toContain("WorkflowStudioEntryPaths");
     expect(source).toContain("workflowModeState");
     expect(source).toContain("studioRegistration");
     expect(source).toContain("shellTitle");
@@ -53,6 +55,7 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("service.transitionLifecycle");
     expect(source).toContain("service.publishVersion");
     expect(source).toContain("service.validateDraft");
+    expect(source).toContain("service.getPersistedWorkflow");
     expect(source).toContain("service.assessWorkflowExecutionReadiness");
     expect(source).toContain("service.runWorkflowDraft");
     expect(source.indexOf("Asset draft authoring")).toBeLessThan(source.indexOf("ui-studio-shell__grid"));

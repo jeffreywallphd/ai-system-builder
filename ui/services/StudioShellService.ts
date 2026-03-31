@@ -13,6 +13,7 @@ import type {
   StudioShellSnapshotReadModel,
   StudioShellValidationIssue,
   WorkflowExecutionReadinessReadModel,
+  PersistedWorkflowReadModel,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import type {
   StartSystemRuntimeExecutionRequest,
@@ -86,6 +87,11 @@ export class StudioShellService {
   public async validateDraft(studioId: string, draftId: string): Promise<StudioShellApiResponse<ReadonlyArray<StudioShellValidationIssue>>> {
     const raw = await this.requireBridge().validateDraft(JSON.stringify({ studioId, draftId }));
     return JSON.parse(raw) as StudioShellApiResponse<ReadonlyArray<StudioShellValidationIssue>>;
+  }
+
+  public async getPersistedWorkflow(workflowId: string): Promise<StudioShellApiResponse<PersistedWorkflowReadModel>> {
+    const raw = await this.requireBridge().getPersistedWorkflow(workflowId);
+    return JSON.parse(raw) as StudioShellApiResponse<PersistedWorkflowReadModel>;
   }
 
   public async assessWorkflowExecutionReadiness(

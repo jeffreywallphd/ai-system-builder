@@ -63,6 +63,7 @@ import type { AgentRunControlRequest, AgentRunRequest } from "../../application/
 import type { TriggerAgentLaunchRequest } from "../../application/agents/TriggerAgentLaunchUseCase";
 import { StudioShellBackendApi } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import { RegistryBackendApi } from "../../infrastructure/api/registry/RegistryBackendApi";
+import { ListPersistedWorkflowsUseCase } from "../../application/workflow-persistence/ListPersistedWorkflowsUseCase";
 import { SqliteStudioShellRepository } from "../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
 import { SqliteWorkflowPersistenceRepository } from "../../infrastructure/filesystem/SqliteWorkflowPersistenceRepository";
 import type { CreateAssetDraftCommand, PublishAssetDraftVersionCommand, TransitionAssetDraftLifecycleCommand, UpdateAssetDraftCommand, UpdateAssetDraftDependenciesCommand } from "../../application/studio-shell/contracts";
@@ -447,6 +448,9 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     const request = JSON.parse(requestJson) as { studioId: string; draftId: string };
     return JSON.stringify(await studioShellBackendApi.validateDraft(request));
   });
+  ipcMain.handle("ai-loom-desktop-studio-shell:get-persisted-workflow", async (_event, workflowId: string) => {
+    return JSON.stringify(await studioShellBackendApi.getPersistedWorkflow(workflowId));
+  });
   ipcMain.handle("ai-loom-desktop-studio-shell:workflow-execution-readiness", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["assessWorkflowExecutionReadiness"]>[0];
     return JSON.stringify(await studioShellBackendApi.assessWorkflowExecutionReadiness(request));
@@ -601,6 +605,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   const registryBackendApi = new RegistryBackendApi(
     new CrossStudioRegistryQueryService(registryQueryService),
     new RegistryDependencyGraphService(registryQueryService, canonicalAssetSystemRepository, canonicalAssetSystemRepository, registryCacheLayer),
+    workflowPersistenceRepository ? new ListPersistedWorkflowsUseCase(workflowPersistenceRepository) : undefined,
   );
 
   ipcMain.handle("ai-loom-desktop-canonical-assets:list", async (_event, criteriaJson?: string) => {

@@ -70,6 +70,9 @@ function installBridge(
     validateDraft(requestJson: string) {
       return api.validateDraft(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
+    getPersistedWorkflow(workflowId: string) {
+      return api.getPersistedWorkflow(workflowId).then((response) => JSON.stringify(response));
+    },
     assessWorkflowExecutionReadiness(requestJson: string) {
       return api.assessWorkflowExecutionReadiness(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },

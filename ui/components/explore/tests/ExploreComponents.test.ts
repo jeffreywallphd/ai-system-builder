@@ -21,6 +21,8 @@ describe("explore UI components", () => {
     expect(source).toContain("data-testid=\"explore-asset-item\"");
     expect(source).toContain("No assets match the current explore query");
     expect(source).toContain("taxonomy:");
+    expect(source).toContain("Open workflow");
+    expect(source).toContain("Resume draft");
     expect(source).toContain("Run here");
     expect(source).toContain("Test here");
     expect(source).toContain("View details");

@@ -9,6 +9,10 @@ import { RegistryQueryService } from "../../../../application/asset-registry/Reg
 import { CrossStudioRegistryQueryService } from "../../../../application/asset-registry/CrossStudioRegistryQueryService";
 import { RegistryDependencyGraphService } from "../../../../application/asset-registry/RegistryDependencyGraphService";
 import { RegistryBackendApi } from "../RegistryBackendApi";
+import { InMemoryWorkflowPersistenceRepository } from "../../../workflows/InMemoryWorkflowPersistenceRepository";
+import { createPersistedWorkflowRecord } from "../../../../domain/workflow-studio/WorkflowPersistenceDomain";
+import { createEmptyWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import { ListPersistedWorkflowsUseCase } from "../../../../application/workflow-persistence/ListPersistedWorkflowsUseCase";
 import { SqliteAssetSystemRepository } from "../../../filesystem/SqliteAssetSystemRepository";
 import type { IAssetContractResolver } from "../../../../application/contracts/CompositionAssetContractResolver";
 import type { IAssetLineageRepository } from "../../../../application/ports/interfaces/IAssetLineageRepository";
@@ -123,7 +127,18 @@ describe("RegistryBackendApi", () => {
       queryRepository,
     );
 
-    const api = new RegistryBackendApi(new CrossStudioRegistryQueryService(queryService), new RegistryDependencyGraphService(queryService, versionRepository));
+    const workflowPersistenceRepository = new InMemoryWorkflowPersistenceRepository();
+    await workflowPersistenceRepository.create(createPersistedWorkflowRecord({
+      id: "workflow:persisted",
+      name: "Persisted Workflow",
+      draft: createEmptyWorkflowDraft(),
+    }));
+
+    const api = new RegistryBackendApi(
+      new CrossStudioRegistryQueryService(queryService),
+      new RegistryDependencyGraphService(queryService, versionRepository),
+      new ListPersistedWorkflowsUseCase(workflowPersistenceRepository),
+    );
 
     const listed = await api.listAssets();
     expect(listed.ok).toBeTrue();
@@ -141,8 +156,9 @@ describe("RegistryBackendApi", () => {
 
     const exploreListed = await api.listExploreAssets();
     expect(exploreListed.ok).toBeTrue();
-    expect(exploreListed.data?.assets.length).toBe(2);
+    expect(exploreListed.data?.assets.length).toBe(3);
     expect(exploreListed.data?.availableKinds.length).toBeGreaterThan(0);
+    expect(exploreListed.data?.assets.some((entry) => entry.id.assetId === "workflow:persisted")).toBeTrue();
 
     const exploreSearched = await api.searchExploreAssets({ keyword: "workflow" });
     expect(exploreSearched.ok).toBeTrue();
