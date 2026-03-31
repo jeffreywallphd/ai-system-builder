@@ -268,6 +268,8 @@ describe("StudioShellBackendApi", () => {
       draftId: created.data!.draft!.draftId,
       content: canvasDraft,
       metadataPatch: {
+        title: "workflow-draft-renamed",
+        summary: "Workflow summary updated from studio save",
         tags: ["workflow", "canvas"],
       },
     });
@@ -280,6 +282,8 @@ describe("StudioShellBackendApi", () => {
 
     const persistedAfterUpdate = await getPersisted.execute(workflowId);
     expect(persistedAfterUpdate?.status).toBe("saved");
+    expect(persistedAfterUpdate?.name).toBe("workflow-draft-renamed");
+    expect(persistedAfterUpdate?.metadata.summary).toBe("Workflow summary updated from studio save");
     expect(persistedAfterUpdate?.revision.persistenceRevision).toBeGreaterThan(1);
     expect(persistedAfterUpdate?.definition.draft.steps.map((entry) => entry.id)).toEqual(["step-canvas"]);
     expect(persistedAfterUpdate?.metadata.tags).toEqual(["workflow", "canvas"]);

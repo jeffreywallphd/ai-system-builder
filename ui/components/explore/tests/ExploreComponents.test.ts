@@ -26,5 +26,6 @@ describe("explore UI components", () => {
     expect(source).toContain("Run here");
     expect(source).toContain("Test here");
     expect(source).toContain("View details");
+    expect(source).toContain("tag:");
   });
 });
