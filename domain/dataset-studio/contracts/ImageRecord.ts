@@ -8,6 +8,10 @@ import {
   createImageDerivedAttributes,
   type ImageDerivedAttributesRecord,
 } from "./ImageDerivedAttributes";
+import {
+  createImageAnnotations,
+  type ImageAnnotationsRecord,
+} from "./ImageAnnotations";
 
 export interface ImageRecord {
   readonly assetRef: ImageAssetReference;
@@ -16,6 +20,7 @@ export interface ImageRecord {
   readonly format: string;
   readonly metadata: Readonly<Record<string, CanonicalRecordValue>>;
   readonly tags: ReadonlyArray<string>;
+  readonly annotations?: ImageAnnotationsRecord;
   readonly derived: ImageDerivedAttributesRecord;
   readonly schemaVersion?: string;
 }
@@ -76,6 +81,7 @@ export function createImageRecord(input: {
   readonly format: string;
   readonly metadata?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly tags?: ReadonlyArray<string>;
+  readonly annotations?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly derived?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly schemaVersion?: string;
 }): ImageRecord {
@@ -86,6 +92,7 @@ export function createImageRecord(input: {
     format: normalizeFormat(input.format),
     metadata: normalizeCanonicalRecord(input.metadata),
     tags: normalizeTags(input.tags),
+    annotations: createImageAnnotations(input.annotations),
     derived: createImageDerivedAttributes(input.derived),
     schemaVersion: normalizeOptional(input.schemaVersion),
   });

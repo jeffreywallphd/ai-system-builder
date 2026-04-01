@@ -61,6 +61,16 @@ function toDerivedRecord(
   return isRecordValue(candidate) ? candidate : undefined;
 }
 
+function toAnnotationsRecord(
+  value: unknown,
+): Readonly<Record<string, CanonicalRecordValue>> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const candidate = value as Readonly<Record<string, CanonicalRecordValue>>;
+  return isRecordValue(candidate) ? candidate : undefined;
+}
+
 function toImageRecordCandidate(item: CanonicalImageStructuredItem): {
   readonly candidate?: unknown;
   readonly issues: ReadonlyArray<MediaValidationIssue>;
@@ -76,6 +86,9 @@ function toImageRecordCandidate(item: CanonicalImageStructuredItem): {
     ?? toStringOrUndefined(item.imageId);
   const derived = toDerivedRecord(metadata.derived)
     ?? toDerivedRecord(attributes.derived)
+    ?? undefined;
+  const annotations = toAnnotationsRecord(metadata.annotations)
+    ?? toAnnotationsRecord(attributes.annotations)
     ?? undefined;
   const tags = toStringArray(metadata.tags ?? attributes.tags);
 
@@ -111,6 +124,7 @@ function toImageRecordCandidate(item: CanonicalImageStructuredItem): {
       format,
       metadata,
       tags,
+      annotations,
       derived,
     }),
     issues: Object.freeze([]),

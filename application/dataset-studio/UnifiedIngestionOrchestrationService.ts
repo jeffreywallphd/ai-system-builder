@@ -21,6 +21,7 @@ import {
   type UnifiedIngestionRouteResolution,
   type UnifiedIngestionSourceReference,
 } from "../../domain/dataset-studio/UnifiedIngestionDomain";
+import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import {
   UnifiedIngestionExecutionStages,
   classifyUnifiedIngestionFailure,
@@ -59,6 +60,7 @@ interface NodeFsPromisesRuntime {
 export interface UnifiedIngestionRequest {
   readonly source: UnifiedIngestionSourceReference;
   readonly payload?: string | Uint8Array;
+  readonly schemaIntentId?: DatasetSchemaIntentId;
   readonly configuration?: UnifiedIngestionConfiguration;
   readonly converterContext?: DataConverterOperationContext;
 }
@@ -141,7 +143,19 @@ function buildIssue(input: {
 function mapRouteKindToOutputTarget(
   route: UnifiedIngestionRouteResolution,
   configuration?: UnifiedIngestionConfiguration,
+  schemaIntentId?: DatasetSchemaIntentId,
 ): UnifiedIngestionConfiguration["outputTarget"] {
+  if (schemaIntentId === DatasetSchemaIntentIds.media) {
+    return UnifiedIngestionOutputTargetKinds.imageMetadataRecords;
+  }
+  if (configuration?.mode === "simple" && configuration.outputTarget === UnifiedIngestionOutputTargetKinds.records) {
+    if (route.handlerKind === "document") {
+      return UnifiedIngestionOutputTargetKinds.textItems;
+    }
+    if (route.handlerKind === "image") {
+      return UnifiedIngestionOutputTargetKinds.imageMetadataRecords;
+    }
+  }
   if (configuration?.outputTarget) {
     return configuration.outputTarget;
   }
@@ -255,6 +269,7 @@ function buildExecutionMetadata(input: {
   readonly conversion?: UnifiedIngestionSuccessResult["conversion"];
   readonly normalized?: UnifiedIngestionNormalizedOutput;
   readonly preview?: UnifiedIngestionPreviewSuccessResult;
+  readonly schemaIntentId?: DatasetSchemaIntentId;
   readonly pipelineId?: string;
   readonly orderedStageIds?: ReadonlyArray<string>;
 }): UnifiedIngestionExecutionMetadata {
@@ -319,6 +334,7 @@ function buildExecutionMetadata(input: {
       completedAt: input.completedAt,
       configurationMode: input.configuration.mode,
       outputTarget: input.configuration.outputTarget,
+      ...(input.schemaIntentId ? { schemaIntentId: input.schemaIntentId } : {}),
       stageCount: input.stages.length,
       pipelineId: input.pipelineId,
       orderedStageIds: input.orderedStageIds,
@@ -396,6 +412,7 @@ export class UnifiedIngestionOrchestrationService {
   private buildFailureResult(input: {
     readonly source: UnifiedIngestionSourceReference;
     readonly configuration: UnifiedIngestionConfiguration;
+    readonly schemaIntentId?: DatasetSchemaIntentId;
     readonly lineageId: string;
     readonly startedAt: string;
     readonly stage: UnifiedIngestionExecutionStage;
@@ -421,6 +438,7 @@ export class UnifiedIngestionOrchestrationService {
       stages: input.stages,
       detection: input.detection,
       route: input.route,
+      schemaIntentId: input.schemaIntentId,
       pipelineId: this.stagePipeline.pipelineId,
       orderedStageIds: this.orderedStageIds,
     });
@@ -512,6 +530,7 @@ export class UnifiedIngestionOrchestrationService {
       return this.buildFailureResult({
         source: request.source,
         configuration: resolvedConfiguration.configuration,
+        schemaIntentId: request.schemaIntentId,
         lineageId,
         startedAt,
         stage: UnifiedIngestionExecutionStages.configuration,
@@ -552,6 +571,7 @@ export class UnifiedIngestionOrchestrationService {
         return this.buildFailureResult({
           source: request.source,
           configuration,
+          schemaIntentId: request.schemaIntentId,
           lineageId,
           startedAt,
           stage: UnifiedIngestionExecutionStages.sourceRead,
@@ -601,6 +621,7 @@ export class UnifiedIngestionOrchestrationService {
       return this.buildFailureResult({
         source: request.source,
         configuration,
+        schemaIntentId: request.schemaIntentId,
         lineageId,
         startedAt,
         stage: UnifiedIngestionExecutionStages.detection,
@@ -651,6 +672,7 @@ export class UnifiedIngestionOrchestrationService {
       return this.buildFailureResult({
         source: request.source,
         configuration,
+        schemaIntentId: request.schemaIntentId,
         lineageId,
         startedAt,
         stage: UnifiedIngestionExecutionStages.routing,
@@ -683,6 +705,7 @@ export class UnifiedIngestionOrchestrationService {
       return this.buildFailureResult({
         source: request.source,
         configuration,
+        schemaIntentId: request.schemaIntentId,
         lineageId,
         startedAt,
         stage: UnifiedIngestionExecutionStages.ingestion,
@@ -723,6 +746,7 @@ export class UnifiedIngestionOrchestrationService {
       return this.buildFailureResult({
         source: request.source,
         configuration,
+        schemaIntentId: request.schemaIntentId,
         lineageId,
         startedAt,
         stage: UnifiedIngestionExecutionStages.conversion,
@@ -743,7 +767,7 @@ export class UnifiedIngestionOrchestrationService {
       }),
     });
 
-    const outputTarget = mapRouteKindToOutputTarget(route, configuration);
+    const outputTarget = mapRouteKindToOutputTarget(route, configuration, request.schemaIntentId);
     const normalizationStageStartedAt = nowIso();
     const normalization = this.normalizationPipeline.normalize({
       source: request.source,
@@ -751,6 +775,7 @@ export class UnifiedIngestionOrchestrationService {
       route,
       outputTarget,
       configurationMode: configuration.mode,
+      schemaIntentId: request.schemaIntentId,
       output: conversion.result.output,
     });
     if (!normalization.ok) {
@@ -766,6 +791,7 @@ export class UnifiedIngestionOrchestrationService {
       return this.buildFailureResult({
         source: request.source,
         configuration,
+        schemaIntentId: request.schemaIntentId,
         lineageId,
         startedAt,
         stage: UnifiedIngestionExecutionStages.normalization,
@@ -793,7 +819,10 @@ export class UnifiedIngestionOrchestrationService {
     const completedAt = nowIso();
     const metadata = buildExecutionMetadata({
       source: request.source,
-      configuration,
+      configuration: Object.freeze({
+        ...configuration,
+        outputTarget,
+      }),
       startedAt,
       completedAt,
       issues: normalization.issues,
@@ -806,6 +835,7 @@ export class UnifiedIngestionOrchestrationService {
         inputBoundary: conversion.result.contract.inputBoundary,
       }),
       normalized: normalization.normalized,
+      schemaIntentId: request.schemaIntentId,
       pipelineId: this.stagePipeline.pipelineId,
       orderedStageIds: this.orderedStageIds,
     });
@@ -861,6 +891,7 @@ export class UnifiedIngestionOrchestrationService {
       return this.buildFailureResult({
         source: ingestion.source,
         configuration: resolvedConfiguration.configuration,
+        schemaIntentId: request.schemaIntentId,
         lineageId: ingestion.lineage.lineageId,
         startedAt: ingestion.metadata.processing.startedAt,
         stage: UnifiedIngestionExecutionStages.preview,
@@ -902,7 +933,10 @@ export class UnifiedIngestionOrchestrationService {
     const previewCompletedAt = nowIso();
     const metadata = buildExecutionMetadata({
       source: ingestion.source,
-      configuration: resolvedConfiguration.configuration,
+      configuration: Object.freeze({
+        ...resolvedConfiguration.configuration,
+        outputTarget: ingestion.outputTarget,
+      }),
       startedAt: ingestion.metadata.processing.startedAt,
       completedAt: previewCompletedAt,
       issues: preview.issues,
@@ -913,6 +947,7 @@ export class UnifiedIngestionOrchestrationService {
       conversion: ingestion.conversion,
       normalized: ingestion.normalized,
       preview,
+      schemaIntentId: request.schemaIntentId,
       pipelineId: this.stagePipeline.pipelineId,
       orderedStageIds: this.orderedStageIds,
     });
@@ -1076,6 +1111,8 @@ export class UnifiedIngestionOrchestrationService {
         ? {
           extractExif: input.configuration.imageExtractExif,
           normalizeOrientation: input.configuration.imageNormalizeOrientation,
+          tags: input.configuration.imageTags,
+          annotations: input.configuration.imageAnnotations,
         }
         : undefined,
     });

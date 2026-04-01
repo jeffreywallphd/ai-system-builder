@@ -215,3 +215,27 @@
 - `image-metadata-records` preview contracts now expose schema-aware fields per preview item: image reference/id, width, height, format, selected metadata summary, tags, and derived attributes.
 - Preview mapping is resilient to partial/malformed media records and emits bounded warning diagnostics instead of throwing/failing preview generation.
 - Data Studio preview rendering now supports bounded thumbnail-oriented image rows with graceful fallbacks for missing thumbnails, missing metadata, and broken references.
+
+## Direction 5 extension update: media tagging/annotations + schema-aware image ingestion (stories 1.1.9-1.1.10)
+
+- Canonical image-record contracts now include first-class lightweight annotations (`ImageAnnotations`) integrated into `ImageRecord` creation/normalization with existing normalized tags.
+- Annotation scope is intentionally bounded and reusable across dataset/workflow/system seams:
+  - optional caption/description/note
+  - optional bounded labels
+  - optional simple region reference (x/y/width/height with pixel coordinate-space support).
+- Validation remains adapter-backed at the boundary:
+  - `ZodImageRecordValidator` validates and normalizes tags + annotations for canonical records
+  - `ZodMediaDatasetValidator` maps and validates annotations from canonical `image-metadata-records`.
+- Unified ingestion now supports schema-aware media routing without introducing a parallel pipeline:
+  - ingestion request/batch metadata can carry `schemaIntentId`
+  - `schemaIntentId=media` can force canonical image metadata output targeting
+  - advanced unified ingestion config supports image tag/annotation passthrough (`imageTags`, `imageAnnotations`)
+  - routed image ingestion passes those values into `ImageIngestorAsset`.
+- `ImageIngestorAsset` now accepts tags/annotations in config/request and emits them in normalized metadata and preview attributes while preserving existing canonical image-record validation flow.
+- Image ingestion detection is more robust for media intent:
+  - probe-confirmed images can proceed even when extension/content-type are ambiguous
+  - unsupported formats still fail with explicit diagnostics
+  - partial metadata continues to degrade gracefully when canonical record construction remains valid.
+- Shared preview compatibility is preserved and extended:
+  - `ImageDatasetPreviewBuilder` + Data Studio preview rendering now expose annotations for image rows
+  - records without annotations remain valid/backward-compatible.

@@ -56,6 +56,8 @@ const AdvancedConfigurationSchema = z.object({
   documentMaxPages: z.number().int().min(1).max(500).optional(),
   imageExtractExif: z.boolean().optional(),
   imageNormalizeOrientation: z.boolean().optional(),
+  imageTags: z.array(z.string().trim().min(1)).max(64).optional(),
+  imageAnnotations: z.record(z.string(), z.any()).optional(),
   enableContentSniffing: z.boolean().default(true),
 });
 
@@ -110,6 +112,24 @@ function toOptionalInt(value: CanonicalRecordValue | undefined): number | undefi
     return undefined;
   }
   return Math.trunc(value);
+}
+
+function toOptionalStringArray(value: CanonicalRecordValue | undefined): ReadonlyArray<string> | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const entries = value
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return entries.length > 0 ? Object.freeze(entries) : Object.freeze([]);
+}
+
+function toOptionalRecord(value: CanonicalRecordValue | undefined): Readonly<Record<string, CanonicalRecordValue>> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Readonly<Record<string, CanonicalRecordValue>>;
 }
 
 function mapZodIssue(issue: z.ZodIssue): UnifiedIngestionConfigurationValidationIssue {
@@ -188,6 +208,8 @@ export function resolveUnifiedIngestionConfiguration(input?: {
       imageExtractExif: toOptionalBoolean(values.imageExtractExif) ?? (input?.base?.mode === "advanced" ? input.base.imageExtractExif : undefined),
       imageNormalizeOrientation: toOptionalBoolean(values.imageNormalizeOrientation)
         ?? (input?.base?.mode === "advanced" ? input.base.imageNormalizeOrientation : undefined),
+      imageTags: toOptionalStringArray(values.imageTags) ?? (input?.base?.mode === "advanced" ? input.base.imageTags : undefined),
+      imageAnnotations: toOptionalRecord(values.imageAnnotations) ?? (input?.base?.mode === "advanced" ? input.base.imageAnnotations : undefined),
       enableContentSniffing: toOptionalBoolean(values.enableContentSniffing)
         ?? (input?.base?.mode === "advanced" ? input.base.enableContentSniffing : undefined),
     });

@@ -83,6 +83,10 @@ describe("DataPreviewEngine", () => {
           height: 480,
           format: "png",
           tags: ["logo", "brand"],
+          annotations: {
+            caption: "Brand logo",
+            labels: ["approved"],
+          },
           derived: {
             orientation: "landscape",
             aspectRatio: 1.333333,
@@ -102,6 +106,10 @@ describe("DataPreviewEngine", () => {
     expect(imagePreview.items[0]?.height).toBe(480);
     expect(imagePreview.items[0]?.format).toBe("png");
     expect(imagePreview.items[0]?.tags).toEqual(["logo", "brand"]);
+    expect(imagePreview.items[0]?.annotations).toEqual({
+      caption: "Brand logo",
+      labels: ["approved"],
+    });
   });
 
   it("builds resilient image previews for partial and malformed records", () => {

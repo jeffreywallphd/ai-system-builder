@@ -10,6 +10,7 @@ import {
   UnifiedIngestionSourceKinds,
   UnifiedIngestionStrategyKinds,
 } from "../../domain/dataset-studio/UnifiedIngestionDomain";
+import type { DatasetSchemaIntentId } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import {
   DataAssetConfigFieldKinds,
   DataAssetConfigFieldVisibilities,
@@ -36,6 +37,7 @@ export const UnifiedIngestionAssetOutputContractVersion = "1.0.0";
 export interface UnifiedIngestionAssetExecutionRequest {
   readonly source: UnifiedIngestionSourceReference;
   readonly payload?: string | Uint8Array;
+  readonly schemaIntentId?: DatasetSchemaIntentId;
   readonly configuration?: UnifiedIngestionConfiguration;
   readonly configurationMode?: UnifiedIngestionConfigMode;
   readonly configurationValues?: Readonly<Record<string, CanonicalRecordValue>>;
@@ -64,6 +66,7 @@ export interface UnifiedIngestionBatchExecutionRequest {
   readonly sourceRequest?: SourceLocatorRequest;
   readonly sources?: ReadonlyArray<UnifiedIngestionSourceReference>;
   readonly payloadBySourceId?: Readonly<Record<string, string | Uint8Array>>;
+  readonly schemaIntentId?: DatasetSchemaIntentId;
   readonly configuration?: UnifiedIngestionConfiguration;
   readonly configurationMode?: UnifiedIngestionConfigMode;
   readonly configurationValues?: Readonly<Record<string, CanonicalRecordValue>>;
@@ -116,6 +119,7 @@ export class UnifiedIngestionAssetExecutionWrapper {
     const result = await this.orchestration.ingest({
       source: request.source,
       payload: request.payload,
+      schemaIntentId: request.schemaIntentId,
       configuration: configurationResolution.configuration,
       converterContext: request.converterContext,
     });
@@ -140,6 +144,7 @@ export class UnifiedIngestionAssetExecutionWrapper {
     const result = await this.orchestration.ingestWithPreview({
       source: request.source,
       payload: request.payload,
+      schemaIntentId: request.schemaIntentId,
       configuration: configurationResolution.configuration,
       converterContext: request.converterContext,
     });
@@ -167,6 +172,7 @@ export class UnifiedIngestionAssetExecutionWrapper {
       sourceRequest: request.sourceRequest,
       sources: request.sources,
       payloadBySourceId: request.payloadBySourceId,
+      schemaIntentId: request.schemaIntentId,
       configuration: configurationResolution.configuration,
       converterContext: request.converterContext,
       options: request.options,
@@ -195,6 +201,7 @@ export class UnifiedIngestionAssetExecutionWrapper {
       sourceRequest: request.sourceRequest,
       sources: request.sources,
       payloadBySourceId: request.payloadBySourceId,
+      schemaIntentId: request.schemaIntentId,
       configuration: configurationResolution.configuration,
       converterContext: request.converterContext,
       options: request.options,

@@ -1,5 +1,6 @@
 import type { CanonicalDataShape } from "../../domain/dataset-studio/CanonicalDataShapes";
 import type { DataPreviewModel } from "../data-studio/DataPreviewEngine";
+import type { DatasetSchemaIntentId } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import {
   UnifiedIngestionContractVersion,
   UnifiedIngestionIssueCodes,
@@ -86,6 +87,7 @@ export interface UnifiedIngestionBatchRequest {
   readonly sourceRequest?: SourceLocatorRequest;
   readonly sources?: ReadonlyArray<UnifiedIngestionSourceReference>;
   readonly payloadBySourceId?: Readonly<Record<string, string | Uint8Array>>;
+  readonly schemaIntentId?: DatasetSchemaIntentId;
   readonly configuration: UnifiedIngestionConfiguration;
   readonly converterContext?: {
     readonly operationId?: string;
@@ -230,6 +232,7 @@ export class UnifiedIngestionBatchOrchestrationService {
             completedAt,
             outputTarget: request.configuration.outputTarget,
             configurationMode: request.configuration.mode,
+            ...(request.schemaIntentId ? { schemaIntentId: request.schemaIntentId } : {}),
             continueOnError: request.options?.continueOnError ?? true,
             requestedConcurrency: request.options?.concurrency ?? 4,
           }),
@@ -294,6 +297,7 @@ export class UnifiedIngestionBatchOrchestrationService {
           const result = await this.orchestration.ingestWithPreview({
             source,
             payload,
+            schemaIntentId: request.schemaIntentId,
             configuration: request.configuration,
             converterContext: request.converterContext,
           });
@@ -335,6 +339,7 @@ export class UnifiedIngestionBatchOrchestrationService {
         const result = await this.orchestration.ingest({
           source,
           payload,
+          schemaIntentId: request.schemaIntentId,
           configuration: request.configuration,
           converterContext: request.converterContext,
         });
@@ -434,6 +439,7 @@ export class UnifiedIngestionBatchOrchestrationService {
         completedAt,
         outputTarget: request.configuration.outputTarget,
         configurationMode: request.configuration.mode,
+        ...(request.schemaIntentId ? { schemaIntentId: request.schemaIntentId } : {}),
         continueOnError,
         requestedConcurrency: concurrency,
       }),

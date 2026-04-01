@@ -10,6 +10,7 @@ import {
   type ImageAssetReferenceInput,
 } from "../../../../domain/dataset-studio/contracts/ImageAssetReference";
 import type { CanonicalRecordValue } from "../../../../domain/dataset-studio/CanonicalDataShapes";
+import { ImageAnnotationCoordinateSpaces } from "../../../../domain/dataset-studio/contracts/ImageAnnotations";
 
 export const MediaImageFormatAllowList = Object.freeze([
   "png",
@@ -95,6 +96,36 @@ const imageRecordSchema = z.object({
   format: z.string().trim().min(1),
   metadata: z.record(z.string(), canonicalRecordValueSchema).optional(),
   tags: z.array(z.string().trim().min(1)).default([]),
+  annotations: z.object({
+    caption: z.string().trim().min(1).max(500).optional(),
+    description: z.string().trim().min(1).max(2000).optional(),
+    note: z.string().trim().min(1).max(2000).optional(),
+    labels: z.array(z.string().trim().min(1).max(100)).max(32).default([]),
+    region: z.object({
+      x: z.number().min(0),
+      y: z.number().min(0),
+      width: z.number().positive(),
+      height: z.number().positive(),
+      coordinateSpace: z.enum([
+        ImageAnnotationCoordinateSpaces.pixel,
+      ]).optional(),
+      referenceId: z.string().trim().min(1).max(100).optional(),
+    }).optional(),
+  }).superRefine((value, ctx) => {
+    const hasContent = Boolean(
+      value.caption
+      || value.description
+      || value.note
+      || value.labels.length > 0
+      || value.region,
+    );
+    if (!hasContent) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Image annotations must include caption, description, note, labels, or region.",
+      });
+    }
+  }).optional(),
   derived: z.object({
     aspectRatio: z.number().positive().optional(),
     orientation: z.enum([
@@ -121,6 +152,7 @@ export class ZodImageRecordValidator implements IImageRecordValidator {
       format: parsed.format,
       metadata: parsed.metadata,
       tags: parsed.tags,
+      annotations: parsed.annotations,
       derived: parsed.derived,
       schemaVersion: parsed.schemaVersion,
     });

@@ -20,6 +20,10 @@ describe("MediaSchemaIntentAdapter", () => {
           height: 256,
           format: "png",
           tags: ["thumbnail"],
+          annotations: {
+            note: "Primary sample",
+            labels: ["curated"],
+          },
           metadata: {
             source: "unit-test",
           },

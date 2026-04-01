@@ -23,6 +23,10 @@ describe("MediaDatasetValidator", () => {
         source: "unit-test",
       },
       tags: ["hero", "homepage"],
+      annotations: {
+        caption: "Homepage hero",
+        labels: ["marketing"],
+      },
       derived: {
         aspectRatio: 1.333333,
         orientation: "landscape",
@@ -95,6 +99,35 @@ describe("MediaDatasetValidator", () => {
     expect(result.value?.metadata).toEqual({});
   });
 
+  it("accepts lightweight annotation payloads and keeps records without annotations valid", () => {
+    const validator = new ZodMediaRecordValidator();
+    const withAnnotations = validator.validateRecord({
+      assetRef: {
+        assetId: "asset:image:ann-ok",
+      },
+      width: 640,
+      height: 480,
+      format: "png",
+      annotations: {
+        description: "Source frame for training sample.",
+        labels: ["source", "reviewed"],
+      },
+    });
+    expect(withAnnotations.valid).toBeTrue();
+    expect(withAnnotations.value?.annotations?.description).toBe("Source frame for training sample.");
+
+    const withoutAnnotations = validator.validateRecord({
+      assetRef: {
+        assetId: "asset:image:no-ann",
+      },
+      width: 640,
+      height: 480,
+      format: "png",
+    });
+    expect(withoutAnnotations.valid).toBeTrue();
+    expect(withoutAnnotations.value?.annotations).toBeUndefined();
+  });
+
   it("rejects malformed derived attribute shapes", () => {
     const validator = new ZodMediaRecordValidator();
     const result = validator.validateRecord({
@@ -106,6 +139,29 @@ describe("MediaDatasetValidator", () => {
       format: "png",
       derived: {
         orientation: 90,
+      },
+    });
+
+    expect(result.valid).toBeFalse();
+    expect(result.issues.some((issue) => issue.code === "media.record.invalid")).toBeTrue();
+  });
+
+  it("rejects malformed annotation payloads", () => {
+    const validator = new ZodMediaRecordValidator();
+    const result = validator.validateRecord({
+      assetRef: {
+        assetId: "asset:image:ann-bad",
+      },
+      width: 200,
+      height: 100,
+      format: "png",
+      annotations: {
+        region: {
+          x: 2,
+          y: 2,
+          width: -1,
+          height: 5,
+        },
       },
     });
 

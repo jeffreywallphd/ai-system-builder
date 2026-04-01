@@ -19,6 +19,8 @@ describe("UnifiedIngestionConfiguration", () => {
         outputTarget: UnifiedIngestionOutputTargetKinds.records,
         flattenJson: true,
         flattenJsonDepth: 3,
+        imageTags: ["vision", "curated"],
+        imageAnnotations: { caption: "Sample frame" },
         enableContentSniffing: false,
       },
     });
@@ -27,6 +29,8 @@ describe("UnifiedIngestionConfiguration", () => {
     if (resolved.configuration.mode === "advanced") {
       expect(resolved.configuration.strategy).toBe("json");
       expect(resolved.configuration.flattenJsonDepth).toBe(3);
+      expect(resolved.configuration.imageTags).toEqual(["vision", "curated"]);
+      expect(resolved.configuration.imageAnnotations).toEqual({ caption: "Sample frame" });
       expect(resolved.configuration.enableContentSniffing).toBeFalse();
     }
     expect(resolved.issues).toHaveLength(0);

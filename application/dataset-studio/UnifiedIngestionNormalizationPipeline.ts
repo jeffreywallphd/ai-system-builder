@@ -6,6 +6,7 @@ import type {
   UnifiedIngestionRouteResolution,
   UnifiedIngestionSourceReference,
 } from "../../domain/dataset-studio/UnifiedIngestionDomain";
+import type { DatasetSchemaIntentId } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import {
   UnifiedIngestionContractVersion,
   UnifiedIngestionIssueCodes,
@@ -22,6 +23,7 @@ export interface UnifiedIngestionNormalizationRequest {
   readonly route: UnifiedIngestionRouteResolution;
   readonly outputTarget: UnifiedIngestionOutputTargetKind;
   readonly configurationMode: UnifiedIngestionConfigMode;
+  readonly schemaIntentId?: DatasetSchemaIntentId;
   readonly output: CanonicalDataShape;
 }
 
@@ -222,6 +224,7 @@ export class UnifiedIngestionNormalizationPipeline {
       metadata: Object.freeze({
         outputTarget: request.outputTarget,
         configurationMode: request.configurationMode,
+        ...(request.schemaIntentId ? { schemaIntentId: request.schemaIntentId } : {}),
         sourceId: request.source.sourceId,
         sourceReference: request.source.reference,
         sourceAssetId: request.source.sourceAssetId,

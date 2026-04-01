@@ -254,3 +254,27 @@ Not implemented in this slice:
   - derived attributes
 - Preview mapping is resilient to partial/malformed image records and surfaces bounded warning diagnostics instead of failing preview generation.
 - Data Studio preview UI now renders bounded thumbnail-oriented image rows (where a preview source is available) with graceful fallbacks for missing references/metadata.
+
+## Direction 5 extension update: media tagging/annotations + schema-aware image ingestion (stories 1.1.9-1.1.10)
+
+- Canonical image-record contracts now include first-class lightweight annotations (`domain/dataset-studio/contracts/ImageAnnotations.ts`) and integrate them into `ImageRecord` normalization/creation (`domain/dataset-studio/contracts/ImageRecord.ts`) alongside normalized tags.
+- Annotation support is intentionally bounded and inspectable for dataset/workflow/system interoperability:
+  - optional `caption`, `description`, `note`
+  - optional bounded `labels`
+  - optional simple region reference (`x/y/width/height`, pixel coordinate-space support).
+- Media validation seams remain adapter-backed and library-agnostic at the domain contract boundary:
+  - image-record validation (`ZodImageRecordValidator`) now validates/normalizes tags + annotations
+  - media-dataset validation (`ZodMediaDatasetValidator`) now maps/validates annotations from canonical image metadata records.
+- Schema-aware ingestion now extends the shared unified ingestion architecture (no parallel media ingestion stack):
+  - unified ingestion requests can carry `schemaIntentId`
+  - media schema intent (`media`) can force canonical image metadata output targeting
+  - advanced unified ingestion config now supports image tag/annotation passthrough (`imageTags`, `imageAnnotations`)
+  - routed image ingestion forwards those values into `ImageIngestorAsset`.
+- `ImageIngestorAsset` now supports tags/annotations in config/request and emits them in normalized metadata/preview payloads while preserving existing canonical image record flow.
+- Image detection/ingestion behavior is now more robust for schema-aware media inputs:
+  - ingestion may proceed when probe-confirmed image metadata is valid even if extension/content-type are ambiguous
+  - unsupported formats are still rejected with explicit diagnostics
+  - partial metadata remains tolerated when a valid canonical image record can be constructed.
+- Shared preview compatibility is preserved and extended:
+  - `ImageDatasetPreviewBuilder` and Data Studio preview surface now expose annotations in image preview rows
+  - records without annotations remain backward-compatible.
