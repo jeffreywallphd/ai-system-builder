@@ -262,12 +262,31 @@ export interface DeleteDatasetInstanceImageRecordsResult {
   readonly removedCount: number;
 }
 
+export interface SelectDatasetInstanceImageRecordRequest {
+  readonly systemId: string;
+  readonly instanceId: string;
+  readonly recordId: string;
+  readonly selectionContext?: {
+    readonly selectionMode?: string;
+    readonly reason?: string;
+    readonly rank?: number;
+  };
+  readonly lineageContext?: DatasetOperationalLineageContext;
+}
+
+export interface SelectDatasetInstanceImageRecordResult {
+  readonly accepted: boolean;
+  readonly changed: boolean;
+  readonly record: DatasetInstanceImageRecord;
+}
+
 export class SystemDatasetInstanceService {
   private readonly schemaEnforcementService: DatasetInstanceSchemaEnforcementService;
   private readonly imageRecordValidator: IImageRecordValidator;
   private readonly imageMetadataExtractor: IImageMetadataExtractor;
   private readonly lineageSink?: DatasetOperationalLineageSink;
   private readonly datasetEventPublisher?: DatasetEventPublisher;
+  private readonly selectedRecordByInstanceKey = new Map<string, string>();
 
   public constructor(
     private readonly repository: DatasetInstanceRepository,
@@ -355,6 +374,9 @@ export class SystemDatasetInstanceService {
       } satisfies DatasetInstancePatch,
     });
     const saved = this.repository.save(updated);
+    if (removedImageRecordCount > 0) {
+      this.selectedRecordByInstanceKey.delete(this.createInstanceSelectionKey(instance.systemId, instance.instanceId));
+    }
     return Object.freeze({
       instance: saved,
       clearedImageRecordCount: removedImageRecordCount,
@@ -409,6 +431,7 @@ export class SystemDatasetInstanceService {
     if (!deleted) {
       throw new Error(`not-found:Dataset instance '${instance.instanceId}' was not found.`);
     }
+    this.selectedRecordByInstanceKey.delete(this.createInstanceSelectionKey(instance.systemId, instance.instanceId));
     return Object.freeze({
       instanceId: instance.instanceId,
       removedImageRecordCount,
@@ -946,7 +969,54 @@ export class SystemDatasetInstanceService {
       resultCount: deleted ? 1 : 0,
       context: request.lineageContext,
     });
+    if (deleted) {
+      const selectionKey = this.createInstanceSelectionKey(instance.systemId, instance.instanceId);
+      if (this.selectedRecordByInstanceKey.get(selectionKey) === request.recordId) {
+        this.selectedRecordByInstanceKey.delete(selectionKey);
+      }
+    }
     return deleted;
+  }
+
+  public async selectImageRecordInInstance(
+    request: SelectDatasetInstanceImageRecordRequest,
+  ): Promise<SelectDatasetInstanceImageRecordResult> {
+    const instance = await this.requireOwnedDatasetInstance({
+      systemId: request.systemId,
+      instanceId: request.instanceId,
+    });
+    const recordId = normalizeRequired(request.recordId, "recordId");
+    const record = this.repository.getImageRecordBySystemAndId({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      recordId,
+    });
+    if (!record) {
+      throw new Error(
+        `not-found:Dataset instance image record '${recordId}' was not found in instance '${instance.instanceId}'.`,
+      );
+    }
+
+    const selectionKey = this.createInstanceSelectionKey(instance.systemId, instance.instanceId);
+    const previousRecordId = this.selectedRecordByInstanceKey.get(selectionKey);
+    if (previousRecordId === record.recordId) {
+      return Object.freeze({
+        accepted: true,
+        changed: false,
+        record,
+      });
+    }
+    this.selectedRecordByInstanceKey.set(selectionKey, record.recordId);
+    await this.publishDatasetRecordSelectionEvent({
+      instance,
+      record,
+      request,
+    });
+    return Object.freeze({
+      accepted: true,
+      changed: true,
+      record,
+    });
   }
 
   public async mutateImageRecordInInstance(input:
@@ -1023,6 +1093,9 @@ export class SystemDatasetInstanceService {
     });
     this.assertInstanceMutable(instance, "delete/remove image records");
     const removedCount = this.repository.deleteImageRecordsByInstanceId(instance.instanceId);
+    if (removedCount > 0) {
+      this.selectedRecordByInstanceKey.delete(this.createInstanceSelectionKey(instance.systemId, instance.instanceId));
+    }
     return Object.freeze({
       instanceId: instance.instanceId,
       removedCount,
@@ -1254,6 +1327,50 @@ export class SystemDatasetInstanceService {
     return Object.freeze([...fields]);
   }
 
+  private async publishDatasetRecordSelectionEvent(input: {
+    readonly instance: DatasetInstance;
+    readonly record: DatasetInstanceImageRecord;
+    readonly request: SelectDatasetInstanceImageRecordRequest;
+  }): Promise<void> {
+    if (!this.datasetEventPublisher) {
+      return;
+    }
+    const event = createDatasetEventEnvelope({
+      eventType: DatasetEventTypes.imageSelected,
+      dataset: { assetId: input.instance.datasetAssetId, versionId: input.instance.datasetAssetVersionId },
+      instance: {
+        systemId: input.instance.systemId,
+        instanceId: input.instance.instanceId,
+        dataset: { assetId: input.instance.datasetAssetId, versionId: input.instance.datasetAssetVersionId },
+      },
+      actor: {
+        actorKind: DatasetEventActorKinds.system,
+        actorId: input.request.lineageContext?.actorId ?? input.instance.systemId,
+        source: input.request.lineageContext?.source ?? "system-runtime-dataset-instance-service",
+        metadata: Object.freeze({
+          operation: "selection",
+        }),
+      },
+      payloadMetadata: {
+        workflowId: input.request.lineageContext?.workflowAssetId,
+        workflowRunId: input.request.lineageContext?.workflowExecutionId,
+        systemId: input.instance.systemId,
+        lineage: Object.freeze(Object.fromEntries(
+          Object.entries({
+            instanceId: input.instance.instanceId,
+            studioId: input.request.lineageContext?.studioId,
+          }).filter((entry): entry is [string, string] => Boolean(entry[1])),
+        )),
+      },
+      payload: {
+        record: this.createDatasetRecordReference(input.record),
+        selectionContext: input.request.selectionContext,
+        derivedMetadata: input.record.image.derived,
+      },
+    });
+    await this.datasetEventPublisher.publish({ event });
+  }
+
   private createDatasetRecordReference(record: DatasetInstanceImageRecord): {
     readonly dataset: {
       readonly assetId: string;
@@ -1290,6 +1407,10 @@ export class SystemDatasetInstanceService {
       },
       imageReference,
     };
+  }
+
+  private createInstanceSelectionKey(systemId: string, instanceId: string): string {
+    return `${systemId}::${instanceId}`;
   }
 
   private isGeneratedRecord(record: DatasetInstanceImageRecord): boolean {

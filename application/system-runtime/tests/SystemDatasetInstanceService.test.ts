@@ -1496,4 +1496,145 @@ describe("SystemDatasetInstanceService", () => {
     expect(publisher.listPublishedEvents()).toHaveLength(0);
   });
 
+  it("emits image-selected events when dataset selection meaningfully changes", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const publisher = new InMemoryDatasetEventPublisher();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+      { datasetEventPublisher: publisher },
+    );
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:event-selected",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+    const first = await service.ingestImageRecordIntoInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      record: {
+        assetRef: { assetId: "asset:image:event-select-1" },
+        width: 320,
+        height: 320,
+        format: "png",
+      },
+    });
+    const second = await service.ingestImageRecordIntoInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      record: {
+        assetRef: { assetId: "asset:image:event-select-2" },
+        width: 640,
+        height: 640,
+        format: "png",
+      },
+    });
+    publisher.clear();
+
+    const firstSelection = await service.selectImageRecordInInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      recordId: first.recordId,
+      selectionContext: {
+        selectionMode: "single",
+        reason: "canvas-focus",
+        rank: 0,
+      },
+      lineageContext: {
+        actorId: "workflow-user-1",
+        source: "workflow-studio-canvas",
+        studioId: "studio:workflow",
+      },
+    });
+    const secondSelection = await service.selectImageRecordInInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      recordId: second.recordId,
+      selectionContext: {
+        selectionMode: "single",
+        reason: "next-image",
+      },
+    });
+
+    expect(firstSelection.changed).toBeTrue();
+    expect(secondSelection.changed).toBeTrue();
+    const events = publisher.listPublishedEvents();
+    expect(events).toHaveLength(2);
+    expect(events[0]?.eventType).toBe(DatasetEventTypes.imageSelected);
+    expect(events[0]?.payload.record.recordId).toBe(first.recordId);
+    expect(events[0]?.actor.actorId).toBe("workflow-user-1");
+    expect(events[0]?.actor.source).toBe("workflow-studio-canvas");
+    expect(events[0]?.payload.selectionContext).toEqual({
+      selectionMode: "single",
+      reason: "canvas-focus",
+      rank: 0,
+    });
+    expect(events[1]?.payload.record.recordId).toBe(second.recordId);
+  });
+
+  it("does not emit image-selected events for no-op selections", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const publisher = new InMemoryDatasetEventPublisher();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+      { datasetEventPublisher: publisher },
+    );
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:event-selected-noop",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+    const record = await service.ingestImageRecordIntoInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      record: {
+        assetRef: { assetId: "asset:image:event-select-noop" },
+        width: 256,
+        height: 256,
+        format: "png",
+      },
+    });
+    publisher.clear();
+
+    const first = await service.selectImageRecordInInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      recordId: record.recordId,
+    });
+    const second = await service.selectImageRecordInInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      recordId: record.recordId,
+      selectionContext: {
+        selectionMode: "single",
+        reason: "still-focused",
+      },
+    });
+
+    expect(first.changed).toBeTrue();
+    expect(second.changed).toBeFalse();
+    expect(publisher.listPublishedEvents()).toHaveLength(1);
+  });
+
 });
