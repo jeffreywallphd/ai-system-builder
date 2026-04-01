@@ -4,6 +4,7 @@ import {
 } from "../../domain/workflow-template-studio/WorkflowTemplateInstanceDomain";
 import type { WorkflowTemplateDefinition } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
 import type { WorkflowTemplateAssetService } from "./WorkflowTemplateAssetService";
+import { AssetValidationStatuses } from "../../domain/contracts/AssetValidation";
 
 export interface InstantiateWorkflowTemplateCommand {
   readonly templateId: string;
@@ -22,6 +23,17 @@ export class WorkflowTemplateInstantiationService {
   constructor(private readonly templateAssets: WorkflowTemplateAssetService) {}
 
   public async instantiate(command: InstantiateWorkflowTemplateCommand): Promise<WorkflowTemplateInstance> {
+    const readiness = await this.templateAssets.validateTemplateReadiness(command.templateId, command.versionId);
+    if (readiness.status === AssetValidationStatuses.invalid) {
+      throw new Error(`Workflow template '${command.templateId}' failed readiness validation: ${readiness.errors[0]?.message ?? "unknown error"}.`);
+    }
+
+    const integrity = await this.templateAssets.validateTemplateAssetGraph(command.templateId, command.versionId);
+    if (integrity.status === AssetValidationStatuses.invalid) {
+      const firstFailure = Object.values(integrity.errorsByAsset).find((entry) => entry.length > 0)?.[0];
+      throw new Error(`Workflow template '${command.templateId}' failed cross-asset validation: ${firstFailure?.message ?? "unknown error"}.`);
+    }
+
     const template = await this.templateAssets.resolveTemplate(command.templateId, command.versionId);
     if (!template) {
       throw new Error(`Workflow template '${command.templateId}' was not found.`);
