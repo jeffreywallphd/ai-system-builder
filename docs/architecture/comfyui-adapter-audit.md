@@ -194,3 +194,16 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
 - Added `ComfySamplerWrapperNodeAdapter` (`infrastructure/comfyui/adapters/image-nodes/ComfySamplerWrapperNodeAdapter.ts`) as the internal sampler seam with narrow sampling config (`steps`, `guidance`, `seed`, optional sampler/scheduler/strength), internal model + prompt-conditioning inputs, optional source-image composition support, and inspectable effective sampling metadata.
 - Added `ComfyResizeUpscaleNodeAdapter` (`infrastructure/comfyui/adapters/image-nodes/ComfyResizeUpscaleNodeAdapter.ts`) as the internal resize/upscale seam with narrow config (`width`/`height` and/or `scaleFactor`, fit mode, strategy), internal image output shape continuity, and explicit transform metadata updates (source/target dimensions + transform details).
 - Added focused adapter tests (`infrastructure/comfyui/adapters/image-nodes/tests/ComfySamplerAndResizeNodeAdapters.test.ts`) covering contract compliance, model+prompt sampler composition, resize metadata integrity, composability-ready output shape, boundary isolation, and normalized validation error behavior.
+
+## Story 2.2.9 + 2.2.10 update
+- Added bounded VAE adapters:
+  - `infrastructure/comfyui/adapters/image-nodes/VaeEncodeNodeAdapter.ts`
+  - `infrastructure/comfyui/adapters/image-nodes/VaeDecodeNodeAdapter.ts`
+- Extended common image-node internal contracts with a reusable latent representation (`ICommonImageNodeLatentRepresentation`) so sampler/VAE composition remains internal-contract-first and Comfy latent payload details stay inside adapter mapping.
+- VAE adapters now map internal image/model/latent inputs to Comfy class/input semantics internally (`VAEEncode`, `VAEDecode`) and return only internal latent/image outputs plus small inspectable metadata.
+- Added focused tests for encode/decode contract behavior, boundary isolation, composability seams, and normalized validation failures:
+  - `infrastructure/comfyui/adapters/image-nodes/tests/ComfyVaeNodeAdapters.test.ts`
+  - `infrastructure/comfyui/adapters/image-nodes/tests/ComfyImageNodeCompositionIntegration.test.ts`
+- Composition coverage now validates representative end-to-end chain behavior under internal contracts:
+  - load -> VAE encode -> sampler -> VAE decode -> resize -> save
+  - inspectability and normalized integration failure behavior across the composed path.
