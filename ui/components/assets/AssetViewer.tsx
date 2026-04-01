@@ -1,21 +1,45 @@
 import type { WorkflowOutputAssetViewModel } from "../../presenters/WorkflowOutputPresenter";
+import {
+  DEFAULT_IMAGE_RENDER_OPTIONS,
+  ImageRenderFrame,
+  type ImageUiViewModel,
+} from "./image-system";
 
 export interface AssetViewerProps {
   readonly asset: WorkflowOutputAssetViewModel;
+}
+
+function toImageViewModel(asset: WorkflowOutputAssetViewModel): ImageUiViewModel {
+  const [width, height] = (asset.detail.dimensionsLabel ?? "")
+    .split("x")
+    .map((entry) => Number.parseInt(entry.trim(), 10));
+
+  return {
+    imageId: asset.detail.reference,
+    title: asset.title,
+    sourceUrl: asset.previewUrl,
+    metadata: {
+      width: Number.isFinite(width) ? width : undefined,
+      height: Number.isFinite(height) ? height : undefined,
+      format: asset.detail.format,
+      altText: asset.title,
+    },
+    tags: Object.freeze([]),
+    isPlaceholder: !asset.previewUrl,
+  };
 }
 
 export default function AssetViewer({ asset }: AssetViewerProps): JSX.Element {
   const renderPreview = (): JSX.Element => {
     switch (asset.viewerType) {
       case "image":
-        return asset.previewUrl ? (
-          <img
+        return (
+          <ImageRenderFrame
             className="ui-asset-viewer__media"
-            src={asset.previewUrl}
-            alt={asset.title}
+            image={toImageViewModel(asset)}
+            renderOptions={DEFAULT_IMAGE_RENDER_OPTIONS}
+            fallbackLabel="Image preview unavailable."
           />
-        ) : (
-          <div className="ui-asset-viewer__placeholder">Image preview unavailable.</div>
         );
 
       case "video":
