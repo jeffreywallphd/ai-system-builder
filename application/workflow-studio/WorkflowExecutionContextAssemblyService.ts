@@ -7,6 +7,12 @@ import {
   type WorkflowExecutionUnresolvedInput,
   WorkflowExecutionValidationStages,
 } from "./WorkflowExecutionAlignmentContracts";
+import {
+  createWorkflowInputBindingDescriptor,
+  WorkflowInputBindingSourceKinds,
+  type WorkflowInputBindingDescriptor,
+} from "../../domain/workflow-studio/WorkflowInputBindingDomain";
+import { resolveWorkflowInputBindings } from "./WorkflowInputBindingResolutionService";
 
 export interface AssembleWorkflowExecutionContextRequest {
   readonly inputBindings: ReadonlyArray<WorkflowExecutionInputBinding>;
@@ -18,76 +24,74 @@ export interface AssembleWorkflowExecutionContextResult {
   readonly issues: ReadonlyArray<WorkflowExecutionTranslationIssue>;
 }
 
-function resolveRuntimeParameterValue(input: {
-  readonly binding: WorkflowExecutionInputBinding;
-  readonly runtimeInputValues: Readonly<Record<string, unknown>>;
-  readonly triggerPayload: Readonly<Record<string, unknown>>;
-}): {
-  readonly resolvedInput?: WorkflowExecutionResolvedInputValue;
-  readonly unresolvedInput?: WorkflowExecutionUnresolvedInput;
-} {
-  const parameterKey = input.binding.bindingKey.startsWith("inputs.")
-    ? input.binding.bindingKey.slice("inputs.".length)
-    : input.binding.bindingKey;
-  const hasRuntimeValue = Object.prototype.hasOwnProperty.call(input.runtimeInputValues, parameterKey);
-  if (hasRuntimeValue) {
-    return Object.freeze({
-      resolvedInput: Object.freeze({
-        inputId: input.binding.inputId,
-        sourceType: input.binding.sourceType,
-        required: input.binding.required,
-        valueType: input.binding.valueType,
-        bindingKey: input.binding.bindingKey,
-        resolved: true,
-        resolutionSource: "runtime-parameter" as const,
-        value: input.runtimeInputValues[parameterKey],
-      }),
+
+function toDomainBindingDescriptor(binding: WorkflowExecutionInputBinding): WorkflowInputBindingDescriptor {
+  if (binding.sourceType === "dataset-asset" && binding.dataset) {
+    return createWorkflowInputBindingDescriptor({
+      bindingId: binding.bindingKey,
+      inputId: binding.inputId,
+      required: binding.required,
+      valueType: binding.valueType,
+      sources: [
+        {
+          sourceId: `${binding.bindingKey}.dataset`,
+          kind: WorkflowInputBindingSourceKinds.constantValue,
+          priority: 1,
+          required: binding.required,
+          value: {
+            assetId: binding.dataset.assetId,
+            versionId: binding.dataset.versionId,
+            format: binding.dataset.format,
+            selection: binding.dataset.selection ? { ...binding.dataset.selection } : undefined,
+            compatibility: binding.dataset.compatibility,
+          },
+        },
+      ],
     });
   }
 
-  const hasTriggerValue = Object.prototype.hasOwnProperty.call(input.triggerPayload, parameterKey);
-  if (hasTriggerValue) {
-    return Object.freeze({
-      resolvedInput: Object.freeze({
-        inputId: input.binding.inputId,
-        sourceType: input.binding.sourceType,
-        required: input.binding.required,
-        valueType: input.binding.valueType,
-        bindingKey: input.binding.bindingKey,
-        resolved: true,
-        resolutionSource: "trigger-activation" as const,
-        value: input.triggerPayload[parameterKey],
-      }),
+  if (binding.sourceType === "static-value") {
+    return createWorkflowInputBindingDescriptor({
+      bindingId: binding.bindingKey,
+      inputId: binding.inputId,
+      required: binding.required,
+      valueType: binding.valueType,
+      sources: [
+        {
+          sourceId: `${binding.bindingKey}.static`,
+          kind: WorkflowInputBindingSourceKinds.constantValue,
+          priority: 1,
+          required: binding.required,
+          value: binding.staticValue,
+        },
+      ],
     });
   }
 
-  if (Object.prototype.hasOwnProperty.call(input.binding, "defaultValue")) {
-    return Object.freeze({
-      resolvedInput: Object.freeze({
-        inputId: input.binding.inputId,
-        sourceType: input.binding.sourceType,
-        required: input.binding.required,
-        valueType: input.binding.valueType,
-        bindingKey: input.binding.bindingKey,
-        resolved: true,
-        resolutionSource: "runtime-default" as const,
-        value: input.binding.defaultValue,
-      }),
-    });
-  }
+  const parameterKey = binding.bindingKey.startsWith("inputs.")
+    ? binding.bindingKey.slice("inputs.".length)
+    : binding.bindingKey;
 
-  return Object.freeze({
-    unresolvedInput: Object.freeze({
-      inputId: input.binding.inputId,
-      sourceType: input.binding.sourceType,
-      required: input.binding.required,
-      valueType: input.binding.valueType,
-      bindingKey: input.binding.bindingKey,
-      reasonCode: input.binding.required ? "required-input-missing" : "runtime-parameter-unresolved",
-      message: input.binding.required
-        ? `Required runtime input '${parameterKey}' was not provided and has no default value.`
-        : `Optional runtime input '${parameterKey}' was not provided; execution will continue without a value.`,
-    }),
+  return createWorkflowInputBindingDescriptor({
+    bindingId: binding.bindingKey,
+    inputId: binding.inputId,
+    required: binding.required,
+    valueType: binding.valueType,
+    ...(Object.prototype.hasOwnProperty.call(binding, "defaultValue") ? { defaultValue: binding.defaultValue } : {}),
+    sources: [
+      {
+        sourceId: `${binding.bindingKey}.runtime`,
+        kind: WorkflowInputBindingSourceKinds.runtimeParameter,
+        parameterKey,
+        priority: 1,
+      },
+      {
+        sourceId: `${binding.bindingKey}.trigger`,
+        kind: WorkflowInputBindingSourceKinds.triggerPayload,
+        payloadKey: parameterKey,
+        priority: 2,
+      },
+    ],
   });
 }
 
@@ -103,90 +107,101 @@ export function assembleWorkflowExecutionContext(
   const resolvedRuntimeInputs: Record<string, unknown> = { ...runtimeInputValues };
   const datasets: WorkflowExecutionResolvedDatasetAsset[] = [];
 
-  for (const binding of request.inputBindings) {
-    if (binding.sourceType === "dataset-asset" && binding.dataset) {
-      const datasetValue = Object.freeze({
-        assetId: binding.dataset.assetId,
-        versionId: binding.dataset.versionId,
-        format: binding.dataset.format,
-        selection: binding.dataset.selection ? Object.freeze({ ...binding.dataset.selection }) : undefined,
-        compatibility: binding.dataset.compatibility,
-      });
-      resolvedInputs.push(Object.freeze({
-        inputId: binding.inputId,
-        sourceType: binding.sourceType,
-        required: binding.required,
-        valueType: binding.valueType,
-        bindingKey: binding.bindingKey,
-        resolved: true,
-        resolutionSource: "dataset-asset",
-        value: datasetValue,
-      }));
-      resolvedInputValues[binding.inputId] = datasetValue;
-      resolvedInputBindings[binding.bindingKey] = datasetValue;
-      if (!Object.prototype.hasOwnProperty.call(resolvedRuntimeInputs, binding.inputId)) {
-        resolvedRuntimeInputs[binding.inputId] = datasetValue;
-      }
-      datasets.push(Object.freeze({
-        inputId: binding.inputId,
-        assetId: binding.dataset.assetId,
-        versionId: binding.dataset.versionId,
-        format: binding.dataset.format,
-        selection: binding.dataset.selection ? Object.freeze({ ...binding.dataset.selection }) : undefined,
-        compatibility: binding.dataset.compatibility,
-      }));
-      continue;
-    }
-
-    if (binding.sourceType === "static-value") {
-      const staticValue = binding.staticValue;
-      resolvedInputs.push(Object.freeze({
-        inputId: binding.inputId,
-        sourceType: binding.sourceType,
-        required: binding.required,
-        valueType: binding.valueType,
-        bindingKey: binding.bindingKey,
-        resolved: true,
-        resolutionSource: "static-value",
-        value: staticValue,
-      }));
-      resolvedInputValues[binding.inputId] = staticValue;
-      resolvedInputBindings[binding.bindingKey] = staticValue;
-      if (!Object.prototype.hasOwnProperty.call(resolvedRuntimeInputs, binding.inputId)) {
-        resolvedRuntimeInputs[binding.inputId] = staticValue;
-      }
-      continue;
-    }
-
-    const runtimeResolution = resolveRuntimeParameterValue({
-      binding,
-      runtimeInputValues,
+  const domainBindings = request.inputBindings.map((binding) => toDomainBindingDescriptor(binding));
+  const resolution = resolveWorkflowInputBindings({
+    bindings: domainBindings,
+    context: {
+      runtimeParameters: runtimeInputValues,
       triggerPayload,
-    });
-    if (runtimeResolution.resolvedInput) {
-      resolvedInputs.push(runtimeResolution.resolvedInput);
-      resolvedInputValues[binding.inputId] = runtimeResolution.resolvedInput.value;
-      resolvedInputBindings[binding.bindingKey] = runtimeResolution.resolvedInput.value;
+      selectedImage: (request.context.metadata?.selectedImage ?? {}) as Readonly<Record<string, unknown>>,
+      datasetInstances: (request.context.metadata?.datasetInstances as ReadonlyArray<{
+        readonly systemId?: string;
+        readonly instanceId: string;
+        readonly datasetAssetId?: string;
+        readonly datasetVersionId?: string;
+        readonly purpose?: string;
+      }> | undefined) ?? [],
+    },
+  });
+
+  for (const binding of request.inputBindings) {
+    const record = resolution.records.find((candidate) => candidate.bindingId === binding.bindingKey && candidate.inputId === binding.inputId);
+    if (!record || !record.resolved) {
+      unresolvedInputs.push(Object.freeze({
+        inputId: binding.inputId,
+        sourceType: binding.sourceType,
+        required: binding.required,
+        valueType: binding.valueType,
+        bindingKey: binding.bindingKey,
+        reasonCode: binding.required ? "required-input-missing" : "runtime-parameter-unresolved",
+        message: binding.required
+          ? `Required input '${binding.inputId}' was not provided and has no default value.`
+          : `Optional input '${binding.inputId}' was not provided; execution will continue without a value.`,
+      }));
+      continue;
+    }
+
+    const resolutionSource = binding.sourceType === "dataset-asset"
+      ? "dataset-asset"
+      : binding.sourceType === "static-value"
+        ? "static-value"
+        : record.sourceKind === WorkflowInputBindingSourceKinds.triggerPayload
+          ? "trigger-activation"
+          : record.resolutionKind === "default"
+            ? "runtime-default"
+            : "runtime-parameter";
+
+    resolvedInputs.push(Object.freeze({
+      inputId: binding.inputId,
+      sourceType: binding.sourceType,
+      required: binding.required,
+      valueType: binding.valueType,
+      bindingKey: binding.bindingKey,
+      resolved: true,
+      resolutionSource,
+      value: record.value,
+    }));
+
+    resolvedInputValues[binding.inputId] = record.value;
+    resolvedInputBindings[binding.bindingKey] = record.value;
+    if (binding.sourceType !== "runtime-parameter" && !Object.prototype.hasOwnProperty.call(resolvedRuntimeInputs, binding.inputId)) {
+      resolvedRuntimeInputs[binding.inputId] = record.value;
+    }
+
+    if (binding.sourceType === "runtime-parameter") {
       const parameterKey = binding.bindingKey.startsWith("inputs.")
         ? binding.bindingKey.slice("inputs.".length)
         : binding.bindingKey;
       if (!Object.prototype.hasOwnProperty.call(resolvedRuntimeInputs, parameterKey)) {
-        resolvedRuntimeInputs[parameterKey] = runtimeResolution.resolvedInput.value;
+        resolvedRuntimeInputs[parameterKey] = record.value;
       }
-      continue;
     }
 
-    if (runtimeResolution.unresolvedInput) {
-      unresolvedInputs.push(runtimeResolution.unresolvedInput);
+    if (binding.sourceType === "dataset-asset" && binding.dataset && record.value && typeof record.value === "object") {
+      const datasetValue = record.value as {
+        readonly assetId: string;
+        readonly versionId?: string;
+        readonly format?: "jsonl" | "json" | "csv" | "parquet";
+        readonly selection?: Readonly<Record<string, unknown>>;
+        readonly compatibility?: WorkflowExecutionResolvedDatasetAsset["compatibility"];
+      };
+      datasets.push(Object.freeze({
+        inputId: binding.inputId,
+        assetId: datasetValue.assetId,
+        versionId: datasetValue.versionId,
+        format: datasetValue.format,
+        selection: datasetValue.selection ? Object.freeze({ ...datasetValue.selection }) : undefined,
+        compatibility: datasetValue.compatibility,
+      }));
     }
   }
 
-  const issues = unresolvedInputs.map((input) => Object.freeze({
-    code: input.required ? "input-resolution-required-missing" : "input-resolution-optional-unresolved",
+  const issues = resolution.diagnostics.map((diagnostic) => Object.freeze({
+    code: diagnostic.code,
     stage: WorkflowExecutionValidationStages.preExecution,
-    severity: input.required ? "error" : "warning",
-    message: input.message,
-    path: `draft.inputs.${input.inputId}`,
+    severity: diagnostic.severity,
+    message: diagnostic.message,
+    path: diagnostic.path ?? `draft.inputs.${diagnostic.inputId}`,
   }));
 
   return Object.freeze({
