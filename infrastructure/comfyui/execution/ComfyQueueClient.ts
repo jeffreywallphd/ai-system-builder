@@ -1,9 +1,4 @@
-import type {
-  ComfyHistoryPromptEntryDto,
-  ComfyQueuePromptResponseDto,
-  ComfyQueueStateDto,
-  ComfyWorkflowDto,
-} from "../dto/ComfyWorkflowDto";
+import type { ComfyQueueStateDto, ComfyWorkflowDto } from "../dto/ComfyWorkflowDto";
 import { ComfyApiClient } from "./ComfyApiClient";
 
 export interface IComfyQueueClientOptions {
@@ -12,12 +7,27 @@ export interface IComfyQueueClientOptions {
   readonly maxWaitMs?: number;
 }
 
+export interface IComfyPromptOutputArtifact {
+  readonly kind: "image" | "video" | "audio" | "text";
+  readonly filename?: string;
+  readonly subfolder?: string;
+  readonly type?: string;
+  readonly format?: string;
+  readonly text?: string;
+}
+
+export interface IComfyPromptCompletion {
+  readonly promptId: string;
+  readonly messages: ReadonlyArray<string>;
+  readonly outputs: Readonly<Record<string, ReadonlyArray<IComfyPromptOutputArtifact>>>;
+}
+
 export interface IComfyPromptProgress {
   readonly promptId: string;
   readonly status: "queued" | "running" | "completed" | "failed" | "cancelled";
   readonly message?: string;
   readonly queuePosition?: number;
-  readonly historyEntry?: ComfyHistoryPromptEntryDto;
+  readonly completion?: IComfyPromptCompletion;
 }
 
 export class ComfyQueueClient {
@@ -33,7 +43,7 @@ export class ComfyQueueClient {
 
   public async enqueuePrompt(
     workflow: ComfyWorkflowDto
-  ): Promise<ComfyQueuePromptResponseDto> {
+  ): Promise<{ readonly prompt_id?: string }> {
     return this.apiClient.queuePrompt(workflow);
   }
 
@@ -56,7 +66,7 @@ export class ComfyQueueClient {
           promptId: normalizedPromptId,
           status: "completed",
           message: historyEntry.status?.status_str,
-          historyEntry,
+          completion: normalizeCompletion(normalizedPromptId, historyEntry),
         });
       }
 
@@ -65,7 +75,6 @@ export class ComfyQueueClient {
           promptId: normalizedPromptId,
           status: "failed",
           message: historyEntry.status?.status_str,
-          historyEntry,
         });
       }
 
@@ -73,7 +82,6 @@ export class ComfyQueueClient {
         promptId: normalizedPromptId,
         status: "running",
         message: historyEntry.status?.status_str,
-        historyEntry,
       });
     }
 
@@ -97,7 +105,7 @@ export class ComfyQueueClient {
   public async waitForCompletion(
     promptId: string,
     onProgress?: (progress: IComfyPromptProgress) => void
-  ): Promise<ComfyHistoryPromptEntryDto> {
+  ): Promise<IComfyPromptCompletion> {
     const startedAt = Date.now();
     const normalizedPromptId = promptId.trim();
 
@@ -106,13 +114,13 @@ export class ComfyQueueClient {
       onProgress?.(progress);
 
       if (progress.status === "completed") {
-        if (!progress.historyEntry) {
+        if (!progress.completion) {
           throw new Error(
             `ComfyUI prompt '${normalizedPromptId}' completed without a history entry.`
           );
         }
 
-        return progress.historyEntry;
+        return progress.completion;
       }
 
       if (progress.status === "failed") {
@@ -137,6 +145,14 @@ export class ComfyQueueClient {
     await this.apiClient.interrupt();
   }
 
+  public buildViewUrl(params: {
+    readonly filename: string;
+    readonly subfolder?: string;
+    readonly type?: string;
+  }): string {
+    return this.apiClient.buildViewUrl(params);
+  }
+
   private findQueuePosition(
     queue: ComfyQueueStateDto,
     promptId: string
@@ -156,6 +172,75 @@ export class ComfyQueueClient {
 
     return undefined;
   }
+}
+
+function normalizeCompletion(
+  promptId: string,
+  historyEntry: Readonly<Record<string, unknown>> & {
+    readonly status?: { readonly messages?: ReadonlyArray<unknown> };
+    readonly outputs?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  }
+): IComfyPromptCompletion {
+  const outputs: Record<string, ReadonlyArray<IComfyPromptOutputArtifact>> = {};
+
+  for (const [nodeId, output] of Object.entries(historyEntry.outputs ?? {})) {
+    const nodeArtifacts: IComfyPromptOutputArtifact[] = [];
+
+    for (const image of asArray(output.images)) {
+      nodeArtifacts.push({
+        kind: "image",
+        filename: asString(image.filename),
+        subfolder: asString(image.subfolder),
+        type: asString(image.type),
+      });
+    }
+
+    for (const gif of asArray(output.gifs)) {
+      nodeArtifacts.push({
+        kind: "video",
+        filename: asString(gif.filename),
+        subfolder: asString(gif.subfolder),
+        type: asString(gif.type),
+        format: asString(gif.format),
+      });
+    }
+
+    for (const audio of asArray(output.audio)) {
+      nodeArtifacts.push({
+        kind: "audio",
+        filename: asString(audio.filename),
+        subfolder: asString(audio.subfolder),
+        type: asString(audio.type),
+        format: asString(audio.format),
+      });
+    }
+
+    for (const text of asArray(output.text)) {
+      nodeArtifacts.push({ kind: "text", text: asString(text.text) });
+    }
+
+    outputs[nodeId] = Object.freeze(nodeArtifacts);
+  }
+
+  return Object.freeze({
+    promptId,
+    messages: Object.freeze(
+      (historyEntry.status?.messages ?? []).map((message) =>
+        typeof message === "string" ? message : JSON.stringify(message)
+      )
+    ),
+    outputs: Object.freeze(outputs),
+  });
+}
+
+function asArray(value: unknown): ReadonlyArray<Record<string, unknown>> {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === "object")
+    : [];
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
 function containsPromptId(value: unknown, promptId: string): boolean {

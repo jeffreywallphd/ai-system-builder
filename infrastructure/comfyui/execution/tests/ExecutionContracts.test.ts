@@ -6,8 +6,7 @@ describe("execution contracts", () => {
   it("ComfyWorkflowExecutor conforms to workflow executor interface", () => {
     const executor: IWorkflowExecutor = new ComfyWorkflowExecutor({
       workflowAdapter: { adaptWorkflowEnvelope: () => ({ prompt: {}, client_id: "wf" }) } as never,
-      apiClient: {} as never,
-      queueClient: {} as never,
+      queueClient: { buildViewUrl: () => "http://example/file.png" } as never,
     });
 
     expect(typeof executor.startExecution).toBe("function");
