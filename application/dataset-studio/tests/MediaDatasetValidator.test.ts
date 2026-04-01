@@ -97,6 +97,7 @@ describe("MediaDatasetValidator", () => {
 
     expect(result.valid).toBeTrue();
     expect(result.value?.metadata).toEqual({});
+    expect(result.value?.schemaVersion).toBe("1.0.0");
   });
 
   it("accepts lightweight annotation payloads and keeps records without annotations valid", () => {
@@ -218,5 +219,21 @@ describe("MediaDatasetValidator", () => {
     expect(result.valid).toBeFalse();
     expect(result.diagnostics.errorCount).toBeGreaterThan(0);
     expect(result.issues.length).toBeGreaterThan(0);
+  });
+
+  it("rejects image record schema versions outside supported compatibility bounds", () => {
+    const validator = new ZodMediaRecordValidator();
+    const result = validator.validateRecord({
+      assetRef: {
+        assetId: "asset:image:future-schema",
+      },
+      width: 256,
+      height: 256,
+      format: "png",
+      schemaVersion: "2.0.0",
+    });
+
+    expect(result.valid).toBeFalse();
+    expect(result.issues.some((issue) => issue.code === "media.schema-version.incompatible")).toBeTrue();
   });
 });

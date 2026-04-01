@@ -19,6 +19,7 @@ import {
   ZodImageRecordValidator,
   isAllowedMediaImageFormat,
 } from "./ImageRecordValidator";
+import { assessImageRecordVersionCompatibility } from "../../../../domain/dataset-studio/contracts/ImageRecordVersioning";
 
 const MediaRecordLimits = Object.freeze({
   maxDimension: 100_000,
@@ -161,6 +162,19 @@ function validateWidthHeightAndFormat(
       path: pathPrefix ? `${pathPrefix}.format` : "format",
       details: Object.freeze({
         allowedFormats: ["png", "jpeg", "jpg", "webp"],
+      }),
+    }));
+  }
+
+  const schemaVersionCompatibility = assessImageRecordVersionCompatibility(record.schemaVersion);
+  if (!schemaVersionCompatibility.compatible) {
+    issues.push(createMediaValidationIssue({
+      code: "media.schema-version.incompatible",
+      message: `Image record schema version '${schemaVersionCompatibility.resolvedSchemaVersion}' is not compatible with supported media image record contracts.`,
+      path: pathPrefix ? `${pathPrefix}.schemaVersion` : "schemaVersion",
+      details: Object.freeze({
+        reason: schemaVersionCompatibility.reason,
+        resolvedSchemaVersion: schemaVersionCompatibility.resolvedSchemaVersion,
       }),
     }));
   }

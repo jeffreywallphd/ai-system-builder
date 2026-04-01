@@ -58,6 +58,9 @@ describe("DataAssetRegistry", () => {
     expect(entry.descriptor.category).toBe("dataset");
     expect(entry.descriptor.versionId).toBe("v1");
     expect(entry.descriptor.version.scheme).toBe("label");
+    expect(entry.descriptor.versioning.schemaVersion).toBe("1.0.0");
+    expect(entry.descriptor.versioning.contractVersion).toBe("1.0.0");
+    expect(entry.descriptor.versioning.schemaIntentContractVersion).toBe("1.0.0");
     expect(entry.descriptor.specialization).toBe("converter");
     expect(entry.descriptor.schemaIntent.id).toBe("tabular");
     expect(entry.descriptor.configSchema.schemaId).toBe("dataset-a.schema");
@@ -197,6 +200,7 @@ describe("DataAssetRegistry", () => {
     const entry = registry.register({ asset });
     expect(entry.descriptor.schemaIntent.id).toBe("media");
     expect(entry.descriptor.schemaIntent.validationIssues).toEqual([]);
+    expect(entry.descriptor.versioning.schemaVersion).toBe("1.0.0");
     expect(entry.descriptor.inspectability.previewModes).toContain("dimensions-format-tags");
     expect(registry.list({ schemaIntentId: "media" })).toHaveLength(1);
   });
@@ -249,6 +253,13 @@ describe("DataAssetRegistry", () => {
     expect(loaded).toBeDefined();
     expect(loaded?.inspect().outputShapeKind).toBe("image-metadata-records");
     expect(loaded?.inspect().revision).toBe(2);
+    expect(loaded?.inspect().metadata.versioning).toEqual({
+      datasetVersionId: "1.0.0",
+      schemaVersion: "1.0.0",
+      contractVersion: "1.0.0",
+      revision: 2,
+      publishedVersionId: "1.0.0",
+    });
     expect(loaded?.config.values.tag).toBe("override");
   });
 

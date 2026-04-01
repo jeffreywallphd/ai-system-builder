@@ -12,6 +12,7 @@ import {
   createImageAnnotations,
   type ImageAnnotationsRecord,
 } from "./ImageAnnotations";
+import { resolveImageRecordSchemaVersion } from "./ImageRecordVersioning";
 
 export interface ImageRecord {
   readonly assetRef: ImageAssetReference;
@@ -85,6 +86,7 @@ export function createImageRecord(input: {
   readonly derived?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly schemaVersion?: string;
 }): ImageRecord {
+  const schemaVersion = resolveImageRecordSchemaVersion(input.schemaVersion);
   return Object.freeze({
     assetRef: createImageAssetReference(input.assetRef),
     width: assertPositiveDimension(input.width, "ImageRecord.width"),
@@ -94,6 +96,6 @@ export function createImageRecord(input: {
     tags: normalizeTags(input.tags),
     annotations: createImageAnnotations(input.annotations),
     derived: createImageDerivedAttributes(input.derived),
-    schemaVersion: normalizeOptional(input.schemaVersion),
+    schemaVersion: normalizeOptional(schemaVersion),
   });
 }

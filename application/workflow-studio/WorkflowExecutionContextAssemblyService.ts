@@ -110,6 +110,7 @@ export function assembleWorkflowExecutionContext(
         versionId: binding.dataset.versionId,
         format: binding.dataset.format,
         selection: binding.dataset.selection ? Object.freeze({ ...binding.dataset.selection }) : undefined,
+        compatibility: binding.dataset.compatibility,
       });
       resolvedInputs.push(Object.freeze({
         inputId: binding.inputId,
@@ -132,6 +133,7 @@ export function assembleWorkflowExecutionContext(
         versionId: binding.dataset.versionId,
         format: binding.dataset.format,
         selection: binding.dataset.selection ? Object.freeze({ ...binding.dataset.selection }) : undefined,
+        compatibility: binding.dataset.compatibility,
       }));
       continue;
     }

@@ -8,6 +8,10 @@ import {
   DatasetSchemaIntentIds,
   type IMediaSchemaIntent,
 } from "../../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import {
+  ImageRecordContractIdentifier,
+  ImageRecordSchemaVersions,
+} from "../../../../domain/dataset-studio/contracts/ImageRecordVersioning";
 import { ZodMediaDatasetValidator } from "../validation/MediaDatasetValidator";
 
 export class MediaSchemaIntentAdapter implements IMediaSchemaIntent {
@@ -19,7 +23,9 @@ export class MediaSchemaIntentAdapter implements IMediaSchemaIntent {
     supportedShapeKinds: Object.freeze(["records", "image-metadata-records"] as const),
     metadata: Object.freeze({
       previewHint: "dimensions-format-tags",
-      recordContract: "image-record",
+      recordContract: ImageRecordContractIdentifier,
+      recordContractVersion: ImageRecordSchemaVersions.current,
+      minimumCompatibleRecordVersion: ImageRecordSchemaVersions.minimumCompatible,
     }),
   });
 
