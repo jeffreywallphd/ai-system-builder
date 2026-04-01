@@ -410,6 +410,18 @@ Not implemented in this slice:
   - dataset-instance mutation continues through system-owned runtime dataset services.
 
 
+## AI Loom Image System vertical-slice update: system-owned binary output storage + provenance persistence (stories 2.3.5-2.3.6)
+
+- Workflow output materialization now supports explicit binary artifact persistence through an internal storage seam (`application/system-runtime/WorkflowOutputArtifactStorage.ts`) rather than executor-specific paths.
+- The filesystem implementation (`infrastructure/filesystem/system-runtime/LocalSystemOutputArtifactStorage.ts`) now governs pathing/naming under a system-owned root with:
+  - deterministic namespace segments (`systemId`/`datasetInstanceId`/`workflowRunId`/`materializationId`),
+  - filename normalization independent of backend names,
+  - collision-safe suffixing,
+  - stable generated output refs and inspectable storage metadata (`fileName`, `relativePath`, `sha256`, `sizeBytes`, collision index).
+- `WorkflowOutputMaterializationService` now optionally coordinates that artifact storage seam before dataset-instance ingestion and writes the resolved internal refs/metadata into the admitted image records.
+- Output lineage/provenance now persists through a dedicated repository seam (`application/system-runtime/WorkflowOutputProvenanceRepository.ts`) with both in-memory and SQLite implementations (`SqliteWorkflowOutputProvenanceRepository`).
+- Persisted provenance records capture output asset ref, source image refs, workflow asset/version, workflow run id, runtime parameter snapshot, execution capability/config snapshots, status, and timestamps so later history/inspection/comparison work can query without re-deriving from transient executor payloads.
+
 ## Direction 5 extension update: instance mutation + lifecycle management (stories 1.2.11-1.2.12)
 
 - Dataset-instance record mutation is now explicit and bounded through `SystemDatasetInstanceService.updateImageRecordInInstance(...)`:
