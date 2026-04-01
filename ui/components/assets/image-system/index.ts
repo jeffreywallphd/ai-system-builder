@@ -4,3 +4,6 @@ export * from "./ImageRenderFrame";
 export * from "./BrowserImageUploadIngestionAdapter";
 export * from "./ImageUploadPanel";
 export * from "./ImageViewer";
+export * from "./ImageParameterMappers";
+export * from "./ImageParameterForm";
+export * from "./ImageOutputGallery";
