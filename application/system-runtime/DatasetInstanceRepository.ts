@@ -11,6 +11,7 @@ import {
 export interface DatasetInstanceRepository {
   save(instance: DatasetInstance): DatasetInstance;
   getById(instanceId: string): DatasetInstance | undefined;
+  deleteById(instanceId: string): boolean;
   listBySystemId(systemId: string): ReadonlyArray<DatasetInstance>;
   findBySystemAndRole(input: {
     readonly systemId: string;
@@ -22,6 +23,11 @@ export interface DatasetInstanceRepository {
     readonly instanceId: string;
     readonly recordId: string;
   }): DatasetInstanceImageRecord | undefined;
+  deleteImageRecordById(input: {
+    readonly instanceId: string;
+    readonly recordId: string;
+  }): boolean;
+  deleteImageRecordsByInstanceId(instanceId: string): number;
   listImageRecordsByInstanceId(instanceId: string): ReadonlyArray<DatasetInstanceImageRecord>;
   queryImageRecordsByInstanceId(input: {
     readonly instanceId: string;
@@ -49,6 +55,18 @@ export class InMemoryDatasetInstanceRepository implements DatasetInstanceReposit
       return undefined;
     }
     return this.byId.get(normalized);
+  }
+
+  public deleteById(instanceId: string): boolean {
+    const normalized = normalizeOptional(instanceId);
+    if (!normalized) {
+      return false;
+    }
+    const deleted = this.byId.delete(normalized);
+    if (deleted) {
+      this.imageRecordsByInstanceId.delete(normalized);
+    }
+    return deleted;
   }
 
   public listBySystemId(systemId: string): ReadonlyArray<DatasetInstance> {
@@ -97,6 +115,40 @@ export class InMemoryDatasetInstanceRepository implements DatasetInstanceReposit
       return undefined;
     }
     return this.imageRecordsByInstanceId.get(instanceId)?.get(recordId);
+  }
+
+  public deleteImageRecordById(input: {
+    readonly instanceId: string;
+    readonly recordId: string;
+  }): boolean {
+    const instanceId = normalizeOptional(input.instanceId);
+    const recordId = normalizeOptional(input.recordId);
+    if (!instanceId || !recordId) {
+      return false;
+    }
+    const byRecordId = this.imageRecordsByInstanceId.get(instanceId);
+    if (!byRecordId) {
+      return false;
+    }
+    const deleted = byRecordId.delete(recordId);
+    if (byRecordId.size === 0) {
+      this.imageRecordsByInstanceId.delete(instanceId);
+    }
+    return deleted;
+  }
+
+  public deleteImageRecordsByInstanceId(instanceId: string): number {
+    const normalized = normalizeOptional(instanceId);
+    if (!normalized) {
+      return 0;
+    }
+    const byRecordId = this.imageRecordsByInstanceId.get(normalized);
+    if (!byRecordId) {
+      return 0;
+    }
+    const count = byRecordId.size;
+    this.imageRecordsByInstanceId.delete(normalized);
+    return count;
   }
 
   public listImageRecordsByInstanceId(instanceId: string): ReadonlyArray<DatasetInstanceImageRecord> {

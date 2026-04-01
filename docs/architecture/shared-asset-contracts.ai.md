@@ -332,3 +332,25 @@
   - deterministic list/get by instance,
   - optional simple filtering (format, tag, dimensions, asset stable id, top-level metadata equality),
   - no parallel search subsystem or UI-specific query coupling introduced.
+
+## Direction 5 extension update: instance mutation + lifecycle management (stories 1.2.11-1.2.12)
+
+- Dataset-instance record mutation is now explicit and bounded through `SystemDatasetInstanceService.updateImageRecordInInstance(...)`:
+  - record updates are patch-driven (image metadata/tags/derived/annotations, storage metadata, record metadata),
+  - image payload mutation is normalized via canonical domain patch contracts (`patchDatasetInstanceImageRecord`),
+  - all record updates are re-admitted through centralized instance schema enforcement (`DatasetInstanceSchemaEnforcementService`) before persistence.
+- Dataset-instance aggregate mutation/lifecycle now has canonical domain helpers in `domain/system-runtime/DatasetInstanceDomain.ts`:
+  - immutable patch updates (`patchDatasetInstance`),
+  - explicit lifecycle transition guards (`isDatasetInstanceLifecycleTransitionAllowed`, `transitionDatasetInstanceLifecycle`).
+- Lifecycle operations are now explicit in `SystemDatasetInstanceService` and remain role-agnostic across input/output/intermediate instances:
+  - `create` (existing),
+  - `load` (`loadDatasetInstance`),
+  - `reset/clear runtime state` (`resetDatasetInstanceState` clears instance records and resets runtime posture without breaking asset linkage),
+  - `archive/deactivate` (`archiveDatasetInstance`, `deactivateDatasetInstance`),
+  - `delete/remove` (`deleteDatasetInstance`) with archive-first gating unless force is explicitly requested.
+- Repository seams now support lifecycle persistence and cleanup operations directly (`DatasetInstanceRepository` + SQLite adapter):
+  - delete instance by id,
+  - delete single image record,
+  - clear all image records for an instance.
+- Mutation/version-tracking friendliness is now built into record state without adding full history infrastructure:
+  - dataset instance image records include `mutationVersion` and stable `admittedAt` while `updatedAt` advances on each accepted mutation.

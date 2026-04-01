@@ -153,6 +153,20 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
     return row ? this.parse(row.instance_json) : undefined;
   }
 
+  public deleteById(instanceId: string): boolean {
+    const normalized = normalizeOptional(instanceId);
+    if (!normalized) {
+      return false;
+    }
+    const result = this.getDatabase()
+      .prepare(`
+        DELETE FROM system_dataset_instances
+        WHERE instance_id = ?
+      `)
+      .run(normalized);
+    return Number(result.changes ?? 0) > 0;
+  }
+
   public listBySystemId(systemId: string): ReadonlyArray<DatasetInstance> {
     const normalized = normalizeOptional(systemId);
     if (!normalized) {
@@ -286,6 +300,40 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
     return row ? this.parseImageRecord(row.record_json) : undefined;
   }
 
+  public deleteImageRecordById(input: {
+    readonly instanceId: string;
+    readonly recordId: string;
+  }): boolean {
+    const instanceId = normalizeOptional(input.instanceId);
+    const recordId = normalizeOptional(input.recordId);
+    if (!instanceId || !recordId) {
+      return false;
+    }
+
+    const result = this.getDatabase()
+      .prepare(`
+        DELETE FROM system_dataset_instance_image_records
+        WHERE instance_id = ? AND record_id = ?
+      `)
+      .run(instanceId, recordId);
+    return Number(result.changes ?? 0) > 0;
+  }
+
+  public deleteImageRecordsByInstanceId(instanceId: string): number {
+    const normalized = normalizeOptional(instanceId);
+    if (!normalized) {
+      return 0;
+    }
+
+    const result = this.getDatabase()
+      .prepare(`
+        DELETE FROM system_dataset_instance_image_records
+        WHERE instance_id = ?
+      `)
+      .run(normalized);
+    return Number(result.changes ?? 0);
+  }
+
   public listImageRecordsByInstanceId(instanceId: string): ReadonlyArray<DatasetInstanceImageRecord> {
     const normalized = normalizeOptional(instanceId);
     if (!normalized) {
@@ -401,6 +449,7 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
       metadata: snapshot.metadata,
       admittedAt: snapshot.admittedAt,
       updatedAt: snapshot.updatedAt,
+      mutationVersion: snapshot.mutationVersion,
     });
   }
 }

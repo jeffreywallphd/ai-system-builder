@@ -8,6 +8,12 @@ import {
   type DatasetSchemaIntentId,
 } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import type { IImageMetadataExtractor } from "../../../domain/dataset-studio/interfaces/ImageMetadataExtraction";
+import type { ImageRecord } from "../../../domain/dataset-studio/contracts/ImageRecord";
+import {
+  createMediaValidationIssue,
+  createMediaValidationResult,
+  type IMediaRecordValidator,
+} from "../../../domain/dataset-studio/interfaces/MediaValidation";
 import { ZodMediaDatasetValidator } from "../../dataset-studio/adapters/validation/MediaDatasetValidator";
 import type { DatasetInstanceAssetCatalog } from "../DatasetInstanceAssetCatalog";
 import { InMemoryDatasetInstanceRepository } from "../DatasetInstanceRepository";
@@ -60,6 +66,42 @@ class StaticImageMetadataExtractor implements IImageMetadataExtractor {
       exif: Object.freeze({ make: "Camera-A" }),
       additionalMetadata: Object.freeze({ extractedBy: "static-extractor" }),
     });
+  }
+}
+
+class BlockedTagMediaRecordValidator implements IMediaRecordValidator {
+  public validateRecord(input: unknown) {
+    const records = this.validateRecords([input], "record");
+    if (!records.valid || !records.value || records.value.length === 0) {
+      return createMediaValidationResult(records.issues);
+    }
+    return createMediaValidationResult(records.issues, records.value[0]);
+  }
+
+  public validateRecords(input: unknown): ReturnType<IMediaRecordValidator["validateRecords"]> {
+    if (!Array.isArray(input)) {
+      return createMediaValidationResult([
+        createMediaValidationIssue({
+          code: "media-records-not-array",
+          message: "Expected record array.",
+        }),
+      ]);
+    }
+    const blocked = input.find((entry) => {
+      const record = entry as { readonly tags?: unknown };
+      return Array.isArray(record?.tags) && record.tags.includes("blocked-tag");
+    });
+    if (blocked) {
+      return createMediaValidationResult([
+        createMediaValidationIssue({
+          code: "media-tag-blocked",
+          message: "Blocked tag is not allowed.",
+          path: "records.tags",
+        }),
+      ]);
+    }
+
+    return createMediaValidationResult([], Object.freeze([...input] as ReadonlyArray<ImageRecord>));
   }
 }
 
@@ -752,5 +794,267 @@ describe("SystemDatasetInstanceService", () => {
     });
     expect(queried.length).toBe(1);
     expect(queried[0]?.recordId).toBe("record:query-1");
+  });
+
+  it("updates instance image records with controlled metadata/tag/derived mutation and centralized schema validation", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+    );
+
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:mutate-record",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    await service.ingestImageRecordIntoInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      recordId: "record:mutable-1",
+      record: {
+        assetRef: { assetId: "asset:image:mutable-1" },
+        width: 640,
+        height: 480,
+        format: "png",
+        metadata: { source: "camera-a", scene: "base" },
+        tags: ["seed"],
+        derived: { orientation: "landscape" },
+      },
+      metadata: { ingestionStage: "input" },
+    });
+
+    const updated = await service.updateImageRecordInInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      recordId: "record:mutable-1",
+      patch: {
+        imagePatch: {
+          tags: ["seed", "hero"],
+          metadataPatch: {
+            set: { source: "camera-b", quality: "high" },
+            remove: ["scene"],
+          },
+          derived: {
+            orientation: "landscape",
+            megapixels: 0.31,
+          },
+        },
+        metadataPatch: {
+          set: { ingestionStage: "mutation", reviewState: "approved" },
+        },
+      },
+    });
+
+    expect(updated.recordId).toBe("record:mutable-1");
+    expect(updated.image.tags).toEqual(["seed", "hero"]);
+    expect(updated.image.metadata.source).toBe("camera-b");
+    expect(updated.image.metadata.scene).toBeUndefined();
+    expect(updated.image.metadata.quality).toBe("high");
+    expect(updated.image.derived.megapixels).toBe(0.31);
+    expect(updated.metadata.ingestionStage).toBe("mutation");
+    expect(updated.metadata.reviewState).toBe("approved");
+    expect(updated.mutationVersion).toBe(2);
+  });
+
+  it("rejects invalid image record mutation through centralized instance schema enforcement", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+      {
+        mediaRecordValidator: new BlockedTagMediaRecordValidator(),
+      },
+    );
+
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:mutate-reject",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    await service.ingestImageRecordIntoInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      recordId: "record:reject-1",
+      record: {
+        assetRef: { assetId: "asset:image:reject-1" },
+        width: 800,
+        height: 600,
+        format: "png",
+        tags: ["safe"],
+      },
+    });
+
+    await expect(service.updateImageRecordInInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      recordId: "record:reject-1",
+      patch: {
+        imagePatch: {
+          tags: ["safe", "blocked-tag"],
+        },
+      },
+    })).rejects.toThrow("rejected record admission");
+  });
+
+  it("enforces dataset-instance lifecycle operations for load/reset/archive/delete with ownership checks", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline", "system:other"]),
+    );
+
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:lifecycle",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+      seedMetadata: { bucket: "incoming" },
+    });
+
+    await service.ingestImageRecordsIntoInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      records: Object.freeze([
+        {
+          recordId: "record:lifecycle-1",
+          record: {
+            assetRef: { assetId: "asset:image:lifecycle-1" },
+            width: 512,
+            height: 512,
+            format: "png",
+          },
+        },
+        {
+          recordId: "record:lifecycle-2",
+          record: {
+            assetRef: { assetId: "asset:image:lifecycle-2" },
+            width: 256,
+            height: 256,
+            format: "png",
+          },
+        },
+      ]),
+    });
+
+    const loaded = service.loadDatasetInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+    });
+    expect(loaded.datasetAssetId).toBe("image-ingestor-v1");
+
+    expect(() => service.loadDatasetInstance({
+      systemId: "system:other",
+      instanceId: instance.instanceId,
+    })).toThrow("is owned by system 'system:image-pipeline'");
+
+    const reset = await service.resetDatasetInstanceState({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      clearSeedMetadata: true,
+    });
+    expect(reset.clearedImageRecordCount).toBe(2);
+    expect(reset.instance.runtimeStatus).toBe("idle");
+    expect(reset.instance.datasetAssetId).toBe("image-ingestor-v1");
+    expect(reset.instance.seedMetadata).toBeUndefined();
+    expect(service.listImageRecordsForInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+    }).length).toBe(0);
+
+    const archived = await service.archiveDatasetInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      cleanupStatus: "pending",
+    });
+    expect(archived.lifecycleStatus).toBe("archived");
+    expect(archived.runtimeStatus).toBe("unavailable");
+    expect(archived.lifecycleMetadata?.cleanupStatus).toBe("pending");
+
+    await expect(service.ingestImageRecordIntoInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      record: {
+        assetRef: { assetId: "asset:image:lifecycle-3" },
+        width: 512,
+        height: 512,
+        format: "png",
+      },
+    })).rejects.toThrow("Cannot ingest image record for archived dataset instance");
+
+    const removed = await service.deleteDatasetInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+    });
+    expect(removed.instanceId).toBe(instance.instanceId);
+    expect(service.getDatasetInstance(instance.instanceId)).toBeUndefined();
+  });
+
+  it("rejects dataset-instance deletion before archive unless force delete is explicitly requested", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+    );
+
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:delete-gate",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    await expect(service.deleteDatasetInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+    })).rejects.toThrow("must be archived before delete/remove");
+
+    const forced = await service.deleteDatasetInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      force: true,
+    });
+    expect(forced.instanceId).toBe(instance.instanceId);
+    expect(service.getDatasetInstance(instance.instanceId)).toBeUndefined();
   });
 });

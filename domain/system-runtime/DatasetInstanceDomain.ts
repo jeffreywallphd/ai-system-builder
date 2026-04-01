@@ -66,6 +66,16 @@ export interface DatasetInstance {
   readonly updatedAt: string;
 }
 
+export interface DatasetInstancePatch {
+  readonly datasetAssetVersionId?: string | null;
+  readonly purpose?: string | null;
+  readonly lifecycleStatus?: DatasetInstanceLifecycleStatus;
+  readonly runtimeStatus?: DatasetInstanceRuntimeStatus;
+  readonly seedMetadata?: Readonly<Record<string, CanonicalRecordValue>> | null;
+  readonly lifecycleMetadata?: DatasetInstanceLifecycleMetadata | null;
+  readonly updatedAt?: string;
+}
+
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
@@ -102,6 +112,10 @@ function normalizeTimestamp(value: string | undefined, label: string): string {
     throw new Error(`${label} must be a valid ISO timestamp.`);
   }
   return normalized;
+}
+
+function normalizePatchTimestamp(input?: string): string {
+  return normalizeTimestamp(input, "DatasetInstance.updatedAt");
 }
 
 function normalizeRole(value: DatasetInstanceRole): DatasetInstanceRole {
@@ -223,6 +237,99 @@ export function createDatasetInstance(input: {
     seedMetadata: normalizeSeedMetadata(input.seedMetadata),
     lifecycleMetadata: normalizeLifecycleMetadata(input.lifecycleMetadata),
     createdAt,
+    updatedAt,
+  });
+}
+
+const AllowedLifecycleTransitions = Object.freeze({
+  [DatasetInstanceLifecycleStatuses.provisioning]: Object.freeze([
+    DatasetInstanceLifecycleStatuses.ready,
+    DatasetInstanceLifecycleStatuses.failed,
+    DatasetInstanceLifecycleStatuses.archived,
+  ]),
+  [DatasetInstanceLifecycleStatuses.ready]: Object.freeze([
+    DatasetInstanceLifecycleStatuses.failed,
+    DatasetInstanceLifecycleStatuses.archived,
+  ]),
+  [DatasetInstanceLifecycleStatuses.failed]: Object.freeze([
+    DatasetInstanceLifecycleStatuses.provisioning,
+    DatasetInstanceLifecycleStatuses.ready,
+    DatasetInstanceLifecycleStatuses.archived,
+  ]),
+  [DatasetInstanceLifecycleStatuses.archived]: Object.freeze([]),
+} as const);
+
+export function isDatasetInstanceLifecycleTransitionAllowed(input: {
+  readonly current: DatasetInstanceLifecycleStatus;
+  readonly next: DatasetInstanceLifecycleStatus;
+}): boolean {
+  if (input.current === input.next) {
+    return true;
+  }
+  const allowed = AllowedLifecycleTransitions[input.current];
+  return allowed.includes(input.next);
+}
+
+export function transitionDatasetInstanceLifecycle(input: {
+  readonly instance: DatasetInstance;
+  readonly nextLifecycleStatus: DatasetInstanceLifecycleStatus;
+  readonly nextRuntimeStatus?: DatasetInstanceRuntimeStatus;
+  readonly updatedAt?: string;
+}): DatasetInstance {
+  if (!isDatasetInstanceLifecycleTransitionAllowed({
+    current: input.instance.lifecycleStatus,
+    next: input.nextLifecycleStatus,
+  })) {
+    throw new Error(
+      `Dataset instance '${input.instance.instanceId}' cannot transition lifecycle from '${input.instance.lifecycleStatus}' to '${input.nextLifecycleStatus}'.`,
+    );
+  }
+
+  const updatedAt = normalizePatchTimestamp(input.updatedAt);
+  if (updatedAt < input.instance.createdAt) {
+    throw new Error("DatasetInstance.updatedAt cannot be earlier than createdAt.");
+  }
+  if (updatedAt < input.instance.updatedAt) {
+    throw new Error("DatasetInstance.updatedAt cannot move backwards.");
+  }
+
+  return createDatasetInstance({
+    ...input.instance,
+    lifecycleStatus: input.nextLifecycleStatus,
+    runtimeStatus: input.nextRuntimeStatus ?? input.instance.runtimeStatus,
+    updatedAt,
+  });
+}
+
+export function patchDatasetInstance(input: {
+  readonly instance: DatasetInstance;
+  readonly patch: DatasetInstancePatch;
+}): DatasetInstance {
+  const updatedAt = normalizePatchTimestamp(input.patch.updatedAt);
+  if (updatedAt < input.instance.createdAt) {
+    throw new Error("DatasetInstance.updatedAt cannot be earlier than createdAt.");
+  }
+  if (updatedAt < input.instance.updatedAt) {
+    throw new Error("DatasetInstance.updatedAt cannot move backwards.");
+  }
+
+  const patch = input.patch;
+  return createDatasetInstance({
+    ...input.instance,
+    datasetAssetVersionId: patch.datasetAssetVersionId === null
+      ? undefined
+      : patch.datasetAssetVersionId ?? input.instance.datasetAssetVersionId,
+    purpose: patch.purpose === null
+      ? undefined
+      : patch.purpose ?? input.instance.purpose,
+    lifecycleStatus: patch.lifecycleStatus ?? input.instance.lifecycleStatus,
+    runtimeStatus: patch.runtimeStatus ?? input.instance.runtimeStatus,
+    seedMetadata: patch.seedMetadata === null
+      ? undefined
+      : patch.seedMetadata ?? input.instance.seedMetadata,
+    lifecycleMetadata: patch.lifecycleMetadata === null
+      ? undefined
+      : patch.lifecycleMetadata ?? input.instance.lifecycleMetadata,
     updatedAt,
   });
 }
