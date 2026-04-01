@@ -98,7 +98,10 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
       title: "Data preparation wizard",
       subtitle: "Stage progression, validation hooks, and dynamic stage rendering over unified preparation metadata.",
       order: 12,
-      render: () => createElement(DataStudioPreparationWizardPanel),
+      render: ({ snapshot, operations }) => createElement(DataStudioPreparationWizardPanel, {
+        persistedState: snapshot?.draft?.content,
+        onPipelineStateChange: (serializedState) => operations.setDraftContent?.(serializedState),
+      }),
     },
     {
       id: "dataset-studio-stage-authoring-panel",

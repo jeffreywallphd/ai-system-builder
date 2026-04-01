@@ -91,6 +91,18 @@ function installBridge(
     runWorkflowDraft(requestJson: string) {
       return api.runWorkflowDraft(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
+    assessDataStudioExecutionReadiness(requestJson: string) {
+      return api.assessDataStudioExecutionReadiness(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    runDataStudioPipeline(requestJson: string) {
+      return api.runDataStudioPipeline(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    listDataStudioPipelines(requestJson: string) {
+      return api.listDataStudioPipelines(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    loadDataStudioPipeline(requestJson: string) {
+      return api.loadDataStudioPipeline(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
     listWorkflowRuns(requestJson: string) {
       return api.listWorkflowRuns(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },

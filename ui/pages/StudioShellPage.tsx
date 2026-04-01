@@ -1069,13 +1069,28 @@ export default function StudioShellPage({
       return false;
     }
 
+    const dataStudioPipelineState = studioRegistration?.role === "dataset"
+      ? (readPersistedDataStudioPipelineState() ?? content).trim()
+      : undefined;
+    if (studioRegistration?.role === "dataset" && !dataStudioPipelineState) {
+      setError("Data pipeline state is unavailable. Configure the Data Studio wizard before saving.");
+      if (isWorkflowStudio) {
+        setIsWorkflowSavePending(false);
+      }
+      return false;
+    }
+
+    const contentToSave = studioRegistration?.role === "dataset"
+      ? dataStudioPipelineState!
+      : workflowDraftContent;
+
     let saveResult: { readonly ok: boolean; readonly errorMessage?: string };
     if (!draftId) {
       const metadata = buildCreateMetadata(defaultDraftTitle, defaultDraftTags, resolvedMetadataPatch);
       saveResult = await runAndRefreshWithResult(() => service.createDraft({
         studioId,
         sessionId,
-        content: workflowDraftContent,
+        content: contentToSave,
         metadata,
       }));
     } else {
@@ -1083,7 +1098,7 @@ export default function StudioShellPage({
         studioId,
         sessionId,
         draftId,
-        content: workflowDraftContent,
+        content: contentToSave,
         metadataPatch: resolvedMetadataPatch,
       }));
     }
@@ -1126,7 +1141,7 @@ export default function StudioShellPage({
     }
 
     if (studioRegistration?.role === "dataset") {
-      const persistedPipelineState = readPersistedDataStudioPipelineState();
+      const persistedPipelineState = (readPersistedDataStudioPipelineState() ?? content).trim();
       if (!persistedPipelineState) {
         setError("Data pipeline state is unavailable. Configure the Data Studio wizard before running validation.");
         return;
@@ -1223,7 +1238,7 @@ export default function StudioShellPage({
     if (studioRegistration?.role !== "dataset") {
       return;
     }
-    const persistedPipelineState = readPersistedDataStudioPipelineState();
+    const persistedPipelineState = (readPersistedDataStudioPipelineState() ?? content).trim();
     if (!persistedPipelineState) {
       setError("Data pipeline state is unavailable. Configure the Data Studio wizard before running execution.");
       return;
@@ -1423,6 +1438,9 @@ export default function StudioShellPage({
     isBusy,
     operations: {
       refresh: refreshSnapshot,
+      setDraftContent: (nextContent) => {
+        updateContent(nextContent);
+      },
       startSystemExecution: async (request) => service.startSystemExecution(request),
       getSystemExecutionStatus: async (executionId) => service.getSystemExecutionStatus(executionId),
       getSystemExecutionTrace: async (request) => service.getSystemExecutionTrace(request),

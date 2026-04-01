@@ -1087,6 +1087,120 @@ describe("StudioShellBackendApi", () => {
     expect(result.data?.result?.preparedOutput?.storageReference).toContain("prepared://");
   });
 
+  it("persists and retrieves Data Studio pipelines from draft, latest-version, and explicit prior-version snapshots", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    const initialized = await api.initializeStudio("studio-dataset", "Dataset Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+
+    const wizard = new DataStudioPreparationWizard();
+    wizard.setStageOptions(PipelineStageIds.SourceSelection, Object.freeze({
+      sourceAssetId: "asset:source-customers:v1",
+      sourceReference: "prepared://warehouse/customers",
+      sourceKind: "records",
+    }));
+    const draftState = wizard.exportPipelineStateJson();
+
+    const created = await api.createDraft({
+      studioId: "studio-dataset",
+      sessionId,
+      content: draftState,
+      metadata: {
+        title: "dataset-pipeline",
+        tags: ["dataset", "pipeline"],
+      },
+    });
+    const draftId = created.data!.draft!.draftId;
+
+    await api.transitionLifecycle({
+      studioId: "studio-dataset",
+      sessionId,
+      draftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    await api.publishVersion({
+      studioId: "studio-dataset",
+      sessionId,
+      draftId,
+      versionId: "version:data-pipeline:v1",
+      versionLabel: "v1",
+    });
+    const v1SourceReference = wizard.getSnapshot().stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection)?.options?.sourceReference;
+
+    wizard.setStageOptions(PipelineStageIds.SourceSelection, Object.freeze({
+      sourceAssetId: "asset:source-customers:v2",
+      sourceReference: "prepared://warehouse/customers-v2",
+      sourceKind: "records",
+    }));
+    await api.updateDraft({
+      studioId: "studio-dataset",
+      sessionId,
+      draftId,
+      content: wizard.exportPipelineStateJson(),
+    });
+    await api.transitionLifecycle({
+      studioId: "studio-dataset",
+      sessionId,
+      draftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    await api.publishVersion({
+      studioId: "studio-dataset",
+      sessionId,
+      draftId,
+      versionId: "version:data-pipeline:v2",
+      versionLabel: "v2",
+      parentVersionId: "version:data-pipeline:v1",
+    });
+
+    const listed = await api.listDataStudioPipelines({
+      studioId: "studio-dataset",
+      draftId,
+    });
+    expect(listed.ok).toBeTrue();
+    expect(listed.data).toHaveLength(2);
+    expect(listed.data?.[0]?.versionId).toBe("version:data-pipeline:v1");
+    expect(listed.data?.[1]?.versionId).toBe("version:data-pipeline:v2");
+    expect(listed.data?.[0]?.dataStudioPipeline?.kind).toBe("data-studio-pipeline-version");
+
+    const loadedDraft = await api.loadDataStudioPipeline({
+      studioId: "studio-dataset",
+      draftId,
+      source: "draft",
+    });
+    expect(loadedDraft.ok).toBeTrue();
+    expect(loadedDraft.data?.source).toBe("draft");
+    expect(loadedDraft.data?.pipelineState.kind).toBe("data-studio-pipeline-state");
+    expect(loadedDraft.data?.latestVersionId).toBe("version:data-pipeline:v2");
+
+    const loadedLatest = await api.loadDataStudioPipeline({
+      studioId: "studio-dataset",
+      draftId,
+      source: "latest-version",
+    });
+    expect(loadedLatest.ok).toBeTrue();
+    expect(loadedLatest.data?.source).toBe("version");
+    expect(loadedLatest.data?.selectedVersionId).toBe("version:data-pipeline:v2");
+
+    const loadedVersion = await api.loadDataStudioPipeline({
+      studioId: "studio-dataset",
+      draftId,
+      source: "version-id",
+      versionId: "version:data-pipeline:v1",
+    });
+    expect(loadedVersion.ok).toBeTrue();
+    expect(loadedVersion.data?.source).toBe("version");
+    expect(loadedVersion.data?.selectedVersionId).toBe("version:data-pipeline:v1");
+    expect(loadedVersion.data?.pipelineState.kind).toBe("data-studio-pipeline-state");
+    const loadedV1SourceReference = loadedVersion.data?.pipelineState.stages
+      .find((stage) => stage.stageId === PipelineStageIds.SourceSelection)
+      ?.options?.sourceReference;
+    const loadedLatestSourceReference = loadedLatest.data?.pipelineState.stages
+      .find((stage) => stage.stageId === PipelineStageIds.SourceSelection)
+      ?.options?.sourceReference;
+    expect(loadedV1SourceReference).toBe(v1SourceReference);
+    expect(loadedLatestSourceReference).toBe("prepared://warehouse/customers-v2");
+  });
+
   it("launches manual workflow execution when validation and translation pass", async () => {
     const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
 

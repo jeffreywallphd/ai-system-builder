@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { CanonicalDataShapeKind, CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
 import {
   DataLineageReferenceKinds,
@@ -93,13 +92,29 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function fnv1a32(input: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+function toHex32(value: number): string {
+  return value.toString(16).padStart(8, "0");
+}
+
 function digestFromRequest(request: PreparedStoragePersistRequest): string {
-  const hash = createHash("sha256");
-  hash.update(request.preparedDataset.preparedAssetId, "utf-8");
-  hash.update(request.preparedDataset.preparedAssetVersionId, "utf-8");
-  hash.update(request.pipeline.pipelineAssetId, "utf-8");
-  hash.update(JSON.stringify(request.metadata ?? {}), "utf-8");
-  return hash.digest("hex");
+  const payload = [
+    request.preparedDataset.preparedAssetId,
+    request.preparedDataset.preparedAssetVersionId,
+    request.pipeline.pipelineAssetId,
+    JSON.stringify(request.metadata ?? {}),
+  ].join("|");
+  const primary = fnv1a32(payload);
+  const secondary = fnv1a32(`${payload}|prepared-storage-stage`);
+  return `fnv1a32:${toHex32(primary)}${toHex32(secondary)}`;
 }
 
 function defaultLineageId(request: PreparedStoragePersistRequest): string {
