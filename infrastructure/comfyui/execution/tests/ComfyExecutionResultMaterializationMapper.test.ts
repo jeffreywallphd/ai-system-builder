@@ -24,6 +24,7 @@ describe("ComfyExecutionResultMaterializationMapper", () => {
               filename: "hero.png",
               width: 1024,
               height: 768,
+              outputGroupId: "group:portrait:1",
             },
           },
           {
@@ -59,6 +60,9 @@ describe("ComfyExecutionResultMaterializationMapper", () => {
     expect(payload.producedAssets).toHaveLength(2);
     expect(payload.producedAssets[0]?.role).toBe("primary");
     expect(payload.producedAssets[1]?.role).toBe("variant");
+    expect(payload.producedAssets[0]?.outputIndex).toBe(0);
+    expect(payload.producedAssets[1]?.outputIndex).toBe(1);
+    expect(payload.producedAssets[0]?.outputGroupId).toBe("group:portrait:1");
     expect(payload.producedAssets[0]?.assetRef.path).toBe("hero.png");
     expect(payload.parameterSnapshot).toEqual({
       prompt: "A portrait",

@@ -65,6 +65,9 @@ export const WorkflowOutputMaterializationPayloadSchema = z.object({
     ]),
     metadata: z.record(z.string(), canonicalRecordValueSchema).default({}),
     tags: z.array(z.string().trim().min(1)).default([]),
+    outputIndex: z.number().int().nonnegative().optional(),
+    outputGroupId: z.string().trim().min(1).optional(),
+    sourceImageRef: imageAssetReferenceSchema.optional(),
     binaryPayload: workflowOutputBinaryPayloadSchema.optional(),
   })).min(1),
   parameterSnapshot: z.record(z.string(), canonicalRecordValueSchema).default({}),
@@ -123,7 +126,7 @@ export function materializationAssetToDatasetGeneration(input: {
   }
 
   const role: DatasetInstanceImageGenerationRole = asset.role;
-  const sourceImageRef = parsed.sourceImage?.imageRef ?? parsed.sourceImages?.[0]?.imageRef;
+  const sourceImageRef = asset.sourceImageRef ?? parsed.sourceImage?.imageRef ?? parsed.sourceImages?.[0]?.imageRef;
   return Object.freeze({
     outputAssetRef: asset.assetRef as ImageAssetReferenceInput,
     sourceImageRef: sourceImageRef as ImageAssetReferenceInput | undefined,
@@ -131,6 +134,8 @@ export function materializationAssetToDatasetGeneration(input: {
     workflowAssetVersionId: parsed.workflowRun.workflowAssetVersionId,
     runId: parsed.workflowRun.runId,
     role,
+    outputIndex: asset.outputIndex ?? input.assetIndex,
+    outputGroupId: asset.outputGroupId ?? `run:${parsed.workflowRun.runId}`,
     metadata: Object.freeze({
       materializationId: parsed.materializationId,
       status: parsed.status,

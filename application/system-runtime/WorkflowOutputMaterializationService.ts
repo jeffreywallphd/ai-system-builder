@@ -81,6 +81,8 @@ export class WorkflowOutputMaterializationService {
             workflowAssetVersionId: generation.workflowAssetVersionId ?? null,
             runId: generation.runId,
             role: generation.role,
+            outputIndex: generation.outputIndex ?? null,
+            outputGroupId: generation.outputGroupId ?? null,
             metadataPatch: {
               replace: generation.metadata,
             },
@@ -193,6 +195,7 @@ export class WorkflowOutputMaterializationService {
     }
 
     const sourceImageStableIds = [
+      produced.sourceImageRef?.stableId,
       input.payload.sourceImage?.imageRef.stableId,
       ...(input.payload.sourceImages ?? []).map((entry) => entry.imageRef.stableId),
     ].filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
@@ -212,6 +215,8 @@ export class WorkflowOutputMaterializationService {
       outputRecordId: input.recordId,
       outputAssetStableId: input.outputAssetStableId,
       outputRole: produced.role,
+      outputIndex: produced.outputIndex ?? input.assetIndex,
+      outputGroupId: produced.outputGroupId ?? `run:${input.payload.workflowRun.runId}`,
       sourceImageStableIds: Object.freeze([...new Set(sourceImageStableIds)]),
       parameterSnapshot: Object.freeze({ ...input.payload.parameterSnapshot }),
       executionContext: Object.freeze({ ...input.payload.executionContext.configurationSnapshot }),

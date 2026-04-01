@@ -15,6 +15,8 @@ export interface WorkflowOutputProvenanceRecord {
   readonly outputRecordId: string;
   readonly outputAssetStableId: string;
   readonly outputRole: WorkflowOutputMaterializationPayload["producedAssets"][number]["role"];
+  readonly outputIndex: number;
+  readonly outputGroupId: string;
   readonly sourceImageStableIds: ReadonlyArray<string>;
   readonly parameterSnapshot: Readonly<Record<string, CanonicalRecordValue>>;
   readonly executionContext: Readonly<Record<string, CanonicalRecordValue>>;
@@ -27,6 +29,7 @@ export interface WorkflowOutputProvenanceQuery {
   readonly workflowRunId?: string;
   readonly workflowAssetId?: string;
   readonly outputAssetStableId?: string;
+  readonly outputGroupId?: string;
   readonly status?: WorkflowOutputMaterializationPayload["status"];
   readonly limit?: number;
 }
@@ -70,9 +73,20 @@ export class InMemoryWorkflowOutputProvenanceRepository implements WorkflowOutpu
       if (query.workflowRunId && entry.workflowRunId !== query.workflowRunId.trim()) return false;
       if (query.workflowAssetId && entry.workflowAssetId !== query.workflowAssetId.trim()) return false;
       if (query.outputAssetStableId && entry.outputAssetStableId !== query.outputAssetStableId.trim()) return false;
+      if (query.outputGroupId && entry.outputGroupId !== query.outputGroupId.trim()) return false;
       if (query.status && entry.status !== query.status) return false;
       return true;
-    }).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    }).sort((a, b) => {
+      const byCreatedAt = a.createdAt.localeCompare(b.createdAt);
+      if (byCreatedAt !== 0) {
+        return byCreatedAt;
+      }
+      const byGroup = a.outputGroupId.localeCompare(b.outputGroupId);
+      if (byGroup !== 0) {
+        return byGroup;
+      }
+      return a.outputIndex - b.outputIndex;
+    });
 
     const limit = typeof query.limit === "number" && Number.isFinite(query.limit)
       ? Math.max(1, Math.floor(query.limit))

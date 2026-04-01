@@ -51,6 +51,15 @@ export interface DatasetInstanceImageRecordPreviewItem {
   readonly admittedAt: string;
   readonly updatedAt: string;
   readonly mutationVersion: number;
+  readonly generation?: {
+    readonly workflowRunId: string;
+    readonly workflowAssetId: string;
+    readonly workflowAssetVersionId?: string;
+    readonly role: string;
+    readonly outputIndex: number;
+    readonly outputGroupId: string;
+    readonly sourceImageStableId?: string;
+  };
 }
 
 export interface DatasetInstancePreviewWindow {
@@ -182,6 +191,17 @@ function toPreviewItem(input: {
       admittedAt: input.record.admittedAt,
       updatedAt: input.record.updatedAt,
       mutationVersion: input.record.mutationVersion,
+      generation: input.record.generation
+        ? Object.freeze({
+          workflowRunId: input.record.generation.runId,
+          workflowAssetId: input.record.generation.workflowAssetId,
+          workflowAssetVersionId: input.record.generation.workflowAssetVersionId,
+          role: input.record.generation.role,
+          outputIndex: input.record.generation.outputIndex ?? 0,
+          outputGroupId: input.record.generation.outputGroupId ?? `run:${input.record.generation.runId}`,
+          sourceImageStableId: input.record.generation.sourceImageRef?.stableId,
+        })
+        : undefined,
     }),
     metadataWasTruncated: metadata.isTruncated,
     validationWarnings: Object.freeze(validationWarnings),

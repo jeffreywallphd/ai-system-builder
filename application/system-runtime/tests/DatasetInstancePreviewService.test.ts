@@ -123,6 +123,31 @@ describe("DatasetInstancePreviewService", () => {
         },
       ]),
     });
+    await datasetService.updateImageRecordInInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      recordId: "preview-record-1",
+      patch: {
+        generationPatch: {
+          workflowAssetId: "asset:workflow:image",
+          workflowAssetVersionId: "v3",
+          runId: "run:preview:1",
+          role: "primary",
+          outputIndex: 0,
+          outputGroupId: "group:preview:1",
+          outputAssetRef: {
+            kind: "generated-output",
+            stableId: "generated-output:preview-record-1",
+            outputId: "prepared://preview-1",
+          },
+          sourceImageRef: {
+            kind: "generated-output",
+            stableId: "generated-output:source:preview",
+            outputId: "source:preview",
+          },
+        },
+      },
+    });
 
     const preview = previewService.listImageRecordPreviews({
       systemId: "system:image-pipeline",
@@ -143,6 +168,10 @@ describe("DatasetInstancePreviewService", () => {
     expect(preview.items[0]?.width).toBeGreaterThan(0);
     expect(preview.items[0]?.height).toBeGreaterThan(0);
     expect(preview.items[0]?.format.length).toBeGreaterThan(0);
+    expect(preview.items[0]?.generation?.workflowRunId).toBe("run:preview:1");
+    expect(preview.items[0]?.generation?.outputGroupId).toBe("group:preview:1");
+    expect(preview.items[0]?.generation?.outputIndex).toBe(0);
+    expect(preview.items[0]?.generation?.sourceImageStableId).toBe("generated-output:source:preview");
     expect(preview.inspection.metadataFieldsPerItemLimit).toBe(8);
     expect(preview.inspection.payloadSizeBytes).toBeGreaterThan(0);
     expect(preview.inspection.cache.enabled).toBeTrue();
