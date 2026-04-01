@@ -115,3 +115,17 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
 - Request/result mapping keeps Comfy file/path specifics inside infrastructure metadata only; adapter-facing contracts remain asset-reference-first.
 - Legacy Comfy direct strategy plumbing (`infrastructure/comfyui/execution/DelegatedWorkflowExecutionStrategy.ts`) was removed so Comfy execution depends on the canonical adapter-driven execution seam rather than parallel delegated wrappers.
 - Tests were updated to cover canonical asset output reference mapping and dataset-reference propagation through normalized adapter outputs.
+
+## Story 2.1.9 and 2.1.10 incremental update
+- Added a small explicit Comfy adapter configuration seam in `infrastructure/comfyui/execution/ComfyAdapterConfig.ts` with:
+  - required adapter endpoint (`baseUrl`),
+  - defaulted request timeout (`requestTimeoutMs`),
+  - defaulted polling cadence (`pollIntervalMs`),
+  - defaulted max execution wait (`maxExecutionWaitMs`),
+  - environment resolution (`COMFYUI_BASE_URL`, `COMFYUI_TIMEOUT_MS`, `COMFYUI_POLL_INTERVAL_MS`, `COMFYUI_MAX_WAIT_MS`).
+- Refactored `ComfyApiClient` and `ComfyQueueClient` constructors so runtime callers can depend on the canonical config seam instead of spreading Comfy env reads or duplicated option defaults.
+- Added adapter-level structured observability via `infrastructure/comfyui/execution/ComfyAdapterObservability.ts`.
+  - Execution path now emits normalized lifecycle logs (`request-accepted`, `execution-started`, `execution-completed`, `execution-failed`, `execution-cancelled`).
+  - Log records are machine-friendly and include execution/workflow identifiers, optional lineage/correlation refs from execution context, terminal status, duration, output count, and normalized error codes/categories where present.
+- Updated `ComfyQueueExecutionAdapter` to use centralized observability emission across request mapping, enqueue, completion, cancellation, and failure paths without leaking raw Comfy payloads into log records.
+- Added tests for configuration validation/defaulting/env loading, config-driven client construction, queue polling timeout behavior from canonical config, and structured lifecycle log emission with context correlation.

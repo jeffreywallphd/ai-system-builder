@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { ComfyAdapterConfig } from "../ComfyAdapterConfig";
 import { ComfyQueueClient } from "../ComfyQueueClient";
 
 describe("ComfyQueueClient", () => {
@@ -25,5 +26,21 @@ describe("ComfyQueueClient", () => {
     const progress = await queue.getPromptProgress("p1");
     expect(progress.status).toBe("completed");
     expect(progress.completion?.outputs.nodeA?.length).toBe(2);
+  });
+
+  it("uses canonical adapter config for polling defaults", async () => {
+    const queue = new ComfyQueueClient({
+      apiClient: {
+        getHistory: async () => ({}),
+        getQueue: async () => ({ queue_running: [], queue_pending: [] }),
+      } as never,
+      config: new ComfyAdapterConfig({
+        baseUrl: "http://localhost:8188",
+        pollIntervalMs: 1,
+        maxExecutionWaitMs: 2,
+      }),
+    });
+
+    await expect(queue.waitForCompletion("p1")).rejects.toThrow("Timed out waiting for ComfyUI prompt");
   });
 });

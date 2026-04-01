@@ -49,4 +49,44 @@ describe("ComfyWorkflowExecutor", () => {
       category: "mapping",
     });
   });
+
+  it("emits structured adapter lifecycle logs with execution context correlation", async () => {
+    const workflow = new Workflow({ id: "wf", metadata: new WorkflowMetadata({ name: "wf" }), nodes: [makeNode({ id: "n1" })] });
+    const events: Array<Record<string, unknown>> = [];
+    const adapter = new ComfyQueueExecutionAdapter({
+      requestMapper: {
+        map: (request: { context: unknown }) => ({ payload: { prompt: {}, client_id: "wf" }, executionContext: request.context }),
+      } as never,
+      queueClient: {
+        enqueuePrompt: async () => ({ prompt_id: "p1" }),
+        waitForCompletion: async () => ({ promptId: "p1", messages: ["ok"], outputs: {} }),
+        cancelPrompt: async () => undefined,
+        buildViewUrl: () => "http://example/file.png",
+      } as never,
+      logger: {
+        log: (event) => events.push(event as unknown as Record<string, unknown>),
+      },
+    });
+
+    const started = await adapter.start({
+      workflow,
+      context: {
+        identifiers: { workflowId: "wf", executionId: "exec-1" },
+        datasets: { datasetAssetRefs: [], datasetInstanceRefs: [] },
+        inputs: { selectedAssetRefs: [] },
+        runtime: { parameters: {}, options: {} },
+        observability: { correlationId: "corr-1", lineageId: "lineage-1" },
+      },
+    });
+    await started.waitForCompletion();
+
+    expect(events.map((event) => event.event)).toEqual([
+      "request-accepted",
+      "execution-started",
+      "execution-completed",
+    ]);
+    expect(events[1]?.executionId).toBe("p1");
+    expect(events[2]?.correlationId).toBe("corr-1");
+    expect(events[2]?.lineageId).toBe("lineage-1");
+  });
 });

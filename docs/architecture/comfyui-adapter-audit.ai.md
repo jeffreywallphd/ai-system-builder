@@ -51,3 +51,10 @@
 - Comfy file/path details remain infrastructure-only metadata on output records; adapter-facing request/result contracts stay asset-reference-first.
 - Removed legacy parallel delegated Comfy strategy wrapper (`infrastructure/comfyui/execution/DelegatedWorkflowExecutionStrategy.ts`) to reinforce adapter-only access patterns.
 - Added/updated tests for canonical output asset reference mapping and dataset-reference propagation in normalized result contracts.
+
+## Story 2.1.9 + 2.1.10 update
+- Added canonical Comfy adapter config seam in `infrastructure/comfyui/execution/ComfyAdapterConfig.ts` (required endpoint + minimal execution defaults + env mapping).
+- Refactored `ComfyApiClient` + `ComfyQueueClient` to consume that config seam so adapter runtime options are centralized and validated.
+- Added lightweight structured adapter observability helper in `infrastructure/comfyui/execution/ComfyAdapterObservability.ts`.
+- `ComfyQueueExecutionAdapter` now emits normalized lifecycle execution logs for accepted/start/completed/failed/cancelled events with execution-context correlation ids when present.
+- Added focused tests for valid/invalid/missing config behavior, env resolution, config-driven polling behavior, and structured log emission contracts.

@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { ComfyAdapterConfig } from "../ComfyAdapterConfig";
 import { ComfyApiClient } from "../ComfyApiClient";
 
 describe("ComfyApiClient", () => {
@@ -21,5 +22,15 @@ describe("ComfyApiClient", () => {
     } finally {
       globalThis.fetch = prev;
     }
+  });
+
+  it("supports canonical adapter config construction", () => {
+    const config = new ComfyAdapterConfig({
+      baseUrl: "http://localhost:8188",
+      requestTimeoutMs: 9999,
+    });
+    const client = new ComfyApiClient({ config });
+    const url = client.buildViewUrl({ filename: "result.png" });
+    expect(url).toContain("http://localhost:8188/view?");
   });
 });
