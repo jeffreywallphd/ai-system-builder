@@ -19,6 +19,8 @@ import type { DatasetInstanceAssetCatalog } from "../DatasetInstanceAssetCatalog
 import { InMemoryDatasetInstanceRepository } from "../DatasetInstanceRepository";
 import type { SystemDatasetOwnershipValidator } from "../SystemDatasetInstanceService";
 import { SystemDatasetInstanceService } from "../SystemDatasetInstanceService";
+import { InMemoryDatasetEventPublisher } from "../../dataset-events/DatasetEventPublisher";
+import { DatasetEventTypes } from "../../../domain/dataset-studio/contracts/DatasetEvent";
 
 class StaticAssetCatalog implements DatasetInstanceAssetCatalog {
   public constructor(
@@ -1252,4 +1254,138 @@ describe("SystemDatasetInstanceService", () => {
       instanceId: instance.instanceId,
     })).toBeUndefined();
   });
+  it("emits image-added events after successful image ingestion", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const publisher = new InMemoryDatasetEventPublisher();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+      { datasetEventPublisher: publisher },
+    );
+
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:event-ingest",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    const record = await service.ingestImageRecordIntoInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      record: {
+        assetRef: { assetId: "asset:image:event-ingest" },
+        width: 640,
+        height: 480,
+        format: "png",
+      },
+    });
+
+    const events = publisher.listPublishedEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]?.eventType).toBe(DatasetEventTypes.imageAdded);
+    expect(events[0]?.payload.record.recordId).toBe(record.recordId);
+  });
+
+  it("emits generated-image events for generated output persistence", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const publisher = new InMemoryDatasetEventPublisher();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+      { datasetEventPublisher: publisher },
+    );
+
+    const instance = await service.ensureOutputImageStoreInstance({
+      instanceId: "dataset-instance:event-generated",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    await service.ingestImageRecordIntoInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      record: {
+        assetRef: {
+          kind: "generated-output",
+          stableId: "generated-output:artifact://result-1.png",
+          outputId: "artifact://result-1.png",
+        },
+        width: 512,
+        height: 512,
+        format: "png",
+      },
+      storageProvider: "generated-output",
+      storageReference: "artifact://result-1.png",
+      provenance: {
+        sourceType: "generated-output",
+        sourceRunId: "run-001",
+      },
+    });
+
+    const events = publisher.listPublishedEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]?.eventType).toBe(DatasetEventTypes.imageGenerated);
+    expect(events[0]?.payload.record.imageReference).toBe("artifact://result-1.png");
+  });
+
+  it("does not emit dataset events when record mutation fails", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const publisher = new InMemoryDatasetEventPublisher();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+      { datasetEventPublisher: publisher, mediaRecordValidator: new BlockedTagMediaRecordValidator() },
+    );
+
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:event-failed",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    await expect(service.ingestImageRecordIntoInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      record: {
+        assetRef: { assetId: "asset:image:event-failed" },
+        width: 640,
+        height: 480,
+        format: "png",
+        tags: ["blocked-tag"],
+      },
+    })).rejects.toThrow("media-tag-blocked");
+
+    expect(publisher.listPublishedEvents()).toHaveLength(0);
+  });
+
 });

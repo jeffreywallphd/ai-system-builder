@@ -39,6 +39,11 @@ import type { DatasetInstanceRepository } from "./DatasetInstanceRepository";
 import { createDefaultMediaValidationAdapters } from "../dataset-studio/adapters/validation/MediaValidationFactory";
 import { DatasetInstanceSchemaEnforcementService } from "./DatasetInstanceSchemaEnforcementService";
 import type { DatasetOperationalLineageContext, DatasetOperationalLineageSink } from "./DatasetOperationalLineage";
+import {
+  createDatasetEventEnvelope,
+  type DatasetEventPublisher,
+} from "../dataset-events/DatasetEventPublisher";
+import { DatasetEventActorKinds, DatasetEventTypes } from "../../domain/dataset-studio/contracts/DatasetEvent";
 
 export interface SystemDatasetOwnershipValidator {
   assertSystemExists(systemId: string): Promise<void> | void;
@@ -115,6 +120,7 @@ export interface SystemDatasetInstanceServiceOptions {
   readonly mediaRecordValidator?: IMediaRecordValidator;
   readonly imageRecordValidator?: IImageRecordValidator;
   readonly imageMetadataExtractor?: IImageMetadataExtractor;
+  readonly datasetEventPublisher?: DatasetEventPublisher;
 }
 
 export interface IngestDatasetInstanceImageRecordMetadataExtraction {
@@ -261,6 +267,7 @@ export class SystemDatasetInstanceService {
   private readonly imageRecordValidator: IImageRecordValidator;
   private readonly imageMetadataExtractor: IImageMetadataExtractor;
   private readonly lineageSink?: DatasetOperationalLineageSink;
+  private readonly datasetEventPublisher?: DatasetEventPublisher;
 
   public constructor(
     private readonly repository: DatasetInstanceRepository,
@@ -280,6 +287,7 @@ export class SystemDatasetInstanceService {
     this.imageMetadataExtractor = options.imageMetadataExtractor
       ?? createDefaultMediaAdapterBundle().metadataExtractor;
     this.lineageSink = lineageSink;
+    this.datasetEventPublisher = options.datasetEventPublisher;
   }
 
   public async createDatasetInstance(request: CreateSystemDatasetInstanceRequest): Promise<DatasetInstance> {
@@ -684,6 +692,12 @@ export class SystemDatasetInstanceService {
       operation: "create",
       context: request.lineageContext,
     });
+    await this.publishDatasetRecordMutationEvent({
+      instance,
+      record: saved,
+      operation: this.isGeneratedRecord(saved) ? "generated" : "create",
+      request,
+    });
     return saved;
   }
 
@@ -899,6 +913,13 @@ export class SystemDatasetInstanceService {
       resultCount: 1,
       context: request.lineageContext,
     });
+    await this.publishDatasetRecordMutationEvent({
+      instance,
+      record: saved,
+      operation: "update",
+      previousRecord: existing,
+      request,
+    });
     return saved;
   }
 
@@ -1105,6 +1126,123 @@ export class SystemDatasetInstanceService {
       ));
     }
     return String(value);
+  }
+
+  private async publishDatasetRecordMutationEvent(input: {
+    readonly instance: DatasetInstance;
+    readonly record: DatasetInstanceImageRecord;
+    readonly operation: "create" | "update" | "generated";
+    readonly previousRecord?: DatasetInstanceImageRecord;
+    readonly request:
+      | IngestDatasetInstanceImageRecordRequest
+      | UpdateDatasetInstanceImageRecordRequest;
+  }): Promise<void> {
+    if (!this.datasetEventPublisher) {
+      return;
+    }
+    const actor = {
+      actorKind: DatasetEventActorKinds.system,
+      actorId: input.instance.systemId,
+      source: "system-runtime-dataset-instance-service",
+      metadata: {
+        operation: input.operation,
+      },
+    } as const;
+    const payloadMetadata = {
+      systemId: input.instance.systemId,
+      lineage: {
+        instanceId: input.instance.instanceId,
+      },
+    } as const;
+
+    if (input.operation === "update") {
+      const event = createDatasetEventEnvelope({
+        eventType: DatasetEventTypes.imageUpdated,
+        dataset: { assetId: input.instance.datasetAssetId, versionId: input.instance.datasetAssetVersionId },
+        instance: {
+          systemId: input.instance.systemId,
+          instanceId: input.instance.instanceId,
+          dataset: { assetId: input.instance.datasetAssetId, versionId: input.instance.datasetAssetVersionId },
+        },
+        actor,
+        payloadMetadata,
+        payload: {
+          record: this.createDatasetRecordReference(input.record),
+          previousRecord: input.previousRecord ? this.createDatasetRecordReference(input.previousRecord) : undefined,
+          updatedFields: Object.freeze(["image", "metadata", "storage", "provenance"]),
+        },
+      });
+      await this.datasetEventPublisher.publish({ event });
+      return;
+    }
+
+    const event = createDatasetEventEnvelope({
+      eventType: input.operation === "generated" ? DatasetEventTypes.imageGenerated : DatasetEventTypes.imageAdded,
+      dataset: { assetId: input.instance.datasetAssetId, versionId: input.instance.datasetAssetVersionId },
+      instance: {
+        systemId: input.instance.systemId,
+        instanceId: input.instance.instanceId,
+        dataset: { assetId: input.instance.datasetAssetId, versionId: input.instance.datasetAssetVersionId },
+      },
+      actor,
+      payloadMetadata,
+      payload: input.operation === "generated"
+        ? {
+          record: this.createDatasetRecordReference(input.record),
+          generationContext: {
+            sourceType: input.record.provenance.sourceType ?? "unknown",
+            sourceRunId: input.record.provenance.sourceRunId ?? "unknown",
+          },
+        }
+        : {
+          record: this.createDatasetRecordReference(input.record),
+        },
+    });
+    await this.datasetEventPublisher.publish({ event });
+  }
+
+  private createDatasetRecordReference(record: DatasetInstanceImageRecord): {
+    readonly dataset: {
+      readonly assetId: string;
+      readonly versionId?: string;
+    };
+    readonly selectionId: string;
+    readonly recordId: string;
+    readonly instance: {
+      readonly systemId: string;
+      readonly instanceId: string;
+      readonly dataset: {
+        readonly assetId: string;
+        readonly versionId?: string;
+      };
+    };
+    readonly imageReference?: string;
+  } {
+    const imageReference = record.storage?.reference
+      ?? record.image.assetRef?.stableId;
+    return {
+      dataset: {
+        assetId: record.datasetAssetId,
+        versionId: record.datasetAssetVersionId,
+      },
+      selectionId: record.recordId,
+      recordId: record.recordId,
+      instance: {
+        systemId: record.systemId,
+        instanceId: record.instanceId,
+        dataset: {
+          assetId: record.datasetAssetId,
+          versionId: record.datasetAssetVersionId,
+        },
+      },
+      imageReference,
+    };
+  }
+
+  private isGeneratedRecord(record: DatasetInstanceImageRecord): boolean {
+    return record.image.assetRef?.kind === "generated-output"
+      || record.storage?.provider === "generated-output"
+      || (record.provenance.sourceType?.toLowerCase().includes("generated") ?? false);
   }
 
   private createStorageReference(input: {
