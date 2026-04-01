@@ -171,6 +171,32 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
     });
   }
 
+  if (semanticRole === TaxonomySemanticRoles.workflowTemplate) {
+    if (structuralKind !== "composite") {
+      return undefined;
+    }
+
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Workflow-template instantiation payload with intent, inputs, and override parameters.",
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Resolved workflow-template expansion result including selected workflow asset references.",
+      },
+      parameters: [
+        parameter("templateCategory", true, "Workflow-template category for discoverability and filtering.", "string"),
+        parameter("supportedIntent", true, "Primary intent supported by this template.", "string"),
+      ],
+      execution: {
+        invocationMode: "deferred",
+        sideEffects: "none",
+      },
+    });
+  }
+
   if (semanticRole === TaxonomySemanticRoles.model) {
     if (structuralKind !== "atomic") {
       return undefined;

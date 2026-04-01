@@ -98,6 +98,14 @@ function classifyAssetByKind(asset: IAsset): CompositionTaxonomyDescriptor | und
     });
   }
 
+  if (asset.kind === "workflow-template") {
+    return createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.composite,
+      semanticRole: TaxonomySemanticRoles.workflowTemplate,
+      behaviorKind: TaxonomyBehaviorKinds.deterministic,
+    });
+  }
+
   if (asset.kind === "embedding") {
     return createCompositionTaxonomyDescriptor({
       structuralKind: TaxonomyStructuralKinds.atomic,
