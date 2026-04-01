@@ -17,6 +17,8 @@ describe("DatasetStudioDraftPreviewPanel", () => {
     expect(html).toContain("Source Input");
     expect(html).toContain("Ingestion Preview");
     expect(html).toContain("Inspect low-level ingestors");
+    expect(html).toContain("Dataset record selection");
+    expect(html).toContain("Dataset Inspection");
     expect(html).not.toContain("CSV Ingestor");
   });
 });
