@@ -163,6 +163,11 @@ export interface UpdateDatasetInstanceImageRecordRequest {
   readonly patch: DatasetInstanceImageRecordPatch;
 }
 
+export interface ResolveOwnedDatasetInstanceRequest {
+  readonly systemId: string;
+  readonly instanceId: string;
+}
+
 export interface ResetDatasetInstanceStateRequest {
   readonly systemId: string;
   readonly instanceId: string;
@@ -238,8 +243,16 @@ export class SystemDatasetInstanceService {
     return this.repository.save(instance);
   }
 
-  public getDatasetInstance(instanceId: string): DatasetInstance | undefined {
-    return this.repository.getById(instanceId);
+  public getDatasetInstance(request: ResolveOwnedDatasetInstanceRequest): DatasetInstance | undefined {
+    const systemId = normalizeOptional(request.systemId);
+    const instanceId = normalizeOptional(request.instanceId);
+    if (!systemId || !instanceId) {
+      return undefined;
+    }
+    return this.repository.getBySystemAndId({
+      systemId,
+      instanceId,
+    });
   }
 
   public loadDatasetInstance(request: {
@@ -484,10 +497,14 @@ export class SystemDatasetInstanceService {
   }
 
   public validateIncomingShapeForInstance(input: {
+    readonly systemId: string;
     readonly instanceId: string;
     readonly shape: CanonicalDataShape;
   }): ReturnType<IMediaDatasetValidator["validateShape"]> {
-    const instance = this.requireDatasetInstance(input.instanceId);
+    const instance = this.requireOwnedDatasetInstanceSync({
+      systemId: input.systemId,
+      instanceId: input.instanceId,
+    });
     return this.schemaEnforcementService.validateShapeForInstance({
       instance,
       shape: input.shape,
@@ -495,10 +512,14 @@ export class SystemDatasetInstanceService {
   }
 
   public validateRecordForInstance(input: {
+    readonly systemId: string;
     readonly instanceId: string;
     readonly record: unknown;
   }) {
-    const instance = this.requireDatasetInstance(input.instanceId);
+    const instance = this.requireOwnedDatasetInstanceSync({
+      systemId: input.systemId,
+      instanceId: input.instanceId,
+    });
     return this.schemaEnforcementService.validateRecordForInstance({
       instance,
       record: input.record,
@@ -506,10 +527,14 @@ export class SystemDatasetInstanceService {
   }
 
   public validateRecordsForInstance(input: {
+    readonly systemId: string;
     readonly instanceId: string;
     readonly records: ReadonlyArray<unknown>;
   }) {
-    const instance = this.requireDatasetInstance(input.instanceId);
+    const instance = this.requireOwnedDatasetInstanceSync({
+      systemId: input.systemId,
+      instanceId: input.instanceId,
+    });
     return this.schemaEnforcementService.validateRecordsForInstance({
       instance,
       records: input.records,
@@ -517,10 +542,14 @@ export class SystemDatasetInstanceService {
   }
 
   public admitRecordForInstance(input: {
+    readonly systemId: string;
     readonly instanceId: string;
     readonly record: unknown;
   }): unknown {
-    const instance = this.requireDatasetInstance(input.instanceId);
+    const instance = this.requireOwnedDatasetInstanceSync({
+      systemId: input.systemId,
+      instanceId: input.instanceId,
+    });
     return this.schemaEnforcementService.admitRecordForInstance({
       instance,
       record: input.record,
@@ -528,10 +557,14 @@ export class SystemDatasetInstanceService {
   }
 
   public admitRecordsForInstance(input: {
+    readonly systemId: string;
     readonly instanceId: string;
     readonly records: ReadonlyArray<unknown>;
   }): ReadonlyArray<unknown> {
-    const instance = this.requireDatasetInstance(input.instanceId);
+    const instance = this.requireOwnedDatasetInstanceSync({
+      systemId: input.systemId,
+      instanceId: input.instanceId,
+    });
     return this.schemaEnforcementService.admitRecordsForInstance({
       instance,
       records: input.records,
@@ -605,7 +638,8 @@ export class SystemDatasetInstanceService {
       systemId: request.systemId,
       instanceId: request.instanceId,
     });
-    return this.repository.queryImageRecordsByInstanceId({
+    return this.repository.queryImageRecordsBySystemId({
+      systemId: request.systemId,
       instanceId: request.instanceId,
       query: request.query,
     });
@@ -619,7 +653,8 @@ export class SystemDatasetInstanceService {
       instanceId: request.instanceId,
     });
     const recordId = normalizeRequired(request.recordId, "recordId");
-    return this.repository.getImageRecordById({
+    return this.repository.getImageRecordBySystemAndId({
+      systemId: request.systemId,
       instanceId: request.instanceId,
       recordId,
     });
@@ -635,7 +670,8 @@ export class SystemDatasetInstanceService {
     this.assertInstanceMutable(instance, "update image record");
 
     const recordId = normalizeRequired(request.recordId, "recordId");
-    const existing = this.repository.getImageRecordById({
+    const existing = this.repository.getImageRecordBySystemAndId({
+      systemId: instance.systemId,
       instanceId: instance.instanceId,
       recordId,
     });
@@ -818,10 +854,18 @@ export class SystemDatasetInstanceService {
     readonly instanceId: string;
   }): DatasetInstance {
     const systemId = normalizeRequired(input.systemId, "systemId");
-    const instance = this.requireDatasetInstance(input.instanceId);
-    if (instance.systemId !== systemId) {
+    const instanceId = normalizeRequired(input.instanceId, "instanceId");
+    const instance = this.repository.getBySystemAndId({
+      systemId,
+      instanceId,
+    });
+    if (!instance) {
+      const existingById = this.repository.getById(instanceId);
+      if (!existingById) {
+        throw new Error(`not-found:Dataset instance '${instanceId}' was not found.`);
+      }
       throw new Error(
-        `invalid-request:Dataset instance '${instance.instanceId}' is owned by system '${instance.systemId}', not '${systemId}'.`,
+        `invalid-request:Dataset instance '${existingById.instanceId}' is owned by system '${existingById.systemId}', not '${systemId}'.`,
       );
     }
     return instance;
@@ -860,13 +904,6 @@ export class SystemDatasetInstanceService {
     return asset;
   }
 
-  private requireDatasetInstance(instanceId: string): DatasetInstance {
-    const instance = this.repository.getById(instanceId);
-    if (!instance) {
-      throw new Error(`not-found:Dataset instance '${instanceId}' was not found.`);
-    }
-    return instance;
-  }
 }
 
 function normalizeOptional(value?: string): string | undefined {

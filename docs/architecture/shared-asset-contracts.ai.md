@@ -354,3 +354,17 @@
   - clear all image records for an instance.
 - Mutation/version-tracking friendliness is now built into record state without adding full history infrastructure:
   - dataset instance image records include `mutationVersion` and stable `admittedAt` while `updatedAt` advances on each accepted mutation.
+
+## Direction 5 extension update: instance isolation + dataset-instance previews (stories 1.2.13-1.2.14)
+
+- Dataset-instance ownership/namespacing is now enforced through repository and service seams, not only caller discipline:
+  - repository contracts now include explicit system-scoped lookups for instance and image-record reads (`getBySystemAndId`, `getImageRecordBySystemAndId`, `list/queryImageRecordsBySystemId`),
+  - `SystemDatasetInstanceService` retrieval/admission/validation paths now require system context for instance resolution and image-record access.
+- SQLite persistence now hardens record-level isolation:
+  - image record identity is now instance-scoped (`PRIMARY KEY(instance_id, record_id)`) instead of globally keyed by `record_id`,
+  - migration updates preserve existing rows and prevent cross-instance overwrite on shared record ids,
+  - foreign-key enforcement is enabled at repository initialization.
+- Dataset-instance preview support is now available through a dedicated application seam (`application/system-runtime/DatasetInstancePreviewService.ts`):
+  - preview listing is instance-boundary and ownership-aware,
+  - preview payloads are lightweight and UI-oriented (preview/image reference, dimensions/format, tags, bounded metadata summary, mutation timestamps),
+  - preview flow remains distinct from full retrieval while reusing existing validated instance/query contracts.
