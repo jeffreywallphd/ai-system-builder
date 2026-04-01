@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { AssetContractShapeKinds } from "../../domain/contracts/AssetContract";
 import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
 import { createCanonicalImageMetadataRecordsShape, type CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
@@ -25,6 +24,7 @@ import {
 import {
   IngestionIssueCategories,
   IngestionIssueRecoverabilities,
+  IngestionIssueSeverities,
   IngestionExecutionContextSchema,
   contextToIssueSource,
   createIngestionIssue,
@@ -41,14 +41,23 @@ import {
   type IngestionPreviewEnvelope,
   type IngestionSuccessEnvelope,
 } from "./IngestionCanonicalNormalization";
-import { ZodImageRecordValidator } from "./adapters/validation/ImageRecordValidator";
 import {
-  ExifrImageExifReaderAdapter,
-  ImageMetadataExtractorAdapter,
-} from "./adapters/media/ImageMetadataExtractorAdapter";
-import { ImageSizeDimensionReaderAdapter } from "./adapters/media/ImageDimensionReaderAdapter";
-import { FileTypeImageFormatDetectorAdapter } from "./adapters/media/ImageFormatDetectorAdapter";
+  createDefaultMediaAdapterBundle,
+} from "./adapters/media/MediaAdapterFactory";
+import { ImageMetadataExtractorAdapter } from "./adapters/media/ImageMetadataExtractorAdapter";
+import {
+  ImageIngestorConfigSchema,
+  parseImageIngestorConfig,
+  safeParseImageIngestorConfig,
+  type ImageIngestorConfig,
+} from "./adapters/validation/ImageIngestorConfigValidator";
+import { createDefaultMediaValidationAdapters } from "./adapters/validation/MediaValidationFactory";
 import { DefaultImageDerivedAttributeCalculator } from "./services/DefaultImageDerivedAttributeCalculator";
+
+export {
+  ImageIngestorConfigSchema,
+  type ImageIngestorConfig,
+} from "./adapters/validation/ImageIngestorConfigValidator";
 
 export const ImageIngestorErrorCodes = Object.freeze({
   invalidConfig: "image-ingestor-invalid-config",
@@ -56,6 +65,8 @@ export const ImageIngestorErrorCodes = Object.freeze({
   unsupportedType: "image-ingestor-unsupported-type",
   metadataExtractionFailed: "image-ingestor-metadata-extraction-failed",
 } as const);
+
+const defaultMediaValidationAdapters = createDefaultMediaValidationAdapters();
 
 export type ImageIngestorErrorCode = typeof ImageIngestorErrorCodes[keyof typeof ImageIngestorErrorCodes];
 
@@ -65,30 +76,6 @@ export interface ImageIngestorDiagnostic {
   readonly path?: string;
   readonly details?: Readonly<Record<string, unknown>>;
 }
-
-export const ImageIngestorConfigSchema = z.object({
-  extractExif: z.boolean().default(true),
-  generatePreviewMetadata: z.boolean().default(true),
-  normalizeOrientation: z.boolean().default(true),
-  includeFileStats: z.boolean().default(true),
-  tags: z.array(z.string().trim().min(1)).max(64).default([]),
-  annotations: z.object({
-    caption: z.string().trim().min(1).max(500).optional(),
-    description: z.string().trim().min(1).max(2000).optional(),
-    note: z.string().trim().min(1).max(2000).optional(),
-    labels: z.array(z.string().trim().min(1).max(100)).max(32).default([]),
-    region: z.object({
-      x: z.number().min(0),
-      y: z.number().min(0),
-      width: z.number().positive(),
-      height: z.number().positive(),
-      coordinateSpace: z.literal("pixel").optional(),
-      referenceId: z.string().trim().min(1).max(100).optional(),
-    }).optional(),
-  }).optional(),
-});
-
-export type ImageIngestorConfig = z.output<typeof ImageIngestorConfigSchema>;
 
 export interface ImageIngestorExecutionRequest {
   readonly source: ResolvedDataSource;
@@ -367,20 +354,28 @@ export class ImageIngestorAsset {
 
   constructor(options: ImageIngestorAssetOptions = {}) {
     this.sourceLocator = options.sourceLocator ?? new DefaultDataSourceLocator();
-    const metadataExtractor = options.metadataExtractor ?? new ImageMetadataExtractorAdapter({
-      formatDetector: options.formatDetector ?? new FileTypeImageFormatDetectorAdapter(),
-      dimensionReader: options.dimensionReader ?? new ImageSizeDimensionReaderAdapter(),
-      exifReader: options.exifReader && "readExif" in options.exifReader
-        ? options.exifReader
-        : new ExifrImageExifReaderAdapter(),
-    });
+    const defaultAdapters = createDefaultMediaAdapterBundle();
+    const resolvedFormatDetector = options.formatDetector ?? defaultAdapters.formatDetector;
+    const resolvedDimensionReader = options.dimensionReader ?? defaultAdapters.dimensionReader;
+    const resolvedExifReader = options.exifReader && "readExif" in options.exifReader
+      ? options.exifReader
+      : defaultAdapters.exifReader;
+    const metadataExtractor = options.metadataExtractor
+      ?? (resolvedFormatDetector === defaultAdapters.formatDetector
+        && resolvedDimensionReader === defaultAdapters.dimensionReader
+        && resolvedExifReader === defaultAdapters.exifReader
+        ? defaultAdapters.metadataExtractor
+        : new ImageMetadataExtractorAdapter({
+          formatDetector: resolvedFormatDetector,
+          dimensionReader: resolvedDimensionReader,
+          exifReader: resolvedExifReader,
+        }));
     this.metadataProbe = options.metadataProbe ?? new MetadataProbeFromExtractor(metadataExtractor);
     this.exifReader = options.exifReader && "read" in options.exifReader
       ? options.exifReader
-      : new ExifReaderFromExtractionReader(options.exifReader && "readExif" in options.exifReader
-        ? options.exifReader
-        : new ExifrImageExifReaderAdapter());
-    this.imageRecordValidator = options.imageRecordValidator ?? new ZodImageRecordValidator();
+      : new ExifReaderFromExtractionReader(resolvedExifReader);
+    this.imageRecordValidator = options.imageRecordValidator
+      ?? defaultMediaValidationAdapters.imageRecordValidator;
     this.imageDerivedAttributeCalculator = options.imageDerivedAttributeCalculator
       ?? new DefaultImageDerivedAttributeCalculator();
   }
@@ -445,7 +440,7 @@ export class ImageIngestorAsset {
       assetId: ImageIngestorAsset.assetId,
       assetVersion: ImageIngestorAsset.assetVersion,
     });
-    const parsedConfig = ImageIngestorConfigSchema.safeParse(request.config ?? {});
+    const parsedConfig = safeParseImageIngestorConfig(request.config);
     if (!parsedConfig.success) {
       const parsedContext = IngestionExecutionContextSchema.safeParse(request.context ?? {});
       const issues = toIngestionIssuesFromZodError(parsedConfig.error, ImageIngestorErrorCodes.invalidConfig, {
@@ -749,7 +744,7 @@ export class ImageIngestorAsset {
             code: "image-ingestor-partial-exif",
             message: "EXIF metadata was not available for this source.",
             category: IngestionIssueCategories.previewFailure,
-            severity: "warning",
+            severity: IngestionIssueSeverities.warning,
             recoverability: IngestionIssueRecoverabilities.partial,
             source: contextToIssueSource(ingestionContext),
           })])
@@ -838,7 +833,7 @@ export function toImageIngestorConfig(config: Readonly<Record<string, CanonicalR
     && !Array.isArray(config.annotations)
     ? config.annotations as Readonly<Record<string, CanonicalRecordValue>>
     : undefined;
-  return ImageIngestorConfigSchema.parse({
+  return parseImageIngestorConfig({
     extractExif: typeof config.extractExif === "boolean" ? config.extractExif : true,
     generatePreviewMetadata: typeof config.generatePreviewMetadata === "boolean" ? config.generatePreviewMetadata : true,
     normalizeOrientation: typeof config.normalizeOrientation === "boolean" ? config.normalizeOrientation : true,
