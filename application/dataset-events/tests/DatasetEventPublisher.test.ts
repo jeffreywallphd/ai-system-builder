@@ -124,4 +124,46 @@ describe("DatasetEventPublisher", () => {
     expect(matchesDatasetEventSubscriptionFilter(match, filter)).toBe(true);
     expect(matchesDatasetEventSubscriptionFilter(nonMatch, filter)).toBe(false);
   });
+
+  it("suppresses duplicate event emissions by event id within the deduplication window", () => {
+    const publisher = new InMemoryDatasetEventPublisher({ deduplicationWindow: 2 });
+    const duplicate = buildEvent(DatasetEventTypes.imageAdded, { eventId: "event-duplicate" });
+
+    publisher.publish({ event: duplicate });
+    publisher.publish({ event: duplicate });
+
+    expect(publisher.listPublishedEvents()).toHaveLength(1);
+
+    publisher.publish({ event: buildEvent(DatasetEventTypes.imageAdded, { eventId: "event-2" }) });
+    publisher.publish({ event: buildEvent(DatasetEventTypes.imageAdded, { eventId: "event-3" }) });
+    publisher.publish({ event: duplicate });
+
+    expect(publisher.listPublishedEvents().map((entry) => entry.eventId)).toEqual([
+      "event-duplicate",
+      "event-2",
+      "event-3",
+      "event-duplicate",
+    ]);
+  });
+
+  it("records subscriber delivery failures and continues notifying other subscribers", () => {
+    const publisher = new InMemoryDatasetEventPublisher();
+    const received: string[] = [];
+    publisher.subscribe({
+      listener: () => {
+        throw new Error("subscriber-broken");
+      },
+    });
+    publisher.subscribe({
+      listener: (event) => {
+        received.push(event.eventId);
+      },
+    });
+
+    publisher.publish({ event: buildEvent(DatasetEventTypes.imageSelected, { eventId: "event-safe-delivery" }) });
+
+    expect(received).toEqual(["event-safe-delivery"]);
+    expect(publisher.listDeliveryFailures()).toHaveLength(1);
+    expect(publisher.listDeliveryFailures()[0]?.message).toContain("subscriber-broken");
+  });
 });

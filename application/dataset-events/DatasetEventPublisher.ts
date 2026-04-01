@@ -22,6 +22,18 @@ export type DatasetEventSubscription = () => void;
 
 export type DatasetEventListener = (event: DatasetEvent) => void;
 
+export interface DatasetEventDeliveryFailure {
+  readonly eventId: string;
+  readonly listenerIndex: number;
+  readonly message: string;
+  readonly occurredAt: string;
+}
+
+export interface InMemoryDatasetEventPublisherOptions {
+  readonly deduplicationWindow?: number;
+  readonly maxDeliveryFailures?: number;
+}
+
 export interface DatasetEventSubscriptionFilter {
   readonly eventTypes?: ReadonlyArray<DatasetEventType>;
   readonly datasetAssetId?: string;
@@ -152,17 +164,48 @@ function matchesMetadataFilter(event: DatasetEvent, metadata: Readonly<Record<st
 }
 
 export class InMemoryDatasetEventPublisher implements DatasetEventPublisher, DatasetEventSubscriber {
+  private readonly deduplicationWindow: number;
+  private readonly maxDeliveryFailures: number;
   private readonly events: DatasetEvent[] = [];
   private readonly listeners = new Set<InMemoryDatasetEventSubscriptionState>();
+  private readonly eventIds = new Set<string>();
+  private readonly eventIdOrder: string[] = [];
+  private readonly deliveryFailures: DatasetEventDeliveryFailure[] = [];
+
+  constructor(options: InMemoryDatasetEventPublisherOptions = {}) {
+    this.deduplicationWindow = options.deduplicationWindow && options.deduplicationWindow > 0
+      ? Math.floor(options.deduplicationWindow)
+      : 500;
+    this.maxDeliveryFailures = options.maxDeliveryFailures && options.maxDeliveryFailures > 0
+      ? Math.floor(options.maxDeliveryFailures)
+      : 100;
+  }
 
   public publish(input: PublishDatasetEventInput): DatasetEvent {
     const event = createDatasetEvent(input.event);
+    if (this.eventIds.has(event.eventId)) {
+      return event;
+    }
     this.events.push(event);
+    this.eventIds.add(event.eventId);
+    this.eventIdOrder.push(event.eventId);
+    this.trimDeduplicationWindow();
 
+    let listenerIndex = 0;
     for (const subscription of this.listeners) {
       if (matchesDatasetEventSubscriptionFilter(event, subscription.filter)) {
-        subscription.listener(event);
+        try {
+          subscription.listener(event);
+        } catch (error) {
+          this.recordDeliveryFailure({
+            eventId: event.eventId,
+            listenerIndex,
+            occurredAt: new Date().toISOString(),
+            message: error instanceof Error ? error.message : "Dataset event listener failed.",
+          });
+        }
       }
+      listenerIndex += 1;
     }
 
     return event;
@@ -180,8 +223,31 @@ export class InMemoryDatasetEventPublisher implements DatasetEventPublisher, Dat
     return Object.freeze([...this.events]);
   }
 
+  public listDeliveryFailures(): ReadonlyArray<DatasetEventDeliveryFailure> {
+    return Object.freeze([...this.deliveryFailures]);
+  }
+
   public clear(): void {
     this.events.length = 0;
+    this.eventIds.clear();
+    this.eventIdOrder.length = 0;
+    this.deliveryFailures.length = 0;
+  }
+
+  private trimDeduplicationWindow(): void {
+    while (this.eventIdOrder.length > this.deduplicationWindow) {
+      const droppedEventId = this.eventIdOrder.shift();
+      if (droppedEventId) {
+        this.eventIds.delete(droppedEventId);
+      }
+    }
+  }
+
+  private recordDeliveryFailure(failure: DatasetEventDeliveryFailure): void {
+    this.deliveryFailures.push(Object.freeze(failure));
+    if (this.deliveryFailures.length > this.maxDeliveryFailures) {
+      this.deliveryFailures.splice(0, this.deliveryFailures.length - this.maxDeliveryFailures);
+    }
   }
 }
 
