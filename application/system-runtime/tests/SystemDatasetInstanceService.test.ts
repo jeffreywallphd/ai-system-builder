@@ -19,8 +19,9 @@ import type { DatasetInstanceAssetCatalog } from "../DatasetInstanceAssetCatalog
 import { InMemoryDatasetInstanceRepository } from "../DatasetInstanceRepository";
 import type { SystemDatasetOwnershipValidator } from "../SystemDatasetInstanceService";
 import { SystemDatasetInstanceService } from "../SystemDatasetInstanceService";
-import { InMemoryDatasetEventPublisher } from "../../dataset-events/DatasetEventPublisher";
+import { InMemoryDatasetEventPublisher, type DatasetEventPublisher } from "../../dataset-events/DatasetEventPublisher";
 import { DatasetEventTypes } from "../../../domain/dataset-studio/contracts/DatasetEvent";
+import { InMemoryDatasetOperationalLineageSink } from "../DatasetOperationalLineage";
 
 class StaticAssetCatalog implements DatasetInstanceAssetCatalog {
   public constructor(
@@ -104,6 +105,12 @@ class BlockedTagMediaRecordValidator implements IMediaRecordValidator {
     }
 
     return createMediaValidationResult([], Object.freeze([...input] as ReadonlyArray<ImageRecord>));
+  }
+}
+
+class ThrowingDatasetEventPublisher implements DatasetEventPublisher {
+  public publish(): never {
+    throw new Error("dataset-event-publish-failed");
   }
 }
 
@@ -1494,6 +1501,59 @@ describe("SystemDatasetInstanceService", () => {
     })).rejects.toThrow("not found");
 
     expect(publisher.listPublishedEvents()).toHaveLength(0);
+  });
+
+  it("keeps authoritative record mutations when best-effort event publication fails", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const lineage = new InMemoryDatasetOperationalLineageSink();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+      { datasetEventPublisher: new ThrowingDatasetEventPublisher() },
+      lineage,
+    );
+
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:event-publish-failed",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    const created = await service.ingestImageRecordIntoInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      recordId: "record:publish-failure",
+      record: {
+        assetRef: { assetId: "asset:image:event-publish-failure" },
+        width: 640,
+        height: 480,
+        format: "png",
+      },
+    });
+
+    const persisted = service.getImageRecordFromInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      recordId: created.recordId,
+    });
+    expect(persisted?.recordId).toBe(created.recordId);
+
+    const diagnostics = lineage.listRecent();
+    const failureEvent = diagnostics.find((entry) => entry.operation === "create-event-publish-failed");
+    expect(failureEvent?.metadata?.datasetEventType).toBe(DatasetEventTypes.imageAdded);
+    expect(failureEvent?.metadata?.datasetEventId).toBe(
+      `dataset-event:${DatasetEventTypes.imageAdded}:${instance.systemId}:${instance.instanceId}:${created.recordId}:v1`,
+    );
   });
 
   it("emits image-selected events when dataset selection meaningfully changes", async () => {

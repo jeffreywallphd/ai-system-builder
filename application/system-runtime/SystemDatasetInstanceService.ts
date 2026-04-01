@@ -1245,6 +1245,12 @@ export class SystemDatasetInstanceService {
       }
       const updateRequest = input.request;
       const event = createDatasetEventEnvelope({
+        eventId: this.createDatasetMutationEventId({
+          eventType: DatasetEventTypes.imageUpdated,
+          instance: input.instance,
+          record: input.record,
+          mutationVersion: input.record.mutationVersion,
+        }),
         eventType: DatasetEventTypes.imageUpdated,
         dataset: { assetId: input.instance.datasetAssetId, versionId: input.instance.datasetAssetVersionId },
         instance: {
@@ -1261,11 +1267,23 @@ export class SystemDatasetInstanceService {
           derivedMetadata: input.record.image.derived,
         },
       });
-      await this.datasetEventPublisher.publish({ event });
+      await this.publishDatasetEventBestEffort({
+        event,
+        instance: input.instance,
+        recordId: input.record.recordId,
+        operation: "update",
+        lineageContext: input.request.lineageContext,
+      });
       return;
     }
 
     const event = createDatasetEventEnvelope({
+      eventId: this.createDatasetMutationEventId({
+        eventType: input.operation === "generated" ? DatasetEventTypes.imageGenerated : DatasetEventTypes.imageAdded,
+        instance: input.instance,
+        record: input.record,
+        mutationVersion: input.record.mutationVersion,
+      }),
       eventType: input.operation === "generated" ? DatasetEventTypes.imageGenerated : DatasetEventTypes.imageAdded,
       dataset: { assetId: input.instance.datasetAssetId, versionId: input.instance.datasetAssetVersionId },
       instance: {
@@ -1292,7 +1310,13 @@ export class SystemDatasetInstanceService {
           derivedMetadata: input.record.image.derived,
         },
     });
-    await this.datasetEventPublisher.publish({ event });
+    await this.publishDatasetEventBestEffort({
+      event,
+      instance: input.instance,
+      recordId: input.record.recordId,
+      operation: input.operation,
+      lineageContext: input.request.lineageContext,
+    });
   }
 
   private resolveUpdatedFields(patch: DatasetInstanceImageRecordPatch): ReadonlyArray<string> {
@@ -1336,6 +1360,10 @@ export class SystemDatasetInstanceService {
       return;
     }
     const event = createDatasetEventEnvelope({
+      eventId: this.createDatasetSelectionEventId({
+        instance: input.instance,
+        record: input.record,
+      }),
       eventType: DatasetEventTypes.imageSelected,
       dataset: { assetId: input.instance.datasetAssetId, versionId: input.instance.datasetAssetVersionId },
       instance: {
@@ -1368,7 +1396,74 @@ export class SystemDatasetInstanceService {
         derivedMetadata: input.record.image.derived,
       },
     });
-    await this.datasetEventPublisher.publish({ event });
+    await this.publishDatasetEventBestEffort({
+      event,
+      instance: input.instance,
+      recordId: input.record.recordId,
+      operation: "selection",
+      lineageContext: input.request.lineageContext,
+    });
+  }
+
+  private async publishDatasetEventBestEffort(input: {
+    readonly event: ReturnType<typeof createDatasetEventEnvelope>;
+    readonly instance: DatasetInstance;
+    readonly recordId: string;
+    readonly operation: string;
+    readonly lineageContext?: DatasetOperationalLineageContext;
+  }): Promise<void> {
+    if (!this.datasetEventPublisher) {
+      return;
+    }
+    try {
+      await this.datasetEventPublisher.publish({ event: input.event });
+    } catch (error) {
+      this.lineageSink?.record({
+        eventKind: "record-write",
+        systemId: input.instance.systemId,
+        instanceId: input.instance.instanceId,
+        datasetAssetId: input.instance.datasetAssetId,
+        datasetAssetVersionId: input.instance.datasetAssetVersionId,
+        recordId: input.recordId,
+        operation: `${input.operation}-event-publish-failed`,
+        resultCount: 1,
+        metadata: Object.freeze({
+          datasetEventId: input.event.eventId,
+          datasetEventType: input.event.eventType,
+          error: error instanceof Error ? error.message : "unknown-error",
+        }),
+        context: input.lineageContext,
+      });
+    }
+  }
+
+  private createDatasetMutationEventId(input: {
+    readonly eventType: typeof DatasetEventTypes[keyof typeof DatasetEventTypes];
+    readonly instance: DatasetInstance;
+    readonly record: DatasetInstanceImageRecord;
+    readonly mutationVersion: number;
+  }): string {
+    return [
+      "dataset-event",
+      input.eventType,
+      input.instance.systemId,
+      input.instance.instanceId,
+      input.record.recordId,
+      `v${Math.max(1, Math.floor(input.mutationVersion))}`,
+    ].join(":");
+  }
+
+  private createDatasetSelectionEventId(input: {
+    readonly instance: DatasetInstance;
+    readonly record: DatasetInstanceImageRecord;
+  }): string {
+    return [
+      "dataset-event",
+      DatasetEventTypes.imageSelected,
+      input.instance.systemId,
+      input.instance.instanceId,
+      input.record.recordId,
+    ].join(":");
   }
 
   private createDatasetRecordReference(record: DatasetInstanceImageRecord): {
