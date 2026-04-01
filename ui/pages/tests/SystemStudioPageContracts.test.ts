@@ -77,6 +77,9 @@ describe("SystemStudioPage contracts", () => {
     expect(parameterSource).toContain("updateSystemParameters");
     expect(executionMetadataSource).toContain("data-testid=\"system-execution-metadata-editor\"");
     expect(executionMetadataSource).toContain("System execution metadata");
+    expect(executionMetadataSource).toContain("Runtime capability binding (bounded)");
+    expect(executionMetadataSource).toContain("Model binding ID");
+    expect(executionMetadataSource).toContain("selected model/checkpoint binding");
     expect(executionMetadataSource).toContain("updateSystemExecutionMetadata");
   });
 

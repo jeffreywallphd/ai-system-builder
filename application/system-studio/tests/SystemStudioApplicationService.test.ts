@@ -353,6 +353,49 @@ describe("SystemStudioApplicationService", () => {
         publish: { visibility: "team", exportTargets: ["registry"] },
         executionProfile: { profileId: "profile:prod", latencyTier: "standard" },
         operations: { ownerTeam: "platform", supportContact: "ops@loom.local" },
+        runtimeCapabilityBindings: {
+          schemaVersion: "1.0.0",
+          bindings: [
+            {
+              persistenceVersion: "1.0.0",
+              bindingContract: {
+                bindingId: "runtime-binding:image-default",
+                systemAssetId: "asset:system-root",
+                executionProvider: {
+                  providerId: "provider:image-runtime",
+                  providerKind: "image-runtime",
+                  labels: ["gpu"],
+                },
+                workflowExecutionProfile: {
+                  profileId: "profile:txt2img",
+                  workflowAssetId: "workflow:txt2img",
+                  executionIntent: "image-generation",
+                  requiredCapabilityTags: ["image-generation"],
+                },
+                modelBindingId: "binding:model:sdxl-default",
+                executionOptionCapability: {
+                  sampler: { required: true, defaultValue: "euler", allowedValues: ["euler"] },
+                  steps: { required: false, minimum: 1, maximum: 60 },
+                  seed: { required: false, allowDeterministic: true, allowRandom: true },
+                  guidanceScale: { required: false, minimum: 1, maximum: 20 },
+                  resolution: { required: false, minimumWidth: 512, minimumHeight: 512 },
+                  batch: { required: false, minimum: 1, maximum: 4 },
+                  runtime: { required: false, allowedDevices: ["auto", "gpu"], allowedPrecisions: ["auto", "fp16"] },
+                },
+                executionOptions: { sampler: "euler", steps: 30 },
+                availability: { status: "available", missingCapabilities: [] },
+              },
+              selectedModelBindingId: "binding:model:sdxl-default",
+              selectedExecutionOptions: { sampler: "euler", steps: 28 },
+              resolved: {
+                resolvedAt: "2026-04-01T00:00:00.000Z",
+                resolverVersion: "2.4.7",
+                resolvedExecutionOptions: { sampler: "euler", steps: 28 },
+              },
+              providerPayload: { shouldNotPersist: true },
+            },
+          ],
+        },
       },
     });
 
@@ -381,6 +424,10 @@ describe("SystemStudioApplicationService", () => {
           readonly runtime?: { readonly environment?: string };
           readonly orchestration?: { readonly mode?: string };
           readonly publish?: { readonly visibility?: string };
+          readonly runtimeCapabilityBindings?: {
+            readonly schemaVersion?: string;
+            readonly bindings?: ReadonlyArray<{ readonly selectedModelBindingId?: string; readonly providerPayload?: unknown }>;
+          };
         };
       };
     };
@@ -393,6 +440,9 @@ describe("SystemStudioApplicationService", () => {
     expect(reloadedSpec.systemSpec?.executionMetadata?.runtime?.environment).toBe("python-3.11");
     expect(reloadedSpec.systemSpec?.executionMetadata?.orchestration?.mode).toBe("queued");
     expect(reloadedSpec.systemSpec?.executionMetadata?.publish?.visibility).toBe("team");
+    expect(reloadedSpec.systemSpec?.executionMetadata?.runtimeCapabilityBindings?.schemaVersion).toBe("1.0.0");
+    expect(reloadedSpec.systemSpec?.executionMetadata?.runtimeCapabilityBindings?.bindings?.[0]?.selectedModelBindingId).toBe("binding:model:sdxl-default");
+    expect(reloadedSpec.systemSpec?.executionMetadata?.runtimeCapabilityBindings?.bindings?.[0]?.providerPayload).toBeUndefined();
 
     const projectedContract = reloaded!.draft.metadata.contract;
     const inputSchema = projectedContract?.input?.schema as { readonly properties?: Record<string, unknown> } | undefined;
@@ -400,5 +450,31 @@ describe("SystemStudioApplicationService", () => {
     expect(Object.keys(inputSchema?.properties ?? {})).toContain("prompt");
     expect(Object.keys(outputSchema?.properties ?? {})).toContain("answer");
     expect(projectedContract?.parameters.some((parameter) => parameter.id === "systemParameter:temperature")).toBeTrue();
+  });
+
+  it("rejects unsupported runtime capability binding persistence versions", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-root"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new SystemStudioApplicationService(studioShell, repository);
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createSystemDraft({
+      sessionId: ensure.session.id,
+      draftId: "draft-root",
+      title: "System Root",
+      content: JSON.stringify({ systemSpec: { components: [], nestedSystems: [], inputs: [], outputs: [], parameters: [], bindings: [] } }),
+      dependencies: [],
+    });
+
+    await expect(service.updateSystemExecutionMetadata({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      executionMetadata: {
+        runtimeCapabilityBindings: {
+          schemaVersion: "0.9.0",
+          bindings: [],
+        },
+      },
+    })).rejects.toThrow("unsupported-runtime-capability-binding-persistence-version:0.9.0");
   });
 });

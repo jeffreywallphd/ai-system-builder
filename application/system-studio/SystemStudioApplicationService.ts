@@ -37,6 +37,7 @@ import {
   type StudioAssetEnforcementIssue,
 } from "../studio-shell/AtomicStudioAssetEnforcement";
 import type { AssetVersion } from "../../domain/assets/AssetVersion";
+import { parsePersistedRuntimeCapabilityBindingEnvelope } from "../system-runtime/RuntimeCapabilityBindingPersistence";
 
 export interface EnsureSystemStudioResult {
   readonly initialized: boolean;
@@ -145,6 +146,23 @@ export interface UpdateSystemExecutionMetadataCommand {
   readonly sessionId: string;
   readonly draftId: string;
   readonly executionMetadata?: SystemExecutionMetadata;
+}
+
+function normalizeSystemExecutionMetadataInput(
+  input?: SystemExecutionMetadata,
+): SystemExecutionMetadata | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  const runtimeCapabilityBindings = input.runtimeCapabilityBindings
+    ? parsePersistedRuntimeCapabilityBindingEnvelope(input.runtimeCapabilityBindings)
+    : undefined;
+
+  return Object.freeze({
+    ...input,
+    runtimeCapabilityBindings,
+  });
 }
 
 function parseSystemContent(content: string): SystemSpecContent {
@@ -690,6 +708,7 @@ export class SystemStudioApplicationService {
     }
 
     const spec = parseSystemContent(loaded.draft.content);
+    const executionMetadata = normalizeSystemExecutionMetadataInput(command.executionMetadata);
     const nextSystem = createSystemAsset({
       assetId: loaded.draft.assetId,
       taxonomy: loaded.draft.metadata.taxonomy ?? createSystemStudioTaxonomy(),
@@ -700,7 +719,7 @@ export class SystemStudioApplicationService {
       outputs: spec.outputs,
       parameters: spec.parameters,
       bindings: spec.bindings,
-      executionMetadata: command.executionMetadata,
+      executionMetadata,
     });
 
     return this.updateSystemDraft({
