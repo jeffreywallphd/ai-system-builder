@@ -16,8 +16,11 @@ describe("DatasetStudioPage contracts", () => {
     expect(registrationSource).toContain('slot: "draft-authoring"');
     expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain("createDatasetStudioTaxonomy()");
-    expect(registrationSource).toContain("DatasetStageWizardPanel");
-    expect(registrationSource).toContain('id: "dataset-studio-stage-wizard-panel"');
+    expect(registrationSource).toContain("DataStudioPreparationWizardPanel");
+    expect(registrationSource).toContain('id: "data-studio-preparation-wizard-panel"');
+    expect(registrationSource).toContain('kind: "save-draft"');
+    expect(registrationSource).toContain('kind: "run-validation"');
+    expect(registrationSource).toContain('kind: "refresh-snapshot"');
     expect(registrationSource).toContain("DatasetStudioDraftPreviewPanel");
     expect(registrationSource).toContain('id: "dataset-studio-data-preview-panel"');
     expect(previewPanelSource).toContain("AssetConfigurationPanel");

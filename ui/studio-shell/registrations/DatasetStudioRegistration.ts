@@ -4,6 +4,7 @@ import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 import DatasetStudioDraftPreviewPanel from "../../components/assets/DatasetStudioDraftPreviewPanel";
 import DatasetStageAuthoringPanel from "../../components/assets/DatasetStageAuthoringPanel";
+import DataStudioPreparationWizardPanel from "../../components/assets/DataStudioPreparationWizardPanel";
 
 export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze({
   studioType: DatasetStudioIdentity.studioType,
@@ -12,6 +13,35 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
   displayName: DatasetStudioIdentity.defaultStudioName,
   role: "dataset",
   allowedBehaviorKinds: Object.freeze(["none"]),
+  shell: Object.freeze({
+    title: "Data Studio",
+    subtitle: "Stage-based data preparation authoring with wizard-first progression over one canonical asset graph.",
+    toolbar: Object.freeze({
+      actions: Object.freeze([
+        {
+          id: "data-studio-toolbar-save",
+          kind: "save-draft",
+          label: "Save",
+          tone: "primary",
+          order: 10,
+        },
+        {
+          id: "data-studio-toolbar-validate",
+          kind: "run-validation",
+          label: "Run Validation",
+          tone: "default",
+          order: 20,
+        },
+        {
+          id: "data-studio-toolbar-refresh",
+          kind: "refresh-snapshot",
+          label: "Refresh Snapshot",
+          tone: "ghost",
+          order: 30,
+        },
+      ]),
+    }),
+  }),
   defaults: {
     title: "Dataset Asset Draft",
     tags: Object.freeze(["dataset", "studio-shell"]),
@@ -54,6 +84,14 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
           `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
         ]);
       },
+    },
+    {
+      id: "data-studio-preparation-wizard-panel",
+      slot: "draft-authoring",
+      title: "Data preparation wizard",
+      subtitle: "Stage progression, validation hooks, and dynamic stage rendering over unified preparation metadata.",
+      order: 12,
+      render: () => createElement(DataStudioPreparationWizardPanel),
     },
     {
       id: "dataset-studio-stage-authoring-panel",

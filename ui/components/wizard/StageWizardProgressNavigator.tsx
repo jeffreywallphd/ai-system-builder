@@ -1,11 +1,11 @@
-import type { DatasetStageWizardStageStatus } from "../../studio-shell/dataset/DatasetStageWizardStateAdapter";
+import type { WizardStageStatus } from "../../studio-shell/wizard/WizardStageContracts";
 
 export interface StageWizardProgressStep {
   readonly id: string;
   readonly name: string;
   readonly description: string;
   readonly order: number;
-  readonly status: DatasetStageWizardStageStatus;
+  readonly status: WizardStageStatus;
   readonly isDisabled: boolean;
 }
 
@@ -14,7 +14,7 @@ export interface StageWizardProgressNavigatorProps {
   readonly steps: ReadonlyArray<StageWizardProgressStep>;
 }
 
-function toStatusLabel(status: DatasetStageWizardStageStatus): string {
+function toStatusLabel(status: WizardStageStatus): string {
   switch (status) {
     case "current":
       return "Current";
