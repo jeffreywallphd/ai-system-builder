@@ -11,6 +11,10 @@ import {
 export interface DatasetInstanceRepository {
   save(instance: DatasetInstance): DatasetInstance;
   getById(instanceId: string): DatasetInstance | undefined;
+  getBySystemAndId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+  }): DatasetInstance | undefined;
   deleteById(instanceId: string): boolean;
   listBySystemId(systemId: string): ReadonlyArray<DatasetInstance>;
   findBySystemAndRole(input: {
@@ -23,13 +27,27 @@ export interface DatasetInstanceRepository {
     readonly instanceId: string;
     readonly recordId: string;
   }): DatasetInstanceImageRecord | undefined;
+  getImageRecordBySystemAndId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+    readonly recordId: string;
+  }): DatasetInstanceImageRecord | undefined;
   deleteImageRecordById(input: {
     readonly instanceId: string;
     readonly recordId: string;
   }): boolean;
   deleteImageRecordsByInstanceId(instanceId: string): number;
   listImageRecordsByInstanceId(instanceId: string): ReadonlyArray<DatasetInstanceImageRecord>;
+  listImageRecordsBySystemId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+  }): ReadonlyArray<DatasetInstanceImageRecord>;
   queryImageRecordsByInstanceId(input: {
+    readonly instanceId: string;
+    readonly query?: DatasetInstanceImageRecordQuery;
+  }): ReadonlyArray<DatasetInstanceImageRecord>;
+  queryImageRecordsBySystemId(input: {
+    readonly systemId: string;
     readonly instanceId: string;
     readonly query?: DatasetInstanceImageRecordQuery;
   }): ReadonlyArray<DatasetInstanceImageRecord>;
@@ -69,6 +87,22 @@ export class InMemoryDatasetInstanceRepository implements DatasetInstanceReposit
     return deleted;
   }
 
+  public getBySystemAndId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+  }): DatasetInstance | undefined {
+    const systemId = normalizeOptional(input.systemId);
+    const instanceId = normalizeOptional(input.instanceId);
+    if (!systemId || !instanceId) {
+      return undefined;
+    }
+    const instance = this.byId.get(instanceId);
+    if (!instance || instance.systemId !== systemId) {
+      return undefined;
+    }
+    return instance;
+  }
+
   public listBySystemId(systemId: string): ReadonlyArray<DatasetInstance> {
     const normalized = normalizeOptional(systemId);
     if (!normalized) {
@@ -99,6 +133,12 @@ export class InMemoryDatasetInstanceRepository implements DatasetInstanceReposit
   }
 
   public saveImageRecord(record: DatasetInstanceImageRecord): DatasetInstanceImageRecord {
+    const instance = this.byId.get(record.instanceId);
+    if (instance && instance.systemId !== record.systemId) {
+      throw new Error(
+        `invalid-request:Cannot save image record '${record.recordId}' with system '${record.systemId}' into instance '${record.instanceId}' owned by '${instance.systemId}'.`,
+      );
+    }
     const byRecordId = this.imageRecordsByInstanceId.get(record.instanceId) ?? new Map<string, DatasetInstanceImageRecord>();
     byRecordId.set(record.recordId, record);
     this.imageRecordsByInstanceId.set(record.instanceId, byRecordId);
@@ -137,6 +177,24 @@ export class InMemoryDatasetInstanceRepository implements DatasetInstanceReposit
     return deleted;
   }
 
+  public getImageRecordBySystemAndId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+    readonly recordId: string;
+  }): DatasetInstanceImageRecord | undefined {
+    const systemId = normalizeOptional(input.systemId);
+    const instanceId = normalizeOptional(input.instanceId);
+    const recordId = normalizeOptional(input.recordId);
+    if (!systemId || !instanceId || !recordId) {
+      return undefined;
+    }
+    const record = this.imageRecordsByInstanceId.get(instanceId)?.get(recordId);
+    if (!record || record.systemId !== systemId) {
+      return undefined;
+    }
+    return record;
+  }
+
   public deleteImageRecordsByInstanceId(instanceId: string): number {
     const normalized = normalizeOptional(instanceId);
     if (!normalized) {
@@ -167,6 +225,17 @@ export class InMemoryDatasetInstanceRepository implements DatasetInstanceReposit
     );
   }
 
+  public listImageRecordsBySystemId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+  }): ReadonlyArray<DatasetInstanceImageRecord> {
+    const systemId = normalizeOptional(input.systemId);
+    if (!systemId) {
+      return Object.freeze([]);
+    }
+    return Object.freeze(this.listImageRecordsByInstanceId(input.instanceId).filter((record) => record.systemId === systemId));
+  }
+
   public queryImageRecordsByInstanceId(input: {
     readonly instanceId: string;
     readonly query?: DatasetInstanceImageRecordQuery;
@@ -174,6 +243,18 @@ export class InMemoryDatasetInstanceRepository implements DatasetInstanceReposit
     const query = normalizeDatasetInstanceImageRecordQuery(input.query);
     return Object.freeze(
       this.listImageRecordsByInstanceId(input.instanceId)
+        .filter((record) => matchesDatasetInstanceImageRecordQuery(record, query)),
+    );
+  }
+
+  public queryImageRecordsBySystemId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+    readonly query?: DatasetInstanceImageRecordQuery;
+  }): ReadonlyArray<DatasetInstanceImageRecord> {
+    const query = normalizeDatasetInstanceImageRecordQuery(input.query);
+    return Object.freeze(
+      this.listImageRecordsBySystemId(input)
         .filter((record) => matchesDatasetInstanceImageRecordQuery(record, query)),
     );
   }

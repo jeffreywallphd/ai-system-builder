@@ -259,7 +259,10 @@ describe("SystemDatasetInstanceService", () => {
     expect(created.lifecycleMetadata?.cleanupStatus).toBe("pending");
     expect(created.seedMetadata?.stageId).toBe("denoise");
 
-    const reloaded = service.getDatasetInstance("dataset-instance:intermediate-stage-1");
+    const reloaded = service.getDatasetInstance({
+      systemId: "system:image-pipeline",
+      instanceId: "dataset-instance:intermediate-stage-1",
+    });
     expect(reloaded?.role).toBe("intermediate-store");
     expect(reloaded?.lifecycleMetadata?.maxAgeDays).toBe(2);
   });
@@ -401,6 +404,7 @@ describe("SystemDatasetInstanceService", () => {
     });
 
     const valid = service.validateIncomingShapeForInstance({
+      systemId: "system:image-pipeline",
       instanceId: instance.instanceId,
       shape: validShape,
     });
@@ -416,6 +420,7 @@ describe("SystemDatasetInstanceService", () => {
       metadata: { schemaVersion: "1.0.0" },
     });
     expect(() => service.validateIncomingShapeForInstance({
+      systemId: "system:image-pipeline",
       instanceId: instance.instanceId,
       shape: invalidShape,
     })).toThrow("is incompatible with dataset asset output shape");
@@ -558,6 +563,7 @@ describe("SystemDatasetInstanceService", () => {
     });
 
     const admitted = service.admitRecordForInstance({
+      systemId: "system:image-pipeline",
       instanceId: instance.instanceId,
       record: {
         assetRef: { assetId: "asset:image:img-1" },
@@ -575,6 +581,7 @@ describe("SystemDatasetInstanceService", () => {
     expect(admitted.format).toBe("png");
 
     const validation = service.validateRecordsForInstance({
+      systemId: "system:image-pipeline",
       instanceId: instance.instanceId,
       records: Object.freeze([
         {
@@ -590,6 +597,7 @@ describe("SystemDatasetInstanceService", () => {
     expect(validation.valid).toBeTrue();
 
     expect(() => service.admitRecordForInstance({
+      systemId: "system:image-pipeline",
       instanceId: instance.instanceId,
       record: {
         assetRef: { assetId: "asset:image:img-invalid" },
@@ -1018,7 +1026,10 @@ describe("SystemDatasetInstanceService", () => {
       instanceId: instance.instanceId,
     });
     expect(removed.instanceId).toBe(instance.instanceId);
-    expect(service.getDatasetInstance(instance.instanceId)).toBeUndefined();
+    expect(service.getDatasetInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+    })).toBeUndefined();
   });
 
   it("rejects dataset-instance deletion before archive unless force delete is explicitly requested", async () => {
@@ -1055,6 +1066,9 @@ describe("SystemDatasetInstanceService", () => {
       force: true,
     });
     expect(forced.instanceId).toBe(instance.instanceId);
-    expect(service.getDatasetInstance(instance.instanceId)).toBeUndefined();
+    expect(service.getDatasetInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+    })).toBeUndefined();
   });
 });

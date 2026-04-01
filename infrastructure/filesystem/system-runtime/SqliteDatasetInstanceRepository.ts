@@ -23,7 +23,7 @@ interface DatasetInstanceImageRecordRow {
   readonly record_json: string;
 }
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
     CREATE TABLE IF NOT EXISTS system_runtime_dataset_instance_migrations (
@@ -55,7 +55,7 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   `],
   [3, `
     CREATE TABLE IF NOT EXISTS system_dataset_instance_image_records (
-      record_id TEXT PRIMARY KEY,
+      record_id TEXT NOT NULL,
       instance_id TEXT NOT NULL,
       system_id TEXT NOT NULL,
       dataset_asset_id TEXT NOT NULL,
@@ -72,8 +72,76 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
       image_metadata_json TEXT NOT NULL,
       record_metadata_json TEXT NOT NULL,
       record_json TEXT NOT NULL,
+      PRIMARY KEY(instance_id, record_id),
       FOREIGN KEY(instance_id) REFERENCES system_dataset_instances(instance_id) ON DELETE CASCADE
     );
+    CREATE INDEX IF NOT EXISTS system_dataset_instance_image_records_instance_idx
+      ON system_dataset_instance_image_records(instance_id, updated_at DESC, record_id ASC);
+    CREATE INDEX IF NOT EXISTS system_dataset_instance_image_records_query_idx
+      ON system_dataset_instance_image_records(instance_id, image_format, image_asset_stable_id, updated_at DESC);
+  `],
+  [4, `
+    CREATE TABLE IF NOT EXISTS system_dataset_instance_image_records_v4 (
+      record_id TEXT NOT NULL,
+      instance_id TEXT NOT NULL,
+      system_id TEXT NOT NULL,
+      dataset_asset_id TEXT NOT NULL,
+      dataset_asset_version_id TEXT,
+      image_format TEXT NOT NULL,
+      image_width REAL NOT NULL,
+      image_height REAL NOT NULL,
+      image_asset_stable_id TEXT NOT NULL,
+      storage_reference TEXT,
+      storage_provider TEXT,
+      admitted_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      tags_json TEXT NOT NULL,
+      image_metadata_json TEXT NOT NULL,
+      record_metadata_json TEXT NOT NULL,
+      record_json TEXT NOT NULL,
+      PRIMARY KEY(instance_id, record_id),
+      FOREIGN KEY(instance_id) REFERENCES system_dataset_instances(instance_id) ON DELETE CASCADE
+    );
+    INSERT INTO system_dataset_instance_image_records_v4 (
+      record_id,
+      instance_id,
+      system_id,
+      dataset_asset_id,
+      dataset_asset_version_id,
+      image_format,
+      image_width,
+      image_height,
+      image_asset_stable_id,
+      storage_reference,
+      storage_provider,
+      admitted_at,
+      updated_at,
+      tags_json,
+      image_metadata_json,
+      record_metadata_json,
+      record_json
+    )
+    SELECT
+      record_id,
+      instance_id,
+      system_id,
+      dataset_asset_id,
+      dataset_asset_version_id,
+      image_format,
+      image_width,
+      image_height,
+      image_asset_stable_id,
+      storage_reference,
+      storage_provider,
+      admitted_at,
+      updated_at,
+      tags_json,
+      image_metadata_json,
+      record_metadata_json,
+      record_json
+    FROM system_dataset_instance_image_records;
+    DROP TABLE system_dataset_instance_image_records;
+    ALTER TABLE system_dataset_instance_image_records_v4 RENAME TO system_dataset_instance_image_records;
     CREATE INDEX IF NOT EXISTS system_dataset_instance_image_records_instance_idx
       ON system_dataset_instance_image_records(instance_id, updated_at DESC, record_id ASC);
     CREATE INDEX IF NOT EXISTS system_dataset_instance_image_records_query_idx
@@ -150,6 +218,25 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
         WHERE instance_id = ?
       `)
       .get(normalized) as DatasetInstanceRow | undefined;
+    return row ? this.parse(row.instance_json) : undefined;
+  }
+
+  public getBySystemAndId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+  }): DatasetInstance | undefined {
+    const systemId = normalizeOptional(input.systemId);
+    const instanceId = normalizeOptional(input.instanceId);
+    if (!systemId || !instanceId) {
+      return undefined;
+    }
+    const row = this.getDatabase()
+      .prepare(`
+        SELECT instance_json
+        FROM system_dataset_instances
+        WHERE system_id = ? AND instance_id = ?
+      `)
+      .get(systemId, instanceId) as DatasetInstanceRow | undefined;
     return row ? this.parse(row.instance_json) : undefined;
   }
 
@@ -239,7 +326,7 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
           record_metadata_json,
           record_json
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(record_id) DO UPDATE SET
+        ON CONFLICT(instance_id, record_id) DO UPDATE SET
           instance_id = excluded.instance_id,
           system_id = excluded.system_id,
           dataset_asset_id = excluded.dataset_asset_id,
@@ -319,6 +406,27 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
     return Number(result.changes ?? 0) > 0;
   }
 
+  public getImageRecordBySystemAndId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+    readonly recordId: string;
+  }): DatasetInstanceImageRecord | undefined {
+    const systemId = normalizeOptional(input.systemId);
+    const instanceId = normalizeOptional(input.instanceId);
+    const recordId = normalizeOptional(input.recordId);
+    if (!systemId || !instanceId || !recordId) {
+      return undefined;
+    }
+    const row = this.getDatabase()
+      .prepare(`
+        SELECT record_json
+        FROM system_dataset_instance_image_records
+        WHERE system_id = ? AND instance_id = ? AND record_id = ?
+      `)
+      .get(systemId, instanceId, recordId) as DatasetInstanceImageRecordRow | undefined;
+    return row ? this.parseImageRecord(row.record_json) : undefined;
+  }
+
   public deleteImageRecordsByInstanceId(instanceId: string): number {
     const normalized = normalizeOptional(instanceId);
     if (!normalized) {
@@ -351,12 +459,49 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
     return Object.freeze(rows.map((row) => this.parseImageRecord(row.record_json)));
   }
 
+  public listImageRecordsBySystemId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+  }): ReadonlyArray<DatasetInstanceImageRecord> {
+    const systemId = normalizeOptional(input.systemId);
+    const instanceId = normalizeOptional(input.instanceId);
+    if (!systemId || !instanceId) {
+      return Object.freeze([]);
+    }
+
+    const rows = this.getDatabase()
+      .prepare(`
+        SELECT record_json
+        FROM system_dataset_instance_image_records
+        WHERE system_id = ? AND instance_id = ?
+        ORDER BY updated_at DESC, record_id ASC
+      `)
+      .all(systemId, instanceId) as DatasetInstanceImageRecordRow[];
+    return Object.freeze(rows.map((row) => this.parseImageRecord(row.record_json)));
+  }
+
   public queryImageRecordsByInstanceId(input: {
     readonly instanceId: string;
     readonly query?: DatasetInstanceImageRecordQuery;
   }): ReadonlyArray<DatasetInstanceImageRecord> {
     const query = normalizeDatasetInstanceImageRecordQuery(input.query);
     const records = this.listImageRecordsByInstanceId(input.instanceId);
+    if (!query) {
+      return records;
+    }
+    return Object.freeze(records.filter((record) => matchesDatasetInstanceImageRecordQuery(record, query)));
+  }
+
+  public queryImageRecordsBySystemId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+    readonly query?: DatasetInstanceImageRecordQuery;
+  }): ReadonlyArray<DatasetInstanceImageRecord> {
+    const query = normalizeDatasetInstanceImageRecordQuery(input.query);
+    const records = this.listImageRecordsBySystemId({
+      systemId: input.systemId,
+      instanceId: input.instanceId,
+    });
     if (!query) {
       return records;
     }
@@ -374,6 +519,7 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
       fs.mkdirSync(path.dirname(this.databasePath), { recursive: true });
       this.database = openSqliteCompatDatabase(this.databasePath);
       this.database.pragma("journal_mode = WAL");
+      this.database.pragma("foreign_keys = ON");
     }
     if (!this.initialized) {
       this.initialize(this.database);

@@ -257,6 +257,115 @@ describe("SqliteDatasetInstanceRepository", () => {
     }
   });
 
+  it("isolates instance and image-record retrieval by system namespace and allows duplicate record ids per instance", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-dataset-instance-isolation-sqlite-"));
+    try {
+      const repository = new SqliteDatasetInstanceRepository(path.join(root, "dataset-instances.sqlite"));
+      repository.save(createDatasetInstance({
+        instanceId: "dataset-instance:owned-a",
+        systemId: "system:image-pipeline-a",
+        datasetAssetId: "image-ingestor-v1",
+        datasetAssetVersionId: "1.0.0",
+        role: "input-store",
+        purpose: "incoming-images",
+        lifecycleStatus: "ready",
+        runtimeStatus: "idle",
+        createdAt: "2026-04-01T00:00:00.000Z",
+        updatedAt: "2026-04-01T00:00:00.000Z",
+      }));
+      repository.save(createDatasetInstance({
+        instanceId: "dataset-instance:owned-b",
+        systemId: "system:image-pipeline-b",
+        datasetAssetId: "image-ingestor-v1",
+        datasetAssetVersionId: "1.0.0",
+        role: "input-store",
+        purpose: "incoming-images",
+        lifecycleStatus: "ready",
+        runtimeStatus: "idle",
+        createdAt: "2026-04-01T00:00:00.000Z",
+        updatedAt: "2026-04-01T00:00:00.000Z",
+      }));
+
+      repository.saveImageRecord(createDatasetInstanceImageRecord({
+        recordId: "shared-record-id",
+        instanceId: "dataset-instance:owned-a",
+        systemId: "system:image-pipeline-a",
+        datasetAssetId: "image-ingestor-v1",
+        datasetAssetVersionId: "1.0.0",
+        image: {
+          assetRef: {
+            kind: "generated-output",
+            stableId: "generated-output:prepared://owned-a",
+            outputId: "prepared://owned-a",
+          },
+          width: 100,
+          height: 100,
+          format: "png",
+          metadata: { source: "a" },
+          tags: ["a"],
+          derived: {},
+          schemaVersion: "1.0.0",
+        },
+      }));
+      repository.saveImageRecord(createDatasetInstanceImageRecord({
+        recordId: "shared-record-id",
+        instanceId: "dataset-instance:owned-b",
+        systemId: "system:image-pipeline-b",
+        datasetAssetId: "image-ingestor-v1",
+        datasetAssetVersionId: "1.0.0",
+        image: {
+          assetRef: {
+            kind: "generated-output",
+            stableId: "generated-output:prepared://owned-b",
+            outputId: "prepared://owned-b",
+          },
+          width: 200,
+          height: 200,
+          format: "png",
+          metadata: { source: "b" },
+          tags: ["b"],
+          derived: {},
+          schemaVersion: "1.0.0",
+        },
+      }));
+
+      const ownedA = repository.getBySystemAndId({
+        systemId: "system:image-pipeline-a",
+        instanceId: "dataset-instance:owned-a",
+      });
+      expect(ownedA?.instanceId).toBe("dataset-instance:owned-a");
+      expect(repository.getBySystemAndId({
+        systemId: "system:image-pipeline-b",
+        instanceId: "dataset-instance:owned-a",
+      })).toBeUndefined();
+
+      const recordsA = repository.listImageRecordsBySystemId({
+        systemId: "system:image-pipeline-a",
+        instanceId: "dataset-instance:owned-a",
+      });
+      const recordsB = repository.listImageRecordsBySystemId({
+        systemId: "system:image-pipeline-b",
+        instanceId: "dataset-instance:owned-b",
+      });
+      expect(recordsA).toHaveLength(1);
+      expect(recordsB).toHaveLength(1);
+      expect(recordsA[0]?.image.metadata.source).toBe("a");
+      expect(recordsB[0]?.image.metadata.source).toBe("b");
+      expect(repository.getImageRecordBySystemAndId({
+        systemId: "system:image-pipeline-a",
+        instanceId: "dataset-instance:owned-a",
+        recordId: "shared-record-id",
+      })?.image.metadata.source).toBe("a");
+      expect(repository.getImageRecordBySystemAndId({
+        systemId: "system:image-pipeline-a",
+        instanceId: "dataset-instance:owned-b",
+        recordId: "shared-record-id",
+      })).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("supports clearing/removing image records and deleting dataset instances", () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-dataset-instance-delete-sqlite-"));
     try {
