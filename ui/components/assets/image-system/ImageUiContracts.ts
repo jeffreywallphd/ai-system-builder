@@ -127,9 +127,15 @@ export interface ImageViewerEventContract {
 export interface ImageParameterDefinition {
   readonly parameterId: string;
   readonly label: string;
-  readonly type: "text" | "number" | "boolean" | "select";
+  readonly type: "text" | "number" | "boolean" | "select" | "range";
+  readonly description?: string;
   readonly required?: boolean;
+  readonly min?: number;
+  readonly max?: number;
+  readonly step?: number;
+  readonly placeholder?: string;
   readonly options?: ReadonlyArray<{ readonly value: string; readonly label: string }>;
+  readonly defaultValue?: unknown;
 }
 
 export interface ImageParameterFormPropsContract {
@@ -138,10 +144,17 @@ export interface ImageParameterFormPropsContract {
   readonly initialValues?: Readonly<Record<string, unknown>>;
 }
 
+export interface ImageParameterValidationIssue {
+  readonly parameterId: string;
+  readonly code: "required" | "invalid-type" | "below-min" | "above-max" | "invalid-option";
+  readonly message: string;
+}
+
 export interface ImageParameterFormEventContract {
   readonly onParametersChanged?: (payload: {
     readonly imageId?: string;
     readonly values: Readonly<Record<string, unknown>>;
+    readonly issues: ReadonlyArray<ImageParameterValidationIssue>;
   }) => void;
 }
 
@@ -149,6 +162,7 @@ export interface ImageOutputGalleryPropsContract {
   readonly items: ReadonlyArray<ImageUiViewModel>;
   readonly selection?: ImageSelectionState;
   readonly renderOptions: ImageRenderOptions;
+  readonly datasetContext?: ImageDatasetContextRef;
 }
 
 export interface ImageOutputGalleryEventContract {

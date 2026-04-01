@@ -444,3 +444,17 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Shared rendering utilities from stories 4.1.1-4.1.2 remain the rendering foundation:
   - `ImageViewer` composes `ImageRenderFrame` + metadata normalization/selection helpers.
   - Upload/viewer exports are surfaced through the same `image-system/index.ts` barrel for reuse across system result/history/comparison/gallery/detail surfaces.
+
+## Direction 5 UI update: Image parameter form + output gallery (stories 4.1.5-4.1.6)
+
+- Added a reusable schema-driven image parameter form component in `ui/components/assets/image-system/ImageParameterForm.tsx` that renders from shared internal parameter contracts (`ImageParameterDefinition`) rather than hardcoded workflow-engine forms.
+- `ImageParameterForm` supports text/number/boolean/select/range controls, default values, required/optional semantics, bounded validation feedback, and change events that include both value snapshots and validation issues.
+- Added a bounded adapter seam in `ui/components/assets/image-system/ImageParameterMappers.ts` (`mapAssetContractParametersToImageParameters`) so shared asset-contract parameter descriptors can be projected into UI-friendly form definitions without coupling to any single workflow runtime/library schema.
+- Added a reusable output gallery component in `ui/components/assets/image-system/ImageOutputGallery.tsx` with:
+  - shared image rendering via `ImageRenderFrame`,
+  - selection state + selection change events,
+  - item-open events,
+  - loading/empty/error states,
+  - bounded paging (`pageSize`) for incremental display,
+  - optional dataset context display for dataset-bound usage.
+- Updated `ui/components/assets/image-system/index.ts` to export parameter-form/gallery/mapper seams together with upload/viewer components for reuse in future output datasets, result/history views, and comparison flows.
