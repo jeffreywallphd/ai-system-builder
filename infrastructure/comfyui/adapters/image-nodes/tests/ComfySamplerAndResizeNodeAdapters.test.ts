@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type {
   ICommonImageNodeInternalImage,
+  ICommonImageNodeLatentRepresentation,
   ICommonImageNodeModelCapabilityRef,
   ICommonImageNodePromptConditioning,
 } from "../../../../../application/execution/comfyui/image-nodes/CommonImageNodeContracts";
@@ -73,7 +74,7 @@ describe("Comfy sampler wrapper and resize/upscale node adapters", () => {
     expect(payload.inputs.scheduler).toBe("karras");
 
     expect(response.outputs[0]?.outputId).toBe("latent");
-    expect((response.outputs[0]?.value as { source: string }).source).toBe("text-to-image");
+    expect((response.outputs[0]?.value as ICommonImageNodeLatentRepresentation).source).toBe("sampler");
     expect(response.outputs[2]?.outputId).toBe("metadata");
     expect((response.outputs[2]?.value as { effectiveConfig: { steps: number } }).effectiveConfig.steps).toBe(30);
   });

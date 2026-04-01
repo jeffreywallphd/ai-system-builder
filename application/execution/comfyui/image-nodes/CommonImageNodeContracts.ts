@@ -52,6 +52,16 @@ export interface ICommonImageNodePromptConditioning {
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
+export interface ICommonImageNodeLatentRepresentation {
+  readonly latentRef: string;
+  readonly width?: number;
+  readonly height?: number;
+  readonly source?: "sampler" | "vae-encode" | "unknown";
+  readonly adapterId: string;
+  readonly adapterVersion: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
 export type ImageNodeDataType =
   | "image"
   | "latent"

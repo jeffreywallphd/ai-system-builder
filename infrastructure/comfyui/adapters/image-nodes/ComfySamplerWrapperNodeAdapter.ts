@@ -1,6 +1,7 @@
 import type {
   ICommonImageNodeContract,
   ICommonImageNodeInternalImage,
+  ICommonImageNodeLatentRepresentation,
   ICommonImageNodeModelCapabilityRef,
   ICommonImageNodePromptConditioning,
   IImageNodeExecutionRequest,
@@ -115,15 +116,22 @@ export class ComfySamplerWrapperNodeAdapter extends ComfyImageNodeAdapterBase {
     const generatedImage = this.readGeneratedImage(result.outputs.image);
     const outputImage = generatedImage ?? sourceImage;
 
+    const latent: ICommonImageNodeLatentRepresentation = Object.freeze({
+      latentRef: this.readText(result.outputs.latent) ?? this.readText(result.outputs.samples) ?? "latent:generated",
+      source: "sampler",
+      width: outputImage?.width,
+      height: outputImage?.height,
+      adapterId: ADAPTER_ID,
+      adapterVersion: ADAPTER_VERSION,
+      metadata: Object.freeze({
+        generationMode: sourceImage ? "image-to-image" : "text-to-image",
+      }),
+    });
+
     return Object.freeze([
       Object.freeze({
         outputId: "latent",
-        value: Object.freeze({
-          handle: this.readText(result.outputs.latent) ?? this.readText(result.outputs.samples) ?? "latent:generated",
-          source: sourceImage ? "image-to-image" : "text-to-image",
-          adapterId: ADAPTER_ID,
-          adapterVersion: ADAPTER_VERSION,
-        }),
+        value: latent,
       }),
       Object.freeze({
         outputId: "image",
