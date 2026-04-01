@@ -15,9 +15,9 @@ import {
   type ResolvedDataSource,
 } from "./DataConverterContracts";
 import type { DataAssetExecutionRequest } from "./DataAssetExecutionFramework";
-import { ZodMediaDatasetValidator } from "./adapters/validation/MediaDatasetValidator";
+import { createDefaultMediaValidationAdapters } from "./adapters/validation/MediaValidationFactory";
 
-const defaultMediaDatasetValidator = new ZodMediaDatasetValidator();
+const defaultMediaDatasetValidator = createDefaultMediaValidationAdapters().mediaDatasetValidator;
 
 export const DataStudioValidationSections = Object.freeze({
   canonicalShape: "canonical-shape",

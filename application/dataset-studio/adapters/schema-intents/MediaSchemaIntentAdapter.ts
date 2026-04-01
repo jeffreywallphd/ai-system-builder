@@ -12,7 +12,7 @@ import {
   ImageRecordContractIdentifier,
   ImageRecordSchemaVersions,
 } from "../../../../domain/dataset-studio/contracts/ImageRecordVersioning";
-import { ZodMediaDatasetValidator } from "../validation/MediaDatasetValidator";
+import { createDefaultMediaValidationAdapters } from "../validation/MediaValidationFactory";
 
 export class MediaSchemaIntentAdapter implements IMediaSchemaIntent {
   public readonly descriptor: IMediaSchemaIntent["descriptor"] = Object.freeze({
@@ -29,7 +29,9 @@ export class MediaSchemaIntentAdapter implements IMediaSchemaIntent {
     }),
   });
 
-  constructor(private readonly validator: IMediaDatasetValidator = new ZodMediaDatasetValidator()) {}
+  constructor(
+    private readonly validator: IMediaDatasetValidator = createDefaultMediaValidationAdapters().mediaDatasetValidator,
+  ) {}
 
   public validateShape(shape: CanonicalDataShape) {
     const issues = [] as ReturnType<typeof createSchemaIntentValidationIssue>[];

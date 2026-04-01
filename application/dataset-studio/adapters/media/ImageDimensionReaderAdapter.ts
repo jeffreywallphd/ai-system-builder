@@ -22,12 +22,12 @@ export class ImageSizeDimensionReaderAdapter implements IImageDimensionReader {
     try {
       const imageSizeRecord = await import("image-size") as Readonly<Record<string, unknown>>;
       imageSizeFn = (imageSizeRecord.imageSize ?? imageSizeRecord.default) as ImageSizeFunction | undefined;
-    } catch (error) {
-      throw new Error(`Unable to load 'image-size': ${error instanceof Error ? error.message : String(error)}`);
+    } catch {
+      throw new Error("Image dimension reader is unavailable.");
     }
 
     if (typeof imageSizeFn !== "function") {
-      throw new Error("'image-size' API is unavailable.");
+      throw new Error("Image dimension reader is unavailable.");
     }
 
     const details = imageSizeFn(payload);
