@@ -390,6 +390,25 @@
   - generation metadata + tags.
 - Record patch contracts now support controlled generation metadata/tag updates (`generationPatch`) while preserving canonical image payload compatibility and preview/read behavior.
 
+
+## AI Loom Image System vertical-slice update: materialization service + execution-result adapter (stories 2.3.3-2.3.4)
+
+- Output persistence now has an explicit application orchestration seam in `application/system-runtime/WorkflowOutputMaterializationService.ts`:
+  - validates canonical `WorkflowOutputMaterializationPayload` requests,
+  - assembles normalized image-record admission payloads from produced assets,
+  - maps per-asset generation metadata via `materializationAssetToDatasetGeneration(...)`,
+  - writes generated records into the target **system-owned dataset instance** through `SystemDatasetInstanceService` (not executor-specific adapters).
+- Executor-shape translation is now explicitly isolated in `infrastructure/comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper.ts`:
+  - maps `IComfyAdapterResult` payloads into the canonical materialization contract,
+  - supports multi-image outputs (`primary` + `variant` role assignment),
+  - normalizes optional/unknown metadata into canonical record values,
+  - keeps ComfyUI-specific result semantics out of application/domain materialization contracts.
+- Boundary direction remains clean for the image vertical slice:
+  - backend-specific execution payloads are translated at infrastructure adapter boundaries,
+  - application services consume only internal materialization contracts,
+  - dataset-instance mutation continues through system-owned runtime dataset services.
+
+
 ## Direction 5 extension update: instance mutation + lifecycle management (stories 1.2.11-1.2.12)
 
 - Dataset-instance record mutation is now explicit and bounded through `SystemDatasetInstanceService.updateImageRecordInInstance(...)`:
