@@ -58,3 +58,13 @@
 - Added lightweight structured adapter observability helper in `infrastructure/comfyui/execution/ComfyAdapterObservability.ts`.
 - `ComfyQueueExecutionAdapter` now emits normalized lifecycle execution logs for accepted/start/completed/failed/cancelled events with execution-context correlation ids when present.
 - Added focused tests for valid/invalid/missing config behavior, env resolution, config-driven polling behavior, and structured log emission contracts.
+
+## Story 2.1.11 + 2.1.12 update
+- Validated that workflow-triggered Comfy execution uses the canonical seam:
+  `ExecuteWorkflowUseCase` -> one-unit workflow execution plan -> `UnifiedExecutionEngine` -> `WorkflowExecutionUnitHandler` -> `IWorkflowExecutor` (Comfy-backed implementation).
+- Added integration coverage for success and failure execution flow through that seam (`application/workflows/tests/ExecuteWorkflowUseCase.test.ts`) so trigger -> execute -> normalized result/error propagation is verified without bypassing adapter boundaries.
+- Added normalized preview/inspection support on workflow execution results (`IWorkflowExecutionResult.inspection`) with Comfy-backed construction in `ComfyExecutionService`:
+  - execution summary (runtime/status/output count/lifecycle/message counts),
+  - normalized output references (node/kind/reference/assetId/metadata),
+  - normalized diagnostics derived from adapter errors.
+- This keeps preview/debug metadata internal-contract-first and adapter-result-driven, without exposing raw Comfy history payloads to workflow callers.

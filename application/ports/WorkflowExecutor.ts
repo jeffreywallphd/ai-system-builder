@@ -158,6 +158,7 @@ export class WorkflowExecutionResult implements IWorkflowExecutionResult {
   public readonly messages?: ReadonlyArray<string>;
   public readonly errorMessage?: string;
   public readonly provenance?: IWorkflowExecutionProvenance;
+  public readonly inspection?: IWorkflowExecutionResult["inspection"];
 
   constructor(params: {
     executionId: string;
@@ -166,6 +167,7 @@ export class WorkflowExecutionResult implements IWorkflowExecutionResult {
     messages?: ReadonlyArray<string>;
     errorMessage?: string;
     provenance?: IWorkflowExecutionProvenance;
+    inspection?: IWorkflowExecutionResult["inspection"];
   }) {
     const executionId = params.executionId.trim();
 
@@ -179,6 +181,20 @@ export class WorkflowExecutionResult implements IWorkflowExecutionResult {
     this.messages = freezeMessages(params.messages);
     this.errorMessage = params.errorMessage?.trim() || undefined;
     this.provenance = freezeProvenance(params.provenance);
+    this.inspection = params.inspection
+      ? Object.freeze({
+          summary: Object.freeze({ ...params.inspection.summary }),
+          outputs: params.inspection.outputs
+            ? Object.freeze(params.inspection.outputs.map((output) => Object.freeze({
+                ...output,
+                metadata: output.metadata ? Object.freeze({ ...output.metadata }) : undefined,
+              })))
+            : undefined,
+          diagnostics: params.inspection.diagnostics
+            ? Object.freeze({ ...params.inspection.diagnostics })
+            : undefined,
+        })
+      : undefined;
   }
 
   public static from(result: IWorkflowExecutionResult): WorkflowExecutionResult {
@@ -189,6 +205,7 @@ export class WorkflowExecutionResult implements IWorkflowExecutionResult {
       messages: result.messages,
       errorMessage: result.errorMessage,
       provenance: result.provenance,
+      inspection: result.inspection,
     });
   }
 }

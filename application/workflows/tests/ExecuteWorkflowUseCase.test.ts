@@ -9,6 +9,7 @@ import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/
 import { WorkflowContextService } from "../../context/WorkflowContextService";
 import { UnifiedExecutionEngine } from "../../execution/UnifiedExecutionEngine";
 import { WorkflowExecutionUnitHandler } from "../../../infrastructure/execution/WorkflowExecutionUnitHandler";
+import { ComfyWorkflowExecutor } from "../../../infrastructure/comfyui/execution/ComfyWorkflowExecutor";
 
 describe("ExecuteWorkflowUseCase", () => {
   it("executes workflow and applies property overrides", async () => {
@@ -250,6 +251,109 @@ describe("ExecuteWorkflowUseCase", () => {
     expect(completion.provenance?.classification).toBe("delegated");
     expect(events).toEqual(["workflow-progress:running"]);
     expect(runHistory.get(started.handle.executionId)?.status).toBe(ExecutionStatuses.completed);
+  });
+
+  it("executes workflow through canonical workflow->engine->unit->comfy adapter path", async () => {
+    const workflow = makeWorkflow({ id: "wf-comfy", nodes: [makeNode({ id: "n1" })] });
+    const comfyExecutor = new ComfyWorkflowExecutor({
+      adapter: {
+        capabilities: {
+          runtimeId: "comfyui",
+          supportsCancellation: true,
+          supportsProgressPolling: true,
+          supportsAssetReferences: true,
+        },
+        async start(request, onLifecycleEvent) {
+          return {
+            executionId: "comfy-exec-1",
+            cancel: async () => undefined,
+            waitForCompletion: async () => {
+              onLifecycleEvent?.({
+                executionId: "comfy-exec-1",
+                status: "running",
+                percent: 60,
+                message: "Generating image",
+              });
+              return {
+              executionId: "comfy-exec-1",
+              status: "completed",
+              lifecycle: [{ executionId: "comfy-exec-1", status: "completed", percent: 100 }],
+              outputs: [{
+                nodeId: "n1",
+                kind: "image",
+                reference: "asset:workflow-output:comfyui:comfy-exec-1:n1:image:0",
+                assetRef: { assetId: "asset:workflow-output:comfyui:comfy-exec-1:n1:image:0" },
+              }],
+              messages: [`context-workflow:${request.context?.identifiers.workflowId}`],
+              };
+            },
+          };
+        },
+      },
+      buildViewUrl: () => "http://example.invalid/image.png",
+    });
+    const useCase = new ExecuteWorkflowUseCase(
+      comfyExecutor,
+      makeWorkflowValidator(),
+      undefined,
+      new UnifiedExecutionEngine([new WorkflowExecutionUnitHandler(comfyExecutor)]),
+    );
+    const result = await useCase.execute({
+      workflow,
+      target: { runtime: "comfyui" },
+      parameters: { prompt: "sunset over mountains" },
+    });
+
+    expect(result.result.status).toBe("completed");
+    expect(result.result.inspection?.summary.runtime).toBe("comfyui");
+    expect(result.result.inspection?.summary.outputCount).toBe(1);
+    expect(result.result.messages?.[0]).toContain("context-workflow:wf-comfy");
+  });
+
+  it("propagates normalized comfy adapter failures through workflow execution seam", async () => {
+    const workflow = makeWorkflow({ id: "wf-comfy-fail", nodes: [makeNode({ id: "n1" })] });
+    const comfyExecutor = new ComfyWorkflowExecutor({
+      adapter: {
+        capabilities: {
+          runtimeId: "comfyui",
+          supportsCancellation: true,
+          supportsProgressPolling: true,
+          supportsAssetReferences: true,
+        },
+        async start() {
+          return {
+            executionId: "comfy-exec-failed",
+            cancel: async () => undefined,
+            waitForCompletion: async () => ({
+              executionId: "comfy-exec-failed",
+              status: "failed",
+              lifecycle: [{ executionId: "comfy-exec-failed", status: "failed", message: "Adapter failed." }],
+              outputs: [],
+              error: {
+                code: "execution-failed",
+                category: "execution",
+                severity: "error",
+                message: "Comfy failed to generate output.",
+                retriable: false,
+                retryable: false,
+              },
+              messages: ["Comfy failed to generate output."],
+            }),
+          };
+        },
+      },
+    });
+    const useCase = new ExecuteWorkflowUseCase(
+      comfyExecutor,
+      makeWorkflowValidator(),
+      undefined,
+      new UnifiedExecutionEngine([new WorkflowExecutionUnitHandler(comfyExecutor)]),
+    );
+
+    const result = await useCase.execute({ workflow, target: { runtime: "comfyui" } });
+    expect(result.result.status).toBe("failed");
+    expect(result.result.errorMessage).toBe("Comfy failed to generate output.");
+    expect(result.result.inspection?.diagnostics?.errorCode).toBe("execution-failed");
   });
 
 });
