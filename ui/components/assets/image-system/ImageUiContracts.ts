@@ -176,14 +176,32 @@ export interface ImageComparisonPair {
   readonly comparisonLabel?: string;
 }
 
+export interface ImageComparisonItem {
+  readonly image: ImageUiViewModel;
+  readonly label?: string;
+}
+
+export type ImageComparisonMode = "side-by-side" | "overlay";
+
+export interface ImageComparisonViewportState {
+  readonly zoom: number;
+  readonly panX: number;
+  readonly panY: number;
+}
+
 export interface ImageComparisonViewPropsContract {
-  readonly pair: ImageComparisonPair;
+  readonly items: ReadonlyArray<ImageComparisonItem>;
+  readonly mode: ImageComparisonMode;
   readonly renderOptions: ImageRenderOptions;
+  readonly activeImageIds?: ReadonlyArray<string>;
+  readonly focusedImageId?: string;
 }
 
 export interface ImageComparisonViewEventContract {
   readonly onSwapRequested?: () => void;
   readonly onSelectionChanged?: (event: ImageSelectionChangeEvent) => void;
+  readonly onModeChanged?: (mode: ImageComparisonMode) => void;
+  readonly onViewportChanged?: (viewport: ImageComparisonViewportState) => void;
 }
 
 export const DEFAULT_IMAGE_RENDER_OPTIONS: ImageRenderOptions = Object.freeze({

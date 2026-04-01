@@ -344,6 +344,80 @@
   gap: var(--space-xs);
 }
 
+.ui-image-comparison-view {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.ui-image-comparison-view--status {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+
+.ui-image-comparison-view__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.ui-image-comparison-view__title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.ui-image-comparison-view__pan-controls {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.ui-image-comparison-view__grid {
+  display: grid;
+  gap: var(--space-sm);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.ui-image-comparison-view__item {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-xs);
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.ui-image-comparison-view__frame {
+  min-height: 12rem;
+  border-radius: var(--radius-sm);
+}
+
+.ui-image-comparison-view__overlay-surface {
+  position: relative;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-xs);
+  overflow: hidden;
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.ui-image-comparison-view__overlay-base,
+.ui-image-comparison-view__overlay-frame {
+  min-height: 16rem;
+}
+
+.ui-image-comparison-view__overlay-top {
+  position: absolute;
+  inset: var(--space-xs);
+  pointer-events: none;
+}
+
+.ui-image-comparison-view :is(.ui-image-comparison-view__frame, .ui-image-comparison-view__overlay-base, .ui-image-comparison-view__overlay-frame) .ui-image-render-frame__img {
+  transform: translate(var(--ui-image-compare-pan-x, 0), var(--ui-image-compare-pan-y, 0)) scale(var(--ui-image-compare-zoom, 1));
+  transform-origin: center;
+}
+
 .ui-template-selection-grid {
   display: grid;
   gap: var(--space-md);

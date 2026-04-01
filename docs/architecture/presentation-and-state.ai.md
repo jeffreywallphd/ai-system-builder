@@ -354,3 +354,8 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - selection state/events, item-open events, and bounded dataset-context display,
   - loading/empty/error status states and bounded pagination (`pageSize`) for incremental display.
 - `image-system/index.ts` now exports parameter-form/gallery/mapper seams alongside prior upload/viewer primitives so remaining image-system slices can compose one shared contract/rendering stack.
+
+## Direction 5 UI update: Image comparison view + state integration (stories 4.1.7-4.1.8)
+
+- Image comparison now has a reusable view component (`ui/components/assets/image-system/ImageComparisonView.tsx`) with bounded side-by-side and overlay modes, shared internal image view models, synchronized zoom/pan through a reusable viewport hook (`useSynchronizedImageViewport.ts`), and explicit loading/empty/error/selection/focus handling.
+- Epic 4.1 image components now have an explicit state-integration seam (`ImageSystemStateIntegration.ts`) that keeps selected image, image collections, parameter values, dataset/system context references, and component interaction/loading/error state in one mapper/reducer path while projecting component-specific props for upload/viewer/parameter/gallery/comparison surfaces.
