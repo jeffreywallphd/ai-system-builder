@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { AssetId } from "../../../domain/assets/AssetId";
+import { ImageAssetReferenceKinds } from "../../../domain/dataset-studio/contracts/ImageAssetReference";
 import { validateImageRecord, ZodImageRecordValidator } from "../adapters/validation/ImageRecordValidator";
 
 describe("ImageRecordValidator", () => {
@@ -28,6 +29,31 @@ describe("ImageRecordValidator", () => {
     expect(result.format).toBe("png");
     expect(result.tags).toEqual(["hero", "homepage"]);
     expect(result.metadata.source).toBe("camera");
+  });
+
+  it("normalizes structured local-file and external URI references", () => {
+    const local = validateImageRecord({
+      assetRef: {
+        kind: ImageAssetReferenceKinds.localFile,
+        path: "C:\\images\\frame.png",
+      },
+      width: 120,
+      height: 80,
+      format: "png",
+    });
+
+    expect(local.assetRef.kind).toBe(ImageAssetReferenceKinds.localFile);
+    if (local.assetRef.kind === ImageAssetReferenceKinds.localFile) {
+      expect(local.assetRef.path).toBe("C:\\images\\frame.png");
+    }
+
+    const external = validateImageRecord({
+      assetRef: "https://example.com/remote.jpg",
+      width: 256,
+      height: 256,
+      format: "jpeg",
+    });
+    expect(external.assetRef.kind).toBe(ImageAssetReferenceKinds.externalUri);
   });
 
   it("rejects invalid image records", () => {

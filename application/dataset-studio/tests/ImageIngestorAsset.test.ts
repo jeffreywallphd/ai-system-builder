@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { DataSourceReferenceKinds } from "../DataConverterContracts";
+import { ImageAssetReferenceKinds } from "../../../domain/dataset-studio/contracts/ImageAssetReference";
 import {
   ImageIngestorAsset,
   ImageIngestorErrorCodes,
@@ -64,6 +65,8 @@ describe("ImageIngestorAsset", () => {
     expect(result.preview.width).toBe(1200);
     expect(result.preview.exifHighlights?.Make).toBe("Canon");
     expect(result.preview.normalized.ingestor).toBe("image-ingestor-v1");
+    const assetRef = result.metadata.assetRef as Record<string, unknown>;
+    expect(assetRef.kind).toBe(ImageAssetReferenceKinds.generatedOutput);
   });
 
   it("normalizes dimensions for rotated orientation when enabled", async () => {
@@ -93,6 +96,47 @@ describe("ImageIngestorAsset", () => {
 
     expect(result.preview.width).toBe(400);
     expect(result.preview.height).toBe(600);
+  });
+
+  it("normalizes local and external source references into standardized assetRef contracts", async () => {
+    const ingestor = new ImageIngestorAsset({
+      metadataProbe: new StubMetadataProbe({ width: 128, height: 128, format: "png" }),
+      exifReader: new StubExifReader(),
+    });
+
+    const local = await ingestor.execute({
+      source: {
+        kind: DataSourceReferenceKinds.localFile,
+        reference: "C:\\images\\local.png",
+        payload: new Uint8Array([1]),
+        fileName: "local.png",
+        contentType: "image/png",
+        diagnostics: Object.freeze([]),
+      },
+    });
+    expect(local.ok).toBeTrue();
+    if (local.ok) {
+      const localRef = local.metadata.assetRef as Record<string, unknown>;
+      expect(localRef.kind).toBe(ImageAssetReferenceKinds.localFile);
+      expect(localRef.path).toBe("C:\\images\\local.png");
+    }
+
+    const external = await ingestor.execute({
+      source: {
+        kind: DataSourceReferenceKinds.url,
+        reference: "https://example.com/a.png",
+        payload: new Uint8Array([2]),
+        fileName: "a.png",
+        contentType: "image/png",
+        diagnostics: Object.freeze([]),
+      },
+    });
+    expect(external.ok).toBeTrue();
+    if (external.ok) {
+      const externalRef = external.metadata.assetRef as Record<string, unknown>;
+      expect(externalRef.kind).toBe(ImageAssetReferenceKinds.externalUri);
+      expect(externalRef.uri).toBe("https://example.com/a.png");
+    }
   });
 
   it("returns structured failures for unsupported image types", async () => {

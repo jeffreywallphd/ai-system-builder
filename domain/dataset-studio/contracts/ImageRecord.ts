@@ -1,10 +1,9 @@
-import { AssetId } from "../../assets/AssetId";
 import type { CanonicalRecordValue } from "../CanonicalDataShapes";
-
-export interface ImageAssetReference {
-  readonly assetId: AssetId;
-  readonly assetVersionId?: string;
-}
+import {
+  createImageAssetReference,
+  type ImageAssetReference,
+  type ImageAssetReferenceInput,
+} from "./ImageAssetReference";
 
 export interface ImageRecord {
   readonly assetRef: ImageAssetReference;
@@ -67,10 +66,7 @@ function assertPositiveDimension(value: number, label: string): number {
 }
 
 export function createImageRecord(input: {
-  readonly assetRef: {
-    readonly assetId: AssetId | string;
-    readonly assetVersionId?: string;
-  };
+  readonly assetRef: ImageAssetReferenceInput;
   readonly width: number;
   readonly height: number;
   readonly format: string;
@@ -80,10 +76,7 @@ export function createImageRecord(input: {
   readonly schemaVersion?: string;
 }): ImageRecord {
   return Object.freeze({
-    assetRef: Object.freeze({
-      assetId: AssetId.from(input.assetRef.assetId),
-      assetVersionId: normalizeOptional(input.assetRef.assetVersionId),
-    }),
+    assetRef: createImageAssetReference(input.assetRef),
     width: assertPositiveDimension(input.width, "ImageRecord.width"),
     height: assertPositiveDimension(input.height, "ImageRecord.height"),
     format: normalizeFormat(input.format),
