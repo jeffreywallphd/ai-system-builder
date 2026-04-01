@@ -164,6 +164,22 @@ function normalizeMetadataList(values?: ReadonlyArray<string>): ReadonlyArray<st
   return Object.freeze(deduped);
 }
 
+function resolvePreviewModes(
+  schemaIntent: IDatasetSchemaIntent,
+  configuredPreviewModes?: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+  const configured = normalizeMetadataList(configuredPreviewModes);
+  if (configured.length > 0) {
+    return configured;
+  }
+
+  const previewHint = normalizeOptional(schemaIntent.descriptor.metadata?.previewHint);
+  return normalizeMetadataList([
+    "preview",
+    ...(previewHint ? [previewHint] : []),
+  ]);
+}
+
 function normalizeConfigRecord(config: Readonly<Record<string, CanonicalRecordValue>>): Readonly<Record<string, CanonicalRecordValue>> {
   return Object.freeze(Object.fromEntries(
     Object.entries(config)
@@ -204,7 +220,7 @@ function toDescriptor(input: {
     supportedFileExtensions: normalizeMetadataList(input.inspectability?.supportedFileExtensions),
     supportedMediaTypes: normalizeMetadataList(input.inspectability?.supportedMediaTypes),
     keyConfigKeys: normalizeMetadataList(input.inspectability?.keyConfigKeys ?? inspection.metadata.configKeys),
-    previewModes: normalizeMetadataList(input.inspectability?.previewModes ?? ["preview"]),
+    previewModes: resolvePreviewModes(input.schemaIntent, input.inspectability?.previewModes),
     executionModes: normalizeMetadataList(input.inspectability?.executionModes ?? ["execute"]),
   } satisfies DataAssetRegistryInspectabilityMetadata);
   const discoverability = Object.freeze({

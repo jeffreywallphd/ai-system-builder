@@ -206,3 +206,12 @@
 - Media validation now has explicit domain-level contracts (`IMediaRecordValidator`, `IMediaDatasetValidator`) and normalized pass/fail issue diagnostics, with zod isolated in adapter implementations.
 - `MediaSchemaIntentAdapter` now consumes the shared media dataset validator seam for schema-aware validation (assetRef structure, dimensions, format allow-list, metadata/tags compatibility, derived attribute shape), avoiding parallel validation paths.
 - Runtime canonical shape checks for `image-metadata-records` now reuse this same media validator seam for consistent, inspectable ingestion/runtime behavior.
+
+## Direction 5 extension update: media dataset compatibility + image preview support (stories 1.1.7-1.1.8)
+
+- Media datasets remain first-class dataset assets under the existing registration/loading/inspection/versioning seams (`CanonicalDataAsset`, `DataAssetRegistry`); no media-specific asset subsystem was added.
+- Dataset inspectability now inherits schema-intent preview hints into shared descriptor preview modes when callers do not provide explicit preview modes, preserving discoverability through one contract path.
+- Image preview shaping is now centralized in `application/data-studio/ImageDatasetPreviewBuilder.ts` and consumed by the shared `DataPreviewEngine`, rather than embedding image parsing in UI components.
+- `image-metadata-records` preview contracts now expose schema-aware fields per preview item: image reference/id, width, height, format, selected metadata summary, tags, and derived attributes.
+- Preview mapping is resilient to partial/malformed media records and emits bounded warning diagnostics instead of throwing/failing preview generation.
+- Data Studio preview rendering now supports bounded thumbnail-oriented image rows with graceful fallbacks for missing thumbnails, missing metadata, and broken references.

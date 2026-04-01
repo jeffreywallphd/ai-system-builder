@@ -197,7 +197,59 @@ describe("DataAssetRegistry", () => {
     const entry = registry.register({ asset });
     expect(entry.descriptor.schemaIntent.id).toBe("media");
     expect(entry.descriptor.schemaIntent.validationIssues).toEqual([]);
+    expect(entry.descriptor.inspectability.previewModes).toContain("dimensions-format-tags");
     expect(registry.list({ schemaIntentId: "media" })).toHaveLength(1);
+  });
+
+  it("loads media datasets through the standard resolve flow with shared inspection/version metadata", () => {
+    const registry = new DataAssetRegistry();
+    const createLoadableMediaAsset = (tag: string) => new CanonicalDataAsset({
+      id: "dataset-media-loadable",
+      name: "dataset-media-loadable",
+      version: "1.0.0",
+      source: { type: "generated", workflowId: "wf-media-load" },
+      location: { accessMethod: "virtual", location: "dataset://dataset-media-loadable" },
+      outputShape: createCanonicalImageMetadataRecordsShape({
+        items: [{
+          itemId: "item-1",
+          attributes: {
+            assetRef: {
+              assetId: "asset:image:loadable",
+            },
+            width: 300,
+            height: 200,
+            format: "png",
+            tags: ["sample"],
+          },
+        }],
+      }),
+      config: {
+        tag,
+      },
+      versionMetadata: {
+        schemaVersion: "1.0.0",
+        contractVersion: "1.0.0",
+        revision: 2,
+        publishedVersionId: "1.0.0",
+      },
+    });
+
+    registry.register({
+      asset: createLoadableMediaAsset("sample"),
+      assetFactory: (config) => createLoadableMediaAsset(String(config.tag ?? "sample")),
+    });
+
+    const loaded = registry.resolveAsset({
+      assetId: "dataset-media-loadable",
+      versionId: "1.0.0",
+      configOverride: {
+        tag: "override",
+      },
+    });
+    expect(loaded).toBeDefined();
+    expect(loaded?.inspect().outputShapeKind).toBe("image-metadata-records");
+    expect(loaded?.inspect().revision).toBe(2);
+    expect(loaded?.config.values.tag).toBe("override");
   });
 
   it("rejects invalid records when explicitly registered as media schema intent", () => {
