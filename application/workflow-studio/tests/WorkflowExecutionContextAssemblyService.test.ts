@@ -101,4 +101,52 @@ describe("assembleWorkflowExecutionContext", () => {
     ]));
     expect(result.context.unresolvedInputs).toEqual([expect.objectContaining({ inputId: "broken", required: true })]);
   });
+
+  it("resolves dataset-instance bindings from declared dataset references in metadata", () => {
+    const result = assembleWorkflowExecutionContext({
+      inputBindings: [{
+        inputId: "history-images",
+        sourceType: "runtime-parameter",
+        required: true,
+        valueType: "array",
+        bindingKey: "inputs.historyImages",
+        metadata: {
+          systemInputBinding: {
+            bindingId: "binding.history-images",
+            sources: [{
+              sourceId: "dataset-history",
+              kind: "dataset-instance-reference",
+              purpose: "history",
+              priority: 1,
+              required: true,
+              resolution: {
+                shape: "collection",
+              },
+            }],
+          },
+        },
+      }],
+      context: {
+        metadata: {
+          datasetInstanceReferences: [{
+            instanceId: "instance:history",
+            purpose: "history",
+            records: [
+              { recordId: "record:1", value: { assetId: "asset:image:1" } },
+              { recordId: "record:2", value: { assetId: "asset:image:2" } },
+            ],
+          }],
+        },
+      },
+    });
+
+    expect(result.context.resolvedInputs).toEqual([expect.objectContaining({
+      inputId: "history-images",
+      resolutionSource: "dataset-instance-reference",
+    })]);
+    expect(result.context.resolvedRuntimeInputs.historyImages).toEqual([
+      { assetId: "asset:image:1" },
+      { assetId: "asset:image:2" },
+    ]);
+  });
 });

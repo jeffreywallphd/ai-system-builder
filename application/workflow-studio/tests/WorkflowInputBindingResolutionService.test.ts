@@ -114,6 +114,70 @@ describe("resolveWorkflowInputBindings", () => {
     });
   });
 
+  it("resolves dataset record and collection binding shapes", () => {
+    const result = resolveWorkflowInputBindings({
+      bindings: [
+        createWorkflowInputBindingDescriptor({
+          bindingId: "binding.dataset.record",
+          inputId: "activeImage",
+          required: true,
+          valueType: "object",
+          sources: [{
+            sourceId: "dataset-record",
+            kind: WorkflowInputBindingSourceKinds.datasetInstanceReference,
+            purpose: "active-input",
+            priority: 1,
+            resolution: {
+              shape: "record",
+              recordId: "record:2",
+            },
+          }],
+        }),
+        createWorkflowInputBindingDescriptor({
+          bindingId: "binding.dataset.collection",
+          inputId: "historyImages",
+          required: true,
+          valueType: "array",
+          sources: [{
+            sourceId: "dataset-history",
+            kind: WorkflowInputBindingSourceKinds.datasetInstanceReference,
+            purpose: "history",
+            priority: 1,
+            resolution: {
+              shape: "collection",
+            },
+          }],
+        }),
+      ],
+      context: {
+        datasetInstances: [
+          {
+            instanceId: "instance:input",
+            purpose: "active-input",
+            records: [
+              { recordId: "record:1", value: { assetId: "asset:image:1" } },
+              { recordId: "record:2", value: { assetId: "asset:image:2" } },
+            ],
+          },
+          {
+            instanceId: "instance:history",
+            purpose: "history",
+            records: [
+              { recordId: "record:h1", value: { assetId: "asset:image:h1" } },
+              { recordId: "record:h2", value: { assetId: "asset:image:h2" } },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(result.resolvedValues.activeImage).toEqual({ assetId: "asset:image:2" });
+    expect(result.resolvedValues.historyImages).toEqual([
+      { assetId: "asset:image:h1" },
+      { assetId: "asset:image:h2" },
+    ]);
+  });
+
   it("emits diagnostics for missing required inputs and uses defaults for optional inputs", () => {
     const result = resolveWorkflowInputBindings({
       bindings: [
@@ -257,6 +321,98 @@ describe("resolveWorkflowInputBindings", () => {
         code: "unresolved-required-input",
         inputId: "imageLocator",
       }),
+    ]));
+  });
+
+  it("emits dataset diagnostics for missing records and schema incompatibility", () => {
+    const result = resolveWorkflowInputBindings({
+      bindings: [
+        createWorkflowInputBindingDescriptor({
+          bindingId: "binding.dataset.record.missing",
+          inputId: "recordImage",
+          required: true,
+          valueType: "object",
+          sources: [{
+            sourceId: "dataset-record-missing",
+            kind: WorkflowInputBindingSourceKinds.datasetInstanceReference,
+            instanceId: "instance:output",
+            priority: 1,
+            required: true,
+            resolution: {
+              shape: "record",
+              recordId: "record:404",
+            },
+          }],
+        }),
+        createWorkflowInputBindingDescriptor({
+          bindingId: "binding.dataset.schema",
+          inputId: "comparisonImage",
+          required: true,
+          valueType: "object",
+          sources: [{
+            sourceId: "dataset-schema-mismatch",
+            kind: WorkflowInputBindingSourceKinds.datasetInstanceReference,
+            instanceId: "instance:output",
+            priority: 1,
+            required: true,
+            resolution: {
+              shape: "record",
+              recordId: "record:1",
+            },
+          }],
+        }),
+      ],
+      context: {
+        datasetInstances: [{
+          instanceId: "instance:output",
+          schema: {
+            recordValueType: "string",
+          },
+          records: [{
+            recordId: "record:1",
+            value: { assetId: "asset:image:1" },
+          }],
+        }],
+      },
+    });
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "dataset-record-missing",
+        inputId: "recordImage",
+      }),
+      expect.objectContaining({
+        code: "dataset-schema-incompatible",
+        inputId: "comparisonImage",
+      }),
+    ]));
+  });
+
+  it("reports definition-validation diagnostics alongside runtime resolution diagnostics", () => {
+    const result = resolveWorkflowInputBindings({
+      bindings: [
+        createWorkflowInputBindingDescriptor({
+          bindingId: "binding.invalid.dataset",
+          inputId: "datasetInput",
+          required: true,
+          sources: [{
+            sourceId: "dataset-invalid",
+            kind: WorkflowInputBindingSourceKinds.datasetInstanceReference,
+            priority: 1,
+            resolution: {
+              shape: "record",
+            },
+          }],
+        }),
+      ],
+      context: {
+        datasetInstances: [],
+      },
+    });
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "invalid-binding-configuration" }),
+      expect.objectContaining({ code: "unresolved-required-input" }),
     ]));
   });
 });
