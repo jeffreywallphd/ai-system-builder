@@ -8,7 +8,13 @@
 } from "../assets/interfaces/IAsset";
 import { AssetContractShapeKinds } from "../contracts/AssetContract";
 import type { CanonicalDataShape, CanonicalDataShapeKind, CanonicalRecordValue } from "./CanonicalDataShapes";
-import { DataAssetBase, type DataAssetContracts, type DataAssetDependencyReference, type DataAssetVersionMetadata } from "./DataAssetBase";
+import {
+  DataAssetBase,
+  type DataAssetContracts,
+  type DataAssetDependencyReference,
+  type DataAssetRuntimeOperationalContract,
+  type DataAssetVersionMetadata,
+} from "./DataAssetBase";
 
 function defaultContracts(outputShapeKind: CanonicalDataShapeKind): DataAssetContracts {
   return Object.freeze({
@@ -54,6 +60,7 @@ export class CanonicalDataAsset extends DataAssetBase {
     readonly dependencies?: ReadonlyArray<DataAssetDependencyReference>;
     readonly composableInputShapeKinds?: ReadonlyArray<CanonicalDataShapeKind>;
     readonly supportsPreview?: boolean;
+    readonly runtime?: Partial<DataAssetRuntimeOperationalContract>;
     readonly status?: "draft" | "pending" | "available" | "missing" | "failed" | "archived" | "deleted";
     readonly technicalMetadata?: IAssetTechnicalMetadata;
     readonly semanticMetadata?: IAssetSemanticMetadata;
@@ -72,6 +79,7 @@ export class CanonicalDataAsset extends DataAssetBase {
       dependencies: params.dependencies,
       composableInputShapeKinds: params.composableInputShapeKinds ?? defaultComposableInputShapeKinds(),
       supportsPreview: params.supportsPreview,
+      runtime: params.runtime,
       status: params.status,
       technicalMetadata: params.technicalMetadata,
       semanticMetadata: params.semanticMetadata,
@@ -86,4 +94,3 @@ export class CanonicalDataAsset extends DataAssetBase {
     return this.outputShape;
   }
 }
-

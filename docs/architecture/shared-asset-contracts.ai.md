@@ -259,6 +259,19 @@
 
 ## Direction 5 extension update: media adapter containment hardening (story 1.1.13)
 
+## Direction 5 extension update: runtime-operational dataset contracts + schema validation engine (stories 1.3.1-1.3.2)
+
+- Dataset assets now expose a bounded runtime-operational contract in the canonical dataset domain (`DataAssetBase`) so runtime usage is explicit and inspectable instead of ad hoc flags:
+  - runtime usability posture (`authoring-only`, `runtime-readable`, `runtime-operational`),
+  - system/asset instance ownership + runtime state scope,
+  - mutability + operational write behavior,
+  - declared runtime access patterns (`scan-read`, `point-lookup`, `random-read`, `append-write`, `upsert-write`, `overwrite-write`).
+- Runtime-operational metadata is projected through shared registration/inspection seams (`DataAssetRegistryDescriptor.runtime`, `capabilities.runtimeUsable`) so Data/Workflow/System studios can consume one platform contract.
+- Dataset schema validation now has a dedicated internal engine seam (`IDatasetSchemaValidationEngine`, `DatasetSchemaValidationEngine`) that executes schema-intent validation through domain contracts and returns inspectable summaries (`errorCount`, `warningCount`) with normalized issues.
+- Media/image schema validation remains adapter-bounded and schema-intent-driven:
+  - canonical image record requirements (asset reference, dimensions, format, metadata/tags/derived shape) are validated through the media intent adapter,
+  - zod-backed implementations remain behind internal validation contracts (`IMediaRecordValidator`, `IMediaDatasetValidator`) to avoid library sprawl.
+
 - Media library mechanics are now explicitly adapter-owned:
   - `file-type` stays inside `application/dataset-studio/adapters/media/ImageFormatDetectorAdapter.ts`,
   - `image-size` stays inside `application/dataset-studio/adapters/media/ImageDimensionReaderAdapter.ts`,

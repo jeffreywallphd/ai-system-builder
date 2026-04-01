@@ -30,6 +30,19 @@ export interface DatasetSchemaIntentValidationResult {
   readonly issues: ReadonlyArray<DatasetSchemaIntentValidationIssue>;
 }
 
+export interface DatasetSchemaValidationSummary {
+  readonly errorCount: number;
+  readonly warningCount: number;
+}
+
+export interface DatasetSchemaValidationResult {
+  readonly intentId: DatasetSchemaIntentId;
+  readonly contractVersion: string;
+  readonly valid: boolean;
+  readonly issues: ReadonlyArray<DatasetSchemaIntentValidationIssue>;
+  readonly summary: DatasetSchemaValidationSummary;
+}
+
 export interface DatasetSchemaIntentDescriptor {
   readonly id: DatasetSchemaIntentId;
   readonly name: string;
@@ -57,6 +70,13 @@ export interface IDatasetSchemaIntentRegistry {
   resolveForShapeKind(shapeKind: CanonicalDataShapeKind): IDatasetSchemaIntent | undefined;
 }
 
+export interface IDatasetSchemaValidationEngine {
+  validate(input: {
+    readonly intent: IDatasetSchemaIntent;
+    readonly shape: CanonicalDataShape;
+  }): DatasetSchemaValidationResult;
+}
+
 export function createSchemaIntentValidationResult(
   issues: ReadonlyArray<DatasetSchemaIntentValidationIssue>,
 ): DatasetSchemaIntentValidationResult {
@@ -64,6 +84,22 @@ export function createSchemaIntentValidationResult(
   return Object.freeze({
     valid: !hasErrors,
     issues: Object.freeze([...issues]),
+  });
+}
+
+export function createDatasetSchemaValidationResult(input: {
+  readonly intent: IDatasetSchemaIntent;
+  readonly validation: DatasetSchemaIntentValidationResult;
+}): DatasetSchemaValidationResult {
+  const issues = Object.freeze([...input.validation.issues]);
+  const errorCount = issues.filter((issue) => issue.severity === DatasetSchemaIntentValidationSeverities.error).length;
+  const warningCount = issues.filter((issue) => issue.severity === DatasetSchemaIntentValidationSeverities.warning).length;
+  return Object.freeze({
+    intentId: input.intent.descriptor.id,
+    contractVersion: input.intent.descriptor.contractVersion,
+    valid: input.validation.valid,
+    issues,
+    summary: Object.freeze({ errorCount, warningCount }),
   });
 }
 

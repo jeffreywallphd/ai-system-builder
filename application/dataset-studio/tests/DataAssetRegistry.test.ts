@@ -133,12 +133,46 @@ describe("DataAssetRegistry", () => {
 
     const previewEntries = registry.list({ previewable: true });
     const ingestionEntries = registry.list({ specialization: DataAssetRegistrySpecializations.ingestion });
+    const runtimeUsableEntries = registry.list({ runtimeUsable: true });
 
     expect(previewEntries).toHaveLength(1);
     expect(previewEntries[0]?.descriptor.assetId).toBe("dataset-preview");
     expect(ingestionEntries).toHaveLength(1);
     expect(ingestionEntries[0]?.descriptor.assetId).toBe("dataset-ingest");
     expect(registry.list({ schemaIntentId: "tabular" }).length).toBeGreaterThanOrEqual(2);
+    expect(runtimeUsableEntries).toHaveLength(2);
+  });
+
+  it("exposes runtime-operational dataset ownership and mutability metadata in registry descriptors", () => {
+    const registry = new DataAssetRegistry();
+    const entry = registry.register({
+      asset: new CanonicalDataAsset({
+        id: "dataset-runtime-ops",
+        name: "dataset-runtime-ops",
+        version: "1.0.0",
+        source: { type: "generated", workflowId: "wf-runtime-ops" },
+        location: { accessMethod: "virtual", location: "dataset://dataset-runtime-ops" },
+        outputShape: createCanonicalRecordsShape({ records: [] }),
+        runtime: {
+          usability: "runtime-operational",
+          instanceOwnership: {
+            owner: "system",
+            stateScope: "system-instance",
+          },
+          mutability: {
+            mode: "append-only",
+            writeBehavior: "system-only",
+          },
+          accessPatterns: ["scan-read", "append-write"],
+        },
+      }),
+    });
+
+    expect(entry.descriptor.capabilities.runtimeUsable).toBeTrue();
+    expect(entry.descriptor.runtime.usability).toBe("runtime-operational");
+    expect(entry.descriptor.runtime.instanceOwnership.stateScope).toBe("system-instance");
+    expect(entry.descriptor.runtime.mutability.mode).toBe("append-only");
+    expect(entry.descriptor.runtime.accessPatterns).toContain("append-write");
   });
 
   it("rejects duplicate registration keys and unsupported config overrides", () => {
