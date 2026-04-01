@@ -9,6 +9,7 @@ import { SystemParameterConfigEditor } from "../../components/studio-shell/Syste
 import { SystemExecutionMetadataEditor } from "../../components/studio-shell/SystemExecutionMetadataEditor";
 import { SystemCompatibilityInsightsPanel } from "../../components/studio-shell/SystemCompatibilityInsightsPanel";
 import { SystemRuntimeRunPanel } from "../../components/studio-shell/SystemRuntimeRunPanel";
+import WorkflowTemplateSelectionPanel from "../../components/studio-shell/workflow/WorkflowTemplateSelectionPanel";
 import type { SystemStudioRegistration } from "../StudioShellExtensions";
 import { createSystemStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -56,6 +57,14 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
     dependencies: Object.freeze([]),
   },
   extensions: Object.freeze([
+    {
+      id: "system-studio-template-selection",
+      slot: "draft-authoring",
+      title: "Workflow template selection",
+      subtitle: "Discover starter workflow templates and prepare instantiation payloads for system composition.",
+      order: 7,
+      render: () => createElement(WorkflowTemplateSelectionPanel, { surface: "system-studio" }),
+    },
     {
       id: "system-studio-structure-editor",
       slot: "draft-authoring",
