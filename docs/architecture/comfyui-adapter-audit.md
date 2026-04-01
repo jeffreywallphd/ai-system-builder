@@ -189,3 +189,8 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
   - `ICommonImageNodePromptConditioning` for prompt/conditioning transfer without raw Comfy payload types.
 - Updated `ComfyPromptInputNodeAdapter` to consume internal model capabilities plus positive/optional negative prompts, emit internal prompt conditioning output, and provide inspectable prompt-supply/binding metadata.
 - Added focused adapter tests (`infrastructure/comfyui/adapters/image-nodes/tests/ComfyModelAndPromptNodeAdapters.test.ts`) for contract compliance, model->prompt composability, Comfy-boundary isolation, and normalized validation error behavior.
+
+## Story 2.2.7 + 2.2.8 update
+- Added `ComfySamplerWrapperNodeAdapter` (`infrastructure/comfyui/adapters/image-nodes/ComfySamplerWrapperNodeAdapter.ts`) as the internal sampler seam with narrow sampling config (`steps`, `guidance`, `seed`, optional sampler/scheduler/strength), internal model + prompt-conditioning inputs, optional source-image composition support, and inspectable effective sampling metadata.
+- Added `ComfyResizeUpscaleNodeAdapter` (`infrastructure/comfyui/adapters/image-nodes/ComfyResizeUpscaleNodeAdapter.ts`) as the internal resize/upscale seam with narrow config (`width`/`height` and/or `scaleFactor`, fit mode, strategy), internal image output shape continuity, and explicit transform metadata updates (source/target dimensions + transform details).
+- Added focused adapter tests (`infrastructure/comfyui/adapters/image-nodes/tests/ComfySamplerAndResizeNodeAdapters.test.ts`) covering contract compliance, model+prompt sampler composition, resize metadata integrity, composability-ready output shape, boundary isolation, and normalized validation error behavior.
