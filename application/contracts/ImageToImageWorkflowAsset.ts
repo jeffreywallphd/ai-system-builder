@@ -1,10 +1,15 @@
 import { z } from "zod";
 import { createImageWorkflowAssetPreview, type ImageWorkflowAssetPreview } from "./ImageWorkflowAssetPreview";
 import {
+  createImageWorkflowInputBindingConfiguration,
+  type ImageWorkflowInputBindingConfiguration,
+} from "./ImageWorkflowInputBindingConfiguration";
+import {
   CoreImageWorkflowAssetTypeContracts,
   ImageWorkflowAssetIntentTypes,
   type ImageWorkflowAssetContract,
 } from "./ImageWorkflowAssetContract";
+import { WorkflowInputBindingSourceKinds } from "../../domain/workflow-studio/WorkflowInputBindingDomain";
 import {
   createReusableImagePipeline,
   ImageWorkflowCompositionStageKinds,
@@ -29,6 +34,7 @@ export interface ImageToImageWorkflowAsset {
   readonly contract: ImageWorkflowAssetContract;
   readonly configuration: ImageToImageWorkflowAssetConfig;
   readonly composition: ImageWorkflowComposition;
+  readonly inputBindings: ImageWorkflowInputBindingConfiguration;
   readonly bindings: Readonly<{
     readonly sourceImageFieldId: "sourceImage";
     readonly promptFieldId: "instruction";
@@ -171,10 +177,37 @@ function buildImageToImageComposition(): ImageWorkflowComposition {
 
 export function createImageToImageWorkflowAsset(input?: {
   readonly configuration?: unknown;
+  readonly inputBindings?: ImageWorkflowInputBindingConfiguration["bindings"];
 }): ImageToImageWorkflowAsset {
   const contract = CoreImageWorkflowAssetTypeContracts[ImageWorkflowAssetIntentTypes.imageToImage];
   const configuration = ImageToImageWorkflowAssetConfigSchema.parse(input?.configuration ?? {});
   const composition = buildImageToImageComposition();
+  const inputBindings = createImageWorkflowInputBindingConfiguration({
+    bindings: input?.inputBindings ?? [
+      {
+        bindingId: "binding.input.sourceImage",
+        inputId: "sourceImage",
+        required: true,
+        valueType: "object",
+        sources: [
+          { sourceId: "selected-image", kind: WorkflowInputBindingSourceKinds.selectedImage, path: "assetRef", priority: 1, required: true },
+          { sourceId: "form-source-image", kind: WorkflowInputBindingSourceKinds.uiFormValue, formKey: "sourceImage", priority: 2 },
+        ],
+      },
+      {
+        bindingId: "binding.input.instruction",
+        inputId: "instruction",
+        required: false,
+        valueType: "string",
+        defaultValue: "",
+        sources: [
+          { sourceId: "form-instruction", kind: WorkflowInputBindingSourceKinds.uiFormValue, formKey: "instruction", priority: 1 },
+          { sourceId: "runtime-instruction", kind: WorkflowInputBindingSourceKinds.runtimeParameter, parameterKey: "instruction", priority: 2 },
+          { sourceId: "default-instruction", kind: WorkflowInputBindingSourceKinds.constantValue, value: "", priority: 3 },
+        ],
+      },
+    ],
+  });
 
   return Object.freeze({
     id: ImageToImageWorkflowAssetId,
@@ -183,6 +216,7 @@ export function createImageToImageWorkflowAsset(input?: {
     contract,
     configuration,
     composition,
+    inputBindings,
     bindings: Object.freeze({
       sourceImageFieldId: "sourceImage",
       promptFieldId: "instruction",
@@ -198,4 +232,3 @@ export function createImageToImageWorkflowAsset(input?: {
     }),
   });
 }
-

@@ -1,4 +1,9 @@
 import { z } from "zod";
+import { WorkflowInputBindingSourceKinds } from "../../domain/workflow-studio/WorkflowInputBindingDomain";
+import {
+  createImageWorkflowInputBindingConfiguration,
+  type ImageWorkflowInputBindingConfiguration,
+} from "./ImageWorkflowInputBindingConfiguration";
 import {
   CoreImageWorkflowAssetTypeContracts,
   ImageWorkflowAssetIntentTypes,
@@ -47,6 +52,7 @@ export interface BatchTransformWorkflowAsset {
   readonly contract: ImageWorkflowAssetContract;
   readonly configuration: BatchTransformWorkflowAssetConfig;
   readonly composition: ImageWorkflowComposition;
+  readonly inputBindings: ImageWorkflowInputBindingConfiguration;
   readonly bindings: Readonly<{
     readonly batchItemsFieldId: "batchItems";
     readonly instructionFieldId: "instruction";
@@ -136,10 +142,38 @@ function buildBatchTransformComposition(): ImageWorkflowComposition {
   });
 }
 
-export function createBatchTransformWorkflowAsset(input?: { readonly configuration?: unknown }): BatchTransformWorkflowAsset {
+export function createBatchTransformWorkflowAsset(input?: {
+  readonly configuration?: unknown;
+  readonly inputBindings?: ImageWorkflowInputBindingConfiguration["bindings"];
+}): BatchTransformWorkflowAsset {
   const contract = CoreImageWorkflowAssetTypeContracts[ImageWorkflowAssetIntentTypes.batchTransform];
   const configuration = BatchTransformWorkflowAssetConfigSchema.parse(input?.configuration ?? {});
   const composition = buildBatchTransformComposition();
+  const inputBindings = createImageWorkflowInputBindingConfiguration({
+    bindings: input?.inputBindings ?? [
+      {
+        bindingId: "binding.input.batchItems",
+        inputId: "batchItems",
+        required: true,
+        valueType: "array",
+        sources: [
+          { sourceId: "form-batch-items", kind: WorkflowInputBindingSourceKinds.uiFormValue, formKey: "batchItems", priority: 1, required: true },
+          { sourceId: "dataset-collection", kind: WorkflowInputBindingSourceKinds.datasetInstanceReference, purpose: "batch-input", priority: 2, resolution: { shape: "collection" } },
+        ],
+      },
+      {
+        bindingId: "binding.input.instruction",
+        inputId: "instruction",
+        required: false,
+        valueType: "string",
+        defaultValue: "",
+        sources: [
+          { sourceId: "form-instruction", kind: WorkflowInputBindingSourceKinds.uiFormValue, formKey: "instruction", priority: 1 },
+          { sourceId: "default-instruction", kind: WorkflowInputBindingSourceKinds.constantValue, value: "", priority: 2 },
+        ],
+      },
+    ],
+  });
 
   return Object.freeze({
     id: BatchTransformWorkflowAssetId,
@@ -148,6 +182,7 @@ export function createBatchTransformWorkflowAsset(input?: { readonly configurati
     contract,
     configuration,
     composition,
+    inputBindings,
     bindings: Object.freeze({
       batchItemsFieldId: "batchItems",
       instructionFieldId: "instruction",
