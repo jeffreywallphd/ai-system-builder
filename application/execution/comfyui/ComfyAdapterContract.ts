@@ -52,6 +52,15 @@ export interface IComfyAdapterOutputRecord {
   readonly nodeId: string;
   readonly kind: "image" | "video" | "audio" | "text";
   readonly reference: string;
+  readonly assetRef?: {
+    readonly assetId: string;
+    readonly versionId?: string;
+  };
+  readonly lineage?: Readonly<{
+    readonly sourceExecutionId: string;
+    readonly sourceNodeId: string;
+    readonly consumedAssetRefs?: ReadonlyArray<IComfyAdapterAssetReference>;
+  }>;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 

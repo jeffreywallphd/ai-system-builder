@@ -84,3 +84,11 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
 1. Introduce a higher-level runtime registration/composition path that depends on `IComfyExecutionAdapter` instead of concrete executor wiring.
 2. Extend normalized output metadata to include explicit lineage correlation IDs for cross-system persistence hooks.
 3. Add richer lifecycle status mapping when Comfy exposes finer-grained progress semantics.
+
+## Story 2.1.3 and 2.1.4 incremental update
+- Added focused mapper seams so request/result mapping no longer lives ad-hoc inside execution orchestration:
+  - `infrastructure/comfyui/execution/mappers/ComfyExecutionRequestMapper.ts`
+  - `infrastructure/comfyui/execution/mappers/ComfyExecutionResultMapper.ts`
+- Added `application/execution/comfyui/ComfyExecutionService.ts` as the adapter-driven invocation layer (`trigger -> execute -> normalize`) for workflow execution callers.
+- Refactored `ComfyWorkflowExecutor` to consume `IComfyExecutionAdapter` and route execution through the new service instead of directly owning Comfy queue invocation mechanics.
+- Expanded normalized adapter output records with `assetRef` and `lineage` hooks for downstream persistence/provenance alignment without exposing Comfy DTOs upstream.

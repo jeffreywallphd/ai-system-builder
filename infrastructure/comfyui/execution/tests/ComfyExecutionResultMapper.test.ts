@@ -1,0 +1,25 @@
+import { describe, expect, it } from "bun:test";
+import { ComfyExecutionResultMapper } from "../mappers/ComfyExecutionResultMapper";
+
+describe("ComfyExecutionResultMapper", () => {
+  it("normalizes completion outputs into adapter-safe output records", () => {
+    const mapper = new ComfyExecutionResultMapper();
+    const result = mapper.map({
+      completion: {
+        promptId: "p1",
+        messages: ["done"],
+        outputs: {
+          nodeA: [
+            { kind: "image", filename: "x.png", subfolder: "out", type: "output" },
+            { kind: "text", text: "hello" },
+          ],
+        },
+      },
+      consumedAssetRefs: [{ assetId: "asset:input", versionId: "v1" }],
+    });
+
+    expect(result.outputs).toHaveLength(2);
+    expect(result.outputs[0]?.assetRef?.assetId).toContain("p1:nodeA:image:x.png");
+    expect(result.outputs[0]?.lineage?.consumedAssetRefs?.[0]?.assetId).toBe("asset:input");
+  });
+});
