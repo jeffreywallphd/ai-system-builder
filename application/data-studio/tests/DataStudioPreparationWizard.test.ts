@@ -8,6 +8,26 @@ import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDo
 import { UnifiedPreparationStageActivationModes } from "../../../domain/dataset-studio/UnifiedPreparationAsset";
 
 describe("DataStudioPreparationWizard", () => {
+  it("initializes from intent templates and supports template selection", () => {
+    const wizard = new DataStudioPreparationWizard();
+    const initial = wizard.getSnapshot();
+    expect(initial.template.id).toBe("elt-pipeline");
+
+    const templates = wizard.listTemplates();
+    expect(templates.map((template) => template.id)).toEqual([
+      "elt-pipeline",
+      "analytics-pipeline",
+      "document-pipeline",
+      "image-pipeline",
+    ]);
+
+    wizard.selectTemplate("document-pipeline");
+    const documentSnapshot = wizard.getSnapshot();
+    expect(documentSnapshot.template.id).toBe("document-pipeline");
+    expect(documentSnapshot.stages.find((stage) => stage.stageId === PipelineStageIds.Chunking)?.availability.isAvailable).toBeTrue();
+    expect(documentSnapshot.stages.find((stage) => stage.stageId === PipelineStageIds.StorageRaw)?.availability.reason).toBe("disabled");
+  });
+
   it("navigates forward and backward while preserving stage configuration state", () => {
     const wizard = new DataStudioPreparationWizard();
     const start = wizard.getSnapshot();
@@ -92,15 +112,37 @@ describe("DataStudioPreparationWizard", () => {
   it("marks advanced-only stages disabled in simple mode and available in advanced mode", () => {
     const wizard = new DataStudioPreparationWizard();
 
-    wizard.setStageActivation(PipelineStageIds.Enrichment, Object.freeze({
+    wizard.setStageActivation(PipelineStageIds.FeatureEngineering, Object.freeze({
       mode: UnifiedPreparationStageActivationModes.always,
     }));
     const simpleSnapshot = wizard.getSnapshot();
-    expect(simpleSnapshot.stages.find((stage) => stage.stageId === PipelineStageIds.Enrichment)?.availability.reason).toBe("visibility");
+    expect(simpleSnapshot.stages.find((stage) => stage.stageId === PipelineStageIds.FeatureEngineering)?.availability.reason).toBe("visibility");
 
     wizard.setPresentationMode(DataStudioWizardPresentationModes.advanced);
     const advancedSnapshot = wizard.getSnapshot();
-    expect(advancedSnapshot.stages.find((stage) => stage.stageId === PipelineStageIds.Enrichment)?.availability.isAvailable).toBeTrue();
+    expect(advancedSnapshot.stages.find((stage) => stage.stageId === PipelineStageIds.FeatureEngineering)?.availability.isAvailable).toBeTrue();
+  });
+
+  it("uses metadata-driven progressive field visibility based on template and prior input", () => {
+    const wizard = new DataStudioPreparationWizard();
+    wizard.selectTemplate("document-pipeline");
+
+    const sourceStage = wizard.getSnapshot().stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection);
+    expect(sourceStage?.fields.find((field) => field.fieldId === "enable-labeling")?.isVisible).toBeFalse();
+
+    wizard.setPresentationMode(DataStudioWizardPresentationModes.advanced);
+    const advancedSource = wizard.getSnapshot().stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection);
+    expect(advancedSource?.fields.find((field) => field.fieldId === "enable-labeling")?.isVisible).toBeTrue();
+
+    const labelingBefore = wizard.getSnapshot().stages.find((stage) => stage.stageId === PipelineStageIds.Labeling);
+    expect(labelingBefore?.availability.reason).toBe("condition");
+
+    wizard.setStageOptions(PipelineStageIds.SourceSelection, Object.freeze({
+      ...advancedSource?.options,
+      enableLabeling: true,
+    }));
+    const labelingAfter = wizard.getSnapshot().stages.find((stage) => stage.stageId === PipelineStageIds.Labeling);
+    expect(labelingAfter?.availability.isAvailable).toBeTrue();
   });
 });
 
