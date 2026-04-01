@@ -506,6 +506,14 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["runDataStudioPipeline"]>[0];
     return JSON.stringify(await studioShellBackendApi.runDataStudioPipeline(request));
   });
+  ipcMain.handle("ai-loom-desktop-studio-shell:data-pipelines:list", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listDataStudioPipelines"]>[0];
+    return JSON.stringify(await studioShellBackendApi.listDataStudioPipelines(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:data-pipelines:load", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["loadDataStudioPipeline"]>[0];
+    return JSON.stringify(await studioShellBackendApi.loadDataStudioPipeline(request));
+  });
   ipcMain.handle("ai-loom-desktop-studio-shell:workflow-runs:list", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listWorkflowRuns"]>[0];
     return JSON.stringify(await studioShellBackendApi.listWorkflowRuns(request));

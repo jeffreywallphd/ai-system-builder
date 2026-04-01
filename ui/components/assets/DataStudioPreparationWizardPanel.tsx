@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
 import type { PipelineStageId } from "../../../domain/dataset-studio/PipelineStageDomain";
 import {
@@ -24,6 +24,8 @@ import {
 
 export interface DataStudioPreparationWizardPanelProps {
   readonly adapter?: DataStudioPreparationWizardStateAdapter;
+  readonly persistedState?: string;
+  readonly onPipelineStateChange?: (serializedState: string) => void;
   readonly onSnapshotChange?: (snapshot: DataStudioWizardSnapshot) => void;
 }
 
@@ -75,19 +77,23 @@ function formatFieldValue(field: DataStudioWizardFieldSnapshot): string {
 }
 
 export default function DataStudioPreparationWizardPanel(props: DataStudioPreparationWizardPanelProps): JSX.Element {
+  const normalizedPersistedState = props.persistedState?.trim() || undefined;
   const localAdapter = useMemo(
     () => {
       if (typeof window === "undefined") {
         return new DataStudioPreparationWizardStateAdapter();
       }
-      const persistedState = window.localStorage.getItem(DataStudioWizardPersistenceStorageKey) ?? undefined;
+      const persistedState = normalizedPersistedState
+        ?? window.localStorage.getItem(DataStudioWizardPersistenceStorageKey)
+        ?? undefined;
       return new DataStudioPreparationWizardStateAdapter({
         persistedState,
       });
     },
-    [],
+    [normalizedPersistedState],
   );
   const adapter = props.adapter ?? localAdapter;
+  const lastImportedStateRef = useRef<string | undefined>(normalizedPersistedState);
   const [snapshot, setSnapshot] = useState<DataStudioWizardSnapshot>(() => adapter.getSnapshot());
   const [isPaletteOpen, setIsPaletteOpen] = useState(true);
   const [paletteSearch, setPaletteSearch] = useState("");
@@ -117,16 +123,41 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
     : undefined;
   const executionReadiness = adapter.assessExecutionReadiness();
 
-  const refreshSnapshot = () => {
-    const next = adapter.getSnapshot();
-    setSnapshot(next);
+  useEffect(() => {
+    const serializedPipelineState = adapter.exportPipelineStateJson();
     if (typeof window !== "undefined") {
       try {
-        window.localStorage.setItem(DataStudioWizardPersistenceStorageKey, adapter.exportPipelineStateJson());
+        window.localStorage.setItem(DataStudioWizardPersistenceStorageKey, serializedPipelineState);
       } catch {
         // ignore persistence failures (storage unavailable/quota)
       }
     }
+    props.onPipelineStateChange?.(serializedPipelineState);
+  }, [adapter, props.onPipelineStateChange]);
+
+  useEffect(() => {
+    if (!normalizedPersistedState || normalizedPersistedState === lastImportedStateRef.current) {
+      return;
+    }
+    const result = adapter.importPipelineState(normalizedPersistedState);
+    if (result.ok) {
+      lastImportedStateRef.current = normalizedPersistedState;
+      setSnapshot(adapter.getSnapshot());
+    }
+  }, [adapter, normalizedPersistedState]);
+
+  const refreshSnapshot = () => {
+    const next = adapter.getSnapshot();
+    setSnapshot(next);
+    const serializedPipelineState = adapter.exportPipelineStateJson();
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(DataStudioWizardPersistenceStorageKey, serializedPipelineState);
+      } catch {
+        // ignore persistence failures (storage unavailable/quota)
+      }
+    }
+    props.onPipelineStateChange?.(serializedPipelineState);
     props.onSnapshotChange?.(next);
   };
 

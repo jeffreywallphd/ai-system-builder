@@ -35,6 +35,7 @@ export type StudioShellExtensionSlot = typeof StudioShellExtensionSlots[keyof ty
 
 export interface StudioShellExtensionOperations {
   refresh(): Promise<void>;
+  setDraftContent?(content: string): void;
   startSystemExecution?(request: StartSystemRuntimeExecutionRequest): Promise<SystemRuntimeApiResponse<StartSystemRuntimeExecutionResponse>>;
   getSystemExecutionStatus?(executionId: string): Promise<SystemRuntimeApiResponse<RuntimeExecutionStatusReadModel>>;
   getSystemExecutionTrace?(request: { readonly executionId: string; readonly eventLimit?: number; readonly logLimit?: number }): Promise<SystemRuntimeApiResponse<RuntimeExecutionTraceReadModel>>;

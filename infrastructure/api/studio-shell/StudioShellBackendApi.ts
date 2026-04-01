@@ -69,6 +69,12 @@ import {
   createDataStudioPipelineState,
   type DataStudioPipelineState,
 } from "../../../application/data-studio/DataStudioPipelineState";
+import {
+  createDataStudioPipelineVersionMetadata,
+  parseDataStudioPipelineVersionMetadata,
+  type DataStudioPipelineVersionSummary,
+} from "../../../application/data-studio/DataStudioPipelineVersioning";
+import { AssetVersion } from "../../../domain/assets/AssetVersion";
 import { UnifiedExecutionEngine } from "../../../application/execution/UnifiedExecutionEngine";
 import { DataStudioPipelineExecutionUnitHandler } from "../../execution/DataStudioPipelineExecutionUnitHandler";
 
@@ -114,6 +120,7 @@ export interface StudioShellSnapshotReadModel {
     readonly versionLabel?: string;
     readonly createdAt: string;
     readonly parentVersionId?: string;
+    readonly dataStudioPipeline?: DataStudioPipelineVersionSummary;
   }>;
   readonly validationIssues: ReadonlyArray<StudioShellValidationIssue>;
 }
@@ -205,6 +212,37 @@ export interface RunDataStudioPipelineRequest {
   readonly pipelineState: DataStudioPipelineState | string;
   readonly initiatedBy?: string;
   readonly executionReason?: string;
+}
+
+export interface ListDataStudioPipelinesRequest {
+  readonly studioId: string;
+  readonly draftId?: string;
+}
+
+export interface LoadDataStudioPipelineRequest {
+  readonly studioId: string;
+  readonly draftId?: string;
+  readonly versionId?: string;
+  readonly source?: "draft" | "latest-version" | "version-id";
+}
+
+export interface DataStudioPipelineVersionReadModel {
+  readonly versionId: string;
+  readonly versionLabel?: string;
+  readonly parentVersionId?: string;
+  readonly createdAt: string;
+  readonly dataStudioPipeline?: DataStudioPipelineVersionSummary;
+}
+
+export interface DataStudioPersistedPipelineReadModel {
+  readonly source: "draft" | "version";
+  readonly studioId: string;
+  readonly draftId: string;
+  readonly assetId: string;
+  readonly selectedVersionId?: string;
+  readonly latestVersionId?: string;
+  readonly pipelineState: DataStudioPipelineState;
+  readonly versions: ReadonlyArray<DataStudioPipelineVersionReadModel>;
 }
 
 export interface DataStudioExecutionReadinessIssueReadModel {
@@ -571,7 +609,8 @@ export class StudioShellBackendApi {
 
   public async publishVersion(command: PublishAssetDraftVersionCommand): Promise<StudioShellApiResponse<StudioShellSnapshotReadModel>> {
     return this.wrap(async () => {
-      await this.service.publishAssetDraftVersion(command);
+      const published = await this.service.publishAssetDraftVersion(command);
+      await this.enrichDataStudioVersionMetadataIfApplicable(published.version, published.draft.content);
       await this.synchronizeWorkflowPersistenceFromStudioDraft(command.studioId, command.draftId);
       return this.requireSnapshot(command.studioId);
     });
@@ -888,6 +927,71 @@ export class StudioShellBackendApi {
         executionReason: request.executionReason,
       });
       return this.toRunDataStudioPipelineReadModel(runResult);
+    });
+  }
+
+  public async listDataStudioPipelines(
+    request: ListDataStudioPipelinesRequest,
+  ): Promise<StudioShellApiResponse<ReadonlyArray<DataStudioPipelineVersionReadModel>>> {
+    return this.wrap(async () => {
+      const snapshot = await this.requireSnapshot(request.studioId);
+      const draft = this.requireDataStudioDraft(snapshot, request.draftId);
+      const versions = await this.repository.listAssetVersionsByAssetId(draft.assetId);
+      return Object.freeze(versions.map((version) => this.toDataStudioPipelineVersionReadModel(version)));
+    });
+  }
+
+  public async loadDataStudioPipeline(
+    request: LoadDataStudioPipelineRequest,
+  ): Promise<StudioShellApiResponse<DataStudioPersistedPipelineReadModel>> {
+    return this.wrap(async () => {
+      const snapshot = await this.requireSnapshot(request.studioId);
+      const draft = this.requireDataStudioDraft(snapshot, request.draftId);
+      const versions = await this.repository.listAssetVersionsByAssetId(draft.assetId);
+      const versionReadModels = Object.freeze(versions.map((version) => this.toDataStudioPipelineVersionReadModel(version)));
+      const latestVersion = versions.length > 0 ? versions[versions.length - 1] : undefined;
+
+      const source = request.source ?? (request.versionId?.trim() ? "version-id" : "draft");
+      if (source === "draft") {
+        return Object.freeze({
+          source: "draft",
+          studioId: request.studioId,
+          draftId: draft.draftId,
+          assetId: draft.assetId,
+          selectedVersionId: draft.lastPublishedVersionId,
+          latestVersionId: latestVersion?.versionId,
+          pipelineState: this.toDataStudioPipelineState(draft.content),
+          versions: versionReadModels,
+        });
+      }
+
+      const targetVersion = source === "latest-version"
+        ? latestVersion
+        : versions.find((version) => version.versionId === request.versionId?.trim());
+      if (!targetVersion) {
+        const sourceDescription = source === "latest-version"
+          ? "latest published Data Studio pipeline version"
+          : `Data Studio pipeline version '${request.versionId?.trim()}'`;
+        throw new StudioShellInvalidRequestError(`${sourceDescription} is not available for draft '${draft.draftId}'.`);
+      }
+
+      const parsedMetadata = parseDataStudioPipelineVersionMetadata(targetVersion.metadata);
+      if (!parsedMetadata) {
+        throw new StudioShellInvalidRequestError(
+          `Data Studio pipeline version '${targetVersion.versionId}' does not include a persisted pipeline snapshot.`,
+        );
+      }
+
+      return Object.freeze({
+        source: "version",
+        studioId: request.studioId,
+        draftId: draft.draftId,
+        assetId: draft.assetId,
+        selectedVersionId: targetVersion.versionId,
+        latestVersionId: latestVersion?.versionId,
+        pipelineState: this.toDataStudioPipelineState(parsedMetadata.serializedPipelineState),
+        versions: versionReadModels,
+      });
     });
   }
 
@@ -1284,6 +1388,70 @@ export class StudioShellBackendApi {
     }
   }
 
+  private toDataStudioPipelineVersionReadModel(version: AssetVersion): DataStudioPipelineVersionReadModel {
+    const parsed = parseDataStudioPipelineVersionMetadata(version.metadata);
+    return Object.freeze({
+      versionId: version.versionId,
+      versionLabel: version.versionLabel,
+      parentVersionId: version.parentVersionId,
+      createdAt: version.createdAt.toISOString(),
+      dataStudioPipeline: parsed?.summary,
+    });
+  }
+
+  private requireDataStudioDraft(
+    snapshot: StudioShellSnapshotReadModel,
+    explicitDraftId?: string,
+  ): NonNullable<StudioShellSnapshotReadModel["draft"]> {
+    const draft = snapshot.draft;
+    if (!draft) {
+      throw new StudioShellInvalidRequestError(`Studio '${snapshot.studioId}' does not have an active draft.`);
+    }
+    if (explicitDraftId?.trim() && draft.draftId !== explicitDraftId.trim()) {
+      throw new StudioShellInvalidRequestError(
+        `Draft '${explicitDraftId}' is not the active draft for studio '${snapshot.studioId}'.`,
+      );
+    }
+    return draft;
+  }
+
+  private async enrichDataStudioVersionMetadataIfApplicable(
+    version: AssetVersion,
+    draftContent: string,
+  ): Promise<void> {
+    const parsedState = this.tryParseDataStudioPipelineState(draftContent);
+    if (!parsedState) {
+      return;
+    }
+
+    const existingMetadata = this.toOptionalRecord(version.metadata) ?? Object.freeze({});
+    const enriched = new AssetVersion({
+      assetId: version.assetId,
+      versionId: version.versionId,
+      versionLabel: version.versionLabel,
+      parentVersionId: version.parentVersionId,
+      createdAt: version.createdAt,
+      createdBy: version.createdBy,
+      contentSha256: version.contentSha256,
+      contentLengthBytes: version.contentLengthBytes,
+      upstreamVersionIds: version.upstreamVersionIds,
+      metadata: Object.freeze({
+        ...existingMetadata,
+        dataStudioPipelineVersion: createDataStudioPipelineVersionMetadata(parsedState),
+      }),
+      reproducibilitySummary: version.reproducibilitySummary,
+    });
+    await this.repository.saveAssetVersion(enriched);
+  }
+
+  private tryParseDataStudioPipelineState(value: string): DataStudioPipelineState | undefined {
+    try {
+      return this.toDataStudioPipelineState(value);
+    } catch {
+      return undefined;
+    }
+  }
+
   private toDataStudioExecutionReadinessReadModel(
     readiness: DataStudioPipelineExecutionReadiness,
   ): DataStudioExecutionReadinessReadModel {
@@ -1673,12 +1841,7 @@ export class StudioShellBackendApi {
       versions: Object.freeze(
         [...versions]
           .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
-          .map((entry) => Object.freeze({
-            versionId: entry.versionId,
-            versionLabel: entry.versionLabel,
-            parentVersionId: entry.parentVersionId,
-            createdAt: entry.createdAt.toISOString(),
-          })),
+          .map((entry) => this.toDataStudioPipelineVersionReadModel(entry)),
       ),
       validationIssues,
     });

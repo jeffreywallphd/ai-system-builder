@@ -38,6 +38,8 @@ export function resolveBrowserStudioShellBridgeFallback(): DesktopStudioShellBri
     runWorkflowDraft: (requestJson) => studioApi.runWorkflowDraft(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     assessDataStudioExecutionReadiness: (requestJson) => studioApi.assessDataStudioExecutionReadiness(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     runDataStudioPipeline: (requestJson) => studioApi.runDataStudioPipeline(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    listDataStudioPipelines: (requestJson) => studioApi.listDataStudioPipelines(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    loadDataStudioPipeline: (requestJson) => studioApi.loadDataStudioPipeline(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     listWorkflowRuns: (requestJson) => studioApi.listWorkflowRuns(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     getWorkflowRunDetail: (runId) => studioApi.getWorkflowRunDetail(runId).then((response) => JSON.stringify(response)),
     startWorkflowRunRerun: (requestJson) => studioApi.startWorkflowRunRerun(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
