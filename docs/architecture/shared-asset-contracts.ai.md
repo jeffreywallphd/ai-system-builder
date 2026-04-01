@@ -498,3 +498,20 @@
   - record queries/filtering,
   - record writes/mutations (create/update/delete).
 - Lineage instrumentation remains service-layer bound (`SystemDatasetInstanceService`, `DatasetInstancePreviewService`) to avoid scattering cross-cutting instrumentation across UI or persistence adapters.
+
+## AI Loom Image Manipulation vertical-slice update: high-level workflow asset contracts (stories 3.1.1-3.1.2)
+
+- High-level image workflow asset contracts are now defined in `application/contracts/ImageWorkflowAssetContract.ts` and validated with zod (`ImageWorkflowAssetContractSchema`).
+- The canonical contract keeps image workflows reusable/versioned/composable/inspectable without leaking backend node-level details:
+  - identity/type (`workflow-asset` + `image-workflow` + intent type),
+  - version envelope (`contractVersion`, optional `assetVersion`, `revision`),
+  - bounded input/output field descriptors,
+  - bounded config field surface,
+  - preview/inspection metadata (`mode`, inspectable fields, output sample limit),
+  - composition metadata with explicit adapter boundary + dependency references.
+- Core intent contracts now ship for four categories:
+  - `image-to-image`,
+  - `restyle`,
+  - `enhance-upscale`,
+  - `batch-transform`.
+- Shared-contract interoperability is preserved through `buildAssetContractForImageWorkflowIntent(...)`, which maps the high-level intent contract into the existing `AssetContractDescriptor` model used by Workflow/System Studio seams.
