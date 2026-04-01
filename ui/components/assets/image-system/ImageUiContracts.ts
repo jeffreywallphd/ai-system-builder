@@ -75,6 +75,7 @@ export interface ImageUploadPanelPropsContract {
   readonly acceptedMimeTypes: ReadonlyArray<string>;
   readonly maxUploadCount?: number;
   readonly targetContext?: ImageUiContextRef;
+  readonly ingestionAdapter?: ImageUploadIngestionAdapter;
 }
 
 export interface ImageUploadPanelEventContract {
@@ -82,6 +83,34 @@ export interface ImageUploadPanelEventContract {
     readonly files: ReadonlyArray<File>;
     readonly context?: ImageUiContextRef;
   }) => void;
+  readonly onValidationChanged?: (payload: {
+    readonly sourceComponent: "upload-panel";
+    readonly validation: ImageUploadValidationResult;
+    readonly context?: ImageUiContextRef;
+  }) => void;
+}
+
+export interface ImageUploadValidationIssue {
+  readonly severity: "error" | "warning";
+  readonly code: string;
+  readonly message: string;
+  readonly fileName?: string;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
+export interface ImageUploadValidationResult {
+  readonly acceptedFiles: ReadonlyArray<File>;
+  readonly rejectedFiles: ReadonlyArray<File>;
+  readonly issues: ReadonlyArray<ImageUploadValidationIssue>;
+}
+
+export interface ImageUploadIngestionAdapter {
+  evaluate(input: {
+    readonly files: ReadonlyArray<File>;
+    readonly acceptedMimeTypes: ReadonlyArray<string>;
+    readonly maxUploadCount?: number;
+    readonly context?: ImageUiContextRef;
+  }): ImageUploadValidationResult;
 }
 
 export interface ImageViewerPropsContract {

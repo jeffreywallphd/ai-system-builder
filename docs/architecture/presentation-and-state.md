@@ -432,3 +432,15 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Image UI component seams now have explicit internal contracts in `ui/components/assets/image-system/ImageUiContracts.ts` covering upload panel, image viewer, parameter form, output gallery, and comparison view props/events/state/context references.
 - Shared image rendering helpers now live in `ui/components/assets/image-system/ImageRenderingUtils.ts` with reusable metadata normalization, fit/layout sizing, placeholder behavior, loading-state/lazy-load helpers, and selection-friendly rendering checks.
 - Reusable renderer primitive `ImageRenderFrame` (`ui/components/assets/image-system/ImageRenderFrame.tsx`) now applies these contracts/utilities as a bounded image-display surface, and existing image-heavy UI surfaces (`AssetViewer`, `DataPreviewSurface`) now reuse that shared seam instead of ad hoc image rendering branches.
+
+## Direction 5 UI update: Image upload panel + single-image viewer (stories 4.1.3-4.1.4)
+
+- Added reusable image-system upload and viewer components in `ui/components/assets/image-system`:
+  - `ImageUploadPanel` supports drag/drop + file selection with validation feedback and preview-friendly local thumbnails.
+  - `ImageViewer` supports single-image display with fit mode controls, bounded zoom interactions, selection state, metadata overlay, and loading/empty/error states.
+- Upload validation remains contract-driven and ingestion-implementation agnostic:
+  - `ImageUiContracts` now defines `ImageUploadValidationResult`, `ImageUploadValidationIssue`, and an `ImageUploadIngestionAdapter` seam.
+  - `BrowserImageUploadIngestionAdapter` bridges browser `File` objects into existing ingestion policy contracts (`FileIngestionPolicyService`) for reusable pre-ingestion validation without hardwiring a specific ingestion pipeline.
+- Shared rendering utilities from stories 4.1.1-4.1.2 remain the rendering foundation:
+  - `ImageViewer` composes `ImageRenderFrame` + metadata normalization/selection helpers.
+  - Upload/viewer exports are surfaced through the same `image-system/index.ts` barrel for reuse across system result/history/comparison/gallery/detail surfaces.

@@ -328,3 +328,15 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Internal image UI contracts are now centralized in `ui/components/assets/image-system/ImageUiContracts.ts` for upload panel, image viewer, parameter form, output gallery, and comparison view props/events/state/context references.
 - Shared rendering helpers now live in `ui/components/assets/image-system/ImageRenderingUtils.ts` and provide bounded metadata normalization, fit/layout sizing, placeholder behavior, loading/lazy-load helpers, and selection-friendly rendering checks.
 - A reusable render primitive `ImageRenderFrame` (`ui/components/assets/image-system/ImageRenderFrame.tsx`) now composes that contract/util layer, and existing renderer surfaces (`ui/components/assets/AssetViewer.tsx`, `ui/components/assets/DataPreviewSurface.tsx`) reuse it rather than ad hoc image branches.
+
+## Direction 5 UI update: Image upload panel + single-image viewer (stories 4.1.3-4.1.4)
+
+- Reusable image upload/view components now live in `ui/components/assets/image-system`:
+  - `ImageUploadPanel` (drag/drop + picker + validation feedback + preview-friendly thumbnails),
+  - `ImageViewer` (single-image frame + fit controls + bounded zoom + metadata overlay + selection + loading/empty/error states).
+- Upload validation stays adapter-bounded and ingestion-contract aligned:
+  - `ImageUiContracts` adds explicit upload validation/result contracts plus `ImageUploadIngestionAdapter`.
+  - `BrowserImageUploadIngestionAdapter` maps browser `File` payloads through existing ingestion policy contracts (`FileIngestionPolicyService`) without coupling UI to a concrete ingestion pipeline implementation.
+- Rendering remains aligned with stories 4.1.1-4.1.2:
+  - `ImageViewer` composes shared render utilities and `ImageRenderFrame`.
+  - `image-system/index.ts` now exports upload/viewer components and adapter seams for reuse in future result/history/comparison/gallery/detail panes.
