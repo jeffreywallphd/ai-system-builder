@@ -41,7 +41,7 @@ export class ComfyExecutionResultMaterializationMapper {
         sourceImageRef: request.sourceImageRef,
         assetRef: Object.freeze({
           kind: "generated-output" as const,
-          assetId: output.assetRef?.assetId ?? output.reference,
+          assetId: this.readAssetId(output.assetRef?.assetId ?? output.reference),
           assetVersionId: output.assetRef?.versionId,
           outputId: output.reference,
           stableId: output.reference,
@@ -114,6 +114,14 @@ export class ComfyExecutionResultMaterializationMapper {
     }
     const normalized = value.trim();
     return normalized.length > 0 ? normalized : undefined;
+  }
+
+  private readAssetId(value: unknown): string | undefined {
+    const normalized = this.readOptionalString(value);
+    if (!normalized) {
+      return undefined;
+    }
+    return normalized.startsWith("asset:") ? normalized : undefined;
   }
 
   private normalizeTags(tags: ReadonlyArray<string>): ReadonlyArray<string> {

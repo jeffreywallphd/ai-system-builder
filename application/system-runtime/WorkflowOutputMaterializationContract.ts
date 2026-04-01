@@ -69,7 +69,7 @@ export const WorkflowOutputMaterializationPayloadSchema = z.object({
     outputGroupId: z.string().trim().min(1).optional(),
     sourceImageRef: imageAssetReferenceSchema.optional(),
     binaryPayload: workflowOutputBinaryPayloadSchema.optional(),
-  })).min(1),
+  })),
   parameterSnapshot: z.record(z.string(), canonicalRecordValueSchema).default({}),
   executionContext: z.object({
     runtimeProfile: z.string().trim().min(1).optional(),
@@ -89,6 +89,17 @@ export const WorkflowOutputMaterializationPayloadSchema = z.object({
     retriable: z.boolean().optional(),
     details: z.record(z.string(), canonicalRecordValueSchema).optional(),
   }).optional(),
+}).superRefine((value, context) => {
+  if (value.status === "failed" && value.producedAssets.length === 0) {
+    return;
+  }
+  if (value.producedAssets.length === 0) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["producedAssets"],
+      message: "Materialization payloads require at least one produced asset unless status is failed.",
+    });
+  }
 });
 
 export type WorkflowOutputMaterializationPayload = z.infer<typeof WorkflowOutputMaterializationPayloadSchema>;

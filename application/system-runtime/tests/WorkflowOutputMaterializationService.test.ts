@@ -12,6 +12,11 @@ import {
 import { InMemoryWorkflowOutputArtifactStorage } from "../WorkflowOutputArtifactStorage";
 import { InMemoryWorkflowOutputProvenanceRepository } from "../WorkflowOutputProvenanceRepository";
 import { WorkflowOutputMaterializationService } from "../WorkflowOutputMaterializationService";
+import type {
+  PersistWorkflowOutputArtifactRequest,
+  PersistWorkflowOutputArtifactResult,
+  WorkflowOutputArtifactStorage,
+} from "../WorkflowOutputArtifactStorage";
 
 class StaticAssetCatalog implements DatasetInstanceAssetCatalog {
   public resolveAsset(input: { readonly assetId: string; readonly versionId?: string }) {
@@ -124,6 +129,7 @@ describe("WorkflowOutputMaterializationService", () => {
       instanceId: "instance:outputs",
     });
     expect(persisted).toHaveLength(2);
+    expect(result.failures).toEqual([]);
   });
 
   it("persists binary output artifacts through system-owned storage contracts and captures provenance", async () => {
@@ -206,6 +212,7 @@ describe("WorkflowOutputMaterializationService", () => {
 
     const binary = artifactStorage.read(record?.storage?.reference ?? "missing");
     expect(binary?.byteLength).toBe(4);
+    expect(result.failures).toEqual([]);
   });
 
   it("surfaces canonical materialization contract validation failures", async () => {
@@ -243,5 +250,123 @@ describe("WorkflowOutputMaterializationService", () => {
         status: "pending",
       },
     } as never)).rejects.toThrow();
+  });
+
+  it("supports partial success and deterministic idempotent reprocessing for retries", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const datasetInstances = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog(),
+      new AllowSystemValidator(),
+    );
+    await datasetInstances.ensureOutputImageStoreInstance({
+      instanceId: "instance:outputs",
+      systemId: "system:image",
+      datasetAssetId: "asset:dataset:outputs",
+      datasetAssetVersionId: "v1",
+    });
+
+    class FlakyArtifactStorage implements WorkflowOutputArtifactStorage {
+      private readonly failedOnce = new Set<number>();
+
+      public async persist(request: PersistWorkflowOutputArtifactRequest): Promise<PersistWorkflowOutputArtifactResult> {
+        if (request.assetIndex === 1 && !this.failedOnce.has(1)) {
+          this.failedOnce.add(1);
+          throw new Error("simulated-artifact-write-failure");
+        }
+        return Object.freeze({
+          storageReference: `system-output://${request.materializationId}/${request.assetIndex}`,
+          storageProvider: "flaky-memory-store",
+          assetRef: Object.freeze({
+            kind: "generated-output",
+            stableId: `generated-output:system-output://${request.materializationId}/${request.assetIndex}`,
+            outputId: `system-output://${request.materializationId}/${request.assetIndex}`,
+            path: `output-${request.assetIndex}.png`,
+            sourceSystem: "flaky-test",
+            sourceContext: Object.freeze({ role: request.role }),
+            mimeTypeHint: "image/png",
+            formatHint: "png",
+          }),
+          metadata: Object.freeze({ sizeBytes: request.payload.byteLength }),
+        });
+      }
+    }
+
+    const provenanceRepository = new InMemoryWorkflowOutputProvenanceRepository();
+    const service = new WorkflowOutputMaterializationService(
+      datasetInstances,
+      new FlakyArtifactStorage(),
+      provenanceRepository,
+    );
+
+    const basePayload = {
+      materializationId: "mat:retry:1",
+      workflowRun: {
+        runId: "run:retry:1",
+        workflowAssetId: "asset:workflow:image",
+      },
+      producedAssets: [0, 1].map((index) => ({
+        assetRef: {
+          kind: "generated-output" as const,
+          stableId: `generated-output:transient:${index}`,
+          outputId: `transient://${index}`,
+        },
+        role: index === 0 ? "primary" as const : "variant" as const,
+        metadata: { width: 64, height: 64, format: "png" },
+        tags: [index === 0 ? "primary" : "variant"],
+        binaryPayload: {
+          dataBase64: Buffer.from([1, 2, 3, index]).toString("base64"),
+          extensionHint: "png",
+          mimeTypeHint: "image/png",
+        },
+      })),
+      parameterSnapshot: { prompt: "retry me" },
+      timestamps: {
+        requestedAt: "2026-04-01T10:00:00.000Z",
+        updatedAt: "2026-04-01T10:00:01.000Z",
+      },
+      status: "materialized" as const,
+    };
+
+    const first = await service.materialize({
+      systemId: "system:image",
+      datasetInstanceId: "instance:outputs",
+      payload: basePayload,
+    });
+    expect(first.status).toBe("partial");
+    expect(first.records).toHaveLength(1);
+    expect(first.failures).toHaveLength(1);
+    expect(first.failures[0]?.code).toBe("artifact-persist-failed");
+
+    const second = await service.materialize({
+      systemId: "system:image",
+      datasetInstanceId: "instance:outputs",
+      payload: basePayload,
+    });
+    expect(second.status).toBe("materialized");
+    expect(second.records).toHaveLength(2);
+    expect(second.failures).toEqual([]);
+
+    const persisted = datasetInstances.listImageRecordsForInstance({
+      systemId: "system:image",
+      instanceId: "instance:outputs",
+    });
+    expect(persisted).toHaveLength(2);
+    expect(new Set(persisted.map((record) => record.recordId)).size).toBe(2);
+
+    const duplicateDelivery = await service.materialize({
+      systemId: "system:image",
+      datasetInstanceId: "instance:outputs",
+      payload: basePayload,
+    });
+    expect(duplicateDelivery.status).toBe("materialized");
+    const persistedAfterDuplicate = datasetInstances.listImageRecordsForInstance({
+      systemId: "system:image",
+      instanceId: "instance:outputs",
+    });
+    expect(persistedAfterDuplicate).toHaveLength(2);
+
+    const provenance = provenanceRepository.listByWorkflowRunId("run:retry:1");
+    expect(provenance).toHaveLength(2);
   });
 });

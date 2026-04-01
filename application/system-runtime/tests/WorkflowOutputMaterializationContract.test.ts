@@ -101,4 +101,25 @@ describe("WorkflowOutputMaterializationContract", () => {
       status: "pending",
     })).toThrow();
   });
+
+  it("accepts failed payloads with no produced outputs when execution fails before materialization", () => {
+    const payload = validateWorkflowOutputMaterializationPayload({
+      materializationId: "mat:run:failed-pre-output",
+      workflowRun: { runId: "run:failed-pre-output", workflowAssetId: "asset:workflow:x" },
+      producedAssets: [],
+      parameterSnapshot: {},
+      timestamps: {
+        requestedAt: "2026-04-01T10:00:00.000Z",
+        updatedAt: "2026-04-01T10:00:00.000Z",
+      },
+      status: "failed",
+      error: {
+        code: "execution-failed",
+        message: "upstream executor failed before producing outputs",
+      },
+    });
+
+    expect(payload.status).toBe("failed");
+    expect(payload.producedAssets).toHaveLength(0);
+  });
 });
