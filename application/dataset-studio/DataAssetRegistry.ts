@@ -3,6 +3,13 @@ import type { CanonicalDataShapeKind, CanonicalRecordValue } from "../../domain/
 import type { DataAssetBase } from "../../domain/dataset-studio/DataAssetBase";
 import type { DataAssetVersionDescriptor } from "../../domain/dataset-studio/DataAssetVersioning";
 import {
+  DatasetSchemaIntentIds,
+  type DatasetSchemaIntentId,
+  type DatasetSchemaIntentValidationIssue,
+  type IDatasetSchemaIntent,
+  type IDatasetSchemaIntentRegistry,
+} from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import {
   assertValidDataAssetVersion,
   compareDataAssetVersions,
 } from "../../domain/dataset-studio/DataAssetVersioning";
@@ -14,6 +21,7 @@ import {
   type DataAssetConfigFieldSchema,
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
+import { createDefaultDatasetSchemaIntentRegistry } from "./DatasetSchemaIntentRegistry";
 
 export const DataAssetRegistrySpecializations = Object.freeze({
   dataset: "dataset",
@@ -83,6 +91,15 @@ export interface DataAssetRegistryDescriptor {
   readonly display: DataAssetRegistryDisplayMetadata;
   readonly contracts: DataAssetRegistryContractReferences;
   readonly capabilities: DataAssetRegistryCapabilities;
+  readonly schemaIntent: {
+    readonly id: DatasetSchemaIntentId;
+    readonly name: string;
+    readonly description: string;
+    readonly contractVersion: string;
+    readonly supportedShapeKinds: ReadonlyArray<CanonicalDataShapeKind>;
+    readonly metadata?: Readonly<Record<string, string>>;
+    readonly validationIssues: ReadonlyArray<DatasetSchemaIntentValidationIssue>;
+  };
   readonly configSchema: DataAssetConfigSchema;
   readonly inspectability: DataAssetRegistryInspectabilityMetadata;
   readonly discoverability: DataAssetRegistryDiscoverabilityMetadata;
@@ -103,6 +120,7 @@ export interface RegisterDataAssetRequest {
   readonly configSchema?: DataAssetConfigSchema;
   readonly configFields?: ReadonlyArray<DataAssetConfigFieldSchema>;
   readonly taxonomy?: CompositionTaxonomyDescriptor;
+  readonly schemaIntentId?: DatasetSchemaIntentId;
   readonly assetFactory?: (config: Readonly<Record<string, CanonicalRecordValue>>) => DataAssetBase;
 }
 
@@ -119,6 +137,7 @@ export interface QueryDataAssets {
   readonly category?: string;
   readonly specialization?: DataAssetRegistrySpecialization;
   readonly outputShapeKind?: CanonicalDataShapeKind;
+  readonly schemaIntentId?: DatasetSchemaIntentId;
   readonly previewable?: boolean;
   readonly configurable?: boolean;
   readonly executable?: boolean;
@@ -174,6 +193,8 @@ function toDescriptor(input: {
   readonly discoverability?: Partial<DataAssetRegistryDiscoverabilityMetadata>;
   readonly configSchema: DataAssetConfigSchema;
   readonly taxonomy: CompositionTaxonomyDescriptor;
+  readonly schemaIntent: IDatasetSchemaIntent;
+  readonly schemaIntentValidationIssues: ReadonlyArray<DatasetSchemaIntentValidationIssue>;
 }): DataAssetRegistryDescriptor {
   const inspection = input.asset.inspect();
   const inputShapeKind = inspection.metadata.contracts.input.kind;
@@ -208,6 +229,17 @@ function toDescriptor(input: {
     }),
     contracts: buildContractReferences(input.asset),
     capabilities: inspection.metadata.capabilities,
+    schemaIntent: Object.freeze({
+      id: input.schemaIntent.descriptor.id,
+      name: input.schemaIntent.descriptor.name,
+      description: input.schemaIntent.descriptor.description,
+      contractVersion: input.schemaIntent.descriptor.contractVersion,
+      supportedShapeKinds: Object.freeze([...input.schemaIntent.descriptor.supportedShapeKinds]),
+      metadata: input.schemaIntent.descriptor.metadata
+        ? Object.freeze({ ...input.schemaIntent.descriptor.metadata })
+        : undefined,
+      validationIssues: Object.freeze([...input.schemaIntentValidationIssues]),
+    }),
     configSchema: input.configSchema,
     discoverability,
     inspectability: Object.freeze({
@@ -228,6 +260,10 @@ function toDescriptor(input: {
 export class DataAssetRegistry {
   private readonly registrationsByKey = new Map<string, InternalDataAssetRegistration>();
   private readonly keysByAssetId = new Map<string, ReadonlyArray<string>>();
+
+  public constructor(
+    private readonly schemaIntentRegistry: IDatasetSchemaIntentRegistry = createDefaultDatasetSchemaIntentRegistry(),
+  ) {}
 
   public register(input: RegisterDataAssetRequest): DataAssetRegistryEntry {
     const assetId = input.asset.id.trim();
@@ -250,6 +286,18 @@ export class DataAssetRegistry {
       })
       : undefined;
     const configSchema = input.configSchema ?? fieldsSchema ?? inferDataAssetConfigSchema(input.asset);
+    const schemaIntent = this.resolveSchemaIntent(input);
+    const validation = schemaIntent.validateShape(input.asset.toCanonicalDataShape());
+    if (!validation.valid) {
+      const errors = validation.issues
+        .filter((issue) => issue.severity === "error")
+        .map((issue) => issue.message);
+      if (errors.length > 0) {
+        throw new Error(
+          `Data asset '${assetId}' schema intent '${schemaIntent.descriptor.id}' validation failed: ${errors.join("; ")}`,
+        );
+      }
+    }
 
     const descriptor = toDescriptor({
       asset: input.asset,
@@ -260,6 +308,8 @@ export class DataAssetRegistry {
       discoverability: input.discoverability,
       configSchema,
       taxonomy: input.taxonomy ?? createDatasetStudioTaxonomy(),
+      schemaIntent,
+      schemaIntentValidationIssues: validation.issues,
     });
 
     const entry = Object.freeze({
@@ -411,6 +461,10 @@ export class DataAssetRegistry {
       return false;
     }
 
+    if (query.schemaIntentId && entry.descriptor.schemaIntent.id !== query.schemaIntentId) {
+      return false;
+    }
+
     if (query.previewable !== undefined && entry.descriptor.capabilities.previewable !== query.previewable) {
       return false;
     }
@@ -424,5 +478,25 @@ export class DataAssetRegistry {
     }
 
     return true;
+  }
+
+  private resolveSchemaIntent(input: RegisterDataAssetRequest): IDatasetSchemaIntent {
+    const explicitIntent = input.schemaIntentId
+      ? this.schemaIntentRegistry.get(input.schemaIntentId)
+      : undefined;
+    if (explicitIntent) {
+      return explicitIntent;
+    }
+
+    if (input.schemaIntentId) {
+      throw new Error(`Data asset schema intent '${input.schemaIntentId}' is not registered.`);
+    }
+
+    const inferred = this.schemaIntentRegistry.resolveForShapeKind(input.asset.toCanonicalDataShape().kind)
+      ?? this.schemaIntentRegistry.get(DatasetSchemaIntentIds.tabular);
+    if (!inferred) {
+      throw new Error("No schema intent could be resolved for data asset registration.");
+    }
+    return inferred;
   }
 }

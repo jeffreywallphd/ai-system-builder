@@ -181,3 +181,11 @@
 - Pipeline/orchestration authoring compatibility now includes:
   - pipeline step-level config UX descriptors tied to registered transformation assets,
   - stage-to-asset compatibility helpers for dataset stage mapping so Wizard/Canvas authoring can consume one inspectable config-contract surface.
+
+## Direction 5 extension update: Dataset schema intent + media contract foundation (stories 1.1.1-1.1.2)
+
+- Dataset asset registration now includes an explicit schema-intent seam with inspectable descriptors (`id`, `name`, `description`, `contractVersion`, supported shape kinds, and validation issues) on `DataAssetRegistry` entries.
+- A reusable schema-intent registry now exists in `application/dataset-studio/DatasetSchemaIntentRegistry.ts` with default intents (`tabular`, `document`, `semantic`, `media`) and shape-kind-based intent resolution for compatibility with existing assets.
+- Media is now a first-class schema intent through `MediaSchemaIntentAdapter`, with dataset-level validation hooks for image-oriented shapes and canonical media-contract checks where image-record fields are present.
+- Canonical image records are now domain-first contracts in `domain/dataset-studio/contracts/ImageRecord.ts` with `AssetId`-backed references and library-agnostic interfaces (`ImageRecord`, `IImageRecordValidator`).
+- zod is now isolated behind adapter boundaries for this slice (`application/dataset-studio/adapters/validation/ImageRecordValidator.ts`), preserving domain/application contracts independent of validation library choice.

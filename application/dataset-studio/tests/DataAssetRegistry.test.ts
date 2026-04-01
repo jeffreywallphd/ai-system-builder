@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { CanonicalDataAsset } from "../../../domain/dataset-studio/CanonicalDataAsset";
-import { createCanonicalRecordsShape } from "../../../domain/dataset-studio/CanonicalDataShapes";
+import {
+  createCanonicalImageMetadataRecordsShape,
+  createCanonicalRecordsShape,
+} from "../../../domain/dataset-studio/CanonicalDataShapes";
 import {
   DataAssetRegistry,
   DataAssetRegistrySpecializations,
@@ -56,6 +59,7 @@ describe("DataAssetRegistry", () => {
     expect(entry.descriptor.versionId).toBe("v1");
     expect(entry.descriptor.version.scheme).toBe("label");
     expect(entry.descriptor.specialization).toBe("converter");
+    expect(entry.descriptor.schemaIntent.id).toBe("tabular");
     expect(entry.descriptor.configSchema.schemaId).toBe("dataset-a.schema");
     expect(entry.descriptor.discoverability.scope).toBe("default");
     expect(entry.descriptor.discoverability.defaultEntryPoint).toBeFalse();
@@ -131,6 +135,7 @@ describe("DataAssetRegistry", () => {
     expect(previewEntries[0]?.descriptor.assetId).toBe("dataset-preview");
     expect(ingestionEntries).toHaveLength(1);
     expect(ingestionEntries[0]?.descriptor.assetId).toBe("dataset-ingest");
+    expect(registry.list({ schemaIntentId: "tabular" }).length).toBeGreaterThanOrEqual(2);
   });
 
   it("rejects duplicate registration keys and unsupported config overrides", () => {
@@ -164,5 +169,62 @@ describe("DataAssetRegistry", () => {
 
     const resolved = registry.resolveAsset({ assetId: "dataset-versioned" });
     expect(resolved?.version).toBe("1.10.0");
+  });
+
+  it("registers image metadata shapes under media schema intent", () => {
+    const registry = new DataAssetRegistry();
+    const asset = new CanonicalDataAsset({
+      id: "dataset-image-media",
+      name: "dataset-image-media",
+      source: { type: "generated", workflowId: "wf-image" },
+      location: { accessMethod: "virtual", location: "dataset://dataset-image-media" },
+      outputShape: createCanonicalImageMetadataRecordsShape({
+        items: [{
+          itemId: "item-1",
+          imageId: "asset:image:sample",
+          metadata: {
+            width: 512,
+            height: 512,
+            format: "png",
+          },
+          attributes: {
+            assetId: "asset:image:sample",
+          },
+        }],
+      }),
+    });
+
+    const entry = registry.register({ asset });
+    expect(entry.descriptor.schemaIntent.id).toBe("media");
+    expect(entry.descriptor.schemaIntent.validationIssues).toEqual([]);
+    expect(registry.list({ schemaIntentId: "media" })).toHaveLength(1);
+  });
+
+  it("rejects invalid records when explicitly registered as media schema intent", () => {
+    const registry = new DataAssetRegistry();
+    const asset = new CanonicalDataAsset({
+      id: "dataset-media-invalid",
+      name: "dataset-media-invalid",
+      source: { type: "generated", workflowId: "wf-invalid-image" },
+      location: { accessMethod: "virtual", location: "dataset://dataset-media-invalid" },
+      outputShape: createCanonicalRecordsShape({
+        records: [{
+          recordId: "img-1",
+          fields: {
+            assetRef: {
+              assetId: "asset:image:sample",
+            },
+            width: -1,
+            height: 256,
+            format: "png",
+          },
+        }],
+      }),
+    });
+
+    expect(() => registry.register({
+      asset,
+      schemaIntentId: "media",
+    })).toThrow("schema intent 'media' validation failed");
   });
 });
