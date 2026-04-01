@@ -515,3 +515,20 @@
   - `enhance-upscale`,
   - `batch-transform`.
 - Shared-contract interoperability is preserved through `buildAssetContractForImageWorkflowIntent(...)`, which maps the high-level intent contract into the existing `AssetContractDescriptor` model used by Workflow/System Studio seams.
+
+## AI Loom Image Manipulation vertical-slice update: internal composition + image-to-image asset (stories 3.1.3-3.1.4)
+
+- High-level image workflows now have a first-class internal composition model in `application/contracts/ImageWorkflowComposition.ts`.
+- The model is intentionally internal-facing and adapter-bounded:
+  - reusable/versioned pipeline envelope (`compositionId`, `compositionVersion`, `revision`),
+  - explicit stage/step structure (`bind-inputs`, `prepare-conditioning`, `transform`, `materialize-output`),
+  - canonical high-level input/output bindings separated from low-level node execution details,
+  - explicit adapter boundary metadata (`image-workflow-execution-adapter` + contract version),
+  - inspectability metadata (preview mode + inspectable stage ids + tags).
+- Composition steps are expressed through shared internal node kinds (`CommonImageNodeContracts`) rather than raw ComfyUI graph DTOs, preserving swappable low-level adapters.
+- The first concrete high-level asset now exists in `application/contracts/ImageToImageWorkflowAsset.ts`:
+  - bounded image-to-image config (`variationStrength`, `resultCount`, `preserveComposition`),
+  - canonical source/prompt/output binding map (`sourceImage`, `instruction`, `images`),
+  - composed internal stage pipeline using the composition model,
+  - preview/inspection metadata for studio discoverability.
+- Discovery/registration support is provided through `ImageWorkflowAssetRegistry`, exposing high-level asset entries without leaking low-level execution graph details.
