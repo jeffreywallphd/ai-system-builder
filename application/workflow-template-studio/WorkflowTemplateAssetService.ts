@@ -19,6 +19,13 @@ import { WorkflowTemplateInstantiationService, type InstantiateWorkflowTemplateC
 import { WorkflowTemplatePreviewService } from "./WorkflowTemplatePreviewService";
 import type { WorkflowTemplateInstance } from "../../domain/workflow-template-studio/WorkflowTemplateInstanceDomain";
 import type { WorkflowTemplatePreview } from "../../domain/workflow-template-studio/WorkflowTemplatePreviewDomain";
+import { WorkflowTemplateValidator } from "./WorkflowTemplateValidator";
+import { AssetValidationOrchestrator, type AggregatedAssetValidationResult } from "../asset-validation/AssetValidationOrchestrator";
+import { DatasetAssetValidator } from "../asset-validation/DatasetAssetValidator";
+import { WorkflowAssetValidator } from "../asset-validation/WorkflowAssetValidator";
+import { ValidatedAssetTypes } from "../asset-validation/AssetValidationTypes";
+import type { AssetValidator } from "../asset-validation/AssetValidationTypes";
+import type { AssetValidationResult } from "../../domain/contracts/AssetValidation";
 
 export interface SaveWorkflowTemplateCommand {
   readonly definition: WorkflowTemplateDefinition;
@@ -30,12 +37,23 @@ function toTemplatePath(assetId: string): string {
 }
 
 export class WorkflowTemplateAssetService {
+  private readonly templateValidator: WorkflowTemplateValidator;
+  private readonly validationOrchestrator: AssetValidationOrchestrator;
+
   constructor(
     private readonly assetCatalog: IAssetCatalog,
     private readonly fileStorage: IFileStorage,
     private readonly rootDirectory: string,
     private readonly workflowContractResolver?: WorkflowTemplateWorkflowContractResolver,
-  ) {}
+    validators?: ReadonlyArray<AssetValidator>,
+  ) {
+    this.templateValidator = new WorkflowTemplateValidator(this.assetCatalog, this.workflowContractResolver);
+    this.validationOrchestrator = new AssetValidationOrchestrator(validators ?? [
+      this.templateValidator,
+      new WorkflowAssetValidator(this.assetCatalog),
+      new DatasetAssetValidator(this.assetCatalog),
+    ]);
+  }
 
   public async saveTemplate(command: SaveWorkflowTemplateCommand): Promise<Asset> {
     const definition = createWorkflowTemplateDefinition(command.definition);
@@ -133,5 +151,31 @@ export class WorkflowTemplateAssetService {
       definitions: input.template.parameters ?? [],
       overrides: input.overrides,
     }).values;
+  }
+
+  public async validateTemplateReadiness(templateId: string, versionId?: string): Promise<AssetValidationResult> {
+    const template = await this.resolveTemplate(templateId, versionId);
+    if (!template) {
+      throw new Error(`Workflow template '${templateId}' was not found.`);
+    }
+    return this.templateValidator.validate({
+      assetType: ValidatedAssetTypes.template,
+      assetId: template.templateId,
+      versionId: template.versionId,
+      payload: template,
+    });
+  }
+
+  public async validateTemplateAssetGraph(templateId: string, versionId?: string): Promise<AggregatedAssetValidationResult> {
+    const template = await this.resolveTemplate(templateId, versionId);
+    if (!template) {
+      throw new Error(`Workflow template '${templateId}' was not found.`);
+    }
+    return this.validationOrchestrator.validate({
+      assetType: ValidatedAssetTypes.template,
+      assetId: template.templateId,
+      versionId: template.versionId,
+      payload: template,
+    });
   }
 }
