@@ -602,3 +602,20 @@ Not implemented in this slice:
   - `application/contracts/tests/RestyleWorkflowAsset.test.ts`
   - `application/contracts/tests/EnhanceUpscaleWorkflowAsset.test.ts`
   - `application/contracts/tests/ImageToImageWorkflowAsset.test.ts`
+
+## AI Loom Image Manipulation vertical-slice update: batch transform + inspectability coherence (stories 3.1.7-3.1.8)
+
+- Added a reusable high-level batch transform workflow asset in `application/contracts/BatchTransformWorkflowAsset.ts` on top of the existing image workflow contract/composition seams:
+  - uses the same `ImageWorkflowAssetContract` + `ImageWorkflowComposition` abstractions (no parallel model),
+  - supports mixed batch items for direct image refs and dataset-backed image entries through one bounded `batchItems` input contract,
+  - exposes bounded shared configuration (`concurrency`, `onItemFailure`, `groupOutputsBy`, `resultCountPerItem`),
+  - preserves per-item output mapping metadata (`itemId`/`status`/`lineage`) for traceable downstream persistence/lineage usage.
+- Preview/inspection support for image workflow assets is now standardized through `application/contracts/ImageWorkflowAssetPreview.ts`:
+  - shared preview metadata now includes intent/workflow summary, input/output summaries, bounded configuration summary, and high-level composition summary,
+  - avoids leaking low-level graph/runtime details while remaining useful for studio authoring/inspection.
+- Existing image workflow assets (`image-to-image`, `restyle`, `enhance-upscale`) now consume that same preview builder, making preview/inspection metadata coherent across all high-level image workflow asset types.
+- `ImageWorkflowAssetRegistry` default discovery now includes `batch-transform` as a first-class inspectable asset entry.
+- Added test coverage for:
+  - batch-transform contract/composition/output mapping boundaries (`application/contracts/tests/BatchTransformWorkflowAsset.test.ts`),
+  - preview/inspection stability across all high-level image workflow assets (`application/contracts/tests/ImageWorkflowAssetPreview.test.ts`),
+  - contract descriptor alignment updates for batch input mapping (`application/contracts/tests/ImageWorkflowAssetContract.test.ts`).

@@ -67,6 +67,6 @@ describe("ImageWorkflowAssetContract", () => {
     const descriptor = buildAssetContractForImageWorkflowIntent(ImageWorkflowAssetIntentTypes.batchTransform);
     expect(descriptor.parameters.find((parameter) => parameter.id === "concurrency")?.defaultValue).toBe(4);
     expect(descriptor.execution?.invocationMode).toBe("async");
-    expect((descriptor.input?.schema as { required?: string[] }).required).toContain("sourceImages");
+    expect((descriptor.input?.schema as { required?: string[] }).required).toContain("batchItems");
   });
 });

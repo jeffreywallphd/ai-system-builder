@@ -223,7 +223,7 @@ export const CoreImageWorkflowAssetTypeContracts = Object.freeze({
     version: { contractVersion: "1.0.0" },
     input: {
       fields: [
-        { id: "sourceImages", description: "Batch image input set.", valueType: "image-asset-reference[]", required: true, allowsMultiple: true },
+        { id: "batchItems", description: "Batch item list that can include direct image refs and dataset-backed image entries.", valueType: "batch-image-item[]", required: true, allowsMultiple: true },
         { id: "instruction", description: "Shared transformation instruction.", valueType: "string", required: false },
       ],
     },
