@@ -71,6 +71,35 @@ describe("DataStudioValidation", () => {
     expect(diagnostics[0]?.details?.section).toBe(DataStudioValidationSections.previewModel);
   });
 
+  it("validates image preview window metadata", () => {
+    const issues = validateDataPreviewModel({
+      kind: "image-metadata-records",
+      summary: { totalCount: 10, sampleCount: 1, truncated: true },
+      metadata: { schemaVersion: "1.0.0", lineageCount: 0 },
+      diagnostics: { infoCount: 0, warningCount: 0, errorCount: 0, diagnostics: [] },
+      items: [{
+        itemId: "img-1",
+        selectionId: "img-1",
+        format: "png",
+        metadataSummary: {},
+        tags: [],
+        annotations: {},
+        derived: {},
+        issues: [],
+      }],
+      window: {
+        offset: -1,
+        limit: 5,
+        returned: 2,
+        hasPreviousWindow: false,
+        hasNextWindow: true,
+      },
+    });
+
+    expect(issues.some((issue) => issue.code === "preview-image-window-returned-count-mismatch")).toBeTrue();
+    expect(issues.some((issue) => issue.code === "preview-image-window-offset-invalid")).toBeTrue();
+  });
+
   it("validates schema-driven data-asset config values with field-level paths", () => {
     const schema = createDataAssetConfigSchema({
       schemaId: "dataset-preview.schema",

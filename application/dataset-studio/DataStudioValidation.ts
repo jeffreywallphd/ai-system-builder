@@ -734,6 +734,27 @@ export function validateDataPreviewModel(preview: DataPreviewModel): ReadonlyArr
     });
   }
 
+  if (preview.kind === "image-metadata-records") {
+    if (preview.window.returned !== preview.items.length) {
+      pushIssue(issues, {
+        code: "preview-image-window-returned-count-mismatch",
+        section: DataStudioValidationSections.previewModel,
+        severity: DataStudioValidationIssueSeverities.warning,
+        message: "Preview image window returned count does not match item length.",
+        path: "window.returned",
+      });
+    }
+    if (preview.window.offset < 0) {
+      pushIssue(issues, {
+        code: "preview-image-window-offset-invalid",
+        section: DataStudioValidationSections.previewModel,
+        severity: DataStudioValidationIssueSeverities.error,
+        message: "Preview image window offset cannot be negative.",
+        path: "window.offset",
+      });
+    }
+  }
+
   if (preview.kind === "error" && !normalizeOptional(preview.message)) {
     pushIssue(issues, {
       code: "preview-error-message-missing",

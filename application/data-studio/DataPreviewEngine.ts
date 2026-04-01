@@ -22,6 +22,15 @@ export interface DataPreviewEngineOptions {
   readonly maxItems?: number;
   readonly maxColumns?: number;
   readonly maxTextLength?: number;
+  readonly windowOffset?: number;
+}
+
+export interface DataPreviewWindow {
+  readonly offset: number;
+  readonly limit: number;
+  readonly returned: number;
+  readonly hasPreviousWindow: boolean;
+  readonly hasNextWindow: boolean;
 }
 
 export interface DataPreviewSummary {
@@ -90,6 +99,7 @@ export interface DataTextItemsPreviewModel extends DataPreviewBase {
 export interface DataImageMetadataPreviewModel extends DataPreviewBase {
   readonly kind: "image-metadata-records";
   readonly items: ReadonlyArray<ImageDatasetPreviewItem>;
+  readonly window: DataPreviewWindow;
 }
 
 export interface DataPreviewErrorModel extends DataPreviewBase {
@@ -109,6 +119,7 @@ function normalizeOptions(options?: DataPreviewEngineOptions): Required<DataPrev
     maxItems: Math.max(1, options?.maxItems ?? 10),
     maxColumns: Math.max(1, options?.maxColumns ?? 8),
     maxTextLength: Math.max(16, options?.maxTextLength ?? 220),
+    windowOffset: Math.max(0, Math.floor(options?.windowOffset ?? 0)),
   });
 }
 
@@ -211,17 +222,27 @@ export class DataPreviewEngine implements IDataPreviewEngine {
         });
       }
       case "image-metadata-records": {
-        const imagePreview = buildImageDatasetPreview(shape, normalizedOptions.maxItems);
+        const imagePreview = buildImageDatasetPreview(shape, {
+          offset: normalizedOptions.windowOffset,
+          limit: normalizedOptions.maxItems,
+        });
         const combinedDiagnostics = Object.freeze([
           ...diagnostics,
           ...imagePreview.diagnostics,
         ]);
         return Object.freeze({
           kind: "image-metadata-records",
-          summary: summarizeCounts(shape.items.length, imagePreview.items.length),
+          summary: summarizeCounts(imagePreview.totalCount, imagePreview.items.length),
           metadata,
           diagnostics: summarizeDiagnostics(combinedDiagnostics),
           items: imagePreview.items,
+          window: Object.freeze({
+            offset: imagePreview.offset,
+            limit: imagePreview.limit,
+            returned: imagePreview.items.length,
+            hasPreviousWindow: imagePreview.offset > 0,
+            hasNextWindow: imagePreview.offset + imagePreview.items.length < imagePreview.totalCount,
+          }),
         });
       }
       default:
@@ -295,5 +316,4 @@ export class DataPreviewEngine implements IDataPreviewEngine {
     });
   }
 }
-
 

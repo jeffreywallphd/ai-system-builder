@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import { useMemo, useState, type JSX } from "react";
 import type { DataPreviewModel } from "../../../application/data-studio/DataPreviewEngine";
 
 export interface DataPreviewSurfaceProps {
@@ -173,6 +173,93 @@ function renderData(preview: DataPreviewModel): JSX.Element {
   );
 }
 
+function formatImageMetadata(value: Readonly<Record<string, unknown>>): string {
+  const entries = Object.entries(value);
+  if (entries.length === 0) {
+    return "-";
+  }
+  return entries
+    .slice(0, 3)
+    .map(([key, entry]) => `${key}: ${typeof entry === "object" ? JSON.stringify(entry) : String(entry)}`)
+    .join(" · ");
+}
+
+function ImageCollectionPreviewSurface({ preview }: { readonly preview: Extract<DataPreviewModel, { kind: "image-metadata-records" }> }): JSX.Element {
+  const [windowOffset, setWindowOffset] = useState(preview.window.offset);
+  const [selectedItemId, setSelectedItemId] = useState<string | undefined>(undefined);
+  const currentOffset = preview.window.offset;
+  const items = useMemo(
+    () => preview.items,
+    [preview.items],
+  );
+
+  return (
+    <section className="ui-stack ui-stack--sm" data-testid="data-preview-image-collection-surface">
+      <div className="ui-row ui-row--between ui-row--wrap">
+        <span className="ui-text-small ui-text-secondary">
+          Showing {currentOffset + 1}-{currentOffset + preview.window.returned} of {preview.summary.totalCount}
+        </span>
+        <div className="ui-row ui-row--wrap">
+          <button
+            type="button"
+            className="ui-button ui-button--ghost ui-button--sm"
+            disabled={!preview.window.hasPreviousWindow}
+            onClick={() => setWindowOffset(Math.max(0, currentOffset - preview.window.limit))}
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            className="ui-button ui-button--ghost ui-button--sm"
+            disabled={!preview.window.hasNextWindow}
+            onClick={() => setWindowOffset(currentOffset + preview.window.limit)}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+      {windowOffset !== currentOffset ? (
+        <span className="ui-text-small ui-text-secondary">
+          Window controls are preview-contract driven. Request offset {windowOffset} from the preview service to fetch that window.
+        </span>
+      ) : null}
+      <div className="ui-image-preview-grid">
+        {items.map((item) => {
+          const isSelected = selectedItemId === item.selectionId;
+          return (
+            <article key={item.itemId} className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="data-preview-image-card">
+              <div className="ui-image-preview-grid__thumb-wrap">
+                {item.thumbnailSource ? (
+                  <img
+                    className="ui-image-preview-thumb ui-image-preview-thumb--grid"
+                    src={item.thumbnailSource}
+                    alt={`Preview ${item.imageReference ?? item.itemId}`}
+                  />
+                ) : (
+                  <span className="ui-image-preview-thumb-placeholder">No preview</span>
+                )}
+              </div>
+              <strong className="ui-text-small">{item.imageReference ?? item.imageId ?? item.itemId}</strong>
+              <span className="ui-text-small ui-text-secondary">{item.width !== undefined && item.height !== undefined ? `${item.width}x${item.height}` : "Unknown size"} · {item.format ?? "unknown"}</span>
+              <span className="ui-text-small ui-text-secondary">{formatImageMetadata(item.metadataSummary)}</span>
+              {item.tags.length > 0 ? <span className="ui-text-small ui-text-secondary">Tags: {item.tags.join(", ")}</span> : null}
+              {item.issues.length > 0 ? <span className="ui-text-small ui-text-danger">{item.issues.join(" ")}</span> : null}
+              <button
+                type="button"
+                className={`ui-button ui-button--sm ${isSelected ? "ui-button--primary" : "ui-button--ghost"}`}
+                aria-pressed={isSelected}
+                onClick={() => setSelectedItemId((current) => current === item.selectionId ? undefined : item.selectionId)}
+              >
+                {isSelected ? "Selected" : "Select"}
+              </button>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default function DataPreviewSurface({ preview, title = "Data Preview" }: DataPreviewSurfaceProps): JSX.Element {
   return (
     <section className="ui-panel ui-stack ui-stack--sm" data-testid="data-preview-surface">
@@ -184,7 +271,7 @@ export default function DataPreviewSurface({ preview, title = "Data Preview" }: 
         </div>
       </header>
       {renderSummary(preview)}
-      {renderData(preview)}
+      {preview.kind === "image-metadata-records" ? <ImageCollectionPreviewSurface preview={preview} /> : renderData(preview)}
     </section>
   );
 }

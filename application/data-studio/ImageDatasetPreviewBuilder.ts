@@ -15,6 +15,7 @@ import {
 
 export interface ImageDatasetPreviewItem {
   readonly itemId: string;
+  readonly selectionId: string;
   readonly imageId?: string;
   readonly imageReference?: string;
   readonly thumbnailSource?: string;
@@ -31,6 +32,14 @@ export interface ImageDatasetPreviewItem {
 export interface ImageDatasetPreviewBuildResult {
   readonly items: ReadonlyArray<ImageDatasetPreviewItem>;
   readonly diagnostics: ReadonlyArray<DataConverterDiagnostic>;
+  readonly totalCount: number;
+  readonly offset: number;
+  readonly limit: number;
+}
+
+export interface ImageDatasetPreviewWindow {
+  readonly offset?: number;
+  readonly limit: number;
 }
 
 function normalizeOptional(value?: string): string | undefined {
@@ -270,6 +279,7 @@ function buildItem(
 
   const previewItem = Object.freeze({
     itemId: item.itemId,
+    selectionId: item.itemId,
     imageId: normalizeOptional(item.imageId),
     imageReference: imageReference.imageReference,
     thumbnailSource: imageReference.thumbnailSource,
@@ -291,9 +301,14 @@ function buildItem(
 
 export function buildImageDatasetPreview(
   shape: CanonicalImageMetadataRecordsShape,
-  maxItems: number,
+  window: number | ImageDatasetPreviewWindow,
 ): ImageDatasetPreviewBuildResult {
-  const sampled = shape.items.slice(0, Math.max(1, maxItems));
+  const normalizedWindow = typeof window === "number"
+    ? Object.freeze({ offset: 0, limit: window })
+    : window;
+  const offset = Math.max(0, Math.floor(normalizedWindow.offset ?? 0));
+  const limit = Math.max(1, Math.floor(normalizedWindow.limit));
+  const sampled = shape.items.slice(offset, offset + limit);
   const items: ImageDatasetPreviewItem[] = [];
   const diagnostics: DataConverterDiagnostic[] = [];
   for (let index = 0; index < sampled.length; index += 1) {
@@ -305,5 +320,8 @@ export function buildImageDatasetPreview(
   return Object.freeze({
     items: Object.freeze(items),
     diagnostics: Object.freeze(diagnostics),
+    totalCount: shape.items.length,
+    offset,
+    limit,
   });
 }

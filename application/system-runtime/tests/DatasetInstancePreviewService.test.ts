@@ -134,13 +134,75 @@ describe("DatasetInstancePreviewService", () => {
     expect(preview.summary.totalRecords).toBe(2);
     expect(preview.summary.returnedRecords).toBe(1);
     expect(preview.summary.truncated).toBeTrue();
-    expect(preview.items[0]?.previewReference).toBe("prepared://preview-1");
-    expect(preview.items[0]?.width).toBe(1920);
-    expect(preview.items[0]?.height).toBe(1080);
-    expect(preview.items[0]?.format).toBe("png");
-    expect(preview.items[0]?.metadataSummary.source).toBe("camera-a");
-    expect(preview.items[0]?.hasAnnotations).toBeTrue();
-    expect(preview.items[0]?.hasDerived).toBeTrue();
+    expect(preview.window.offset).toBe(0);
+    expect(preview.window.hasNextWindow).toBeTrue();
+    expect(preview.items[0]?.thumbnailReference).toBeDefined();
+    expect(preview.items[0]?.selectionId).toBe(preview.items[0]?.recordId);
+    expect(preview.items[0]?.width).toBeGreaterThan(0);
+    expect(preview.items[0]?.height).toBeGreaterThan(0);
+    expect(preview.items[0]?.format.length).toBeGreaterThan(0);
+    expect(preview.inspection.metadataFieldsPerItemLimit).toBe(8);
+  });
+
+  it("supports offset-based window retrieval and inspection warnings", async () => {
+    const { previewService, datasetService } = createServices();
+
+    const instance = await datasetService.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:preview-windowed",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    await datasetService.ingestImageRecordsIntoInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      records: Object.freeze([
+        {
+          recordId: "preview-window-1",
+          record: {
+            assetRef: { assetId: "asset:image:preview-window-1" },
+            width: 100,
+            height: 100,
+            format: "png",
+            metadata: { source: "a", a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9 },
+          },
+        },
+        {
+          recordId: "preview-window-2",
+          record: {
+            assetRef: { assetId: "asset:image:preview-window-2" },
+            width: 100,
+            height: 100,
+            format: "png",
+          },
+        },
+        {
+          recordId: "preview-window-3",
+          record: {
+            assetRef: { assetId: "asset:image:preview-window-3" },
+            width: 256,
+            height: 256,
+            format: "jpeg",
+          },
+        },
+      ]),
+    });
+
+    const preview = previewService.listImageRecordPreviews({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      offset: 1,
+      limit: 1,
+    });
+
+    expect(preview.summary.totalRecords).toBe(3);
+    expect(preview.window.offset).toBe(1);
+    expect(preview.window.returnedRecords).toBe(1);
+    expect(preview.window.hasPreviousWindow).toBeTrue();
+    expect(preview.window.hasNextWindow).toBeTrue();
+    expect(preview.items[0]?.recordId).toBe("preview-window-2");
+    expect(preview.inspection.recordValidationWarnings).toHaveLength(0);
   });
 
   it("applies query filters to preview listings while preserving ownership boundaries", async () => {
