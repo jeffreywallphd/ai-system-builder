@@ -74,3 +74,9 @@
 - Added reusable Comfy adapter base pattern at `infrastructure/comfyui/adapters/image-nodes/ComfyImageNodeAdapterPattern.ts` with explicit hook points for identity/capabilities, input mapping, output mapping, inspection metadata, and error normalization.
 - Added a single concrete pattern-validation adapter (`ComfyPromptInputNodeAdapter`) to prove the seam without prematurely implementing the full adapter catalog.
 - Added tests for contract shape, adapter consistency, required input validation, normalized error behavior, and boundary isolation (no Comfy-specific types in the internal contract module).
+
+## Story 2.2.3 + 2.2.4 update
+- Added `ComfyLoadImageNodeAdapter` (`infrastructure/comfyui/adapters/image-nodes/ComfyLoadImageNodeAdapter.ts`) that loads images only from system-owned dataset instances through `DatasetInstanceRepository`, supports id/index/random/latest selection semantics, resolves file bytes with Node `fs`, and outputs internal image + metadata/preview contracts.
+- Added `ComfySaveImageNodeAdapter` (`infrastructure/comfyui/adapters/image-nodes/ComfySaveImageNodeAdapter.ts`) that accepts internal image payloads, persists files with Node `fs/path`, writes dataset image records (timestamp/metadata/lineage/workflow/source refs) through dataset repository ports, and keeps filename strategy internal via prefix + timestamp + unique id.
+- Extended common image-node contracts with reusable internal image and dataset-selection types to keep load/save compatibility explicit without introducing Comfy-specific types into application contracts.
+- Added focused adapter tests (`infrastructure/comfyui/adapters/image-nodes/tests/ComfyLoadSaveImageNodeAdapters.test.ts`) for dataset->image resolution, save persistence + lineage capture, load->save composability, and Comfy-type boundary isolation.
