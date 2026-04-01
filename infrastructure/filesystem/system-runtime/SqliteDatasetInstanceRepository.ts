@@ -12,7 +12,7 @@ interface DatasetInstanceRow {
   readonly instance_json: string;
 }
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
     CREATE TABLE IF NOT EXISTS system_runtime_dataset_instance_migrations (
@@ -38,6 +38,10 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
     CREATE INDEX IF NOT EXISTS system_dataset_instances_role_idx
       ON system_dataset_instances(system_id, instance_role, instance_purpose, updated_at DESC);
   `],
+  [2, `
+    ALTER TABLE system_dataset_instances
+      ADD COLUMN lifecycle_metadata_json TEXT;
+  `],
 ]);
 
 export class SqliteDatasetInstanceRepository implements DatasetInstanceRepository {
@@ -61,8 +65,9 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
           created_at,
           updated_at,
           seed_metadata_json,
+          lifecycle_metadata_json,
           instance_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(instance_id) DO UPDATE SET
           system_id = excluded.system_id,
           dataset_asset_id = excluded.dataset_asset_id,
@@ -74,6 +79,7 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
           created_at = excluded.created_at,
           updated_at = excluded.updated_at,
           seed_metadata_json = excluded.seed_metadata_json,
+          lifecycle_metadata_json = excluded.lifecycle_metadata_json,
           instance_json = excluded.instance_json
       `)
       .run(
@@ -88,6 +94,7 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
         instance.createdAt,
         instance.updatedAt,
         instance.seedMetadata ? JSON.stringify(instance.seedMetadata) : null,
+        instance.lifecycleMetadata ? JSON.stringify(instance.lifecycleMetadata) : null,
         JSON.stringify(instance),
       );
     return instance;
@@ -226,6 +233,7 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
       lifecycleStatus: snapshot.lifecycleStatus,
       runtimeStatus: snapshot.runtimeStatus,
       seedMetadata: snapshot.seedMetadata,
+      lifecycleMetadata: snapshot.lifecycleMetadata,
       createdAt: snapshot.createdAt,
       updatedAt: snapshot.updatedAt,
     });

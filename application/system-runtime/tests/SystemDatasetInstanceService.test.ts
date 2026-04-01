@@ -122,6 +122,89 @@ describe("SystemDatasetInstanceService", () => {
     expect(service.listSystemDatasetInstances("system:image-pipeline").length).toBe(1);
   });
 
+  it("creates output image stores through the shared role ensure path and remains idempotent", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-exporter-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+    );
+
+    const first = await service.ensureOutputImageStoreInstance({
+      instanceId: "dataset-instance:output-images",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-exporter-v1",
+      datasetAssetVersionId: "1.0.0",
+      seedMetadata: {
+        targetCollection: "studio-results",
+      },
+    });
+    const second = await service.ensureOutputImageStoreInstance({
+      instanceId: "dataset-instance:output-images",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-exporter-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    expect(first.instanceId).toBe(second.instanceId);
+    expect(first.role).toBe("output-store");
+    expect(first.purpose).toBe("workflow-output-images");
+    expect(first.seedMetadata?.targetCollection).toBe("studio-results");
+    expect(service.listSystemDatasetInstances("system:image-pipeline").length).toBe(1);
+  });
+
+  it("creates optional intermediate stores with lifecycle metadata via shared dataset instance contracts", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-transform-stage-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+    );
+
+    const created = await service.ensureIntermediateStoreInstance({
+      instanceId: "dataset-instance:intermediate-stage-1",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-transform-stage-v1",
+      datasetAssetVersionId: "1.0.0",
+      purpose: "stage:denoise",
+      lifecycleMetadata: {
+        retentionPolicy: "ttl",
+        maxAgeDays: 2,
+        cleanupStatus: "pending",
+      },
+      seedMetadata: {
+        stageId: "denoise",
+      },
+    });
+
+    expect(created.role).toBe("intermediate-store");
+    expect(created.purpose).toBe("stage:denoise");
+    expect(created.lifecycleMetadata?.retentionPolicy).toBe("ttl");
+    expect(created.lifecycleMetadata?.maxAgeDays).toBe(2);
+    expect(created.lifecycleMetadata?.cleanupStatus).toBe("pending");
+    expect(created.seedMetadata?.stageId).toBe("denoise");
+
+    const reloaded = service.getDatasetInstance("dataset-instance:intermediate-stage-1");
+    expect(reloaded?.role).toBe("intermediate-store");
+    expect(reloaded?.lifecycleMetadata?.maxAgeDays).toBe(2);
+  });
+
   it("rejects invalid system ownership, asset linkage, and role schema requirements", async () => {
     const repository = new InMemoryDatasetInstanceRepository();
     const service = new SystemDatasetInstanceService(
@@ -159,6 +242,64 @@ describe("SystemDatasetInstanceService", () => {
       datasetAssetId: "tabular-ingestor-v1",
       datasetAssetVersionId: "1.0.0",
     })).rejects.toThrow("expected 'media'");
+
+    await expect(service.createDatasetInstance({
+      instanceId: "dataset-instance:bad-role",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "tabular-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+      role: "unknown-role" as never,
+    })).rejects.toThrow("role 'unknown-role' is not supported");
+  });
+
+  it("rejects conflicting role/purpose linkage and invalid intermediate lifecycle metadata", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-transform-stage-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+        {
+          assetId: "image-transform-stage-v2",
+          versionId: "2.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+    );
+
+    await service.ensureIntermediateStoreInstance({
+      instanceId: "dataset-instance:intermediate-stage",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-transform-stage-v1",
+      datasetAssetVersionId: "1.0.0",
+      purpose: "stage:compose",
+    });
+
+    await expect(service.ensureIntermediateStoreInstance({
+      instanceId: "dataset-instance:intermediate-stage-2",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-transform-stage-v2",
+      datasetAssetVersionId: "2.0.0",
+      purpose: "stage:compose",
+    })).rejects.toThrow("already has a 'intermediate-store' dataset instance");
+
+    await expect(service.ensureIntermediateStoreInstance({
+      instanceId: "dataset-instance:intermediate-invalid-lifecycle",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-transform-stage-v1",
+      datasetAssetVersionId: "1.0.0",
+      purpose: "stage:sharpen",
+      lifecycleMetadata: {
+        retentionPolicy: "ttl",
+      },
+    })).rejects.toThrow("must set maxAgeDays when retentionPolicy is ttl");
   });
 
   it("enforces incoming image schema compliance through the dataset asset/instance boundary", async () => {
