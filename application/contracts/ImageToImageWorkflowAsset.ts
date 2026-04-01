@@ -1,5 +1,7 @@
 import { z } from "zod";
+import { createBatchTransformWorkflowAsset, type BatchTransformWorkflowAsset } from "./BatchTransformWorkflowAsset";
 import { createEnhanceUpscaleWorkflowAsset, type EnhanceUpscaleWorkflowAsset } from "./EnhanceUpscaleWorkflowAsset";
+import { createImageWorkflowAssetPreview, type ImageWorkflowAssetPreview } from "./ImageWorkflowAssetPreview";
 import { createRestyleWorkflowAsset, type RestyleWorkflowAsset } from "./RestyleWorkflowAsset";
 import {
   CoreImageWorkflowAssetTypeContracts,
@@ -35,12 +37,7 @@ export interface ImageToImageWorkflowAsset {
     readonly promptFieldId: "instruction";
     readonly outputFieldId: "images";
   }>;
-  readonly preview: Readonly<{
-    readonly title: string;
-    readonly summary: string;
-    readonly inspectableFields: ReadonlyArray<string>;
-    readonly inspectableStageIds: ReadonlyArray<string>;
-  }>;
+  readonly preview: ImageWorkflowAssetPreview;
 }
 
 function buildImageToImageComposition(): ImageWorkflowComposition {
@@ -194,16 +191,18 @@ export function createImageToImageWorkflowAsset(input?: {
       promptFieldId: "instruction",
       outputFieldId: "images",
     }),
-    preview: Object.freeze({
+    preview: createImageWorkflowAssetPreview({
       title: "Image-to-image transform",
       summary: "Transforms a source image with prompt-driven edits using bounded configuration.",
-      inspectableFields: Object.freeze([...contract.preview.inspectableFields]),
-      inspectableStageIds: Object.freeze(composition.metadata.preview.inspectableStageIds),
+      workflowType: "image-workflow",
+      intentType: ImageWorkflowAssetIntentTypes.imageToImage,
+      contract,
+      composition,
     }),
   });
 }
 
-export type ImageWorkflowAssetDefinition = ImageToImageWorkflowAsset | RestyleWorkflowAsset | EnhanceUpscaleWorkflowAsset;
+export type ImageWorkflowAssetDefinition = ImageToImageWorkflowAsset | RestyleWorkflowAsset | EnhanceUpscaleWorkflowAsset | BatchTransformWorkflowAsset;
 
 export interface ImageWorkflowAssetRegistryEntry {
   readonly id: string;
@@ -220,6 +219,7 @@ export class ImageWorkflowAssetRegistry {
     createImageToImageWorkflowAsset(),
     createRestyleWorkflowAsset(),
     createEnhanceUpscaleWorkflowAsset(),
+    createBatchTransformWorkflowAsset(),
   ]) {
     this.entries = Object.freeze(entries.map((entry) => Object.freeze(entry)));
   }

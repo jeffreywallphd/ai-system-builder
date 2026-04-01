@@ -9,6 +9,7 @@ import {
   ImageWorkflowCompositionStageKinds,
   type ImageWorkflowComposition,
 } from "./ImageWorkflowComposition";
+import { createImageWorkflowAssetPreview, type ImageWorkflowAssetPreview } from "./ImageWorkflowAssetPreview";
 
 export const EnhanceUpscaleWorkflowAssetId = "image-workflow.enhance-upscale";
 export const EnhanceUpscaleWorkflowAssetVersion = "1.0.0";
@@ -32,12 +33,7 @@ export interface EnhanceUpscaleWorkflowAsset {
     readonly sourceImageFieldId: "sourceImage";
     readonly outputFieldId: "enhancedImage";
   }>;
-  readonly preview: Readonly<{
-    readonly title: string;
-    readonly summary: string;
-    readonly inspectableFields: ReadonlyArray<string>;
-    readonly inspectableStageIds: ReadonlyArray<string>;
-  }>;
+  readonly preview: ImageWorkflowAssetPreview;
 }
 
 function buildEnhanceUpscaleComposition(): ImageWorkflowComposition {
@@ -113,11 +109,13 @@ export function createEnhanceUpscaleWorkflowAsset(input?: { readonly configurati
       sourceImageFieldId: "sourceImage",
       outputFieldId: "enhancedImage",
     }),
-    preview: Object.freeze({
+    preview: createImageWorkflowAssetPreview({
       title: "Enhance and upscale",
       summary: "Improves source image quality and resolution via bounded reusable controls.",
-      inspectableFields: Object.freeze([...contract.preview.inspectableFields]),
-      inspectableStageIds: Object.freeze(composition.metadata.preview.inspectableStageIds),
+      workflowType: "image-workflow",
+      intentType: ImageWorkflowAssetIntentTypes.enhanceUpscale,
+      contract,
+      composition,
     }),
   });
 }

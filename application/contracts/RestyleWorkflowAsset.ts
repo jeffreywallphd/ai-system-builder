@@ -9,6 +9,7 @@ import {
   ImageWorkflowCompositionStageKinds,
   type ImageWorkflowComposition,
 } from "./ImageWorkflowComposition";
+import { createImageWorkflowAssetPreview, type ImageWorkflowAssetPreview } from "./ImageWorkflowAssetPreview";
 
 export const RestyleWorkflowAssetId = "image-workflow.restyle";
 export const RestyleWorkflowAssetVersion = "1.0.0";
@@ -33,12 +34,7 @@ export interface RestyleWorkflowAsset {
     readonly stylePresetFieldId: "stylePreset";
     readonly outputFieldId: "images";
   }>;
-  readonly preview: Readonly<{
-    readonly title: string;
-    readonly summary: string;
-    readonly inspectableFields: ReadonlyArray<string>;
-    readonly inspectableStageIds: ReadonlyArray<string>;
-  }>;
+  readonly preview: ImageWorkflowAssetPreview;
 }
 
 function buildRestyleComposition(): ImageWorkflowComposition {
@@ -127,11 +123,13 @@ export function createRestyleWorkflowAsset(input?: { readonly configuration?: un
       stylePresetFieldId: "stylePreset",
       outputFieldId: "images",
     }),
-    preview: Object.freeze({
+    preview: createImageWorkflowAssetPreview({
       title: "Image restyle",
       summary: "Applies style-oriented image transformations with bounded reusable controls.",
-      inspectableFields: Object.freeze([...contract.preview.inspectableFields]),
-      inspectableStageIds: Object.freeze(composition.metadata.preview.inspectableStageIds),
+      workflowType: "image-workflow",
+      intentType: ImageWorkflowAssetIntentTypes.restyle,
+      contract,
+      composition,
     }),
   });
 }
