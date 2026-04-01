@@ -13,8 +13,10 @@ describe("DatasetStudioDraftPreviewPanel", () => {
     }));
 
     expect(html).toContain("Asset Configuration");
-    expect(html).toContain("Ingestion Asset");
+    expect(html).toContain("Unified Ingestion");
     expect(html).toContain("Source Input");
     expect(html).toContain("Ingestion Preview");
+    expect(html).toContain("Inspect low-level ingestors");
+    expect(html).not.toContain("CSV Ingestor");
   });
 });

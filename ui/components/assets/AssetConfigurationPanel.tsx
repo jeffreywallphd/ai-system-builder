@@ -19,6 +19,7 @@ export interface AssetConfigurationPanelProps {
   readonly disabled?: boolean;
   readonly emptyMessage?: string;
   readonly initialMode?: AssetConfigurationMode;
+  readonly onModeChange?: (mode: AssetConfigurationMode) => void;
   readonly onApply?: (config: Readonly<Record<string, CanonicalRecordValue>>) => void;
   readonly onConfigChange?: (config: Readonly<Record<string, CanonicalRecordValue>>) => void;
 }
@@ -214,6 +215,7 @@ export default function AssetConfigurationPanel({
   disabled = false,
   emptyMessage = "No configuration schema is available for this data asset.",
   initialMode = "simple",
+  onModeChange,
   onApply,
   onConfigChange,
 }: AssetConfigurationPanelProps): JSX.Element {
@@ -243,8 +245,9 @@ export default function AssetConfigurationPanel({
   useEffect(() => {
     if (!hasAdvancedFields) {
       setMode("simple");
+      onModeChange?.("simple");
     }
-  }, [hasAdvancedFields]);
+  }, [hasAdvancedFields, onModeChange]);
 
   useEffect(() => {
     setMode(initialMode);
@@ -280,7 +283,11 @@ export default function AssetConfigurationPanel({
             <button
               type="button"
               className="ui-button ui-button--ghost"
-              onClick={() => setMode((current) => (current === "simple" ? "advanced" : "simple"))}
+              onClick={() => setMode((current) => {
+                const next = current === "simple" ? "advanced" : "simple";
+                onModeChange?.(next);
+                return next;
+              })}
               data-testid="asset-config-mode-toggle"
             >
               {mode === "simple" ? "Show advanced options" : "Show simple options"}

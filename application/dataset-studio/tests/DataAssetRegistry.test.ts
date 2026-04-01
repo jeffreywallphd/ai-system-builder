@@ -57,6 +57,8 @@ describe("DataAssetRegistry", () => {
     expect(entry.descriptor.version.scheme).toBe("label");
     expect(entry.descriptor.specialization).toBe("converter");
     expect(entry.descriptor.configSchema.schemaId).toBe("dataset-a.schema");
+    expect(entry.descriptor.discoverability.scope).toBe("default");
+    expect(entry.descriptor.discoverability.defaultEntryPoint).toBeFalse();
     expect(registry.get({ assetId: "dataset-a", versionId: "v1" })?.descriptor.assetId).toBe("dataset-a");
   });
 
@@ -73,9 +75,15 @@ describe("DataAssetRegistry", () => {
         previewModes: ["sample-records"],
         executionModes: ["execute", "preview"],
       },
+      discoverability: {
+        scope: "advanced",
+        defaultEntryPoint: false,
+        inspectable: true,
+      },
     });
 
     expect(entry.descriptor.inspectability.supportedSourceKinds).toEqual(["in-memory", "local-file"]);
+    expect(entry.descriptor.discoverability.scope).toBe("advanced");
     expect(registry.list({ category: "data-ingestion" })).toHaveLength(1);
     expect(registry.list({ category: "dataset" })).toHaveLength(0);
   });

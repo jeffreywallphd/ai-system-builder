@@ -317,3 +317,110 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - The global header command palette/navigation menu now includes a first-class `Data` entry (`ui/routes/CommandPalette.ts`) that routes to Dataset Studio (`/studio-shell/dataset`).
 - Top-level menu order is now: `Build`, `Run`, `Explore`, `Data`, `Manage`.
 - This extends existing shell navigation patterns without adding a parallel navigation system.
+
+## Direction 5 UI update: Unified ingestion simple/advanced UX (stories 15.5-15.6)
+
+- Dataset Studio ingestion preview now defaults to the unified ingestion asset surface, with low-level ingestors hidden unless users explicitly opt in to inspect them.
+- The configuration panel keeps simple mode primary and exposes advanced options through the existing mode toggle pattern; mode changes preserve relevant values while reusing shared schema/config surfaces.
+- Detection and route summaries are rendered as bounded UI disclosures so advanced users can inspect routing decisions without exposing raw infrastructure internals or duplicating orchestration logic in UI components.
+
+## Direction 5 UI update: Unified ingestion failure/fallback surfacing + wrapper usage (stories 15.9-15.10)
+
+- Dataset Studio preview now invokes unified ingestion through the high-level wrapper (`UnifiedIngestionAssetExecutionWrapper`) instead of calling orchestration internals directly.
+- Unified fallback state is rendered as concise summary badges (fallback route, degraded preview) plus existing issue lists, so users can inspect deterministic fallback behavior without seeing raw stack/library internals.
+- UI error/warning rendering remains contract-driven (`code`, `severity`, `message`, optional path/details) and now includes degraded-preview warnings from the shared unified preview contract.
+
+## Direction 5 UI update: unified-first discoverability + unified batch preview (stories 15.11-15.12)
+
+- Ingestion asset discoverability is now centralized in data-asset registry metadata (`descriptor.discoverability`) and catalog queries (`listIngestionDataAssets`), so default UI flows surface only the unified ingestion entrypoint while advanced inspection can reveal low-level ingestors.
+- Dataset Studio preview now reads ingestion options from that shared catalog visibility seam (`default` vs `advanced`) instead of ad hoc UI-only filtering.
+- Unified ingestion now supports directory/file batch preview through batch wrapper entrypoints (`previewBatch`/`executeBatch`) while still reusing per-item unified single-ingestion orchestration.
+- Batch preview UX remains concise by default (aggregate counts and badges) and uses expandable per-item status details for route/detection inspection and failed-item visibility.
+
+## Direction 5 UI extension update: Stage-based Dataset Studio wizard shell (story 15E.10)
+
+- Dataset Studio draft authoring now includes a stage-based wizard panel (`ui/components/assets/DatasetStageWizardPanel.tsx`) rendered through the existing registration-based shell extension path (`DatasetStudioRegistration`).
+- Wizard UI state/orchestration stays out of React components through a dedicated adapter seam (`ui/studio-shell/dataset/DatasetStageWizardStateAdapter.ts`) that wraps `WizardFlowEngine` for snapshot/read/update/navigation behavior.
+- Stage progress/navigation UI is now reusable in `ui/components/wizard/StageWizardProgressNavigator.tsx`, with explicit current/completed/skipped/pending/disabled stage cues.
+- Stage rendering uses progressive disclosure:
+  - simple stage-specific config renderers for source/ingestion stages,
+  - fallback stage summary renderer for non-customized stages,
+  - optional advanced metadata disclosure for inspectability/lineage-focused details.
+- Styling reuses existing wizard/card/field classes and extends shared wizard styles (`ui/styles/components/wizard.css`) with reusable stage-wizard classes (no stage-specific element selectors).
+
+
+## Direction 5 UI extension update: Stage-aware dataset canvas graph + editing foundations (stories 15E.11-15E.12)
+
+- Dataset Studio now has a dedicated stage-canvas projection seam in `application/dataset-studio/StageCanvasGraphProjectionService.ts` that projects canonical stage flow/runtime state into a canvas graph model (stage groups, underlying asset nodes, and stage-flow edges) without introducing a parallel domain graph.
+- Projection supports wizard-backed runtime state, template-instantiated stage flows, and saved stage-flow definitions through one contract path, preserving stage ordering/dependency semantics and inspectable stage/node metadata.
+- Stage grouping metadata now includes stage name/description/status, execution mode, asset-count/shape summaries, runtime config/output payloads, and runtime-tracking hooks for later inspection/editor expansion.
+- Stage-aware editing is now centralized in `application/dataset-studio/StageCanvasEditingService.ts` (reorder validation, optional stage add/remove validation, stage config updates, compatibility checks, and graph regeneration) instead of UI-local domain mutations.
+- Dataset stage authoring UI now exposes a shared Wizard/Canvas surface (`ui/components/assets/DatasetStageAuthoringPanel.tsx`) with one adapter-backed source of truth (`DatasetStageWizardStateAdapter` wrapping `WizardFlowEngine`) so wizard and canvas remain synchronized.
+- Canvas rendering for dataset stages now uses `@xyflow/react` (`ui/components/assets/DatasetStageCanvasReactFlow.tsx`) and keeps business rules in adapter/service seams; UI handles selection and minimal edit affordances only.
+
+## Direction 5 UI extension update: Stage inspection + persistence reload surfaces (stories 15E.13-15E.14)
+
+- Dataset stage wizard/canvas views now render normalized stage inspection summaries produced by shared application adapters (not component-local derivation), including:
+  - stage output summaries,
+  - contract/type summaries,
+  - preview availability/reference/fallback status,
+  - propagated upstream lineage/storage metadata.
+- Wizard now surfaces current-stage inspection plus previously completed/skipped stage inspection cards using the same adapter snapshot source used for navigation/configuration.
+- Canvas inspector now renders stage-group inspection from the same projected model used by node/edge graph rendering, preserving wizard/canvas consistency.
+- Dataset stage adapter (`ui/studio-shell/dataset/DatasetStageWizardStateAdapter.ts`) now supports persistence export/import via a thin bridge to application persistence service, and reconstructed wizard/canvas state remains synchronized through one rehydrated `WizardFlowEngine`.
+- UI persistence controls in dataset stage authoring remain bounded to adapter-level save/reload actions; persistence mechanics stay outside React component business logic.
+
+## Direction 5 UI extension update: Data Studio preparation wizard framework + stage rendering (stories 18.3-18.4)
+
+- Data Studio now has a dedicated renderer adapter seam in `ui/studio-shell/data/DataStudioPreparationWizardStateAdapter.ts` over the application wizard engine (`application/data-studio/DataStudioPreparationWizard.ts`), keeping navigation/state/validation orchestration out of React components.
+- A new stage-based authoring surface now renders in Data Studio via `ui/components/assets/DataStudioPreparationWizardPanel.tsx`:
+  - metadata-driven stage navigation/progress rendering,
+  - dynamic stage body rendering (stage-id keyed renderers + fallback renderer),
+  - conditional/optional stage availability behavior from wizard snapshots,
+  - simple/advanced presentation mode toggles,
+  - wizard-to-canvas handoff summary from canonical authoring graph projection.
+- Data Studio now includes toolbar alignment through shared shell toolbar contracts in `DatasetStudioRegistration` (`save-draft`, `run-validation`, `refresh-snapshot`) rather than bespoke per-panel toolbar logic.
+- Stage progress status contracts are now shared through `ui/studio-shell/wizard/WizardStageContracts.ts` so stage-based wizard surfaces can reuse one status vocabulary (`current/completed/skipped/pending/disabled`) without dataset-specific type coupling.
+- Data Studio node-palette behavior now uses a left-drawer pattern aligned with Workflow Canvas semantics (search + stage-focused selection), but mapped to Data Studio stage/assets context instead of workflow trigger/input/step/output node semantics.
+
+## Direction 5 UI extension update: Data Studio intent templates + progressive disclosure (stories 18.5-18.6)
+
+- Data Studio preparation now initializes from an intent-based template registry (`application/data-studio/DataStudioPreparationTemplates.ts`) with built-in ELT, analytics, document, and image templates.
+- Template contracts are explicit and inspectable (id/version/intent/stage defaults/default asset-group bindings/conditional evaluators/field-visibility overrides), and template instantiation produces validated unified-preparation assets through existing stage/pipeline seams.
+- Wizard initialization now supports template selection/reselection through the existing state adapter seam (`DataStudioPreparationWizard` + `DataStudioPreparationWizardStateAdapter`) without bypassing the canonical preparation asset model.
+- Progressive disclosure is now metadata-driven at stage and field level:
+  - stage availability still honors simple/advanced visibility + activation conditions,
+  - field visibility uses descriptor metadata with simple/advanced flags, template targeting, and prior-input dependency conditions.
+- Wizard-to-canvas compatibility is preserved: simplified wizard views hide complexity, but canonical stage/asset graph state remains available in the underlying unified-preparation definition and handoff projection.
+
+## Direction 5 UI extension update: Data Studio persistent pipeline state + prepared storage integration (stories 18.7-18.8)
+
+- Data Studio wizard state now supports export/import as a canonical persistent pipeline-state document through `application/data-studio/DataStudioPipelineState.ts` and `DataStudioPreparationWizard` state methods (`exportPipelineState`, `importPipelineState`), including stage state, asset-group bindings, transitions, navigation/progression metadata, and wizard/canvas compatibility projection hooks.
+- Renderer adapter and panel wiring now consume that persistent contract (`DataStudioPreparationWizardStateAdapter`) and persist/reload authoring state via local storage (`DataStudioPreparationWizardPanel`), keeping wizard interactions aligned with non-UI-only draft/session behavior.
+- Prepared output storage integration now has a dedicated application seam in `application/dataset-studio/PreparedStorageStageService.ts` and stage contracts in `StageIntegrationContracts.ts` (`PreparedStorageStageOutput`), with explicit prepared dataset identity/version, storage target/reference, upstream linkage, and lineage capture suitable for reuse across registry/canvas/read-model surfaces.
+
+## Direction 5 UI extension update: Data Studio lineage/reuse + wizard-canvas handoff (stories 18.9-18.10)
+
+- Data Studio prepared dataset lineage/reuse is now structured through explicit contracts in `domain/dataset-studio/PreparedDatasetLineage.ts` and application orchestration in `application/data-studio/DataStudioLineageAndReuseService.ts` (upstream source/asset/pipeline references, stage structure/dependencies, preparation context, and reusable prepared-dataset references).
+- Persistent Data Studio pipeline state now carries first-class prepared lineage + reuse records (`preparedDatasetLineage`, `preparedDatasetReuse`) in `application/data-studio/DataStudioPipelineState.ts` rather than freeform provenance metadata.
+- Prepared storage output contracts now include stage-structure and preparation-context lineage fields (`application/dataset-studio/StageIntegrationContracts.ts`, `PreparedStorageStageService.ts`) so prepared outputs remain inspectable and reusable across downstream systems.
+- Wizard-to-Canvas handoff now projects stage-aware canvas metadata through `application/data-studio/DataStudioWizardCanvasProjectionService.ts` and `DataStudioPreparationWizardStateAdapter.toCanvasProjection()`, while preserving one shared underlying authoring graph from the wizard state.
+- Data Studio authoring UI now exposes explicit Wizard/Canvas mode switching in `ui/components/assets/DataStudioPreparationWizardPanel.tsx` with a canvas projection surface (`DataStudioPreparationCanvasReactFlow.tsx`) over the same underlying wizard/pipeline state and stage-node palette semantics.
+
+## Direction 5 UI extension update: Data Studio reusable stage UX + advanced editing entry points (stories 18.11-18.12)
+
+- Data Studio stage authoring now uses reusable stage UX components in `ui/components/assets/data-studio/DataStudioStageUxComponents.tsx` (stage metadata/status surface, advanced editing actions, internals panel, and stage-aware node palette drawer) instead of one large panel-local implementation.
+- Wizard-mode stage configuration now renders through those reusable shells while preserving progressive disclosure (`simple` vs `advanced`) and canonical stage updates through `DataStudioPreparationWizardStateAdapter`.
+- Advanced entry points are now explicit and stateful (`Inspect internals`, `Edit in Canvas`): wizard- and stage-level actions are wired to shared wizard/canvas state in `DataStudioPreparationWizardPanel.tsx`, with stage-specific canvas focus and internals inspection backed by real authoring-graph projection data.
+- Stage-level internals are now adapter-owned read models (`findCanvasNodeIdForStage`, `getStageInternals` on `DataStudioPreparationWizardStateAdapter`) so UI rendering remains contract-driven and does not derive graph internals ad hoc.
+
+## Direction 5 UI extension update: Data Studio validation and pipeline-run toolbar integration (stories 18.13-18.14)
+- Data Studio wizard/canvas state adapter now uses canonical pipeline-validation seams for navigation/readiness (`assessPipelineValidation`, `assessExecutionReadiness`, transition guards in `goNext`/`goToStage`) instead of UI-local transition rules.
+- Studio Shell toolbar now includes a Data Studio run action kind (`run-data-pipeline`) and routes validation/run operations through backend-authoritative Studio Shell contracts (`assessDataStudioExecutionReadiness`, `runDataStudioPipeline`) rather than client-side execution logic.
+- Data Studio execution/readiness feedback remains bounded in the shared Studio Shell page surface, preserving Workflow Studio toolbar/run patterns while keeping dataset-pipeline semantics distinct.
+
+## Direction 5 UI extension update: Data Studio pipeline save/load/versioning (story 18.15)
+- Data Studio draft authoring now synchronizes canonical pipeline-state content with the shared Studio Shell draft content path (`DataStudioPreparationWizardPanel` -> `StudioShellPage` extension operations), so toolbar `Save` persists the same wizard/canvas authoring graph state that execution/readiness consume.
+- Data Studio wizard initialization now prefers persisted draft content from Studio Shell snapshots (with local storage fallback), preserving load fidelity across refresh/reopen while keeping Wizard and Canvas as two views over one canonical pipeline state.
+- Studio Shell backend now exposes Data Studio version-aware retrieval seams (`listDataStudioPipelines`, `loadDataStudioPipeline`) and enriches published asset-version metadata with inspectable Data Studio pipeline summaries plus serialized canonical pipeline state.
+- Snapshot/version read models now include optional Data Studio pipeline version summary metadata for inspection without introducing a dedicated history UI surface.

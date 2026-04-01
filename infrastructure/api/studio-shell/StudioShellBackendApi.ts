@@ -60,6 +60,23 @@ import type {
   RunWorkflowDraftManualResult,
   WorkflowExecutionFailureDetail,
 } from "../../../application/workflow-studio/WorkflowStudioApplicationService";
+import {
+  DataStudioPipelineExecutionService,
+  type DataStudioPipelineExecutionReadiness,
+  type RunDataStudioPipelineResult,
+} from "../../../application/data-studio/DataStudioPipelineExecutionService";
+import {
+  createDataStudioPipelineState,
+  type DataStudioPipelineState,
+} from "../../../application/data-studio/DataStudioPipelineState";
+import {
+  createDataStudioPipelineVersionMetadata,
+  parseDataStudioPipelineVersionMetadata,
+  type DataStudioPipelineVersionSummary,
+} from "../../../application/data-studio/DataStudioPipelineVersioning";
+import { AssetVersion } from "../../../domain/assets/AssetVersion";
+import { UnifiedExecutionEngine } from "../../../application/execution/UnifiedExecutionEngine";
+import { DataStudioPipelineExecutionUnitHandler } from "../../execution/DataStudioPipelineExecutionUnitHandler";
 
 export interface StudioShellApiError {
   readonly code:
@@ -103,6 +120,7 @@ export interface StudioShellSnapshotReadModel {
     readonly versionLabel?: string;
     readonly createdAt: string;
     readonly parentVersionId?: string;
+    readonly dataStudioPipeline?: DataStudioPipelineVersionSummary;
   }>;
   readonly validationIssues: ReadonlyArray<StudioShellValidationIssue>;
 }
@@ -182,6 +200,120 @@ export interface WorkflowExecutionReadinessReadModel {
   readonly issues: ReadonlyArray<WorkflowExecutionValidationIssueReadModel>;
   readonly blockingIssueCount: number;
   readonly warningIssueCount: number;
+}
+
+export interface AssessDataStudioExecutionReadinessRequest {
+  readonly studioId: string;
+  readonly pipelineState: DataStudioPipelineState | string;
+}
+
+export interface RunDataStudioPipelineRequest {
+  readonly studioId: string;
+  readonly pipelineState: DataStudioPipelineState | string;
+  readonly initiatedBy?: string;
+  readonly executionReason?: string;
+}
+
+export interface ListDataStudioPipelinesRequest {
+  readonly studioId: string;
+  readonly draftId?: string;
+}
+
+export interface LoadDataStudioPipelineRequest {
+  readonly studioId: string;
+  readonly draftId?: string;
+  readonly versionId?: string;
+  readonly source?: "draft" | "latest-version" | "version-id";
+}
+
+export interface DataStudioPipelineVersionReadModel {
+  readonly versionId: string;
+  readonly versionLabel?: string;
+  readonly parentVersionId?: string;
+  readonly createdAt: string;
+  readonly dataStudioPipeline?: DataStudioPipelineVersionSummary;
+}
+
+export interface DataStudioPersistedPipelineReadModel {
+  readonly source: "draft" | "version";
+  readonly studioId: string;
+  readonly draftId: string;
+  readonly assetId: string;
+  readonly selectedVersionId?: string;
+  readonly latestVersionId?: string;
+  readonly pipelineState: DataStudioPipelineState;
+  readonly versions: ReadonlyArray<DataStudioPipelineVersionReadModel>;
+}
+
+export interface DataStudioExecutionReadinessIssueReadModel {
+  readonly code: string;
+  readonly message: string;
+  readonly severity: "error" | "warning";
+  readonly blocking: boolean;
+  readonly scope: "stage" | "transition" | "pipeline" | "graph";
+  readonly stageId?: string;
+  readonly relatedStageIds?: ReadonlyArray<string>;
+  readonly path?: string;
+}
+
+export interface DataStudioExecutionReadinessReadModel {
+  readonly ready: boolean;
+  readonly executionReady: boolean;
+  readonly blockingIssueCount: number;
+  readonly warningIssueCount: number;
+  readonly issues: ReadonlyArray<DataStudioExecutionReadinessIssueReadModel>;
+  readonly stageResults: ReadonlyArray<{
+    readonly stageId: string;
+    readonly ready: boolean;
+    readonly status: "ready" | "ready-with-warnings" | "blocked" | "skipped" | "disabled";
+    readonly blockingIssueCount: number;
+    readonly warningIssueCount: number;
+  }>;
+}
+
+export interface RunDataStudioPipelineReadModel {
+  readonly launchStatus: "blocked" | "launched" | "failed";
+  readonly readiness: DataStudioExecutionReadinessReadModel;
+  readonly execution: {
+    readonly runId?: string;
+    readonly planId?: string;
+    readonly state: "queued" | "running" | "completed" | "failed";
+    readonly launchAccepted: boolean;
+    readonly transitions: ReadonlyArray<{
+      readonly unitId: string;
+      readonly state: string;
+      readonly message?: string;
+      readonly occurredAt: string;
+    }>;
+  };
+  readonly result?: {
+    readonly pipelineId: string;
+    readonly pipelineAssetId: string;
+    readonly status: "completed" | "failed";
+    readonly stageResults: ReadonlyArray<{
+      readonly stageId: string;
+      readonly order: number;
+      readonly status: "completed" | "skipped" | "failed";
+      readonly message: string;
+      readonly resolvedAssetIds: ReadonlyArray<string>;
+      readonly startedAt: string;
+      readonly completedAt: string;
+    }>;
+    readonly preparedOutput?: {
+      readonly preparedAssetId: string;
+      readonly preparedAssetVersionId: string;
+      readonly storageTargetId: string;
+      readonly storageReference: string;
+      readonly lineageId: string;
+    };
+    readonly lineageId?: string;
+    readonly reusableAssetId?: string;
+    readonly startedAt: string;
+    readonly completedAt: string;
+    readonly warnings: ReadonlyArray<string>;
+    readonly errors: ReadonlyArray<string>;
+  };
+  readonly failureMessage?: string;
 }
 
 export interface WorkflowExecutionOutputDeliveryResultReadModel {
@@ -385,6 +517,7 @@ export class StudioShellBackendApi {
   private readonly listWorkflowRunSummariesUseCase?: ListWorkflowRunSummariesUseCase;
   private readonly getWorkflowRunDetailUseCase?: GetWorkflowRunDetailUseCase;
   private readonly workflowRunSummaryRepository?: IWorkflowRunSummaryRepository;
+  private readonly dataStudioPipelineExecutionService: DataStudioPipelineExecutionService;
   private readonly now: () => Date;
 
   constructor(
@@ -395,6 +528,9 @@ export class StudioShellBackendApi {
   ) {
     this.now = now;
     this.workflowRunSummaryRepository = workflowRunSummaryRepository;
+    this.dataStudioPipelineExecutionService = new DataStudioPipelineExecutionService(
+      new UnifiedExecutionEngine([new DataStudioPipelineExecutionUnitHandler()]),
+    );
     this.service = new DefaultStudioShellApplicationService(repository);
     this.workflowStudioService = new WorkflowStudioApplicationService(
       this.service,
@@ -473,7 +609,8 @@ export class StudioShellBackendApi {
 
   public async publishVersion(command: PublishAssetDraftVersionCommand): Promise<StudioShellApiResponse<StudioShellSnapshotReadModel>> {
     return this.wrap(async () => {
-      await this.service.publishAssetDraftVersion(command);
+      const published = await this.service.publishAssetDraftVersion(command);
+      await this.enrichDataStudioVersionMetadataIfApplicable(published.version, published.draft.content);
       await this.synchronizeWorkflowPersistenceFromStudioDraft(command.studioId, command.draftId);
       return this.requireSnapshot(command.studioId);
     });
@@ -544,6 +681,17 @@ export class StudioShellBackendApi {
         blockingIssueCount: readiness.blockingIssues.length,
         warningIssueCount: readiness.warningIssues.length,
       });
+    });
+  }
+
+  public async assessDataStudioExecutionReadiness(
+    request: AssessDataStudioExecutionReadinessRequest,
+  ): Promise<StudioShellApiResponse<DataStudioExecutionReadinessReadModel>> {
+    return this.wrap(async () => {
+      await this.requireSnapshot(request.studioId);
+      const pipelineState = this.toDataStudioPipelineState(request.pipelineState);
+      const readiness = this.dataStudioPipelineExecutionService.assessReadiness(pipelineState);
+      return this.toDataStudioExecutionReadinessReadModel(readiness);
     });
   }
 
@@ -763,6 +911,86 @@ export class StudioShellBackendApi {
           })
           : undefined,
         failureMessage: runResult.failureMessage,
+      });
+    });
+  }
+
+  public async runDataStudioPipeline(
+    request: RunDataStudioPipelineRequest,
+  ): Promise<StudioShellApiResponse<RunDataStudioPipelineReadModel>> {
+    return this.wrap(async () => {
+      await this.requireSnapshot(request.studioId);
+      const pipelineState = this.toDataStudioPipelineState(request.pipelineState);
+      const runResult = await this.dataStudioPipelineExecutionService.run({
+        pipelineState,
+        initiatedBy: request.initiatedBy,
+        executionReason: request.executionReason,
+      });
+      return this.toRunDataStudioPipelineReadModel(runResult);
+    });
+  }
+
+  public async listDataStudioPipelines(
+    request: ListDataStudioPipelinesRequest,
+  ): Promise<StudioShellApiResponse<ReadonlyArray<DataStudioPipelineVersionReadModel>>> {
+    return this.wrap(async () => {
+      const snapshot = await this.requireSnapshot(request.studioId);
+      const draft = this.requireDataStudioDraft(snapshot, request.draftId);
+      const versions = await this.repository.listAssetVersionsByAssetId(draft.assetId);
+      return Object.freeze(versions.map((version) => this.toDataStudioPipelineVersionReadModel(version)));
+    });
+  }
+
+  public async loadDataStudioPipeline(
+    request: LoadDataStudioPipelineRequest,
+  ): Promise<StudioShellApiResponse<DataStudioPersistedPipelineReadModel>> {
+    return this.wrap(async () => {
+      const snapshot = await this.requireSnapshot(request.studioId);
+      const draft = this.requireDataStudioDraft(snapshot, request.draftId);
+      const versions = await this.repository.listAssetVersionsByAssetId(draft.assetId);
+      const versionReadModels = Object.freeze(versions.map((version) => this.toDataStudioPipelineVersionReadModel(version)));
+      const latestVersion = versions.length > 0 ? versions[versions.length - 1] : undefined;
+
+      const source = request.source ?? (request.versionId?.trim() ? "version-id" : "draft");
+      if (source === "draft") {
+        return Object.freeze({
+          source: "draft",
+          studioId: request.studioId,
+          draftId: draft.draftId,
+          assetId: draft.assetId,
+          selectedVersionId: draft.lastPublishedVersionId,
+          latestVersionId: latestVersion?.versionId,
+          pipelineState: this.toDataStudioPipelineState(draft.content),
+          versions: versionReadModels,
+        });
+      }
+
+      const targetVersion = source === "latest-version"
+        ? latestVersion
+        : versions.find((version) => version.versionId === request.versionId?.trim());
+      if (!targetVersion) {
+        const sourceDescription = source === "latest-version"
+          ? "latest published Data Studio pipeline version"
+          : `Data Studio pipeline version '${request.versionId?.trim()}'`;
+        throw new StudioShellInvalidRequestError(`${sourceDescription} is not available for draft '${draft.draftId}'.`);
+      }
+
+      const parsedMetadata = parseDataStudioPipelineVersionMetadata(targetVersion.metadata);
+      if (!parsedMetadata) {
+        throw new StudioShellInvalidRequestError(
+          `Data Studio pipeline version '${targetVersion.versionId}' does not include a persisted pipeline snapshot.`,
+        );
+      }
+
+      return Object.freeze({
+        source: "version",
+        studioId: request.studioId,
+        draftId: draft.draftId,
+        assetId: draft.assetId,
+        selectedVersionId: targetVersion.versionId,
+        latestVersionId: latestVersion?.versionId,
+        pipelineState: this.toDataStudioPipelineState(parsedMetadata.serializedPipelineState),
+        versions: versionReadModels,
       });
     });
   }
@@ -1148,6 +1376,163 @@ export class StudioShellBackendApi {
     } satisfies WorkflowRunFailureLocationReadModel);
   }
 
+  private toDataStudioPipelineState(input: DataStudioPipelineState | string): DataStudioPipelineState {
+    try {
+      const parsed = typeof input === "string"
+        ? JSON.parse(input) as DataStudioPipelineState
+        : input;
+      return createDataStudioPipelineState(parsed);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "data-studio-pipeline-state-invalid";
+      throw new StudioShellInvalidRequestError(`Data Studio pipeline state is invalid: ${detail}`);
+    }
+  }
+
+  private toDataStudioPipelineVersionReadModel(version: AssetVersion): DataStudioPipelineVersionReadModel {
+    const parsed = parseDataStudioPipelineVersionMetadata(version.metadata);
+    return Object.freeze({
+      versionId: version.versionId,
+      versionLabel: version.versionLabel,
+      parentVersionId: version.parentVersionId,
+      createdAt: version.createdAt.toISOString(),
+      dataStudioPipeline: parsed?.summary,
+    });
+  }
+
+  private requireDataStudioDraft(
+    snapshot: StudioShellSnapshotReadModel,
+    explicitDraftId?: string,
+  ): NonNullable<StudioShellSnapshotReadModel["draft"]> {
+    const draft = snapshot.draft;
+    if (!draft) {
+      throw new StudioShellInvalidRequestError(`Studio '${snapshot.studioId}' does not have an active draft.`);
+    }
+    if (explicitDraftId?.trim() && draft.draftId !== explicitDraftId.trim()) {
+      throw new StudioShellInvalidRequestError(
+        `Draft '${explicitDraftId}' is not the active draft for studio '${snapshot.studioId}'.`,
+      );
+    }
+    return draft;
+  }
+
+  private async enrichDataStudioVersionMetadataIfApplicable(
+    version: AssetVersion,
+    draftContent: string,
+  ): Promise<void> {
+    const parsedState = this.tryParseDataStudioPipelineState(draftContent);
+    if (!parsedState) {
+      return;
+    }
+
+    const existingMetadata = this.toOptionalRecord(version.metadata) ?? Object.freeze({});
+    const enriched = new AssetVersion({
+      assetId: version.assetId,
+      versionId: version.versionId,
+      versionLabel: version.versionLabel,
+      parentVersionId: version.parentVersionId,
+      createdAt: version.createdAt,
+      createdBy: version.createdBy,
+      contentSha256: version.contentSha256,
+      contentLengthBytes: version.contentLengthBytes,
+      upstreamVersionIds: version.upstreamVersionIds,
+      metadata: Object.freeze({
+        ...existingMetadata,
+        dataStudioPipelineVersion: createDataStudioPipelineVersionMetadata(parsedState),
+      }),
+      reproducibilitySummary: version.reproducibilitySummary,
+    });
+    await this.repository.saveAssetVersion(enriched);
+  }
+
+  private tryParseDataStudioPipelineState(value: string): DataStudioPipelineState | undefined {
+    try {
+      return this.toDataStudioPipelineState(value);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private toDataStudioExecutionReadinessReadModel(
+    readiness: DataStudioPipelineExecutionReadiness,
+  ): DataStudioExecutionReadinessReadModel {
+    return Object.freeze({
+      ready: readiness.ready,
+      executionReady: readiness.executionReady,
+      blockingIssueCount: readiness.blockingIssueCount,
+      warningIssueCount: readiness.warningIssueCount,
+      issues: Object.freeze(readiness.issues.map((issue) => Object.freeze({
+        code: issue.code,
+        message: issue.message,
+        severity: issue.severity,
+        blocking: issue.blocking,
+        scope: issue.scope,
+        stageId: issue.stageId,
+        relatedStageIds: issue.relatedStageIds,
+        path: issue.path,
+      }))),
+      stageResults: Object.freeze(readiness.stageResults.map((stage) => Object.freeze({
+        stageId: stage.stageId,
+        ready: stage.ready,
+        status: stage.status,
+        blockingIssueCount: stage.blockingIssueCount,
+        warningIssueCount: stage.warningIssueCount,
+      }))),
+    });
+  }
+
+  private toRunDataStudioPipelineReadModel(
+    result: RunDataStudioPipelineResult,
+  ): RunDataStudioPipelineReadModel {
+    return Object.freeze({
+      launchStatus: result.launchStatus,
+      readiness: this.toDataStudioExecutionReadinessReadModel(result.readiness),
+      execution: Object.freeze({
+        runId: result.execution.runId,
+        planId: result.execution.planId,
+        state: result.execution.state,
+        launchAccepted: result.execution.launchAccepted,
+        transitions: Object.freeze(result.execution.transitions.map((transition) => Object.freeze({
+          unitId: transition.unitId,
+          state: transition.state,
+          message: transition.message,
+          occurredAt: transition.occurredAt,
+        }))),
+      }),
+      result: result.result
+        ? Object.freeze({
+          pipelineId: result.result.pipelineId,
+          pipelineAssetId: result.result.pipelineAssetId,
+          status: result.result.status,
+          stageResults: Object.freeze(result.result.stageResults.map((stage) => Object.freeze({
+            stageId: stage.stageId,
+            order: stage.order,
+            status: stage.status,
+            message: stage.message,
+            resolvedAssetIds: stage.resolvedAssetIds,
+            startedAt: stage.startedAt,
+            completedAt: stage.completedAt,
+          }))),
+          preparedOutput: result.result.preparedOutput
+            ? Object.freeze({
+              preparedAssetId: result.result.preparedOutput.preparedAssetId,
+              preparedAssetVersionId: result.result.preparedOutput.preparedAssetVersionId,
+              storageTargetId: result.result.preparedOutput.storageTargetId,
+              storageReference: result.result.preparedOutput.storageReference,
+              lineageId: result.result.preparedOutput.lineageId,
+            })
+            : undefined,
+          lineageId: result.result.lineageId,
+          reusableAssetId: result.result.reusableAssetId,
+          startedAt: result.result.startedAt,
+          completedAt: result.result.completedAt,
+          warnings: result.result.warnings,
+          errors: result.result.errors,
+        })
+        : undefined,
+      failureMessage: result.failureMessage,
+    });
+  }
+
   private createRerunRunId(workflowId: string): string {
     const normalized = workflowId.trim().replace(/[^a-zA-Z0-9:_-]/g, "-");
     return `run:${normalized}:rerun:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`;
@@ -1456,12 +1841,7 @@ export class StudioShellBackendApi {
       versions: Object.freeze(
         [...versions]
           .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
-          .map((entry) => Object.freeze({
-            versionId: entry.versionId,
-            versionLabel: entry.versionLabel,
-            parentVersionId: entry.parentVersionId,
-            createdAt: entry.createdAt.toISOString(),
-          })),
+          .map((entry) => this.toDataStudioPipelineVersionReadModel(entry)),
       ),
       validationIssues,
     });

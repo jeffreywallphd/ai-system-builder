@@ -175,4 +175,47 @@ describe("BatchIngestionFramework", () => {
     expect(result.preview.normalized.log.preview).toBeTrue();
     expect(result.logging.batch.preview).toBeTrue();
   });
+
+  it("routes missing-extension descriptors using content detection", async () => {
+    const fixture = await createBatchFixture();
+    const framework = new BatchIngestionFramework();
+
+    const result = await framework.executeBatch({
+      descriptors: Object.freeze([
+        Object.freeze({
+          sourceId: "no-ext-json",
+          kind: SourceDescriptorKinds.localFile,
+          originalReference: path.join(fixture, "users.json"),
+          normalizedReference: path.join(fixture, "users.json"),
+          sourceType: "file" as const,
+          displayName: "users-data",
+        }),
+      ]),
+      strategy: { kind: BatchIngestionStrategyKinds.routed },
+    });
+
+    expect(result.failureCount).toBe(0);
+    expect(result.successCount).toBe(1);
+    expect(result.outputs[0]?.ingestor).toBe(BatchIngestorKinds.json);
+  });
+
+  it("prefers JSON content over csv-like extension in routed mode", async () => {
+    const fixture = await createBatchFixture();
+    const aliasPath = path.join(fixture, "json-with-csv-extension.csv");
+    await fs.writeFile(aliasPath, JSON.stringify([{ id: "x-1", name: "Ada" }]), "utf-8");
+    const framework = new BatchIngestionFramework();
+
+    const result = await framework.executeBatch({
+      sourceRequest: {
+        input: {
+          kind: SourceInputKinds.localFile,
+          path: aliasPath,
+        },
+      },
+      strategy: { kind: BatchIngestionStrategyKinds.routed },
+    });
+
+    expect(result.failureCount).toBe(0);
+    expect(result.outputs[0]?.ingestor).toBe(BatchIngestorKinds.json);
+  });
 });

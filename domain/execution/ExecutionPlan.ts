@@ -3,6 +3,7 @@ export const ExecutionUnitKinds = Object.freeze({
   datasetGeneration: "dataset-generation",
   modelPreparation: "model-preparation",
   modelTraining: "model-training",
+  dataPipeline: "data-pipeline",
   mcpServerOperation: "mcp-server-operation",
   mcpToolInvocation: "mcp-tool-invocation",
   agentToolStep: "agent-tool-step",

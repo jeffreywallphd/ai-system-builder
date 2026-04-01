@@ -1,13 +1,25 @@
 import { describe, expect, it } from "bun:test";
-import { getDataStudioAssetRegistry, listIngestionDataAssets } from "../DataStudioAssetRegistryCatalog";
+import {
+  getDataStudioAssetRegistry,
+  IngestionCatalogVisibilityModes,
+  listIngestionDataAssets,
+} from "../DataStudioAssetRegistryCatalog";
 import { BatchIngestionAssetId } from "../BatchIngestionFramework";
+import { UnifiedIngestionAssetId } from "../UnifiedIngestionAsset";
 
 describe("DataStudioAssetRegistryCatalog", () => {
-  it("exposes ingestion assets through shared category/specialization discovery", () => {
+  it("defaults ingestion catalog discovery to the unified ingestion entry point", () => {
     const ingestionEntries = listIngestionDataAssets();
-    expect(ingestionEntries.length).toBe(5);
+    expect(ingestionEntries.length).toBe(1);
+    expect(ingestionEntries[0]?.descriptor.assetId).toBe(UnifiedIngestionAssetId);
+  });
+
+  it("exposes low-level ingestors through advanced inspection discovery", () => {
+    const ingestionEntries = listIngestionDataAssets({ visibility: IngestionCatalogVisibilityModes.advanced });
+    expect(ingestionEntries.length).toBe(6);
     expect(ingestionEntries.every((entry) => entry.descriptor.category === "data-ingestion")).toBeTrue();
     expect(ingestionEntries.some((entry) => entry.descriptor.assetId === BatchIngestionAssetId)).toBeTrue();
+    expect(ingestionEntries.some((entry) => entry.descriptor.assetId === UnifiedIngestionAssetId)).toBeTrue();
   });
 
   it("supports shared lookup by id/version from the catalog registry", () => {

@@ -1323,3 +1323,361 @@ Explicitly later than this scope:
   - warning/error counts.
 - Batch ingestion now emits batch-level + per-item logging metadata and lineage hooks with parent/child execution linkage hints while preserving existing bounded orchestration scope.
 - Data asset execution framework results now include ingestion-oriented logging/lineage metadata in addition to existing lineage diagnostics, keeping preview/full execution traceability machine-readable for downstream registry/inspection surfaces.
+
+## Direction 5 update: Unified ingestion model + source detection foundation (stories 15.1-15.2)
+
+- Dataset Studio now has a unified ingestion domain contract in `domain/dataset-studio/UnifiedIngestionDomain.ts` with:
+  - source kinds (`csv`, `json`, `document`, `image`, `unknown`),
+  - versioned source-reference collections that support single-source now and multi-source expansion,
+  - simple/advanced configuration modes,
+  - output targets aligned to canonical shape kinds (`records`, `text-items`, `image-metadata-records`),
+  - structured detection/result/preview/error contracts.
+- Source detection now follows clean boundaries:
+  - domain-level interfaces/contracts in `domain/dataset-studio/UnifiedIngestionDomain.ts`,
+  - application orchestration in `application/dataset-studio/UnifiedSourceTypeDetectionService.ts`,
+  - infrastructure `file-type` wrapper in `infrastructure/dataset-studio/FileTypeSignatureSniffer.ts`.
+- Detection is deterministic and explainable with layered signals:
+  - explicit metadata,
+  - extension + MIME heuristics,
+  - optional signature probing,
+  - bounded content sniffing (JSON/CSV/PDF/image signatures),
+  - structured evidence + candidate scores + confidence output.
+- Batch ingestion routed mode now delegates routing decisions to this detector, improving missing-extension and conflicting-signal cases without adding a parallel ingestion runtime.
+
+## Direction 5 update: Unified ingestion routing engine + converter integration (stories 15.3-15.4)
+
+- Unified ingestion now has a dedicated routing seam in `application/dataset-studio/UnifiedIngestionRoutingService.ts`:
+  - deterministic source-kind routing for `csv` / `json` / `document` / `image`,
+  - explicit unknown-kind fallback policy keyed by output target,
+  - structured route contracts (route request, resolved route metadata, unsupported-route failures) defined in `domain/dataset-studio/UnifiedIngestionDomain.ts`.
+- Unified ingestion orchestration is now explicit in `application/dataset-studio/UnifiedIngestionOrchestrationService.ts`:
+  - receives source + optional payload/config,
+  - runs source detection (15.2),
+  - resolves route (15.3),
+  - executes the selected low-level ingestor asset from Epic 14,
+  - normalizes through shared `DataConverterCore` operations (15.4),
+  - returns canonical-shape output with stage-aware structured failure contracts (`source-read`, `detection`, `routing`, `ingestion`, `conversion`).
+- Routing policy is centralized and extensible via route descriptors rather than embedded per-caller conditionals.
+- Batch ingestion routed mode now delegates route selection to the unified router so routing behavior stays consistent across ingestion surfaces.
+
+## Direction 5 update: Unified ingestion simple/advanced configuration modes (stories 15.5-15.6)
+
+- Unified ingestion configuration now resolves through one shared application contract in `application/dataset-studio/UnifiedIngestionConfiguration.ts`, with centralized defaults and validation for both simple and advanced modes.
+- Simple mode remains the default surface with minimal required decisions and automatic detection/routing defaults.
+- Advanced mode now supports explicit detection override and strategy override (`auto`/`csv`/`json`/`document`/`image`) while still executing through the same orchestration service (`UnifiedIngestionOrchestrationService`) and routing seam.
+- Contradictory advanced combinations are rejected before execution so advanced overrides do not bypass canonical validation or produce silent route/output mismatches.
+
+## Direction 5 update: Unified ingestion normalization pipeline + preview contracts (stories 15.7-15.8)
+
+- Unified ingestion now has an explicit post-routing/post-conversion normalization seam in `application/dataset-studio/UnifiedIngestionNormalizationPipeline.ts`.
+- Normalization contracts are now first-class in `domain/dataset-studio/UnifiedIngestionDomain.ts` through `UnifiedIngestionNormalizedOutput` and `UnifiedIngestionNormalizationVersion`.
+- Normalization behavior is centralized and composable through discrete stages (kind validation, output-target alignment, summary/warning synthesis), rather than ad hoc per-ingestor shaping.
+- Normalized unified outputs now carry one consistent inspectable envelope across source kinds:
+  - canonical output kind,
+  - canonical normalized payload,
+  - output/source/config metadata summary,
+  - detection summary,
+  - route summary,
+  - structured warnings (including empty output and fallback-route posture).
+- Unified orchestration now enforces normalization as an explicit stage and returns stage-aware failures for normalization and preview generation paths (`normalization`, `preview`) in addition to existing ingestion stages.
+- Unified ingestion preview is now centralized in `application/dataset-studio/UnifiedIngestionPreviewService.ts` and is generated from normalized outputs only (no raw format-specific preview bypass path).
+- Preview contracts now include:
+  - sampled row/item entries,
+  - metadata summary,
+  - detected kind/confidence summary,
+  - route/handler summary,
+  - structured warning/error propagation.
+- Dataset Studio unified preview UI now consumes `ingestWithPreview(...)` results from the shared orchestration path and renders high-signal summary first with progressive diagnostics/sample details.
+
+## Direction 5 update: Unified ingestion failure policy + composable asset wrapper (stories 15.9-15.10)
+
+- Unified ingestion failure handling now routes through one centralized application policy seam in `application/dataset-studio/UnifiedIngestionFailurePolicy.ts` instead of ad hoc per-stage try/catch mapping.
+- Stage-aware failure contracts now include deterministic classification metadata (`stage`, `code`, `message`, `disposition=recoverable|terminal`) plus bounded partial context (`detectionResolved`, `routeResolved`, `outputTarget`) in `UnifiedIngestionOrchestrationService` results.
+- Fallback behavior is now explicit and inspectable:
+  - detection tie-break decisions,
+  - unknown-kind routing fallback decisions (and unavailable-fallback outcomes),
+  - degraded preview fallback decisions,
+  - partial-metadata fallback notes.
+- Preview generation no longer hard-fails the full unified path when preview rendering throws; `UnifiedIngestionPreviewService` returns a degraded preview payload with warning issues, preserving normalized output metadata for downstream orchestration/UI.
+- Unified ingestion now has a high-level composable execution wrapper in `application/dataset-studio/UnifiedIngestionAsset.ts`:
+  - stable asset identity/version (`unified-ingestion@1.0.0`),
+  - versioned wrapper contracts (`inputContractVersion`, `outputContractVersion`),
+  - wrapper entrypoints (`execute`, `preview`) that run through the same orchestration/configuration seams,
+  - no low-level ingestor or third-party adapter leakage in wrapper-facing contracts.
+- Dataset Studio preview paths now consume this wrapper surface, keeping UI/application callers on asset-level contracts instead of direct low-level orchestration invocation.
+
+## Direction 5 update: Unified-first ingestor discoverability + batch orchestration contracts (stories 15.11-15.12)
+
+- Data-asset registry descriptors now include centralized discoverability metadata (`scope`, `defaultEntryPoint`, `inspectable`) so ingestion visibility policy is data-driven rather than UI-conditional.
+- Ingestion catalog querying now supports visibility modes (`default`, `advanced`) and defaults to unified ingestion as the primary entrypoint while preserving advanced/internal inspectability for low-level ingestors.
+- Unified ingestion batch orchestration now exists as a dedicated application seam (`UnifiedIngestionBatchOrchestrationService`) that processes multiple sources by invoking existing per-item unified ingestion orchestration (no parallel source-specific stack).
+- Unified wrapper contracts now include batch entrypoints (`previewBatch`, `executeBatch`) and batch results with:
+  - per-item status/detection/route metadata,
+  - aggregate summaries (total/succeeded/failed/skipped/partial-success),
+  - normalized output aggregation,
+  - structured batch-level issues for empty/partial/fail-fast scenarios.
+
+## Direction 5 update: Unified ingestion lineage + metadata tracking (story 15.13)
+
+- Unified ingestion contracts now include bounded, versioned lineage + metadata envelopes in `domain/dataset-studio/UnifiedIngestionDomain.ts`:
+  - per-item execution metadata (source identity, detection summary, route summary, conversion summary, normalization counts, optional preview summary, processing timestamps),
+  - per-item lineage record with explicit stage timeline (`source-registration`, `configuration`, `source-read`, `detection`, `routing`, `ingestion`, `conversion`, `normalization`, `preview`) and stage-level status (`succeeded`/`failed`/`degraded`/`skipped`),
+  - batch-level aggregate metadata and lineage summary contracts (counts + item lineage references).
+- Unified orchestration now captures lineage + metadata across success, partial, degraded, and failure paths in `application/dataset-studio/UnifiedIngestionOrchestrationService.ts` without introducing a parallel provenance subsystem.
+- Batch orchestration now preserves per-item lineage/metadata and emits batch aggregate metadata/lineage in `application/dataset-studio/UnifiedIngestionBatchOrchestrationService.ts`, including partial-failure and fail-fast visibility.
+- Unified asset wrapper contracts expose lineage/metadata for single and batch execution surfaces through `application/dataset-studio/UnifiedIngestionAsset.ts`.
+- Dataset Studio unified preview/batch inspection now surfaces high-signal metadata first with expandable lineage details in `ui/components/assets/DatasetStudioDraftPreviewPanel.tsx`.
+
+## Direction 5 extension update: Stage-based ingestion pipeline model + stage-asset mapping (stories 15E.1-15E.2)
+
+- Dataset Studio now has a canonical stage-pipeline domain contract in `domain/dataset-studio/StagePipelineDomain.ts`:
+  - explicit high-level stage kinds (`source-selection`, `ingestion`, `profiling`, `normalization`, `preview`),
+  - ordered stage definitions with unique ids/order,
+  - stage-level data-shape contracts (canonical shape kinds),
+  - stage-to-underlying-asset references (wrappers, not replacement definitions),
+  - explicit execution policy (`required` / `optional` / `conditional`).
+- Unified ingestion execution metadata now includes stage-pipeline inspectability (`pipelineId`, ordered stage ids) while preserving existing lineage/event contracts and execution behavior.
+- Stage-to-asset resolution now has a dedicated application seam in `application/dataset-studio/StageAssetMappingService.ts`:
+  - static stage mappings (for example source-selection/profiling/normalization/preview),
+  - conditional stage mappings for ingestion (detected source kind, advanced strategy override, output-target fallback),
+  - optional config-default payloads and typed policy/fallback metadata,
+  - zod-backed mapping-definition validation.
+- Unified routing integration remains orchestration-only:
+  - `UnifiedIngestionRoutingService` now resolves low-level ingestion assets through the stage mapping seam,
+  - routing still does not execute assets directly; execution remains in `UnifiedIngestionOrchestrationService` and existing ingestor/converter seams.
+
+
+## Direction 5 extension update: Wizard flow engine + default pipeline templates (stories 15E.3-15E.4)
+
+- Dataset Studio now has a stage-oriented wizard flow state-machine seam in `application/dataset-studio/WizardFlowEngine.ts` backed by canonical flow contracts in `domain/dataset-studio/StageFlowDefinition.ts`.
+- Wizard state is application-owned (current/completed/skipped stages + per-stage configuration/output), UI-independent, and supports forward/back transitions, conditional branching, and auto-skip behavior.
+- Stage-flow contracts now support dynamic insertion/removal/reordering and transition validation against stage data contracts to prevent invalid stage hops.
+- Default pipeline templates are now modeled in `domain/dataset-studio/PipelineTemplateDomain.ts` and served through `application/dataset-studio/TemplateService.ts` with:
+  - template listing and UI-ready descriptors,
+  - template instantiation with partial customization (stage config overrides, skip list, reorder list),
+  - validation against stage definition contracts and stage-to-asset mapping (`StageAssetMappingService`).
+- Stage-to-asset mapping now includes template-stage coverage (source/raw-storage/extraction/chunking/cleaning/transformation/aggregation/prepared-storage) while preserving orchestration-only behavior (no asset execution in template/wizard seams).
+
+## Direction 5 extension update: Intent-driven wizard configuration + stage policy automation (stories 15E.5-15E.6)
+
+- Dataset Studio now has an explicit intent model in `domain/dataset-studio/IntentDomain.ts` with intent id/name/description, associated pipeline templates, optional stage overrides, and optional stage blueprints for extensible/custom presets.
+- Intent resolution is now a dedicated application seam in `application/dataset-studio/IntentService.ts`:
+  - lists registered intents,
+  - resolves `intent -> template` mappings,
+  - applies intent-specific stage include/exclude/reorder adjustments,
+  - validates resulting flows against stage-flow contracts and stage-to-asset mappings.
+- Wizard flow initialization now supports intent-first orchestration in `application/dataset-studio/WizardFlowEngine.ts` by accepting `intentId`/`intentPreset` + `IntentService`, resolving template+intent adjustments before start, and persisting intent context in runtime wizard state.
+- Stage execution automation is now isolated in `application/dataset-studio/StageExecutionPolicy.ts`:
+  - stage decision outcomes: `execute`, `auto-complete`, `skip`,
+  - data-driven skip rules over unified-ingestion outputs,
+  - auto-configuration merge from mapping defaults + template defaults + intent defaults + ingestion-derived normalization hints.
+- Wizard runtime state tracking now includes `autoConfiguredStageIds` and `userOverriddenStageIds` (plus existing skipped/completed tracking) to preserve deterministic navigation with dynamic stage behavior.
+
+## Direction 5 extension update: Unified ingestion stage contracts + raw storage integration (stories 15E.7-15E.8)
+
+- Stage-aware unified-ingestion output contracts are now explicit and zod-backed in `application/dataset-studio/StageIntegrationContracts.ts`.
+- Unified-ingestion stage outputs now support both:
+  - typed envelope projection from orchestration results, and
+  - backward-compatible parsing of legacy flat stage output records.
+- Wizard orchestration now supports typed stage output writes through:
+  - `WizardFlowEngine.setUnifiedIngestionStageOutput(...)`,
+  - `WizardFlowEngine.setRawStorageStageOutput(...)`.
+- Stage policy automation now consumes typed ingestion-stage output metadata when available and still supports legacy output fields for compatibility (`application/dataset-studio/StageExecutionPolicy.ts`).
+- Raw storage is now a first-class stage integration with:
+  - explicit stage asset id (`raw-storage-stage`) in `domain/dataset-studio/StagePipelineDomain.ts`,
+  - stage-to-asset mapping defaults + metadata hooks in `application/dataset-studio/StageAssetMappingService.ts`,
+  - reusable raw-storage persistence adapter seam and inspectable output/log/lineage contracts in `application/dataset-studio/RawStorageStageService.ts`.
+- Default template flows now include raw-storage as a first-class stage in ELT, document, and analytics templates (`domain/dataset-studio/PipelineTemplateDomain.ts`).
+
+## Direction 5 extension update: Stage metadata/contracts + stage-based wizard state integration (stories 15E.9-15E.10)
+
+- Dataset Studio now has a dedicated stage metadata + contract seam in `application/dataset-studio/StageMetadataContracts.ts` with zod-backed validation for:
+  - stage metadata envelopes (identity/type/category/description/order/execution/inspectability/lineage/preview/source/status markers),
+  - stage input/output contracts (`simple` and `composite-mapped`),
+  - stage metadata propagation payloads for downstream stage access.
+- `WizardFlowEngine` now integrates this contract seam by maintaining stage runtime tracking (`metadata`, `contract`, propagated metadata) per stage, while preserving existing stage flow/runtime state and stage output behavior.
+- Stage metadata propagation now supports detected data type, storage references, normalization hints, preview/inspection references, and lineage hooks from typed stage outputs and legacy-compatible stage output records.
+- Downstream stages now receive propagated upstream metadata through engine-managed tracking instead of stage-specific implementation coupling.
+- Wizard stage UI snapshots now include stage-category/status-marker/lineage metadata in addition to existing stage contract summaries for inspectable renderer surfaces.
+
+## Direction 5 extension update: Stage-aware dataset canvas projection + editing services (stories 15E.11-15E.12)
+
+- Application-layer stage-canvas projection now lives in `application/dataset-studio/StageCanvasGraphProjectionService.ts` and translates canonical stage-flow/runtime contracts into canvas graph read models (stage groups + asset nodes + flow edges) while preserving ordering/dependency semantics.
+- Projection contracts remain application translators: no UI data shape leakage into `domain/dataset-studio/*` and no second stage graph source-of-truth.
+- Stage-level editing orchestration now lives in `application/dataset-studio/StageCanvasEditingService.ts` with explicit validation/error contracts for:
+  - stage configuration updates,
+  - stage reorder constraints,
+  - optional-stage insertion/removal constraints,
+  - compatibility validation against stage-flow + stage-asset mapping seams,
+  - post-edit graph regeneration.
+- Wizard/canvas synchronization remains centered on `WizardFlowEngine` state; adapter surfaces consume/edit the same underlying stage-flow/runtime contracts instead of duplicating state logic in React components.
+
+## Direction 5 extension update: Intermediate output inspection + pipeline persistence (stories 15E.13-15E.14)
+
+- Stage output inspection now has an application-owned adapter seam in `application/dataset-studio/StageOutputInspectionService.ts` that normalizes inspectable stage outputs into one UI-ready contract:
+  - output summary,
+  - stage contract/type summary,
+  - preview availability/reference with structured fallback summary,
+  - propagated upstream metadata (detected type/storage/lineage/pipeline/upstream-stage ids),
+  - inspectability status handling for skipped, auto-configured, and no-output states.
+- Inspection normalization is reused across Wizard and Canvas projection paths through shared `WizardFlowEngine` state + `StageRuntimeTracking` metadata (no React-owned inspection derivation).
+- Stage pipeline persistence now has a versioned application seam in `application/dataset-studio/StagePipelinePersistenceService.ts` that captures:
+  - pipeline identity/metadata,
+  - full stage flow definition,
+  - wizard runtime state (including stage config/output/status tracking context),
+  - stage runtime-tracking metadata and navigation history,
+  - stage-to-asset mapping references and graph reconstruction metadata.
+- Persistence reload/rehydration now reconstructs `WizardFlowEngine` from the same canonical stage/runtime contracts used for live-created flows, so Wizard and Canvas continue to share one source of truth after reload.
+- Persistence decoding now includes a bounded compatibility path for legacy unversioned payloads while rejecting unsupported future versions deterministically.
+
+## Direction 5 extension update: Mid-level pipeline stage domain + composition mapping foundation (stories 17.1-17.2)
+
+- Dataset Studio now has a dedicated mid-level stage domain seam in `domain/dataset-studio/PipelineStageDomain.ts` with explicit stage ids, definitions, instances, config, metadata, canonical-shape contracts, ordering constraints, and zod-backed validation.
+- A runtime-inspectable stage registry now exists in `domain/dataset-studio/PipelineStageRegistry.ts`, covering the full stage set (`SourceSelection` through `StoragePrepared`) with reusable stage definitions and no hardcoded pipeline-flow graph.
+- Stage-to-asset composition now has a dedicated application seam in `application/dataset-studio/StageAssetCompositionService.ts` with:
+  - explicit composition contracts (`AssetReference`, `AssetGroup`, `StageCompositionDefinition`),
+  - stage-config to asset-config mapping rules,
+  - single-asset, multi-asset, and conditional composition support,
+  - React Flow-compatible asset-graph segment projection (`Node`/`Edge`) for canvas inspectability.
+- Composition definitions reuse existing ingestion/transformation asset ids from Epics 13-16 and keep orchestration logic in shared application/domain seams (no UI coupling and no duplicated asset execution logic).
+
+## Direction 5 extension update: Mid-level pipeline graph construction + canvas mapping (stories 17.3-17.4)
+
+- Mid-level stage pipelines now have a dedicated graph contract in `domain/dataset-studio/PipelineGraphDomain.ts` with typed stage/asset nodes, typed inter-node edges, zod-backed schema validation, and deterministic serialization/deserialization + inspection helpers.
+- Graph construction now lives in `application/dataset-studio/PipelineGraphConstructionService.ts` and reuses existing stage registry + stage-asset composition seams (`PipelineStageRegistry`, `StageAssetCompositionService`) instead of duplicating asset logic.
+- Construction enforces fail-fast graph correctness for:
+  - ordering constraints,
+  - stage input/output compatibility,
+  - required/optional stage enablement behavior,
+  - branching restrictions unless explicitly allowed.
+- React Flow projection now has a dedicated mapper in `application/dataset-studio/PipelineReactFlowGraph.ts` with strongly typed `stage`/`asset` node-data unions and typed edge data, plus deterministic horizontal stage-group layout and UI-ready metadata fields for preview/inspection hooks.
+- The graph + React Flow mappers are pure deterministic translators suitable for memoized canvas consumption and future custom node/edge extensions.
+
+## Direction 5 extension update: Mid-level pipeline inspection + editing orchestration (stories 17.5-17.6)
+
+- Mid-level pipeline inspection now has a dedicated canonical seam:
+  - domain inspection contracts in `domain/dataset-studio/PipelineInspectionDomain.ts` define typed pipeline/stage/asset inspection results, execution status, preview payload unions, metadata envelopes, and zod validation.
+  - stage/asset preview contracts are canonical-shape aligned (`records`, `table`, `text-items`, `image-metadata`) with bounded sample sizes for inspectability without heavy compute paths.
+  - application inspection orchestration in `application/dataset-studio/PipelineInspectionService.ts` maps execution outputs to inspection results, handles partial/missing outputs, supports extensible enrichment hooks, and attaches serializable inspection metadata to `PipelineGraph` nodes (non-UI).
+- Mid-level pipeline editing now has an immutable, validation-first orchestration seam in `application/dataset-studio/PipelineEditingService.ts`:
+  - edit API supports `addStage`, `removeStage`, `replaceStage`, `reorderStage`, and `toggleStage`.
+  - edits return a new pipeline definition (`domain/dataset-studio/PipelineDefinitionDomain.ts`) plus regenerated deterministic `PipelineGraph` and `PipelineReactFlowGraph` projections.
+  - validation enforces ordering/compatibility/required-stage constraints through existing stage registry + graph construction seams (no duplicated composition logic), with typed edit errors for deterministic callers.
+  - replacement edits preserve compatible config keys via stage-to-asset composition mappings and reset incompatible configuration/metadata fields using explicit preservation reports.
+  - serialized edited pipelines round-trip through version-safe definition serialization and rehydrate into graph/canvas projections.
+
+## Direction 5 extension update: Mid-level pipeline composition packages (stories 17.7-17.8)
+
+- Mid-level reusable pipeline-definition packages now live in `application/dataset-studio/MidLevelPipelineDefinitions.ts` with strongly typed contracts for:
+  - `TabularCleaningPipelineDefinition` (`Normalization -> Cleaning -> Transformation? -> Aggregation?`),
+  - `DocumentPreparationPipelineDefinition` (`Extraction -> Normalization -> Chunking -> Labeling? -> Enrichment?`).
+- Both pipeline packages now expose:
+  - validated stage-order constraints,
+  - reusable `PipelineDefinition` payloads,
+  - dedicated stage-composition mapping sets (`StageCompositionDefinition[]`) with stage-config to asset-config mapping,
+  - direct integration hooks for `PipelineGraphConstructionService`, `PipelineReactFlowGraph`, and `PipelineInspectionService`.
+- Tabular cleaning composition reuses existing transformation assets (`type-normalization`, `missing-value-handling`, `deduplication`, `field-mapping`, `data-validation`, `aggregation`) and is constrained to canonical `records`/`table` shapes.
+- Document preparation composition reuses existing ingestion/transformation assets and adds Node-first extraction/chunking runtime helpers:
+  - PDF/text extraction through `DocumentPdfIngestorAsset` (`unpdf` parser path),
+  - image OCR extraction via `tesseract.js` behind injectable `IImageOcrExtractor`,
+  - character/token chunking (`js-tiktoken` optional strategy) with configurable `chunkSize` + `chunkOverlap`.
+- Inspection integration now includes pipeline-specific metadata enrichment hooks:
+  - tabular row/sample schema snapshots plus numeric summary stats (via `simple-statistics` wrapper),
+  - document extracted text previews, chunk counts, character lengths, and optional token counts.
+
+## Direction 5 extension update: Image preparation + reusable enrichment composition (stories 17.9-17.10)
+
+- Mid-level image preparation now has a reusable pipeline package in `application/dataset-studio/MidLevelPipelineDefinitions.ts`:
+  - `ImagePreparationPipelineDefinition` with optional `Extraction`, required `Normalization`, optional `Transformation`, optional `Labeling`, and optional `Enrichment`.
+  - deterministic stage-order validation plus direct `PipelineDefinition`/`PipelineGraph`/`PipelineReactFlowGraph`/inspection integration through existing 17.x seams.
+- Image preparation composition is Node-first and reuses existing ingestion/transformation contracts:
+  - image metadata ingestion/normalization through `ImageIngestorAsset` (`exifr` + `sharp` metadata path),
+  - optional OCR extraction through injectable `IImageOcrExtractor` (`tesseract.js` default implementation),
+  - optional image transformation through `SharpImageTransformationService` (resize/grayscale/format normalization via `sharp`),
+  - placeholder labeling through existing classification asset mapping (no ML runtime introduced).
+- Enrichment now has an explicit reusable domain contract in `domain/dataset-studio/EnrichmentStageDomain.ts`:
+  - `EnrichmentStageConfig`,
+  - strategy kinds: `derived`, `lookup`, `metadata-augmentation`,
+  - lookup join-type support (`left`, `inner`),
+  - zod-backed validation and typed stage-option mapping helpers.
+- Stage composition mappings now support richer enrichment composition patterns (lookup/transform/merge and strategy-based branching) while preserving existing 17.2 contracts:
+  - default enrichment composition in `StageAssetCompositionService` expanded to strategy-conditional multi-asset groups plus bounded fallback,
+  - reusable composable enrichment definitions consumed by both document and image mid-level pipelines.
+- Inspection integration remains on the shared 17.5 seam and now includes image-focused enrichment/preview metadata:
+  - image metadata previews (dimensions/format snapshots),
+  - OCR text previews when extraction emits text items,
+  - transform/enrichment summary stats surfaced through existing `PipelineInspectionService` hooks.
+
+## Direction 5 extension update: Feature engineering + labeling stage compositions (stories 17.11-17.12)
+
+- Dataset Studio now has dedicated stage-domain contracts for:
+  - `FeatureEngineeringStageConfig`, `FeatureEngineeringOperation`, and `FeatureEngineeringStrategy` (`domain/dataset-studio/FeatureEngineeringStageDomain.ts`),
+  - `LabelingStageConfig`, `AnnotationMode`, `AnnotationTarget`, and `AnnotationRecord` (`domain/dataset-studio/LabelingStageDomain.ts`).
+- Both contracts are zod-backed, serializable, and include stage-option parse/round-trip helpers for canonical stage config persistence and safe reconfiguration.
+- Stage-to-asset composition now supports richer reusable multi-asset mappings in `application/dataset-studio/StageAssetCompositionService.ts`:
+  - feature engineering expands to normalization -> generation -> validation -> projection patterns over reusable existing transformation assets,
+  - labeling expands to target preparation -> mode-aware assisted/placeholder seeding -> annotation attachment -> output validation using existing reusable assets.
+- Canonical-shape compatibility was expanded for feature engineering (`records`, `table`, `text-items`, `image-metadata-records`) while preserving stage typing/ordering constraints in the existing stage registry and graph-construction seams.
+- Pipeline graph + React Flow mapping now carry stage specialization metadata for annotation-oriented and feature-engineering-oriented nodes (`PipelineReactFlowGraph`), enabling future UI differentiation without introducing a parallel graph model.
+- Inspection integration now emits feature/annotation-specific metadata through existing inspection contracts (`PipelineInspectionService`), including before/after field visibility for feature stages and annotation mode/count/manual-needed status for labeling stages.
+- Editing integration remains on the existing 17.6 seam and now adds stage-configuration updates with stage-specific safe normalization for feature-engineering and labeling configurations (`PipelineEditingService.updateStageConfiguration(...)`).
+- Mid-level pipeline packages now include feature-engineering participation in tabular analytics flows and updated labeling option contracts for document/image preparation paths while reusing the same composition, graph, and inspection infrastructure.
+
+## Direction 5 extension update: Mid-level template registry + composition hardening (stories 17.13-17.14)
+
+- Mid-level pipeline templates now have explicit domain contracts in `domain/dataset-studio/MidLevelPipelineTemplateDomain.ts` with zod-backed validation for:
+  - template identity/category/use-case metadata,
+  - default + optional stage declarations,
+  - default stage configuration maps,
+  - wizard guidance/progressive-disclosure metadata,
+  - editing + preview capability descriptors,
+  - instantiation options (optional-stage enable/disable, stage-order, config overrides).
+- A dedicated mid-level template registry + instantiation seam now exists in `application/dataset-studio/MidLevelPipelineTemplateService.ts`, covering:
+  - discoverable default templates (`General`, `Analytics`, `Document`, `Image` preparation),
+  - deterministic instantiation into canonical `PipelineDefinition` + `PipelineGraph` + `PipelineReactFlowGraph`,
+  - reuse of existing 17.x pipeline-definition packages + stage composition mappings (no parallel pipeline model).
+- Validation hardening now includes an explicit end-to-end seam in `application/dataset-studio/PipelineValidationService.ts` with typed validation errors for:
+  - invalid pipeline definitions/stage instances/transitions,
+  - invalid template instantiations,
+  - invalid edited pipelines.
+- Serialization/reload hardening now has a dedicated seam in `application/dataset-studio/PipelineSerializationService.ts` for:
+  - persisted mid-level pipeline documents (versioned envelope),
+  - round-trip definition/graph serialization,
+  - deterministic graph reconstruction checks on rehydrate,
+  - React Flow reconstruction from persisted canonical graph.
+- Inspection preview contracts now expose a normalized preview envelope (`version/kind/truncated/totalCount/payload`) in `domain/dataset-studio/PipelineInspectionDomain.ts` and `application/dataset-studio/PipelineInspectionService.ts` while preserving legacy preview payload access.
+
+## Direction 5 extension update: Data Studio unified preparation asset + stage-first abstraction (stories 18.1-18.2)
+
+- Data Studio now has a canonical unified preparation asset contract in `domain/dataset-studio/UnifiedPreparationAsset.ts` with explicit identity/versioning, upstream Epic 17 pipeline bindings, stage configuration (visibility + activation + config mode), output/storage hooks, lineage/reuse hooks, and preview/inspection metadata.
+- Unified preparation validation now enforces required stage coverage (`SourceSelection`, `UnifiedIngestion`, `StoragePrepared`), conditional-stage activation integrity, and normalized stage definitions via zod-backed schema parsing.
+- Stage-oriented preparation orchestration now has a dedicated application seam in `application/dataset-studio/UnifiedPreparationPipelineService.ts`:
+  - resolves unified preparation definitions into canonical `PipelineDefinition` stage instances,
+  - validates and projects through existing stage/graph seams (`PipelineValidationService`, `PipelineGraphConstructionService`, `StageAssetCompositionService`),
+  - emits explicit stage-to-asset-group mappings for Wizard/Canvas-ready stage reasoning,
+  - enforces bounded Epic 17 upstream binding compatibility.
+- A compact cross-studio authoring projection extension point now exists in `application/studio-shell/StudioAuthoringGraph.ts`, and unified preparation resolution emits this projection as a future Wizard/Canvas handoff hook without changing existing Workflow Studio semantics.
+
+## Direction 5 extension update: Data Studio wizard framework + dynamic stage rendering (stories 18.3-18.4)
+
+- Data Studio now has an explicit wizard state-machine seam in `application/data-studio/DataStudioPreparationWizard.ts` that operates directly on unified preparation asset definitions from 18.1-18.2 (not a disconnected UI model).
+- Wizard progression includes:
+  - stage navigation (`goNext`, `goBack`, `goToStage`),
+  - stage completion/skipping tracking,
+  - presentation mode control (`simple` vs `advanced`),
+  - stage availability resolution from activation + visibility + conditional evaluators,
+  - validation hook points for enter/leave/complete transitions,
+  - wizard-to-canvas handoff projection (`toCanvasHandoff`) carrying canonical asset + authoring graph context.
+- Dynamic stage rendering foundations now project stage metadata into a stable snapshot contract:
+  - stage order/title/description/status,
+  - optional/skippable state,
+  - activation/visibility/config-mode metadata,
+  - stage option payload binding,
+  - stage-group mapping references from unified preparation resolution.
+- This keeps Data Studio wizard/canvas compatibility bounded to one canonical preparation definition while remaining semantically distinct from Workflow Studio trigger/input/step/output semantics.
+
+## Direction 5 extension update: Data Studio persistent pipeline state + prepared output storage (stories 18.7-18.8)
+
+- Data Studio now has a canonical persistent authoring-state contract in `application/data-studio/DataStudioPipelineState.ts`, modeling pipeline identity/metadata, stage-level state, stage asset-group bindings, transitions, authoring-flow metadata, and wizard/canvas compatibility projection hooks over one unified-preparation asset source.
+- `DataStudioPreparationWizard` now exports/imports this persistent state directly, so wizard progression and later canvas projection can operate on one serializable, validation-backed representation rather than transient component-local state.
+- Prepared-data persistence now includes an explicit prepared-storage stage service (`application/dataset-studio/PreparedStorageStageService.ts`) and output contracts (`PreparedStorageStageOutput` in `StageIntegrationContracts.ts`) that bind prepared dataset identity, storage target/reference, upstream asset/pipeline references, and lineage metadata through bounded application seams.

@@ -6,6 +6,7 @@ import {
   type CanonicalRecordValue,
 } from "../../domain/dataset-studio/CanonicalDataShapes";
 import {
+  DataAssetDiscoverabilityScopes,
   DataAssetRegistry,
   DataAssetRegistrySpecializations,
   type DataAssetRegistryEntry,
@@ -41,6 +42,12 @@ import {
   createDataAssetConfigSchema,
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
+import {
+  UnifiedIngestionAssetId,
+  createUnifiedIngestionConfigSchema,
+  createUnifiedIngestionDataAsset,
+} from "./UnifiedIngestionAsset";
+import { UnifiedIngestionOutputTargetKinds, UnifiedIngestionStrategyKinds } from "../../domain/dataset-studio/UnifiedIngestionDomain";
 
 export interface DataStudioSampleAssetSet {
   readonly registry: DataAssetRegistry;
@@ -272,6 +279,7 @@ export function registerDataStudioSampleAssets(
   const documentPdfIngestorSchema = createDocumentPdfIngestorConfigSchema(DocumentPdfIngestorAsset.assetId);
   const imageIngestorSchema = createImageIngestorConfigSchema(ImageIngestorAsset.assetId);
   const batchIngestionSchema = createBatchIngestionConfigSchema(BatchIngestionAssetId);
+  const unifiedIngestionSchema = createUnifiedIngestionConfigSchema(UnifiedIngestionAssetId);
 
   const recordsEntry = registry.register({
     asset: createRecordsConverterAsset({
@@ -343,8 +351,67 @@ export function registerDataStudioSampleAssets(
       previewModes: ["sample-records"],
       executionModes: ["execute", "preview"],
     },
+    discoverability: {
+      scope: DataAssetDiscoverabilityScopes.advanced,
+      defaultEntryPoint: false,
+      inspectable: true,
+    },
     configSchema: csvIngestorSchema,
     assetFactory: (config) => createCsvIngestorDataAsset(config),
+  });
+
+  const unifiedIngestionEntry = registry.register({
+    asset: createUnifiedIngestionDataAsset({
+      outputTarget: UnifiedIngestionOutputTargetKinds.records,
+      previewSampleLimit: 25,
+      strategy: UnifiedIngestionStrategyKinds.auto,
+      enableContentSniffing: true,
+      flattenJson: false,
+      textEncoding: "utf-8",
+      normalizeHeadersToLowercase: false,
+    }),
+    specialization: DataAssetRegistrySpecializations.ingestion,
+    category: "data-ingestion",
+    display: {
+      title: "Unified Ingestion",
+      summary: "Default ingestion entry point with automatic detection and optional advanced overrides.",
+      tags: ["ingestion", "unified", "default"],
+    },
+    inspectability: {
+      supportedSourceKinds: ["in-memory", "local-file", "url"],
+      supportedFileExtensions: [".csv", ".json", ".pdf", ".txt", ".md", ".png", ".jpg", ".jpeg", ".webp"],
+      supportedMediaTypes: [
+        "text/csv",
+        "application/json",
+        "application/pdf",
+        "text/plain",
+        "text/markdown",
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+      ],
+      keyConfigKeys: [
+        "outputTarget",
+        "strategy",
+        "explicitSourceKind",
+        "enableContentSniffing",
+        "delimiterHint",
+        "flattenJson",
+        "flattenJsonDepth",
+        "documentMaxPages",
+        "imageExtractExif",
+        "imageNormalizeOrientation",
+      ],
+      previewModes: ["unified-route-preview"],
+      executionModes: ["unified-execute-v1", "unified-preview-v1"],
+    },
+    discoverability: {
+      scope: DataAssetDiscoverabilityScopes.default,
+      defaultEntryPoint: true,
+      inspectable: true,
+    },
+    configSchema: unifiedIngestionSchema,
+    assetFactory: (config) => createUnifiedIngestionDataAsset(config),
   });
 
   const jsonIngestorEntry = registry.register({
@@ -365,6 +432,11 @@ export function registerDataStudioSampleAssets(
       keyConfigKeys: ["flatten", "maxDepth"],
       previewModes: ["sample-records"],
       executionModes: ["execute", "preview"],
+    },
+    discoverability: {
+      scope: DataAssetDiscoverabilityScopes.advanced,
+      defaultEntryPoint: false,
+      inspectable: true,
     },
     configSchema: jsonIngestorSchema,
     assetFactory: (config) => createJsonIngestorDataAsset(config),
@@ -392,6 +464,11 @@ export function registerDataStudioSampleAssets(
       previewModes: ["page-excerpts", "metadata-summary"],
       executionModes: ["execute", "preview"],
     },
+    discoverability: {
+      scope: DataAssetDiscoverabilityScopes.advanced,
+      defaultEntryPoint: false,
+      inspectable: true,
+    },
     configSchema: documentPdfIngestorSchema,
     assetFactory: (config) => createDocumentPdfIngestorDataAsset(config),
   });
@@ -417,6 +494,11 @@ export function registerDataStudioSampleAssets(
       keyConfigKeys: ["extractExif", "generatePreviewMetadata", "normalizeOrientation", "includeFileStats"],
       previewModes: ["image-metadata-summary"],
       executionModes: ["execute", "preview"],
+    },
+    discoverability: {
+      scope: DataAssetDiscoverabilityScopes.advanced,
+      defaultEntryPoint: false,
+      inspectable: true,
     },
     configSchema: imageIngestorSchema,
     assetFactory: (config) => createImageIngestorDataAsset(config),
@@ -453,6 +535,11 @@ export function registerDataStudioSampleAssets(
       previewModes: ["batch-summary", "per-item-sample", "partial-failure-warnings"],
       executionModes: ["execute-batch", "preview-batch"],
     },
+    discoverability: {
+      scope: DataAssetDiscoverabilityScopes.internal,
+      defaultEntryPoint: false,
+      inspectable: true,
+    },
     configSchema: batchIngestionSchema,
     assetFactory: (config) => createBatchIngestionDataAsset(config),
   });
@@ -464,6 +551,7 @@ export function registerDataStudioSampleAssets(
       documentEntry,
       imageEntry,
       csvIngestorEntry,
+      unifiedIngestionEntry,
       jsonIngestorEntry,
       documentPdfIngestorEntry,
       imageIngestorEntry,

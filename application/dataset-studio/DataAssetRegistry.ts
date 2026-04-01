@@ -55,6 +55,21 @@ export interface DataAssetRegistryInspectabilityMetadata {
   readonly executionModes: ReadonlyArray<string>;
 }
 
+export const DataAssetDiscoverabilityScopes = Object.freeze({
+  default: "default",
+  advanced: "advanced",
+  internal: "internal",
+} as const);
+
+export type DataAssetDiscoverabilityScope =
+  typeof DataAssetDiscoverabilityScopes[keyof typeof DataAssetDiscoverabilityScopes];
+
+export interface DataAssetRegistryDiscoverabilityMetadata {
+  readonly scope: DataAssetDiscoverabilityScope;
+  readonly defaultEntryPoint: boolean;
+  readonly inspectable: boolean;
+}
+
 export interface DataAssetRegistryDescriptor {
   readonly assetId: string;
   readonly versionId?: string;
@@ -70,6 +85,7 @@ export interface DataAssetRegistryDescriptor {
   readonly capabilities: DataAssetRegistryCapabilities;
   readonly configSchema: DataAssetConfigSchema;
   readonly inspectability: DataAssetRegistryInspectabilityMetadata;
+  readonly discoverability: DataAssetRegistryDiscoverabilityMetadata;
 }
 
 export interface DataAssetRegistryEntry {
@@ -83,6 +99,7 @@ export interface RegisterDataAssetRequest {
   readonly specialization?: DataAssetRegistrySpecialization;
   readonly display?: DataAssetRegistryDisplayMetadata;
   readonly inspectability?: Partial<DataAssetRegistryInspectabilityMetadata>;
+  readonly discoverability?: Partial<DataAssetRegistryDiscoverabilityMetadata>;
   readonly configSchema?: DataAssetConfigSchema;
   readonly configFields?: ReadonlyArray<DataAssetConfigFieldSchema>;
   readonly taxonomy?: CompositionTaxonomyDescriptor;
@@ -154,6 +171,7 @@ function toDescriptor(input: {
   readonly specialization: DataAssetRegistrySpecialization;
   readonly display?: DataAssetRegistryDisplayMetadata;
   readonly inspectability?: Partial<DataAssetRegistryInspectabilityMetadata>;
+  readonly discoverability?: Partial<DataAssetRegistryDiscoverabilityMetadata>;
   readonly configSchema: DataAssetConfigSchema;
   readonly taxonomy: CompositionTaxonomyDescriptor;
 }): DataAssetRegistryDescriptor {
@@ -168,6 +186,11 @@ function toDescriptor(input: {
     previewModes: normalizeMetadataList(input.inspectability?.previewModes ?? ["preview"]),
     executionModes: normalizeMetadataList(input.inspectability?.executionModes ?? ["execute"]),
   } satisfies DataAssetRegistryInspectabilityMetadata);
+  const discoverability = Object.freeze({
+    scope: input.discoverability?.scope ?? DataAssetDiscoverabilityScopes.default,
+    defaultEntryPoint: input.discoverability?.defaultEntryPoint ?? false,
+    inspectable: input.discoverability?.inspectable ?? true,
+  } satisfies DataAssetRegistryDiscoverabilityMetadata);
   return Object.freeze({
     assetId: inspection.metadata.identity.assetId,
     versionId: inspection.metadata.identity.versionId,
@@ -186,6 +209,7 @@ function toDescriptor(input: {
     contracts: buildContractReferences(input.asset),
     capabilities: inspection.metadata.capabilities,
     configSchema: input.configSchema,
+    discoverability,
     inspectability: Object.freeze({
       ...inspectability,
       previewModes: inspectability.previewModes.length > 0 ? inspectability.previewModes : Object.freeze(["preview"]),
@@ -233,6 +257,7 @@ export class DataAssetRegistry {
       specialization: input.specialization ?? DataAssetRegistrySpecializations.dataset,
       display: input.display,
       inspectability: input.inspectability,
+      discoverability: input.discoverability,
       configSchema,
       taxonomy: input.taxonomy ?? createDatasetStudioTaxonomy(),
     });

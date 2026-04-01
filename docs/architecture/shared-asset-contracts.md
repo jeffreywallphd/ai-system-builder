@@ -158,3 +158,59 @@ Not implemented in this slice:
   - bounded nested-system summaries,
   - bounded diagnostics summary + entries.
 - Serializer behavior is intentionally thin over existing runtime result truth and does not re-derive execution business logic.
+
+## Direction 5 extension update: Core transformation assets foundation (stories 16.1-16.6)
+
+- Dataset Studio now has a dedicated transformation-asset seam in `application/dataset-studio/core/data/transformation/*` with explicit contracts:
+  - `ITransformationAsset`
+  - `ITransformationInput`
+  - `ITransformationOutput`
+  - `ITransformationConfig`
+- Transformation assets are zod-validated end-to-end (input/config/output) and run through a shared base class (`BaseTransformationAsset`) with:
+  - config/input/output validation,
+  - async execution handling,
+  - preview sampling support over canonical records/table shapes,
+  - bounded execution error wrapping.
+- A dedicated transformation registry seam (`TransformationAssetRegistry` + `registerTransformationAssets`) now provides deterministic registration/lookup/listing for pipeline composition.
+- Initial transformation implementation now includes `SchemaInferenceAsset`:
+  - sample-based inference over canonical records/table inputs,
+  - strict/permissive mixed-type resolution,
+  - inferred field type + nullability + lightweight stats,
+  - categorical vs free-text heuristic for string fields,
+  - preview outputs that include inferred schema plus sampled rows.
+- Transformation coverage now also includes:
+  - `DataProfilingAsset` with bounded per-field profiling over canonical records/table inputs (row/null/distinct counts, inferred type reference, min/max, optional numeric summary stats, and short field samples),
+  - `FieldMappingAsset` with deterministic one-to-one field mapping/rename behavior (preserve/drop unmapped controls and optional empty-target dropping),
+  - `TypeNormalizationAsset` with deterministic type normalization and coercion controls (field-targeted string/number/boolean/date conversion, string trimming, optional empty-string-to-null handling, inspectable conversion outcomes/failure posture),
+  - `MissingValueHandlingAsset` with deterministic missing-value strategy controls (leave, fill-default, fill-per-field, drop-row with any/all modes, and explicit empty/whitespace missing semantics),
+  - `DeduplicationAsset` with deterministic duplicate grouping/retention across exact-all, exact-fields, and fuzzy-fields modes (field-scoped matching controls, keep-first/last/best behavior, duplicate-group metadata, and preview row/group summaries),
+  - `DataValidationAsset` with deterministic row/field validation over required/type/enum/length/range/pattern rules plus configurable invalid-row handling (annotate-and-keep, drop-invalid, split-valid-invalid) and inspectable row-level issues,
+  - `DataClassificationAsset` with rule-based field/record tagging for semantic type guesses, practical PII likelihood tags (`pii.email/phone/name/address/identifier`), sensitivity tags (`sensitivity.low/medium/high`), and inspectable reason/confidence signals,
+  - `FilteringAsset` with deterministic record-level condition filtering across equality/set/range/string/null-empty operators with AND/OR grouping, include/exclude modes, and inspectable per-condition match counts,
+  - `AggregationAsset` with deterministic grouped aggregation over canonical records/table rows (`count`, `sum`, `avg`, `min`, `max`, `distinctCount`, `first`, `last`) using explicit group-by + operation config, null-handling posture, skipped-operation diagnostics, and preview-ready grouped row summaries,
+  - framework-aligned preview outputs for transformation assets (summary + representative sampled rows/groups/issues) suitable for Wizard/Canvas inspection surfaces.
+- Core transformation orchestration now has a dedicated pipeline contract/execution seam in `TransformationPipeline` with:
+  - zod-validated serializable pipeline definitions (pipeline id, ordered step descriptors, asset reference, config, optional metadata, deterministic failure mode),
+  - execution over registered assets by id/version or direct instances without coupling to concrete asset classes,
+  - per-step config validation before execution, per-step status/summary/error diagnostics, fail-fast `stop-on-error` behavior, and pipeline-level output/result metadata,
+  - chain preview support with per-step summaries plus bounded sampled final preview output for Wizard summaries and future Canvas node inspection.
+- Transformation stage mapping now resolves stage-to-asset references for these capabilities:
+  - `profiling -> data-profiling`,
+  - `classification -> data-classification`,
+  - `normalization -> type-normalization`,
+  - `cleaning -> missing-value-handling + deduplication + filtering`,
+  - `transformation -> field-mapping + data-validation + filtering`,
+  - `aggregation -> aggregation`.
+
+## Direction 5 extension update: Transformation preview + config UX contracts (stories 16.13-16.14)
+
+- Transformation preview now has one standardized contract seam for single assets and pipelines:
+  - single-asset previews return normalized contracts with row-count/change summaries, sampled input/output rows, structured diff snippets, warning/error arrays, and bounded asset-specific diagnostic extensions,
+  - pipeline previews now aggregate per-step normalized previews and expose concise top-level summaries plus deeper per-step inspection payloads for future Wizard/Canvas progressive disclosure.
+- Preview shaping is centralized through shared internal helpers (`TransformationPreviewService`, `TransformationPreviewContracts`, `TransformationDiffUtils`) so preview logic is consistent and not scattered across individual assets.
+- Transformation config UX contracts are now standardized and zod-aligned:
+  - reusable descriptor contracts for fields/sections/options/defaults/constraints/simple-vs-advanced visibility,
+  - descriptor generation is derived from executable zod config schemas with bounded UX overlays per asset, preserving runtime schema authority and preventing drift.
+- Pipeline/orchestration authoring compatibility now includes:
+  - pipeline step-level config UX descriptors tied to registered transformation assets,
+  - stage-to-asset compatibility helpers for dataset stage mapping so Wizard/Canvas authoring can consume one inspectable config-contract surface.

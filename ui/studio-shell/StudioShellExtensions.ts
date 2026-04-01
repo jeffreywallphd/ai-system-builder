@@ -35,6 +35,7 @@ export type StudioShellExtensionSlot = typeof StudioShellExtensionSlots[keyof ty
 
 export interface StudioShellExtensionOperations {
   refresh(): Promise<void>;
+  setDraftContent?(content: string): void;
   startSystemExecution?(request: StartSystemRuntimeExecutionRequest): Promise<SystemRuntimeApiResponse<StartSystemRuntimeExecutionResponse>>;
   getSystemExecutionStatus?(executionId: string): Promise<SystemRuntimeApiResponse<RuntimeExecutionStatusReadModel>>;
   getSystemExecutionTrace?(request: { readonly executionId: string; readonly eventLimit?: number; readonly logLimit?: number }): Promise<SystemRuntimeApiResponse<RuntimeExecutionTraceReadModel>>;
@@ -130,6 +131,7 @@ export const StudioShellToolbarActionKinds = Object.freeze({
   saveDraft: "save-draft",
   runValidation: "run-validation",
   runWorkflowDraft: "run-workflow-draft",
+  runDataPipeline: "run-data-pipeline",
   setWorkflowMode: "set-workflow-mode",
 });
 
@@ -152,7 +154,7 @@ export interface SetWorkflowModeStudioShellToolbarAction extends BaseStudioShell
 export type StudioShellToolbarAction =
   | SetWorkflowModeStudioShellToolbarAction
   | (BaseStudioShellToolbarAction & {
-    readonly kind: "refresh-snapshot" | "save-draft" | "run-validation" | "run-workflow-draft";
+    readonly kind: "refresh-snapshot" | "save-draft" | "run-validation" | "run-workflow-draft" | "run-data-pipeline";
   });
 
 export interface StudioShellToolbarConfiguration {

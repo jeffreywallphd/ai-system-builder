@@ -12,9 +12,17 @@ import type {
   RunWorkflowStudioDraftReadModel,
   StartWorkflowRunRerunRequest,
   RunWorkflowStudioDraftRequest,
+  RunDataStudioPipelineRequest,
   StudioShellApiResponse,
   StudioShellSnapshotReadModel,
   StudioShellValidationIssue,
+  ListDataStudioPipelinesRequest,
+  LoadDataStudioPipelineRequest,
+  DataStudioPersistedPipelineReadModel,
+  DataStudioPipelineVersionReadModel,
+  RunDataStudioPipelineReadModel,
+  AssessDataStudioExecutionReadinessRequest,
+  DataStudioExecutionReadinessReadModel,
   WorkflowRunDetailReadModel,
   WorkflowRunRerunLaunchReadModel,
   WorkflowRunSummaryReadModel,
@@ -117,6 +125,34 @@ export class StudioShellService {
   public async runWorkflowDraft(request: RunWorkflowStudioDraftRequest): Promise<StudioShellApiResponse<RunWorkflowStudioDraftReadModel>> {
     const raw = await this.requireBridge().runWorkflowDraft(JSON.stringify(request));
     return JSON.parse(raw) as StudioShellApiResponse<RunWorkflowStudioDraftReadModel>;
+  }
+
+  public async assessDataStudioExecutionReadiness(
+    request: AssessDataStudioExecutionReadinessRequest,
+  ): Promise<StudioShellApiResponse<DataStudioExecutionReadinessReadModel>> {
+    const raw = await this.requireBridge().assessDataStudioExecutionReadiness(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<DataStudioExecutionReadinessReadModel>;
+  }
+
+  public async runDataStudioPipeline(
+    request: RunDataStudioPipelineRequest,
+  ): Promise<StudioShellApiResponse<RunDataStudioPipelineReadModel>> {
+    const raw = await this.requireBridge().runDataStudioPipeline(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<RunDataStudioPipelineReadModel>;
+  }
+
+  public async listDataStudioPipelines(
+    request: ListDataStudioPipelinesRequest,
+  ): Promise<StudioShellApiResponse<ReadonlyArray<DataStudioPipelineVersionReadModel>>> {
+    const raw = await this.requireBridge().listDataStudioPipelines(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<ReadonlyArray<DataStudioPipelineVersionReadModel>>;
+  }
+
+  public async loadDataStudioPipeline(
+    request: LoadDataStudioPipelineRequest,
+  ): Promise<StudioShellApiResponse<DataStudioPersistedPipelineReadModel>> {
+    const raw = await this.requireBridge().loadDataStudioPipeline(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<DataStudioPersistedPipelineReadModel>;
   }
 
   public async listWorkflowRuns(
