@@ -1,6 +1,15 @@
 import type { CanonicalDataShape } from "../../domain/dataset-studio/CanonicalDataShapes";
 import { DatasetSchemaIntentIds } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
-import type { IMediaDatasetValidator } from "../../domain/dataset-studio/interfaces/MediaValidation";
+import type {
+  IMediaDatasetValidator,
+  IMediaRecordValidator,
+} from "../../domain/dataset-studio/interfaces/MediaValidation";
+import {
+  createSystemDatasetBindingFromInstance,
+  mapSystemBindingRoleToDatasetInstanceRole,
+  type SystemDatasetBinding,
+  type SystemDatasetBindingRole,
+} from "../../domain/system-runtime/SystemDatasetBindingDomain";
 import {
   createDatasetInstance,
   DatasetInstanceLifecycleStatuses,
@@ -11,6 +20,8 @@ import {
 } from "../../domain/system-runtime/DatasetInstanceDomain";
 import type { DatasetInstanceAssetCatalog } from "./DatasetInstanceAssetCatalog";
 import type { DatasetInstanceRepository } from "./DatasetInstanceRepository";
+import { createDefaultMediaValidationAdapters } from "../dataset-studio/adapters/validation/MediaValidationFactory";
+import { DatasetInstanceSchemaEnforcementService } from "./DatasetInstanceSchemaEnforcementService";
 
 export interface SystemDatasetOwnershipValidator {
   assertSystemExists(systemId: string): Promise<void> | void;
@@ -70,13 +81,39 @@ export interface EnsureIntermediateStoreInstanceRequest {
   readonly lifecycleMetadata?: DatasetInstance["lifecycleMetadata"];
 }
 
+export interface BindSystemDatasetInstanceByRoleRequest {
+  readonly systemId: string;
+  readonly instanceId: string;
+  readonly role: SystemDatasetBindingRole;
+  readonly purpose?: string;
+}
+
+export interface GetSystemDatasetBindingByRoleRequest {
+  readonly systemId: string;
+  readonly role: SystemDatasetBindingRole;
+  readonly purpose?: string;
+}
+
+export interface SystemDatasetInstanceServiceOptions {
+  readonly mediaRecordValidator?: IMediaRecordValidator;
+}
+
 export class SystemDatasetInstanceService {
+  private readonly schemaEnforcementService: DatasetInstanceSchemaEnforcementService;
+
   public constructor(
     private readonly repository: DatasetInstanceRepository,
     private readonly assetCatalog: DatasetInstanceAssetCatalog,
     private readonly mediaDatasetValidator: IMediaDatasetValidator,
     private readonly systemValidator?: SystemDatasetOwnershipValidator,
-  ) {}
+    options: SystemDatasetInstanceServiceOptions = {},
+  ) {
+    this.schemaEnforcementService = new DatasetInstanceSchemaEnforcementService(
+      this.assetCatalog,
+      this.mediaDatasetValidator,
+      options.mediaRecordValidator ?? createDefaultMediaValidationAdapters().mediaRecordValidator,
+    );
+  }
 
   public async createDatasetInstance(request: CreateSystemDatasetInstanceRequest): Promise<DatasetInstance> {
     await this.assertSystemExists(request.systemId);
@@ -107,6 +144,66 @@ export class SystemDatasetInstanceService {
 
   public listSystemDatasetInstances(systemId: string): ReadonlyArray<DatasetInstance> {
     return this.repository.listBySystemId(systemId);
+  }
+
+  public listSystemDatasetBindings(systemId: string): ReadonlyArray<SystemDatasetBinding> {
+    return Object.freeze(this.repository.listBySystemId(systemId).map(createSystemDatasetBindingFromInstance));
+  }
+
+  public getSystemDatasetBindingByRole(request: GetSystemDatasetBindingByRoleRequest): SystemDatasetBinding | undefined {
+    const instance = this.getBoundDatasetInstanceByRole(request);
+    return instance ? createSystemDatasetBindingFromInstance(instance) : undefined;
+  }
+
+  public getBoundDatasetInstanceByRole(request: GetSystemDatasetBindingByRoleRequest): DatasetInstance | undefined {
+    const role = mapSystemBindingRoleToDatasetInstanceRole(request.role);
+    return this.repository.findBySystemAndRole({
+      systemId: request.systemId,
+      role,
+      purpose: request.purpose,
+    });
+  }
+
+  public async bindDatasetInstanceByRole(request: BindSystemDatasetInstanceByRoleRequest): Promise<SystemDatasetBinding> {
+    await this.assertSystemExists(request.systemId);
+
+    const instance = this.repository.getById(request.instanceId);
+    if (!instance) {
+      throw new Error(`not-found:Dataset instance '${request.instanceId}' was not found.`);
+    }
+
+    if (instance.systemId !== request.systemId.trim()) {
+      throw new Error(
+        `invalid-request:Dataset instance '${instance.instanceId}' is owned by system '${instance.systemId}', not '${request.systemId.trim()}'.`,
+      );
+    }
+
+    const expectedRole = mapSystemBindingRoleToDatasetInstanceRole(request.role);
+    if (instance.role !== expectedRole) {
+      throw new Error(
+        `invalid-request:Dataset instance '${instance.instanceId}' has role '${instance.role}', expected '${expectedRole}' for binding role '${request.role}'.`,
+      );
+    }
+
+    const requestedPurpose = normalizeOptional(request.purpose);
+    if (requestedPurpose && requestedPurpose !== normalizeOptional(instance.purpose)) {
+      throw new Error(
+        `invalid-request:Dataset instance '${instance.instanceId}' purpose '${instance.purpose ?? ""}' does not match requested binding purpose '${requestedPurpose}'.`,
+      );
+    }
+
+    const existing = this.repository.findBySystemAndRole({
+      systemId: request.systemId,
+      role: expectedRole,
+      purpose: requestedPurpose ?? instance.purpose,
+    });
+    if (existing && existing.instanceId !== instance.instanceId) {
+      throw new Error(
+        `conflict:System '${request.systemId}' already has a '${expectedRole}' dataset instance for purpose '${requestedPurpose ?? instance.purpose ?? ""}'.`,
+      );
+    }
+
+    return createSystemDatasetBindingFromInstance(instance);
   }
 
   public async ensureRoleDatasetInstance(request: EnsureRoleDatasetInstanceRequest): Promise<DatasetInstance> {
@@ -204,39 +301,55 @@ export class SystemDatasetInstanceService {
     readonly instanceId: string;
     readonly shape: CanonicalDataShape;
   }): ReturnType<IMediaDatasetValidator["validateShape"]> {
-    const instance = this.repository.getById(input.instanceId);
-    if (!instance) {
-      throw new Error(`not-found:Dataset instance '${input.instanceId}' was not found.`);
-    }
-
-    const asset = this.assetCatalog.resolveAsset({
-      assetId: instance.datasetAssetId,
-      versionId: instance.datasetAssetVersionId,
+    const instance = this.requireDatasetInstance(input.instanceId);
+    return this.schemaEnforcementService.validateShapeForInstance({
+      instance,
+      shape: input.shape,
     });
-    if (!asset) {
-      throw new Error(
-        `invalid-request:Dataset instance '${instance.instanceId}' references missing dataset asset '${instance.datasetAssetId}@${instance.datasetAssetVersionId ?? "latest"}'.`,
-      );
-    }
-    if (asset.outputShapeKind !== input.shape.kind) {
-      throw new Error(
-        `invalid-request:Incoming shape '${input.shape.kind}' is incompatible with dataset asset output shape '${asset.outputShapeKind}'.`,
-      );
-    }
-    if (asset.schemaIntentId !== DatasetSchemaIntentIds.media) {
-      return {
-        valid: true,
-        value: Object.freeze([]),
-        issues: Object.freeze([]),
-        diagnostics: Object.freeze({
-          errorCount: 0,
-          warningCount: 0,
-          issueCodes: Object.freeze([]),
-        }),
-      };
-    }
+  }
 
-    return this.mediaDatasetValidator.validateShape(input.shape);
+  public validateRecordForInstance(input: {
+    readonly instanceId: string;
+    readonly record: unknown;
+  }) {
+    const instance = this.requireDatasetInstance(input.instanceId);
+    return this.schemaEnforcementService.validateRecordForInstance({
+      instance,
+      record: input.record,
+    });
+  }
+
+  public validateRecordsForInstance(input: {
+    readonly instanceId: string;
+    readonly records: ReadonlyArray<unknown>;
+  }) {
+    const instance = this.requireDatasetInstance(input.instanceId);
+    return this.schemaEnforcementService.validateRecordsForInstance({
+      instance,
+      records: input.records,
+    });
+  }
+
+  public admitRecordForInstance(input: {
+    readonly instanceId: string;
+    readonly record: unknown;
+  }): unknown {
+    const instance = this.requireDatasetInstance(input.instanceId);
+    return this.schemaEnforcementService.admitRecordForInstance({
+      instance,
+      record: input.record,
+    });
+  }
+
+  public admitRecordsForInstance(input: {
+    readonly instanceId: string;
+    readonly records: ReadonlyArray<unknown>;
+  }): ReadonlyArray<unknown> {
+    const instance = this.requireDatasetInstance(input.instanceId);
+    return this.schemaEnforcementService.admitRecordsForInstance({
+      instance,
+      records: input.records,
+    });
   }
 
   private async assertSystemExists(systemId: string): Promise<void> {
@@ -262,6 +375,14 @@ export class SystemDatasetInstanceService {
       );
     }
     return asset;
+  }
+
+  private requireDatasetInstance(instanceId: string): DatasetInstance {
+    const instance = this.repository.getById(instanceId);
+    if (!instance) {
+      throw new Error(`not-found:Dataset instance '${instanceId}' was not found.`);
+    }
+    return instance;
   }
 }
 
