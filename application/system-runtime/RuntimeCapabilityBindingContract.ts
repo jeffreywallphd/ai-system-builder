@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  type ExecutionOptionCapabilityContract,
+  ExecutionOptionCapabilityContractSchema,
+  RuntimeExecutionOptionValuesSchema,
+  type RuntimeExecutionOptionValues,
+} from "./ExecutionOptionCapabilityContract";
 
 const providerIdSchema = z.string().trim().min(1);
 const providerKindSchema = z.enum(["image-runtime", "workflow-runtime", "generic-runtime"]);
@@ -23,15 +29,8 @@ export const WorkflowExecutionProfileSchema = z.object({
 
 export type WorkflowExecutionProfile = z.infer<typeof WorkflowExecutionProfileSchema>;
 
-export const RuntimeExecutionOptionsSchema = z.object({
-  deterministicSeed: z.number().int().nonnegative().optional(),
-  batchSize: z.number().int().positive().max(16).optional(),
-  timeoutMs: z.number().int().positive().max(60_000 * 60).optional(),
-  qualityProfile: z.enum(["draft", "balanced", "quality"]).optional(),
-  tags: z.array(z.string().trim().min(1)).default([]),
-});
-
-export type RuntimeExecutionOptions = z.infer<typeof RuntimeExecutionOptionsSchema>;
+export type RuntimeExecutionOptions = RuntimeExecutionOptionValues;
+export const RuntimeExecutionOptionsSchema = RuntimeExecutionOptionValuesSchema;
 
 export const RuntimeCapabilityAvailabilitySchema = z.object({
   status: lifecycleStatusSchema,
@@ -50,12 +49,15 @@ export const RuntimeCapabilityBindingContractSchema = z.object({
   workflowExecutionProfile: WorkflowExecutionProfileSchema,
   modelBindingId: z.string().trim().min(1),
   executionOptions: RuntimeExecutionOptionsSchema.default({}),
+  executionOptionCapability: ExecutionOptionCapabilityContractSchema.default({}),
   availability: RuntimeCapabilityAvailabilitySchema,
   contractVersion: z.string().trim().min(1).default("1.0.0"),
   metadata: z.record(z.string(), z.unknown()).default({}),
 });
 
-export type RuntimeCapabilityBindingContract = z.infer<typeof RuntimeCapabilityBindingContractSchema>;
+export interface RuntimeCapabilityBindingContract extends z.infer<typeof RuntimeCapabilityBindingContractSchema> {
+  readonly executionOptionCapability: ExecutionOptionCapabilityContract;
+}
 
 export function validateRuntimeCapabilityBindingContract(input: unknown): RuntimeCapabilityBindingContract {
   return RuntimeCapabilityBindingContractSchema.parse(input);
@@ -70,7 +72,8 @@ export function createRuntimeCapabilityBindingContract(input: RuntimeCapabilityB
       ...parsed.workflowExecutionProfile,
       requiredCapabilityTags: Object.freeze([...parsed.workflowExecutionProfile.requiredCapabilityTags]),
     }),
-    executionOptions: Object.freeze({ ...parsed.executionOptions, tags: Object.freeze([...parsed.executionOptions.tags]) }),
+    executionOptions: Object.freeze({ ...parsed.executionOptions }),
+    executionOptionCapability: Object.freeze(parsed.executionOptionCapability),
     availability: Object.freeze({ ...parsed.availability, missingCapabilities: Object.freeze([...parsed.availability.missingCapabilities]) }),
     metadata: Object.freeze({ ...parsed.metadata }),
   });
