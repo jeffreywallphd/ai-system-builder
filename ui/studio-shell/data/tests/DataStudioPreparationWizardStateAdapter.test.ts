@@ -37,6 +37,26 @@ describe("DataStudioPreparationWizardStateAdapter", () => {
     expect(snapshot.stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection)?.options.sourceKind).toBe("json");
   });
 
+  it("applies simple vs advanced presentation visibility to stage availability", () => {
+    const adapter = new DataStudioPreparationWizardStateAdapter();
+    const targetStageId = PipelineStageIds.Enrichment;
+
+    const setVisibility = adapter.setStageVisibility(targetStageId, "advanced");
+    expect(setVisibility.ok).toBeTrue();
+    adapter.setSimpleMode();
+
+    const simpleSnapshot = adapter.getSnapshot();
+    const simpleStage = simpleSnapshot.stages.find((stage) => stage.stageId === targetStageId);
+    expect(simpleStage?.visibility).toBe("advanced");
+    expect(simpleStage?.availability.isAvailable).toBeFalse();
+    expect(simpleStage?.availability.reason).toBe("visibility");
+
+    adapter.setAdvancedMode();
+    const advancedSnapshot = adapter.getSnapshot();
+    const advancedStage = advancedSnapshot.stages.find((stage) => stage.stageId === targetStageId);
+    expect(advancedStage?.availability.isAvailable).toBeTrue();
+  });
+
   it("supports wizard-to-canvas handoff metadata", () => {
     const adapter = new DataStudioPreparationWizardStateAdapter();
     const handoff = adapter.toCanvasHandoff();
@@ -48,6 +68,18 @@ describe("DataStudioPreparationWizardStateAdapter", () => {
     expect(handoff.stages.length).toBeGreaterThan(0);
     expect(projection.graph.source).toBe("canvas");
     expect(projection.graph.nodes.length).toBe(handoff.authoringGraph.nodes.length);
+  });
+
+  it("resolves stage-level canvas and internals snapshots from live wizard state", () => {
+    const adapter = new DataStudioPreparationWizardStateAdapter();
+    const nodeId = adapter.findCanvasNodeIdForStage(PipelineStageIds.SourceSelection);
+    const internals = adapter.getStageInternals(PipelineStageIds.SourceSelection);
+
+    expect(typeof nodeId).toBe("string");
+    expect(internals?.stageId).toBe(PipelineStageIds.SourceSelection);
+    expect(internals?.nodeIds.length).toBeGreaterThan(0);
+    expect(Array.isArray(internals?.incomingEdgeIds)).toBeTrue();
+    expect(Array.isArray(internals?.outgoingEdgeIds)).toBeTrue();
   });
 
   it("exports and re-imports persistent pipeline state", () => {
