@@ -48,6 +48,7 @@ import {
   type ISystemRuntimeExecutionStore,
   type PersistedExecutionRecord,
 } from "./SystemRuntimeExecutionStore";
+import { parsePersistedRuntimeCapabilityBindingEnvelope } from "./RuntimeCapabilityBindingPersistence";
 
 export interface StartSystemRuntimeExecutionRequest {
   readonly studioId?: string;
@@ -190,6 +191,15 @@ export interface RuntimeExecutionResultReadModel {
     readonly startedAt: string;
     readonly completedAt?: string;
   }>;
+  readonly runtimeCapability?: {
+    readonly bindingId: string;
+    readonly providerId: string;
+    readonly profileId: string;
+    readonly selectedModelBindingId: string;
+    readonly resolvedAt?: string;
+    readonly resolverVersion?: string;
+    readonly stale: boolean;
+  };
 }
 
 export interface RuntimeExecutionTraceReadModel {
@@ -218,6 +228,8 @@ interface SystemSpecContent {
   readonly executionMetadata?: SystemAsset["executionMetadata"];
 }
 
+type RuntimeCapabilityExecutionTrace = NonNullable<ExecutionMetadataSnapshot["runtimeCapability"]>;
+
 function trimOrUndefined(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
@@ -231,6 +243,27 @@ function parseSystemContent(content: string): SystemSpecContent {
 
   const parsed = JSON.parse(raw) as { readonly systemSpec?: SystemSpecContent };
   return Object.freeze(parsed.systemSpec ?? {});
+}
+
+function resolveRuntimeCapabilityTrace(root: SystemAsset): RuntimeCapabilityExecutionTrace | undefined {
+  const envelope = root.executionMetadata?.runtimeCapabilityBindings;
+  if (!envelope) {
+    return undefined;
+  }
+  const parsed = parsePersistedRuntimeCapabilityBindingEnvelope(envelope);
+  const selected = parsed?.bindings[0];
+  if (!selected) {
+    return undefined;
+  }
+  return Object.freeze({
+    bindingId: selected.bindingContract.bindingId,
+    providerId: selected.bindingContract.executionProvider.providerId,
+    profileId: selected.bindingContract.workflowExecutionProfile.profileId,
+    selectedModelBindingId: selected.selectedModelBindingId,
+    resolvedAt: selected.resolved?.resolvedAt,
+    resolverVersion: selected.resolved?.resolverVersion,
+    stale: !selected.resolved,
+  });
 }
 
 function readVersionDraftEnvelope(version: AssetVersion): {
@@ -411,6 +444,7 @@ export class SystemRuntimeApplicationService {
       throw new Error(`invalid-request:${result.errors[0] ?? "Unable to create runtime execution."}`);
     }
 
+    const runtimeCapabilityTrace = resolveRuntimeCapabilityTrace(root);
     const normalizedExecution: SystemExecution = result.execution.output
       ? Object.freeze({
         ...result.execution,
@@ -421,6 +455,7 @@ export class SystemRuntimeApplicationService {
               ? result.execution.output.payload as Record<string, unknown>
               : {}),
             contractOutputs: runtimeContract.outputs.map((entry) => entry.id),
+            runtimeCapability: runtimeCapabilityTrace,
           }),
         }),
       })
@@ -434,10 +469,20 @@ export class SystemRuntimeApplicationService {
           metadata: Object.freeze({
             ...(normalizedExecution.context.metadata ?? {}),
             tenantId: request.tenantContext.tenantId,
+            runtimeCapability: runtimeCapabilityTrace,
           }),
         }),
       })
-      : normalizedExecution;
+      : Object.freeze({
+        ...normalizedExecution,
+        context: Object.freeze({
+          ...normalizedExecution.context,
+          metadata: Object.freeze({
+            ...(normalizedExecution.context.metadata ?? {}),
+            runtimeCapability: runtimeCapabilityTrace,
+          }),
+        }),
+      });
 
     this.executionStore.saveExecutionRecord(this.createExecutionRecord(executionWithTenant));
     return Object.freeze({
@@ -508,6 +553,7 @@ export class SystemRuntimeApplicationService {
         nodeVersionIds: this.buildNodeVersionMap(execution),
       }),
       nestedExecutionLineage: this.buildNestedExecutionLineage(execution.executionId),
+      runtimeCapability: this.readRuntimeCapabilityTrace(execution),
     });
   }
 
@@ -603,6 +649,7 @@ export class SystemRuntimeApplicationService {
         nodeVersionIds: this.buildNodeVersionMap(execution),
       }),
       nestedExecutionLineage: this.buildNestedExecutionLineage(execution.executionId),
+      runtimeCapability: this.readRuntimeCapabilityTrace(execution),
     });
   }
 
@@ -922,6 +969,7 @@ export class SystemRuntimeApplicationService {
         ? execution.context.metadata.parentNodeId
         : undefined,
       childExecutionIds: Object.freeze([...new Set(childExecutionIds)].sort((left, right) => left.localeCompare(right))),
+      runtimeCapability: this.readRuntimeCapabilityTrace(execution),
     });
 
     return Object.freeze({
@@ -936,6 +984,32 @@ export class SystemRuntimeApplicationService {
       .filter((node) => Boolean(node.target.versionId))
       .map((node) => [node.executionNodeId, node.target.versionId!])
       .sort(([left], [right]) => left.localeCompare(right))));
+  }
+
+  private readRuntimeCapabilityTrace(execution: SystemExecution): RuntimeCapabilityExecutionTrace | undefined {
+    const trace = execution.context.metadata?.runtimeCapability;
+    if (!trace || typeof trace !== "object") {
+      return undefined;
+    }
+    const value = trace as Record<string, unknown>;
+    const bindingId = typeof value.bindingId === "string" ? value.bindingId : undefined;
+    const providerId = typeof value.providerId === "string" ? value.providerId : undefined;
+    const profileId = typeof value.profileId === "string" ? value.profileId : undefined;
+    const selectedModelBindingId = typeof value.selectedModelBindingId === "string"
+      ? value.selectedModelBindingId
+      : undefined;
+    if (!bindingId || !providerId || !profileId || !selectedModelBindingId) {
+      return undefined;
+    }
+    return Object.freeze({
+      bindingId,
+      providerId,
+      profileId,
+      selectedModelBindingId,
+      resolvedAt: typeof value.resolvedAt === "string" ? value.resolvedAt : undefined,
+      resolverVersion: typeof value.resolverVersion === "string" ? value.resolverVersion : undefined,
+      stale: value.stale !== false,
+    });
   }
 
   private buildNestedExecutionLineage(executionId: string): RuntimeExecutionResultReadModel["nestedExecutionLineage"] {

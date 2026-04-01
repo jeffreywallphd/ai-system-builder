@@ -247,3 +247,14 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
   - `application/system-runtime/tests/RuntimeCapabilityBindingPersistence.test.ts`
   - `application/system-studio/tests/SystemStudioApplicationService.test.ts` (runtime-capability persistence/reload, provider payload leakage prevention, unsupported-version rejection)
   - `ui/pages/tests/SystemStudioPageContracts.test.ts` (bounded runtime-capability editor contract surface)
+
+## Story 2.4.9 + 2.4.10 update
+- Runtime-capability execution trace propagation is now explicit in `application/system-runtime/SystemRuntimeApplicationService.ts`:
+  - persisted runtime-capability binding envelopes are parsed from system execution metadata,
+  - bounded resolved trace facts (binding id/provider/profile/selected model binding/resolution freshness) are attached to execution context metadata,
+  - the same bounded trace is surfaced on output payload metadata and persisted execution metadata snapshots for run/result inspection.
+- Execution metadata storage contracts now include bounded runtime-capability trace state in
+  `application/system-runtime/SystemRuntimeExecutionStore.ts`.
+- Added focused hardening coverage:
+  - `application/system-runtime/tests/RuntimeCapabilityBindingFlow.integration.test.ts` (precedence, provider translation, persistence reload, missing model, provider mismatch, unsupported provider mapping contracts),
+  - `application/system-runtime/tests/SystemRuntimeApplicationService.test.ts` (execution handoff + run/output metadata propagation of resolved runtime-capability trace).
