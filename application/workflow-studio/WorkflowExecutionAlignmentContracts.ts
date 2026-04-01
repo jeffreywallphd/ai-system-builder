@@ -84,6 +84,9 @@ export interface WorkflowExecutionResolvedInputValue {
     | "runtime-parameter"
     | "runtime-default"
     | "trigger-activation"
+    | "ui-form-value"
+    | "selected-image-context"
+    | "dataset-instance-reference"
     | "dataset-asset"
     | "static-value";
   readonly value: unknown;
@@ -114,6 +117,7 @@ export interface WorkflowExecutionInputBinding {
     readonly selection?: Readonly<Record<string, unknown>>;
     readonly compatibility?: WorkflowDatasetCompatibilityContract;
   }>;
+  readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 export interface WorkflowExecutionTriggerDescriptor {
@@ -378,6 +382,7 @@ export function mapWorkflowInputToExecutionBinding(input: WorkflowDraftInput): W
       valueType: input.valueType,
       bindingKey: `inputs.${input.parameterKey}`,
       defaultValue: input.defaultValue,
+      metadata: input.metadata,
     });
   }
 
@@ -388,6 +393,6 @@ export function mapWorkflowInputToExecutionBinding(input: WorkflowDraftInput): W
     valueType: input.valueType,
     bindingKey: `inputs.${input.id}.static`,
     staticValue: input.value,
+    metadata: input.metadata,
   });
 }
-

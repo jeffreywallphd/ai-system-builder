@@ -35,6 +35,23 @@ function readByPath(record: Readonly<Record<string, unknown>>, path?: string): u
   return current;
 }
 
+type SourceResolutionStatus =
+  | "resolved"
+  | "source-value-missing"
+  | "missing-field-reference"
+  | "selected-image-missing"
+  | "invalid-selection-reference"
+  | "dataset-instance-missing";
+
+interface SourceResolutionResult {
+  readonly status: SourceResolutionStatus;
+  readonly value?: unknown;
+}
+
+function hasRecordValues(record: Readonly<Record<string, unknown>>): boolean {
+  return Object.keys(record).length > 0;
+}
+
 function matchDatasetInstance(
   source: Extract<WorkflowInputBindingSourceDescriptor, { kind: typeof WorkflowInputBindingSourceKinds.datasetInstanceReference }>,
   instances: ReadonlyArray<NonNullable<WorkflowInputBindingResolutionContext["datasetInstances"]>[number]>,
@@ -68,25 +85,67 @@ function matchDatasetInstance(
 function resolveSourceValue(
   source: WorkflowInputBindingSourceDescriptor,
   context: Required<WorkflowInputBindingResolutionContext>,
-): unknown {
+): SourceResolutionResult {
   switch (source.kind) {
     case WorkflowInputBindingSourceKinds.uiFormValue:
-      return hasOwn(context.uiFormValues, source.formKey) ? context.uiFormValues[source.formKey] : undefined;
+      if (!hasOwn(context.uiFormValues, source.formKey)) {
+        return Object.freeze({ status: "missing-field-reference" });
+      }
+      return Object.freeze({ status: "resolved", value: context.uiFormValues[source.formKey] });
     case WorkflowInputBindingSourceKinds.runtimeParameter:
-      return hasOwn(context.runtimeParameters, source.parameterKey)
-        ? context.runtimeParameters[source.parameterKey]
-        : undefined;
+      if (!hasOwn(context.runtimeParameters, source.parameterKey)) {
+        return Object.freeze({ status: "source-value-missing" });
+      }
+      return Object.freeze({ status: "resolved", value: context.runtimeParameters[source.parameterKey] });
     case WorkflowInputBindingSourceKinds.triggerPayload:
-      return hasOwn(context.triggerPayload, source.payloadKey) ? context.triggerPayload[source.payloadKey] : undefined;
-    case WorkflowInputBindingSourceKinds.selectedImage:
-      return readByPath(context.selectedImage, source.path);
-    case WorkflowInputBindingSourceKinds.datasetInstanceReference:
-      return matchDatasetInstance(source, context.datasetInstances);
+      if (!hasOwn(context.triggerPayload, source.payloadKey)) {
+        return Object.freeze({ status: "source-value-missing" });
+      }
+      return Object.freeze({ status: "resolved", value: context.triggerPayload[source.payloadKey] });
+    case WorkflowInputBindingSourceKinds.selectedImage: {
+      if (!hasRecordValues(context.selectedImage)) {
+        return Object.freeze({ status: "selected-image-missing" });
+      }
+      const value = readByPath(context.selectedImage, source.path);
+      if (value === undefined) {
+        return Object.freeze({ status: "invalid-selection-reference" });
+      }
+      return Object.freeze({ status: "resolved", value });
+    }
+    case WorkflowInputBindingSourceKinds.datasetInstanceReference: {
+      const value = matchDatasetInstance(source, context.datasetInstances);
+      if (value === undefined) {
+        return Object.freeze({ status: "dataset-instance-missing" });
+      }
+      return Object.freeze({ status: "resolved", value });
+    }
     case WorkflowInputBindingSourceKinds.constantValue:
-      return source.value;
+      return Object.freeze({ status: "resolved", value: source.value });
     default:
-      return undefined;
+      return Object.freeze({ status: "source-value-missing" });
   }
+}
+
+function valueTypeMatches(valueType: WorkflowInputBindingDescriptor["valueType"], value: unknown): boolean {
+  if (!valueType || valueType === "unknown") {
+    return true;
+  }
+  if (valueType === "string") {
+    return typeof value === "string";
+  }
+  if (valueType === "number") {
+    return typeof value === "number" && Number.isFinite(value);
+  }
+  if (valueType === "boolean") {
+    return typeof value === "boolean";
+  }
+  if (valueType === "array") {
+    return Array.isArray(value);
+  }
+  if (valueType === "object") {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+  return true;
 }
 
 function createDiagnostic(input: {
@@ -130,13 +189,17 @@ export function resolveWorkflowInputBindings(
     let resolvedRecord: WorkflowInputBindingResolutionRecord | undefined;
 
     for (const source of candidateSources) {
-      const value = resolveSourceValue(source, context);
-      if (value === undefined) {
-        const diagnosticCode = source.kind === WorkflowInputBindingSourceKinds.selectedImage
+      const resolution = resolveSourceValue(source, context);
+      if (resolution.status !== "resolved") {
+        const diagnosticCode = resolution.status === "selected-image-missing"
           ? WorkflowInputBindingResolutionDiagnosticCodes.selectedImageMissing
-          : source.kind === WorkflowInputBindingSourceKinds.datasetInstanceReference
+          : resolution.status === "dataset-instance-missing"
             ? WorkflowInputBindingResolutionDiagnosticCodes.datasetInstanceMissing
-            : WorkflowInputBindingResolutionDiagnosticCodes.sourceValueMissing;
+            : resolution.status === "missing-field-reference"
+              ? WorkflowInputBindingResolutionDiagnosticCodes.missingFieldReference
+              : resolution.status === "invalid-selection-reference"
+                ? WorkflowInputBindingResolutionDiagnosticCodes.invalidSelectionReference
+                : WorkflowInputBindingResolutionDiagnosticCodes.sourceValueMissing;
         if (source.required) {
           diagnostics.push(createDiagnostic({
             code: diagnosticCode,
@@ -147,6 +210,18 @@ export function resolveWorkflowInputBindings(
             message: `Binding source '${source.sourceId}' did not resolve a value.`,
           }));
         }
+        continue;
+      }
+      const value = resolution.value;
+      if (!valueTypeMatches(binding.valueType, value)) {
+        diagnostics.push(createDiagnostic({
+          code: WorkflowInputBindingResolutionDiagnosticCodes.typeMismatch,
+          severity: source.required || binding.required ? "error" : "warning",
+          bindingId: binding.bindingId,
+          inputId: binding.inputId,
+          source,
+          message: `Binding source '${source.sourceId}' resolved value incompatible with expected type '${binding.valueType ?? "unknown"}'.`,
+        }));
         continue;
       }
 

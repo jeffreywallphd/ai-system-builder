@@ -91,8 +91,12 @@ export const WorkflowInputBindingResolutionDiagnosticCodes = Object.freeze({
   unresolvedRequiredInput: "unresolved-required-input",
   unresolvedOptionalInput: "unresolved-optional-input",
   sourceValueMissing: "source-value-missing",
+  missingFieldReference: "missing-field-reference",
+  invalidSelectionReference: "invalid-selection-reference",
   selectedImageMissing: "selected-image-missing",
   datasetInstanceMissing: "dataset-instance-missing",
+  typeMismatch: "type-mismatch",
+  invalidBindingConfiguration: "invalid-binding-configuration",
 });
 
 export type WorkflowInputBindingResolutionDiagnosticCode =
