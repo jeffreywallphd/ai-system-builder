@@ -27,6 +27,16 @@ describe("WorkflowTemplateDomain", () => {
       { parameterId: "steps", value: 30 },
       { parameterId: "guidanceScale", value: 7 },
     ],
+    parameters: [
+      { parameterId: "steps", name: "Steps", type: "integer", required: true, defaultValue: 30, validation: { min: 1, max: 100 } },
+      { parameterId: "guidanceScale", name: "Guidance", type: "number", required: false, defaultValue: 7 },
+    ],
+    composition: {
+      workflowInterfaces: [{ workflowAssetId: "asset:workflow:cinematic", inputIds: ["prompt"], outputIds: ["images"], parameterIds: ["steps", "guidanceScale"] }],
+      inputBindings: [{ bindingId: "input-prompt", templateInputId: "prompt", workflowAssetId: "asset:workflow:cinematic", workflowInputId: "prompt" }],
+      outputBindings: [{ bindingId: "output-images", templateOutputId: "images", workflowAssetId: "asset:workflow:cinematic", workflowOutputId: "images" }],
+      parameterMappings: [{ parameterId: "steps", workflowAssetId: "asset:workflow:cinematic", workflowParameterId: "steps" }],
+    },
     workflowAssets: [
       { role: "workflow-definition", assetId: "asset:workflow:cinematic", versionId: "asset:workflow:cinematic:v3" },
       { role: "model", assetId: "asset:model:sdxl", versionId: "asset:model:sdxl:v1" },
@@ -47,6 +57,8 @@ describe("WorkflowTemplateDomain", () => {
     expect(reloaded.templateId).toBe(definition.templateId);
     expect(reloaded.versionId).toBe(definition.versionId);
     expect(reloaded.outputExpectations[0]?.outputId).toBe("images");
+    expect(reloaded.parameters?.[0]?.parameterId).toBe("steps");
+    expect(reloaded.composition?.workflowInterfaces[0]?.workflowAssetId).toBe("asset:workflow:cinematic");
   });
 
   it("requires at least one workflow-definition reference", () => {
@@ -54,6 +66,17 @@ describe("WorkflowTemplateDomain", () => {
       ...definition,
       workflowAssets: [{ role: "model", assetId: "asset:model:only" }],
     })).toThrow("must reference at least one workflow-definition");
+  });
+
+
+  it("requires unique template parameter ids", () => {
+    expect(() => createWorkflowTemplateDefinition({
+      ...definition,
+      parameters: [
+        { parameterId: "steps", name: "Steps", type: "integer", required: true },
+        { parameterId: "steps", name: "Steps Again", type: "integer", required: false },
+      ],
+    })).toThrow("unique parameter ids");
   });
 
   it("creates composite workflow-template taxonomy + metadata", () => {

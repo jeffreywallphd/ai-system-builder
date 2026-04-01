@@ -70,6 +70,13 @@ describe("WorkflowTemplateAssetService", () => {
     inputRequirements: [{ inputId: "prompt", valueType: "text", required: true }],
     outputExpectations: [{ outputId: "images", valueType: "images" }],
     parameterDefaults: [{ parameterId: "steps", value: 20 }],
+    parameters: [{ parameterId: "steps", name: "Steps", type: "integer", required: true, defaultValue: 20 }],
+    composition: {
+      workflowInterfaces: [{ workflowAssetId: "asset:workflow:starter", inputIds: ["prompt"], outputIds: ["images"], parameterIds: ["steps"] }],
+      inputBindings: [{ bindingId: "in-1", templateInputId: "prompt", workflowAssetId: "asset:workflow:starter", workflowInputId: "prompt" }],
+      outputBindings: [{ bindingId: "out-1", templateOutputId: "images", workflowAssetId: "asset:workflow:starter", workflowOutputId: "images" }],
+      parameterMappings: [{ parameterId: "steps", workflowAssetId: "asset:workflow:starter", workflowParameterId: "steps" }],
+    },
     workflowAssets: [{ role: "workflow-definition", assetId: "asset:workflow:starter", versionId: "asset:workflow:starter:v1" }],
     tags: ["starter"],
     metadata: { owner: "platform" },
@@ -93,5 +100,8 @@ describe("WorkflowTemplateAssetService", () => {
 
     const unresolved = await service.resolveTemplate(baseTemplate.templateId, "template:image:starter:v2");
     expect(unresolved).toBeUndefined();
+
+    const defaults = service.applyParameterDefaults({ template: loaded! });
+    expect(defaults.steps).toBe(20);
   });
 });

@@ -8,6 +8,13 @@ import {
   type TaxonomyBehaviorKind,
 } from "../taxonomy/CompositionTaxonomy";
 
+import {
+  createWorkflowTemplateComposition,
+  createWorkflowTemplateParameterDefinition,
+  type WorkflowTemplateComposition,
+  type WorkflowTemplateParameterDefinition,
+} from "./WorkflowTemplateCompositionDomain";
+
 export const WorkflowTemplateStudioIdentity = Object.freeze({
   studioType: "workflow-template-studio",
   defaultStudioId: "studio-workflow-templates",
@@ -52,6 +59,8 @@ export interface WorkflowTemplateDefinition {
   readonly inputRequirements: ReadonlyArray<WorkflowTemplateInputRequirement>;
   readonly outputExpectations: ReadonlyArray<WorkflowTemplateOutputExpectation>;
   readonly parameterDefaults: ReadonlyArray<WorkflowTemplateParameterDefault>;
+  readonly composition?: WorkflowTemplateComposition;
+  readonly parameters?: ReadonlyArray<WorkflowTemplateParameterDefinition>;
   readonly workflowAssets: ReadonlyArray<WorkflowTemplateAssetReference>;
   readonly tags: ReadonlyArray<string>;
   readonly metadata: Readonly<Record<string, string>>;
@@ -94,6 +103,12 @@ export function createWorkflowTemplateDefinition(input: WorkflowTemplateDefiniti
     description: normalizeOptional(entry.description),
   })));
 
+  const parameters = Object.freeze((input.parameters ?? []).map((entry) => createWorkflowTemplateParameterDefinition(entry)));
+  const parameterIds = parameters.map((entry) => entry.parameterId);
+  if (new Set(parameterIds).size !== parameterIds.length) {
+    throw new Error("Workflow template parameters must use unique parameter ids.");
+  }
+
   const workflowAssets = Object.freeze(input.workflowAssets.map((entry) => Object.freeze({
     role: entry.role,
     assetId: normalizeRequired(entry.assetId, "Workflow template asset reference id"),
@@ -114,6 +129,8 @@ export function createWorkflowTemplateDefinition(input: WorkflowTemplateDefiniti
     inputRequirements,
     outputExpectations,
     parameterDefaults,
+    composition: input.composition ? createWorkflowTemplateComposition(input.composition) : undefined,
+    parameters,
     workflowAssets,
     tags: normalizeTags(input.tags),
     metadata: Object.freeze(Object.fromEntries(
