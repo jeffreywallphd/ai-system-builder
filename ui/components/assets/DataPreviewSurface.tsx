@@ -29,6 +29,19 @@ function renderSummary(preview: DataPreviewModel): JSX.Element {
   );
 }
 
+function formatSummaryRecord(value: Readonly<Record<string, unknown>>): string {
+  const entries = Object.entries(value);
+  if (entries.length === 0) {
+    return "-";
+  }
+  return entries.map(([key, entry]) => {
+    if (entry && typeof entry === "object") {
+      return `${key}: ${JSON.stringify(entry)}`;
+    }
+    return `${key}: ${String(entry)}`;
+  }).join(", ");
+}
+
 function renderData(preview: DataPreviewModel): JSX.Element {
   if (preview.kind === "records") {
     return (
@@ -104,21 +117,40 @@ function renderData(preview: DataPreviewModel): JSX.Element {
         <table className="ui-table">
           <thead>
             <tr>
-              <th>Item</th>
-              <th>Label</th>
-              <th>Confidence</th>
-              <th>Bounding box</th>
+              <th>Thumbnail</th>
+              <th>Image</th>
+              <th>Dimensions</th>
+              <th>Format</th>
+              <th>Metadata</th>
+              <th>Tags</th>
+              <th>Derived</th>
             </tr>
           </thead>
           <tbody>
             {preview.items.map((item) => (
               <tr key={item.itemId}>
-                <td>{item.itemId}</td>
-                <td>{item.label ?? "-"}</td>
-                <td>{item.confidence?.toFixed(3) ?? "-"}</td>
-                <td>{item.boundingBox
-                  ? `${item.boundingBox.x},${item.boundingBox.y},${item.boundingBox.width},${item.boundingBox.height}`
-                  : "-"}</td>
+                <td>
+                  {item.thumbnailSource ? (
+                    <img
+                      className="ui-image-preview-thumb"
+                      src={item.thumbnailSource}
+                      alt={`Preview ${item.imageReference ?? item.itemId}`}
+                    />
+                  ) : (
+                    <span className="ui-image-preview-thumb-placeholder">No preview</span>
+                  )}
+                </td>
+                <td>
+                  <div>{item.imageReference ?? item.imageId ?? item.itemId}</div>
+                  {item.issues.length > 0 ? (
+                    <div className="ui-text-small ui-subtle">{item.issues.join(" ")}</div>
+                  ) : null}
+                </td>
+                <td>{item.width !== undefined && item.height !== undefined ? `${item.width}x${item.height}` : "-"}</td>
+                <td>{item.format ?? "-"}</td>
+                <td>{formatSummaryRecord(item.metadataSummary)}</td>
+                <td>{item.tags.length > 0 ? item.tags.join(", ") : "-"}</td>
+                <td>{formatSummaryRecord(item.derived)}</td>
               </tr>
             ))}
           </tbody>

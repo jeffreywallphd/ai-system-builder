@@ -24,7 +24,21 @@ describe("DataPreviewSurface", () => {
       items: [{ itemId: "item-1", text: "hello world" }],
     }));
     const imagePreview = engine.buildFromCanonicalShape(createCanonicalImageMetadataRecordsShape({
-      items: [{ itemId: "img-1", label: "invoice" }],
+      items: [{
+        itemId: "img-1",
+        attributes: {
+          assetRef: {
+            assetId: "asset:image:invoice",
+          },
+          width: 512,
+          height: 320,
+          format: "png",
+          tags: ["invoice"],
+          derived: {
+            orientation: "landscape",
+          },
+        },
+      }],
     }));
 
     const recordsHtml = renderToStaticMarkup(React.createElement(DataPreviewSurface, { preview: recordsPreview }));
@@ -35,7 +49,26 @@ describe("DataPreviewSurface", () => {
     expect(recordsHtml).toContain("record-1");
     expect(tableHtml).toContain("Name");
     expect(textHtml).toContain("item-1");
+    expect(imageHtml).toContain("asset:image:invoice");
+    expect(imageHtml).toContain("512x320");
     expect(imageHtml).toContain("invoice");
+  });
+
+  it("renders graceful image preview fallbacks for missing preview source", () => {
+    const engine = new DataPreviewEngine();
+    const imagePreview = engine.buildFromCanonicalShape(createCanonicalImageMetadataRecordsShape({
+      items: [{
+        itemId: "img-missing",
+        attributes: {
+          width: 256,
+          format: "jpeg",
+        },
+      }],
+    }));
+    const html = renderToStaticMarkup(React.createElement(DataPreviewSurface, { preview: imagePreview }));
+
+    expect(html).toContain("No preview");
+    expect(html).toContain("Missing width or height");
   });
 
   it("renders error previews with diagnostics", () => {

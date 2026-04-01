@@ -244,10 +244,21 @@ function createImageMetadataAsset(config: Readonly<Record<string, CanonicalRecor
         {
           itemId: "seed-image-1",
           imageId: toStringConfig(config, "imageId", "sample-image-1"),
-          label: "object",
-          confidence: minConfidence,
-          boundingBox: { x: 10, y: 20, width: 200, height: 140 },
-          attributes: { source: "harness" },
+          attributes: {
+            assetRef: {
+              assetId: `asset:image:${toStringConfig(config, "imageId", "sample-image-1")}`,
+            },
+            width: 200,
+            height: 140,
+            format: "png",
+            tags: ["sample", "image"],
+            derived: {
+              orientation: "landscape",
+              aspectRatio: 1.428571,
+            },
+            confidenceHint: minConfidence,
+            source: "harness",
+          },
         },
       ]),
       metadata: {

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { createCanonicalRecordsShape } from "../../../domain/dataset-studio/CanonicalDataShapes";
+import {
+  createCanonicalImageMetadataRecordsShape,
+  createCanonicalRecordsShape,
+} from "../../../domain/dataset-studio/CanonicalDataShapes";
 import { CanonicalDataAsset } from "../../../domain/dataset-studio/CanonicalDataAsset";
 import { DataConverterCore } from "../DataConverterCore";
 import { DataSourceReferenceKinds } from "../DataConverterContracts";
@@ -17,6 +20,40 @@ function createRecordsAsset(): CanonicalDataAsset {
     location: { accessMethod: "virtual", location: "dataset://exec" },
     outputShape: createCanonicalRecordsShape({
       records: [{ recordId: "seed-1", fields: { id: "1", name: "Seed" } }],
+    }),
+  });
+}
+
+function createImageAsset(): CanonicalDataAsset {
+  return new CanonicalDataAsset({
+    id: "dataset-image-asset",
+    name: "Dataset Image Asset",
+    version: "1.0.0",
+    source: { type: "generated", workflowId: "wf-image" },
+    location: { accessMethod: "virtual", location: "dataset://image" },
+    outputShape: createCanonicalImageMetadataRecordsShape({
+      items: [{
+        itemId: "img-1",
+        attributes: {
+          assetRef: {
+            assetId: "asset:image:img-1",
+          },
+          width: 100,
+          height: 50,
+          format: "png",
+          tags: ["hero"],
+        },
+      }, {
+        itemId: "img-2",
+        attributes: {
+          assetRef: {
+            assetId: "asset:image:img-2",
+          },
+          width: 200,
+          height: 120,
+          format: "jpeg",
+        },
+      }],
     }),
   });
 }
@@ -167,5 +204,29 @@ describe("DefaultDataAssetExecutionFramework", () => {
     expect(result.diagnostics[0]?.code).toBe("preview_unsupported");
     expect(result.failure?.kind).toBe("validation");
     expect(result.ingestionLog.status).toBe("failed");
+  });
+
+  it("supports media dataset preview generation through the standard execution flow", async () => {
+    const framework = new DefaultDataAssetExecutionFramework({
+      now: () => new Date("2026-03-31T13:50:00.000Z"),
+      executionIdFactory: () => "exec-image-preview",
+    });
+
+    const result = await framework.execute({
+      asset: createImageAsset(),
+      previewOptions: {
+        maxItems: 1,
+      },
+    });
+
+    expect(result.ok).toBeTrue();
+    expect(result.preview.kind).toBe("image-metadata-records");
+    if (result.preview.kind !== "image-metadata-records") {
+      throw new Error("Expected image-metadata-records preview.");
+    }
+    expect(result.preview.summary.totalCount).toBe(2);
+    expect(result.preview.summary.sampleCount).toBe(1);
+    expect(result.preview.items[0]?.imageReference).toBe("asset:image:img-1");
+    expect(result.validationIssues.length).toBe(0);
   });
 });

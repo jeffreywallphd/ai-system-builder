@@ -68,3 +68,19 @@
 .ui-asset-viewer__placeholder {
   color: var(--color-text-secondary);
 }
+
+.ui-image-preview-thumb {
+  width: 4rem;
+  height: 4rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-soft);
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.ui-image-preview-thumb-placeholder {
+  display: inline-block;
+  min-width: 4rem;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
