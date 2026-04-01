@@ -60,6 +60,17 @@ import type {
   RunWorkflowDraftManualResult,
   WorkflowExecutionFailureDetail,
 } from "../../../application/workflow-studio/WorkflowStudioApplicationService";
+import {
+  DataStudioPipelineExecutionService,
+  type DataStudioPipelineExecutionReadiness,
+  type RunDataStudioPipelineResult,
+} from "../../../application/data-studio/DataStudioPipelineExecutionService";
+import {
+  createDataStudioPipelineState,
+  type DataStudioPipelineState,
+} from "../../../application/data-studio/DataStudioPipelineState";
+import { UnifiedExecutionEngine } from "../../../application/execution/UnifiedExecutionEngine";
+import { DataStudioPipelineExecutionUnitHandler } from "../../execution/DataStudioPipelineExecutionUnitHandler";
 
 export interface StudioShellApiError {
   readonly code:
@@ -182,6 +193,89 @@ export interface WorkflowExecutionReadinessReadModel {
   readonly issues: ReadonlyArray<WorkflowExecutionValidationIssueReadModel>;
   readonly blockingIssueCount: number;
   readonly warningIssueCount: number;
+}
+
+export interface AssessDataStudioExecutionReadinessRequest {
+  readonly studioId: string;
+  readonly pipelineState: DataStudioPipelineState | string;
+}
+
+export interface RunDataStudioPipelineRequest {
+  readonly studioId: string;
+  readonly pipelineState: DataStudioPipelineState | string;
+  readonly initiatedBy?: string;
+  readonly executionReason?: string;
+}
+
+export interface DataStudioExecutionReadinessIssueReadModel {
+  readonly code: string;
+  readonly message: string;
+  readonly severity: "error" | "warning";
+  readonly blocking: boolean;
+  readonly scope: "stage" | "transition" | "pipeline" | "graph";
+  readonly stageId?: string;
+  readonly relatedStageIds?: ReadonlyArray<string>;
+  readonly path?: string;
+}
+
+export interface DataStudioExecutionReadinessReadModel {
+  readonly ready: boolean;
+  readonly executionReady: boolean;
+  readonly blockingIssueCount: number;
+  readonly warningIssueCount: number;
+  readonly issues: ReadonlyArray<DataStudioExecutionReadinessIssueReadModel>;
+  readonly stageResults: ReadonlyArray<{
+    readonly stageId: string;
+    readonly ready: boolean;
+    readonly status: "ready" | "ready-with-warnings" | "blocked" | "skipped" | "disabled";
+    readonly blockingIssueCount: number;
+    readonly warningIssueCount: number;
+  }>;
+}
+
+export interface RunDataStudioPipelineReadModel {
+  readonly launchStatus: "blocked" | "launched" | "failed";
+  readonly readiness: DataStudioExecutionReadinessReadModel;
+  readonly execution: {
+    readonly runId?: string;
+    readonly planId?: string;
+    readonly state: "queued" | "running" | "completed" | "failed";
+    readonly launchAccepted: boolean;
+    readonly transitions: ReadonlyArray<{
+      readonly unitId: string;
+      readonly state: string;
+      readonly message?: string;
+      readonly occurredAt: string;
+    }>;
+  };
+  readonly result?: {
+    readonly pipelineId: string;
+    readonly pipelineAssetId: string;
+    readonly status: "completed" | "failed";
+    readonly stageResults: ReadonlyArray<{
+      readonly stageId: string;
+      readonly order: number;
+      readonly status: "completed" | "skipped" | "failed";
+      readonly message: string;
+      readonly resolvedAssetIds: ReadonlyArray<string>;
+      readonly startedAt: string;
+      readonly completedAt: string;
+    }>;
+    readonly preparedOutput?: {
+      readonly preparedAssetId: string;
+      readonly preparedAssetVersionId: string;
+      readonly storageTargetId: string;
+      readonly storageReference: string;
+      readonly lineageId: string;
+    };
+    readonly lineageId?: string;
+    readonly reusableAssetId?: string;
+    readonly startedAt: string;
+    readonly completedAt: string;
+    readonly warnings: ReadonlyArray<string>;
+    readonly errors: ReadonlyArray<string>;
+  };
+  readonly failureMessage?: string;
 }
 
 export interface WorkflowExecutionOutputDeliveryResultReadModel {
@@ -385,6 +479,7 @@ export class StudioShellBackendApi {
   private readonly listWorkflowRunSummariesUseCase?: ListWorkflowRunSummariesUseCase;
   private readonly getWorkflowRunDetailUseCase?: GetWorkflowRunDetailUseCase;
   private readonly workflowRunSummaryRepository?: IWorkflowRunSummaryRepository;
+  private readonly dataStudioPipelineExecutionService: DataStudioPipelineExecutionService;
   private readonly now: () => Date;
 
   constructor(
@@ -395,6 +490,9 @@ export class StudioShellBackendApi {
   ) {
     this.now = now;
     this.workflowRunSummaryRepository = workflowRunSummaryRepository;
+    this.dataStudioPipelineExecutionService = new DataStudioPipelineExecutionService(
+      new UnifiedExecutionEngine([new DataStudioPipelineExecutionUnitHandler()]),
+    );
     this.service = new DefaultStudioShellApplicationService(repository);
     this.workflowStudioService = new WorkflowStudioApplicationService(
       this.service,
@@ -544,6 +642,17 @@ export class StudioShellBackendApi {
         blockingIssueCount: readiness.blockingIssues.length,
         warningIssueCount: readiness.warningIssues.length,
       });
+    });
+  }
+
+  public async assessDataStudioExecutionReadiness(
+    request: AssessDataStudioExecutionReadinessRequest,
+  ): Promise<StudioShellApiResponse<DataStudioExecutionReadinessReadModel>> {
+    return this.wrap(async () => {
+      await this.requireSnapshot(request.studioId);
+      const pipelineState = this.toDataStudioPipelineState(request.pipelineState);
+      const readiness = this.dataStudioPipelineExecutionService.assessReadiness(pipelineState);
+      return this.toDataStudioExecutionReadinessReadModel(readiness);
     });
   }
 
@@ -764,6 +873,21 @@ export class StudioShellBackendApi {
           : undefined,
         failureMessage: runResult.failureMessage,
       });
+    });
+  }
+
+  public async runDataStudioPipeline(
+    request: RunDataStudioPipelineRequest,
+  ): Promise<StudioShellApiResponse<RunDataStudioPipelineReadModel>> {
+    return this.wrap(async () => {
+      await this.requireSnapshot(request.studioId);
+      const pipelineState = this.toDataStudioPipelineState(request.pipelineState);
+      const runResult = await this.dataStudioPipelineExecutionService.run({
+        pipelineState,
+        initiatedBy: request.initiatedBy,
+        executionReason: request.executionReason,
+      });
+      return this.toRunDataStudioPipelineReadModel(runResult);
     });
   }
 
@@ -1146,6 +1270,99 @@ export class StudioShellBackendApi {
     return Object.freeze({
       scope: "workflow",
     } satisfies WorkflowRunFailureLocationReadModel);
+  }
+
+  private toDataStudioPipelineState(input: DataStudioPipelineState | string): DataStudioPipelineState {
+    try {
+      const parsed = typeof input === "string"
+        ? JSON.parse(input) as DataStudioPipelineState
+        : input;
+      return createDataStudioPipelineState(parsed);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "data-studio-pipeline-state-invalid";
+      throw new StudioShellInvalidRequestError(`Data Studio pipeline state is invalid: ${detail}`);
+    }
+  }
+
+  private toDataStudioExecutionReadinessReadModel(
+    readiness: DataStudioPipelineExecutionReadiness,
+  ): DataStudioExecutionReadinessReadModel {
+    return Object.freeze({
+      ready: readiness.ready,
+      executionReady: readiness.executionReady,
+      blockingIssueCount: readiness.blockingIssueCount,
+      warningIssueCount: readiness.warningIssueCount,
+      issues: Object.freeze(readiness.issues.map((issue) => Object.freeze({
+        code: issue.code,
+        message: issue.message,
+        severity: issue.severity,
+        blocking: issue.blocking,
+        scope: issue.scope,
+        stageId: issue.stageId,
+        relatedStageIds: issue.relatedStageIds,
+        path: issue.path,
+      }))),
+      stageResults: Object.freeze(readiness.stageResults.map((stage) => Object.freeze({
+        stageId: stage.stageId,
+        ready: stage.ready,
+        status: stage.status,
+        blockingIssueCount: stage.blockingIssueCount,
+        warningIssueCount: stage.warningIssueCount,
+      }))),
+    });
+  }
+
+  private toRunDataStudioPipelineReadModel(
+    result: RunDataStudioPipelineResult,
+  ): RunDataStudioPipelineReadModel {
+    return Object.freeze({
+      launchStatus: result.launchStatus,
+      readiness: this.toDataStudioExecutionReadinessReadModel(result.readiness),
+      execution: Object.freeze({
+        runId: result.execution.runId,
+        planId: result.execution.planId,
+        state: result.execution.state,
+        launchAccepted: result.execution.launchAccepted,
+        transitions: Object.freeze(result.execution.transitions.map((transition) => Object.freeze({
+          unitId: transition.unitId,
+          state: transition.state,
+          message: transition.message,
+          occurredAt: transition.occurredAt,
+        }))),
+      }),
+      result: result.result
+        ? Object.freeze({
+          pipelineId: result.result.pipelineId,
+          pipelineAssetId: result.result.pipelineAssetId,
+          status: result.result.status,
+          stageResults: Object.freeze(result.result.stageResults.map((stage) => Object.freeze({
+            stageId: stage.stageId,
+            order: stage.order,
+            status: stage.status,
+            message: stage.message,
+            resolvedAssetIds: stage.resolvedAssetIds,
+            startedAt: stage.startedAt,
+            completedAt: stage.completedAt,
+          }))),
+          preparedOutput: result.result.preparedOutput
+            ? Object.freeze({
+              preparedAssetId: result.result.preparedOutput.preparedAssetId,
+              preparedAssetVersionId: result.result.preparedOutput.preparedAssetVersionId,
+              storageTargetId: result.result.preparedOutput.storageTargetId,
+              storageReference: result.result.preparedOutput.storageReference,
+              lineageId: result.result.preparedOutput.lineageId,
+            })
+            : undefined,
+          lineageId: result.result.lineageId,
+          reusableAssetId: result.result.reusableAssetId,
+          startedAt: result.result.startedAt,
+          completedAt: result.result.completedAt,
+          warnings: result.result.warnings,
+          errors: result.result.errors,
+        })
+        : undefined,
+      failureMessage: result.failureMessage,
+    });
   }
 
   private createRerunRunId(workflowId: string): string {

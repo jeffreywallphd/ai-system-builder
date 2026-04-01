@@ -12,6 +12,11 @@ import {
   DataStudioWizardCanvasProjectionService,
   type DataStudioCanvasProjection,
 } from "../../../application/data-studio/DataStudioWizardCanvasProjectionService";
+import {
+  DataStudioPipelineValidationService,
+  type DataStudioPipelineValidationIssue,
+  type DataStudioPipelineValidationResult,
+} from "../../../application/data-studio/DataStudioPipelineValidation";
 import type { DataStudioPipelineState } from "../../../application/data-studio/DataStudioPipelineState";
 import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
 import type { PipelineStageId } from "../../../domain/dataset-studio/PipelineStageDomain";
@@ -60,6 +65,7 @@ function issueResult(message: string, stageId?: PipelineStageId): DataStudioPrep
 export class DataStudioPreparationWizardStateAdapter {
   private readonly wizard: DataStudioPreparationWizard;
   private readonly canvasProjectionService: DataStudioWizardCanvasProjectionService;
+  private readonly pipelineValidationService: DataStudioPipelineValidationService;
 
   constructor(
     wizardOrOptions?: DataStudioPreparationWizard | {
@@ -70,10 +76,12 @@ export class DataStudioPreparationWizardStateAdapter {
     if (wizardOrOptions instanceof DataStudioPreparationWizard) {
       this.wizard = wizardOrOptions;
       this.canvasProjectionService = new DataStudioWizardCanvasProjectionService();
+      this.pipelineValidationService = new DataStudioPipelineValidationService();
       return;
     }
     this.wizard = wizardOrOptions?.wizard ?? new DataStudioPreparationWizard();
     this.canvasProjectionService = new DataStudioWizardCanvasProjectionService();
+    this.pipelineValidationService = new DataStudioPipelineValidationService();
     if (wizardOrOptions?.persistedState) {
       this.wizard.importPipelineState(wizardOrOptions.persistedState);
     }
@@ -106,7 +114,16 @@ export class DataStudioPreparationWizardStateAdapter {
   }
 
   public goNext(): DataStudioWizardNavigationResult {
-    return this.wizard.goNext();
+    const snapshot = this.wizard.getSnapshot();
+    const orderedStages = [...snapshot.stages].sort((left, right) => left.order - right.order);
+    const currentIndex = orderedStages.findIndex((stage) => stage.stageId === snapshot.currentStageId);
+    const nextStage = currentIndex >= 0
+      ? orderedStages.slice(currentIndex + 1).find((stage) => stage.availability.isAvailable)
+      : undefined;
+    if (!nextStage) {
+      return this.wizard.goNext();
+    }
+    return this.guardTransition(snapshot.currentStageId, nextStage.stageId, () => this.wizard.goNext());
   }
 
   public goBack(): DataStudioWizardNavigationResult {
@@ -114,7 +131,11 @@ export class DataStudioPreparationWizardStateAdapter {
   }
 
   public goToStage(stageId: PipelineStageId): DataStudioWizardNavigationResult {
-    return this.wizard.goToStage(stageId);
+    const snapshot = this.wizard.getSnapshot();
+    if (snapshot.currentStageId === stageId) {
+      return this.wizard.goToStage(stageId);
+    }
+    return this.guardTransition(snapshot.currentStageId, stageId, () => this.wizard.goToStage(stageId));
   }
 
   public setSimpleMode(): DataStudioWizardSnapshot {
@@ -203,6 +224,14 @@ export class DataStudioPreparationWizardStateAdapter {
     return this.wizard.exportPipelineState();
   }
 
+  public assessPipelineValidation(): DataStudioPipelineValidationResult {
+    return this.pipelineValidationService.validate(this.exportPipelineState(), { mode: "authoring" });
+  }
+
+  public assessExecutionReadiness(): DataStudioPipelineValidationResult {
+    return this.pipelineValidationService.validate(this.exportPipelineState(), { mode: "execution" });
+  }
+
   public exportPipelineStateJson(): string {
     return this.wizard.exportPipelineStateJson();
   }
@@ -214,5 +243,55 @@ export class DataStudioPreparationWizardStateAdapter {
     } catch (error) {
       return issueResult((error as Error).message);
     }
+  }
+
+  private guardTransition(
+    fromStageId: PipelineStageId,
+    toStageId: PipelineStageId,
+    transition: () => DataStudioWizardNavigationResult,
+  ): DataStudioWizardNavigationResult {
+    const validation = this.pipelineValidationService.validate(this.exportPipelineState(), {
+      mode: "authoring",
+      transition: {
+        fromStageId,
+        toStageId,
+      },
+    });
+    const blockingIssues = validation.blockingIssues.filter((issue) => (
+      issue.scope === "transition"
+      || issue.scope === "pipeline"
+      || issue.stageId === toStageId
+    ));
+    if (blockingIssues.length > 0) {
+      return Object.freeze({
+        moved: false,
+        fromStageId,
+        toStageId: fromStageId,
+        skippedStageIds: Object.freeze([]),
+        issues: Object.freeze(blockingIssues.map((issue) => this.toWizardIssue(issue))),
+        reason: blockingIssues[0]?.message ?? "Transition blocked by pipeline validation.",
+      });
+    }
+
+    const result = transition();
+    if (result.moved) {
+      return Object.freeze({
+        ...result,
+        issues: Object.freeze([
+          ...result.issues,
+          ...validation.warningIssues.map((issue) => this.toWizardIssue(issue)),
+        ]),
+      });
+    }
+    return result;
+  }
+
+  private toWizardIssue(issue: DataStudioPipelineValidationIssue): DataStudioWizardValidationIssue {
+    return Object.freeze({
+      code: issue.code,
+      message: issue.message,
+      severity: issue.severity,
+      stageId: issue.stageId,
+    });
   }
 }

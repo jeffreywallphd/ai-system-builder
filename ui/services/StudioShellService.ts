@@ -12,9 +12,13 @@ import type {
   RunWorkflowStudioDraftReadModel,
   StartWorkflowRunRerunRequest,
   RunWorkflowStudioDraftRequest,
+  RunDataStudioPipelineRequest,
   StudioShellApiResponse,
   StudioShellSnapshotReadModel,
   StudioShellValidationIssue,
+  RunDataStudioPipelineReadModel,
+  AssessDataStudioExecutionReadinessRequest,
+  DataStudioExecutionReadinessReadModel,
   WorkflowRunDetailReadModel,
   WorkflowRunRerunLaunchReadModel,
   WorkflowRunSummaryReadModel,
@@ -117,6 +121,20 @@ export class StudioShellService {
   public async runWorkflowDraft(request: RunWorkflowStudioDraftRequest): Promise<StudioShellApiResponse<RunWorkflowStudioDraftReadModel>> {
     const raw = await this.requireBridge().runWorkflowDraft(JSON.stringify(request));
     return JSON.parse(raw) as StudioShellApiResponse<RunWorkflowStudioDraftReadModel>;
+  }
+
+  public async assessDataStudioExecutionReadiness(
+    request: AssessDataStudioExecutionReadinessRequest,
+  ): Promise<StudioShellApiResponse<DataStudioExecutionReadinessReadModel>> {
+    const raw = await this.requireBridge().assessDataStudioExecutionReadiness(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<DataStudioExecutionReadinessReadModel>;
+  }
+
+  public async runDataStudioPipeline(
+    request: RunDataStudioPipelineRequest,
+  ): Promise<StudioShellApiResponse<RunDataStudioPipelineReadModel>> {
+    const raw = await this.requireBridge().runDataStudioPipeline(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<RunDataStudioPipelineReadModel>;
   }
 
   public async listWorkflowRuns(

@@ -178,6 +178,12 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     runWorkflowDraft(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:run-workflow-draft", requestJson) as Promise<string>;
     },
+    assessDataStudioExecutionReadiness(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:data-execution-readiness", requestJson) as Promise<string>;
+    },
+    runDataStudioPipeline(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:run-data-pipeline", requestJson) as Promise<string>;
+    },
     listWorkflowRuns(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:workflow-runs:list", requestJson) as Promise<string>;
     },

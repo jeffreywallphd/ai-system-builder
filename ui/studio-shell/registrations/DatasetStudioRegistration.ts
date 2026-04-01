@@ -33,6 +33,13 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
           order: 20,
         },
         {
+          id: "data-studio-toolbar-run",
+          kind: "run-data-pipeline",
+          label: "Run Pipeline",
+          tone: "default",
+          order: 25,
+        },
+        {
           id: "data-studio-toolbar-refresh",
           kind: "refresh-snapshot",
           label: "Refresh Snapshot",

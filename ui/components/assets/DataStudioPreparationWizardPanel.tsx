@@ -27,7 +27,7 @@ export interface DataStudioPreparationWizardPanelProps {
   readonly onSnapshotChange?: (snapshot: DataStudioWizardSnapshot) => void;
 }
 
-const DataStudioWizardPersistenceStorageKey = "ai-loom.data-studio.preparation.state.v1";
+export const DataStudioWizardPersistenceStorageKey = "ai-loom.data-studio.preparation.state.v1";
 
 function toActivation(
   mode: string,
@@ -115,6 +115,7 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
   const stageInternals = inspectedStage
     ? adapter.getStageInternals(inspectedStage)
     : undefined;
+  const executionReadiness = adapter.assessExecutionReadiness();
 
   const refreshSnapshot = () => {
     const next = adapter.getSnapshot();
@@ -470,7 +471,12 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
                 type="button"
                 className="ui-button ui-button--ghost"
                 onClick={() => {
-                  adapter.goBack();
+                  const result = adapter.goBack();
+                  if (!result.moved && result.issues[0]?.message) {
+                    setUpdateError(result.issues[0].message);
+                  } else {
+                    setUpdateError(undefined);
+                  }
                   refreshSnapshot();
                 }}
                 disabled={!snapshot.canGoBack}
@@ -481,7 +487,12 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
                 type="button"
                 className="ui-button ui-button--primary"
                 onClick={() => {
-                  adapter.goNext();
+                  const result = adapter.goNext();
+                  if (!result.moved && result.issues[0]?.message) {
+                    setUpdateError(result.issues[0].message);
+                  } else {
+                    setUpdateError(undefined);
+                  }
                   refreshSnapshot();
                 }}
                 disabled={!snapshot.canGoNext}
@@ -575,6 +586,10 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
 
       <details className="ui-card ui-card--padded ui-stack ui-stack--2xs">
         <summary className="ui-text-small">Wizard to Canvas handoff</summary>
+        <span className="ui-text-small ui-text-secondary">
+          Execution readiness: {executionReadiness.executionReady ? "ready" : "blocked"} (
+          {executionReadiness.summary.blockingIssueCount} blocking, {executionReadiness.summary.warningIssueCount} warning)
+        </span>
         <span className="ui-text-small ui-text-secondary">Current stage: {handoff.currentStageId}</span>
         <span className="ui-text-small ui-text-secondary">Presentation mode: {handoff.presentationMode}</span>
         <span className="ui-text-small ui-text-secondary">
