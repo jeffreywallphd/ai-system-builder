@@ -13,6 +13,7 @@ describe("ImageRecordValidator", () => {
       width: 1024,
       height: 768,
       format: "PNG",
+      mimeType: "IMAGE/PNG",
       metadata: {
         source: "camera",
       },
@@ -31,6 +32,7 @@ describe("ImageRecordValidator", () => {
     expect(result.width).toBe(1024);
     expect(result.height).toBe(768);
     expect(result.format).toBe("png");
+    expect(result.mimeType).toBe("image/png");
     expect(result.tags).toEqual(["hero", "homepage"]);
     expect(result.annotations?.caption).toBe("Landing hero");
     expect(result.annotations?.labels).toEqual(["marketing", "homepage"]);

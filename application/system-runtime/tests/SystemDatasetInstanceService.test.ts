@@ -645,6 +645,11 @@ describe("SystemDatasetInstanceService", () => {
       metadata: {
         ingestionSource: "system-upload",
       },
+      provenance: {
+        sourceType: "upload",
+        sourceReference: "upload:session-1:file-1",
+        ingestedBy: "user:tester",
+      },
       metadataExtraction: {
         payload: new Uint8Array([1, 2, 3, 4]),
         includeExifInMetadata: true,
@@ -662,6 +667,9 @@ describe("SystemDatasetInstanceService", () => {
     expect(ingested.image.metadata.extractedBy).toBe("static-extractor");
     expect(ingested.image.metadata.exif).toEqual({ make: "Camera-A" });
     expect(ingested.metadata.ingestionSource).toBe("system-upload");
+    expect(ingested.provenance.sourceType).toBe("upload");
+    expect(ingested.provenance.sourceReference).toBe("upload:session-1:file-1");
+    expect(ingested.provenance.ingestedBy).toBe("user:tester");
 
     const listed = service.listImageRecordsForInstance({
       systemId: "system:image-pipeline",
@@ -874,6 +882,76 @@ describe("SystemDatasetInstanceService", () => {
     expect(updated.metadata.ingestionStage).toBe("mutation");
     expect(updated.metadata.reviewState).toBe("approved");
     expect(updated.mutationVersion).toBe(2);
+  });
+
+  it("supports batch get and delete/remove operations for runtime instance image records", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+    );
+
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:batch-and-delete",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    await service.ingestImageRecordsIntoInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      records: Object.freeze([
+        {
+          recordId: "record:batch-1",
+          record: {
+            assetRef: { assetId: "asset:image:batch-1" },
+            width: 400,
+            height: 300,
+            format: "png",
+          },
+        },
+        {
+          recordId: "record:batch-2",
+          record: {
+            assetRef: { assetId: "asset:image:batch-2" },
+            width: 500,
+            height: 400,
+            format: "jpeg",
+          },
+        },
+      ]),
+    });
+
+    const selected = service.getImageRecordsFromInstanceByIds({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      recordIds: ["record:batch-1", "missing", "record:batch-2", "record:batch-2"],
+    });
+    expect(selected.map((entry) => entry.recordId)).toEqual(["record:batch-1", "record:batch-2"]);
+
+    const removedOne = await service.deleteImageRecordFromInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      recordId: "record:batch-1",
+    });
+    expect(removedOne).toBeTrue();
+
+    const removedRemaining = await service.deleteAllImageRecordsFromInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+    });
+    expect(removedRemaining.instanceId).toBe(instance.instanceId);
+    expect(removedRemaining.removedCount).toBe(1);
   });
 
   it("rejects invalid image record mutation through centralized instance schema enforcement", async () => {

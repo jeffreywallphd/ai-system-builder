@@ -19,6 +19,7 @@ export interface ImageRecord {
   readonly width: number;
   readonly height: number;
   readonly format: string;
+  readonly mimeType?: string;
   readonly metadata: Readonly<Record<string, CanonicalRecordValue>>;
   readonly tags: ReadonlyArray<string>;
   readonly annotations?: ImageAnnotationsRecord;
@@ -67,6 +68,11 @@ function normalizeFormat(format: string): string {
   return normalized;
 }
 
+function normalizeMimeType(mimeType?: string): string | undefined {
+  const normalized = normalizeOptional(mimeType)?.toLowerCase();
+  return normalized;
+}
+
 function assertPositiveDimension(value: number, label: string): number {
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`${label} must be a positive number.`);
@@ -80,6 +86,7 @@ export function createImageRecord(input: {
   readonly width: number;
   readonly height: number;
   readonly format: string;
+  readonly mimeType?: string;
   readonly metadata?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly tags?: ReadonlyArray<string>;
   readonly annotations?: Readonly<Record<string, CanonicalRecordValue>>;
@@ -92,6 +99,7 @@ export function createImageRecord(input: {
     width: assertPositiveDimension(input.width, "ImageRecord.width"),
     height: assertPositiveDimension(input.height, "ImageRecord.height"),
     format: normalizeFormat(input.format),
+    mimeType: normalizeMimeType(input.mimeType),
     metadata: normalizeCanonicalRecord(input.metadata),
     tags: normalizeTags(input.tags),
     annotations: createImageAnnotations(input.annotations),

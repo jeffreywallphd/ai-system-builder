@@ -29,6 +29,7 @@ import {
   createDatasetInstanceImageRecord,
   deriveStorageReferenceFromImageRecord,
   patchDatasetInstanceImageRecord,
+  type DatasetInstanceImageRecordProvenance,
   type DatasetInstanceImageRecordPatch,
   type DatasetInstanceImageRecord,
   type DatasetInstanceImageRecordQuery,
@@ -128,6 +129,7 @@ export interface IngestDatasetInstanceImageRecordRequest {
   readonly storageReference?: string;
   readonly storageProvider?: string;
   readonly metadata?: Readonly<Record<string, CanonicalRecordValue>>;
+  readonly provenance?: DatasetInstanceImageRecordProvenance;
   readonly metadataExtraction?: IngestDatasetInstanceImageRecordMetadataExtraction;
 }
 
@@ -140,6 +142,7 @@ export interface IngestDatasetInstanceImageRecordsRequest {
     readonly storageReference?: string;
     readonly storageProvider?: string;
     readonly metadata?: Readonly<Record<string, CanonicalRecordValue>>;
+    readonly provenance?: DatasetInstanceImageRecordProvenance;
     readonly metadataExtraction?: IngestDatasetInstanceImageRecordMetadataExtraction;
   }>;
 }
@@ -156,11 +159,23 @@ export interface GetDatasetInstanceImageRecordRequest {
   readonly recordId: string;
 }
 
+export interface GetDatasetInstanceImageRecordsByIdsRequest {
+  readonly systemId: string;
+  readonly instanceId: string;
+  readonly recordIds: ReadonlyArray<string>;
+}
+
 export interface UpdateDatasetInstanceImageRecordRequest {
   readonly systemId: string;
   readonly instanceId: string;
   readonly recordId: string;
   readonly patch: DatasetInstanceImageRecordPatch;
+}
+
+export interface DeleteDatasetInstanceImageRecordRequest {
+  readonly systemId: string;
+  readonly instanceId: string;
+  readonly recordId: string;
 }
 
 export interface ResolveOwnedDatasetInstanceRequest {
@@ -195,6 +210,11 @@ export interface DeleteDatasetInstanceRequest {
 export interface DeleteDatasetInstanceResult {
   readonly instanceId: string;
   readonly removedImageRecordCount: number;
+}
+
+export interface DeleteDatasetInstanceImageRecordsResult {
+  readonly instanceId: string;
+  readonly removedCount: number;
 }
 
 export class SystemDatasetInstanceService {
@@ -604,6 +624,7 @@ export class SystemDatasetInstanceService {
         image,
       }),
       metadata: request.metadata,
+      provenance: request.provenance,
       admittedAt: now,
       updatedAt: now,
       mutationVersion: 1,
@@ -625,6 +646,7 @@ export class SystemDatasetInstanceService {
         storageReference: record.storageReference,
         storageProvider: record.storageProvider,
         metadata: record.metadata,
+        provenance: record.provenance,
         metadataExtraction: record.metadataExtraction,
       }));
     }
@@ -658,6 +680,26 @@ export class SystemDatasetInstanceService {
       instanceId: request.instanceId,
       recordId,
     });
+  }
+
+  public getImageRecordsFromInstanceByIds(
+    request: GetDatasetInstanceImageRecordsByIdsRequest,
+  ): ReadonlyArray<DatasetInstanceImageRecord> {
+    this.requireOwnedDatasetInstanceSync({
+      systemId: request.systemId,
+      instanceId: request.instanceId,
+    });
+    const recordIds = [...new Set(request.recordIds.map((recordId) => normalizeOptional(recordId)).filter(Boolean))];
+    if (recordIds.length === 0) {
+      return Object.freeze([]);
+    }
+    return Object.freeze(recordIds
+      .map((recordId) => this.repository.getImageRecordBySystemAndId({
+        systemId: request.systemId,
+        instanceId: request.instanceId,
+        recordId: recordId!,
+      }))
+      .filter((record): record is DatasetInstanceImageRecord => Boolean(record)));
   }
 
   public async updateImageRecordInInstance(
@@ -704,6 +746,35 @@ export class SystemDatasetInstanceService {
       mutationVersion: patched.mutationVersion,
     });
     return this.repository.saveImageRecord(persisted);
+  }
+
+  public async deleteImageRecordFromInstance(
+    request: DeleteDatasetInstanceImageRecordRequest,
+  ): Promise<boolean> {
+    const instance = await this.requireOwnedDatasetInstance({
+      systemId: request.systemId,
+      instanceId: request.instanceId,
+    });
+    this.assertInstanceMutable(instance, "delete/remove image record");
+    return this.repository.deleteImageRecordById({
+      instanceId: instance.instanceId,
+      recordId: normalizeRequired(request.recordId, "recordId"),
+    });
+  }
+
+  public async deleteAllImageRecordsFromInstance(
+    request: ResolveOwnedDatasetInstanceRequest,
+  ): Promise<DeleteDatasetInstanceImageRecordsResult> {
+    const instance = await this.requireOwnedDatasetInstance({
+      systemId: request.systemId,
+      instanceId: request.instanceId,
+    });
+    this.assertInstanceMutable(instance, "delete/remove image records");
+    const removedCount = this.repository.deleteImageRecordsByInstanceId(instance.instanceId);
+    return Object.freeze({
+      instanceId: instance.instanceId,
+      removedCount,
+    });
   }
 
   private async prepareImageRecordCandidate(input: {

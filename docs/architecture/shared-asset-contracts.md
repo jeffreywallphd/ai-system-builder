@@ -427,3 +427,16 @@ Not implemented in this slice:
 - Media/image schema validation remains adapter-bounded and schema-intent-driven:
   - canonical image record requirements (asset reference, dimensions, format, metadata/tags/derived shape) are validated through the media intent adapter,
   - zod-backed implementations remain behind internal validation contracts (`IMediaRecordValidator`, `IMediaDatasetValidator`) to avoid library sprawl.
+
+## Direction 5 extension update: canonical image dataset records + runtime access layer (stories 1.3.3-1.3.4)
+
+- Canonical image records used inside runtime dataset instances are now explicitly modeled as inspectable/versionable contracts:
+  - image payload keeps canonical media fields (`assetRef`, `width`, `height`, `format`, optional `mimeType`, metadata, tags, derived attributes, optional annotations, schema version),
+  - dataset-instance envelope keeps runtime-operational identity/provenance (`recordId`, `instanceId`, `systemId`, dataset asset linkage, record metadata, runtime provenance fields, admitted/updated timestamps, and mutation version).
+- Runtime dataset instance access is exposed through existing internal service/repository seams (not direct persistence calls in workflows/systems):
+  - create/add (`ingestImageRecordIntoInstance`, batch ingest),
+  - read/get (`getImageRecordFromInstance`, batch get by ids),
+  - list/query (`listImageRecordsForInstance` with bounded query contract),
+  - update (`updateImageRecordInInstance` with patch contracts),
+  - delete/remove (`deleteImageRecordFromInstance`, delete-all for instance).
+- Persistence remains adapter-bounded (`DatasetInstanceRepository` over `DatasetInstanceStorageAdapter` with SQLite adapter implementation), so future non-image dataset intents can reuse the same runtime boundary pattern without leaking backend details.
