@@ -372,6 +372,25 @@ Not implemented in this slice:
   - optional simple filtering (format, tag, dimensions, asset stable id, top-level metadata equality),
   - no parallel search subsystem or UI-specific query coupling introduced.
 
+## AI Loom Image System vertical-slice update: output materialization + generated image records (stories 2.3.1-2.3.2)
+
+- Workflow output persistence now has a canonical system-owned materialization contract in `application/system-runtime/WorkflowOutputMaterializationContract.ts`:
+  - workflow run reference (`runId`, `workflowAssetId`, optional `workflowAssetVersionId`),
+  - source image reference (optional),
+  - produced asset references (one-or-more), per-asset generation role (`primary` / `variant` / `intermediate`), tags, and metadata,
+  - parameter snapshot,
+  - timestamps (`requestedAt`, optional `startedAt`/`completedAt`, `updatedAt`),
+  - lifecycle status (`pending` / `materialized` / `failed` / `partial`) and optional structured error envelope.
+- The materialization contract is system-centric and execution-adapter agnostic: no ComfyUI DTO/result shape leaks into this contract.
+- Dataset-instance image records now model generated outputs as first-class entry schema in `domain/system-runtime/DatasetInstanceRecordDomain.ts` via `generation` metadata:
+  - output asset reference,
+  - optional source image linkage,
+  - workflow asset/version,
+  - run identifier,
+  - generation role,
+  - generation metadata + tags.
+- Record patch contracts now support controlled generation metadata/tag updates (`generationPatch`) while preserving canonical image payload compatibility and preview/read behavior.
+
 ## Direction 5 extension update: instance mutation + lifecycle management (stories 1.2.11-1.2.12)
 
 - Dataset-instance record mutation is now explicit and bounded through `SystemDatasetInstanceService.updateImageRecordInInstance(...)`:
