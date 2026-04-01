@@ -324,3 +324,23 @@ Not implemented in this slice:
 - Intermediate stores are now first-class role-driven dataset instances via `SystemDatasetInstanceService.ensureIntermediateStoreInstance(...)` (`role=intermediate-store`) with optional per-purpose usage and existing idempotent role lookup semantics.
 - Dataset instance lifecycle contracts now include optional lifecycle metadata (`retentionPolicy`, `maxAgeDays`, `cleanupAfter`, `cleanupStatus`) for bounded retention/cleanup intent without introducing a second intermediate-storage subsystem.
 - Runtime domain normalization now rejects unsupported role/status values and invalid lifecycle metadata combinations, and persistence rehydrates these fields through the same canonical dataset-instance model.
+
+## Direction 5 extension update: system-owned binding + instance-level schema enforcement (stories 1.2.7-1.2.8)
+
+- System dataset ownership now has an explicit binding projection contract in `domain/system-runtime/SystemDatasetBindingDomain.ts`:
+  - stable system binding roles (`input`, `output`, `intermediate`) mapped from runtime dataset-instance roles,
+  - explicit binding shape (`systemId`, `instanceId`, dataset asset linkage, role, purpose),
+  - no duplication of ownership truth: bindings are projected from owned `DatasetInstance` entities.
+- `SystemDatasetInstanceService` now exposes role-oriented binding APIs for runtime composition:
+  - `bindDatasetInstanceByRole(...)` for explicit binding assertions on existing system-owned instances,
+  - `getSystemDatasetBindingByRole(...)`, `getBoundDatasetInstanceByRole(...)`, and `listSystemDatasetBindings(...)` for reusable role-based lookup.
+- Binding validation remains ownership-first and conflict-safe:
+  - rejects cross-system binding attempts,
+  - rejects binding-role mismatches against dataset-instance runtime role,
+  - preserves role+purpose uniqueness semantics per system through existing repository contracts.
+- Instance-level schema enforcement is now centralized in `application/system-runtime/DatasetInstanceSchemaEnforcementService.ts` and consumed by `SystemDatasetInstanceService`:
+  - shape validation (`validateShapeForInstance`) and record-admission validation (`validateRecordForInstance`, `validateRecordsForInstance`) share one enforcement path,
+  - admission gates (`admitRecordForInstance`, `admitRecordsForInstance`) reject invalid payloads with deterministic `invalid-request` errors,
+  - enforcement resolves the linked dataset asset/schema intent from the instance boundary instead of relying on caller-local checks.
+- For the image slice, media-intent records are validated through shared media contracts (`IMediaDatasetValidator` + `IMediaRecordValidator`), covering canonical image fields such as `assetRef`, `width`/`height`, `format`, `metadata`, `tags`, and `derived` attributes.
+- The enforcement seam remains generic for additional schema intents: non-media intents continue through the same boundary contract without introducing UI-local or adapter-local validation duplication.

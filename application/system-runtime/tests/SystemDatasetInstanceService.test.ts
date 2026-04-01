@@ -361,4 +361,182 @@ describe("SystemDatasetInstanceService", () => {
       shape: invalidShape,
     })).toThrow("is incompatible with dataset asset output shape");
   });
+
+  it("binds system-owned dataset instances by explicit binding role and resolves role lookups", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+        {
+          assetId: "image-exporter-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+        {
+          assetId: "image-stage-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+    );
+
+    const inputInstance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:binding-input",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+    await service.ensureOutputImageStoreInstance({
+      instanceId: "dataset-instance:binding-output",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-exporter-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+    await service.ensureIntermediateStoreInstance({
+      instanceId: "dataset-instance:binding-intermediate",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-stage-v1",
+      datasetAssetVersionId: "1.0.0",
+      purpose: "stage:enhance",
+    });
+
+    const boundInput = await service.bindDatasetInstanceByRole({
+      systemId: "system:image-pipeline",
+      instanceId: inputInstance.instanceId,
+      role: "input",
+      purpose: "incoming-images",
+    });
+    expect(boundInput.role).toBe("input");
+    expect(boundInput.instanceId).toBe("dataset-instance:binding-input");
+
+    const outputBinding = service.getSystemDatasetBindingByRole({
+      systemId: "system:image-pipeline",
+      role: "output",
+      purpose: "workflow-output-images",
+    });
+    expect(outputBinding?.instanceId).toBe("dataset-instance:binding-output");
+
+    const intermediateLookup = service.getBoundDatasetInstanceByRole({
+      systemId: "system:image-pipeline",
+      role: "intermediate",
+      purpose: "stage:enhance",
+    });
+    expect(intermediateLookup?.instanceId).toBe("dataset-instance:binding-intermediate");
+
+    const allBindings = service.listSystemDatasetBindings("system:image-pipeline");
+    expect(allBindings.map((binding) => binding.role).sort()).toEqual(["input", "intermediate", "output"]);
+  });
+
+  it("rejects invalid binding ownership and role mismatches", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline", "system:other"]),
+    );
+
+    await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:ownership-check",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    await expect(service.bindDatasetInstanceByRole({
+      systemId: "system:other",
+      instanceId: "dataset-instance:ownership-check",
+      role: "input",
+      purpose: "incoming-images",
+    })).rejects.toThrow("is owned by system 'system:image-pipeline'");
+
+    await expect(service.bindDatasetInstanceByRole({
+      systemId: "system:image-pipeline",
+      instanceId: "dataset-instance:ownership-check",
+      role: "output",
+      purpose: "incoming-images",
+    })).rejects.toThrow("expected 'output-store' for binding role 'output'");
+  });
+
+  it("enforces schema at instance record-admission boundary for image-oriented records", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+    );
+
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:admission-input",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    const admitted = service.admitRecordForInstance({
+      instanceId: instance.instanceId,
+      record: {
+        assetRef: { assetId: "asset:image:img-1" },
+        width: 1024,
+        height: 768,
+        format: "png",
+        metadata: { source: "camera-a" },
+        tags: ["portrait"],
+        derived: { exposure: "balanced" },
+      },
+    }) as Record<string, unknown>;
+
+    expect(admitted.width).toBe(1024);
+    expect(admitted.height).toBe(768);
+    expect(admitted.format).toBe("png");
+
+    const validation = service.validateRecordsForInstance({
+      instanceId: instance.instanceId,
+      records: Object.freeze([
+        {
+          assetRef: { assetId: "asset:image:img-2" },
+          width: 512,
+          height: 512,
+          format: "jpeg",
+          metadata: { source: "camera-b" },
+          tags: ["thumbnail"],
+        },
+      ]),
+    });
+    expect(validation.valid).toBeTrue();
+
+    expect(() => service.admitRecordForInstance({
+      instanceId: instance.instanceId,
+      record: {
+        assetRef: { assetId: "asset:image:img-invalid" },
+        width: 512,
+        height: 512,
+      },
+    })).toThrow("rejected record admission");
+  });
 });
