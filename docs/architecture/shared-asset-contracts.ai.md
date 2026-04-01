@@ -421,6 +421,26 @@
 - Output lineage/provenance now persists through a dedicated repository seam (`application/system-runtime/WorkflowOutputProvenanceRepository.ts`) with both in-memory and SQLite implementations (`SqliteWorkflowOutputProvenanceRepository`).
 - Persisted provenance records capture output asset ref, source image refs, workflow asset/version, workflow run id, runtime parameter snapshot, execution capability/config snapshots, status, and timestamps so later history/inspection/comparison work can query without re-deriving from transient executor payloads.
 
+## AI Loom Image System vertical-slice update: failure handling, partial success, idempotency, and end-to-end persistence tests (stories 2.3.9-2.3.10)
+
+- Materialization status handling is now explicit for pre-output failures:
+  - canonical payload validation permits `status=failed` with `producedAssets=[]` for executor failures that happen before any output can be materialized,
+  - non-failed payloads still require at least one produced output.
+- `WorkflowOutputMaterializationService` now applies deterministic per-output idempotency using internal record identity (`matrec:<materializationId>:<assetIndex>`) so duplicate delivery/reprocessing updates existing records instead of creating duplicates.
+- Per-output persistence failure handling is now bounded and inspectable:
+  - artifact-persistence and dataset-write failures are captured per output,
+  - successful outputs still materialize in the same request,
+  - final status is derived from observed outcomes (`materialized` / `partial` / `failed`) rather than blindly echoing requested status.
+- Retry behavior is now coherent across full and partial failures:
+  - retries after partial success only materialize missing/failed outputs while preserving already-materialized outputs under the same deterministic ids,
+  - retries after full failure can reuse the same materialization identifiers without duplicate record creation.
+- End-to-end integration coverage now validates execution-result mapping through reusable persisted outputs:
+  - Comfy execution result mapping -> canonical materialization payload,
+  - artifact storage persistence,
+  - dataset record create/update idempotency behavior,
+  - provenance capture,
+  - multi-output and failure/retry paths.
+
 ## Direction 5 extension update: instance mutation + lifecycle management (stories 1.2.11-1.2.12)
 
 - Dataset-instance record mutation is now explicit and bounded through `SystemDatasetInstanceService.updateImageRecordInInstance(...)`:
