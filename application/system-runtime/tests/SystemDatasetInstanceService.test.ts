@@ -731,7 +731,7 @@ describe("SystemDatasetInstanceService", () => {
     })).toThrow("is owned by system 'system:image-pipeline'");
   });
 
-  it("lists and queries ingested records by simple metadata fields", async () => {
+  it("lists and queries ingested records by image query contracts (tags/format/dimensions/metadata/derived/identifiers)", async () => {
     const repository = new InMemoryDatasetInstanceRepository();
     const service = new SystemDatasetInstanceService(
       repository,
@@ -765,9 +765,12 @@ describe("SystemDatasetInstanceService", () => {
             width: 1024,
             height: 1024,
             format: "png",
+            mimeType: "image/png",
             tags: ["featured", "hero"],
-            metadata: { source: "camera-a" },
+            metadata: { source: "camera-a", cameraModel: "A1" },
+            derived: { orientation: "square" },
           },
+          storageReference: "prepared://query-1",
         },
         {
           recordId: "record:query-2",
@@ -801,11 +804,18 @@ describe("SystemDatasetInstanceService", () => {
       instanceId: instance.instanceId,
       query: {
         format: "png",
-        tag: "hero",
+        mimeType: "image/png",
+        tagsAny: ["hero", "missing"],
+        tagsAll: ["featured"],
         minWidth: 800,
         metadata: {
           source: "camera-a",
         },
+        derived: {
+          orientation: "square",
+        },
+        recordIds: ["record:query-1", "record:query-3"],
+        storageReference: "prepared://query-1",
       },
     });
     expect(queried.length).toBe(1);
@@ -857,7 +867,9 @@ describe("SystemDatasetInstanceService", () => {
       recordId: "record:mutable-1",
       patch: {
         imagePatch: {
-          tags: ["seed", "hero"],
+          tagsPatch: {
+            add: ["hero"],
+          },
           metadataPatch: {
             set: { source: "camera-b", quality: "high" },
             remove: ["scene"],
@@ -882,6 +894,97 @@ describe("SystemDatasetInstanceService", () => {
     expect(updated.metadata.ingestionStage).toBe("mutation");
     expect(updated.metadata.reviewState).toBe("approved");
     expect(updated.mutationVersion).toBe(2);
+  });
+
+  it("returns structured mutation/query results for runtime integration surfaces", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+    );
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:mutation-contract",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    const created = await service.mutateImageRecordInInstance({
+      operation: "create",
+      request: {
+        systemId: "system:image-pipeline",
+        instanceId: instance.instanceId,
+        recordId: "record:mutation-1",
+        record: {
+          assetRef: { assetId: "asset:image:mutation-1" },
+          width: 320,
+          height: 240,
+          format: "png",
+          tags: ["seed"],
+        },
+      },
+    });
+    expect(created.accepted).toBeTrue();
+    expect(created.record?.recordId).toBe("record:mutation-1");
+
+    const updated = await service.mutateImageRecordInInstance({
+      operation: "update",
+      request: {
+        systemId: "system:image-pipeline",
+        instanceId: instance.instanceId,
+        recordId: "record:mutation-1",
+        patch: {
+          imagePatch: {
+            tagsPatch: {
+              add: ["hero"],
+            },
+          },
+        },
+      },
+    });
+    expect(updated.accepted).toBeTrue();
+    expect(updated.record?.image.tags).toEqual(["seed", "hero"]);
+
+    const queryResult = service.queryImageRecordsForInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      query: {
+        tagsAll: ["hero"],
+      },
+    });
+    expect(queryResult.totalCount).toBe(1);
+    expect(queryResult.items[0]?.recordId).toBe("record:mutation-1");
+
+    const deleted = await service.mutateImageRecordInInstance({
+      operation: "delete",
+      request: {
+        systemId: "system:image-pipeline",
+        instanceId: instance.instanceId,
+        recordId: "record:mutation-1",
+      },
+    });
+    expect(deleted.accepted).toBeTrue();
+    expect(deleted.deletedRecordId).toBe("record:mutation-1");
+
+    const missingDelete = await service.mutateImageRecordInInstance({
+      operation: "delete",
+      request: {
+        systemId: "system:image-pipeline",
+        instanceId: instance.instanceId,
+        recordId: "record:missing",
+      },
+    });
+    expect(missingDelete.accepted).toBeFalse();
+    expect(missingDelete.issues[0]?.code).toBe("not-found");
   });
 
   it("supports batch get and delete/remove operations for runtime instance image records", async () => {

@@ -178,6 +178,25 @@ export interface DeleteDatasetInstanceImageRecordRequest {
   readonly recordId: string;
 }
 
+export interface DatasetInstanceImageMutationIssue {
+  readonly code: "invalid-request" | "not-found" | "conflict";
+  readonly message: string;
+}
+
+export interface DatasetInstanceImageMutationResult {
+  readonly operation: "create" | "update" | "delete";
+  readonly accepted: boolean;
+  readonly record?: DatasetInstanceImageRecord;
+  readonly deletedRecordId?: string;
+  readonly issues: ReadonlyArray<DatasetInstanceImageMutationIssue>;
+}
+
+export interface QueryDatasetInstanceImageRecordsResult {
+  readonly items: ReadonlyArray<DatasetInstanceImageRecord>;
+  readonly totalCount: number;
+  readonly appliedQuery?: DatasetInstanceImageRecordQuery;
+}
+
 export interface ResolveOwnedDatasetInstanceRequest {
   readonly systemId: string;
   readonly instanceId: string;
@@ -667,6 +686,17 @@ export class SystemDatasetInstanceService {
     });
   }
 
+  public queryImageRecordsForInstance(
+    request: QueryDatasetInstanceImageRecordsRequest,
+  ): QueryDatasetInstanceImageRecordsResult {
+    const items = this.listImageRecordsForInstance(request);
+    return Object.freeze({
+      items,
+      totalCount: items.length,
+      appliedQuery: request.query,
+    });
+  }
+
   public getImageRecordFromInstance(
     request: GetDatasetInstanceImageRecordRequest,
   ): DatasetInstanceImageRecord | undefined {
@@ -760,6 +790,71 @@ export class SystemDatasetInstanceService {
       instanceId: instance.instanceId,
       recordId: normalizeRequired(request.recordId, "recordId"),
     });
+  }
+
+  public async mutateImageRecordInInstance(input:
+    | {
+      readonly operation: "create";
+      readonly request: IngestDatasetInstanceImageRecordRequest;
+    }
+    | {
+      readonly operation: "update";
+      readonly request: UpdateDatasetInstanceImageRecordRequest;
+    }
+    | {
+      readonly operation: "delete";
+      readonly request: DeleteDatasetInstanceImageRecordRequest;
+    }): Promise<DatasetInstanceImageMutationResult> {
+    try {
+      if (input.operation === "create") {
+        const record = await this.ingestImageRecordIntoInstance(input.request);
+        return Object.freeze({
+          operation: "create",
+          accepted: true,
+          record,
+          issues: Object.freeze([]),
+        });
+      }
+      if (input.operation === "update") {
+        const record = await this.updateImageRecordInInstance(input.request);
+        return Object.freeze({
+          operation: "update",
+          accepted: true,
+          record,
+          issues: Object.freeze([]),
+        });
+      }
+      const deleted = await this.deleteImageRecordFromInstance(input.request);
+      if (!deleted) {
+        return Object.freeze({
+          operation: "delete",
+          accepted: false,
+          issues: Object.freeze([Object.freeze({
+            code: "not-found",
+            message: `Dataset instance image record '${input.request.recordId}' was not found.`,
+          })]),
+        });
+      }
+      return Object.freeze({
+        operation: "delete",
+        accepted: true,
+        deletedRecordId: input.request.recordId,
+        issues: Object.freeze([]),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const separator = message.indexOf(":");
+      const code = separator > 0 ? message.slice(0, separator) : "invalid-request";
+      const normalizedCode = code === "not-found" || code === "conflict" ? code : "invalid-request";
+      return Object.freeze({
+        operation: input.operation,
+        accepted: false,
+        issues: Object.freeze([Object.freeze({
+          code: normalizedCode,
+          message,
+        })]),
+      });
+    }
   }
 
   public async deleteAllImageRecordsFromInstance(

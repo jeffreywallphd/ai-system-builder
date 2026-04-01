@@ -203,6 +203,7 @@ describe("SqliteDatasetInstanceRepository", () => {
           width: 1024,
           height: 768,
           format: "png",
+          mimeType: "image/png",
           metadata: {
             source: "camera-a",
             quality: "high",
@@ -271,8 +272,13 @@ describe("SqliteDatasetInstanceRepository", () => {
         instanceId: "dataset-instance:input-images",
         query: {
           format: "png",
-          tag: "portrait",
+          mimeType: "image/png",
+          tagsAny: ["portrait"],
+          tagsAll: ["hero"],
           minWidth: 1000,
+          derived: {
+            orientation: "landscape",
+          },
         },
       });
       expect(queried.length).toBe(1);

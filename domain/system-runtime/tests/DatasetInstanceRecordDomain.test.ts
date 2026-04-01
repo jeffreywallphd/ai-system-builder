@@ -119,4 +119,66 @@ describe("DatasetInstanceRecordDomain", () => {
     });
     expect(matchesDatasetInstanceImageRecordQuery(record, query)).toBeTrue();
   });
+
+  it("supports partial tag mutation updates", () => {
+    const record = createDatasetInstanceImageRecord({
+      recordId: "record:image:tag-patch",
+      instanceId: "dataset-instance:1",
+      systemId: "system:image",
+      datasetAssetId: "asset:image-dataset",
+      image: {
+        assetRef: { assetId: "asset:image:query" },
+        width: 320,
+        height: 320,
+        format: "png",
+        tags: ["seed", "base"],
+      },
+    });
+
+    const patched = patchDatasetInstanceImageRecord({
+      record,
+      patch: {
+        imagePatch: {
+          tagsPatch: {
+            add: ["hero"],
+            remove: ["base"],
+          },
+        },
+      },
+    });
+    expect(patched.image.tags).toEqual(["seed", "hero"]);
+  });
+
+  it("supports richer image query filters for mime, tags, identifiers, metadata, and derived fields", () => {
+    const record = createDatasetInstanceImageRecord({
+      recordId: "record:image:advanced-query",
+      instanceId: "dataset-instance:1",
+      systemId: "system:image",
+      datasetAssetId: "asset:image-dataset",
+      image: {
+        assetRef: { assetId: "asset:image:advanced-query" },
+        width: 1920,
+        height: 1080,
+        format: "png",
+        mimeType: "image/png",
+        tags: ["hero", "featured"],
+        metadata: { source: "camera-z" },
+        derived: { orientation: "landscape" },
+      },
+      storage: {
+        reference: "prepared://record:image:advanced-query",
+      },
+    });
+
+    const query = normalizeDatasetInstanceImageRecordQuery({
+      mimeType: " IMAGE/PNG ",
+      tagsAny: ["featured", "other"],
+      tagsAll: ["hero"],
+      recordIds: ["record:image:advanced-query"],
+      storageReference: "prepared://record:image:advanced-query",
+      metadata: { source: "camera-z" },
+      derived: { orientation: "landscape" },
+    });
+    expect(matchesDatasetInstanceImageRecordQuery(record, query)).toBeTrue();
+  });
 });
