@@ -1,5 +1,11 @@
 import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
 import {
+  createDatasetAssetReference,
+  createDatasetInstanceReference,
+  createDatasetRecordReference,
+  type DatasetRecordReference,
+} from "../../domain/dataset-studio/contracts/StudioDatasetCompatibility";
+import {
   deriveStorageReferenceFromImageRecord,
   type DatasetInstanceImageRecord,
   type DatasetInstanceImageRecordQuery,
@@ -30,6 +36,7 @@ export interface DatasetInstancePreviewSummary {
 }
 
 export interface DatasetInstanceImageRecordPreviewItem {
+  readonly recordReference: DatasetRecordReference;
   readonly recordId: string;
   readonly selectionId: string;
   readonly imageReference?: string;
@@ -123,36 +130,58 @@ function toThumbnailReference(record: DatasetInstanceImageRecord): string | unde
   return record.storage?.reference ?? toImageReference(record);
 }
 
-function toPreviewItem(record: DatasetInstanceImageRecord): {
+function toPreviewItem(input: {
+  readonly record: DatasetInstanceImageRecord;
+  readonly systemId: string;
+  readonly instanceId: string;
+  readonly datasetAssetId: string;
+  readonly datasetAssetVersionId?: string;
+}): {
   readonly item: DatasetInstanceImageRecordPreviewItem;
   readonly metadataWasTruncated: boolean;
   readonly validationWarnings: ReadonlyArray<string>;
 } {
-  const metadata = pickMetadataSummary(record.image.metadata);
+  const metadata = pickMetadataSummary(input.record.image.metadata);
+  const dataset = createDatasetAssetReference({
+    assetId: input.datasetAssetId,
+    versionId: input.datasetAssetVersionId,
+  });
+  const instanceReference = createDatasetInstanceReference({
+    systemId: input.systemId,
+    instanceId: input.instanceId,
+    dataset,
+  });
   const validationWarnings: string[] = [];
-  if (record.image.width <= 0 || record.image.height <= 0) {
-    validationWarnings.push(`Record '${record.recordId}' has non-positive image dimensions.`);
+  if (input.record.image.width <= 0 || input.record.image.height <= 0) {
+    validationWarnings.push(`Record '${input.record.recordId}' has non-positive image dimensions.`);
   }
-  if (!record.image.format.trim()) {
-    validationWarnings.push(`Record '${record.recordId}' has an empty image format.`);
+  if (!input.record.image.format.trim()) {
+    validationWarnings.push(`Record '${input.record.recordId}' has an empty image format.`);
   }
 
   return Object.freeze({
     item: Object.freeze({
-      recordId: record.recordId,
-      selectionId: record.recordId,
-      imageReference: toImageReference(record),
-      thumbnailReference: toThumbnailReference(record),
-      width: record.image.width,
-      height: record.image.height,
-      format: record.image.format,
-      tags: record.image.tags,
+      recordReference: createDatasetRecordReference({
+        dataset,
+        selectionId: input.record.recordId,
+        recordId: input.record.recordId,
+        instance: instanceReference,
+        imageReference: toImageReference(input.record),
+      }),
+      recordId: input.record.recordId,
+      selectionId: input.record.recordId,
+      imageReference: toImageReference(input.record),
+      thumbnailReference: toThumbnailReference(input.record),
+      width: input.record.image.width,
+      height: input.record.image.height,
+      format: input.record.image.format,
+      tags: input.record.image.tags,
       metadataSummary: metadata.metadataSummary,
-      hasAnnotations: Boolean(record.image.annotations && Object.keys(record.image.annotations).length > 0),
-      hasDerived: Boolean(record.image.derived && Object.keys(record.image.derived).length > 0),
-      admittedAt: record.admittedAt,
-      updatedAt: record.updatedAt,
-      mutationVersion: record.mutationVersion,
+      hasAnnotations: Boolean(input.record.image.annotations && Object.keys(input.record.image.annotations).length > 0),
+      hasDerived: Boolean(input.record.image.derived && Object.keys(input.record.image.derived).length > 0),
+      admittedAt: input.record.admittedAt,
+      updatedAt: input.record.updatedAt,
+      mutationVersion: input.record.mutationVersion,
     }),
     metadataWasTruncated: metadata.isTruncated,
     validationWarnings: Object.freeze(validationWarnings),
@@ -202,7 +231,13 @@ export class DatasetInstancePreviewService {
       offset,
       lineageContext: request.lineageContext,
     });
-    const mappedItems = recordsPage.items.map(toPreviewItem);
+    const mappedItems = recordsPage.items.map((record) => toPreviewItem({
+      record,
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      datasetAssetId: instance.datasetAssetId,
+      datasetAssetVersionId: instance.datasetAssetVersionId,
+    }));
     const previewItems = Object.freeze(mappedItems.map((entry) => entry.item));
     const validationWarnings = Object.freeze(mappedItems.flatMap((entry) => entry.validationWarnings));
     const metadataFieldsTruncatedCount = mappedItems.filter((entry) => entry.metadataWasTruncated).length;

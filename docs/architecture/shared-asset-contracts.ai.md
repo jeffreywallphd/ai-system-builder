@@ -259,6 +259,19 @@
 
 ## Direction 5 extension update: media adapter containment hardening (story 1.1.13)
 
+## Direction 5 extension update: Data Studio ↔ System dataset compatibility (story 1.3.13)
+
+- Data Studio preview selection references and System runtime preview record references now reuse one shared contract seam in `domain/dataset-studio/contracts/StudioDatasetCompatibility.ts`.
+- Shared references now explicitly model:
+  - dataset asset refs (`assetId` + optional `versionId`),
+  - dataset instance refs (`systemId` + `instanceId` + dataset asset ref),
+  - record/selection refs (`recordId` + `selectionId` + dataset + optional instance).
+- Data Studio selection snapshots and System runtime image-preview payloads now carry this same reference contract (no studio-private remapping of core dataset identifiers).
+- Bounded application-layer orchestration for handoff/selection continuity now lives in `application/system-runtime/StudioDatasetCompatibilityService.ts`:
+  - validates selection-to-instance dataset compatibility,
+  - projects runtime previews into shared references,
+  - resolves selected record ids through existing runtime query/read seams.
+
 ## Direction 5 extension update: runtime-operational dataset contracts + schema validation engine (stories 1.3.1-1.3.2)
 
 - Dataset assets now expose a bounded runtime-operational contract in the canonical dataset domain (`DataAssetBase`) so runtime usage is explicit and inspectable instead of ad hoc flags:
