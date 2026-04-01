@@ -181,3 +181,11 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
   - save persistence + lineage metadata,
   - load->save composability roundtrip,
   - boundary validation that Comfy-specific type names do not leak into application contract modules.
+
+## Story 2.2.5 + 2.2.6 update
+- Added `ComfyModelLoaderNodeAdapter` (`infrastructure/comfyui/adapters/image-nodes/ComfyModelLoaderNodeAdapter.ts`) as the internal model/checkpoint loading seam with narrow model selection input (`modelRef`) and optional runtime/model-family hints in config.
+- Added internal image-node contracts for downstream model/prompt composition in `CommonImageNodeContracts.ts`:
+  - `ICommonImageNodeModelCapabilityRef` for loaded model capability references,
+  - `ICommonImageNodePromptConditioning` for prompt/conditioning transfer without raw Comfy payload types.
+- Updated `ComfyPromptInputNodeAdapter` to consume internal model capabilities plus positive/optional negative prompts, emit internal prompt conditioning output, and provide inspectable prompt-supply/binding metadata.
+- Added focused adapter tests (`infrastructure/comfyui/adapters/image-nodes/tests/ComfyModelAndPromptNodeAdapters.test.ts`) for contract compliance, model->prompt composability, Comfy-boundary isolation, and normalized validation error behavior.

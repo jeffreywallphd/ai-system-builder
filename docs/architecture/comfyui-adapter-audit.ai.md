@@ -80,3 +80,11 @@
 - Added `ComfySaveImageNodeAdapter` (`infrastructure/comfyui/adapters/image-nodes/ComfySaveImageNodeAdapter.ts`) that accepts internal image payloads, persists files with Node `fs/path`, writes dataset image records (timestamp/metadata/lineage/workflow/source refs) through dataset repository ports, and keeps filename strategy internal via prefix + timestamp + unique id.
 - Extended common image-node contracts with reusable internal image and dataset-selection types to keep load/save compatibility explicit without introducing Comfy-specific types into application contracts.
 - Added focused adapter tests (`infrastructure/comfyui/adapters/image-nodes/tests/ComfyLoadSaveImageNodeAdapters.test.ts`) for dataset->image resolution, save persistence + lineage capture, load->save composability, and Comfy-type boundary isolation.
+
+## Story 2.2.5 + 2.2.6 update
+- Added `ComfyModelLoaderNodeAdapter` (`infrastructure/comfyui/adapters/image-nodes/ComfyModelLoaderNodeAdapter.ts`) as the internal model/checkpoint loading seam with narrow model selection input (`modelRef`) and optional runtime/model-family hints in config.
+- Added internal image-node contracts for downstream model/prompt composition in `CommonImageNodeContracts.ts`:
+  - `ICommonImageNodeModelCapabilityRef` for loaded model capability references,
+  - `ICommonImageNodePromptConditioning` for prompt/conditioning transfer without raw Comfy payload types.
+- Updated `ComfyPromptInputNodeAdapter` to consume internal model capabilities plus positive/optional negative prompts, emit internal prompt conditioning output, and provide inspectable prompt-supply/binding metadata.
+- Added focused adapter tests (`infrastructure/comfyui/adapters/image-nodes/tests/ComfyModelAndPromptNodeAdapters.test.ts`) for contract compliance, model->prompt composability, Comfy-boundary isolation, and normalized validation error behavior.
