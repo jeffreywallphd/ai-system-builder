@@ -36,3 +36,11 @@
   - `application/execution/comfyui/ComfyExecutionService.ts`
 - Refactored `ComfyWorkflowExecutor` to consume `IComfyExecutionAdapter` instead of owning Comfy queue calls directly.
 - Added output lineage hooks (`assetRef`, `lineage`) in `IComfyAdapterOutputRecord` so downstream persistence/provenance stories have a stable internal contract.
+
+## Story 2.1.5 + 2.1.6 update
+- Added canonical Comfy execution-context assembly in `application/execution/comfyui/ComfyExecutionContext.ts`.
+- Expanded the internal Comfy adapter execution-context contract so one typed object now carries execution identifiers, system/runtime references, dataset refs, selected input assets, runtime params/options, trigger metadata, and observability hooks.
+- Updated `ComfyWorkflowExecutor` + request mapping flow so execution metadata is no longer passed as loose bags.
+- Added structured normalized execution error semantics to adapter errors (`code`, `category`, `severity`, retryability hints, execution references, diagnostics).
+- Centralized normalization in `infrastructure/comfyui/execution/ComfyExecutionLifecycle.ts` and applied it in `ComfyQueueExecutionAdapter` for mapping, connectivity, execution, and output-normalization failures.
+- Added tests for execution-context construction and representative normalized failure scenarios.

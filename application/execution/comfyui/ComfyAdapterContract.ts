@@ -8,13 +8,28 @@ export type ComfyAdapterLifecycleStatus =
   | "cancelled";
 
 export type ComfyAdapterErrorCode =
+  | "connection-failed"
+  | "request-mapping-failed"
   | "invalid-request"
   | "transport-error"
   | "queue-timeout"
   | "execution-failed"
   | "execution-cancelled"
   | "output-normalization-failed"
+  | "cancelled"
   | "unknown";
+
+export type ComfyAdapterErrorCategory =
+  | "connectivity"
+  | "validation"
+  | "mapping"
+  | "execution"
+  | "timeout"
+  | "cancellation"
+  | "output"
+  | "unknown";
+
+export type ComfyAdapterErrorSeverity = "info" | "warning" | "error" | "critical";
 
 export interface IComfyAdapterAssetReference {
   readonly assetId: string;
@@ -23,10 +38,38 @@ export interface IComfyAdapterAssetReference {
 }
 
 export interface IComfyAdapterExecutionContext {
-  readonly executionId?: string;
-  readonly systemId?: string;
-  readonly datasetRefs?: ReadonlyArray<string>;
-  readonly runtimeOptions?: Readonly<Record<string, unknown>>;
+  readonly identifiers: Readonly<{
+    readonly executionId?: string;
+    readonly workflowId: string;
+    readonly workflowVersionId?: string;
+    readonly parentExecutionId?: string;
+  }>;
+  readonly system?: Readonly<{
+    readonly systemAssetRef?: string;
+    readonly systemRuntimeRef?: string;
+  }>;
+  readonly datasets: Readonly<{
+    readonly datasetAssetRefs: ReadonlyArray<string>;
+    readonly datasetInstanceRefs: ReadonlyArray<string>;
+  }>;
+  readonly inputs: Readonly<{
+    readonly selectedAssetRefs: ReadonlyArray<IComfyAdapterAssetReference>;
+  }>;
+  readonly runtime: Readonly<{
+    readonly parameters: Readonly<Record<string, unknown>>;
+    readonly options: Readonly<Record<string, unknown>>;
+  }>;
+  readonly trigger?: Readonly<{
+    readonly source: string;
+    readonly action?: string;
+    readonly actorId?: string;
+    readonly metadata?: Readonly<Record<string, unknown>>;
+  }>;
+  readonly observability?: Readonly<{
+    readonly lineageId?: string;
+    readonly correlationId?: string;
+    readonly tags?: ReadonlyArray<string>;
+  }>;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
@@ -66,8 +109,16 @@ export interface IComfyAdapterOutputRecord {
 
 export interface IComfyAdapterError {
   readonly code: ComfyAdapterErrorCode;
+  readonly category: ComfyAdapterErrorCategory;
+  readonly severity: ComfyAdapterErrorSeverity;
   readonly message: string;
   readonly retriable: boolean;
+  readonly retryable: boolean;
+  readonly executionRef?: Readonly<{
+    readonly executionId?: string;
+    readonly workflowId?: string;
+  }>;
+  readonly diagnostics?: Readonly<Record<string, unknown>>;
   readonly details?: Readonly<Record<string, unknown>>;
 }
 

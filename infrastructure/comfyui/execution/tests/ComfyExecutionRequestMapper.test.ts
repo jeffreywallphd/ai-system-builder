@@ -24,14 +24,19 @@ describe("ComfyExecutionRequestMapper", () => {
       inputAssetRefs: [{ assetId: "asset:1", versionId: "v1" }],
       runtimeParameters: { seed: 42 },
       context: {
-        systemId: "system:abc",
-        runtimeOptions: { steps: 30 },
+        identifiers: { workflowId: workflow.id, executionId: "exec-1" },
+        system: { systemAssetRef: "system:abc" },
+        datasets: { datasetAssetRefs: ["dataset:1"], datasetInstanceRefs: ["dataset-instance:1"] },
+        inputs: { selectedAssetRefs: [{ assetId: "asset:1", versionId: "v1" }] },
+        runtime: { parameters: { seed: 42 }, options: { steps: 30 } },
         metadata: { initiatedBy: "test" },
       },
     });
 
     expect(mapped.payload.client_id).toBe("wf");
-    expect(mapped.executionContext.runtimeOptions).toEqual({ seed: 42, steps: 30 });
-    expect((mapped.executionContext.metadata as any).inputAssetRefs).toHaveLength(1);
+    expect(mapped.executionContext.runtime.parameters).toEqual({ seed: 42 });
+    expect(mapped.executionContext.runtime.options).toEqual({ steps: 30 });
+    expect(mapped.executionContext.inputs.selectedAssetRefs).toHaveLength(1);
+    expect(mapped.executionContext.datasets.datasetAssetRefs).toEqual(["dataset:1"]);
   });
 });
