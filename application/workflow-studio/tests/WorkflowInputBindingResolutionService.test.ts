@@ -162,4 +162,101 @@ describe("resolveWorkflowInputBindings", () => {
       }),
     ]);
   });
+
+  it("surfaces missing form fields and type mismatches for form-bound values", () => {
+    const result = resolveWorkflowInputBindings({
+      bindings: [
+        createWorkflowInputBindingDescriptor({
+          bindingId: "binding.form-number",
+          inputId: "seed",
+          required: true,
+          valueType: "number",
+          sources: [
+            {
+              sourceId: "ui-seed",
+              kind: WorkflowInputBindingSourceKinds.uiFormValue,
+              formKey: "seed",
+              priority: 1,
+              required: true,
+            },
+          ],
+        }),
+        createWorkflowInputBindingDescriptor({
+          bindingId: "binding.form-missing",
+          inputId: "strength",
+          required: true,
+          valueType: "number",
+          sources: [
+            {
+              sourceId: "ui-strength",
+              kind: WorkflowInputBindingSourceKinds.uiFormValue,
+              formKey: "strength",
+              priority: 1,
+              required: true,
+            },
+          ],
+        }),
+      ],
+      context: {
+        uiFormValues: {
+          seed: "not-a-number",
+        },
+      },
+    });
+
+    expect(result.records).toEqual([
+      expect.objectContaining({ inputId: "seed", resolved: false }),
+      expect.objectContaining({ inputId: "strength", resolved: false }),
+    ]);
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "type-mismatch",
+        inputId: "seed",
+      }),
+      expect.objectContaining({
+        code: "missing-field-reference",
+        inputId: "strength",
+      }),
+    ]));
+  });
+
+  it("surfaces invalid selected-image references when a selection exists but path is wrong", () => {
+    const result = resolveWorkflowInputBindings({
+      bindings: [
+        createWorkflowInputBindingDescriptor({
+          bindingId: "binding.selected-image-path",
+          inputId: "imageLocator",
+          required: true,
+          sources: [
+            {
+              sourceId: "selection-path",
+              kind: WorkflowInputBindingSourceKinds.selectedImage,
+              path: "locator.path",
+              priority: 1,
+              required: true,
+            },
+          ],
+        }),
+      ],
+      context: {
+        selectedImage: {
+          assetRef: {
+            assetId: "asset:image:selected",
+          },
+        },
+      },
+    });
+
+    expect(result.records).toEqual([expect.objectContaining({ inputId: "imageLocator", resolved: false })]);
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "invalid-selection-reference",
+        inputId: "imageLocator",
+      }),
+      expect.objectContaining({
+        code: "unresolved-required-input",
+        inputId: "imageLocator",
+      }),
+    ]));
+  });
 });

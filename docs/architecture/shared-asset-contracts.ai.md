@@ -594,3 +594,15 @@
 - Added focused contract/resolution tests:
   - `domain/workflow-studio/tests/WorkflowInputBindingDomain.test.ts`
   - `application/workflow-studio/tests/WorkflowInputBindingResolutionService.test.ts`
+
+## AI Loom Image Manipulation vertical-slice update: form-value + selected-image context binding hardening (stories 3.2.3-3.2.4)
+
+- Extended the existing input-binding resolver seam (`application/workflow-studio/WorkflowInputBindingResolutionService.ts`) with richer diagnostics and typed-resolution safeguards:
+  - explicit diagnostics for missing form-field references, invalid selected-image references, and resolved value type mismatches,
+  - continued deterministic source-priority resolution with inspectable preview metadata.
+- `WorkflowExecutionContextAssemblyService` now supports explicit, persistable system-aware input binding metadata on workflow inputs (`input.metadata.systemInputBinding`) and maps it through the same canonical binding resolver (no parallel subsystem).
+- Assembly now also reads bounded System Studio form context (`metadata.systemFormValues` / `metadata.uiFormValues`) and selected-image context metadata, allowing image-context bindings to resolve asset refs and other selected-image paths through canonical contracts.
+- Invalid authored binding metadata now returns deterministic pre-execution issues (`invalid-binding-configuration`) rather than silent fallback.
+- Added focused tests for typed form binding, invalid binding configuration diagnostics, and selected-image binding resolution:
+  - `application/workflow-studio/tests/WorkflowInputBindingResolutionService.test.ts`
+  - `application/workflow-studio/tests/WorkflowExecutionContextAssemblyService.test.ts`
