@@ -67,6 +67,6 @@ describe("MediaSchemaIntentAdapter", () => {
 
     const result = adapter.validateShape(shape);
     expect(result.valid).toBeFalse();
-    expect(result.issues.some((issue) => issue.code === "schema-intent.media.record-invalid")).toBeTrue();
+    expect(result.issues.some((issue) => issue.code === "schema-intent.media.record.invalid")).toBeTrue();
   });
 });

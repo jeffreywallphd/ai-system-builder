@@ -7,6 +7,7 @@ import {
   type IImageExifReader,
   type IImageMetadataProbe,
 } from "../ImageIngestorAsset";
+import { ZodMediaDatasetValidator } from "../adapters/validation/MediaDatasetValidator";
 
 class StubMetadataProbe implements IImageMetadataProbe {
   constructor(
@@ -65,6 +66,13 @@ describe("ImageIngestorAsset", () => {
     expect(result.preview.width).toBe(1200);
     expect(result.preview.exifHighlights?.Make).toBe("Canon");
     expect(result.preview.normalized.ingestor).toBe("image-ingestor-v1");
+    expect(result.metadata.derived).toBeDefined();
+    const derived = result.metadata.derived as Record<string, unknown>;
+    expect(derived.orientation).toBe("landscape");
+    expect(derived.aspectRatio).toBeCloseTo(1.5, 6);
+    const mediaValidation = new ZodMediaDatasetValidator().validateShape(result.output);
+    expect(mediaValidation.valid).toBeTrue();
+    expect(mediaValidation.diagnostics.errorCount).toBe(0);
     const assetRef = result.metadata.assetRef as Record<string, unknown>;
     expect(assetRef.kind).toBe(ImageAssetReferenceKinds.generatedOutput);
   });

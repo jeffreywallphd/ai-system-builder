@@ -4,11 +4,26 @@ import {
   type IImageRecordValidator,
   type ImageRecord,
 } from "../../../../domain/dataset-studio/contracts/ImageRecord";
+import { ImageOrientationKinds } from "../../../../domain/dataset-studio/contracts/ImageDerivedAttributes";
 import {
   ImageAssetReferenceKinds,
   type ImageAssetReferenceInput,
 } from "../../../../domain/dataset-studio/contracts/ImageAssetReference";
 import type { CanonicalRecordValue } from "../../../../domain/dataset-studio/CanonicalDataShapes";
+
+export const MediaImageFormatAllowList = Object.freeze([
+  "png",
+  "jpeg",
+  "jpg",
+  "webp",
+] as const);
+
+export type MediaImageFormat = typeof MediaImageFormatAllowList[number];
+
+export function isAllowedMediaImageFormat(format: string): boolean {
+  const normalized = format.trim().toLowerCase();
+  return (MediaImageFormatAllowList as ReadonlyArray<string>).includes(normalized);
+}
 
 const canonicalRecordValueSchema: z.ZodType<CanonicalRecordValue> = z.lazy(() => z.union([
   z.string(),
@@ -80,7 +95,17 @@ const imageRecordSchema = z.object({
   format: z.string().trim().min(1),
   metadata: z.record(z.string(), canonicalRecordValueSchema).optional(),
   tags: z.array(z.string().trim().min(1)).default([]),
-  derived: z.record(z.string(), canonicalRecordValueSchema).optional(),
+  derived: z.object({
+    aspectRatio: z.number().positive().optional(),
+    orientation: z.enum([
+      ImageOrientationKinds.portrait,
+      ImageOrientationKinds.landscape,
+      ImageOrientationKinds.square,
+    ]).optional(),
+    isAnimated: z.boolean().optional(),
+    pixelCount: z.number().int().positive().optional(),
+    megapixels: z.number().positive().optional(),
+  }).catchall(canonicalRecordValueSchema).optional(),
   schemaVersion: z.string().trim().min(1).optional(),
 });
 

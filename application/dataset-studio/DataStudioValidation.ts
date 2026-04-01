@@ -15,6 +15,9 @@ import {
   type ResolvedDataSource,
 } from "./DataConverterContracts";
 import type { DataAssetExecutionRequest } from "./DataAssetExecutionFramework";
+import { ZodMediaDatasetValidator } from "./adapters/validation/MediaDatasetValidator";
+
+const defaultMediaDatasetValidator = new ZodMediaDatasetValidator();
 
 export const DataStudioValidationSections = Object.freeze({
   canonicalShape: "canonical-shape",
@@ -257,6 +260,18 @@ function validateShapeKind(
   }
 
   if (shape.kind === "image-metadata-records") {
+    const mediaValidation = defaultMediaDatasetValidator.validateShape(shape);
+    for (const mediaIssue of mediaValidation.issues) {
+      pushIssue(issues, {
+        code: mediaIssue.code,
+        section: DataStudioValidationSections.canonicalShape,
+        severity: mediaIssue.severity,
+        message: mediaIssue.message,
+        path: mediaIssue.path,
+        details: mediaIssue.details,
+      });
+    }
+
     for (const [index, item] of shape.items.entries()) {
       if (!normalizeOptional(item.itemId)) {
         pushIssue(issues, {

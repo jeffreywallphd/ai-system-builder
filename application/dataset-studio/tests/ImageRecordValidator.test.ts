@@ -82,5 +82,15 @@ describe("ImageRecordValidator", () => {
         format: "jpeg",
       },
     ])).toThrow();
+
+    expect(() => validator.validateImageRecord({
+      assetRef: { assetId: "asset:image:three" },
+      width: 32,
+      height: 32,
+      format: "png",
+      derived: {
+        orientation: "sideways",
+      },
+    })).toThrow();
   });
 });
