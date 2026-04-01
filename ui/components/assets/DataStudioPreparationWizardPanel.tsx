@@ -94,6 +94,10 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
   );
   const adapter = props.adapter ?? localAdapter;
   const lastImportedStateRef = useRef<string | undefined>(normalizedPersistedState);
+  const lastPublishedStateRef = useRef<string | undefined>(normalizedPersistedState);
+  const onPipelineStateChangeRef = useRef<DataStudioPreparationWizardPanelProps["onPipelineStateChange"]>(
+    props.onPipelineStateChange,
+  );
   const [snapshot, setSnapshot] = useState<DataStudioWizardSnapshot>(() => adapter.getSnapshot());
   const [isPaletteOpen, setIsPaletteOpen] = useState(true);
   const [paletteSearch, setPaletteSearch] = useState("");
@@ -124,7 +128,14 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
   const executionReadiness = adapter.assessExecutionReadiness();
 
   useEffect(() => {
-    const serializedPipelineState = adapter.exportPipelineStateJson();
+    onPipelineStateChangeRef.current = props.onPipelineStateChange;
+  }, [props.onPipelineStateChange]);
+
+  const publishPipelineState = (serializedPipelineState: string) => {
+    if (serializedPipelineState === lastPublishedStateRef.current) {
+      return;
+    }
+    lastPublishedStateRef.current = serializedPipelineState;
     if (typeof window !== "undefined") {
       try {
         window.localStorage.setItem(DataStudioWizardPersistenceStorageKey, serializedPipelineState);
@@ -132,8 +143,16 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
         // ignore persistence failures (storage unavailable/quota)
       }
     }
-    props.onPipelineStateChange?.(serializedPipelineState);
-  }, [adapter, props.onPipelineStateChange]);
+    onPipelineStateChangeRef.current?.(serializedPipelineState);
+  };
+
+  useEffect(() => {
+    if (normalizedPersistedState) {
+      return;
+    }
+    const serializedPipelineState = adapter.exportPipelineStateJson();
+    publishPipelineState(serializedPipelineState);
+  }, [adapter, normalizedPersistedState]);
 
   useEffect(() => {
     if (!normalizedPersistedState || normalizedPersistedState === lastImportedStateRef.current) {
@@ -142,6 +161,7 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
     const result = adapter.importPipelineState(normalizedPersistedState);
     if (result.ok) {
       lastImportedStateRef.current = normalizedPersistedState;
+      lastPublishedStateRef.current = normalizedPersistedState;
       setSnapshot(adapter.getSnapshot());
     }
   }, [adapter, normalizedPersistedState]);
@@ -150,14 +170,7 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
     const next = adapter.getSnapshot();
     setSnapshot(next);
     const serializedPipelineState = adapter.exportPipelineStateJson();
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.setItem(DataStudioWizardPersistenceStorageKey, serializedPipelineState);
-      } catch {
-        // ignore persistence failures (storage unavailable/quota)
-      }
-    }
-    props.onPipelineStateChange?.(serializedPipelineState);
+    publishPipelineState(serializedPipelineState);
     props.onSnapshotChange?.(next);
   };
 
