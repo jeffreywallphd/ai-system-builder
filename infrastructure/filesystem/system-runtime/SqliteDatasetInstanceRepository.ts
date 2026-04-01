@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { DatasetInstanceRepository } from "../../../application/system-runtime/DatasetInstanceRepository";
+import type { DatasetInstanceStorageAdapter } from "../../../application/system-runtime/DatasetInstanceStorageAdapter";
 import {
   createDatasetInstance,
   type DatasetInstance,
@@ -149,13 +149,45 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   `],
 ]);
 
-export class SqliteDatasetInstanceRepository implements DatasetInstanceRepository {
+export class SqliteDatasetInstanceRepository implements DatasetInstanceStorageAdapter {
   private database?: SqliteCompatDatabase;
   private initialized = false;
 
   public constructor(private readonly databasePath: string) {}
 
+  // Backward-compatible repository aliases (used by existing tests/composition).
   public save(instance: DatasetInstance): DatasetInstance {
+    return this.saveInstance(instance);
+  }
+
+  public getById(instanceId: string): DatasetInstance | undefined {
+    return this.getInstanceById(instanceId);
+  }
+
+  public getBySystemAndId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+  }): DatasetInstance | undefined {
+    return this.getInstanceBySystemAndId(input);
+  }
+
+  public deleteById(instanceId: string): boolean {
+    return this.deleteInstanceById(instanceId);
+  }
+
+  public listBySystemId(systemId: string): ReadonlyArray<DatasetInstance> {
+    return this.listInstancesBySystemId(systemId);
+  }
+
+  public findBySystemAndRole(input: {
+    readonly systemId: string;
+    readonly role: DatasetInstanceRole;
+    readonly purpose?: string;
+  }): DatasetInstance | undefined {
+    return this.findInstanceBySystemAndRole(input);
+  }
+
+  public saveInstance(instance: DatasetInstance): DatasetInstance {
     this.getDatabase()
       .prepare(`
         INSERT INTO system_dataset_instances (
@@ -205,7 +237,7 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
     return instance;
   }
 
-  public getById(instanceId: string): DatasetInstance | undefined {
+  public getInstanceById(instanceId: string): DatasetInstance | undefined {
     const normalized = normalizeOptional(instanceId);
     if (!normalized) {
       return undefined;
@@ -221,7 +253,7 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
     return row ? this.parse(row.instance_json) : undefined;
   }
 
-  public getBySystemAndId(input: {
+  public getInstanceBySystemAndId(input: {
     readonly systemId: string;
     readonly instanceId: string;
   }): DatasetInstance | undefined {
@@ -240,7 +272,7 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
     return row ? this.parse(row.instance_json) : undefined;
   }
 
-  public deleteById(instanceId: string): boolean {
+  public deleteInstanceById(instanceId: string): boolean {
     const normalized = normalizeOptional(instanceId);
     if (!normalized) {
       return false;
@@ -254,7 +286,7 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
     return Number(result.changes ?? 0) > 0;
   }
 
-  public listBySystemId(systemId: string): ReadonlyArray<DatasetInstance> {
+  public listInstancesBySystemId(systemId: string): ReadonlyArray<DatasetInstance> {
     const normalized = normalizeOptional(systemId);
     if (!normalized) {
       return Object.freeze([]);
@@ -271,7 +303,7 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
     return Object.freeze(rows.map((row) => this.parse(row.instance_json)));
   }
 
-  public findBySystemAndRole(input: {
+  public findInstanceBySystemAndRole(input: {
     readonly systemId: string;
     readonly role: DatasetInstanceRole;
     readonly purpose?: string;

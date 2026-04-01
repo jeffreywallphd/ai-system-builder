@@ -7,6 +7,7 @@ import {
   matchesDatasetInstanceImageRecordQuery,
   normalizeDatasetInstanceImageRecordQuery,
 } from "../../domain/system-runtime/DatasetInstanceRecordDomain";
+import type { DatasetInstanceStorageAdapter } from "./DatasetInstanceStorageAdapter";
 
 export interface DatasetInstanceRepository {
   save(instance: DatasetInstance): DatasetInstance;
@@ -58,16 +59,16 @@ function normalizeOptional(value?: string): string | undefined {
   return normalized ? normalized : undefined;
 }
 
-export class InMemoryDatasetInstanceRepository implements DatasetInstanceRepository {
+class InMemoryDatasetInstanceStorageAdapter implements DatasetInstanceStorageAdapter {
   private readonly byId = new Map<string, DatasetInstance>();
   private readonly imageRecordsByInstanceId = new Map<string, Map<string, DatasetInstanceImageRecord>>();
 
-  public save(instance: DatasetInstance): DatasetInstance {
+  public saveInstance(instance: DatasetInstance): DatasetInstance {
     this.byId.set(instance.instanceId, instance);
     return instance;
   }
 
-  public getById(instanceId: string): DatasetInstance | undefined {
+  public getInstanceById(instanceId: string): DatasetInstance | undefined {
     const normalized = normalizeOptional(instanceId);
     if (!normalized) {
       return undefined;
@@ -75,7 +76,7 @@ export class InMemoryDatasetInstanceRepository implements DatasetInstanceReposit
     return this.byId.get(normalized);
   }
 
-  public deleteById(instanceId: string): boolean {
+  public deleteInstanceById(instanceId: string): boolean {
     const normalized = normalizeOptional(instanceId);
     if (!normalized) {
       return false;
@@ -87,7 +88,7 @@ export class InMemoryDatasetInstanceRepository implements DatasetInstanceReposit
     return deleted;
   }
 
-  public getBySystemAndId(input: {
+  public getInstanceBySystemAndId(input: {
     readonly systemId: string;
     readonly instanceId: string;
   }): DatasetInstance | undefined {
@@ -103,7 +104,7 @@ export class InMemoryDatasetInstanceRepository implements DatasetInstanceReposit
     return instance;
   }
 
-  public listBySystemId(systemId: string): ReadonlyArray<DatasetInstance> {
+  public listInstancesBySystemId(systemId: string): ReadonlyArray<DatasetInstance> {
     const normalized = normalizeOptional(systemId);
     if (!normalized) {
       return Object.freeze([]);
@@ -115,7 +116,7 @@ export class InMemoryDatasetInstanceRepository implements DatasetInstanceReposit
     );
   }
 
-  public findBySystemAndRole(input: {
+  public findInstanceBySystemAndRole(input: {
     readonly systemId: string;
     readonly role: DatasetInstanceRole;
     readonly purpose?: string;
@@ -133,12 +134,6 @@ export class InMemoryDatasetInstanceRepository implements DatasetInstanceReposit
   }
 
   public saveImageRecord(record: DatasetInstanceImageRecord): DatasetInstanceImageRecord {
-    const instance = this.byId.get(record.instanceId);
-    if (instance && instance.systemId !== record.systemId) {
-      throw new Error(
-        `invalid-request:Cannot save image record '${record.recordId}' with system '${record.systemId}' into instance '${record.instanceId}' owned by '${instance.systemId}'.`,
-      );
-    }
     const byRecordId = this.imageRecordsByInstanceId.get(record.instanceId) ?? new Map<string, DatasetInstanceImageRecord>();
     byRecordId.set(record.recordId, record);
     this.imageRecordsByInstanceId.set(record.instanceId, byRecordId);
@@ -235,6 +230,88 @@ export class InMemoryDatasetInstanceRepository implements DatasetInstanceReposit
     }
     return Object.freeze(this.listImageRecordsByInstanceId(input.instanceId).filter((record) => record.systemId === systemId));
   }
+}
+
+export class StorageBackedDatasetInstanceRepository implements DatasetInstanceRepository {
+  public constructor(private readonly storageAdapter: DatasetInstanceStorageAdapter) {}
+
+  public save(instance: DatasetInstance): DatasetInstance {
+    return this.storageAdapter.saveInstance(instance);
+  }
+
+  public getById(instanceId: string): DatasetInstance | undefined {
+    return this.storageAdapter.getInstanceById(instanceId);
+  }
+
+  public getBySystemAndId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+  }): DatasetInstance | undefined {
+    return this.storageAdapter.getInstanceBySystemAndId(input);
+  }
+
+  public deleteById(instanceId: string): boolean {
+    return this.storageAdapter.deleteInstanceById(instanceId);
+  }
+
+  public listBySystemId(systemId: string): ReadonlyArray<DatasetInstance> {
+    return this.storageAdapter.listInstancesBySystemId(systemId);
+  }
+
+  public findBySystemAndRole(input: {
+    readonly systemId: string;
+    readonly role: DatasetInstanceRole;
+    readonly purpose?: string;
+  }): DatasetInstance | undefined {
+    return this.storageAdapter.findInstanceBySystemAndRole(input);
+  }
+
+  public saveImageRecord(record: DatasetInstanceImageRecord): DatasetInstanceImageRecord {
+    const instance = this.storageAdapter.getInstanceById(record.instanceId);
+    if (instance && instance.systemId !== record.systemId) {
+      throw new Error(
+        `invalid-request:Cannot save image record '${record.recordId}' with system '${record.systemId}' into instance '${record.instanceId}' owned by '${instance.systemId}'.`,
+      );
+    }
+    return this.storageAdapter.saveImageRecord(record);
+  }
+
+  public getImageRecordById(input: {
+    readonly instanceId: string;
+    readonly recordId: string;
+  }): DatasetInstanceImageRecord | undefined {
+    return this.storageAdapter.getImageRecordById(input);
+  }
+
+  public getImageRecordBySystemAndId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+    readonly recordId: string;
+  }): DatasetInstanceImageRecord | undefined {
+    return this.storageAdapter.getImageRecordBySystemAndId(input);
+  }
+
+  public deleteImageRecordById(input: {
+    readonly instanceId: string;
+    readonly recordId: string;
+  }): boolean {
+    return this.storageAdapter.deleteImageRecordById(input);
+  }
+
+  public deleteImageRecordsByInstanceId(instanceId: string): number {
+    return this.storageAdapter.deleteImageRecordsByInstanceId(instanceId);
+  }
+
+  public listImageRecordsByInstanceId(instanceId: string): ReadonlyArray<DatasetInstanceImageRecord> {
+    return this.storageAdapter.listImageRecordsByInstanceId(instanceId);
+  }
+
+  public listImageRecordsBySystemId(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+  }): ReadonlyArray<DatasetInstanceImageRecord> {
+    return this.storageAdapter.listImageRecordsBySystemId(input);
+  }
 
   public queryImageRecordsByInstanceId(input: {
     readonly instanceId: string;
@@ -257,5 +334,11 @@ export class InMemoryDatasetInstanceRepository implements DatasetInstanceReposit
       this.listImageRecordsBySystemId(input)
         .filter((record) => matchesDatasetInstanceImageRecordQuery(record, query)),
     );
+  }
+}
+
+export class InMemoryDatasetInstanceRepository extends StorageBackedDatasetInstanceRepository {
+  public constructor() {
+    super(new InMemoryDatasetInstanceStorageAdapter());
   }
 }
