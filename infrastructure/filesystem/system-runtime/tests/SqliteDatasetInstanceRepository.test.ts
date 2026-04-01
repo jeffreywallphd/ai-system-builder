@@ -251,6 +251,114 @@ describe("SqliteDatasetInstanceRepository", () => {
       });
       expect(queried.length).toBe(1);
       expect(queried[0]?.recordId).toBe("img-record-1");
+      expect(queried[0]?.mutationVersion).toBe(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("supports clearing/removing image records and deleting dataset instances", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-dataset-instance-delete-sqlite-"));
+    try {
+      const repository = new SqliteDatasetInstanceRepository(path.join(root, "dataset-instances.sqlite"));
+      repository.save(createDatasetInstance({
+        instanceId: "dataset-instance:delete-1",
+        systemId: "system:image-pipeline",
+        datasetAssetId: "image-ingestor-v1",
+        datasetAssetVersionId: "1.0.0",
+        role: "input-store",
+        purpose: "incoming-images",
+        lifecycleStatus: "ready",
+        runtimeStatus: "idle",
+        createdAt: "2026-04-01T00:00:00.000Z",
+        updatedAt: "2026-04-01T00:00:00.000Z",
+      }));
+
+      repository.saveImageRecord(createDatasetInstanceImageRecord({
+        recordId: "img-record-delete-1",
+        instanceId: "dataset-instance:delete-1",
+        systemId: "system:image-pipeline",
+        datasetAssetId: "image-ingestor-v1",
+        datasetAssetVersionId: "1.0.0",
+        image: {
+          assetRef: {
+            kind: "generated-output",
+            stableId: "generated-output:prepared://delete-1",
+            outputId: "prepared://delete-1",
+          },
+          width: 512,
+          height: 512,
+          format: "png",
+          metadata: {},
+          tags: [],
+          derived: {},
+          schemaVersion: "1.0.0",
+        },
+        admittedAt: "2026-04-01T00:01:00.000Z",
+        updatedAt: "2026-04-01T00:01:00.000Z",
+      }));
+
+      const deletedRecord = repository.deleteImageRecordById({
+        instanceId: "dataset-instance:delete-1",
+        recordId: "img-record-delete-1",
+      });
+      expect(deletedRecord).toBeTrue();
+      expect(repository.listImageRecordsByInstanceId("dataset-instance:delete-1").length).toBe(0);
+
+      repository.saveImageRecord(createDatasetInstanceImageRecord({
+        recordId: "img-record-delete-2",
+        instanceId: "dataset-instance:delete-1",
+        systemId: "system:image-pipeline",
+        datasetAssetId: "image-ingestor-v1",
+        datasetAssetVersionId: "1.0.0",
+        image: {
+          assetRef: {
+            kind: "generated-output",
+            stableId: "generated-output:prepared://delete-2",
+            outputId: "prepared://delete-2",
+          },
+          width: 256,
+          height: 256,
+          format: "png",
+          metadata: {},
+          tags: [],
+          derived: {},
+          schemaVersion: "1.0.0",
+        },
+        admittedAt: "2026-04-01T00:02:00.000Z",
+        updatedAt: "2026-04-01T00:02:00.000Z",
+      }));
+      repository.saveImageRecord(createDatasetInstanceImageRecord({
+        recordId: "img-record-delete-3",
+        instanceId: "dataset-instance:delete-1",
+        systemId: "system:image-pipeline",
+        datasetAssetId: "image-ingestor-v1",
+        datasetAssetVersionId: "1.0.0",
+        image: {
+          assetRef: {
+            kind: "generated-output",
+            stableId: "generated-output:prepared://delete-3",
+            outputId: "prepared://delete-3",
+          },
+          width: 128,
+          height: 128,
+          format: "png",
+          metadata: {},
+          tags: [],
+          derived: {},
+          schemaVersion: "1.0.0",
+        },
+        admittedAt: "2026-04-01T00:03:00.000Z",
+        updatedAt: "2026-04-01T00:03:00.000Z",
+      }));
+
+      const removedCount = repository.deleteImageRecordsByInstanceId("dataset-instance:delete-1");
+      expect(removedCount).toBe(2);
+      expect(repository.listImageRecordsByInstanceId("dataset-instance:delete-1").length).toBe(0);
+
+      const deletedInstance = repository.deleteById("dataset-instance:delete-1");
+      expect(deletedInstance).toBeTrue();
+      expect(repository.getById("dataset-instance:delete-1")).toBeUndefined();
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

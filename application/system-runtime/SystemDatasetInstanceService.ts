@@ -15,15 +15,21 @@ import {
 } from "../../domain/system-runtime/SystemDatasetBindingDomain";
 import {
   createDatasetInstance,
+  patchDatasetInstance,
+  transitionDatasetInstanceLifecycle,
   DatasetInstanceLifecycleStatuses,
   DatasetInstanceRoles,
   DatasetInstanceRuntimeStatuses,
+  type DatasetInstancePatch,
   type DatasetInstance,
+  type DatasetInstanceCleanupStatus,
   type DatasetInstanceRole,
 } from "../../domain/system-runtime/DatasetInstanceDomain";
 import {
   createDatasetInstanceImageRecord,
   deriveStorageReferenceFromImageRecord,
+  patchDatasetInstanceImageRecord,
+  type DatasetInstanceImageRecordPatch,
   type DatasetInstanceImageRecord,
   type DatasetInstanceImageRecordQuery,
 } from "../../domain/system-runtime/DatasetInstanceRecordDomain";
@@ -150,6 +156,42 @@ export interface GetDatasetInstanceImageRecordRequest {
   readonly recordId: string;
 }
 
+export interface UpdateDatasetInstanceImageRecordRequest {
+  readonly systemId: string;
+  readonly instanceId: string;
+  readonly recordId: string;
+  readonly patch: DatasetInstanceImageRecordPatch;
+}
+
+export interface ResetDatasetInstanceStateRequest {
+  readonly systemId: string;
+  readonly instanceId: string;
+  readonly clearSeedMetadata?: boolean;
+  readonly clearLifecycleMetadata?: boolean;
+}
+
+export interface ResetDatasetInstanceStateResult {
+  readonly instance: DatasetInstance;
+  readonly clearedImageRecordCount: number;
+}
+
+export interface ArchiveDatasetInstanceRequest {
+  readonly systemId: string;
+  readonly instanceId: string;
+  readonly cleanupStatus?: DatasetInstanceCleanupStatus;
+}
+
+export interface DeleteDatasetInstanceRequest {
+  readonly systemId: string;
+  readonly instanceId: string;
+  readonly force?: boolean;
+}
+
+export interface DeleteDatasetInstanceResult {
+  readonly instanceId: string;
+  readonly removedImageRecordCount: number;
+}
+
 export class SystemDatasetInstanceService {
   private readonly schemaEnforcementService: DatasetInstanceSchemaEnforcementService;
   private readonly imageRecordValidator: IImageRecordValidator;
@@ -200,8 +242,94 @@ export class SystemDatasetInstanceService {
     return this.repository.getById(instanceId);
   }
 
+  public loadDatasetInstance(request: {
+    readonly systemId: string;
+    readonly instanceId: string;
+  }): DatasetInstance {
+    return this.requireOwnedDatasetInstanceSync(request);
+  }
+
   public listSystemDatasetInstances(systemId: string): ReadonlyArray<DatasetInstance> {
     return this.repository.listBySystemId(systemId);
+  }
+
+  public async resetDatasetInstanceState(
+    request: ResetDatasetInstanceStateRequest,
+  ): Promise<ResetDatasetInstanceStateResult> {
+    const instance = await this.requireOwnedDatasetInstance({
+      systemId: request.systemId,
+      instanceId: request.instanceId,
+    });
+    this.assertInstanceMutable(instance, "reset dataset instance state");
+
+    const removedImageRecordCount = this.repository.deleteImageRecordsByInstanceId(instance.instanceId);
+    const updated = patchDatasetInstance({
+      instance,
+      patch: {
+        runtimeStatus: DatasetInstanceRuntimeStatuses.idle,
+        seedMetadata: request.clearSeedMetadata ? null : instance.seedMetadata,
+        lifecycleMetadata: request.clearLifecycleMetadata ? null : instance.lifecycleMetadata,
+      } satisfies DatasetInstancePatch,
+    });
+    const saved = this.repository.save(updated);
+    return Object.freeze({
+      instance: saved,
+      clearedImageRecordCount: removedImageRecordCount,
+    });
+  }
+
+  public async archiveDatasetInstance(request: ArchiveDatasetInstanceRequest): Promise<DatasetInstance> {
+    const instance = await this.requireOwnedDatasetInstance({
+      systemId: request.systemId,
+      instanceId: request.instanceId,
+    });
+    if (instance.lifecycleStatus === DatasetInstanceLifecycleStatuses.archived) {
+      return instance;
+    }
+
+    const transitioned = transitionDatasetInstanceLifecycle({
+      instance,
+      nextLifecycleStatus: DatasetInstanceLifecycleStatuses.archived,
+      nextRuntimeStatus: DatasetInstanceRuntimeStatuses.unavailable,
+    });
+    const lifecycleMetadata = request.cleanupStatus
+      ? {
+        ...(transitioned.lifecycleMetadata ?? {}),
+        cleanupStatus: request.cleanupStatus,
+      }
+      : transitioned.lifecycleMetadata;
+    return this.repository.save(patchDatasetInstance({
+      instance: transitioned,
+      patch: {
+        lifecycleMetadata: lifecycleMetadata ?? null,
+      },
+    }));
+  }
+
+  public async deactivateDatasetInstance(request: ArchiveDatasetInstanceRequest): Promise<DatasetInstance> {
+    return this.archiveDatasetInstance(request);
+  }
+
+  public async deleteDatasetInstance(request: DeleteDatasetInstanceRequest): Promise<DeleteDatasetInstanceResult> {
+    const instance = await this.requireOwnedDatasetInstance({
+      systemId: request.systemId,
+      instanceId: request.instanceId,
+    });
+    if (!request.force && instance.lifecycleStatus !== DatasetInstanceLifecycleStatuses.archived) {
+      throw new Error(
+        `invalid-request:Dataset instance '${instance.instanceId}' must be archived before delete/remove.`,
+      );
+    }
+
+    const removedImageRecordCount = this.repository.deleteImageRecordsByInstanceId(instance.instanceId);
+    const deleted = this.repository.deleteById(instance.instanceId);
+    if (!deleted) {
+      throw new Error(`not-found:Dataset instance '${instance.instanceId}' was not found.`);
+    }
+    return Object.freeze({
+      instanceId: instance.instanceId,
+      removedImageRecordCount,
+    });
   }
 
   public listSystemDatasetBindings(systemId: string): ReadonlyArray<SystemDatasetBinding> {
@@ -417,6 +545,7 @@ export class SystemDatasetInstanceService {
       systemId: request.systemId,
       instanceId: request.instanceId,
     });
+    this.assertInstanceMutable(instance, "ingest image record");
 
     const candidate = await this.prepareImageRecordCandidate({
       record: request.record,
@@ -444,6 +573,7 @@ export class SystemDatasetInstanceService {
       metadata: request.metadata,
       admittedAt: now,
       updatedAt: now,
+      mutationVersion: 1,
     });
 
     return this.repository.saveImageRecord(persisted);
@@ -493,6 +623,51 @@ export class SystemDatasetInstanceService {
       instanceId: request.instanceId,
       recordId,
     });
+  }
+
+  public async updateImageRecordInInstance(
+    request: UpdateDatasetInstanceImageRecordRequest,
+  ): Promise<DatasetInstanceImageRecord> {
+    const instance = await this.requireOwnedDatasetInstance({
+      systemId: request.systemId,
+      instanceId: request.instanceId,
+    });
+    this.assertInstanceMutable(instance, "update image record");
+
+    const recordId = normalizeRequired(request.recordId, "recordId");
+    const existing = this.repository.getImageRecordById({
+      instanceId: instance.instanceId,
+      recordId,
+    });
+    if (!existing) {
+      throw new Error(
+        `not-found:Dataset instance image record '${recordId}' was not found in instance '${instance.instanceId}'.`,
+      );
+    }
+
+    const patched = patchDatasetInstanceImageRecord({
+      record: existing,
+      patch: request.patch,
+    });
+    const admitted = this.schemaEnforcementService.admitRecordForInstance({
+      instance,
+      record: patched.image,
+    });
+    const image = this.imageRecordValidator.validateImageRecord(admitted);
+    const persisted = createDatasetInstanceImageRecord({
+      recordId: patched.recordId,
+      instanceId: patched.instanceId,
+      systemId: patched.systemId,
+      datasetAssetId: patched.datasetAssetId,
+      datasetAssetVersionId: patched.datasetAssetVersionId,
+      image,
+      storage: patched.storage,
+      metadata: patched.metadata,
+      admittedAt: patched.admittedAt,
+      updatedAt: patched.updatedAt,
+      mutationVersion: patched.mutationVersion,
+    });
+    return this.repository.saveImageRecord(persisted);
   }
 
   private async prepareImageRecordCandidate(input: {
@@ -650,6 +825,14 @@ export class SystemDatasetInstanceService {
       );
     }
     return instance;
+  }
+
+  private assertInstanceMutable(instance: DatasetInstance, operation: string): void {
+    if (instance.lifecycleStatus === DatasetInstanceLifecycleStatuses.archived) {
+      throw new Error(
+        `invalid-request:Cannot ${operation} for archived dataset instance '${instance.instanceId}'.`,
+      );
+    }
   }
 
   private async assertSystemExists(systemId: string): Promise<void> {

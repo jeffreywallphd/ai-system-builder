@@ -21,6 +21,7 @@ export interface DatasetInstanceImageRecord {
   readonly metadata: Readonly<Record<string, CanonicalRecordValue>>;
   readonly admittedAt: string;
   readonly updatedAt: string;
+  readonly mutationVersion: number;
 }
 
 export interface DatasetInstanceImageRecordQuery {
@@ -32,6 +33,36 @@ export interface DatasetInstanceImageRecordQuery {
   readonly maxHeight?: number;
   readonly assetRefStableId?: string;
   readonly metadata?: Readonly<Record<string, CanonicalRecordPrimitiveValue>>;
+}
+
+export interface DatasetInstanceImageRecordMetadataPatch {
+  readonly set?: Readonly<Record<string, CanonicalRecordValue>>;
+  readonly remove?: ReadonlyArray<string>;
+  readonly replace?: Readonly<Record<string, CanonicalRecordValue>>;
+}
+
+export interface DatasetInstanceImageRecordStoragePatch {
+  readonly reference?: string | null;
+  readonly provider?: string | null;
+}
+
+export interface DatasetInstanceImagePatch {
+  readonly assetRef?: ImageRecord["assetRef"];
+  readonly width?: number;
+  readonly height?: number;
+  readonly format?: string;
+  readonly metadataPatch?: DatasetInstanceImageRecordMetadataPatch;
+  readonly tags?: ReadonlyArray<string>;
+  readonly derived?: Readonly<Record<string, CanonicalRecordValue>> | null;
+  readonly annotations?: Readonly<Record<string, CanonicalRecordValue>> | null;
+  readonly schemaVersion?: string | null;
+}
+
+export interface DatasetInstanceImageRecordPatch {
+  readonly imagePatch?: DatasetInstanceImagePatch;
+  readonly metadataPatch?: DatasetInstanceImageRecordMetadataPatch;
+  readonly storagePatch?: DatasetInstanceImageRecordStoragePatch | null;
+  readonly updatedAt?: string;
 }
 
 function normalizeOptional(value?: string): string | undefined {
@@ -84,6 +115,47 @@ function normalizeStorage(
   });
 }
 
+function applyMetadataPatch(
+  current: Readonly<Record<string, CanonicalRecordValue>>,
+  patch?: DatasetInstanceImageRecordMetadataPatch,
+): Readonly<Record<string, CanonicalRecordValue>> {
+  if (!patch) {
+    return current;
+  }
+  if (patch.replace) {
+    return normalizeMetadata(patch.replace);
+  }
+
+  const next: Record<string, CanonicalRecordValue> = { ...current };
+  if (patch.set) {
+    for (const [rawKey, value] of Object.entries(patch.set)) {
+      const key = rawKey.trim();
+      if (key) {
+        next[key] = value;
+      }
+    }
+  }
+  if (patch.remove) {
+    for (const rawKey of patch.remove) {
+      const key = rawKey.trim();
+      if (key) {
+        delete next[key];
+      }
+    }
+  }
+  return normalizeMetadata(next);
+}
+
+function normalizeMutationVersion(value: number | undefined): number {
+  if (value === undefined) {
+    return 1;
+  }
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error("DatasetInstanceImageRecord.mutationVersion must be a positive integer.");
+  }
+  return value;
+}
+
 function normalizeDimensionFilter(value: number | undefined, label: string): number | undefined {
   if (value === undefined) {
     return undefined;
@@ -105,6 +177,7 @@ export function createDatasetInstanceImageRecord(input: {
   readonly metadata?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly admittedAt?: string;
   readonly updatedAt?: string;
+  readonly mutationVersion?: number;
 }): DatasetInstanceImageRecord {
   const admittedAt = normalizeTimestamp(input.admittedAt, "DatasetInstanceImageRecord.admittedAt");
   const updatedAt = normalizeTimestamp(input.updatedAt, "DatasetInstanceImageRecord.updatedAt");
@@ -123,6 +196,71 @@ export function createDatasetInstanceImageRecord(input: {
     metadata: normalizeMetadata(input.metadata),
     admittedAt,
     updatedAt,
+    mutationVersion: normalizeMutationVersion(input.mutationVersion),
+  });
+}
+
+export function patchDatasetInstanceImageRecord(input: {
+  readonly record: DatasetInstanceImageRecord;
+  readonly patch: DatasetInstanceImageRecordPatch;
+}): DatasetInstanceImageRecord {
+  const nextUpdatedAt = normalizeTimestamp(input.patch.updatedAt, "DatasetInstanceImageRecord.updatedAt");
+  if (nextUpdatedAt < input.record.admittedAt) {
+    throw new Error("DatasetInstanceImageRecord.updatedAt cannot be earlier than admittedAt.");
+  }
+  if (nextUpdatedAt < input.record.updatedAt) {
+    throw new Error("DatasetInstanceImageRecord.updatedAt cannot move backwards.");
+  }
+
+  const nextMetadata = applyMetadataPatch(input.record.metadata, input.patch.metadataPatch);
+  const currentStorage = input.record.storage;
+  const nextStorage = input.patch.storagePatch === null
+    ? undefined
+    : input.patch.storagePatch
+      ? normalizeStorage({
+        reference: input.patch.storagePatch.reference === null
+          ? ""
+          : input.patch.storagePatch.reference ?? currentStorage?.reference ?? "",
+        provider: input.patch.storagePatch.provider === null
+          ? undefined
+          : input.patch.storagePatch.provider ?? currentStorage?.provider,
+      })
+      : currentStorage;
+
+  const imagePatch = input.patch.imagePatch;
+  const nextImageMetadata = imagePatch
+    ? applyMetadataPatch(input.record.image.metadata, imagePatch.metadataPatch)
+    : input.record.image.metadata;
+  const nextImage = createImageRecord({
+    assetRef: imagePatch?.assetRef ?? input.record.image.assetRef,
+    width: imagePatch?.width ?? input.record.image.width,
+    height: imagePatch?.height ?? input.record.image.height,
+    format: imagePatch?.format ?? input.record.image.format,
+    metadata: nextImageMetadata,
+    tags: imagePatch?.tags ?? input.record.image.tags,
+    derived: imagePatch?.derived === null
+      ? undefined
+      : imagePatch?.derived ?? input.record.image.derived,
+    annotations: imagePatch?.annotations === null
+      ? undefined
+      : imagePatch?.annotations ?? input.record.image.annotations,
+    schemaVersion: imagePatch?.schemaVersion === null
+      ? undefined
+      : imagePatch?.schemaVersion ?? input.record.image.schemaVersion,
+  });
+
+  return createDatasetInstanceImageRecord({
+    recordId: input.record.recordId,
+    instanceId: input.record.instanceId,
+    systemId: input.record.systemId,
+    datasetAssetId: input.record.datasetAssetId,
+    datasetAssetVersionId: input.record.datasetAssetVersionId,
+    image: nextImage,
+    storage: nextStorage,
+    metadata: nextMetadata,
+    admittedAt: input.record.admittedAt,
+    updatedAt: nextUpdatedAt,
+    mutationVersion: input.record.mutationVersion + 1,
   });
 }
 
