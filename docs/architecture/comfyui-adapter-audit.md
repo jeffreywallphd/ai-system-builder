@@ -140,3 +140,26 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
   - output preview references (`nodeId`, kind, reference, `assetId`, metadata),
   - normalized diagnostics from adapter errors.
 - Preview/inspection shaping remains contract-first and avoids exposing raw Comfy transport payloads to workflow callers.
+
+## Story 2.2.1 + 2.2.2 update (Common image node contracts + adapter pattern)
+- Added internal common-image node contracts in `application/execution/comfyui/image-nodes/CommonImageNodeContracts.ts` for:
+  - load image
+  - save image
+  - model loader
+  - prompt input
+  - sampler wrapper
+  - resize/upscale
+  - VAE encode
+  - VAE decode
+- Contracts are intentionally runtime-agnostic and include explicit identity, capabilities, input/output/config contracts, execution request/response, inspectability metadata, and normalized execution error contracts.
+- Added reusable Comfy adapter base pattern in `infrastructure/comfyui/adapters/image-nodes/ComfyImageNodeAdapterPattern.ts` with consistent seams for:
+  - node identity and capability contract access
+  - input mapping (`toComfyPayload`)
+  - output mapping (`fromComfyResult`)
+  - inspection metadata (`inspect`)
+  - normalized error hook (`normalizeError`)
+- Added one thin concrete adapter (`ComfyPromptInputNodeAdapter`) only to validate the pattern without over-implementing all node adapters in this slice.
+- Added focused tests to verify:
+  - contract coverage and runtime-agnostic shape
+  - adapter pattern consistency and required-input enforcement
+  - separation between domain/application contracts and Comfy-specific infrastructure concerns.
