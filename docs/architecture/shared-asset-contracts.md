@@ -735,3 +735,12 @@ Not implemented in this slice:
   - append-oriented history writes across multiple runs with non-colliding record ids and preserved metadata,
   - explicit comparison grouping + membership persistence for sibling outputs,
   - target-behavior distinction and compatibility with existing output-binding resolution/materialization seams.
+
+
+## AI Loom Image Manipulation vertical-slice update: runtime output-persistence integration + validation coverage (stories 3.3.9-3.3.10)
+
+- Workflow runtime execution now integrates the same output-binding pipeline used in stories 3.3.1-3.3.8 through `application/workflow-studio/WorkflowRuntimeOutputPersistenceService.ts` (binding descriptors -> write-plan resolution -> record materialization -> dataset-instance persistence), instead of introducing a parallel runtime writer path.
+- Runtime output persistence is configuration-driven (`executionMetadata.workflowOutputPersistence.configuration`) and supports output/history/comparison dataset target behavior consistently via one orchestration seam.
+- Execution results now carry structured output-persistence summaries (`outputPersistence`) so downstream history/UI surfaces can inspect persisted-record counts, target counts, and bounded issues without infrastructure-specific DTO leakage.
+- Persistence failures after successful execution are bounded/predictable: execution result status is promoted to failed with structured persistence issue metadata, and write-plan/materialization denials fail before any dataset writes.
+- Added focused runtime unit/integration coverage for success + bounded failure paths, append-oriented history behavior, comparison grouping semantics, and lineage/traceability metadata propagation.

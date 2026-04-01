@@ -224,6 +224,26 @@ export interface IWorkflowExecutionEvent {
   readonly nodeProvenance?: INodeExecutionProvenance;
 }
 
+
+export interface IWorkflowOutputPersistenceSummary {
+  readonly status: "skipped" | "persisted" | "failed";
+  readonly persistedRecordCount: number;
+  readonly targetCount: number;
+  readonly results: ReadonlyArray<Readonly<{
+    readonly recordId: string;
+    readonly bindingId: string;
+    readonly outputId: string;
+    readonly targetDatasetInstanceId: string;
+    readonly writeMode: string;
+  }>>;
+  readonly issues: ReadonlyArray<Readonly<{
+    readonly code: string;
+    readonly message: string;
+    readonly bindingId?: string;
+    readonly outputId?: string;
+  }>>;
+}
+
 export interface IWorkflowExecutionResult {
   readonly executionId: string;
   readonly status: Extract<
@@ -254,6 +274,8 @@ export interface IWorkflowExecutionResult {
   /**
    * Optional normalized execution inspection summary for preview/debugging flows.
    */
+  readonly outputPersistence?: IWorkflowOutputPersistenceSummary;
+
   readonly inspection?: Readonly<{
     readonly summary: Readonly<{
       readonly runtime?: string;

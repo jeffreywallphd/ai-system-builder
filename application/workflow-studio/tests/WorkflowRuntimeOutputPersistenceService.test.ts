@@ -1,0 +1,116 @@
+import { describe, expect, it } from "bun:test";
+import { InMemoryDatasetInstanceRepository } from "../../system-runtime/DatasetInstanceRepository";
+import { SystemDatasetInstanceService, type SystemDatasetOwnershipValidator } from "../../system-runtime/SystemDatasetInstanceService";
+import type { DatasetInstanceAssetCatalog } from "../../system-runtime/DatasetInstanceAssetCatalog";
+import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import { DefaultWorkflowRuntimeOutputPersistenceService } from "../WorkflowRuntimeOutputPersistenceService";
+import type { IWorkflowExecutionInput, IWorkflowExecutionResult } from "../../ports/interfaces/IWorkflowExecutor";
+import { createImageWorkflowOutputBindingConfiguration } from "../../contracts/ImageWorkflowOutputBindingConfiguration";
+
+class StaticAssetCatalog implements DatasetInstanceAssetCatalog {
+  public resolveAsset(input: { readonly assetId: string; readonly versionId?: string }) {
+    if (!input.assetId.startsWith("asset:dataset:")) {
+      return undefined;
+    }
+    return Object.freeze({
+      assetId: input.assetId,
+      versionId: input.versionId ?? "v1",
+      schemaIntentId: DatasetSchemaIntentIds.media as DatasetSchemaIntentId,
+      outputShapeKind: "image-metadata-records" as const,
+    });
+  }
+}
+
+class AllowAnySystem implements SystemDatasetOwnershipValidator {
+  public assertSystemExists(): void {}
+}
+
+function createExecutionInput(): IWorkflowExecutionInput {
+  return {
+    workflow: {
+      id: "asset:workflow:image",
+      metadata: { name: "Image workflow", version: "v7" },
+      status: "ready",
+      isEnabled: true,
+      executionPolicy: "acyclic-only",
+      nodes: [],
+      connections: [],
+      getNode: () => undefined,
+      getConnection: () => undefined,
+      getGraph: () => ({}) as never,
+      validate: () => ({ isValid: true, messages: [], invalidNodeIds: [], invalidConnectionIds: [] }),
+      toJSON: () => ({}),
+    },
+    executionMetadata: {
+      workflowOutputPersistence: {
+        systemId: "system:image",
+        configuration: createImageWorkflowOutputBindingConfiguration({
+          bindings: [
+            { bindingId: "b.out", outputId: "images", targetType: "output-dataset", targetId: "target:out", datasetInstanceId: "instance:out" },
+            { bindingId: "b.history", outputId: "images", targetType: "history-dataset", targetId: "target:hist", datasetInstanceId: "instance:hist", writeMode: "append" },
+            { bindingId: "b.compare", outputId: "images", targetType: "comparison-dataset", targetId: "target:cmp", datasetInstanceId: "instance:cmp", groupBy: "set:abc", writeMode: "append" },
+          ],
+        }),
+      },
+    },
+  };
+}
+
+function createExecutionResult(): IWorkflowExecutionResult {
+  return {
+    executionId: "exec:1",
+    status: "completed",
+    outputAssets: [
+      {
+        id: "asset:out:1",
+        kind: "image",
+        name: "out.png",
+        status: "available",
+        source: { type: "generated" },
+        location: { accessMethod: "remote-url", location: "https://example.com/out.png", format: "png", contentType: "image/png" },
+        technicalMetadata: { width: 128, height: 128 },
+        semanticMetadata: { tags: ["generated"] },
+        relationships: [],
+      } as never,
+    ],
+  };
+}
+
+describe("DefaultWorkflowRuntimeOutputPersistenceService", () => {
+  it("persists output/history/comparison records through one runtime path", async () => {
+    const datasetService = new SystemDatasetInstanceService(
+      new InMemoryDatasetInstanceRepository(),
+      new StaticAssetCatalog(),
+      undefined,
+      new AllowAnySystem(),
+    );
+    await datasetService.ensureOutputImageStoreInstance({ instanceId: "instance:out", systemId: "system:image", datasetAssetId: "asset:dataset:out" });
+    await datasetService.ensureWorkflowOutputTargetInstance({ targetType: "history-dataset", instanceId: "instance:hist", systemId: "system:image", datasetAssetId: "asset:dataset:hist" });
+    await datasetService.ensureWorkflowOutputTargetInstance({ targetType: "comparison-dataset", instanceId: "instance:cmp", systemId: "system:image", datasetAssetId: "asset:dataset:cmp" });
+
+    const service = new DefaultWorkflowRuntimeOutputPersistenceService(datasetService);
+    const result = await service.persist({ input: createExecutionInput(), result: createExecutionResult() });
+
+    expect(result.status).toBe("persisted");
+    expect(result.persistedRecordCount).toBe(3);
+    expect(datasetService.listImageRecordsForInstance({ systemId: "system:image", instanceId: "instance:out" })).toHaveLength(1);
+    const history = datasetService.listImageRecordsForInstance({ systemId: "system:image", instanceId: "instance:hist" });
+    expect(history[0]?.metadata.historyEntryId).toBeString();
+    const comparison = datasetService.listImageRecordsForInstance({ systemId: "system:image", instanceId: "instance:cmp" });
+    expect(comparison[0]?.metadata.comparisonSetId).toBe("set:abc");
+  });
+
+  it("returns structured failure when write-plan resolution fails", async () => {
+    const datasetService = new SystemDatasetInstanceService(
+      new InMemoryDatasetInstanceRepository(),
+      new StaticAssetCatalog(),
+      undefined,
+      new AllowAnySystem(),
+    );
+    const service = new DefaultWorkflowRuntimeOutputPersistenceService(datasetService);
+    const result = await service.persist({ input: createExecutionInput(), result: createExecutionResult() });
+
+    expect(result.status).toBe("failed");
+    expect(result.issues[0]?.code).toBe("dataset-instance-not-found");
+  });
+});

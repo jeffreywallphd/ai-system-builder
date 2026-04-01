@@ -1,0 +1,291 @@
+import type { IAsset } from "../../domain/assets/interfaces/IAsset";
+import { ImageAssetReferenceKinds, type ImageAssetReferenceInput } from "../../domain/dataset-studio/contracts/ImageAssetReference";
+import type { IWorkflowExecutionInput, IWorkflowExecutionResult } from "../ports/interfaces/IWorkflowExecutor";
+import {
+  createWorkflowOutputBindingDescriptorsFromAssetConfiguration,
+  type ImageWorkflowOutputBindingConfiguration,
+} from "../contracts/ImageWorkflowOutputBindingConfiguration";
+import type { SystemDatasetInstanceService } from "../system-runtime/SystemDatasetInstanceService";
+import { materializeWorkflowOutputRecords } from "./WorkflowOutputRecordMaterializationService";
+import { resolveWorkflowOutputBindingWritePlan } from "./WorkflowOutputBindingResolutionService";
+
+export interface WorkflowRuntimeOutputPersistenceResult {
+  readonly status: "skipped" | "persisted" | "failed";
+  readonly persistedRecordCount: number;
+  readonly targetCount: number;
+  readonly results: ReadonlyArray<{
+    readonly recordId: string;
+    readonly bindingId: string;
+    readonly outputId: string;
+    readonly targetDatasetInstanceId: string;
+    readonly writeMode: "append" | "upsert" | (string & {});
+  }>;
+  readonly issues: ReadonlyArray<{
+    readonly code: string;
+    readonly message: string;
+    readonly bindingId?: string;
+    readonly outputId?: string;
+  }>;
+}
+
+export interface WorkflowRuntimeOutputPersistenceService {
+  persist(request: {
+    readonly input: IWorkflowExecutionInput;
+    readonly result: IWorkflowExecutionResult;
+  }): Promise<WorkflowRuntimeOutputPersistenceResult>;
+}
+
+interface OutputBindingRuntimeMetadata {
+  readonly systemId: string;
+  readonly configuration: ImageWorkflowOutputBindingConfiguration;
+  readonly sourceContext?: {
+    readonly sourceImageStableIds?: ReadonlyArray<string>;
+    readonly sourceDatasetAssetId?: string;
+    readonly sourceDatasetAssetVersionId?: string;
+    readonly sourceDatasetInstanceId?: string;
+    readonly sourceRecordIds?: ReadonlyArray<string>;
+  };
+}
+
+function extractRuntimeMetadata(input: IWorkflowExecutionInput): OutputBindingRuntimeMetadata | undefined {
+  const metadata = input.executionMetadata as Record<string, unknown> | undefined;
+  const persistence = metadata?.workflowOutputPersistence as Record<string, unknown> | undefined;
+  if (!persistence) {
+    return undefined;
+  }
+  const systemId = typeof persistence.systemId === "string" ? persistence.systemId.trim() : "";
+  if (!systemId) {
+    return undefined;
+  }
+  const configuration = persistence.configuration as ImageWorkflowOutputBindingConfiguration | undefined;
+  if (!configuration || !Array.isArray(configuration.bindings)) {
+    return undefined;
+  }
+  const sourceContext = (persistence.sourceContext && typeof persistence.sourceContext === "object")
+    ? persistence.sourceContext as OutputBindingRuntimeMetadata["sourceContext"]
+    : undefined;
+  return Object.freeze({
+    systemId,
+    configuration,
+    sourceContext,
+  });
+}
+
+function toProducedImage(asset: IAsset, outputId: string, outputIndex: number) {
+  const location = asset.location;
+  const technical = asset.technicalMetadata;
+  const format = location?.format ?? "png";
+  const mimeType = location?.contentType;
+  const locationValue = location?.location;
+  const assetRef: ImageAssetReferenceInput = locationValue
+    ? location?.accessMethod === "remote-url"
+      ? { kind: ImageAssetReferenceKinds.externalUri, uri: locationValue, stableId: `${asset.id}:uri` }
+      : { kind: ImageAssetReferenceKinds.localFile, path: locationValue, stableId: `${asset.id}:path` }
+    : { kind: ImageAssetReferenceKinds.generatedOutput, outputId: asset.id, stableId: `${asset.id}:generated` };
+
+  return Object.freeze({
+    outputId,
+    outputIndex,
+    assetRef,
+    width: typeof technical?.width === "number" && technical.width > 0 ? technical.width : 1,
+    height: typeof technical?.height === "number" && technical.height > 0 ? technical.height : 1,
+    format,
+    mimeType,
+    metadata: Object.freeze({ assetId: asset.id, assetKind: asset.kind }),
+    tags: Object.freeze([...(asset.semanticMetadata?.tags ?? [])]),
+  });
+}
+
+export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowRuntimeOutputPersistenceService {
+  public constructor(private readonly datasetInstanceService: SystemDatasetInstanceService) {}
+
+  public async persist(request: {
+    readonly input: IWorkflowExecutionInput;
+    readonly result: IWorkflowExecutionResult;
+  }): Promise<WorkflowRuntimeOutputPersistenceResult> {
+    if (request.result.status !== "completed") {
+      return Object.freeze({
+        status: "skipped",
+        persistedRecordCount: 0,
+        targetCount: 0,
+        results: Object.freeze([]),
+        issues: Object.freeze([]),
+      });
+    }
+
+    const runtimeMetadata = extractRuntimeMetadata(request.input);
+    if (!runtimeMetadata) {
+      return Object.freeze({
+        status: "skipped",
+        persistedRecordCount: 0,
+        targetCount: 0,
+        results: Object.freeze([]),
+        issues: Object.freeze([]),
+      });
+    }
+
+    const descriptors = createWorkflowOutputBindingDescriptorsFromAssetConfiguration({
+      configuration: runtimeMetadata.configuration,
+      workflowRun: {
+        workflowAssetId: request.input.workflow.id,
+        workflowAssetVersionId: request.input.workflow.metadata?.version,
+        workflowRunId: request.result.executionId,
+      },
+      persistence: { systemId: runtimeMetadata.systemId },
+      sourceContext: runtimeMetadata.sourceContext,
+    });
+
+    const writePlan = await resolveWorkflowOutputBindingWritePlan({
+      systemId: runtimeMetadata.systemId,
+      bindings: descriptors,
+      datasetInstanceService: this.datasetInstanceService,
+    });
+
+    if (!writePlan.ready) {
+      return Object.freeze({
+        status: "failed",
+        persistedRecordCount: 0,
+        targetCount: writePlan.plan.length,
+        results: Object.freeze([]),
+        issues: Object.freeze(writePlan.issues.map((issue) => Object.freeze({
+          code: issue.code,
+          message: issue.message,
+          bindingId: issue.bindingId,
+          outputId: issue.outputId,
+        }))),
+      });
+    }
+
+    const outputId = runtimeMetadata.configuration.bindings[0]?.outputId ?? "images";
+    const producedImages = request.result.outputAssets
+      .filter((asset) => asset.kind === "image")
+      .map((asset, index) => toProducedImage(asset, outputId, index));
+
+    const materialized = materializeWorkflowOutputRecords({
+      writePlan: writePlan.plan,
+      workflowRun: {
+        runId: request.result.executionId,
+        workflowAssetId: request.input.workflow.id,
+        workflowAssetVersionId: request.input.workflow.metadata?.version,
+      },
+      producedImages,
+    });
+
+    if (materialized.missingOutputs.length > 0) {
+      return Object.freeze({
+        status: "failed",
+        persistedRecordCount: 0,
+        targetCount: writePlan.plan.length,
+        results: Object.freeze([]),
+        issues: Object.freeze(materialized.missingOutputs.map((output) => Object.freeze({
+          code: "materialization-output-missing",
+          message: `No workflow output assets were produced for output '${output}'.`,
+          outputId: output,
+        }))),
+      });
+    }
+
+    const persistedResults: WorkflowRuntimeOutputPersistenceResult["results"] = [];
+    for (const record of materialized.records) {
+      try {
+        const existing = this.datasetInstanceService.getImageRecordFromInstance({
+          systemId: runtimeMetadata.systemId,
+          instanceId: record.targetDatasetInstanceId,
+          recordId: record.recordId,
+        });
+
+        if (existing && record.writeMode === "upsert") {
+          await this.datasetInstanceService.updateImageRecordInInstance({
+            systemId: runtimeMetadata.systemId,
+            instanceId: record.targetDatasetInstanceId,
+            recordId: record.recordId,
+            patch: {
+              imagePatch: {
+                assetRef: record.record.assetRef,
+                width: record.record.width,
+                height: record.record.height,
+                format: record.record.format,
+                mimeType: record.record.mimeType ?? null,
+                metadataPatch: { replace: record.record.metadata },
+                tags: record.record.tags,
+                derived: record.record.derived,
+              },
+              metadataPatch: { replace: record.record.metadata },
+              provenancePatch: record.provenance,
+              generationPatch: {
+                outputAssetRef: record.generation.outputAssetRef,
+                sourceImageRef: record.generation.sourceImageRef ?? null,
+                workflowAssetId: record.generation.workflowAssetId,
+                workflowAssetVersionId: record.generation.workflowAssetVersionId ?? null,
+                runId: record.generation.runId,
+                role: record.generation.role,
+                outputIndex: record.generation.outputIndex ?? null,
+                outputGroupId: record.generation.outputGroupId ?? null,
+                metadataPatch: { replace: record.generation.metadata },
+                tags: record.generation.tags,
+              },
+            },
+          });
+        } else {
+          await this.datasetInstanceService.ingestImageRecordIntoInstance({
+            systemId: runtimeMetadata.systemId,
+            instanceId: record.targetDatasetInstanceId,
+            recordId: record.recordId,
+            record: record.record,
+            metadata: record.record.metadata,
+            provenance: record.provenance,
+          });
+          await this.datasetInstanceService.updateImageRecordInInstance({
+            systemId: runtimeMetadata.systemId,
+            instanceId: record.targetDatasetInstanceId,
+            recordId: record.recordId,
+            patch: {
+              generationPatch: {
+                outputAssetRef: record.generation.outputAssetRef,
+                sourceImageRef: record.generation.sourceImageRef ?? null,
+                workflowAssetId: record.generation.workflowAssetId,
+                workflowAssetVersionId: record.generation.workflowAssetVersionId ?? null,
+                runId: record.generation.runId,
+                role: record.generation.role,
+                outputIndex: record.generation.outputIndex ?? null,
+                outputGroupId: record.generation.outputGroupId ?? null,
+                metadataPatch: { replace: record.generation.metadata },
+                tags: record.generation.tags,
+              },
+            },
+          });
+        }
+
+        (persistedResults as Array<WorkflowRuntimeOutputPersistenceResult["results"][number]>).push(Object.freeze({
+          recordId: record.recordId,
+          bindingId: record.bindingId,
+          outputId: record.outputId,
+          targetDatasetInstanceId: record.targetDatasetInstanceId,
+          writeMode: record.writeMode,
+        }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "workflow-output-persistence-failed";
+        return Object.freeze({
+          status: "failed",
+          persistedRecordCount: persistedResults.length,
+          targetCount: writePlan.plan.length,
+          results: Object.freeze([...persistedResults]),
+          issues: Object.freeze([Object.freeze({
+            code: "workflow-output-persistence-failed",
+            message,
+            bindingId: record.bindingId,
+            outputId: record.outputId,
+          })]),
+        });
+      }
+    }
+
+    return Object.freeze({
+      status: "persisted",
+      persistedRecordCount: persistedResults.length,
+      targetCount: writePlan.plan.length,
+      results: Object.freeze([...persistedResults]),
+      issues: Object.freeze([]),
+    });
+  }
+}

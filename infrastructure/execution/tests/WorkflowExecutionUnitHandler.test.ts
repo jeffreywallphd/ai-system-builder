@@ -137,4 +137,48 @@ describe("WorkflowExecutionUnitHandler", () => {
       { kind: "completed", runId: "workflow-plan-run-2", status: "completed" },
     ]);
   });
+
+  it("marks execution failed with structured output persistence summary when persistence fails after runtime success", async () => {
+    const handler = new WorkflowExecutionUnitHandler(
+      {
+        canExecute: () => true,
+        startExecution: async () => ({
+          executionId: "unused",
+          input: {} as never,
+          getProgress: async () => ({ executionId: "unused", status: "queued" }),
+          waitForCompletion: async () => ({ executionId: "unused", status: "completed", outputAssets: [] }),
+          cancel: async () => undefined,
+        }),
+        execute: async () => ({
+          executionId: "exec-3",
+          status: "completed",
+          outputAssets: [],
+        }),
+      },
+      undefined,
+      undefined,
+      {
+        persist: async () => ({
+          status: "failed",
+          persistedRecordCount: 0,
+          targetCount: 1,
+          results: [],
+          issues: [{ code: "workflow-output-persistence-failed", message: "boom" }],
+        }),
+      },
+    );
+
+    const result = await handler.execute({
+      plan: new ExecutionPlan({ id: "plan-3", units: [{ id: "workflow:wf-3", kind: ExecutionUnitKinds.workflow }] }),
+      runId: "workflow-plan-run-3",
+      unit: { id: "workflow:wf-3", kind: ExecutionUnitKinds.workflow, dependsOn: [] },
+      unitInputs: {
+        "workflow:wf-3": { workflow: { id: "wf-3" } },
+      },
+    });
+
+    expect(result.status).toBe(ExecutionStatuses.failed);
+    expect(result.errorMessage).toContain("boom");
+  });
+
 });
