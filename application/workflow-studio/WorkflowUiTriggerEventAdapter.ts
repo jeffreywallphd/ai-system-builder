@@ -100,11 +100,11 @@ export function mapUiTriggerEventToWorkflowTriggerEntries(input: {
       triggerType: binding?.target.triggerType ?? plan.triggerType,
       activationType: `ui-${event.kind}`,
       payload: Object.freeze({
+        ...event.payload,
         uiEventId: event.eventId,
         uiEventName: event.name,
         uiEventKind: event.kind,
         source: event.source,
-        payload: event.payload,
         context: event.context,
       }),
       contextReferences: event.context ? Object.freeze({ ...event.context, references: event.context.references }) : undefined,

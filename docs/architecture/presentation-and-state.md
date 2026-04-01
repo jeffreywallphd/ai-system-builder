@@ -494,3 +494,16 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - selectors cover `sourceComponentId` and optional `actionId`/`eventName`, then target workflow trigger ids/types.
 - Image workflow assets now include `uiTriggerBindings` beside existing input/output binding configs (`ImageToImageWorkflowAsset`, `RestyleWorkflowAsset`, `EnhanceUpscaleWorkflowAsset`, `BatchTransformWorkflowAsset`), keeping UI-trigger wiring inspectable, versionable, and reusable.
 - `application/workflow-studio/WorkflowUiTriggerEventAdapter.ts` now consumes declarative binding configs when provided and falls back to existing manual-trigger matching when absent, preserving compatibility with prior dataset/system/manual trigger semantics.
+
+## Direction 5 UI update: Runtime UI-event dispatch + parameter passing (stories 4.2.5-4.2.6)
+
+- Runtime dispatch is now implemented as an application-layer seam (`application/workflow-studio/WorkflowUiEventRuntimeDispatcher.ts`) that consumes normalized UI events, resolves declarative UI trigger bindings, and dispatches into the existing `WorkflowStudioApplicationService.runWorkflowDraftTriggered` path without replacing the trigger/runtime pipeline.
+- Dispatch remains boundary-clean and asynchronous:
+  - UI event normalization stays in `UiTriggerEventContract`/UI adapters,
+  - binding lookup stays in `WorkflowUiTriggerEventAdapter`,
+  - runtime handoff stays in the existing workflow execution service.
+- UI-derived parameter passing now maps into workflow-facing contracts (runtime parameters, form values, selected image context, dataset references) via context patching in the dispatcher, so raw React/browser event objects do not leak into workflow execution.
+- Trigger payload mapping now carries both normalized UI metadata and top-level event payload fields, enabling trigger-payload input bindings to resolve business keys directly.
+- Dispatcher results now return structured dispatch records and inspectable issue codes (including blocking validation codes) for invalid/missing UI-derived parameters.
+- Added tests cover dispatch behavior, no-match/error outcomes, payload normalization/mapping, and invalid input handling.
+

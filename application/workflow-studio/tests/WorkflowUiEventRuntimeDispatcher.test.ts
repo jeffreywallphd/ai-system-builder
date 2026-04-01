@@ -1,0 +1,191 @@
+import { describe, expect, it } from "bun:test";
+import {
+  createEmptyWorkflowDraft,
+  serializeWorkflowDraft,
+  WorkflowDraftTriggerKinds,
+  WorkflowDraftTriggerTypes,
+} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import { createImageWorkflowUiTriggerBindingConfiguration } from "../../contracts/ImageWorkflowUiTriggerBindingConfiguration";
+import { createUiTriggerEvent, UiTriggerEventKinds } from "../UiTriggerEventContract";
+import { WorkflowUiEventRuntimeDispatcher } from "../WorkflowUiEventRuntimeDispatcher";
+
+describe("WorkflowUiEventRuntimeDispatcher", () => {
+  it("dispatches normalized UI submit events to the workflow trigger runtime asynchronously", async () => {
+    const draft = {
+      ...createEmptyWorkflowDraft(),
+      triggers: [{
+        id: "trigger-submit",
+        kind: WorkflowDraftTriggerKinds.user,
+        type: WorkflowDraftTriggerTypes.userInitiatedRun,
+        config: {},
+      }],
+    };
+    const content = serializeWorkflowDraft(draft);
+
+    const bindings = createImageWorkflowUiTriggerBindingConfiguration({
+      bindings: [{
+        bindingId: "binding.ui.parameter.submit",
+        event: {
+          kind: UiTriggerEventKinds.submit,
+          sourceComponentId: "parameter-form",
+          actionId: "submit",
+          eventName: "ui.image.parameter.submit",
+        },
+        target: { triggerId: "trigger-submit" },
+      }],
+    });
+
+    const event = createUiTriggerEvent({
+      kind: UiTriggerEventKinds.submit,
+      name: "ui.image.parameter.submit",
+      source: {
+        studio: "system-studio",
+        componentId: "parameter-form",
+        actionId: "submit",
+      },
+      payload: {
+        values: {
+          instruction: "repair scratches",
+        },
+      },
+    });
+
+    const calls: Array<Record<string, unknown>> = [];
+    const dispatcher = new WorkflowUiEventRuntimeDispatcher({
+      runWorkflowDraftTriggered: async (command) => {
+        calls.push(command as unknown as Record<string, unknown>);
+        return Object.freeze({
+          launchStatus: "launched",
+          validation: {
+            ready: true,
+            issues: Object.freeze([]),
+            blockingIssues: Object.freeze([]),
+            warningIssues: Object.freeze([]),
+            authoredValidation: { stage: "authored-validation", ready: true, blockingIssueCount: 0, warningIssueCount: 0 },
+            preExecutionValidation: { stage: "pre-execution-validation", ready: true, blockingIssueCount: 0, warningIssueCount: 0 },
+            translationValidation: { stage: "translation", ready: true, blockingIssueCount: 0, warningIssueCount: 0 },
+            plan: undefined,
+          },
+          executionStatus: {
+            executionId: "exec-1",
+            state: "completed",
+            launchAccepted: true,
+            transitions: Object.freeze([]),
+          },
+        });
+      },
+    });
+
+    const result = await dispatcher.dispatch({ content, event, bindings });
+    expect(calls).toHaveLength(1);
+    expect(result.issues).toEqual([]);
+    expect(result.dispatched).toEqual([
+      expect.objectContaining({
+        triggerId: "trigger-submit",
+        launchStatus: "launched",
+      }),
+    ]);
+
+    const firstContext = calls[0]?.context as Record<string, unknown>;
+    expect((firstContext.inputValues as Record<string, unknown>).instruction).toBe("repair scratches");
+    expect(((firstContext.metadata as Record<string, unknown>).systemFormValues as Record<string, unknown>).instruction).toBe("repair scratches");
+  });
+
+  it("returns a structured no-match issue when no workflow trigger binding resolves", async () => {
+    const content = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      triggers: [],
+    });
+
+    const event = createUiTriggerEvent({
+      kind: UiTriggerEventKinds.click,
+      name: "ui.image.gallery.open",
+      source: {
+        studio: "system-studio",
+        componentId: "output-gallery",
+        actionId: "open-image",
+      },
+      payload: {
+        imageId: "img-1",
+      },
+    });
+
+    const dispatcher = new WorkflowUiEventRuntimeDispatcher({
+      runWorkflowDraftTriggered: async () => {
+        throw new Error("should not run");
+      },
+    });
+
+    const result = await dispatcher.dispatch({ content, event });
+    expect(result.dispatched).toHaveLength(0);
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        code: "ui-trigger-no-match",
+      }),
+    ]);
+  });
+
+  it("surfaces blocking validation codes for inspectable invalid UI parameter payloads", async () => {
+    const draft = {
+      ...createEmptyWorkflowDraft(),
+      triggers: [{
+        id: "trigger-submit",
+        kind: WorkflowDraftTriggerKinds.user,
+        type: WorkflowDraftTriggerTypes.userInitiatedRun,
+        config: {},
+      }],
+    };
+    const content = serializeWorkflowDraft(draft);
+
+    const event = createUiTriggerEvent({
+      kind: UiTriggerEventKinds.submit,
+      name: "ui.image.parameter.submit",
+      source: {
+        studio: "system-studio",
+        componentId: "parameter-form",
+        actionId: "submit",
+      },
+      payload: {
+        values: {
+          instruction: 42,
+        },
+      },
+    });
+
+    const dispatcher = new WorkflowUiEventRuntimeDispatcher({
+      runWorkflowDraftTriggered: async () => Object.freeze({
+        launchStatus: "blocked",
+        validation: {
+          ready: false,
+          issues: Object.freeze([]),
+          blockingIssues: Object.freeze([
+            Object.freeze({ code: "unresolved-required-input", message: "missing", path: "x", stage: "pre-execution", severity: "error", category: "input-binding", blocking: true }),
+          ]),
+          warningIssues: Object.freeze([]),
+          authoredValidation: { stage: "authored-validation", ready: true, blockingIssueCount: 0, warningIssueCount: 0 },
+          preExecutionValidation: { stage: "pre-execution-validation", ready: false, blockingIssueCount: 1, warningIssueCount: 0 },
+          translationValidation: { stage: "translation", ready: false, blockingIssueCount: 1, warningIssueCount: 0 },
+          plan: undefined,
+        },
+        executionStatus: {
+          executionId: "exec-invalid",
+          state: "failed",
+          launchAccepted: false,
+          transitions: Object.freeze([]),
+          failure: {
+            kind: "validation-failure",
+            code: "unresolved-required-input",
+            message: "missing",
+            stage: "validation",
+          },
+        },
+      }),
+    });
+
+    const result = await dispatcher.dispatch({ content, event });
+    expect(result.dispatched[0]).toEqual(expect.objectContaining({
+      launchStatus: "blocked",
+      blockingIssueCodes: ["unresolved-required-input"],
+    }));
+  });
+});
