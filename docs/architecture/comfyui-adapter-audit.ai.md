@@ -116,3 +116,14 @@
 - Comfy result mapping remains adapter-bounded: `ComfyExecutionResultMaterializationMapper` maps executor outputs into those canonical fields (including stable ordering/group defaults) without leaking Comfy-specific batch semantics outside the adapter.
 - System-owned dataset persistence now stores ordering/group metadata in dataset generation records plus workflow-output provenance rows, keeping run-level grouping and output-level lineage queryable and inspectable.
 - Dataset preview read models now expose generation/run/group metadata for materialized outputs so Data Studio/System Studio inspection and reuse paths can browse workflow outputs as ordinary operational image records.
+
+
+## Story 2.4.5 + 2.4.6 update
+- Added a provider-agnostic runtime capability preflight seam in `application/system-runtime/RuntimeCapabilityExecutionPreflight.ts`.
+  - Resolves model bindings and runtime execution options against existing capability contracts.
+  - Returns structured failure states for validation failures vs unsupported provider mappings.
+  - Fails before provider execution for missing models, invalid combinations, unsupported requirements, and out-of-bounds values.
+- Added a ComfyUI-specific translation adapter in `infrastructure/comfyui/execution/mappers/ComfyRuntimeCapabilityTranslator.ts` that maps internal runtime capability state into ComfyUI execution configuration without leaking Comfy-specific terms upward.
+- Added focused tests:
+  - `application/system-runtime/tests/RuntimeCapabilityExecutionPreflight.test.ts`
+  - `infrastructure/comfyui/execution/tests/ComfyRuntimeCapabilityTranslator.test.ts`
