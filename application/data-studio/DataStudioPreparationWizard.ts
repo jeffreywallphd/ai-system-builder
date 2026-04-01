@@ -2,6 +2,7 @@ import type { CanonicalRecordValue } from "../../domain/dataset-studio/Canonical
 import {
   type PipelineStageConfigMode,
   type PipelineStageId,
+  PipelineStageIds,
 } from "../../domain/dataset-studio/PipelineStageDomain";
 import { PipelineStageRegistry } from "../../domain/dataset-studio/PipelineStageRegistry";
 import {
@@ -147,6 +148,10 @@ export interface DataStudioWizardValidationHooks {
 export interface DataStudioWizardCanvasHandoff {
   readonly asset: UnifiedPreparationAssetDefinition;
   readonly currentStageId: PipelineStageId;
+  readonly presentationMode: DataStudioWizardPresentationMode;
+  readonly stages: ReadonlyArray<DataStudioWizardStageSnapshot>;
+  readonly completedStageIds: ReadonlyArray<PipelineStageId>;
+  readonly skippedStageIds: ReadonlyArray<PipelineStageId>;
   readonly authoringGraph: StudioAuthoringGraphProjection;
 }
 
@@ -186,6 +191,12 @@ function stageOptionsMap(
     PipelineStageId,
     Readonly<Record<string, CanonicalRecordValue>>
   >);
+}
+
+function normalizeStringArray(values: ReadonlyArray<string> | undefined): ReadonlyArray<string> {
+  return Object.freeze([...new Set((values ?? [])
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0))]);
 }
 
 function updateStageConfig(
@@ -324,6 +335,7 @@ export class DataStudioPreparationWizard {
       throw new Error("Data Studio wizard requires at least one available stage.");
     }
     this.currentStageId = initialStageId;
+    this.synchronizeLineageMetadata();
   }
 
   public getSnapshot(): DataStudioWizardSnapshot {
@@ -373,6 +385,7 @@ export class DataStudioPreparationWizard {
       throw new Error("Data Studio wizard requires at least one available stage.");
     }
     this.currentStageId = initialStageId;
+    this.synchronizeLineageMetadata();
     return this.getSnapshot();
   }
 
@@ -633,10 +646,15 @@ export class DataStudioPreparationWizard {
   }
 
   public toCanvasHandoff(): DataStudioWizardCanvasHandoff {
+    const snapshot = this.getSnapshot();
     return Object.freeze({
       asset: this.asset,
-      currentStageId: this.currentStageId,
-      authoringGraph: this.resolution.authoringGraph,
+      currentStageId: snapshot.currentStageId,
+      presentationMode: snapshot.presentationMode,
+      stages: snapshot.stages,
+      completedStageIds: snapshot.completedStageIds,
+      skippedStageIds: snapshot.skippedStageIds,
+      authoringGraph: snapshot.authoringGraph,
     });
   }
 
@@ -701,6 +719,7 @@ export class DataStudioPreparationWizard {
     this.navigationHistory = Object.freeze(
       this.navigationHistory.filter((stageId) => knownStageIds.has(stageId)),
     );
+    this.synchronizeLineageMetadata();
   }
 
   private resolveFieldSnapshots(
@@ -884,6 +903,36 @@ export class DataStudioPreparationWizard {
       revision: nextRevision,
       updatedAt: now,
       createdAt: this.persistentIdentity.createdAt ?? now,
+    });
+  }
+
+  private synchronizeLineageMetadata(): void {
+    const stageReferences = Object.freeze(this.resolution.stageDescriptors.map((descriptor) => Object.freeze({
+      stageId: descriptor.stageId,
+      order: descriptor.order,
+      assetGroupIds: descriptor.assetGroupIds,
+    })));
+    const upstreamPipelineAssetIds = normalizeStringArray(this.asset.upstreamBindings.map((binding) => binding.pipelineAssetId));
+    const sourceSelection = this.asset.stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection);
+    const sourceReferences = normalizeStringArray([
+      typeof sourceSelection?.options.sourceReference === "string" ? sourceSelection.options.sourceReference : "",
+      ...this.asset.upstreamBindings.map((binding) => binding.sourceReference ?? ""),
+    ]);
+
+    this.asset = Object.freeze({
+      ...this.asset,
+      lineage: Object.freeze({
+        ...this.asset.lineage,
+        upstreamPipelineAssetIds,
+        sourceReferences,
+        stageReferences,
+        preparationContext: Object.freeze({
+          ...this.asset.lineage.preparationContext,
+          templateId: this.selectedTemplateId,
+          presentationMode: this.presentationMode,
+          authoringMode: "wizard",
+        }),
+      }),
     });
   }
 

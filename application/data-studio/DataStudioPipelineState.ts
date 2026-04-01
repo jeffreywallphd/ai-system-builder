@@ -9,11 +9,20 @@ import type {
 } from "../../domain/dataset-studio/UnifiedPreparationAsset";
 import { createUnifiedPreparationAssetDefinition } from "../../domain/dataset-studio/UnifiedPreparationAsset";
 import type {
+  PreparedDatasetLineageRecord,
+  PreparedDatasetReuseReference,
+} from "../../domain/dataset-studio/PreparedDatasetLineage";
+import type {
   DataStudioWizardPresentationMode,
   DataStudioWizardSnapshot,
   DataStudioWizardStageStatus,
 } from "./DataStudioPreparationWizard";
 import type { StudioAuthoringGraphProjection } from "../studio-shell/StudioAuthoringGraph";
+import {
+  buildPreparedDatasetLineage,
+  buildPreparedDatasetReuseReference,
+  validatePreparedDatasetLineageLinks,
+} from "./DataStudioLineageAndReuseService";
 
 export const DataStudioPipelineStateKind = "data-studio-pipeline-state";
 export const DataStudioPipelineStateSchemaVersion = "1.0.0";
@@ -91,6 +100,8 @@ export interface DataStudioPipelineState {
   readonly flow: DataStudioPipelineAuthoringFlowState;
   readonly authoringGraph: StudioAuthoringGraphProjection;
   readonly compatibility: DataStudioPipelineWizardCanvasCompatibility;
+  readonly preparedDatasetLineage: PreparedDatasetLineageRecord;
+  readonly preparedDatasetReuse: PreparedDatasetReuseReference;
 }
 
 const StageIdSchema = z.nativeEnum(PipelineStageIds);
@@ -177,6 +188,83 @@ const CompatibilitySchema = z.object({
   groupCount: z.number().int().nonnegative(),
 });
 
+const PreparedDatasetLineageSchema = z.object({
+  schemaVersion: z.literal("1.0.0"),
+  lineageId: z.string().trim().min(1),
+  capturedAt: z.string().trim().min(1),
+  pipeline: z.object({
+    pipelineId: z.string().trim().min(1),
+    pipelineAssetId: z.string().trim().min(1),
+    pipelineAssetVersionId: z.string().trim().min(1),
+  }),
+  upstream: z.object({
+    sources: z.array(z.object({
+      referenceId: z.string().trim().min(1),
+      sourceKind: z.string().trim().min(1).optional(),
+      sourceReference: z.string().trim().min(1).optional(),
+      sourceAssetId: z.string().trim().min(1).optional(),
+      sourceVersionId: z.string().trim().min(1).optional(),
+    })),
+    assets: z.array(z.object({
+      assetId: z.string().trim().min(1),
+      versionId: z.string().trim().min(1).optional(),
+      relationship: z.enum(["source", "pipeline", "stage-output", "prepared-storage"]),
+      stageId: StageIdSchema.optional(),
+    })),
+    pipelines: z.array(z.object({
+      pipelineAssetId: z.string().trim().min(1),
+      pipelineVersionId: z.string().trim().min(1).optional(),
+      outputStageId: StageIdSchema.optional(),
+      outputAssetGroupIds: z.array(z.string().trim().min(1)),
+    })),
+  }),
+  stages: z.array(z.object({
+    stageId: StageIdSchema,
+    order: z.number().int().positive(),
+    status: z.enum(["current", "completed", "skipped", "pending", "disabled"]),
+    isOptional: z.boolean(),
+    isAvailable: z.boolean(),
+    activationMode: z.enum(["always", "conditional", "disabled"]),
+    configMode: z.enum(["simple", "advanced"]),
+    optionKeys: z.array(z.string().trim().min(1)),
+    assetGroupIds: z.array(z.string().trim().min(1)),
+    dependsOnStageIds: z.array(StageIdSchema),
+  })),
+  output: z.object({
+    preparedAssetId: z.string().trim().min(1),
+    preparedAssetVersionId: z.string().trim().min(1).optional(),
+    outputShapeKind: z.string().trim().min(1),
+    storageTargetId: z.string().trim().min(1).optional(),
+    storageReference: z.string().trim().min(1).optional(),
+  }),
+  preparationContext: z.object({
+    templateId: z.string().trim().min(1).optional(),
+    templateIntent: z.string().trim().min(1).optional(),
+    authoringMode: z.nativeEnum(DataStudioAuthoringModes),
+    presentationMode: z.enum(["simple", "advanced"]),
+    currentStageId: StageIdSchema,
+    completedStageIds: z.array(StageIdSchema),
+    skippedStageIds: z.array(StageIdSchema),
+    metadata: z.record(z.any()).optional(),
+  }),
+});
+
+const PreparedDatasetReuseSchema = z.object({
+  reuseId: z.string().trim().min(1),
+  assetId: z.string().trim().min(1),
+  versionId: z.string().trim().min(1).optional(),
+  displayName: z.string().trim().min(1),
+  reusable: z.boolean(),
+  lineageId: z.string().trim().min(1),
+  pipelineAssetId: z.string().trim().min(1),
+  discoverability: z.object({
+    semanticRole: z.literal("dataset"),
+    sourceType: z.literal("data-studio"),
+    tags: z.array(z.string().trim().min(1)),
+    upstreamAssetIds: z.array(z.string().trim().min(1)),
+  }),
+});
+
 const DataStudioPipelineStateSchema = z.object({
   kind: z.literal(DataStudioPipelineStateKind),
   schemaVersion: z.literal(DataStudioPipelineStateSchemaVersion),
@@ -188,6 +276,8 @@ const DataStudioPipelineStateSchema = z.object({
   flow: FlowStateSchema,
   authoringGraph: GraphProjectionSchema,
   compatibility: CompatibilitySchema,
+  preparedDatasetLineage: PreparedDatasetLineageSchema.optional(),
+  preparedDatasetReuse: PreparedDatasetReuseSchema.optional(),
 });
 
 function dedupeStageIds(ids: ReadonlyArray<PipelineStageId>): ReadonlyArray<PipelineStageId> {
@@ -247,6 +337,16 @@ function assertStateIntegrity(state: DataStudioPipelineState): void {
     }
     bindingStageIds.add(binding.stageId);
   }
+
+  if (state.preparedDatasetReuse.lineageId !== state.preparedDatasetLineage.lineageId) {
+    throw new Error("Prepared dataset reuse reference must point to the same lineage record.");
+  }
+
+  const linkageIssues = validatePreparedDatasetLineageLinks(state.preparedDatasetLineage);
+  const blockingIssues = linkageIssues.filter((issue) => issue.severity === "error");
+  if (blockingIssues.length > 0) {
+    throw new Error(`Prepared dataset lineage contains invalid linkage: ${blockingIssues[0]?.message}`);
+  }
 }
 
 export function createDataStudioPipelineState(
@@ -256,6 +356,39 @@ export function createDataStudioPipelineState(
   const unifiedPreparationAsset = createUnifiedPreparationAssetDefinition(
     parsed.unifiedPreparationAsset as UnifiedPreparationAssetDefinition,
   );
+  const normalizedFlow = Object.freeze({
+    ...parsed.flow,
+    completedStageIds: dedupeStageIds(parsed.flow.completedStageIds),
+    skippedStageIds: dedupeStageIds(parsed.flow.skippedStageIds),
+    navigationHistory: dedupeStageIds(parsed.flow.navigationHistory),
+    templateId: parsed.flow.templateId.trim(),
+  });
+  const normalizedStages = Object.freeze(
+    parsed.stages
+      .map((stage) => Object.freeze({
+        ...stage,
+        assetGroupIds: dedupeStrings(stage.assetGroupIds),
+      }))
+      .sort((left, right) => left.order - right.order),
+  );
+  const normalizedTransitions = Object.freeze(
+    parsed.transitions.map((transition) => Object.freeze({ ...transition })),
+  );
+
+  const preparedDatasetLineage = parsed.preparedDatasetLineage
+    ?? buildPreparedDatasetLineage({
+      identity: parsed.identity,
+      asset: unifiedPreparationAsset,
+      stages: normalizedStages,
+      transitions: normalizedTransitions,
+      flow: normalizedFlow,
+    });
+  const preparedDatasetReuse = parsed.preparedDatasetReuse
+    ?? buildPreparedDatasetReuseReference(preparedDatasetLineage, {
+      displayName: parsed.identity.name,
+      reusable: unifiedPreparationAsset.lineage.reusableAsAsset,
+      additionalTags: unifiedPreparationAsset.lineage.reuseTags,
+    });
 
   const normalized: DataStudioPipelineState = Object.freeze({
     kind: DataStudioPipelineStateKind,
@@ -270,28 +403,15 @@ export function createDataStudioPipelineState(
       description: parsed.identity.description?.trim() || undefined,
     }),
     unifiedPreparationAsset,
-    stages: Object.freeze(
-      parsed.stages
-        .map((stage) => Object.freeze({
-          ...stage,
-          assetGroupIds: dedupeStrings(stage.assetGroupIds),
-        }))
-        .sort((left, right) => left.order - right.order),
-    ),
+    stages: normalizedStages,
     assetBindings: Object.freeze(parsed.assetBindings.map((binding) => Object.freeze({
       ...binding,
       assetGroupIds: dedupeStrings(binding.assetGroupIds),
       upstreamPipelineAssetIds: dedupeStrings(binding.upstreamPipelineAssetIds),
       upstreamOutputStageIds: dedupeStageIds(binding.upstreamOutputStageIds),
     }))),
-    transitions: Object.freeze(parsed.transitions.map((transition) => Object.freeze({ ...transition }))),
-    flow: Object.freeze({
-      ...parsed.flow,
-      completedStageIds: dedupeStageIds(parsed.flow.completedStageIds),
-      skippedStageIds: dedupeStageIds(parsed.flow.skippedStageIds),
-      navigationHistory: dedupeStageIds(parsed.flow.navigationHistory),
-      templateId: parsed.flow.templateId.trim(),
-    }),
+    transitions: normalizedTransitions,
+    flow: normalizedFlow,
     authoringGraph: Object.freeze({
       source: "pipeline",
       nodes: Object.freeze(parsed.authoringGraph.nodes.map((node) => Object.freeze({ ...node }))),
@@ -303,6 +423,12 @@ export function createDataStudioPipelineState(
       graphNodeCount: parsed.compatibility.graphNodeCount,
       graphEdgeCount: parsed.compatibility.graphEdgeCount,
       groupCount: parsed.compatibility.groupCount,
+    }),
+    preparedDatasetLineage: Object.freeze({
+      ...preparedDatasetLineage,
+    }),
+    preparedDatasetReuse: Object.freeze({
+      ...preparedDatasetReuse,
     }),
   });
 
@@ -331,6 +457,51 @@ export function createDataStudioPipelineStateFromWizard(input: {
       .map((binding) => binding.outputStageId)
       .filter((stageId): stageId is PipelineStageId => typeof stageId === "string"),
   );
+  const flow = Object.freeze({
+    authoringMode: input.authoringMode ?? DataStudioAuthoringModes.wizard,
+    currentStageId: input.snapshot.currentStageId,
+    presentationMode: input.snapshot.presentationMode,
+    progressiveDisclosureMode: input.snapshot.presentationMode,
+    templateId: input.snapshot.template.id,
+    completedStageIds: input.snapshot.completedStageIds,
+    skippedStageIds: input.snapshot.skippedStageIds,
+    navigationHistory: dedupeStageIds(input.navigationHistory),
+  });
+  const stages = Object.freeze(stageDescriptors.map((stage) => Object.freeze({
+    stageId: stage.stageId,
+    order: stage.order,
+    enabled: stage.availability.isAvailable,
+    status: stage.status,
+    visibility: stage.visibility,
+    configMode: stage.configMode,
+    activation: stage.activation,
+    options: stage.options,
+    assetGroupIds: stage.assetGroupIds,
+  })));
+
+  const preparedDatasetLineage = buildPreparedDatasetLineage({
+    identity: Object.freeze({
+      draftId: identity?.draftId?.trim() || defaults.draftId,
+      pipelineId: identity?.pipelineId?.trim() || defaults.pipelineId,
+      assetId: input.snapshot.assetId,
+      assetVersionId: input.snapshot.versionId,
+      name: identity?.name?.trim() || defaults.name,
+      description: identity?.description?.trim() || defaults.description,
+      revision: currentRevision,
+      createdAt: identity?.createdAt?.trim() || defaults.createdAt,
+      updatedAt: now,
+    }),
+    asset: input.asset,
+    stages,
+    transitions: Object.freeze(transitions.filter((transition) => transition.fromStageId !== transition.toStageId)),
+    flow,
+    templateIntent: input.snapshot.template.intent,
+  });
+  const preparedDatasetReuse = buildPreparedDatasetReuseReference(preparedDatasetLineage, {
+    displayName: input.snapshot.template.name,
+    reusable: input.asset.lineage.reusableAsAsset,
+    additionalTags: input.asset.lineage.reuseTags,
+  });
 
   return createDataStudioPipelineState({
     kind: DataStudioPipelineStateKind,
@@ -347,17 +518,7 @@ export function createDataStudioPipelineStateFromWizard(input: {
       updatedAt: now,
     }),
     unifiedPreparationAsset: input.asset,
-    stages: Object.freeze(stageDescriptors.map((stage) => Object.freeze({
-      stageId: stage.stageId,
-      order: stage.order,
-      enabled: stage.availability.isAvailable,
-      status: stage.status,
-      visibility: stage.visibility,
-      configMode: stage.configMode,
-      activation: stage.activation,
-      options: stage.options,
-      assetGroupIds: stage.assetGroupIds,
-    }))),
+    stages,
     assetBindings: Object.freeze(stageDescriptors.map((stage) => Object.freeze({
       stageId: stage.stageId,
       assetGroupIds: stage.assetGroupIds,
@@ -365,16 +526,7 @@ export function createDataStudioPipelineStateFromWizard(input: {
       upstreamOutputStageIds: upstreamOutputStages,
     }))),
     transitions: Object.freeze(transitions.filter((transition) => transition.fromStageId !== transition.toStageId)),
-    flow: Object.freeze({
-      authoringMode: input.authoringMode ?? DataStudioAuthoringModes.wizard,
-      currentStageId: input.snapshot.currentStageId,
-      presentationMode: input.snapshot.presentationMode,
-      progressiveDisclosureMode: input.snapshot.presentationMode,
-      templateId: input.snapshot.template.id,
-      completedStageIds: input.snapshot.completedStageIds,
-      skippedStageIds: input.snapshot.skippedStageIds,
-      navigationHistory: dedupeStageIds(input.navigationHistory),
-    }),
+    flow,
     authoringGraph: input.snapshot.authoringGraph,
     compatibility: Object.freeze({
       source: "pipeline",
@@ -382,6 +534,8 @@ export function createDataStudioPipelineStateFromWizard(input: {
       graphEdgeCount: input.snapshot.authoringGraph.edges.length,
       groupCount: input.snapshot.authoringGraph.groups.length,
     }),
+    preparedDatasetLineage,
+    preparedDatasetReuse,
   });
 }
 

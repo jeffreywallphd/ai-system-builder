@@ -22,11 +22,14 @@ describe("DataStudioPipelineState", () => {
     expect(state.flow.currentStageId).toBe(PipelineStageIds.UnifiedIngestion);
     expect(state.stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection)?.options.sourceKind).toBe("json");
     expect(state.assetBindings.length).toBeGreaterThan(0);
+    expect(state.preparedDatasetLineage.output.preparedAssetId).toBe(state.unifiedPreparationAsset.output.preparedAssetId);
+    expect(state.preparedDatasetReuse.assetId).toBe(state.preparedDatasetLineage.output.preparedAssetId);
 
     const serialized = serializeDataStudioPipelineState(state);
     const rehydrated = deserializeDataStudioPipelineState(serialized);
     expect(rehydrated.flow.currentStageId).toBe(PipelineStageIds.UnifiedIngestion);
     expect(rehydrated.identity.revision).toBe(state.identity.revision);
+    expect(rehydrated.preparedDatasetReuse.lineageId).toBe(rehydrated.preparedDatasetLineage.lineageId);
   });
 
   it("rejects invalid pipeline states that disable required stages", () => {

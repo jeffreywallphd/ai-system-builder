@@ -14,6 +14,7 @@ import { DataStudioWizardPresentationModes } from "../../../application/data-stu
 import type { WizardStageStatus } from "../../studio-shell/wizard/WizardStageContracts";
 import { DataStudioPreparationWizardStateAdapter } from "../../studio-shell/data/DataStudioPreparationWizardStateAdapter";
 import StageWizardProgressNavigator from "../wizard/StageWizardProgressNavigator";
+import DataStudioPreparationCanvasReactFlow from "./DataStudioPreparationCanvasReactFlow";
 
 export interface DataStudioPreparationWizardPanelProps {
   readonly adapter?: DataStudioPreparationWizardStateAdapter;
@@ -100,6 +101,8 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
   const [snapshot, setSnapshot] = useState<DataStudioWizardSnapshot>(() => adapter.getSnapshot());
   const [isPaletteOpen, setIsPaletteOpen] = useState(true);
   const [paletteSearch, setPaletteSearch] = useState("");
+  const [authoringMode, setAuthoringMode] = useState<"wizard" | "canvas">("wizard");
+  const [selectedCanvasNodeId, setSelectedCanvasNodeId] = useState<string | undefined>(undefined);
   const [activationConditionDraft, setActivationConditionDraft] = useState<string>("");
   const [updateError, setUpdateError] = useState<string | undefined>(undefined);
 
@@ -113,6 +116,10 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
     return `${stage.title} ${stage.description} ${stage.stageId}`.toLowerCase().includes(paletteTerm);
   });
   const handoff = adapter.toCanvasHandoff();
+  const canvasProjection = adapter.toCanvasProjection();
+  const selectedCanvasNode = selectedCanvasNodeId
+    ? canvasProjection.graph.nodes.find((node) => node.id === selectedCanvasNodeId)
+    : undefined;
 
   const refreshSnapshot = () => {
     const next = adapter.getSnapshot();
@@ -301,6 +308,22 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
       <div className="ui-row ui-row--wrap">
         <button
           type="button"
+          className={`ui-button ui-button--sm ${authoringMode === "wizard" ? "ui-button--primary" : "ui-button--ghost"}`}
+          onClick={() => setAuthoringMode("wizard")}
+          data-testid="data-studio-authoring-mode-wizard"
+        >
+          Wizard
+        </button>
+        <button
+          type="button"
+          className={`ui-button ui-button--sm ${authoringMode === "canvas" ? "ui-button--primary" : "ui-button--ghost"}`}
+          onClick={() => setAuthoringMode("canvas")}
+          data-testid="data-studio-authoring-mode-canvas"
+        >
+          Canvas
+        </button>
+        <button
+          type="button"
           className={`ui-button ui-button--sm ${snapshot.presentationMode === DataStudioWizardPresentationModes.simple ? "ui-button--primary" : "ui-button--ghost"}`}
           onClick={() => {
             adapter.setSimpleMode();
@@ -328,131 +351,166 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
         </button>
       </div>
 
-      <div className="ui-stage-wizard__layout">
-        <StageWizardProgressNavigator
-          title="Data Studio wizard"
-          steps={snapshot.stages.map((stage) => ({
-            id: stage.stageId,
-            name: stage.title,
-            description: stage.description,
-            order: stage.order,
-            status: stage.status,
-            isDisabled: !stage.availability.isAvailable,
-          }))}
-        />
+      {authoringMode === "wizard" ? (
+        <div className="ui-stage-wizard__layout">
+          <StageWizardProgressNavigator
+            title="Data Studio wizard"
+            steps={snapshot.stages.map((stage) => ({
+              id: stage.stageId,
+              name: stage.title,
+              description: stage.description,
+              order: stage.order,
+              status: stage.status,
+              isDisabled: !stage.availability.isAvailable,
+            }))}
+          />
 
-        <section className="ui-stage-wizard__panel ui-stack ui-stack--sm">
-          {currentStage ? (
-            <>
-              <header className="ui-stack ui-stack--2xs">
-                <h4>{currentStage.title}</h4>
-                <span className="ui-subtle">{currentStage.description}</span>
-                <span className="ui-subtle">
-                  Stage {currentStage.order} of {snapshot.stages.length} | Status: {stageStatusLabel(currentStage.status)}
-                </span>
-              </header>
+          <section className="ui-stage-wizard__panel ui-stack ui-stack--sm">
+            {currentStage ? (
+              <>
+                <header className="ui-stack ui-stack--2xs">
+                  <h4>{currentStage.title}</h4>
+                  <span className="ui-subtle">{currentStage.description}</span>
+                  <span className="ui-subtle">
+                    Stage {currentStage.order} of {snapshot.stages.length} | Status: {stageStatusLabel(currentStage.status)}
+                  </span>
+                </header>
 
-              {renderCurrentStage()}
+                {renderCurrentStage()}
 
-              <section className="ui-card ui-card--padded ui-stack ui-stack--xs">
-                <strong>Stage controls</strong>
-                {currentStage.isOptional ? (
-                  <>
-                    <label className="ui-field">
-                      <span className="ui-field__label">Activation</span>
-                      <select
-                        className="ui-select"
-                        value={currentStage.activation.mode}
-                        onChange={(event) => {
-                          const result = adapter.setStageActivation(
-                            currentStage.stageId,
-                            toActivation(event.currentTarget.value, activationConditionDraft),
-                          );
-                          applyResult(result);
-                        }}
-                      >
-                        <option value={UnifiedPreparationStageActivationModes.always}>always</option>
-                        <option value={UnifiedPreparationStageActivationModes.conditional}>conditional</option>
-                        <option value={UnifiedPreparationStageActivationModes.disabled}>disabled</option>
-                      </select>
-                    </label>
-                    {currentStage.activation.mode === UnifiedPreparationStageActivationModes.conditional ? (
+                <section className="ui-card ui-card--padded ui-stack ui-stack--xs">
+                  <strong>Stage controls</strong>
+                  {currentStage.isOptional ? (
+                    <>
                       <label className="ui-field">
-                        <span className="ui-field__label">Condition id</span>
-                        <input
-                          className="ui-input"
-                          value={activationConditionDraft || currentStage.activation.conditionId || ""}
-                          onChange={(event) => setActivationConditionDraft(event.currentTarget.value)}
-                          onBlur={() => {
+                        <span className="ui-field__label">Activation</span>
+                        <select
+                          className="ui-select"
+                          value={currentStage.activation.mode}
+                          onChange={(event) => {
                             const result = adapter.setStageActivation(
                               currentStage.stageId,
-                              toActivation(
-                                UnifiedPreparationStageActivationModes.conditional,
-                                activationConditionDraft || currentStage.activation.conditionId || "",
-                              ),
+                              toActivation(event.currentTarget.value, activationConditionDraft),
                             );
                             applyResult(result);
                           }}
-                        />
+                        >
+                          <option value={UnifiedPreparationStageActivationModes.always}>always</option>
+                          <option value={UnifiedPreparationStageActivationModes.conditional}>conditional</option>
+                          <option value={UnifiedPreparationStageActivationModes.disabled}>disabled</option>
+                        </select>
                       </label>
-                    ) : null}
-                  </>
-                ) : (
-                  <span className="ui-subtle">Required stage. Activation controls are disabled.</span>
-                )}
-                <label className="ui-field">
-                  <span className="ui-field__label">Visibility</span>
-                  <select
-                    className="ui-select"
-                    value={currentStage.visibility}
-                    onChange={(event) => {
-                      const result = adapter.setStageVisibility(
-                        currentStage.stageId,
-                        event.currentTarget.value as "simple" | "advanced",
-                      );
-                      applyResult(result);
-                    }}
-                  >
-                    <option value="simple">simple</option>
-                    <option value="advanced">advanced</option>
-                  </select>
-                </label>
-              </section>
-            </>
-          ) : (
-            <span className="ui-subtle">No active stage.</span>
-          )}
+                      {currentStage.activation.mode === UnifiedPreparationStageActivationModes.conditional ? (
+                        <label className="ui-field">
+                          <span className="ui-field__label">Condition id</span>
+                          <input
+                            className="ui-input"
+                            value={activationConditionDraft || currentStage.activation.conditionId || ""}
+                            onChange={(event) => setActivationConditionDraft(event.currentTarget.value)}
+                            onBlur={() => {
+                              const result = adapter.setStageActivation(
+                                currentStage.stageId,
+                                toActivation(
+                                  UnifiedPreparationStageActivationModes.conditional,
+                                  activationConditionDraft || currentStage.activation.conditionId || "",
+                                ),
+                              );
+                              applyResult(result);
+                            }}
+                          />
+                        </label>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span className="ui-subtle">Required stage. Activation controls are disabled.</span>
+                  )}
+                  <label className="ui-field">
+                    <span className="ui-field__label">Visibility</span>
+                    <select
+                      className="ui-select"
+                      value={currentStage.visibility}
+                      onChange={(event) => {
+                        const result = adapter.setStageVisibility(
+                          currentStage.stageId,
+                          event.currentTarget.value as "simple" | "advanced",
+                        );
+                        applyResult(result);
+                      }}
+                    >
+                      <option value="simple">simple</option>
+                      <option value="advanced">advanced</option>
+                    </select>
+                  </label>
+                </section>
+              </>
+            ) : (
+              <span className="ui-subtle">No active stage.</span>
+            )}
 
-          {updateError ? (
-            <p className="ui-text-small ui-text-danger" data-testid="data-studio-wizard-update-error">{updateError}</p>
-          ) : null}
+            {updateError ? (
+              <p className="ui-text-small ui-text-danger" data-testid="data-studio-wizard-update-error">{updateError}</p>
+            ) : null}
 
-          <footer className="ui-row ui-row--between ui-row--wrap">
-            <button
-              type="button"
-              className="ui-button ui-button--ghost"
-              onClick={() => {
-                adapter.goBack();
-                refreshSnapshot();
-              }}
-              disabled={!snapshot.canGoBack}
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              className="ui-button ui-button--primary"
-              onClick={() => {
-                adapter.goNext();
-                refreshSnapshot();
-              }}
-              disabled={!snapshot.canGoNext}
-            >
-              Next
-            </button>
-          </footer>
+            <footer className="ui-row ui-row--between ui-row--wrap">
+              <button
+                type="button"
+                className="ui-button ui-button--ghost"
+                onClick={() => {
+                  adapter.goBack();
+                  refreshSnapshot();
+                }}
+                disabled={!snapshot.canGoBack}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                className="ui-button ui-button--primary"
+                onClick={() => {
+                  adapter.goNext();
+                  refreshSnapshot();
+                }}
+                disabled={!snapshot.canGoNext}
+              >
+                Next
+              </button>
+            </footer>
+          </section>
+        </div>
+      ) : (
+        <section className="ui-workflow-studio-canvas ui-stack ui-stack--sm" data-testid="data-studio-canvas-mode">
+          <header className="ui-row ui-row--between ui-row--wrap">
+            <strong>Data Studio Canvas</strong>
+            <div className="ui-row ui-row--wrap">
+              <span className="ui-badge ui-badge--neutral">Groups: {canvasProjection.graph.groups.length}</span>
+              <span className="ui-badge ui-badge--neutral">Nodes: {canvasProjection.graph.nodes.length}</span>
+              <span className="ui-badge ui-badge--neutral">Edges: {canvasProjection.graph.edges.length}</span>
+            </div>
+          </header>
+          <DataStudioPreparationCanvasReactFlow
+            projection={canvasProjection}
+            selectedNodeId={selectedCanvasNodeId}
+            onSelectNode={setSelectedCanvasNodeId}
+            onClearSelection={() => setSelectedCanvasNodeId(undefined)}
+          />
+          <aside className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="data-studio-canvas-inspector">
+            <strong>Stage Inspector</strong>
+            {selectedCanvasNode ? (
+              <>
+                <span className="ui-text-small">{selectedCanvasNode.label}</span>
+                <span className="ui-text-small ui-text-secondary">
+                  Stage: {typeof selectedCanvasNode.metadata?.stageId === "string" ? selectedCanvasNode.metadata.stageId : "n/a"}
+                </span>
+                <span className="ui-text-small ui-text-secondary">
+                  Status: {typeof selectedCanvasNode.metadata?.stageStatus === "string" ? selectedCanvasNode.metadata.stageStatus : "n/a"}
+                </span>
+              </>
+            ) : (
+              <span className="ui-subtle">Select a canvas node to inspect stage metadata.</span>
+            )}
+          </aside>
         </section>
-      </div>
+      )}
 
       {isPaletteOpen ? (
         <aside className="ui-workflow-studio-canvas__drawer-overlay ui-workflow-studio-canvas__drawer-overlay--left" data-testid="data-studio-node-palette-drawer">
@@ -513,8 +571,9 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
       <details className="ui-card ui-card--padded ui-stack ui-stack--2xs">
         <summary className="ui-text-small">Wizard to Canvas handoff</summary>
         <span className="ui-text-small ui-text-secondary">Current stage: {handoff.currentStageId}</span>
+        <span className="ui-text-small ui-text-secondary">Presentation mode: {handoff.presentationMode}</span>
         <span className="ui-text-small ui-text-secondary">
-          Graph nodes: {handoff.authoringGraph.nodes.length} | edges: {handoff.authoringGraph.edges.length}
+          Graph nodes: {handoff.authoringGraph.nodes.length} | edges: {handoff.authoringGraph.edges.length} | stages: {handoff.stages.length}
         </span>
       </details>
     </section>

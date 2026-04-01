@@ -40,10 +40,14 @@ describe("DataStudioPreparationWizardStateAdapter", () => {
   it("supports wizard-to-canvas handoff metadata", () => {
     const adapter = new DataStudioPreparationWizardStateAdapter();
     const handoff = adapter.toCanvasHandoff();
+    const projection = adapter.toCanvasProjection();
 
     expect(handoff.currentStageId).toBe(PipelineStageIds.SourceSelection);
     expect(handoff.authoringGraph.nodes.length).toBeGreaterThan(0);
     expect(handoff.asset.identity.kind).toBe("unified-preparation");
+    expect(handoff.stages.length).toBeGreaterThan(0);
+    expect(projection.graph.source).toBe("canvas");
+    expect(projection.graph.nodes.length).toBe(handoff.authoringGraph.nodes.length);
   });
 
   it("exports and re-imports persistent pipeline state", () => {
