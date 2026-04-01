@@ -45,5 +45,22 @@ describe("DataStudioPreparationWizardStateAdapter", () => {
     expect(handoff.authoringGraph.nodes.length).toBeGreaterThan(0);
     expect(handoff.asset.identity.kind).toBe("unified-preparation");
   });
+
+  it("exports and re-imports persistent pipeline state", () => {
+    const adapter = new DataStudioPreparationWizardStateAdapter();
+    adapter.setStageOptions(PipelineStageIds.SourceSelection, Object.freeze({
+      sourceReference: "in-memory://records",
+      sourceKind: "json",
+    }));
+    adapter.goNext();
+
+    const serialized = adapter.exportPipelineStateJson();
+    const restored = new DataStudioPreparationWizardStateAdapter({
+      persistedState: serialized,
+    });
+    const snapshot = restored.getSnapshot();
+    expect(snapshot.currentStageId).toBe(PipelineStageIds.UnifiedIngestion);
+    expect(snapshot.stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection)?.options.sourceKind).toBe("json");
+  });
 });
 
