@@ -920,6 +920,8 @@ export class SystemDatasetInstanceService {
       image,
       storage: patched.storage,
       metadata: patched.metadata,
+      provenance: patched.provenance,
+      generation: patched.generation,
       admittedAt: patched.admittedAt,
       updatedAt: patched.updatedAt,
       mutationVersion: patched.mutationVersion,
