@@ -305,3 +305,30 @@
   - enforcement resolves the linked dataset asset/schema intent from the instance boundary instead of relying on caller-local checks.
 - For the image slice, media-intent records are validated through shared media contracts (`IMediaDatasetValidator` + `IMediaRecordValidator`), covering canonical image fields such as `assetRef`, `width`/`height`, `format`, `metadata`, `tags`, and `derived` attributes.
 - The enforcement seam remains generic for additional schema intents: non-media intents continue through the same boundary contract without introducing UI-local or adapter-local validation duplication.
+
+## Direction 5 extension update: image instance ingestion + query retrieval APIs (stories 1.2.9-1.2.10)
+
+- Dataset-instance runtime records now include an explicit image-record contract in `domain/system-runtime/DatasetInstanceRecordDomain.ts`:
+  - system-owned/runtime-scoped identity (`recordId`, `instanceId`, `systemId`, dataset asset linkage),
+  - admitted canonical image payload (`ImageRecord`),
+  - optional storage reference metadata (`reference`, `provider`),
+  - bounded query criteria helpers (format/tag/dimension/asset-ref/metadata filters).
+- Dataset-instance persistence now supports image record durability alongside instance state through `application/system-runtime/DatasetInstanceRepository.ts` + `infrastructure/filesystem/system-runtime/SqliteDatasetInstanceRepository.ts`:
+  - save/get/list/query image records by instance boundary,
+  - SQLite schema migration adds `system_dataset_instance_image_records` with indexed instance/query fields,
+  - rehydration uses canonical domain normalization (no raw cast-only payload reads).
+- `SystemDatasetInstanceService` now exposes bounded ingestion/retrieval APIs for image instance records:
+  - `ingestImageRecordIntoInstance(...)` and `ingestImageRecordsIntoInstance(...)`,
+  - `listImageRecordsForInstance(...)` and `getImageRecordFromInstance(...)`.
+- Ingestion remains instance-boundary-first and system-ownership-safe:
+  - requires an existing target dataset instance,
+  - enforces system ownership checks before admit/read operations,
+  - routes admission through existing schema enforcement (`DatasetInstanceSchemaEnforcementService`) tied to the linked dataset asset.
+- Image ingestion metadata handling is now adapter-backed and reusable:
+  - optional metadata extraction via existing image metadata extractor seams (`IImageMetadataExtractor`),
+  - extraction can populate missing dimensions/format and merge metadata/exif into candidate records,
+  - storage reference handling remains an explicit runtime concern (request-provided or derived from `assetRef`).
+- Query/retrieval remains intentionally bounded for this slice:
+  - deterministic list/get by instance,
+  - optional simple filtering (format, tag, dimensions, asset stable id, top-level metadata equality),
+  - no parallel search subsystem or UI-specific query coupling introduced.

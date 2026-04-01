@@ -1,9 +1,12 @@
-import type { CanonicalDataShape } from "../../domain/dataset-studio/CanonicalDataShapes";
+import type { CanonicalDataShape, CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
 import { DatasetSchemaIntentIds } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import type {
-  IMediaDatasetValidator,
   IMediaRecordValidator,
+  IMediaDatasetValidator,
 } from "../../domain/dataset-studio/interfaces/MediaValidation";
+import type { IImageRecordValidator } from "../../domain/dataset-studio/contracts/ImageRecord";
+import type { IImageMetadataExtractor } from "../../domain/dataset-studio/interfaces/ImageMetadataExtraction";
+import { createDefaultMediaAdapterBundle } from "../dataset-studio/adapters/media/MediaAdapterFactory";
 import {
   createSystemDatasetBindingFromInstance,
   mapSystemBindingRoleToDatasetInstanceRole,
@@ -18,6 +21,12 @@ import {
   type DatasetInstance,
   type DatasetInstanceRole,
 } from "../../domain/system-runtime/DatasetInstanceDomain";
+import {
+  createDatasetInstanceImageRecord,
+  deriveStorageReferenceFromImageRecord,
+  type DatasetInstanceImageRecord,
+  type DatasetInstanceImageRecordQuery,
+} from "../../domain/system-runtime/DatasetInstanceRecordDomain";
 import type { DatasetInstanceAssetCatalog } from "./DatasetInstanceAssetCatalog";
 import type { DatasetInstanceRepository } from "./DatasetInstanceRepository";
 import { createDefaultMediaValidationAdapters } from "../dataset-studio/adapters/validation/MediaValidationFactory";
@@ -96,10 +105,55 @@ export interface GetSystemDatasetBindingByRoleRequest {
 
 export interface SystemDatasetInstanceServiceOptions {
   readonly mediaRecordValidator?: IMediaRecordValidator;
+  readonly imageRecordValidator?: IImageRecordValidator;
+  readonly imageMetadataExtractor?: IImageMetadataExtractor;
+}
+
+export interface IngestDatasetInstanceImageRecordMetadataExtraction {
+  readonly payload: Uint8Array;
+  readonly includeExifInMetadata?: boolean;
+}
+
+export interface IngestDatasetInstanceImageRecordRequest {
+  readonly systemId: string;
+  readonly instanceId: string;
+  readonly record: unknown;
+  readonly recordId?: string;
+  readonly storageReference?: string;
+  readonly storageProvider?: string;
+  readonly metadata?: Readonly<Record<string, CanonicalRecordValue>>;
+  readonly metadataExtraction?: IngestDatasetInstanceImageRecordMetadataExtraction;
+}
+
+export interface IngestDatasetInstanceImageRecordsRequest {
+  readonly systemId: string;
+  readonly instanceId: string;
+  readonly records: ReadonlyArray<{
+    readonly record: unknown;
+    readonly recordId?: string;
+    readonly storageReference?: string;
+    readonly storageProvider?: string;
+    readonly metadata?: Readonly<Record<string, CanonicalRecordValue>>;
+    readonly metadataExtraction?: IngestDatasetInstanceImageRecordMetadataExtraction;
+  }>;
+}
+
+export interface QueryDatasetInstanceImageRecordsRequest {
+  readonly systemId: string;
+  readonly instanceId: string;
+  readonly query?: DatasetInstanceImageRecordQuery;
+}
+
+export interface GetDatasetInstanceImageRecordRequest {
+  readonly systemId: string;
+  readonly instanceId: string;
+  readonly recordId: string;
 }
 
 export class SystemDatasetInstanceService {
   private readonly schemaEnforcementService: DatasetInstanceSchemaEnforcementService;
+  private readonly imageRecordValidator: IImageRecordValidator;
+  private readonly imageMetadataExtractor: IImageMetadataExtractor;
 
   public constructor(
     private readonly repository: DatasetInstanceRepository,
@@ -113,6 +167,10 @@ export class SystemDatasetInstanceService {
       this.mediaDatasetValidator,
       options.mediaRecordValidator ?? createDefaultMediaValidationAdapters().mediaRecordValidator,
     );
+    this.imageRecordValidator = options.imageRecordValidator
+      ?? createDefaultMediaValidationAdapters().imageRecordValidator;
+    this.imageMetadataExtractor = options.imageMetadataExtractor
+      ?? createDefaultMediaAdapterBundle().metadataExtractor;
   }
 
   public async createDatasetInstance(request: CreateSystemDatasetInstanceRequest): Promise<DatasetInstance> {
@@ -350,6 +408,248 @@ export class SystemDatasetInstanceService {
       instance,
       records: input.records,
     });
+  }
+
+  public async ingestImageRecordIntoInstance(
+    request: IngestDatasetInstanceImageRecordRequest,
+  ): Promise<DatasetInstanceImageRecord> {
+    const instance = await this.requireOwnedDatasetInstance({
+      systemId: request.systemId,
+      instanceId: request.instanceId,
+    });
+
+    const candidate = await this.prepareImageRecordCandidate({
+      record: request.record,
+      storageReference: request.storageReference,
+      metadataExtraction: request.metadataExtraction,
+    });
+    const admitted = this.schemaEnforcementService.admitRecordForInstance({
+      instance,
+      record: candidate,
+    });
+    const image = this.imageRecordValidator.validateImageRecord(admitted);
+    const now = new Date().toISOString();
+    const persisted = createDatasetInstanceImageRecord({
+      recordId: normalizeOptional(request.recordId) ?? this.createImageRecordId(instance.instanceId),
+      instanceId: instance.instanceId,
+      systemId: instance.systemId,
+      datasetAssetId: instance.datasetAssetId,
+      datasetAssetVersionId: instance.datasetAssetVersionId,
+      image,
+      storage: this.createStorageReference({
+        explicitReference: request.storageReference,
+        explicitProvider: request.storageProvider,
+        image,
+      }),
+      metadata: request.metadata,
+      admittedAt: now,
+      updatedAt: now,
+    });
+
+    return this.repository.saveImageRecord(persisted);
+  }
+
+  public async ingestImageRecordsIntoInstance(
+    request: IngestDatasetInstanceImageRecordsRequest,
+  ): Promise<ReadonlyArray<DatasetInstanceImageRecord>> {
+    const persisted: DatasetInstanceImageRecord[] = [];
+    for (const record of request.records) {
+      persisted.push(await this.ingestImageRecordIntoInstance({
+        systemId: request.systemId,
+        instanceId: request.instanceId,
+        record: record.record,
+        recordId: record.recordId,
+        storageReference: record.storageReference,
+        storageProvider: record.storageProvider,
+        metadata: record.metadata,
+        metadataExtraction: record.metadataExtraction,
+      }));
+    }
+    return Object.freeze(persisted);
+  }
+
+  public listImageRecordsForInstance(
+    request: QueryDatasetInstanceImageRecordsRequest,
+  ): ReadonlyArray<DatasetInstanceImageRecord> {
+    this.requireOwnedDatasetInstanceSync({
+      systemId: request.systemId,
+      instanceId: request.instanceId,
+    });
+    return this.repository.queryImageRecordsByInstanceId({
+      instanceId: request.instanceId,
+      query: request.query,
+    });
+  }
+
+  public getImageRecordFromInstance(
+    request: GetDatasetInstanceImageRecordRequest,
+  ): DatasetInstanceImageRecord | undefined {
+    this.requireOwnedDatasetInstanceSync({
+      systemId: request.systemId,
+      instanceId: request.instanceId,
+    });
+    const recordId = normalizeRequired(request.recordId, "recordId");
+    return this.repository.getImageRecordById({
+      instanceId: request.instanceId,
+      recordId,
+    });
+  }
+
+  private async prepareImageRecordCandidate(input: {
+    readonly record: unknown;
+    readonly storageReference?: string;
+    readonly metadataExtraction?: IngestDatasetInstanceImageRecordMetadataExtraction;
+  }): Promise<unknown> {
+    const baseRecord = this.ensureRecordObject(input.record);
+    const recordWithStorageReference = this.ensureAssetReferenceFromStorageReference({
+      record: baseRecord,
+      storageReference: input.storageReference,
+    });
+    if (!input.metadataExtraction) {
+      return recordWithStorageReference;
+    }
+
+    const extracted = await this.imageMetadataExtractor.extract(input.metadataExtraction.payload);
+    const metadataRecord = this.ensureCanonicalMetadataRecord(recordWithStorageReference.metadata);
+    const mergedMetadata = {
+      ...metadataRecord,
+      ...(extracted.additionalMetadata ?? {}),
+    } as Record<string, CanonicalRecordValue>;
+    if (input.metadataExtraction.includeExifInMetadata && extracted.exif) {
+      mergedMetadata.exif = this.toCanonicalRecordValue(extracted.exif);
+    }
+
+    return Object.freeze({
+      ...recordWithStorageReference,
+      width: this.toOptionalPositiveNumber(recordWithStorageReference.width) ?? extracted.dimensions.width,
+      height: this.toOptionalPositiveNumber(recordWithStorageReference.height) ?? extracted.dimensions.height,
+      format: this.toOptionalString(recordWithStorageReference.format)
+        ?? extracted.formatHint?.format
+        ?? "png",
+      metadata: Object.freeze(mergedMetadata),
+    });
+  }
+
+  private ensureRecordObject(value: unknown): Readonly<Record<string, unknown>> {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error("invalid-request:Image ingestion requires a record object.");
+    }
+    return Object.freeze({ ...(value as Record<string, unknown>) });
+  }
+
+  private ensureAssetReferenceFromStorageReference(input: {
+    readonly record: Readonly<Record<string, unknown>>;
+    readonly storageReference?: string;
+  }): Readonly<Record<string, unknown>> {
+    const storageReference = normalizeOptional(input.storageReference);
+    if (!storageReference || input.record.assetRef !== undefined) {
+      return input.record;
+    }
+
+    return Object.freeze({
+      ...input.record,
+      assetRef: Object.freeze({
+        kind: "generated-output",
+        stableId: `generated-output:${storageReference}`,
+        outputId: storageReference,
+        path: storageReference,
+        sourceSystem: "system-runtime-dataset-instance",
+        sourceContext: Object.freeze({
+          sourceKind: "instance-storage-reference",
+        }),
+      }),
+    });
+  }
+
+  private ensureCanonicalMetadataRecord(
+    metadata: unknown,
+  ): Readonly<Record<string, CanonicalRecordValue>> {
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+      return Object.freeze({});
+    }
+    const normalized: Record<string, CanonicalRecordValue> = {};
+    for (const [key, value] of Object.entries(metadata as Record<string, unknown>)) {
+      const normalizedKey = key.trim();
+      if (!normalizedKey) {
+        continue;
+      }
+      normalized[normalizedKey] = this.toCanonicalRecordValue(value);
+    }
+    return Object.freeze(normalized);
+  }
+
+  private toCanonicalRecordValue(value: unknown): CanonicalRecordValue {
+    if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      return value;
+    }
+    if (Array.isArray(value)) {
+      return Object.freeze(value.map((entry) => this.toCanonicalRecordValue(entry)));
+    }
+    if (typeof value === "object") {
+      return Object.freeze(Object.fromEntries(
+        Object.entries(value as Record<string, unknown>)
+          .map(([key, entry]) => [key, this.toCanonicalRecordValue(entry)] as const),
+      ));
+    }
+    return String(value);
+  }
+
+  private createStorageReference(input: {
+    readonly explicitReference?: string;
+    readonly explicitProvider?: string;
+    readonly image: DatasetInstanceImageRecord["image"];
+  }): DatasetInstanceImageRecord["storage"] | undefined {
+    const explicitReference = normalizeOptional(input.explicitReference);
+    const derivedReference = deriveStorageReferenceFromImageRecord(input.image);
+    const reference = explicitReference ?? derivedReference;
+    if (!reference) {
+      return undefined;
+    }
+    return Object.freeze({
+      reference,
+      provider: normalizeOptional(input.explicitProvider),
+    });
+  }
+
+  private toOptionalPositiveNumber(value: unknown): number | undefined {
+    if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+      return undefined;
+    }
+    return value;
+  }
+
+  private toOptionalString(value: unknown): string | undefined {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+    const normalized = value.trim();
+    return normalized ? normalized : undefined;
+  }
+
+  private createImageRecordId(instanceId: string): string {
+    return `${instanceId}:image-record:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  private async requireOwnedDatasetInstance(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+  }): Promise<DatasetInstance> {
+    await this.assertSystemExists(input.systemId);
+    return this.requireOwnedDatasetInstanceSync(input);
+  }
+
+  private requireOwnedDatasetInstanceSync(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+  }): DatasetInstance {
+    const systemId = normalizeRequired(input.systemId, "systemId");
+    const instance = this.requireDatasetInstance(input.instanceId);
+    if (instance.systemId !== systemId) {
+      throw new Error(
+        `invalid-request:Dataset instance '${instance.instanceId}' is owned by system '${instance.systemId}', not '${systemId}'.`,
+      );
+    }
+    return instance;
   }
 
   private async assertSystemExists(systemId: string): Promise<void> {

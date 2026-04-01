@@ -7,6 +7,7 @@ import {
   DatasetSchemaIntentIds,
   type DatasetSchemaIntentId,
 } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import type { IImageMetadataExtractor } from "../../../domain/dataset-studio/interfaces/ImageMetadataExtraction";
 import { ZodMediaDatasetValidator } from "../../dataset-studio/adapters/validation/MediaDatasetValidator";
 import type { DatasetInstanceAssetCatalog } from "../DatasetInstanceAssetCatalog";
 import { InMemoryDatasetInstanceRepository } from "../DatasetInstanceRepository";
@@ -43,6 +44,22 @@ class AllowListSystemValidator implements SystemDatasetOwnershipValidator {
     if (!this.allowedSystemIds.includes(systemId)) {
       throw new Error(`invalid-request:System '${systemId}' is not available.`);
     }
+  }
+}
+
+class StaticImageMetadataExtractor implements IImageMetadataExtractor {
+  public async extract(_payload: Uint8Array): Promise<{
+    readonly dimensions: { readonly width: number; readonly height: number };
+    readonly formatHint: { readonly format: string; readonly mimeType: string };
+    readonly exif: { readonly make: string };
+    readonly additionalMetadata: { readonly extractedBy: string };
+  }> {
+    return Object.freeze({
+      dimensions: Object.freeze({ width: 1600, height: 900 }),
+      formatHint: Object.freeze({ format: "png", mimeType: "image/png" }),
+      exif: Object.freeze({ make: "Camera-A" }),
+      additionalMetadata: Object.freeze({ extractedBy: "static-extractor" }),
+    });
   }
 }
 
@@ -538,5 +555,202 @@ describe("SystemDatasetInstanceService", () => {
         height: 512,
       },
     })).toThrow("rejected record admission");
+  });
+
+  it("ingests image records into system-owned instances with metadata extraction and storage reference persistence", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+      {
+        imageMetadataExtractor: new StaticImageMetadataExtractor(),
+      },
+    );
+
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:ingest-images",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    const ingested = await service.ingestImageRecordIntoInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      recordId: "record:image-1",
+      storageReference: "prepared://incoming/image-1",
+      storageProvider: "prepared-store",
+      record: {
+        tags: ["input", "hero"],
+      },
+      metadata: {
+        ingestionSource: "system-upload",
+      },
+      metadataExtraction: {
+        payload: new Uint8Array([1, 2, 3, 4]),
+        includeExifInMetadata: true,
+      },
+    });
+
+    expect(ingested.recordId).toBe("record:image-1");
+    expect(ingested.instanceId).toBe("dataset-instance:ingest-images");
+    expect(ingested.systemId).toBe("system:image-pipeline");
+    expect(ingested.image.width).toBe(1600);
+    expect(ingested.image.height).toBe(900);
+    expect(ingested.image.format).toBe("png");
+    expect(ingested.storage?.reference).toBe("prepared://incoming/image-1");
+    expect(ingested.storage?.provider).toBe("prepared-store");
+    expect(ingested.image.metadata.extractedBy).toBe("static-extractor");
+    expect(ingested.image.metadata.exif).toEqual({ make: "Camera-A" });
+    expect(ingested.metadata.ingestionSource).toBe("system-upload");
+
+    const listed = service.listImageRecordsForInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+    });
+    expect(listed.length).toBe(1);
+    expect(listed[0]?.recordId).toBe("record:image-1");
+  });
+
+  it("rejects invalid ingested image records and enforces system ownership on retrieval", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline", "system:other"]),
+    );
+
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:invalid-ingest",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    await expect(service.ingestImageRecordIntoInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      record: {
+        assetRef: { assetId: "asset:image:bad-1" },
+        width: 512,
+        height: 512,
+      },
+    })).rejects.toThrow("rejected record admission");
+
+    await service.ingestImageRecordIntoInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      recordId: "record:image-owned",
+      record: {
+        assetRef: { assetId: "asset:image:ok-1" },
+        width: 512,
+        height: 512,
+        format: "png",
+      },
+    });
+
+    expect(() => service.getImageRecordFromInstance({
+      systemId: "system:other",
+      instanceId: instance.instanceId,
+      recordId: "record:image-owned",
+    })).toThrow("is owned by system 'system:image-pipeline'");
+  });
+
+  it("lists and queries ingested records by simple metadata fields", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+    );
+
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:query-images",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    await service.ingestImageRecordsIntoInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      records: Object.freeze([
+        {
+          recordId: "record:query-1",
+          record: {
+            assetRef: { assetId: "asset:image:query-1" },
+            width: 1024,
+            height: 1024,
+            format: "png",
+            tags: ["featured", "hero"],
+            metadata: { source: "camera-a" },
+          },
+        },
+        {
+          recordId: "record:query-2",
+          record: {
+            assetRef: { assetId: "asset:image:query-2" },
+            width: 512,
+            height: 512,
+            format: "jpeg",
+            tags: ["thumbnail"],
+            metadata: { source: "camera-b" },
+          },
+        },
+      ]),
+    });
+
+    const all = service.listImageRecordsForInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+    });
+    expect(all.length).toBe(2);
+
+    const byId = service.getImageRecordFromInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      recordId: "record:query-1",
+    });
+    expect(byId?.image.assetRef.stableId).toContain("asset:image:query-1");
+
+    const queried = service.listImageRecordsForInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      query: {
+        format: "png",
+        tag: "hero",
+        minWidth: 800,
+        metadata: {
+          source: "camera-a",
+        },
+      },
+    });
+    expect(queried.length).toBe(1);
+    expect(queried[0]?.recordId).toBe("record:query-1");
   });
 });

@@ -7,6 +7,7 @@ import {
   DatasetInstanceLifecycleStatuses,
   DatasetInstanceRuntimeStatuses,
 } from "../../../../domain/system-runtime/DatasetInstanceDomain";
+import { createDatasetInstanceImageRecord } from "../../../../domain/system-runtime/DatasetInstanceRecordDomain";
 import { SqliteDatasetInstanceRepository } from "../SqliteDatasetInstanceRepository";
 
 describe("SqliteDatasetInstanceRepository", () => {
@@ -139,6 +140,117 @@ describe("SqliteDatasetInstanceRepository", () => {
       expect(intermediateLookup?.instanceId).toBe("dataset-instance:intermediate");
       expect(intermediateLookup?.lifecycleMetadata?.retentionPolicy).toBe("ttl");
       expect(intermediateLookup?.lifecycleMetadata?.maxAgeDays).toBe(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("persists, lists, retrieves, and queries image records by dataset instance boundary", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-dataset-instance-image-records-sqlite-"));
+    try {
+      const repository = new SqliteDatasetInstanceRepository(path.join(root, "dataset-instances.sqlite"));
+      repository.save(createDatasetInstance({
+        instanceId: "dataset-instance:input-images",
+        systemId: "system:image-pipeline",
+        datasetAssetId: "image-ingestor-v1",
+        datasetAssetVersionId: "1.0.0",
+        role: "input-store",
+        purpose: "incoming-images",
+        lifecycleStatus: DatasetInstanceLifecycleStatuses.ready,
+        runtimeStatus: DatasetInstanceRuntimeStatuses.idle,
+        createdAt: "2026-04-01T00:00:00.000Z",
+        updatedAt: "2026-04-01T00:00:00.000Z",
+      }));
+
+      repository.saveImageRecord(createDatasetInstanceImageRecord({
+        recordId: "img-record-1",
+        instanceId: "dataset-instance:input-images",
+        systemId: "system:image-pipeline",
+        datasetAssetId: "image-ingestor-v1",
+        datasetAssetVersionId: "1.0.0",
+        image: {
+          assetRef: {
+            kind: "generated-output",
+            stableId: "generated-output:prepared://image-1",
+            outputId: "prepared://image-1",
+          },
+          width: 1024,
+          height: 768,
+          format: "png",
+          metadata: {
+            source: "camera-a",
+            quality: "high",
+          },
+          tags: ["portrait", "hero"],
+          derived: {
+            orientation: "landscape",
+          },
+          schemaVersion: "1.0.0",
+        },
+        storage: {
+          reference: "prepared://image-1",
+          provider: "prepared-store",
+        },
+        metadata: {
+          role: "input",
+        },
+        admittedAt: "2026-04-01T00:01:00.000Z",
+        updatedAt: "2026-04-01T00:01:00.000Z",
+      }));
+
+      repository.saveImageRecord(createDatasetInstanceImageRecord({
+        recordId: "img-record-2",
+        instanceId: "dataset-instance:input-images",
+        systemId: "system:image-pipeline",
+        datasetAssetId: "image-ingestor-v1",
+        datasetAssetVersionId: "1.0.0",
+        image: {
+          assetRef: {
+            kind: "generated-output",
+            stableId: "generated-output:prepared://image-2",
+            outputId: "prepared://image-2",
+          },
+          width: 512,
+          height: 512,
+          format: "jpeg",
+          metadata: {
+            source: "camera-b",
+          },
+          tags: ["thumbnail"],
+          derived: {
+            orientation: "square",
+          },
+          schemaVersion: "1.0.0",
+        },
+        storage: {
+          reference: "prepared://image-2",
+        },
+        admittedAt: "2026-04-01T00:02:00.000Z",
+        updatedAt: "2026-04-01T00:02:00.000Z",
+      }));
+
+      const listed = repository.listImageRecordsByInstanceId("dataset-instance:input-images");
+      expect(listed.length).toBe(2);
+      expect(listed[0]?.recordId).toBe("img-record-2");
+
+      const fetched = repository.getImageRecordById({
+        instanceId: "dataset-instance:input-images",
+        recordId: "img-record-1",
+      });
+      expect(fetched?.image.width).toBe(1024);
+      expect(fetched?.storage?.reference).toBe("prepared://image-1");
+      expect(fetched?.metadata.role).toBe("input");
+
+      const queried = repository.queryImageRecordsByInstanceId({
+        instanceId: "dataset-instance:input-images",
+        query: {
+          format: "png",
+          tag: "portrait",
+          minWidth: 1000,
+        },
+      });
+      expect(queried.length).toBe(1);
+      expect(queried[0]?.recordId).toBe("img-record-1");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
