@@ -68,3 +68,9 @@
   - normalized output references (node/kind/reference/assetId/metadata),
   - normalized diagnostics derived from adapter errors.
 - This keeps preview/debug metadata internal-contract-first and adapter-result-driven, without exposing raw Comfy history payloads to workflow callers.
+
+## Story 2.2.1 + 2.2.2 update
+- Added runtime-agnostic common image node contracts at `application/execution/comfyui/image-nodes/CommonImageNodeContracts.ts` covering the current image vertical-slice node set (load/save/model/prompt/sampler/resize/VAE encode/decode).
+- Added reusable Comfy adapter base pattern at `infrastructure/comfyui/adapters/image-nodes/ComfyImageNodeAdapterPattern.ts` with explicit hook points for identity/capabilities, input mapping, output mapping, inspection metadata, and error normalization.
+- Added a single concrete pattern-validation adapter (`ComfyPromptInputNodeAdapter`) to prove the seam without prematurely implementing the full adapter catalog.
+- Added tests for contract shape, adapter consistency, required input validation, normalized error behavior, and boundary isolation (no Comfy-specific types in the internal contract module).
