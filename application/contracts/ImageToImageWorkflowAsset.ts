@@ -1,8 +1,5 @@
 import { z } from "zod";
-import { createBatchTransformWorkflowAsset, type BatchTransformWorkflowAsset } from "./BatchTransformWorkflowAsset";
-import { createEnhanceUpscaleWorkflowAsset, type EnhanceUpscaleWorkflowAsset } from "./EnhanceUpscaleWorkflowAsset";
 import { createImageWorkflowAssetPreview, type ImageWorkflowAssetPreview } from "./ImageWorkflowAssetPreview";
-import { createRestyleWorkflowAsset, type RestyleWorkflowAsset } from "./RestyleWorkflowAsset";
 import {
   CoreImageWorkflowAssetTypeContracts,
   ImageWorkflowAssetIntentTypes,
@@ -202,43 +199,3 @@ export function createImageToImageWorkflowAsset(input?: {
   });
 }
 
-export type ImageWorkflowAssetDefinition = ImageToImageWorkflowAsset | RestyleWorkflowAsset | EnhanceUpscaleWorkflowAsset | BatchTransformWorkflowAsset;
-
-export interface ImageWorkflowAssetRegistryEntry {
-  readonly id: string;
-  readonly version: string;
-  readonly intentType: string;
-  readonly title: string;
-  readonly summary: string;
-}
-
-export class ImageWorkflowAssetRegistry {
-  private readonly entries: ReadonlyArray<ImageWorkflowAssetDefinition>;
-
-  public constructor(entries: ReadonlyArray<ImageWorkflowAssetDefinition> = [
-    createImageToImageWorkflowAsset(),
-    createRestyleWorkflowAsset(),
-    createEnhanceUpscaleWorkflowAsset(),
-    createBatchTransformWorkflowAsset(),
-  ]) {
-    this.entries = Object.freeze(entries.map((entry) => Object.freeze(entry)));
-  }
-
-  public list(): ReadonlyArray<ImageWorkflowAssetRegistryEntry> {
-    return Object.freeze(this.entries.map((entry) => Object.freeze({
-      id: entry.id,
-      version: entry.version,
-      intentType: entry.intentType,
-      title: entry.preview.title,
-      summary: entry.preview.summary,
-    })));
-  }
-
-  public getByIntent(intentType: string): ImageWorkflowAssetDefinition | undefined {
-    return this.entries.find((entry) => entry.intentType === intentType);
-  }
-}
-
-export function createDefaultImageWorkflowAssetRegistry(): ImageWorkflowAssetRegistry {
-  return new ImageWorkflowAssetRegistry();
-}
