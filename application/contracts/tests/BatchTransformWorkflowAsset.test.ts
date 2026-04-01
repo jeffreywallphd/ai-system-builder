@@ -21,6 +21,7 @@ describe("BatchTransformWorkflowAsset", () => {
     expect(asset.outputMapping.mode).toBe("per-item");
     expect(asset.outputMapping.lineageField).toBe("lineage");
     expect(asset.inputBindings.bindings.some((binding) => binding.inputId === "batchItems")).toBeTrue();
+    expect(asset.outputBindings.bindings.some((binding) => binding.targetType === "output-dataset")).toBeTrue();
   });
 
   it("preserves composition integrity and batch preview/inspection metadata", () => {

@@ -15,6 +15,10 @@ import {
   type ImageWorkflowComposition,
 } from "./ImageWorkflowComposition";
 import { createImageWorkflowAssetPreview, type ImageWorkflowAssetPreview } from "./ImageWorkflowAssetPreview";
+import {
+  createImageWorkflowOutputBindingConfiguration,
+  type ImageWorkflowOutputBindingConfiguration,
+} from "./ImageWorkflowOutputBindingConfiguration";
 
 export const BatchTransformWorkflowAssetId = "image-workflow.batch-transform";
 export const BatchTransformWorkflowAssetVersion = "1.0.0";
@@ -53,6 +57,7 @@ export interface BatchTransformWorkflowAsset {
   readonly configuration: BatchTransformWorkflowAssetConfig;
   readonly composition: ImageWorkflowComposition;
   readonly inputBindings: ImageWorkflowInputBindingConfiguration;
+  readonly outputBindings: ImageWorkflowOutputBindingConfiguration;
   readonly bindings: Readonly<{
     readonly batchItemsFieldId: "batchItems";
     readonly instructionFieldId: "instruction";
@@ -68,6 +73,16 @@ export interface BatchTransformWorkflowAsset {
     readonly lineageField: "lineage";
   }>;
   readonly preview: ImageWorkflowAssetPreview;
+}
+
+function buildDefaultOutputBindings(): ImageWorkflowOutputBindingConfiguration {
+  return createImageWorkflowOutputBindingConfiguration({
+    bindings: [
+      { bindingId: "binding.output.primary", outputId: "images", targetType: "output-dataset", targetId: "workflow-output", writeMode: "upsert", defaultTags: ["output"] },
+      { bindingId: "binding.output.history", outputId: "images", targetType: "history-dataset", targetId: "workflow-output-history", writeMode: "append", defaultTags: ["history"] },
+      { bindingId: "binding.output.comparison", outputId: "images", targetType: "comparison-dataset", targetId: "workflow-output-comparison", writeMode: "append", groupBy: "comparison:batchtransform", defaultTags: ["comparison"] },
+    ],
+  });
 }
 
 function buildBatchTransformComposition(): ImageWorkflowComposition {
@@ -145,6 +160,7 @@ function buildBatchTransformComposition(): ImageWorkflowComposition {
 export function createBatchTransformWorkflowAsset(input?: {
   readonly configuration?: unknown;
   readonly inputBindings?: ImageWorkflowInputBindingConfiguration["bindings"];
+  readonly outputBindings?: unknown;
 }): BatchTransformWorkflowAsset {
   const contract = CoreImageWorkflowAssetTypeContracts[ImageWorkflowAssetIntentTypes.batchTransform];
   const configuration = BatchTransformWorkflowAssetConfigSchema.parse(input?.configuration ?? {});
@@ -175,6 +191,8 @@ export function createBatchTransformWorkflowAsset(input?: {
     ],
   });
 
+  const outputBindings = createImageWorkflowOutputBindingConfiguration(input?.outputBindings ?? buildDefaultOutputBindings());
+
   return Object.freeze({
     id: BatchTransformWorkflowAssetId,
     version: BatchTransformWorkflowAssetVersion,
@@ -183,6 +201,7 @@ export function createBatchTransformWorkflowAsset(input?: {
     configuration,
     composition,
     inputBindings,
+    outputBindings,
     bindings: Object.freeze({
       batchItemsFieldId: "batchItems",
       instructionFieldId: "instruction",

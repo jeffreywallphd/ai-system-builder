@@ -15,6 +15,10 @@ import {
   type ImageWorkflowComposition,
 } from "./ImageWorkflowComposition";
 import { createImageWorkflowAssetPreview, type ImageWorkflowAssetPreview } from "./ImageWorkflowAssetPreview";
+import {
+  createImageWorkflowOutputBindingConfiguration,
+  type ImageWorkflowOutputBindingConfiguration,
+} from "./ImageWorkflowOutputBindingConfiguration";
 
 export const EnhanceUpscaleWorkflowAssetId = "image-workflow.enhance-upscale";
 export const EnhanceUpscaleWorkflowAssetVersion = "1.0.0";
@@ -35,11 +39,22 @@ export interface EnhanceUpscaleWorkflowAsset {
   readonly configuration: EnhanceUpscaleWorkflowAssetConfig;
   readonly composition: ImageWorkflowComposition;
   readonly inputBindings: ImageWorkflowInputBindingConfiguration;
+  readonly outputBindings: ImageWorkflowOutputBindingConfiguration;
   readonly bindings: Readonly<{
     readonly sourceImageFieldId: "sourceImage";
     readonly outputFieldId: "enhancedImage";
   }>;
   readonly preview: ImageWorkflowAssetPreview;
+}
+
+function buildDefaultOutputBindings(): ImageWorkflowOutputBindingConfiguration {
+  return createImageWorkflowOutputBindingConfiguration({
+    bindings: [
+      { bindingId: "binding.output.primary", outputId: "enhancedImage", targetType: "output-dataset", targetId: "workflow-output", writeMode: "upsert", defaultTags: ["output"] },
+      { bindingId: "binding.output.history", outputId: "enhancedImage", targetType: "history-dataset", targetId: "workflow-output-history", writeMode: "append", defaultTags: ["history"] },
+      { bindingId: "binding.output.comparison", outputId: "enhancedImage", targetType: "comparison-dataset", targetId: "workflow-output-comparison", writeMode: "append", groupBy: "comparison:enhanceupscale", defaultTags: ["comparison"] },
+    ],
+  });
 }
 
 function buildEnhanceUpscaleComposition(): ImageWorkflowComposition {
@@ -102,6 +117,7 @@ function buildEnhanceUpscaleComposition(): ImageWorkflowComposition {
 export function createEnhanceUpscaleWorkflowAsset(input?: {
   readonly configuration?: unknown;
   readonly inputBindings?: ImageWorkflowInputBindingConfiguration["bindings"];
+  readonly outputBindings?: unknown;
 }): EnhanceUpscaleWorkflowAsset {
   const contract = CoreImageWorkflowAssetTypeContracts[ImageWorkflowAssetIntentTypes.enhanceUpscale];
   const configuration = EnhanceUpscaleWorkflowAssetConfigSchema.parse(input?.configuration ?? {});
@@ -122,6 +138,8 @@ export function createEnhanceUpscaleWorkflowAsset(input?: {
     ],
   });
 
+  const outputBindings = createImageWorkflowOutputBindingConfiguration(input?.outputBindings ?? buildDefaultOutputBindings());
+
   return Object.freeze({
     id: EnhanceUpscaleWorkflowAssetId,
     version: EnhanceUpscaleWorkflowAssetVersion,
@@ -130,6 +148,7 @@ export function createEnhanceUpscaleWorkflowAsset(input?: {
     configuration,
     composition,
     inputBindings,
+    outputBindings,
     bindings: Object.freeze({
       sourceImageFieldId: "sourceImage",
       outputFieldId: "enhancedImage",

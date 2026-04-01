@@ -12,6 +12,9 @@ import type { ImageWorkflowAssetContract } from "./ImageWorkflowAssetContract";
 import { ImageWorkflowAssetIntentTypes } from "./ImageWorkflowAssetContract";
 import type { ImageWorkflowAssetPreview } from "./ImageWorkflowAssetPreview";
 import { serializeImageWorkflowInputBindingConfiguration } from "./ImageWorkflowInputBindingConfiguration";
+import {
+  ImageWorkflowOutputBindingConfigurationSchema,
+} from "./ImageWorkflowOutputBindingConfiguration";
 import { createRestyleWorkflowAsset, type RestyleWorkflowAsset } from "./RestyleWorkflowAsset";
 
 export type ImageWorkflowAssetDefinition =
@@ -44,6 +47,7 @@ export interface ImageWorkflowAssetRegistryEntry {
     readonly description?: string;
   }>;
   readonly inputBindings: Readonly<Record<string, unknown>>;
+  readonly outputBindings: Readonly<Record<string, unknown>>;
 }
 
 export class ImageWorkflowAssetRegistry {
@@ -87,6 +91,7 @@ export class ImageWorkflowAssetRegistry {
         description: field.description,
       }))),
       inputBindings: serializeImageWorkflowInputBindingConfiguration(entry.inputBindings),
+      outputBindings: ImageWorkflowOutputBindingConfigurationSchema.parse(entry.outputBindings),
     })));
   }
 

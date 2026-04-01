@@ -44,8 +44,27 @@ const workflowOutputLineageReferenceSchema = z.object({
   workflowAssetVersionId: z.string().trim().min(1).optional(),
   workflowRunId: z.string().trim().min(1),
   sourceImageStableIds: z.array(z.string().trim().min(1)).default([]),
+  sourceDatasetAssetId: z.string().trim().min(1).optional(),
+  sourceDatasetAssetVersionId: z.string().trim().min(1).optional(),
+  sourceDatasetInstanceId: z.string().trim().min(1).optional(),
+  sourceRecordIds: z.array(z.string().trim().min(1)).default([]),
   outputGroupId: z.string().trim().min(1).optional(),
   outputIndex: z.number().int().nonnegative().optional(),
+  outputRelationship: z.object({
+    relationshipType: z.string().trim().min(1),
+    direction: z.enum(["produced-to-target", "derived-from-source", "captured-in-history"]).default("produced-to-target"),
+    reusable: z.boolean().default(true),
+    audit: z.boolean().default(true),
+    introspection: z.boolean().default(true),
+    metadata: z.record(z.string().trim().min(1), canonicalRecordValueSchema).default({}),
+  }).default({
+    relationshipType: "workflow-output-binding",
+    direction: "produced-to-target",
+    reusable: true,
+    audit: true,
+    introspection: true,
+    metadata: {},
+  }),
 });
 
 const workflowOutputPersistenceMetadataSchema = z.object({
