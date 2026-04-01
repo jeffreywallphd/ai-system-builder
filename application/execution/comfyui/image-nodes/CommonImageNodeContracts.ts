@@ -32,6 +32,26 @@ export interface ICommonImageNodeDatasetSelection {
   readonly strategy?: "latest" | "index" | "random";
 }
 
+export interface ICommonImageNodeModelCapabilityRef {
+  readonly modelRef: string;
+  readonly modelVersionRef?: string;
+  readonly modelFamily?: string;
+  readonly runtimeBindingRef?: string;
+  readonly adapterId: string;
+  readonly adapterVersion: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export interface ICommonImageNodePromptConditioning {
+  readonly positivePrompt: string;
+  readonly negativePrompt?: string;
+  readonly source?: "workflow-input" | "ui" | "system" | "unspecified";
+  readonly bindingRef?: string;
+  readonly adapterId: string;
+  readonly adapterVersion: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
 export type ImageNodeDataType =
   | "image"
   | "latent"
