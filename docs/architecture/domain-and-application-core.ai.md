@@ -1675,3 +1675,9 @@ Explicitly later than this scope:
   - stage option payload binding,
   - stage-group mapping references from unified preparation resolution.
 - This keeps Data Studio wizard/canvas compatibility bounded to one canonical preparation definition while remaining semantically distinct from Workflow Studio trigger/input/step/output semantics.
+
+## Direction 5 extension update: Data Studio persistent pipeline state + prepared output storage (stories 18.7-18.8)
+
+- Data Studio now has a canonical persistent authoring-state contract in `application/data-studio/DataStudioPipelineState.ts`, modeling pipeline identity/metadata, stage-level state, stage asset-group bindings, transitions, authoring-flow metadata, and wizard/canvas compatibility projection hooks over one unified-preparation asset source.
+- `DataStudioPreparationWizard` now exports/imports this persistent state directly, so wizard progression and later canvas projection can operate on one serializable, validation-backed representation rather than transient component-local state.
+- Prepared-data persistence now includes an explicit prepared-storage stage service (`application/dataset-studio/PreparedStorageStageService.ts`) and output contracts (`PreparedStorageStageOutput` in `StageIntegrationContracts.ts`) that bind prepared dataset identity, storage target/reference, upstream asset/pipeline references, and lineage metadata through bounded application seams.

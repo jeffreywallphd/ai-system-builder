@@ -76,6 +76,39 @@ const RawStorageStageOutputSchema = z.object({
 
 export type RawStorageStageOutput = z.output<typeof RawStorageStageOutputSchema>;
 
+const PreparedStorageDatasetSchema = z.object({
+  preparedAssetId: z.string().trim().min(1),
+  preparedAssetVersionId: z.string().trim().min(1),
+  outputShapeKind: z.string().trim().min(1),
+  recordCount: z.number().int().nonnegative().optional(),
+  byteLength: z.number().int().nonnegative().optional(),
+});
+
+const PreparedStoragePersistenceSchema = z.object({
+  targetId: z.string().trim().min(1),
+  storageReference: z.string().trim().min(1),
+  persistedAt: z.string().trim().min(1),
+  contentDigest: z.string().trim().min(1).optional(),
+});
+
+const PreparedStorageLineageSchema = z.object({
+  lineageId: z.string().trim().min(1),
+  pipelineAssetId: z.string().trim().min(1),
+  pipelineVersionId: z.string().trim().min(1).optional(),
+  upstreamAssetIds: z.array(z.string().trim().min(1)).default([]),
+  upstreamPipelineAssetIds: z.array(z.string().trim().min(1)).default([]),
+});
+
+const PreparedStorageStageOutputSchema = z.object({
+  stageKind: z.literal(DatasetPipelineStageKinds.preparedStorage),
+  status: StageExecutionStatusSchema,
+  dataset: PreparedStorageDatasetSchema,
+  persistence: PreparedStoragePersistenceSchema,
+  lineage: PreparedStorageLineageSchema,
+});
+
+export type PreparedStorageStageOutput = z.output<typeof PreparedStorageStageOutputSchema>;
+
 function toBoolean(value: CanonicalRecordValue | undefined): boolean | undefined {
   if (value === undefined) {
     return undefined;
@@ -350,4 +383,128 @@ export function readRawStorageStageOutput(
   }
 
   return fromLegacyRawStorageStageOutput(value);
+}
+
+export function createPreparedStorageStageOutput(input: {
+  readonly status?: StageExecutionStatusKind;
+  readonly dataset: {
+    readonly preparedAssetId: string;
+    readonly preparedAssetVersionId: string;
+    readonly outputShapeKind: string;
+    readonly recordCount?: number;
+    readonly byteLength?: number;
+  };
+  readonly persistence: {
+    readonly targetId: string;
+    readonly storageReference: string;
+    readonly persistedAt: string;
+    readonly contentDigest?: string;
+  };
+  readonly lineage: {
+    readonly lineageId: string;
+    readonly pipelineAssetId: string;
+    readonly pipelineVersionId?: string;
+    readonly upstreamAssetIds?: ReadonlyArray<string>;
+    readonly upstreamPipelineAssetIds?: ReadonlyArray<string>;
+  };
+}): PreparedStorageStageOutput {
+  const output = PreparedStorageStageOutputSchema.parse({
+    stageKind: DatasetPipelineStageKinds.preparedStorage,
+    status: input.status ?? StageExecutionStatusKinds.completed,
+    dataset: input.dataset,
+    persistence: input.persistence,
+    lineage: input.lineage,
+  });
+  return Object.freeze(output);
+}
+
+export function toStageRecordFromPreparedStorageOutput(
+  output: PreparedStorageStageOutput,
+): Readonly<Record<string, CanonicalRecordValue>> {
+  return withoutUndefined({
+    status: output.status,
+    completed: output.status === StageExecutionStatusKinds.completed,
+    preparedAssetId: output.dataset.preparedAssetId,
+    preparedAssetVersionId: output.dataset.preparedAssetVersionId,
+    outputShapeKind: output.dataset.outputShapeKind,
+    preparedRecordCount: output.dataset.recordCount,
+    preparedByteLength: output.dataset.byteLength,
+    storageTargetId: output.persistence.targetId,
+    storageReference: output.persistence.storageReference,
+    persistedAt: output.persistence.persistedAt,
+    contentDigest: output.persistence.contentDigest,
+    lineageId: output.lineage.lineageId,
+    pipelineAssetId: output.lineage.pipelineAssetId,
+    pipelineVersionId: output.lineage.pipelineVersionId,
+    upstreamAssetIds: output.lineage.upstreamAssetIds as CanonicalRecordValue,
+    upstreamPipelineAssetIds: output.lineage.upstreamPipelineAssetIds as CanonicalRecordValue,
+    preparedStorage: output as unknown as CanonicalRecordValue,
+  });
+}
+
+function fromLegacyPreparedStorageStageOutput(
+  value: Readonly<Record<string, CanonicalRecordValue>>,
+): PreparedStorageStageOutput | undefined {
+  const preparedAssetId = toString(value.preparedAssetId);
+  const preparedAssetVersionId = toString(value.preparedAssetVersionId);
+  const storageReference = toString(value.storageReference);
+  const targetId = toString(value.storageTargetId);
+  const persistedAt = toString(value.persistedAt);
+  const lineageId = toString(value.lineageId);
+  const pipelineAssetId = toString(value.pipelineAssetId);
+  if (!preparedAssetId || !preparedAssetVersionId || !storageReference || !targetId || !persistedAt || !lineageId || !pipelineAssetId) {
+    return undefined;
+  }
+
+  const upstreamAssetIds = Array.isArray(value.upstreamAssetIds)
+    ? value.upstreamAssetIds.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+  const upstreamPipelineAssetIds = Array.isArray(value.upstreamPipelineAssetIds)
+    ? value.upstreamPipelineAssetIds.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+
+  return PreparedStorageStageOutputSchema.parse({
+    stageKind: DatasetPipelineStageKinds.preparedStorage,
+    status: toBoolean(value.completed)
+      ? StageExecutionStatusKinds.completed
+      : (toString(value.status) ?? StageExecutionStatusKinds.partial),
+    dataset: {
+      preparedAssetId,
+      preparedAssetVersionId,
+      outputShapeKind: toString(value.outputShapeKind) ?? "records",
+      recordCount: typeof value.preparedRecordCount === "number" ? value.preparedRecordCount : undefined,
+      byteLength: typeof value.preparedByteLength === "number" ? value.preparedByteLength : undefined,
+    },
+    persistence: {
+      targetId,
+      storageReference,
+      persistedAt,
+      contentDigest: toString(value.contentDigest),
+    },
+    lineage: {
+      lineageId,
+      pipelineAssetId,
+      pipelineVersionId: toString(value.pipelineVersionId),
+      upstreamAssetIds,
+      upstreamPipelineAssetIds,
+    },
+  });
+}
+
+export function readPreparedStorageStageOutput(
+  value?: Readonly<Record<string, CanonicalRecordValue>>,
+): PreparedStorageStageOutput | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const embedded = value.preparedStorage;
+  if (embedded && typeof embedded === "object" && !Array.isArray(embedded)) {
+    const parsed = PreparedStorageStageOutputSchema.safeParse(embedded);
+    if (parsed.success) {
+      return Object.freeze(parsed.data);
+    }
+  }
+
+  return fromLegacyPreparedStorageStageOutput(value);
 }

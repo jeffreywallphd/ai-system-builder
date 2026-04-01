@@ -28,6 +28,14 @@ import {
   type DataStudioPreparationFieldDependency,
   type DataStudioPreparationTemplateRegistry,
 } from "./DataStudioPreparationTemplates";
+import {
+  DataStudioAuthoringModes,
+  createDataStudioPipelineStateFromWizard,
+  deserializeDataStudioPipelineState,
+  serializeDataStudioPipelineState,
+  type DataStudioPipelineIdentity,
+  type DataStudioPipelineState,
+} from "./DataStudioPipelineState";
 
 export const DataStudioWizardPresentationModes = Object.freeze({
   simple: "simple",
@@ -274,6 +282,7 @@ export class DataStudioPreparationWizard {
   private completedStageIds: ReadonlyArray<PipelineStageId>;
   private skippedStageIds: ReadonlyArray<PipelineStageId>;
   private navigationHistory: ReadonlyArray<PipelineStageId>;
+  private persistentIdentity: Partial<DataStudioPipelineIdentity>;
 
   constructor(options: DataStudioPreparationWizardOptions = {}) {
     const stageRegistry = options.stageRegistry ?? new PipelineStageRegistry();
@@ -297,6 +306,18 @@ export class DataStudioPreparationWizard {
     this.completedStageIds = Object.freeze([]);
     this.skippedStageIds = Object.freeze([]);
     this.navigationHistory = Object.freeze([]);
+    const now = new Date().toISOString();
+    this.persistentIdentity = Object.freeze({
+      draftId: `data-studio-draft:${this.asset.identity.assetId}`,
+      pipelineId: `data-studio-pipeline:${this.asset.identity.assetId}`,
+      assetId: this.asset.identity.assetId,
+      assetVersionId: this.asset.identity.versionId,
+      name: this.templateRegistry.getTemplateSummary(this.selectedTemplateId).name,
+      description: this.templateRegistry.getTemplateSummary(this.selectedTemplateId).description,
+      revision: this.asset.versioning.revision,
+      createdAt: now,
+      updatedAt: now,
+    });
 
     const initialStageId = this.getInitialStageId();
     if (!initialStageId) {
@@ -346,6 +367,7 @@ export class DataStudioPreparationWizard {
     this.completedStageIds = Object.freeze([]);
     this.skippedStageIds = Object.freeze([]);
     this.navigationHistory = Object.freeze([]);
+    this.bumpPersistentRevision();
     const initialStageId = this.getInitialStageId();
     if (!initialStageId) {
       throw new Error("Data Studio wizard requires at least one available stage.");
@@ -357,6 +379,7 @@ export class DataStudioPreparationWizard {
   public setPresentationMode(mode: DataStudioWizardPresentationMode): DataStudioWizardSnapshot {
     this.presentationMode = mode;
     this.refreshResolution();
+    this.bumpPersistentRevision();
     return this.getSnapshot();
   }
 
@@ -369,6 +392,7 @@ export class DataStudioPreparationWizard {
       options: Object.freeze({ ...options }),
     }));
     this.refreshResolution();
+    this.bumpPersistentRevision();
     return this.getSnapshot();
   }
 
@@ -381,6 +405,7 @@ export class DataStudioPreparationWizard {
       visibility,
     }));
     this.refreshResolution();
+    this.bumpPersistentRevision();
     return this.getSnapshot();
   }
 
@@ -397,6 +422,7 @@ export class DataStudioPreparationWizard {
       }),
     }));
     this.refreshResolution();
+    this.bumpPersistentRevision();
     return this.getSnapshot();
   }
 
@@ -465,6 +491,7 @@ export class DataStudioPreparationWizard {
     this.completedStageIds = dedupeOrderedStageIds([...this.completedStageIds, currentStage.stageId]);
     this.skippedStageIds = dedupeOrderedStageIds([...this.skippedStageIds, ...skippedBetween]);
     this.currentStageId = candidateNext;
+    this.bumpPersistentRevision();
 
     return Object.freeze({
       moved: true,
@@ -523,6 +550,7 @@ export class DataStudioPreparationWizard {
       this.navigationHistory = Object.freeze(this.navigationHistory.slice(0, -1));
     }
     this.currentStageId = candidatePrevious;
+    this.bumpPersistentRevision();
 
     return Object.freeze({
       moved: true,
@@ -593,6 +621,7 @@ export class DataStudioPreparationWizard {
 
     this.navigationHistory = Object.freeze([...this.navigationHistory, snapshot.currentStageId]);
     this.currentStageId = stageId;
+    this.bumpPersistentRevision();
 
     return Object.freeze({
       moved: true,
@@ -609,6 +638,46 @@ export class DataStudioPreparationWizard {
       currentStageId: this.currentStageId,
       authoringGraph: this.resolution.authoringGraph,
     });
+  }
+
+  public exportPipelineState(): DataStudioPipelineState {
+    return createDataStudioPipelineStateFromWizard({
+      snapshot: this.getSnapshot(),
+      asset: this.asset,
+      navigationHistory: this.navigationHistory,
+      authoringMode: DataStudioAuthoringModes.wizard,
+      identity: this.persistentIdentity,
+    });
+  }
+
+  public exportPipelineStateJson(): string {
+    return serializeDataStudioPipelineState(this.exportPipelineState());
+  }
+
+  public importPipelineState(input: DataStudioPipelineState | string): DataStudioWizardSnapshot {
+    const state = typeof input === "string"
+      ? deserializeDataStudioPipelineState(input)
+      : input;
+    const templateExists = this.templateRegistry
+      .listTemplates()
+      .some((template) => template.id === state.flow.templateId);
+    if (templateExists) {
+      this.selectedTemplateId = state.flow.templateId;
+    }
+    this.templateConditionEvaluators = this.templateRegistry
+      .getTemplate(this.selectedTemplateId)
+      .conditionEvaluators ?? Object.freeze({});
+    this.asset = state.unifiedPreparationAsset;
+    this.presentationMode = state.flow.presentationMode;
+    this.completedStageIds = dedupeOrderedStageIds(state.flow.completedStageIds);
+    this.skippedStageIds = dedupeOrderedStageIds(state.flow.skippedStageIds);
+    this.navigationHistory = dedupeOrderedStageIds(state.flow.navigationHistory);
+    this.currentStageId = state.flow.currentStageId;
+    this.persistentIdentity = Object.freeze({
+      ...state.identity,
+    });
+    this.refreshResolution();
+    return this.getSnapshot();
   }
 
   private getInitialStageId(): PipelineStageId | undefined {
@@ -801,6 +870,21 @@ export class DataStudioPreparationWizard {
       .slice(fromIndex + 1, toIndex)
       .filter((stage) => !stage.availability.isAvailable)
       .map((stage) => stage.stageId));
+  }
+
+  private bumpPersistentRevision(): void {
+    const now = new Date().toISOString();
+    const nextRevision = (this.persistentIdentity.revision ?? 0) + 1;
+    this.persistentIdentity = Object.freeze({
+      ...this.persistentIdentity,
+      assetId: this.asset.identity.assetId,
+      assetVersionId: this.asset.identity.versionId,
+      name: this.templateRegistry.getTemplateSummary(this.selectedTemplateId).name,
+      description: this.templateRegistry.getTemplateSummary(this.selectedTemplateId).description,
+      revision: nextRevision,
+      updatedAt: now,
+      createdAt: this.persistentIdentity.createdAt ?? now,
+    });
   }
 
 }

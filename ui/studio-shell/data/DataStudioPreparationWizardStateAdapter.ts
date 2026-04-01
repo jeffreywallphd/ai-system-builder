@@ -8,6 +8,7 @@ import {
   type DataStudioPreparationTemplateSummary,
   type DataStudioWizardValidationIssue,
 } from "../../../application/data-studio/DataStudioPreparationWizard";
+import type { DataStudioPipelineState } from "../../../application/data-studio/DataStudioPipelineState";
 import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
 import type { PipelineStageId } from "../../../domain/dataset-studio/PipelineStageDomain";
 import type {
@@ -42,8 +43,20 @@ function issueResult(message: string, stageId?: PipelineStageId): DataStudioPrep
 export class DataStudioPreparationWizardStateAdapter {
   private readonly wizard: DataStudioPreparationWizard;
 
-  constructor(wizard?: DataStudioPreparationWizard) {
-    this.wizard = wizard ?? new DataStudioPreparationWizard();
+  constructor(
+    wizardOrOptions?: DataStudioPreparationWizard | {
+      readonly wizard?: DataStudioPreparationWizard;
+      readonly persistedState?: DataStudioPipelineState | string;
+    },
+  ) {
+    if (wizardOrOptions instanceof DataStudioPreparationWizard) {
+      this.wizard = wizardOrOptions;
+      return;
+    }
+    this.wizard = wizardOrOptions?.wizard ?? new DataStudioPreparationWizard();
+    if (wizardOrOptions?.persistedState) {
+      this.wizard.importPipelineState(wizardOrOptions.persistedState);
+    }
   }
 
   public getSnapshot(): DataStudioWizardSnapshot {
@@ -126,5 +139,22 @@ export class DataStudioPreparationWizardStateAdapter {
 
   public toCanvasHandoff(): DataStudioWizardCanvasHandoff {
     return this.wizard.toCanvasHandoff();
+  }
+
+  public exportPipelineState(): DataStudioPipelineState {
+    return this.wizard.exportPipelineState();
+  }
+
+  public exportPipelineStateJson(): string {
+    return this.wizard.exportPipelineStateJson();
+  }
+
+  public importPipelineState(input: DataStudioPipelineState | string): DataStudioPreparationWizardAdapterUpdateResult {
+    try {
+      this.wizard.importPipelineState(input);
+      return okResult();
+    } catch (error) {
+      return issueResult((error as Error).message);
+    }
   }
 }

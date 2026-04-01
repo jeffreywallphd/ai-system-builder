@@ -20,6 +20,8 @@ export interface DataStudioPreparationWizardPanelProps {
   readonly onSnapshotChange?: (snapshot: DataStudioWizardSnapshot) => void;
 }
 
+const DataStudioWizardPersistenceStorageKey = "ai-loom.data-studio.preparation.state.v1";
+
 function stageStatusLabel(status: WizardStageStatus): string {
   if (status === "disabled") {
     return "Disabled";
@@ -83,7 +85,15 @@ function formatFieldValue(field: DataStudioWizardFieldSnapshot): string {
 
 export default function DataStudioPreparationWizardPanel(props: DataStudioPreparationWizardPanelProps): JSX.Element {
   const localAdapter = useMemo(
-    () => new DataStudioPreparationWizardStateAdapter(),
+    () => {
+      if (typeof window === "undefined") {
+        return new DataStudioPreparationWizardStateAdapter();
+      }
+      const persistedState = window.localStorage.getItem(DataStudioWizardPersistenceStorageKey) ?? undefined;
+      return new DataStudioPreparationWizardStateAdapter({
+        persistedState,
+      });
+    },
     [],
   );
   const adapter = props.adapter ?? localAdapter;
@@ -107,6 +117,13 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
   const refreshSnapshot = () => {
     const next = adapter.getSnapshot();
     setSnapshot(next);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(DataStudioWizardPersistenceStorageKey, adapter.exportPipelineStateJson());
+      } catch {
+        // ignore persistence failures (storage unavailable/quota)
+      }
+    }
     props.onSnapshotChange?.(next);
   };
 
