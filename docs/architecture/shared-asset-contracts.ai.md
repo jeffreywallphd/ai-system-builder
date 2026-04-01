@@ -618,9 +618,23 @@
   - emit structured dataset diagnostics (`dataset-instance-missing`, `dataset-record-missing`, `dataset-schema-incompatible`, `dataset-resolution-shape-unsupported`) alongside existing source/type diagnostics.
 - Kept binding contracts inspectable/persistable and layer-safe: domain owns binding rules + diagnostics, application orchestrates resolution/assembly, and metadata adapters provide context payloads without leaking persistence internals.
 - Added focused coverage for dataset binding resolution + diagnostics and reusable validation output:
-  - `domain/workflow-studio/tests/WorkflowInputBindingDomain.test.ts`
-  - `application/workflow-studio/tests/WorkflowInputBindingResolutionService.test.ts`
-  - `application/workflow-studio/tests/WorkflowExecutionContextAssemblyService.test.ts`
+
+## AI Loom Image Manipulation vertical-slice update: output binding contracts + target typing (stories 3.3.1-3.3.2)
+
+- Added a domain-first, versioned output-binding contract seam in `domain/workflow-studio/WorkflowOutputBindingDomain.ts` with:
+  - canonical output target typing (`output-dataset`, `history-dataset`, `comparison-dataset`),
+  - explicit binding intents and write modes (`publish-current-result`/`append-run-history`/`append-comparison-group`, `upsert`/`append`/`replace`),
+  - structured record payload envelopes, lineage references, and persistence metadata for system-context dataset writes,
+  - inspectable and composable binding descriptors that remain independent from ComfyUI/runtime-specific DTOs.
+- Added canonical system-runtime target definitions in `domain/system-runtime/WorkflowOutputTargetDomain.ts` with explicit semantics:
+  - output dataset = current/published workflow results,
+  - history dataset = append-oriented durable run history,
+  - comparison dataset = grouped comparable outputs for inspection.
+- `SystemDatasetInstanceService` now exposes `ensureWorkflowOutputTargetInstance(...)` to provision/resolve system-owned dataset instances from target-type semantics without duplicating role/purpose logic; existing `ensureOutputImageStoreInstance(...)` now reuses this seam.
+- Added focused target/binding coverage in:
+  - `domain/workflow-studio/tests/WorkflowOutputBindingDomain.test.ts`,
+  - `domain/system-runtime/tests/WorkflowOutputTargetDomain.test.ts`,
+  - `application/system-runtime/tests/SystemDatasetInstanceService.test.ts`.
 
 ## AI Loom Image Manipulation vertical-slice update: binding preview inspection + asset-definition integration (stories 3.2.7-3.2.8)
 

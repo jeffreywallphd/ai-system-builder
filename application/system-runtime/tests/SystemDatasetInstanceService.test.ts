@@ -22,6 +22,7 @@ import { SystemDatasetInstanceService } from "../SystemDatasetInstanceService";
 import { InMemoryDatasetEventPublisher, type DatasetEventPublisher } from "../../dataset-events/DatasetEventPublisher";
 import { DatasetEventTypes } from "../../../domain/dataset-studio/contracts/DatasetEvent";
 import { InMemoryDatasetOperationalLineageSink } from "../DatasetOperationalLineage";
+import { WorkflowOutputTargetTypes } from "../../../domain/system-runtime/WorkflowOutputTargetDomain";
 
 class StaticAssetCatalog implements DatasetInstanceAssetCatalog {
   public constructor(
@@ -227,6 +228,45 @@ describe("SystemDatasetInstanceService", () => {
     expect(first.purpose).toBe("workflow-output-images");
     expect(first.seedMetadata?.targetCollection).toBe("studio-results");
     expect(service.listSystemDatasetInstances("system:image-pipeline").length).toBe(1);
+  });
+
+  it("models canonical workflow output target types through a composable ensure path", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-exporter-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+    );
+
+    const history = await service.ensureWorkflowOutputTargetInstance({
+      targetType: WorkflowOutputTargetTypes.historyDataset,
+      instanceId: "dataset-instance:history-images",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-exporter-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    const comparison = await service.ensureWorkflowOutputTargetInstance({
+      targetType: WorkflowOutputTargetTypes.comparisonDataset,
+      instanceId: "dataset-instance:comparison-images",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-exporter-v1",
+      datasetAssetVersionId: "1.0.0",
+      purpose: "image-compare-inspection",
+    });
+
+    expect(history.role).toBe("output-store");
+    expect(history.purpose).toBe("workflow-output-history-images");
+    expect(comparison.role).toBe("output-store");
+    expect(comparison.purpose).toBe("image-compare-inspection");
   });
 
   it("creates optional intermediate stores with lifecycle metadata via shared dataset instance contracts", async () => {
