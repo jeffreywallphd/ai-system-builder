@@ -578,3 +578,19 @@
   - batch-transform contract/composition/output mapping boundaries (`application/contracts/tests/BatchTransformWorkflowAsset.test.ts`),
   - preview/inspection stability across all high-level image workflow assets (`application/contracts/tests/ImageWorkflowAssetPreview.test.ts`),
   - contract descriptor alignment updates for batch input mapping (`application/contracts/tests/ImageWorkflowAssetContract.test.ts`).
+
+
+## AI Loom Image Manipulation vertical-slice update: system-aware input binding contracts + resolution service (stories 3.2.1-3.2.2)
+
+- Added a domain-first, versioned input-binding contract seam in `domain/workflow-studio/WorkflowInputBindingDomain.ts` with:
+  - normalized binding descriptors (`bindingId`, `inputId`, required/value type, ordered source candidates),
+  - source kinds for UI form values, runtime parameters, trigger payloads, selected-image context, dataset-instance references, and constant values,
+  - structured resolution diagnostics and inspectable preview metadata per resolved input.
+- Added an application-layer resolver in `application/workflow-studio/WorkflowInputBindingResolutionService.ts` that:
+  - resolves bindings deterministically by source priority with default fallback support,
+  - returns normalized resolved values plus per-input resolution records,
+  - emits structured diagnostics for missing source values and unresolved required/optional inputs.
+- `WorkflowExecutionContextAssemblyService` now consumes this resolver as an orchestration seam while preserving workflow-studio execution-context contracts.
+- Added focused contract/resolution tests:
+  - `domain/workflow-studio/tests/WorkflowInputBindingDomain.test.ts`
+  - `application/workflow-studio/tests/WorkflowInputBindingResolutionService.test.ts`
