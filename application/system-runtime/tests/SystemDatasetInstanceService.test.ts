@@ -1346,6 +1346,80 @@ describe("SystemDatasetInstanceService", () => {
     expect(events).toHaveLength(1);
     expect(events[0]?.eventType).toBe(DatasetEventTypes.imageGenerated);
     expect(events[0]?.payload.record.imageReference).toBe("artifact://result-1.png");
+    expect(events[0]?.payloadMetadata?.workflowId).toBeUndefined();
+    expect(events[0]?.payloadMetadata?.workflowRunId).toBe("run-001");
+  });
+
+  it("emits image-updated events with lineage metadata for image record updates", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const publisher = new InMemoryDatasetEventPublisher();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+      { datasetEventPublisher: publisher },
+    );
+
+    const instance = await service.ensureOutputImageStoreInstance({
+      instanceId: "dataset-instance:event-update",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+    const original = await service.ingestImageRecordIntoInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      record: {
+        assetRef: { assetId: "asset:image:event-update" },
+        width: 512,
+        height: 512,
+        format: "png",
+        derived: { qualityScore: 0.83 },
+      },
+    });
+    publisher.clear();
+
+    const updated = await service.updateImageRecordInInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      recordId: original.recordId,
+      lineageContext: {
+        workflowAssetId: "workflow:image-upscale",
+        workflowExecutionId: "execution:workflow-42",
+        actorId: "workflow-runtime",
+        source: "workflow-execution-output",
+        studioId: "studio:image-manipulation",
+      },
+      patch: {
+        imagePatch: {
+          derived: { qualityScore: 0.95, sharpness: "high" },
+        },
+        metadataPatch: {
+          set: { moderationState: "approved" },
+        },
+      },
+    });
+
+    expect(updated.image.derived.qualityScore).toBe(0.95);
+    const events = publisher.listPublishedEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]?.eventType).toBe(DatasetEventTypes.imageUpdated);
+    expect(events[0]?.actor.actorId).toBe("workflow-runtime");
+    expect(events[0]?.actor.source).toBe("workflow-execution-output");
+    expect(events[0]?.payload.updatedFields).toEqual(expect.arrayContaining(["image", "image.derived", "metadata"]));
+    expect(events[0]?.payloadMetadata?.workflowId).toBe("workflow:image-upscale");
+    expect(events[0]?.payloadMetadata?.workflowRunId).toBe("execution:workflow-42");
+    expect(events[0]?.payloadMetadata?.lineage?.studioId).toBe("studio:image-manipulation");
+    expect(events[0]?.payloadMetadata?.lineage?.instanceId).toBe(instance.instanceId);
+    expect(events[0]?.payload.previousRecord?.recordId).toBe(original.recordId);
   });
 
   it("does not emit dataset events when record mutation fails", async () => {
@@ -1384,6 +1458,40 @@ describe("SystemDatasetInstanceService", () => {
         tags: ["blocked-tag"],
       },
     })).rejects.toThrow("media-tag-blocked");
+
+    expect(publisher.listPublishedEvents()).toHaveLength(0);
+  });
+
+  it("does not emit dataset events when update mutation fails", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const publisher = new InMemoryDatasetEventPublisher();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+      { datasetEventPublisher: publisher },
+    );
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:event-failed-update",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    await expect(service.updateImageRecordInInstance({
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      recordId: "record:missing",
+      patch: { metadataPatch: { set: { note: "invalid" } } },
+    })).rejects.toThrow("not found");
 
     expect(publisher.listPublishedEvents()).toHaveLength(0);
   });

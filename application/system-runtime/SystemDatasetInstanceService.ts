@@ -1142,20 +1142,35 @@ export class SystemDatasetInstanceService {
     }
     const actor = {
       actorKind: DatasetEventActorKinds.system,
-      actorId: input.instance.systemId,
-      source: "system-runtime-dataset-instance-service",
+      actorId: input.request.lineageContext?.actorId ?? input.instance.systemId,
+      source: input.request.lineageContext?.source ?? "system-runtime-dataset-instance-service",
       metadata: {
         operation: input.operation,
       },
     } as const;
+    const payloadMetadataLineage = {
+      instanceId: input.instance.instanceId,
+      studioId: input.request.lineageContext?.studioId,
+      sourceType: input.record.provenance.sourceType,
+      sourceReference: input.record.provenance.sourceReference,
+      sourceSystemId: input.record.provenance.sourceSystemId,
+      sourceRecordId: input.record.provenance.sourceReference,
+      sourceRunId: input.record.provenance.sourceRunId,
+    } satisfies Readonly<Record<string, string | undefined>>;
     const payloadMetadata = {
+      workflowId: input.request.lineageContext?.workflowAssetId,
+      workflowRunId: input.request.lineageContext?.workflowExecutionId ?? input.record.provenance.sourceRunId,
       systemId: input.instance.systemId,
-      lineage: {
-        instanceId: input.instance.instanceId,
-      },
+      lineage: Object.freeze(Object.fromEntries(
+        Object.entries(payloadMetadataLineage).filter((entry): entry is [string, string] => Boolean(entry[1])),
+      )),
     } as const;
 
     if (input.operation === "update") {
+      if (!("patch" in input.request)) {
+        throw new Error("invalid-request:Update event emission requires a record patch.");
+      }
+      const updateRequest = input.request;
       const event = createDatasetEventEnvelope({
         eventType: DatasetEventTypes.imageUpdated,
         dataset: { assetId: input.instance.datasetAssetId, versionId: input.instance.datasetAssetVersionId },
@@ -1169,7 +1184,8 @@ export class SystemDatasetInstanceService {
         payload: {
           record: this.createDatasetRecordReference(input.record),
           previousRecord: input.previousRecord ? this.createDatasetRecordReference(input.previousRecord) : undefined,
-          updatedFields: Object.freeze(["image", "metadata", "storage", "provenance"]),
+          updatedFields: this.resolveUpdatedFields(updateRequest.patch),
+          derivedMetadata: input.record.image.derived,
         },
       });
       await this.datasetEventPublisher.publish({ event });
@@ -1190,15 +1206,52 @@ export class SystemDatasetInstanceService {
         ? {
           record: this.createDatasetRecordReference(input.record),
           generationContext: {
+            sourceWorkflowId: input.request.lineageContext?.workflowAssetId ?? "unknown",
+            sourceExecutionId: input.request.lineageContext?.workflowExecutionId ?? "unknown",
+            sourceRecordReference: input.record.provenance.sourceReference ?? "unknown",
             sourceType: input.record.provenance.sourceType ?? "unknown",
             sourceRunId: input.record.provenance.sourceRunId ?? "unknown",
           },
+          derivedMetadata: input.record.image.derived,
         }
         : {
           record: this.createDatasetRecordReference(input.record),
+          derivedMetadata: input.record.image.derived,
         },
     });
     await this.datasetEventPublisher.publish({ event });
+  }
+
+  private resolveUpdatedFields(patch: DatasetInstanceImageRecordPatch): ReadonlyArray<string> {
+    const fields = new Set<string>();
+    if (patch.imagePatch) {
+      fields.add("image");
+      if (patch.imagePatch.metadataPatch) {
+        fields.add("image.metadata");
+      }
+      if (patch.imagePatch.tags !== undefined || patch.imagePatch.tagsPatch) {
+        fields.add("image.tags");
+      }
+      if (patch.imagePatch.derived !== undefined) {
+        fields.add("image.derived");
+      }
+      if (patch.imagePatch.annotations !== undefined) {
+        fields.add("image.annotations");
+      }
+    }
+    if (patch.metadataPatch) {
+      fields.add("metadata");
+    }
+    if (patch.storagePatch !== undefined) {
+      fields.add("storage");
+    }
+    if (patch.provenancePatch) {
+      fields.add("provenance");
+    }
+    if (fields.size === 0) {
+      fields.add("record");
+    }
+    return Object.freeze([...fields]);
   }
 
   private createDatasetRecordReference(record: DatasetInstanceImageRecord): {
