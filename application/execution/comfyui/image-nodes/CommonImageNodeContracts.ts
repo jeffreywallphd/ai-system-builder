@@ -17,6 +17,21 @@ export interface IImageNodeAssetReference {
   readonly role?: string;
 }
 
+export interface ICommonImageNodeInternalImage {
+  readonly buffer: Uint8Array;
+  readonly mimeType?: string;
+  readonly format?: string;
+  readonly width?: number;
+  readonly height?: number;
+  readonly filename?: string;
+}
+
+export interface ICommonImageNodeDatasetSelection {
+  readonly recordId?: string;
+  readonly index?: number;
+  readonly strategy?: "latest" | "index" | "random";
+}
+
 export type ImageNodeDataType =
   | "image"
   | "latent"

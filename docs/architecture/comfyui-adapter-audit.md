@@ -163,3 +163,21 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
   - contract coverage and runtime-agnostic shape
   - adapter pattern consistency and required-input enforcement
   - separation between domain/application contracts and Comfy-specific infrastructure concerns.
+
+## Story 2.2.3 + 2.2.4 update (Load/Save image node adapters)
+- Added `ComfyLoadImageNodeAdapter` at `infrastructure/comfyui/adapters/image-nodes/ComfyLoadImageNodeAdapter.ts`:
+  - consumes system-owned dataset instance references through `DatasetInstanceRepository`,
+  - resolves image records using id/index/random/latest selection strategy semantics,
+  - reads image bytes via Node `fs` and emits internal image payload + metadata (dataset/image/filename/dimensions),
+  - includes preview metadata hooks while keeping Comfy-specific payload details inside adapter outputs only.
+- Added `ComfySaveImageNodeAdapter` at `infrastructure/comfyui/adapters/image-nodes/ComfySaveImageNodeAdapter.ts`:
+  - consumes internal image payloads and target dataset instance references,
+  - persists image files via Node `fs/path` into system-owned dataset storage roots,
+  - writes dataset image records through `DatasetInstanceRepository` with timestamp, metadata, lineage/provenance, and source/workflow references,
+  - keeps filename strategy internal (`prefix + timestamp + unique id`) without exposing raw Comfy `filename_prefix` at system-facing contracts.
+- Extended common runtime-agnostic contracts in `CommonImageNodeContracts.ts` with reusable internal image and dataset-selection contract shapes for load/save adapter compatibility.
+- Added focused integration tests in `infrastructure/comfyui/adapters/image-nodes/tests/ComfyLoadSaveImageNodeAdapters.test.ts` for:
+  - dataset-resolution-to-image mapping,
+  - save persistence + lineage metadata,
+  - load->save composability roundtrip,
+  - boundary validation that Comfy-specific type names do not leak into application contract modules.
