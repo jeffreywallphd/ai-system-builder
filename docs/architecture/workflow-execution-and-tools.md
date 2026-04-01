@@ -502,3 +502,11 @@ Audit schema now records administrative approval transitions plus decision denia
   - execution-unit handling in `infrastructure/execution/DataStudioPipelineExecutionUnitHandler.ts`,
   - handler registration in shared execution infrastructure composition (`createExecutionInfrastructure*.ts`).
 - Studio Shell now exposes backend-authoritative Data Studio readiness/run operations (`assessDataStudioExecutionReadiness`, `runDataStudioPipeline`) and toolbar-aligned renderer wiring (`run-data-pipeline`) while preserving workflow-specific semantics.
+
+
+## AI Loom image manipulation runtime integration update (stories 3.3.9-3.3.10)
+
+- Runtime output persistence now composes the existing image output-binding contracts/resolution/materialization seams directly inside workflow execution handling (post-success execution, pre-history completion) through `WorkflowExecutionUnitHandler` + `WorkflowRuntimeOutputPersistenceService`.
+- Runtime execution output persistence remains adapter-bounded: workflow executors still return workflow-native assets, while the persistence seam maps assets into canonical image-record materialization contracts and writes through `SystemDatasetInstanceService`.
+- Runtime result contracts now expose structured persistence summaries (`status`, `persistedRecordCount`, `targetCount`, `issues`) for downstream run-history and UI inspection without exposing repository/storage internals.
+- Added test coverage validating runtime integration behavior for output/history/comparison dataset writes and bounded failure outcomes when resolution/materialization/persistence cannot complete.

@@ -12,6 +12,7 @@ import type {
   IWorkflowExecutionResult,
   IWorkflowExecutor,
 } from "../../application/ports/interfaces/IWorkflowExecutor";
+import type { WorkflowRuntimeOutputPersistenceService } from "../../application/workflow-studio/WorkflowRuntimeOutputPersistenceService";
 import type { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
 import type { WorkflowRunHistoryService } from "../../application/workflow-run-history/WorkflowRunHistoryService";
 import {
@@ -104,6 +105,7 @@ export class WorkflowExecutionUnitHandler implements IExecutionUnitHandler {
     workflowExecutor: IWorkflowExecutor,
     private readonly executionAssetLineageRecorder?: ExecutionAssetLineageRecorder,
     private readonly workflowRunHistoryService?: WorkflowRunHistoryService,
+    private readonly workflowOutputPersistenceService?: WorkflowRuntimeOutputPersistenceService,
   ) {
     this.workflowExecutor = workflowExecutor;
   }
@@ -128,7 +130,8 @@ export class WorkflowExecutionUnitHandler implements IExecutionUnitHandler {
       input,
     });
 
-    const workflowResult = await this.runWorkflowExecution(request, input, onEvent);
+    const workflowResultRaw = await this.runWorkflowExecution(request, input, onEvent);
+    const workflowResult = await this.persistWorkflowOutputs(input, workflowResultRaw);
 
     await this.executionAssetLineageRecorder?.recordWorkflowExecution({
       input,
@@ -166,6 +169,7 @@ export class WorkflowExecutionUnitHandler implements IExecutionUnitHandler {
         let workflowResult: IWorkflowExecutionResult;
         try {
           workflowResult = await workflowHandle.waitForCompletion();
+          workflowResult = await this.persistWorkflowOutputs(input, workflowResult);
         } catch (error) {
           await this.workflowRunHistoryService?.recordRunFailed({
             runId: request.runId,
@@ -201,6 +205,30 @@ export class WorkflowExecutionUnitHandler implements IExecutionUnitHandler {
           }
         : undefined,
     });
+  }
+
+
+  private async persistWorkflowOutputs(
+    input: IWorkflowExecutionInput,
+    result: IWorkflowExecutionResult,
+  ): Promise<IWorkflowExecutionResult> {
+    if (!this.workflowOutputPersistenceService) {
+      return result;
+    }
+
+    const persistence = await this.workflowOutputPersistenceService.persist({ input, result });
+    const merged: IWorkflowExecutionResult = Object.freeze({
+      ...result,
+      outputPersistence: persistence,
+      status: persistence.status === "failed" && result.status === "completed" ? "failed" : result.status,
+      errorMessage: persistence.status === "failed"
+        ? persistence.issues[0]?.message ?? result.errorMessage ?? "Workflow output persistence failed."
+        : result.errorMessage,
+      messages: persistence.status === "failed"
+        ? Object.freeze([...(result.messages ?? []), "Workflow output persistence failed."])
+        : result.messages,
+    });
+    return merged;
   }
 
   private async runWorkflowExecution(

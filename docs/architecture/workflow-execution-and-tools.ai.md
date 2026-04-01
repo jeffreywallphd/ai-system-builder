@@ -264,3 +264,11 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Agent Studio backend reads remain composition-native: authored-agent payloads are taxonomy-classified and contract-projected; session/operational payloads stay execution-artifact classified with optional authored-agent contract projection.
 - Desktop IPC now includes studio-facing operations on the existing `ai-loom-desktop-agents:*` namespace (`launch`, `trigger-launch`, `list-sessions`, `get-session`, `control-run`, `studio-snapshot`) without creating a second runtime or launch path.
 - Desktop host wiring now provides a real runner-backed launch path (planner + capability execution + asset-backed memory + session persistence), so studio launch/trigger-launch are execution-backed operations in desktop mode.
+
+
+## AI Loom image manipulation runtime integration update (stories 3.3.9-3.3.10)
+
+- Runtime output persistence now composes the existing image output-binding contracts/resolution/materialization seams directly inside workflow execution handling (post-success execution, pre-history completion) through `WorkflowExecutionUnitHandler` + `WorkflowRuntimeOutputPersistenceService`.
+- Runtime execution output persistence remains adapter-bounded: workflow executors still return workflow-native assets, while the persistence seam maps assets into canonical image-record materialization contracts and writes through `SystemDatasetInstanceService`.
+- Runtime result contracts now expose structured persistence summaries (`status`, `persistedRecordCount`, `targetCount`, `issues`) for downstream run-history and UI inspection without exposing repository/storage internals.
+- Added test coverage validating runtime integration behavior for output/history/comparison dataset writes and bounded failure outcomes when resolution/materialization/persistence cannot complete.
