@@ -26,6 +26,7 @@ export interface CreateSystemDatasetInstanceRequest {
   readonly lifecycleStatus?: DatasetInstance["lifecycleStatus"];
   readonly runtimeStatus?: DatasetInstance["runtimeStatus"];
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
+  readonly lifecycleMetadata?: DatasetInstance["lifecycleMetadata"];
 }
 
 export interface EnsureRoleDatasetInstanceRequest {
@@ -38,6 +39,7 @@ export interface EnsureRoleDatasetInstanceRequest {
   readonly requiredSchemaIntentId?: string;
   readonly requiredOutputShapeKind?: string;
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
+  readonly lifecycleMetadata?: DatasetInstance["lifecycleMetadata"];
 }
 
 export interface EnsureInputImageStoreInstanceRequest {
@@ -46,6 +48,26 @@ export interface EnsureInputImageStoreInstanceRequest {
   readonly datasetAssetId: string;
   readonly datasetAssetVersionId?: string;
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
+}
+
+export interface EnsureOutputImageStoreInstanceRequest {
+  readonly instanceId: string;
+  readonly systemId: string;
+  readonly datasetAssetId: string;
+  readonly datasetAssetVersionId?: string;
+  readonly seedMetadata?: DatasetInstance["seedMetadata"];
+}
+
+export interface EnsureIntermediateStoreInstanceRequest {
+  readonly instanceId: string;
+  readonly systemId: string;
+  readonly datasetAssetId: string;
+  readonly datasetAssetVersionId?: string;
+  readonly purpose?: string;
+  readonly requiredSchemaIntentId?: string;
+  readonly requiredOutputShapeKind?: string;
+  readonly seedMetadata?: DatasetInstance["seedMetadata"];
+  readonly lifecycleMetadata?: DatasetInstance["lifecycleMetadata"];
 }
 
 export class SystemDatasetInstanceService {
@@ -73,6 +95,7 @@ export class SystemDatasetInstanceService {
       lifecycleStatus: request.lifecycleStatus ?? DatasetInstanceLifecycleStatuses.ready,
       runtimeStatus: request.runtimeStatus ?? DatasetInstanceRuntimeStatuses.idle,
       seedMetadata: request.seedMetadata,
+      lifecycleMetadata: request.lifecycleMetadata,
     });
 
     return this.repository.save(instance);
@@ -128,6 +151,7 @@ export class SystemDatasetInstanceService {
       seedMetadata: request.seedMetadata,
       lifecycleStatus: DatasetInstanceLifecycleStatuses.ready,
       runtimeStatus: DatasetInstanceRuntimeStatuses.idle,
+      lifecycleMetadata: request.lifecycleMetadata,
     });
   }
 
@@ -142,6 +166,37 @@ export class SystemDatasetInstanceService {
       requiredSchemaIntentId: DatasetSchemaIntentIds.media,
       requiredOutputShapeKind: "image-metadata-records",
       seedMetadata: request.seedMetadata,
+    });
+  }
+
+  public async ensureOutputImageStoreInstance(request: EnsureOutputImageStoreInstanceRequest): Promise<DatasetInstance> {
+    return this.ensureRoleDatasetInstance({
+      instanceId: request.instanceId,
+      systemId: request.systemId,
+      datasetAssetId: request.datasetAssetId,
+      datasetAssetVersionId: request.datasetAssetVersionId,
+      role: DatasetInstanceRoles.outputStore,
+      purpose: "workflow-output-images",
+      requiredSchemaIntentId: DatasetSchemaIntentIds.media,
+      requiredOutputShapeKind: "image-metadata-records",
+      seedMetadata: request.seedMetadata,
+    });
+  }
+
+  public async ensureIntermediateStoreInstance(
+    request: EnsureIntermediateStoreInstanceRequest,
+  ): Promise<DatasetInstance> {
+    return this.ensureRoleDatasetInstance({
+      instanceId: request.instanceId,
+      systemId: request.systemId,
+      datasetAssetId: request.datasetAssetId,
+      datasetAssetVersionId: request.datasetAssetVersionId,
+      role: DatasetInstanceRoles.intermediateStore,
+      purpose: normalizeOptional(request.purpose) ?? "workflow-intermediate-images",
+      requiredSchemaIntentId: request.requiredSchemaIntentId,
+      requiredOutputShapeKind: request.requiredOutputShapeKind,
+      seedMetadata: request.seedMetadata,
+      lifecycleMetadata: request.lifecycleMetadata,
     });
   }
 

@@ -27,6 +27,11 @@ describe("SqliteDatasetInstanceRepository", () => {
           bucket: "seed-input",
           retainDays: 7,
         },
+        lifecycleMetadata: {
+          retentionPolicy: "manual",
+          cleanupAfter: "2026-04-07T00:00:00.000Z",
+          cleanupStatus: "pending",
+        },
         createdAt: "2026-04-01T00:00:00.000Z",
         updatedAt: "2026-04-01T00:00:00.000Z",
       });
@@ -43,12 +48,14 @@ describe("SqliteDatasetInstanceRepository", () => {
       expect(reloaded?.lifecycleStatus).toBe("ready");
       expect(reloaded?.runtimeStatus).toBe("idle");
       expect(reloaded?.seedMetadata?.bucket).toBe("seed-input");
+      expect(reloaded?.lifecycleMetadata?.cleanupAfter).toBe("2026-04-07T00:00:00.000Z");
+      expect(reloaded?.lifecycleMetadata?.cleanupStatus).toBe("pending");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it("lists instances by system id and resolves role/purpose lookups", () => {
+  it("lists instances by system id and resolves output/intermediate role lookups", () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-dataset-instance-sqlite-list-"));
     try {
       const repository = new SqliteDatasetInstanceRepository(path.join(root, "dataset-instances.sqlite"));
@@ -88,17 +95,50 @@ describe("SqliteDatasetInstanceRepository", () => {
         createdAt: "2026-04-01T00:00:00.000Z",
         updatedAt: "2026-04-01T00:00:00.000Z",
       }));
+      repository.save(createDatasetInstance({
+        instanceId: "dataset-instance:intermediate",
+        systemId: "system:image-pipeline",
+        datasetAssetId: "image-stage-v1",
+        datasetAssetVersionId: "1.0.0",
+        role: "intermediate-store",
+        purpose: "stage:enhance",
+        lifecycleStatus: "ready",
+        runtimeStatus: "processing",
+        lifecycleMetadata: {
+          retentionPolicy: "ttl",
+          maxAgeDays: 1,
+          cleanupStatus: "pending",
+        },
+        createdAt: "2026-04-01T00:00:00.000Z",
+        updatedAt: "2026-04-01T00:02:00.000Z",
+      }));
 
       const bySystem = repository.listBySystemId("system:image-pipeline");
-      expect(bySystem.length).toBe(2);
-      expect(bySystem[0]?.instanceId).toBe("dataset-instance:output");
+      expect(bySystem.length).toBe(3);
+      expect(bySystem[0]?.instanceId).toBe("dataset-instance:intermediate");
 
-      const lookup = repository.findBySystemAndRole({
+      const inputLookup = repository.findBySystemAndRole({
         systemId: "system:image-pipeline",
         role: "input-store",
         purpose: "incoming-images",
       });
-      expect(lookup?.instanceId).toBe("dataset-instance:input");
+      expect(inputLookup?.instanceId).toBe("dataset-instance:input");
+
+      const outputLookup = repository.findBySystemAndRole({
+        systemId: "system:image-pipeline",
+        role: "output-store",
+        purpose: "rendered-images",
+      });
+      expect(outputLookup?.instanceId).toBe("dataset-instance:output");
+
+      const intermediateLookup = repository.findBySystemAndRole({
+        systemId: "system:image-pipeline",
+        role: "intermediate-store",
+        purpose: "stage:enhance",
+      });
+      expect(intermediateLookup?.instanceId).toBe("dataset-instance:intermediate");
+      expect(intermediateLookup?.lifecycleMetadata?.retentionPolicy).toBe("ttl");
+      expect(intermediateLookup?.lifecycleMetadata?.maxAgeDays).toBe(1);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

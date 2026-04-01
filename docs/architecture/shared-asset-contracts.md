@@ -317,3 +317,10 @@ Not implemented in this slice:
   - role/purpose compatibility and conflict-safe idempotency for system-role stores.
 - Input image store now exists as a role-driven dataset-instance configuration (`role=input-store`, `purpose=incoming-images`) via `SystemDatasetInstanceService.ensureInputImageStoreInstance(...)`, not as a separate bespoke model.
 - Incoming image payload compatibility is enforced through the dataset asset/instance boundary (`validateIncomingShapeForInstance`) using linked dataset schema intent/shape requirements plus shared media dataset validation contracts.
+
+## Direction 5 extension update: output + intermediate dataset stores (stories 1.2.5-1.2.6)
+
+- Output image store provisioning now uses the same dataset-instance service path as other runtime stores through `SystemDatasetInstanceService.ensureOutputImageStoreInstance(...)` (`role=output-store`, `purpose=workflow-output-images`), preserving system ownership + dataset-asset linkage checks.
+- Intermediate stores are now first-class role-driven dataset instances via `SystemDatasetInstanceService.ensureIntermediateStoreInstance(...)` (`role=intermediate-store`) with optional per-purpose usage and existing idempotent role lookup semantics.
+- Dataset instance lifecycle contracts now include optional lifecycle metadata (`retentionPolicy`, `maxAgeDays`, `cleanupAfter`, `cleanupStatus`) for bounded retention/cleanup intent without introducing a second intermediate-storage subsystem.
+- Runtime domain normalization now rejects unsupported role/status values and invalid lifecycle metadata combinations, and persistence rehydrates these fields through the same canonical dataset-instance model.
