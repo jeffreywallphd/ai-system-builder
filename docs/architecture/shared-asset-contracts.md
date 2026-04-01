@@ -584,3 +584,21 @@ Not implemented in this slice:
   - composed internal stage pipeline using the composition model,
   - preview/inspection metadata for studio discoverability.
 - Discovery/registration support is provided through `ImageWorkflowAssetRegistry`, exposing high-level asset entries without leaking low-level execution graph details.
+
+
+## AI Loom Image Manipulation vertical-slice update: restyle + enhance/upscale assets (stories 3.1.5-3.1.6)
+
+- Added reusable high-level image workflow assets backed by the established 3.1.1-3.1.4 contract/composition seams:
+  - `application/contracts/RestyleWorkflowAsset.ts`
+  - `application/contracts/EnhanceUpscaleWorkflowAsset.ts`
+- Both assets preserve a small public contract surface while keeping execution internals adapter-bounded:
+  - canonical input bindings (`sourceImage`, plus style input for restyle),
+  - bounded configuration with zod validation,
+  - canonical output bindings (`images` for restyle, `enhancedImage` for enhance/upscale),
+  - preview/inspection metadata for studio discovery surfaces.
+- Internal composition reuses `ImageWorkflowComposition` and shared `CommonImageNodeContracts` node kinds (for example `prompt-input`, `sampler-wrapper`, `resize-upscale`, `save-image`) instead of exposing raw ComfyUI graph details in asset contracts.
+- `ImageWorkflowAssetRegistry` default discovery entries now include all three concrete assets (`image-to-image`, `restyle`, `enhance-upscale`) via the existing registry/discovery path.
+- Added focused contract/composition tests for both assets and expanded registry coverage:
+  - `application/contracts/tests/RestyleWorkflowAsset.test.ts`
+  - `application/contracts/tests/EnhanceUpscaleWorkflowAsset.test.ts`
+  - `application/contracts/tests/ImageToImageWorkflowAsset.test.ts`

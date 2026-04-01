@@ -42,6 +42,8 @@ describe("ImageToImageWorkflowAsset", () => {
     const listed = registry.list();
 
     expect(listed.some((entry) => entry.id === ImageToImageWorkflowAssetId)).toBeTrue();
+    expect(listed.some((entry) => entry.intentType === ImageWorkflowAssetIntentTypes.restyle)).toBeTrue();
+    expect(listed.some((entry) => entry.intentType === ImageWorkflowAssetIntentTypes.enhanceUpscale)).toBeTrue();
     expect(registry.getByIntent(ImageWorkflowAssetIntentTypes.imageToImage)?.preview.title).toContain("Image-to-image");
   });
 

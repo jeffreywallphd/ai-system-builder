@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { createEnhanceUpscaleWorkflowAsset, type EnhanceUpscaleWorkflowAsset } from "./EnhanceUpscaleWorkflowAsset";
+import { createRestyleWorkflowAsset, type RestyleWorkflowAsset } from "./RestyleWorkflowAsset";
 import {
   CoreImageWorkflowAssetTypeContracts,
   ImageWorkflowAssetIntentTypes,
@@ -201,6 +203,8 @@ export function createImageToImageWorkflowAsset(input?: {
   });
 }
 
+export type ImageWorkflowAssetDefinition = ImageToImageWorkflowAsset | RestyleWorkflowAsset | EnhanceUpscaleWorkflowAsset;
+
 export interface ImageWorkflowAssetRegistryEntry {
   readonly id: string;
   readonly version: string;
@@ -210,9 +214,13 @@ export interface ImageWorkflowAssetRegistryEntry {
 }
 
 export class ImageWorkflowAssetRegistry {
-  private readonly entries: ReadonlyArray<ImageToImageWorkflowAsset>;
+  private readonly entries: ReadonlyArray<ImageWorkflowAssetDefinition>;
 
-  public constructor(entries: ReadonlyArray<ImageToImageWorkflowAsset> = [createImageToImageWorkflowAsset()]) {
+  public constructor(entries: ReadonlyArray<ImageWorkflowAssetDefinition> = [
+    createImageToImageWorkflowAsset(),
+    createRestyleWorkflowAsset(),
+    createEnhanceUpscaleWorkflowAsset(),
+  ]) {
     this.entries = Object.freeze(entries.map((entry) => Object.freeze(entry)));
   }
 
@@ -226,7 +234,7 @@ export class ImageWorkflowAssetRegistry {
     })));
   }
 
-  public getByIntent(intentType: string): ImageToImageWorkflowAsset | undefined {
+  public getByIntent(intentType: string): ImageWorkflowAssetDefinition | undefined {
     return this.entries.find((entry) => entry.intentType === intentType);
   }
 }
