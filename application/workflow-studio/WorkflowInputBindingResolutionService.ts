@@ -9,6 +9,7 @@ import {
   type WorkflowInputBindingResolutionResult,
   type WorkflowInputBindingSourceDescriptor,
   WorkflowInputBindingSourceKinds,
+  validateWorkflowInputBindingDefinitions,
 } from "../../domain/workflow-studio/WorkflowInputBindingDomain";
 
 export interface ResolveWorkflowInputBindingsRequest {
@@ -41,7 +42,10 @@ type SourceResolutionStatus =
   | "missing-field-reference"
   | "selected-image-missing"
   | "invalid-selection-reference"
-  | "dataset-instance-missing";
+  | "dataset-instance-missing"
+  | "dataset-record-missing"
+  | "dataset-resolution-shape-unsupported"
+  | "dataset-schema-incompatible";
 
 interface SourceResolutionResult {
   readonly status: SourceResolutionStatus;
@@ -52,10 +56,33 @@ function hasRecordValues(record: Readonly<Record<string, unknown>>): boolean {
   return Object.keys(record).length > 0;
 }
 
-function matchDatasetInstance(
+function valueTypeMatches(valueType: WorkflowInputBindingDescriptor["valueType"], value: unknown): boolean {
+  if (!valueType || valueType === "unknown") {
+    return true;
+  }
+  if (valueType === "string") {
+    return typeof value === "string";
+  }
+  if (valueType === "number") {
+    return typeof value === "number" && Number.isFinite(value);
+  }
+  if (valueType === "boolean") {
+    return typeof value === "boolean";
+  }
+  if (valueType === "array") {
+    return Array.isArray(value);
+  }
+  if (valueType === "object") {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+  return true;
+}
+
+function resolveDatasetSourceValue(
   source: Extract<WorkflowInputBindingSourceDescriptor, { kind: typeof WorkflowInputBindingSourceKinds.datasetInstanceReference }>,
   instances: ReadonlyArray<NonNullable<WorkflowInputBindingResolutionContext["datasetInstances"]>[number]>,
-): unknown {
+  bindingValueType?: WorkflowInputBindingDescriptor["valueType"],
+): SourceResolutionResult {
   const matched = instances.find((instance) => {
     if (source.instanceId && source.instanceId !== instance.instanceId) {
       return false;
@@ -66,25 +93,79 @@ function matchDatasetInstance(
     if (source.purpose && source.purpose !== instance.purpose) {
       return false;
     }
+    if (source.datasetAssetId && source.datasetAssetId !== instance.datasetAssetId) {
+      return false;
+    }
+    if (source.datasetVersionId && source.datasetVersionId !== instance.datasetVersionId) {
+      return false;
+    }
     return true;
   });
 
   if (!matched) {
-    return undefined;
+    return Object.freeze({ status: "dataset-instance-missing" });
   }
 
-  return createDatasetInstanceReference({
-    systemId: matched.systemId,
-    instanceId: matched.instanceId,
-    datasetAssetId: matched.datasetAssetId,
-    datasetVersionId: matched.datasetVersionId,
-    purpose: matched.purpose,
-  });
+  const resolutionShape = source.resolution?.shape ?? "instance";
+  if (resolutionShape === "instance") {
+    return Object.freeze({
+      status: "resolved",
+      value: createDatasetInstanceReference({
+        systemId: matched.systemId,
+        instanceId: matched.instanceId,
+        datasetAssetId: matched.datasetAssetId,
+        datasetVersionId: matched.datasetVersionId,
+        purpose: matched.purpose,
+      }),
+    });
+  }
+
+  const records = matched.records ?? [];
+  if (resolutionShape === "record") {
+    const selectedRecord = source.resolution?.recordId
+      ? records.find((record) => record.recordId === source.resolution?.recordId)
+      : source.resolution?.index !== undefined
+        ? records[source.resolution.index]
+        : undefined;
+
+    if (!selectedRecord) {
+      return Object.freeze({ status: "dataset-record-missing" });
+    }
+
+    const selectedValue = source.resolution?.fieldPath
+      ? readByPath((selectedRecord.value ?? {}) as Readonly<Record<string, unknown>>, source.resolution.fieldPath)
+      : selectedRecord.value;
+
+    if (selectedValue === undefined) {
+      return Object.freeze({ status: "dataset-record-missing" });
+    }
+
+    if (matched.schema?.recordValueType && !valueTypeMatches(matched.schema.recordValueType, selectedValue)) {
+      return Object.freeze({ status: "dataset-schema-incompatible" });
+    }
+
+    if (bindingValueType && !valueTypeMatches(bindingValueType, selectedValue)) {
+      return Object.freeze({ status: "dataset-schema-incompatible" });
+    }
+
+    return Object.freeze({ status: "resolved", value: selectedValue });
+  }
+
+  if (resolutionShape === "collection") {
+    const collection = Object.freeze(records.map((record) => record.value));
+    if (bindingValueType && !valueTypeMatches(bindingValueType, collection)) {
+      return Object.freeze({ status: "dataset-resolution-shape-unsupported" });
+    }
+    return Object.freeze({ status: "resolved", value: collection });
+  }
+
+  return Object.freeze({ status: "dataset-resolution-shape-unsupported" });
 }
 
 function resolveSourceValue(
   source: WorkflowInputBindingSourceDescriptor,
   context: Required<WorkflowInputBindingResolutionContext>,
+  bindingValueType?: WorkflowInputBindingDescriptor["valueType"],
 ): SourceResolutionResult {
   switch (source.kind) {
     case WorkflowInputBindingSourceKinds.uiFormValue:
@@ -112,40 +193,13 @@ function resolveSourceValue(
       }
       return Object.freeze({ status: "resolved", value });
     }
-    case WorkflowInputBindingSourceKinds.datasetInstanceReference: {
-      const value = matchDatasetInstance(source, context.datasetInstances);
-      if (value === undefined) {
-        return Object.freeze({ status: "dataset-instance-missing" });
-      }
-      return Object.freeze({ status: "resolved", value });
-    }
+    case WorkflowInputBindingSourceKinds.datasetInstanceReference:
+      return resolveDatasetSourceValue(source, context.datasetInstances, bindingValueType);
     case WorkflowInputBindingSourceKinds.constantValue:
       return Object.freeze({ status: "resolved", value: source.value });
     default:
       return Object.freeze({ status: "source-value-missing" });
   }
-}
-
-function valueTypeMatches(valueType: WorkflowInputBindingDescriptor["valueType"], value: unknown): boolean {
-  if (!valueType || valueType === "unknown") {
-    return true;
-  }
-  if (valueType === "string") {
-    return typeof value === "string";
-  }
-  if (valueType === "number") {
-    return typeof value === "number" && Number.isFinite(value);
-  }
-  if (valueType === "boolean") {
-    return typeof value === "boolean";
-  }
-  if (valueType === "array") {
-    return Array.isArray(value);
-  }
-  if (valueType === "object") {
-    return value !== null && typeof value === "object" && !Array.isArray(value);
-  }
-  return true;
 }
 
 function createDiagnostic(input: {
@@ -180,7 +234,7 @@ export function resolveWorkflowInputBindings(
   });
 
   const records: WorkflowInputBindingResolutionRecord[] = [];
-  const diagnostics: WorkflowInputBindingResolutionDiagnostic[] = [];
+  const diagnostics: WorkflowInputBindingResolutionDiagnostic[] = [...validateWorkflowInputBindingDefinitions({ bindings: request.bindings })];
   const resolvedValues: Record<string, unknown> = {};
 
   for (const binding of request.bindings) {
@@ -189,17 +243,23 @@ export function resolveWorkflowInputBindings(
     let resolvedRecord: WorkflowInputBindingResolutionRecord | undefined;
 
     for (const source of candidateSources) {
-      const resolution = resolveSourceValue(source, context);
+      const resolution = resolveSourceValue(source, context, binding.valueType);
       if (resolution.status !== "resolved") {
         const diagnosticCode = resolution.status === "selected-image-missing"
           ? WorkflowInputBindingResolutionDiagnosticCodes.selectedImageMissing
           : resolution.status === "dataset-instance-missing"
             ? WorkflowInputBindingResolutionDiagnosticCodes.datasetInstanceMissing
-            : resolution.status === "missing-field-reference"
-              ? WorkflowInputBindingResolutionDiagnosticCodes.missingFieldReference
-              : resolution.status === "invalid-selection-reference"
-                ? WorkflowInputBindingResolutionDiagnosticCodes.invalidSelectionReference
-                : WorkflowInputBindingResolutionDiagnosticCodes.sourceValueMissing;
+            : resolution.status === "dataset-record-missing"
+              ? WorkflowInputBindingResolutionDiagnosticCodes.datasetRecordMissing
+              : resolution.status === "dataset-resolution-shape-unsupported"
+                ? WorkflowInputBindingResolutionDiagnosticCodes.datasetResolutionShapeUnsupported
+                : resolution.status === "dataset-schema-incompatible"
+                  ? WorkflowInputBindingResolutionDiagnosticCodes.datasetSchemaIncompatible
+                  : resolution.status === "missing-field-reference"
+                    ? WorkflowInputBindingResolutionDiagnosticCodes.missingFieldReference
+                    : resolution.status === "invalid-selection-reference"
+                      ? WorkflowInputBindingResolutionDiagnosticCodes.invalidSelectionReference
+                      : WorkflowInputBindingResolutionDiagnosticCodes.sourceValueMissing;
         if (source.required) {
           diagnostics.push(createDiagnostic({
             code: diagnosticCode,
@@ -294,7 +354,7 @@ export function resolveWorkflowInputBindings(
   }
 
   return Object.freeze({
-    contractVersion: "1.0.0",
+    contractVersion: "1.1.0",
     resolvedValues: Object.freeze({ ...resolvedValues }),
     records: Object.freeze(records),
     diagnostics: Object.freeze(diagnostics),

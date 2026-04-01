@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { WorkflowDraftInputValueType } from "./WorkflowStudioDomain";
 
-export const WorkflowInputBindingContractVersion = "1.0.0";
+export const WorkflowInputBindingContractVersion = "1.1.0";
 
 export const WorkflowInputBindingSourceKinds = Object.freeze({
   uiFormValue: "ui-form-value",
@@ -20,6 +20,13 @@ const bindingSourceBaseSchema = z.object({
   priority: z.number().int().min(1).default(100),
   required: z.boolean().default(false),
   description: z.string().trim().min(1).optional(),
+});
+
+const datasetResolutionSchema = z.object({
+  shape: z.enum(["instance", "record", "collection"]).default("instance"),
+  recordId: z.string().trim().min(1).optional(),
+  index: z.number().int().min(0).optional(),
+  fieldPath: z.string().trim().min(1).optional(),
 });
 
 const datasetInstanceRefSchema = z.object({
@@ -54,7 +61,10 @@ const datasetInstanceSourceSchema = bindingSourceBaseSchema.extend({
   kind: z.literal(WorkflowInputBindingSourceKinds.datasetInstanceReference),
   systemId: z.string().trim().min(1).optional(),
   instanceId: z.string().trim().min(1).optional(),
+  datasetAssetId: z.string().trim().min(1).optional(),
+  datasetVersionId: z.string().trim().min(1).optional(),
   purpose: z.string().trim().min(1).optional(),
+  resolution: datasetResolutionSchema.optional(),
 });
 
 const constantValueSourceSchema = bindingSourceBaseSchema.extend({
@@ -95,8 +105,14 @@ export const WorkflowInputBindingResolutionDiagnosticCodes = Object.freeze({
   invalidSelectionReference: "invalid-selection-reference",
   selectedImageMissing: "selected-image-missing",
   datasetInstanceMissing: "dataset-instance-missing",
+  datasetRecordMissing: "dataset-record-missing",
+  datasetResolutionShapeUnsupported: "dataset-resolution-shape-unsupported",
+  datasetSchemaIncompatible: "dataset-schema-incompatible",
   typeMismatch: "type-mismatch",
   invalidBindingConfiguration: "invalid-binding-configuration",
+  invalidSourceReference: "invalid-source-reference",
+  missingRequiredContext: "missing-required-context",
+  ambiguousBindingConfiguration: "ambiguous-binding-configuration",
 });
 
 export type WorkflowInputBindingResolutionDiagnosticCode =
@@ -152,6 +168,14 @@ export interface WorkflowInputBindingResolutionContext {
     readonly datasetAssetId?: string;
     readonly datasetVersionId?: string;
     readonly purpose?: string;
+    readonly schema?: Readonly<{
+      readonly recordValueType?: WorkflowDraftInputValueType | (string & {});
+      readonly collectionValueType?: WorkflowDraftInputValueType | (string & {});
+    }>;
+    readonly records?: ReadonlyArray<{
+      readonly recordId: string;
+      readonly value: unknown;
+    }>;
   }>;
 }
 
@@ -166,4 +190,56 @@ export function createWorkflowInputBindingDescriptor(input: unknown): WorkflowIn
 
 export function createDatasetInstanceReference(input: unknown): z.infer<typeof datasetInstanceRefSchema> {
   return Object.freeze(datasetInstanceRefSchema.parse(input));
+}
+
+export function validateWorkflowInputBindingDefinitions(input: {
+  readonly bindings: ReadonlyArray<WorkflowInputBindingDescriptor>;
+}): ReadonlyArray<WorkflowInputBindingResolutionDiagnostic> {
+  const diagnostics: WorkflowInputBindingResolutionDiagnostic[] = [];
+  const seenInputIds = new Set<string>();
+
+  for (const binding of input.bindings) {
+    if (seenInputIds.has(binding.inputId)) {
+      diagnostics.push(Object.freeze({
+        code: WorkflowInputBindingResolutionDiagnosticCodes.ambiguousBindingConfiguration,
+        severity: "error",
+        inputId: binding.inputId,
+        bindingId: binding.bindingId,
+        message: `Input '${binding.inputId}' is bound by more than one binding descriptor.`,
+        path: `workflow.inputBindings.${binding.bindingId}`,
+      }));
+    }
+    seenInputIds.add(binding.inputId);
+
+    for (const source of binding.sources) {
+      if (source.kind === WorkflowInputBindingSourceKinds.datasetInstanceReference) {
+        if (!source.instanceId && !source.purpose) {
+          diagnostics.push(Object.freeze({
+            code: WorkflowInputBindingResolutionDiagnosticCodes.invalidBindingConfiguration,
+            severity: "error",
+            inputId: binding.inputId,
+            bindingId: binding.bindingId,
+            sourceId: source.sourceId,
+            sourceKind: source.kind,
+            message: "Dataset-instance binding requires either instanceId or purpose.",
+            path: `workflow.inputBindings.${binding.bindingId}`,
+          }));
+        }
+        if (source.resolution?.shape === "record" && !source.resolution.recordId && source.resolution.index === undefined) {
+          diagnostics.push(Object.freeze({
+            code: WorkflowInputBindingResolutionDiagnosticCodes.invalidBindingConfiguration,
+            severity: "error",
+            inputId: binding.inputId,
+            bindingId: binding.bindingId,
+            sourceId: source.sourceId,
+            sourceKind: source.kind,
+            message: "Dataset record resolution requires recordId or index.",
+            path: `workflow.inputBindings.${binding.bindingId}`,
+          }));
+        }
+      }
+    }
+  }
+
+  return Object.freeze(diagnostics);
 }

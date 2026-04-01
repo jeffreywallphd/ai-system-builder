@@ -208,6 +208,24 @@ export function assembleWorkflowExecutionContext(
       domainBindings.push(mapped.descriptor);
     }
   }
+  const datasetInstances = (request.context.metadata?.datasetInstances
+    ?? request.context.metadata?.datasetInstanceReferences
+    ?? []) as ReadonlyArray<{
+      readonly systemId?: string;
+      readonly instanceId: string;
+      readonly datasetAssetId?: string;
+      readonly datasetVersionId?: string;
+      readonly purpose?: string;
+      readonly schema?: Readonly<{
+        readonly recordValueType?: "string" | "number" | "boolean" | "array" | "object" | "unknown";
+        readonly collectionValueType?: "string" | "number" | "boolean" | "array" | "object" | "unknown";
+      }>;
+      readonly records?: ReadonlyArray<{
+        readonly recordId: string;
+        readonly value: unknown;
+      }>;
+    }>;
+
   const resolution = resolveWorkflowInputBindings({
     bindings: domainBindings,
     context: {
@@ -218,13 +236,7 @@ export function assembleWorkflowExecutionContext(
       runtimeParameters: runtimeInputValues,
       triggerPayload,
       selectedImage: (request.context.metadata?.selectedImage ?? {}) as Readonly<Record<string, unknown>>,
-      datasetInstances: (request.context.metadata?.datasetInstances as ReadonlyArray<{
-        readonly systemId?: string;
-        readonly instanceId: string;
-        readonly datasetAssetId?: string;
-        readonly datasetVersionId?: string;
-        readonly purpose?: string;
-      }> | undefined) ?? [],
+      datasetInstances,
     },
   });
 

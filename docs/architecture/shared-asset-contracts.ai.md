@@ -606,3 +606,18 @@
 - Added focused tests for typed form binding, invalid binding configuration diagnostics, and selected-image binding resolution:
   - `application/workflow-studio/tests/WorkflowInputBindingResolutionService.test.ts`
   - `application/workflow-studio/tests/WorkflowExecutionContextAssemblyService.test.ts`
+
+
+## AI Loom Image Manipulation vertical-slice update: dataset-instance binding + validation diagnostics (stories 3.2.5-3.2.6)
+
+- Extended the canonical workflow input-binding contract seam (`domain/workflow-studio/WorkflowInputBindingDomain.ts`) for dataset-instance authoring with explicit dataset linkage and resolution shape metadata (`instance` / `record` / `collection`) plus bounded record-selection selectors.
+- Added reusable binding-definition validation in the domain (`validateWorkflowInputBindingDefinitions`) so malformed/ambiguous binding definitions are surfaced as structured diagnostics before runtime.
+- Extended runtime resolution (`application/workflow-studio/WorkflowInputBindingResolutionService.ts`) to:
+  - resolve dataset-bound inputs from declared dataset instance references (including metadata-provided `datasetInstanceReferences`),
+  - support record-level and collection-level dataset resolution for image-workflow scenarios,
+  - emit structured dataset diagnostics (`dataset-instance-missing`, `dataset-record-missing`, `dataset-schema-incompatible`, `dataset-resolution-shape-unsupported`) alongside existing source/type diagnostics.
+- Kept binding contracts inspectable/persistable and layer-safe: domain owns binding rules + diagnostics, application orchestrates resolution/assembly, and metadata adapters provide context payloads without leaking persistence internals.
+- Added focused coverage for dataset binding resolution + diagnostics and reusable validation output:
+  - `domain/workflow-studio/tests/WorkflowInputBindingDomain.test.ts`
+  - `application/workflow-studio/tests/WorkflowInputBindingResolutionService.test.ts`
+  - `application/workflow-studio/tests/WorkflowExecutionContextAssemblyService.test.ts`
