@@ -1,4 +1,9 @@
 import type { ImageDatasetPreviewItem } from "./ImageDatasetPreviewBuilder";
+import {
+  createDatasetAssetReference,
+  createDatasetRecordReference,
+  type DatasetRecordReference,
+} from "../../domain/dataset-studio/contracts/StudioDatasetCompatibility";
 
 export const DatasetPreviewSelectionModes = Object.freeze({
   single: "single",
@@ -8,12 +13,7 @@ export const DatasetPreviewSelectionModes = Object.freeze({
 export type DatasetPreviewSelectionMode =
   typeof DatasetPreviewSelectionModes[keyof typeof DatasetPreviewSelectionModes];
 
-export interface DatasetRecordSelectionReference {
-  readonly datasetAssetId: string;
-  readonly selectionId: string;
-  readonly recordId: string;
-  readonly imageReference?: string;
-}
+export type DatasetRecordSelectionReference = DatasetRecordReference;
 
 export interface DatasetPreviewSelectionSnapshot {
   readonly datasetAssetId: string;
@@ -26,8 +26,10 @@ function toSelectionReference(
   datasetAssetId: string,
   item: ImageDatasetPreviewItem,
 ): DatasetRecordSelectionReference {
-  return Object.freeze({
-    datasetAssetId,
+  return createDatasetRecordReference({
+    dataset: createDatasetAssetReference({
+      assetId: datasetAssetId,
+    }),
     selectionId: item.selectionId,
     recordId: item.itemId,
     imageReference: item.imageReference,
@@ -92,7 +94,7 @@ export class DatasetPreviewSelectionState {
   public snapshot(): DatasetPreviewSelectionSnapshot {
     const selectedRecords = Object.freeze([...this.selectedById.values()]);
     return Object.freeze({
-      datasetAssetId: this.datasetAssetId,
+      datasetAssetId: createDatasetAssetReference({ assetId: this.datasetAssetId }).assetId,
       mode: this.mode,
       selectedSelectionIds: Object.freeze(selectedRecords.map((record) => record.selectionId)),
       selectedRecords,

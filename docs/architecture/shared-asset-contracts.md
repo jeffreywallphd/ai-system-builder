@@ -455,3 +455,16 @@ Not implemented in this slice:
   - record queries/filtering,
   - record writes/mutations (create/update/delete).
 - Lineage instrumentation remains service-layer bound (`SystemDatasetInstanceService`, `DatasetInstancePreviewService`) to avoid scattering cross-cutting instrumentation across UI or persistence adapters.
+
+## Direction 5 extension update: Data Studio ↔ System dataset compatibility (story 1.3.13)
+
+- Data Studio preview selection references and System runtime preview record references now reuse one shared contract seam in `domain/dataset-studio/contracts/StudioDatasetCompatibility.ts`.
+- Shared references now explicitly model:
+  - dataset asset refs (`assetId` + optional `versionId`),
+  - dataset instance refs (`systemId` + `instanceId` + dataset asset ref),
+  - record/selection refs (`recordId` + `selectionId` + dataset + optional instance).
+- Data Studio selection snapshots and System runtime image-preview payloads now carry this same reference contract (no studio-private remapping of core dataset identifiers).
+- Bounded application-layer orchestration for handoff/selection continuity now lives in `application/system-runtime/StudioDatasetCompatibilityService.ts`:
+  - validates selection-to-instance dataset compatibility,
+  - projects runtime previews into shared references,
+  - resolves selected record ids through existing runtime query/read seams.

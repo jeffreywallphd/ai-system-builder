@@ -23,6 +23,7 @@ describe("DatasetPreviewSelectionState", () => {
     expect(snapshot.datasetAssetId).toBe("asset:dataset:images");
     expect(snapshot.selectedSelectionIds).toEqual(["record-1", "record-2"]);
     expect(snapshot.selectedRecords.map((record) => record.recordId)).toEqual(["record-1", "record-2"]);
+    expect(snapshot.selectedRecords[0]?.dataset.assetId).toBe("asset:dataset:images");
   });
 
   it("enforces single-select mode", () => {

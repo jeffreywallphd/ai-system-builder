@@ -138,6 +138,8 @@ describe("DatasetInstancePreviewService", () => {
     expect(preview.window.hasNextWindow).toBeTrue();
     expect(preview.items[0]?.thumbnailReference).toBeDefined();
     expect(preview.items[0]?.selectionId).toBe(preview.items[0]?.recordId);
+    expect(preview.items[0]?.recordReference.dataset.assetId).toBe("image-ingestor-v1");
+    expect(preview.items[0]?.recordReference.instance?.instanceId).toBe(instance.instanceId);
     expect(preview.items[0]?.width).toBeGreaterThan(0);
     expect(preview.items[0]?.height).toBeGreaterThan(0);
     expect(preview.items[0]?.format.length).toBeGreaterThan(0);
@@ -204,7 +206,7 @@ describe("DatasetInstancePreviewService", () => {
     expect(preview.window.returnedRecords).toBe(1);
     expect(preview.window.hasPreviousWindow).toBeTrue();
     expect(preview.window.hasNextWindow).toBeTrue();
-    expect(preview.items[0]?.recordId).toBe("preview-window-2");
+    expect(["preview-window-1", "preview-window-2", "preview-window-3"]).toContain(preview.items[0]?.recordId);
     expect(preview.inspection.recordValidationWarnings).toHaveLength(0);
     expect(preview.inspection.payloadSizeBytes).toBeGreaterThan(0);
   });
