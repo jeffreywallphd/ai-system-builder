@@ -37,6 +37,11 @@ export interface ResolvedWorkflowOutputWritePlanItem {
     readonly datasetAssetId: string;
     readonly datasetAssetVersionId?: string;
     readonly purpose?: string;
+    readonly groupBy?: string;
+  }>;
+  readonly targetSemantics: Readonly<{
+    readonly comparisonGrouping: WorkflowOutputTargetDefinition["comparisonGrouping"];
+    readonly appendBehavior: "append-only" | "upsert-preferred";
   }>;
   readonly lineage: WorkflowOutputBindingDescriptor["lineage"];
   readonly recordEnvelope: Readonly<{
@@ -161,6 +166,11 @@ export async function resolveWorkflowOutputBindingWritePlan(
           datasetAssetId: instance.datasetAssetId,
           datasetAssetVersionId: instance.datasetAssetVersionId,
           purpose: instance.purpose,
+          groupBy: binding.target.groupBy?.trim() || undefined,
+        }),
+        targetSemantics: Object.freeze({
+          comparisonGrouping: definition.comparisonGrouping,
+          appendBehavior: binding.writeMode === "append" ? "append-only" : "upsert-preferred",
         }),
         lineage: binding.lineage,
         recordEnvelope: Object.freeze({

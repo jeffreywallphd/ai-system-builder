@@ -69,6 +69,7 @@ describe("resolveWorkflowOutputBindingWritePlan", () => {
         datasetInstanceId: "instance:output",
         datasetAssetId: "asset:dataset:output",
       }),
+      targetSemantics: expect.objectContaining({ appendBehavior: "upsert-preferred" }),
     }));
   });
 
@@ -175,4 +176,51 @@ describe("resolveWorkflowOutputBindingWritePlan", () => {
       }),
     ]);
   });
+
+  it("keeps comparison grouping metadata explicit in resolved plans", async () => {
+    const comparison = createWorkflowOutputBindingDescriptor({
+      bindingId: "binding:comparison",
+      outputId: "images",
+      intent: WorkflowOutputBindingIntents.appendComparisonGroup,
+      writeMode: WorkflowOutputBindingWriteModes.append,
+      target: {
+        targetType: WorkflowOutputTargetTypes.comparisonDataset,
+        targetId: "comparison-target",
+        groupBy: "comparison-set:batch-a",
+      },
+      lineage: {
+        workflowAssetId: "asset:workflow:image-edit",
+        workflowRunId: "run:99",
+      },
+      persistence: {
+        systemId: "system:1",
+        datasetInstanceId: "instance:comparison",
+      },
+    });
+
+    const instance = createDatasetInstance({
+      instanceId: "instance:comparison",
+      systemId: "system:1",
+      datasetAssetId: "asset:dataset:comparison",
+      role: "output-store",
+      lifecycleStatus: "ready",
+      runtimeStatus: "idle",
+    });
+
+    const result = await resolveWorkflowOutputBindingWritePlan({
+      systemId: "system:1",
+      bindings: [comparison],
+      datasetInstanceService: createServiceStub({ ensuredInstance: instance }),
+    });
+
+    expect(result.ready).toBe(true);
+    expect(result.plan[0]).toEqual(expect.objectContaining({
+      target: expect.objectContaining({ groupBy: "comparison-set:batch-a" }),
+      targetSemantics: expect.objectContaining({
+        comparisonGrouping: "required",
+        appendBehavior: "append-only",
+      }),
+    }));
+  });
+
 });

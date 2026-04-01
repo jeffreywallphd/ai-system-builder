@@ -722,3 +722,16 @@ Not implemented in this slice:
   - `domain/workflow-studio/tests/WorkflowOutputBindingDomain.test.ts`,
   - `domain/system-runtime/tests/WorkflowOutputTargetDomain.test.ts`,
   - `application/system-runtime/tests/SystemDatasetInstanceService.test.ts`.
+
+## AI Loom Image Manipulation vertical-slice update: history/comparison dataset write behavior (stories 3.3.5-3.3.6)
+
+- Extended the existing output-binding write-plan contract (`application/workflow-studio/WorkflowOutputBindingResolutionService.ts`) so resolved targets now carry explicit grouping + semantic hints (`target.groupBy`, `targetSemantics`) instead of relying on implicit writer behavior.
+- Extended canonical output record materialization (`application/workflow-studio/WorkflowOutputRecordMaterializationService.ts`) to keep output/history/comparison semantics distinct while staying on the same binding-resolution/materialization pipeline:
+  - output dataset: current-result semantics remain upsert-friendly,
+  - history dataset: append-oriented record identity + history entry metadata (`historyEntryId`, `historyEntryType`) and run-scoped output grouping for durable per-run inspection,
+  - comparison dataset: explicit comparison set/member association metadata (`comparisonSetId`, `comparisonMemberId`) and stable comparison-group routing (`groupBy`/lineage fallback).
+- Materialized records now preserve richer traceability across source context/workflow asset version/run/parameter context/output artifacts through shared metadata and generation envelopes (no UI-specific assumptions).
+- Added targeted tests for:
+  - append-oriented history writes across multiple runs with non-colliding record ids and preserved metadata,
+  - explicit comparison grouping + membership persistence for sibling outputs,
+  - target-behavior distinction and compatibility with existing output-binding resolution/materialization seams.
