@@ -31,6 +31,7 @@ export type AssetKind =
   | "embedding"
   | "model-output"
   | "workflow-definition"
+  | "workflow-template"
   | "workflow-export"
   | "prompt"
   | "transcript"

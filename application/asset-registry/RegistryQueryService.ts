@@ -930,6 +930,12 @@ const studioExpectationBySemanticRole: Readonly<
     semanticRole: TaxonomySemanticRoles.workflow,
     allowedBehaviorKinds: Object.freeze(["deterministic", "conditional", "iterative"]),
   }),
+  [TaxonomySemanticRoles.workflowTemplate]: Object.freeze({
+    studioType: "workflow-template-studio",
+    structuralKind: TaxonomyStructuralKinds.composite,
+    semanticRole: TaxonomySemanticRoles.workflowTemplate,
+    allowedBehaviorKinds: Object.freeze(["deterministic", "conditional", "iterative"]),
+  }),
   [TaxonomySemanticRoles.contextBundle]: Object.freeze({
     studioType: "context-bundle-studio",
     structuralKind: TaxonomyStructuralKinds.composite,

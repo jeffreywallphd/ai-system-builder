@@ -9,7 +9,7 @@ This foundation is intentionally narrow. It adds shared taxonomy descriptors and
 The shared descriptor has three dimensions:
 
 - **structural kind**: `atomic` | `composite` | `system`
-- **semantic role**: `model` | `dataset` | `tool` | `prompt-template` | `embedding-index` | `config-profile` | `workflow` | `agent` | `context-bundle` | `dataset-pipeline` | `training-recipe` | `tool-chain` | `app-template` | `system`
+- **semantic role**: `model` | `dataset` | `tool` | `prompt-template` | `embedding-index` | `config-profile` | `workflow` | `workflow-template` | `agent` | `context-bundle` | `dataset-pipeline` | `training-recipe` | `tool-chain` | `app-template` | `system`
 - **behavior kind**: `none` | `deterministic` | `conditional` | `iterative` | `autonomous` (with legacy `dynamic` normalized as an alias)
 
 Behavior is treated as a property/capability of a structural thing, not as a separate architecture stack.

@@ -6,7 +6,7 @@ Provide one compact, reusable classification model for workflows/assets/context/
 ## Core model
 `domain/taxonomy/CompositionTaxonomy.ts` defines:
 - `structuralKind`: `atomic` | `composite` | `system`
-- `semanticRole`: `model` | `dataset` | `tool` | `prompt-template` | `embedding-index` | `config-profile` | `workflow` | `agent` | `context-bundle` | `dataset-pipeline` | `training-recipe` | `tool-chain` | `app-template` | `system`
+- `semanticRole`: `model` | `dataset` | `tool` | `prompt-template` | `embedding-index` | `config-profile` | `workflow` | `workflow-template` | `agent` | `context-bundle` | `dataset-pipeline` | `training-recipe` | `tool-chain` | `app-template` | `system`
 - `behaviorKind`: `none` | `deterministic` | `conditional` | `iterative` | `autonomous` (with `dynamic` normalized as a compatibility alias)
 
 Behavior is a property of the same structural object, not a separate top-level architecture.

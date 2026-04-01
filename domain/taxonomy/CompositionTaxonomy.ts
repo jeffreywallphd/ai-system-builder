@@ -14,6 +14,7 @@ export const TaxonomySemanticRoles = Object.freeze({
   embeddingIndex: "embedding-index",
   configProfile: "config-profile",
   workflow: "workflow",
+  workflowTemplate: "workflow-template",
   agent: "agent",
   contextBundle: "context-bundle",
   datasetPipeline: "dataset-pipeline",
@@ -56,6 +57,11 @@ const allowedTaxonomyCombinationsBySemanticRole: Readonly<Record<TaxonomySemanti
   [TaxonomySemanticRoles.embeddingIndex]: Object.freeze([[TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none]]),
   [TaxonomySemanticRoles.configProfile]: Object.freeze([[TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none]]),
   [TaxonomySemanticRoles.workflow]: Object.freeze([
+    [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.deterministic],
+    [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.conditional],
+    [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.iterative],
+  ]),
+  [TaxonomySemanticRoles.workflowTemplate]: Object.freeze([
     [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.deterministic],
     [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.conditional],
     [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.iterative],
