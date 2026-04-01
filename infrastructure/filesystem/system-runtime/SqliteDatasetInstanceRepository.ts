@@ -6,13 +6,24 @@ import {
   type DatasetInstance,
   type DatasetInstanceRole,
 } from "../../../domain/system-runtime/DatasetInstanceDomain";
+import {
+  createDatasetInstanceImageRecord,
+  matchesDatasetInstanceImageRecordQuery,
+  normalizeDatasetInstanceImageRecordQuery,
+  type DatasetInstanceImageRecord,
+  type DatasetInstanceImageRecordQuery,
+} from "../../../domain/system-runtime/DatasetInstanceRecordDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 
 interface DatasetInstanceRow {
   readonly instance_json: string;
 }
 
-const SCHEMA_VERSION = 2;
+interface DatasetInstanceImageRecordRow {
+  readonly record_json: string;
+}
+
+const SCHEMA_VERSION = 3;
 const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
     CREATE TABLE IF NOT EXISTS system_runtime_dataset_instance_migrations (
@@ -41,6 +52,32 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [2, `
     ALTER TABLE system_dataset_instances
       ADD COLUMN lifecycle_metadata_json TEXT;
+  `],
+  [3, `
+    CREATE TABLE IF NOT EXISTS system_dataset_instance_image_records (
+      record_id TEXT PRIMARY KEY,
+      instance_id TEXT NOT NULL,
+      system_id TEXT NOT NULL,
+      dataset_asset_id TEXT NOT NULL,
+      dataset_asset_version_id TEXT,
+      image_format TEXT NOT NULL,
+      image_width REAL NOT NULL,
+      image_height REAL NOT NULL,
+      image_asset_stable_id TEXT NOT NULL,
+      storage_reference TEXT,
+      storage_provider TEXT,
+      admitted_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      tags_json TEXT NOT NULL,
+      image_metadata_json TEXT NOT NULL,
+      record_metadata_json TEXT NOT NULL,
+      record_json TEXT NOT NULL,
+      FOREIGN KEY(instance_id) REFERENCES system_dataset_instances(instance_id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS system_dataset_instance_image_records_instance_idx
+      ON system_dataset_instance_image_records(instance_id, updated_at DESC, record_id ASC);
+    CREATE INDEX IF NOT EXISTS system_dataset_instance_image_records_query_idx
+      ON system_dataset_instance_image_records(instance_id, image_format, image_asset_stable_id, updated_at DESC);
   `],
 ]);
 
@@ -166,6 +203,118 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
     return row ? this.parse(row.instance_json) : undefined;
   }
 
+  public saveImageRecord(record: DatasetInstanceImageRecord): DatasetInstanceImageRecord {
+    this.getDatabase()
+      .prepare(`
+        INSERT INTO system_dataset_instance_image_records (
+          record_id,
+          instance_id,
+          system_id,
+          dataset_asset_id,
+          dataset_asset_version_id,
+          image_format,
+          image_width,
+          image_height,
+          image_asset_stable_id,
+          storage_reference,
+          storage_provider,
+          admitted_at,
+          updated_at,
+          tags_json,
+          image_metadata_json,
+          record_metadata_json,
+          record_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(record_id) DO UPDATE SET
+          instance_id = excluded.instance_id,
+          system_id = excluded.system_id,
+          dataset_asset_id = excluded.dataset_asset_id,
+          dataset_asset_version_id = excluded.dataset_asset_version_id,
+          image_format = excluded.image_format,
+          image_width = excluded.image_width,
+          image_height = excluded.image_height,
+          image_asset_stable_id = excluded.image_asset_stable_id,
+          storage_reference = excluded.storage_reference,
+          storage_provider = excluded.storage_provider,
+          admitted_at = excluded.admitted_at,
+          updated_at = excluded.updated_at,
+          tags_json = excluded.tags_json,
+          image_metadata_json = excluded.image_metadata_json,
+          record_metadata_json = excluded.record_metadata_json,
+          record_json = excluded.record_json
+      `)
+      .run(
+        record.recordId,
+        record.instanceId,
+        record.systemId,
+        record.datasetAssetId,
+        record.datasetAssetVersionId ?? null,
+        record.image.format,
+        record.image.width,
+        record.image.height,
+        record.image.assetRef.stableId,
+        record.storage?.reference ?? null,
+        record.storage?.provider ?? null,
+        record.admittedAt,
+        record.updatedAt,
+        JSON.stringify(record.image.tags),
+        JSON.stringify(record.image.metadata),
+        JSON.stringify(record.metadata),
+        JSON.stringify(record),
+      );
+
+    return record;
+  }
+
+  public getImageRecordById(input: {
+    readonly instanceId: string;
+    readonly recordId: string;
+  }): DatasetInstanceImageRecord | undefined {
+    const instanceId = normalizeOptional(input.instanceId);
+    const recordId = normalizeOptional(input.recordId);
+    if (!instanceId || !recordId) {
+      return undefined;
+    }
+
+    const row = this.getDatabase()
+      .prepare(`
+        SELECT record_json
+        FROM system_dataset_instance_image_records
+        WHERE instance_id = ? AND record_id = ?
+      `)
+      .get(instanceId, recordId) as DatasetInstanceImageRecordRow | undefined;
+    return row ? this.parseImageRecord(row.record_json) : undefined;
+  }
+
+  public listImageRecordsByInstanceId(instanceId: string): ReadonlyArray<DatasetInstanceImageRecord> {
+    const normalized = normalizeOptional(instanceId);
+    if (!normalized) {
+      return Object.freeze([]);
+    }
+
+    const rows = this.getDatabase()
+      .prepare(`
+        SELECT record_json
+        FROM system_dataset_instance_image_records
+        WHERE instance_id = ?
+        ORDER BY updated_at DESC, record_id ASC
+      `)
+      .all(normalized) as DatasetInstanceImageRecordRow[];
+    return Object.freeze(rows.map((row) => this.parseImageRecord(row.record_json)));
+  }
+
+  public queryImageRecordsByInstanceId(input: {
+    readonly instanceId: string;
+    readonly query?: DatasetInstanceImageRecordQuery;
+  }): ReadonlyArray<DatasetInstanceImageRecord> {
+    const query = normalizeDatasetInstanceImageRecordQuery(input.query);
+    const records = this.listImageRecordsByInstanceId(input.instanceId);
+    if (!query) {
+      return records;
+    }
+    return Object.freeze(records.filter((record) => matchesDatasetInstanceImageRecordQuery(record, query)));
+  }
+
   public dispose(): void {
     this.database?.close();
     this.database = undefined;
@@ -235,6 +384,22 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceRepositor
       seedMetadata: snapshot.seedMetadata,
       lifecycleMetadata: snapshot.lifecycleMetadata,
       createdAt: snapshot.createdAt,
+      updatedAt: snapshot.updatedAt,
+    });
+  }
+
+  private parseImageRecord(raw: string): DatasetInstanceImageRecord {
+    const snapshot = JSON.parse(raw) as DatasetInstanceImageRecord;
+    return createDatasetInstanceImageRecord({
+      recordId: snapshot.recordId,
+      instanceId: snapshot.instanceId,
+      systemId: snapshot.systemId,
+      datasetAssetId: snapshot.datasetAssetId,
+      datasetAssetVersionId: snapshot.datasetAssetVersionId,
+      image: snapshot.image,
+      storage: snapshot.storage,
+      metadata: snapshot.metadata,
+      admittedAt: snapshot.admittedAt,
       updatedAt: snapshot.updatedAt,
     });
   }
