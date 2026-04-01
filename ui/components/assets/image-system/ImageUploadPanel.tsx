@@ -5,6 +5,7 @@ import type {
   ImageUploadValidationResult,
   ImageUploadValidationIssue,
 } from "./ImageUiContracts";
+import { emitImageUiEvent } from "./ImageUiEventAdapters";
 
 export interface ImageUploadPanelProps extends ImageUploadPanelPropsContract, ImageUploadPanelEventContract {
   readonly title?: string;
@@ -28,6 +29,7 @@ export function ImageUploadPanel({
   ingestionAdapter,
   onUploadRequested,
   onValidationChanged,
+  onEvent,
   title = "Upload images",
   className,
   disabled = false,
@@ -70,6 +72,15 @@ export function ImageUploadPanel({
     if (disabled) {
       return;
     }
+    emitImageUiEvent(onEvent, {
+      type: "upload-initiated",
+      sourceComponent: "upload-panel",
+      context: targetContext,
+      payload: {
+        fileCount: files.length,
+        fileNames: Object.freeze(files.map((file) => file.name)),
+      },
+    });
 
     const defaultResult: ImageUploadValidationResult = {
       acceptedFiles: Object.freeze(files),
@@ -82,6 +93,30 @@ export function ImageUploadPanel({
       : defaultResult;
 
     applyValidation(result);
+    if (result.acceptedFiles.length > 0) {
+      emitImageUiEvent(onEvent, {
+        type: "upload-completed",
+        sourceComponent: "upload-panel",
+        context: targetContext,
+        payload: {
+          acceptedCount: result.acceptedFiles.length,
+          rejectedCount: result.rejectedFiles.length,
+          issueCount: result.issues.length,
+          issueCodes: Object.freeze(result.issues.map((issue) => issue.code)),
+        },
+      });
+    } else {
+      emitImageUiEvent(onEvent, {
+        type: "upload-failed",
+        sourceComponent: "upload-panel",
+        context: targetContext,
+        payload: {
+          rejectedCount: result.rejectedFiles.length,
+          issueCount: result.issues.length,
+          issueCodes: Object.freeze(result.issues.map((issue) => issue.code)),
+        },
+      });
+    }
     if (result.acceptedFiles.length > 0) {
       onUploadRequested?.({ files: result.acceptedFiles, context: targetContext });
     }
@@ -103,9 +138,9 @@ export function ImageUploadPanel({
   };
 
   return (
-    <section className={["ui-image-upload-panel", className ?? ""].filter(Boolean).join(" ")} aria-label={title}>
-      <header className="ui-image-upload-panel__header">
-        <h3 className="ui-image-upload-panel__title">{title}</h3>
+    <section className={["ui-image-upload-panel", "ui-image-surface", className ?? ""].filter(Boolean).join(" ")} aria-label={title}>
+      <header className="ui-image-upload-panel__header ui-image-surface__header">
+        <h3 className="ui-image-upload-panel__title ui-image-surface__title">{title}</h3>
         <span className="ui-text-small ui-text-secondary">{summary}</span>
       </header>
       <div

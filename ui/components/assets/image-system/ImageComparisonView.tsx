@@ -6,6 +6,7 @@ import type {
   ImageComparisonViewPropsContract,
   ImageSelectionChangeEvent,
 } from "./ImageUiContracts";
+import { emitImageUiEvent } from "./ImageUiEventAdapters";
 import { isImageSelectionActive } from "./ImageRenderingUtils";
 import { useSynchronizedImageViewport } from "./useSynchronizedImageViewport";
 
@@ -38,10 +39,12 @@ export function ImageComparisonView({
   renderOptions,
   activeImageIds,
   focusedImageId,
+  eventContext,
   onSwapRequested,
   onSelectionChanged,
   onModeChanged,
   onViewportChanged,
+  onEvent,
   title = "Image comparison",
   className,
   loading = false,
@@ -57,13 +60,13 @@ export function ImageComparisonView({
   const comparableItems = useMemo(() => items.slice(0, 2), [items]);
 
   if (loading) {
-    return <section className="ui-image-comparison-view ui-image-comparison-view--status">Loading comparison…</section>;
+    return <section className="ui-image-comparison-view ui-image-comparison-view--status ui-image-surface--status">Loading comparison…</section>;
   }
   if (errorMessage) {
-    return <section className="ui-image-comparison-view ui-image-comparison-view--status ui-text-danger">{errorMessage}</section>;
+    return <section className="ui-image-comparison-view ui-image-comparison-view--status ui-image-surface--status ui-text-danger">{errorMessage}</section>;
   }
   if (comparableItems.length < 2) {
-    return <section className="ui-image-comparison-view ui-image-comparison-view--status">{emptyMessage}</section>;
+    return <section className="ui-image-comparison-view ui-image-comparison-view--status ui-image-surface--status">{emptyMessage}</section>;
   }
 
   const [first, second] = comparableItems;
@@ -76,7 +79,18 @@ export function ImageComparisonView({
     } else {
       next.add(imageId);
     }
-    onSelectionChanged?.(createSelectionEvent(Object.freeze([...next]), imageId));
+    const nextSelectedIds = Object.freeze([...next]);
+    onSelectionChanged?.(createSelectionEvent(nextSelectedIds, imageId));
+    emitImageUiEvent(onEvent, {
+      type: "comparison-target-changed",
+      sourceComponent: "comparison-view",
+      context: eventContext,
+      payload: {
+        imageId,
+        focused: next.has(imageId),
+        selectedIds: nextSelectedIds,
+      },
+    });
   };
 
   const onPan = (direction: "left" | "right" | "up" | "down") => {
@@ -89,22 +103,63 @@ export function ImageComparisonView({
     } else {
       viewport.panBy(0, 20);
     }
+    emitImageUiEvent(onEvent, {
+      type: "viewer-interaction",
+      sourceComponent: "comparison-view",
+      context: eventContext,
+      payload: {
+        interactionType: "pan",
+        details: Object.freeze({ direction }),
+      },
+    });
   };
 
   return (
-    <section className={["ui-image-comparison-view", className ?? ""].filter(Boolean).join(" ")}>
-      <header className="ui-image-comparison-view__header">
+    <section className={["ui-image-comparison-view", "ui-image-surface", className ?? ""].filter(Boolean).join(" ")}>
+      <header className="ui-image-comparison-view__header ui-image-surface__header">
         <div className="ui-stack ui-stack--2xs">
-          <h3 className="ui-image-comparison-view__title">{title}</h3>
+          <h3 className="ui-image-comparison-view__title ui-image-surface__title">{title}</h3>
           <span className="ui-text-small ui-text-secondary">{first.label ?? first.image.title ?? first.image.imageId} vs {second.label ?? second.image.title ?? second.image.imageId}</span>
         </div>
-        <div className="ui-row ui-row--wrap">
-          <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={() => onModeChanged?.(mode === "overlay" ? "side-by-side" : "overlay")}>{renderModeLabel(mode)}</button>
+        <div className="ui-row ui-row--wrap ui-image-control-group">
+          <button
+            type="button"
+            className="ui-button ui-button--ghost ui-button--sm"
+            onClick={() => {
+              const nextMode = mode === "overlay" ? "side-by-side" : "overlay";
+              onModeChanged?.(nextMode);
+              emitImageUiEvent(onEvent, {
+                type: "comparison-mode-changed",
+                sourceComponent: "comparison-view",
+                context: eventContext,
+                payload: { mode: nextMode },
+              });
+            }}
+          >
+            {renderModeLabel(mode)}
+          </button>
           <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={viewport.zoomOut}>-</button>
           <span className="ui-text-small ui-text-secondary">{Math.round(viewport.viewport.zoom * 100)}%</span>
           <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={viewport.zoomIn}>+</button>
           <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={viewport.resetViewport}>Reset</button>
-          <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={onSwapRequested}>Swap</button>
+          <button
+            type="button"
+            className="ui-button ui-button--ghost ui-button--sm"
+            onClick={() => {
+              onSwapRequested?.();
+              emitImageUiEvent(onEvent, {
+                type: "viewer-interaction",
+                sourceComponent: "comparison-view",
+                context: eventContext,
+                payload: {
+                  interactionType: "swap",
+                  details: Object.freeze({ leftImageId: first.image.imageId, rightImageId: second.image.imageId }),
+                },
+              });
+            }}
+          >
+            Swap
+          </button>
         </div>
       </header>
 
@@ -128,7 +183,7 @@ export function ImageComparisonView({
           {[first, second].map((item) => {
             const selected = isImageSelectionActive({ mode: "multi", selectedIds, focusedId: focusedImageId }, item.image.imageId);
             return (
-              <article key={item.image.imageId} className="ui-image-comparison-view__item">
+              <article key={item.image.imageId} className="ui-image-comparison-view__item ui-image-item-card">
                 <ImageRenderFrame image={item.image} renderOptions={renderOptions} selected={selected} className="ui-image-comparison-view__frame" />
                 <div className="ui-row ui-row--between ui-row--wrap">
                   <span className="ui-text-small">{item.label ?? item.image.title ?? item.image.imageId}</span>

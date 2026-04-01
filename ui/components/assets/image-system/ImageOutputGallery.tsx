@@ -5,6 +5,7 @@ import type {
   ImageSelectionChangeEvent,
 } from "./ImageUiContracts";
 import { ImageRenderFrame } from "./ImageRenderFrame";
+import { emitImageUiEvent } from "./ImageUiEventAdapters";
 import { isImageSelectionActive } from "./ImageRenderingUtils";
 
 export interface ImageOutputGalleryProps extends ImageOutputGalleryPropsContract, ImageOutputGalleryEventContract {
@@ -32,8 +33,10 @@ export function ImageOutputGallery({
   selection,
   renderOptions,
   datasetContext,
+  eventContext,
   onSelectionChanged,
   onItemOpened,
+  onEvent,
   title = "Output gallery",
   className,
   loading = false,
@@ -49,20 +52,20 @@ export function ImageOutputGallery({
   );
 
   if (loading) {
-    return <section className="ui-image-output-gallery ui-image-output-gallery--status">{title}: Loading…</section>;
+    return <section className="ui-image-output-gallery ui-image-output-gallery--status ui-image-surface--status">{title}: Loading…</section>;
   }
   if (errorMessage) {
-    return <section className="ui-image-output-gallery ui-image-output-gallery--status ui-text-danger">{errorMessage}</section>;
+    return <section className="ui-image-output-gallery ui-image-output-gallery--status ui-image-surface--status ui-text-danger">{errorMessage}</section>;
   }
   if (items.length === 0) {
-    return <section className="ui-image-output-gallery ui-image-output-gallery--status">{emptyMessage}</section>;
+    return <section className="ui-image-output-gallery ui-image-output-gallery--status ui-image-surface--status">{emptyMessage}</section>;
   }
 
   return (
-    <section className={["ui-image-output-gallery", className ?? ""].filter(Boolean).join(" ")}>
-      <header className="ui-image-output-gallery__header">
+    <section className={["ui-image-output-gallery", "ui-image-surface", className ?? ""].filter(Boolean).join(" ")}>
+      <header className="ui-image-output-gallery__header ui-image-surface__header">
         <div className="ui-stack ui-stack--2xs">
-          <h3 className="ui-image-output-gallery__title">{title}</h3>
+          <h3 className="ui-image-output-gallery__title ui-image-surface__title">{title}</h3>
           {datasetContext ? (
             <span className="ui-text-small ui-text-secondary">
               Dataset: {datasetContext.datasetAssetId}
@@ -79,11 +82,19 @@ export function ImageOutputGallery({
           const selected = isImageSelectionActive(selection, item.imageId);
           const currentSelection = selection?.selectedIds ?? [];
           return (
-            <article key={item.imageId} className={["ui-image-output-gallery__item", selected ? "ui-image-output-gallery__item--selected" : ""].filter(Boolean).join(" ")}>
+            <article key={item.imageId} className={["ui-image-output-gallery__item", "ui-image-item-card", selected ? "ui-image-output-gallery__item--selected ui-image-item-card--selected" : ""].filter(Boolean).join(" ")}>
               <button
                 type="button"
                 className="ui-image-output-gallery__button"
-                onClick={() => onItemOpened?.({ imageId: item.imageId })}
+                onClick={() => {
+                  onItemOpened?.({ imageId: item.imageId });
+                  emitImageUiEvent(onEvent, {
+                    type: "gallery-item-opened",
+                    sourceComponent: "output-gallery",
+                    context: eventContext ?? item.context,
+                    payload: { imageId: item.imageId },
+                  });
+                }}
               >
                 <ImageRenderFrame image={item} renderOptions={renderOptions} selected={selected} className="ui-image-output-gallery__frame" />
               </button>
@@ -99,7 +110,27 @@ export function ImageOutputGallery({
                     } else {
                       selectedSet.add(item.imageId);
                     }
-                    onSelectionChanged?.(createSelectionEvent(Object.freeze([...selectedSet]), item.imageId));
+                    const selectedIds = Object.freeze([...selectedSet]);
+                    onSelectionChanged?.(createSelectionEvent(selectedIds, item.imageId));
+                    emitImageUiEvent(onEvent, {
+                      type: selected ? "image-deselected" : "image-selected",
+                      sourceComponent: "output-gallery",
+                      context: eventContext ?? item.context,
+                      payload: {
+                        imageId: item.imageId,
+                        selectionMode: "multi",
+                      },
+                    });
+                    emitImageUiEvent(onEvent, {
+                      type: "gallery-item-selected",
+                      sourceComponent: "output-gallery",
+                      context: eventContext ?? item.context,
+                      payload: {
+                        imageId: item.imageId,
+                        selected: !selected,
+                        selectedIds,
+                      },
+                    });
                   }}
                 >
                   {selected ? "Deselect" : "Select"}

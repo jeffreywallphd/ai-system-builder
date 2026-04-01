@@ -5,6 +5,7 @@ import type {
   ImageParameterFormPropsContract,
   ImageParameterValidationIssue,
 } from "./ImageUiContracts";
+import { emitImageUiEvent } from "./ImageUiEventAdapters";
 
 export interface ImageParameterFormProps extends ImageParameterFormPropsContract, ImageParameterFormEventContract {
   readonly title?: string;
@@ -73,14 +74,17 @@ export function ImageParameterForm({
   imageId,
   parameters,
   initialValues,
+  eventContext,
   onParametersChanged,
+  onEvent,
   title = "Parameters",
   className,
 }: ImageParameterFormProps): JSX.Element {
-  const [values, setValues] = useState<Readonly<Record<string, unknown>>>(() => createInitialValues({ imageId, parameters, initialValues }));
+  const createNextValues = () => createInitialValues({ imageId, parameters, initialValues });
+  const [values, setValues] = useState<Readonly<Record<string, unknown>>>(createNextValues);
 
   useEffect(() => {
-    setValues(createInitialValues({ imageId, parameters, initialValues }));
+    setValues(createNextValues());
   }, [imageId, initialValues, parameters]);
 
   const issues = useMemo(() => validateValues(parameters, values), [parameters, values]);
@@ -98,12 +102,33 @@ export function ImageParameterForm({
     onParametersChanged?.({ imageId, values, issues });
   }, [imageId, issues, onParametersChanged, values]);
 
+  const updateValue = (parameterId: string, value: unknown): void => {
+    setValues((current) => Object.freeze({ ...current, [parameterId]: value }));
+    emitImageUiEvent(onEvent, {
+      type: "parameter-changed",
+      sourceComponent: "parameter-form",
+      context: eventContext,
+      payload: { imageId, parameterId, value },
+    });
+  };
+
   return (
-    <section className={["ui-image-parameter-form", className ?? ""].filter(Boolean).join(" ")}>
-      <header className="ui-image-parameter-form__header">
-        <h3 className="ui-image-parameter-form__title">{title}</h3>
+    <section className={["ui-image-parameter-form", "ui-image-surface", className ?? ""].filter(Boolean).join(" ")}>
+      <header className="ui-image-parameter-form__header ui-image-surface__header">
+        <h3 className="ui-image-parameter-form__title ui-image-surface__title">{title}</h3>
       </header>
-      <div className="ui-form-grid">
+      <form
+        className="ui-form-grid"
+        onSubmit={(event) => {
+          event.preventDefault();
+          emitImageUiEvent(onEvent, {
+            type: "parameter-submitted",
+            sourceComponent: "parameter-form",
+            context: eventContext,
+            payload: { imageId, values, issueCount: issues.length },
+          });
+        }}
+      >
         {parameters.map((parameter) => {
           const issue = issueMap.get(parameter.parameterId);
           const fieldId = `image-param-${parameter.parameterId}`;
@@ -118,7 +143,7 @@ export function ImageParameterForm({
                   id={fieldId}
                   type="checkbox"
                   checked={Boolean(values[parameter.parameterId])}
-                  onChange={(event) => setValues((current) => Object.freeze({ ...current, [parameter.parameterId]: event.target.checked }))}
+                  onChange={(event) => updateValue(parameter.parameterId, event.target.checked)}
                 />
               ) : null}
               {parameter.type === "select" ? (
@@ -126,7 +151,7 @@ export function ImageParameterForm({
                   id={fieldId}
                   className="ui-select"
                   value={String(values[parameter.parameterId] ?? "")}
-                  onChange={(event) => setValues((current) => Object.freeze({ ...current, [parameter.parameterId]: event.target.value }))}
+                  onChange={(event) => updateValue(parameter.parameterId, event.target.value)}
                 >
                   {parameter.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
@@ -141,7 +166,7 @@ export function ImageParameterForm({
                     max={parameter.max}
                     step={parameter.step ?? 1}
                     value={Number(values[parameter.parameterId] ?? parameter.min ?? 0)}
-                    onChange={(event) => setValues((current) => Object.freeze({ ...current, [parameter.parameterId]: Number(event.target.value) }))}
+                    onChange={(event) => updateValue(parameter.parameterId, Number(event.target.value))}
                   />
                   <span className="ui-text-small ui-text-secondary">{String(values[parameter.parameterId] ?? "")}</span>
                 </div>
@@ -160,7 +185,7 @@ export function ImageParameterForm({
                     const nextValue = parameter.type === "number"
                       ? (event.target.value === "" ? "" : Number(event.target.value))
                       : event.target.value;
-                    setValues((current) => Object.freeze({ ...current, [parameter.parameterId]: nextValue }));
+                    updateValue(parameter.parameterId, nextValue);
                   }}
                 />
               ) : null}
@@ -169,7 +194,26 @@ export function ImageParameterForm({
             </label>
           );
         })}
-      </div>
+        <div className="ui-image-parameter-form__actions ui-image-control-group">
+          <button type="submit" className="ui-button ui-button--secondary ui-button--sm">Apply</button>
+          <button
+            type="button"
+            className="ui-button ui-button--ghost ui-button--sm"
+            onClick={() => {
+              const resetValues = createNextValues();
+              setValues(resetValues);
+              emitImageUiEvent(onEvent, {
+                type: "parameter-reset",
+                sourceComponent: "parameter-form",
+                context: eventContext,
+                payload: { imageId, values: resetValues },
+              });
+            }}
+          >
+            Reset
+          </button>
+        </div>
+      </form>
     </section>
   );
 }

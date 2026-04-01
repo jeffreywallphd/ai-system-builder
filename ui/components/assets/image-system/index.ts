@@ -1,4 +1,5 @@
 export * from "./ImageUiContracts";
+export * from "./ImageUiEventAdapters";
 export * from "./ImageRenderingUtils";
 export * from "./ImageRenderFrame";
 export * from "./BrowserImageUploadIngestionAdapter";

@@ -30,6 +30,101 @@ export interface ImageUiContextRef {
   readonly workflowRunId?: string;
 }
 
+export type ImageUiEventType =
+  | "upload-initiated"
+  | "upload-completed"
+  | "upload-failed"
+  | "image-selected"
+  | "image-deselected"
+  | "parameter-changed"
+  | "parameter-submitted"
+  | "parameter-reset"
+  | "gallery-item-selected"
+  | "gallery-item-opened"
+  | "comparison-target-changed"
+  | "comparison-mode-changed"
+  | "viewer-zoom-requested"
+  | "viewer-interaction";
+
+export interface ImageUiEventPayloadMap {
+  readonly "upload-initiated": {
+    readonly fileCount: number;
+    readonly fileNames: ReadonlyArray<string>;
+  };
+  readonly "upload-completed": {
+    readonly acceptedCount: number;
+    readonly rejectedCount: number;
+    readonly issueCount: number;
+    readonly issueCodes: ReadonlyArray<string>;
+  };
+  readonly "upload-failed": {
+    readonly rejectedCount: number;
+    readonly issueCount: number;
+    readonly issueCodes: ReadonlyArray<string>;
+  };
+  readonly "image-selected": {
+    readonly imageId: string;
+    readonly selectionMode: ImageSelectionState["mode"];
+  };
+  readonly "image-deselected": {
+    readonly imageId: string;
+    readonly selectionMode: ImageSelectionState["mode"];
+  };
+  readonly "parameter-changed": {
+    readonly imageId?: string;
+    readonly parameterId: string;
+    readonly value: unknown;
+  };
+  readonly "parameter-submitted": {
+    readonly imageId?: string;
+    readonly values: Readonly<Record<string, unknown>>;
+    readonly issueCount: number;
+  };
+  readonly "parameter-reset": {
+    readonly imageId?: string;
+    readonly values: Readonly<Record<string, unknown>>;
+  };
+  readonly "gallery-item-selected": {
+    readonly imageId: string;
+    readonly selected: boolean;
+    readonly selectedIds: ReadonlyArray<string>;
+  };
+  readonly "gallery-item-opened": {
+    readonly imageId: string;
+  };
+  readonly "comparison-target-changed": {
+    readonly imageId: string;
+    readonly focused: boolean;
+    readonly selectedIds: ReadonlyArray<string>;
+  };
+  readonly "comparison-mode-changed": {
+    readonly mode: ImageComparisonMode;
+  };
+  readonly "viewer-zoom-requested": {
+    readonly imageId: string;
+    readonly delta: number;
+    readonly zoom: number;
+  };
+  readonly "viewer-interaction": {
+    readonly interactionType: "pan" | "swap" | "zoom" | "select";
+    readonly imageId?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  };
+}
+
+export interface ImageUiEvent<TType extends ImageUiEventType = ImageUiEventType> {
+  readonly type: TType;
+  readonly sourceComponent: ImageComponentId;
+  readonly eventId: string;
+  readonly occurredAt: string;
+  readonly context?: ImageUiContextRef;
+  readonly payload: ImageUiEventPayloadMap[TType];
+}
+
+export interface ImageUiEventEmitterContract {
+  readonly onEvent?: (event: ImageUiEvent) => void;
+}
+
 export interface ImageRenderMetadata {
   readonly width?: number;
   readonly height?: number;
@@ -78,7 +173,7 @@ export interface ImageUploadPanelPropsContract {
   readonly ingestionAdapter?: ImageUploadIngestionAdapter;
 }
 
-export interface ImageUploadPanelEventContract {
+export interface ImageUploadPanelEventContract extends ImageUiEventEmitterContract {
   readonly onUploadRequested?: (payload: {
     readonly files: ReadonlyArray<File>;
     readonly context?: ImageUiContextRef;
@@ -117,9 +212,10 @@ export interface ImageViewerPropsContract {
   readonly image: ImageUiViewModel;
   readonly selection?: ImageSelectionState;
   readonly renderOptions: ImageRenderOptions;
+  readonly eventContext?: ImageUiContextRef;
 }
 
-export interface ImageViewerEventContract {
+export interface ImageViewerEventContract extends ImageUiEventEmitterContract {
   readonly onImageSelected?: (event: ImageSelectionChangeEvent) => void;
   readonly onZoomRequested?: (payload: { readonly imageId: string; readonly delta: number }) => void;
 }
@@ -142,6 +238,7 @@ export interface ImageParameterFormPropsContract {
   readonly imageId?: string;
   readonly parameters: ReadonlyArray<ImageParameterDefinition>;
   readonly initialValues?: Readonly<Record<string, unknown>>;
+  readonly eventContext?: ImageUiContextRef;
 }
 
 export interface ImageParameterValidationIssue {
@@ -150,7 +247,7 @@ export interface ImageParameterValidationIssue {
   readonly message: string;
 }
 
-export interface ImageParameterFormEventContract {
+export interface ImageParameterFormEventContract extends ImageUiEventEmitterContract {
   readonly onParametersChanged?: (payload: {
     readonly imageId?: string;
     readonly values: Readonly<Record<string, unknown>>;
@@ -163,9 +260,10 @@ export interface ImageOutputGalleryPropsContract {
   readonly selection?: ImageSelectionState;
   readonly renderOptions: ImageRenderOptions;
   readonly datasetContext?: ImageDatasetContextRef;
+  readonly eventContext?: ImageUiContextRef;
 }
 
-export interface ImageOutputGalleryEventContract {
+export interface ImageOutputGalleryEventContract extends ImageUiEventEmitterContract {
   readonly onSelectionChanged?: (event: ImageSelectionChangeEvent) => void;
   readonly onItemOpened?: (payload: { readonly imageId: string }) => void;
 }
@@ -195,9 +293,10 @@ export interface ImageComparisonViewPropsContract {
   readonly renderOptions: ImageRenderOptions;
   readonly activeImageIds?: ReadonlyArray<string>;
   readonly focusedImageId?: string;
+  readonly eventContext?: ImageUiContextRef;
 }
 
-export interface ImageComparisonViewEventContract {
+export interface ImageComparisonViewEventContract extends ImageUiEventEmitterContract {
   readonly onSwapRequested?: () => void;
   readonly onSelectionChanged?: (event: ImageSelectionChangeEvent) => void;
   readonly onModeChanged?: (mode: ImageComparisonMode) => void;

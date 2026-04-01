@@ -145,17 +145,47 @@
   gap: var(--space-sm);
 }
 
-.ui-image-upload-panel__header {
+.ui-image-surface {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.ui-image-surface__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
-.ui-image-upload-panel__title {
+.ui-image-surface__title {
   margin: 0;
   font-size: 1rem;
+}
+
+.ui-image-surface--status {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+
+.ui-image-item-card {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-xs);
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.ui-image-item-card--selected {
+  border-color: var(--color-border-strong);
+}
+
+.ui-image-control-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
 }
 
 .ui-image-upload-panel__dropzone {
@@ -273,6 +303,10 @@
   gap: var(--space-sm);
 }
 
+.ui-image-parameter-form__actions {
+  justify-content: flex-end;
+}
+
 .ui-slider {
   width: 100%;
 }
@@ -280,12 +314,6 @@
 .ui-image-output-gallery {
   display: grid;
   gap: var(--space-sm);
-}
-
-.ui-image-output-gallery--status {
-  border: 1px solid var(--color-border-soft);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
 }
 
 .ui-image-output-gallery__header {
@@ -304,18 +332,6 @@
   display: grid;
   gap: var(--space-sm);
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-}
-
-.ui-image-output-gallery__item {
-  border: 1px solid var(--color-border-soft);
-  border-radius: var(--radius-md);
-  padding: var(--space-xs);
-  display: grid;
-  gap: var(--space-xs);
-}
-
-.ui-image-output-gallery__item--selected {
-  border-color: var(--color-border-strong);
 }
 
 .ui-image-output-gallery__button {
@@ -349,12 +365,6 @@
   gap: var(--space-sm);
 }
 
-.ui-image-comparison-view--status {
-  border: 1px solid var(--color-border-soft);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-}
-
 .ui-image-comparison-view__header {
   display: flex;
   align-items: flex-start;
@@ -377,14 +387,6 @@
   display: grid;
   gap: var(--space-sm);
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-}
-
-.ui-image-comparison-view__item {
-  border: 1px solid var(--color-border-soft);
-  border-radius: var(--radius-md);
-  padding: var(--space-xs);
-  display: grid;
-  gap: var(--space-xs);
 }
 
 .ui-image-comparison-view__frame {
