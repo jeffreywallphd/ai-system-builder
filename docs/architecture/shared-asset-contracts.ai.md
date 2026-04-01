@@ -631,6 +631,22 @@
   - history dataset = append-oriented durable run history,
   - comparison dataset = grouped comparable outputs for inspection.
 - `SystemDatasetInstanceService` now exposes `ensureWorkflowOutputTargetInstance(...)` to provision/resolve system-owned dataset instances from target-type semantics without duplicating role/purpose logic; existing `ensureOutputImageStoreInstance(...)` now reuses this seam.
+
+## AI Loom Image Manipulation vertical-slice update: output binding resolution + record materialization (stories 3.3.3-3.3.4)
+
+- Added a dedicated application-layer output target resolution seam in `application/workflow-studio/WorkflowOutputBindingResolutionService.ts`:
+  - resolves declared workflow output bindings into concrete system-owned dataset instances through `SystemDatasetInstanceService` (existing runtime contract reuse, no parallel dataset model),
+  - validates target availability, grouping requirements, and dataset asset/version compatibility before writes,
+  - emits an inspectable resolved write plan (`ResolvedWorkflowOutputWritePlanItem`) with only downstream materialization/writer fields.
+- Added canonical record materialization mapping in `application/workflow-studio/WorkflowOutputRecordMaterializationService.ts`:
+  - transforms execution-produced images and resolved output plans into persistable dataset-image record envelopes,
+  - includes run metadata, parameter context, target metadata, provenance, generation linkage, timestamps, and derived routing fields,
+  - stays execution-adapter agnostic (no ComfyUI-specific DTO coupling).
+- Added focused tests under `application/workflow-studio/tests/*` for:
+  - successful binding resolution,
+  - missing/incompatible target validation failures,
+  - write-plan generation semantics,
+  - canonical output-record materialization and metadata traceability.
 - Added focused target/binding coverage in:
   - `domain/workflow-studio/tests/WorkflowOutputBindingDomain.test.ts`,
   - `domain/system-runtime/tests/WorkflowOutputTargetDomain.test.ts`,
