@@ -25,6 +25,7 @@ import { ComfyExecutionService } from "../../../application/execution/comfyui/Co
 import { createComfyExecutionContext } from "../../../application/execution/comfyui/ComfyExecutionContext";
 import { mapComfyError, mapComfyProgressToLifecycleEvent } from "./ComfyExecutionLifecycle";
 import { ComfyQueueClient } from "./ComfyQueueClient";
+import { ComfyAdapterObservability, type IComfyAdapterLogger } from "./ComfyAdapterObservability";
 import { ComfyExecutionRequestMapper } from "./mappers/ComfyExecutionRequestMapper";
 import { ComfyExecutionResultMapper } from "./mappers/ComfyExecutionResultMapper";
 
@@ -41,6 +42,7 @@ export interface IComfyQueueExecutionAdapterOptions {
   readonly queueClient: ComfyQueueClient;
   readonly requestMapper?: ComfyExecutionRequestMapper;
   readonly resultMapper?: ComfyExecutionResultMapper;
+  readonly logger?: IComfyAdapterLogger;
 }
 
 export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
@@ -53,10 +55,12 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
 
   private readonly requestMapper: ComfyExecutionRequestMapper;
   private readonly resultMapper: ComfyExecutionResultMapper;
+  private readonly observability: ComfyAdapterObservability;
 
   constructor(private readonly options: IComfyQueueExecutionAdapterOptions) {
     this.requestMapper = options.requestMapper ?? new ComfyExecutionRequestMapper();
     this.resultMapper = options.resultMapper ?? new ComfyExecutionResultMapper();
+    this.observability = new ComfyAdapterObservability(options.logger);
   }
 
   public async start(
@@ -67,6 +71,12 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
     cancel(): Promise<void>;
     waitForCompletion(): Promise<IComfyAdapterResult>;
   }> {
+    this.observability.requestAccepted({
+      context: request.context,
+      runtimeOptions: request.context?.runtime.options,
+    });
+
+    const startedAt = Date.now();
     let mapped;
     try {
       mapped = this.requestMapper.map(request);
@@ -85,6 +95,7 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
     } catch (error: unknown) {
       return this.createImmediateFailureHandle(request, error, "connection");
     }
+    this.observability.executionStarted({ executionId: promptId, context: mapped.executionContext });
 
     const lifecycle: IComfyAdapterLifecycleEvent[] = [];
 
@@ -104,6 +115,11 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
       executionId: promptId,
       cancel: async () => {
         await this.options.queueClient.cancelPrompt(promptId);
+        this.observability.executionCancelled({
+          executionId: promptId,
+          context: mapped.executionContext,
+          durationMs: Date.now() - startedAt,
+        });
         emitLifecycle(Object.freeze({
           executionId: promptId,
           status: "cancelled",
@@ -129,6 +145,12 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
               stage: "output-normalization",
               context: mapped.executionContext,
             });
+            this.observability.executionFailed({
+              executionId: promptId,
+              context: mapped.executionContext,
+              durationMs: Date.now() - startedAt,
+              error: normalizedError,
+            });
 
             return Object.freeze({
               executionId: promptId,
@@ -139,6 +161,13 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
               messages: [normalizedError.message],
             });
           }
+
+          this.observability.executionCompleted({
+            executionId: promptId,
+            context: mapped.executionContext,
+            durationMs: Date.now() - startedAt,
+            outputCount: normalized.outputs.length,
+          });
 
           return Object.freeze({
             executionId: promptId,
@@ -152,6 +181,20 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
             stage: "execution",
             context: mapped.executionContext,
           });
+          if (normalizedError.code === "execution-cancelled") {
+            this.observability.executionCancelled({
+              executionId: promptId,
+              context: mapped.executionContext,
+              durationMs: Date.now() - startedAt,
+            });
+          } else {
+            this.observability.executionFailed({
+              executionId: promptId,
+              context: mapped.executionContext,
+              durationMs: Date.now() - startedAt,
+              error: normalizedError,
+            });
+          }
           return Object.freeze({
             executionId: promptId,
             status: normalizedError.code === "execution-cancelled" ? "cancelled" : "failed",
@@ -177,6 +220,11 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
     const normalizedError = mapComfyError(error, {
       stage,
       context: request.context,
+    });
+    this.observability.executionFailed({
+      executionId: request.context?.identifiers.executionId,
+      context: request.context,
+      error: normalizedError,
     });
 
     const executionId = request.context?.identifiers.executionId

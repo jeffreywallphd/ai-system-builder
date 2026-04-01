@@ -1,10 +1,12 @@
 import type { ComfyQueueStateDto, ComfyWorkflowDto } from "../dto/ComfyWorkflowDto";
 import { ComfyApiClient } from "./ComfyApiClient";
+import type { ComfyAdapterConfig } from "./ComfyAdapterConfig";
 
 export interface IComfyQueueClientOptions {
   readonly apiClient: ComfyApiClient;
   readonly pollIntervalMs?: number;
   readonly maxWaitMs?: number;
+  readonly config?: ComfyAdapterConfig;
 }
 
 export interface IComfyPromptOutputArtifact {
@@ -37,8 +39,8 @@ export class ComfyQueueClient {
 
   constructor(options: IComfyQueueClientOptions) {
     this.apiClient = options.apiClient;
-    this.pollIntervalMs = options.pollIntervalMs ?? 1_000;
-    this.maxWaitMs = options.maxWaitMs ?? 1000 * 60 * 60;
+    this.pollIntervalMs = options.pollIntervalMs ?? options.config?.pollIntervalMs ?? 1_000;
+    this.maxWaitMs = options.maxWaitMs ?? options.config?.maxExecutionWaitMs ?? 1000 * 60 * 60;
   }
 
   public async enqueuePrompt(
