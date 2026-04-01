@@ -625,6 +625,7 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceStorageAd
       image: snapshot.image,
       storage: snapshot.storage,
       metadata: snapshot.metadata,
+      provenance: snapshot.provenance,
       admittedAt: snapshot.admittedAt,
       updatedAt: snapshot.updatedAt,
       mutationVersion: snapshot.mutationVersion,

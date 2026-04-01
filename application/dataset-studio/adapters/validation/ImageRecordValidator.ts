@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AssetId } from "../../../../domain/assets/AssetId";
 import {
   createImageRecord,
   type IImageRecordValidator,
@@ -40,7 +41,10 @@ const sourceContextSchema = z.record(z.string().trim().min(1), z.string().trim()
 const canonicalAssetReferenceSchema = z.object({
   kind: z.literal(ImageAssetReferenceKinds.canonicalAsset).optional(),
   stableId: z.string().trim().min(1).optional(),
-  assetId: z.string().trim().min(1),
+  assetId: z.union([
+    z.string().trim().min(1),
+    z.instanceof(AssetId).transform((value) => value.toString()),
+  ]),
   assetVersionId: z.string().trim().min(1).optional(),
   sourceSystem: z.string().trim().min(1).optional(),
   sourceContext: sourceContextSchema.optional(),
@@ -94,6 +98,7 @@ const imageRecordSchema = z.object({
   width: z.number().positive(),
   height: z.number().positive(),
   format: z.string().trim().min(1),
+  mimeType: z.string().trim().min(1).optional(),
   metadata: z.record(z.string(), canonicalRecordValueSchema).optional(),
   tags: z.array(z.string().trim().min(1)).default([]),
   annotations: z.object({
@@ -150,6 +155,7 @@ export class ZodImageRecordValidator implements IImageRecordValidator {
       width: parsed.width,
       height: parsed.height,
       format: parsed.format,
+      mimeType: parsed.mimeType,
       metadata: parsed.metadata,
       tags: parsed.tags,
       annotations: parsed.annotations,

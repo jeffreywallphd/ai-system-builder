@@ -19,9 +19,18 @@ export interface DatasetInstanceImageRecord {
   readonly image: ImageRecord;
   readonly storage?: DatasetInstanceImageStorageReference;
   readonly metadata: Readonly<Record<string, CanonicalRecordValue>>;
+  readonly provenance: DatasetInstanceImageRecordProvenance;
   readonly admittedAt: string;
   readonly updatedAt: string;
   readonly mutationVersion: number;
+}
+
+export interface DatasetInstanceImageRecordProvenance {
+  readonly sourceType?: string;
+  readonly sourceReference?: string;
+  readonly sourceSystemId?: string;
+  readonly sourceRunId?: string;
+  readonly ingestedBy?: string;
 }
 
 export interface DatasetInstanceImageRecordQuery {
@@ -51,6 +60,7 @@ export interface DatasetInstanceImagePatch {
   readonly width?: number;
   readonly height?: number;
   readonly format?: string;
+  readonly mimeType?: string | null;
   readonly metadataPatch?: DatasetInstanceImageRecordMetadataPatch;
   readonly tags?: ReadonlyArray<string>;
   readonly derived?: Readonly<Record<string, CanonicalRecordValue>> | null;
@@ -61,8 +71,17 @@ export interface DatasetInstanceImagePatch {
 export interface DatasetInstanceImageRecordPatch {
   readonly imagePatch?: DatasetInstanceImagePatch;
   readonly metadataPatch?: DatasetInstanceImageRecordMetadataPatch;
+  readonly provenancePatch?: DatasetInstanceImageRecordProvenancePatch;
   readonly storagePatch?: DatasetInstanceImageRecordStoragePatch | null;
   readonly updatedAt?: string;
+}
+
+export interface DatasetInstanceImageRecordProvenancePatch {
+  readonly sourceType?: string | null;
+  readonly sourceReference?: string | null;
+  readonly sourceSystemId?: string | null;
+  readonly sourceRunId?: string | null;
+  readonly ingestedBy?: string | null;
 }
 
 function normalizeOptional(value?: string): string | undefined {
@@ -112,6 +131,18 @@ function normalizeStorage(
   return Object.freeze({
     reference,
     provider: normalizeOptional(storage.provider),
+  });
+}
+
+function normalizeProvenance(
+  provenance?: DatasetInstanceImageRecordProvenance,
+): DatasetInstanceImageRecordProvenance {
+  return Object.freeze({
+    sourceType: normalizeOptional(provenance?.sourceType),
+    sourceReference: normalizeOptional(provenance?.sourceReference),
+    sourceSystemId: normalizeOptional(provenance?.sourceSystemId),
+    sourceRunId: normalizeOptional(provenance?.sourceRunId),
+    ingestedBy: normalizeOptional(provenance?.ingestedBy),
   });
 }
 
@@ -175,6 +206,7 @@ export function createDatasetInstanceImageRecord(input: {
   readonly image: ImageRecord;
   readonly storage?: DatasetInstanceImageStorageReference;
   readonly metadata?: Readonly<Record<string, CanonicalRecordValue>>;
+  readonly provenance?: DatasetInstanceImageRecordProvenance;
   readonly admittedAt?: string;
   readonly updatedAt?: string;
   readonly mutationVersion?: number;
@@ -194,6 +226,7 @@ export function createDatasetInstanceImageRecord(input: {
     image: createImageRecord(input.image),
     storage: normalizeStorage(input.storage),
     metadata: normalizeMetadata(input.metadata),
+    provenance: normalizeProvenance(input.provenance),
     admittedAt,
     updatedAt,
     mutationVersion: normalizeMutationVersion(input.mutationVersion),
@@ -213,6 +246,25 @@ export function patchDatasetInstanceImageRecord(input: {
   }
 
   const nextMetadata = applyMetadataPatch(input.record.metadata, input.patch.metadataPatch);
+  const currentProvenance = input.record.provenance;
+  const patchProvenance = input.patch.provenancePatch;
+  const nextProvenance = patchProvenance
+    ? normalizeProvenance({
+      sourceType: patchProvenance.sourceType === null ? undefined : patchProvenance.sourceType ?? currentProvenance.sourceType,
+      sourceReference: patchProvenance.sourceReference === null
+        ? undefined
+        : patchProvenance.sourceReference ?? currentProvenance.sourceReference,
+      sourceSystemId: patchProvenance.sourceSystemId === null
+        ? undefined
+        : patchProvenance.sourceSystemId ?? currentProvenance.sourceSystemId,
+      sourceRunId: patchProvenance.sourceRunId === null
+        ? undefined
+        : patchProvenance.sourceRunId ?? currentProvenance.sourceRunId,
+      ingestedBy: patchProvenance.ingestedBy === null
+        ? undefined
+        : patchProvenance.ingestedBy ?? currentProvenance.ingestedBy,
+    })
+    : currentProvenance;
   const currentStorage = input.record.storage;
   const nextStorage = input.patch.storagePatch === null
     ? undefined
@@ -236,6 +288,9 @@ export function patchDatasetInstanceImageRecord(input: {
     width: imagePatch?.width ?? input.record.image.width,
     height: imagePatch?.height ?? input.record.image.height,
     format: imagePatch?.format ?? input.record.image.format,
+    mimeType: imagePatch?.mimeType === null
+      ? undefined
+      : imagePatch?.mimeType ?? input.record.image.mimeType,
     metadata: nextImageMetadata,
     tags: imagePatch?.tags ?? input.record.image.tags,
     derived: imagePatch?.derived === null
@@ -258,6 +313,7 @@ export function patchDatasetInstanceImageRecord(input: {
     image: nextImage,
     storage: nextStorage,
     metadata: nextMetadata,
+    provenance: nextProvenance,
     admittedAt: input.record.admittedAt,
     updatedAt: nextUpdatedAt,
     mutationVersion: input.record.mutationVersion + 1,
@@ -355,4 +411,3 @@ export function matchesDatasetInstanceImageRecordQuery(
   }
   return true;
 }
-
