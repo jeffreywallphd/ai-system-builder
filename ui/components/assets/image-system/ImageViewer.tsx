@@ -5,6 +5,7 @@ import type {
   ImageViewerPropsContract,
 } from "./ImageUiContracts";
 import { ImageRenderFrame } from "./ImageRenderFrame";
+import { emitImageUiEvent } from "./ImageUiEventAdapters";
 import { isImageSelectionActive, normalizeImageRenderMetadata } from "./ImageRenderingUtils";
 
 export interface ImageViewerProps extends ImageViewerPropsContract, ImageViewerEventContract {
@@ -33,8 +34,10 @@ export function ImageViewer({
   image,
   selection,
   renderOptions,
+  eventContext,
   onImageSelected,
   onZoomRequested,
+  onEvent,
   loading = false,
   errorMessage,
   emptyMessage = "No image selected.",
@@ -60,13 +63,33 @@ export function ImageViewer({
     const nextZoom = Math.min(maxZoom, Math.max(minZoom, Number((zoom + delta).toFixed(2))));
     setZoom(nextZoom);
     onZoomRequested?.({ imageId: image.imageId, delta });
+    emitImageUiEvent(onEvent, {
+      type: "viewer-zoom-requested",
+      sourceComponent: "image-viewer",
+      context: eventContext ?? image.context,
+      payload: {
+        imageId: image.imageId,
+        delta,
+        zoom: nextZoom,
+      },
+    });
+    emitImageUiEvent(onEvent, {
+      type: "viewer-interaction",
+      sourceComponent: "image-viewer",
+      context: eventContext ?? image.context,
+      payload: {
+        interactionType: "zoom",
+        imageId: image.imageId,
+        details: Object.freeze({ delta, zoom: nextZoom }),
+      },
+    });
   };
 
   return (
-    <section className={["ui-image-viewer", className ?? ""].filter(Boolean).join(" ")} aria-busy={loading}>
-      <div className="ui-image-viewer__toolbar">
+    <section className={["ui-image-viewer", "ui-image-surface", className ?? ""].filter(Boolean).join(" ")} aria-busy={loading}>
+      <div className="ui-image-viewer__toolbar ui-image-surface__toolbar">
         <span className="ui-text-small ui-text-secondary">Fit: {renderOptions.fitMode}</span>
-        <div className="ui-row">
+        <div className="ui-row ui-image-control-group">
           <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={() => requestZoom(-zoomStep)}>-</button>
           <span className="ui-text-small ui-text-secondary">{Math.round(zoom * 100)}%</span>
           <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={() => requestZoom(zoomStep)}>+</button>
@@ -74,7 +97,28 @@ export function ImageViewer({
             type="button"
             className={`ui-button ui-button--sm ${isSelected ? "ui-button--primary" : "ui-button--ghost"}`}
             aria-pressed={isSelected}
-            onClick={() => onImageSelected?.(createSelectionEvent(image.imageId))}
+            onClick={() => {
+              onImageSelected?.(createSelectionEvent(image.imageId));
+              emitImageUiEvent(onEvent, {
+                type: isSelected ? "image-deselected" : "image-selected",
+                sourceComponent: "image-viewer",
+                context: eventContext ?? image.context,
+                payload: {
+                  imageId: image.imageId,
+                  selectionMode: "single",
+                },
+              });
+              emitImageUiEvent(onEvent, {
+                type: "viewer-interaction",
+                sourceComponent: "image-viewer",
+                context: eventContext ?? image.context,
+                payload: {
+                  interactionType: "select",
+                  imageId: image.imageId,
+                  details: Object.freeze({ selected: !isSelected }),
+                },
+              });
+            }}
           >
             {isSelected ? "Selected" : "Select"}
           </button>
