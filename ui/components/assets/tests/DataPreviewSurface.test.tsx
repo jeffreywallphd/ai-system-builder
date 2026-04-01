@@ -58,6 +58,7 @@ describe("DataPreviewSurface", () => {
     expect(imageHtml).toContain("invoice");
     expect(imageHtml).toContain("Showing 1-1 of 1");
     expect(imageHtml).toContain("Select");
+    expect(imageHtml).toContain("selection: single");
   });
 
   it("renders graceful image preview fallbacks for missing preview source", () => {

@@ -4,6 +4,9 @@ import type { DataPreviewModel } from "../../../application/data-studio/DataPrev
 export interface DataPreviewSurfaceProps {
   readonly preview: DataPreviewModel;
   readonly title?: string;
+  readonly imageSelectionMode?: "single" | "multi";
+  readonly selectedImageSelectionIds?: ReadonlyArray<string>;
+  readonly onToggleImageSelection?: (selectionId: string) => void;
 }
 
 function renderSummary(preview: DataPreviewModel): JSX.Element {
@@ -184,14 +187,42 @@ function formatImageMetadata(value: Readonly<Record<string, unknown>>): string {
     .join(" · ");
 }
 
-function ImageCollectionPreviewSurface({ preview }: { readonly preview: Extract<DataPreviewModel, { kind: "image-metadata-records" }> }): JSX.Element {
+function ImageCollectionPreviewSurface({
+  preview,
+  imageSelectionMode = "single",
+  selectedImageSelectionIds,
+  onToggleImageSelection,
+}: {
+  readonly preview: Extract<DataPreviewModel, { kind: "image-metadata-records" }>;
+  readonly imageSelectionMode?: "single" | "multi";
+  readonly selectedImageSelectionIds?: ReadonlyArray<string>;
+  readonly onToggleImageSelection?: (selectionId: string) => void;
+}): JSX.Element {
   const [windowOffset, setWindowOffset] = useState(preview.window.offset);
-  const [selectedItemId, setSelectedItemId] = useState<string | undefined>(undefined);
+  const [localSelectedIds, setLocalSelectedIds] = useState<ReadonlyArray<string>>(Object.freeze([]));
   const currentOffset = preview.window.offset;
   const items = useMemo(
     () => preview.items,
     [preview.items],
   );
+  const selectedIds = selectedImageSelectionIds ?? localSelectedIds;
+
+  const toggleSelection = (selectionId: string) => {
+    if (onToggleImageSelection) {
+      onToggleImageSelection(selectionId);
+      return;
+    }
+    setLocalSelectedIds((current) => {
+      const hasSelection = current.includes(selectionId);
+      if (imageSelectionMode === "single") {
+        return hasSelection ? Object.freeze([]) : Object.freeze([selectionId]);
+      }
+      if (hasSelection) {
+        return Object.freeze(current.filter((entry) => entry !== selectionId));
+      }
+      return Object.freeze([...current, selectionId]);
+    });
+  };
 
   return (
     <section className="ui-stack ui-stack--sm" data-testid="data-preview-image-collection-surface">
@@ -223,9 +254,13 @@ function ImageCollectionPreviewSurface({ preview }: { readonly preview: Extract<
           Window controls are preview-contract driven. Request offset {windowOffset} from the preview service to fetch that window.
         </span>
       ) : null}
+      <div className="ui-row ui-row--wrap">
+        <span className="ui-badge ui-badge--neutral">selection: {imageSelectionMode}</span>
+        <span className="ui-badge ui-badge--neutral">selected: {selectedIds.length}</span>
+      </div>
       <div className="ui-image-preview-grid">
         {items.map((item) => {
-          const isSelected = selectedItemId === item.selectionId;
+          const isSelected = selectedIds.includes(item.selectionId);
           return (
             <article key={item.itemId} className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="data-preview-image-card">
               <div className="ui-image-preview-grid__thumb-wrap">
@@ -248,7 +283,7 @@ function ImageCollectionPreviewSurface({ preview }: { readonly preview: Extract<
                 type="button"
                 className={`ui-button ui-button--sm ${isSelected ? "ui-button--primary" : "ui-button--ghost"}`}
                 aria-pressed={isSelected}
-                onClick={() => setSelectedItemId((current) => current === item.selectionId ? undefined : item.selectionId)}
+                onClick={() => toggleSelection(item.selectionId)}
               >
                 {isSelected ? "Selected" : "Select"}
               </button>
@@ -260,7 +295,13 @@ function ImageCollectionPreviewSurface({ preview }: { readonly preview: Extract<
   );
 }
 
-export default function DataPreviewSurface({ preview, title = "Data Preview" }: DataPreviewSurfaceProps): JSX.Element {
+export default function DataPreviewSurface({
+  preview,
+  title = "Data Preview",
+  imageSelectionMode = "single",
+  selectedImageSelectionIds,
+  onToggleImageSelection,
+}: DataPreviewSurfaceProps): JSX.Element {
   return (
     <section className="ui-panel ui-stack ui-stack--sm" data-testid="data-preview-surface">
       <header className="ui-stack ui-stack--2xs">
@@ -271,7 +312,14 @@ export default function DataPreviewSurface({ preview, title = "Data Preview" }: 
         </div>
       </header>
       {renderSummary(preview)}
-      {preview.kind === "image-metadata-records" ? <ImageCollectionPreviewSurface preview={preview} /> : renderData(preview)}
+      {preview.kind === "image-metadata-records" ? (
+        <ImageCollectionPreviewSurface
+          preview={preview}
+          imageSelectionMode={imageSelectionMode}
+          selectedImageSelectionIds={selectedImageSelectionIds}
+          onToggleImageSelection={onToggleImageSelection}
+        />
+      ) : renderData(preview)}
     </section>
   );
 }
