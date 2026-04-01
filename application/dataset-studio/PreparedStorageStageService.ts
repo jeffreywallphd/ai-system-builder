@@ -36,6 +36,21 @@ export interface PreparedStoragePersistRequest {
   readonly upstream: {
     readonly upstreamAssetIds: ReadonlyArray<string>;
     readonly upstreamPipelineAssetIds: ReadonlyArray<string>;
+    readonly upstreamSourceReferences?: ReadonlyArray<string>;
+  };
+  readonly stageLineage?: ReadonlyArray<{
+    readonly stageId: string;
+    readonly order: number;
+    readonly status?: "current" | "completed" | "skipped" | "pending" | "disabled";
+  }>;
+  readonly preparationContext?: {
+    readonly authoringMode?: "wizard" | "canvas";
+    readonly presentationMode?: "simple" | "advanced";
+    readonly currentStageId?: string;
+  };
+  readonly reuse?: {
+    readonly reusableAsAsset: boolean;
+    readonly reusableLabel?: string;
   };
   readonly traceability?: {
     readonly lineageId?: string;
@@ -153,6 +168,25 @@ export class PreparedStorageStageService {
         pipelineVersionId: request.pipeline.pipelineVersionId,
         upstreamAssetIds,
         upstreamPipelineAssetIds,
+        upstreamSourceReferences: dedupe(request.upstream.upstreamSourceReferences ?? []),
+        stageStructure: Object.freeze((request.stageLineage ?? []).map((entry) => Object.freeze({
+          stageId: entry.stageId.trim(),
+          order: entry.order,
+          status: entry.status,
+        }))),
+        preparationContext: request.preparationContext
+          ? Object.freeze({
+            authoringMode: request.preparationContext.authoringMode,
+            presentationMode: request.preparationContext.presentationMode,
+            currentStageId: request.preparationContext.currentStageId?.trim() || undefined,
+          })
+          : undefined,
+        reuse: request.reuse
+          ? Object.freeze({
+            reusableAsAsset: request.reuse.reusableAsAsset,
+            reusableLabel: request.reuse.reusableLabel?.trim() || undefined,
+          })
+          : undefined,
       },
     });
 

@@ -144,5 +144,21 @@ describe("DataStudioPreparationWizard", () => {
     const labelingAfter = wizard.getSnapshot().stages.find((stage) => stage.stageId === PipelineStageIds.Labeling);
     expect(labelingAfter?.availability.isAvailable).toBeTrue();
   });
+
+  it("projects wizard-to-canvas handoff over the same underlying graph with stage continuity metadata", () => {
+    const wizard = new DataStudioPreparationWizard();
+    wizard.setStageOptions(PipelineStageIds.SourceSelection, Object.freeze({
+      sourceReference: "in-memory://records",
+      sourceKind: "json",
+    }));
+    wizard.goNext();
+    const handoff = wizard.toCanvasHandoff();
+
+    expect(handoff.currentStageId).toBe(PipelineStageIds.UnifiedIngestion);
+    expect(handoff.presentationMode).toBe("simple");
+    expect(handoff.stages.length).toBeGreaterThan(0);
+    expect(handoff.completedStageIds).toContain(PipelineStageIds.SourceSelection);
+    expect(handoff.authoringGraph.nodes.length).toBeGreaterThan(0);
+  });
 });
 

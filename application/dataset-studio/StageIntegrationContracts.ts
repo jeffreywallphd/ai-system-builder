@@ -97,6 +97,21 @@ const PreparedStorageLineageSchema = z.object({
   pipelineVersionId: z.string().trim().min(1).optional(),
   upstreamAssetIds: z.array(z.string().trim().min(1)).default([]),
   upstreamPipelineAssetIds: z.array(z.string().trim().min(1)).default([]),
+  upstreamSourceReferences: z.array(z.string().trim().min(1)).default([]),
+  stageStructure: z.array(z.object({
+    stageId: z.string().trim().min(1),
+    order: z.number().int().positive(),
+    status: z.enum(["current", "completed", "skipped", "pending", "disabled"]).optional(),
+  })).default([]),
+  preparationContext: z.object({
+    authoringMode: z.enum(["wizard", "canvas"]).optional(),
+    presentationMode: z.enum(["simple", "advanced"]).optional(),
+    currentStageId: z.string().trim().min(1).optional(),
+  }).optional(),
+  reuse: z.object({
+    reusableAsAsset: z.boolean().default(true),
+    reusableLabel: z.string().trim().min(1).optional(),
+  }).optional(),
 });
 
 const PreparedStorageStageOutputSchema = z.object({
@@ -406,6 +421,21 @@ export function createPreparedStorageStageOutput(input: {
     readonly pipelineVersionId?: string;
     readonly upstreamAssetIds?: ReadonlyArray<string>;
     readonly upstreamPipelineAssetIds?: ReadonlyArray<string>;
+    readonly upstreamSourceReferences?: ReadonlyArray<string>;
+    readonly stageStructure?: ReadonlyArray<{
+      readonly stageId: string;
+      readonly order: number;
+      readonly status?: "current" | "completed" | "skipped" | "pending" | "disabled";
+    }>;
+    readonly preparationContext?: {
+      readonly authoringMode?: "wizard" | "canvas";
+      readonly presentationMode?: "simple" | "advanced";
+      readonly currentStageId?: string;
+    };
+    readonly reuse?: {
+      readonly reusableAsAsset: boolean;
+      readonly reusableLabel?: string;
+    };
   };
 }): PreparedStorageStageOutput {
   const output = PreparedStorageStageOutputSchema.parse({
@@ -438,6 +468,11 @@ export function toStageRecordFromPreparedStorageOutput(
     pipelineVersionId: output.lineage.pipelineVersionId,
     upstreamAssetIds: output.lineage.upstreamAssetIds as CanonicalRecordValue,
     upstreamPipelineAssetIds: output.lineage.upstreamPipelineAssetIds as CanonicalRecordValue,
+    upstreamSourceReferences: output.lineage.upstreamSourceReferences as CanonicalRecordValue,
+    stageStructure: output.lineage.stageStructure as CanonicalRecordValue,
+    preparationContext: output.lineage.preparationContext as CanonicalRecordValue,
+    reusableAsAsset: output.lineage.reuse?.reusableAsAsset,
+    reusableLabel: output.lineage.reuse?.reusableLabel,
     preparedStorage: output as unknown as CanonicalRecordValue,
   });
 }
@@ -487,6 +522,38 @@ function fromLegacyPreparedStorageStageOutput(
       pipelineVersionId: toString(value.pipelineVersionId),
       upstreamAssetIds,
       upstreamPipelineAssetIds,
+      upstreamSourceReferences: Array.isArray(value.upstreamSourceReferences)
+        ? value.upstreamSourceReferences.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+        : [],
+      stageStructure: Array.isArray(value.stageStructure)
+        ? value.stageStructure
+          .filter((entry): entry is { readonly stageId: string; readonly order: number; readonly status?: string } => (
+            Boolean(entry)
+            && typeof entry === "object"
+            && typeof (entry as { readonly stageId?: string }).stageId === "string"
+            && typeof (entry as { readonly order?: number }).order === "number"
+          ))
+          .map((entry) => {
+            const status = typeof entry.status === "string"
+              && ["current", "completed", "skipped", "pending", "disabled"].includes(entry.status)
+              ? entry.status as "current" | "completed" | "skipped" | "pending" | "disabled"
+              : undefined;
+            return {
+            stageId: entry.stageId,
+            order: entry.order,
+            status,
+          };
+          })
+        : [],
+      preparationContext: {
+        authoringMode: toString((value.preparationContext as { readonly authoringMode?: CanonicalRecordValue } | undefined)?.authoringMode) as "wizard" | "canvas" | undefined,
+        presentationMode: toString((value.preparationContext as { readonly presentationMode?: CanonicalRecordValue } | undefined)?.presentationMode) as "simple" | "advanced" | undefined,
+        currentStageId: toString((value.preparationContext as { readonly currentStageId?: CanonicalRecordValue } | undefined)?.currentStageId),
+      },
+      reuse: {
+        reusableAsAsset: toBoolean(value.reusableAsAsset) ?? true,
+        reusableLabel: toString(value.reusableLabel),
+      },
     },
   });
 }

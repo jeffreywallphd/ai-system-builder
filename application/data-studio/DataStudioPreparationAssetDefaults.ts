@@ -58,7 +58,20 @@ export function createDefaultDataStudioPreparationAssetDefinition(
     }),
     lineage: Object.freeze({
       upstreamAssetIds: Object.freeze(["pipeline.tabular-cleaning.v1"]),
+      upstreamPipelineAssetIds: Object.freeze(["pipeline.tabular-cleaning.v1"]),
+      sourceReferences: Object.freeze(["in-memory://sample"]),
+      stageReferences: Object.freeze(stages.map((stage, index) => Object.freeze({
+        stageId: stage.stageId,
+        order: index + 1,
+        assetGroupIds: Object.freeze([]),
+      }))),
+      preparationContext: Object.freeze({
+        templateId: "elt-pipeline",
+        presentationMode: "simple",
+        authoringMode: "wizard",
+      }),
       reusableAsAsset: true,
+      reuseTags: Object.freeze(["dataset", "prepared", "data-studio"]),
     }),
     preview: Object.freeze({
       previewEnabled: true,

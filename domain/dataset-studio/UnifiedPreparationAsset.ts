@@ -78,8 +78,21 @@ export interface UnifiedPreparationStorageTarget {
 export interface UnifiedPreparationLineageMetadata {
   readonly lineageId?: string;
   readonly upstreamAssetIds: ReadonlyArray<string>;
+  readonly upstreamPipelineAssetIds?: ReadonlyArray<string>;
+  readonly sourceReferences?: ReadonlyArray<string>;
+  readonly stageReferences?: ReadonlyArray<{
+    readonly stageId: PipelineStageId;
+    readonly order: number;
+    readonly assetGroupIds: ReadonlyArray<string>;
+  }>;
+  readonly preparationContext?: Readonly<{
+    readonly templateId?: string;
+    readonly presentationMode?: "simple" | "advanced";
+    readonly authoringMode?: "wizard" | "canvas";
+  }>;
   readonly reusableAsAsset: boolean;
   readonly reusableLabel?: string;
+  readonly reuseTags?: ReadonlyArray<string>;
 }
 
 export interface UnifiedPreparationPreviewMetadata {
@@ -157,8 +170,21 @@ const UnifiedPreparationStorageTargetSchema = z.object({
 const UnifiedPreparationLineageMetadataSchema = z.object({
   lineageId: z.string().trim().min(1).optional(),
   upstreamAssetIds: z.array(z.string().trim().min(1)).default([]),
+  upstreamPipelineAssetIds: z.array(z.string().trim().min(1)).default([]),
+  sourceReferences: z.array(z.string().trim().min(1)).default([]),
+  stageReferences: z.array(z.object({
+    stageId: StageIdSchema,
+    order: z.number().int().positive(),
+    assetGroupIds: z.array(z.string().trim().min(1)).default([]),
+  })).default([]),
+  preparationContext: z.object({
+    templateId: z.string().trim().min(1).optional(),
+    presentationMode: z.enum(["simple", "advanced"]).optional(),
+    authoringMode: z.enum(["wizard", "canvas"]).optional(),
+  }).optional(),
   reusableAsAsset: z.boolean().default(true),
   reusableLabel: z.string().trim().min(1).optional(),
+  reuseTags: z.array(z.string().trim().min(1)).default([]),
 });
 
 const UnifiedPreparationPreviewMetadataSchema = z.object({

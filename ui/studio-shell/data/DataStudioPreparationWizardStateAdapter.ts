@@ -8,6 +8,10 @@ import {
   type DataStudioPreparationTemplateSummary,
   type DataStudioWizardValidationIssue,
 } from "../../../application/data-studio/DataStudioPreparationWizard";
+import {
+  DataStudioWizardCanvasProjectionService,
+  type DataStudioCanvasProjection,
+} from "../../../application/data-studio/DataStudioWizardCanvasProjectionService";
 import type { DataStudioPipelineState } from "../../../application/data-studio/DataStudioPipelineState";
 import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
 import type { PipelineStageId } from "../../../domain/dataset-studio/PipelineStageDomain";
@@ -42,6 +46,7 @@ function issueResult(message: string, stageId?: PipelineStageId): DataStudioPrep
 
 export class DataStudioPreparationWizardStateAdapter {
   private readonly wizard: DataStudioPreparationWizard;
+  private readonly canvasProjectionService: DataStudioWizardCanvasProjectionService;
 
   constructor(
     wizardOrOptions?: DataStudioPreparationWizard | {
@@ -51,9 +56,11 @@ export class DataStudioPreparationWizardStateAdapter {
   ) {
     if (wizardOrOptions instanceof DataStudioPreparationWizard) {
       this.wizard = wizardOrOptions;
+      this.canvasProjectionService = new DataStudioWizardCanvasProjectionService();
       return;
     }
     this.wizard = wizardOrOptions?.wizard ?? new DataStudioPreparationWizard();
+    this.canvasProjectionService = new DataStudioWizardCanvasProjectionService();
     if (wizardOrOptions?.persistedState) {
       this.wizard.importPipelineState(wizardOrOptions.persistedState);
     }
@@ -139,6 +146,10 @@ export class DataStudioPreparationWizardStateAdapter {
 
   public toCanvasHandoff(): DataStudioWizardCanvasHandoff {
     return this.wizard.toCanvasHandoff();
+  }
+
+  public toCanvasProjection(): DataStudioCanvasProjection {
+    return this.canvasProjectionService.projectFromCanvasHandoff(this.toCanvasHandoff());
   }
 
   public exportPipelineState(): DataStudioPipelineState {

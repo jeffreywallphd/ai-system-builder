@@ -28,6 +28,21 @@ describe("PreparedStorageStageService", () => {
       upstream: Object.freeze({
         upstreamAssetIds: Object.freeze(["source.dataset.v2"]),
         upstreamPipelineAssetIds: Object.freeze(["pipeline.tabular-cleaning.v1"]),
+        upstreamSourceReferences: Object.freeze(["in-memory://records"]),
+      }),
+      stageLineage: Object.freeze([
+        Object.freeze({ stageId: "SourceSelection", order: 1, status: "completed" as const }),
+        Object.freeze({ stageId: "UnifiedIngestion", order: 2, status: "completed" as const }),
+        Object.freeze({ stageId: "StoragePrepared", order: 3, status: "current" as const }),
+      ]),
+      preparationContext: Object.freeze({
+        authoringMode: "wizard",
+        presentationMode: "simple",
+        currentStageId: "StoragePrepared",
+      }),
+      reuse: Object.freeze({
+        reusableAsAsset: true,
+        reusableLabel: "Prepared Dataset",
       }),
       traceability: Object.freeze({
         lineageId: "lineage-prepared-1",
@@ -43,6 +58,8 @@ describe("PreparedStorageStageService", () => {
     expect(result.stageRecord.lineageId).toBe("lineage-prepared-1");
     expect(result.lineage.execution.pipelineId).toBe("data-studio.pipeline.v1");
     expect(result.lineage.outputs[0]?.assetId).toBe("prepared.dataset.v1");
+    expect(result.output.lineage.stageStructure.length).toBe(3);
+    expect(result.output.lineage.reuse?.reusableAsAsset).toBeTrue();
   });
 
   it("rejects requests missing upstream lineage references", async () => {
