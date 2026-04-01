@@ -69,6 +69,40 @@
   color: var(--color-text-secondary);
 }
 
+.ui-image-render-frame {
+  position: relative;
+  width: 100%;
+  min-height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: inherit;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.ui-image-render-frame--keep-space {
+  min-height: 8rem;
+}
+
+.ui-image-render-frame--selected {
+  outline: 2px solid var(--color-border-strong);
+  outline-offset: -2px;
+}
+
+.ui-image-render-frame__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ui-image-render-frame__placeholder {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  padding: var(--space-xs);
+  text-align: center;
+}
+
 .ui-image-preview-thumb {
   width: 4rem;
   height: 4rem;

@@ -426,3 +426,9 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Data Studio wizard initialization now prefers persisted draft content from Studio Shell snapshots (with local storage fallback), preserving load fidelity across refresh/reopen while keeping Wizard and Canvas as two views over one canonical pipeline state.
 - Studio Shell backend now exposes Data Studio version-aware retrieval seams (`listDataStudioPipelines`, `loadDataStudioPipeline`) and enriches published asset-version metadata with inspectable Data Studio pipeline summaries plus serialized canonical pipeline state.
 - Snapshot/version read models now include optional Data Studio pipeline version summary metadata for inspection without introducing a dedicated history UI surface.
+
+## Direction 5 UI update: Image system component contracts + shared rendering utilities (stories 4.1.1-4.1.2)
+
+- Image UI component seams now have explicit internal contracts in `ui/components/assets/image-system/ImageUiContracts.ts` covering upload panel, image viewer, parameter form, output gallery, and comparison view props/events/state/context references.
+- Shared image rendering helpers now live in `ui/components/assets/image-system/ImageRenderingUtils.ts` with reusable metadata normalization, fit/layout sizing, placeholder behavior, loading-state/lazy-load helpers, and selection-friendly rendering checks.
+- Reusable renderer primitive `ImageRenderFrame` (`ui/components/assets/image-system/ImageRenderFrame.tsx`) now applies these contracts/utilities as a bounded image-display surface, and existing image-heavy UI surfaces (`AssetViewer`, `DataPreviewSurface`) now reuse that shared seam instead of ad hoc image rendering branches.

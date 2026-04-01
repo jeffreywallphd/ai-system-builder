@@ -1,5 +1,6 @@
 import { useMemo, useState, type JSX } from "react";
 import type { DataPreviewModel } from "../../../application/data-studio/DataPreviewEngine";
+import { DEFAULT_IMAGE_RENDER_OPTIONS, ImageRenderFrame, resolveSelectionForImage, type ImageUiViewModel } from "./image-system";
 
 export interface DataPreviewSurfaceProps {
   readonly preview: DataPreviewModel;
@@ -7,6 +8,39 @@ export interface DataPreviewSurfaceProps {
   readonly imageSelectionMode?: "single" | "multi";
   readonly selectedImageSelectionIds?: ReadonlyArray<string>;
   readonly onToggleImageSelection?: (selectionId: string) => void;
+}
+
+const THUMBNAIL_RENDER_OPTIONS = Object.freeze({
+  ...DEFAULT_IMAGE_RENDER_OPTIONS,
+  fitMode: "cover",
+  placeholderBehavior: "show-placeholder",
+  zoomCapability: "disabled",
+});
+
+function toImageViewModel(item: {
+  readonly itemId: string;
+  readonly imageId?: string;
+  readonly imageReference?: string;
+  readonly thumbnailSource?: string;
+  readonly width?: number;
+  readonly height?: number;
+  readonly format?: string;
+  readonly tags: ReadonlyArray<string>;
+}): ImageUiViewModel {
+  return {
+    imageId: item.imageId ?? item.itemId,
+    title: item.imageReference ?? item.itemId,
+    sourceUrl: item.thumbnailSource,
+    thumbnailUrl: item.thumbnailSource,
+    metadata: {
+      width: item.width,
+      height: item.height,
+      format: item.format,
+      altText: item.imageReference ?? item.itemId,
+    },
+    tags: item.tags,
+    isPlaceholder: !item.thumbnailSource,
+  };
 }
 
 function renderSummary(preview: DataPreviewModel): JSX.Element {
@@ -134,15 +168,12 @@ function renderData(preview: DataPreviewModel): JSX.Element {
             {preview.items.map((item) => (
               <tr key={item.itemId}>
                 <td>
-                  {item.thumbnailSource ? (
-                    <img
-                      className="ui-image-preview-thumb"
-                      src={item.thumbnailSource}
-                      alt={`Preview ${item.imageReference ?? item.itemId}`}
-                    />
-                  ) : (
-                    <span className="ui-image-preview-thumb-placeholder">No preview</span>
-                  )}
+                  <ImageRenderFrame
+                    className="ui-image-preview-thumb"
+                    image={toImageViewModel(item)}
+                    renderOptions={THUMBNAIL_RENDER_OPTIONS}
+                    fallbackLabel="No preview"
+                  />
                 </td>
                 <td>
                   <div>{item.imageReference ?? item.imageId ?? item.itemId}</div>
@@ -260,19 +291,20 @@ function ImageCollectionPreviewSurface({
       </div>
       <div className="ui-image-preview-grid">
         {items.map((item) => {
-          const isSelected = selectedIds.includes(item.selectionId);
+          const isSelected = resolveSelectionForImage({
+            imageId: item.selectionId,
+            selectedIds,
+          });
           return (
             <article key={item.itemId} className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="data-preview-image-card">
               <div className="ui-image-preview-grid__thumb-wrap">
-                {item.thumbnailSource ? (
-                  <img
-                    className="ui-image-preview-thumb ui-image-preview-thumb--grid"
-                    src={item.thumbnailSource}
-                    alt={`Preview ${item.imageReference ?? item.itemId}`}
-                  />
-                ) : (
-                  <span className="ui-image-preview-thumb-placeholder">No preview</span>
-                )}
+                <ImageRenderFrame
+                  className="ui-image-preview-thumb ui-image-preview-thumb--grid"
+                  image={toImageViewModel(item)}
+                  renderOptions={THUMBNAIL_RENDER_OPTIONS}
+                  selected={isSelected}
+                  fallbackLabel="No preview"
+                />
               </div>
               <strong className="ui-text-small">{item.imageReference ?? item.imageId ?? item.itemId}</strong>
               <span className="ui-text-small ui-text-secondary">{item.width !== undefined && item.height !== undefined ? `${item.width}x${item.height}` : "Unknown size"} · {item.format ?? "unknown"}</span>
