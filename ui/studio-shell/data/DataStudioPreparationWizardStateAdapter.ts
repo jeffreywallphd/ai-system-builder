@@ -25,6 +25,19 @@ export interface DataStudioPreparationWizardAdapterUpdateResult {
   readonly issues: ReadonlyArray<DataStudioWizardValidationIssue>;
 }
 
+export interface DataStudioStageInternalsSnapshot {
+  readonly stageId: PipelineStageId;
+  readonly stageTitle: string;
+  readonly status: DataStudioWizardStageSnapshot["status"];
+  readonly options: Readonly<Record<string, CanonicalRecordValue>>;
+  readonly visibility: DataStudioWizardStageSnapshot["visibility"];
+  readonly activationMode: DataStudioWizardStageSnapshot["activation"]["mode"];
+  readonly assetGroupIds: ReadonlyArray<string>;
+  readonly nodeIds: ReadonlyArray<string>;
+  readonly incomingEdgeIds: ReadonlyArray<string>;
+  readonly outgoingEdgeIds: ReadonlyArray<string>;
+}
+
 function okResult(): DataStudioPreparationWizardAdapterUpdateResult {
   return Object.freeze({
     ok: true,
@@ -73,6 +86,10 @@ export class DataStudioPreparationWizardStateAdapter {
   public getCurrentStage(): DataStudioWizardStageSnapshot | undefined {
     const snapshot = this.getSnapshot();
     return snapshot.stages.find((stage) => stage.stageId === snapshot.currentStageId);
+  }
+
+  public getStage(stageId: PipelineStageId): DataStudioWizardStageSnapshot | undefined {
+    return this.getSnapshot().stages.find((stage) => stage.stageId === stageId);
   }
 
   public listTemplates(): ReadonlyArray<DataStudioPreparationTemplateSummary> {
@@ -150,6 +167,36 @@ export class DataStudioPreparationWizardStateAdapter {
 
   public toCanvasProjection(): DataStudioCanvasProjection {
     return this.canvasProjectionService.projectFromCanvasHandoff(this.toCanvasHandoff());
+  }
+
+  public findCanvasNodeIdForStage(stageId: PipelineStageId): string | undefined {
+    const projection = this.toCanvasProjection();
+    return projection.graph.nodes.find((node) => node.metadata?.stageId === stageId)?.id;
+  }
+
+  public getStageInternals(stageId: PipelineStageId): DataStudioStageInternalsSnapshot | undefined {
+    const stage = this.getStage(stageId);
+    if (!stage) {
+      return undefined;
+    }
+
+    const projection = this.toCanvasProjection();
+    const stageNodes = projection.graph.nodes.filter((node) => node.metadata?.stageId === stageId);
+    const incomingEdges = projection.graph.edges.filter((edge) => edge.metadata?.targetStageId === stageId);
+    const outgoingEdges = projection.graph.edges.filter((edge) => edge.metadata?.sourceStageId === stageId);
+
+    return Object.freeze({
+      stageId,
+      stageTitle: stage.title,
+      status: stage.status,
+      options: stage.options,
+      visibility: stage.visibility,
+      activationMode: stage.activation.mode,
+      assetGroupIds: stage.assetGroupIds,
+      nodeIds: Object.freeze(stageNodes.map((node) => node.id)),
+      incomingEdgeIds: Object.freeze(incomingEdges.map((edge) => edge.id)),
+      outgoingEdgeIds: Object.freeze(outgoingEdges.map((edge) => edge.id)),
+    });
   }
 
   public exportPipelineState(): DataStudioPipelineState {
