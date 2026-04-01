@@ -9,6 +9,25 @@ import {
 } from "../../domain/system-runtime/DatasetInstanceRecordDomain";
 import type { DatasetInstanceStorageAdapter } from "./DatasetInstanceStorageAdapter";
 
+export interface DatasetInstanceImageRecordWindow {
+  readonly offset: number;
+  readonly limit: number;
+}
+
+export interface QueryDatasetInstanceImageRecordPageBySystemIdRequest {
+  readonly systemId: string;
+  readonly instanceId: string;
+  readonly query?: DatasetInstanceImageRecordQuery;
+  readonly window: DatasetInstanceImageRecordWindow;
+}
+
+export interface QueryDatasetInstanceImageRecordPageResult {
+  readonly items: ReadonlyArray<DatasetInstanceImageRecord>;
+  readonly totalCount: number;
+  readonly offset: number;
+  readonly limit: number;
+}
+
 export interface DatasetInstanceRepository {
   save(instance: DatasetInstance): DatasetInstance;
   getById(instanceId: string): DatasetInstance | undefined;
@@ -52,6 +71,9 @@ export interface DatasetInstanceRepository {
     readonly instanceId: string;
     readonly query?: DatasetInstanceImageRecordQuery;
   }): ReadonlyArray<DatasetInstanceImageRecord>;
+  queryImageRecordPageBySystemId(
+    input: QueryDatasetInstanceImageRecordPageBySystemIdRequest,
+  ): QueryDatasetInstanceImageRecordPageResult;
 }
 
 function normalizeOptional(value?: string): string | undefined {
@@ -334,6 +356,25 @@ export class StorageBackedDatasetInstanceRepository implements DatasetInstanceRe
       this.listImageRecordsBySystemId(input)
         .filter((record) => matchesDatasetInstanceImageRecordQuery(record, query)),
     );
+  }
+
+  public queryImageRecordPageBySystemId(
+    input: QueryDatasetInstanceImageRecordPageBySystemIdRequest,
+  ): QueryDatasetInstanceImageRecordPageResult {
+    const records = this.queryImageRecordsBySystemId({
+      systemId: input.systemId,
+      instanceId: input.instanceId,
+      query: input.query,
+    });
+    const offset = Math.max(0, Math.floor(input.window.offset));
+    const limit = Math.max(1, Math.floor(input.window.limit));
+    const items = records.slice(offset, offset + limit);
+    return Object.freeze({
+      items: Object.freeze(items),
+      totalCount: records.length,
+      offset,
+      limit,
+    });
   }
 }
 
