@@ -18,8 +18,33 @@ export interface PublishDatasetEventInput {
   readonly event: DatasetEvent;
 }
 
+export type DatasetEventSubscription = () => void;
+
+export type DatasetEventListener = (event: DatasetEvent) => void;
+
+export interface DatasetEventSubscriptionFilter {
+  readonly eventTypes?: ReadonlyArray<DatasetEventType>;
+  readonly datasetAssetId?: string;
+  readonly datasetVersionId?: string;
+  readonly instanceId?: string;
+  readonly systemId?: string;
+  readonly recordId?: string;
+  readonly selectionId?: string;
+  readonly imageReference?: string;
+  readonly metadata?: Readonly<Record<string, string>>;
+}
+
+export interface SubscribeToDatasetEventsInput {
+  readonly listener: DatasetEventListener;
+  readonly filter?: DatasetEventSubscriptionFilter;
+}
+
 export interface DatasetEventPublisher {
   publish(input: PublishDatasetEventInput): Promise<DatasetEvent> | DatasetEvent;
+}
+
+export interface DatasetEventSubscriber {
+  subscribe(input: SubscribeToDatasetEventsInput): DatasetEventSubscription;
 }
 
 export interface CreateDatasetEventEnvelopeInput {
@@ -49,13 +74,106 @@ export function createDatasetEventEnvelope(input: CreateDatasetEventEnvelopeInpu
   });
 }
 
-export class InMemoryDatasetEventPublisher implements DatasetEventPublisher {
+interface InMemoryDatasetEventSubscriptionState {
+  readonly listener: DatasetEventListener;
+  readonly filter?: DatasetEventSubscriptionFilter;
+}
+
+export function matchesDatasetEventSubscriptionFilter(
+  event: DatasetEvent,
+  filter?: DatasetEventSubscriptionFilter,
+): boolean {
+  if (!filter) {
+    return true;
+  }
+
+  if (filter.eventTypes && filter.eventTypes.length > 0 && !filter.eventTypes.includes(event.eventType)) {
+    return false;
+  }
+
+  if (filter.datasetAssetId && event.dataset.assetId !== filter.datasetAssetId) {
+    return false;
+  }
+
+  if (filter.datasetVersionId && event.dataset.versionId !== filter.datasetVersionId) {
+    return false;
+  }
+
+  if (filter.instanceId && event.instance?.instanceId !== filter.instanceId) {
+    return false;
+  }
+
+  if (filter.systemId) {
+    const systemIds = [event.instance?.systemId, event.payloadMetadata?.systemId].filter(
+      (entry): entry is string => typeof entry === "string" && entry.length > 0,
+    );
+    if (!systemIds.includes(filter.systemId)) {
+      return false;
+    }
+  }
+
+  const record = event.payload.record;
+  if (filter.recordId && record.recordId !== filter.recordId) {
+    return false;
+  }
+
+  if (filter.selectionId && record.selectionId !== filter.selectionId) {
+    return false;
+  }
+
+  if (filter.imageReference && record.imageReference !== filter.imageReference) {
+    return false;
+  }
+
+  if (filter.metadata && !matchesMetadataFilter(event, filter.metadata)) {
+    return false;
+  }
+
+  return true;
+}
+
+function matchesMetadataFilter(event: DatasetEvent, metadata: Readonly<Record<string, string>>): boolean {
+  const entries = Object.entries(metadata);
+  if (entries.length === 0) {
+    return true;
+  }
+
+  const candidateMaps: ReadonlyArray<Readonly<Record<string, unknown>> | undefined> = Object.freeze([
+    event.actor.metadata,
+    event.payloadMetadata?.lineage,
+    event.payload.derivedMetadata,
+  ]);
+
+  return entries.every(([key, expected]) => (
+    candidateMaps.some((candidate) => (
+      typeof candidate?.[key] === "string" && candidate[key] === expected
+    ))
+  ));
+}
+
+export class InMemoryDatasetEventPublisher implements DatasetEventPublisher, DatasetEventSubscriber {
   private readonly events: DatasetEvent[] = [];
+  private readonly listeners = new Set<InMemoryDatasetEventSubscriptionState>();
 
   public publish(input: PublishDatasetEventInput): DatasetEvent {
     const event = createDatasetEvent(input.event);
     this.events.push(event);
+
+    for (const subscription of this.listeners) {
+      if (matchesDatasetEventSubscriptionFilter(event, subscription.filter)) {
+        subscription.listener(event);
+      }
+    }
+
     return event;
+  }
+
+  public subscribe(input: SubscribeToDatasetEventsInput): DatasetEventSubscription {
+    const subscription = Object.freeze({ listener: input.listener, filter: input.filter });
+    this.listeners.add(subscription);
+    return () => {
+      this.listeners.delete(subscription);
+    };
   }
 
   public listPublishedEvents(): ReadonlyArray<DatasetEvent> {
