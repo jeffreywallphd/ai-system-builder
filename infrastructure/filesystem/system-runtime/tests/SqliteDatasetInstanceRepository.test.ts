@@ -8,9 +8,35 @@ import {
   DatasetInstanceRuntimeStatuses,
 } from "../../../../domain/system-runtime/DatasetInstanceDomain";
 import { createDatasetInstanceImageRecord } from "../../../../domain/system-runtime/DatasetInstanceRecordDomain";
+import { StorageBackedDatasetInstanceRepository } from "../../../../application/system-runtime/DatasetInstanceRepository";
 import { SqliteDatasetInstanceRepository } from "../SqliteDatasetInstanceRepository";
 
 describe("SqliteDatasetInstanceRepository", () => {
+  it("supports repository operations through the storage adapter boundary", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-dataset-instance-sqlite-adapter-"));
+    try {
+      const adapter = new SqliteDatasetInstanceRepository(path.join(root, "dataset-instances.sqlite"));
+      const repository = new StorageBackedDatasetInstanceRepository(adapter);
+      const instance = createDatasetInstance({
+        instanceId: "dataset-instance:adapter:1",
+        systemId: "system:image-pipeline",
+        datasetAssetId: "image-ingestor-v1",
+        role: "input-store",
+        lifecycleStatus: "ready",
+        runtimeStatus: "idle",
+      });
+      repository.save(instance);
+
+      const persisted = repository.getBySystemAndId({
+        systemId: "system:image-pipeline",
+        instanceId: "dataset-instance:adapter:1",
+      });
+      expect(persisted?.instanceId).toBe("dataset-instance:adapter:1");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("persists and rehydrates dataset instance identity, ownership, linkage, role, lifecycle, and seed metadata", () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-dataset-instance-sqlite-"));
     try {
