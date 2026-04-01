@@ -272,6 +272,18 @@
   - projects runtime previews into shared references,
   - resolves selected record ids through existing runtime query/read seams.
 
+## Direction 5 extension update: image dataset mutation and generation events (stories 1.4.5-1.4.6)
+
+- Runtime image dataset instance mutations now emit canonical dataset events through the existing application publisher seam (`DatasetEventPublisher`) after successful persistence only:
+  - add/create flows emit `image_added`,
+  - update flows emit `image_updated`,
+  - generated-output persistence flows emit `image_generated`.
+- Event payloads remain contract-first and domain-bounded:
+  - include dataset + instance + record references through shared compatibility contracts,
+  - include bounded derived metadata when present,
+  - include mutation-level field summaries for updates (`updatedFields`).
+- Workflow/runtime lineage context is projected into bounded event metadata when available (`workflowId`, `workflowRunId`, lineage map fields such as `instanceId`/`studioId` and source refs), without coupling the dataset event model to any specific execution adapter/runtime object.
+
 ## Direction 5 extension update: runtime-operational dataset contracts + schema validation engine (stories 1.3.1-1.3.2)
 
 - Dataset assets now expose a bounded runtime-operational contract in the canonical dataset domain (`DataAssetBase`) so runtime usage is explicit and inspectable instead of ad hoc flags:
