@@ -3,6 +3,7 @@ import { AssetContractShapeKinds } from "../../domain/contracts/AssetContract";
 import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
 import { createCanonicalImageMetadataRecordsShape, type CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
 import { createImageRecord, type IImageRecordValidator } from "../../domain/dataset-studio/contracts/ImageRecord";
+import type { IImageDerivedAttributeCalculator } from "../../domain/dataset-studio/interfaces/IImageDerivedAttributeCalculator";
 import {
   ImageAssetReferenceKinds,
   type ImageAssetReferenceInput,
@@ -47,6 +48,7 @@ import {
 } from "./adapters/media/ImageMetadataExtractorAdapter";
 import { ImageSizeDimensionReaderAdapter } from "./adapters/media/ImageDimensionReaderAdapter";
 import { FileTypeImageFormatDetectorAdapter } from "./adapters/media/ImageFormatDetectorAdapter";
+import { DefaultImageDerivedAttributeCalculator } from "./services/DefaultImageDerivedAttributeCalculator";
 
 export const ImageIngestorErrorCodes = Object.freeze({
   invalidConfig: "image-ingestor-invalid-config",
@@ -314,6 +316,7 @@ export interface ImageIngestorAssetOptions {
   readonly metadataProbe?: IImageMetadataProbe;
   readonly exifReader?: IImageExifReader | IImageExifExtractionReader;
   readonly imageRecordValidator?: IImageRecordValidator;
+  readonly imageDerivedAttributeCalculator?: IImageDerivedAttributeCalculator;
 }
 
 export class ImageIngestorAsset {
@@ -334,6 +337,7 @@ export class ImageIngestorAsset {
   private readonly metadataProbe: IImageMetadataProbe;
   private readonly exifReader: IImageExifReader;
   private readonly imageRecordValidator: IImageRecordValidator;
+  private readonly imageDerivedAttributeCalculator: IImageDerivedAttributeCalculator;
 
   constructor(options: ImageIngestorAssetOptions = {}) {
     this.sourceLocator = options.sourceLocator ?? new DefaultDataSourceLocator();
@@ -351,6 +355,8 @@ export class ImageIngestorAsset {
         ? options.exifReader
         : new ExifrImageExifReaderAdapter());
     this.imageRecordValidator = options.imageRecordValidator ?? new ZodImageRecordValidator();
+    this.imageDerivedAttributeCalculator = options.imageDerivedAttributeCalculator
+      ?? new DefaultImageDerivedAttributeCalculator();
   }
 
   public async resolveAndExecute(request: ImageIngestorResolveRequest): Promise<ImageIngestorExecutionResult> {
@@ -537,6 +543,12 @@ export class ImageIngestorAsset {
       ?? normalizeOptional(request.source.fileName)
       ?? "image-1";
 
+    const derivedAttributes = this.imageDerivedAttributeCalculator.calculate({
+      width: normalizedDimensions.width,
+      height: normalizedDimensions.height,
+      format: normalizedFormat,
+    });
+
     const imageRecord = this.imageRecordValidator.validateImageRecord(createImageRecord({
       assetRef: toImageAssetRefFromSource({
         source: request.source,
@@ -553,9 +565,7 @@ export class ImageIngestorAsset {
         contentType: request.source.contentType ?? null,
       }),
       tags: Object.freeze([]),
-      derived: Object.freeze({
-        orientation: orientation ?? null,
-      }),
+      derived: derivedAttributes,
       schemaVersion: "1.0.0",
     }));
 
@@ -565,7 +575,8 @@ export class ImageIngestorAsset {
       height: imageRecord.height,
       format: imageRecord.format,
       mimeType: mimeTypeHint ?? null,
-      orientation: orientation ?? null,
+      exifOrientation: orientation ?? null,
+      derived: imageRecord.derived as unknown as CanonicalRecordValue,
       sourceReference: request.source.reference,
       normalizeOrientationApplied: config.normalizeOrientation,
     };

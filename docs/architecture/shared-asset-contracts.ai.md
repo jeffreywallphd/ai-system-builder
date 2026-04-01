@@ -197,3 +197,12 @@
 - Image metadata extraction is now adapter-backed through internal interfaces in `domain/dataset-studio/interfaces/ImageMetadataExtraction.ts` (`IImageMetadataExtractor`, `IImageFormatDetector`, `IImageDimensionReader`, `IImageExifReader`).
 - Library integrations are confined to media adapter modules (`application/dataset-studio/adapters/media/*`) using `file-type`, `image-size`, and `exifr`; domain contracts remain library-independent.
 - `ImageIngestorAsset` now composes extraction + normalization + image-record validation before producing canonical image metadata outputs, so ingestion reliably populates image-record fields (`assetRef`, dimensions, format, mime/exif hints) while degrading gracefully when EXIF data is absent.
+
+## Direction 5 extension update: derived attributes + media schema validation layer (stories 1.1.5-1.1.6)
+
+- Canonical image records now include a typed derived-attributes seam (`ImageDerivedAttributes`) with bounded inspectable fields (`aspectRatio`, `orientation`, `isAnimated`, `pixelCount`, `megapixels`) while remaining canonical-record-compatible.
+- Derived computation is now explicit via `IImageDerivedAttributeCalculator` with a default adapter-backed implementation (`DefaultImageDerivedAttributeCalculator`), keeping the compute boundary separate from extraction and validation.
+- `ImageIngestorAsset` now computes derived attributes from canonical fields (dimensions + format) and emits them as canonical media metadata for downstream preview/runtime use.
+- Media validation now has explicit domain-level contracts (`IMediaRecordValidator`, `IMediaDatasetValidator`) and normalized pass/fail issue diagnostics, with zod isolated in adapter implementations.
+- `MediaSchemaIntentAdapter` now consumes the shared media dataset validator seam for schema-aware validation (assetRef structure, dimensions, format allow-list, metadata/tags compatibility, derived attribute shape), avoiding parallel validation paths.
+- Runtime canonical shape checks for `image-metadata-records` now reuse this same media validator seam for consistent, inspectable ingestion/runtime behavior.
