@@ -5,6 +5,7 @@ import {
   type DatasetInstanceImageGeneration,
   type DatasetInstanceImageGenerationRole,
 } from "../../domain/system-runtime/DatasetInstanceRecordDomain";
+import { WorkflowOutputTargetTypes } from "../../domain/workflow-studio/WorkflowOutputBindingDomain";
 import type { ResolvedWorkflowOutputWritePlanItem } from "./WorkflowOutputBindingResolutionService";
 
 export interface WorkflowExecutionProducedImage {
@@ -74,6 +75,35 @@ function resolveGenerationRole(role?: DatasetInstanceImageGenerationRole): Datas
   return DatasetInstanceImageGenerationRoles.primary;
 }
 
+function createRecordId(input: {
+  readonly planItem: ResolvedWorkflowOutputWritePlanItem;
+  readonly runId: string;
+  readonly outputIndex: number;
+}): string {
+  const prefix = input.planItem.target.targetType === WorkflowOutputTargetTypes.historyDataset
+    ? "history"
+    : input.planItem.target.targetType === WorkflowOutputTargetTypes.comparisonDataset
+      ? "comparison"
+      : "output";
+  return `${prefix}:${input.planItem.bindingId}:${input.runId}:${input.outputIndex}`;
+}
+
+function resolveOutputGroupId(input: {
+  readonly planItem: ResolvedWorkflowOutputWritePlanItem;
+  readonly runId: string;
+  readonly outputId: string;
+}): string {
+  if (input.planItem.target.targetType === WorkflowOutputTargetTypes.comparisonDataset) {
+    return input.planItem.target.groupBy
+      ?? input.planItem.lineage.outputGroupId
+      ?? `comparison:${input.planItem.target.targetId}:${input.outputId}`;
+  }
+  if (input.planItem.target.targetType === WorkflowOutputTargetTypes.historyDataset) {
+    return input.planItem.lineage.outputGroupId ?? `history:${input.runId}:${input.outputId}`;
+  }
+  return input.planItem.lineage.outputGroupId ?? `run:${input.runId}:${input.outputId}`;
+}
+
 export function materializeWorkflowOutputRecords(
   request: MaterializeWorkflowOutputRecordsRequest,
 ): MaterializeWorkflowOutputRecordsResult {
@@ -93,19 +123,48 @@ export function materializeWorkflowOutputRecords(
     produced.forEach((image, index) => {
       const outputIndex = image.outputIndex ?? index;
       const role = resolveGenerationRole(image.role);
-      const recordId = `${planItem.bindingId}:${request.workflowRun.runId}:${outputIndex}`;
-      const tags = normalizeTags([...(planItem.recordEnvelope.defaultTags ?? []), ...(image.tags ?? [])]);
+      const recordId = createRecordId({
+        planItem,
+        runId: request.workflowRun.runId,
+        outputIndex,
+      });
+      const outputGroupId = resolveOutputGroupId({
+        planItem,
+        runId: request.workflowRun.runId,
+        outputId: planItem.outputId,
+      });
+      const tags = normalizeTags([
+        ...(planItem.recordEnvelope.defaultTags ?? []),
+        ...(image.tags ?? []),
+        ...(planItem.target.targetType === WorkflowOutputTargetTypes.historyDataset ? ["history-entry"] : []),
+        ...(planItem.target.targetType === WorkflowOutputTargetTypes.comparisonDataset ? ["comparison-member"] : []),
+      ]);
       const metadata: Record<string, CanonicalRecordValue> = {
         outputId: planItem.outputId,
         bindingId: planItem.bindingId,
         runId: request.workflowRun.runId,
         workflowAssetId: request.workflowRun.workflowAssetId,
+        workflowAssetVersionId: request.workflowRun.workflowAssetVersionId,
         writeMode: planItem.writeMode,
         materializedAt: timestamp,
+        targetType: planItem.target.targetType,
+        targetId: planItem.target.targetId,
+        targetDatasetInstanceId: planItem.target.datasetInstanceId,
+        outputGroupId,
+        sourceImageStableIds: planItem.lineage.sourceImageStableIds,
         ...(request.parameterContext ? { parameterContext: request.parameterContext } : {}),
         ...(planItem.recordEnvelope.metadata as Record<string, CanonicalRecordValue>),
         ...(image.metadata ?? {}),
       };
+
+      if (planItem.target.targetType === WorkflowOutputTargetTypes.historyDataset) {
+        metadata.historyEntryId = recordId;
+        metadata.historyEntryType = "workflow-run-output";
+      }
+      if (planItem.target.targetType === WorkflowOutputTargetTypes.comparisonDataset) {
+        metadata.comparisonSetId = outputGroupId;
+        metadata.comparisonMemberId = recordId;
+      }
 
       const generation: DatasetInstanceImageGeneration = Object.freeze({
         outputAssetRef: image.assetRef,
@@ -114,7 +173,7 @@ export function materializeWorkflowOutputRecords(
         runId: request.workflowRun.runId,
         role,
         outputIndex,
-        outputGroupId: planItem.lineage.outputGroupId ?? `run:${request.workflowRun.runId}:${planItem.outputId}`,
+        outputGroupId,
         metadata: Object.freeze({
           ...metadata,
           sourceOutputId: planItem.outputId,
@@ -142,6 +201,7 @@ export function materializeWorkflowOutputRecords(
             targetType: planItem.target.targetType,
             targetId: planItem.target.targetId,
             targetDatasetInstanceId: planItem.target.datasetInstanceId,
+            outputGroupId,
           }),
         }),
         provenance: Object.freeze({
