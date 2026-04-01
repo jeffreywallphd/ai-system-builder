@@ -44,3 +44,10 @@
 - Added structured normalized execution error semantics to adapter errors (`code`, `category`, `severity`, retryability hints, execution references, diagnostics).
 - Centralized normalization in `infrastructure/comfyui/execution/ComfyExecutionLifecycle.ts` and applied it in `ComfyQueueExecutionAdapter` for mapping, connectivity, execution, and output-normalization failures.
 - Added tests for execution-context construction and representative normalized failure scenarios.
+
+## Story 2.1.7 + 2.1.8 update
+- Adapter outputs now normalize to canonical asset-style references for generated execution artifacts (`asset:workflow-output:comfyui:...`) instead of prompt/file-derived ids.
+- Normalized output metadata now carries dataset ownership hooks (`outputDatasetRefs`, `outputDatasetInstanceRefs`) sourced from execution context so downstream system-owned dataset persistence can bind outputs without Comfy payload parsing.
+- Comfy file/path details remain infrastructure-only metadata on output records; adapter-facing request/result contracts stay asset-reference-first.
+- Removed legacy parallel delegated Comfy strategy wrapper (`infrastructure/comfyui/execution/DelegatedWorkflowExecutionStrategy.ts`) to reinforce adapter-only access patterns.
+- Added/updated tests for canonical output asset reference mapping and dataset-reference propagation in normalized result contracts.
