@@ -9,8 +9,7 @@ describe("ComfyWorkflowExecutor", () => {
     const workflow = new Workflow({ id: "wf", metadata: new WorkflowMetadata({ name: "wf" }), nodes: [makeNode({ id: "n1" })] });
     const executor = new ComfyWorkflowExecutor({
       workflowAdapter: { adaptWorkflowEnvelope: () => ({ prompt: {}, client_id: "wf" }) } as never,
-      apiClient: {} as never,
-      queueClient: {} as never,
+      queueClient: { buildViewUrl: () => "http://example/file.png" } as never,
     });
 
     expect(executor.canExecute({ workflow, target: { runtime: "comfyui" } })).toBe(true);

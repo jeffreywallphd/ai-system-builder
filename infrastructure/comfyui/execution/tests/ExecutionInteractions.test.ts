@@ -10,11 +10,11 @@ describe("execution interactions", () => {
 
     const executor = new ComfyWorkflowExecutor({
       workflowAdapter: { adaptWorkflowEnvelope: () => ({ prompt: {}, client_id: "wf" }) } as never,
-      apiClient: { buildViewUrl: () => "http://example/file.png", downloadFile: async () => new Uint8Array([1]) } as never,
       queueClient: {
         enqueuePrompt: async () => ({ prompt_id: "p1" }),
-        waitForCompletion: async () => ({ status: { completed: true, messages: ["ok"] }, outputs: {} }),
+        waitForCompletion: async () => ({ promptId: "p1", messages: ["ok"], outputs: {} }),
         cancelPrompt: async () => undefined,
+        buildViewUrl: () => "http://example/file.png",
       } as never,
     });
 

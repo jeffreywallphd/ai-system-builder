@@ -2,16 +2,28 @@ import { describe, expect, it } from "bun:test";
 import { ComfyQueueClient } from "../ComfyQueueClient";
 
 describe("ComfyQueueClient", () => {
-  it("reads completion from history", async () => {
+  it("reads completion from history and normalizes output artifacts", async () => {
     const api = {
       queuePrompt: async () => ({ prompt_id: "p1" }),
-      getHistory: async () => ({ p1: { status: { completed: true, status_str: "done" } } }),
+      getHistory: async () => ({
+        p1: {
+          status: { completed: true, status_str: "done", messages: ["ok"] },
+          outputs: {
+            nodeA: {
+              images: [{ filename: "image.png", subfolder: "outputs", type: "output" }],
+              text: [{ text: "hello" }],
+            },
+          },
+        },
+      }),
       getQueue: async () => ({ queue_running: [], queue_pending: [] }),
       interrupt: async () => undefined,
+      buildViewUrl: () => "http://example/file.png",
     };
 
     const queue = new ComfyQueueClient({ apiClient: api as never, pollIntervalMs: 1, maxWaitMs: 20 });
     const progress = await queue.getPromptProgress("p1");
     expect(progress.status).toBe("completed");
+    expect(progress.completion?.outputs.nodeA?.length).toBe(2);
   });
 });
