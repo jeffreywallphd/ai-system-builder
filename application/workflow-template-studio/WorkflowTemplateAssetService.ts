@@ -9,6 +9,12 @@ import {
 } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
 import type { IAssetCatalog } from "../ports/interfaces/IAssetCatalog";
 import type { IFileStorage } from "../ports/interfaces/IFileStorage";
+import {
+  WorkflowTemplateCompositionResolver,
+  type ResolvedWorkflowTemplateComposition,
+  type WorkflowTemplateWorkflowContractResolver,
+} from "./WorkflowTemplateCompositionResolver";
+import { applyWorkflowTemplateParameterDefaults } from "./WorkflowTemplateParameterizationService";
 
 export interface SaveWorkflowTemplateCommand {
   readonly definition: WorkflowTemplateDefinition;
@@ -24,6 +30,7 @@ export class WorkflowTemplateAssetService {
     private readonly assetCatalog: IAssetCatalog,
     private readonly fileStorage: IFileStorage,
     private readonly rootDirectory: string,
+    private readonly workflowContractResolver?: WorkflowTemplateWorkflowContractResolver,
   ) {}
 
   public async saveTemplate(command: SaveWorkflowTemplateCommand): Promise<Asset> {
@@ -94,5 +101,24 @@ export class WorkflowTemplateAssetService {
     }
 
     return template;
+  }
+
+  public async resolveTemplateComposition(templateId: string, versionId?: string): Promise<ResolvedWorkflowTemplateComposition | undefined> {
+    const template = await this.resolveTemplate(templateId, versionId);
+    if (!template) {
+      return undefined;
+    }
+
+    return new WorkflowTemplateCompositionResolver(this.assetCatalog, this.workflowContractResolver).resolve(template);
+  }
+
+  public applyParameterDefaults(input: {
+    readonly template: WorkflowTemplateDefinition;
+    readonly overrides?: Readonly<Record<string, unknown>>;
+  }): Readonly<Record<string, unknown>> {
+    return applyWorkflowTemplateParameterDefaults({
+      definitions: input.template.parameters ?? [],
+      overrides: input.overrides,
+    }).values;
   }
 }

@@ -50,6 +50,8 @@ Specialized composite semantics remain explicit in these shared contracts: workf
 - Registry/system detail lineage surfaces now make system version lineage explicit with bounded nested-system/child-version reference alignment (`includedInUpstream`) so recursive system-of-systems derivation remains deterministic and grounded in canonical version/upstream truth.
 - System publish enforcement now extends the same shared studio-shell enforcement seam with bounded recursive checks for system child references/contracts, binding endpoint compatibility, and recursion cycle/depth safety before publish.
 - Tool Chain Studio now reuses this same composite publish-consistency seam (`tool-chain`/`deterministic`) and the shared taxonomy-driven contract projection (`executionOrdering=sequential`) for draft authoring and publish gating.
+- Workflow Template assets now include explicit composition-mapping contracts (workflow interface refs, template input/output bindings, parameter mappings, optional system-context mappings) plus parameter-definition contracts with safe default/override validation, keeping template orchestration asset-first and runtime-agnostic.
+- Workflow Template deep compatibility checks are now concretely wireable through a canonical workflow-contract resolver adapter (asset-id to workflow contract), and parameter contracts now support formal cross-parameter dependency rules (`requires-when-set` / `requires-when-equals`) validated during parameter application.
 - Cross-studio end-to-end consistency coverage now verifies that projected contracts remain stable through create/update/validate/publish/reload paths over shared shell seams.
 
 ## Canonical read integration seam
