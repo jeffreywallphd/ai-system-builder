@@ -23,6 +23,7 @@ export interface ImageDatasetPreviewItem {
   readonly format?: string;
   readonly metadataSummary: Readonly<Record<string, CanonicalRecordValue>>;
   readonly tags: ReadonlyArray<string>;
+  readonly annotations: Readonly<Record<string, CanonicalRecordValue>>;
   readonly derived: Readonly<Record<string, CanonicalRecordValue>>;
   readonly issues: ReadonlyArray<string>;
 }
@@ -163,6 +164,11 @@ function normalizeSelectedMetadata(
     "sourceReference",
     "fileSizeInBytes",
     "exifOrientation",
+    "annotationsCaption",
+    "annotationsDescription",
+    "annotationsNote",
+    "annotationLabelCount",
+    "annotationRegion",
   ] as const;
   const summary: Record<string, CanonicalRecordValue> = {};
   for (const key of selectedKeys) {
@@ -172,6 +178,30 @@ function normalizeSelectedMetadata(
     }
   }
   return Object.freeze(summary);
+}
+
+function normalizeAnnotations(
+  item: CanonicalImageStructuredItem,
+): Readonly<Record<string, CanonicalRecordValue>> {
+  const annotations = toRecordValueRecord(getRecordValue(item, "annotations"));
+  if (!annotations) {
+    return Object.freeze({});
+  }
+
+  const labels = Array.isArray(annotations.labels)
+    ? annotations.labels.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+  const summary = Object.freeze({
+    caption: toString(annotations.caption),
+    description: toString(annotations.description),
+    note: toString(annotations.note),
+    labels: Object.freeze(labels),
+    region: toRecordValueRecord(annotations.region) ?? undefined,
+  });
+
+  return Object.freeze(Object.fromEntries(
+    Object.entries(summary).filter(([, value]) => value !== undefined),
+  )) as Readonly<Record<string, CanonicalRecordValue>>;
 }
 
 function normalizeDerived(
@@ -248,6 +278,7 @@ function buildItem(
     format,
     metadataSummary: normalizeSelectedMetadata(item),
     tags: toStringArray(getRecordValue(item, "tags")),
+    annotations: normalizeAnnotations(item),
     derived: normalizeDerived(item),
     issues: Object.freeze(issues),
   } satisfies ImageDatasetPreviewItem);

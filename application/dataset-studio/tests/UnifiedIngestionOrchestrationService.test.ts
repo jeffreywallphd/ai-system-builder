@@ -263,6 +263,154 @@ describe("UnifiedIngestionOrchestrationService", () => {
     }
   });
 
+  it("auto-maps simple image ingestion to media output target", async () => {
+    const capturedImageConfigs: Array<Record<string, unknown> | undefined> = [];
+    const service = new UnifiedIngestionOrchestrationService({
+      detector: Object.freeze({
+        detect: async () => createDetection("image"),
+      }) as never,
+      router: Object.freeze({
+        route: () => Object.freeze({
+          status: "resolved" as const,
+          sourceKind: "image" as const,
+          handlerKind: "image" as const,
+          assetId: "image-ingestor-v1",
+          policy: "detected-kind" as const,
+          fallbackUsed: false,
+          reason: "image route",
+        }),
+      }) as never,
+      imageIngestor: {
+        execute: async (request: { readonly config?: Record<string, unknown> }) => {
+          capturedImageConfigs.push(request.config);
+          return Object.freeze({
+            ok: true,
+            metadata: Object.freeze({
+              width: 32,
+              height: 32,
+              format: "png",
+              tags: ["curated"],
+              annotations: Object.freeze({ caption: "Sample" }),
+            }),
+          });
+        },
+      } as never,
+      converter: {
+        convert: () => Object.freeze({
+          ok: true,
+          operation: DataConverterOperationKinds.imageMetadataToRecords,
+          context: Object.freeze({}),
+          contract: Object.freeze({
+            schemaVersion: "1.0.0",
+            converterId: "test-converter",
+            converterVersion: "1.0.0",
+            operation: DataConverterOperationKinds.imageMetadataToRecords,
+            inputBoundary: "image-metadata",
+            outputShapeKind: "image-metadata-records",
+          }),
+          metadata: Object.freeze({ schemaVersion: "1.0.0" }),
+          output: createCanonicalImageMetadataRecordsShape({
+            items: Object.freeze([Object.freeze({ itemId: "img-1", imageId: "img-1" })]),
+          }),
+          diagnostics: Object.freeze([]),
+        }),
+      } as never,
+    });
+
+    const result = await service.ingest({
+      source: createSource(),
+      payload: new Uint8Array([1, 2, 3]),
+      schemaIntentId: "media",
+      configuration: Object.freeze({
+        mode: "simple",
+        outputTarget: UnifiedIngestionOutputTargetKinds.records,
+      }),
+    });
+
+    expect(result.ok).toBeTrue();
+    if (result.ok) {
+      expect(result.outputTarget).toBe("canonical-image-metadata-records");
+      expect(result.metadata.processing.outputTarget).toBe("canonical-image-metadata-records");
+      expect(result.metadata.processing.schemaIntentId).toBe("media");
+    }
+    expect(capturedImageConfigs[0]).toBeUndefined();
+  });
+
+  it("forwards advanced image tag/annotation config into routed image ingestion", async () => {
+    const capturedImageConfigs: Array<Record<string, unknown> | undefined> = [];
+    const service = new UnifiedIngestionOrchestrationService({
+      detector: Object.freeze({
+        detect: async () => createDetection("image"),
+      }) as never,
+      router: Object.freeze({
+        route: () => Object.freeze({
+          status: "resolved" as const,
+          sourceKind: "image" as const,
+          handlerKind: "image" as const,
+          assetId: "image-ingestor-v1",
+          policy: "advanced-strategy" as const,
+          fallbackUsed: false,
+          reason: "image route",
+        }),
+      }) as never,
+      imageIngestor: {
+        execute: async (request: { readonly config?: Record<string, unknown> }) => {
+          capturedImageConfigs.push(request.config);
+          return Object.freeze({
+            ok: true,
+            metadata: Object.freeze({ width: 16, height: 16, format: "png" }),
+          });
+        },
+      } as never,
+      converter: {
+        convert: () => Object.freeze({
+          ok: true,
+          operation: DataConverterOperationKinds.imageMetadataToRecords,
+          context: Object.freeze({}),
+          contract: Object.freeze({
+            schemaVersion: "1.0.0",
+            converterId: "test-converter",
+            converterVersion: "1.0.0",
+            operation: DataConverterOperationKinds.imageMetadataToRecords,
+            inputBoundary: "image-metadata",
+            outputShapeKind: "image-metadata-records",
+          }),
+          metadata: Object.freeze({ schemaVersion: "1.0.0" }),
+          output: createCanonicalImageMetadataRecordsShape({
+            items: Object.freeze([Object.freeze({ itemId: "img-1", imageId: "img-1" })]),
+          }),
+          diagnostics: Object.freeze([]),
+        }),
+      } as never,
+    });
+
+    const result = await service.ingest({
+      source: createSource(),
+      payload: new Uint8Array([1, 2, 3]),
+      configuration: Object.freeze({
+        mode: "advanced",
+        strategy: "image",
+        outputTarget: UnifiedIngestionOutputTargetKinds.imageMetadataRecords,
+        imageTags: Object.freeze([" hero ", "reviewed "]),
+        imageAnnotations: Object.freeze({
+          caption: "Sample",
+          labels: Object.freeze(["catalog"]),
+        }),
+      }),
+    });
+
+    expect(result.ok).toBeTrue();
+    expect(capturedImageConfigs[0]).toEqual({
+      extractExif: undefined,
+      normalizeOrientation: undefined,
+      tags: [" hero ", "reviewed "],
+      annotations: {
+        caption: "Sample",
+        labels: ["catalog"],
+      },
+    });
+  });
+
   it("rejects contradictory advanced configuration before routing/execution", async () => {
     const service = new UnifiedIngestionOrchestrationService();
     const result = await service.ingest({

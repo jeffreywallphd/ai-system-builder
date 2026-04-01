@@ -123,6 +123,7 @@ function renderData(preview: DataPreviewModel): JSX.Element {
               <th>Format</th>
               <th>Metadata</th>
               <th>Tags</th>
+              <th>Annotations</th>
               <th>Derived</th>
             </tr>
           </thead>
@@ -150,6 +151,7 @@ function renderData(preview: DataPreviewModel): JSX.Element {
                 <td>{item.format ?? "-"}</td>
                 <td>{formatSummaryRecord(item.metadataSummary)}</td>
                 <td>{item.tags.length > 0 ? item.tags.join(", ") : "-"}</td>
+                <td>{formatSummaryRecord(item.annotations)}</td>
                 <td>{formatSummaryRecord(item.derived)}</td>
               </tr>
             ))}

@@ -71,6 +71,21 @@ export const ImageIngestorConfigSchema = z.object({
   generatePreviewMetadata: z.boolean().default(true),
   normalizeOrientation: z.boolean().default(true),
   includeFileStats: z.boolean().default(true),
+  tags: z.array(z.string().trim().min(1)).max(64).default([]),
+  annotations: z.object({
+    caption: z.string().trim().min(1).max(500).optional(),
+    description: z.string().trim().min(1).max(2000).optional(),
+    note: z.string().trim().min(1).max(2000).optional(),
+    labels: z.array(z.string().trim().min(1).max(100)).max(32).default([]),
+    region: z.object({
+      x: z.number().min(0),
+      y: z.number().min(0),
+      width: z.number().positive(),
+      height: z.number().positive(),
+      coordinateSpace: z.literal("pixel").optional(),
+      referenceId: z.string().trim().min(1).max(100).optional(),
+    }).optional(),
+  }).optional(),
 });
 
 export type ImageIngestorConfig = z.output<typeof ImageIngestorConfigSchema>;
@@ -79,6 +94,8 @@ export interface ImageIngestorExecutionRequest {
   readonly source: ResolvedDataSource;
   readonly config?: Partial<ImageIngestorConfig>;
   readonly imageId?: string;
+  readonly tags?: ReadonlyArray<string>;
+  readonly annotations?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly context?: Partial<IngestionExecutionContext>;
 }
 
@@ -86,6 +103,8 @@ export interface ImageIngestorResolveRequest {
   readonly source: DataSourceReference;
   readonly config?: Partial<ImageIngestorConfig>;
   readonly imageId?: string;
+  readonly tags?: ReadonlyArray<string>;
+  readonly annotations?: Readonly<Record<string, CanonicalRecordValue>>;
 }
 
 export interface ImageIngestorPreviewResult {
@@ -240,7 +259,7 @@ function inferExtension(source: ResolvedDataSource): string | undefined {
   return name.slice(name.lastIndexOf("."));
 }
 
-function isSupportedImage(source: ResolvedDataSource): boolean {
+function isLikelySupportedImageSource(source: ResolvedDataSource): boolean {
   const extension = inferExtension(source);
   const contentType = normalizeOptional(source.contentType)?.toLowerCase();
   return extension === ".png"
@@ -250,6 +269,13 @@ function isSupportedImage(source: ResolvedDataSource): boolean {
     || contentType === "image/png"
     || contentType === "image/jpeg"
     || contentType === "image/webp";
+}
+
+function isSupportedNormalizedFormat(format: string): boolean {
+  return format === "png"
+    || format === "jpg"
+    || format === "jpeg"
+    || format === "webp";
 }
 
 function normalizeOrientationDimensions(metadata: ImageMetadataResult): { width: number; height: number } {
@@ -366,7 +392,13 @@ export class ImageIngestorAsset {
     });
     try {
       const source = await this.sourceLocator.resolve({ source: request.source });
-      return this.execute({ source, config: request.config, imageId: request.imageId });
+      return this.execute({
+        source,
+        config: request.config,
+        imageId: request.imageId,
+        tags: request.tags,
+        annotations: request.annotations,
+      });
     } catch (error) {
       const context = IngestionExecutionContextSchema.parse({});
       const issues = Object.freeze([toIngestionIssueFromError({
@@ -445,32 +477,7 @@ export class ImageIngestorAsset {
       fileName: request.source.fileName,
       contentType: request.source.contentType,
     });
-    if (!isSupportedImage(request.source)) {
-      const issues = Object.freeze([createIngestionIssue({
-        code: ImageIngestorErrorCodes.unsupportedType,
-        message: "Image ingestor supports PNG, JPG/JPEG, and WEBP sources.",
-        category: IngestionIssueCategories.unsupportedSourceType,
-        recoverability: IngestionIssueRecoverabilities.fixSource,
-        source: contextToIssueSource(ingestionContext),
-      })]);
-      return Object.freeze({
-        ok: false,
-        diagnostics: Object.freeze([Object.freeze({
-          code: ImageIngestorErrorCodes.unsupportedType,
-          message: "Image ingestor supports PNG, JPG/JPEG, and WEBP sources.",
-          details: Object.freeze({
-            fileName: request.source.fileName,
-            contentType: request.source.contentType,
-          }),
-        } satisfies ImageIngestorDiagnostic)]),
-        normalized: buildIngestionFailureEnvelope({
-          context: ingestionContext,
-          issues,
-          asset: assetIdentity,
-          configSummary: config,
-        }),
-      });
-    }
+    const sourceLooksSupportedImage = isLikelySupportedImageSource(request.source);
 
     const payload = toUint8Array(request.source.payload);
     if (!payload || payload.length === 0) {
@@ -501,6 +508,33 @@ export class ImageIngestorAsset {
     try {
       metadata = await this.metadataProbe.probe(payload);
     } catch (error) {
+      if (!sourceLooksSupportedImage) {
+        const issues = Object.freeze([createIngestionIssue({
+          code: ImageIngestorErrorCodes.unsupportedType,
+          message: "Image ingestor supports PNG, JPG/JPEG, and WEBP sources.",
+          category: IngestionIssueCategories.unsupportedSourceType,
+          recoverability: IngestionIssueRecoverabilities.fixSource,
+          source: contextToIssueSource(ingestionContext),
+        })]);
+        return Object.freeze({
+          ok: false,
+          diagnostics: Object.freeze([Object.freeze({
+            code: ImageIngestorErrorCodes.unsupportedType,
+            message: "Image ingestor supports PNG, JPG/JPEG, and WEBP sources.",
+            details: Object.freeze({
+              fileName: request.source.fileName,
+              contentType: request.source.contentType,
+              cause: error instanceof Error ? error.message : String(error),
+            }),
+          } satisfies ImageIngestorDiagnostic)]),
+          normalized: buildIngestionFailureEnvelope({
+            context: ingestionContext,
+            issues,
+            asset: assetIdentity,
+            configSummary: config,
+          }),
+        });
+      }
       const issues = Object.freeze([toIngestionIssueFromError({
         code: ImageIngestorErrorCodes.metadataExtractionFailed,
         message: "Image metadata extraction failed.",
@@ -535,6 +569,33 @@ export class ImageIngestorAsset {
     const normalizedFormat = normalizeOptional(metadata.format)?.toLowerCase()
       ?? inferExtension(request.source)?.replace(".", "")
       ?? "unknown";
+    if (!isSupportedNormalizedFormat(normalizedFormat)) {
+      const issues = Object.freeze([createIngestionIssue({
+        code: ImageIngestorErrorCodes.unsupportedType,
+        message: `Image ingestor does not support format '${normalizedFormat}'.`,
+        category: IngestionIssueCategories.unsupportedSourceType,
+        recoverability: IngestionIssueRecoverabilities.fixSource,
+        source: contextToIssueSource(ingestionContext),
+      })]);
+      return Object.freeze({
+        ok: false,
+        diagnostics: Object.freeze([Object.freeze({
+          code: ImageIngestorErrorCodes.unsupportedType,
+          message: `Image ingestor does not support format '${normalizedFormat}'.`,
+          details: Object.freeze({
+            fileName: request.source.fileName,
+            contentType: request.source.contentType,
+            format: normalizedFormat,
+          }),
+        } satisfies ImageIngestorDiagnostic)]),
+        normalized: buildIngestionFailureEnvelope({
+          context: ingestionContext,
+          issues,
+          asset: assetIdentity,
+          configSummary: config,
+        }),
+      });
+    }
     const mimeTypeHint = normalizeOptional(metadata.mimeType) ?? normalizeOptional(request.source.contentType)?.toLowerCase();
 
     const exifRaw = config.extractExif ? await this.exifReader.read(payload) : undefined;
@@ -548,6 +609,8 @@ export class ImageIngestorAsset {
       height: normalizedDimensions.height,
       format: normalizedFormat,
     });
+    const normalizedTags = request.tags ?? config.tags;
+    const normalizedAnnotations = request.annotations ?? config.annotations;
 
     const imageRecord = this.imageRecordValidator.validateImageRecord(createImageRecord({
       assetRef: toImageAssetRefFromSource({
@@ -564,7 +627,8 @@ export class ImageIngestorAsset {
         fileName: request.source.fileName ?? null,
         contentType: request.source.contentType ?? null,
       }),
-      tags: Object.freeze([]),
+      tags: normalizedTags,
+      annotations: normalizedAnnotations,
       derived: derivedAttributes,
       schemaVersion: "1.0.0",
     }));
@@ -576,6 +640,13 @@ export class ImageIngestorAsset {
       format: imageRecord.format,
       mimeType: mimeTypeHint ?? null,
       exifOrientation: orientation ?? null,
+      tags: imageRecord.tags as unknown as CanonicalRecordValue,
+      annotations: imageRecord.annotations as unknown as CanonicalRecordValue ?? null,
+      annotationsCaption: imageRecord.annotations?.caption ?? null,
+      annotationsDescription: imageRecord.annotations?.description ?? null,
+      annotationsNote: imageRecord.annotations?.note ?? null,
+      annotationLabelCount: imageRecord.annotations?.labels.length ?? 0,
+      annotationRegion: imageRecord.annotations?.region as CanonicalRecordValue ?? null,
       derived: imageRecord.derived as unknown as CanonicalRecordValue,
       sourceReference: request.source.reference,
       normalizeOrientationApplied: config.normalizeOrientation,
@@ -646,6 +717,8 @@ export class ImageIngestorAsset {
                 width: normalizedDimensions.width,
                 height: normalizedDimensions.height,
                 format: imageRecord.format,
+                tags: imageRecord.tags as unknown as CanonicalRecordValue,
+                annotations: imageRecord.annotations as unknown as CanonicalRecordValue ?? null,
               }),
             })]),
             metadata: {
@@ -757,11 +830,21 @@ export function createImageIngestorConfigSchema(assetId: string): DataAssetConfi
 }
 
 export function toImageIngestorConfig(config: Readonly<Record<string, CanonicalRecordValue>>): ImageIngestorConfig {
+  const tags = Array.isArray(config.tags)
+    ? config.tags.filter((entry): entry is string => typeof entry === "string")
+    : [];
+  const annotations = config.annotations
+    && typeof config.annotations === "object"
+    && !Array.isArray(config.annotations)
+    ? config.annotations as Readonly<Record<string, CanonicalRecordValue>>
+    : undefined;
   return ImageIngestorConfigSchema.parse({
     extractExif: typeof config.extractExif === "boolean" ? config.extractExif : true,
     generatePreviewMetadata: typeof config.generatePreviewMetadata === "boolean" ? config.generatePreviewMetadata : true,
     normalizeOrientation: typeof config.normalizeOrientation === "boolean" ? config.normalizeOrientation : true,
     includeFileStats: typeof config.includeFileStats === "boolean" ? config.includeFileStats : true,
+    tags,
+    annotations,
   });
 }
 

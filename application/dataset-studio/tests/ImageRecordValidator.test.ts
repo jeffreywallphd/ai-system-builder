@@ -17,6 +17,10 @@ describe("ImageRecordValidator", () => {
         source: "camera",
       },
       tags: ["hero", "homepage"],
+      annotations: {
+        caption: " Landing hero ",
+        labels: ["marketing", "homepage"],
+      },
       derived: {
         aspectRatio: 1.3333,
       },
@@ -28,7 +32,40 @@ describe("ImageRecordValidator", () => {
     expect(result.height).toBe(768);
     expect(result.format).toBe("png");
     expect(result.tags).toEqual(["hero", "homepage"]);
+    expect(result.annotations?.caption).toBe("Landing hero");
+    expect(result.annotations?.labels).toEqual(["marketing", "homepage"]);
     expect(result.metadata.source).toBe("camera");
+  });
+
+  it("normalizes tags by trimming and de-duplicating", () => {
+    const result = validateImageRecord({
+      assetRef: {
+        assetId: "asset:image:tags",
+      },
+      width: 80,
+      height: 80,
+      format: "png",
+      tags: [" hero ", "hero", "detail", " detail "],
+    });
+
+    expect(result.tags).toEqual(["hero", "detail"]);
+  });
+
+  it("supports lightweight annotations with optional fields omitted", () => {
+    const result = validateImageRecord({
+      assetRef: {
+        assetId: "asset:image:ann-min",
+      },
+      width: 640,
+      height: 480,
+      format: "jpeg",
+      annotations: {
+        note: "Needs crop review",
+      },
+    });
+
+    expect(result.annotations?.note).toBe("Needs crop review");
+    expect(result.annotations?.labels).toBeUndefined();
   });
 
   it("normalizes structured local-file and external URI references", () => {
@@ -54,6 +91,18 @@ describe("ImageRecordValidator", () => {
       format: "jpeg",
     });
     expect(external.assetRef.kind).toBe(ImageAssetReferenceKinds.externalUri);
+  });
+
+  it("keeps records without annotations valid for backward compatibility", () => {
+    const result = validateImageRecord({
+      assetRef: { assetId: "asset:image:legacy" },
+      width: 320,
+      height: 240,
+      format: "png",
+      tags: ["legacy"],
+    });
+    expect(result.annotations).toBeUndefined();
+    expect(result.tags).toEqual(["legacy"]);
   });
 
   it("rejects invalid image records", () => {
@@ -90,6 +139,30 @@ describe("ImageRecordValidator", () => {
       format: "png",
       derived: {
         orientation: "sideways",
+      },
+    })).toThrow();
+
+    expect(() => validator.validateImageRecord({
+      assetRef: { assetId: "asset:image:bad-tags" },
+      width: 32,
+      height: 32,
+      format: "png",
+      // @ts-expect-error runtime contract validation coverage
+      tags: "hero",
+    })).toThrow();
+
+    expect(() => validator.validateImageRecord({
+      assetRef: { assetId: "asset:image:bad-ann" },
+      width: 32,
+      height: 32,
+      format: "png",
+      annotations: {
+        region: {
+          x: -1,
+          y: 2,
+          width: 10,
+          height: 10,
+        },
       },
     })).toThrow();
   });

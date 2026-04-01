@@ -34,6 +34,10 @@ describe("DataPreviewSurface", () => {
           height: 320,
           format: "png",
           tags: ["invoice"],
+          annotations: {
+            caption: "Invoice scan",
+            labels: ["finance"],
+          },
           derived: {
             orientation: "landscape",
           },
@@ -52,6 +56,7 @@ describe("DataPreviewSurface", () => {
     expect(imageHtml).toContain("asset:image:invoice");
     expect(imageHtml).toContain("512x320");
     expect(imageHtml).toContain("invoice");
+    expect(imageHtml).toContain("Invoice scan");
   });
 
   it("renders graceful image preview fallbacks for missing preview source", () => {

@@ -54,6 +54,11 @@ describe("ImageIngestorAsset", () => {
         diagnostics: Object.freeze([]),
       },
       imageId: "photo-1",
+      tags: [" hero ", "hero", "catalog"],
+      annotations: {
+        caption: "Homepage hero",
+        labels: ["primary", "reviewed"],
+      },
     });
 
     expect(result.ok).toBeTrue();
@@ -67,6 +72,9 @@ describe("ImageIngestorAsset", () => {
     expect(result.preview.exifHighlights?.Make).toBe("Canon");
     expect(result.preview.normalized.ingestor).toBe("image-ingestor-v1");
     expect(result.metadata.derived).toBeDefined();
+    expect(result.metadata.tags).toEqual(["hero", "catalog"]);
+    const annotations = result.metadata.annotations as Record<string, unknown>;
+    expect(annotations.caption).toBe("Homepage hero");
     const derived = result.metadata.derived as Record<string, unknown>;
     expect(derived.orientation).toBe("landscape");
     expect(derived.aspectRatio).toBeCloseTo(1.5, 6);
@@ -169,6 +177,30 @@ describe("ImageIngestorAsset", () => {
       throw new Error("Expected unsupported type failure.");
     }
     expect(result.diagnostics[0]?.code).toBe(ImageIngestorErrorCodes.unsupportedType);
+  });
+
+  it("accepts image payloads with unsupported extensions when metadata detection confirms an image", async () => {
+    const ingestor = new ImageIngestorAsset({
+      metadataProbe: new StubMetadataProbe({ width: 32, height: 32, format: "png" }),
+      exifReader: new StubExifReader(),
+    });
+
+    const result = await ingestor.execute({
+      source: {
+        kind: "in-memory",
+        reference: "in-memory",
+        payload: new Uint8Array([1, 2, 3]),
+        fileName: "frame.bin",
+        contentType: "application/octet-stream",
+        diagnostics: Object.freeze([]),
+      },
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      throw new Error("Expected metadata-confirmed image success.");
+    }
+    expect(result.metadata.format).toBe("png");
   });
 
   it("returns extraction failures for unreadable/corrupt images", async () => {
