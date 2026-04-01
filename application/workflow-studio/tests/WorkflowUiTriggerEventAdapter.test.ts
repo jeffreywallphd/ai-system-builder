@@ -121,6 +121,10 @@ describe("WorkflowUiTriggerEventAdapter", () => {
     expect(mapped.entries[0]?.bindingMetadata).toEqual(expect.objectContaining({
       bindingId: "binding.ui.parameter.submit",
     }));
+    expect(mapped.entries[0]?.payload).toEqual(expect.objectContaining({
+      imageId: "img-2",
+      uiEventKind: "submit",
+    }));
     expect(mapped.entries[0]?.contextReferences).toEqual(expect.objectContaining({
       workflowAssetId: "asset:workflow:image",
     }));
