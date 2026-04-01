@@ -9,6 +9,8 @@ import {
   SystemDatasetInstanceService,
   type SystemDatasetOwnershipValidator,
 } from "../SystemDatasetInstanceService";
+import { InMemoryWorkflowOutputArtifactStorage } from "../WorkflowOutputArtifactStorage";
+import { InMemoryWorkflowOutputProvenanceRepository } from "../WorkflowOutputProvenanceRepository";
 import { WorkflowOutputMaterializationService } from "../WorkflowOutputMaterializationService";
 
 class StaticAssetCatalog implements DatasetInstanceAssetCatalog {
@@ -115,6 +117,83 @@ describe("WorkflowOutputMaterializationService", () => {
       instanceId: "instance:outputs",
     });
     expect(persisted).toHaveLength(2);
+  });
+
+  it("persists binary output artifacts through system-owned storage contracts and captures provenance", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const datasetInstances = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog(),
+      new AllowSystemValidator(),
+    );
+    await datasetInstances.ensureOutputImageStoreInstance({
+      instanceId: "instance:outputs",
+      systemId: "system:image",
+      datasetAssetId: "asset:dataset:outputs",
+      datasetAssetVersionId: "v1",
+    });
+
+    const artifactStorage = new InMemoryWorkflowOutputArtifactStorage();
+    const provenanceRepository = new InMemoryWorkflowOutputProvenanceRepository();
+    const service = new WorkflowOutputMaterializationService(datasetInstances, artifactStorage, provenanceRepository);
+
+    const result = await service.materialize({
+      systemId: "system:image",
+      datasetInstanceId: "instance:outputs",
+      payload: {
+        materializationId: "mat:run:binary-1",
+        workflowRun: {
+          runId: "run:binary:1",
+          workflowAssetId: "asset:workflow:image",
+          workflowAssetVersionId: "v10",
+        },
+        sourceImages: [{ imageRef: { kind: "generated-output", stableId: "generated-output:source:1", outputId: "source:1" } }],
+        producedAssets: [
+          {
+            assetRef: {
+              kind: "generated-output",
+              outputId: "transient://comfy/image-1",
+              stableId: "generated-output:transient-1",
+            },
+            role: "primary",
+            metadata: { width: 32, height: 32, format: "png" },
+            tags: ["primary"],
+            binaryPayload: {
+              dataBase64: Buffer.from([137, 80, 78, 71]).toString("base64"),
+              fileNameHint: "Hero Final.png",
+              extensionHint: "png",
+              mimeTypeHint: "image/png",
+            },
+          },
+        ],
+        parameterSnapshot: { prompt: "hero" },
+        executionContext: {
+          runtimeProfile: "comfyui",
+          capabilityProfile: { supportsCancellation: true },
+          configurationSnapshot: { scheduler: "karras" },
+        },
+        timestamps: {
+          requestedAt: "2026-04-01T10:00:00.000Z",
+          completedAt: "2026-04-01T10:00:03.000Z",
+          updatedAt: "2026-04-01T10:00:03.000Z",
+        },
+        status: "materialized",
+      },
+    });
+
+    const record = result.records[0];
+    expect(record?.storage?.provider).toBe("in-memory-system-output-store");
+    expect(record?.image.assetRef.stableId.startsWith("generated-output:system-output://")).toBe(true);
+
+    const provenance = provenanceRepository.listByWorkflowRunId("run:binary:1");
+    expect(provenance).toHaveLength(1);
+    expect(provenance[0]?.workflowAssetVersionId).toBe("v10");
+    expect(provenance[0]?.sourceImageStableIds).toEqual(["generated-output:source:1"]);
+    expect(provenance[0]?.parameterSnapshot.prompt).toBe("hero");
+    expect(provenance[0]?.capabilityContext.supportsCancellation).toBe(true);
+
+    const binary = artifactStorage.read(record?.storage?.reference ?? "missing");
+    expect(binary?.byteLength).toBe(4);
   });
 
   it("surfaces canonical materialization contract validation failures", async () => {

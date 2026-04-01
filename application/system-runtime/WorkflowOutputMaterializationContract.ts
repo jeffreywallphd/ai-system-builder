@@ -34,6 +34,13 @@ const imageAssetReferenceSchema = z.object({
   message: "Image asset references require at least one identifying field.",
 });
 
+const workflowOutputBinaryPayloadSchema = z.object({
+  dataBase64: z.string().trim().min(1),
+  fileNameHint: z.string().trim().min(1).optional(),
+  extensionHint: z.string().trim().min(1).optional(),
+  mimeTypeHint: z.string().trim().min(1).optional(),
+});
+
 export const WorkflowOutputMaterializationPayloadSchema = z.object({
   materializationId: z.string().trim().min(1),
   workflowRun: z.object({
@@ -45,6 +52,10 @@ export const WorkflowOutputMaterializationPayloadSchema = z.object({
     imageRef: imageAssetReferenceSchema,
     recordId: z.string().trim().min(1).optional(),
   }).optional(),
+  sourceImages: z.array(z.object({
+    imageRef: imageAssetReferenceSchema,
+    recordId: z.string().trim().min(1).optional(),
+  })).optional(),
   producedAssets: z.array(z.object({
     assetRef: imageAssetReferenceSchema,
     role: z.enum([
@@ -54,8 +65,14 @@ export const WorkflowOutputMaterializationPayloadSchema = z.object({
     ]),
     metadata: z.record(z.string(), canonicalRecordValueSchema).default({}),
     tags: z.array(z.string().trim().min(1)).default([]),
+    binaryPayload: workflowOutputBinaryPayloadSchema.optional(),
   })).min(1),
   parameterSnapshot: z.record(z.string(), canonicalRecordValueSchema).default({}),
+  executionContext: z.object({
+    runtimeProfile: z.string().trim().min(1).optional(),
+    capabilityProfile: z.record(z.string(), canonicalRecordValueSchema).default({}),
+    configurationSnapshot: z.record(z.string(), canonicalRecordValueSchema).default({}),
+  }).default({}),
   timestamps: z.object({
     requestedAt: z.string().datetime(),
     startedAt: z.string().datetime().optional(),
@@ -77,6 +94,20 @@ function normalizeTags(tags: ReadonlyArray<string>): ReadonlyArray<string> {
   return Object.freeze([...new Set(tags.map((tag) => tag.trim()).filter(Boolean))]);
 }
 
+export function decodeWorkflowBinaryPayload(payload: {
+  readonly dataBase64: string;
+}): Uint8Array {
+  const normalized = payload.dataBase64.trim();
+  if (!normalized) {
+    throw new Error("Workflow output binary payload cannot be empty.");
+  }
+  const buffer = Buffer.from(normalized, "base64");
+  if (buffer.length === 0) {
+    throw new Error("Workflow output binary payload decoded to an empty buffer.");
+  }
+  return new Uint8Array(buffer);
+}
+
 export function validateWorkflowOutputMaterializationPayload(input: unknown): WorkflowOutputMaterializationPayload {
   return WorkflowOutputMaterializationPayloadSchema.parse(input);
 }
@@ -92,9 +123,10 @@ export function materializationAssetToDatasetGeneration(input: {
   }
 
   const role: DatasetInstanceImageGenerationRole = asset.role;
+  const sourceImageRef = parsed.sourceImage?.imageRef ?? parsed.sourceImages?.[0]?.imageRef;
   return Object.freeze({
     outputAssetRef: asset.assetRef as ImageAssetReferenceInput,
-    sourceImageRef: parsed.sourceImage?.imageRef as ImageAssetReferenceInput | undefined,
+    sourceImageRef: sourceImageRef as ImageAssetReferenceInput | undefined,
     workflowAssetId: parsed.workflowRun.workflowAssetId,
     workflowAssetVersionId: parsed.workflowRun.workflowAssetVersionId,
     runId: parsed.workflowRun.runId,
