@@ -2,10 +2,12 @@ import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createBrowserImageUploadIngestionAdapter } from "../image-system/BrowserImageUploadIngestionAdapter";
+import { ImageComparisonView } from "../image-system/ImageComparisonView";
 import { ImageOutputGallery } from "../image-system/ImageOutputGallery";
 import { ImageParameterForm } from "../image-system/ImageParameterForm";
 import { ImageUploadPanel } from "../image-system/ImageUploadPanel";
 import { ImageViewer } from "../image-system/ImageViewer";
+import { createInitialImageInterfaceState, mapStateToComparisonProps, mapStateToOutputGalleryProps } from "../image-system/ImageSystemStateIntegration";
 import { mapAssetContractParametersToImageParameters } from "../image-system/ImageParameterMappers";
 import { DEFAULT_IMAGE_RENDER_OPTIONS, type ImageUiViewModel } from "../image-system/ImageUiContracts";
 
@@ -84,6 +86,16 @@ describe("image-system components", () => {
         datasetContext: { datasetAssetId: "dataset-images", datasetVersionId: "v1" },
       }),
     );
+    const comparisonHtml = renderToStaticMarkup(
+      React.createElement(ImageComparisonView, {
+        items: [
+          { image, label: "Before" },
+          { image: { ...image, imageId: "image-2", title: "After" }, label: "After" },
+        ],
+        mode: "side-by-side",
+        renderOptions: DEFAULT_IMAGE_RENDER_OPTIONS,
+      }),
+    );
 
     expect(uploadHtml).toContain("Upload images");
     expect(uploadHtml).toContain("Choose files");
@@ -93,6 +105,8 @@ describe("image-system components", () => {
     expect(formHtml).toContain("Prompt");
     expect(galleryHtml).toContain("Output gallery");
     expect(galleryHtml).toContain("dataset-images");
+    expect(comparisonHtml).toContain("Image comparison");
+    expect(comparisonHtml).toContain("Before vs After");
   });
 
   it("maps asset contract parameters into image form definitions through an adapter seam", () => {
@@ -107,5 +121,37 @@ describe("image-system components", () => {
       expect.objectContaining({ parameterId: "guidanceScale", type: "range", required: false, defaultValue: 7 }),
       expect.objectContaining({ parameterId: "seed", type: "number", required: false }),
     ]);
+  });
+
+  it("maps image interface state into reusable component props", () => {
+    const imageA: ImageUiViewModel = {
+      imageId: "img-a",
+      sourceUrl: "https://example.com/a.png",
+      title: "A",
+      metadata: {},
+      tags: [],
+    };
+    const imageB: ImageUiViewModel = {
+      imageId: "img-b",
+      sourceUrl: "https://example.com/b.png",
+      title: "B",
+      metadata: {},
+      tags: [],
+    };
+
+    const state = createInitialImageInterfaceState({
+      imageCollection: [imageA, imageB],
+      selectedImageId: "img-b",
+      datasetRef: { datasetAssetId: "dataset-1", datasetVersionId: "v2" },
+      interaction: { comparisonMode: "overlay", loadingByComponent: {}, errorByComponent: {} },
+    });
+
+    const galleryProps = mapStateToOutputGalleryProps(state, DEFAULT_IMAGE_RENDER_OPTIONS);
+    const comparisonProps = mapStateToComparisonProps(state, DEFAULT_IMAGE_RENDER_OPTIONS);
+
+    expect(galleryProps.selection?.selectedIds).toEqual(["img-b"]);
+    expect(galleryProps.datasetContext?.datasetAssetId).toBe("dataset-1");
+    expect(comparisonProps.mode).toBe("overlay");
+    expect(comparisonProps.items.length).toBe(2);
   });
 });

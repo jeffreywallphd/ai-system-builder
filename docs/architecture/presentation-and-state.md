@@ -458,3 +458,9 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - bounded paging (`pageSize`) for incremental display,
   - optional dataset context display for dataset-bound usage.
 - Updated `ui/components/assets/image-system/index.ts` to export parameter-form/gallery/mapper seams together with upload/viewer components for reuse in future output datasets, result/history views, and comparison flows.
+
+## Direction 5 UI update: Image comparison view + state integration (stories 4.1.7-4.1.8)
+
+- Added a reusable comparison surface (`ui/components/assets/image-system/ImageComparisonView.tsx`) with bounded side-by-side and overlay modes, internal image view-model contracts, synchronized zoom/pan interactions, selection/focus behavior, and explicit loading/empty/error state rendering.
+- Added a reusable synchronized viewport hook (`ui/components/assets/image-system/useSynchronizedImageViewport.ts`) so comparison and future image surfaces can share one zoom/pan state seam instead of per-component interaction logic.
+- Added explicit state integration/mapping seams in `ui/components/assets/image-system/ImageSystemStateIntegration.ts` so selected image, image collections, parameter values, dataset/system refs, and interaction/loading/error component state can be propagated coherently into upload/viewer/parameter/gallery/comparison component props without introducing a parallel state architecture.
