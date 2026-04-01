@@ -621,3 +621,19 @@
   - `domain/workflow-studio/tests/WorkflowInputBindingDomain.test.ts`
   - `application/workflow-studio/tests/WorkflowInputBindingResolutionService.test.ts`
   - `application/workflow-studio/tests/WorkflowExecutionContextAssemblyService.test.ts`
+
+## AI Loom Image Manipulation vertical-slice update: binding preview inspection + asset-definition integration (stories 3.2.7-3.2.8)
+
+- Added reusable binding preview/inspection orchestration in `application/workflow-studio/WorkflowInputBindingPreviewService.ts` over the existing canonical resolver path:
+  - inspectable declared source metadata per binding target (source id/kind/priority/required + declared-source summary),
+  - selected-source projection + bounded resolved value summaries (shape + concise summary),
+  - unresolved binding projection + structured validation/resolution diagnostics in one compact output model.
+- Added reusable image-workflow binding configuration seam in `application/contracts/ImageWorkflowInputBindingConfiguration.ts` so high-level workflow assets can save/load, duplicate, serialize, and inspect binding descriptors using the existing domain binding contract (`WorkflowInputBindingDomain`).
+- Integrated binding-aware input configuration into all high-level image workflow asset definitions (`image-to-image`, `restyle`, `enhance-upscale`, `batch-transform`) via shared `inputBindings` authoring surface:
+  - no workflow-type-specific binding model was introduced,
+  - defaults cover the supported 3.2.x source kinds (UI form values, selected-image context, dataset instances, constants/defaults).
+- Extended registry projection (`application/contracts/ImageWorkflowAssetRegistry.ts`) to include serialized binding configuration in discovery/inspection outputs for cross-system reuse.
+- Added targeted tests:
+  - `application/workflow-studio/tests/WorkflowInputBindingPreviewService.test.ts`,
+  - `application/contracts/tests/ImageWorkflowInputBindingConfiguration.test.ts`,
+  - updated asset/registry tests under `application/contracts/tests/*` to assert binding-aware definition surfaces.

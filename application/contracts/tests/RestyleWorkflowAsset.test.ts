@@ -19,6 +19,7 @@ describe("RestyleWorkflowAsset", () => {
     expect(asset.bindings.sourceImageFieldId).toBe("sourceImage");
     expect(asset.bindings.stylePresetFieldId).toBe("stylePreset");
     expect(asset.bindings.outputFieldId).toBe("images");
+    expect(asset.inputBindings.bindings.some((binding) => binding.inputId === "stylePreset")).toBeTrue();
   });
 
   it("exposes reusable composition and preview metadata", () => {

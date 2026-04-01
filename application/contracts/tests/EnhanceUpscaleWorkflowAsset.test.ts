@@ -18,6 +18,7 @@ describe("EnhanceUpscaleWorkflowAsset", () => {
     expect(asset.configuration.scaleFactor).toBe(3);
     expect(asset.bindings.sourceImageFieldId).toBe("sourceImage");
     expect(asset.bindings.outputFieldId).toBe("enhancedImage");
+    expect(asset.inputBindings.bindings.some((binding) => binding.inputId === "sourceImage")).toBeTrue();
   });
 
   it("exposes composition integrity and preview metadata", () => {

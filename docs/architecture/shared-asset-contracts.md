@@ -673,3 +673,19 @@ Not implemented in this slice:
   - `domain/workflow-studio/tests/WorkflowInputBindingDomain.test.ts`
   - `application/workflow-studio/tests/WorkflowInputBindingResolutionService.test.ts`
   - `application/workflow-studio/tests/WorkflowExecutionContextAssemblyService.test.ts`
+
+## AI Loom Image Manipulation vertical-slice update: binding preview inspection + asset-definition integration (stories 3.2.7-3.2.8)
+
+- Added reusable binding preview/inspection orchestration in `application/workflow-studio/WorkflowInputBindingPreviewService.ts` on top of the existing canonical resolver:
+  - reports declared source metadata per workflow input (source id/kind/priority/required + declared source summary),
+  - reports selected source and bounded resolved value summaries (shape + compact textual summary),
+  - reports unresolved bindings and all structured validation/resolution diagnostics in one inspectable payload.
+- Added reusable image-workflow binding configuration seam in `application/contracts/ImageWorkflowInputBindingConfiguration.ts` so high-level image workflow assets can persist, duplicate, serialize, and inspect workflow input bindings through the same domain binding contract (`WorkflowInputBindingDomain`).
+- Integrated binding-aware configuration into high-level image workflow asset definitions (`image-to-image`, `restyle`, `enhance-upscale`, `batch-transform`) via `inputBindings`:
+  - authorable binding descriptors now live inside the asset definition/configuration surface,
+  - defaults include supported 3.2.x binding source kinds (UI form values, selected image context, dataset instances, constants/defaults).
+- Extended discovery/inspection projection in `application/contracts/ImageWorkflowAssetRegistry.ts` so registry entries expose serialized binding configuration for cross-system reuse and authoring-time inspection.
+- Added focused tests for preview/inspection behavior and binding-aware asset configuration serialization/duplication:
+  - `application/workflow-studio/tests/WorkflowInputBindingPreviewService.test.ts`
+  - `application/contracts/tests/ImageWorkflowInputBindingConfiguration.test.ts`
+  - updated image workflow asset and registry tests under `application/contracts/tests/*`.

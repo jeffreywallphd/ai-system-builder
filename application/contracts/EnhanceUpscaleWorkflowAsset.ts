@@ -1,4 +1,9 @@
 import { z } from "zod";
+import { WorkflowInputBindingSourceKinds } from "../../domain/workflow-studio/WorkflowInputBindingDomain";
+import {
+  createImageWorkflowInputBindingConfiguration,
+  type ImageWorkflowInputBindingConfiguration,
+} from "./ImageWorkflowInputBindingConfiguration";
 import {
   CoreImageWorkflowAssetTypeContracts,
   ImageWorkflowAssetIntentTypes,
@@ -29,6 +34,7 @@ export interface EnhanceUpscaleWorkflowAsset {
   readonly contract: ImageWorkflowAssetContract;
   readonly configuration: EnhanceUpscaleWorkflowAssetConfig;
   readonly composition: ImageWorkflowComposition;
+  readonly inputBindings: ImageWorkflowInputBindingConfiguration;
   readonly bindings: Readonly<{
     readonly sourceImageFieldId: "sourceImage";
     readonly outputFieldId: "enhancedImage";
@@ -93,10 +99,28 @@ function buildEnhanceUpscaleComposition(): ImageWorkflowComposition {
   });
 }
 
-export function createEnhanceUpscaleWorkflowAsset(input?: { readonly configuration?: unknown }): EnhanceUpscaleWorkflowAsset {
+export function createEnhanceUpscaleWorkflowAsset(input?: {
+  readonly configuration?: unknown;
+  readonly inputBindings?: ImageWorkflowInputBindingConfiguration["bindings"];
+}): EnhanceUpscaleWorkflowAsset {
   const contract = CoreImageWorkflowAssetTypeContracts[ImageWorkflowAssetIntentTypes.enhanceUpscale];
   const configuration = EnhanceUpscaleWorkflowAssetConfigSchema.parse(input?.configuration ?? {});
   const composition = buildEnhanceUpscaleComposition();
+  const inputBindings = createImageWorkflowInputBindingConfiguration({
+    bindings: input?.inputBindings ?? [
+      {
+        bindingId: "binding.input.sourceImage",
+        inputId: "sourceImage",
+        required: true,
+        valueType: "object",
+        sources: [
+          { sourceId: "selected-image", kind: WorkflowInputBindingSourceKinds.selectedImage, path: "assetRef", priority: 1, required: true },
+          { sourceId: "form-source-image", kind: WorkflowInputBindingSourceKinds.uiFormValue, formKey: "sourceImage", priority: 2 },
+          { sourceId: "dataset-input-image", kind: WorkflowInputBindingSourceKinds.datasetInstanceReference, purpose: "active-input", priority: 3, resolution: { shape: "record", index: 0 } },
+        ],
+      },
+    ],
+  });
 
   return Object.freeze({
     id: EnhanceUpscaleWorkflowAssetId,
@@ -105,6 +129,7 @@ export function createEnhanceUpscaleWorkflowAsset(input?: { readonly configurati
     contract,
     configuration,
     composition,
+    inputBindings,
     bindings: Object.freeze({
       sourceImageFieldId: "sourceImage",
       outputFieldId: "enhancedImage",

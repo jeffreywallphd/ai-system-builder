@@ -20,6 +20,7 @@ describe("ImageToImageWorkflowAsset", () => {
     expect(asset.bindings.sourceImageFieldId).toBe("sourceImage");
     expect(asset.bindings.promptFieldId).toBe("instruction");
     expect(asset.bindings.outputFieldId).toBe("images");
+    expect(asset.inputBindings.bindings.some((binding) => binding.inputId === "sourceImage")).toBeTrue();
   });
 
   it("exposes composition stages and preview inspection metadata", () => {

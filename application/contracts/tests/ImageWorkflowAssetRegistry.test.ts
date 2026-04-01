@@ -26,6 +26,7 @@ describe("ImageWorkflowAssetRegistry", () => {
     expect(restyle?.configurationSurface.some((entry) => entry.id === "styleStrength")).toBeTrue();
     expect(restyle?.configurationSurface.some((entry) => entry.id.includes("comfy"))).toBeFalse();
     expect(restyle?.contract.input.fields.some((field) => field.id.includes("node"))).toBeFalse();
+    expect(Array.isArray(restyle?.inputBindings.bindings)).toBeTrue();
   });
 
   it("keeps composition and inspectability boundaries portable across the full 3.1 asset set", () => {

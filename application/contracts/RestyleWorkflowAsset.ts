@@ -1,4 +1,9 @@
 import { z } from "zod";
+import { WorkflowInputBindingSourceKinds } from "../../domain/workflow-studio/WorkflowInputBindingDomain";
+import {
+  createImageWorkflowInputBindingConfiguration,
+  type ImageWorkflowInputBindingConfiguration,
+} from "./ImageWorkflowInputBindingConfiguration";
 import {
   CoreImageWorkflowAssetTypeContracts,
   ImageWorkflowAssetIntentTypes,
@@ -29,6 +34,7 @@ export interface RestyleWorkflowAsset {
   readonly contract: ImageWorkflowAssetContract;
   readonly configuration: RestyleWorkflowAssetConfig;
   readonly composition: ImageWorkflowComposition;
+  readonly inputBindings: ImageWorkflowInputBindingConfiguration;
   readonly bindings: Readonly<{
     readonly sourceImageFieldId: "sourceImage";
     readonly stylePresetFieldId: "stylePreset";
@@ -106,10 +112,37 @@ function buildRestyleComposition(): ImageWorkflowComposition {
   });
 }
 
-export function createRestyleWorkflowAsset(input?: { readonly configuration?: unknown }): RestyleWorkflowAsset {
+export function createRestyleWorkflowAsset(input?: {
+  readonly configuration?: unknown;
+  readonly inputBindings?: ImageWorkflowInputBindingConfiguration["bindings"];
+}): RestyleWorkflowAsset {
   const contract = CoreImageWorkflowAssetTypeContracts[ImageWorkflowAssetIntentTypes.restyle];
   const configuration = RestyleWorkflowAssetConfigSchema.parse(input?.configuration ?? {});
   const composition = buildRestyleComposition();
+  const inputBindings = createImageWorkflowInputBindingConfiguration({
+    bindings: input?.inputBindings ?? [
+      {
+        bindingId: "binding.input.sourceImage",
+        inputId: "sourceImage",
+        required: true,
+        valueType: "object",
+        sources: [
+          { sourceId: "selected-image", kind: WorkflowInputBindingSourceKinds.selectedImage, path: "assetRef", priority: 1, required: true },
+          { sourceId: "form-source-image", kind: WorkflowInputBindingSourceKinds.uiFormValue, formKey: "sourceImage", priority: 2 },
+        ],
+      },
+      {
+        bindingId: "binding.input.stylePreset",
+        inputId: "stylePreset",
+        required: true,
+        valueType: "string",
+        sources: [
+          { sourceId: "form-style-preset", kind: WorkflowInputBindingSourceKinds.uiFormValue, formKey: "stylePreset", priority: 1, required: true },
+          { sourceId: "runtime-style-preset", kind: WorkflowInputBindingSourceKinds.runtimeParameter, parameterKey: "stylePreset", priority: 2 },
+        ],
+      },
+    ],
+  });
 
   return Object.freeze({
     id: RestyleWorkflowAssetId,
@@ -118,6 +151,7 @@ export function createRestyleWorkflowAsset(input?: { readonly configuration?: un
     contract,
     configuration,
     composition,
+    inputBindings,
     bindings: Object.freeze({
       sourceImageFieldId: "sourceImage",
       stylePresetFieldId: "stylePreset",
