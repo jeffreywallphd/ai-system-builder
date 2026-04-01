@@ -42,7 +42,7 @@ describe("DataAssetBase", () => {
       versionMetadata: {
         schemaVersion: "1.0.0",
         revision: 3,
-        publishedVersionId: "dataset-published-v1",
+        publishedVersionId: "1.0.0",
       },
       composableInputShapeKinds: ["records", "table"],
       dependencies: [
@@ -73,10 +73,22 @@ describe("DataAssetBase", () => {
       schemaVersion: "1.0.0",
       contractVersion: "1.1.0",
       revision: 3,
-      publishedVersionId: "dataset-published-v1",
+      publishedVersionId: "1.0.0",
     });
     expect(inspection.outputShapeKind).toBe("records");
     expect(inspection.metadata.dependencies).toHaveLength(1);
+    expect(inspection.metadata.runtime).toEqual({
+      usability: "runtime-readable",
+      instanceOwnership: {
+        owner: "asset",
+        stateScope: "shared-asset",
+      },
+      mutability: {
+        mode: "immutable",
+        writeBehavior: "never",
+      },
+      accessPatterns: ["scan-read"],
+    });
 
     expect(asset.canComposeFrom({ outputShapeKind: "table" })).toBe(true);
     expect(asset.canComposeFrom({ outputShapeKind: "text-items" })).toBe(false);
@@ -112,5 +124,52 @@ describe("DataAssetBase", () => {
       },
     })).toThrow("DataAssetVersionMetadata.schemaVersion");
   });
-});
 
+  it("supports explicit runtime-operational dataset contracts", () => {
+    const asset = new CanonicalDataAsset({
+      id: "runtime-dataset-1",
+      name: "Runtime Dataset",
+      source: { type: "generated", workflowId: "wf-runtime" },
+      location: { accessMethod: "virtual", location: "dataset://runtime-dataset-1" },
+      outputShape: createCanonicalRecordsShape({
+        records: [{ recordId: "record-1", fields: { id: "1" } }],
+      }),
+      runtime: {
+        usability: "runtime-operational",
+        instanceOwnership: {
+          owner: "system",
+          stateScope: "system-instance",
+        },
+        mutability: {
+          mode: "mutable",
+          writeBehavior: "system-only",
+        },
+        accessPatterns: ["scan-read", "point-lookup", "upsert-write"],
+      },
+    });
+
+    expect(asset.inspect().metadata.runtime.usability).toBe("runtime-operational");
+    expect(asset.inspect().metadata.runtime.instanceOwnership.owner).toBe("system");
+    expect(asset.inspect().metadata.runtime.mutability.writeBehavior).toBe("system-only");
+    expect(asset.inspect().metadata.runtime.accessPatterns).toContain("upsert-write");
+  });
+
+  it("rejects runtime contracts that declare write access patterns for read-only datasets", () => {
+    expect(() => new CanonicalDataAsset({
+      id: "runtime-dataset-invalid",
+      name: "Runtime Dataset Invalid",
+      source: { type: "generated", workflowId: "wf-runtime-invalid" },
+      location: { accessMethod: "virtual", location: "dataset://runtime-dataset-invalid" },
+      outputShape: createCanonicalRecordsShape({
+        records: [{ recordId: "record-1", fields: { id: "1" } }],
+      }),
+      runtime: {
+        mutability: {
+          mode: "immutable",
+          writeBehavior: "never",
+        },
+        accessPatterns: ["append-write"],
+      },
+    })).toThrow("Read-only runtime datasets cannot declare write access patterns");
+  });
+});

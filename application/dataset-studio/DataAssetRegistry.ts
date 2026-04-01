@@ -1,6 +1,10 @@
 import { createDatasetStudioTaxonomy } from "../../domain/dataset-studio/DatasetStudioDomain";
 import type { CanonicalDataShapeKind, CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { DataAssetBase } from "../../domain/dataset-studio/DataAssetBase";
+import {
+  DataAssetRuntimeUsabilityModes,
+  type DataAssetBase,
+  type DataAssetRuntimeOperationalContract,
+} from "../../domain/dataset-studio/DataAssetBase";
 import type { DataAssetVersionDescriptor } from "../../domain/dataset-studio/DataAssetVersioning";
 import {
   DatasetSchemaIntentIds,
@@ -8,6 +12,7 @@ import {
   type DatasetSchemaIntentValidationIssue,
   type IDatasetSchemaIntent,
   type IDatasetSchemaIntentRegistry,
+  type IDatasetSchemaValidationEngine,
 } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import {
   assertValidDataAssetVersion,
@@ -22,6 +27,7 @@ import {
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
 import { createDefaultDatasetSchemaIntentRegistry } from "./DatasetSchemaIntentRegistry";
+import { DatasetSchemaValidationEngine } from "./DatasetSchemaValidationEngine";
 
 export const DataAssetRegistrySpecializations = Object.freeze({
   dataset: "dataset",
@@ -52,6 +58,7 @@ export interface DataAssetRegistryCapabilities {
   readonly configurable: boolean;
   readonly previewable: boolean;
   readonly executable: boolean;
+  readonly runtimeUsable: boolean;
 }
 
 export interface DataAssetRegistryVersioningMetadata {
@@ -101,6 +108,7 @@ export interface DataAssetRegistryDescriptor {
   readonly display: DataAssetRegistryDisplayMetadata;
   readonly contracts: DataAssetRegistryContractReferences;
   readonly capabilities: DataAssetRegistryCapabilities;
+  readonly runtime: DataAssetRuntimeOperationalContract;
   readonly schemaIntent: {
     readonly id: DatasetSchemaIntentId;
     readonly name: string;
@@ -151,6 +159,7 @@ export interface QueryDataAssets {
   readonly previewable?: boolean;
   readonly configurable?: boolean;
   readonly executable?: boolean;
+  readonly runtimeUsable?: boolean;
 }
 
 interface InternalDataAssetRegistration {
@@ -262,7 +271,11 @@ function toDescriptor(input: {
       tags: normalizeTags(input.display?.tags ?? inspection.metadata.display.tags),
     }),
     contracts: buildContractReferences(input.asset),
-    capabilities: inspection.metadata.capabilities,
+    capabilities: Object.freeze({
+      ...inspection.metadata.capabilities,
+      runtimeUsable: inspection.metadata.runtime.usability !== DataAssetRuntimeUsabilityModes.authoringOnly,
+    }),
+    runtime: inspection.metadata.runtime,
     schemaIntent: Object.freeze({
       id: input.schemaIntent.descriptor.id,
       name: input.schemaIntent.descriptor.name,
@@ -297,6 +310,7 @@ export class DataAssetRegistry {
 
   public constructor(
     private readonly schemaIntentRegistry: IDatasetSchemaIntentRegistry = createDefaultDatasetSchemaIntentRegistry(),
+    private readonly schemaValidationEngine: IDatasetSchemaValidationEngine = new DatasetSchemaValidationEngine(),
   ) {}
 
   public register(input: RegisterDataAssetRequest): DataAssetRegistryEntry {
@@ -321,7 +335,10 @@ export class DataAssetRegistry {
       : undefined;
     const configSchema = input.configSchema ?? fieldsSchema ?? inferDataAssetConfigSchema(input.asset);
     const schemaIntent = this.resolveSchemaIntent(input);
-    const validation = schemaIntent.validateShape(input.asset.toCanonicalDataShape());
+    const validation = this.schemaValidationEngine.validate({
+      intent: schemaIntent,
+      shape: input.asset.toCanonicalDataShape(),
+    });
     if (!validation.valid) {
       const errors = validation.issues
         .filter((issue) => issue.severity === "error")
@@ -508,6 +525,10 @@ export class DataAssetRegistry {
     }
 
     if (query.executable !== undefined && entry.descriptor.capabilities.executable !== query.executable) {
+      return false;
+    }
+
+    if (query.runtimeUsable !== undefined && entry.descriptor.capabilities.runtimeUsable !== query.runtimeUsable) {
       return false;
     }
 
