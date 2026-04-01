@@ -5,6 +5,7 @@ import {
   type DatasetInstanceImageRecordQuery,
 } from "../../domain/system-runtime/DatasetInstanceRecordDomain";
 import type { DatasetInstance } from "../../domain/system-runtime/DatasetInstanceDomain";
+import type { DatasetOperationalLineageContext, DatasetOperationalLineageSink } from "./DatasetOperationalLineage";
 import { SystemDatasetInstanceService } from "./SystemDatasetInstanceService";
 
 export interface ListDatasetInstancePreviewsRequest {
@@ -13,6 +14,7 @@ export interface ListDatasetInstancePreviewsRequest {
   readonly query?: DatasetInstanceImageRecordQuery;
   readonly limit?: number;
   readonly offset?: number;
+  readonly lineageContext?: DatasetOperationalLineageContext;
 }
 
 export interface DatasetInstancePreviewSummary {
@@ -56,6 +58,12 @@ export interface DatasetInstancePreviewInspection {
   readonly metadataFieldsPerItemLimit: number;
   readonly metadataFieldsTruncatedCount: number;
   readonly recordValidationWarnings: ReadonlyArray<string>;
+  readonly payloadSizeBytes: number;
+  readonly cache: {
+    readonly enabled: boolean;
+    readonly hit: boolean;
+    readonly maxEntries: number;
+  };
 }
 
 export interface DatasetInstanceImagePreviewList {
@@ -152,26 +160,54 @@ function toPreviewItem(record: DatasetInstanceImageRecord): {
 }
 
 export class DatasetInstancePreviewService {
-  public constructor(private readonly datasetInstanceService: SystemDatasetInstanceService) {}
+  private readonly previewCache = new Map<string, DatasetInstanceImagePreviewList>();
+  private readonly maxCacheEntries: number;
+
+  public constructor(
+    private readonly datasetInstanceService: SystemDatasetInstanceService,
+    private readonly lineageSink?: DatasetOperationalLineageSink,
+    options?: {
+      readonly maxCacheEntries?: number;
+    },
+  ) {
+    this.maxCacheEntries = normalizeCacheSize(options?.maxCacheEntries);
+  }
 
   public listImageRecordPreviews(request: ListDatasetInstancePreviewsRequest): DatasetInstanceImagePreviewList {
     const limit = normalizeLimit(request.limit);
     const offset = normalizeOffset(request.offset);
+    const cacheKey = this.createCacheKey({
+      systemId: request.systemId,
+      instanceId: request.instanceId,
+      query: request.query,
+      offset,
+      limit,
+    });
+    const cached = this.previewCache.get(cacheKey);
+    if (cached) {
+      const withCacheHitInspection = this.withCacheInspection(cached, true);
+      this.recordPreviewLineage(withCacheHitInspection, request.lineageContext, true);
+      return withCacheHitInspection;
+    }
+
     const instance = this.datasetInstanceService.loadDatasetInstance({
       systemId: request.systemId,
       instanceId: request.instanceId,
     });
-    const records = this.datasetInstanceService.listImageRecordsForInstance({
+    const recordsPage = this.datasetInstanceService.listImageRecordPageForInstance({
       systemId: request.systemId,
       instanceId: request.instanceId,
       query: request.query,
+      limit,
+      offset,
+      lineageContext: request.lineageContext,
     });
-    const windowedRecords = records.slice(offset, offset + limit);
-    const mappedItems = windowedRecords.map(toPreviewItem);
+    const mappedItems = recordsPage.items.map(toPreviewItem);
     const previewItems = Object.freeze(mappedItems.map((entry) => entry.item));
     const validationWarnings = Object.freeze(mappedItems.flatMap((entry) => entry.validationWarnings));
     const metadataFieldsTruncatedCount = mappedItems.filter((entry) => entry.metadataWasTruncated).length;
-    return Object.freeze({
+    const payloadSizeBytes = JSON.stringify(previewItems).length;
+    const preview = Object.freeze({
       kind: "image-records",
       summary: Object.freeze({
         systemId: instance.systemId,
@@ -180,23 +216,112 @@ export class DatasetInstancePreviewService {
         datasetAssetVersionId: instance.datasetAssetVersionId,
         role: instance.role,
         purpose: instance.purpose,
-        totalRecords: records.length,
+        totalRecords: recordsPage.totalCount,
         returnedRecords: previewItems.length,
-        truncated: offset + previewItems.length < records.length,
+        truncated: offset + previewItems.length < recordsPage.totalCount,
       }),
       window: Object.freeze({
         offset,
         limit,
         returnedRecords: previewItems.length,
         hasPreviousWindow: offset > 0,
-        hasNextWindow: offset + previewItems.length < records.length,
+        hasNextWindow: offset + previewItems.length < recordsPage.totalCount,
       }),
       inspection: Object.freeze({
         metadataFieldsPerItemLimit: 8,
         metadataFieldsTruncatedCount,
         recordValidationWarnings: validationWarnings,
+        payloadSizeBytes,
+        cache: Object.freeze({
+          enabled: this.maxCacheEntries > 0,
+          hit: false,
+          maxEntries: this.maxCacheEntries,
+        }),
       }),
       items: previewItems,
     });
+    this.saveToCache(cacheKey, preview);
+    this.recordPreviewLineage(preview, request.lineageContext, false);
+    return preview;
   }
+
+  private createCacheKey(input: {
+    readonly systemId: string;
+    readonly instanceId: string;
+    readonly query?: DatasetInstanceImageRecordQuery;
+    readonly offset: number;
+    readonly limit: number;
+  }): string {
+    return JSON.stringify({
+      systemId: input.systemId,
+      instanceId: input.instanceId,
+      offset: input.offset,
+      limit: input.limit,
+      query: input.query ?? null,
+    });
+  }
+
+  private saveToCache(key: string, preview: DatasetInstanceImagePreviewList): void {
+    if (this.maxCacheEntries <= 0) {
+      return;
+    }
+    if (this.previewCache.has(key)) {
+      this.previewCache.delete(key);
+    }
+    this.previewCache.set(key, preview);
+    while (this.previewCache.size > this.maxCacheEntries) {
+      const oldestKey = this.previewCache.keys().next().value as string | undefined;
+      if (!oldestKey) {
+        break;
+      }
+      this.previewCache.delete(oldestKey);
+    }
+  }
+
+  private withCacheInspection(preview: DatasetInstanceImagePreviewList, hit: boolean): DatasetInstanceImagePreviewList {
+    return Object.freeze({
+      ...preview,
+      inspection: Object.freeze({
+        ...preview.inspection,
+        cache: Object.freeze({
+          ...preview.inspection.cache,
+          hit,
+        }),
+      }),
+    });
+  }
+
+  private recordPreviewLineage(
+    preview: DatasetInstanceImagePreviewList,
+    context: DatasetOperationalLineageContext | undefined,
+    wasCacheHit: boolean,
+  ): void {
+    this.lineageSink?.record({
+      eventKind: "preview-access",
+      systemId: preview.summary.systemId,
+      instanceId: preview.summary.instanceId,
+      datasetAssetId: preview.summary.datasetAssetId,
+      datasetAssetVersionId: preview.summary.datasetAssetVersionId,
+      operation: "list-image-record-previews",
+      resultCount: preview.window.returnedRecords,
+      context,
+      metadata: Object.freeze({
+        offset: String(preview.window.offset),
+        limit: String(preview.window.limit),
+        totalCount: String(preview.summary.totalRecords),
+        payloadSizeBytes: String(preview.inspection.payloadSizeBytes),
+        cacheHit: wasCacheHit ? "true" : "false",
+      }),
+    });
+  }
+}
+
+function normalizeCacheSize(value: number | undefined): number {
+  if (value === undefined) {
+    return 40;
+  }
+  if (!Number.isFinite(value) || Math.floor(value) !== value || value < 0 || value > 500) {
+    throw new Error("invalid-request:maxCacheEntries must be an integer between 0 and 500.");
+  }
+  return value;
 }

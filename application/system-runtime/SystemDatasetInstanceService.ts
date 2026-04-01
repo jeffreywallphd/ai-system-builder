@@ -38,6 +38,7 @@ import type { DatasetInstanceAssetCatalog } from "./DatasetInstanceAssetCatalog"
 import type { DatasetInstanceRepository } from "./DatasetInstanceRepository";
 import { createDefaultMediaValidationAdapters } from "../dataset-studio/adapters/validation/MediaValidationFactory";
 import { DatasetInstanceSchemaEnforcementService } from "./DatasetInstanceSchemaEnforcementService";
+import type { DatasetOperationalLineageContext, DatasetOperationalLineageSink } from "./DatasetOperationalLineage";
 
 export interface SystemDatasetOwnershipValidator {
   assertSystemExists(systemId: string): Promise<void> | void;
@@ -131,6 +132,7 @@ export interface IngestDatasetInstanceImageRecordRequest {
   readonly metadata?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly provenance?: DatasetInstanceImageRecordProvenance;
   readonly metadataExtraction?: IngestDatasetInstanceImageRecordMetadataExtraction;
+  readonly lineageContext?: DatasetOperationalLineageContext;
 }
 
 export interface IngestDatasetInstanceImageRecordsRequest {
@@ -145,24 +147,40 @@ export interface IngestDatasetInstanceImageRecordsRequest {
     readonly provenance?: DatasetInstanceImageRecordProvenance;
     readonly metadataExtraction?: IngestDatasetInstanceImageRecordMetadataExtraction;
   }>;
+  readonly lineageContext?: DatasetOperationalLineageContext;
 }
 
 export interface QueryDatasetInstanceImageRecordsRequest {
   readonly systemId: string;
   readonly instanceId: string;
   readonly query?: DatasetInstanceImageRecordQuery;
+  readonly lineageContext?: DatasetOperationalLineageContext;
+}
+
+export interface QueryDatasetInstanceImageRecordPageRequest extends QueryDatasetInstanceImageRecordsRequest {
+  readonly limit: number;
+  readonly offset: number;
+}
+
+export interface QueryDatasetInstanceImageRecordPageResult {
+  readonly items: ReadonlyArray<DatasetInstanceImageRecord>;
+  readonly totalCount: number;
+  readonly limit: number;
+  readonly offset: number;
 }
 
 export interface GetDatasetInstanceImageRecordRequest {
   readonly systemId: string;
   readonly instanceId: string;
   readonly recordId: string;
+  readonly lineageContext?: DatasetOperationalLineageContext;
 }
 
 export interface GetDatasetInstanceImageRecordsByIdsRequest {
   readonly systemId: string;
   readonly instanceId: string;
   readonly recordIds: ReadonlyArray<string>;
+  readonly lineageContext?: DatasetOperationalLineageContext;
 }
 
 export interface UpdateDatasetInstanceImageRecordRequest {
@@ -170,12 +188,14 @@ export interface UpdateDatasetInstanceImageRecordRequest {
   readonly instanceId: string;
   readonly recordId: string;
   readonly patch: DatasetInstanceImageRecordPatch;
+  readonly lineageContext?: DatasetOperationalLineageContext;
 }
 
 export interface DeleteDatasetInstanceImageRecordRequest {
   readonly systemId: string;
   readonly instanceId: string;
   readonly recordId: string;
+  readonly lineageContext?: DatasetOperationalLineageContext;
 }
 
 export interface DatasetInstanceImageMutationIssue {
@@ -240,6 +260,7 @@ export class SystemDatasetInstanceService {
   private readonly schemaEnforcementService: DatasetInstanceSchemaEnforcementService;
   private readonly imageRecordValidator: IImageRecordValidator;
   private readonly imageMetadataExtractor: IImageMetadataExtractor;
+  private readonly lineageSink?: DatasetOperationalLineageSink;
 
   public constructor(
     private readonly repository: DatasetInstanceRepository,
@@ -247,6 +268,7 @@ export class SystemDatasetInstanceService {
     private readonly mediaDatasetValidator: IMediaDatasetValidator,
     private readonly systemValidator?: SystemDatasetOwnershipValidator,
     options: SystemDatasetInstanceServiceOptions = {},
+    lineageSink?: DatasetOperationalLineageSink,
   ) {
     this.schemaEnforcementService = new DatasetInstanceSchemaEnforcementService(
       this.assetCatalog,
@@ -257,6 +279,7 @@ export class SystemDatasetInstanceService {
       ?? createDefaultMediaValidationAdapters().imageRecordValidator;
     this.imageMetadataExtractor = options.imageMetadataExtractor
       ?? createDefaultMediaAdapterBundle().metadataExtractor;
+    this.lineageSink = lineageSink;
   }
 
   public async createDatasetInstance(request: CreateSystemDatasetInstanceRequest): Promise<DatasetInstance> {
@@ -649,7 +672,19 @@ export class SystemDatasetInstanceService {
       mutationVersion: 1,
     });
 
-    return this.repository.saveImageRecord(persisted);
+    const saved = this.repository.saveImageRecord(persisted);
+    this.lineageSink?.record({
+      eventKind: "record-write",
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      datasetAssetId: instance.datasetAssetId,
+      datasetAssetVersionId: instance.datasetAssetVersionId,
+      recordId: saved.recordId,
+      resultCount: 1,
+      operation: "create",
+      context: request.lineageContext,
+    });
+    return saved;
   }
 
   public async ingestImageRecordsIntoInstance(
@@ -667,6 +702,7 @@ export class SystemDatasetInstanceService {
         metadata: record.metadata,
         provenance: record.provenance,
         metadataExtraction: record.metadataExtraction,
+        lineageContext: request.lineageContext,
       }));
     }
     return Object.freeze(persisted);
@@ -675,14 +711,66 @@ export class SystemDatasetInstanceService {
   public listImageRecordsForInstance(
     request: QueryDatasetInstanceImageRecordsRequest,
   ): ReadonlyArray<DatasetInstanceImageRecord> {
-    this.requireOwnedDatasetInstanceSync({
+    const instance = this.requireOwnedDatasetInstanceSync({
       systemId: request.systemId,
       instanceId: request.instanceId,
     });
-    return this.repository.queryImageRecordsBySystemId({
+    const items = this.repository.queryImageRecordsBySystemId({
       systemId: request.systemId,
       instanceId: request.instanceId,
       query: request.query,
+    });
+    this.lineageSink?.record({
+      eventKind: "record-query",
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      datasetAssetId: instance.datasetAssetId,
+      datasetAssetVersionId: instance.datasetAssetVersionId,
+      operation: "list",
+      resultCount: items.length,
+      query: request.query as unknown as Readonly<Record<string, unknown>> | undefined,
+      context: request.lineageContext,
+    });
+    return items;
+  }
+
+  public listImageRecordPageForInstance(
+    request: QueryDatasetInstanceImageRecordPageRequest,
+  ): QueryDatasetInstanceImageRecordPageResult {
+    const instance = this.requireOwnedDatasetInstanceSync({
+      systemId: request.systemId,
+      instanceId: request.instanceId,
+    });
+    const page = this.repository.queryImageRecordPageBySystemId({
+      systemId: request.systemId,
+      instanceId: request.instanceId,
+      query: request.query,
+      window: Object.freeze({
+        limit: request.limit,
+        offset: request.offset,
+      }),
+    });
+    this.lineageSink?.record({
+      eventKind: "record-query",
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      datasetAssetId: instance.datasetAssetId,
+      datasetAssetVersionId: instance.datasetAssetVersionId,
+      operation: "windowed-list",
+      resultCount: page.items.length,
+      query: request.query as unknown as Readonly<Record<string, unknown>> | undefined,
+      context: request.lineageContext,
+      metadata: Object.freeze({
+        totalCount: String(page.totalCount),
+        offset: String(page.offset),
+        limit: String(page.limit),
+      }),
+    });
+    return Object.freeze({
+      items: page.items,
+      totalCount: page.totalCount,
+      limit: page.limit,
+      offset: page.offset,
     });
   }
 
@@ -700,22 +788,34 @@ export class SystemDatasetInstanceService {
   public getImageRecordFromInstance(
     request: GetDatasetInstanceImageRecordRequest,
   ): DatasetInstanceImageRecord | undefined {
-    this.requireOwnedDatasetInstanceSync({
+    const instance = this.requireOwnedDatasetInstanceSync({
       systemId: request.systemId,
       instanceId: request.instanceId,
     });
     const recordId = normalizeRequired(request.recordId, "recordId");
-    return this.repository.getImageRecordBySystemAndId({
+    const found = this.repository.getImageRecordBySystemAndId({
       systemId: request.systemId,
       instanceId: request.instanceId,
       recordId,
     });
+    this.lineageSink?.record({
+      eventKind: "record-read",
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      datasetAssetId: instance.datasetAssetId,
+      datasetAssetVersionId: instance.datasetAssetVersionId,
+      recordId,
+      operation: "get-by-id",
+      resultCount: found ? 1 : 0,
+      context: request.lineageContext,
+    });
+    return found;
   }
 
   public getImageRecordsFromInstanceByIds(
     request: GetDatasetInstanceImageRecordsByIdsRequest,
   ): ReadonlyArray<DatasetInstanceImageRecord> {
-    this.requireOwnedDatasetInstanceSync({
+    const instance = this.requireOwnedDatasetInstanceSync({
       systemId: request.systemId,
       instanceId: request.instanceId,
     });
@@ -723,13 +823,25 @@ export class SystemDatasetInstanceService {
     if (recordIds.length === 0) {
       return Object.freeze([]);
     }
-    return Object.freeze(recordIds
+    const records = Object.freeze(recordIds
       .map((recordId) => this.repository.getImageRecordBySystemAndId({
         systemId: request.systemId,
         instanceId: request.instanceId,
         recordId: recordId!,
       }))
       .filter((record): record is DatasetInstanceImageRecord => Boolean(record)));
+    this.lineageSink?.record({
+      eventKind: "record-read",
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      datasetAssetId: instance.datasetAssetId,
+      datasetAssetVersionId: instance.datasetAssetVersionId,
+      recordIds: recordIds as ReadonlyArray<string>,
+      operation: "get-by-ids",
+      resultCount: records.length,
+      context: request.lineageContext,
+    });
+    return records;
   }
 
   public async updateImageRecordInInstance(
@@ -775,7 +887,19 @@ export class SystemDatasetInstanceService {
       updatedAt: patched.updatedAt,
       mutationVersion: patched.mutationVersion,
     });
-    return this.repository.saveImageRecord(persisted);
+    const saved = this.repository.saveImageRecord(persisted);
+    this.lineageSink?.record({
+      eventKind: "record-write",
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      datasetAssetId: instance.datasetAssetId,
+      datasetAssetVersionId: instance.datasetAssetVersionId,
+      recordId: saved.recordId,
+      operation: "update",
+      resultCount: 1,
+      context: request.lineageContext,
+    });
+    return saved;
   }
 
   public async deleteImageRecordFromInstance(
@@ -786,10 +910,22 @@ export class SystemDatasetInstanceService {
       instanceId: request.instanceId,
     });
     this.assertInstanceMutable(instance, "delete/remove image record");
-    return this.repository.deleteImageRecordById({
+    const deleted = this.repository.deleteImageRecordById({
       instanceId: instance.instanceId,
       recordId: normalizeRequired(request.recordId, "recordId"),
     });
+    this.lineageSink?.record({
+      eventKind: "record-write",
+      systemId: instance.systemId,
+      instanceId: instance.instanceId,
+      datasetAssetId: instance.datasetAssetId,
+      datasetAssetVersionId: instance.datasetAssetVersionId,
+      recordId: request.recordId,
+      operation: "delete",
+      resultCount: deleted ? 1 : 0,
+      context: request.lineageContext,
+    });
+    return deleted;
   }
 
   public async mutateImageRecordInInstance(input:

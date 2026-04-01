@@ -13,6 +13,10 @@ import {
   type DatasetInstanceImageRecord,
   type DatasetInstanceImageRecordQuery,
 } from "../../../domain/system-runtime/DatasetInstanceRecordDomain";
+import type {
+  QueryDatasetInstanceImageRecordPageBySystemIdRequest,
+  QueryDatasetInstanceImageRecordPageResult,
+} from "../../../application/system-runtime/DatasetInstanceRepository";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 
 interface DatasetInstanceRow {
@@ -538,6 +542,38 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceStorageAd
       return records;
     }
     return Object.freeze(records.filter((record) => matchesDatasetInstanceImageRecordQuery(record, query)));
+  }
+
+  public queryImageRecordPageBySystemId(
+    input: QueryDatasetInstanceImageRecordPageBySystemIdRequest,
+  ): QueryDatasetInstanceImageRecordPageResult {
+    const systemId = normalizeOptional(input.systemId);
+    const instanceId = normalizeOptional(input.instanceId);
+    if (!systemId || !instanceId) {
+      return Object.freeze({
+        items: Object.freeze([]),
+        totalCount: 0,
+        offset: 0,
+        limit: 0,
+      });
+    }
+
+    const normalizedQuery = normalizeDatasetInstanceImageRecordQuery(input.query);
+    const offset = Math.max(0, Math.floor(input.window.offset));
+    const limit = Math.max(1, Math.floor(input.window.limit));
+    const records = this.queryImageRecordsBySystemId({
+      systemId,
+      instanceId,
+      query: normalizedQuery,
+    });
+
+    const paged = records.slice(offset, offset + limit);
+    return Object.freeze({
+      items: Object.freeze(paged),
+      totalCount: records.length,
+      offset,
+      limit,
+    });
   }
 
   public dispose(): void {

@@ -440,3 +440,18 @@ Not implemented in this slice:
   - update (`updateImageRecordInInstance` with patch contracts),
   - delete/remove (`deleteImageRecordFromInstance`, delete-all for instance).
 - Persistence remains adapter-bounded (`DatasetInstanceRepository` over `DatasetInstanceStorageAdapter` with SQLite adapter implementation), so future non-image dataset intents can reuse the same runtime boundary pattern without leaking backend details.
+
+## Direction 5 extension update: dataset preview optimization + operational lineage hooks (stories 1.3.11-1.3.12)
+
+- Dataset preview access now supports bounded windowed retrieval through internal runtime contracts (`queryImageRecordPageBySystemId`, `listImageRecordPageForInstance`) so large collections do not require eager full-list retrieval in preview flows.
+- `DatasetInstancePreviewService` now keeps preview optimization behind the service boundary:
+  - consumes repository-backed paged retrieval,
+  - emits bounded payload-size inspectability (`payloadSizeBytes`),
+  - uses an explicit bounded in-memory preview window cache for repeated access patterns (inspectable hit metadata, max-entry bound).
+- Operational dataset lineage now has a dedicated internal hook contract (`DatasetOperationalLineageSink`) with bounded in-memory implementation for this slice.
+- Runtime dataset operations now emit structured lineage events with optional workflow/system context linkage:
+  - preview access,
+  - record reads,
+  - record queries/filtering,
+  - record writes/mutations (create/update/delete).
+- Lineage instrumentation remains service-layer bound (`SystemDatasetInstanceService`, `DatasetInstancePreviewService`) to avoid scattering cross-cutting instrumentation across UI or persistence adapters.

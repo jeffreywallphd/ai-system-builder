@@ -388,3 +388,18 @@
 - `StorageBackedDatasetInstanceRepository` now owns application-level repository behavior and delegates persistence concerns through that adapter seam.
 - The existing SQLite implementation (`infrastructure/filesystem/system-runtime/SqliteDatasetInstanceRepository.ts`) now acts as a backend adapter, preserving current behavior while allowing alternate backends to be introduced without changing `SystemDatasetInstanceService` or preview/query flows.
 - Image-record storage validation for system ownership is now centralized at the repository boundary, so adapter implementations can stay focused on backend persistence mechanics.
+
+## Direction 5 extension update: dataset preview optimization + operational lineage hooks (stories 1.3.11-1.3.12)
+
+- Dataset preview access now supports bounded windowed retrieval through internal runtime contracts (`queryImageRecordPageBySystemId`, `listImageRecordPageForInstance`) so large collections do not require eager full-list retrieval in preview flows.
+- `DatasetInstancePreviewService` now keeps preview optimization behind the service boundary:
+  - consumes repository-backed paged retrieval,
+  - emits bounded payload-size inspectability (`payloadSizeBytes`),
+  - uses an explicit bounded in-memory preview window cache for repeated access patterns (inspectable hit metadata, max-entry bound).
+- Operational dataset lineage now has a dedicated internal hook contract (`DatasetOperationalLineageSink`) with bounded in-memory implementation for this slice.
+- Runtime dataset operations now emit structured lineage events with optional workflow/system context linkage:
+  - preview access,
+  - record reads,
+  - record queries/filtering,
+  - record writes/mutations (create/update/delete).
+- Lineage instrumentation remains service-layer bound (`SystemDatasetInstanceService`, `DatasetInstancePreviewService`) to avoid scattering cross-cutting instrumentation across UI or persistence adapters.

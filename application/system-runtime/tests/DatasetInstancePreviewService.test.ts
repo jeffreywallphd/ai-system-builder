@@ -142,6 +142,9 @@ describe("DatasetInstancePreviewService", () => {
     expect(preview.items[0]?.height).toBeGreaterThan(0);
     expect(preview.items[0]?.format.length).toBeGreaterThan(0);
     expect(preview.inspection.metadataFieldsPerItemLimit).toBe(8);
+    expect(preview.inspection.payloadSizeBytes).toBeGreaterThan(0);
+    expect(preview.inspection.cache.enabled).toBeTrue();
+    expect(preview.inspection.cache.hit).toBeFalse();
   });
 
   it("supports offset-based window retrieval and inspection warnings", async () => {
@@ -203,6 +206,7 @@ describe("DatasetInstancePreviewService", () => {
     expect(preview.window.hasNextWindow).toBeTrue();
     expect(preview.items[0]?.recordId).toBe("preview-window-2");
     expect(preview.inspection.recordValidationWarnings).toHaveLength(0);
+    expect(preview.inspection.payloadSizeBytes).toBeGreaterThan(0);
   });
 
   it("applies query filters to preview listings while preserving ownership boundaries", async () => {
@@ -283,5 +287,44 @@ describe("DatasetInstancePreviewService", () => {
       systemId: "system:other",
       instanceId: instance.instanceId,
     })).toThrow("is owned by system 'system:image-pipeline'");
+  });
+
+  it("reuses cached preview windows for repeated access patterns", async () => {
+    const { previewService, datasetService } = createServices();
+    const instance = await datasetService.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:preview-cache",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+
+    await datasetService.ingestImageRecordIntoInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      recordId: "preview-cache-1",
+      record: {
+        assetRef: { assetId: "asset:image:preview-cache-1" },
+        width: 128,
+        height: 128,
+        format: "png",
+      },
+    });
+
+    const first = previewService.listImageRecordPreviews({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      limit: 1,
+      offset: 0,
+    });
+    const second = previewService.listImageRecordPreviews({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      limit: 1,
+      offset: 0,
+    });
+
+    expect(first.inspection.cache.hit).toBeFalse();
+    expect(second.inspection.cache.hit).toBeTrue();
+    expect(second.items).toEqual(first.items);
   });
 });
