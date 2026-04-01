@@ -15,6 +15,10 @@ import {
   type WorkflowTemplateWorkflowContractResolver,
 } from "./WorkflowTemplateCompositionResolver";
 import { applyWorkflowTemplateParameterDefaults } from "./WorkflowTemplateParameterizationService";
+import { WorkflowTemplateInstantiationService, type InstantiateWorkflowTemplateCommand } from "./WorkflowTemplateInstantiationService";
+import { WorkflowTemplatePreviewService } from "./WorkflowTemplatePreviewService";
+import type { WorkflowTemplateInstance } from "../../domain/workflow-template-studio/WorkflowTemplateInstanceDomain";
+import type { WorkflowTemplatePreview } from "../../domain/workflow-template-studio/WorkflowTemplatePreviewDomain";
 
 export interface SaveWorkflowTemplateCommand {
   readonly definition: WorkflowTemplateDefinition;
@@ -112,6 +116,15 @@ export class WorkflowTemplateAssetService {
     return new WorkflowTemplateCompositionResolver(this.assetCatalog, this.workflowContractResolver).resolve(template);
   }
 
+
+
+  public async instantiateTemplate(command: InstantiateWorkflowTemplateCommand): Promise<WorkflowTemplateInstance> {
+    return new WorkflowTemplateInstantiationService(this).instantiate(command);
+  }
+
+  public async previewTemplate(templateId: string, versionId?: string): Promise<WorkflowTemplatePreview | undefined> {
+    return new WorkflowTemplatePreviewService(this).buildPreview(templateId, versionId);
+  }
   public applyParameterDefaults(input: {
     readonly template: WorkflowTemplateDefinition;
     readonly overrides?: Readonly<Record<string, unknown>>;
