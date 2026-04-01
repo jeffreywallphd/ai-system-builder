@@ -35,13 +35,19 @@ export interface DatasetInstanceImageRecordProvenance {
 
 export interface DatasetInstanceImageRecordQuery {
   readonly format?: string;
+  readonly mimeType?: string;
   readonly tag?: string;
+  readonly tagsAny?: ReadonlyArray<string>;
+  readonly tagsAll?: ReadonlyArray<string>;
   readonly minWidth?: number;
   readonly maxWidth?: number;
   readonly minHeight?: number;
   readonly maxHeight?: number;
   readonly assetRefStableId?: string;
+  readonly recordIds?: ReadonlyArray<string>;
+  readonly storageReference?: string;
   readonly metadata?: Readonly<Record<string, CanonicalRecordPrimitiveValue>>;
+  readonly derived?: Readonly<Record<string, CanonicalRecordPrimitiveValue>>;
 }
 
 export interface DatasetInstanceImageRecordMetadataPatch {
@@ -63,9 +69,16 @@ export interface DatasetInstanceImagePatch {
   readonly mimeType?: string | null;
   readonly metadataPatch?: DatasetInstanceImageRecordMetadataPatch;
   readonly tags?: ReadonlyArray<string>;
+  readonly tagsPatch?: DatasetInstanceImageTagPatch;
   readonly derived?: Readonly<Record<string, CanonicalRecordValue>> | null;
   readonly annotations?: Readonly<Record<string, CanonicalRecordValue>> | null;
   readonly schemaVersion?: string | null;
+}
+
+export interface DatasetInstanceImageTagPatch {
+  readonly add?: ReadonlyArray<string>;
+  readonly remove?: ReadonlyArray<string>;
+  readonly replace?: ReadonlyArray<string>;
 }
 
 export interface DatasetInstanceImageRecordPatch {
@@ -197,6 +210,35 @@ function normalizeDimensionFilter(value: number | undefined, label: string): num
   return value;
 }
 
+function normalizeStringList(values: ReadonlyArray<string> | undefined): ReadonlyArray<string> | undefined {
+  if (!values) {
+    return undefined;
+  }
+  const normalized = [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+  return normalized.length > 0 ? Object.freeze(normalized) : undefined;
+}
+
+function applyTagPatch(
+  current: ReadonlyArray<string>,
+  patch?: DatasetInstanceImageTagPatch,
+): ReadonlyArray<string> {
+  if (!patch) {
+    return current;
+  }
+  const replace = normalizeStringList(patch.replace);
+  if (replace) {
+    return replace;
+  }
+  const next = new Set(current);
+  for (const tag of normalizeStringList(patch.add) ?? []) {
+    next.add(tag);
+  }
+  for (const tag of normalizeStringList(patch.remove) ?? []) {
+    next.delete(tag);
+  }
+  return Object.freeze([...next]);
+}
+
 export function createDatasetInstanceImageRecord(input: {
   readonly recordId: string;
   readonly instanceId: string;
@@ -283,6 +325,12 @@ export function patchDatasetInstanceImageRecord(input: {
   const nextImageMetadata = imagePatch
     ? applyMetadataPatch(input.record.image.metadata, imagePatch.metadataPatch)
     : input.record.image.metadata;
+  const nextImageTags = imagePatch
+    ? applyTagPatch(
+      imagePatch.tags ?? input.record.image.tags,
+      imagePatch.tagsPatch,
+    )
+    : input.record.image.tags;
   const nextImage = createImageRecord({
     assetRef: imagePatch?.assetRef ?? input.record.image.assetRef,
     width: imagePatch?.width ?? input.record.image.width,
@@ -292,7 +340,7 @@ export function patchDatasetInstanceImageRecord(input: {
       ? undefined
       : imagePatch?.mimeType ?? input.record.image.mimeType,
     metadata: nextImageMetadata,
-    tags: imagePatch?.tags ?? input.record.image.tags,
+    tags: nextImageTags,
     derived: imagePatch?.derived === null
       ? undefined
       : imagePatch?.derived ?? input.record.image.derived,
@@ -351,13 +399,25 @@ export function normalizeDatasetInstanceImageRecordQuery(
     : undefined;
   const normalized = Object.freeze({
     format: normalizeOptional(input.format)?.toLowerCase(),
+    mimeType: normalizeOptional(input.mimeType)?.toLowerCase(),
     tag: normalizeOptional(input.tag),
+    tagsAny: normalizeStringList(input.tagsAny),
+    tagsAll: normalizeStringList(input.tagsAll),
     minWidth: normalizeDimensionFilter(input.minWidth, "query.minWidth"),
     maxWidth: normalizeDimensionFilter(input.maxWidth, "query.maxWidth"),
     minHeight: normalizeDimensionFilter(input.minHeight, "query.minHeight"),
     maxHeight: normalizeDimensionFilter(input.maxHeight, "query.maxHeight"),
     assetRefStableId: normalizeOptional(input.assetRefStableId),
+    recordIds: normalizeStringList(input.recordIds),
+    storageReference: normalizeOptional(input.storageReference),
     metadata,
+    derived: input.derived
+      ? Object.freeze(Object.fromEntries(
+        Object.entries(input.derived)
+          .map(([key, value]) => [key.trim(), value] as const)
+          .filter(([key]) => key.length > 0),
+      ))
+      : undefined,
   } satisfies DatasetInstanceImageRecordQuery);
 
   if (normalized.minWidth && normalized.maxWidth && normalized.minWidth > normalized.maxWidth) {
@@ -384,7 +444,16 @@ export function matchesDatasetInstanceImageRecordQuery(
   if (normalized.format && record.image.format.toLowerCase() !== normalized.format) {
     return false;
   }
+  if (normalized.mimeType && record.image.mimeType?.toLowerCase() !== normalized.mimeType) {
+    return false;
+  }
   if (normalized.tag && !record.image.tags.includes(normalized.tag)) {
+    return false;
+  }
+  if (normalized.tagsAny && !normalized.tagsAny.some((tag) => record.image.tags.includes(tag))) {
+    return false;
+  }
+  if (normalized.tagsAll && !normalized.tagsAll.every((tag) => record.image.tags.includes(tag))) {
     return false;
   }
   if (normalized.minWidth !== undefined && record.image.width < normalized.minWidth) {
@@ -402,9 +471,22 @@ export function matchesDatasetInstanceImageRecordQuery(
   if (normalized.assetRefStableId && record.image.assetRef.stableId !== normalized.assetRefStableId) {
     return false;
   }
+  if (normalized.recordIds && !normalized.recordIds.includes(record.recordId)) {
+    return false;
+  }
+  if (normalized.storageReference && record.storage?.reference !== normalized.storageReference) {
+    return false;
+  }
   if (normalized.metadata) {
     for (const [key, expected] of Object.entries(normalized.metadata)) {
       if (record.image.metadata[key] !== expected) {
+        return false;
+      }
+    }
+  }
+  if (normalized.derived) {
+    for (const [key, expected] of Object.entries(normalized.derived)) {
+      if (record.image.derived?.[key] !== expected) {
         return false;
       }
     }
