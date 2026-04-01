@@ -25,6 +25,10 @@ describe("materializeWorkflowOutputRecords", () => {
             workflowAssetId: "asset:workflow:image-edit",
             workflowRunId: "run:1",
             sourceImageStableIds: ["source:1"],
+            sourceDatasetAssetId: "asset:dataset:input",
+            sourceDatasetAssetVersionId: "v5",
+            sourceDatasetInstanceId: "instance:input",
+            sourceRecordIds: ["record:input:1"],
           },
           recordEnvelope: {
             metadata: { bindingScope: "output" },
@@ -75,6 +79,12 @@ describe("materializeWorkflowOutputRecords", () => {
           bindingScope: "output",
           seed: 9,
           parameterContext: { prompt: "enhance detail" },
+          lineage: expect.objectContaining({
+            workflowAssetId: "asset:workflow:image-edit",
+            sourceDatasetAssetId: "asset:dataset:input",
+            sourceRecordIds: ["record:input:1"],
+            bindingTarget: expect.objectContaining({ targetType: "output-dataset" }),
+          }),
         }),
       }),
       generation: expect.objectContaining({
@@ -107,6 +117,14 @@ describe("materializeWorkflowOutputRecords", () => {
           workflowAssetVersionId: "v2",
           workflowRunId: "run:1",
           sourceImageStableIds: ["source:a"],
+          outputRelationship: {
+            relationshipType: "workflow-output-history",
+            direction: "captured-in-history",
+            reusable: true,
+            audit: true,
+            introspection: true,
+            metadata: { lane: "history" },
+          },
         },
         recordEnvelope: {
           metadata: { sourceContext: "user-upload" },
@@ -160,6 +178,10 @@ describe("materializeWorkflowOutputRecords", () => {
       parameterContext: { prompt: "vivid" },
     }));
     expect(run1.records[0]?.generation.outputGroupId).toBe("history:run:1:images");
+    expect((run1.records[0]?.record.metadata.lineage as Record<string, unknown>).outputRelationship).toEqual(expect.objectContaining({
+      relationshipType: "workflow-output-history",
+      direction: "captured-in-history",
+    }));
     expect(run2.records[0]?.generation.outputGroupId).toBe("history:run:2:images");
   });
 
@@ -227,6 +249,9 @@ describe("materializeWorkflowOutputRecords", () => {
       comparisonSetId: "comparison-set:hero-vs-variants",
       comparisonMemberId: "comparison:binding:comparison:run:7:0",
       comparisonAxis: "style",
+      lineage: expect.objectContaining({
+        bindingTarget: expect.objectContaining({ targetType: "comparison-dataset" }),
+      }),
     }));
   });
 

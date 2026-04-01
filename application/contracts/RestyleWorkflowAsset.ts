@@ -15,6 +15,10 @@ import {
   type ImageWorkflowComposition,
 } from "./ImageWorkflowComposition";
 import { createImageWorkflowAssetPreview, type ImageWorkflowAssetPreview } from "./ImageWorkflowAssetPreview";
+import {
+  createImageWorkflowOutputBindingConfiguration,
+  type ImageWorkflowOutputBindingConfiguration,
+} from "./ImageWorkflowOutputBindingConfiguration";
 
 export const RestyleWorkflowAssetId = "image-workflow.restyle";
 export const RestyleWorkflowAssetVersion = "1.0.0";
@@ -35,12 +39,23 @@ export interface RestyleWorkflowAsset {
   readonly configuration: RestyleWorkflowAssetConfig;
   readonly composition: ImageWorkflowComposition;
   readonly inputBindings: ImageWorkflowInputBindingConfiguration;
+  readonly outputBindings: ImageWorkflowOutputBindingConfiguration;
   readonly bindings: Readonly<{
     readonly sourceImageFieldId: "sourceImage";
     readonly stylePresetFieldId: "stylePreset";
     readonly outputFieldId: "images";
   }>;
   readonly preview: ImageWorkflowAssetPreview;
+}
+
+function buildDefaultOutputBindings(): ImageWorkflowOutputBindingConfiguration {
+  return createImageWorkflowOutputBindingConfiguration({
+    bindings: [
+      { bindingId: "binding.output.primary", outputId: "images", targetType: "output-dataset", targetId: "workflow-output", writeMode: "upsert", defaultTags: ["output"] },
+      { bindingId: "binding.output.history", outputId: "images", targetType: "history-dataset", targetId: "workflow-output-history", writeMode: "append", defaultTags: ["history"] },
+      { bindingId: "binding.output.comparison", outputId: "images", targetType: "comparison-dataset", targetId: "workflow-output-comparison", writeMode: "append", groupBy: "comparison:restyle", defaultTags: ["comparison"] },
+    ],
+  });
 }
 
 function buildRestyleComposition(): ImageWorkflowComposition {
@@ -115,6 +130,7 @@ function buildRestyleComposition(): ImageWorkflowComposition {
 export function createRestyleWorkflowAsset(input?: {
   readonly configuration?: unknown;
   readonly inputBindings?: ImageWorkflowInputBindingConfiguration["bindings"];
+  readonly outputBindings?: unknown;
 }): RestyleWorkflowAsset {
   const contract = CoreImageWorkflowAssetTypeContracts[ImageWorkflowAssetIntentTypes.restyle];
   const configuration = RestyleWorkflowAssetConfigSchema.parse(input?.configuration ?? {});
@@ -144,6 +160,8 @@ export function createRestyleWorkflowAsset(input?: {
     ],
   });
 
+  const outputBindings = createImageWorkflowOutputBindingConfiguration(input?.outputBindings ?? buildDefaultOutputBindings());
+
   return Object.freeze({
     id: RestyleWorkflowAssetId,
     version: RestyleWorkflowAssetVersion,
@@ -152,6 +170,7 @@ export function createRestyleWorkflowAsset(input?: {
     configuration,
     composition,
     inputBindings,
+    outputBindings,
     bindings: Object.freeze({
       sourceImageFieldId: "sourceImage",
       stylePresetFieldId: "stylePreset",

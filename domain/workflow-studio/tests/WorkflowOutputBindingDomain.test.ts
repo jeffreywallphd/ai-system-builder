@@ -30,6 +30,8 @@ describe("WorkflowOutputBindingDomain", () => {
         workflowAssetId: "asset:workflow:image",
         workflowAssetVersionId: "v1",
         workflowRunId: "run:1",
+        sourceDatasetAssetId: "asset:dataset:input",
+        sourceDatasetInstanceId: "instance:input",
       },
       persistence: {
         systemId: "system:image",
@@ -41,6 +43,8 @@ describe("WorkflowOutputBindingDomain", () => {
     expect(descriptor.contractVersion).toBe("1.0.0");
     expect(descriptor.records[0]?.tags).toEqual(["hero", "primary"]);
     expect(descriptor.persistence.datasetInstanceId).toBe("instance:output");
+    expect(descriptor.lineage.sourceRecordIds).toEqual([]);
+    expect(descriptor.lineage.outputRelationship.relationshipType).toBe("workflow-output-binding");
   });
 
   it("maps canonical target types to default intent/write semantics while remaining extensible", () => {

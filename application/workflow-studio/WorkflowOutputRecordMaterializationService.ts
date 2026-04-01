@@ -139,6 +139,33 @@ export function materializeWorkflowOutputRecords(
         ...(planItem.target.targetType === WorkflowOutputTargetTypes.historyDataset ? ["history-entry"] : []),
         ...(planItem.target.targetType === WorkflowOutputTargetTypes.comparisonDataset ? ["comparison-member"] : []),
       ]);
+      const lineageMetadata: Record<string, CanonicalRecordValue> = {
+        workflowAssetId: planItem.lineage.workflowAssetId,
+        workflowAssetVersionId: planItem.lineage.workflowAssetVersionId ?? request.workflowRun.workflowAssetVersionId ?? null,
+        workflowRunId: planItem.lineage.workflowRunId,
+        sourceImageStableIds: planItem.lineage.sourceImageStableIds,
+        sourceDatasetAssetId: planItem.lineage.sourceDatasetAssetId ?? null,
+        sourceDatasetAssetVersionId: planItem.lineage.sourceDatasetAssetVersionId ?? null,
+        sourceDatasetInstanceId: planItem.lineage.sourceDatasetInstanceId ?? null,
+        sourceRecordIds: planItem.lineage.sourceRecordIds,
+        bindingTarget: Object.freeze({
+          targetType: planItem.target.targetType,
+          targetId: planItem.target.targetId,
+          datasetInstanceId: planItem.target.datasetInstanceId,
+          datasetAssetId: planItem.target.datasetAssetId,
+          datasetAssetVersionId: planItem.target.datasetAssetVersionId ?? null,
+          groupBy: planItem.target.groupBy ?? null,
+        }),
+        outputRelationship: Object.freeze({
+          relationshipType: planItem.lineage.outputRelationship?.relationshipType ?? "workflow-output-binding",
+          direction: planItem.lineage.outputRelationship?.direction ?? "produced-to-target",
+          reusable: planItem.lineage.outputRelationship?.reusable ?? true,
+          audit: planItem.lineage.outputRelationship?.audit ?? true,
+          introspection: planItem.lineage.outputRelationship?.introspection ?? true,
+          metadata: planItem.lineage.outputRelationship?.metadata ?? {},
+        }),
+      };
+
       const metadata: Record<string, CanonicalRecordValue> = {
         outputId: planItem.outputId,
         bindingId: planItem.bindingId,
@@ -152,6 +179,7 @@ export function materializeWorkflowOutputRecords(
         targetDatasetInstanceId: planItem.target.datasetInstanceId,
         outputGroupId,
         sourceImageStableIds: planItem.lineage.sourceImageStableIds,
+        lineage: lineageMetadata,
         ...(request.parameterContext ? { parameterContext: request.parameterContext } : {}),
         ...(planItem.recordEnvelope.metadata as Record<string, CanonicalRecordValue>),
         ...(image.metadata ?? {}),

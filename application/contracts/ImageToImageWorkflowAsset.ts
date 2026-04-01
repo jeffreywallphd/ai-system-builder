@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { createImageWorkflowAssetPreview, type ImageWorkflowAssetPreview } from "./ImageWorkflowAssetPreview";
 import {
+  createImageWorkflowOutputBindingConfiguration,
+  type ImageWorkflowOutputBindingConfiguration,
+} from "./ImageWorkflowOutputBindingConfiguration";
+import {
   createImageWorkflowInputBindingConfiguration,
   type ImageWorkflowInputBindingConfiguration,
 } from "./ImageWorkflowInputBindingConfiguration";
@@ -35,12 +39,49 @@ export interface ImageToImageWorkflowAsset {
   readonly configuration: ImageToImageWorkflowAssetConfig;
   readonly composition: ImageWorkflowComposition;
   readonly inputBindings: ImageWorkflowInputBindingConfiguration;
+  readonly outputBindings: ImageWorkflowOutputBindingConfiguration;
   readonly bindings: Readonly<{
     readonly sourceImageFieldId: "sourceImage";
     readonly promptFieldId: "instruction";
     readonly outputFieldId: "images";
   }>;
   readonly preview: ImageWorkflowAssetPreview;
+}
+
+
+function buildDefaultOutputBindings(): ImageWorkflowOutputBindingConfiguration {
+  return createImageWorkflowOutputBindingConfiguration({
+    bindings: [
+      {
+        bindingId: "binding.output.primary",
+        outputId: "images",
+        targetType: "output-dataset",
+        targetId: "workflow-output",
+        writeMode: "upsert",
+        targetMetadata: { view: "primary" },
+        defaultTags: ["output"],
+      },
+      {
+        bindingId: "binding.output.history",
+        outputId: "images",
+        targetType: "history-dataset",
+        targetId: "workflow-output-history",
+        writeMode: "append",
+        targetMetadata: { view: "history" },
+        defaultTags: ["history"],
+      },
+      {
+        bindingId: "binding.output.comparison",
+        outputId: "images",
+        targetType: "comparison-dataset",
+        targetId: "workflow-output-comparison",
+        writeMode: "append",
+        groupBy: "comparison:image-to-image",
+        targetMetadata: { view: "comparison" },
+        defaultTags: ["comparison"],
+      },
+    ],
+  });
 }
 
 function buildImageToImageComposition(): ImageWorkflowComposition {
@@ -178,6 +219,7 @@ function buildImageToImageComposition(): ImageWorkflowComposition {
 export function createImageToImageWorkflowAsset(input?: {
   readonly configuration?: unknown;
   readonly inputBindings?: ImageWorkflowInputBindingConfiguration["bindings"];
+  readonly outputBindings?: unknown;
 }): ImageToImageWorkflowAsset {
   const contract = CoreImageWorkflowAssetTypeContracts[ImageWorkflowAssetIntentTypes.imageToImage];
   const configuration = ImageToImageWorkflowAssetConfigSchema.parse(input?.configuration ?? {});
@@ -209,6 +251,8 @@ export function createImageToImageWorkflowAsset(input?: {
     ],
   });
 
+  const outputBindings = createImageWorkflowOutputBindingConfiguration(input?.outputBindings ?? buildDefaultOutputBindings());
+
   return Object.freeze({
     id: ImageToImageWorkflowAssetId,
     version: ImageToImageWorkflowAssetVersion,
@@ -217,6 +261,7 @@ export function createImageToImageWorkflowAsset(input?: {
     configuration,
     composition,
     inputBindings,
+    outputBindings,
     bindings: Object.freeze({
       sourceImageFieldId: "sourceImage",
       promptFieldId: "instruction",
