@@ -54,6 +54,15 @@ export interface DataAssetRegistryCapabilities {
   readonly executable: boolean;
 }
 
+export interface DataAssetRegistryVersioningMetadata {
+  readonly datasetVersionId?: string;
+  readonly schemaVersion: string;
+  readonly contractVersion: string;
+  readonly revision: number;
+  readonly publishedVersionId?: string;
+  readonly schemaIntentContractVersion: string;
+}
+
 export interface DataAssetRegistryInspectabilityMetadata {
   readonly supportedSourceKinds: ReadonlyArray<string>;
   readonly supportedFileExtensions: ReadonlyArray<string>;
@@ -82,6 +91,7 @@ export interface DataAssetRegistryDescriptor {
   readonly assetId: string;
   readonly versionId?: string;
   readonly version: DataAssetVersionDescriptor;
+  readonly versioning: DataAssetRegistryVersioningMetadata;
   readonly name: string;
   readonly category: string;
   readonly taxonomy: CompositionTaxonomyDescriptor;
@@ -232,6 +242,14 @@ function toDescriptor(input: {
     assetId: inspection.metadata.identity.assetId,
     versionId: inspection.metadata.identity.versionId,
     version: inspection.metadata.version,
+    versioning: Object.freeze({
+      datasetVersionId: inspection.metadata.versioning.datasetVersionId,
+      schemaVersion: inspection.metadata.versioning.schemaVersion,
+      contractVersion: inspection.metadata.versioning.contractVersion,
+      revision: inspection.metadata.versioning.revision,
+      publishedVersionId: inspection.metadata.versioning.publishedVersionId,
+      schemaIntentContractVersion: input.schemaIntent.descriptor.contractVersion,
+    } satisfies DataAssetRegistryVersioningMetadata),
     name: inspection.metadata.display.name,
     category: input.category.trim() || "dataset",
     taxonomy: input.taxonomy,

@@ -10,6 +10,10 @@ import type {
   WorkflowDraftStepType,
   WorkflowValidationIssue,
 } from "../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  buildWorkflowDatasetCompatibilityContract,
+  type WorkflowDatasetCompatibilityContract,
+} from "./WorkflowDatasetCompatibilityContracts";
 
 export const WorkflowExecutionValidationStages = Object.freeze({
   preTranslation: "pre-translation",
@@ -66,6 +70,7 @@ export interface WorkflowExecutionResolvedDatasetAsset {
   readonly versionId?: string;
   readonly format?: "jsonl" | "json" | "csv" | "parquet";
   readonly selection?: Readonly<Record<string, unknown>>;
+  readonly compatibility?: WorkflowDatasetCompatibilityContract;
 }
 
 export interface WorkflowExecutionResolvedInputValue {
@@ -107,6 +112,7 @@ export interface WorkflowExecutionInputBinding {
     readonly versionId?: string;
     readonly format?: "jsonl" | "json" | "csv" | "parquet";
     readonly selection?: Readonly<Record<string, unknown>>;
+    readonly compatibility?: WorkflowDatasetCompatibilityContract;
   }>;
 }
 
@@ -343,6 +349,11 @@ export function createTranslationSuccessResult<TPlan>(
 
 export function mapWorkflowInputToExecutionBinding(input: WorkflowDraftInput): WorkflowExecutionInputBinding {
   if (input.sourceType === "dataset-asset") {
+    const compatibility = buildWorkflowDatasetCompatibilityContract({
+      assetId: input.asset.assetId,
+      versionId: input.asset.versionId,
+      selection: input.selection,
+    });
     return Object.freeze({
       inputId: input.id,
       sourceType: input.sourceType,
@@ -354,6 +365,7 @@ export function mapWorkflowInputToExecutionBinding(input: WorkflowDraftInput): W
         versionId: input.asset.versionId,
         format: input.format,
         selection: input.selection ? Object.freeze({ ...input.selection }) : undefined,
+        compatibility,
       }),
     });
   }

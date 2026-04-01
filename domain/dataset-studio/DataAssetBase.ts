@@ -62,10 +62,19 @@ export interface DataAssetCapabilityMetadata {
   readonly executable: boolean;
 }
 
+export interface DataAssetInspectableVersionMetadata {
+  readonly datasetVersionId?: string;
+  readonly schemaVersion: string;
+  readonly contractVersion: string;
+  readonly revision: number;
+  readonly publishedVersionId?: string;
+}
+
 export interface DataAssetMetadataSnapshot {
   readonly identity: DataAssetIdentityMetadata;
   readonly display: DataAssetDisplayMetadata;
   readonly version: DataAssetVersionDescriptor;
+  readonly versioning: DataAssetInspectableVersionMetadata;
   readonly contracts: DataAssetContractReferenceMetadata;
   readonly capabilities: DataAssetCapabilityMetadata;
   readonly configKeys: ReadonlyArray<string>;
@@ -258,6 +267,13 @@ export abstract class DataAssetBase extends Asset {
         tags,
       } satisfies DataAssetDisplayMetadata),
       version: parseDataAssetVersion(versionId),
+      versioning: Object.freeze({
+        datasetVersionId: versionId,
+        schemaVersion: this.versionMetadata.schemaVersion,
+        contractVersion: this.contract.version,
+        revision: this.versionMetadata.revision,
+        publishedVersionId: this.versionMetadata.publishedVersionId,
+      } satisfies DataAssetInspectableVersionMetadata),
       contracts: Object.freeze({
         input: this.contract.input!,
         output: this.contract.output!,

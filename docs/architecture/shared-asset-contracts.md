@@ -278,3 +278,20 @@ Not implemented in this slice:
 - Shared preview compatibility is preserved and extended:
   - `ImageDatasetPreviewBuilder` and Data Studio preview surface now expose annotations in image preview rows
   - records without annotations remain backward-compatible.
+
+## Direction 5 extension update: media versioning + workflow compatibility contracts (stories 1.1.11-1.1.12)
+
+- Media dataset assets now expose inspectable versioning through the same shared dataset-asset inspection/registry seams:
+  - dataset version id,
+  - dataset schema version,
+  - dataset contract version,
+  - revision,
+  - published version id,
+  - schema-intent contract version.
+- Canonical image-record version handling now has explicit bounded compatibility rules in a shared domain helper (`domain/dataset-studio/contracts/ImageRecordVersioning.ts`) that reuses existing dataset version parsing/comparison conventions instead of creating a media-only versioning stack.
+- Media validation now enforces bounded image-record schema-version compatibility (invalid/incompatible versions fail validation) while preserving backward-safe defaults for legacy records with missing schema-version declarations.
+- Workflow dataset-input contracts now include an inspectable compatibility descriptor seam (`application/workflow-studio/WorkflowDatasetCompatibilityContracts.ts`) on the existing input-binding/context-assembly path (no parallel workflow pathway):
+  - generic dataset-reference compatibility for all dataset inputs,
+  - media image-record compatibility contracts when inputs declare media intent (`schemaIntentId=media` / `shapeKind=image-metadata-records` / `recordContract=image-record`),
+  - stable workflow-facing media fields: `assetRef`, `width`, `height`, `format`, `metadata`, `tags`, `derived`, `annotations`,
+  - optional selected-field subset projection for bounded dataset-selection compatibility.

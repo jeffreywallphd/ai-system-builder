@@ -68,6 +68,13 @@ describe("DataAssetBase", () => {
 
     expect(inspection.metadata.identity.assetId).toBe("dataset-asset-1");
     expect(inspection.metadata.version.scheme).toBe("label");
+    expect(inspection.metadata.versioning).toEqual({
+      datasetVersionId: "v1",
+      schemaVersion: "1.0.0",
+      contractVersion: "1.1.0",
+      revision: 3,
+      publishedVersionId: "dataset-published-v1",
+    });
     expect(inspection.outputShapeKind).toBe("records");
     expect(inspection.metadata.dependencies).toHaveLength(1);
 
