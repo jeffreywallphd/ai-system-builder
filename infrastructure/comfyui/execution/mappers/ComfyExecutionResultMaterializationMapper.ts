@@ -36,6 +36,9 @@ export class ComfyExecutionResultMaterializationMapper {
     const producedAssets = request.result.outputs
       .filter((output) => output.kind === "image")
       .map((output, index) => Object.freeze({
+        outputIndex: index,
+        outputGroupId: this.resolveOutputGroupId(request.result.executionId, output, request.sourceImageRef?.stableId),
+        sourceImageRef: request.sourceImageRef,
         assetRef: Object.freeze({
           kind: "generated-output" as const,
           assetId: output.assetRef?.assetId ?? output.reference,
@@ -115,6 +118,19 @@ export class ComfyExecutionResultMaterializationMapper {
 
   private normalizeTags(tags: ReadonlyArray<string>): ReadonlyArray<string> {
     return [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))];
+  }
+
+  private resolveOutputGroupId(
+    executionId: string,
+    output: IComfyAdapterResult["outputs"][number],
+    sourceStableId?: string,
+  ): string {
+    const metadata = this.toCanonicalRecord(output.metadata ?? {});
+    const explicitGroupId = this.readOptionalString(metadata.outputGroupId)
+      ?? this.readOptionalString(metadata.groupId)
+      ?? this.readOptionalString(metadata.batchGroupId)
+      ?? this.readOptionalString(sourceStableId);
+    return explicitGroupId ?? `run:${executionId}`;
   }
 
   private toCanonicalRecord(input: unknown): Readonly<Record<string, CanonicalRecordValue>> {

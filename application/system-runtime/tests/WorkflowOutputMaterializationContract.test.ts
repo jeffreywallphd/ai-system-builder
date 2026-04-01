@@ -63,6 +63,8 @@ describe("WorkflowOutputMaterializationContract", () => {
           {
             assetRef: { assetId: "asset:image:output:2" },
             role: DatasetInstanceImageGenerationRoles.variant,
+            outputIndex: 4,
+            outputGroupId: "batch:source:2",
             metadata: { strength: 0.35 },
             tags: ["variant", "v2", "variant"],
           },
@@ -80,6 +82,8 @@ describe("WorkflowOutputMaterializationContract", () => {
     expect(generation.workflowAssetId).toBe("asset:workflow:image-system");
     expect(generation.runId).toBe("run-2");
     expect(generation.role).toBe("variant");
+    expect(generation.outputIndex).toBe(4);
+    expect(generation.outputGroupId).toBe("batch:source:2");
     expect(generation.tags).toEqual(["variant", "v2"]);
     expect(generation.metadata.materializationId).toBe("mat:run-2");
   });

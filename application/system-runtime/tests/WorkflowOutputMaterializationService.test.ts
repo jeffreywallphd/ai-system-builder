@@ -70,6 +70,8 @@ describe("WorkflowOutputMaterializationService", () => {
               outputId: "asset:workflow-output:1",
             },
             role: "primary",
+            outputIndex: 0,
+            outputGroupId: "run:1:source:seed",
             metadata: {
               width: 768,
               height: 512,
@@ -85,6 +87,8 @@ describe("WorkflowOutputMaterializationService", () => {
               outputId: "asset:workflow-output:2",
             },
             role: "variant",
+            outputIndex: 1,
+            outputGroupId: "run:1:source:seed",
             metadata: {
               width: 768,
               height: 512,
@@ -111,6 +115,9 @@ describe("WorkflowOutputMaterializationService", () => {
     expect(result.records[1]?.image.format).toBe("webp");
     expect(result.records[0]?.generation?.runId).toBe("run:1");
     expect(result.records[0]?.generation?.metadata.materializationId).toBe("mat:run:1");
+    expect(result.records[0]?.generation?.outputIndex).toBe(0);
+    expect(result.records[0]?.generation?.outputGroupId).toBe("run:1:source:seed");
+    expect(result.records[1]?.generation?.outputIndex).toBe(1);
 
     const persisted = datasetInstances.listImageRecordsForInstance({
       systemId: "system:image",
@@ -156,6 +163,9 @@ describe("WorkflowOutputMaterializationService", () => {
               stableId: "generated-output:transient-1",
             },
             role: "primary",
+            outputIndex: 2,
+            outputGroupId: "group:hero",
+            sourceImageRef: { kind: "generated-output", stableId: "generated-output:source:hero", outputId: "source:hero" },
             metadata: { width: 32, height: 32, format: "png" },
             tags: ["primary"],
             binaryPayload: {
@@ -188,7 +198,9 @@ describe("WorkflowOutputMaterializationService", () => {
     const provenance = provenanceRepository.listByWorkflowRunId("run:binary:1");
     expect(provenance).toHaveLength(1);
     expect(provenance[0]?.workflowAssetVersionId).toBe("v10");
-    expect(provenance[0]?.sourceImageStableIds).toEqual(["generated-output:source:1"]);
+    expect(provenance[0]?.sourceImageStableIds).toEqual(["generated-output:source:hero", "generated-output:source:1"]);
+    expect(provenance[0]?.outputIndex).toBe(2);
+    expect(provenance[0]?.outputGroupId).toBe("group:hero");
     expect(provenance[0]?.parameterSnapshot.prompt).toBe("hero");
     expect(provenance[0]?.capabilityContext.supportsCancellation).toBe(true);
 

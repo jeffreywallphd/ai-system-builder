@@ -106,3 +106,13 @@
 - Composition coverage now validates representative end-to-end chain behavior under internal contracts:
   - load -> VAE encode -> sampler -> VAE decode -> resize -> save
   - inspectability and normalized integration failure behavior across the composed path.
+
+## Story 2.3.7 + 2.3.8 update
+- Workflow-output materialization now supports inspectable multi-output semantics on the canonical payload contract (`WorkflowOutputMaterializationPayload`):
+  - per-output ordering (`outputIndex`),
+  - per-output grouping (`outputGroupId`),
+  - optional per-output source linkage (`sourceImageRef`),
+  - role-tagged output persistence (`primary`/`variant`/`intermediate`) under one parent workflow run/materialization id.
+- Comfy result mapping remains adapter-bounded: `ComfyExecutionResultMaterializationMapper` maps executor outputs into those canonical fields (including stable ordering/group defaults) without leaking Comfy-specific batch semantics outside the adapter.
+- System-owned dataset persistence now stores ordering/group metadata in dataset generation records plus workflow-output provenance rows, keeping run-level grouping and output-level lineage queryable and inspectable.
+- Dataset preview read models now expose generation/run/group metadata for materialized outputs so Data Studio/System Studio inspection and reuse paths can browse workflow outputs as ordinary operational image records.

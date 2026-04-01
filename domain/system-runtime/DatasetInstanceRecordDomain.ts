@@ -51,6 +51,8 @@ export interface DatasetInstanceImageGeneration {
   readonly workflowAssetVersionId?: string;
   readonly runId: string;
   readonly role: DatasetInstanceImageGenerationRole;
+  readonly outputIndex?: number;
+  readonly outputGroupId?: string;
   readonly metadata: Readonly<Record<string, CanonicalRecordValue>>;
   readonly tags: ReadonlyArray<string>;
 }
@@ -127,6 +129,8 @@ export interface DatasetInstanceImageGenerationPatch {
   readonly workflowAssetVersionId?: string | null;
   readonly runId?: string;
   readonly role?: DatasetInstanceImageGenerationRole;
+  readonly outputIndex?: number | null;
+  readonly outputGroupId?: string | null;
   readonly metadataPatch?: DatasetInstanceImageRecordMetadataPatch;
   readonly tags?: ReadonlyArray<string>;
   readonly tagsPatch?: DatasetInstanceImageTagPatch;
@@ -216,9 +220,21 @@ function normalizeGeneration(
     workflowAssetVersionId: normalizeOptional(generation.workflowAssetVersionId),
     runId: normalizeRequired(generation.runId, "Dataset instance image generation runId"),
     role: normalizeGenerationRole(generation.role),
+    outputIndex: normalizeOutputIndex(generation.outputIndex),
+    outputGroupId: normalizeOptional(generation.outputGroupId),
     metadata: normalizeMetadata(generation.metadata),
     tags: normalizeStringList(generation.tags) ?? Object.freeze([]),
   });
+}
+
+function normalizeOutputIndex(value: number | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error("DatasetInstanceImageGeneration.outputIndex must be a non-negative integer.");
+  }
+  return value;
 }
 
 function applyMetadataPatch(
@@ -400,6 +416,12 @@ export function patchDatasetInstanceImageRecord(input: {
           : generationPatch.workflowAssetVersionId ?? currentGeneration?.workflowAssetVersionId,
         runId: generationPatch.runId ?? currentGeneration?.runId ?? "",
         role: generationPatch.role ?? currentGeneration?.role ?? DatasetInstanceImageGenerationRoles.primary,
+        outputIndex: generationPatch.outputIndex === null
+          ? undefined
+          : generationPatch.outputIndex ?? currentGeneration?.outputIndex,
+        outputGroupId: generationPatch.outputGroupId === null
+          ? undefined
+          : generationPatch.outputGroupId ?? currentGeneration?.outputGroupId,
         metadata: applyMetadataPatch(currentGeneration?.metadata ?? Object.freeze({}), generationPatch.metadataPatch),
         tags: applyTagPatch(
           generationPatch.tags ?? currentGeneration?.tags ?? Object.freeze([]),
