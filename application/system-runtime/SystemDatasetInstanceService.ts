@@ -26,6 +26,12 @@ import {
   type DatasetInstanceRole,
 } from "../../domain/system-runtime/DatasetInstanceDomain";
 import {
+  WorkflowOutputTargetTypes,
+  getWorkflowOutputTargetDefinition,
+  resolveWorkflowOutputTargetPurpose,
+  type WorkflowOutputTargetType,
+} from "../../domain/system-runtime/WorkflowOutputTargetDomain";
+import {
   createDatasetInstanceImageRecord,
   deriveStorageReferenceFromImageRecord,
   patchDatasetInstanceImageRecord,
@@ -88,6 +94,16 @@ export interface EnsureOutputImageStoreInstanceRequest {
   readonly systemId: string;
   readonly datasetAssetId: string;
   readonly datasetAssetVersionId?: string;
+  readonly seedMetadata?: DatasetInstance["seedMetadata"];
+}
+
+export interface EnsureWorkflowOutputTargetInstanceRequest {
+  readonly targetType: WorkflowOutputTargetType;
+  readonly instanceId: string;
+  readonly systemId: string;
+  readonly datasetAssetId: string;
+  readonly datasetAssetVersionId?: string;
+  readonly purpose?: string;
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
 }
 
@@ -559,13 +575,33 @@ export class SystemDatasetInstanceService {
   }
 
   public async ensureOutputImageStoreInstance(request: EnsureOutputImageStoreInstanceRequest): Promise<DatasetInstance> {
+    return this.ensureWorkflowOutputTargetInstance({
+      targetType: WorkflowOutputTargetTypes.outputDataset,
+      instanceId: request.instanceId,
+      systemId: request.systemId,
+      datasetAssetId: request.datasetAssetId,
+      datasetAssetVersionId: request.datasetAssetVersionId,
+      seedMetadata: request.seedMetadata,
+    });
+  }
+
+  public async ensureWorkflowOutputTargetInstance(
+    request: EnsureWorkflowOutputTargetInstanceRequest,
+  ): Promise<DatasetInstance> {
+    const target = getWorkflowOutputTargetDefinition(request.targetType);
+    if (!target) {
+      throw new Error(`invalid-request:Workflow output target type '${request.targetType}' is not supported.`);
+    }
     return this.ensureRoleDatasetInstance({
       instanceId: request.instanceId,
       systemId: request.systemId,
       datasetAssetId: request.datasetAssetId,
       datasetAssetVersionId: request.datasetAssetVersionId,
-      role: DatasetInstanceRoles.outputStore,
-      purpose: "workflow-output-images",
+      role: target.datasetInstanceRole,
+      purpose: resolveWorkflowOutputTargetPurpose({
+        targetType: request.targetType,
+        purpose: request.purpose,
+      }),
       requiredSchemaIntentId: DatasetSchemaIntentIds.media,
       requiredOutputShapeKind: "image-metadata-records",
       seedMetadata: request.seedMetadata,
