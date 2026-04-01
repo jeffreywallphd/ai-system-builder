@@ -129,3 +129,14 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
   - Log records are machine-friendly and include execution/workflow identifiers, optional lineage/correlation refs from execution context, terminal status, duration, output count, and normalized error codes/categories where present.
 - Updated `ComfyQueueExecutionAdapter` to use centralized observability emission across request mapping, enqueue, completion, cancellation, and failure paths without leaking raw Comfy payloads into log records.
 - Added tests for configuration validation/defaulting/env loading, config-driven client construction, queue polling timeout behavior from canonical config, and structured lifecycle log emission with context correlation.
+
+## Story 2.1.11 and 2.1.12 incremental update
+- Validated canonical workflow execution integration for Comfy-backed runs through:
+  `ExecuteWorkflowUseCase` -> one-unit workflow execution plan -> `UnifiedExecutionEngine` -> `WorkflowExecutionUnitHandler` -> Comfy-backed `IWorkflowExecutor`.
+- Added workflow integration coverage for trigger -> execute -> result/error propagation so Comfy execution no longer risks hidden bypasses around the unified execution seam.
+- Added normalized execution preview/inspection support to workflow results via `IWorkflowExecutionResult.inspection`.
+- `ComfyExecutionService` now maps normalized adapter result data into platform-facing inspection contracts:
+  - execution summary (`runtime`, `status`, output/lifecycle/message counts, error presence),
+  - output preview references (`nodeId`, kind, reference, `assetId`, metadata),
+  - normalized diagnostics from adapter errors.
+- Preview/inspection shaping remains contract-first and avoids exposing raw Comfy transport payloads to workflow callers.

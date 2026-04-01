@@ -45,6 +45,7 @@ export class TruthfulWorkflowExecutor implements IWorkflowExecutor {
       messages: result.messages,
       errorMessage: result.errorMessage,
       provenance: result.provenance,
+      inspection: result.inspection,
     }));
 
     return new WorkflowExecutionHandle({
@@ -91,6 +92,7 @@ export class TruthfulWorkflowExecutor implements IWorkflowExecutor {
       messages: result.messages,
       errorMessage: result.errorMessage,
       provenance,
+      inspection: result.inspection,
     });
   }
 

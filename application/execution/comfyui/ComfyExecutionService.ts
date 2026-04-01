@@ -75,6 +75,34 @@ export class ComfyExecutionService {
         outputAssets,
         messages: adapterResult.messages,
         errorMessage: adapterResult.error?.message,
+        inspection: Object.freeze({
+          summary: Object.freeze({
+            runtime: this.adapter.capabilities.runtimeId,
+            status: adapterResult.status,
+            outputCount: adapterResult.outputs.length,
+            lifecycleEventCount: adapterResult.lifecycle.length,
+            messageCount: adapterResult.messages?.length,
+            hasError: !!adapterResult.error,
+          }),
+          outputs: Object.freeze(adapterResult.outputs.map((output) => Object.freeze({
+            nodeId: output.nodeId,
+            kind: output.kind,
+            reference: output.reference,
+            assetId: output.assetRef?.assetId,
+            metadata: output.metadata ? Object.freeze({ ...output.metadata }) : undefined,
+          }))),
+          diagnostics: adapterResult.error
+            ? Object.freeze({
+                errorCode: adapterResult.error.code,
+                errorCategory: adapterResult.error.category,
+                errorSeverity: adapterResult.error.severity,
+                message: adapterResult.error.message,
+                retriable: adapterResult.error.retryable,
+              })
+            : adapterResult.inspection?.diagnostics
+              ? Object.freeze({ ...adapterResult.inspection.diagnostics })
+              : undefined,
+        }),
       });
     })();
 

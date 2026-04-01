@@ -129,6 +129,10 @@ export interface IComfyAdapterResult {
   readonly lifecycle: ReadonlyArray<IComfyAdapterLifecycleEvent>;
   readonly error?: IComfyAdapterError;
   readonly messages?: ReadonlyArray<string>;
+  readonly inspection?: Readonly<{
+    readonly executionSummary?: Readonly<Record<string, unknown>>;
+    readonly diagnostics?: Readonly<Record<string, unknown>>;
+  }>;
 }
 
 export interface IComfyAdapterCapabilities {
