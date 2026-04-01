@@ -18,12 +18,19 @@ interface ExecutionMetadataForm {
   readonly ownerTeam: string;
   readonly supportContact: string;
   readonly operationsNotes: string;
+  readonly capabilitySelectedModelBindingId: string;
+  readonly capabilitySampler: string;
+  readonly capabilitySteps: string;
+  readonly capabilityGuidanceScale: string;
 }
 
 interface JsonParseResult<T> {
   readonly ok: boolean;
   readonly data?: T;
 }
+
+type RuntimeCapabilityBindingEnvelope = NonNullable<SystemExecutionMetadata["runtimeCapabilityBindings"]>;
+type RuntimeCapabilityBindingRecord = RuntimeCapabilityBindingEnvelope["bindings"] extends ReadonlyArray<infer T> ? T : never;
 
 function parseSystemSpec(content: string): SystemSpecContent {
   try {
@@ -57,7 +64,29 @@ function formatList(values?: ReadonlyArray<string>): string {
   return (values ?? []).join(", ");
 }
 
+function getFirstCapabilityBinding(metadata?: SystemExecutionMetadata): RuntimeCapabilityBindingRecord | undefined {
+  return metadata?.runtimeCapabilityBindings?.bindings?.[0] as RuntimeCapabilityBindingRecord | undefined;
+}
+
+function normalizeExecutionOptionNumber(value: string): number | undefined {
+  const normalized = value.trim();
+  if (!normalized) {
+    return undefined;
+  }
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function toForm(metadata?: SystemExecutionMetadata): ExecutionMetadataForm {
+  const firstBinding = getFirstCapabilityBinding(metadata) as {
+    readonly selectedModelBindingId?: string;
+    readonly selectedExecutionOptions?: {
+      readonly sampler?: string;
+      readonly steps?: number;
+      readonly guidanceScale?: number;
+    };
+  } | undefined;
+
   return Object.freeze({
     runtimeEnvironment: metadata?.runtime?.environment ?? "",
     runtimeRequirements: formatList(metadata?.runtime?.requirements),
@@ -70,10 +99,84 @@ function toForm(metadata?: SystemExecutionMetadata): ExecutionMetadataForm {
     ownerTeam: metadata?.operations?.ownerTeam ?? "",
     supportContact: metadata?.operations?.supportContact ?? "",
     operationsNotes: metadata?.operations?.notes ?? "",
+    capabilitySelectedModelBindingId: firstBinding?.selectedModelBindingId ?? "",
+    capabilitySampler: firstBinding?.selectedExecutionOptions?.sampler ?? "",
+    capabilitySteps: String(firstBinding?.selectedExecutionOptions?.steps ?? ""),
+    capabilityGuidanceScale: String(firstBinding?.selectedExecutionOptions?.guidanceScale ?? ""),
   });
 }
 
-function toMetadata(form: ExecutionMetadataForm): SystemExecutionMetadata {
+function buildRuntimeCapabilityBindings(metadata: SystemExecutionMetadata | undefined, form: ExecutionMetadataForm): RuntimeCapabilityBindingEnvelope | undefined {
+  const existingEnvelope = metadata?.runtimeCapabilityBindings;
+  const existingBindings = [...(existingEnvelope?.bindings ?? [])] as Array<Record<string, unknown>>;
+  const hasCapabilityInputs = Boolean(
+    form.capabilitySelectedModelBindingId.trim()
+    || form.capabilitySampler.trim()
+    || form.capabilitySteps.trim()
+    || form.capabilityGuidanceScale.trim(),
+  );
+
+  if (!hasCapabilityInputs && existingBindings.length === 0) {
+    return undefined;
+  }
+
+  const first = (existingBindings[0] ?? {
+    persistenceVersion: "1.0.0",
+    bindingContract: {
+      bindingId: "runtime-binding:default",
+      systemAssetId: "system:unknown",
+      executionProvider: {
+        providerId: "provider:unassigned",
+        providerKind: "generic-runtime",
+        labels: [],
+      },
+      workflowExecutionProfile: {
+        profileId: "profile:default",
+        workflowAssetId: "workflow:default",
+        executionIntent: "generic",
+        requiredCapabilityTags: [],
+      },
+      modelBindingId: form.capabilitySelectedModelBindingId.trim() || "binding:model:default",
+      executionOptionCapability: {
+        sampler: { required: false, allowedValues: [] },
+        steps: { required: false },
+        seed: { required: false, allowDeterministic: true, allowRandom: true },
+        guidanceScale: { required: false },
+        resolution: { required: false },
+        batch: { required: false },
+        runtime: { required: false, allowedDevices: ["auto"], allowedPrecisions: ["auto"] },
+      },
+      executionOptions: {},
+      availability: {
+        status: "degraded",
+        message: "Runtime capability binding requires provider/runtime resolution.",
+        missingCapabilities: [],
+      },
+      contractVersion: "1.0.0",
+    },
+  }) as Record<string, unknown>;
+
+  const selectedExecutionOptions = {
+    ...(typeof first.selectedExecutionOptions === "object" && first.selectedExecutionOptions ? first.selectedExecutionOptions as Record<string, unknown> : {}),
+    sampler: form.capabilitySampler.trim() || undefined,
+    steps: normalizeExecutionOptionNumber(form.capabilitySteps),
+    guidanceScale: normalizeExecutionOptionNumber(form.capabilityGuidanceScale),
+  };
+
+  existingBindings[0] = {
+    ...first,
+    selectedModelBindingId: form.capabilitySelectedModelBindingId.trim() || undefined,
+    selectedExecutionOptions,
+  };
+
+  return {
+    schemaVersion: existingEnvelope?.schemaVersion ?? "1.0.0",
+    bindings: existingBindings,
+  };
+}
+
+function toMetadata(form: ExecutionMetadataForm, sourceMetadata?: SystemExecutionMetadata): SystemExecutionMetadata {
+  const runtimeCapabilityBindings = buildRuntimeCapabilityBindings(sourceMetadata, form);
   return Object.freeze({
     runtime: form.runtimeEnvironment || form.runtimeRequirements
       ? Object.freeze({
@@ -106,6 +209,7 @@ function toMetadata(form: ExecutionMetadataForm): SystemExecutionMetadata {
         notes: form.operationsNotes || undefined,
       })
       : undefined,
+    runtimeCapabilityBindings,
   });
 }
 
@@ -128,12 +232,12 @@ export function SystemExecutionMetadataEditor({ context }: { readonly context: S
 
   const updateForm = (nextForm: ExecutionMetadataForm): void => {
     setForm(nextForm);
-    setMetadataJson(JSON.stringify(toMetadata(nextForm), null, 2));
+    setMetadataJson(JSON.stringify(toMetadata(nextForm, spec.executionMetadata), null, 2));
   };
 
   const resolvePayload = (): SystemExecutionMetadata | undefined => {
     if (!isJsonMode) {
-      return toMetadata(form);
+      return toMetadata(form, spec.executionMetadata);
     }
 
     const parsed = parseJson<SystemExecutionMetadata>(metadataJson);
@@ -144,6 +248,8 @@ export function SystemExecutionMetadataEditor({ context }: { readonly context: S
     setJsonError(undefined);
     return parsed.data ?? {};
   };
+
+  const capabilityBindingCount = spec.executionMetadata?.runtimeCapabilityBindings?.bindings?.length ?? 0;
 
   return (
     <div className="ui-stack ui-stack--sm" data-testid="system-execution-metadata-editor">
@@ -160,7 +266,7 @@ export function SystemExecutionMetadataEditor({ context }: { readonly context: S
           className="ui-button ui-button--ghost ui-button--sm"
           onClick={() => {
             if (!isJsonMode) {
-              setMetadataJson(JSON.stringify(toMetadata(form), null, 2));
+              setMetadataJson(JSON.stringify(toMetadata(form, spec.executionMetadata), null, 2));
               setIsJsonMode(true);
               setJsonError(undefined);
               return;
@@ -195,19 +301,11 @@ export function SystemExecutionMetadataEditor({ context }: { readonly context: S
             <div className="ui-form-grid">
               <label className="ui-field">
                 <span className="ui-field__label">Environment</span>
-                <input
-                  className="ui-input"
-                  value={form.runtimeEnvironment}
-                  onChange={(event) => updateForm({ ...form, runtimeEnvironment: event.target.value })}
-                />
+                <input className="ui-input" value={form.runtimeEnvironment} onChange={(event) => updateForm({ ...form, runtimeEnvironment: event.target.value })} />
               </label>
               <label className="ui-field">
                 <span className="ui-field__label">Requirements (comma-separated)</span>
-                <input
-                  className="ui-input"
-                  value={form.runtimeRequirements}
-                  onChange={(event) => updateForm({ ...form, runtimeRequirements: event.target.value })}
-                />
+                <input className="ui-input" value={form.runtimeRequirements} onChange={(event) => updateForm({ ...form, runtimeRequirements: event.target.value })} />
               </label>
             </div>
           </div>
@@ -217,19 +315,11 @@ export function SystemExecutionMetadataEditor({ context }: { readonly context: S
             <div className="ui-form-grid">
               <label className="ui-field">
                 <span className="ui-field__label">Mode</span>
-                <input
-                  className="ui-input"
-                  value={form.orchestrationMode}
-                  onChange={(event) => updateForm({ ...form, orchestrationMode: event.target.value })}
-                />
+                <input className="ui-input" value={form.orchestrationMode} onChange={(event) => updateForm({ ...form, orchestrationMode: event.target.value })} />
               </label>
               <label className="ui-field">
                 <span className="ui-field__label">Hints (comma-separated)</span>
-                <input
-                  className="ui-input"
-                  value={form.orchestrationHints}
-                  onChange={(event) => updateForm({ ...form, orchestrationHints: event.target.value })}
-                />
+                <input className="ui-input" value={form.orchestrationHints} onChange={(event) => updateForm({ ...form, orchestrationHints: event.target.value })} />
               </label>
             </div>
           </div>
@@ -239,19 +329,11 @@ export function SystemExecutionMetadataEditor({ context }: { readonly context: S
             <div className="ui-form-grid">
               <label className="ui-field">
                 <span className="ui-field__label">Visibility</span>
-                <input
-                  className="ui-input"
-                  value={form.publishVisibility}
-                  onChange={(event) => updateForm({ ...form, publishVisibility: event.target.value })}
-                />
+                <input className="ui-input" value={form.publishVisibility} onChange={(event) => updateForm({ ...form, publishVisibility: event.target.value })} />
               </label>
               <label className="ui-field">
                 <span className="ui-field__label">Export targets (comma-separated)</span>
-                <input
-                  className="ui-input"
-                  value={form.publishExportTargets}
-                  onChange={(event) => updateForm({ ...form, publishExportTargets: event.target.value })}
-                />
+                <input className="ui-input" value={form.publishExportTargets} onChange={(event) => updateForm({ ...form, publishExportTargets: event.target.value })} />
               </label>
             </div>
           </div>
@@ -261,21 +343,61 @@ export function SystemExecutionMetadataEditor({ context }: { readonly context: S
             <div className="ui-form-grid">
               <label className="ui-field">
                 <span className="ui-field__label">Profile ID</span>
-                <input
-                  className="ui-input"
-                  value={form.profileId}
-                  onChange={(event) => updateForm({ ...form, profileId: event.target.value })}
-                />
+                <input className="ui-input" value={form.profileId} onChange={(event) => updateForm({ ...form, profileId: event.target.value })} />
               </label>
               <label className="ui-field">
                 <span className="ui-field__label">Latency tier</span>
+                <input className="ui-input" value={form.latencyTier} onChange={(event) => updateForm({ ...form, latencyTier: event.target.value })} />
+              </label>
+            </div>
+          </div>
+
+          <div className="ui-card ui-card--padded ui-stack ui-stack--sm">
+            <strong>Runtime capability binding (bounded)</strong>
+            <span className="ui-text-small ui-text-secondary">
+              Persist and inspect the selected model/checkpoint binding plus bounded runtime options (provider payloads are intentionally excluded).
+            </span>
+            <div className="ui-form-grid">
+              <label className="ui-field">
+                <span className="ui-field__label">Model binding ID</span>
                 <input
                   className="ui-input"
-                  value={form.latencyTier}
-                  onChange={(event) => updateForm({ ...form, latencyTier: event.target.value })}
+                  value={form.capabilitySelectedModelBindingId}
+                  onChange={(event) => updateForm({ ...form, capabilitySelectedModelBindingId: event.target.value })}
+                  placeholder="binding:model:sdxl-default"
+                />
+              </label>
+              <label className="ui-field">
+                <span className="ui-field__label">Sampler</span>
+                <input
+                  className="ui-input"
+                  value={form.capabilitySampler}
+                  onChange={(event) => updateForm({ ...form, capabilitySampler: event.target.value })}
+                  placeholder="euler"
+                />
+              </label>
+              <label className="ui-field">
+                <span className="ui-field__label">Steps</span>
+                <input
+                  className="ui-input"
+                  value={form.capabilitySteps}
+                  onChange={(event) => updateForm({ ...form, capabilitySteps: event.target.value })}
+                  placeholder="30"
+                />
+              </label>
+              <label className="ui-field">
+                <span className="ui-field__label">Guidance scale</span>
+                <input
+                  className="ui-input"
+                  value={form.capabilityGuidanceScale}
+                  onChange={(event) => updateForm({ ...form, capabilityGuidanceScale: event.target.value })}
+                  placeholder="7"
                 />
               </label>
             </div>
+            <span className="ui-text-small ui-text-secondary">
+              Persisted bindings: {capabilityBindingCount}
+            </span>
           </div>
 
           <div className="ui-card ui-card--padded ui-stack ui-stack--sm">
@@ -283,29 +405,16 @@ export function SystemExecutionMetadataEditor({ context }: { readonly context: S
             <div className="ui-form-grid">
               <label className="ui-field">
                 <span className="ui-field__label">Owner team</span>
-                <input
-                  className="ui-input"
-                  value={form.ownerTeam}
-                  onChange={(event) => updateForm({ ...form, ownerTeam: event.target.value })}
-                />
+                <input className="ui-input" value={form.ownerTeam} onChange={(event) => updateForm({ ...form, ownerTeam: event.target.value })} />
               </label>
               <label className="ui-field">
                 <span className="ui-field__label">Support contact</span>
-                <input
-                  className="ui-input"
-                  value={form.supportContact}
-                  onChange={(event) => updateForm({ ...form, supportContact: event.target.value })}
-                />
+                <input className="ui-input" value={form.supportContact} onChange={(event) => updateForm({ ...form, supportContact: event.target.value })} />
               </label>
             </div>
             <label className="ui-field">
               <span className="ui-field__label">Notes</span>
-              <textarea
-                className="ui-textarea"
-                rows={4}
-                value={form.operationsNotes}
-                onChange={(event) => updateForm({ ...form, operationsNotes: event.target.value })}
-              />
+              <textarea className="ui-textarea" rows={4} value={form.operationsNotes} onChange={(event) => updateForm({ ...form, operationsNotes: event.target.value })} />
             </label>
           </div>
         </div>

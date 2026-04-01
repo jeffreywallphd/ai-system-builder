@@ -127,3 +127,22 @@
 - Added focused tests:
   - `application/system-runtime/tests/RuntimeCapabilityExecutionPreflight.test.ts`
   - `infrastructure/comfyui/execution/tests/ComfyRuntimeCapabilityTranslator.test.ts`
+
+## Story 2.4.7 + 2.4.8 update
+- Added provider-agnostic runtime-capability binding persistence/serialization seam at
+  `application/system-runtime/RuntimeCapabilityBindingPersistence.ts`.
+  - Persists explicit internal records (`bindingContract`, selected model binding, selected execution options, optional resolved options).
+  - Enforces schema-version awareness (`1.0.0`) and rejects unsupported persisted versions.
+  - Normalizes/strips unknown provider-payload leakage at this higher-level persistence boundary.
+- Integrated that persistence seam into System Studio execution-metadata updates in
+  `application/system-studio/SystemStudioApplicationService.ts` so persisted runtime capability bindings are validated/sanitized before draft save.
+- Extended System Studio execution metadata domain shape with bounded runtime-capability binding storage slot (`runtimeCapabilityBindings`) for inspectable persistence in system draft content.
+- Added minimal bounded System Studio UI integration in
+  `ui/components/studio-shell/SystemExecutionMetadataEditor.tsx`:
+  - select/confirm model binding id,
+  - adjust bounded normalized execution options (sampler, steps, guidance scale),
+  - inspect persisted binding count from saved execution metadata.
+- Added focused tests:
+  - `application/system-runtime/tests/RuntimeCapabilityBindingPersistence.test.ts`
+  - `application/system-studio/tests/SystemStudioApplicationService.test.ts` (runtime-capability persistence/reload, provider payload leakage prevention, unsupported-version rejection)
+  - `ui/pages/tests/SystemStudioPageContracts.test.ts` (bounded runtime-capability editor contract surface)
