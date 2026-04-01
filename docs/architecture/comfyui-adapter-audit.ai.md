@@ -27,3 +27,12 @@
 
 ## Next
 - Keep Comfy specifics inside infrastructure adapter layers and keep application/execution orchestration on internal contracts.
+
+## Story 2.1.3 + 2.1.4 update
+- Added focused mapper seams:
+  - `infrastructure/comfyui/execution/mappers/ComfyExecutionRequestMapper.ts`
+  - `infrastructure/comfyui/execution/mappers/ComfyExecutionResultMapper.ts`
+- Added an adapter-driven invocation service:
+  - `application/execution/comfyui/ComfyExecutionService.ts`
+- Refactored `ComfyWorkflowExecutor` to consume `IComfyExecutionAdapter` instead of owning Comfy queue calls directly.
+- Added output lineage hooks (`assetRef`, `lineage`) in `IComfyAdapterOutputRecord` so downstream persistence/provenance stories have a stable internal contract.
