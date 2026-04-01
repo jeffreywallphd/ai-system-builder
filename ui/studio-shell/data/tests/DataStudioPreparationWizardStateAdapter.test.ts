@@ -37,6 +37,16 @@ describe("DataStudioPreparationWizardStateAdapter", () => {
     expect(snapshot.stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection)?.options.sourceKind).toBe("json");
   });
 
+  it("blocks forward progression when transition validation prerequisites fail", () => {
+    const adapter = new DataStudioPreparationWizardStateAdapter();
+    const start = adapter.getSnapshot();
+    expect(start.currentStageId).toBe(PipelineStageIds.SourceSelection);
+
+    const jump = adapter.goToStage(PipelineStageIds.Transformation);
+    expect(jump.moved).toBeFalse();
+    expect(jump.issues.some((issue) => issue.code === "data-pipeline.transition.prerequisite-incomplete")).toBeTrue();
+  });
+
   it("applies simple vs advanced presentation visibility to stage availability", () => {
     const adapter = new DataStudioPreparationWizardStateAdapter();
     const targetStageId = PipelineStageIds.Enrichment;
@@ -97,6 +107,26 @@ describe("DataStudioPreparationWizardStateAdapter", () => {
     const snapshot = restored.getSnapshot();
     expect(snapshot.currentStageId).toBe(PipelineStageIds.UnifiedIngestion);
     expect(snapshot.stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection)?.options.sourceKind).toBe("json");
+  });
+
+  it("surfaces execution readiness diagnostics from the canonical pipeline validation service", () => {
+    const adapter = new DataStudioPreparationWizardStateAdapter();
+    const blocked = adapter.assessExecutionReadiness();
+    expect(blocked.executionReady).toBeFalse();
+    expect(blocked.blockingIssues.length).toBeGreaterThan(0);
+
+    adapter.setStageOptions(PipelineStageIds.SourceSelection, Object.freeze({
+      sourceAssetId: "asset:source-customers:v1",
+    }));
+    adapter.setStageOptions(PipelineStageIds.UnifiedIngestion, Object.freeze({
+      outputTarget: "records",
+    }));
+    adapter.setStageOptions(PipelineStageIds.StoragePrepared, Object.freeze({
+      destination: "prepared://warehouse/customers",
+    }));
+    const ready = adapter.assessExecutionReadiness();
+    expect(ready.executionReady).toBeTrue();
+    expect(ready.blockingIssues).toHaveLength(0);
   });
 });
 

@@ -208,6 +208,16 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - If asked whether Direction 1 is finished, answer: "done enough that the execution substrate is no longer the obvious bottleneck; the next focus should likely move to Direction 2 unless a new truthful runtime-backed slice is clearly ready."
 - Keep runtime docs aligned with implementation: when runtime seams or bounds change, update both `.md` and `.ai.md` architecture docs in the same change.
 
+## Direction 5 update: Data Studio validation and execution integration (stories 18.13-18.14)
+- Data Studio pipeline validation is now a first-class application seam (`application/data-studio/DataStudioPipelineValidation.ts`) with structured stage/pipeline/transition/graph diagnostics.
+- Validation enforces required stages/configuration plus cross-stage constraints (source -> ingestion, extraction -> chunking, prepared-storage prerequisites) and transition-progression constraints for wizard/canvas authoring parity.
+- Data Studio execution now runs through the unified execution backbone:
+  - execution plan mapping + artifacts/provenance in `application/data-studio/DataStudioPipelineExecution.ts`,
+  - run orchestration/readiness gating in `application/data-studio/DataStudioPipelineExecutionService.ts`,
+  - execution-unit handling in `infrastructure/execution/DataStudioPipelineExecutionUnitHandler.ts`,
+  - handler registration in shared execution infrastructure composition (`createExecutionInfrastructure*.ts`).
+- Studio Shell now exposes backend-authoritative Data Studio readiness/run operations (`assessDataStudioExecutionReadiness`, `runDataStudioPipeline`) and toolbar-aligned renderer wiring (`run-data-pipeline`) while preserving workflow-specific semantics.
+
 ## Direction 4 update: agent execution placement (bounded first implementation)
 - Agent planning/execution sits above the existing execution backbone; it does not introduce a second runtime.
 - Planner output is a bounded ordered step plan (`toolId` + goal/action) that is executed through existing tool capability execution seams.

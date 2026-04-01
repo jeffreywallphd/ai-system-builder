@@ -17,6 +17,7 @@ import { DesktopBridgeExecutionRunRepository } from "../browser/execution/Deskto
 import { LocalExecutionRunRepository } from "../filesystem/execution/LocalExecutionRunRepository";
 import { SqliteExecutionRunRepository } from "../filesystem/execution/SqliteExecutionRunRepository";
 import { DatasetGenerationExecutionUnitHandler } from "./DatasetGenerationExecutionUnitHandler";
+import { DataStudioPipelineExecutionUnitHandler } from "./DataStudioPipelineExecutionUnitHandler";
 import { McpServerOperationExecutionUnitHandler } from "./McpServerOperationExecutionUnitHandler";
 import { ModelPreparationExecutionUnitHandler } from "./ModelPreparationExecutionUnitHandler";
 import { ModelTrainingExecutionUnitHandler } from "./ModelTrainingExecutionUnitHandler";
@@ -104,7 +105,7 @@ export function createUnifiedExecutionInfrastructure(
     options.workflowExecutor,
     options.executionAssetLineageRecorder,
     options.workflowRunHistoryService,
-  )];
+  ), new DataStudioPipelineExecutionUnitHandler()];
 
   if (options.datasetGenerationService) {
     handlers.push(new DatasetGenerationExecutionUnitHandler(options.datasetGenerationService, options.executionAssetLineageRecorder));

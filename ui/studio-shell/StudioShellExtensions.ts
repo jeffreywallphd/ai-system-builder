@@ -130,6 +130,7 @@ export const StudioShellToolbarActionKinds = Object.freeze({
   saveDraft: "save-draft",
   runValidation: "run-validation",
   runWorkflowDraft: "run-workflow-draft",
+  runDataPipeline: "run-data-pipeline",
   setWorkflowMode: "set-workflow-mode",
 });
 
@@ -152,7 +153,7 @@ export interface SetWorkflowModeStudioShellToolbarAction extends BaseStudioShell
 export type StudioShellToolbarAction =
   | SetWorkflowModeStudioShellToolbarAction
   | (BaseStudioShellToolbarAction & {
-    readonly kind: "refresh-snapshot" | "save-draft" | "run-validation" | "run-workflow-draft";
+    readonly kind: "refresh-snapshot" | "save-draft" | "run-validation" | "run-workflow-draft" | "run-data-pipeline";
   });
 
 export interface StudioShellToolbarConfiguration {

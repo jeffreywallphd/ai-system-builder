@@ -125,6 +125,8 @@ export interface DesktopStudioShellBridge {
   duplicatePersistedWorkflow(requestJson: string): Promise<string>;
   assessWorkflowExecutionReadiness(requestJson: string): Promise<string>;
   runWorkflowDraft(requestJson: string): Promise<string>;
+  assessDataStudioExecutionReadiness(requestJson: string): Promise<string>;
+  runDataStudioPipeline(requestJson: string): Promise<string>;
   listWorkflowRuns(requestJson: string): Promise<string>;
   getWorkflowRunDetail(runId: string): Promise<string>;
   startWorkflowRunRerun(requestJson: string): Promise<string>;

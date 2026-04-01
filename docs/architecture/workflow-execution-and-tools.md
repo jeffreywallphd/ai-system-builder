@@ -490,3 +490,13 @@ Audit schema now records administrative approval transitions plus decision denia
   - workflow list/detail/completion surfaces now expose direct run-history/run-detail entry points instead of isolated observability-only navigation;
   - manual workflow launch results now return persisted run identity when run-history storage is available, enabling immediate completion-surface links to the exact run detail;
   - rerun/edit-and-rerun affordances now enforce terminal-state and historical-context prerequisites with explicit unsupported-state UX.
+
+## Direction 5 update: Data Studio validation and execution integration (stories 18.13-18.14)
+- Data Studio pipeline validation is now a first-class application seam (`application/data-studio/DataStudioPipelineValidation.ts`) with structured stage/pipeline/transition/graph diagnostics.
+- Validation enforces required stages/configuration plus cross-stage constraints (source -> ingestion, extraction -> chunking, prepared-storage prerequisites) and transition-progression constraints for wizard/canvas authoring parity.
+- Data Studio execution now runs through the unified execution backbone:
+  - execution plan mapping + artifacts/provenance in `application/data-studio/DataStudioPipelineExecution.ts`,
+  - run orchestration/readiness gating in `application/data-studio/DataStudioPipelineExecutionService.ts`,
+  - execution-unit handling in `infrastructure/execution/DataStudioPipelineExecutionUnitHandler.ts`,
+  - handler registration in shared execution infrastructure composition (`createExecutionInfrastructure*.ts`).
+- Studio Shell now exposes backend-authoritative Data Studio readiness/run operations (`assessDataStudioExecutionReadiness`, `runDataStudioPipeline`) and toolbar-aligned renderer wiring (`run-data-pipeline`) while preserving workflow-specific semantics.

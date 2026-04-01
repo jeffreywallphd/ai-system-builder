@@ -8,6 +8,8 @@ import {
 } from "react-router-dom";
 import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
 import type {
+  DataStudioExecutionReadinessReadModel,
+  RunDataStudioPipelineReadModel,
   PersistedWorkflowReadModel,
   StudioShellSnapshotReadModel,
   StudioShellValidationIssue,
@@ -67,6 +69,7 @@ import {
   type InlineAssetCreationReturnTarget,
 } from "../routes/InlineAssetCreation";
 import { createWorkflowAssetMetadata } from "../../domain/workflow-studio/WorkflowStudioDomain";
+import { DataStudioWizardPersistenceStorageKey } from "../components/assets/DataStudioPreparationWizardPanel";
 
 interface JsonParseResult<T> {
   readonly ok: boolean;
@@ -231,6 +234,13 @@ function getWorkflowStudioUnsavedPrompt(): string {
   return "You have unsaved workflow changes. Click OK to save before leaving, or Cancel to leave without saving.";
 }
 
+function readPersistedDataStudioPipelineState(): string | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+  return window.localStorage.getItem(DataStudioWizardPersistenceStorageKey) ?? undefined;
+}
+
 interface StudioShellPageProps {
   readonly studioRegistration?: StudioRegistration;
   readonly extensions?: ReadonlyArray<StudioShellExtensionContribution>;
@@ -357,6 +367,9 @@ export default function StudioShellPage({
   const [workflowRunFeedback, setWorkflowRunFeedback] = useState<WorkflowStudioRunFeedback | undefined>();
   const [workflowExecutionReadiness, setWorkflowExecutionReadiness] = useState<WorkflowExecutionReadinessReadModel | undefined>();
   const [isWorkflowReadinessPending, setIsWorkflowReadinessPending] = useState(false);
+  const [dataStudioExecutionReadiness, setDataStudioExecutionReadiness] = useState<DataStudioExecutionReadinessReadModel | undefined>();
+  const [dataStudioRunResult, setDataStudioRunResult] = useState<RunDataStudioPipelineReadModel | undefined>();
+  const [isDataStudioReadinessPending, setIsDataStudioReadinessPending] = useState(false);
   const leftDrawerConfiguration = studioRegistration?.shell?.drawers?.left;
   const rightDrawerConfiguration = studioRegistration?.shell?.drawers?.right;
   const [isLeftDrawerOpen, setIsLeftDrawerOpen] = useState(leftDrawerConfiguration?.defaultOpen ?? true);
@@ -379,6 +392,10 @@ export default function StudioShellPage({
       setWorkflowExecutionReadiness(undefined);
       setIsWorkflowReadinessPending(false);
       setWorkflowSaveError(undefined);
+    } else if (studioRegistration?.role === "dataset") {
+      setDataStudioExecutionReadiness(undefined);
+      setDataStudioRunResult(undefined);
+      setIsDataStudioReadinessPending(false);
     }
     workflowModeStore?.hydrateFromSerializedDraft(nextContent);
   };
@@ -563,6 +580,9 @@ export default function StudioShellPage({
     setWorkflowRunFeedback(undefined);
     setWorkflowExecutionReadiness(undefined);
     setIsWorkflowReadinessPending(false);
+    setDataStudioExecutionReadiness(undefined);
+    setDataStudioRunResult(undefined);
+    setIsDataStudioReadinessPending(false);
   }, [initialDependencies, initialMetadataPatch, initialWorkflowCoreMetadata]);
 
   useEffect(() => {
@@ -1105,6 +1125,29 @@ export default function StudioShellPage({
       return;
     }
 
+    if (studioRegistration?.role === "dataset") {
+      const persistedPipelineState = readPersistedDataStudioPipelineState();
+      if (!persistedPipelineState) {
+        setError("Data pipeline state is unavailable. Configure the Data Studio wizard before running validation.");
+        return;
+      }
+      setIsDataStudioReadinessPending(true);
+      void (async () => {
+        const response = await service.assessDataStudioExecutionReadiness({
+          studioId,
+          pipelineState: persistedPipelineState,
+        });
+        setIsDataStudioReadinessPending(false);
+        if (!response.ok || !response.data) {
+          setError(response.error?.message ?? "Failed to validate Data Studio pipeline readiness.");
+          return;
+        }
+        setDataStudioExecutionReadiness(response.data);
+        setError(undefined);
+      })();
+      return;
+    }
+
     if (!draftId) {
       return;
     }
@@ -1176,6 +1219,43 @@ export default function StudioShellPage({
     })();
   };
 
+  const runDataStudioPipelineFromAuthoring = (): void => {
+    if (studioRegistration?.role !== "dataset") {
+      return;
+    }
+    const persistedPipelineState = readPersistedDataStudioPipelineState();
+    if (!persistedPipelineState) {
+      setError("Data pipeline state is unavailable. Configure the Data Studio wizard before running execution.");
+      return;
+    }
+    setIsDataStudioReadinessPending(true);
+    setDataStudioRunResult(undefined);
+    void (async () => {
+      const response = await service.runDataStudioPipeline({
+        studioId,
+        pipelineState: persistedPipelineState,
+        initiatedBy: "studio-shell",
+        executionReason: "toolbar-run",
+      });
+      setIsDataStudioReadinessPending(false);
+      if (!response.ok || !response.data) {
+        setError(response.error?.message ?? "Data pipeline launch failed.");
+        return;
+      }
+      setDataStudioExecutionReadiness(response.data.readiness);
+      setDataStudioRunResult(response.data);
+      if (response.data.launchStatus === "blocked") {
+        setError("Data pipeline launch was blocked by readiness validation.");
+        return;
+      }
+      if (response.data.launchStatus === "failed") {
+        setError(response.data.failureMessage ?? "Data pipeline execution failed.");
+        return;
+      }
+      setError(undefined);
+    })();
+  };
+
   const buildWorkflowStudioSearchWithoutModeParams = (): string => {
     const nextSearchParams = new URLSearchParams(location.search);
     nextSearchParams.delete("mode");
@@ -1225,6 +1305,11 @@ export default function StudioShellPage({
       return;
     }
 
+    if (action.kind === StudioShellToolbarActionKinds.runDataPipeline) {
+      runDataStudioPipelineFromAuthoring();
+      return;
+    }
+
     setWorkflowModeFromToolbar(action.modeId);
   };
 
@@ -1239,6 +1324,9 @@ export default function StudioShellPage({
       if (isWorkflowStudio) {
         return isBusy || hasWorkflowDraftParseError || isWorkflowReadinessPending;
       }
+      if (studioRegistration?.role === "dataset") {
+        return isBusy || isDataStudioReadinessPending;
+      }
       return isBusy || !draftId;
     }
     if (action.kind === StudioShellToolbarActionKinds.runWorkflowDraft) {
@@ -1248,6 +1336,12 @@ export default function StudioShellPage({
         || workflowRunFeedback?.status === "running"
         || isWorkflowReadinessPending
         || (workflowExecutionReadiness?.ready === false && workflowExecutionReadiness.blockingIssueCount > 0);
+    }
+    if (action.kind === StudioShellToolbarActionKinds.runDataPipeline) {
+      return isBusy
+        || studioRegistration?.role !== "dataset"
+        || isDataStudioReadinessPending
+        || (dataStudioExecutionReadiness?.executionReady === false && dataStudioExecutionReadiness.blockingIssueCount > 0);
     }
     if (!isWorkflowStudio || !workflowModeState) {
       return true;
@@ -1505,6 +1599,29 @@ export default function StudioShellPage({
             runHistoryPath={workflowRunHistoryPath}
             runDetailPath={workflowLatestRunDetailPath}
           />
+        ) : null}
+        {studioRegistration?.role === "dataset" ? (
+          <StudioShellPanel
+            title="Data Pipeline Run"
+            subtitle="Execution readiness and launch diagnostics for the canonical Data Studio pipeline state."
+          >
+            <div className="ui-stack ui-stack--2xs">
+              <div><strong>Readiness:</strong> {dataStudioExecutionReadiness?.executionReady ? "ready" : "not-ready"}</div>
+              <div><strong>Blocking issues:</strong> {dataStudioExecutionReadiness?.blockingIssueCount ?? 0}</div>
+              <div><strong>Warnings:</strong> {dataStudioExecutionReadiness?.warningIssueCount ?? 0}</div>
+              <div><strong>Run status:</strong> {dataStudioRunResult?.launchStatus ?? "-"}</div>
+              <div><strong>Execution state:</strong> {dataStudioRunResult?.execution.state ?? "-"}</div>
+              {dataStudioRunResult?.result ? (
+                <div><strong>Prepared output:</strong> {dataStudioRunResult.result.preparedOutput?.storageReference ?? "not-persisted"}</div>
+              ) : null}
+              {isDataStudioReadinessPending ? (
+                <span className="ui-text-small ui-text-secondary">Assessing readiness / running pipeline...</span>
+              ) : null}
+              {dataStudioRunResult?.failureMessage ? (
+                <span className="ui-text-small ui-text-danger">{dataStudioRunResult.failureMessage}</span>
+              ) : null}
+            </div>
+          </StudioShellPanel>
         ) : null}
 
         <StudioShellPanel title="Asset draft authoring" subtitle="Thin authoring surface over studio-shell draft contracts.">
