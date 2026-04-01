@@ -8,6 +8,9 @@ import {
 import type { UiDependencies } from "./types";
 import { createUiDependencies } from "./createUiDependencies";
 import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
+import { WorkflowTemplateBootstrapService } from "../services/WorkflowTemplateBootstrapService";
+import { StudioShellService } from "../services/StudioShellService";
+import { RegistryService } from "../services/RegistryService";
 
 const UiDependenciesContext = createContext<UiDependencies | undefined>(undefined);
 
@@ -29,6 +32,9 @@ export function AppProviders({
       const startedAt = Date.now();
 
       await dependencies.runtimeConsoleStore.initializeRuntime();
+      await new WorkflowTemplateBootstrapService(new StudioShellService(), new RegistryService())
+        .ensureCoreTemplatesSeeded()
+        .catch(() => undefined);
 
       while (!isCancelled) {
         try {

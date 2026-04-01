@@ -7,6 +7,7 @@ import {
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import WorkflowStudioModePanel from "../../components/studio-shell/workflow/WorkflowStudioModePanel";
 import WorkflowStudioRunHistoryPanel from "../../components/studio-shell/workflow/WorkflowStudioRunHistoryPanel";
+import WorkflowTemplateSelectionPanel from "../../components/studio-shell/workflow/WorkflowTemplateSelectionPanel";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -93,6 +94,14 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
     dependencies: Object.freeze([]),
   },
   extensions: Object.freeze([
+    {
+      id: "workflow-studio-template-selection",
+      slot: "draft-authoring",
+      title: "Workflow template selection",
+      subtitle: "Select, preview, and instantiate starter workflow-template assets into a working draft configuration.",
+      order: 7,
+      render: () => createElement(WorkflowTemplateSelectionPanel, { surface: "workflow-studio" }),
+    },
     {
       id: "workflow-studio-mode-abstraction",
       slot: "draft-authoring",
