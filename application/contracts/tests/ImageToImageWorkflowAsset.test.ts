@@ -1,10 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { ImageWorkflowAssetIntentTypes } from "../ImageWorkflowAssetContract";
-import {
-  createDefaultImageWorkflowAssetRegistry,
-  createImageToImageWorkflowAsset,
-  ImageToImageWorkflowAssetId,
-} from "../ImageToImageWorkflowAsset";
+import { createImageToImageWorkflowAsset, ImageToImageWorkflowAssetId } from "../ImageToImageWorkflowAsset";
+import { createDefaultImageWorkflowAssetRegistry } from "../ImageWorkflowAssetRegistry";
 
 describe("ImageToImageWorkflowAsset", () => {
   it("conforms to high-level contract and preserves bounded config", () => {

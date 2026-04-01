@@ -614,6 +614,17 @@ Not implemented in this slice:
   - shared preview metadata now includes intent/workflow summary, input/output summaries, bounded configuration summary, and high-level composition summary,
   - avoids leaking low-level graph/runtime details while remaining useful for studio authoring/inspection.
 - Existing image workflow assets (`image-to-image`, `restyle`, `enhance-upscale`) now consume that same preview builder, making preview/inspection metadata coherent across all high-level image workflow asset types.
+
+
+## AI Loom Image Manipulation vertical-slice update: registry/authoring integration + boundary hardening (stories 3.1.9-3.1.10)
+
+- High-level image workflow assets now register through a dedicated shared registry seam in `application/contracts/ImageWorkflowAssetRegistry.ts` rather than ad-hoc in a single asset file.
+- Registry entries expose stable workflow-taxonomy and authoring metadata (workflow semantic role, deterministic behavior, preview summaries, inspectable fields, and bounded configuration surface descriptors) for consistent discovery/selection/inspection/configuration flows.
+- Studio authoring selector compatibility is now explicit through `ui/studio-shell/asset-selector/ImageWorkflowAssetSelectorAdapter.ts` plus a dedicated usage-context capability mapping (`workflow-image-transform`) in `application/studio-entry/AssetSelectorCapabilityRegistry.ts`; this reuses the shared selector request/response contracts rather than introducing a parallel authoring contract model.
+- Composition and boundary integrity hardening now validates the full 3.1 asset set through registry-centric tests:
+  - registry inclusion/discoverability + metadata/config surface exposure (`application/contracts/tests/ImageWorkflowAssetRegistry.test.ts`),
+  - authoring selector projection consistency (`ui/studio-shell/asset-selector/tests/ImageWorkflowAssetSelectorAdapter.test.ts`),
+  - existing preview/contract tests continue to enforce no ComfyUI leakage in high-level contracts and inspectable composition summaries.
 - `ImageWorkflowAssetRegistry` default discovery now includes `batch-transform` as a first-class inspectable asset entry.
 - Added test coverage for:
   - batch-transform contract/composition/output mapping boundaries (`application/contracts/tests/BatchTransformWorkflowAsset.test.ts`),

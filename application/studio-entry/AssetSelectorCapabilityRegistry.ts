@@ -15,6 +15,7 @@ export const AssetSelectorUsageContexts = Object.freeze({
   workflowModel: "workflow-model",
   workflowTool: "workflow-tool",
   workflowSystem: "workflow-system",
+  workflowImageTransform: "workflow-image-transform",
 });
 
 export type AssetSelectorUsageContext = typeof AssetSelectorUsageContexts[keyof typeof AssetSelectorUsageContexts];
@@ -45,6 +46,13 @@ const defaultCapabilityDescriptors: ReadonlyArray<AssetSelectorCapabilityDescrip
   Object.freeze({
     usageContext: AssetSelectorUsageContexts.workflowSystem,
     allowedAssetTypes: Object.freeze([TaxonomySemanticRoles.system]),
+  }),
+  Object.freeze({
+    usageContext: AssetSelectorUsageContexts.workflowImageTransform,
+    allowedAssetTypes: Object.freeze([TaxonomySemanticRoles.workflow]),
+    metadata: Object.freeze({
+      workflowDomain: "image-manipulation",
+    }),
   }),
 ]);
 

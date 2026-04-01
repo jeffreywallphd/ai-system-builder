@@ -18,6 +18,7 @@ describe("AssetSelectorCapabilityRegistry", () => {
     const registry = createDefaultAssetSelectorCapabilityRegistry();
     expect(registry.isAssetTypeAllowed(AssetSelectorUsageContexts.workflowInput, "dataset")).toBeTrue();
     expect(registry.isAssetTypeAllowed(AssetSelectorUsageContexts.workflowStep, "agent")).toBeTrue();
+    expect(registry.isAssetTypeAllowed(AssetSelectorUsageContexts.workflowImageTransform, "workflow")).toBeTrue();
   });
 
   it("rejects invalid combinations through application-layer validation", () => {
