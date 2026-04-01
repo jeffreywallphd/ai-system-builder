@@ -1,10 +1,13 @@
 import { z } from "zod";
-import { AssetId } from "../../../../domain/assets/AssetId";
 import {
   createImageRecord,
   type IImageRecordValidator,
   type ImageRecord,
 } from "../../../../domain/dataset-studio/contracts/ImageRecord";
+import {
+  ImageAssetReferenceKinds,
+  type ImageAssetReferenceInput,
+} from "../../../../domain/dataset-studio/contracts/ImageAssetReference";
 import type { CanonicalRecordValue } from "../../../../domain/dataset-studio/CanonicalDataShapes";
 
 const canonicalRecordValueSchema: z.ZodType<CanonicalRecordValue> = z.lazy(() => z.union([
@@ -16,12 +19,59 @@ const canonicalRecordValueSchema: z.ZodType<CanonicalRecordValue> = z.lazy(() =>
   z.record(z.string(), canonicalRecordValueSchema),
 ]));
 
-const imageAssetReferenceSchema = z.object({
-  assetId: z.string().trim().min(1).refine((value) => value.startsWith("asset:"), {
-    message: "ImageRecord.assetRef.assetId must use canonical 'asset:' identity.",
-  }),
+const sourceContextSchema = z.record(z.string().trim().min(1), z.string().trim().min(1));
+
+const canonicalAssetReferenceSchema = z.object({
+  kind: z.literal(ImageAssetReferenceKinds.canonicalAsset).optional(),
+  stableId: z.string().trim().min(1).optional(),
+  assetId: z.string().trim().min(1),
   assetVersionId: z.string().trim().min(1).optional(),
+  sourceSystem: z.string().trim().min(1).optional(),
+  sourceContext: sourceContextSchema.optional(),
+  mimeTypeHint: z.string().trim().min(1).optional(),
+  formatHint: z.string().trim().min(1).optional(),
 });
+
+const localFileReferenceSchema = z.object({
+  kind: z.literal(ImageAssetReferenceKinds.localFile),
+  stableId: z.string().trim().min(1).optional(),
+  path: z.string().trim().min(1),
+  sourceSystem: z.string().trim().min(1).optional(),
+  sourceContext: sourceContextSchema.optional(),
+  mimeTypeHint: z.string().trim().min(1).optional(),
+  formatHint: z.string().trim().min(1).optional(),
+});
+
+const generatedOutputReferenceSchema = z.object({
+  kind: z.literal(ImageAssetReferenceKinds.generatedOutput),
+  stableId: z.string().trim().min(1).optional(),
+  outputId: z.string().trim().min(1).optional(),
+  path: z.string().trim().min(1).optional(),
+  sourceSystem: z.string().trim().min(1).optional(),
+  sourceContext: sourceContextSchema.optional(),
+  mimeTypeHint: z.string().trim().min(1).optional(),
+  formatHint: z.string().trim().min(1).optional(),
+}).refine((value) => Boolean(value.outputId || value.path), {
+  message: "Generated image asset references require outputId or path.",
+});
+
+const externalUriReferenceSchema = z.object({
+  kind: z.literal(ImageAssetReferenceKinds.externalUri),
+  stableId: z.string().trim().min(1).optional(),
+  uri: z.string().trim().min(1),
+  sourceSystem: z.string().trim().min(1).optional(),
+  sourceContext: sourceContextSchema.optional(),
+  mimeTypeHint: z.string().trim().min(1).optional(),
+  formatHint: z.string().trim().min(1).optional(),
+});
+
+const imageAssetReferenceSchema: z.ZodType<ImageAssetReferenceInput> = z.union([
+  z.string().trim().min(1),
+  canonicalAssetReferenceSchema,
+  localFileReferenceSchema,
+  generatedOutputReferenceSchema,
+  externalUriReferenceSchema,
+]);
 
 const imageRecordSchema = z.object({
   assetRef: imageAssetReferenceSchema,
@@ -40,10 +90,7 @@ export class ZodImageRecordValidator implements IImageRecordValidator {
   public validateImageRecord(input: unknown): ImageRecord {
     const parsed = imageRecordSchema.parse(input);
     return createImageRecord({
-      assetRef: {
-        assetId: new AssetId(parsed.assetRef.assetId),
-        assetVersionId: parsed.assetRef.assetVersionId,
-      },
+      assetRef: parsed.assetRef,
       width: parsed.width,
       height: parsed.height,
       format: parsed.format,

@@ -33,6 +33,7 @@ function toStringArray(value: unknown): ReadonlyArray<string> {
 function toImageRecordCandidate(item: CanonicalImageStructuredItem) {
   const metadata = item.metadata ?? {};
   const attributes = item.attributes ?? {};
+  const structuredAssetRef = (attributes.assetRef ?? metadata.assetRef);
   const width = toNumberOrUndefined(metadata.width) ?? toNumberOrUndefined(attributes.width);
   const height = toNumberOrUndefined(metadata.height) ?? toNumberOrUndefined(attributes.height);
   const format = toStringOrUndefined(metadata.format) ?? toStringOrUndefined(attributes.format);
@@ -40,15 +41,18 @@ function toImageRecordCandidate(item: CanonicalImageStructuredItem) {
     ?? toStringOrUndefined(attributes.assetId)
     ?? toStringOrUndefined(item.imageId);
 
-  if (!assetId || width === undefined || height === undefined || !format) {
+  if (!structuredAssetRef && !assetId) {
+    return undefined;
+  }
+  if (width === undefined || height === undefined || !format) {
     return undefined;
   }
 
   return Object.freeze({
-    assetRef: {
+    assetRef: structuredAssetRef ?? Object.freeze({
       assetId,
       assetVersionId: toStringOrUndefined(metadata.assetVersionId) ?? toStringOrUndefined(attributes.assetVersionId),
-    },
+    }),
     width,
     height,
     format,
@@ -103,7 +107,7 @@ export class MediaSchemaIntentAdapter implements IMediaSchemaIntent {
     if (shape.kind === "image-metadata-records" && candidates.length === 0 && shape.items.length > 0) {
       issues.push(createSchemaIntentValidationIssue({
         code: "schema-intent.media.metadata-contract-missing",
-        message: "Image metadata records did not expose canonical image-record fields (assetId, width, height, format).",
+        message: "Image metadata records did not expose canonical image-record fields (assetRef/assetId, width, height, format).",
         severity: DatasetSchemaIntentValidationSeverities.warning,
         path: "shape.items",
       }));
