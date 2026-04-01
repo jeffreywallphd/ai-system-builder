@@ -107,3 +107,11 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
   - output-normalization failures,
   instead of leaking raw Comfy exception shapes across adapter boundaries.
 - Added focused test coverage for context assembly/propagation and normalized error scenarios.
+
+## Story 2.1.7 and 2.1.8 incremental update
+- Comfy adapter result normalization is now explicitly asset-oriented for downstream persistence:
+  - output records now use canonical asset-style references (`asset:workflow-output:comfyui:...`) instead of ad-hoc prompt/file-derived identifiers;
+  - dataset ownership intent is propagated on normalized output metadata (`outputDatasetRefs`, `outputDatasetInstanceRefs`) so system-owned dataset persistence hooks can attach without parsing Comfy payloads.
+- Request/result mapping keeps Comfy file/path specifics inside infrastructure metadata only; adapter-facing contracts remain asset-reference-first.
+- Legacy Comfy direct strategy plumbing (`infrastructure/comfyui/execution/DelegatedWorkflowExecutionStrategy.ts`) was removed so Comfy execution depends on the canonical adapter-driven execution seam rather than parallel delegated wrappers.
+- Tests were updated to cover canonical asset output reference mapping and dataset-reference propagation through normalized adapter outputs.

@@ -2,6 +2,7 @@ import type {
   IComfyAdapterOutputRecord,
   IComfyAdapterResult,
   IComfyAdapterAssetReference,
+  IComfyAdapterExecutionContext,
 } from "../../../../application/execution/comfyui/ComfyAdapterContract";
 import type {
   IComfyPromptCompletion,
@@ -12,6 +13,7 @@ export class ComfyExecutionResultMapper {
   public map(params: {
     readonly completion: IComfyPromptCompletion;
     readonly consumedAssetRefs?: ReadonlyArray<IComfyAdapterAssetReference>;
+    readonly executionContext?: IComfyAdapterExecutionContext;
   }): Pick<IComfyAdapterResult, "outputs" | "messages"> {
     const outputs: IComfyAdapterOutputRecord[] = [];
 
@@ -23,6 +25,7 @@ export class ComfyExecutionResultMapper {
           artifact,
           index,
           consumedAssetRefs: params.consumedAssetRefs,
+          executionContext: params.executionContext,
         });
 
         if (normalized) {
@@ -43,16 +46,18 @@ export class ComfyExecutionResultMapper {
     readonly artifact: IComfyPromptOutputArtifact;
     readonly index: number;
     readonly consumedAssetRefs?: ReadonlyArray<IComfyAdapterAssetReference>;
+    readonly executionContext?: IComfyAdapterExecutionContext;
   }): IComfyAdapterOutputRecord | undefined {
+    const outputAssetId = this.createOutputAssetId(params);
+
     if (params.artifact.kind === "text") {
-      const reference = `${params.promptId}:${params.nodeId}:text:${params.index}`;
       return Object.freeze({
         nodeId: params.nodeId,
         kind: "text",
-        reference,
-        assetRef: Object.freeze({ assetId: reference }),
+        reference: outputAssetId,
+        assetRef: Object.freeze({ assetId: outputAssetId }),
         lineage: this.createLineage(params),
-        metadata: Object.freeze({ text: params.artifact.text ?? "" }),
+        metadata: this.createMetadata(params, { text: params.artifact.text ?? "" }),
       });
     }
 
@@ -60,15 +65,13 @@ export class ComfyExecutionResultMapper {
       return undefined;
     }
 
-    const reference = `${params.promptId}:${params.nodeId}:${params.artifact.kind}:${params.artifact.filename}`;
-
     return Object.freeze({
       nodeId: params.nodeId,
       kind: params.artifact.kind,
-      reference,
-      assetRef: Object.freeze({ assetId: reference }),
+      reference: outputAssetId,
+      assetRef: Object.freeze({ assetId: outputAssetId }),
       lineage: this.createLineage(params),
-      metadata: Object.freeze({
+      metadata: this.createMetadata(params, {
         filename: params.artifact.filename,
         subfolder: params.artifact.subfolder,
         type: params.artifact.type,
@@ -86,6 +89,28 @@ export class ComfyExecutionResultMapper {
       sourceExecutionId: params.promptId,
       sourceNodeId: params.nodeId,
       consumedAssetRefs: Object.freeze([...(params.consumedAssetRefs ?? [])]),
+    });
+  }
+
+  private createOutputAssetId(params: {
+    readonly promptId: string;
+    readonly nodeId: string;
+    readonly artifact: IComfyPromptOutputArtifact;
+    readonly index: number;
+  }): string {
+    return `asset:workflow-output:comfyui:${params.promptId}:${params.nodeId}:${params.artifact.kind}:${params.index}`;
+  }
+
+  private createMetadata(
+    params: { readonly executionContext?: IComfyAdapterExecutionContext },
+    base: Readonly<Record<string, unknown>>,
+  ): Readonly<Record<string, unknown>> {
+    return Object.freeze({
+      ...base,
+      outputDatasetRefs: Object.freeze([...(params.executionContext?.datasets.datasetAssetRefs ?? [])]),
+      outputDatasetInstanceRefs: Object.freeze([
+        ...(params.executionContext?.datasets.datasetInstanceRefs ?? []),
+      ]),
     });
   }
 }

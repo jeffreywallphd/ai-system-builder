@@ -122,6 +122,7 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
             normalized = this.resultMapper.map({
               completion,
               consumedAssetRefs: request.inputAssetRefs,
+              executionContext: request.context,
             });
           } catch (error: unknown) {
             const normalizedError = mapComfyError(error, {
