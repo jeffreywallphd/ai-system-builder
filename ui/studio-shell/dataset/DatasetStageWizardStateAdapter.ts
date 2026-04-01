@@ -21,8 +21,9 @@ import { TemplateService } from "../../../application/dataset-studio/TemplateSer
 import { WizardFlowEngine } from "../../../application/dataset-studio/WizardFlowEngine";
 import type { DatasetPipelineStageKind } from "../../../domain/dataset-studio/StagePipelineDomain";
 import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
+import type { WizardStageStatus } from "../wizard/WizardStageContracts";
 
-export type DatasetStageWizardStageStatus = "current" | "completed" | "skipped" | "pending" | "disabled";
+export type DatasetStageWizardStageStatus = WizardStageStatus;
 
 export interface DatasetStageWizardStageViewModel {
   readonly id: string;

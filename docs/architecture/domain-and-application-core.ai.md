@@ -1657,3 +1657,21 @@ Explicitly later than this scope:
   - emits explicit stage-to-asset-group mappings for Wizard/Canvas-ready stage reasoning,
   - enforces bounded Epic 17 upstream binding compatibility.
 - A compact cross-studio authoring projection extension point now exists in `application/studio-shell/StudioAuthoringGraph.ts`, and unified preparation resolution emits this projection as a future Wizard/Canvas handoff hook without changing existing Workflow Studio semantics.
+
+## Direction 5 extension update: Data Studio wizard framework + dynamic stage rendering (stories 18.3-18.4)
+
+- Data Studio now has an explicit wizard state-machine seam in `application/data-studio/DataStudioPreparationWizard.ts` that operates directly on unified preparation asset definitions from 18.1-18.2 (not a disconnected UI model).
+- Wizard progression includes:
+  - stage navigation (`goNext`, `goBack`, `goToStage`),
+  - stage completion/skipping tracking,
+  - presentation mode control (`simple` vs `advanced`),
+  - stage availability resolution from activation + visibility + conditional evaluators,
+  - validation hook points for enter/leave/complete transitions,
+  - wizard-to-canvas handoff projection (`toCanvasHandoff`) carrying canonical asset + authoring graph context.
+- Dynamic stage rendering foundations now project stage metadata into a stable snapshot contract:
+  - stage order/title/description/status,
+  - optional/skippable state,
+  - activation/visibility/config-mode metadata,
+  - stage option payload binding,
+  - stage-group mapping references from unified preparation resolution.
+- This keeps Data Studio wizard/canvas compatibility bounded to one canonical preparation definition while remaining semantically distinct from Workflow Studio trigger/input/step/output semantics.
