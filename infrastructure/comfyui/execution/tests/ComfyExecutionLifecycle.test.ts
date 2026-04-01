@@ -19,11 +19,29 @@ describe("ComfyExecutionLifecycle", () => {
   it("normalizes execution errors", () => {
     expect(mapComfyError(new Error("Timed out waiting"))).toMatchObject({
       code: "queue-timeout",
+      category: "timeout",
       retriable: true,
     });
     expect(mapComfyError(new Error("Prompt was cancelled"))).toMatchObject({
       code: "execution-cancelled",
+      category: "cancellation",
       retriable: false,
     });
+  });
+
+  it("normalizes mapping failures with structured diagnostics", () => {
+    const normalized = mapComfyError(new Error("unknown property id"), {
+      stage: "request-mapping",
+      context: {
+        identifiers: { workflowId: "wf-1", executionId: "exec-1" },
+        datasets: { datasetAssetRefs: [], datasetInstanceRefs: [] },
+        inputs: { selectedAssetRefs: [] },
+        runtime: { parameters: {}, options: {} },
+      },
+    });
+
+    expect(normalized.code).toBe("request-mapping-failed");
+    expect(normalized.executionRef).toEqual({ executionId: "exec-1", workflowId: "wf-1" });
+    expect(normalized.diagnostics).toMatchObject({ stage: "request-mapping" });
   });
 });

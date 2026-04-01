@@ -92,3 +92,18 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
 - Added `application/execution/comfyui/ComfyExecutionService.ts` as the adapter-driven invocation layer (`trigger -> execute -> normalize`) for workflow execution callers.
 - Refactored `ComfyWorkflowExecutor` to consume `IComfyExecutionAdapter` and route execution through the new service instead of directly owning Comfy queue invocation mechanics.
 - Expanded normalized adapter output records with `assetRef` and `lineage` hooks for downstream persistence/provenance alignment without exposing Comfy DTOs upstream.
+
+## Story 2.1.5 and 2.1.6 incremental update
+- Introduced canonical execution-context construction for Comfy adapter execution via:
+  - `application/execution/comfyui/ComfyExecutionContext.ts`
+  - expanded `IComfyAdapterExecutionContext` contract in `application/execution/comfyui/ComfyAdapterContract.ts`
+- Comfy execution paths now pass one stable execution context object (identifiers, system refs, dataset refs, selected input assets, runtime params/options, trigger metadata, observability hooks, metadata) rather than ad-hoc metadata bags.
+- `ComfyWorkflowExecutor` now consistently builds and passes that context into adapter requests.
+- Error handling now normalizes infrastructure/adapter failures into structured internal contracts (`code`, `category`, `severity`, retryability, execution refs, diagnostics) through `infrastructure/comfyui/execution/ComfyExecutionLifecycle.ts`.
+- `ComfyQueueExecutionAdapter` now captures and normalizes:
+  - request-mapping failures,
+  - connection/queue submission failures,
+  - execution-time failures,
+  - output-normalization failures,
+  instead of leaking raw Comfy exception shapes across adapter boundaries.
+- Added focused test coverage for context assembly/propagation and normalized error scenarios.

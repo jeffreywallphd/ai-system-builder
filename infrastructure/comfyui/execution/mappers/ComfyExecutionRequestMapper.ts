@@ -28,14 +28,38 @@ export class ComfyExecutionRequestMapper {
     return Object.freeze({
       payload,
       executionContext: Object.freeze({
-        executionId: request.context?.executionId,
-        systemId: request.context?.systemId,
-        datasetRefs: Object.freeze([...(request.context?.datasetRefs ?? [])]),
-        runtimeOptions: Object.freeze({ ...(request.runtimeParameters ?? {}), ...(request.context?.runtimeOptions ?? {}) }),
-        metadata: Object.freeze({
-          ...(request.context?.metadata ?? {}),
-          inputAssetRefs: Object.freeze([...(request.inputAssetRefs ?? [])]),
+        identifiers: Object.freeze({ ...(request.context?.identifiers ?? { workflowId: request.workflow.id }) }),
+        system: request.context?.system
+          ? Object.freeze({ ...request.context.system })
+          : Object.freeze({}),
+        datasets: Object.freeze({
+          datasetAssetRefs: Object.freeze([...(request.context?.datasets.datasetAssetRefs ?? [])]),
+          datasetInstanceRefs: Object.freeze([...(request.context?.datasets.datasetInstanceRefs ?? [])]),
         }),
+        inputs: Object.freeze({
+          selectedAssetRefs: Object.freeze([
+            ...(request.context?.inputs.selectedAssetRefs ?? request.inputAssetRefs ?? []),
+          ]),
+        }),
+        runtime: Object.freeze({
+          parameters: Object.freeze({ ...(request.context?.runtime.parameters ?? request.runtimeParameters ?? {}) }),
+          options: Object.freeze({ ...(request.context?.runtime.options ?? {}) }),
+        }),
+        trigger: request.context?.trigger
+          ? Object.freeze({
+              ...request.context.trigger,
+              metadata: request.context.trigger.metadata
+                ? Object.freeze({ ...request.context.trigger.metadata })
+                : undefined,
+            })
+          : undefined,
+        observability: request.context?.observability
+          ? Object.freeze({
+              ...request.context.observability,
+              tags: Object.freeze([...(request.context.observability.tags ?? [])]),
+            })
+          : undefined,
+        metadata: Object.freeze({ ...(request.context?.metadata ?? {}) }),
       }),
     });
   }

@@ -22,6 +22,7 @@ import type {
   IComfyExecutionAdapter,
 } from "../../../application/execution/comfyui/ComfyAdapterContract";
 import { ComfyExecutionService } from "../../../application/execution/comfyui/ComfyExecutionService";
+import { createComfyExecutionContext } from "../../../application/execution/comfyui/ComfyExecutionContext";
 import { mapComfyError, mapComfyProgressToLifecycleEvent } from "./ComfyExecutionLifecycle";
 import { ComfyQueueClient } from "./ComfyQueueClient";
 import { ComfyExecutionRequestMapper } from "./mappers/ComfyExecutionRequestMapper";
@@ -66,12 +67,23 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
     cancel(): Promise<void>;
     waitForCompletion(): Promise<IComfyAdapterResult>;
   }> {
-    const mapped = this.requestMapper.map(request);
-    const queued = await this.options.queueClient.enqueuePrompt(mapped.payload);
-    const promptId = queued.prompt_id?.trim();
+    let mapped;
+    try {
+      mapped = this.requestMapper.map(request);
+    } catch (error: unknown) {
+      return this.createImmediateFailureHandle(request, error, "request-mapping");
+    }
 
-    if (!promptId) {
-      throw new Error("ComfyUI did not return a prompt_id.");
+    let promptId: string;
+    try {
+      const queued = await this.options.queueClient.enqueuePrompt(mapped.payload);
+      promptId = queued.prompt_id?.trim() ?? "";
+
+      if (!promptId) {
+        throw new Error("ComfyUI did not return a prompt_id.");
+      }
+    } catch (error: unknown) {
+      return this.createImmediateFailureHandle(request, error, "connection");
     }
 
     const lifecycle: IComfyAdapterLifecycleEvent[] = [];
@@ -105,10 +117,27 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
             (progress) => emitLifecycle(mapComfyProgressToLifecycleEvent(progress)),
           );
 
-          const normalized = this.resultMapper.map({
-            completion,
-            consumedAssetRefs: request.inputAssetRefs,
-          });
+          let normalized;
+          try {
+            normalized = this.resultMapper.map({
+              completion,
+              consumedAssetRefs: request.inputAssetRefs,
+            });
+          } catch (error: unknown) {
+            const normalizedError = mapComfyError(error, {
+              stage: "output-normalization",
+              context: mapped.executionContext,
+            });
+
+            return Object.freeze({
+              executionId: promptId,
+              status: "failed" as const,
+              outputs: [],
+              lifecycle: Object.freeze(lifecycle.slice()),
+              error: normalizedError,
+              messages: [normalizedError.message],
+            });
+          }
 
           return Object.freeze({
             executionId: promptId,
@@ -118,7 +147,10 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
             messages: normalized.messages,
           });
         } catch (error: unknown) {
-          const normalizedError = mapComfyError(error);
+          const normalizedError = mapComfyError(error, {
+            stage: "execution",
+            context: mapped.executionContext,
+          });
           return Object.freeze({
             executionId: promptId,
             status: normalizedError.code === "execution-cancelled" ? "cancelled" : "failed",
@@ -130,6 +162,37 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
         }
       },
     });
+  }
+
+  private createImmediateFailureHandle(
+    request: IComfyAdapterRequest,
+    error: unknown,
+    stage: "connection" | "request-mapping",
+  ): Promise<{
+    readonly executionId: string;
+    cancel(): Promise<void>;
+    waitForCompletion(): Promise<IComfyAdapterResult>;
+  }> {
+    const normalizedError = mapComfyError(error, {
+      stage,
+      context: request.context,
+    });
+
+    const executionId = request.context?.identifiers.executionId
+      ?? request.workflow.id;
+
+    return Promise.resolve(Object.freeze({
+      executionId,
+      cancel: async () => undefined,
+      waitForCompletion: async () => Object.freeze({
+        executionId,
+        status: "failed" as const,
+        outputs: [],
+        lifecycle: [],
+        error: normalizedError,
+        messages: [normalizedError.message],
+      }),
+    }));
   }
 }
 
@@ -179,17 +242,14 @@ export class ComfyWorkflowExecutor implements IWorkflowExecutor {
   }
 
   private toAdapterRequest(input: IWorkflowExecutionInput): IComfyAdapterRequest {
+    const context = createComfyExecutionContext(input);
+
     return {
       workflow: input.workflow,
       propertyOverrides: input.propertyOverrides,
       runtimeParameters: input.parameters,
-      context: {
-        metadata: input.executionMetadata,
-      },
-      inputAssetRefs: (input.inputAssets ?? []).map((asset) => ({
-        assetId: asset.id,
-        versionId: asset.latestVersion?.version,
-      })),
+      context,
+      inputAssetRefs: context.inputs.selectedAssetRefs,
     };
   }
 
