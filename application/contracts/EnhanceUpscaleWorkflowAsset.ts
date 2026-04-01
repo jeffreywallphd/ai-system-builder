@@ -19,6 +19,10 @@ import {
   createImageWorkflowOutputBindingConfiguration,
   type ImageWorkflowOutputBindingConfiguration,
 } from "./ImageWorkflowOutputBindingConfiguration";
+import {
+  createImageWorkflowUiTriggerBindingConfiguration,
+  type ImageWorkflowUiTriggerBindingConfiguration,
+} from "./ImageWorkflowUiTriggerBindingConfiguration";
 
 export const EnhanceUpscaleWorkflowAssetId = "image-workflow.enhance-upscale";
 export const EnhanceUpscaleWorkflowAssetVersion = "1.0.0";
@@ -40,6 +44,7 @@ export interface EnhanceUpscaleWorkflowAsset {
   readonly composition: ImageWorkflowComposition;
   readonly inputBindings: ImageWorkflowInputBindingConfiguration;
   readonly outputBindings: ImageWorkflowOutputBindingConfiguration;
+  readonly uiTriggerBindings: ImageWorkflowUiTriggerBindingConfiguration;
   readonly bindings: Readonly<{
     readonly sourceImageFieldId: "sourceImage";
     readonly outputFieldId: "enhancedImage";
@@ -114,10 +119,33 @@ function buildEnhanceUpscaleComposition(): ImageWorkflowComposition {
   });
 }
 
+function buildDefaultUiTriggerBindings(): ImageWorkflowUiTriggerBindingConfiguration {
+  return createImageWorkflowUiTriggerBindingConfiguration({
+    bindings: [
+      {
+        bindingId: "binding.ui.gallery.open",
+        event: { kind: "click", sourceComponentId: "output-gallery", actionId: "open-image", eventName: "ui.image.gallery.open" },
+        target: { triggerType: "button-click" },
+      },
+      {
+        bindingId: "binding.ui.parameter.submit",
+        event: { kind: "submit", sourceComponentId: "parameter-form", actionId: "submit", eventName: "ui.image.parameter.submit" },
+        target: { triggerType: "user-initiated-run" },
+      },
+      {
+        bindingId: "binding.ui.selection.changed",
+        event: { kind: "selection", sourceComponentId: "output-gallery", actionId: "select-image", eventName: "ui.image.selection.changed" },
+        target: { triggerType: "user-initiated-run" },
+      },
+    ],
+  });
+}
+
 export function createEnhanceUpscaleWorkflowAsset(input?: {
   readonly configuration?: unknown;
   readonly inputBindings?: ImageWorkflowInputBindingConfiguration["bindings"];
   readonly outputBindings?: unknown;
+  readonly uiTriggerBindings?: unknown;
 }): EnhanceUpscaleWorkflowAsset {
   const contract = CoreImageWorkflowAssetTypeContracts[ImageWorkflowAssetIntentTypes.enhanceUpscale];
   const configuration = EnhanceUpscaleWorkflowAssetConfigSchema.parse(input?.configuration ?? {});
@@ -139,6 +167,7 @@ export function createEnhanceUpscaleWorkflowAsset(input?: {
   });
 
   const outputBindings = createImageWorkflowOutputBindingConfiguration(input?.outputBindings ?? buildDefaultOutputBindings());
+  const uiTriggerBindings = createImageWorkflowUiTriggerBindingConfiguration(input?.uiTriggerBindings ?? buildDefaultUiTriggerBindings());
 
   return Object.freeze({
     id: EnhanceUpscaleWorkflowAssetId,
@@ -149,6 +178,7 @@ export function createEnhanceUpscaleWorkflowAsset(input?: {
     composition,
     inputBindings,
     outputBindings,
+    uiTriggerBindings,
     bindings: Object.freeze({
       sourceImageFieldId: "sourceImage",
       outputFieldId: "enhancedImage",

@@ -19,6 +19,10 @@ import {
   createImageWorkflowOutputBindingConfiguration,
   type ImageWorkflowOutputBindingConfiguration,
 } from "./ImageWorkflowOutputBindingConfiguration";
+import {
+  createImageWorkflowUiTriggerBindingConfiguration,
+  type ImageWorkflowUiTriggerBindingConfiguration,
+} from "./ImageWorkflowUiTriggerBindingConfiguration";
 
 export const RestyleWorkflowAssetId = "image-workflow.restyle";
 export const RestyleWorkflowAssetVersion = "1.0.0";
@@ -40,6 +44,7 @@ export interface RestyleWorkflowAsset {
   readonly composition: ImageWorkflowComposition;
   readonly inputBindings: ImageWorkflowInputBindingConfiguration;
   readonly outputBindings: ImageWorkflowOutputBindingConfiguration;
+  readonly uiTriggerBindings: ImageWorkflowUiTriggerBindingConfiguration;
   readonly bindings: Readonly<{
     readonly sourceImageFieldId: "sourceImage";
     readonly stylePresetFieldId: "stylePreset";
@@ -127,10 +132,33 @@ function buildRestyleComposition(): ImageWorkflowComposition {
   });
 }
 
+function buildDefaultUiTriggerBindings(): ImageWorkflowUiTriggerBindingConfiguration {
+  return createImageWorkflowUiTriggerBindingConfiguration({
+    bindings: [
+      {
+        bindingId: "binding.ui.gallery.open",
+        event: { kind: "click", sourceComponentId: "output-gallery", actionId: "open-image", eventName: "ui.image.gallery.open" },
+        target: { triggerType: "button-click" },
+      },
+      {
+        bindingId: "binding.ui.parameter.submit",
+        event: { kind: "submit", sourceComponentId: "parameter-form", actionId: "submit", eventName: "ui.image.parameter.submit" },
+        target: { triggerType: "user-initiated-run" },
+      },
+      {
+        bindingId: "binding.ui.selection.changed",
+        event: { kind: "selection", sourceComponentId: "output-gallery", actionId: "select-image", eventName: "ui.image.selection.changed" },
+        target: { triggerType: "user-initiated-run" },
+      },
+    ],
+  });
+}
+
 export function createRestyleWorkflowAsset(input?: {
   readonly configuration?: unknown;
   readonly inputBindings?: ImageWorkflowInputBindingConfiguration["bindings"];
   readonly outputBindings?: unknown;
+  readonly uiTriggerBindings?: unknown;
 }): RestyleWorkflowAsset {
   const contract = CoreImageWorkflowAssetTypeContracts[ImageWorkflowAssetIntentTypes.restyle];
   const configuration = RestyleWorkflowAssetConfigSchema.parse(input?.configuration ?? {});
@@ -161,6 +189,7 @@ export function createRestyleWorkflowAsset(input?: {
   });
 
   const outputBindings = createImageWorkflowOutputBindingConfiguration(input?.outputBindings ?? buildDefaultOutputBindings());
+  const uiTriggerBindings = createImageWorkflowUiTriggerBindingConfiguration(input?.uiTriggerBindings ?? buildDefaultUiTriggerBindings());
 
   return Object.freeze({
     id: RestyleWorkflowAssetId,
@@ -171,6 +200,7 @@ export function createRestyleWorkflowAsset(input?: {
     composition,
     inputBindings,
     outputBindings,
+    uiTriggerBindings,
     bindings: Object.freeze({
       sourceImageFieldId: "sourceImage",
       stylePresetFieldId: "stylePreset",

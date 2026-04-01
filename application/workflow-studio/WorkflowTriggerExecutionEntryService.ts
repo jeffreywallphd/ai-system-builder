@@ -7,6 +7,8 @@ export interface WorkflowExecutionTriggerEntry {
   readonly triggerType?: string;
   readonly activationType?: string;
   readonly payload?: Readonly<Record<string, unknown>>;
+  readonly contextReferences?: Readonly<Record<string, unknown>>;
+  readonly bindingMetadata?: Readonly<Record<string, unknown>>;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
@@ -29,6 +31,8 @@ export function normalizeWorkflowExecutionTriggerEntry(
     triggerType: entry.triggerType?.trim() || undefined,
     activationType: entry.activationType?.trim() || toDefaultActivationType(entry.sourceKind),
     payload: entry.payload ? Object.freeze({ ...entry.payload }) : undefined,
+    contextReferences: entry.contextReferences ? Object.freeze({ ...entry.contextReferences }) : undefined,
+    bindingMetadata: entry.bindingMetadata ? Object.freeze({ ...entry.bindingMetadata }) : undefined,
     metadata: entry.metadata ? Object.freeze({ ...entry.metadata }) : undefined,
   });
 }
@@ -59,9 +63,10 @@ export function applyTriggerExecutionEntryToContext(input: {
         triggerId: normalizedEntry.triggerId,
         triggerType: normalizedEntry.triggerType,
         activationType: normalizedEntry.activationType,
+        contextReferences: normalizedEntry.contextReferences,
+        bindingMetadata: normalizedEntry.bindingMetadata,
       }),
       ...(normalizedEntry.metadata ?? {}),
     }),
   });
 }
-

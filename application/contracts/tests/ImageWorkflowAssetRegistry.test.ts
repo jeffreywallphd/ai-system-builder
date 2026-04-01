@@ -28,7 +28,9 @@ describe("ImageWorkflowAssetRegistry", () => {
     expect(restyle?.contract.input.fields.some((field) => field.id.includes("node"))).toBeFalse();
     expect(Array.isArray(restyle?.inputBindings.bindings)).toBeTrue();
     expect(Array.isArray(restyle?.outputBindings.bindings)).toBeTrue();
+    expect(Array.isArray(restyle?.uiTriggerBindings.bindings)).toBeTrue();
     expect(restyle?.outputBindings.bindings.some((binding: { targetType: string }) => binding.targetType === "history-dataset")).toBeTrue();
+    expect(restyle?.uiTriggerBindings.bindings.some((binding: { event: { kind: string } }) => binding.event.kind === "submit")).toBeTrue();
   });
 
   it("keeps composition and inspectability boundaries portable across the full 3.1 asset set", () => {

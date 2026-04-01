@@ -19,6 +19,10 @@ import {
   createImageWorkflowOutputBindingConfiguration,
   type ImageWorkflowOutputBindingConfiguration,
 } from "./ImageWorkflowOutputBindingConfiguration";
+import {
+  createImageWorkflowUiTriggerBindingConfiguration,
+  type ImageWorkflowUiTriggerBindingConfiguration,
+} from "./ImageWorkflowUiTriggerBindingConfiguration";
 
 export const BatchTransformWorkflowAssetId = "image-workflow.batch-transform";
 export const BatchTransformWorkflowAssetVersion = "1.0.0";
@@ -58,6 +62,7 @@ export interface BatchTransformWorkflowAsset {
   readonly composition: ImageWorkflowComposition;
   readonly inputBindings: ImageWorkflowInputBindingConfiguration;
   readonly outputBindings: ImageWorkflowOutputBindingConfiguration;
+  readonly uiTriggerBindings: ImageWorkflowUiTriggerBindingConfiguration;
   readonly bindings: Readonly<{
     readonly batchItemsFieldId: "batchItems";
     readonly instructionFieldId: "instruction";
@@ -157,10 +162,33 @@ function buildBatchTransformComposition(): ImageWorkflowComposition {
   });
 }
 
+function buildDefaultUiTriggerBindings(): ImageWorkflowUiTriggerBindingConfiguration {
+  return createImageWorkflowUiTriggerBindingConfiguration({
+    bindings: [
+      {
+        bindingId: "binding.ui.gallery.open",
+        event: { kind: "click", sourceComponentId: "output-gallery", actionId: "open-image", eventName: "ui.image.gallery.open" },
+        target: { triggerType: "button-click" },
+      },
+      {
+        bindingId: "binding.ui.parameter.submit",
+        event: { kind: "submit", sourceComponentId: "parameter-form", actionId: "submit", eventName: "ui.image.parameter.submit" },
+        target: { triggerType: "user-initiated-run" },
+      },
+      {
+        bindingId: "binding.ui.selection.changed",
+        event: { kind: "selection", sourceComponentId: "output-gallery", actionId: "select-image", eventName: "ui.image.selection.changed" },
+        target: { triggerType: "user-initiated-run" },
+      },
+    ],
+  });
+}
+
 export function createBatchTransformWorkflowAsset(input?: {
   readonly configuration?: unknown;
   readonly inputBindings?: ImageWorkflowInputBindingConfiguration["bindings"];
   readonly outputBindings?: unknown;
+  readonly uiTriggerBindings?: unknown;
 }): BatchTransformWorkflowAsset {
   const contract = CoreImageWorkflowAssetTypeContracts[ImageWorkflowAssetIntentTypes.batchTransform];
   const configuration = BatchTransformWorkflowAssetConfigSchema.parse(input?.configuration ?? {});
@@ -192,6 +220,7 @@ export function createBatchTransformWorkflowAsset(input?: {
   });
 
   const outputBindings = createImageWorkflowOutputBindingConfiguration(input?.outputBindings ?? buildDefaultOutputBindings());
+  const uiTriggerBindings = createImageWorkflowUiTriggerBindingConfiguration(input?.uiTriggerBindings ?? buildDefaultUiTriggerBindings());
 
   return Object.freeze({
     id: BatchTransformWorkflowAssetId,
@@ -202,6 +231,7 @@ export function createBatchTransformWorkflowAsset(input?: {
     composition,
     inputBindings,
     outputBindings,
+    uiTriggerBindings,
     bindings: Object.freeze({
       batchItemsFieldId: "batchItems",
       instructionFieldId: "instruction",

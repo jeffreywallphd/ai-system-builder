@@ -4,6 +4,7 @@ import {
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import { createImageWorkflowUiTriggerBindingConfiguration } from "../../contracts/ImageWorkflowUiTriggerBindingConfiguration";
 import { UiTriggerEventKinds, createUiTriggerEvent } from "../UiTriggerEventContract";
 import { mapUiTriggerEventToWorkflowTriggerEntries } from "../WorkflowUiTriggerEventAdapter";
 
@@ -73,6 +74,56 @@ describe("WorkflowUiTriggerEventAdapter", () => {
     expect(mapped.entries).toHaveLength(1);
     expect(mapped.entries[0]?.sourceKind).toBe("state-data");
     expect(mapped.entries[0]?.activationType).toBe("ui-selection");
+  });
+
+  it("maps UI events through declarative binding configuration without component-level hardcoding", () => {
+    const draft = {
+      ...createEmptyWorkflowDraft(),
+      triggers: [{
+        id: "trigger-parameter-submit",
+        kind: WorkflowDraftTriggerKinds.user,
+        type: WorkflowDraftTriggerTypes.userInitiatedRun,
+        config: {},
+      }],
+    };
+    const bindings = createImageWorkflowUiTriggerBindingConfiguration({
+      bindings: [{
+        bindingId: "binding.ui.parameter.submit",
+        event: {
+          kind: UiTriggerEventKinds.submit,
+          sourceComponentId: "parameter-form",
+          eventName: "ui.image.parameter.submit",
+        },
+        target: {
+          triggerId: "trigger-parameter-submit",
+        },
+      }],
+    });
+    const event = createUiTriggerEvent({
+      kind: UiTriggerEventKinds.submit,
+      name: "ui.image.parameter.submit",
+      source: {
+        studio: "system-studio",
+        componentId: "parameter-form",
+        actionId: "submit",
+      },
+      payload: {
+        imageId: "img-2",
+      },
+      context: {
+        workflowAssetId: "asset:workflow:image",
+      },
+    });
+
+    const mapped = mapUiTriggerEventToWorkflowTriggerEntries({ draft, event, bindings });
+    expect(mapped.entries).toHaveLength(1);
+    expect(mapped.entries[0]?.triggerId).toBe("trigger-parameter-submit");
+    expect(mapped.entries[0]?.bindingMetadata).toEqual(expect.objectContaining({
+      bindingId: "binding.ui.parameter.submit",
+    }));
+    expect(mapped.entries[0]?.contextReferences).toEqual(expect.objectContaining({
+      workflowAssetId: "asset:workflow:image",
+    }));
   });
 
   it("returns issues for invalid UI trigger contracts", () => {
