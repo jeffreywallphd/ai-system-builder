@@ -1,4 +1,8 @@
 import { WorkflowDraftTriggerTypes, type WorkflowDraft } from "../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  matchesUiTriggerBindingEvent,
+  type ImageWorkflowUiTriggerBindingConfiguration,
+} from "../contracts/ImageWorkflowUiTriggerBindingConfiguration";
 import { mapWorkflowDraftTriggersToExecutionTriggerPlan } from "./WorkflowDraftTriggerExecutionPlanner";
 import type { WorkflowExecutionTriggerEntry } from "./WorkflowTriggerExecutionEntryService";
 import {
@@ -45,6 +49,7 @@ function matchesManualTrigger(event: UiTriggerEvent, plan: ReturnType<typeof map
 export function mapUiTriggerEventToWorkflowTriggerEntries(input: {
   readonly draft: WorkflowDraft;
   readonly event: UiTriggerEvent;
+  readonly bindings?: ImageWorkflowUiTriggerBindingConfiguration;
 }): MapUiTriggerEventToWorkflowTriggerEntriesResult {
   const event = createUiTriggerEvent(input.event);
   const validationIssues = validateUiTriggerEvent(event);
@@ -58,12 +63,41 @@ export function mapUiTriggerEventToWorkflowTriggerEntries(input: {
     });
   }
 
-  const entries = mapWorkflowDraftTriggersToExecutionTriggerPlan(input.draft)
-    .filter((plan) => matchesManualTrigger(event, plan))
-    .map((plan) => Object.freeze({
+  const triggerPlan = mapWorkflowDraftTriggersToExecutionTriggerPlan(input.draft);
+  const declarativeBindings = input.bindings?.bindings ?? [];
+
+  const matchesByBinding = (plan: typeof triggerPlan[number]) => declarativeBindings
+    .filter((binding) => matchesUiTriggerBindingEvent({ binding, event }))
+    .filter((binding) => {
+      if (binding.target.triggerId && binding.target.triggerId !== plan.triggerId) {
+        return false;
+      }
+      if (binding.target.triggerType && binding.target.triggerType !== plan.triggerType) {
+        return false;
+      }
+      return true;
+    });
+
+  const matches = triggerPlan
+    .flatMap((plan) => {
+      const matchingBindings = matchesByBinding(plan);
+      if (matchingBindings.length === 0) {
+        if (declarativeBindings.length > 0) {
+          return [];
+        }
+        if (!matchesManualTrigger(event, plan)) {
+          return [];
+        }
+        return [Object.freeze({ plan })];
+      }
+      return matchingBindings.map((binding) => Object.freeze({ plan, binding }));
+    });
+
+  const entries = matches
+    .map(({ plan, binding }) => Object.freeze({
       sourceKind: mapUiTriggerKindToWorkflowSourceKind(event.kind),
-      triggerId: plan.triggerId,
-      triggerType: plan.triggerType,
+      triggerId: binding?.target.triggerId ?? plan.triggerId,
+      triggerType: binding?.target.triggerType ?? plan.triggerType,
       activationType: `ui-${event.kind}`,
       payload: Object.freeze({
         uiEventId: event.eventId,
@@ -73,13 +107,23 @@ export function mapUiTriggerEventToWorkflowTriggerEntries(input: {
         payload: event.payload,
         context: event.context,
       }),
+      contextReferences: event.context ? Object.freeze({ ...event.context, references: event.context.references }) : undefined,
+      bindingMetadata: binding
+        ? Object.freeze({
+          bindingId: binding.bindingId,
+          bindingContractVersion: input.bindings?.contractVersion,
+          source: "ui-trigger-binding",
+          ...binding.metadata,
+        })
+        : undefined,
       metadata: Object.freeze({
         uiEventName: event.name,
         uiEventKind: event.kind,
         uiSourceStudio: event.source.studio,
         uiComponentId: event.source.componentId,
       }),
-    } satisfies WorkflowExecutionTriggerEntry));
+    } satisfies WorkflowExecutionTriggerEntry))
+    .filter((entry) => Boolean(entry.triggerId || entry.triggerType));
 
   return Object.freeze({
     entries: Object.freeze(entries),

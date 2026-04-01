@@ -32,6 +32,12 @@ describe("WorkflowTriggerExecutionEntryService", () => {
         payload: {
           customerId: "customer-99",
         },
+        contextReferences: {
+          workflowAssetId: "asset:workflow:1",
+        },
+        bindingMetadata: {
+          bindingId: "binding.ui.selection",
+        },
       },
     });
 
@@ -50,8 +56,13 @@ describe("WorkflowTriggerExecutionEntryService", () => {
         triggerId: "trigger-state",
         triggerType: "system-event",
         activationType: "state-data",
+        contextReferences: {
+          workflowAssetId: "asset:workflow:1",
+        },
+        bindingMetadata: {
+          bindingId: "binding.ui.selection",
+        },
       },
     }));
   });
 });
-

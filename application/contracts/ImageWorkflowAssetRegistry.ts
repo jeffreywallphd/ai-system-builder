@@ -12,6 +12,7 @@ import type { ImageWorkflowAssetContract } from "./ImageWorkflowAssetContract";
 import { ImageWorkflowAssetIntentTypes } from "./ImageWorkflowAssetContract";
 import type { ImageWorkflowAssetPreview } from "./ImageWorkflowAssetPreview";
 import { serializeImageWorkflowInputBindingConfiguration } from "./ImageWorkflowInputBindingConfiguration";
+import { serializeImageWorkflowUiTriggerBindingConfiguration } from "./ImageWorkflowUiTriggerBindingConfiguration";
 import {
   ImageWorkflowOutputBindingConfigurationSchema,
 } from "./ImageWorkflowOutputBindingConfiguration";
@@ -48,6 +49,7 @@ export interface ImageWorkflowAssetRegistryEntry {
   }>;
   readonly inputBindings: Readonly<Record<string, unknown>>;
   readonly outputBindings: Readonly<Record<string, unknown>>;
+  readonly uiTriggerBindings: Readonly<Record<string, unknown>>;
 }
 
 export class ImageWorkflowAssetRegistry {
@@ -92,6 +94,7 @@ export class ImageWorkflowAssetRegistry {
       }))),
       inputBindings: serializeImageWorkflowInputBindingConfiguration(entry.inputBindings),
       outputBindings: ImageWorkflowOutputBindingConfigurationSchema.parse(entry.outputBindings),
+      uiTriggerBindings: serializeImageWorkflowUiTriggerBindingConfiguration(entry.uiTriggerBindings),
     })));
   }
 
