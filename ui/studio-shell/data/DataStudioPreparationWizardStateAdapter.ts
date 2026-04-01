@@ -5,6 +5,7 @@ import {
   type DataStudioWizardNavigationResult,
   type DataStudioWizardSnapshot,
   type DataStudioWizardStageSnapshot,
+  type DataStudioPreparationTemplateSummary,
   type DataStudioWizardValidationIssue,
 } from "../../../application/data-studio/DataStudioPreparationWizard";
 import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
@@ -52,6 +53,19 @@ export class DataStudioPreparationWizardStateAdapter {
   public getCurrentStage(): DataStudioWizardStageSnapshot | undefined {
     const snapshot = this.getSnapshot();
     return snapshot.stages.find((stage) => stage.stageId === snapshot.currentStageId);
+  }
+
+  public listTemplates(): ReadonlyArray<DataStudioPreparationTemplateSummary> {
+    return this.wizard.listTemplates();
+  }
+
+  public selectTemplate(templateId: string): DataStudioPreparationWizardAdapterUpdateResult {
+    try {
+      this.wizard.selectTemplate(templateId);
+      return okResult();
+    } catch (error) {
+      return issueResult((error as Error).message);
+    }
   }
 
   public goNext(): DataStudioWizardNavigationResult {

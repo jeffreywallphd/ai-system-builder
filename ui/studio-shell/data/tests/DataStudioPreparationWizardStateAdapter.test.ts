@@ -3,6 +3,21 @@ import { DataStudioPreparationWizardStateAdapter } from "../DataStudioPreparatio
 import { PipelineStageIds } from "../../../../domain/dataset-studio/PipelineStageDomain";
 
 describe("DataStudioPreparationWizardStateAdapter", () => {
+  it("lists and applies intent templates", () => {
+    const adapter = new DataStudioPreparationWizardStateAdapter();
+    const templates = adapter.listTemplates();
+    expect(templates.map((template) => template.id)).toEqual([
+      "elt-pipeline",
+      "analytics-pipeline",
+      "document-pipeline",
+      "image-pipeline",
+    ]);
+
+    const apply = adapter.selectTemplate("image-pipeline");
+    expect(apply.ok).toBeTrue();
+    expect(adapter.getSnapshot().template.id).toBe("image-pipeline");
+  });
+
   it("supports stage navigation and preserves stage configuration", () => {
     const adapter = new DataStudioPreparationWizardStateAdapter();
     const start = adapter.getSnapshot();

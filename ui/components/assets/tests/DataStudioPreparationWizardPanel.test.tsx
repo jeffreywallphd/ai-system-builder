@@ -8,6 +8,7 @@ describe("DataStudioPreparationWizardPanel", () => {
     const html = renderToStaticMarkup(React.createElement(DataStudioPreparationWizardPanel));
 
     expect(html).toContain("Data Studio Preparation Wizard");
+    expect(html).toContain("Pipeline template");
     expect(html).toContain("Simple Flow");
     expect(html).toContain("Advanced Flow");
     expect(html).toContain("Asset Nodes");

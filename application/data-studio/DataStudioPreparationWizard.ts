@@ -1,12 +1,10 @@
 import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
 import {
-  PipelineStageIds,
   type PipelineStageConfigMode,
   type PipelineStageId,
 } from "../../domain/dataset-studio/PipelineStageDomain";
 import { PipelineStageRegistry } from "../../domain/dataset-studio/PipelineStageRegistry";
 import {
-  UnifiedPreparationAssetKinds,
   UnifiedPreparationStageActivationModes,
   type UnifiedPreparationAssetDefinition,
   type UnifiedPreparationStageActivation,
@@ -18,6 +16,18 @@ import {
   type UnifiedPreparationPipelineResolution,
 } from "../dataset-studio/UnifiedPreparationPipelineService";
 import type { StudioAuthoringGraphProjection } from "../studio-shell/StudioAuthoringGraph";
+import { createDefaultDataStudioPreparationAssetDefinition } from "./DataStudioPreparationAssetDefaults";
+import {
+  createDefaultDataStudioPreparationTemplateRegistry,
+  type DataStudioPreparationFieldDescriptor,
+  type DataStudioPreparationFieldInputKind,
+  type DataStudioPreparationFieldOption,
+  type DataStudioPreparationTemplateConditionContext,
+  type DataStudioPreparationTemplateConditionEvaluator,
+  type DataStudioPreparationTemplateSummary,
+  type DataStudioPreparationFieldDependency,
+  type DataStudioPreparationTemplateRegistry,
+} from "./DataStudioPreparationTemplates";
 
 export const DataStudioWizardPresentationModes = Object.freeze({
   simple: "simple",
@@ -50,6 +60,20 @@ export interface DataStudioWizardStageAvailability {
   readonly reason?: "disabled" | "visibility" | "condition";
 }
 
+export interface DataStudioWizardFieldSnapshot {
+  readonly fieldId: string;
+  readonly optionKey: string;
+  readonly label: string;
+  readonly description?: string;
+  readonly placeholder?: string;
+  readonly inputKind: DataStudioPreparationFieldInputKind;
+  readonly visibility: UnifiedPreparationVisibilityMode;
+  readonly value?: CanonicalRecordValue;
+  readonly options?: ReadonlyArray<DataStudioPreparationFieldOption>;
+  readonly isVisible: boolean;
+  readonly hiddenReason?: "visibility" | "template" | "condition";
+}
+
 export interface DataStudioWizardStageSnapshot {
   readonly stageId: PipelineStageId;
   readonly order: number;
@@ -64,6 +88,7 @@ export interface DataStudioWizardStageSnapshot {
   readonly options: Readonly<Record<string, CanonicalRecordValue>>;
   readonly assetGroupIds: ReadonlyArray<string>;
   readonly availability: DataStudioWizardStageAvailability;
+  readonly fields: ReadonlyArray<DataStudioWizardFieldSnapshot>;
 }
 
 export interface DataStudioWizardSnapshot {
@@ -71,6 +96,7 @@ export interface DataStudioWizardSnapshot {
   readonly versionId: string;
   readonly currentStageId: PipelineStageId;
   readonly presentationMode: DataStudioWizardPresentationMode;
+  readonly template: DataStudioPreparationTemplateSummary;
   readonly stages: ReadonlyArray<DataStudioWizardStageSnapshot>;
   readonly completedStageIds: ReadonlyArray<PipelineStageId>;
   readonly skippedStageIds: ReadonlyArray<PipelineStageId>;
@@ -89,15 +115,9 @@ export interface DataStudioWizardNavigationResult {
   readonly reason?: string;
 }
 
-export interface DataStudioWizardConditionContext {
-  readonly currentStageId: PipelineStageId;
-  readonly presentationMode: DataStudioWizardPresentationMode;
-  readonly completedStageIds: ReadonlyArray<PipelineStageId>;
-  readonly skippedStageIds: ReadonlyArray<PipelineStageId>;
-  readonly stageOptions: Readonly<Record<PipelineStageId, Readonly<Record<string, CanonicalRecordValue>>>>;
-}
+export type DataStudioWizardConditionContext = DataStudioPreparationTemplateConditionContext;
 
-export type DataStudioWizardConditionEvaluator = (context: DataStudioWizardConditionContext) => boolean;
+export type DataStudioWizardConditionEvaluator = DataStudioPreparationTemplateConditionEvaluator;
 
 export interface DataStudioWizardValidationHooks {
   readonly onEnterStage?: (input: {
@@ -126,6 +146,8 @@ export interface DataStudioPreparationWizardOptions {
   readonly asset?: UnifiedPreparationAssetDefinition;
   readonly pipelineService?: UnifiedPreparationPipelineService;
   readonly stageRegistry?: PipelineStageRegistry;
+  readonly templateRegistry?: DataStudioPreparationTemplateRegistry;
+  readonly templateId?: string;
   readonly conditionEvaluators?: Readonly<Record<string, DataStudioWizardConditionEvaluator>>;
   readonly validationHooks?: DataStudioWizardValidationHooks;
   readonly presentationMode?: DataStudioWizardPresentationMode;
@@ -224,71 +246,27 @@ function computeProgressPercent(stages: ReadonlyArray<DataStudioWizardStageSnaps
   return Math.round((completedCount / stages.length) * 100);
 }
 
-export function createDefaultDataStudioPreparationAssetDefinition(
-  stageRegistry: PipelineStageRegistry = new PipelineStageRegistry(),
-): UnifiedPreparationAssetDefinition {
-  const stageDefinitions = stageRegistry.listDefinitions();
-  const stages = Object.freeze(stageDefinitions.map((definition) => Object.freeze({
-    stageId: definition.id,
-    visibility: definition.defaultEnabled ? "simple" : "advanced",
-    configMode: definition.defaultEnabled ? "simple" : "advanced",
-    activation: Object.freeze({
-      mode: definition.defaultEnabled
-        ? UnifiedPreparationStageActivationModes.always
-        : UnifiedPreparationStageActivationModes.disabled,
-    }),
-    options: Object.freeze({}),
-  } satisfies UnifiedPreparationStageConfig)));
-
-  return Object.freeze({
-    identity: Object.freeze({
-      assetId: "data-studio.preparation.default",
-      versionId: "1.0.0",
-      kind: UnifiedPreparationAssetKinds.unifiedPreparation,
-    }),
-    versioning: Object.freeze({
-      schemaVersion: "1.0.0",
-      contractVersion: "1.0.0",
-      revision: 1,
-    }),
-    upstreamBindings: Object.freeze([
-      Object.freeze({
-        pipelineAssetId: "pipeline.tabular-cleaning.v1",
-      }),
-    ]),
-    stages: Object.freeze(stages.map((stage) => (
-      stage.stageId === PipelineStageIds.StoragePrepared
-        ? Object.freeze({
-          ...stage,
-          options: Object.freeze({
-            destination: "prepared://dataset",
-          }),
-        })
-        : stage
-    ))),
-    output: Object.freeze({
-      preparedAssetId: "data-studio.prepared.default",
-      outputShapeKind: "records",
-    }),
-    storageTarget: Object.freeze({
-      targetId: "prepared://dataset",
-    }),
-    lineage: Object.freeze({
-      upstreamAssetIds: Object.freeze(["pipeline.tabular-cleaning.v1"]),
-      reusableAsAsset: true,
-    }),
-    preview: Object.freeze({
-      previewEnabled: true,
-      inspectionEnabled: true,
-      previewSampleSize: 50,
-    }),
-  });
+function matchesFieldDependency(
+  dependency: DataStudioPreparationFieldDependency,
+  context: DataStudioWizardConditionContext,
+): boolean {
+  const value = context.stageOptions[dependency.stageId]?.[dependency.optionKey];
+  if (dependency.in && dependency.in.length > 0) {
+    return dependency.in.includes(value);
+  }
+  if (dependency.equals !== undefined) {
+    return value === dependency.equals;
+  }
+  return Boolean(value);
 }
 
 export class DataStudioPreparationWizard {
   private asset: UnifiedPreparationAssetDefinition;
   private readonly pipelineService: UnifiedPreparationPipelineService;
-  private readonly conditionEvaluators: Readonly<Record<string, DataStudioWizardConditionEvaluator>>;
+  private readonly templateRegistry: DataStudioPreparationTemplateRegistry;
+  private selectedTemplateId: string;
+  private readonly customConditionEvaluators: Readonly<Record<string, DataStudioWizardConditionEvaluator>>;
+  private templateConditionEvaluators: Readonly<Record<string, DataStudioWizardConditionEvaluator>>;
   private readonly validationHooks: DataStudioWizardValidationHooks;
   private presentationMode: DataStudioWizardPresentationMode;
   private resolution: UnifiedPreparationPipelineResolution;
@@ -302,8 +280,17 @@ export class DataStudioPreparationWizard {
     this.pipelineService = options.pipelineService ?? new UnifiedPreparationPipelineService({
       stageRegistry,
     });
-    this.asset = options.asset ?? createDefaultDataStudioPreparationAssetDefinition(stageRegistry);
-    this.conditionEvaluators = options.conditionEvaluators ?? Object.freeze({});
+    this.templateRegistry = options.templateRegistry ?? createDefaultDataStudioPreparationTemplateRegistry();
+    this.selectedTemplateId = options.templateId?.trim() || this.templateRegistry.getDefaultTemplateId();
+
+    const templateInstantiation = options.asset
+      ? undefined
+      : this.templateRegistry.instantiate(this.selectedTemplateId);
+    this.asset = options.asset ?? templateInstantiation?.asset ?? createDefaultDataStudioPreparationAssetDefinition(stageRegistry);
+    this.selectedTemplateId = templateInstantiation?.template.id ?? this.selectedTemplateId;
+
+    this.customConditionEvaluators = options.conditionEvaluators ?? Object.freeze({});
+    this.templateConditionEvaluators = this.templateRegistry.getTemplate(this.selectedTemplateId).conditionEvaluators ?? Object.freeze({});
     this.validationHooks = options.validationHooks ?? Object.freeze({});
     this.presentationMode = options.presentationMode ?? DataStudioWizardPresentationModes.simple;
     this.resolution = this.pipelineService.resolve(this.asset);
@@ -331,6 +318,7 @@ export class DataStudioPreparationWizard {
       versionId: this.asset.identity.versionId,
       currentStageId,
       presentationMode: this.presentationMode,
+      template: this.templateRegistry.getTemplateSummary(this.selectedTemplateId),
       stages,
       completedStageIds: this.completedStageIds,
       skippedStageIds: this.skippedStageIds,
@@ -343,6 +331,27 @@ export class DataStudioPreparationWizard {
 
   public getAssetDefinition(): UnifiedPreparationAssetDefinition {
     return this.asset;
+  }
+
+  public listTemplates(): ReadonlyArray<DataStudioPreparationTemplateSummary> {
+    return this.templateRegistry.listTemplates();
+  }
+
+  public selectTemplate(templateId: string): DataStudioWizardSnapshot {
+    const instantiation = this.templateRegistry.instantiate(templateId);
+    this.selectedTemplateId = instantiation.template.id;
+    this.asset = instantiation.asset;
+    this.templateConditionEvaluators = instantiation.template.conditionEvaluators ?? Object.freeze({});
+    this.resolution = this.pipelineService.resolve(this.asset);
+    this.completedStageIds = Object.freeze([]);
+    this.skippedStageIds = Object.freeze([]);
+    this.navigationHistory = Object.freeze([]);
+    const initialStageId = this.getInitialStageId();
+    if (!initialStageId) {
+      throw new Error("Data Studio wizard requires at least one available stage.");
+    }
+    this.currentStageId = initialStageId;
+    return this.getSnapshot();
   }
 
   public setPresentationMode(mode: DataStudioWizardPresentationMode): DataStudioWizardSnapshot {
@@ -625,6 +634,61 @@ export class DataStudioPreparationWizard {
     );
   }
 
+  private resolveFieldSnapshots(
+    stage: UnifiedPreparationStageConfig,
+    conditionContext: DataStudioWizardConditionContext,
+  ): ReadonlyArray<DataStudioWizardFieldSnapshot> {
+    const descriptors = this.templateRegistry
+      .listFieldDescriptors()
+      .filter((descriptor) => descriptor.stageId === stage.stageId);
+
+    return Object.freeze(descriptors.map((descriptor) => this.toFieldSnapshot(descriptor, stage, conditionContext)));
+  }
+
+  private toFieldSnapshot(
+    descriptor: DataStudioPreparationFieldDescriptor,
+    stage: UnifiedPreparationStageConfig,
+    conditionContext: DataStudioWizardConditionContext,
+  ): DataStudioWizardFieldSnapshot {
+    const override = this.templateRegistry.resolveFieldVisibilityOverride(
+      this.selectedTemplateId,
+      stage.stageId,
+      descriptor.fieldId,
+    );
+
+    const visibility = override?.visibility ?? descriptor.visibility;
+    const templates = override?.templates ?? descriptor.templates;
+    const dependency = override?.dependsOn ?? descriptor.dependsOn;
+
+    let isVisible = true;
+    let hiddenReason: DataStudioWizardFieldSnapshot["hiddenReason"];
+
+    if (this.presentationMode === DataStudioWizardPresentationModes.simple && visibility === "advanced") {
+      isVisible = false;
+      hiddenReason = "visibility";
+    } else if (templates && templates.length > 0 && !templates.includes(this.selectedTemplateId)) {
+      isVisible = false;
+      hiddenReason = "template";
+    } else if (dependency && !matchesFieldDependency(dependency, conditionContext)) {
+      isVisible = false;
+      hiddenReason = "condition";
+    }
+
+    return Object.freeze({
+      fieldId: descriptor.fieldId,
+      optionKey: descriptor.optionKey,
+      label: descriptor.label,
+      description: descriptor.description,
+      placeholder: descriptor.placeholder,
+      inputKind: descriptor.inputKind,
+      visibility,
+      value: stage.options[descriptor.optionKey] ?? descriptor.defaultValue,
+      options: descriptor.options,
+      isVisible,
+      hiddenReason,
+    });
+  }
+
   private getOrderedStageSnapshots(): ReadonlyArray<DataStudioWizardStageSnapshot> {
     const stageConfigById = new Map(this.asset.stages.map((stage) => [stage.stageId, stage]));
     const completedSet = new Set(this.completedStageIds);
@@ -644,6 +708,7 @@ export class DataStudioPreparationWizard {
       }
       const availability = this.resolveAvailability(config, conditionContext);
       const status = this.resolveStatus(descriptor.stageId, availability, completedSet, skippedSet);
+      const fields = this.resolveFieldSnapshots(config, conditionContext);
 
       return Object.freeze({
         stageId: descriptor.stageId,
@@ -659,6 +724,7 @@ export class DataStudioPreparationWizard {
         options: config.options,
         assetGroupIds: descriptor.assetGroupIds,
         availability,
+        fields,
       });
     }));
   }
@@ -687,7 +753,7 @@ export class DataStudioPreparationWizard {
           reason: "condition",
         });
       }
-      const evaluator = this.conditionEvaluators[conditionId];
+      const evaluator = this.customConditionEvaluators[conditionId] ?? this.templateConditionEvaluators[conditionId];
       const conditionMet = Boolean(evaluator?.(context));
       if (!conditionMet) {
         return Object.freeze({
@@ -736,4 +802,8 @@ export class DataStudioPreparationWizard {
       .filter((stage) => !stage.availability.isAvailable)
       .map((stage) => stage.stageId));
   }
+
 }
+
+export { createDefaultDataStudioPreparationAssetDefinition } from "./DataStudioPreparationAssetDefaults";
+export type { DataStudioPreparationTemplateSummary } from "./DataStudioPreparationTemplates";

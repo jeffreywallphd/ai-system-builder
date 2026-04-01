@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
-import { PipelineStageIds, type PipelineStageId } from "../../../domain/dataset-studio/PipelineStageDomain";
+import type { PipelineStageId } from "../../../domain/dataset-studio/PipelineStageDomain";
 import {
   UnifiedPreparationStageActivationModes,
   type UnifiedPreparationStageActivation,
 } from "../../../domain/dataset-studio/UnifiedPreparationAsset";
 import type {
+  DataStudioWizardFieldSnapshot,
   DataStudioWizardSnapshot,
   DataStudioWizardStageSnapshot,
 } from "../../../application/data-studio/DataStudioPreparationWizard";
@@ -35,127 +36,6 @@ function stageStatusLabel(status: WizardStageStatus): string {
   return "Pending";
 }
 
-function sourceStageRenderer(
-  stage: DataStudioWizardStageSnapshot,
-  onOptionsChange: (stageId: PipelineStageId, options: Readonly<Record<string, CanonicalRecordValue>>) => void,
-): JSX.Element {
-  const sourceReference = typeof stage.options.sourceReference === "string" ? stage.options.sourceReference : "";
-  const sourceKind = typeof stage.options.sourceKind === "string" ? stage.options.sourceKind : "auto";
-  return (
-    <section className="ui-stack ui-stack--xs">
-      <strong>Source Selection</strong>
-      <label className="ui-field">
-        <span className="ui-field__label">Source kind</span>
-        <select
-          className="ui-select"
-          value={sourceKind}
-          onChange={(event) => onOptionsChange(stage.stageId, Object.freeze({
-            ...stage.options,
-            sourceKind: event.currentTarget.value,
-          }))}
-        >
-          <option value="auto">auto</option>
-          <option value="csv">csv</option>
-          <option value="json">json</option>
-          <option value="document">document</option>
-          <option value="image">image</option>
-        </select>
-      </label>
-      <label className="ui-field">
-        <span className="ui-field__label">Source reference</span>
-        <input
-          className="ui-input"
-          value={sourceReference}
-          placeholder="in-memory://source or C:\\data\\source.csv"
-          onChange={(event) => onOptionsChange(stage.stageId, Object.freeze({
-            ...stage.options,
-            sourceReference: event.currentTarget.value,
-          }))}
-        />
-      </label>
-    </section>
-  );
-}
-
-function ingestionStageRenderer(
-  stage: DataStudioWizardStageSnapshot,
-  onOptionsChange: (stageId: PipelineStageId, options: Readonly<Record<string, CanonicalRecordValue>>) => void,
-): JSX.Element {
-  const outputTarget = typeof stage.options.outputTarget === "string" ? stage.options.outputTarget : "records";
-  return (
-    <section className="ui-stack ui-stack--xs">
-      <strong>Unified Ingestion</strong>
-      <label className="ui-field">
-        <span className="ui-field__label">Output target</span>
-        <select
-          className="ui-select"
-          value={outputTarget}
-          onChange={(event) => onOptionsChange(stage.stageId, Object.freeze({
-            ...stage.options,
-            outputTarget: event.currentTarget.value,
-          }))}
-        >
-          <option value="records">records</option>
-          <option value="text-items">text-items</option>
-          <option value="image-metadata-records">image-metadata-records</option>
-        </select>
-      </label>
-      <span className="ui-subtle">Route override, detection tuning, and advanced mapping editors can layer on this stage.</span>
-    </section>
-  );
-}
-
-function preparedStorageRenderer(
-  stage: DataStudioWizardStageSnapshot,
-  onOptionsChange: (stageId: PipelineStageId, options: Readonly<Record<string, CanonicalRecordValue>>) => void,
-): JSX.Element {
-  const destination = typeof stage.options.destination === "string" ? stage.options.destination : "";
-  return (
-    <section className="ui-stack ui-stack--xs">
-      <strong>Prepared Storage</strong>
-      <label className="ui-field">
-        <span className="ui-field__label">Destination</span>
-        <input
-          className="ui-input"
-          value={destination}
-          placeholder="prepared://dataset"
-          onChange={(event) => onOptionsChange(stage.stageId, Object.freeze({
-            ...stage.options,
-            destination: event.currentTarget.value,
-          }))}
-        />
-      </label>
-    </section>
-  );
-}
-
-function defaultRenderer(stage: DataStudioWizardStageSnapshot): JSX.Element {
-  return (
-    <section className="ui-stack ui-stack--xs" data-testid="data-studio-wizard-stage-default-renderer">
-      <strong>{stage.title}</strong>
-      <span className="ui-subtle">{stage.description}</span>
-      <div className="ui-meta-grid">
-        <div className="ui-meta-item">
-          <div className="ui-meta-label">Status</div>
-          <div className="ui-meta-value">{stageStatusLabel(stage.status)}</div>
-        </div>
-        <div className="ui-meta-item">
-          <div className="ui-meta-label">Visibility</div>
-          <div className="ui-meta-value">{stage.visibility}</div>
-        </div>
-        <div className="ui-meta-item">
-          <div className="ui-meta-label">Config mode</div>
-          <div className="ui-meta-value">{stage.configMode}</div>
-        </div>
-        <div className="ui-meta-item">
-          <div className="ui-meta-label">Activation</div>
-          <div className="ui-meta-value">{stage.activation.mode}</div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function toActivation(
   mode: string,
   conditionId: string,
@@ -176,6 +56,31 @@ function toActivation(
   });
 }
 
+function parseTextList(value: string): ReadonlyArray<string> {
+  return Object.freeze(
+    value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0),
+  );
+}
+
+function formatFieldValue(field: DataStudioWizardFieldSnapshot): string {
+  if (Array.isArray(field.value)) {
+    return field.value.join(", ");
+  }
+  if (typeof field.value === "number") {
+    return String(field.value);
+  }
+  if (typeof field.value === "boolean") {
+    return field.value ? "true" : "false";
+  }
+  if (typeof field.value === "string") {
+    return field.value;
+  }
+  return "";
+}
+
 export default function DataStudioPreparationWizardPanel(props: DataStudioPreparationWizardPanelProps): JSX.Element {
   const localAdapter = useMemo(
     () => new DataStudioPreparationWizardStateAdapter(),
@@ -189,6 +94,7 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
   const [updateError, setUpdateError] = useState<string | undefined>(undefined);
 
   const currentStage = snapshot.stages.find((stage) => stage.stageId === snapshot.currentStageId);
+  const templateOptions = adapter.listTemplates();
   const paletteTerm = paletteSearch.trim().toLowerCase();
   const paletteStages = snapshot.stages.filter((stage) => {
     if (!paletteTerm) {
@@ -223,29 +129,157 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
     applyResult(result);
   };
 
+  const updateFieldValue = (
+    stage: DataStudioWizardStageSnapshot,
+    field: DataStudioWizardFieldSnapshot,
+    value: CanonicalRecordValue,
+  ) => {
+    applyStageOptions(stage.stageId, Object.freeze({
+      ...stage.options,
+      [field.optionKey]: value,
+    }));
+  };
+
+  const renderField = (stage: DataStudioWizardStageSnapshot, field: DataStudioWizardFieldSnapshot): JSX.Element => {
+    if (!field.isVisible) {
+      return (
+        <div key={field.fieldId} className="ui-text-small ui-text-secondary">
+          {field.label} hidden in this flow ({field.hiddenReason ?? "rule"}).
+        </div>
+      );
+    }
+
+    if (field.inputKind === "toggle") {
+      return (
+        <label key={field.fieldId} className="ui-field">
+          <span className="ui-field__label">{field.label}</span>
+          <input
+            type="checkbox"
+            checked={field.value === true}
+            onChange={(event) => updateFieldValue(stage, field, event.currentTarget.checked)}
+          />
+          {field.description ? <span className="ui-field__hint">{field.description}</span> : null}
+        </label>
+      );
+    }
+
+    if (field.inputKind === "select") {
+      return (
+        <label key={field.fieldId} className="ui-field">
+          <span className="ui-field__label">{field.label}</span>
+          <select
+            className="ui-select"
+            value={typeof field.value === "string" || typeof field.value === "number" ? String(field.value) : ""}
+            onChange={(event) => updateFieldValue(stage, field, event.currentTarget.value)}
+          >
+            {(field.options ?? []).map((option) => (
+              <option key={`${field.fieldId}-${option.value}`} value={String(option.value)}>{option.label}</option>
+            ))}
+          </select>
+          {field.description ? <span className="ui-field__hint">{field.description}</span> : null}
+        </label>
+      );
+    }
+
+    if (field.inputKind === "number") {
+      return (
+        <label key={field.fieldId} className="ui-field">
+          <span className="ui-field__label">{field.label}</span>
+          <input
+            className="ui-input"
+            type="number"
+            value={formatFieldValue(field)}
+            placeholder={field.placeholder}
+            onChange={(event) => {
+              const parsed = Number(event.currentTarget.value);
+              updateFieldValue(stage, field, Number.isFinite(parsed) ? parsed : 0);
+            }}
+          />
+          {field.description ? <span className="ui-field__hint">{field.description}</span> : null}
+        </label>
+      );
+    }
+
+    const isList = field.optionKey.toLowerCase().includes("fields");
+    return (
+      <label key={field.fieldId} className="ui-field">
+        <span className="ui-field__label">{field.label}</span>
+        <input
+          className="ui-input"
+          value={formatFieldValue(field)}
+          placeholder={field.placeholder}
+          onChange={(event) => updateFieldValue(
+            stage,
+            field,
+            isList ? parseTextList(event.currentTarget.value) : event.currentTarget.value,
+          )}
+        />
+        {field.description ? <span className="ui-field__hint">{field.description}</span> : null}
+      </label>
+    );
+  };
+
   const renderCurrentStage = (): JSX.Element => {
     if (!currentStage) {
       return <span className="ui-subtle">No active stage.</span>;
     }
-    if (currentStage.stageId === PipelineStageIds.SourceSelection) {
-      return sourceStageRenderer(currentStage, applyStageOptions);
+
+    const visibleFields = currentStage.fields.filter((field) => field.isVisible);
+    if (visibleFields.length === 0) {
+      return (
+        <section className="ui-stack ui-stack--xs" data-testid="data-studio-wizard-stage-default-renderer">
+          <strong>{currentStage.title}</strong>
+          <span className="ui-subtle">No configurable fields in the current visibility mode.</span>
+          <div className="ui-meta-grid">
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Status</div>
+              <div className="ui-meta-value">{stageStatusLabel(currentStage.status)}</div>
+            </div>
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Visibility</div>
+              <div className="ui-meta-value">{currentStage.visibility}</div>
+            </div>
+            <div className="ui-meta-item">
+              <div className="ui-meta-label">Activation</div>
+              <div className="ui-meta-value">{currentStage.activation.mode}</div>
+            </div>
+          </div>
+        </section>
+      );
     }
-    if (currentStage.stageId === PipelineStageIds.UnifiedIngestion) {
-      return ingestionStageRenderer(currentStage, applyStageOptions);
-    }
-    if (currentStage.stageId === PipelineStageIds.StoragePrepared) {
-      return preparedStorageRenderer(currentStage, applyStageOptions);
-    }
-    return defaultRenderer(currentStage);
+
+    return (
+      <section className="ui-stack ui-stack--xs" data-testid="data-studio-wizard-stage-field-renderer">
+        <strong>{currentStage.title} Configuration</strong>
+        {visibleFields.map((field) => renderField(currentStage, field))}
+      </section>
+    );
   };
 
   return (
     <section className="ui-card ui-card--padded ui-stage-wizard ui-stack ui-stack--md" data-testid="data-studio-preparation-wizard-panel">
       <header className="ui-stack ui-stack--2xs">
         <h3>Data Studio Preparation Wizard</h3>
-        <span className="ui-subtle">Stage-oriented authoring over the unified preparation asset graph.</span>
+        <span className="ui-subtle">Intent-driven stage-oriented authoring over the unified preparation asset graph.</span>
         <span className="ui-subtle">Progress: {snapshot.progressPercent}%</span>
       </header>
+
+      <label className="ui-field">
+        <span className="ui-field__label">Pipeline template</span>
+        <select
+          className="ui-select"
+          value={snapshot.template.id}
+          onChange={(event) => {
+            const result = adapter.selectTemplate(event.currentTarget.value);
+            applyResult(result);
+          }}
+        >
+          {templateOptions.map((template) => (
+            <option key={template.id} value={template.id}>{template.name} ({template.intent})</option>
+          ))}
+        </select>
+        <span className="ui-field__hint">{snapshot.template.description} (v{snapshot.template.version})</span>
+      </label>
 
       <div className="ui-row ui-row--wrap">
         <button
@@ -469,4 +503,3 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
     </section>
   );
 }
-
