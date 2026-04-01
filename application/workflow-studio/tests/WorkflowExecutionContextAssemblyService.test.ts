@@ -149,4 +149,85 @@ describe("assembleWorkflowExecutionContext", () => {
       { assetId: "asset:image:2" },
     ]);
   });
+
+  it("resolves reusable authored bindings end-to-end across form, trigger, dataset, selected-image, and constants/defaults", () => {
+    const result = assembleWorkflowExecutionContext({
+      inputBindings: [
+        {
+          inputId: "instruction",
+          sourceType: "runtime-parameter",
+          required: true,
+          valueType: "string",
+          bindingKey: "inputs.instruction",
+          metadata: {
+            systemInputBinding: {
+              bindingId: "binding.instruction",
+              sources: [
+                { sourceId: "form", kind: "ui-form-value", formKey: "instruction", priority: 1, required: true },
+                { sourceId: "trigger", kind: "trigger-payload", payloadKey: "instruction", priority: 2 },
+              ],
+            },
+          },
+        },
+        {
+          inputId: "sourceImage",
+          sourceType: "runtime-parameter",
+          required: true,
+          valueType: "object",
+          bindingKey: "inputs.sourceImage",
+          metadata: {
+            systemInputBinding: {
+              bindingId: "binding.source-image",
+              sources: [
+                { sourceId: "selected", kind: "selected-image", path: "assetRef", priority: 1, required: true },
+                { sourceId: "dataset", kind: "dataset-instance-reference", purpose: "active-input", priority: 2, resolution: { shape: "record", index: 0, fieldPath: "assetRef" } },
+              ],
+            },
+          },
+        },
+        {
+          inputId: "stylePreset",
+          sourceType: "runtime-parameter",
+          required: false,
+          valueType: "string",
+          bindingKey: "inputs.stylePreset",
+          defaultValue: "neutral",
+          metadata: {
+            systemInputBinding: {
+              bindingId: "binding.style-preset",
+              sources: [
+                { sourceId: "runtime", kind: "runtime-parameter", parameterKey: "stylePreset", priority: 1 },
+                { sourceId: "constant", kind: "constant-value", value: "cinematic", priority: 2 },
+              ],
+            },
+          },
+        },
+      ],
+      context: {
+        inputValues: {},
+        triggerPayload: { instruction: "trigger fallback instruction" },
+        metadata: {
+          systemFormValues: { instruction: "form instruction" },
+          selectedImage: { assetRef: { assetId: "asset:image:selected" } },
+          datasetInstances: [{
+            instanceId: "instance:active",
+            purpose: "active-input",
+            records: [{ recordId: "record:0", value: { assetRef: { assetId: "asset:image:from-dataset" } } }],
+          }],
+        },
+      },
+    });
+
+    expect(result.context.resolvedInputValues).toEqual({
+      instruction: "form instruction",
+      sourceImage: { assetId: "asset:image:selected" },
+      stylePreset: "cinematic",
+    });
+    expect(result.context.resolvedInputs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ inputId: "instruction", resolutionSource: "ui-form-value" }),
+      expect.objectContaining({ inputId: "sourceImage", resolutionSource: "selected-image-context" }),
+      expect.objectContaining({ inputId: "stylePreset", resolutionSource: "runtime-parameter" }),
+    ]));
+    expect(result.issues.some((issue) => `${issue.code}:${issue.message}`.toLowerCase().includes("comfy"))).toBeFalse();
+  });
 });

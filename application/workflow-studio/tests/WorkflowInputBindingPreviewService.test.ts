@@ -86,4 +86,44 @@ describe("previewWorkflowInputBindings", () => {
     expect(preview.items[0]?.diagnostics.some((diagnostic) => diagnostic.code === "invalid-binding-configuration")).toBeTrue();
     expect(preview.items[0]?.diagnostics.some((diagnostic) => diagnostic.code === "dataset-instance-missing")).toBeTrue();
   });
+
+  it("supports inspectable preview coverage for dataset + selected image + constant fallback flows", () => {
+    const preview = previewWorkflowInputBindings({
+      bindings: [
+        createWorkflowInputBindingDescriptor({
+          bindingId: "binding.sourceImage",
+          inputId: "sourceImage",
+          required: true,
+          valueType: "object",
+          sources: [
+            { sourceId: "selected", kind: WorkflowInputBindingSourceKinds.selectedImage, path: "assetRef", priority: 1 },
+            { sourceId: "dataset", kind: WorkflowInputBindingSourceKinds.datasetInstanceReference, purpose: "active-input", priority: 2, resolution: { shape: "record", index: 0, fieldPath: "assetRef" } },
+          ],
+        }),
+        createWorkflowInputBindingDescriptor({
+          bindingId: "binding.stylePreset",
+          inputId: "stylePreset",
+          required: false,
+          valueType: "string",
+          sources: [
+            { sourceId: "runtime", kind: WorkflowInputBindingSourceKinds.runtimeParameter, parameterKey: "stylePreset", priority: 1 },
+            { sourceId: "constant", kind: WorkflowInputBindingSourceKinds.constantValue, value: "cinematic", priority: 2 },
+          ],
+        }),
+      ],
+      context: {
+        runtimeParameters: {},
+        selectedImage: { assetRef: { assetId: "asset:image:selected" } },
+        datasetInstances: [{
+          instanceId: "instance:active",
+          purpose: "active-input",
+          records: [{ recordId: "record:0", value: { assetRef: { assetId: "asset:image:from-dataset" } } }],
+        }],
+      },
+    });
+
+    expect(preview.items.find((item) => item.inputId === "sourceImage")?.resolved).toBeTrue();
+    expect(preview.items.find((item) => item.inputId === "stylePreset")?.valueSummary?.summary).toBe("cinematic");
+    expect(preview.diagnostics.some((diagnostic) => diagnostic.code === "source-value-missing")).toBeFalse();
+  });
 });
