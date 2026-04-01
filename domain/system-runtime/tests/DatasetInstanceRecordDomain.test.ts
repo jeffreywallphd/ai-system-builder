@@ -4,6 +4,7 @@ import {
   matchesDatasetInstanceImageRecordQuery,
   normalizeDatasetInstanceImageRecordQuery,
   patchDatasetInstanceImageRecord,
+  DatasetInstanceImageGenerationRoles,
 } from "../DatasetInstanceRecordDomain";
 
 describe("DatasetInstanceRecordDomain", () => {
@@ -149,6 +150,36 @@ describe("DatasetInstanceRecordDomain", () => {
     expect(patched.image.tags).toEqual(["seed", "hero"]);
   });
 
+  it("models generated output linkage as first-class image record generation metadata", () => {
+    const record = createDatasetInstanceImageRecord({
+      recordId: "record:image:generation",
+      instanceId: "dataset-instance:1",
+      systemId: "system:image",
+      datasetAssetId: "asset:image-dataset",
+      image: {
+        assetRef: { assetId: "asset:image:generated:1" },
+        width: 1024,
+        height: 1024,
+        format: "png",
+      },
+      generation: {
+        outputAssetRef: { assetId: "asset:image:generated:1" },
+        sourceImageRef: { assetId: "asset:image:source:1" },
+        workflowAssetId: "asset:workflow:image-upscale",
+        workflowAssetVersionId: "v2",
+        runId: "run:image:42",
+        role: DatasetInstanceImageGenerationRoles.variant,
+        metadata: { scheduler: "karras" },
+        tags: ["variant", "hero"],
+      },
+    });
+
+    expect(record.generation?.runId).toBe("run:image:42");
+    expect(record.generation?.workflowAssetId).toBe("asset:workflow:image-upscale");
+    expect(record.generation?.role).toBe("variant");
+    expect(record.generation?.tags).toEqual(["variant", "hero"]);
+  });
+
   it("supports richer image query filters for mime, tags, identifiers, metadata, and derived fields", () => {
     const record = createDatasetInstanceImageRecord({
       recordId: "record:image:advanced-query",
@@ -180,5 +211,44 @@ describe("DatasetInstanceRecordDomain", () => {
       derived: { orientation: "landscape" },
     });
     expect(matchesDatasetInstanceImageRecordQuery(record, query)).toBeTrue();
+  });
+
+  it("supports patching generation metadata/tags without mutating base image contracts", () => {
+    const record = createDatasetInstanceImageRecord({
+      recordId: "record:image:generation-patch",
+      instanceId: "dataset-instance:1",
+      systemId: "system:image",
+      datasetAssetId: "asset:image-dataset",
+      image: {
+        assetRef: { assetId: "asset:image:generated:2" },
+        width: 640,
+        height: 640,
+        format: "png",
+      },
+      generation: {
+        outputAssetRef: { assetId: "asset:image:generated:2" },
+        workflowAssetId: "asset:workflow:image-edit",
+        runId: "run:image:100",
+        role: DatasetInstanceImageGenerationRoles.primary,
+        metadata: { steps: 20 },
+        tags: ["primary"],
+      },
+    });
+
+    const patched = patchDatasetInstanceImageRecord({
+      record,
+      patch: {
+        generationPatch: {
+          role: DatasetInstanceImageGenerationRoles.intermediate,
+          metadataPatch: { set: { steps: 30, seed: 1234 } },
+          tagsPatch: { add: ["intermediate"] },
+        },
+      },
+    });
+
+    expect(patched.generation?.role).toBe("intermediate");
+    expect(patched.generation?.metadata.steps).toBe(30);
+    expect(patched.generation?.metadata.seed).toBe(1234);
+    expect(patched.generation?.tags).toEqual(["primary", "intermediate"]);
   });
 });

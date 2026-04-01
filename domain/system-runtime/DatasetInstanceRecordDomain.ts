@@ -3,6 +3,7 @@ import type {
   CanonicalRecordValue,
 } from "../dataset-studio/CanonicalDataShapes";
 import { ImageAssetReferenceKinds } from "../dataset-studio/contracts/ImageAssetReference";
+import { createImageAssetReference } from "../dataset-studio/contracts/ImageAssetReference";
 import { createImageRecord, type ImageRecord } from "../dataset-studio/contracts/ImageRecord";
 
 export interface DatasetInstanceImageStorageReference {
@@ -20,6 +21,7 @@ export interface DatasetInstanceImageRecord {
   readonly storage?: DatasetInstanceImageStorageReference;
   readonly metadata: Readonly<Record<string, CanonicalRecordValue>>;
   readonly provenance: DatasetInstanceImageRecordProvenance;
+  readonly generation?: DatasetInstanceImageGeneration;
   readonly admittedAt: string;
   readonly updatedAt: string;
   readonly mutationVersion: number;
@@ -31,6 +33,26 @@ export interface DatasetInstanceImageRecordProvenance {
   readonly sourceSystemId?: string;
   readonly sourceRunId?: string;
   readonly ingestedBy?: string;
+}
+
+export const DatasetInstanceImageGenerationRoles = Object.freeze({
+  primary: "primary",
+  variant: "variant",
+  intermediate: "intermediate",
+} as const);
+
+export type DatasetInstanceImageGenerationRole =
+  typeof DatasetInstanceImageGenerationRoles[keyof typeof DatasetInstanceImageGenerationRoles];
+
+export interface DatasetInstanceImageGeneration {
+  readonly outputAssetRef: ImageRecord["assetRef"];
+  readonly sourceImageRef?: ImageRecord["assetRef"];
+  readonly workflowAssetId: string;
+  readonly workflowAssetVersionId?: string;
+  readonly runId: string;
+  readonly role: DatasetInstanceImageGenerationRole;
+  readonly metadata: Readonly<Record<string, CanonicalRecordValue>>;
+  readonly tags: ReadonlyArray<string>;
 }
 
 export interface DatasetInstanceImageRecordQuery {
@@ -85,6 +107,7 @@ export interface DatasetInstanceImageRecordPatch {
   readonly imagePatch?: DatasetInstanceImagePatch;
   readonly metadataPatch?: DatasetInstanceImageRecordMetadataPatch;
   readonly provenancePatch?: DatasetInstanceImageRecordProvenancePatch;
+  readonly generationPatch?: DatasetInstanceImageGenerationPatch | null;
   readonly storagePatch?: DatasetInstanceImageRecordStoragePatch | null;
   readonly updatedAt?: string;
 }
@@ -95,6 +118,18 @@ export interface DatasetInstanceImageRecordProvenancePatch {
   readonly sourceSystemId?: string | null;
   readonly sourceRunId?: string | null;
   readonly ingestedBy?: string | null;
+}
+
+export interface DatasetInstanceImageGenerationPatch {
+  readonly outputAssetRef?: ImageRecord["assetRef"];
+  readonly sourceImageRef?: ImageRecord["assetRef"] | null;
+  readonly workflowAssetId?: string;
+  readonly workflowAssetVersionId?: string | null;
+  readonly runId?: string;
+  readonly role?: DatasetInstanceImageGenerationRole;
+  readonly metadataPatch?: DatasetInstanceImageRecordMetadataPatch;
+  readonly tags?: ReadonlyArray<string>;
+  readonly tagsPatch?: DatasetInstanceImageTagPatch;
 }
 
 function normalizeOptional(value?: string): string | undefined {
@@ -156,6 +191,33 @@ function normalizeProvenance(
     sourceSystemId: normalizeOptional(provenance?.sourceSystemId),
     sourceRunId: normalizeOptional(provenance?.sourceRunId),
     ingestedBy: normalizeOptional(provenance?.ingestedBy),
+  });
+}
+
+function normalizeGenerationRole(value: DatasetInstanceImageGenerationRole): DatasetInstanceImageGenerationRole {
+  if (Object.values(DatasetInstanceImageGenerationRoles).includes(value)) {
+    return value;
+  }
+  throw new Error(`Dataset instance image generation role '${value}' is not supported.`);
+}
+
+function normalizeGeneration(
+  generation?: DatasetInstanceImageGeneration,
+): DatasetInstanceImageGeneration | undefined {
+  if (!generation) {
+    return undefined;
+  }
+  return Object.freeze({
+    outputAssetRef: createImageAssetReference(generation.outputAssetRef),
+    sourceImageRef: generation.sourceImageRef
+      ? createImageAssetReference(generation.sourceImageRef)
+      : undefined,
+    workflowAssetId: normalizeRequired(generation.workflowAssetId, "Dataset instance image generation workflowAssetId"),
+    workflowAssetVersionId: normalizeOptional(generation.workflowAssetVersionId),
+    runId: normalizeRequired(generation.runId, "Dataset instance image generation runId"),
+    role: normalizeGenerationRole(generation.role),
+    metadata: normalizeMetadata(generation.metadata),
+    tags: normalizeStringList(generation.tags) ?? Object.freeze([]),
   });
 }
 
@@ -249,6 +311,7 @@ export function createDatasetInstanceImageRecord(input: {
   readonly storage?: DatasetInstanceImageStorageReference;
   readonly metadata?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly provenance?: DatasetInstanceImageRecordProvenance;
+  readonly generation?: DatasetInstanceImageGeneration;
   readonly admittedAt?: string;
   readonly updatedAt?: string;
   readonly mutationVersion?: number;
@@ -269,6 +332,7 @@ export function createDatasetInstanceImageRecord(input: {
     storage: normalizeStorage(input.storage),
     metadata: normalizeMetadata(input.metadata),
     provenance: normalizeProvenance(input.provenance),
+    generation: normalizeGeneration(input.generation),
     admittedAt,
     updatedAt,
     mutationVersion: normalizeMutationVersion(input.mutationVersion),
@@ -320,6 +384,29 @@ export function patchDatasetInstanceImageRecord(input: {
           : input.patch.storagePatch.provider ?? currentStorage?.provider,
       })
       : currentStorage;
+  const currentGeneration = input.record.generation;
+  const generationPatch = input.patch.generationPatch;
+  const nextGeneration = generationPatch === null
+    ? undefined
+    : generationPatch
+      ? normalizeGeneration({
+        outputAssetRef: generationPatch.outputAssetRef ?? currentGeneration?.outputAssetRef ?? input.record.image.assetRef,
+        sourceImageRef: generationPatch.sourceImageRef === null
+          ? undefined
+          : generationPatch.sourceImageRef ?? currentGeneration?.sourceImageRef,
+        workflowAssetId: generationPatch.workflowAssetId ?? currentGeneration?.workflowAssetId ?? "",
+        workflowAssetVersionId: generationPatch.workflowAssetVersionId === null
+          ? undefined
+          : generationPatch.workflowAssetVersionId ?? currentGeneration?.workflowAssetVersionId,
+        runId: generationPatch.runId ?? currentGeneration?.runId ?? "",
+        role: generationPatch.role ?? currentGeneration?.role ?? DatasetInstanceImageGenerationRoles.primary,
+        metadata: applyMetadataPatch(currentGeneration?.metadata ?? Object.freeze({}), generationPatch.metadataPatch),
+        tags: applyTagPatch(
+          generationPatch.tags ?? currentGeneration?.tags ?? Object.freeze([]),
+          generationPatch.tagsPatch,
+        ),
+      })
+      : currentGeneration;
 
   const imagePatch = input.patch.imagePatch;
   const nextImageMetadata = imagePatch
@@ -362,6 +449,7 @@ export function patchDatasetInstanceImageRecord(input: {
     storage: nextStorage,
     metadata: nextMetadata,
     provenance: nextProvenance,
+    generation: nextGeneration,
     admittedAt: input.record.admittedAt,
     updatedAt: nextUpdatedAt,
     mutationVersion: input.record.mutationVersion + 1,
