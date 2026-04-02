@@ -95,6 +95,16 @@ import { InMemoryWorkflowOutputArtifactStorage } from "../../../application/syst
 import { InMemoryWorkflowOutputProvenanceRepository } from "../../../application/system-runtime/WorkflowOutputProvenanceRepository";
 import { OutputGalleryDatasetIntegrationService } from "../../../application/system-runtime/OutputGalleryDatasetIntegrationService";
 import type { OutputGalleryListing } from "../../../application/system-runtime/OutputGalleryDataContract";
+import {
+  ImageRunHistoryExecutionStatuses,
+  type ImageRunHistoryExecutionStatus,
+  type ImageRunHistoryListing,
+} from "../../../application/system-runtime/ImageRunHistoryDataContract";
+import { ImageRunHistoryService } from "../../../application/system-runtime/ImageRunHistoryService";
+import {
+  InMemoryImageRunHistoryRepository,
+  type ImageRunHistoryRepository,
+} from "../../../application/system-runtime/ImageRunHistoryRepository";
 import { ComfyExecutionResultMaterializationMapper } from "../../comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper";
 
 export interface StudioShellApiError {
@@ -223,6 +233,14 @@ export interface ListReferenceImageOutputsRequest {
   readonly draftId?: string;
   readonly limit?: number;
   readonly offset?: number;
+}
+
+export interface ListReferenceImageRunHistoryRequest {
+  readonly studioId: string;
+  readonly draftId?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+  readonly status?: ImageRunHistoryExecutionStatus;
 }
 
 class StaticDatasetInstanceAssetCatalog implements DatasetInstanceAssetCatalog {
@@ -610,6 +628,7 @@ export class StudioShellBackendApi {
   private readonly referenceImageDatasets: SystemDatasetInstanceService;
   private readonly referenceImageOutputMaterialization: WorkflowOutputMaterializationService;
   private readonly referenceImageOutputGallery: OutputGalleryDatasetIntegrationService;
+  private readonly referenceImageRunHistory: ImageRunHistoryService;
   private readonly comfyMaterializationMapper = new ComfyExecutionResultMaterializationMapper();
   private readonly now: () => Date;
 
@@ -618,6 +637,7 @@ export class StudioShellBackendApi {
     workflowPersistenceRepository?: IWorkflowPersistenceRepository,
     workflowRunSummaryRepository?: IWorkflowRunSummaryRepository,
     now: () => Date = () => new Date(),
+    imageRunHistoryRepository?: ImageRunHistoryRepository,
   ) {
     this.now = now;
     this.workflowRunSummaryRepository = workflowRunSummaryRepository;
@@ -650,6 +670,11 @@ export class StudioShellBackendApi {
       new InMemoryWorkflowOutputProvenanceRepository(),
     );
     this.referenceImageOutputGallery = new OutputGalleryDatasetIntegrationService(this.referenceImageDatasets);
+    this.referenceImageRunHistory = new ImageRunHistoryService(
+      imageRunHistoryRepository ?? new InMemoryImageRunHistoryRepository(),
+      this.referenceImageOutputGallery,
+      this.now,
+    );
     this.workflowStudioService = new WorkflowStudioApplicationService(
       this.service,
       undefined,
@@ -1142,6 +1167,26 @@ export class StudioShellBackendApi {
 
       const comfyResult = this.extractComfyResultFromRuntimeResult(request.runtimeResult?.output);
       if (!comfyResult) {
+        this.referenceImageRunHistory.recordRun({
+          runId: executionId,
+          workflowExecutionId: executionId,
+          systemId: runtimeSystemId,
+          workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+          workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+          status: ImageRunHistoryExecutionStatuses.failed,
+          inputImages: request.sourceAssetId?.trim()
+            ? Object.freeze([Object.freeze({
+              stableId: request.sourceAssetId.trim(),
+              outputId: request.sourceAssetId.trim(),
+              recordId: request.sourceRecordId?.trim(),
+            })])
+            : undefined,
+          parameterSummary: request.parameterSnapshot,
+          timestamps: {
+            requestedAt: this.now().toISOString(),
+            updatedAt: this.now().toISOString(),
+          },
+        });
         return Object.freeze({
           systemId: runtimeSystemId,
           datasetInstanceId: outputDataset.instanceId,
@@ -1174,6 +1219,47 @@ export class StudioShellBackendApi {
         systemId: runtimeSystemId,
         datasetInstanceId: outputDataset.instanceId,
         payload: mapped,
+      });
+      this.referenceImageRunHistory.recordRun({
+        runId: executionId,
+        workflowExecutionId: executionId,
+        systemId: runtimeSystemId,
+        workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+        workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+        status: materialized.status === "materialized"
+          ? ImageRunHistoryExecutionStatuses.completed
+          : materialized.status === "partial"
+            ? ImageRunHistoryExecutionStatuses.partial
+            : materialized.status === "failed"
+              ? ImageRunHistoryExecutionStatuses.failed
+              : ImageRunHistoryExecutionStatuses.running,
+        inputImages: request.sourceAssetId?.trim()
+          ? Object.freeze([Object.freeze({
+            stableId: request.sourceAssetId.trim(),
+            outputId: request.sourceAssetId.trim(),
+            recordId: request.sourceRecordId?.trim(),
+          })])
+          : undefined,
+        parameterSummary: request.parameterSnapshot,
+        outputDatasetInstance: Object.freeze({
+          instanceId: outputDataset.instanceId,
+          datasetAssetId: outputDataset.datasetAssetId,
+          datasetAssetVersionId: outputDataset.datasetAssetVersionId,
+          role: outputDataset.role,
+          purpose: outputDataset.purpose,
+          persistedRecordIds: Object.freeze(materialized.records.map((record) => record.recordId)),
+        }),
+        outputImages: Object.freeze(materialized.records.map((record) => Object.freeze({
+          stableId: record.image.assetRef.stableId,
+          assetId: record.image.assetRef.assetId,
+          outputId: record.image.assetRef.outputId,
+          recordId: record.recordId,
+        }))),
+        timestamps: {
+          requestedAt: this.now().toISOString(),
+          completedAt: this.now().toISOString(),
+          updatedAt: this.now().toISOString(),
+        },
       });
 
       return Object.freeze({
@@ -1211,6 +1297,32 @@ export class StudioShellBackendApi {
       return this.referenceImageOutputGallery.listOutputGalleryItems({
         systemId: runtimeSystemId,
         datasetInstanceId: outputDataset.instanceId,
+        limit: request.limit,
+        offset: request.offset,
+      });
+    });
+  }
+
+  public async listReferenceImageRunHistory(
+    request: ListReferenceImageRunHistoryRequest,
+  ): Promise<StudioShellApiResponse<ImageRunHistoryListing>> {
+    return this.wrap(async () => {
+      const snapshot = await this.requireSnapshot(request.studioId);
+      const draft = snapshot.draft;
+      if (!draft) {
+        throw new StudioShellInvalidRequestError("Open a system draft to view recent activity.");
+      }
+      if (request.draftId?.trim() && draft.draftId !== request.draftId.trim()) {
+        throw new StudioShellInvalidRequestError(`Draft '${request.draftId}' is not the active draft for studio '${request.studioId}'.`);
+      }
+      if (draft.assetId !== ReferenceImageSystemTemplate.systemAsset.assetId) {
+        throw new StudioShellInvalidRequestError("Recent activity is only available for the reference image template.");
+      }
+      const runtimeSystemId = this.resolveReferenceRuntimeSystemId(draft);
+      return this.referenceImageRunHistory.listRuns({
+        systemId: runtimeSystemId,
+        workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+        status: request.status,
         limit: request.limit,
         offset: request.offset,
       });

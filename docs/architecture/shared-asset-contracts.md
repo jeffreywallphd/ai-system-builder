@@ -852,3 +852,10 @@ Not implemented in this slice:
   - a focused single-image viewer, and
   - optional collapsed “Settings used” details.
 - Start actions now reuse the existing UI trigger + system-context mapping stack (`UiTriggerSystemContextMapper` -> `WorkflowSystemContextBindingAdapter` + `ReferenceImageSystemWorkflowContextMapping`) before invoking runtime start, so selected image refs, user settings, and dataset instance refs flow into execution context without adding a parallel mapping path.
+
+## Direction 5 extension update: basic run history + end-to-end reference-image validation (stories 5.1.9-5.1.10)
+- Reference-image run history is now recorded at output persistence time via `ImageRunHistoryService`, keyed by execution/run id and tied to the same system-owned output dataset records used by the generated-results gallery.
+- Studio Shell now exposes a bounded read operation (`listReferenceImageRunHistory`) for recent activity retrieval so history is queryable through runtime/persistence layers instead of UI-only transient state.
+- Desktop composition now uses `SqliteImageRunHistoryRepository` for durable run-history storage; browser fallback keeps the same API contract with in-memory persistence.
+- The reference-image panel now includes approachable history UX (`Recent activity`, `Run details`, `Created`, `Source image`, `Open result`, `Settings`) and lets users jump from previous runs back to saved outputs.
+- Added focused integration coverage for the end-to-end vertical slice (upload -> persist outputs -> output listing -> run history listing), including assertions that run-history entries remain associated with persisted output record ids.

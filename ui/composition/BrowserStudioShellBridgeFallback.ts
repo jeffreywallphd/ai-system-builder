@@ -58,6 +58,7 @@ export function resolveBrowserStudioShellBridgeFallback(): DesktopStudioShellBri
     ingestReferenceImageUpload: (requestJson) => studioApi.ingestReferenceImageUpload(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     persistReferenceImageOutputs: (requestJson) => studioApi.persistReferenceImageOutputs(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     listReferenceImageOutputs: (requestJson) => studioApi.listReferenceImageOutputs(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    listReferenceImageRunHistory: (requestJson) => studioApi.listReferenceImageRunHistory(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
   });
 
   return fallbackBridge;

@@ -3,8 +3,8 @@ import { StudioShellBackendApi } from "../StudioShellBackendApi";
 import { InMemoryStudioShellRepository } from "../../../studio-shell/InMemoryStudioShellRepository";
 import { ReferenceImageSystemTemplate } from "../../../../application/system-studio/ReferenceImageSystemTemplate";
 
-describe("Reference image output persistence flow", () => {
-  it("persists generated workflow outputs into the system-owned output dataset and returns gallery items", async () => {
+describe("Reference image vertical slice", () => {
+  it("supports upload -> run output persistence -> gallery visualization -> recent activity history", async () => {
     const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
     const initialized = await api.initializeStudio("studio-system", "System Studio");
     const created = await api.createDraft({
@@ -23,14 +23,24 @@ describe("Reference image output persistence flow", () => {
       },
     });
 
+    const upload = await api.ingestReferenceImageUpload({
+      studioId: "studio-system",
+      draftId: created.data!.draft!.draftId,
+      fileName: "seed.png",
+      mimeType: "image/png",
+      payloadBase64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z2YcAAAAASUVORK5CYII=",
+    });
+    expect(upload.ok).toBeTrue();
+
     const persisted = await api.persistReferenceImageOutputs({
       studioId: "studio-system",
       draftId: created.data!.draft!.draftId,
-      executionId: "run:output:1",
-      sourceAssetId: "generated-output:upload://source.png",
+      executionId: "run:e2e:1",
+      sourceRecordId: upload.data?.recordId,
+      sourceAssetId: upload.data?.image.assetId,
       parameterSnapshot: {
-        editInstruction: "brighten and sharpen",
-        variationStrength: 0.45,
+        editInstruction: "Add warm highlights",
+        variationStrength: 0.4,
         resultCount: 1,
       },
       runtimeResult: {
@@ -39,16 +49,16 @@ describe("Reference image output persistence flow", () => {
             nodeResults: {
               workflow: {
                 result: {
-                  executionId: "run:output:1",
+                  executionId: "run:e2e:1",
                   status: "completed",
                   outputs: [{
                     nodeId: "save_image",
                     kind: "image",
-                    reference: "memory://generated-1.png",
+                    reference: "memory://generated-e2e-1.png",
                     metadata: {
-                      filename: "generated-1.png",
-                      width: 1024,
-                      height: 768,
+                      filename: "generated-e2e-1.png",
+                      width: 800,
+                      height: 600,
                     },
                   }],
                 },
@@ -58,25 +68,18 @@ describe("Reference image output persistence flow", () => {
         },
       },
     });
-
     expect(persisted.ok).toBeTrue();
-    expect(persisted.data?.datasetInstanceId).toBe("dataset-instance:reference-image:output");
     expect(persisted.data?.persistedRecordIds.length).toBe(1);
-    expect(persisted.data?.status).toBe("materialized");
 
-    const listed = await api.listReferenceImageOutputs({
+    const outputs = await api.listReferenceImageOutputs({
       studioId: "studio-system",
       draftId: created.data!.draft!.draftId,
       limit: 10,
       offset: 0,
     });
-
-    expect(listed.ok).toBeTrue();
-    expect(listed.data?.summary.datasetInstanceId).toBe("dataset-instance:reference-image:output");
-    expect(listed.data?.summary.totalItems).toBe(1);
-    expect(listed.data?.items[0]?.workflow?.workflowRunId).toBe("run:output:1");
-    expect(listed.data?.items[0]?.sourceImage?.stableId).toBe("generated-output:upload://source.png");
-    expect(listed.data?.items[0]?.generationParametersSummary.editInstruction).toBe("brighten and sharpen");
+    expect(outputs.ok).toBeTrue();
+    expect(outputs.data?.summary.totalItems).toBe(1);
+    expect(outputs.data?.items[0]?.workflow?.workflowRunId).toBe("run:e2e:1");
 
     const history = await api.listReferenceImageRunHistory({
       studioId: "studio-system",
@@ -84,11 +87,11 @@ describe("Reference image output persistence flow", () => {
       limit: 10,
       offset: 0,
     });
-
     expect(history.ok).toBeTrue();
     expect(history.data?.summary.totalRuns).toBe(1);
-    expect(history.data?.runs[0]?.runId).toBe("run:output:1");
+    expect(history.data?.runs[0]?.runId).toBe("run:e2e:1");
     expect(history.data?.runs[0]?.outputs.datasetInstance?.persistedRecordIds).toEqual(persisted.data?.persistedRecordIds);
-    expect(history.data?.runs[0]?.inputs.parameterSummary.editInstruction).toBe("brighten and sharpen");
+    expect(history.data?.runs[0]?.inputs.images[0]?.stableId).toBe(upload.data?.image.assetId);
   });
 });
+

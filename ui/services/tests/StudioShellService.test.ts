@@ -36,6 +36,7 @@ describe("StudioShellService", () => {
     expect(source).toContain("ingestReferenceImageUpload(");
     expect(source).toContain("persistReferenceImageOutputs(");
     expect(source).toContain("listReferenceImageOutputs(");
+    expect(source).toContain("listReferenceImageRunHistory(");
     expect(source).not.toContain("fetch(");
   });
 });
