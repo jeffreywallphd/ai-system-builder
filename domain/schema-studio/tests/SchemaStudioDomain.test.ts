@@ -2,17 +2,21 @@ import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
 import {
   addSchemaEntityToDocument,
+  addSchemaFieldToEntityInDocument,
+  addSchemaRelationshipToDocument,
   createEmptySchemaAssetDocument,
   createSchemaAssetDocument,
   createSchemaAssetMetadata,
   createSchemaEntityDefinition,
   createSchemaStudioTaxonomy,
   deserializeSchemaAssetDocument,
+  removeSchemaFieldFromEntityInDocument,
   SchemaFieldTypeKinds,
   SchemaRelationshipCardinalityKinds,
   serializeSchemaAssetDocument,
   SchemaStudioIdentity,
   updateSchemaEntityInDocument,
+  updateSchemaFieldInEntityInDocument,
 } from "../SchemaStudioDomain";
 
 describe("SchemaStudioDomain", () => {
@@ -200,5 +204,90 @@ describe("SchemaStudioDomain", () => {
       entityId: "entity:order",
       name: "Customer",
     })).toThrow("already contains an entity named");
+  });
+
+  it("adds, updates, and removes fields with duplicate-name guards", () => {
+    const seeded = createSchemaAssetDocument({
+      schemaVersion: "1.0.0",
+      definition: {
+        entities: [{ entityId: "entity:order", name: "Order", fields: [] }],
+        relationships: [],
+      },
+    });
+
+    const withField = addSchemaFieldToEntityInDocument({
+      document: seeded,
+      entityId: "entity:order",
+      name: "order_number",
+      type: SchemaFieldTypeKinds.string,
+      required: true,
+    });
+    const fieldId = withField.definition.entities[0]?.fields[0]?.fieldId;
+
+    expect(fieldId).toBe("field:order-number");
+
+    const updated = updateSchemaFieldInEntityInDocument({
+      document: withField,
+      entityId: "entity:order",
+      fieldId: fieldId!,
+      name: "order_number",
+      key: "order_number",
+      type: SchemaFieldTypeKinds.uuid,
+      required: false,
+      description: "Public order key",
+    });
+
+    expect(updated.definition.entities[0]?.fields[0]?.type).toBe(SchemaFieldTypeKinds.uuid);
+
+    const removed = removeSchemaFieldFromEntityInDocument({
+      document: updated,
+      entityId: "entity:order",
+      fieldId: fieldId!,
+    });
+
+    expect(removed.definition.entities[0]?.fields).toHaveLength(0);
+  });
+
+  it("adds relationships with field references and rejects duplicates", () => {
+    const seed = createSchemaAssetDocument({
+      schemaVersion: "1.0.0",
+      definition: {
+        entities: [
+          {
+            entityId: "entity:customer",
+            name: "Customer",
+            fields: [{ fieldId: "field:id", name: "id", type: SchemaFieldTypeKinds.uuid }],
+          },
+          {
+            entityId: "entity:order",
+            name: "Order",
+            fields: [{ fieldId: "field:customer-id", name: "customer_id", type: SchemaFieldTypeKinds.uuid }],
+          },
+        ],
+        relationships: [],
+      },
+    });
+
+    const withRelationship = addSchemaRelationshipToDocument({
+      document: seed,
+      sourceEntityId: "entity:customer",
+      sourceFieldId: "field:id",
+      targetEntityId: "entity:order",
+      targetFieldId: "field:customer-id",
+      cardinality: SchemaRelationshipCardinalityKinds.oneToMany,
+      label: "Customer orders",
+    });
+
+    expect(withRelationship.definition.relationships).toHaveLength(1);
+    expect(withRelationship.definition.relationships[0]?.relationshipId).toContain("relationship:customer-order");
+
+    expect(() => addSchemaRelationshipToDocument({
+      document: withRelationship,
+      sourceEntityId: "entity:customer",
+      sourceFieldId: "field:id",
+      targetEntityId: "entity:order",
+      targetFieldId: "field:customer-id",
+      cardinality: SchemaRelationshipCardinalityKinds.oneToMany,
+    })).toThrow("already exists");
   });
 });
