@@ -10,6 +10,7 @@ import {
   validateImageRunHistoryRecord,
 } from "./ImageRunHistoryDataContract";
 import type { ImageRunHistoryRepository } from "./ImageRunHistoryRepository";
+import { buildImageRunLineageView, type ImageRunLineageView } from "./ImageRunLineageDataContract";
 
 export interface RecordImageRunHistoryRequest {
   readonly runId: string;
@@ -193,6 +194,14 @@ export class ImageRunHistoryService {
       .filter((entry): entry is ImageRunHistoryWithOutputs => entry !== undefined));
   }
 
+
+  public getRunLineage(request: GetImageRunWithOutputsRequest): ImageRunLineageView | undefined {
+    const entry = this.getRunWithLinkedOutputs(request);
+    if (!entry) {
+      return undefined;
+    }
+    return buildImageRunLineageView(entry);
+  }
   public getRunWithLinkedOutputs(request: GetImageRunWithOutputsRequest): ImageRunHistoryWithOutputs | undefined {
     const systemId = normalizeRequired(request.systemId, "systemId");
     const runId = normalizeRequired(request.runId, "runId");

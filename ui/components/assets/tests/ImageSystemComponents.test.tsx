@@ -3,7 +3,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createBrowserImageUploadIngestionAdapter } from "../image-system/BrowserImageUploadIngestionAdapter";
 import { ImageComparisonView } from "../image-system/ImageComparisonView";
-import { ImageHistoryLinkedOutputInspectorAsset, ImageOutputGalleryAsset, ImageRunHistoryAsset } from "../image-system/ImageComposedAssets";
+import { ImageHistoryLinkedOutputInspectorAsset, ImageOutputGalleryAsset, ImageResultHistoryInteractionSpaceAsset, ImageRunHistoryAsset } from "../image-system/ImageComposedAssets";
 import { ImageOutputGallery } from "../image-system/ImageOutputGallery";
 import { ImageParameterForm } from "../image-system/ImageParameterForm";
 import { mapImageRunHistoryListingToViewModels } from "../image-system/ImageRunHistoryDataAdapter";
@@ -363,6 +363,44 @@ describe("image-system components", () => {
       }],
     }));
     expect(linkedInspectorHtml).toContain("History-linked output inspector");
-    expect(linkedInspectorHtml).toContain("Selected");
+    expect(linkedInspectorHtml).toContain("Lineage mini-view");
+
+    const interactionSpaceHtml = renderToStaticMarkup(React.createElement(ImageResultHistoryInteractionSpaceAsset, {
+      runsWithOutputs: [{
+        run: listing.runs[0],
+        linkedOutputs: [{
+          itemId: "item:linked:1",
+          image: {
+            recordId: "record:1",
+            selectionId: "record:1",
+            imageReference: "storage://outputs/record-1.png",
+            width: 512,
+            height: 512,
+            format: "png",
+          },
+          dataset: {
+            systemId: "system:image",
+            instanceId: "instance:out",
+            datasetAssetId: "asset:dataset:outputs",
+            role: "system-output",
+          },
+          workflow: {
+            workflowRunId: "run:1",
+            workflowAssetId: "asset:workflow:image",
+            generationRole: "primary",
+          },
+          timestamps: {
+            admittedAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:10.000Z",
+          },
+          generationParametersSummary: { prompt: "portrait" },
+          imageMetadataSummary: { metadata: { prompt: "portrait" }, hasAnnotations: false, hasDerived: false },
+          tags: [],
+          derivedAttributes: {},
+        }],
+      }],
+    }));
+    expect(interactionSpaceHtml).toContain("Image system interaction space");
+    expect(interactionSpaceHtml).toContain("Lineage mini-view");
   });
 });

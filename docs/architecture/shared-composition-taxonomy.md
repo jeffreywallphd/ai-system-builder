@@ -100,3 +100,14 @@ This shared taxonomy is a guardrail to keep workflow/agent/asset/system language
   - `autonomous` -> planner-capable profile
 - `none` remains non-executable in runtime behavior mapping and intentionally resolves to no runtime behavior profile.
 - Workflow, agent, and system runtime behavior resolution flows through the existing taxonomy classifier seam (`CompositionTaxonomyClassifier`) via `RuntimeBehaviorAlignmentService`, preserving current atomic/composite/system taxonomy authority.
+
+## Image-slice lineage + system interaction realization (stories 4.4.9-4.4.10)
+
+- Added `ImageLineageMiniView` as an additional atomic interface asset for bounded lineage inspection (input -> run -> output -> dataset).
+- Added `ImageResultHistoryInteractionSpaceAsset` as a higher-level composed interface asset that integrates:
+  - output gallery,
+  - run history,
+  - selection/inspection behavior,
+  - history->output linking,
+  - lineage mini-view.
+- Lineage and interaction composition are driven by persisted run-history + output-gallery contracts (`ImageRunHistoryWithOutputs`) and stable record/run/instance ids.

@@ -15,6 +15,7 @@ export * from "./ImageOutputGalleryDataAdapter";
 export * from "./ImageRunHistoryDataAdapter";
 export * from "./ImageRunHistoryList";
 export * from "./ImageSummaryPanels";
+export * from "./ImageLineageMiniView";
 export * from "./ImageComposedAssets";
 export * from "./useSynchronizedImageViewport";
 export * from "./ImageComparisonView";

@@ -114,5 +114,10 @@ describe("ImageRunHistoryService", () => {
     expect(linkedListing).toHaveLength(1);
     expect(linkedListing[0]?.run.runId).toBe("run:1");
     expect(linkedListing[0]?.linkedOutputs[0]?.workflow?.workflowRunId).toBe("run:1");
+
+    const lineage = service.getRunLineage({ systemId: "system:image", runId: "run:1" });
+    expect(lineage?.summary.runId).toBe("run:1");
+    expect(lineage?.summary.datasetInstanceId).toBe("instance:out");
+    expect(lineage?.edges.some((edge) => edge.kind === "run-to-output")).toBeTrue();
   });
 });
