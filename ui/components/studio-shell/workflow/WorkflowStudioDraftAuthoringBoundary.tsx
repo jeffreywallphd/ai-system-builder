@@ -93,8 +93,8 @@ export default function WorkflowStudioDraftAuthoringBoundary({
     <>
       <ExperienceAssetAuthoringBoundary
         asset={workflowExperienceDefinition}
-        activeModeId={workflowModeContext.selectedModeId}
-        invalidModeId={invalidModeRouteId}
+        currentModeId={workflowModeContext.selectedModeId}
+        invalidRequestedModeId={invalidModeRouteId}
         document={workflowModeContext.sharedDraft}
         issues={workflowModeContext.draftValidationIssues}
         surfaces={{

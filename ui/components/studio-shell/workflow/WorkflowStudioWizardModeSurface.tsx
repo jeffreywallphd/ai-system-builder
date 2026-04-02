@@ -76,7 +76,8 @@ export default function WorkflowStudioWizardModeSurface({
         definition={adapterModel.definition}
         definitionContext={adapterModel.context}
         activePageId={adapterModel.activePageId}
-        onSelectPage={(pageId) => onSelectWizardPage?.(pageId as WorkflowStudioWizardPageId)}
+        currentPageId={adapterModel.activePageId}
+        onPageChange={(pageId) => onSelectWizardPage?.(pageId as WorkflowStudioWizardPageId)}
         pageNavigationTestIds={{
           back: "workflow-wizard-back-page",
           next: "workflow-wizard-next-page",

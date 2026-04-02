@@ -43,7 +43,7 @@ describe("ExperienceAssetAuthoringBoundary", () => {
     expect(html).not.toContain('data-testid="canvas-surface"');
   });
 
-  it("shows a fallback mode route message when the requested mode is invalid", () => {
+  it("shows a fallback mode selection message when the requested mode is invalid", () => {
     const html = renderToStaticMarkup(
       <ExperienceAssetAuthoringBoundary
         asset={definition}
@@ -57,7 +57,7 @@ describe("ExperienceAssetAuthoringBoundary", () => {
       />,
     );
 
-    expect(html).toContain("Unsupported experience mode route");
+    expect(html).toContain("Unsupported experience mode selection");
     expect(html).toContain("unknown");
     expect(html).toContain("using canvas mode");
   });
