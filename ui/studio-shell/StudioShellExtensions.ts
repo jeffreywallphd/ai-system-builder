@@ -22,6 +22,7 @@ import type {
   UpdateSystemParametersRequest,
 } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import type { ExperienceSurfaceAssetId } from "./experience-assets/ExperienceSurfaceAssets";
+import type { DraftAuthoringSurfaceConfiguration } from "./experience-assets/ExperienceSurfaceAssets";
 
 export const StudioShellExtensionSlots = Object.freeze({
   sessionContext: "session-context",
@@ -179,6 +180,7 @@ export interface StudioShellPresentationHints {
   readonly toolbar?: StudioShellToolbarConfiguration;
   readonly drawers?: StudioShellDrawerConfiguration;
   readonly experienceAssets?: ReadonlyArray<ExperienceSurfaceAssetId>;
+  readonly draftAuthoringSurfaces?: DraftAuthoringSurfaceConfiguration;
 }
 
 interface BaseStudioRegistration {
@@ -390,6 +392,12 @@ function normalizeRegistration(registration: StudioRegistration): StudioRegistra
           experienceAssets: registration.shell.experienceAssets
             ? Object.freeze([...registration.shell.experienceAssets])
             : undefined,
+          draftAuthoringSurfaces: registration.shell.draftAuthoringSurfaces
+            ? Object.freeze({
+              wizard: registration.shell.draftAuthoringSurfaces.wizard === true,
+              canvas: registration.shell.draftAuthoringSurfaces.canvas === true,
+            })
+            : undefined,
         })
         : undefined,
     });
@@ -426,6 +434,12 @@ function normalizeRegistration(registration: StudioRegistration): StudioRegistra
           experienceAssets: registration.shell.experienceAssets
             ? Object.freeze([...registration.shell.experienceAssets])
             : undefined,
+          draftAuthoringSurfaces: registration.shell.draftAuthoringSurfaces
+            ? Object.freeze({
+              wizard: registration.shell.draftAuthoringSurfaces.wizard === true,
+              canvas: registration.shell.draftAuthoringSurfaces.canvas === true,
+            })
+            : undefined,
         })
         : undefined,
     });
@@ -457,6 +471,12 @@ function normalizeRegistration(registration: StudioRegistration): StudioRegistra
           : undefined,
         experienceAssets: registration.shell.experienceAssets
           ? Object.freeze([...registration.shell.experienceAssets])
+          : undefined,
+        draftAuthoringSurfaces: registration.shell.draftAuthoringSurfaces
+          ? Object.freeze({
+            wizard: registration.shell.draftAuthoringSurfaces.wizard === true,
+            canvas: registration.shell.draftAuthoringSurfaces.canvas === true,
+          })
           : undefined,
       })
       : undefined,

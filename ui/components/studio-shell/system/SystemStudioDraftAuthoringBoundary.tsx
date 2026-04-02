@@ -4,6 +4,7 @@ import type { StudioShellValidationIssue } from "../../../../infrastructure/api/
 import { ExperienceAssetModeIds } from "../../../studio-shell/experience-assets/ExperienceAssetContracts";
 import {
   ExperienceSurfaceAssetIds,
+  resolveExperienceAssetModesFromRegistrations,
   type ExperienceSurfaceAssetId,
 } from "../../../studio-shell/experience-assets/ExperienceSurfaceAssets";
 import type { StudioShellExtensionContext } from "../../../studio-shell/StudioShellExtensions";
@@ -52,12 +53,23 @@ export function SystemStudioDraftAuthoringBoundary({
   hostMode = StudioAssetRenderModes.full,
   onStudioEvent,
 }: SystemStudioDraftAuthoringBoundaryProps): JSX.Element {
-  const [selectedModeId, setSelectedModeId] = useState<"wizard" | "canvas">("wizard");
   const [selectedWizardPageId, setSelectedWizardPageId] = useState<string>("pages");
   const [selectedLayoutNodeId, setSelectedLayoutNodeId] = useState<string | undefined>(undefined);
   const [selectedPageId, setSelectedPageId] = useState<string>("page-1");
+  const supportedModes = useMemo(
+    () => resolveExperienceAssetModesFromRegistrations({ assetIds: experienceAssetIds }),
+    [experienceAssetIds],
+  );
+  const [selectedModeId, setSelectedModeId] = useState<"wizard" | "canvas">(
+    supportedModes.some((mode) => mode.id === ExperienceAssetModeIds.wizard)
+      ? "wizard"
+      : "canvas",
+  );
 
   const document = useMemo(() => parseSystemStudioDraftDocument(content), [content]);
+  const resolvedModeId = supportedModes.some((mode) => mode.id === selectedModeId)
+    ? selectedModeId
+    : (supportedModes[0]?.id ?? "wizard");
 
   const resolvedSelectedPageId = document.systemSpec.pages.some((page) => page.pageId === selectedPageId)
     ? selectedPageId
@@ -314,16 +326,22 @@ export function SystemStudioDraftAuthoringBoundary({
     <div className="ui-stack ui-stack--sm" data-testid="system-studio-draft-authoring-boundary">
       {hostMode === StudioAssetRenderModes.full ? (
         <div className="ui-row ui-row--wrap" data-testid="system-studio-mode-actions">
-          {experienceAssetIds.includes(ExperienceSurfaceAssetIds.loomWizard) ? (
+          {supportedModes.some((mode) => mode.id === ExperienceAssetModeIds.wizard) ? (
             <button type="button" className={`ui-button ui-button--sm ${selectedModeId === "wizard" ? "ui-button--primary" : "ui-button--ghost"}`} onClick={() => setSelectedModeId("wizard")}>Wizard</button>
           ) : null}
-          {experienceAssetIds.includes(ExperienceSurfaceAssetIds.loomCanvas) ? (
+          {supportedModes.some((mode) => mode.id === ExperienceAssetModeIds.canvas) ? (
             <button type="button" className={`ui-button ui-button--sm ${selectedModeId === "canvas" ? "ui-button--primary" : "ui-button--ghost"}`} onClick={() => setSelectedModeId("canvas")}>Canvas</button>
           ) : null}
         </div>
       ) : null}
 
-      {selectedModeId === ExperienceAssetModeIds.canvas ? (
+      {supportedModes.length === 0 ? (
+        <section className="ui-card ui-card--padded">
+          <p className="ui-text-small ui-text-secondary">
+            No draft authoring surface is configured for this system experience.
+          </p>
+        </section>
+      ) : resolvedModeId === ExperienceAssetModeIds.canvas ? (
         <ConfigurableCanvasSurface definition={canvasModel.definition} definitionContext={canvasModel.context} />
       ) : (
         <div className="ui-stack ui-stack--sm">

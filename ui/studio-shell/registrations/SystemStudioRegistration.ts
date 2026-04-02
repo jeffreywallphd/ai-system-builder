@@ -12,7 +12,6 @@ import { SystemStudioWorkManagementPanel } from "../../components/studio-shell/S
 import WorkflowTemplateSelectionPanel from "../../components/studio-shell/workflow/WorkflowTemplateSelectionPanel";
 import type { SystemStudioRegistration } from "../StudioShellExtensions";
 import { createSystemStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
-import { ExperienceSurfaceAssetIds } from "../experience-assets/ExperienceSurfaceAssets";
 
 export const systemStudioRegistration: SystemStudioRegistration = Object.freeze({
   studioType: SystemStudioIdentity.studioType,
@@ -29,11 +28,11 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
   }),
   shell: Object.freeze({
     title: SystemStudioIdentity.defaultStudioName,
-    subtitle: "Compose systems from reusable assets using guided or canvas authoring.",
-    experienceAssets: Object.freeze([
-      ExperienceSurfaceAssetIds.loomWizard,
-      ExperienceSurfaceAssetIds.loomCanvas,
-    ]),
+    subtitle: "Compose systems from reusable assets using guided authoring.",
+    draftAuthoringSurfaces: Object.freeze({
+      wizard: true,
+      canvas: false,
+    }),
   }),
   defaults: {
     title: "System Asset Draft",

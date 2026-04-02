@@ -16,7 +16,9 @@ describe("SystemStudioPage contracts", () => {
     expect(registrationSource).toContain("createSystemStudioTaxonomy(\"system\", \"deterministic\")");
     expect(registrationSource).toContain('supportsSystemAssets: true');
     expect(registrationSource).toContain('supportsNestedSystemAssets: true');
-    expect(registrationSource).toContain("experienceAssets");
+    expect(registrationSource).toContain("draftAuthoringSurfaces");
+    expect(registrationSource).toContain("wizard: true");
+    expect(registrationSource).toContain("canvas: false");
     expect(registrationSource).toContain('slot: "draft-authoring"');
     expect(registrationSource).toContain("system-studio-advanced-setup");
     expect(registrationSource).toContain("system-studio-advanced-validation");
@@ -88,6 +90,7 @@ describe("SystemStudioPage contracts", () => {
     expect(boundarySource).not.toContain("ExperienceAssetAuthoringBoundary");
     expect(boundarySource).toContain("SystemPageSetupEditor");
     expect(boundarySource).toContain("ConfigurableCanvasSurface");
+    expect(boundarySource).toContain("No draft authoring surface is configured");
     expect(canvasAdapterSource).toContain("Page structure");
     expect(canvasAdapterSource).toContain("add-panel");
     expect(canvasAdapterSource).toContain("Add page section");
