@@ -1140,3 +1140,27 @@ Not implemented in this slice:
   - **Asset Library + Asset Inspector** inside panel design own child insertion, replacement, and schema-driven config edits.
   - **System draft serialization/deserialization** remains the persistence backbone for panel identity/layout/content metadata (`SystemStudioDraftDocument` + existing registry-backed composition serialization).
 
+
+## Direction 5 extension update: schema asset contract + entity/table model foundation (stories 3.1.1-3.1.2)
+
+- Shared taxonomy now treats `schema` as a first-class atomic semantic role (`atomic/schema/none`) rather than overloading dataset, pipeline, or UI asset roles.
+- Shared taxonomy-driven contract projection now includes `schema` in `CompositionAssetContractResolver` with a bounded schema-authoring contract surface:
+  - JSON-schema input/output payload posture,
+  - schema metadata/definition compatibility,
+  - inspectable parameters for modeling dialect and entity scale.
+- A canonical schema-domain contract now exists in `domain/schema-studio/SchemaStudioDomain.ts` and follows existing studio asset conventions:
+  - schema studio identity + taxonomy metadata helpers,
+  - schema asset metadata construction aligned with shared draft metadata/provenance,
+  - versioned schema-asset document contract (`schemaVersion=1.0.0`).
+- Schema assets now formalize reusable entity/table modeling units via `SchemaEntityDefinition` with:
+  - stable identity (`entityId`),
+  - canonical naming (`name`, optional `label`),
+  - optional descriptions,
+  - field-collection hook support (inline or external reference),
+  - optional metadata and optional canvas-layout metadata for future node/canvas authoring.
+- Schema definitions also include bounded relationship declarations (`SchemaRelationshipDefinition`) that reference entities by id, preserving compatibility with future ERD-style authoring without forcing runtime execution semantics into this slice.
+- Serialization/deserialization + validation are now explicit and deterministic through `createSchemaAssetDocument`, `serializeSchemaAssetDocument`, and `deserializeSchemaAssetDocument`, including:
+  - duplicate entity/relationship id rejection,
+  - relationship endpoint validation against declared entities,
+  - normalized immutable documents for persistence and downstream registry/read-model use.
+- This slice intentionally keeps scope structural and asset-first: it does not add full schema-field authoring UX, relationship editors, or schema execution behaviors.

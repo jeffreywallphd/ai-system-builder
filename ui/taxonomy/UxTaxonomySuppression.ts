@@ -41,6 +41,7 @@ export class UxTaxonomySuppressionPolicy {
 const intentRoleLabelMap: Readonly<Record<TaxonomySemanticRole, string>> = Object.freeze({
   model: "AI capability",
   dataset: "Data asset",
+  schema: "Data blueprint",
   tool: "Task capability",
   "prompt-template": "Prompt asset",
   "embedding-index": "Knowledge index",

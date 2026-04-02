@@ -272,6 +272,32 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
     });
   }
 
+  if (semanticRole === TaxonomySemanticRoles.schema) {
+    if (structuralKind !== "atomic") {
+      return undefined;
+    }
+
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Schema authoring/update payload for structured data definitions, including entities and relationship declarations.",
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Versioned schema descriptor with entities/tables, relationship metadata, and downstream-compatible structural definitions.",
+      },
+      parameters: [
+        parameter("schemaDialect", false, "Declared schema modeling dialect (for example relational, document, semantic).", "string", "relational"),
+        parameter("entityCount", false, "Declared number of entities/tables described by the schema definition.", "number"),
+      ],
+      execution: {
+        invocationMode: "deferred",
+        sideEffects: "none",
+      },
+    });
+  }
+
   if (semanticRole === TaxonomySemanticRoles.promptTemplate) {
     if (structuralKind !== "atomic") {
       return undefined;

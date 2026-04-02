@@ -1084,3 +1084,17 @@
   - **Asset Library + Asset Inspector** inside panel design own child insertion, replacement, and schema-driven config edits.
   - **System draft serialization/deserialization** remains the persistence backbone for panel identity/layout/content metadata (`SystemStudioDraftDocument` + existing registry-backed composition serialization).
 
+
+## Direction 5 extension update: schema asset contract + entity/table model foundation (stories 3.1.1-3.1.2)
+
+- Shared taxonomy now includes `schema` as a first-class atomic semantic role (`atomic/schema/none`) instead of overloading dataset, pipeline, or UI-only roles.
+- Taxonomy-driven contract projection now supports `schema` in `CompositionAssetContractResolver` with bounded schema-authoring contracts (JSON-schema I/O posture + dialect/entity-scale parameters).
+- A canonical schema-domain contract now exists in `domain/schema-studio/SchemaStudioDomain.ts` and follows existing studio-shell asset metadata/taxonomy conventions.
+- Schema asset documents are versioned (`schemaVersion=1.0.0`) and now define reusable entity/table units via `SchemaEntityDefinition`:
+  - stable id (`entityId`),
+  - name + optional label/description,
+  - field-collection hooks (inline ids or referenced collection assets),
+  - optional metadata and optional canvas layout metadata for future schema-canvas authoring.
+- Bounded relationship declarations (`SchemaRelationshipDefinition`) are included with entity-id endpoint references so future ERD-style modeling can layer in without introducing runtime/pipeline semantics here.
+- Deterministic validation + persistence helpers are now explicit (`createSchemaAssetDocument`, `serializeSchemaAssetDocument`, `deserializeSchemaAssetDocument`) with duplicate-id checks and relationship endpoint validation.
+- Scope remains intentionally foundational: no full field editor, no ERD interaction tooling, and no execution behavior stack is introduced in this slice.

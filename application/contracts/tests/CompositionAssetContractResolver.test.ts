@@ -100,6 +100,11 @@ describe("CompositionAssetContractResolver", () => {
       semanticRole: TaxonomySemanticRoles.dataset,
       behaviorKind: TaxonomyBehaviorKinds.none,
     });
+    const schemaContract = resolver.resolveContractForTaxonomy({
+      structuralKind: "atomic",
+      semanticRole: TaxonomySemanticRoles.schema,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
     const configContract = resolver.resolveContractForTaxonomy({
       structuralKind: "atomic",
       semanticRole: TaxonomySemanticRoles.configProfile,
@@ -154,6 +159,7 @@ describe("CompositionAssetContractResolver", () => {
     expect(modelContract?.execution?.invocationMode).toBe("async");
     expect(toolContract?.parameters.find((parameter) => parameter.id === "providerKind")?.defaultValue).toBe("mcp-or-api");
     expect(datasetContract?.parameters.find((parameter) => parameter.id === "datasetFormat")?.defaultValue).toBe("jsonl");
+    expect(schemaContract?.parameters.find((parameter) => parameter.id === "schemaDialect")?.defaultValue).toBe("relational");
     expect(promptTemplateContract?.parameters.find((parameter) => parameter.id === "templateFormat")?.defaultValue).toBe("mustache");
     expect(embeddingIndexContract?.parameters.find((parameter) => parameter.id === "indexAlgorithm")?.defaultValue).toBe("hnsw");
     expect(configContract?.parameters.find((parameter) => parameter.id === "profileScope")?.defaultValue).toBe("runtime");
