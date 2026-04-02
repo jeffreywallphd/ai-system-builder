@@ -133,6 +133,18 @@ export function SystemStudioDraftAuthoringBoundary({
     }));
   };
 
+  const updateSelectedPagePanel = (input: {
+    readonly panelId: string;
+    readonly update: (panel: PanelAssetContract) => PanelAssetContract;
+  }): void => {
+    persistPanelsForSelectedPage(selectedPagePanels.map((panel) => {
+      if ((panel.panelId !== input.panelId) && (panel.sourceLayoutNodeId !== input.panelId)) {
+        return panel;
+      }
+      return Object.freeze(input.update(panel));
+    }));
+  };
+
   const persistSystemPages = (pages: SystemStudioDraftDocument["systemSpec"]["pages"]): void => {
     const serializedPages = serializeSystemStudioPageDefinitions({
       existingContent: content,
@@ -253,6 +265,13 @@ export function SystemStudioDraftAuthoringBoundary({
         description: "High-level layout section. Detailed design is handled in the panel studio.",
         layoutBounds: Object.freeze({ x: 0.05, y: 0.05, width: 0.22, height: 0.18 }),
         contentSlots: Object.freeze([{ slotId: `${panelId}-content`, label: "Section content" }]),
+        content: Object.freeze({
+          kind: "embedded-studio",
+          studioAssetId: "workflow-studio",
+          draftContent: "",
+          experienceAssetIds: Object.freeze(["loom-wizard"]),
+          embeddedVariant: "behavior-automation",
+        }),
         sourceLayoutNodeId: panelId,
       });
       persistPanelsForSelectedPage(Object.freeze([...selectedPagePanels, panel]));
@@ -326,8 +345,47 @@ export function SystemStudioDraftAuthoringBoundary({
         setSelectedLayoutNodeId(undefined);
       },
       onCanvasEditingEvent: handleCanvasEditingEvent,
+      onPanelDraftContentChange: ({ panelId, draftContent }) => {
+        updateSelectedPagePanel({
+          panelId,
+          update: (panel) => Object.freeze({
+            ...panel,
+            content: panel.content?.kind === "embedded-studio"
+              ? Object.freeze({
+                ...panel.content,
+                draftContent,
+              })
+              : Object.freeze({
+                kind: "embedded-studio",
+                studioAssetId: "workflow-studio",
+                draftContent,
+                experienceAssetIds: Object.freeze(["loom-wizard"]),
+                embeddedVariant: "behavior-automation",
+              }),
+          }),
+        });
+      },
+      onConnectSelectedPanelStudio: ({ panelId, studioAssetId }) => {
+        updateSelectedPagePanel({
+          panelId,
+          update: (panel) => Object.freeze({
+            ...panel,
+            content: Object.freeze({
+              kind: "embedded-studio",
+              studioAssetId,
+              draftContent: panel.content?.kind === "embedded-studio" ? panel.content.draftContent ?? "" : "",
+              experienceAssetIds: panel.content?.kind === "embedded-studio" && panel.content.experienceAssetIds
+                ? panel.content.experienceAssetIds
+                : Object.freeze(["loom-wizard"]),
+              embeddedVariant: panel.content?.kind === "embedded-studio" && panel.content.embeddedVariant
+                ? panel.content.embeddedVariant
+                : "behavior-automation",
+            }),
+          }),
+        });
+      },
     }),
-    [content, extensionContext, selectedLayoutNodeId, resolvedSelectedPageId, validationIssues],
+    [content, extensionContext, selectedLayoutNodeId, resolvedSelectedPageId, selectedPagePanels, validationIssues],
   );
 
   const wizardModel = useMemo(

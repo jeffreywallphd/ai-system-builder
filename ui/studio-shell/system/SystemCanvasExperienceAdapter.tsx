@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import type { StudioShellValidationIssue } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import StudioAssetHostBoundary from "../../components/studio-shell/studio-assets/StudioAssetHostBoundary";
 import type {
   CanvasExperienceAssetDefinition,
   CanvasSurfaceEditingEvent,
@@ -13,9 +14,18 @@ import type { ExperienceIssueSummary } from "../experience-assets/ExperiencePres
 import {
   mapLayoutNodeToPanelAsset,
   mapPanelAssetToRuntimeInstance,
+  type PanelAssetContent,
   type PanelAssetContract,
 } from "../experience-assets/PanelAssetContracts";
 import type { StudioShellExtensionContext } from "../StudioShellExtensions";
+import {
+  createStudioHostContext,
+  createStudioHostSessionState,
+  datasetStudioSurfaceAssetDefinition,
+  workflowStudioSurfaceAssetDefinition,
+} from "../studio-assets/StudioSurfaceAssetDefinitions";
+import { StudioAssetRenderModes, type StudioAssetDefinition } from "../studio-assets/StudioAssetContracts";
+import type { StudioEmbeddedEvent } from "../studio-assets/StudioEmbeddedEventContracts";
 import {
   parseSystemStudioDraftDocument,
   type SystemStudioDraftDocument,
@@ -43,6 +53,14 @@ export interface SystemCanvasExperienceAdapterInput {
   readonly selectedPageId: string;
   readonly onSelectPage: (pageId: string) => void;
   readonly onCanvasEditingEvent?: (event: CanvasSurfaceEditingEvent) => void;
+  readonly onPanelDraftContentChange?: (input: {
+    readonly panelId: string;
+    readonly draftContent: string;
+  }) => void;
+  readonly onConnectSelectedPanelStudio?: (input: {
+    readonly panelId: string;
+    readonly studioAssetId: string;
+  }) => void;
 }
 
 function toIssueSummaries(issues: ReadonlyArray<StudioShellValidationIssue>): ReadonlyArray<ExperienceIssueSummary> {
@@ -63,7 +81,7 @@ function resolveFocusedTarget(context: SystemCanvasExperienceContext): CanvasSur
   return Object.freeze({
     kind: "node",
     id: context.selectedPageId,
-    label: context.pages.find((page) => page.pageId === context.selectedPageId)?.title ?? "Page",
+    label: `Page: ${context.pages.find((page) => page.pageId === context.selectedPageId)?.title ?? "Page"}`,
   });
 }
 
@@ -102,6 +120,75 @@ function resolveLayoutNodes(input: {
     movable: true,
     resizable: true,
   })));
+}
+
+function resolvePanelStudioAsset(
+  panel: PanelAssetContract,
+): {
+  readonly asset?: StudioAssetDefinition<unknown, StudioEmbeddedEvent>;
+  readonly unsupportedStudioAssetId?: string;
+} {
+  const studioAssetId = panel.content?.kind === "embedded-studio" ? panel.content.studioAssetId : undefined;
+  if (!studioAssetId) {
+    return Object.freeze({});
+  }
+  if (studioAssetId === workflowStudioSurfaceAssetDefinition.contract.identity.studioType) {
+    return Object.freeze({ asset: workflowStudioSurfaceAssetDefinition as StudioAssetDefinition<unknown, StudioEmbeddedEvent> });
+  }
+  if (studioAssetId === datasetStudioSurfaceAssetDefinition.contract.identity.studioType) {
+    return Object.freeze({ asset: datasetStudioSurfaceAssetDefinition as StudioAssetDefinition<unknown, StudioEmbeddedEvent> });
+  }
+  return Object.freeze({ unsupportedStudioAssetId: studioAssetId });
+}
+
+function resolvePanelStudioInput(input: {
+  readonly panel: PanelAssetContract;
+  readonly extensionContext: StudioShellExtensionContext;
+  readonly onPanelDraftContentChange?: (params: { readonly panelId: string; readonly draftContent: string }) => void;
+}): unknown {
+  const panelStudioContent = input.panel.content;
+  if (panelStudioContent?.kind !== "embedded-studio") {
+    return undefined;
+  }
+
+  if (panelStudioContent.studioAssetId === workflowStudioSurfaceAssetDefinition.contract.identity.studioType) {
+    return Object.freeze({
+      content: panelStudioContent.draftContent ?? "",
+      onChangeContent: (nextContent: string) => input.onPanelDraftContentChange?.({
+        panelId: input.panel.panelId,
+        draftContent: nextContent,
+      }),
+      isWorkflowStudio: true,
+      experienceAssetIds: panelStudioContent.experienceAssetIds ?? Object.freeze(["loom-wizard"]),
+      embeddedVariant: panelStudioContent.embeddedVariant === "behavior-automation" ? "behavior-automation" : undefined,
+      workflowModeContext: undefined,
+      invalidModeRouteId: undefined,
+      invalidWizardPageRouteId: undefined,
+    });
+  }
+
+  if (panelStudioContent.studioAssetId === datasetStudioSurfaceAssetDefinition.contract.identity.studioType) {
+    const delegatedExtensionContext: StudioShellExtensionContext = Object.freeze({
+      ...input.extensionContext,
+      operations: Object.freeze({
+        ...input.extensionContext.operations,
+        setDraftContent: (nextContent: string) => {
+          input.onPanelDraftContentChange?.({
+            panelId: input.panel.panelId,
+            draftContent: nextContent,
+          });
+        },
+      }),
+    });
+    return Object.freeze({
+      content: panelStudioContent.draftContent ?? "",
+      extensionContext: delegatedExtensionContext,
+      experienceAssetIds: panelStudioContent.experienceAssetIds,
+      embeddedVariant: panelStudioContent.embeddedVariant === "inputs-outputs" ? "inputs-outputs" : undefined,
+    });
+  }
+
+  return undefined;
 }
 
 function resolveEditingModel(context: SystemCanvasExperienceContext): CanvasSurfaceEditingModel {
@@ -246,17 +333,106 @@ export function createSystemCanvasExperienceDefinition(
       </div>
     ),
     renderInspectorRegion: ({ context: canvasContext }) => (
-      <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="system-canvas-structure-guidance">
-        <strong className="ui-text-small">Structure only</strong>
-        <p className="ui-text-small ui-text-secondary">
-          Use this canvas for page-level section placement. Screen navigation and system-wide defaults are set in the Settings step.
-        </p>
-        <p className="ui-text-small ui-text-secondary">
-          Detailed panel content is edited in each panel&apos;s dedicated studio.
-        </p>
-      </section>
+      <>
+        <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="system-canvas-structure-guidance">
+          <strong className="ui-text-small">Structure only</strong>
+          <p className="ui-text-small ui-text-secondary">
+            Use this canvas for page-level section placement. Screen navigation and system-wide defaults are set in the Settings step.
+          </p>
+          <p className="ui-text-small ui-text-secondary">
+            Detailed panel content is edited in each panel&apos;s dedicated studio.
+          </p>
+        </section>
+        {(() => {
+          const selectedPanelForInspector = canvasContext.panels.find((panel) => (
+            (panel.sourceLayoutNodeId ?? panel.panelId) === canvasContext.selectedLayoutNodeId
+          ));
+          if (!selectedPanelForInspector) {
+            return (
+              <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="system-canvas-panel-design-empty-selection">
+                <strong className="ui-text-small">Panel design studio</strong>
+                <p className="ui-text-small ui-text-secondary">
+                  Select a page section in the canvas to open its panel design space.
+                </p>
+              </section>
+            );
+          }
+          const studioResolution = resolvePanelStudioAsset(selectedPanelForInspector);
+          if (!selectedPanelForInspector.content || selectedPanelForInspector.content.kind !== "embedded-studio") {
+            return (
+              <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="system-canvas-panel-design-unconfigured">
+                <strong className="ui-text-small">Panel design studio</strong>
+                <p className="ui-text-small ui-text-secondary">
+                  This section has not been linked to a panel design studio yet.
+                </p>
+                <button
+                  type="button"
+                  className="ui-button ui-button--sm ui-button--primary"
+                  onClick={() => input.onConnectSelectedPanelStudio?.({
+                    panelId: selectedPanelForInspector.panelId,
+                    studioAssetId: workflowStudioSurfaceAssetDefinition.contract.identity.studioType,
+                  })}
+                >
+                  Connect panel design studio
+                </button>
+              </section>
+            );
+          }
+          if (!studioResolution.asset) {
+            return (
+              <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="system-canvas-panel-design-unsupported">
+                <strong className="ui-text-small">Panel design studio</strong>
+                <p className="ui-text-small ui-text-secondary">
+                  This section references a studio that is not available in this view.
+                </p>
+                {studioResolution.unsupportedStudioAssetId ? (
+                  <details>
+                    <summary className="ui-text-small">Advanced details</summary>
+                    <p className="ui-text-small ui-text-secondary">Unsupported studio asset id: {studioResolution.unsupportedStudioAssetId}</p>
+                  </details>
+                ) : null}
+              </section>
+            );
+          }
+          return (
+            <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="system-canvas-panel-design-studio">
+              <strong className="ui-text-small">Designing: {selectedPanelForInspector.title}</strong>
+              <p className="ui-text-small ui-text-secondary">
+                You&apos;re now editing this section&apos;s internal content in a focused panel design studio.
+              </p>
+              <StudioAssetHostBoundary
+                asset={studioResolution.asset}
+                context={createStudioHostContext({
+                  hostId: `system-canvas-panel:${selectedPanelForInspector.pageId}:${selectedPanelForInspector.panelId}`,
+                  mode: StudioAssetRenderModes.embedded,
+                  capabilities: Object.freeze({
+                    canNavigate: false,
+                    canShowShellChrome: false,
+                    canMutateDraft: true,
+                    canLaunchRuns: false,
+                    canManageSessionState: false,
+                  }),
+                  input: resolvePanelStudioInput({
+                    panel: selectedPanelForInspector,
+                    extensionContext: input.extensionContext,
+                    onPanelDraftContentChange: input.onPanelDraftContentChange,
+                  }),
+                })}
+                session={createStudioHostSessionState({
+                  sessionId: input.extensionContext.snapshot?.activeSessionId,
+                  draftId: input.extensionContext.snapshot?.draft?.draftId,
+                  isBusy: input.extensionContext.isBusy,
+                  operationError: input.extensionContext.operationError,
+                })}
+              />
+            </section>
+          );
+        })()}
+      </>
     ),
-    resolveInteractionMessage: (canvasContext) => `Sections on this page: ${canvasContext.layoutNodes.length} · Panel internals are designed separately`,
+    resolveInteractionMessage: (canvasContext) => canvasContext.selectedLayoutNodeId
+      ? `Selected section ready for panel design · Total sections on page: ${canvasContext.layoutNodes.length}`
+      : `Sections on this page: ${canvasContext.layoutNodes.length} · Select a section to open its panel design studio`,
     emptyState: Object.freeze({
       when: (canvasContext) => canvasContext.layoutNodes.length === 0,
       render: () => (
@@ -288,5 +464,12 @@ export function createSystemPanelFromCanvasNode(input: {
         label: "Panel region",
       }),
     ]),
+    content: Object.freeze({
+      kind: "embedded-studio",
+      studioAssetId: workflowStudioSurfaceAssetDefinition.contract.identity.studioType,
+      draftContent: "",
+      experienceAssetIds: Object.freeze(["loom-wizard"]),
+      embeddedVariant: "behavior-automation",
+    } satisfies PanelAssetContent),
   });
 }

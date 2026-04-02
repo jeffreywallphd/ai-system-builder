@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { renderToStaticMarkup } from "react-dom/server";
 import { createSystemCanvasExperienceDefinition } from "../SystemCanvasExperienceAdapter";
 import { createSystemWizardExperienceAdapterModel, SystemWizardPageIds } from "../SystemWizardExperienceAdapter";
 import type { StudioShellExtensionContext } from "../../StudioShellExtensions";
@@ -69,6 +70,56 @@ describe("System studio experience adapters", () => {
     expect(editing?.nodes[0]?.title).toBe("Main panel");
     expect(editing?.nodes[0]?.subtitle).toContain("left-pane");
     expect(editing?.commands?.map((command) => command.id)).toEqual(["add-panel", "remove-panel", "fit-layout"]);
+  });
+
+  it("opens an embedded panel design studio when a canvas panel is selected", () => {
+    const content = JSON.stringify({
+      systemSpec: {
+        pages: [{ pageId: "page-1", title: "Welcome" }],
+        canvasAuthoring: {
+          pageLayouts: [{
+            pageId: "page-1",
+            panels: [{
+              panelId: "panel-1",
+              pageId: "page-1",
+              title: "Automation",
+              layoutBounds: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+              contentSlots: [],
+              sourceLayoutNodeId: "panel-1",
+              content: {
+                kind: "embedded-studio",
+                studioAssetId: "workflow-studio",
+                draftContent: "{\"steps\":[]}",
+              },
+            }],
+          }],
+        },
+      },
+    });
+
+    const model = createSystemCanvasExperienceDefinition({
+      content,
+      extensionContext,
+      validationIssues: [],
+      selectedPageId: "page-1",
+      selectedLayoutNodeId: "panel-1",
+      onSelectPage: () => undefined,
+      onPanelDraftContentChange: () => undefined,
+    });
+
+    const inspector = model.definition.renderInspectorRegion?.({
+      context: model.context,
+      inspector: Object.freeze({
+        focusedTarget: Object.freeze({
+          kind: "node",
+          id: "panel-1",
+          label: "Automation",
+        }),
+      }),
+    });
+    const html = renderToStaticMarkup(<>{inspector}</>);
+    expect(html).toContain("Designing: Automation");
+    expect(html).toContain("data-testid=\"studio-asset-host-boundary\"");
   });
 
   it("starts wizard flow with multi-page setup", () => {
