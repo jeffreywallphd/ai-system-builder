@@ -105,6 +105,7 @@ describe("SystemStudioDraftDocument", () => {
 
     const parsed = parseSystemStudioDraftDocument(nextContent);
     expect(parsed.systemSpec.embeddedStudios?.dataset?.draftContent).toBe("{\"pipeline\":\"inputs-outputs\"}");
+    expect(parsed.systemSpec.sharedDocument?.datasetDraftContent).toBe("{\"pipeline\":\"inputs-outputs\"}");
   });
 
   it("serializes and parses embedded workflow draft content", () => {
@@ -115,5 +116,52 @@ describe("SystemStudioDraftDocument", () => {
 
     const parsed = parseSystemStudioDraftDocument(nextContent);
     expect(parsed.systemSpec.embeddedStudios?.workflow?.draftContent).toBe("{\"steps\":[{\"stepId\":\"step-1\"}]}");
+    expect(parsed.systemSpec.sharedDocument?.workflowDraftContent).toBe("{\"steps\":[{\"stepId\":\"step-1\"}]}");
+  });
+
+  it("keeps panel-hosted embedded studio draft content synchronized with shared document drafts", () => {
+    const baseContent = JSON.stringify({
+      systemSpec: {
+        canvasAuthoring: {
+          pageLayouts: [
+            {
+              pageId: "page-1",
+              panels: [
+                {
+                  panelId: "dataset-panel",
+                  pageId: "page-1",
+                  title: "Dataset panel",
+                  layoutBounds: { x: 0, y: 0, width: 0.4, height: 0.3 },
+                  contentSlots: [],
+                  content: { kind: "embedded-studio", studioAssetId: "dataset-studio", draftContent: "old-dataset" },
+                },
+                {
+                  panelId: "workflow-panel",
+                  pageId: "page-1",
+                  title: "Workflow panel",
+                  layoutBounds: { x: 0.4, y: 0, width: 0.4, height: 0.3 },
+                  contentSlots: [],
+                  content: { kind: "embedded-studio", studioAssetId: "workflow-studio", draftContent: "old-workflow" },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+    const withDatasetUpdate = serializeSystemStudioEmbeddedDatasetDraftContent({
+      existingContent: baseContent,
+      draftContent: "new-dataset",
+    });
+    const withWorkflowUpdate = serializeSystemStudioEmbeddedWorkflowDraftContent({
+      existingContent: withDatasetUpdate,
+      draftContent: "new-workflow",
+    });
+    const parsed = parseSystemStudioDraftDocument(withWorkflowUpdate);
+    const panels = parsed.canvasAuthoring.pageLayouts[0]?.panels ?? [];
+
+    expect((panels[0]?.content as { draftContent?: string } | undefined)?.draftContent).toBe("new-dataset");
+    expect((panels[1]?.content as { draftContent?: string } | undefined)?.draftContent).toBe("new-workflow");
   });
 });

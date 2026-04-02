@@ -91,7 +91,7 @@ function renderInterfaceDesignPage(context: SystemWizardExperienceContext): JSX.
   return (
     <section className="ui-stack ui-stack--sm" data-testid="system-wizard-interface-design-page">
       <div className="ui-stack ui-stack--2xs">
-        <p className="ui-text-small ui-text-secondary">Pick a page, then arrange the panels for that page.</p>
+        <p className="ui-text-small ui-text-secondary">Pick a page, then arrange the sections for that screen.</p>
         <div className="ui-row ui-row--wrap" data-testid="system-wizard-page-switcher">
           {context.document.systemSpec.pages.map((page) => (
             <button
@@ -134,21 +134,31 @@ function renderInputsOutputsPage(context: SystemWizardExperienceContext): JSX.El
       experienceAssetIds: Object.freeze([ExperienceSurfaceAssetIds.loomWizard]),
       embeddedVariant: "inputs-outputs" as const,
     }),
+    documentAccess: Object.freeze({
+      readOnly: false,
+      readDocument: () => context.extensionContext.snapshot?.draft?.content ?? "",
+      updateDocument: (nextContent: string) => {
+        context.extensionContext.operations.setDraftContent?.(nextContent);
+      },
+    }),
+    injectedContext: Object.freeze({
+      sharedDocumentBoundary: "systemSpec.sharedDocument",
+      synchronizedScope: "dataset-definitions",
+    }),
   });
 
   return (
     <section className="ui-stack ui-stack--sm" data-testid="system-wizard-inputs-outputs-page">
       <div className="ui-stack ui-stack--2xs">
-        <strong>Inputs &amp; Outputs</strong>
         <p className="ui-text-small ui-text-secondary">
-          Set up the data this system uses and the results it produces in one guided place.
+          Set up what comes in and what people get back, all in one place.
         </p>
       </div>
       <section className="ui-card ui-card--padded ui-stack ui-stack--sm">
         <div className="ui-stack ui-stack--2xs">
           <strong>Data setup</strong>
           <p className="ui-text-small ui-text-secondary">
-            Add and refine your data definitions without leaving this step.
+            Add or edit the information this system uses.
           </p>
         </div>
         <StudioAssetHostBoundary
@@ -208,14 +218,24 @@ function renderBehaviorAutomationPage(context: SystemWizardExperienceContext): J
       experienceAssetIds: Object.freeze([ExperienceSurfaceAssetIds.loomWizard]),
       embeddedVariant: "behavior-automation" as const,
     }),
+    documentAccess: Object.freeze({
+      readOnly: false,
+      readDocument: () => context.extensionContext.snapshot?.draft?.content ?? "",
+      updateDocument: (nextContent: string) => {
+        context.extensionContext.operations.setDraftContent?.(nextContent);
+      },
+    }),
+    injectedContext: Object.freeze({
+      sharedDocumentBoundary: "systemSpec.sharedDocument",
+      synchronizedScope: "workflow-definitions",
+    }),
   });
 
   return (
     <section className="ui-stack ui-stack--sm" data-testid="system-wizard-behavior-automation-page">
       <div className="ui-stack ui-stack--2xs">
-        <strong>Behavior &amp; Automation</strong>
         <p className="ui-text-small ui-text-secondary">
-          Set up how this system responds and what it does automatically, right inside this guided step.
+          Define how the system responds and what it does automatically.
         </p>
       </div>
       <section className="ui-card ui-card--padded ui-stack ui-stack--sm">
@@ -272,7 +292,9 @@ const definition: WizardExperienceAssetDefinition<SystemWizardExperienceContext>
       title: "Inputs & Outputs",
       summary: "Define what information comes in and what is produced.",
       resolveStatus: (context) => toStatus(
-        context.document.systemSpec.inputs.length > 0 || context.document.systemSpec.outputs.length > 0,
+        context.document.systemSpec.inputs.length > 0
+          || context.document.systemSpec.outputs.length > 0
+          || context.embeddedDatasetContent.trim().length > 0,
       ),
       render: renderInputsOutputsPage,
     }),
@@ -305,7 +327,9 @@ const definition: WizardExperienceAssetDefinition<SystemWizardExperienceContext>
       },
       {
         id: SystemWizardPageIds.inputsOutputs,
-        ready: context.document.systemSpec.inputs.length > 0 || context.document.systemSpec.outputs.length > 0,
+        ready: context.document.systemSpec.inputs.length > 0
+          || context.document.systemSpec.outputs.length > 0
+          || context.embeddedDatasetContent.trim().length > 0,
         title: "Inputs & Outputs",
       },
       {
