@@ -291,3 +291,9 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
   - trigger binding resolution (`WorkflowUiTriggerEventAdapter` + image trigger binding config),
   - parameter/context mapping (`UiTriggerSystemContextMapper`),
   - workflow execution handoff (`WorkflowUiEventRuntimeDispatcher` -> `runWorkflowDraftTriggered`).
+
+## AI Loom image manipulation update: system-context to input-binding adapters (stories 4.3.1-4.3.2)
+
+- `UiTriggerSystemContextMapper` now maps trigger events into the shared `SystemContextContract` rather than directly emitting workflow-execution metadata objects.
+- A dedicated workflow adapter seam (`WorkflowSystemContextBindingAdapter` in `application/workflow-studio/SystemContextWorkflowInputMapper.ts`) translates that contract into workflow execution context metadata/input values.
+- `WorkflowUiEventRuntimeDispatcher` composes both seams (`UiTriggerSystemContextMapper` + `WorkflowSystemContextBindingAdapter`) so state gathering and workflow binding translation remain independently swappable.
