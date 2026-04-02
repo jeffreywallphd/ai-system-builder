@@ -21,6 +21,7 @@ import {
   type SystemStudioDraftDocument,
   type SystemStudioPageDefinition,
 } from "./SystemStudioDraftDocument";
+import { systemPageLayoutTemplates } from "./SystemPageModel";
 import { SystemCompositionEditor } from "../../components/studio-shell/SystemCompositionEditor";
 import { SystemInterfaceEditor } from "../../components/studio-shell/SystemInterfaceEditor";
 import { SystemParameterConfigEditor } from "../../components/studio-shell/SystemParameterConfigEditor";
@@ -109,7 +110,7 @@ function resolveLayoutNodes(input: {
   return Object.freeze(input.panels.map((panel) => Object.freeze({
     id: panel.sourceLayoutNodeId ?? panel.panelId,
     title: panel.title,
-    subtitle: panel.description,
+    subtitle: panel.description ?? "High-level section",
     x: panel.layoutBounds.x,
     y: panel.layoutBounds.y,
     width: panel.layoutBounds.width,
@@ -127,16 +128,16 @@ function resolveEditingModel(context: SystemCanvasExperienceContext): CanvasSurf
     nodes: context.layoutNodes,
     selectedNodeId: context.selectedLayoutNodeId,
     commands: Object.freeze([
-      Object.freeze({ id: "add-panel", label: "Add section", tone: "primary" as const }),
+      Object.freeze({ id: "add-panel", label: "Add page section", tone: "primary" as const }),
       Object.freeze({
         id: "remove-panel",
         label: "Remove selected section",
         tone: "ghost" as const,
         disabled: !context.selectedLayoutNodeId,
       }),
-      Object.freeze({ id: "fit-layout", label: "Reset page layout", tone: "ghost" as const }),
+      Object.freeze({ id: "fit-layout", label: "Clear page layout", tone: "ghost" as const }),
     ]),
-    createNodeDescription: "Double-click to add a panel region. Drag or resize to shape the page layout.",
+    createNodeDescription: "Double-click to add a major page section. Drag or resize to shape page structure.",
     designFrame: context.designFrame,
     coordinateSpace: Object.freeze({
       mode: "normalized",
@@ -195,6 +196,9 @@ export function createSystemCanvasExperienceDefinition(
     ),
     renderPaletteRegion: () => (
       <div className="ui-stack ui-stack--2xs" data-testid="system-canvas-page-picker">
+        <p className="ui-text-small ui-text-secondary">
+          Build the high-level page structure here. Detailed panel content is authored inside each panel's own studio.
+        </p>
         <div className="ui-row ui-row--wrap">
           {pages.map((page) => (
             <button
@@ -207,6 +211,18 @@ export function createSystemCanvasExperienceDefinition(
             </button>
           ))}
         </div>
+        <div className="ui-row ui-row--wrap">
+          {(pages.find((page) => page.pageId === selectedPageId)?.layout.regionIds ?? []).map((regionId) => (
+            <span key={regionId} className="ui-badge ui-badge--neutral">
+              {regionId}
+            </span>
+          ))}
+        </div>
+        <span className="ui-text-small ui-text-secondary">
+          {systemPageLayoutTemplates.find(
+            (template) => template.layoutKind === pages.find((page) => page.pageId === selectedPageId)?.layout.layoutKind,
+          )?.summary ?? "Select a page to view layout regions."}
+        </span>
         <div className="ui-row ui-row--wrap" data-testid="system-canvas-palette-actions">
           <button
             type="button"
@@ -229,14 +245,14 @@ export function createSystemCanvasExperienceDefinition(
     renderSupplementaryPanels: ({ extensionContext }) => (
       <SystemCompositionEditor context={extensionContext} />
     ),
-    resolveInteractionMessage: (canvasContext) => `Page sections: ${canvasContext.layoutNodes.length} · Ready for preview: ${runtimePanels.length}`,
+    resolveInteractionMessage: (canvasContext) => `Sections on this page: ${canvasContext.layoutNodes.length} · Panel internals are designed separately`,
     emptyState: Object.freeze({
       when: (canvasContext) => canvasContext.layoutNodes.length === 0,
       render: () => (
         <div className="ui-card ui-card--padded" data-testid="system-canvas-empty-state">
-          <strong>Add your first page section</strong>
+          <strong>Add your first major section</strong>
           <p className="ui-text-small ui-text-secondary">
-            Start this page with a section, then move and resize it to shape the layout.
+            Start with high-level structure only. You can design section internals later in panel studios.
           </p>
         </div>
       ),
