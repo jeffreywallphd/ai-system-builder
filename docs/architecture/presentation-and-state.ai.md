@@ -610,6 +610,10 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Panel assets now persist as first-class composed UI assets (`ui-composed:panel`) with explicit slot definitions, identity metadata, configuration defaults, and serialization-compatible composition payloads (`asset-composition`) inside `PanelAssetContract`.
 - The shared studio-asset registry now registers panel as a composed asset kind (`defaultComposedStudioUiContracts`), so panel composition uses the same discovery, renderer-resolution, and composition-validation seams as other UI assets.
 - System Studio canvas inspector now embeds a dedicated Panel Design Studio (`PanelDesignStudio`) where child UI assets are inserted into panel slots via the existing asset library + insertion + selection + validation infrastructure (`StudioAssetLibraryPanel`, `resolveDefaultInsertionTarget`, `insertStudioAssetIntoCompositionTree`), instead of adding child content from page-layout canvas commands.
+- Panel Design Studio now keeps Asset Library and Asset Inspector integrated in one embedded authoring surface:
+  - library entries are contextual to the selected panel/child insertion target and constrained by existing slot + composition validation rules,
+  - panel root and nested child selections share one selection context and bind directly into the existing schema-driven Asset Inspector flow,
+  - invalid-target/no-compatible/empty-result states are surfaced explicitly without breaking host-owned System Studio layout boundaries.
 
 
 ## Direction 5 UI extension update: atomic and composed UI asset contract foundation (stories 1.1.1-1.1.2)

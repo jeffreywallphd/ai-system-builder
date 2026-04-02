@@ -24,6 +24,8 @@ export interface StudioAssetLibraryPanelProps {
   readonly onChangeSelectedAssetConfig?: (nextConfig: Readonly<Record<string, unknown>>) => void;
   readonly onChangeSelection?: (nextSelection: StudioAssetSelectionState) => void;
   readonly onReplaceCompositionRoot?: (nextRoot: StudioAssetCompositionNode) => void;
+  readonly entryFilter?: (entry: StudioAssetLibraryEntry) => boolean;
+  readonly emptyStateMessage?: string;
 }
 
 const defaultCategories = Object.freeze([
@@ -60,6 +62,8 @@ export default function StudioAssetLibraryPanel({
   onChangeSelectedAssetConfig,
   onChangeSelection,
   onReplaceCompositionRoot,
+  entryFilter,
+  emptyStateMessage = "No assets matched this search.",
 }: StudioAssetLibraryPanelProps): JSX.Element {
   const [query, setQuery] = useState("");
   const [groupFilter, setGroupFilter] = useState("");
@@ -69,16 +73,27 @@ export default function StudioAssetLibraryPanel({
     registry,
     categories: categoryFilter,
   }), [registry, categoryFilter]);
-  const sections = useMemo(() => listStudioAssetLibrarySections({
-    registry,
-    query: {
-      searchText: query,
-      categories: categoryFilter,
-      groups: groupFilter ? Object.freeze([groupFilter]) : undefined,
-      contractCategories: contractFilter ? Object.freeze([contractFilter]) : undefined,
-      tags: tagFilter ? Object.freeze([tagFilter]) : undefined,
-    },
-  }), [registry, query, categoryFilter, groupFilter, contractFilter, tagFilter]);
+  const sections = useMemo(() => {
+    const listed = listStudioAssetLibrarySections({
+      registry,
+      query: {
+        searchText: query,
+        categories: categoryFilter,
+        groups: groupFilter ? Object.freeze([groupFilter]) : undefined,
+        contractCategories: contractFilter ? Object.freeze([contractFilter]) : undefined,
+        tags: tagFilter ? Object.freeze([tagFilter]) : undefined,
+      },
+    });
+    if (!entryFilter) {
+      return listed;
+    }
+    return Object.freeze(listed
+      .map((section) => Object.freeze({
+        ...section,
+        entries: Object.freeze(section.entries.filter((entry) => entryFilter(entry))),
+      }))
+      .filter((section) => section.entries.length > 0));
+  }, [registry, query, categoryFilter, groupFilter, contractFilter, tagFilter, entryFilter]);
 
   const boundSelection = useMemo(
     () => bindStudioAssetSelection({ root: compositionRoot, selection }),
@@ -134,7 +149,7 @@ export default function StudioAssetLibraryPanel({
       </div>
 
       {sections.length === 0 ? (
-        <p className="ui-text-small ui-text-secondary">No assets matched this search.</p>
+        <p className="ui-text-small ui-text-secondary">{emptyStateMessage}</p>
       ) : (
         <div className="ui-stack ui-stack--xs">
           {sections.map((section) => (
