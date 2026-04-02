@@ -53,6 +53,7 @@ export function mapLayoutNodeToPanelAsset(input: {
   readonly regionId?: string;
   readonly description?: string;
   readonly contentSlots?: ReadonlyArray<PanelAssetContentSlot>;
+  readonly content?: PanelAssetContent;
 }): PanelAssetContract {
   return Object.freeze({
     panelId: input.panelId ?? input.node.id,
@@ -67,7 +68,7 @@ export function mapLayoutNodeToPanelAsset(input: {
       height: input.node.height,
     }),
     contentSlots: Object.freeze(input.contentSlots ?? []),
-    content: undefined,
+    content: input.content,
     sourceLayoutNodeId: input.node.id,
   });
 }
