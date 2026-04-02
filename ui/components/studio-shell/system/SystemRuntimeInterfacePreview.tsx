@@ -1,0 +1,99 @@
+import { useMemo, useState } from "react";
+import { mapPanelAssetToRuntimeInstance } from "../../../studio-shell/experience-assets/PanelAssetContracts";
+import { parseSystemStudioDraftDocument } from "../../../studio-shell/system/SystemStudioDraftDocument";
+
+interface SystemRuntimeInterfacePreviewProps {
+  readonly content: string;
+}
+
+interface RuntimePageLayoutModel {
+  readonly pageId: string;
+  readonly heading: string;
+  readonly description?: string;
+  readonly panels: ReturnType<typeof mapPanelAssetToRuntimeInstance>[];
+}
+
+function resolveRuntimePages(content: string): ReadonlyArray<RuntimePageLayoutModel> {
+  const document = parseSystemStudioDraftDocument(content);
+  return Object.freeze(document.systemSpec.pages.map((page) => {
+    const layout = document.canvasAuthoring.pageLayouts.find((entry) => entry.pageId === page.pageId);
+    return Object.freeze({
+      pageId: page.pageId,
+      heading: page.heading,
+      description: page.description,
+      panels: Object.freeze((layout?.panels ?? []).map((panel) => mapPanelAssetToRuntimeInstance(panel))),
+    });
+  }));
+}
+
+export default function SystemRuntimeInterfacePreview({
+  content,
+}: SystemRuntimeInterfacePreviewProps): JSX.Element {
+  const pages = useMemo(() => resolveRuntimePages(content), [content]);
+  const [selectedPageId, setSelectedPageId] = useState<string>(pages[0]?.pageId ?? "page-1");
+  const activePage = pages.find((page) => page.pageId === selectedPageId) ?? pages[0];
+
+  return (
+    <section className="ui-stack ui-stack--sm" data-testid="system-runtime-interface-preview">
+      <div className="ui-stack ui-stack--2xs">
+        <strong>Interface preview</strong>
+        <p className="ui-text-small ui-text-secondary">
+          This preview uses your saved page and panel layout so you can confirm the live experience flow.
+        </p>
+      </div>
+
+      {pages.length > 1 ? (
+        <div className="ui-row ui-row--wrap" data-testid="system-runtime-interface-pages">
+          {pages.map((page) => (
+            <button
+              key={page.pageId}
+              type="button"
+              className={`ui-button ui-button--sm ${page.pageId === activePage?.pageId ? "ui-button--primary" : "ui-button--ghost"}`}
+              onClick={() => setSelectedPageId(page.pageId)}
+            >
+              {page.heading}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {activePage ? (
+        <article className="ui-card ui-card--padded ui-stack ui-stack--xs">
+          <header className="ui-stack ui-stack--3xs">
+            <strong>{activePage.heading}</strong>
+            {activePage.description ? <span className="ui-text-small ui-text-secondary">{activePage.description}</span> : null}
+          </header>
+          {activePage.panels.length > 0 ? (
+            <div className="ui-system-runtime-layout-frame" data-testid="system-runtime-interface-layout">
+              {activePage.panels.map((panel) => (
+                <section
+                  key={panel.instanceId}
+                  className="ui-system-runtime-layout-panel ui-card ui-card--padded ui-stack ui-stack--3xs"
+                  style={{
+                    left: `${panel.layoutBounds.x * 100}%`,
+                    top: `${panel.layoutBounds.y * 100}%`,
+                    width: `${panel.layoutBounds.width * 100}%`,
+                    height: `${panel.layoutBounds.height * 100}%`,
+                  }}
+                  data-testid={`system-runtime-interface-panel-${panel.panelId}`}
+                >
+                  <strong>{panel.title}</strong>
+                  <span className="ui-text-small ui-text-secondary">
+                    {panel.description ?? "No content has been connected yet."}
+                  </span>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <div className="ui-card ui-card--padded" data-testid="system-runtime-interface-empty-panel-state">
+              <strong>This page is ready for content</strong>
+              <p className="ui-text-small ui-text-secondary">
+                Add panels in Interface Design to build this page.
+              </p>
+            </div>
+          )}
+        </article>
+      ) : null}
+    </section>
+  );
+}

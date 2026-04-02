@@ -4,6 +4,7 @@ import type { StudioShellExtensionContext } from "../../studio-shell/StudioShell
 import { ExecutionMonitorPanel } from "./runtime/ExecutionMonitorPanel";
 import { ExecutionResultPanel } from "./runtime/ExecutionResultPanel";
 import { UxRuntimeService } from "../../runtime/UxRuntimeService";
+import SystemRuntimeInterfacePreview from "./system/SystemRuntimeInterfacePreview";
 
 interface SystemRuntimeRunPanelProps {
   readonly context: StudioShellExtensionContext;
@@ -65,6 +66,7 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
       <p className="ui-text-muted">
         Trigger bounded runtime execution for the current System Studio draft and monitor runtime progression/results through the real backend API path.
       </p>
+      <SystemRuntimeInterfacePreview content={draft?.content ?? ""} />
       <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
         <button
           className="ui-button ui-button--primary"

@@ -75,3 +75,20 @@
 .ui-studio-shell__grid {
   align-items: flex-start;
 }
+
+.ui-system-runtime-layout-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px dashed var(--color-border-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  overflow: hidden;
+}
+
+.ui-system-runtime-layout-panel {
+  position: absolute;
+  overflow: auto;
+  min-width: 120px;
+  min-height: 90px;
+}
