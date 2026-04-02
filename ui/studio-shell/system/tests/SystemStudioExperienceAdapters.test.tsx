@@ -15,6 +15,16 @@ const extensionContext: StudioShellExtensionContext = Object.freeze({
 });
 
 describe("System studio experience adapters", () => {
+  const buildCanvasModel = (content: string) => createSystemCanvasExperienceDefinition({
+    content,
+    extensionContext,
+    validationIssues: [],
+    selectedInspectorPanel: "interfaces",
+    onSelectInspectorPanel: () => undefined,
+    selectedPageId: "page-1",
+    onSelectPage: () => undefined,
+  });
+
   it("maps selected page layout panels into the reusable canvas editing model", () => {
     const content = JSON.stringify({
       systemSpec: {
@@ -72,6 +82,7 @@ describe("System studio experience adapters", () => {
       },
     });
 
+    const canvasModel = buildCanvasModel(content);
     const model = createSystemWizardExperienceAdapterModel({
       content,
       extensionContext,
@@ -79,9 +90,14 @@ describe("System studio experience adapters", () => {
       selectedPageId: "page-1",
       onSelectPage: () => undefined,
       onPagesChange: () => undefined,
+      canvasDefinition: canvasModel.definition,
+      canvasContext: canvasModel.context,
     });
 
     expect(model.definition.pages[0]?.id).toBe(SystemWizardPageIds.pages);
+    expect(model.definition.pages[1]?.id).toBe(SystemWizardPageIds.interfaceDesign);
+    expect(model.definition.pages[2]?.id).toBe(SystemWizardPageIds.inputsOutputs);
+    expect(model.definition.pages[3]?.id).toBe(SystemWizardPageIds.settings);
     const progress = model.definition.resolveProgress({ context: model.context, activePageId: SystemWizardPageIds.pages });
     expect(progress.totalCount).toBe(4);
   });
