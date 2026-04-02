@@ -91,6 +91,7 @@ type AtomicStudioRole = Extract<
   TaxonomySemanticRole,
   | "model"
   | "dataset"
+  | "schema"
   | "tool"
   | "prompt-template"
   | "embedding-index"
@@ -214,6 +215,7 @@ function assertAtomicRole(role: TaxonomySemanticRole): AtomicStudioRole {
   const allowed = new Set<TaxonomySemanticRole>([
     TaxonomySemanticRoles.model,
     TaxonomySemanticRoles.dataset,
+    TaxonomySemanticRoles.schema,
     TaxonomySemanticRoles.tool,
     TaxonomySemanticRoles.promptTemplate,
     TaxonomySemanticRoles.embeddingIndex,

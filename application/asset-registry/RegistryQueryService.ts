@@ -900,6 +900,12 @@ const studioExpectationBySemanticRole: Readonly<
     semanticRole: TaxonomySemanticRoles.dataset,
     allowedBehaviorKinds: Object.freeze(["none"]),
   }),
+  [TaxonomySemanticRoles.schema]: Object.freeze({
+    studioType: "schema-studio",
+    structuralKind: TaxonomyStructuralKinds.atomic,
+    semanticRole: TaxonomySemanticRoles.schema,
+    allowedBehaviorKinds: Object.freeze(["none"]),
+  }),
   [TaxonomySemanticRoles.tool]: Object.freeze({
     studioType: "tool-studio",
     structuralKind: TaxonomyStructuralKinds.atomic,

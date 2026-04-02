@@ -9,6 +9,7 @@ export type TaxonomyStructuralKind = typeof TaxonomyStructuralKinds[keyof typeof
 export const TaxonomySemanticRoles = Object.freeze({
   model: "model",
   dataset: "dataset",
+  schema: "schema",
   tool: "tool",
   promptTemplate: "prompt-template",
   embeddingIndex: "embedding-index",
@@ -49,6 +50,7 @@ const allowedTaxonomyCombinationsBySemanticRole: Readonly<Record<TaxonomySemanti
 ]>>> = Object.freeze({
   [TaxonomySemanticRoles.model]: Object.freeze([[TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none]]),
   [TaxonomySemanticRoles.dataset]: Object.freeze([[TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none]]),
+  [TaxonomySemanticRoles.schema]: Object.freeze([[TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none]]),
   [TaxonomySemanticRoles.tool]: Object.freeze([
     [TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.deterministic],
     [TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.conditional],
