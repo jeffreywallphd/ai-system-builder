@@ -597,3 +597,10 @@ Audit schema now records administrative approval transitions plus decision denia
 - `StudioShellBackendApi.persistReferenceImageOutputs(...)` now validates these contracts before materialization and returns recoverable `failed` responses with user-safe failure messages while recording explicit incomplete lineage markers.
 - System Studio’s reference-image panel now keeps user messaging non-technical and exposes technical diagnostics in a collapsed `Advanced details` section.
 - Save/load integrity is now covered with repository-reload integration tests (`ReferenceImageEndToEndFlow` + output persistence tests) asserting that dataset/workflow/output/lineage handoff links remain valid after rehydration.
+
+## AI Loom image manipulation hardening update: execution outcome contracts + resilient interaction loop (stories 5.4.3-5.4.4)
+
+- Reference-image output persistence now returns explicit execution-outcome contracts (`success`, `partial-failure`, `recoverable-failure`, `non-recoverable-failure`) plus `persistenceBlocked` so runtime/presentation layers consume normalized backend truth instead of inferring state from ad hoc message strings.
+- Persistence now fails fast when upstream runtime status is terminal (`failed`/`cancelled`), blocking malformed or incomplete output payloads from dataset materialization.
+- The System Studio reference-image interaction flow now guards against stale async refresh responses and duplicate launch actions while runs are in progress, reducing stale state and accidental duplicate invocations.
+- Primary interaction copy now uses plain-language user-facing labels and feedback (`Choose an image`, `Change settings`, `Create new version`, `Something went wrong while creating this image`) while technical diagnostics remain available under collapsed advanced details.

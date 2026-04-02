@@ -340,3 +340,10 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - `StudioShellBackendApi.persistReferenceImageOutputs(...)` now performs this contract validation up front and returns recoverable `failed` materialization responses with user-safe failure messages while recording explicit incomplete lineage markers, preventing silent state corruption.
 - System Studio reference-image UI now surfaces boundary failures with plain-language primary messaging and keeps technical diagnostics in a collapsed `Advanced details` disclosure.
 - Save/load integrity is now validated through repository reload integration coverage (`ReferenceImageEndToEndFlow` + output-persistence flow tests), asserting preserved dataset references, workflow linkage, output materialization paths, and lineage trace continuity after rehydration.
+
+## AI Loom image manipulation hardening update: execution outcome contracts + resilient interaction loop (stories 5.4.3-5.4.4)
+
+- Reference-image output persistence now returns explicit execution-outcome contracts (`success`, `partial-failure`, `recoverable-failure`, `non-recoverable-failure`) and an explicit `persistenceBlocked` flag so upstream failures are normalized through backend contracts rather than inferred from UI text.
+- Persistence now fails fast when upstream runtime status reports failed/cancelled, preventing malformed or incomplete payloads from materializing into output datasets.
+- System Studio reference-image interactions now guard result/history refresh against stale async responses and disable duplicate create actions while a run is active, reducing desynchronization and duplicate invocations.
+- Primary action/status copy for the reference-image panel now follows plain-language non-technical UX patterns (`Choose an image`, `Change settings`, `Create new version`, `Something went wrong while creating this image`) while keeping technical diagnostics inside collapsed advanced details.

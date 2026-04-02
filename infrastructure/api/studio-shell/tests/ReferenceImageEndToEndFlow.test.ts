@@ -57,6 +57,7 @@ describe("Reference image vertical slice", () => {
                     reference: "memory://generated-e2e-1.png",
                     metadata: {
                       filename: "generated-e2e-1.png",
+                      format: "png",
                       width: 800,
                       height: 600,
                     },
@@ -149,7 +150,7 @@ describe("Reference image vertical slice", () => {
                 result: {
                   executionId: "run:reload:1",
                   status: "completed",
-                  outputs: [{ nodeId: "save_image", kind: "image", reference: "memory://reload-1.png", metadata: { filename: "reload-1.png", width: 640, height: 640 } }],
+                  outputs: [{ nodeId: "save_image", kind: "image", reference: "memory://reload-1.png", metadata: { filename: "reload-1.png", format: "png", width: 640, height: 640 } }],
                 },
               },
             },
