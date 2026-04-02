@@ -1039,3 +1039,11 @@ Not implemented in this slice:
 - Architectural direction remains explicit:
   - studios are embeddable assets in the same shared registry/discovery system,
   - recursive composition is supported (including nested system/page structures) through existing composition rules + validation boundaries.
+
+## Direction 5 UI extension update: asset library browsing + insertion flow foundation (stories 1.2.1-1.2.2)
+
+- A reusable Asset Library discovery projection now sits on top of the existing shared studio asset registry (`ui/studio-shell/studio-assets/StudioAssetLibrary.ts`) and preserves existing taxonomy/category groupings (`atomic-ui`, `composed-ui`, `system-page`) instead of introducing a parallel classification model.
+- A reusable library panel UI now renders grouped registered UI assets with metadata-first labels (display name, optional description, grouping/category, optional icon token) and optional insert actions (`ui/components/studio-shell/studio-assets/StudioAssetLibraryPanel.tsx`).
+- A generic insertion seam now creates instance nodes from registered definitions and inserts them into composition trees through existing slot/region contracts and validation rules (`ui/studio-shell/studio-assets/StudioAssetInsertion.ts`).
+- Insertion outcomes are explicit and structured (`ok` success vs typed failure kinds for unknown asset/parent, invalid placement, and validation-denied insert), keeping the distinction between definition browsing and composition instantiation explicit.
+- Composition validation enforcement is reused from the existing registry-backed composition validator (`StudioAssetRegistry.validateCompositionTree`), including placement rules, allowed child kinds/types/categories, and cardinality checks.
