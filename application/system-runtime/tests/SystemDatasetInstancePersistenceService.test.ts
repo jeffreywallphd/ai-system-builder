@@ -122,6 +122,69 @@ describe("SystemDatasetInstancePersistenceService", () => {
     ]);
   });
 
+  it("skips restoring a dataset instance when any persisted image record ownership is invalid", () => {
+    const store = {
+      instances: new Map<string, ReturnType<typeof createDatasetInstance>>(),
+      records: new Map<string, ReturnType<typeof createDatasetInstanceImageRecord>>(),
+      listBySystemId: () => [],
+      listImageRecordsBySystemId: () => [],
+      save(instance: ReturnType<typeof createDatasetInstance>) {
+        this.instances.set(instance.instanceId, instance);
+        return instance;
+      },
+      saveImageRecord(record: ReturnType<typeof createDatasetInstanceImageRecord>) {
+        this.records.set(record.recordId, record);
+        return record;
+      },
+    };
+    const service = new SystemDatasetInstancePersistenceService(store);
+
+    const result = service.restoreSystemDatasetInstances({
+      systemId: "system:image",
+      datasetInstances: [{
+        instanceId: "dataset-instance:output",
+        datasetAssetId: "dataset:image-output",
+        role: "output-store",
+        persistedState: {
+          instance: {
+            instanceId: "dataset-instance:output",
+            systemId: "system:image",
+            datasetAssetId: "dataset:image-output",
+            role: "output-store",
+            lifecycleStatus: "ready",
+            runtimeStatus: "idle",
+            createdAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+          },
+          imageRecords: [{
+            recordId: "record:bad",
+            instanceId: "dataset-instance:other",
+            systemId: "system:image",
+            datasetAssetId: "dataset:image-output",
+            image: {
+              assetRef: { kind: "canonical-asset", stableId: "canonical-asset:image:1", assetId: "asset:image:1" },
+              width: 512,
+              height: 512,
+              format: "png",
+              mimeType: "image/png",
+              metadata: {},
+              tags: [],
+            },
+            metadata: {},
+            provenance: {},
+            admittedAt: "2026-04-01T00:00:00.000Z",
+            updatedAt: "2026-04-01T00:00:00.000Z",
+            mutationVersion: 1,
+          }],
+        },
+      }],
+    });
+
+    expect(result.issues.map((entry) => entry.code)).toEqual(["invalid-dataset-instance-state"]);
+    expect(store.instances.size).toBe(0);
+    expect(store.records.size).toBe(0);
+  });
+
   it("duplicates dataset instances into isolated runtime state for another system", () => {
     const store = {
       listBySystemId: () => [],

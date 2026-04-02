@@ -371,3 +371,30 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Baseline summaries are computed over real run reports (single-image, repeated recent runs, and multi-result batch-style runs where supported) so bottleneck discovery stays lightweight and maintainable.
 - Cross-studio refresh orchestration now routes through a dedicated synchronization seam (`ui/runtime/ReferenceImageCrossStudioSyncService.ts`) that refreshes shared studio snapshot state before reloading results/history and reconciling active selections.
 - This keeps Data/Workflow/System views aligned on the same underlying persisted runtime graph without navigation hacks or duplicated refresh logic.
+
+## AI Loom image manipulation hardening update: persistence stress/recovery + architecture gap log (stories 5.4.9-5.4.10)
+
+### Implemented hardening (5.4.9)
+- System dataset-instance restore now enforces per-instance atomicity: mismatched persisted image-record ownership causes that instance restore to be skipped rather than partially admitted.
+- Reload issues for incomplete/incompatible persisted runtime slices now use plain-language user-safe messages to avoid presenting partial state as fully valid.
+- Added stress/recovery coverage for:
+  - larger runtime payloads (hundreds of image records),
+  - repeated save/load cycles with runtime-state changes,
+  - partial/incompatible persisted dataset-state reload scenarios,
+  - runtime-state consistency checks after recovery.
+
+### Architectural gaps observed from the image vertical slice (5.4.10)
+#### Immediate follow-up
+1. Add a tighter application save transaction seam covering draft serialization + runtime dataset-state capture to reduce interrupted-write windows.
+2. Standardize recovery-decision projection (`restored-complete`, `restored-partial`, `fallback-last-complete`, `blocked`) so UI/orchestration layers consume one canonical recovery truth.
+3. Add shared result/history confidence projection so partial-restore states are explicitly surfaced in output views.
+
+#### Medium-term improvements
+1. Introduce one cross-studio persistence-health read model (save completeness, unresolved references, recovery outcomes).
+2. Tighten lineage completeness invariants at serialization and adapter boundaries for `complete`/`partial`/`incomplete` semantics.
+3. Normalize run/session identity envelopes across Data/Workflow/System projections to reduce adapter-specific correlation logic.
+
+#### Nice-to-have refinements
+1. Add bounded background integrity scans for large historical payloads.
+2. Emit aggregate recovery telemetry for reliability prioritization.
+3. Explore chunked runtime snapshot persistence for very large dataset-instance payloads.
