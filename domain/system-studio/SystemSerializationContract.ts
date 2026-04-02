@@ -1,5 +1,7 @@
 import { z } from "zod";
 import type { AssetDraftDependencyReference } from "../studio-shell/StudioShellDomain";
+import type { DatasetInstance } from "../system-runtime/DatasetInstanceDomain";
+import type { DatasetInstanceImageRecord } from "../system-runtime/DatasetInstanceRecordDomain";
 import type {
   SystemAsset,
   SystemBinding,
@@ -38,6 +40,20 @@ export interface SerializedSystemRuntimeDatasetInstanceReference {
   readonly datasetAssetId?: string;
   readonly datasetVersionId?: string;
   readonly role?: string;
+  readonly persistedState?: SerializedSystemRuntimeDatasetInstancePersistedState;
+}
+
+export interface SerializedSystemRuntimeDatasetInstancePersistedState {
+  readonly instance?: DatasetInstance;
+  readonly imageRecords?: ReadonlyArray<DatasetInstanceImageRecord>;
+}
+
+export interface SerializedSystemWorkflowBindingReference {
+  readonly bindingId: string;
+  readonly componentAlias?: string;
+  readonly workflowAssetId: string;
+  readonly workflowVersionId?: string;
+  readonly pinMode: "version";
 }
 
 export interface SystemSerializationContract {
@@ -63,6 +79,7 @@ export interface SystemSerializationContract {
   };
   readonly runtime: {
     readonly datasetInstances: ReadonlyArray<SerializedSystemRuntimeDatasetInstanceReference>;
+    readonly workflowBindings: ReadonlyArray<SerializedSystemWorkflowBindingReference>;
     readonly bindings?: SystemExecutionMetadata["runtimeCapabilityBindings"];
     readonly state?: Readonly<Record<string, unknown>>;
   };
@@ -187,11 +204,25 @@ const assetReferenceSchema = z.object({
   metadata: passthroughRecordSchema.optional(),
 }).strict();
 
+const datasetInstancePersistedStateSchema = z.object({
+  instance: passthroughRecordSchema.optional(),
+  imageRecords: z.array(passthroughRecordSchema).optional(),
+}).strict();
+
 const datasetInstanceReferenceSchema = z.object({
   instanceId: z.string().trim().min(1),
   datasetAssetId: optionalStringSchema,
   datasetVersionId: optionalStringSchema,
   role: optionalStringSchema,
+  persistedState: datasetInstancePersistedStateSchema.optional(),
+}).strict();
+
+const workflowBindingReferenceSchema = z.object({
+  bindingId: z.string().trim().min(1),
+  componentAlias: optionalStringSchema,
+  workflowAssetId: z.string().trim().min(1),
+  workflowVersionId: optionalStringSchema,
+  pinMode: z.literal("version"),
 }).strict();
 
 const serializationContractSchema = z.object({
@@ -217,6 +248,7 @@ const serializationContractSchema = z.object({
   }).strict(),
   runtime: z.object({
     datasetInstances: z.array(datasetInstanceReferenceSchema).default([]),
+    workflowBindings: z.array(workflowBindingReferenceSchema).default([]),
     bindings: runtimeCapabilityBindingsSchema,
     state: passthroughRecordSchema.optional(),
   }).strict(),
@@ -245,10 +277,12 @@ function collectLegacyReferences(input: {
   readonly datasets: ReadonlyArray<SerializedSystemAssetReference>;
   readonly workflows: ReadonlyArray<SerializedSystemAssetReference>;
   readonly datasetInstances: ReadonlyArray<SerializedSystemRuntimeDatasetInstanceReference>;
+  readonly workflowBindings: ReadonlyArray<SerializedSystemWorkflowBindingReference>;
 } {
   const datasetMap = new Map<string, SerializedSystemAssetReference>();
   const workflowMap = new Map<string, SerializedSystemAssetReference>();
   const datasetInstanceMap = new Map<string, SerializedSystemRuntimeDatasetInstanceReference>();
+  const workflowBindingMap = new Map<string, SerializedSystemWorkflowBindingReference>();
 
   for (const component of input.components) {
     if (component.assetId.includes("workflow")) {
@@ -259,6 +293,14 @@ function collectLegacyReferences(input: {
         alias: component.alias,
       });
       workflowMap.set(`${reference.assetId}::${reference.versionId ?? ""}`, reference);
+      const bindingId = `component:${component.alias ?? component.assetId}`;
+      workflowBindingMap.set(bindingId, Object.freeze({
+        bindingId,
+        componentAlias: component.alias,
+        workflowAssetId: component.assetId,
+        workflowVersionId: component.versionId,
+        pinMode: "version",
+      }));
     }
   }
 
@@ -325,6 +367,7 @@ function collectLegacyReferences(input: {
     datasets: Object.freeze([...datasetMap.values()]),
     workflows: Object.freeze([...workflowMap.values()]),
     datasetInstances: Object.freeze([...datasetInstanceMap.values()]),
+    workflowBindings: Object.freeze([...workflowBindingMap.values()]),
   });
 }
 
@@ -352,6 +395,7 @@ function normalizeParsedContract(contract: z.infer<typeof serializationContractS
     }),
     runtime: Object.freeze({
       datasetInstances: Object.freeze(contract.runtime.datasetInstances),
+      workflowBindings: Object.freeze(contract.runtime.workflowBindings),
       bindings: contract.runtime.bindings,
       state: contract.runtime.state,
     }),
@@ -408,6 +452,7 @@ function createLegacyBackfilledContract(input: {
     }),
     runtime: Object.freeze({
       datasetInstances: extracted.datasetInstances,
+      workflowBindings: extracted.workflowBindings,
       bindings: input.executionMetadata?.runtimeCapabilityBindings,
       state: undefined,
     }),
@@ -479,6 +524,8 @@ export function serializeSystemSerializationDocument(input: {
   readonly dependencies: ReadonlyArray<AssetDraftDependencyReference>;
   readonly systemSpec: SystemSerializationDocument["systemSpec"];
   readonly uiConfiguration?: Readonly<Record<string, unknown>>;
+  readonly runtimeDatasetInstances?: ReadonlyArray<SerializedSystemRuntimeDatasetInstanceReference>;
+  readonly runtimeWorkflowBindings?: ReadonlyArray<SerializedSystemWorkflowBindingReference>;
 }): string {
   const root = parseRootEnvelope(input.existingContent);
   const existingSystemSpec = (root.systemSpec && typeof root.systemSpec === "object" && !Array.isArray(root.systemSpec))
@@ -500,10 +547,21 @@ export function serializeSystemSerializationDocument(input: {
     executionMetadata: input.systemSpec.executionMetadata,
   });
 
+  const normalizedContract: SystemSerializationContract = (input.runtimeDatasetInstances || input.runtimeWorkflowBindings)
+    ? Object.freeze({
+      ...contract,
+      runtime: Object.freeze({
+        ...contract.runtime,
+        datasetInstances: Object.freeze([...(input.runtimeDatasetInstances ?? contract.runtime.datasetInstances)]),
+        workflowBindings: Object.freeze([...(input.runtimeWorkflowBindings ?? contract.runtime.workflowBindings)]),
+      }),
+    })
+    : contract;
+
   const mergedSystemSpec: Record<string, unknown> = {
     ...existingSystemSpec,
     ...input.systemSpec,
-    serialization: contract,
+    serialization: normalizedContract,
   };
 
   if (input.uiConfiguration) {

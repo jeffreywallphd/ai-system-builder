@@ -185,4 +185,58 @@ describe("SystemRuntimeApplicationService", () => {
     expect(result.runtimeCapability?.providerId).toBe("comfyui-local");
     expect((result.output?.payload as { runtimeCapability?: { stale?: boolean } } | undefined)?.runtimeCapability?.stale).toBe(false);
   });
+
+  it("rejects system versions that include workflow bindings without explicit version pins", async () => {
+    const repository = new RuntimeRepo();
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:root",
+      versionId: "system:root:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            nestedSystems: [],
+            inputs: [{ inputId: "request", required: true, valueType: "object" }],
+            outputs: [{ outputId: "result", valueType: "object" }],
+            serialization: {
+              contractKind: "ai-loom.system-serialization",
+              schemaVersion: "1.0.0",
+              compatibility: {
+                minimumReaderVersion: "1.0.0",
+                legacySystemSpecSupported: true,
+              },
+              definition: {
+                components: [],
+                nestedSystems: [],
+                dependencies: [],
+                inputs: [],
+                outputs: [],
+                parameters: [],
+                bindings: [],
+              },
+              assetReferences: { datasets: [], workflows: [] },
+              runtime: {
+                datasetInstances: [],
+                workflowBindings: [{
+                  bindingId: "component:primary",
+                  workflowAssetId: "workflow:image-edit",
+                  pinMode: "version",
+                }],
+              },
+              ui: {},
+            },
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+
+    const service = new SystemRuntimeApplicationService(repository, new InMemorySystemRuntimeExecutionStore());
+    await expect(service.startExecution({
+      versionId: "system:root:v1",
+    })).rejects.toThrow("serialized-reference-unresolved-workflow-version");
+  });
 });

@@ -7,6 +7,9 @@ import { SystemStudioApplicationService } from "../SystemStudioApplicationServic
 import { SystemStudioIdentity } from "../../../domain/system-studio/SystemAssetDomain";
 import { AssetVersion as AssetVersionEntity } from "../../../domain/assets/AssetVersion";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
+import { SystemDatasetInstancePersistenceService } from "../../system-runtime/SystemDatasetInstancePersistenceService";
+import { createDatasetInstance } from "../../../domain/system-runtime/DatasetInstanceDomain";
+import { createDatasetInstanceImageRecord } from "../../../domain/system-runtime/DatasetInstanceRecordDomain";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -492,7 +495,29 @@ describe("SystemStudioApplicationService", () => {
     }));
     const ids = ["session-1", "draft-root"];
     const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
-    const service = new SystemStudioApplicationService(studioShell, repository);
+    const runtimeDatasetStore = {
+      instances: new Map<string, ReturnType<typeof createDatasetInstance>>(),
+      records: new Map<string, ReturnType<typeof createDatasetInstanceImageRecord>>(),
+      listBySystemId(systemId: string) {
+        return [...this.instances.values()].filter((entry) => entry.systemId === systemId);
+      },
+      listImageRecordsBySystemId(input: { readonly systemId: string; readonly instanceId: string }) {
+        return [...this.records.values()].filter((entry) => entry.systemId === input.systemId && entry.instanceId === input.instanceId);
+      },
+      save(instance: ReturnType<typeof createDatasetInstance>) {
+        this.instances.set(instance.instanceId, instance);
+        return instance;
+      },
+      saveImageRecord(record: ReturnType<typeof createDatasetInstanceImageRecord>) {
+        this.records.set(record.recordId, record);
+        return record;
+      },
+    };
+    const service = new SystemStudioApplicationService(
+      studioShell,
+      repository,
+      new SystemDatasetInstancePersistenceService(runtimeDatasetStore),
+    );
     const ensure = await service.ensureStudioInitialized();
     const created = await service.createSystemDraft({
       sessionId: ensure.session.id,
@@ -514,6 +539,36 @@ describe("SystemStudioApplicationService", () => {
       }),
       dependencies: [{ assetId: "dataset:input", versionId: "dataset:input:v1" }],
     });
+    runtimeDatasetStore.save(createDatasetInstance({
+      instanceId: "dataset-instance:system-root:output",
+      systemId: created.draft.assetId,
+      datasetAssetId: "dataset:input",
+      role: "output-store",
+      lifecycleStatus: "ready",
+      runtimeStatus: "idle",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    }));
+    runtimeDatasetStore.saveImageRecord(createDatasetInstanceImageRecord({
+      recordId: "record:1",
+      instanceId: "dataset-instance:system-root:output",
+      systemId: created.draft.assetId,
+      datasetAssetId: "dataset:input",
+      image: {
+        assetRef: { kind: "canonical-asset", stableId: "canonical-asset:image:1", assetId: "asset:image:1" },
+        width: 1024,
+        height: 768,
+        format: "png",
+        mimeType: "image/png",
+        metadata: {},
+        tags: [],
+      },
+      metadata: {},
+      provenance: {},
+      admittedAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+      mutationVersion: 1,
+    }));
 
     const saved = await service.saveSystemDefinition({
       sessionId: ensure.session.id,
@@ -522,7 +577,8 @@ describe("SystemStudioApplicationService", () => {
     expect(saved.serialization.contractKind).toBe("ai-loom.system-serialization");
     expect(saved.serialization.assetReferences.datasets.some((entry) => entry.assetId === "dataset:input")).toBeTrue();
     expect(saved.serialization.assetReferences.workflows.some((entry) => entry.assetId === "workflow:image-edit")).toBeTrue();
-    expect(saved.serialization.runtime.datasetInstances).toEqual([]);
+    expect(saved.serialization.runtime.workflowBindings.some((entry) => entry.workflowVersionId === "workflow:image-edit:v3")).toBeTrue();
+    expect(saved.serialization.runtime.datasetInstances[0]?.persistedState?.imageRecords?.length).toBe(1);
     expect(saved.serialization.ui.configuration).toEqual(expect.objectContaining({
       referenceImageRuntimeContext: { selectedRecordId: "img:1" },
       canvasLayout: { sections: ["upload", "results"] },
@@ -574,6 +630,107 @@ describe("SystemStudioApplicationService", () => {
       "incompatible-version",
       "missing-asset",
     ]));
+  });
+
+  it("restores persisted dataset-instance runtime state and reports unpinned workflow bindings", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(createPublishedVersion({
+      assetId: "workflow:image-edit",
+      versionId: "workflow:image-edit:v1",
+      taxonomy: { structuralKind: "composite", semanticRole: "workflow", behaviorKind: "deterministic" },
+    }));
+    const runtimeDatasetStore = {
+      instances: new Map<string, ReturnType<typeof createDatasetInstance>>(),
+      records: new Map<string, ReturnType<typeof createDatasetInstanceImageRecord>>(),
+      listBySystemId(systemId: string) {
+        return [...this.instances.values()].filter((entry) => entry.systemId === systemId);
+      },
+      listImageRecordsBySystemId(input: { readonly systemId: string; readonly instanceId: string }) {
+        return [...this.records.values()].filter((entry) => entry.systemId === input.systemId && entry.instanceId === input.instanceId);
+      },
+      save(instance: ReturnType<typeof createDatasetInstance>) {
+        this.instances.set(instance.instanceId, instance);
+        return instance;
+      },
+      saveImageRecord(record: ReturnType<typeof createDatasetInstanceImageRecord>) {
+        this.records.set(record.recordId, record);
+        return record;
+      },
+    };
+    const ids = ["session-1", "draft-root"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new SystemStudioApplicationService(
+      studioShell,
+      repository,
+      new SystemDatasetInstancePersistenceService(runtimeDatasetStore),
+    );
+    const ensure = await service.ensureStudioInitialized();
+    const created = await studioShell.createAssetDraft({
+      studioId: ensure.studio.id,
+      sessionId: ensure.session.id,
+      draftId: "draft-root",
+      content: "{}",
+      metadata: { title: "System Root" },
+      dependencies: [],
+    });
+    await studioShell.updateAssetDraft({
+      studioId: ensure.studio.id,
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      content: JSON.stringify({
+        systemSpec: {
+          components: [],
+          nestedSystems: [],
+          inputs: [],
+          outputs: [],
+          parameters: [],
+          bindings: [],
+          serialization: {
+            contractKind: "ai-loom.system-serialization",
+            schemaVersion: "1.0.0",
+            compatibility: { minimumReaderVersion: "1.0.0", legacySystemSpecSupported: true },
+            definition: { components: [], nestedSystems: [], dependencies: [], inputs: [], outputs: [], parameters: [], bindings: [] },
+            assetReferences: { datasets: [], workflows: [{ kind: "workflow", assetId: "workflow:image-edit", versionId: "workflow:image-edit:v1" }] },
+            runtime: {
+              datasetInstances: [{
+                instanceId: "dataset-instance:output",
+                datasetAssetId: "dataset:output",
+                role: "output-store",
+                persistedState: {
+                  instance: {
+                    instanceId: "dataset-instance:output",
+                    systemId: created.draft.assetId,
+                    datasetAssetId: "dataset:output",
+                    role: "output-store",
+                    lifecycleStatus: "ready",
+                    runtimeStatus: "idle",
+                    createdAt: "2026-04-01T00:00:00.000Z",
+                    updatedAt: "2026-04-01T00:00:00.000Z",
+                  },
+                  imageRecords: [],
+                },
+              }],
+              workflowBindings: [{
+                bindingId: "component:primary",
+                componentAlias: "primary",
+                workflowAssetId: "workflow:image-edit",
+                pinMode: "version",
+              }],
+            },
+            ui: {},
+          },
+        },
+      }),
+      dependencies: [],
+    });
+
+    const loaded = await service.loadSystemDefinition({
+      studioId: ensure.studio.id,
+      draftId: created.draft.id,
+    });
+
+    expect(runtimeDatasetStore.instances.get("dataset-instance:output")?.systemId).toBe(created.draft.assetId);
+    expect(loaded.issues.map((entry) => entry.code)).toContain("unresolved-workflow-version");
   });
 
   it("rejects invalid serialized payloads during system-definition load", async () => {

@@ -56,7 +56,7 @@ describe("SystemSerializationContract", () => {
             bindings: [],
           },
           assetReferences: { datasets: [], workflows: [] },
-          runtime: { datasetInstances: [] },
+          runtime: { datasetInstances: [], workflowBindings: [] },
           ui: {},
         },
       },
@@ -80,5 +80,67 @@ describe("SystemSerializationContract", () => {
     });
     const parsed = JSON.parse(serialized) as { readonly systemSpec?: { readonly serialization?: { readonly schemaVersion?: string } } };
     expect(parsed.systemSpec?.serialization?.schemaVersion).toBe("1.0.0");
+  });
+
+  it("supports persisted dataset-instance runtime state and explicit workflow version bindings", () => {
+    const content = JSON.stringify({
+      systemSpec: {
+        components: [{ componentKind: "composite", assetId: "workflow:image-edit", versionId: "workflow:image-edit:v2", alias: "primary" }],
+        serialization: {
+          contractKind: "ai-loom.system-serialization",
+          schemaVersion: "1.0.0",
+          compatibility: {
+            minimumReaderVersion: "1.0.0",
+            legacySystemSpecSupported: true,
+          },
+          definition: {
+            components: [{ componentKind: "composite", assetId: "workflow:image-edit", versionId: "workflow:image-edit:v2", alias: "primary" }],
+            nestedSystems: [],
+            dependencies: [],
+            inputs: [],
+            outputs: [],
+            parameters: [],
+            bindings: [],
+          },
+          assetReferences: {
+            datasets: [],
+            workflows: [{ kind: "workflow", assetId: "workflow:image-edit", versionId: "workflow:image-edit:v2", alias: "primary" }],
+          },
+          runtime: {
+            datasetInstances: [{
+              instanceId: "dataset-instance:output",
+              datasetAssetId: "dataset:image-output",
+              datasetVersionId: "dataset:image-output:v1",
+              role: "output-store",
+              persistedState: {
+                instance: {
+                  instanceId: "dataset-instance:output",
+                  systemId: "system:image",
+                  datasetAssetId: "dataset:image-output",
+                  role: "output-store",
+                  lifecycleStatus: "ready",
+                  runtimeStatus: "idle",
+                  createdAt: "2026-04-01T00:00:00.000Z",
+                  updatedAt: "2026-04-01T00:00:00.000Z",
+                },
+                imageRecords: [],
+              },
+            }],
+            workflowBindings: [{
+              bindingId: "component:primary",
+              componentAlias: "primary",
+              workflowAssetId: "workflow:image-edit",
+              workflowVersionId: "workflow:image-edit:v2",
+              pinMode: "version",
+            }],
+          },
+          ui: {},
+        },
+      },
+    });
+
+    const parsed = parseSystemSerializationDocument({ content });
+    expect(parsed.contract?.runtime.datasetInstances[0]?.persistedState?.instance).toBeDefined();
+    expect(parsed.contract?.runtime.workflowBindings[0]?.workflowVersionId).toBe("workflow:image-edit:v2");
   });
 });
