@@ -5,13 +5,13 @@ import { serializeDatasetPipelineAssetDocument } from "../../../../../domain/dat
 import DatasetPipelineStudioDraftAuthoringBoundary from "../DatasetPipelineStudioDraftAuthoringBoundary";
 
 describe("DatasetPipelineStudioDraftAuthoringBoundary", () => {
-  it("renders transformation-focused messaging and schema linkage controls", () => {
+  it("renders ingestion and pipeline schema linkage controls", () => {
     const html = renderToStaticMarkup(
       <DatasetPipelineStudioDraftAuthoringBoundary
         content={serializeDatasetPipelineAssetDocument({
           schemaVersion: "ai-loom.dataset-pipeline-draft.v1",
           datasetPipelineSpec: {
-            sources: [{ datasetRef: "dataset:raw:v1" }],
+            sources: [{ datasetRef: "dataset:raw:v1", schema: { assetId: "asset:schema:raw" } }],
             steps: [{ id: "transform", kind: "dataset-transformation" }],
             schemas: {
               input: { assetId: "asset:schema:input" },
@@ -25,9 +25,10 @@ describe("DatasetPipelineStudioDraftAuthoringBoundary", () => {
 
     expect(html).toContain('data-testid="dataset-pipeline-studio-boundary"');
     expect(html).toContain("Pipeline flow setup");
-    expect(html).toContain("Schema links only");
+    expect(html).toContain("Pipeline structure links");
     expect(html).toContain("Pipeline input");
     expect(html).toContain("Pipeline output");
+    expect(html).toContain("Ingestion source structure");
     expect(html).toContain("Pipeline draft document");
   });
 });

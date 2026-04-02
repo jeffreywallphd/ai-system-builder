@@ -4,6 +4,7 @@ import {
   resolveDatasetPipelineSchemaReferenceStatus,
   serializeDatasetPipelineAssetDocument,
   updateDatasetPipelineSchemaReference,
+  updateDatasetPipelineSourceSchemaReference,
 } from "../DatasetPipelineAssetDocument";
 
 describe("DatasetPipelineAssetDocument", () => {
@@ -64,5 +65,32 @@ describe("DatasetPipelineAssetDocument", () => {
       reference: { assetId: "asset:schema:missing" },
       availableSchemaAssetIds: new Set(["asset:schema:known"]),
     })).toBe("unresolved");
+  });
+
+  it("supports source-level schema linkage for ingestion sources", () => {
+    const parsed = deserializeDatasetPipelineAssetDocumentForEditing(JSON.stringify({
+      datasetPipelineSpec: {
+        sources: [
+          { datasetRef: "dataset:orders:v1", ingestionMode: "batch" },
+          { datasetRef: "dataset:customers:v2", ingestionMode: "stream" },
+        ],
+      },
+    }));
+
+    const withSchema = updateDatasetPipelineSourceSchemaReference({
+      document: parsed.document,
+      sourceIndex: 0,
+      reference: { assetId: "asset:schema:orders" },
+    });
+
+    expect(withSchema.datasetPipelineSpec.sources[0]?.schema?.assetId).toBe("asset:schema:orders");
+    expect(withSchema.datasetPipelineSpec.sources[1]?.schema).toBeUndefined();
+
+    const removed = updateDatasetPipelineSourceSchemaReference({
+      document: withSchema,
+      sourceIndex: 0,
+      reference: undefined,
+    });
+    expect(removed.datasetPipelineSpec.sources[0]?.schema).toBeUndefined();
   });
 });
