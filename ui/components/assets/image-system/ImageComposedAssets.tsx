@@ -1,4 +1,5 @@
 import { useMemo, useState, type JSX } from "react";
+import { buildImageRunLineageView } from "../../../../application/system-runtime/ImageRunLineageDataContract";
 import type { ImageRunHistoryWithOutputs } from "../../../../application/system-runtime/ImageRunHistoryService";
 import type { ImageRunHistoryListing } from "../../../../application/system-runtime/ImageRunHistoryDataContract";
 import type { OutputGalleryItem, OutputGalleryListing } from "../../../../application/system-runtime/OutputGalleryDataContract";
@@ -12,6 +13,7 @@ import { ImageOutputGallery } from "./ImageOutputGallery";
 import { mapImageRunHistoryListingToViewModels } from "./ImageRunHistoryDataAdapter";
 import { ImageRunHistoryList } from "./ImageRunHistoryList";
 import { MetadataSummaryPanel, ParameterSummaryPanel } from "./ImageSummaryPanels";
+import { ImageLineageMiniView } from "./ImageLineageMiniView";
 
 function findOutputByImageId(items: ReadonlyArray<OutputGalleryItem>, imageId?: string): OutputGalleryItem | undefined {
   if (!imageId) {
@@ -225,6 +227,70 @@ export function ImageHistoryLinkedOutputInspectorAsset({
         }}
         mode="list"
       />
+      <ImageLineageMiniView lineage={selectedEntry ? buildImageRunLineageView(selectedEntry) : undefined} />
+    </section>
+  );
+}
+
+export function ImageResultHistoryInteractionSpaceAsset({
+  runsWithOutputs,
+}: {
+  readonly runsWithOutputs: ReadonlyArray<ImageRunHistoryWithOutputs>;
+}): JSX.Element {
+  const [selectedRunId, setSelectedRunId] = useState<string | undefined>(runsWithOutputs[0]?.run.runId);
+  const selectedEntry = useMemo(
+    () => runsWithOutputs.find((entry) => entry.run.runId === selectedRunId) ?? runsWithOutputs[0],
+    [runsWithOutputs, selectedRunId],
+  );
+
+  const runListing: ImageRunHistoryListing = {
+    kind: "image-run-history",
+    summary: {
+      systemId: selectedEntry?.run.system.systemId ?? "system:image",
+      totalRuns: runsWithOutputs.length,
+      returnedRuns: runsWithOutputs.length,
+      truncated: false,
+    },
+    window: {
+      offset: 0,
+      limit: Math.max(1, runsWithOutputs.length),
+      hasPreviousWindow: false,
+      hasNextWindow: false,
+    },
+    runs: runsWithOutputs.map((entry) => entry.run),
+  };
+
+  return (
+    <section className="ui-image-system-experience ui-image-surface">
+      <header className="ui-image-surface__header">
+        <h3 className="ui-image-surface__title">Image system interaction space</h3>
+      </header>
+      <ImageRunHistoryAsset listing={runListing} selectedRunId={selectedEntry?.run.runId} onRunSelected={setSelectedRunId} />
+      <ImageOutputGalleryAsset
+        mode="list"
+        listing={{
+          kind: "output-gallery-items",
+          summary: {
+            systemId: selectedEntry?.run.system.systemId ?? "system:image",
+            datasetInstanceId: selectedEntry?.run.outputs.datasetInstance?.instanceId ?? "linked-outputs",
+            datasetAssetId: selectedEntry?.run.outputs.datasetInstance?.datasetAssetId ?? "linked-outputs",
+            datasetAssetVersionId: selectedEntry?.run.outputs.datasetInstance?.datasetAssetVersionId,
+            role: selectedEntry?.run.outputs.datasetInstance?.role ?? "system-output",
+            purpose: selectedEntry?.run.outputs.datasetInstance?.purpose,
+            totalItems: selectedEntry?.linkedOutputs.length ?? 0,
+            returnedItems: selectedEntry?.linkedOutputs.length ?? 0,
+            truncated: false,
+          },
+          window: {
+            offset: 0,
+            limit: Math.max(1, selectedEntry?.linkedOutputs.length ?? 1),
+            hasPreviousWindow: false,
+            hasNextWindow: false,
+          },
+          items: selectedEntry?.linkedOutputs ?? [],
+        }}
+      />
+      <ImageLineageMiniView lineage={selectedEntry ? buildImageRunLineageView(selectedEntry) : undefined} />
     </section>
   );
 }

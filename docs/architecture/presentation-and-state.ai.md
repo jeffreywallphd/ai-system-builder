@@ -473,3 +473,17 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Trigger payload mapping now carries both normalized UI metadata and top-level event payload fields, enabling trigger-payload input bindings to resolve business keys directly.
 - Dispatcher results now return structured dispatch records and inspectable issue codes (including blocking validation codes) for invalid/missing UI-derived parameters.
 - Added tests cover dispatch behavior, no-match/error outcomes, payload normalization/mapping, and invalid input handling.
+
+## AI Loom image manipulation update: lineage mini-view + system interaction space composition (stories 4.4.9-4.4.10)
+
+- Added a minimal persisted lineage contract for image runs in `application/system-runtime/ImageRunLineageDataContract.ts`.
+  - Scope is intentionally bounded for this slice: input image refs -> workflow/run -> output image refs -> output dataset instance.
+  - Lineage is built from persisted run-history and output-gallery relationships (`ImageRunHistoryWithOutputs`) using stable identifiers.
+- `ImageRunHistoryService` now exposes `getRunLineage(...)` as a retrieval seam over persisted state rather than UI-only graph assembly.
+- Added a lightweight reusable atomic interface asset `ImageLineageMiniView` (`ui/components/assets/image-system/ImageLineageMiniView.tsx`) that renders inspectable lineage edges/nodes without introducing a graph-library-specific domain contract.
+- Extended composed image interface assets for cohesive System Studio experience:
+  - `ImageHistoryLinkedOutputInspectorAsset` now includes lineage inspection for the selected persisted run/output linkage.
+  - `ImageResultHistoryInteractionSpaceAsset` composes run history, output gallery selection/inspection, history->output linking, and lineage mini-view into one system interaction space.
+- Composition remains contract-first and reusable:
+  - atomic assets keep narrow rendering contracts,
+  - higher-level composed assets bind those atomics to persisted system-owned output/run relationships.
