@@ -244,6 +244,9 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     listReferenceImageOutputs(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:reference-image:list-outputs", requestJson) as Promise<string>;
     },
+    listReferenceImageRunHistory(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:reference-image:list-run-history", requestJson) as Promise<string>;
+    },
   },
   registry: {
     listAssets(limit?: number) {

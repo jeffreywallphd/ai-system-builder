@@ -30,10 +30,12 @@ import type {
   PersistedWorkflowReadModel,
   IngestReferenceImageUploadReadModel,
   IngestReferenceImageUploadRequest,
+  ListReferenceImageRunHistoryRequest,
   ListReferenceImageOutputsRequest,
   PersistReferenceImageOutputsReadModel,
   PersistReferenceImageOutputsRequest,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { ImageRunHistoryListing } from "../../application/system-runtime/ImageRunHistoryDataContract";
 import type { OutputGalleryListing } from "../../application/system-runtime/OutputGalleryDataContract";
 import type {
   StartSystemRuntimeExecutionRequest,
@@ -257,5 +259,12 @@ export class StudioShellService {
   ): Promise<StudioShellApiResponse<OutputGalleryListing>> {
     const raw = await this.requireBridge().listReferenceImageOutputs(JSON.stringify(request));
     return JSON.parse(raw) as StudioShellApiResponse<OutputGalleryListing>;
+  }
+
+  public async listReferenceImageRunHistory(
+    request: ListReferenceImageRunHistoryRequest,
+  ): Promise<StudioShellApiResponse<ImageRunHistoryListing>> {
+    const raw = await this.requireBridge().listReferenceImageRunHistory(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<ImageRunHistoryListing>;
   }
 }

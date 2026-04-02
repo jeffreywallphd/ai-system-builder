@@ -78,6 +78,7 @@ import { SystemStudioBackendApi } from "../../infrastructure/api/system-studio/S
 import { SystemRuntimeBackendApi } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import { SqliteSystemRuntimeExecutionStore } from "../../infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
 import { SqliteExecutionAuditRepository } from "../../infrastructure/filesystem/system-runtime/SqliteExecutionAuditRepository";
+import { SqliteImageRunHistoryRepository } from "../../infrastructure/filesystem/system-runtime/SqliteImageRunHistoryRepository";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -313,6 +314,8 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     studioShellRepository,
     workflowPersistenceRepository,
     workflowRunSummaryRepository,
+    undefined,
+    new SqliteImageRunHistoryRepository(path.join(storagePaths.assetsDirectory, "system-image-run-history.sqlite")),
   );
   const systemStudioBackendApi = new SystemStudioBackendApi(studioShellRepository);
   const runtimeExecutionStore = new SqliteSystemRuntimeExecutionStore(path.join(storagePaths.assetsDirectory, "system-runtime.sqlite"));
@@ -582,6 +585,10 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:list-outputs", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listReferenceImageOutputs"]>[0];
     return JSON.stringify(await studioShellBackendApi.listReferenceImageOutputs(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:list-run-history", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listReferenceImageRunHistory"]>[0];
+    return JSON.stringify(await studioShellBackendApi.listReferenceImageRunHistory(request));
   });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
     event.returnValue = fs.existsSync(targetPath);

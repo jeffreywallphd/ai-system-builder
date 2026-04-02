@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ReferenceImageSystemTemplate } from "../../../application/system-studio/ReferenceImageSystemTemplate";
+import type { ImageRunHistoryRecord } from "../../../application/system-runtime/ImageRunHistoryDataContract";
 import type { OutputGalleryItem } from "../../../application/system-runtime/OutputGalleryDataContract";
 import { createDefaultUiTriggerSystemContextMapper } from "../../../application/workflow-studio/UiTriggerSystemContextMapper";
 import { createDefaultWorkflowSystemContextBindingAdapter } from "../../../application/workflow-studio/SystemContextWorkflowInputMapper";
@@ -117,6 +118,8 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
   const [isUploading, setIsUploading] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [runHistory, setRunHistory] = useState<ReadonlyArray<ImageRunHistoryRecord>>([]);
   const uploadAdapter = useMemo(() => createBrowserImageUploadIngestionAdapter({ policy: uploadPolicy }), []);
   const selectedResult = useMemo(
     () => resultItems.find((item) => item.image.recordId === activeResultId) ?? resultItems[0],
@@ -152,8 +155,27 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
     }).finally(() => setIsLoadingResults(false));
   };
 
+  const loadHistory = () => {
+    if (!draft) {
+      return Promise.resolve();
+    }
+    setIsLoadingHistory(true);
+    return studioShell.listReferenceImageRunHistory({
+      studioId: context.studioId,
+      draftId: draft.draftId,
+      limit: 20,
+      offset: 0,
+    }).then((response) => {
+      if (!response.ok || !response.data) {
+        return;
+      }
+      setRunHistory(response.data.runs);
+    }).finally(() => setIsLoadingHistory(false));
+  };
+
   useEffect(() => {
     void loadResults();
+    void loadHistory();
   }, [draft?.draftId]);
 
   if (!isReferenceImageDraft || !draft) {
@@ -209,7 +231,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
               setDatasetInstanceId(response.data.datasetInstanceId);
               setStatus("Image uploaded and ready.");
             })
-            .then(loadResults)
+            .then(() => Promise.all([loadResults(), loadHistory()]))
             .finally(() => {
               setIsUploading(false);
             });
@@ -293,7 +315,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
                     ? `Generated images saved (${count}).`
                     : "Run finished, but no generated images were returned.");
                 })
-                .then(loadResults);
+                .then(() => Promise.all([loadResults(), loadHistory()]));
             }).finally(() => setIsStarting(false));
           }}
         >
@@ -363,6 +385,49 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
             </p>
           </div>
         ) : null}
+      </section>
+      <section className="ui-image-surface">
+        <header className="ui-image-surface__header">
+          <h3 className="ui-image-surface__title">Recent activity</h3>
+        </header>
+        {isLoadingHistory ? <p className="ui-text-small ui-text-secondary">Loading activity...</p> : null}
+        {runHistory.length === 0 && !isLoadingHistory ? (
+          <p className="ui-text-small ui-text-secondary">No previous results yet.</p>
+        ) : null}
+        <div className="ui-stack ui-stack--xs">
+          {runHistory.map((run) => (
+            <article key={run.runId} className="ui-card ui-stack ui-stack--xs">
+              <strong className="ui-text-small">Run details</strong>
+              <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                Created {new Date(run.timestamps.requestedAt).toLocaleString()}
+              </p>
+              <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                Source image: {run.inputs.images[0]?.stableId ?? "Uploaded image"}
+              </p>
+              <div className="ui-row ui-row--space-between ui-row--middle">
+                <span className="ui-text-small ui-text-secondary">
+                  Previous results: {run.outputs.datasetInstance?.persistedRecordIds.length ?? 0}
+                </span>
+                <button
+                  type="button"
+                  className="ui-button ui-button--ghost ui-button--sm"
+                  onClick={() => {
+                    const firstResultId = run.outputs.datasetInstance?.persistedRecordIds[0];
+                    if (firstResultId) {
+                      setActiveResultId(firstResultId);
+                    }
+                  }}
+                >
+                  Open result
+                </button>
+              </div>
+              <details>
+                <summary className="ui-text-small ui-text-secondary">Settings</summary>
+                <pre className="ui-code-block">{JSON.stringify(run.inputs.parameterSummary ?? {}, null, 2)}</pre>
+              </details>
+            </article>
+          ))}
+        </div>
       </section>
     </section>
   );
