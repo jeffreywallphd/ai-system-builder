@@ -7,6 +7,7 @@ import {
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import { createImageWorkflowUiTriggerBindingConfiguration } from "../../contracts/ImageWorkflowUiTriggerBindingConfiguration";
 import { createUiTriggerEvent, UiTriggerEventKinds } from "../UiTriggerEventContract";
+import { WorkflowUiInteractionIssueCodes } from "../WorkflowUiInteractionContracts";
 import { WorkflowUiEventRuntimeDispatcher } from "../WorkflowUiEventRuntimeDispatcher";
 
 describe("WorkflowUiEventRuntimeDispatcher", () => {
@@ -120,7 +121,8 @@ describe("WorkflowUiEventRuntimeDispatcher", () => {
     expect(result.dispatched).toHaveLength(0);
     expect(result.issues).toEqual([
       expect.objectContaining({
-        code: "ui-trigger-no-match",
+        code: WorkflowUiInteractionIssueCodes.missingOrInvalidBinding,
+        category: "binding",
       }),
     ]);
   });
@@ -187,5 +189,64 @@ describe("WorkflowUiEventRuntimeDispatcher", () => {
       launchStatus: "blocked",
       blockingIssueCodes: ["unresolved-required-input"],
     }));
+  });
+
+  it("emits normalized feedback statuses/issues and trace lifecycle entries for dispatch failures", async () => {
+    const draft = {
+      ...createEmptyWorkflowDraft(),
+      triggers: [{
+        id: "trigger-submit",
+        kind: WorkflowDraftTriggerKinds.user,
+        type: WorkflowDraftTriggerTypes.userInitiatedRun,
+        config: {},
+      }],
+    };
+    const content = serializeWorkflowDraft(draft);
+    const event = createUiTriggerEvent({
+      kind: UiTriggerEventKinds.submit,
+      name: "ui.image.parameter.submit",
+      source: {
+        studio: "system-studio",
+        componentId: "parameter-form",
+      },
+      payload: {
+        values: {
+          instruction: "repair",
+        },
+      },
+    });
+
+    const statuses: string[] = [];
+    const issues: string[] = [];
+    const traces: Array<Record<string, unknown>> = [];
+    const dispatcher = new WorkflowUiEventRuntimeDispatcher({
+      runWorkflowDraftTriggered: async () => {
+        throw new Error("runtime launch exploded");
+      },
+    }, {
+      record: (entry) => {
+        traces.push(entry as unknown as Record<string, unknown>);
+      },
+    });
+
+    const result = await dispatcher.dispatch({
+      content,
+      event,
+      feedback: {
+        onStatus: (update) => statuses.push(update.status),
+        onIssue: (issue) => issues.push(issue.code),
+      },
+    });
+
+    expect(result.dispatched).toHaveLength(0);
+    expect(result.issues[0]?.code).toBe(WorkflowUiInteractionIssueCodes.dispatchFailure);
+    expect(statuses).toContain("received");
+    expect(statuses).toContain("dispatching");
+    expect(statuses).toContain("launch-failed");
+    expect(issues).toContain(WorkflowUiInteractionIssueCodes.dispatchFailure);
+    const traceStages = traces.map((entry) => entry.stage);
+    expect(traceStages).toContain("received");
+    expect(traceStages).toContain("dispatch-started");
+    expect(traceStages).toContain("dispatch-failed");
   });
 });
