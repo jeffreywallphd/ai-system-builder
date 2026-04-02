@@ -381,6 +381,24 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - maps contract-backed gallery listings into reusable image interface state/view-models,
   - keeps UI components runtime/storage agnostic while grounding output gallery display in persisted dataset-backed state.
 
+## AI Loom image manipulation update: run history model + persisted retrieval seams (stories 4.4.3-4.4.4)
+
+- Added canonical run-history contracts in `application/system-runtime/ImageRunHistoryDataContract.ts`:
+  - run/workflow execution references,
+  - system/workflow asset references,
+  - input/output image references,
+  - output dataset-instance linkage,
+  - parameter summary and execution status,
+  - timestamps and bounded lineage fields (`parentRunId`, trigger linkage, output grouping).
+- Added storage-agnostic run-history repository seams in `application/system-runtime/ImageRunHistoryRepository.ts` with in-memory implementation for application-layer orchestration/tests.
+- Added `application/system-runtime/ImageRunHistoryService.ts` retrieval APIs for System Studio interface assets:
+  - list prior runs (`listRuns`) with paging,
+  - fetch a run plus linked outputs (`getRunWithLinkedOutputs`) by joining persisted run history and output-gallery dataset-backed records.
+- Runtime output persistence now records run-history entries through the same image-output pipeline (`application/workflow-studio/WorkflowRuntimeOutputPersistenceService.ts`) when a run-history service is composed:
+  - no renderer-local/transient history arrays,
+  - no parallel output/history model detached from dataset-backed output records.
+- Added SQLite persistence adapter `infrastructure/filesystem/system-runtime/SqliteImageRunHistoryRepository.ts` for durable run-history storage aligned with existing repository/migration patterns.
+
 ## Direction 5 UI update: Image component event contracts + style reuse alignment (stories 4.1.9-4.1.10)
 
 - Epic 4.1 image components now emit one standardized UI event envelope (`ImageUiEvent`) with typed event names/payloads in `ui/components/assets/image-system/ImageUiContracts.ts`, covering upload lifecycle, image selection/deselection, parameter change/submit/reset, gallery interactions, comparison target/mode changes, and viewer interactions.

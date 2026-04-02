@@ -709,6 +709,16 @@
   - keeps retrieval contract-first and storage-adapter agnostic.
 - This keeps output-gallery state grounded in persisted dataset state (not renderer-local ad hoc output arrays) while remaining reusable for future non-image media/document gallery surfaces via the same contract shape.
 
+## AI Loom Image Manipulation vertical-slice update: run history contract + linked retrieval (stories 4.4.3-4.4.4)
+
+- Added a canonical image-run-history contract in `application/system-runtime/ImageRunHistoryDataContract.ts` aligned with output-gallery fields:
+  - system/workflow/run references,
+  - input/output image references,
+  - output dataset-instance references,
+  - parameter summary, execution status, timestamps, and bounded lineage metadata.
+- Added repository/service seams in `application/system-runtime/ImageRunHistoryRepository.ts` and `application/system-runtime/ImageRunHistoryService.ts` so run history remains persisted/queryable system state rather than UI-local projections.
+- Run-history detail retrieval now composes with the existing output-gallery dataset integration seam (`OutputGalleryDatasetIntegrationService`) to support durable history -> output linking and future lineage displays through shared contracts.
+
 ## AI Loom Image System vertical-slice update: system context contract + mapping seam (stories 4.3.1-4.3.2)
 
 - System context now has a formal internal contract in `domain/system-studio/SystemContextContract.ts` with explicit, inspectable fields for:
