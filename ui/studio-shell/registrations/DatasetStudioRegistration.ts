@@ -3,8 +3,6 @@ import { createElement } from "react";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 import DatasetStudioDraftPreviewPanel from "../../components/assets/DatasetStudioDraftPreviewPanel";
-import DatasetStageAuthoringPanel from "../../components/assets/DatasetStageAuthoringPanel";
-import DataStudioPreparationWizardPanel from "../../components/assets/DataStudioPreparationWizardPanel";
 import { ExperienceSurfaceAssetIds } from "../experience-assets/ExperienceSurfaceAssets";
 
 export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze({
@@ -96,25 +94,6 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
           `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
         ]);
       },
-    },
-    {
-      id: "data-studio-preparation-wizard-panel",
-      slot: "draft-authoring",
-      title: "Data preparation wizard",
-      subtitle: "Stage progression, validation hooks, and dynamic stage rendering over unified preparation metadata.",
-      order: 12,
-      render: ({ snapshot, operations }) => createElement(DataStudioPreparationWizardPanel, {
-        persistedState: snapshot?.draft?.content,
-        onPipelineStateChange: (serializedState) => operations.setDraftContent?.(serializedState),
-      }),
-    },
-    {
-      id: "dataset-studio-stage-authoring-panel",
-      slot: "draft-authoring",
-      title: "Stage authoring",
-      subtitle: "Stage-aware wizard and canvas authoring powered by shared WizardFlowEngine state.",
-      order: 15,
-      render: () => createElement(DatasetStageAuthoringPanel),
     },
     {
       id: "dataset-studio-data-preview-panel",
