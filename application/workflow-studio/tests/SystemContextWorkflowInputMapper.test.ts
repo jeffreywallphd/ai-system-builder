@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { createSystemContextContract } from "../../../domain/system-studio/SystemContextContract";
+import { createSystemContextWorkflowMappingConfiguration } from "../../../domain/system-studio/SystemContextWorkflowMappingConfiguration";
 import { createDefaultWorkflowSystemContextBindingAdapter } from "../SystemContextWorkflowInputMapper";
 
 describe("SystemContextWorkflowInputMapper", () => {
@@ -47,5 +48,57 @@ describe("SystemContextWorkflowInputMapper", () => {
     expect((metadata.systemDatasetInstanceRefs as Array<Record<string, unknown>>)[0]?.instanceId).toBe("instance:system-output");
     expect((metadata.datasetResolution as Record<string, unknown>).resolvedCount).toBe(2);
     expect((metadata.runtimeContext as Record<string, unknown>).runtimeSessionId).toBe("runtime-session:123");
+    expect((metadata.systemContextMapping as { appliedMappings: unknown[] }).appliedMappings.length).toBeGreaterThan(0);
+  });
+
+  it("supports reusable explicit mapping configuration for system/ui/image/dataset binding targets", () => {
+    const adapter = createDefaultWorkflowSystemContextBindingAdapter({
+      mappingConfiguration: createSystemContextWorkflowMappingConfiguration({
+        mappings: [
+          {
+            mappingId: "map.ui.prompt",
+            sourceRoot: "parameters",
+            sourcePath: "prompt",
+            targetKind: "workflow-input",
+            targetPath: "workflowPrompt",
+            required: true,
+          },
+          {
+            mappingId: "map.image.asset",
+            sourceRoot: "selected-image",
+            sourcePath: "assetRef.assetId",
+            targetKind: "workflow-metadata",
+            targetPath: "debug.selectedImageAssetId",
+            required: true,
+          },
+          {
+            mappingId: "map.dataset.ref",
+            sourceRoot: "datasets",
+            sourcePath: "[0].referenceId",
+            targetKind: "workflow-input",
+            targetPath: "activeDatasetReferenceId",
+            required: true,
+          },
+          {
+            mappingId: "map.dataset.instance-handles",
+            sourceRoot: "dataset-resolution",
+            targetKind: "workflow-metadata",
+            targetPath: "datasetRuntimeHandles",
+            transformId: "dataset-runtime-handles",
+          },
+        ],
+      }),
+    });
+
+    const mapped = adapter.map(createSystemContextContract({
+      parameters: { prompt: "refine shadows" },
+      selectedImages: [{ selectionId: "selected", imageId: "img-1", assetRef: { assetId: "asset:img-1" } }],
+      datasets: [{ referenceId: "dataset-active", instanceId: "instance:active", role: "active-input", datasetAssetId: "dataset:images" }],
+    }));
+
+    expect((mapped.inputValues as Record<string, unknown>).workflowPrompt).toBe("refine shadows");
+    expect((mapped.inputValues as Record<string, unknown>).activeDatasetReferenceId).toBe("dataset-active");
+    expect((((mapped.metadata as Record<string, unknown>).debug as Record<string, unknown>).selectedImageAssetId)).toBe("asset:img-1");
+    expect((((mapped.metadata as Record<string, unknown>).datasetRuntimeHandles as Array<Record<string, unknown>>)[0] as Record<string, unknown>).instanceId).toBe("instance:active");
   });
 });

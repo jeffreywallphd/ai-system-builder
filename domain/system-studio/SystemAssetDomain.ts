@@ -14,6 +14,10 @@ import {
   type CompositionTaxonomyDescriptor,
   type TaxonomyBehaviorKind,
 } from "../taxonomy/CompositionTaxonomy";
+import {
+  createSystemContextWorkflowMappingConfiguration,
+  type SystemContextWorkflowMappingConfiguration,
+} from "./SystemContextWorkflowMappingConfiguration";
 
 export const SystemStudioIdentity = Object.freeze({
   studioType: "system-studio",
@@ -90,6 +94,7 @@ export interface SystemExecutionMetadata {
     readonly schemaVersion?: string;
     readonly bindings?: ReadonlyArray<Record<string, unknown>>;
   };
+  readonly workflowContextMapping?: SystemContextWorkflowMappingConfiguration;
 }
 
 export const SystemBindingEndpointScopes = Object.freeze({
@@ -300,6 +305,9 @@ function normalizeSystemExecutionMetadata(input?: SystemExecutionMetadata): Syst
           : undefined,
       })
       : undefined,
+    workflowContextMapping: input.workflowContextMapping
+      ? createSystemContextWorkflowMappingConfiguration(input.workflowContextMapping)
+      : undefined,
   });
 
   const hasEntries = Boolean(
@@ -315,7 +323,8 @@ function normalizeSystemExecutionMetadata(input?: SystemExecutionMetadata): Syst
     || normalized.operations?.supportContact
     || normalized.operations?.notes
     || normalized.runtimeCapabilityBindings?.schemaVersion
-    || normalized.runtimeCapabilityBindings?.bindings?.length,
+    || normalized.runtimeCapabilityBindings?.bindings?.length
+    || normalized.workflowContextMapping?.mappings?.length
   );
   return hasEntries ? normalized : undefined;
 }

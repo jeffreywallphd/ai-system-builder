@@ -703,3 +703,8 @@
 - Workflow input translation now uses a dedicated adapter seam in `application/workflow-studio/SystemContextWorkflowInputMapper.ts` (`WorkflowSystemContextBindingAdapter`) that maps the system-context contract into workflow execution context/input-binding metadata.
 - UI-trigger system-context gathering remains decoupled from workflow runtime internals via `application/workflow-studio/UiTriggerSystemContextMapper.ts`, which now produces the shared system-context contract before adapter-driven workflow binding translation.
 - This keeps the architecture aligned with shared composition principles: internal contracts first, UI/runtime adapters second, and no direct leakage of component-library or execution-engine-specific state shapes.
+
+## AI Loom Image System vertical-slice update: reusable context mapping configuration (story 4.3.9)
+
+- Added reusable/versioned mapping configuration contracts in `domain/system-studio/SystemContextWorkflowMappingConfiguration.ts` for explicit source-path -> workflow-target mapping.
+- System assets can persist/reuse these mapping definitions through `SystemExecutionMetadata.workflowContextMapping` in `domain/system-studio/SystemAssetDomain.ts`.

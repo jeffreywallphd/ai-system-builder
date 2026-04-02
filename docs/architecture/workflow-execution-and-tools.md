@@ -571,3 +571,15 @@ Audit schema now records administrative approval transitions plus decision denia
 - System Studio now includes a bounded developer-facing context preview/debug surface:
   - orchestration service (`application/workflow-studio/SystemContextDebugPreviewService.ts`) that executes extraction -> validation -> dataset resolution -> workflow binding -> enriched payload preview,
   - reusable extension panel (`ui/components/studio-shell/SystemContextDebugPreviewPanel.tsx`) wired through System Studio registration (`system-studio-context-debug-preview`) for pre-dispatch inspection.
+
+## AI Loom image manipulation update: reusable system-context mapping configuration (story 4.3.9)
+
+- System-context to workflow-input binding now uses an explicit reusable mapping configuration contract (`domain/system-studio/SystemContextWorkflowMappingConfiguration.ts`) with:
+  - versioned mapping configuration envelopes,
+  - source roots/path selectors (`parameters`, `selected-image`, `datasets`, `dataset-resolution`, etc.),
+  - workflow target selectors (`workflow-input`, `workflow-metadata`),
+  - optional transformer ids, default values, and required flags.
+- `WorkflowSystemContextBindingAdapter` (`application/workflow-studio/SystemContextWorkflowInputMapper.ts`) now applies this contract instead of embedding ad hoc field wiring:
+  - default mapping behavior remains compatible with prior 4.3.1-4.3.8 outputs,
+  - custom mapping configurations can override/extend binding behavior with inspectable `systemContextMapping` report metadata (`appliedMappings`, issues).
+- System assets can now persist reusable context mapping configuration under bounded execution metadata (`SystemExecutionMetadata.workflowContextMapping` in `domain/system-studio/SystemAssetDomain.ts`) so System Studio setups are save/load/duplicate friendly.
