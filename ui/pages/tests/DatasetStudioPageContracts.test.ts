@@ -36,7 +36,9 @@ describe("DatasetStudioPage contracts", () => {
 
     expect(boundarySource).toContain('data-testid="dataset-studio-wizard-surface"');
     expect(boundarySource).toContain('data-testid="dataset-studio-canvas-surface"');
+    expect(boundarySource).toContain('data-testid="dataset-studio-mode-actions"');
     expect(boundarySource).toContain("DataStudioPreparationWizardStateAdapter");
+    expect(boundarySource).not.toContain("ExperienceAssetAuthoringBoundary");
     expect(boundarySource).not.toContain("DataStudioPreparationWizardPanel");
     expect(boundarySource).not.toContain("DatasetStageAuthoringPanel");
   });

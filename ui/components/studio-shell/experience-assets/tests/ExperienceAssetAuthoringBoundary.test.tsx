@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import ExperienceAssetAuthoringBoundary from "../ExperienceAssetAuthoringBoundary";
+import ExperienceAssetAuthoringBoundary from "../DEPRECATED_ExperienceAssetAuthoringBoundary";
 import { ExperienceAssetModeIds, type ExperienceAssetDefinition } from "../../../../studio-shell/experience-assets/ExperienceAssetContracts";
 
 interface DemoDocument {
@@ -24,7 +24,7 @@ const definition: ExperienceAssetDefinition<DemoDocument, DemoIssue> = Object.fr
   canvas: Object.freeze({ id: "canvas", title: "Canvas", summary: "Graph" }),
 });
 
-describe("ExperienceAssetAuthoringBoundary", () => {
+describe("DEPRECATED_ExperienceAssetAuthoringBoundary", () => {
   it("renders mode-specific surfaces based on the active mode", () => {
     const html = renderToStaticMarkup(
       <ExperienceAssetAuthoringBoundary
