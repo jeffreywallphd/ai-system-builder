@@ -45,6 +45,7 @@ import {
 } from "../../domain/system-studio/SystemSerializationContract";
 import { SerializedAssetReferenceResolutionService } from "../system-runtime/SerializedAssetReferenceResolutionService";
 import {
+  DatasetInstanceDuplicationModes,
   SystemDatasetInstancePersistenceService,
   type RestoreSystemDatasetInstancePersistenceIssue,
 } from "../system-runtime/SystemDatasetInstancePersistenceService";
@@ -187,6 +188,23 @@ export interface LoadSystemDefinitionResult {
   readonly serialization: SystemSerializationContract;
   readonly system: SystemAsset;
   readonly uiConfiguration?: Readonly<Record<string, unknown>>;
+  readonly issues: ReadonlyArray<LoadSystemDefinitionIssue>;
+}
+
+export interface DuplicateSystemDefinitionCommand {
+  readonly studioId?: string;
+  readonly sessionId: string;
+  readonly sourceDraftId: string;
+  readonly duplicateDraftId?: string;
+  readonly duplicateAssetId?: string;
+  readonly title?: string;
+  readonly summary?: string;
+  readonly datasetInstanceMode?: "duplicate" | "reuse";
+}
+
+export interface DuplicateSystemDefinitionResult {
+  readonly sourceDraftId: string;
+  readonly duplicateDraft: AssetDraftResult["draft"];
   readonly issues: ReadonlyArray<LoadSystemDefinitionIssue>;
 }
 
@@ -907,6 +925,78 @@ export class SystemStudioApplicationService {
       }),
       uiConfiguration: parsed.uiConfiguration,
       issues: Object.freeze([...issues, ...restoreIssues]),
+    });
+  }
+
+  public async duplicateSystemDefinition(command: DuplicateSystemDefinitionCommand): Promise<DuplicateSystemDefinitionResult> {
+    const studioId = command.studioId?.trim() || SystemStudioIdentity.defaultStudioId;
+    const loaded = await this.studioShellService.loadAssetDraft({ studioId, draftId: command.sourceDraftId });
+    if (!loaded) {
+      throw new StudioShellInvalidRequestError(`Draft '${command.sourceDraftId}' is not available in studio '${studioId}'.`);
+    }
+
+    const parsed = parseSystemSerializationDocument({
+      content: loaded.draft.content,
+      dependencies: loaded.draft.dependencies,
+    });
+
+    const duplicateDraftId = command.duplicateDraftId?.trim() || `${loaded.draft.id}:copy`;
+    const duplicateAssetId = command.duplicateAssetId?.trim() || `studio-asset:${duplicateDraftId}`;
+    const datasetInstanceMode = command.datasetInstanceMode ?? DatasetInstanceDuplicationModes.duplicate;
+
+    const datasetInstanceDuplication = this.datasetInstancePersistence
+      ? this.datasetInstancePersistence.duplicateSystemDatasetInstances({
+        sourceSystemId: loaded.draft.assetId,
+        targetSystemId: duplicateAssetId,
+        datasetInstances: parsed.contract.runtime.datasetInstances,
+        mode: datasetInstanceMode,
+      })
+      : Object.freeze({
+        datasetInstances: parsed.contract.runtime.datasetInstances,
+        issues: Object.freeze([] as ReadonlyArray<RestoreSystemDatasetInstancePersistenceIssue>),
+      });
+
+    const duplicatedContent = serializeSystemSerializationDocument({
+      existingContent: loaded.draft.content,
+      dependencies: parsed.contract.definition.dependencies,
+      systemSpec: parsed.systemSpec,
+      uiConfiguration: parsed.uiConfiguration,
+      runtimeDatasetInstances: datasetInstanceDuplication.datasetInstances,
+      runtimeWorkflowBindings: parsed.contract.runtime.workflowBindings,
+    });
+
+    const duplicated = await this.studioShellService.createAssetDraft({
+      studioId,
+      sessionId: command.sessionId,
+      draftId: duplicateDraftId,
+      assetId: duplicateAssetId,
+      content: duplicatedContent,
+      metadata: {
+        ...loaded.draft.metadata,
+        title: command.title?.trim() || `${loaded.draft.metadata.title} copy`,
+        summary: command.summary?.trim() || loaded.draft.metadata.summary,
+      },
+      dependencies: parsed.contract.definition.dependencies,
+    });
+
+    const referenceIssues = await this.resolveSerializedReferenceIssues(parsed.contract);
+    const restoreIssues = this.restoreSerializedDatasetInstanceState({
+      systemId: duplicated.draft.assetId,
+      contract: parseSystemSerializationDocument({
+        content: duplicated.draft.content,
+        dependencies: duplicated.draft.dependencies,
+      }).contract,
+    });
+    const duplicationIssues = datasetInstanceDuplication.issues.map((issue) => Object.freeze({
+      code: issue.code,
+      message: issue.message,
+      severity: issue.severity,
+    }));
+
+    return Object.freeze({
+      sourceDraftId: command.sourceDraftId,
+      duplicateDraft: duplicated.draft,
+      issues: Object.freeze([...referenceIssues, ...duplicationIssues, ...restoreIssues]),
     });
   }
 

@@ -18,6 +18,26 @@ export interface RestoreSystemDatasetInstancePersistenceResult {
   readonly issues: ReadonlyArray<RestoreSystemDatasetInstancePersistenceIssue>;
 }
 
+export const DatasetInstanceDuplicationModes = Object.freeze({
+  reuse: "reuse",
+  duplicate: "duplicate",
+});
+
+export type DatasetInstanceDuplicationMode =
+  typeof DatasetInstanceDuplicationModes[keyof typeof DatasetInstanceDuplicationModes];
+
+export interface DuplicateSystemDatasetInstancePersistenceRequest {
+  readonly sourceSystemId: string;
+  readonly targetSystemId: string;
+  readonly datasetInstances: ReadonlyArray<SerializedSystemRuntimeDatasetInstanceReference>;
+  readonly mode: DatasetInstanceDuplicationMode;
+}
+
+export interface DuplicateSystemDatasetInstancePersistenceResult {
+  readonly datasetInstances: ReadonlyArray<SerializedSystemRuntimeDatasetInstanceReference>;
+  readonly issues: ReadonlyArray<RestoreSystemDatasetInstancePersistenceIssue>;
+}
+
 export class SystemDatasetInstancePersistenceService {
   public constructor(private readonly repository: Pick<
     DatasetInstanceRepository,
@@ -89,5 +109,72 @@ export class SystemDatasetInstancePersistenceService {
     }
 
     return Object.freeze({ issues: Object.freeze(issues) });
+  }
+
+  public duplicateSystemDatasetInstances(
+    input: DuplicateSystemDatasetInstancePersistenceRequest,
+  ): DuplicateSystemDatasetInstancePersistenceResult {
+    if (input.mode === DatasetInstanceDuplicationModes.reuse) {
+      return Object.freeze({
+        datasetInstances: Object.freeze([...input.datasetInstances]),
+        issues: Object.freeze([]),
+      });
+    }
+
+    const issues: RestoreSystemDatasetInstancePersistenceIssue[] = [];
+    const datasetInstances = input.datasetInstances.map((entry) => {
+      const duplicatedInstanceId = `${input.targetSystemId}::${entry.instanceId}`;
+      const persistedState = entry.persistedState;
+      if (!persistedState?.instance) {
+        issues.push(Object.freeze({
+          code: "missing-dataset-instance-state",
+          message: `Dataset instance '${entry.instanceId}' did not include persisted runtime state for duplication.`,
+          severity: "warning",
+        }));
+        return Object.freeze({
+          ...entry,
+          instanceId: duplicatedInstanceId,
+          persistedState: undefined,
+        });
+      }
+
+      if (
+        persistedState.instance.instanceId !== entry.instanceId
+        || persistedState.instance.systemId !== input.sourceSystemId
+      ) {
+        issues.push(Object.freeze({
+          code: "invalid-dataset-instance-state",
+          message: `Dataset instance '${entry.instanceId}' contains incompatible persisted state identity for duplication.`,
+          severity: "error",
+        }));
+        return Object.freeze({
+          ...entry,
+          instanceId: duplicatedInstanceId,
+          persistedState: undefined,
+        });
+      }
+
+      return Object.freeze({
+        ...entry,
+        instanceId: duplicatedInstanceId,
+        persistedState: Object.freeze({
+          instance: Object.freeze({
+            ...persistedState.instance,
+            instanceId: duplicatedInstanceId,
+            systemId: input.targetSystemId,
+          }),
+          imageRecords: Object.freeze((persistedState.imageRecords ?? []).map((record) => Object.freeze({
+            ...record,
+            instanceId: duplicatedInstanceId,
+            systemId: input.targetSystemId,
+          }))),
+        }),
+      });
+    });
+
+    return Object.freeze({
+      datasetInstances: Object.freeze(datasetInstances),
+      issues: Object.freeze(issues),
+    });
   }
 }
