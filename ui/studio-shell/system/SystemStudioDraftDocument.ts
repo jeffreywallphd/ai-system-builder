@@ -19,7 +19,18 @@ const defaultPanelBounds: PanelAssetLayoutBounds = Object.freeze({
 
 export interface SystemStudioCanvasAuthoringConfiguration {
   readonly designFrame: CanvasSurfaceDesignFrameModel;
+  readonly pageLayouts: ReadonlyArray<SystemStudioCanvasPageLayout>;
+}
+
+export interface SystemStudioCanvasPageLayout {
+  readonly pageId: string;
   readonly panels: ReadonlyArray<PanelAssetContract>;
+}
+
+export interface SystemStudioPageDefinition {
+  readonly pageId: string;
+  readonly heading: string;
+  readonly description?: string;
 }
 
 export interface SystemStudioDraftDocument {
@@ -31,9 +42,16 @@ export interface SystemStudioDraftDocument {
     readonly inputs: NonNullable<SystemAsset["inputs"]>;
     readonly outputs: NonNullable<SystemAsset["outputs"]>;
     readonly parameters: NonNullable<SystemAsset["parameters"]>;
+    readonly pages: ReadonlyArray<SystemStudioPageDefinition>;
   };
   readonly canvasAuthoring: SystemStudioCanvasAuthoringConfiguration;
 }
+
+const defaultSystemPage: SystemStudioPageDefinition = Object.freeze({
+  pageId: "page-1",
+  heading: "Main page",
+  description: "Start here and arrange the panels for this page.",
+});
 
 const emptyDocument: SystemStudioDraftDocument = Object.freeze({
   systemSpec: Object.freeze({
@@ -44,6 +62,7 @@ const emptyDocument: SystemStudioDraftDocument = Object.freeze({
     inputs: Object.freeze([]),
     outputs: Object.freeze([]),
     parameters: Object.freeze([]),
+    pages: Object.freeze([defaultSystemPage]),
   }),
   canvasAuthoring: Object.freeze({
     designFrame: Object.freeze({
@@ -52,9 +71,24 @@ const emptyDocument: SystemStudioDraftDocument = Object.freeze({
       dimensions: Object.freeze({ width: 1600, height: 900 }),
       boundedArea: Object.freeze({ padding: 20 }),
     }),
-    panels: Object.freeze([]),
+    pageLayouts: Object.freeze([
+      Object.freeze({
+        pageId: defaultSystemPage.pageId,
+        panels: Object.freeze([]),
+      }),
+    ]),
   }),
 });
+
+function normalizePageDefinition(entry: Partial<SystemStudioPageDefinition>, index: number): SystemStudioPageDefinition {
+  const fallbackId = `page-${index + 1}`;
+  const pageId = entry.pageId?.trim() || fallbackId;
+  return Object.freeze({
+    pageId,
+    heading: entry.heading?.trim() || `Page ${index + 1}`,
+    description: entry.description?.trim() || undefined,
+  });
+}
 
 function normalizeLayoutBounds(input: unknown): PanelAssetLayoutBounds {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -78,6 +112,10 @@ function normalizeCanvasAuthoringConfig(input: unknown): SystemStudioCanvasAutho
     ? {}
     : (input as {
       readonly designFrame?: CanvasSurfaceDesignFrameModel;
+      readonly pageLayouts?: ReadonlyArray<{
+        readonly pageId?: string;
+        readonly panels?: ReadonlyArray<Partial<PanelAssetContract>>;
+      }>;
       readonly panels?: ReadonlyArray<Partial<PanelAssetContract>>;
     });
 
@@ -100,7 +138,7 @@ function normalizeCanvasAuthoringConfig(input: unknown): SystemStudioCanvasAutho
     }),
   });
 
-  const panels = Object.freeze((record.panels ?? [])
+  const normalizePanels = (panelsInput: ReadonlyArray<Partial<PanelAssetContract>>): ReadonlyArray<PanelAssetContract> => Object.freeze(panelsInput
     .filter((entry): entry is Partial<PanelAssetContract> => Boolean(entry))
     .map((entry, index) => {
       const panelId = entry.panelId?.trim() || `panel-${index + 1}`;
@@ -118,10 +156,46 @@ function normalizeCanvasAuthoringConfig(input: unknown): SystemStudioCanvasAutho
       } satisfies PanelAssetContract);
     }));
 
+  const legacyPanels = normalizePanels(record.panels ?? []);
+  const pageLayouts = Object.freeze((record.pageLayouts ?? [])
+    .filter((entry): entry is NonNullable<typeof record.pageLayouts>[number] => Boolean(entry))
+    .map((entry, layoutIndex) => Object.freeze({
+      pageId: entry.pageId?.trim() || `page-${layoutIndex + 1}`,
+      panels: normalizePanels(entry.panels ?? []),
+    })));
+
+  const resolvedPageLayouts = pageLayouts.length > 0
+    ? pageLayouts
+    : Object.freeze([
+      Object.freeze({
+        pageId: defaultSystemPage.pageId,
+        panels: legacyPanels.map((panel) => Object.freeze({
+          ...panel,
+          pageId: defaultSystemPage.pageId,
+        })),
+      }),
+    ]);
+
   return Object.freeze({
     designFrame,
-    panels,
+    pageLayouts: resolvedPageLayouts,
   });
+}
+
+function normalizePageLayouts(input: {
+  readonly pages: ReadonlyArray<SystemStudioPageDefinition>;
+  readonly canvasAuthoring: SystemStudioCanvasAuthoringConfiguration;
+}): ReadonlyArray<SystemStudioCanvasPageLayout> {
+  const layoutsByPageId = new Map(
+    input.canvasAuthoring.pageLayouts.map((layout) => [layout.pageId, layout] as const),
+  );
+  return Object.freeze(input.pages.map((page) => {
+    const existing = layoutsByPageId.get(page.pageId);
+    return Object.freeze({
+      pageId: page.pageId,
+      panels: existing?.panels ?? Object.freeze([]),
+    });
+  }));
 }
 
 export function parseSystemStudioDraftDocument(content: string): SystemStudioDraftDocument {
@@ -135,6 +209,12 @@ export function parseSystemStudioDraftDocument(content: string): SystemStudioDra
         readonly canvasAuthoring?: unknown;
       };
     };
+    const pages = Object.freeze((parsed.systemSpec?.pages ?? [defaultSystemPage]).map((entry, index) => normalizePageDefinition(
+      entry ?? {},
+      index,
+    )));
+    const canvasAuthoring = normalizeCanvasAuthoringConfig(parsed.systemSpec?.canvasAuthoring);
+
     return Object.freeze({
       systemSpec: Object.freeze({
         components: Object.freeze(parsed.systemSpec?.components ?? []),
@@ -144,8 +224,15 @@ export function parseSystemStudioDraftDocument(content: string): SystemStudioDra
         inputs: Object.freeze(parsed.systemSpec?.inputs ?? []),
         outputs: Object.freeze(parsed.systemSpec?.outputs ?? []),
         parameters: Object.freeze(parsed.systemSpec?.parameters ?? []),
+        pages,
       }),
-      canvasAuthoring: normalizeCanvasAuthoringConfig(parsed.systemSpec?.canvasAuthoring),
+      canvasAuthoring: Object.freeze({
+        ...canvasAuthoring,
+        pageLayouts: normalizePageLayouts({
+          pages,
+          canvasAuthoring,
+        }),
+      }),
     });
   } catch {
     return emptyDocument;
@@ -166,6 +253,25 @@ export function serializeSystemStudioCanvasAuthoringConfiguration(input: {
   root.systemSpec = {
     ...existingSystemSpec,
     canvasAuthoring: input.canvasAuthoring,
+  };
+
+  return JSON.stringify(root, null, 2);
+}
+
+export function serializeSystemStudioPageDefinitions(input: {
+  readonly existingContent: string;
+  readonly pages: ReadonlyArray<SystemStudioPageDefinition>;
+}): string {
+  const root = input.existingContent.trim()
+    ? (JSON.parse(input.existingContent) as Record<string, unknown>)
+    : {};
+  const existingSystemSpec = (root.systemSpec && typeof root.systemSpec === "object" && !Array.isArray(root.systemSpec))
+    ? { ...(root.systemSpec as Record<string, unknown>) }
+    : {};
+
+  root.systemSpec = {
+    ...existingSystemSpec,
+    pages: input.pages,
   };
 
   return JSON.stringify(root, null, 2);

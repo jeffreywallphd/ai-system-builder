@@ -16,7 +16,11 @@ import {
   type PanelAssetContract,
 } from "../experience-assets/PanelAssetContracts";
 import type { StudioShellExtensionContext } from "../StudioShellExtensions";
-import { parseSystemStudioDraftDocument, type SystemStudioDraftDocument } from "./SystemStudioDraftDocument";
+import {
+  parseSystemStudioDraftDocument,
+  type SystemStudioDraftDocument,
+  type SystemStudioPageDefinition,
+} from "./SystemStudioDraftDocument";
 import { SystemCompositionEditor } from "../../components/studio-shell/SystemCompositionEditor";
 import { SystemInterfaceEditor } from "../../components/studio-shell/SystemInterfaceEditor";
 import { SystemParameterConfigEditor } from "../../components/studio-shell/SystemParameterConfigEditor";
@@ -35,6 +39,8 @@ export interface SystemCanvasExperienceContext {
   readonly issues: ReadonlyArray<ExperienceIssueSummary>;
   readonly selectedInspectorPanel: SystemCanvasInspectorPanelId;
   readonly selectedLayoutNodeId?: string;
+  readonly selectedPageId: string;
+  readonly pages: ReadonlyArray<SystemStudioPageDefinition>;
   readonly layoutNodes: ReadonlyArray<CanvasSurfaceLayoutNodeModel>;
   readonly designFrame: CanvasSurfaceDesignFrameModel;
   readonly panels: ReadonlyArray<PanelAssetContract>;
@@ -47,6 +53,8 @@ export interface SystemCanvasExperienceAdapterInput {
   readonly selectedInspectorPanel: SystemCanvasInspectorPanelId;
   readonly onSelectInspectorPanel: (panelId: SystemCanvasInspectorPanelId) => void;
   readonly selectedLayoutNodeId?: string;
+  readonly selectedPageId: string;
+  readonly onSelectPage: (pageId: string) => void;
   readonly onCanvasEditingEvent?: (event: CanvasSurfaceEditingEvent) => void;
 }
 
@@ -61,25 +69,21 @@ function resolveFocusedTarget(context: SystemCanvasExperienceContext): CanvasSur
   if (context.selectedLayoutNodeId) {
     const selected = context.layoutNodes.find((node) => node.id === context.selectedLayoutNodeId);
     if (selected) {
-      return Object.freeze({
-        kind: "node",
-        id: selected.id,
-        label: selected.title,
-      });
+      return Object.freeze({ kind: "node", id: selected.id, label: selected.title });
     }
   }
 
   return Object.freeze({
     kind: "node",
-    id: "system-composition",
-    label: `Components (${context.document.systemSpec.components.length})`,
+    id: context.selectedPageId,
+    label: context.pages.find((page) => page.pageId === context.selectedPageId)?.heading ?? "Page",
   });
 }
 
 function resolveGraphSummary(context: SystemCanvasExperienceContext): CanvasSurfaceGraphSummary {
   return Object.freeze({
-    nodeCount: context.document.systemSpec.components.length,
-    edgeCount: context.document.systemSpec.bindings.length,
+    nodeCount: context.layoutNodes.length,
+    edgeCount: 0,
     issueCount: context.issues.length,
   });
 }
@@ -91,57 +95,30 @@ function renderInspector(context: SystemCanvasExperienceContext): JSX.Element {
   return <SystemParameterConfigEditor context={context.extensionContext} />;
 }
 
-function resolveLayoutNodes(input: {
+function resolvePanelsForPage(input: {
   readonly document: SystemStudioDraftDocument;
-}): ReadonlyArray<CanvasSurfaceLayoutNodeModel> {
-  const columns = 3;
-  return Object.freeze(input.document.systemSpec.components.map((component, index) => {
-    const alias = component.alias?.trim() || `${component.componentKind} ${index + 1}`;
-    const nodeId = component.alias?.trim() || `${component.assetId}:${index}`;
-    const row = Math.floor(index / columns);
-    const col = index % columns;
-    const defaultFrame = Object.freeze({
-      x: 0.03 + (col * 0.31),
-      y: 0.06 + (row * 0.24),
-      width: 0.27,
-      height: 0.2,
-    });
-    const persistedPanel = input.document.canvasAuthoring.panels.find((panel) => panel.sourceLayoutNodeId === nodeId);
-    const frame = persistedPanel?.layoutBounds ?? defaultFrame;
-
-    return Object.freeze({
-      id: nodeId,
-      title: alias,
-      subtitle: component.assetId,
-      x: frame.x,
-      y: frame.y,
-      width: frame.width,
-      height: frame.height,
-      minWidth: 180,
-      minHeight: 112,
-      selectable: true,
-      movable: true,
-      resizable: true,
-    });
-  }));
+  readonly selectedPageId: string;
+}): ReadonlyArray<PanelAssetContract> {
+  const pageLayout = input.document.canvasAuthoring.pageLayouts.find((entry) => entry.pageId === input.selectedPageId);
+  return pageLayout?.panels ?? Object.freeze([]);
 }
 
-function resolvePanels(input: {
-  readonly document: SystemStudioDraftDocument;
-  readonly nodes: ReadonlyArray<CanvasSurfaceLayoutNodeModel>;
-}): ReadonlyArray<PanelAssetContract> {
-  if (input.document.canvasAuthoring.panels.length > 0) {
-    return input.document.canvasAuthoring.panels;
-  }
-  return Object.freeze(input.nodes.map((node) => mapLayoutNodeToPanelAsset({
-    node,
-    pageId: "system-canvas",
-    contentSlots: Object.freeze([
-      Object.freeze({
-        slotId: `${node.id}-content`,
-        label: "Main content",
-      }),
-    ]),
+function resolveLayoutNodes(input: {
+  readonly panels: ReadonlyArray<PanelAssetContract>;
+}): ReadonlyArray<CanvasSurfaceLayoutNodeModel> {
+  return Object.freeze(input.panels.map((panel) => Object.freeze({
+    id: panel.sourceLayoutNodeId ?? panel.panelId,
+    title: panel.title,
+    subtitle: panel.description,
+    x: panel.layoutBounds.x,
+    y: panel.layoutBounds.y,
+    width: panel.layoutBounds.width,
+    height: panel.layoutBounds.height,
+    minWidth: 140,
+    minHeight: 96,
+    selectable: true,
+    movable: true,
+    resizable: true,
   })));
 }
 
@@ -150,9 +127,16 @@ function resolveEditingModel(context: SystemCanvasExperienceContext): CanvasSurf
     nodes: context.layoutNodes,
     selectedNodeId: context.selectedLayoutNodeId,
     commands: Object.freeze([
-      Object.freeze({ id: "fit-layout", label: "Reset layout", tone: "ghost" as const }),
+      Object.freeze({ id: "add-panel", label: "Add panel", tone: "primary" as const }),
+      Object.freeze({
+        id: "remove-panel",
+        label: "Remove selected panel",
+        tone: "ghost" as const,
+        disabled: !context.selectedLayoutNodeId,
+      }),
+      Object.freeze({ id: "fit-layout", label: "Reset page layout", tone: "ghost" as const }),
     ]),
-    createNodeDescription: "Double-click to stage a new block. Add details with the composer below.",
+    createNodeDescription: "Double-click to add a panel. Drag or resize each panel to design this page.",
     designFrame: context.designFrame,
     coordinateSpace: Object.freeze({
       mode: "normalized",
@@ -168,10 +152,12 @@ export function createSystemCanvasExperienceDefinition(
   readonly context: SystemCanvasExperienceContext;
 } {
   const document = parseSystemStudioDraftDocument(input.content);
-  const layoutNodes = resolveLayoutNodes({
-    document,
-  });
-  const panels = resolvePanels({ document, nodes: layoutNodes });
+  const pages = document.systemSpec.pages;
+  const selectedPageId = pages.some((page) => page.pageId === input.selectedPageId)
+    ? input.selectedPageId
+    : pages[0]?.pageId ?? "page-1";
+  const panels = resolvePanelsForPage({ document, selectedPageId });
+  const layoutNodes = resolveLayoutNodes({ panels });
   const runtimePanels = Object.freeze(panels.map((panel) => mapPanelAssetToRuntimeInstance(panel)));
 
   const context: SystemCanvasExperienceContext = Object.freeze({
@@ -180,6 +166,8 @@ export function createSystemCanvasExperienceDefinition(
     issues: toIssueSummaries(input.validationIssues),
     selectedInspectorPanel: input.selectedInspectorPanel,
     selectedLayoutNodeId: input.selectedLayoutNodeId,
+    selectedPageId,
+    pages,
     layoutNodes,
     designFrame: document.canvasAuthoring.designFrame,
     panels,
@@ -188,8 +176,8 @@ export function createSystemCanvasExperienceDefinition(
   const definition: CanvasExperienceAssetDefinition<SystemCanvasExperienceContext> = Object.freeze({
     identity: Object.freeze({
       id: "system-canvas",
-      title: "System canvas",
-      summary: "Arrange reusable components and tune how they connect.",
+      title: "Interface designer",
+      summary: "Lay out each page with simple movable and resizable panels.",
     }),
     resolveGraphSummary,
     resolveFocusedTarget,
@@ -198,43 +186,57 @@ export function createSystemCanvasExperienceDefinition(
       input.onCanvasEditingEvent?.(event);
     },
     resolvePalette: () => Object.freeze({
-      title: "Builder",
-      description: "Use these tools to edit structure details.",
+      title: "Page",
+      description: "Choose which page you want to design.",
     }),
     resolveIssues: (canvasContext) => canvasContext.issues,
     renderGraphInteractionShell: ({ context: canvasContext }) => (
       <SystemCompositionEditor context={canvasContext.extensionContext} />
     ),
     renderPaletteRegion: () => (
-      <div className="ui-row ui-row--wrap" data-testid="system-canvas-palette-actions">
-        <button
-          type="button"
-          className={`ui-button ui-button--sm ${input.selectedInspectorPanel === SystemCanvasInspectorPanels.interfaces ? "ui-button--primary" : "ui-button--ghost"}`}
-          onClick={() => input.onSelectInspectorPanel(SystemCanvasInspectorPanels.interfaces)}
-        >
-          Inputs & outputs
-        </button>
-        <button
-          type="button"
-          className={`ui-button ui-button--sm ${input.selectedInspectorPanel === SystemCanvasInspectorPanels.parameters ? "ui-button--primary" : "ui-button--ghost"}`}
-          onClick={() => input.onSelectInspectorPanel(SystemCanvasInspectorPanels.parameters)}
-        >
-          Settings
-        </button>
+      <div className="ui-stack ui-stack--2xs" data-testid="system-canvas-page-picker">
+        <div className="ui-row ui-row--wrap">
+          {pages.map((page) => (
+            <button
+              key={page.pageId}
+              type="button"
+              className={`ui-button ui-button--sm ${page.pageId === selectedPageId ? "ui-button--primary" : "ui-button--ghost"}`}
+              onClick={() => input.onSelectPage(page.pageId)}
+            >
+              {page.heading}
+            </button>
+          ))}
+        </div>
+        <div className="ui-row ui-row--wrap" data-testid="system-canvas-palette-actions">
+          <button
+            type="button"
+            className={`ui-button ui-button--sm ${input.selectedInspectorPanel === SystemCanvasInspectorPanels.interfaces ? "ui-button--primary" : "ui-button--ghost"}`}
+            onClick={() => input.onSelectInspectorPanel(SystemCanvasInspectorPanels.interfaces)}
+          >
+            Inputs & outputs
+          </button>
+          <button
+            type="button"
+            className={`ui-button ui-button--sm ${input.selectedInspectorPanel === SystemCanvasInspectorPanels.parameters ? "ui-button--primary" : "ui-button--ghost"}`}
+            onClick={() => input.onSelectInspectorPanel(SystemCanvasInspectorPanels.parameters)}
+          >
+            Settings
+          </button>
+        </div>
       </div>
     ),
     renderInspectorRegion: ({ context: canvasContext }) => renderInspector(canvasContext),
     renderSupplementaryPanels: ({ extensionContext }) => (
       <SystemCompositionEditor context={extensionContext} />
     ),
-    resolveInteractionMessage: (canvasContext) => `Bindings configured: ${canvasContext.document.systemSpec.bindings.length} · Panels ready for runtime: ${runtimePanels.length}`,
+    resolveInteractionMessage: (canvasContext) => `Page panels: ${canvasContext.layoutNodes.length} · Ready for preview: ${runtimePanels.length}`,
     emptyState: Object.freeze({
-      when: (canvasContext) => canvasContext.document.systemSpec.components.length === 0,
+      when: (canvasContext) => canvasContext.layoutNodes.length === 0,
       render: () => (
         <div className="ui-card ui-card--padded" data-testid="system-canvas-empty-state">
-          <strong>Add your first component</strong>
+          <strong>Add your first panel</strong>
           <p className="ui-text-small ui-text-secondary">
-            Start with a model, workflow, or nested system to build this composition.
+            Start this page with a panel, then move and resize it to build the layout.
           </p>
         </div>
       ),
@@ -242,4 +244,20 @@ export function createSystemCanvasExperienceDefinition(
   });
 
   return Object.freeze({ definition, context });
+}
+
+export function createSystemPanelFromCanvasNode(input: {
+  readonly node: CanvasSurfaceLayoutNodeModel;
+  readonly pageId: string;
+}): PanelAssetContract {
+  return mapLayoutNodeToPanelAsset({
+    node: input.node,
+    pageId: input.pageId,
+    contentSlots: Object.freeze([
+      Object.freeze({
+        slotId: `${input.node.id}-content`,
+        label: "Panel content",
+      }),
+    ]),
+  });
 }

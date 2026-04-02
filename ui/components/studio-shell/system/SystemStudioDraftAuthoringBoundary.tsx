@@ -11,6 +11,7 @@ import type { StudioShellExtensionContext } from "../../../studio-shell/StudioSh
 import {
   parseSystemStudioDraftDocument,
   serializeSystemStudioCanvasAuthoringConfiguration,
+  serializeSystemStudioPageDefinitions,
   type SystemStudioDraftDocument,
 } from "../../../studio-shell/system/SystemStudioDraftDocument";
 import {
@@ -19,6 +20,7 @@ import {
   type SystemWizardPageId,
 } from "../../../studio-shell/system/SystemWizardExperienceAdapter";
 import {
+  createSystemPanelFromCanvasNode,
   createSystemCanvasExperienceDefinition,
   SystemCanvasInspectorPanels,
   type SystemCanvasInspectorPanelId,
@@ -90,24 +92,64 @@ export function SystemStudioDraftAuthoringBoundary({
   experienceAssetIds = defaultSystemExperienceAssetIds,
 }: SystemStudioDraftAuthoringBoundaryProps): JSX.Element {
   const [selectedModeId, setSelectedModeId] = useState<"wizard" | "canvas">("wizard");
-  const [selectedWizardPageId, setSelectedWizardPageId] = useState<SystemWizardPageId>(SystemWizardPageIds.composition);
+  const [selectedWizardPageId, setSelectedWizardPageId] = useState<SystemWizardPageId>(SystemWizardPageIds.pages);
   const [selectedInspectorPanel, setSelectedInspectorPanel] = useState<SystemCanvasInspectorPanelId>(
     SystemCanvasInspectorPanels.interfaces,
   );
   const [selectedLayoutNodeId, setSelectedLayoutNodeId] = useState<string | undefined>(undefined);
+  const [selectedPageId, setSelectedPageId] = useState<string>("page-1");
 
   const document = useMemo(() => parseSystemStudioDraftDocument(content), [content]);
 
-  const persistPanels = (panels: ReadonlyArray<PanelAssetContract>): void => {
+  const resolvedSelectedPageId = document.systemSpec.pages.some((page) => page.pageId === selectedPageId)
+    ? selectedPageId
+    : (document.systemSpec.pages[0]?.pageId ?? "page-1");
+
+  const persistPanelsForSelectedPage = (panels: ReadonlyArray<PanelAssetContract>): void => {
+    const nextLayouts = document.canvasAuthoring.pageLayouts.map((layout) => (
+      layout.pageId === resolvedSelectedPageId
+        ? Object.freeze({ ...layout, panels })
+        : layout
+    ));
+
     const serialized = serializeSystemStudioCanvasAuthoringConfiguration({
       existingContent: content,
       canvasAuthoring: Object.freeze({
         ...document.canvasAuthoring,
-        panels,
+        pageLayouts: Object.freeze(nextLayouts),
       }),
     });
     extensionContext.operations.setDraftContent?.(serialized);
   };
+
+  const persistSystemPages = (pages: SystemStudioDraftDocument["systemSpec"]["pages"]): void => {
+    const serializedPages = serializeSystemStudioPageDefinitions({
+      existingContent: content,
+      pages,
+    });
+    const serialized = serializeSystemStudioCanvasAuthoringConfiguration({
+      existingContent: serializedPages,
+      canvasAuthoring: Object.freeze({
+        ...document.canvasAuthoring,
+        pageLayouts: Object.freeze(
+          pages.map((page) => {
+            const existing = document.canvasAuthoring.pageLayouts.find((layout) => layout.pageId === page.pageId);
+            return Object.freeze({
+              pageId: page.pageId,
+              panels: existing?.panels ?? Object.freeze([]),
+            });
+          }),
+        ),
+      }),
+    });
+    extensionContext.operations.setDraftContent?.(serialized);
+    if (!pages.some((page) => page.pageId === resolvedSelectedPageId)) {
+      setSelectedPageId(pages[0]?.pageId ?? "page-1");
+      setSelectedLayoutNodeId(undefined);
+    }
+  };
+
+  const selectedPagePanels = document.canvasAuthoring.pageLayouts.find((layout) => layout.pageId === resolvedSelectedPageId)?.panels ?? [];
 
   const handleCanvasEditingEvent = (event: CanvasSurfaceEditingEvent): void => {
     if (event.type === "selection.change") {
@@ -116,7 +158,7 @@ export function SystemStudioDraftAuthoringBoundary({
     }
 
     if (event.type === "node.position.change") {
-      persistPanels(document.canvasAuthoring.panels.map((panel) => (
+      persistPanelsForSelectedPage(selectedPagePanels.map((panel) => (
         panel.sourceLayoutNodeId === event.nodeId
           ? Object.freeze({
             ...panel,
@@ -132,7 +174,7 @@ export function SystemStudioDraftAuthoringBoundary({
     }
 
     if (event.type === "node.resize.change") {
-      persistPanels(document.canvasAuthoring.panels.map((panel) => (
+      persistPanelsForSelectedPage(selectedPagePanels.map((panel) => (
         panel.sourceLayoutNodeId === event.nodeId
           ? Object.freeze({
             ...panel,
@@ -148,8 +190,50 @@ export function SystemStudioDraftAuthoringBoundary({
       return;
     }
 
+    if (event.type === "node.create.request") {
+      const nodeId = `panel-node-${Date.now()}`;
+      const panel = createSystemPanelFromCanvasNode({
+        pageId: resolvedSelectedPageId,
+        node: Object.freeze({
+          id: nodeId,
+          title: `Panel ${selectedPagePanels.length + 1}`,
+          x: event.position.x,
+          y: event.position.y,
+          width: 0.22,
+          height: 0.18,
+        }),
+      });
+      persistPanelsForSelectedPage(Object.freeze([...selectedPagePanels, panel]));
+      setSelectedLayoutNodeId(panel.sourceLayoutNodeId ?? panel.panelId);
+      return;
+    }
+
     if (event.type === "canvas.command" && event.commandId === "fit-layout") {
-      persistPanels([]);
+      persistPanelsForSelectedPage([]);
+      setSelectedLayoutNodeId(undefined);
+      return;
+    }
+
+    if (event.type === "canvas.command" && event.commandId === "add-panel") {
+      const panelId = `panel-${selectedPagePanels.length + 1}`;
+      const panel: PanelAssetContract = Object.freeze({
+        panelId,
+        pageId: resolvedSelectedPageId,
+        title: `Panel ${selectedPagePanels.length + 1}`,
+        layoutBounds: Object.freeze({ x: 0.05, y: 0.05, width: 0.22, height: 0.18 }),
+        contentSlots: Object.freeze([{ slotId: `${panelId}-content`, label: "Panel content" }]),
+        sourceLayoutNodeId: panelId,
+      });
+      persistPanelsForSelectedPage(Object.freeze([...selectedPagePanels, panel]));
+      setSelectedLayoutNodeId(panel.sourceLayoutNodeId ?? panel.panelId);
+      return;
+    }
+
+    if (event.type === "canvas.command" && event.commandId === "remove-panel" && selectedLayoutNodeId) {
+      persistPanelsForSelectedPage(Object.freeze(
+        selectedPagePanels.filter((panel) => panel.sourceLayoutNodeId !== selectedLayoutNodeId && panel.panelId !== selectedLayoutNodeId),
+      ));
+      setSelectedLayoutNodeId(undefined);
     }
   };
   const assetDefinition = useMemo(
@@ -158,8 +242,18 @@ export function SystemStudioDraftAuthoringBoundary({
   );
 
   const wizardModel = useMemo(
-    () => createSystemWizardExperienceAdapterModel({ content, extensionContext, validationIssues }),
-    [content, extensionContext, validationIssues],
+    () => createSystemWizardExperienceAdapterModel({
+      content,
+      extensionContext,
+      validationIssues,
+      selectedPageId: resolvedSelectedPageId,
+      onSelectPage: (pageId) => {
+        setSelectedPageId(pageId);
+        setSelectedLayoutNodeId(undefined);
+      },
+      onPagesChange: persistSystemPages,
+    }),
+    [content, extensionContext, validationIssues, resolvedSelectedPageId],
   );
 
   const canvasModel = useMemo(
@@ -170,9 +264,14 @@ export function SystemStudioDraftAuthoringBoundary({
       selectedInspectorPanel,
       onSelectInspectorPanel: setSelectedInspectorPanel,
       selectedLayoutNodeId,
+      selectedPageId: resolvedSelectedPageId,
+      onSelectPage: (pageId) => {
+        setSelectedPageId(pageId);
+        setSelectedLayoutNodeId(undefined);
+      },
       onCanvasEditingEvent: handleCanvasEditingEvent,
     }),
-    [content, extensionContext, selectedInspectorPanel, selectedLayoutNodeId, validationIssues],
+    [content, extensionContext, selectedInspectorPanel, selectedLayoutNodeId, resolvedSelectedPageId, validationIssues],
   );
 
   return (
