@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import DatasetStageWizardPanel from "../DatasetStageWizardPanel";
+import DatasetStageWizardPanel from "../DEPRECATED_DatasetStageWizardPanel";
 
 describe("DatasetStageWizardPanel", () => {
   it("renders stage wizard shell, progress navigation, fallback renderer, and navigation controls", () => {

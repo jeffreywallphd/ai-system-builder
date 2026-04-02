@@ -25,6 +25,8 @@ import type {
   UnifiedPreparationVisibilityMode,
 } from "../../../domain/dataset-studio/UnifiedPreparationAsset";
 
+
+export const DataStudioWizardPersistenceStorageKey = "ai-loom.data-studio.preparation.state.v1";
 export interface DataStudioPreparationWizardAdapterUpdateResult {
   readonly ok: boolean;
   readonly issues: ReadonlyArray<DataStudioWizardValidationIssue>;

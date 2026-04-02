@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import DataStudioPreparationWizardPanel from "../DataStudioPreparationWizardPanel";
+import DataStudioPreparationWizardPanel from "../DEPRECATED_DataStudioPreparationWizardPanel";
 
 describe("DataStudioPreparationWizardPanel", () => {
   it("renders wizard shell, stage navigation, reusable stage UX, and advanced entry points", () => {

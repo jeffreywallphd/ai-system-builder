@@ -69,7 +69,7 @@ import {
   type InlineAssetCreationReturnTarget,
 } from "../routes/InlineAssetCreation";
 import { createWorkflowAssetMetadata } from "../../domain/workflow-studio/WorkflowStudioDomain";
-import { DataStudioWizardPersistenceStorageKey } from "../components/assets/DataStudioPreparationWizardPanel";
+import { DataStudioWizardPersistenceStorageKey } from "../studio-shell/data/DataStudioPreparationWizardStateAdapter";
 import {
   createStudioHostContext,
   createStudioHostSessionState,

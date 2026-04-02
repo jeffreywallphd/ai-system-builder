@@ -856,3 +856,6 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - **Schema Studio** is dedicated to structural schema definition and editing,
   - **Pipeline Studio** is dedicated to ingestion/mapping/transformation/enrichment/execution flow authoring and schema linkage.
 - Schema references remain first-class links in pipeline definitions (`datasetPipelineSpec.schemas` and `datasetPipelineSpec.sources[].schema`) so structural assets and execution assets stay distinct while still connected.
+
+- Stories 5–6 now make Data Studio’s dataset authoring path asset-native under the Studio Shell: `DatasetStudioDraftAuthoringBoundary` owns the canonical `DataStudioPreparationWizardStateAdapter` state, renders wizard/canvas surfaces directly from that shared state, and no longer mounts the legacy nested intermediary authoring panels in active runtime.
+- Legacy Data Studio intermediary panel implementations are now disconnected from active runtime and renamed with `DEPRECATED_` prefixes (`DEPRECATED_DataStudioPreparationWizardPanel`, `DEPRECATED_DatasetStageAuthoringPanel`, `DEPRECATED_DatasetStageWizardPanel`, `DEPRECATED_DatasetStageCanvasReactFlow`) for follow-up cleanup slices.
