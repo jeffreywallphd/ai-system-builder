@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { createSystemContextContract } from "../../../domain/system-studio/SystemContextContract";
 import { createSystemContextWorkflowMappingConfiguration } from "../../../domain/system-studio/SystemContextWorkflowMappingConfiguration";
+import { ReferenceImageSystemWorkflowContextMapping } from "../../system-studio/ReferenceImageSystemTemplate";
 import { createDefaultWorkflowSystemContextBindingAdapter } from "../SystemContextWorkflowInputMapper";
 
 describe("SystemContextWorkflowInputMapper", () => {
@@ -100,5 +101,51 @@ describe("SystemContextWorkflowInputMapper", () => {
     expect((mapped.inputValues as Record<string, unknown>).activeDatasetReferenceId).toBe("dataset-active");
     expect((((mapped.metadata as Record<string, unknown>).debug as Record<string, unknown>).selectedImageAssetId)).toBe("asset:img-1");
     expect((((mapped.metadata as Record<string, unknown>).datasetRuntimeHandles as Array<Record<string, unknown>>)[0] as Record<string, unknown>).instanceId).toBe("instance:active");
+  });
+
+  it("maps reference-image system context into primary workflow inputs + dataset metadata", () => {
+    const adapter = createDefaultWorkflowSystemContextBindingAdapter({
+      mappingConfiguration: ReferenceImageSystemWorkflowContextMapping,
+    });
+
+    const mapped = adapter.map(createSystemContextContract({
+      parameters: {
+        editInstruction: "remove scratches and warm up colors",
+        variationStrength: 0.6,
+        resultCount: 2,
+      },
+      selectedImages: [{
+        selectionId: "selected-main",
+        imageId: "asset:image:selected-main",
+        assetRef: {
+          assetId: "asset:image:selected-main",
+        },
+      }],
+      datasets: [{
+        referenceId: "dataset-input",
+        instanceId: "dataset-instance:reference-image:input",
+        role: "system-owned-input",
+        datasetAssetId: "asset:dataset:image-reference-input",
+      }, {
+        referenceId: "dataset-output",
+        instanceId: "dataset-instance:reference-image:output",
+        role: "system-owned-output",
+        datasetAssetId: "asset:dataset:image-reference-output",
+      }],
+      runtime: {
+        runtimeSessionId: "runtime:reference-image",
+      },
+    }));
+
+    const inputs = mapped.inputValues as Record<string, unknown>;
+    const metadata = mapped.metadata as Record<string, unknown>;
+    expect(inputs.sourceImage).toBe("asset:image:selected-main");
+    expect(inputs.instruction).toBe("remove scratches and warm up colors");
+    expect(inputs.variationStrength).toBe(0.6);
+    expect(inputs.resultCount).toBe(2);
+    expect((metadata.datasetInstances as Array<Record<string, unknown>>).length).toBe(2);
+    expect((metadata.systemDatasetInstanceRefs as Array<Record<string, unknown>>)[0]?.instanceId).toBe("dataset-instance:reference-image:input");
+    expect((metadata.datasetRuntimeHandles as Array<Record<string, unknown>>)[0]?.kind).toBe("dataset-instance");
+    expect((metadata.runtimeContext as Record<string, unknown>).runtimeSessionId).toBe("runtime:reference-image");
   });
 });

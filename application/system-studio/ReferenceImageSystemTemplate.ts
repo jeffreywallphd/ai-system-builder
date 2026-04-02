@@ -1,5 +1,9 @@
 import { DatasetSchemaIntentIds } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import {
+  createSystemContextWorkflowMappingConfiguration,
+  type SystemContextWorkflowMappingConfiguration,
+} from "../../domain/system-studio/SystemContextWorkflowMappingConfiguration";
+import {
   createSystemAsset,
   createSystemStudioTaxonomy,
   SystemBindingEndpointScopes,
@@ -8,8 +12,92 @@ import {
 import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "../../domain/taxonomy/CompositionTaxonomy";
 import { DatasetInstanceRoles, type DatasetInstanceRole } from "../../domain/system-runtime/DatasetInstanceDomain";
 import type { EnsureRoleDatasetInstanceRequest } from "../system-runtime/SystemDatasetInstanceService";
+import { CoreImageStarterWorkflowTemplates } from "../workflow-template-studio/CoreImageStarterWorkflowTemplates";
 
 export const ReferenceImageSystemTemplateId = "template:system:reference-image-manipulation";
+export const ReferenceImagePrimaryWorkflowTemplateAssetId = "asset:workflow-template:image-to-image:starter";
+export const ReferenceImagePrimaryWorkflowTemplateVersionId = "asset:workflow-template:image-to-image:starter:v1";
+
+const ReferenceImagePrimaryWorkflowTemplate = CoreImageStarterWorkflowTemplates.find((template) => (
+  template.templateId === ReferenceImagePrimaryWorkflowTemplateAssetId
+));
+
+if (!ReferenceImagePrimaryWorkflowTemplate) {
+  throw new Error(`Reference image system template requires workflow template '${ReferenceImagePrimaryWorkflowTemplateAssetId}'.`);
+}
+
+export const ReferenceImageSystemWorkflowContextMapping: SystemContextWorkflowMappingConfiguration = createSystemContextWorkflowMappingConfiguration({
+  mappings: [
+    {
+      mappingId: "reference-image.input.source-image",
+      sourceRoot: "selected-image",
+      sourcePath: "assetRef.assetId",
+      targetKind: "workflow-input",
+      targetPath: "sourceImage",
+      required: true,
+      description: "Map the selected image into the workflow source image input.",
+    },
+    {
+      mappingId: "reference-image.input.instruction",
+      sourceRoot: "parameters",
+      sourcePath: "editInstruction",
+      targetKind: "workflow-input",
+      targetPath: "instruction",
+      defaultValue: "",
+      description: "Map user-entered edit instruction text into the workflow instruction input.",
+    },
+    {
+      mappingId: "reference-image.input.variation-strength",
+      sourceRoot: "parameters",
+      sourcePath: "variationStrength",
+      targetKind: "workflow-input",
+      targetPath: "variationStrength",
+      defaultValue: 0.5,
+      description: "Map optional style/intensity control into variation strength.",
+    },
+    {
+      mappingId: "reference-image.input.result-count",
+      sourceRoot: "parameters",
+      sourcePath: "resultCount",
+      targetKind: "workflow-input",
+      targetPath: "resultCount",
+      defaultValue: 1,
+      description: "Map optional result count control into bounded output count.",
+    },
+    {
+      mappingId: "reference-image.metadata.dataset-instances",
+      sourceRoot: "dataset-resolution",
+      targetKind: "workflow-metadata",
+      targetPath: "datasetInstances",
+      transformId: "dataset-instances",
+      description: "Expose resolved dataset instances to workflow runtime metadata.",
+    },
+    {
+      mappingId: "reference-image.metadata.system-dataset-refs",
+      sourceRoot: "dataset-resolution",
+      targetKind: "workflow-metadata",
+      targetPath: "systemDatasetInstanceRefs",
+      transformId: "system-dataset-instance-refs",
+      description: "Expose system-owned dataset references for runtime persistence and output routing.",
+    },
+    {
+      mappingId: "reference-image.metadata.dataset-runtime-handles",
+      sourceRoot: "dataset-resolution",
+      targetKind: "workflow-metadata",
+      targetPath: "datasetRuntimeHandles",
+      transformId: "dataset-runtime-handles",
+      description: "Expose runtime dataset handles for adapter-driven execution integration.",
+    },
+    {
+      mappingId: "reference-image.metadata.runtime-context",
+      sourceRoot: "runtime",
+      targetKind: "workflow-metadata",
+      targetPath: "runtimeContext",
+      transformId: "runtime-context",
+      description: "Carry runtime correlation ids for run tracing.",
+    },
+  ],
+});
 
 export interface ReferenceImageDatasetInstanceTemplate {
   readonly bindingId: "input-image-dataset" | "output-image-dataset";
@@ -33,6 +121,20 @@ export interface ReferenceImageSystemTemplateDefinition {
     readonly componentAlias: string;
     readonly inputIds: ReadonlyArray<string>;
     readonly outputIds: ReadonlyArray<string>;
+  };
+  readonly primaryWorkflowAsset: {
+    readonly bindingId: "primary-image-workflow";
+    readonly componentAlias: string;
+    readonly workflowTemplateAssetId: string;
+    readonly workflowTemplateVersionId?: string;
+    readonly datasetBindings: Readonly<{
+      readonly inputDatasetInstanceBindingId: "input-image-dataset";
+      readonly workflowInputId: string;
+      readonly outputDatasetInstanceBindingId: "output-image-dataset";
+      readonly workflowOutputId: string;
+    }>;
+    readonly parameterInputIds: ReadonlyArray<string>;
+    readonly contextMapping: SystemContextWorkflowMappingConfiguration;
   };
   readonly uiBindingBoundary: {
     readonly componentAlias: string;
@@ -81,7 +183,8 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
       },
       {
         componentKind: "composite",
-        assetId: "asset:workflow-template:reference-image-editing",
+        assetId: ReferenceImagePrimaryWorkflowTemplate.templateId,
+        versionId: ReferenceImagePrimaryWorkflowTemplate.versionId,
         alias: "reference-workflow",
         taxonomy: {
           structuralKind: TaxonomyStructuralKinds.composite,
@@ -113,10 +216,13 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
       },
       {
         bindingId: "bind:workflow-output-to-system",
-        source: { scope: SystemBindingEndpointScopes.componentOutput, componentAlias: "reference-workflow", endpointId: "editedImages" },
+        source: { scope: SystemBindingEndpointScopes.componentOutput, componentAlias: "reference-workflow", endpointId: "images" },
         target: { scope: SystemBindingEndpointScopes.systemOutput, endpointId: "editedImages" },
       },
     ],
+    executionMetadata: {
+      workflowContextMapping: ReferenceImageSystemWorkflowContextMapping,
+    },
   }),
   datasetInstances: Object.freeze([
     Object.freeze({
@@ -143,7 +249,21 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
   workflowBindingBoundary: Object.freeze({
     componentAlias: "reference-workflow",
     inputIds: Object.freeze(["sourceImage", "instruction"]),
-    outputIds: Object.freeze(["editedImages"]),
+    outputIds: Object.freeze(["images"]),
+  }),
+  primaryWorkflowAsset: Object.freeze({
+    bindingId: "primary-image-workflow",
+    componentAlias: "reference-workflow",
+    workflowTemplateAssetId: ReferenceImagePrimaryWorkflowTemplate.templateId,
+    workflowTemplateVersionId: ReferenceImagePrimaryWorkflowTemplate.versionId,
+    datasetBindings: Object.freeze({
+      inputDatasetInstanceBindingId: "input-image-dataset",
+      workflowInputId: "sourceImage",
+      outputDatasetInstanceBindingId: "output-image-dataset",
+      workflowOutputId: "images",
+    }),
+    parameterInputIds: Object.freeze(["instruction", "variationStrength", "resultCount"]),
+    contextMapping: ReferenceImageSystemWorkflowContextMapping,
   }),
   uiBindingBoundary: Object.freeze({
     componentAlias: "reference-ui",

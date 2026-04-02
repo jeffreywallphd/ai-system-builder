@@ -817,3 +817,15 @@ Not implemented in this slice:
 - Runtime provisioning is represented through `buildReferenceImageDatasetInstanceRequests(systemId)` to produce bounded `EnsureRoleDatasetInstanceRequest` contracts for `SystemDatasetInstanceService` reuse.
 - Build route exposure now includes a `/build` template card that links to System Studio for this reference-image system path, keeping vertical-slice discovery inside the existing Build UX entry surface.
 
+## Direction 5 extension update: primary image workflow binding + system context mapping (stories 5.1.3-5.1.4)
+
+- The reference image system template now binds a concrete primary workflow-template asset (`asset:workflow-template:image-to-image:starter`) instead of a placeholder workflow id, including explicit version pinning through the existing template catalog boundary.
+- The system template now exposes inspectable primary-workflow binding metadata (`primaryWorkflowAsset`) that traces:
+  - workflow component alias,
+  - dataset-instance binding IDs (input/output) to workflow input/output IDs,
+  - workflow parameter input IDs that can be populated from system context.
+- System execution metadata now includes a reusable `workflowContextMapping` contract (`ReferenceImageSystemWorkflowContextMapping`) that maps:
+  - selected image -> workflow `sourceImage`,
+  - user-entered parameters (`editInstruction`, `variationStrength`, `resultCount`) -> workflow inputs,
+  - resolved dataset references/handles -> workflow metadata.
+- This keeps mapping contract-first and adapter-driven (`WorkflowSystemContextBindingAdapter`) without leaking execution-library details into system/domain contracts.
