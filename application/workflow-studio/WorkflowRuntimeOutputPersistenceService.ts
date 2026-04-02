@@ -362,7 +362,9 @@ export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowR
         this.recordHistory({
           request,
           runtimeMetadata,
-          status: ImageRunHistoryExecutionStatuses.failed,
+          status: persistedResults.length > 0
+            ? ImageRunHistoryExecutionStatuses.partial
+            : ImageRunHistoryExecutionStatuses.failed,
           persistedResults,
         });
         return Object.freeze({
@@ -435,16 +437,35 @@ export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowR
       .filter((asset) => asset.kind === "image")
       .map((asset) => Object.freeze({ outputId: asset.id }));
     const firstTarget = input.persistedResults[0];
-    const outputDatasetInstance = firstTarget
+    const outputStoreBinding = input.runtimeMetadata.configuration.bindings.find((binding) => binding.targetType === "output-dataset");
+    const preferredTarget = outputStoreBinding
+      ? input.persistedResults.find((entry) => entry.bindingId === outputStoreBinding.bindingId)
+      : undefined;
+    const outputDatasetInstance = (preferredTarget ?? firstTarget)
       ? Object.freeze({
-        instanceId: firstTarget.targetDatasetInstanceId,
-        datasetAssetId: input.runtimeMetadata.configuration.bindings[0]?.datasetAssetId ?? "unknown-dataset-asset",
-        datasetAssetVersionId: input.runtimeMetadata.configuration.bindings[0]?.datasetAssetVersionId,
+        instanceId: (preferredTarget ?? firstTarget).targetDatasetInstanceId,
+        datasetAssetId: outputStoreBinding?.datasetAssetId ?? input.runtimeMetadata.configuration.bindings[0]?.datasetAssetId ?? "unknown-dataset-asset",
+        datasetAssetVersionId: outputStoreBinding?.datasetAssetVersionId ?? input.runtimeMetadata.configuration.bindings[0]?.datasetAssetVersionId,
         role: "output-store",
         purpose: undefined,
         persistedRecordIds: input.persistedResults.map((entry) => entry.recordId),
       })
       : undefined;
+    const lineageStatus = input.status === ImageRunHistoryExecutionStatuses.completed
+      ? "complete"
+      : input.status === ImageRunHistoryExecutionStatuses.partial
+        ? "partial"
+        : "incomplete";
+    const missingLineage: string[] = [];
+    if (!input.runtimeMetadata.sourceContext?.sourceImageStableIds?.length) {
+      missingLineage.push("source-image");
+    }
+    if (!outputDatasetInstance) {
+      missingLineage.push("output-dataset-instance");
+    }
+    if (input.persistedResults.length === 0 && input.status !== ImageRunHistoryExecutionStatuses.failed) {
+      missingLineage.push("persisted-output-record");
+    }
 
     this.runHistoryService.recordRun({
       runId: input.request.result.executionId,
@@ -464,6 +485,18 @@ export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowR
         triggerEventId: typeof input.request.input.parameters?.triggerEventId === "string"
           ? input.request.input.parameters.triggerEventId
           : undefined,
+        status: lineageStatus,
+        workflowExecutionId: input.request.result.executionId,
+        sourceDatasetAssetId: input.runtimeMetadata.sourceContext?.sourceDatasetAssetId,
+        sourceDatasetInstanceId: input.runtimeMetadata.sourceContext?.sourceDatasetInstanceId,
+        sourceImageAssetId: input.runtimeMetadata.sourceContext?.sourceImageStableIds?.[0],
+        workflowAssetId: input.request.input.workflow.id,
+        workflowAssetVersionId: input.request.input.workflow.metadata?.version,
+        systemAssetId: input.runtimeMetadata.systemId,
+        outputDatasetInstanceId: outputDatasetInstance?.instanceId,
+        outputRecordIds: input.persistedResults.map((entry) => entry.recordId),
+        missing: missingLineage,
+        traceId: input.runtimeMetadata.sourceContext?.traceId,
       }),
       timestamps: Object.freeze({
         startedAt: input.request.result.startedAt,

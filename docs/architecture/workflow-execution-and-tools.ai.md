@@ -347,3 +347,19 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Persistence now fails fast when upstream runtime status reports failed/cancelled, preventing malformed or incomplete payloads from materializing into output datasets.
 - System Studio reference-image interactions now guard result/history refresh against stale async responses and disable duplicate create actions while a run is active, reducing desynchronization and duplicate invocations.
 - Primary action/status copy for the reference-image panel now follows plain-language non-technical UX patterns (`Choose an image`, `Change settings`, `Create new version`, `Something went wrong while creating this image`) while keeping technical diagnostics inside collapsed advanced details.
+
+## AI Loom image manipulation hardening update: ComfyUI failure normalization + output/lineage consistency (stories 5.4.5-5.4.6)
+
+- Comfy runtime error normalization now classifies representative failure modes into stable internal categories (`user-correctable`, `environment-configuration`, `runtime-execution`, `partial-completion`) without leaking raw Comfy transport/history payloads above adapter boundaries.
+- Queue/runtime hardening now captures and normalizes:
+  - prompt rejection with node-level validation errors,
+  - missing/incompatible node/model/checkpoint style failures,
+  - malformed/invalid prompt parameter paths,
+  - network/timeout/cancellation/runtime failures,
+  - partial-output failure scenarios where files were generated before terminal failure.
+- Adapter results now preserve partial outputs on failed runs when recoverable output records exist, so upper layers can distinguish failed-with-artifacts from failed-without-output.
+- Workflow output persistence/run history now treat partial persistence as first-class state:
+  - failed persistence after partial writes records run-history status `partial` (not `completed`),
+  - persisted output dataset linkage prefers explicit output-target binding identity,
+  - run-history lineage records now include structured completeness status + missing-field markers (`complete` / `partial` / `incomplete`) and output record references.
+- This keeps output/result/history views grounded in persisted normalized state and reduces ambiguity/orphaned lineage across successful, failed, and partial runs.

@@ -24,6 +24,16 @@ export interface IComfyPromptCompletion {
   readonly outputs: Readonly<Record<string, ReadonlyArray<IComfyPromptOutputArtifact>>>;
 }
 
+export class ComfyPromptExecutionError extends Error {
+  public readonly completion?: IComfyPromptCompletion;
+
+  public constructor(message: string, completion?: IComfyPromptCompletion) {
+    super(message);
+    this.name = "ComfyPromptExecutionError";
+    this.completion = completion;
+  }
+}
+
 export interface IComfyPromptProgress {
   readonly promptId: string;
   readonly status: "queued" | "running" | "completed" | "failed" | "cancelled";
@@ -46,7 +56,14 @@ export class ComfyQueueClient {
   public async enqueuePrompt(
     workflow: ComfyWorkflowDto
   ): Promise<{ readonly prompt_id?: string }> {
-    return this.apiClient.queuePrompt(workflow);
+    const queued = await this.apiClient.queuePrompt(workflow);
+    const nodeErrors = queued.node_errors;
+    if (nodeErrors && Object.keys(nodeErrors).length > 0) {
+      throw new ComfyPromptExecutionError(
+        `ComfyUI rejected prompt because one or more nodes are invalid: ${JSON.stringify(nodeErrors)}`,
+      );
+    }
+    return queued;
   }
 
   public async getPromptProgress(promptId: string): Promise<IComfyPromptProgress> {
@@ -73,10 +90,12 @@ export class ComfyQueueClient {
       }
 
       if (statusStr.includes("error") || statusStr.includes("failed")) {
+        const completion = normalizeCompletion(normalizedPromptId, historyEntry);
         return Object.freeze({
           promptId: normalizedPromptId,
           status: "failed",
           message: historyEntry.status?.status_str,
+          completion: hasCompletionOutputs(completion) ? completion : undefined,
         });
       }
 
@@ -126,8 +145,9 @@ export class ComfyQueueClient {
       }
 
       if (progress.status === "failed") {
-        throw new Error(
-          `ComfyUI prompt '${normalizedPromptId}' failed: ${progress.message ?? "Unknown error"}`
+        throw new ComfyPromptExecutionError(
+          `ComfyUI prompt '${normalizedPromptId}' failed: ${progress.message ?? "Unknown error"}`,
+          progress.completion,
         );
       }
 
@@ -174,6 +194,10 @@ export class ComfyQueueClient {
 
     return undefined;
   }
+}
+
+function hasCompletionOutputs(completion: IComfyPromptCompletion): boolean {
+  return Object.values(completion.outputs).some((artifacts) => artifacts.length > 0);
 }
 
 function normalizeCompletion(

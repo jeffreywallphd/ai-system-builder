@@ -8,6 +8,7 @@ import type { IWorkflowExecutionInput, IWorkflowExecutionResult } from "../../po
 import { createImageWorkflowOutputBindingConfiguration } from "../../contracts/ImageWorkflowOutputBindingConfiguration";
 import { OutputGalleryDatasetIntegrationService } from "../../system-runtime/OutputGalleryDatasetIntegrationService";
 import { ImageRunHistoryService } from "../../system-runtime/ImageRunHistoryService";
+import { ImageRunHistoryExecutionStatuses } from "../../system-runtime/ImageRunHistoryDataContract";
 import {
   InMemoryImageRunHistoryRepository,
 } from "../../system-runtime/ImageRunHistoryRepository";
@@ -185,9 +186,48 @@ describe("DefaultWorkflowRuntimeOutputPersistenceService", () => {
     expect(listing.runs).toHaveLength(1);
     expect(listing.runs[0]?.workflow.workflowAssetId).toBe("asset:workflow:image");
     expect(listing.runs[0]?.outputs.datasetInstance?.instanceId).toBe("instance:out");
+    expect(listing.runs[0]?.lineage?.status).toBe("complete");
+    expect(listing.runs[0]?.lineage?.outputRecordIds?.length).toBe(3);
 
     const detail = historyService.getRunWithLinkedOutputs({ systemId: "system:image", runId: "exec:1" });
     expect(detail?.linkedOutputs).toHaveLength(1);
     expect(detail?.linkedOutputs[0]?.workflow?.workflowRunId).toBe("exec:1");
+  });
+
+  it("records partial run-history status when persistence fails after some writes", async () => {
+    const datasetService = new SystemDatasetInstanceService(
+      new InMemoryDatasetInstanceRepository(),
+      new StaticAssetCatalog(),
+      undefined,
+      new AllowAnySystem(),
+    );
+    await datasetService.ensureOutputImageStoreInstance({ instanceId: "instance:out", systemId: "system:image", datasetAssetId: "asset:dataset:out" });
+    await datasetService.ensureWorkflowOutputTargetInstance({ targetType: "history-dataset", instanceId: "instance:hist", systemId: "system:image", datasetAssetId: "asset:dataset:hist" });
+    await datasetService.ensureWorkflowOutputTargetInstance({ targetType: "comparison-dataset", instanceId: "instance:cmp", systemId: "system:image", datasetAssetId: "asset:dataset:cmp" });
+    const originalUpdate = datasetService.updateImageRecordInInstance.bind(datasetService);
+    let updates = 0;
+    datasetService.updateImageRecordInInstance = async (input) => {
+      updates += 1;
+      if (updates > 1) {
+        throw new Error("simulated persistence failure");
+      }
+      return originalUpdate(input);
+    };
+
+    const historyService = new ImageRunHistoryService(
+      new InMemoryImageRunHistoryRepository(),
+      new OutputGalleryDatasetIntegrationService(datasetService),
+      () => new Date("2026-04-02T10:00:00.000Z"),
+    );
+    const service = new DefaultWorkflowRuntimeOutputPersistenceService(datasetService, historyService);
+    const persistence = await service.persist({ input: createExecutionInput(), result: createExecutionResult() });
+    expect(persistence.status).toBe("failed");
+    expect(persistence.persistedRecordCount).toBeGreaterThan(0);
+
+    const listing = historyService.listRuns({ systemId: "system:image" });
+    expect(listing.runs).toHaveLength(1);
+    expect(listing.runs[0]?.status).toBe(ImageRunHistoryExecutionStatuses.partial);
+    expect(listing.runs[0]?.lineage?.status).toBe("partial");
+    expect(listing.runs[0]?.outputs.datasetInstance?.instanceId).toBe("instance:out");
   });
 });

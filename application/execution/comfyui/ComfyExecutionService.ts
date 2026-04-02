@@ -98,6 +98,13 @@ export class ComfyExecutionService {
                 errorSeverity: adapterResult.error.severity,
                 message: adapterResult.error.message,
                 retriable: adapterResult.error.retryable,
+                failureClass: typeof adapterResult.error.diagnostics?.failureClass === "string"
+                  ? adapterResult.error.diagnostics.failureClass
+                  : undefined,
+                stage: typeof adapterResult.error.diagnostics?.stage === "string"
+                  ? adapterResult.error.diagnostics.stage
+                  : undefined,
+                details: adapterResult.error.details,
               })
             : adapterResult.inspection?.diagnostics
               ? Object.freeze({ ...adapterResult.inspection.diagnostics })
