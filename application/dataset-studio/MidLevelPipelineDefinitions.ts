@@ -375,7 +375,7 @@ function resolveImageStageOrder(options: ImagePreparationPipelineOptions): Reado
 function mergeConfig(
   stageId: PipelineStageId,
   defaults: Readonly<Record<string, CanonicalRecordValue>>,
-  overrides: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>> | undefined,
+  overrides: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>> | undefined,
 ): Readonly<Record<string, CanonicalRecordValue>> {
   return Object.freeze({
     ...defaults,
@@ -385,7 +385,7 @@ function mergeConfig(
 function toPipelineDefinition(input: {
   readonly stageOrder: ReadonlyArray<PipelineStageId>;
   readonly tabularShape?: z.output<typeof TabularShapeSchema>;
-  readonly stageConfigOverrides?: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>;
+  readonly stageConfigOverrides?: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>>;
   readonly isDocument?: boolean;
   readonly documentOptions?: DocumentPreparationPipelineOptions;
 }): PipelineDefinition {

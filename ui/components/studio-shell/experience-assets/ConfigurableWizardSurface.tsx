@@ -11,7 +11,9 @@ import type {
 interface ConfigurableWizardSurfaceDirectProps {
   readonly pages: ReadonlyArray<WizardSurfacePageModel>;
   readonly activePageId: ExperiencePageId;
+  readonly currentPageId?: ExperiencePageId;
   readonly onSelectPage?: (pageId: ExperiencePageId) => void;
+  readonly onPageChange?: (pageId: ExperiencePageId) => void;
   readonly progress: WizardSurfaceProgressSummary;
   readonly readiness: WizardSurfaceReadinessSummary;
   readonly renderPageHost: (pageId: ExperiencePageId) => JSX.Element;
@@ -27,7 +29,9 @@ interface ConfigurableWizardSurfaceDefinitionProps<TContext> {
   readonly definition: WizardExperienceAssetDefinition<TContext>;
   readonly definitionContext: TContext;
   readonly activePageId: ExperiencePageId;
+  readonly currentPageId?: ExperiencePageId;
   readonly onSelectPage?: (pageId: ExperiencePageId) => void;
+  readonly onPageChange?: (pageId: ExperiencePageId) => void;
   readonly pageNavigationTestIds?: {
     readonly back?: string;
     readonly next?: string;
@@ -47,8 +51,8 @@ function isDefinitionProps<TContext>(
 export default function ConfigurableWizardSurface<TContext = never>(
   props: ConfigurableWizardSurfaceProps<TContext>,
 ): JSX.Element {
-  const activePageId = props.activePageId;
-  const onSelectPage = props.onSelectPage;
+  const activePageId = props.currentPageId ?? props.activePageId;
+  const onSelectPage = props.onPageChange ?? props.onSelectPage;
   const pageNavigationTestIds = props.pageNavigationTestIds;
 
   const resolvedModel = isDefinitionProps(props)

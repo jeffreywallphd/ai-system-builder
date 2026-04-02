@@ -57,6 +57,10 @@ import {
   setWorkflowOutputTitle,
   workflowOutputTypeDefinitions,
 } from "../../../studio-shell/workflow/WorkflowWizardOutputs";
+import {
+  workflowCanvasExperienceDefinition,
+  type WorkflowCanvasExperienceContext,
+} from "../../../studio-shell/workflow/WorkflowCanvasExperienceAdapter";
 
 export interface WorkflowStudioCanvasModeSurfaceProps {
   readonly studioId?: string;
@@ -1129,101 +1133,78 @@ export default function WorkflowStudioCanvasModeSurface({
     </aside>
   );
 
+  const canvasExperienceContext: WorkflowCanvasExperienceContext = Object.freeze({
+    viewModel,
+    selectedNode: selectedItemNode,
+    interactionMessage: canvasInteractionMessage,
+    issues: topDraftValidationIssues.map((issue, index) => Object.freeze({
+      id: `workflow-canvas-issue-${index}`,
+      message: issue.message,
+    })),
+    renderGraphInteractionShell: () => (
+      <WorkflowStudioCanvasReactFlow
+        graph={viewModel.graph}
+        selectedNodeId={selectedNodeId}
+        onSelectNode={setSelectedNodeId}
+        onClearSelection={() => setSelectedNodeId(undefined)}
+        onRemoveNode={handleRemoveNode}
+        onStepNodeDragStop={handleStepNodeDragStop}
+        onCreateConnection={handleCreateConnection}
+        onReconnectConnection={handleReconnectConnection}
+        onRemoveConnection={handleRemoveConnection}
+        renderNodeEditor={renderNodeEditor}
+      />
+    ),
+    renderPaletteRegion: renderPalette,
+    renderInspectorRegion: renderInspector,
+    renderSupplementaryPanels: () => (
+      <div className="ui-stack ui-stack--sm ui-workflow-studio-canvas__details">
+        {!rightDrawerEnabled ? renderInspector() : null}
+        <details className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-canvas-validation-panel">
+          <summary className="ui-text-small">Canvas validation feedback</summary>
+          <div className="ui-row ui-row--wrap">
+            {workflowCanvasPaletteSections.map((section) => {
+              const count = validationIssueSummaryBySection.get(section.id) ?? 0;
+              if (count === 0) {
+                return null;
+              }
+              return (
+                <span key={`canvas-issue-summary-${section.id}`} className="ui-badge ui-badge--neutral">
+                  {section.title}: {count}
+                </span>
+              );
+            })}
+          </div>
+          {draftValidationIssues.length > topDraftValidationIssues.length ? (
+            <p className="ui-text-small ui-text-secondary">
+              Showing first {topDraftValidationIssues.length} issues.
+            </p>
+          ) : null}
+        </details>
+        <details className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-graph-details">
+          <summary className="ui-text-small">Canvas graph projection</summary>
+          <p className="ui-text-small ui-text-secondary">
+            Graph nodes: {viewModel.graph.nodes.length} | Graph edges: {viewModel.graph.edges.length}
+          </p>
+        </details>
+        <details className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-json-details">
+          <summary className="ui-text-small">Canonical workflow draft JSON</summary>
+          <textarea
+            className="ui-textarea"
+            rows={8}
+            value={draftEditorContent}
+            onChange={(event) => onChangeDraftEditorContent(event.target.value)}
+          />
+        </details>
+      </div>
+    ),
+  });
+
   return (
     <div className="ui-workflow-studio-canvas" data-testid="workflow-studio-canvas-mode-surface">
       <ConfigurableCanvasSurface
-        identity={Object.freeze({
-          id: "workflow-canvas",
-          title: "Workflow Canvas",
-          summary: "Graph-oriented workflow authoring.",
-        })}
-        graphSummary={Object.freeze({
-          nodeCount: viewModel.graph.nodes.length,
-          edgeCount: viewModel.graph.edges.length,
-          issueCount: viewModel.totalIssueCount,
-        })}
-        focusedTarget={selectedItemNode
-          ? Object.freeze({
-            kind: "node" as const,
-            id: selectedItemNode.id,
-            label: selectedItemNode.title,
-          })
-          : Object.freeze({ kind: "none" as const })}
-        interactionMessage={canvasInteractionMessage}
-        isEmpty={viewModel.totalNodeCount === 0}
-        renderEmptyState={() => (
-          <div className="ui-card ui-card--padded ui-workflow-canvas-empty-state" data-testid="workflow-canvas-empty-state">
-            <strong>Canvas is empty</strong>
-            <p className="ui-text-small ui-text-secondary">
-              Add trigger, input, step, and output nodes from the Nodes drawer to start authoring this workflow.
-            </p>
-          </div>
-        )}
-        issues={topDraftValidationIssues.map((issue, index) => Object.freeze({
-          id: `workflow-canvas-issue-${index}`,
-          message: issue.message,
-        }))}
-        renderGraphInteractionShell={() => (
-          <WorkflowStudioCanvasReactFlow
-            graph={viewModel.graph}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={setSelectedNodeId}
-            onClearSelection={() => setSelectedNodeId(undefined)}
-            onRemoveNode={handleRemoveNode}
-            onStepNodeDragStop={handleStepNodeDragStop}
-            onCreateConnection={handleCreateConnection}
-            onReconnectConnection={handleReconnectConnection}
-            onRemoveConnection={handleRemoveConnection}
-            renderNodeEditor={renderNodeEditor}
-          />
-        )}
-        palette={Object.freeze({
-          title: drawerState?.left?.label ?? "Nodes",
-          description: "Search and add workflow nodes.",
-        })}
-        renderPaletteRegion={renderPalette}
-        renderInspectorRegion={() => renderInspector()}
-        renderSupplementaryPanels={() => (
-          <div className="ui-stack ui-stack--sm ui-workflow-studio-canvas__details">
-            {!rightDrawerEnabled ? renderInspector() : null}
-            <details className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-canvas-validation-panel">
-              <summary className="ui-text-small">Canvas validation feedback</summary>
-              <div className="ui-row ui-row--wrap">
-                {workflowCanvasPaletteSections.map((section) => {
-                  const count = validationIssueSummaryBySection.get(section.id) ?? 0;
-                  if (count === 0) {
-                    return null;
-                  }
-                  return (
-                    <span key={`canvas-issue-summary-${section.id}`} className="ui-badge ui-badge--neutral">
-                      {section.title}: {count}
-                    </span>
-                  );
-                })}
-              </div>
-              {draftValidationIssues.length > topDraftValidationIssues.length ? (
-                <p className="ui-text-small ui-text-secondary">
-                  Showing first {topDraftValidationIssues.length} issues.
-                </p>
-              ) : null}
-            </details>
-            <details className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-graph-details">
-              <summary className="ui-text-small">Canvas graph projection</summary>
-              <p className="ui-text-small ui-text-secondary">
-                Graph nodes: {viewModel.graph.nodes.length} | Graph edges: {viewModel.graph.edges.length}
-              </p>
-            </details>
-            <details className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-json-details">
-              <summary className="ui-text-small">Canonical workflow draft JSON</summary>
-              <textarea
-                className="ui-textarea"
-                rows={8}
-                value={draftEditorContent}
-                onChange={(event) => onChangeDraftEditorContent(event.target.value)}
-              />
-            </details>
-          </div>
-        )}
+        definition={workflowCanvasExperienceDefinition}
+        definitionContext={canvasExperienceContext}
         leftDrawer={Object.freeze({
           label: drawerState?.left?.label ?? "Nodes",
           isEnabled: leftDrawerEnabled,
