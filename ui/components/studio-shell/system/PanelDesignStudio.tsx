@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import StudioAssetLibraryPanel from "../studio-assets/StudioAssetLibraryPanel";
 import {
-  createDefaultPanelCompositionRoot,
   defaultPanelSlotId,
-  resolvePanelContainerConfig,
   type PanelAssetCompositionContent,
   type PanelContainerConfig,
   type PanelAssetContract,
 } from "../../../studio-shell/experience-assets/PanelAssetContracts";
+import {
+  PanelCompositionStatusKinds,
+  resolvePanelCompositionState,
+} from "../../../studio-shell/experience-assets/PanelAssetCompositionState";
 import type { StudioAssetCompositionNode } from "../../../studio-shell/studio-assets/StudioAssetComposition";
 import { createDefaultStudioAssetRegistry, StudioAssetRegistrationCategories } from "../../../studio-shell/studio-assets/StudioAssetRegistry";
 import { insertStudioAssetIntoCompositionTree, resolveDefaultInsertionTarget } from "../../../studio-shell/studio-assets/StudioAssetInsertion";
@@ -22,9 +24,7 @@ interface CompositionNodeSummary {
 }
 
 interface InsertionContext {
-  readonly targetNodeId: string;
   readonly targetAssetTitle: string;
-  readonly slotId: string;
   readonly slotLabel: string;
 }
 
@@ -57,36 +57,6 @@ export interface PanelDesignStudioProps {
   readonly onChangePanel: (next: PanelAssetContract) => void;
 }
 
-function parsePanelComposition(input: {
-  readonly panel: PanelAssetContract;
-  readonly registry: ReturnType<typeof createDefaultStudioAssetRegistry>;
-}): StudioAssetCompositionNode {
-  const content = input.panel.content;
-  if (content?.kind === "asset-composition") {
-    try {
-      const parsed = input.registry.deserializeCompositionTree({
-        serialized: content.serializedDocument,
-        validate: true,
-      });
-      const containerConfig = resolvePanelContainerConfig({
-        panel: input.panel,
-        config: parsed.root.config,
-      });
-      return Object.freeze({
-        ...parsed.root,
-        config: Object.freeze({
-          ...(parsed.root.config ?? {}),
-          layout: containerConfig.layout,
-          header: containerConfig.header,
-        }),
-      });
-    } catch {
-      return createDefaultPanelCompositionRoot(input.panel);
-    }
-  }
-  return createDefaultPanelCompositionRoot(input.panel);
-}
-
 function toPanelCompositionContent(input: {
   readonly root: StudioAssetCompositionNode;
   readonly registry: ReturnType<typeof createDefaultStudioAssetRegistry>;
@@ -99,9 +69,10 @@ function toPanelCompositionContent(input: {
 
 export default function PanelDesignStudio({ panel, onChangePanel }: PanelDesignStudioProps): JSX.Element {
   const registry = useMemo(() => createDefaultStudioAssetRegistry(), []);
-  const compositionRoot = useMemo(() => parsePanelComposition({ panel, registry }), [panel, registry]);
+  const parsedCompositionState = useMemo(() => resolvePanelCompositionState({ panel, registry }), [panel, registry]);
+  const [compositionRoot, setCompositionRoot] = useState<StudioAssetCompositionNode>(parsedCompositionState.root);
   const [selection, setSelection] = useState<StudioAssetSelectionState>(
-    createStudioAssetSelectionState({ root: compositionRoot, nodeId: compositionRoot.nodeId }),
+    createStudioAssetSelectionState({ root: parsedCompositionState.root, nodeId: parsedCompositionState.root.nodeId }),
   );
   const [statusMessage, setStatusMessage] = useState<string | undefined>();
   const boundSelection = useMemo(() => bindStudioAssetSelection({ root: compositionRoot, selection }), [compositionRoot, selection]);
@@ -125,9 +96,7 @@ export default function PanelDesignStudio({ panel, onChangePanel }: PanelDesignS
     const targetNode = collectCompositionNodeSummaries({ root: compositionRoot, registry })
       .find((entry) => entry.nodeId === insertionTarget.parentNodeId);
     return Object.freeze({
-      targetNodeId: insertionTarget.parentNodeId,
       targetAssetTitle: targetNode?.title ?? insertionTarget.parentNodeId,
-      slotId: insertionTarget.placementId,
       slotLabel: insertionTarget.placementId === defaultPanelSlotId ? "Panel content" : insertionTarget.placementId,
     });
   }, [compositionRoot, insertionTarget, registry]);
@@ -156,10 +125,7 @@ export default function PanelDesignStudio({ panel, onChangePanel }: PanelDesignS
     () => collectCompositionNodeSummaries({ root: compositionRoot, registry }),
     [compositionRoot, registry],
   );
-  const panelContainerConfig = useMemo<PanelContainerConfig>(() => resolvePanelContainerConfig({
-    panel,
-    config: compositionRoot.config,
-  }), [panel, compositionRoot.config]);
+  const panelContainerConfig = useMemo<PanelContainerConfig>(() => parsedCompositionState.panelContainerConfig, [parsedCompositionState.panelContainerConfig]);
 
   useEffect(() => {
     const selectedNodeId = selection.selectedNodeId?.trim();
@@ -173,7 +139,13 @@ export default function PanelDesignStudio({ panel, onChangePanel }: PanelDesignS
     }
   }, [compositionRoot, nodeSummaries, selection.selectedNodeId]);
 
+
+  useEffect(() => {
+    setCompositionRoot(parsedCompositionState.root);
+  }, [parsedCompositionState.root]);
+
   const replaceCompositionRoot = (nextRoot: StudioAssetCompositionNode): void => {
+    setCompositionRoot(nextRoot);
     onChangePanel(Object.freeze({
       ...panel,
       contentSlots: panel.contentSlots.length > 0 ? panel.contentSlots : Object.freeze([{ slotId: defaultPanelSlotId, label: "Panel content" }]),
@@ -223,6 +195,20 @@ export default function PanelDesignStudio({ panel, onChangePanel }: PanelDesignS
           </p>
         ) : null}
       </section>
+      {parsedCompositionState.notice ? (
+        <section className="ui-panel ui-empty-state" data-testid={`panel-design-studio-notice-${parsedCompositionState.notice.kind}`}>
+          <strong className="ui-text-small">{parsedCompositionState.notice.title}</strong>
+          <p className="ui-text-small ui-text-secondary">{parsedCompositionState.notice.description}</p>
+          {parsedCompositionState.validationIssues.length > 0 ? (
+            <ul className="ui-text-small ui-text-secondary" style={{ margin: 0, paddingInlineStart: "1rem" }}>
+              {parsedCompositionState.validationIssues.slice(0, 3).map((issue) => (
+                <li key={`${issue.path}:${issue.code}`}>{issue.message}</li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
+
       <section className="ui-panel ui-stack ui-stack--2xs" data-testid="panel-design-studio-layout-header-summary">
         <strong className="ui-text-small">Section behavior</strong>
         <p className="ui-text-small ui-text-secondary">
@@ -265,7 +251,9 @@ export default function PanelDesignStudio({ panel, onChangePanel }: PanelDesignS
         entryFilter={(entry: StudioAssetLibraryEntry) => insertionTarget ? compatibleEntryIds.has(entry.id) : false}
         emptyStateMessage={insertionTarget
           ? "No compatible assets match your current filters for this spot."
-          : "Select a container item to browse assets you can add here."}
+          : parsedCompositionState.notice?.kind === PanelCompositionStatusKinds.invalidConfiguration
+            ? "Fix section issues above, then select a container item to add content."
+            : "Select a container item to browse assets you can add here."}
         onReplaceCompositionRoot={(nextRoot) => {
           replaceCompositionRoot(nextRoot);
           setStatusMessage("Section design updated.");

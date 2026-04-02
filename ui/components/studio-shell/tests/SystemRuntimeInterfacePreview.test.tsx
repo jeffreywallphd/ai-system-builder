@@ -26,6 +26,10 @@ describe("SystemRuntimeInterfacePreview", () => {
                       description: "Intro content",
                       layoutBounds: { x: 0.1, y: 0.1, width: 0.5, height: 0.4 },
                       contentSlots: [],
+                      content: {
+                        kind: "asset-composition",
+                        serializedDocument: '{"schemaVersion":"1.1.0","root":{"nodeId":"hero","assetId":"ui-composed:panel","assetVersion":"1.0.0","slots":[{"placementId":"panel-content","children":[]}]}}',
+                      },
                     },
                   ],
                 },
@@ -119,4 +123,36 @@ describe("SystemRuntimeInterfacePreview", () => {
     expect(html).toContain("Embedded panel studio");
     expect(html).toContain("data-testid=\"studio-asset-host-boundary\"");
   });
+
+  it("shows recoverable guidance for invalid panel composition references", () => {
+    const html = renderToStaticMarkup(
+      <SystemRuntimeInterfacePreview
+        content={JSON.stringify({
+          systemSpec: {
+            pages: [{ pageId: "page-1", heading: "Home" }],
+            canvasAuthoring: {
+              pageLayouts: [{
+                pageId: "page-1",
+                panels: [{
+                  panelId: "alerts",
+                  pageId: "page-1",
+                  title: "Alerts",
+                  layoutBounds: { x: 0.1, y: 0.1, width: 0.5, height: 0.4 },
+                  contentSlots: [],
+                  content: {
+                    kind: "asset-composition",
+                    serializedDocument: "{\"schemaVersion\":\"1.1.0\",\"root\":{\"nodeId\":\"alerts\",\"assetId\":\"ui-composed:panel\",\"assetVersion\":\"1.0.0\",\"slots\":[{\"placementId\":\"panel-content\",\"children\":[{\"nodeId\":\"missing\",\"assetId\":\"ui-primitive:button\",\"assetVersion\":\"9.9.9\"}]}]}}",
+                  },
+                }],
+              }],
+            },
+          },
+        })}
+      />,
+    );
+
+    expect(html).toContain("This section needs a quick fix");
+    expect(html).toContain('data-testid="system-runtime-interface-panel-notice-alerts-invalid-configuration"');
+  });
+
 });

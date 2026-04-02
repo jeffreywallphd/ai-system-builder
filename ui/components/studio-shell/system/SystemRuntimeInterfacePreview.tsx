@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { mapPanelAssetToRuntimeInstance } from "../../../studio-shell/experience-assets/PanelAssetContracts";
+import { resolvePanelCompositionState } from "../../../studio-shell/experience-assets/PanelAssetCompositionState";
+import { createDefaultStudioAssetRegistry } from "../../../studio-shell/studio-assets/StudioAssetRegistry";
 import { parseSystemStudioDraftDocument } from "../../../studio-shell/system/SystemStudioDraftDocument";
 import type { StudioShellExtensionContext } from "../../../studio-shell/StudioShellExtensions";
 import type { StudioAssetDefinition } from "../../../studio-shell/studio-assets/StudioAssetContracts";
@@ -55,6 +57,7 @@ export default function SystemRuntimeInterfacePreview({
   studioAssetHosts,
 }: SystemRuntimeInterfacePreviewProps): JSX.Element {
   const { pages, defaultLandingPageId } = useMemo(() => resolveRuntimePages(content), [content]);
+  const assetRegistry = useMemo(() => createDefaultStudioAssetRegistry(), []);
   const [selectedPageId, setSelectedPageId] = useState<string>(defaultLandingPageId ?? pages[0]?.pageId ?? "page-1");
   const activePage = pages.find((page) => page.pageId === selectedPageId) ?? pages[0];
 
@@ -129,7 +132,27 @@ export default function SystemRuntimeInterfacePreview({
                         operationError: extensionContext.operationError,
                       })}
                     />
-                  ) : (
+                  ) : panel.content?.kind === "asset-composition" ? (() => {
+                    const compositionState = resolvePanelCompositionState({
+                      panel,
+                      registry: assetRegistry,
+                    });
+                    if (compositionState.notice) {
+                      return (
+                        <div className="ui-empty-state" data-testid={`system-runtime-interface-panel-notice-${panel.panelId}-${compositionState.notice.kind}`}>
+                          <strong className="ui-text-small">{compositionState.notice.title}</strong>
+                          <p className="ui-text-small ui-text-secondary">{compositionState.notice.description}</p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <span className="ui-text-small ui-text-secondary" data-testid={`system-runtime-interface-panel-summary-${panel.panelId}`}>
+                        {compositionState.childCount === 1
+                          ? "1 content item is connected."
+                          : `${compositionState.childCount} content items are connected.`}
+                      </span>
+                    );
+                  })() : (
                     <span className="ui-text-small ui-text-secondary">
                       {panel.description ?? "No content has been connected yet."}
                     </span>

@@ -1067,3 +1067,20 @@
 - Panel configuration is normalized through shared panel asset helpers (`resolvePanelContainerConfig`) and remains persisted in the composition root config (`asset-composition` content), so serialization/deserialization stays on existing registry-backed seams.
 - Default panel composition roots now seed both layout and header config, and legacy/partial configs degrade safely back to supported defaults instead of throwing.
 - Embedded Panel Design Studio now surfaces a user-friendly section behavior summary while keeping editing in the shared inspector/property-schema model.
+
+## Direction 5 UI extension update: panel empty states + persisted panel composition architecture (stories 2.2.9-2.2.10)
+
+- Panel composition state is now resolved through one shared helper (`resolvePanelCompositionState` in `ui/studio-shell/experience-assets/PanelAssetCompositionState.ts`) so embedded panel authoring and runtime preview use the same status model for:
+  - empty/new panels with no child assets,
+  - configured layout/header panels with no content yet,
+  - invalid/incomplete composition payloads,
+  - unresolved child asset references.
+- Embedded Panel Design Studio now renders reusable non-technical guidance notices for those states and keeps the same shared Asset Library + Asset Inspector flows for recovery/action, instead of panel-local one-off fallback copy.
+- Panel Design Studio now keeps the active composition root in local authoring state and syncs from persisted draft content updates, so repeated inspector/library edits apply against the latest panel composition while still writing through the existing system draft persistence seam (`setDraftContent` -> `systemSpec.canvasAuthoring.pageLayouts`).
+- Runtime interface preview now surfaces panel-composition status (empty/unresolved/invalid) using the same shared resolver for `asset-composition` panel content, so page-level preview does not silently show blank sections when panel content is missing or broken.
+- Responsibility boundaries in this slice remain explicit:
+  - **System Studio canvas** owns page structure, panel placement, and selecting which panel to edit.
+  - **Embedded Panel Design Studio** owns panel-internal composition (slots, child assets, panel config).
+  - **Asset Library + Asset Inspector** inside panel design own child insertion, replacement, and schema-driven config edits.
+  - **System draft serialization/deserialization** remains the persistence backbone for panel identity/layout/content metadata (`SystemStudioDraftDocument` + existing registry-backed composition serialization).
+
