@@ -13,6 +13,7 @@ import {
   StudioAssetRegistrationCategories,
   StudioAssetRendererResolutionKinds,
 } from "../StudioAssetRegistry";
+import { StudioAssetCompositionValidationIssueCodes } from "../StudioAssetComposition";
 
 describe("StudioUiAssetContracts", () => {
   it("defines atomic UI primitive contracts with leaf-only constraints", () => {
@@ -108,5 +109,81 @@ describe("StudioUiAssetContracts", () => {
     const systemCategoryRenderers = registry.resolveRenderersByCategory(StudioAssetRegistrationCategories.systemPage);
     expect(systemCategoryRenderers.map((entry) => entry.assetId)).toEqual(["system-studio"]);
     expect(systemCategoryRenderers[0]?.kind).toBe(StudioAssetRendererResolutionKinds.resolved);
+  });
+
+  it("validates slot and region compatibility with cardinality and nesting rules", () => {
+    const registry = createDefaultStudioAssetRegistry();
+    const invalid = registry.validateCompositionTree({
+      nodeId: "root-workflow",
+      assetId: "workflow-studio",
+      slots: [
+        {
+          placementId: "main",
+          children: [
+            {
+              nodeId: "system-child",
+              assetId: "system-studio",
+            },
+            {
+              nodeId: "viewer-child",
+              assetId: "ui-primitive:viewer",
+              slots: [
+                {
+                  placementId: "invalid-slot",
+                  children: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(invalid.valid).toBeFalse();
+    expect(invalid.issues.some((issue) => issue.code === StudioAssetCompositionValidationIssueCodes.slotCardinalityExceeded)).toBeTrue();
+    expect(invalid.issues.some((issue) => issue.code === StudioAssetCompositionValidationIssueCodes.childKindNotAllowed)).toBeTrue();
+    expect(invalid.issues.some((issue) => issue.code === StudioAssetCompositionValidationIssueCodes.invalidNesting)).toBeTrue();
+    expect(invalid.issues.some((issue) => issue.code === StudioAssetCompositionValidationIssueCodes.atomicCannotContainChildren)).toBeTrue();
+  });
+
+  it("serializes and deserializes composed and system-page trees through registry-backed lookup", () => {
+    const registry = createDefaultStudioAssetRegistry();
+    const composition = {
+      nodeId: "system-root",
+      assetId: "system-studio",
+      config: {
+        mode: "embedded",
+      },
+      metadataReferences: {
+        draftId: "draft-1",
+        regionId: "workspace",
+      },
+      regions: [
+        {
+          placementId: "navigation",
+          children: [{ nodeId: "nav-viewer", assetId: "ui-primitive:viewer" }],
+        },
+        {
+          placementId: "workspace",
+          children: [{
+            nodeId: "workflow-child",
+            assetId: "workflow-studio",
+            slots: [{ placementId: "main", children: [{ nodeId: "workflow-main-viewer", assetId: "ui-primitive:viewer" }] }],
+          }],
+        },
+        {
+          placementId: "inspector",
+          children: [{ nodeId: "inspector-toggle", assetId: "ui-primitive:toggle" }],
+        },
+      ],
+    } as const;
+
+    const serialized = registry.serializeCompositionTree(composition);
+    const parsed = registry.deserializeCompositionTree({ serialized });
+
+    expect(parsed.validation.valid).toBeTrue();
+    expect(parsed.root.assetId).toBe("system-studio");
+    expect(parsed.root.regions?.map((entry) => entry.placementId)).toEqual(["navigation", "workspace", "inspector"]);
+    expect(parsed.root.regions?.[1]?.children[0]?.assetId).toBe("workflow-studio");
   });
 });

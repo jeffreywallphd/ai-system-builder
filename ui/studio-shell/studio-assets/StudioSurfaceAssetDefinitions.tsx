@@ -55,30 +55,37 @@ const defaultComposedUiSlot = Object.freeze({
   required: true,
   allowsMultiple: false,
   allowedChildKinds: Object.freeze([StudioUiAssetKinds.atomic, StudioUiAssetKinds.composed]),
+  allowedRegistrationCategories: Object.freeze(["atomic-ui", "composed-ui"] as const),
 });
 
 const defaultSystemPageRegions = Object.freeze([
   Object.freeze({
     regionId: "navigation",
     label: "Navigation rail",
+    required: true,
     allowsMultiple: false,
     allowedChildKinds: Object.freeze([StudioUiAssetKinds.atomic, StudioUiAssetKinds.composed]),
+    allowedRegistrationCategories: Object.freeze(["atomic-ui", "composed-ui"] as const),
   }),
   Object.freeze({
     regionId: "workspace",
     label: "Primary workspace",
+    required: true,
     allowsMultiple: false,
     allowedChildKinds: Object.freeze([
       StudioUiAssetKinds.atomic,
       StudioUiAssetKinds.composed,
       StudioUiAssetKinds.systemPage,
     ]),
+    allowedRegistrationCategories: Object.freeze(["atomic-ui", "composed-ui", "system-page"] as const),
   }),
   Object.freeze({
     regionId: "inspector",
     label: "Inspector panel",
+    required: true,
     allowsMultiple: false,
     allowedChildKinds: Object.freeze([StudioUiAssetKinds.atomic, StudioUiAssetKinds.composed]),
+    allowedRegistrationCategories: Object.freeze(["atomic-ui", "composed-ui"] as const),
   }),
 ]);
 
