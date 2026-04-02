@@ -1188,3 +1188,20 @@ Not implemented in this slice:
   - source/target field references (when provided) must resolve on the referenced entities.
 - Serialization/deserialization compatibility is preserved by accepting legacy relationship `kind` values and normalizing them into the new `type` property at the boundary.
 - This remains a structural foundation slice: it strengthens schema-authoring contracts for future studio/pipeline integration without introducing schema-editing UI workflows or runtime database semantics.
+
+## Direction 5 extension update: schema persistence/validation completion slice (stories 3.1.9-3.1.10)
+
+- Schema domain now includes a reusable validation seam (`validateSchemaAssetDocument`) that follows existing issue-list validation patterns and returns deterministic structural diagnostics without mutating persisted content.
+- Validation currently covers bounded structural integrity checks:
+  - duplicate entity/table names,
+  - duplicate field names within an entity/table,
+  - missing relationship entity references,
+  - missing relationship field references,
+  - incomplete field definitions and obviously incomplete relationship bindings.
+- Schema document parsing now supports a safe-edit compatibility seam (`deserializeSchemaAssetDocumentForEditing`) for malformed/legacy payloads:
+  - strict parsing is still available for canonical persistence paths,
+  - safe-edit parse normalizes recoverable sections and returns explicit warning issues when payloads are incomplete.
+- Persistence remains aligned with existing taxonomy/registration/versioning patterns:
+  - schema assets remain first-class atomic `schema` role assets,
+  - schema documents remain versioned (`schemaVersion=1.0.0`) and serialize through canonical domain helpers,
+  - Schema Studio edits continue to flow through the existing studio draft content infrastructure.

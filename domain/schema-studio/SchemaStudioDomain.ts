@@ -125,6 +125,39 @@ export type SchemaEntityDefinition = z.infer<typeof SchemaEntityDefinitionSchema
 export type SchemaRelationshipDefinition = Omit<z.infer<typeof SchemaRelationshipDefinitionSchema>, "kind">;
 export type SchemaAssetDefinition = z.infer<typeof SchemaAssetDefinitionSchema>;
 export type SchemaAssetDocument = z.infer<typeof SchemaAssetDocumentSchema>;
+export const SchemaValidationSeverityKinds = Object.freeze({
+  error: "error",
+  warning: "warning",
+} as const);
+export type SchemaValidationSeverityKind = typeof SchemaValidationSeverityKinds[keyof typeof SchemaValidationSeverityKinds];
+export const SchemaValidationIssueCodes = Object.freeze({
+  schemaMalformed: "schema-malformed",
+  duplicateEntityName: "duplicate-entity-name",
+  duplicateFieldName: "duplicate-field-name",
+  relationshipEntityMissing: "relationship-entity-missing",
+  relationshipFieldMissing: "relationship-field-missing",
+  relationshipSelfReferenceMissingField: "relationship-self-reference-missing-field",
+  relationshipMissingBinding: "relationship-missing-binding",
+  invalidFieldDefinition: "invalid-field-definition",
+} as const);
+export type SchemaValidationIssueCode = typeof SchemaValidationIssueCodes[keyof typeof SchemaValidationIssueCodes];
+
+export interface SchemaValidationIssue {
+  readonly code: SchemaValidationIssueCode;
+  readonly message: string;
+  readonly severity: SchemaValidationSeverityKind;
+  readonly path?: string;
+}
+
+export interface SchemaValidationResult {
+  readonly valid: boolean;
+  readonly issues: ReadonlyArray<SchemaValidationIssue>;
+}
+
+export interface SchemaDocumentParseResult {
+  readonly document: SchemaAssetDocument;
+  readonly issues: ReadonlyArray<SchemaValidationIssue>;
+}
 
 export function createEmptySchemaAssetDocument(): SchemaAssetDocument {
   return Object.freeze({
@@ -750,4 +783,151 @@ export function serializeSchemaAssetDocument(document: SchemaAssetDocument): str
 export function deserializeSchemaAssetDocument(content: string): SchemaAssetDocument {
   const raw = JSON.parse(content) as unknown;
   return createSchemaAssetDocument(raw as SchemaAssetDocument);
+}
+
+export function deserializeSchemaAssetDocumentForEditing(content: string): SchemaDocumentParseResult {
+  try {
+    const strict = deserializeSchemaAssetDocument(content);
+    return Object.freeze({
+      document: strict,
+      issues: validateSchemaAssetDocument(strict).issues,
+    });
+  } catch {
+    try {
+      const raw = JSON.parse(content) as Record<string, unknown>;
+      const definition = (raw?.definition && typeof raw.definition === "object" ? raw.definition : {}) as Record<string, unknown>;
+      const fallback = createSchemaAssetDocument({
+        schemaVersion: typeof raw?.schemaVersion === "string" ? raw.schemaVersion : SchemaAssetDocumentVersion,
+        definition: {
+          dialect: typeof definition.dialect === "string" ? definition.dialect : undefined,
+          entities: Array.isArray(definition.entities) ? definition.entities as SchemaEntityDefinition[] : [],
+          relationships: Array.isArray(definition.relationships) ? definition.relationships as SchemaRelationshipDefinition[] : [],
+          metadata: (definition.metadata && typeof definition.metadata === "object")
+            ? definition.metadata as Record<string, unknown>
+            : undefined,
+        },
+      });
+      return Object.freeze({
+        document: fallback,
+        issues: Object.freeze([
+          {
+            code: SchemaValidationIssueCodes.schemaMalformed,
+            severity: SchemaValidationSeverityKinds.warning,
+            message: "Some saved schema details were incomplete and were normalized while loading.",
+          },
+          ...validateSchemaAssetDocument(fallback).issues,
+        ]),
+      });
+    } catch {
+      return Object.freeze({
+        document: createEmptySchemaAssetDocument(),
+        issues: Object.freeze([{
+          code: SchemaValidationIssueCodes.schemaMalformed,
+          severity: SchemaValidationSeverityKinds.error,
+          message: "Schema draft content is invalid JSON.",
+          path: "$",
+        }]),
+      });
+    }
+  }
+}
+
+export function validateSchemaAssetDocument(document: SchemaAssetDocument): SchemaValidationResult {
+  const issues: SchemaValidationIssue[] = [];
+  const entityNameToCount = new Map<string, number>();
+  const entityById = new Map(document.definition.entities.map((entity) => [entity.entityId, entity]));
+
+  for (const entity of document.definition.entities) {
+    const normalizedEntityName = entity.name.trim().toLowerCase();
+    entityNameToCount.set(normalizedEntityName, (entityNameToCount.get(normalizedEntityName) ?? 0) + 1);
+
+    const fieldNameToCount = new Map<string, number>();
+    for (const field of entity.fields) {
+      const normalizedFieldName = field.name.trim().toLowerCase();
+      fieldNameToCount.set(normalizedFieldName, (fieldNameToCount.get(normalizedFieldName) ?? 0) + 1);
+      if (!field.name.trim() || !field.type.trim()) {
+        issues.push({
+          code: SchemaValidationIssueCodes.invalidFieldDefinition,
+          severity: SchemaValidationSeverityKinds.error,
+          message: `Table '${entity.name}' contains an incomplete field definition.`,
+          path: `definition.entities.${entity.entityId}.fields.${field.fieldId}`,
+        });
+      }
+    }
+    for (const [name, count] of fieldNameToCount.entries()) {
+      if (count > 1) {
+        issues.push({
+          code: SchemaValidationIssueCodes.duplicateFieldName,
+          severity: SchemaValidationSeverityKinds.error,
+          message: `Table '${entity.name}' contains duplicate field name '${name}'.`,
+          path: `definition.entities.${entity.entityId}.fields`,
+        });
+      }
+    }
+  }
+
+  for (const [name, count] of entityNameToCount.entries()) {
+    if (count > 1) {
+      issues.push({
+        code: SchemaValidationIssueCodes.duplicateEntityName,
+        severity: SchemaValidationSeverityKinds.error,
+        message: `Schema contains duplicate table name '${name}'.`,
+        path: "definition.entities",
+      });
+    }
+  }
+
+  for (const relationship of document.definition.relationships) {
+    const source = entityById.get(relationship.sourceEntityId);
+    const target = entityById.get(relationship.targetEntityId);
+    if (!source || !target) {
+      issues.push({
+        code: SchemaValidationIssueCodes.relationshipEntityMissing,
+        severity: SchemaValidationSeverityKinds.error,
+        message: `Relationship '${relationship.relationshipId}' references a table that does not exist.`,
+        path: `definition.relationships.${relationship.relationshipId}`,
+      });
+      continue;
+    }
+    if (relationship.sourceFieldId && !source.fields.some((field) => field.fieldId === relationship.sourceFieldId)) {
+      issues.push({
+        code: SchemaValidationIssueCodes.relationshipFieldMissing,
+        severity: SchemaValidationSeverityKinds.error,
+        message: `Relationship '${relationship.relationshipId}' references a source field that does not exist.`,
+        path: `definition.relationships.${relationship.relationshipId}.sourceFieldId`,
+      });
+    }
+    if (relationship.targetFieldId && !target.fields.some((field) => field.fieldId === relationship.targetFieldId)) {
+      issues.push({
+        code: SchemaValidationIssueCodes.relationshipFieldMissing,
+        severity: SchemaValidationSeverityKinds.error,
+        message: `Relationship '${relationship.relationshipId}' references a target field that does not exist.`,
+        path: `definition.relationships.${relationship.relationshipId}.targetFieldId`,
+      });
+    }
+    if (!relationship.sourceFieldId && !relationship.targetFieldId) {
+      issues.push({
+        code: SchemaValidationIssueCodes.relationshipMissingBinding,
+        severity: SchemaValidationSeverityKinds.warning,
+        message: `Relationship '${relationship.relationshipId}' is not bound to any fields yet.`,
+        path: `definition.relationships.${relationship.relationshipId}`,
+      });
+    }
+    if (
+      relationship.sourceEntityId === relationship.targetEntityId
+      && (!relationship.sourceFieldId || !relationship.targetFieldId)
+    ) {
+      issues.push({
+        code: SchemaValidationIssueCodes.relationshipSelfReferenceMissingField,
+        severity: SchemaValidationSeverityKinds.warning,
+        message: `Self-relationship '${relationship.relationshipId}' should bind both source and target fields.`,
+        path: `definition.relationships.${relationship.relationshipId}`,
+      });
+    }
+  }
+
+  return Object.freeze({
+    valid: !issues.some((issue) => issue.severity === SchemaValidationSeverityKinds.error),
+    issues: Object.freeze(issues),
+  });
 }

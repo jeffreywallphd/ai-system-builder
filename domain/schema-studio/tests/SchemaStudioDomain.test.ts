@@ -13,10 +13,13 @@ import {
   removeSchemaFieldFromEntityInDocument,
   SchemaFieldTypeKinds,
   SchemaRelationshipCardinalityKinds,
+  SchemaValidationIssueCodes,
   serializeSchemaAssetDocument,
   SchemaStudioIdentity,
   updateSchemaEntityInDocument,
   updateSchemaFieldInEntityInDocument,
+  validateSchemaAssetDocument,
+  deserializeSchemaAssetDocumentForEditing,
 } from "../SchemaStudioDomain";
 
 describe("SchemaStudioDomain", () => {
@@ -289,5 +292,42 @@ describe("SchemaStudioDomain", () => {
       targetFieldId: "field:customer-id",
       cardinality: SchemaRelationshipCardinalityKinds.oneToMany,
     })).toThrow("already exists");
+  });
+
+  it("returns schema validation issues for duplicate names and invalid relationships", () => {
+    const validation = validateSchemaAssetDocument({
+      schemaVersion: "1.0.0",
+      definition: {
+        entities: [
+          {
+            entityId: "entity:customer",
+            name: "Customer",
+            fields: [{ fieldId: "field:id", name: "id", type: "uuid" }],
+          },
+          {
+            entityId: "entity:customer-copy",
+            name: "Customer",
+            fields: [{ fieldId: "field:id-2", name: "id", type: "uuid" }],
+          },
+        ],
+        relationships: [{
+          relationshipId: "relationship:bad",
+          sourceEntityId: "entity:customer",
+          sourceFieldId: "field:missing",
+          targetEntityId: "entity:missing",
+        }],
+      },
+    });
+
+    expect(validation.valid).toBeFalse();
+    expect(validation.issues.some((issue) => issue.code === SchemaValidationIssueCodes.duplicateEntityName)).toBeTrue();
+    expect(validation.issues.some((issue) => issue.code === SchemaValidationIssueCodes.relationshipEntityMissing)).toBeTrue();
+  });
+
+  it("supports safe editing parse flow for malformed schema content", () => {
+    const parsed = deserializeSchemaAssetDocumentForEditing("{bad");
+
+    expect(parsed.document.definition.entities).toHaveLength(0);
+    expect(parsed.issues.some((issue) => issue.code === SchemaValidationIssueCodes.schemaMalformed)).toBeTrue();
   });
 });

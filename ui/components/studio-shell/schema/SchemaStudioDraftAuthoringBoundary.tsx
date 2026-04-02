@@ -4,10 +4,13 @@ import {
   addSchemaFieldToEntityInDocument,
   addSchemaRelationshipToDocument,
   createEmptySchemaAssetDocument,
-  deserializeSchemaAssetDocument,
+  deserializeSchemaAssetDocumentForEditing,
+  SchemaValidationIssueCodes,
+  SchemaValidationSeverityKinds,
   SchemaFieldTypeKinds,
   SchemaRelationshipCardinalityKinds,
   serializeSchemaAssetDocument,
+  validateSchemaAssetDocument,
   updateSchemaEntityInDocument,
   updateSchemaFieldInEntityInDocument,
   removeSchemaFieldFromEntityInDocument,
@@ -30,7 +33,7 @@ interface SchemaStudioDraftAuthoringBoundaryProps {
 
 interface ParsedSchemaDocument {
   readonly document: SchemaAssetDocument;
-  readonly parseError?: string;
+  readonly hasMalformedContent: boolean;
 }
 
 const schemaFieldTypeOptions = Object.freeze(Object.values(SchemaFieldTypeKinds));
@@ -38,17 +41,14 @@ const schemaRelationshipCardinalityOptions = Object.freeze(Object.values(SchemaR
 
 function parseSchemaDocument(content: string): ParsedSchemaDocument {
   if (!content.trim()) {
-    return Object.freeze({ document: createEmptySchemaAssetDocument() });
+    return Object.freeze({ document: createEmptySchemaAssetDocument(), hasMalformedContent: false });
   }
 
-  try {
-    return Object.freeze({ document: deserializeSchemaAssetDocument(content) });
-  } catch (error) {
-    return Object.freeze({
-      document: createEmptySchemaAssetDocument(),
-      parseError: error instanceof Error ? error.message : "Schema draft is malformed.",
-    });
-  }
+  const parsed = deserializeSchemaAssetDocumentForEditing(content);
+  return Object.freeze({
+    document: parsed.document,
+    hasMalformedContent: parsed.issues.some((issue) => issue.code === SchemaValidationIssueCodes.schemaMalformed),
+  });
 }
 
 function createDefaultEntityName(entities: ReadonlyArray<SchemaEntityDefinition>): string {
@@ -118,6 +118,9 @@ export default function SchemaStudioDraftAuthoringBoundary({
     ?? parsed.document.definition.entities[0];
   const selectedField = selectedEntity?.fields.find((field) => field.fieldId === selectedFieldId)
     ?? selectedEntity?.fields[0];
+  const validation = useMemo(() => validateSchemaAssetDocument(parsed.document), [parsed.document]);
+  const blockingIssues = validation.issues.filter((issue) => issue.severity === SchemaValidationSeverityKinds.error);
+  const advisoryIssues = validation.issues.filter((issue) => issue.severity !== SchemaValidationSeverityKinds.error);
 
   const persistDocument = (nextDocument: SchemaAssetDocument): void => {
     onChangeContent(serializeSchemaAssetDocument(nextDocument));
@@ -278,9 +281,9 @@ export default function SchemaStudioDraftAuthoringBoundary({
         </button>
       </div>
 
-      {parsed.parseError ? (
+      {parsed.hasMalformedContent ? (
         <p className="ui-text-danger" data-testid="schema-studio-parse-error">
-          Schema draft content is invalid. Fix the JSON to continue editing.
+          Some saved schema content was incomplete. The editor loaded what it could and flagged issues below.
         </p>
       ) : null}
 
@@ -294,6 +297,29 @@ export default function SchemaStudioDraftAuthoringBoundary({
 
       {relationshipError ? (
         <p className="ui-text-danger" data-testid="schema-studio-relationship-error">{relationshipError}</p>
+      ) : null}
+
+      {validation.issues.length > 0 ? (
+        <section className="ui-card ui-card--padded" data-testid="schema-studio-validation-summary">
+          <div className="ui-stack ui-stack--3xs">
+            <strong>Schema check results</strong>
+            {blockingIssues.length > 0 ? (
+              <p className="ui-text-danger">
+                {blockingIssues.length} blocking issue(s) found.
+              </p>
+            ) : (
+              <p className="ui-text-muted">No blocking issues found.</p>
+            )}
+            {blockingIssues.map((issue) => (
+              <p key={`${issue.code}:${issue.path ?? issue.message}`} className="ui-text-danger">{issue.message}</p>
+            ))}
+            {advisoryIssues.map((issue) => (
+              <p key={`${issue.code}:${issue.path ?? issue.message}`} className="ui-text-small ui-text-muted">
+                {issue.message}
+              </p>
+            ))}
+          </div>
+        </section>
       ) : null}
 
       <div className="ui-grid ui-grid--2col">

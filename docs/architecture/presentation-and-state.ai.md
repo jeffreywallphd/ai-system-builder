@@ -669,3 +669,17 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Field edits persist through canonical schema-domain helpers (`addSchemaFieldToEntityInDocument`, `updateSchemaFieldInEntityInDocument`, `removeSchemaFieldFromEntityInDocument`) and the same host-owned draft persistence/event infrastructure.
 - Removing a field clears dangling relationship field refs for relationships targeting that field, preserving document validity while keeping relationship records intact for follow-up edits.
 - Scope remains intentionally bounded to schema-structure authoring: pipelines/execution semantics remain outside Schema Studio and continue to be authored in their dedicated studios.
+
+## Direction 5 UI extension update: Schema Studio persistence hardening + validation feedback (stories 3.1.9-3.1.10)
+
+- Schema Studio editing remains bound to host-owned draft content (`content` + `onChangeContent`) and canonical schema serialization (`serializeSchemaAssetDocument`), so table/field/relationship edits are persisted in the real schema asset draft payload rather than UI-local transient copies.
+- Schema draft loading now uses a bounded safe-edit parse seam (`deserializeSchemaAssetDocumentForEditing`) to keep authoring available for malformed/legacy drafts by normalizing recoverable sections and surfacing warning state instead of hard-failing the editor.
+- Authoring now renders lightweight in-context schema validation feedback (`validateSchemaAssetDocument`) for create/edit/inspector flows:
+  - duplicate table names,
+  - duplicate field names within a table,
+  - missing table/field references in relationships,
+  - obviously incomplete relationship bindings.
+- Validation scope remains intentionally structural and persistence-aligned: no full database-rule engine, migration semantics, or pipeline/runtime execution checks.
+- Responsibility boundaries remain explicit:
+  - **Schema Studio** owns structural schema authoring (tables, fields, relationships, canvas-structure metadata).
+  - **Pipeline Studio/Data Studio** own transformation/execution authoring and runtime validation semantics.
