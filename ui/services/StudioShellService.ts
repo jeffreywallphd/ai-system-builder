@@ -56,6 +56,10 @@ import type {
   UpdateSystemExecutionMetadataRequest,
   UpdateSystemInterfacesRequest,
   UpdateSystemParametersRequest,
+  SaveSystemDefinitionRequest,
+  LoadSystemDefinitionRequest,
+  DuplicateSystemDefinitionRequest,
+  ModifySystemDefinitionRequest,
 } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import { resolveDesktopStudioShellBridge } from "../composition/DesktopStudioShellBridgeAdapter";
 import { resolveBrowserStudioShellBridgeFallback } from "../composition/BrowserStudioShellBridgeFallback";
@@ -215,6 +219,32 @@ export class StudioShellService {
   public async updateSystemExecutionMetadata(request: UpdateSystemExecutionMetadataRequest): Promise<SystemStudioApiResponse<{ readonly updated: boolean }>> {
     const raw = await this.requireBridge().updateSystemExecutionMetadata(JSON.stringify(request));
     return JSON.parse(raw) as SystemStudioApiResponse<{ readonly updated: boolean }>;
+  }
+
+  public async saveSystemDefinition(request: SaveSystemDefinitionRequest): Promise<SystemStudioApiResponse<{
+    readonly draft: StudioShellSnapshotReadModel["draft"];
+    readonly serialization: Readonly<Record<string, unknown>>;
+  }>> {
+    const raw = await this.requireBridge().saveSystemDefinition(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<{
+      readonly draft: StudioShellSnapshotReadModel["draft"];
+      readonly serialization: Readonly<Record<string, unknown>>;
+    }>;
+  }
+
+  public async loadSystemDefinition(request: LoadSystemDefinitionRequest): Promise<SystemStudioApiResponse<Readonly<Record<string, unknown>>>> {
+    const raw = await this.requireBridge().loadSystemDefinition(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<Readonly<Record<string, unknown>>>;
+  }
+
+  public async duplicateSystemDefinition(request: DuplicateSystemDefinitionRequest): Promise<SystemStudioApiResponse<Readonly<Record<string, unknown>>>> {
+    const raw = await this.requireBridge().duplicateSystemDefinition(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<Readonly<Record<string, unknown>>>;
+  }
+
+  public async modifySystemDefinition(request: ModifySystemDefinitionRequest): Promise<SystemStudioApiResponse<Readonly<Record<string, unknown>>>> {
+    const raw = await this.requireBridge().modifySystemDefinition(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<Readonly<Record<string, unknown>>>;
   }
 
   public async getSystemCompatibilityInsights(request: ListSystemChildComponentsRequest): Promise<SystemStudioApiResponse<SystemCompatibilityInsightsReadModel>> {

@@ -208,6 +208,34 @@ export interface DuplicateSystemDefinitionResult {
   readonly issues: ReadonlyArray<LoadSystemDefinitionIssue>;
 }
 
+export interface WorkflowBindingModification {
+  readonly bindingId: string;
+  readonly workflowAssetId: string;
+  readonly workflowVersionId?: string;
+  readonly componentAlias?: string;
+}
+
+export interface DatasetBindingModification {
+  readonly instanceId: string;
+  readonly datasetAssetId: string;
+  readonly datasetVersionId?: string;
+}
+
+export interface ModifySystemDefinitionCommand {
+  readonly studioId?: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+  readonly workflowBindings?: ReadonlyArray<WorkflowBindingModification>;
+  readonly datasetBindings?: ReadonlyArray<DatasetBindingModification>;
+  readonly runtimeStatePatch?: Readonly<Record<string, unknown>>;
+  readonly uiConfigurationPatch?: Readonly<Record<string, unknown>>;
+}
+
+export interface ModifySystemDefinitionResult {
+  readonly draft: AssetDraftResult["draft"];
+  readonly issues: ReadonlyArray<LoadSystemDefinitionIssue>;
+}
+
 function normalizeSystemExecutionMetadataInput(
   input?: SystemExecutionMetadata,
 ): SystemExecutionMetadata | undefined {
@@ -833,6 +861,7 @@ export class SystemStudioApplicationService {
       uiConfiguration: parsed.uiConfiguration,
       runtimeDatasetInstances: this.datasetInstancePersistence?.captureSystemDatasetInstances(loaded.draft.assetId).datasetInstances,
       runtimeWorkflowBindings: parsed.contract.runtime.workflowBindings,
+      runtimeState: parsed.contract.runtime.state,
     });
 
     const updated = await this.studioShellService.updateAssetDraft({
@@ -963,6 +992,7 @@ export class SystemStudioApplicationService {
       uiConfiguration: parsed.uiConfiguration,
       runtimeDatasetInstances: datasetInstanceDuplication.datasetInstances,
       runtimeWorkflowBindings: parsed.contract.runtime.workflowBindings,
+      runtimeState: parsed.contract.runtime.state,
     });
 
     const duplicated = await this.studioShellService.createAssetDraft({
@@ -997,6 +1027,168 @@ export class SystemStudioApplicationService {
       sourceDraftId: command.sourceDraftId,
       duplicateDraft: duplicated.draft,
       issues: Object.freeze([...referenceIssues, ...duplicationIssues, ...restoreIssues]),
+    });
+  }
+
+  public async modifySystemDefinition(command: ModifySystemDefinitionCommand): Promise<ModifySystemDefinitionResult> {
+    const studioId = command.studioId?.trim() || SystemStudioIdentity.defaultStudioId;
+    const loaded = await this.studioShellService.loadAssetDraft({ studioId, draftId: command.draftId });
+    if (!loaded) {
+      throw new StudioShellInvalidRequestError(`Draft '${command.draftId}' is not available in studio '${studioId}'.`);
+    }
+
+    const parsed = parseSystemSerializationDocument({
+      content: loaded.draft.content,
+      dependencies: loaded.draft.dependencies,
+    });
+    const workflowBindings = [...parsed.contract.runtime.workflowBindings];
+    const workflowBindingLookup = new Map(workflowBindings.map((entry) => [entry.bindingId, entry]));
+    for (const change of command.workflowBindings ?? []) {
+      const normalizedBindingId = change.bindingId.trim();
+      if (!normalizedBindingId) {
+        continue;
+      }
+      const next = Object.freeze({
+        bindingId: normalizedBindingId,
+        componentAlias: change.componentAlias?.trim() || workflowBindingLookup.get(normalizedBindingId)?.componentAlias,
+        workflowAssetId: change.workflowAssetId.trim(),
+        workflowVersionId: change.workflowVersionId?.trim() || undefined,
+        pinMode: "version" as const,
+      });
+      if (!next.workflowAssetId) {
+        throw new StudioShellInvalidRequestError(`Workflow binding '${normalizedBindingId}' requires workflowAssetId.`);
+      }
+      workflowBindingLookup.set(normalizedBindingId, next);
+    }
+    const nextWorkflowBindings = Object.freeze([...workflowBindingLookup.values()]);
+
+    const datasetInstances = [...parsed.contract.runtime.datasetInstances];
+    const datasetInstanceLookup = new Map(datasetInstances.map((entry) => [entry.instanceId, entry]));
+    for (const change of command.datasetBindings ?? []) {
+      const normalizedInstanceId = change.instanceId.trim();
+      if (!normalizedInstanceId) {
+        continue;
+      }
+      const existing = datasetInstanceLookup.get(normalizedInstanceId);
+      if (!existing) {
+        throw new StudioShellInvalidRequestError(`Dataset binding '${normalizedInstanceId}' is not present in this system.`);
+      }
+      const datasetAssetId = change.datasetAssetId.trim();
+      if (!datasetAssetId) {
+        throw new StudioShellInvalidRequestError(`Dataset binding '${normalizedInstanceId}' requires datasetAssetId.`);
+      }
+      datasetInstanceLookup.set(normalizedInstanceId, Object.freeze({
+        ...existing,
+        datasetAssetId,
+        datasetVersionId: change.datasetVersionId?.trim() || undefined,
+      }));
+    }
+    const nextDatasetInstances = Object.freeze([...datasetInstanceLookup.values()]);
+
+    const workflowReferenceMap = new Map<string, SystemSerializationContract["assetReferences"]["workflows"][number]>();
+    for (const reference of parsed.contract.assetReferences.workflows) {
+      workflowReferenceMap.set(`${reference.assetId}::${reference.versionId ?? ""}`, reference);
+    }
+    for (const binding of nextWorkflowBindings) {
+      const key = `${binding.workflowAssetId}::${binding.workflowVersionId ?? ""}`;
+      workflowReferenceMap.set(key, Object.freeze({
+        kind: "workflow" as const,
+        assetId: binding.workflowAssetId,
+        versionId: binding.workflowVersionId,
+        alias: binding.componentAlias,
+        metadata: { bindingId: binding.bindingId, pinMode: binding.pinMode },
+      }));
+    }
+    const nextWorkflowReferences = Object.freeze([...workflowReferenceMap.values()]);
+
+    const datasetReferenceMap = new Map<string, SystemSerializationContract["assetReferences"]["datasets"][number]>();
+    for (const reference of parsed.contract.assetReferences.datasets) {
+      datasetReferenceMap.set(`${reference.assetId}::${reference.versionId ?? ""}`, reference);
+    }
+    for (const instance of nextDatasetInstances) {
+      if (!instance.datasetAssetId) {
+        continue;
+      }
+      const key = `${instance.datasetAssetId}::${instance.datasetVersionId ?? ""}`;
+      datasetReferenceMap.set(key, Object.freeze({
+        kind: "dataset" as const,
+        assetId: instance.datasetAssetId,
+        versionId: instance.datasetVersionId,
+        alias: instance.role,
+        metadata: { instanceId: instance.instanceId },
+      }));
+    }
+    const nextDatasetReferences = Object.freeze([...datasetReferenceMap.values()]);
+
+    const workflowBindingByAlias = new Map(
+      nextWorkflowBindings
+        .filter((entry) => Boolean(entry.componentAlias?.trim()))
+        .map((entry) => [entry.componentAlias!.trim(), entry] as const),
+    );
+    const nextComponents = parsed.systemSpec.components.map((component) => {
+      const alias = component.alias?.trim();
+      if (!alias) {
+        return component;
+      }
+      const binding = workflowBindingByAlias.get(alias);
+      if (!binding || component.componentKind !== "composite") {
+        return component;
+      }
+      return Object.freeze({
+        ...component,
+        assetId: binding.workflowAssetId,
+        versionId: binding.workflowVersionId,
+      });
+    });
+
+    const nextRuntimeState = command.runtimeStatePatch
+      ? Object.freeze({
+        ...(parsed.contract.runtime.state ?? {}),
+        ...command.runtimeStatePatch,
+      })
+      : parsed.contract.runtime.state;
+    const nextUiConfiguration = command.uiConfigurationPatch
+      ? Object.freeze({
+        ...(parsed.uiConfiguration ?? {}),
+        ...command.uiConfigurationPatch,
+      })
+      : parsed.uiConfiguration;
+    const retainedDependencies = parsed.contract.definition.dependencies.filter(
+      (entry) => !entry.assetId.includes("workflow") && !entry.assetId.includes("dataset"),
+    );
+    const nextDependencies = Object.freeze([
+      ...retainedDependencies,
+      ...nextWorkflowReferences.map((entry) => Object.freeze({ assetId: entry.assetId, versionId: entry.versionId })),
+      ...nextDatasetReferences.map((entry) => Object.freeze({ assetId: entry.assetId, versionId: entry.versionId })),
+    ]);
+
+    const nextContent = serializeSystemSerializationDocument({
+      existingContent: loaded.draft.content,
+      dependencies: nextDependencies,
+      systemSpec: {
+        ...parsed.systemSpec,
+        components: nextComponents,
+      },
+      uiConfiguration: nextUiConfiguration,
+      runtimeDatasetInstances: nextDatasetInstances,
+      runtimeWorkflowBindings: nextWorkflowBindings,
+      runtimeState: nextRuntimeState,
+    });
+    const updated = await this.studioShellService.updateAssetDraft({
+      studioId,
+      sessionId: command.sessionId,
+      draftId: command.draftId,
+      content: nextContent,
+      dependencies: nextDependencies,
+    });
+    const updatedParsed = parseSystemSerializationDocument({
+      content: updated.draft.content,
+      dependencies: updated.draft.dependencies,
+    });
+    const issues = await this.resolveSerializedReferenceIssues(updatedParsed.contract);
+    return Object.freeze({
+      draft: updated.draft,
+      issues,
     });
   }
 

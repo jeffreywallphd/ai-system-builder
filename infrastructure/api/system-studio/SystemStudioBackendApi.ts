@@ -71,6 +71,39 @@ export interface UpdateSystemExecutionMetadataRequest extends MutateSystemChildC
   readonly executionMetadata?: SystemExecutionMetadata;
 }
 
+export interface SaveSystemDefinitionRequest extends MutateSystemChildComponentRequest {}
+
+export interface LoadSystemDefinitionRequest {
+  readonly studioId?: string;
+  readonly draftId?: string;
+  readonly versionId?: string;
+}
+
+export interface DuplicateSystemDefinitionRequest extends MutateSystemChildComponentRequest {
+  readonly sourceDraftId: string;
+  readonly duplicateDraftId?: string;
+  readonly duplicateAssetId?: string;
+  readonly title?: string;
+  readonly summary?: string;
+  readonly datasetInstanceMode?: "duplicate" | "reuse";
+}
+
+export interface ModifySystemDefinitionRequest extends MutateSystemChildComponentRequest {
+  readonly workflowBindings?: ReadonlyArray<{
+    readonly bindingId: string;
+    readonly workflowAssetId: string;
+    readonly workflowVersionId?: string;
+    readonly componentAlias?: string;
+  }>;
+  readonly datasetBindings?: ReadonlyArray<{
+    readonly instanceId: string;
+    readonly datasetAssetId: string;
+    readonly datasetVersionId?: string;
+  }>;
+  readonly runtimeStatePatch?: Readonly<Record<string, unknown>>;
+  readonly uiConfigurationPatch?: Readonly<Record<string, unknown>>;
+}
+
 export interface SystemCompatibilitySummaryReadModel {
   readonly status: "clean" | "warning" | "incompatible";
   readonly totalIssueCount: number;
@@ -155,6 +188,28 @@ export class SystemStudioBackendApi {
       await this.service.updateSystemExecutionMetadata(request);
       return Object.freeze({ updated: true });
     });
+  }
+
+  public async saveSystemDefinition(request: SaveSystemDefinitionRequest) {
+    return this.wrap(async () => {
+      const result = await this.service.saveSystemDefinition(request);
+      return Object.freeze({
+        draft: result.draft,
+        serialization: result.serialization,
+      });
+    });
+  }
+
+  public async loadSystemDefinition(request: LoadSystemDefinitionRequest) {
+    return this.wrap(async () => this.service.loadSystemDefinition(request));
+  }
+
+  public async duplicateSystemDefinition(request: DuplicateSystemDefinitionRequest) {
+    return this.wrap(async () => this.service.duplicateSystemDefinition(request));
+  }
+
+  public async modifySystemDefinition(request: ModifySystemDefinitionRequest) {
+    return this.wrap(async () => this.service.modifySystemDefinition(request));
   }
 
   public async getCompatibilityInsights(request: ListSystemChildComponentsRequest): Promise<SystemStudioApiResponse<SystemCompatibilityInsightsReadModel>> {
