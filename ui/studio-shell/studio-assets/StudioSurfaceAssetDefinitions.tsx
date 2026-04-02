@@ -5,6 +5,7 @@ import WorkflowStudioDraftAuthoringBoundary from "../../components/studio-shell/
 import { SystemStudioDraftAuthoringBoundary as SystemStudioDraftAuthoringSurface } from "../../components/studio-shell/system/SystemStudioDraftAuthoringBoundary";
 import DatasetStudioDraftAuthoringBoundary from "../../components/studio-shell/dataset/DatasetStudioDraftAuthoringBoundary";
 import {
+  StudioAssetPropertyFieldKinds,
   StudioUiAssetKinds,
   StudioUiAssetContractVersion,
   SystemPageLayoutKinds,
@@ -110,7 +111,54 @@ export const workflowStudioSurfaceAssetDefinition: StudioAssetDefinition<Workflo
       contractCategory: "composed-ui",
       capabilityFlags: Object.freeze(["nested-studios", "authoring"]),
     }),
-    propsSchema: Object.freeze({ schemaId: "studio.workflow-surface.input", schemaVersion: "1.0.0" }),
+    propsSchema: Object.freeze({
+      schemaId: "studio.workflow-surface.input",
+      schemaVersion: "1.0.0",
+      propertySchema: Object.freeze({
+        schemaId: "studio.workflow-surface.properties",
+        schemaVersion: "1.0.0",
+        sections: Object.freeze([
+          Object.freeze({
+            id: "overview",
+            label: "Overview",
+            fields: Object.freeze([
+              Object.freeze({
+                id: "content",
+                path: "content",
+                label: "Draft content",
+                kind: StudioAssetPropertyFieldKinds.textarea,
+                helpText: "Raw draft JSON/text used by this workflow surface.",
+                defaultValue: "",
+              }),
+              Object.freeze({
+                id: "isWorkflowStudio",
+                path: "isWorkflowStudio",
+                label: "Enable workflow authoring tools",
+                kind: StudioAssetPropertyFieldKinds.boolean,
+                defaultValue: true,
+              }),
+            ]),
+          }),
+          Object.freeze({
+            id: "advanced",
+            label: "Advanced",
+            fields: Object.freeze([
+              Object.freeze({
+                id: "embeddedVariant",
+                path: "embeddedVariant",
+                label: "Embedded variant",
+                kind: StudioAssetPropertyFieldKinds.select,
+                defaultValue: "",
+                options: Object.freeze([
+                  Object.freeze({ value: "", label: "Default" }),
+                  Object.freeze({ value: "behavior-automation", label: "Behavior automation" }),
+                ]),
+              }),
+            ]),
+          }),
+        ]),
+      }),
+    }),
     supportedModes: Object.freeze([
       StudioAssetRenderModes.full,
       StudioAssetRenderModes.embedded,
@@ -164,7 +212,29 @@ export const systemStudioSurfaceAssetDefinition: StudioAssetDefinition<SystemStu
       contractCategory: "system-page",
       capabilityFlags: Object.freeze(["nested-pages", "runtime"]),
     }),
-    propsSchema: Object.freeze({ schemaId: "studio.system-surface.input", schemaVersion: "1.0.0" }),
+    propsSchema: Object.freeze({
+      schemaId: "studio.system-surface.input",
+      schemaVersion: "1.0.0",
+      propertySchema: Object.freeze({
+        schemaId: "studio.system-surface.properties",
+        schemaVersion: "1.0.0",
+        sections: Object.freeze([
+          Object.freeze({
+            id: "content",
+            label: "Content",
+            fields: Object.freeze([
+              Object.freeze({
+                id: "content",
+                path: "content",
+                label: "Draft content",
+                kind: StudioAssetPropertyFieldKinds.textarea,
+                defaultValue: "",
+              }),
+            ]),
+          }),
+        ]),
+      }),
+    }),
     supportedModes: Object.freeze([
       StudioAssetRenderModes.full,
       StudioAssetRenderModes.embedded,
@@ -236,7 +306,40 @@ export const datasetStudioSurfaceAssetDefinition: StudioAssetDefinition<DatasetS
       contractCategory: "composed-ui",
       capabilityFlags: Object.freeze(["nested-studios", "preview"]),
     }),
-    propsSchema: Object.freeze({ schemaId: "studio.dataset-surface.input", schemaVersion: "1.0.0" }),
+    propsSchema: Object.freeze({
+      schemaId: "studio.dataset-surface.input",
+      schemaVersion: "1.0.0",
+      propertySchema: Object.freeze({
+        schemaId: "studio.dataset-surface.properties",
+        schemaVersion: "1.0.0",
+        sections: Object.freeze([
+          Object.freeze({
+            id: "content",
+            label: "Data studio settings",
+            fields: Object.freeze([
+              Object.freeze({
+                id: "content",
+                path: "content",
+                label: "Draft content",
+                kind: StudioAssetPropertyFieldKinds.textarea,
+                defaultValue: "",
+              }),
+              Object.freeze({
+                id: "embeddedVariant",
+                path: "embeddedVariant",
+                label: "Embedded variant",
+                kind: StudioAssetPropertyFieldKinds.select,
+                defaultValue: "",
+                options: Object.freeze([
+                  Object.freeze({ value: "", label: "Default" }),
+                  Object.freeze({ value: "inputs-outputs", label: "Inputs & outputs" }),
+                ]),
+              }),
+            ]),
+          }),
+        ]),
+      }),
+    }),
     supportedModes: Object.freeze([
       StudioAssetRenderModes.full,
       StudioAssetRenderModes.embedded,
