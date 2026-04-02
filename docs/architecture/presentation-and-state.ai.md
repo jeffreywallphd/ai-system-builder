@@ -555,6 +555,7 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - The reusable canvas experience contract now supports a neutral editing-surface model (`resolveEditingModel`) plus generic event callbacks (`onEditingEvent`) for node selection, create requests, movement, resize, and canvas commands.
 - The shared configurable canvas renderer now includes reusable rectangular layout-node primitives (x/y + width/height + minimum size + resize handles + selection affordances) while staying prop-driven and callback-driven for studio adapters.
 - System Studio canvas now consumes that reusable editing contract at adapter boundaries, with layout frame state owned in the authoring boundary and composition orchestration still routed through existing system services/components.
+- Canvas command controls now render in a reusable control bar above the interactive canvas frame (instead of overlaying the frame), and command events can include a viewport snapshot so add-section actions can place new sections at the visual center of the active canvas.
 
 ## Direction 5 UI extension update: viewport-ratio framed canvas + panel asset model (systems stories 3-4)
 

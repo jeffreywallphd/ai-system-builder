@@ -81,6 +81,7 @@ describe("ConfigurableCanvasSurface", () => {
     );
 
     expect(html).toContain('data-testid="configurable-canvas-editing-surface"');
+    expect(html).toContain('data-testid="configurable-canvas-command-bar"');
     expect(html).toContain('data-testid="configurable-canvas-design-frame"');
     expect(html).toContain('data-testid="configurable-canvas-layout-node-layout-1"');
   });
