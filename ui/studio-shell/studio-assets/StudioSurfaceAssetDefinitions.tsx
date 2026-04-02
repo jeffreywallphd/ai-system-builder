@@ -6,6 +6,7 @@ import { SystemStudioDraftAuthoringBoundary as SystemStudioDraftAuthoringSurface
 import DatasetStudioDraftAuthoringBoundary from "../../components/studio-shell/dataset/DatasetStudioDraftAuthoringBoundary";
 import {
   StudioUiAssetKinds,
+  StudioUiAssetContractVersion,
   SystemPageLayoutKinds,
   StudioAssetRenderModes,
   type StudioAssetDefinition,
@@ -91,6 +92,7 @@ const defaultSystemPageRegions = Object.freeze([
 
 export const workflowStudioSurfaceAssetDefinition: StudioAssetDefinition<WorkflowStudioSurfaceInput, StudioEmbeddedEvent> = Object.freeze({
   contract: Object.freeze({
+    contractVersion: StudioUiAssetContractVersion,
     identity: Object.freeze({
       studioType: "workflow-studio",
       studioId: "workflow-studio",
@@ -144,6 +146,7 @@ export const workflowStudioSurfaceAssetDefinition: StudioAssetDefinition<Workflo
 
 export const systemStudioSurfaceAssetDefinition: StudioAssetDefinition<SystemStudioSurfaceInput, StudioEmbeddedEvent> = Object.freeze({
   contract: Object.freeze({
+    contractVersion: StudioUiAssetContractVersion,
     identity: Object.freeze({
       studioType: "system-studio",
       studioId: "system-studio",
@@ -215,6 +218,7 @@ export const systemStudioSurfaceAssetDefinition: StudioAssetDefinition<SystemStu
 
 export const datasetStudioSurfaceAssetDefinition: StudioAssetDefinition<DatasetStudioSurfaceInput, StudioEmbeddedEvent> = Object.freeze({
   contract: Object.freeze({
+    contractVersion: StudioUiAssetContractVersion,
     identity: Object.freeze({
       studioType: "dataset-studio",
       studioId: "dataset-studio",

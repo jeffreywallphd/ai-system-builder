@@ -94,7 +94,10 @@ export interface StudioUiAssetRenderingDescriptor {
   readonly resolution: "definition-render";
 }
 
+export const StudioUiAssetContractVersion = "1.0.0";
+
 interface StudioAssetContractBase<TInput> {
+  readonly contractVersion: string;
   readonly identity: StudioAssetIdentity;
   readonly kind: StudioUiAssetKind;
   readonly metadata?: StudioUiAssetMetadata;

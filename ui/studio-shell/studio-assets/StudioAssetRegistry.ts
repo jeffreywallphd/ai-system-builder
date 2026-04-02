@@ -32,6 +32,7 @@ export interface StudioAssetRegistration {
   readonly id: string;
   readonly kind: StudioUiAssetKind;
   readonly category: StudioAssetRegistrationCategory;
+  readonly contractVersion: string;
   readonly contract: StudioAssetContract<unknown>;
   readonly renderer: {
     readonly renderer: "react";
@@ -154,6 +155,10 @@ function normalizeRegistration(registration: StudioAssetRegistration): StudioAss
   if (!id) {
     throw new Error("Studio asset registration id is required.");
   }
+  const contractVersion = registration.contractVersion.trim();
+  if (!contractVersion) {
+    throw new Error(`Studio asset registration '${id}' contractVersion is required.`);
+  }
 
   const title = registration.metadata.title.trim();
   if (!title) {
@@ -180,6 +185,7 @@ function normalizeRegistration(registration: StudioAssetRegistration): StudioAss
   return freezeRegistration({
     ...registration,
     id,
+    contractVersion,
     metadata: {
       ...registration.metadata,
       id,
@@ -228,6 +234,7 @@ function registrationFromContract(contract: StudioAssetContract<unknown>): Studi
     id: contract.identity.studioId,
     kind: contract.kind,
     category: categoryFromKind(contract.kind),
+    contractVersion: contract.contractVersion,
     contract,
     renderer: {
       renderer: contract.rendering.renderer,
@@ -351,7 +358,10 @@ export class StudioAssetRegistry {
   }
 
   public serializeCompositionTree(root: StudioAssetCompositionNode): string {
-    return serializeStudioAssetCompositionDocument(root);
+    return serializeStudioAssetCompositionDocument({
+      root,
+      registry: this,
+    });
   }
 
   public deserializeCompositionTree(input: { readonly serialized: string; readonly validate?: boolean }): {
