@@ -4,6 +4,7 @@ import type { WorkflowStudioDraftAuthoringBoundaryProps } from "../../components
 import WorkflowStudioDraftAuthoringBoundary from "../../components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary";
 import { SystemStudioDraftAuthoringBoundary as SystemStudioDraftAuthoringSurface } from "../../components/studio-shell/system/SystemStudioDraftAuthoringBoundary";
 import DatasetStudioDraftAuthoringBoundary from "../../components/studio-shell/dataset/DatasetStudioDraftAuthoringBoundary";
+import DatasetPipelineStudioDraftAuthoringBoundary from "../../components/studio-shell/dataset-pipeline/DatasetPipelineStudioDraftAuthoringBoundary";
 import SchemaStudioDraftAuthoringBoundary from "../../components/studio-shell/schema/SchemaStudioDraftAuthoringBoundary";
 import {
   StudioAssetPropertyFieldKinds,
@@ -45,6 +46,10 @@ interface DatasetStudioSurfaceInput {
 }
 
 interface SchemaStudioSurfaceInput {
+  readonly content: string;
+  readonly onChangeContent: (nextContent: string) => void;
+}
+interface DatasetPipelineStudioSurfaceInput {
   readonly content: string;
   readonly onChangeContent: (nextContent: string) => void;
 }
@@ -444,6 +449,79 @@ export const schemaStudioSurfaceAssetDefinition: StudioAssetDefinition<SchemaStu
   ),
 });
 
+export const datasetPipelineStudioSurfaceAssetDefinition: StudioAssetDefinition<DatasetPipelineStudioSurfaceInput, StudioEmbeddedEvent> = Object.freeze({
+  contract: Object.freeze({
+    contractVersion: StudioUiAssetContractVersion,
+    identity: Object.freeze({
+      studioType: "dataset-pipeline-studio",
+      studioId: "dataset-pipeline-studio",
+      title: "Dataset Pipeline Studio",
+      summary: "Reusable authoring surface for ingestion, transformation, and execution-oriented data flow setup.",
+    }),
+    kind: StudioUiAssetKinds.composed,
+    metadata: Object.freeze({
+      displayName: "Dataset Pipeline Studio Surface",
+      description: "Composed authoring surface for transformation/execution-focused dataset pipeline setup.",
+      group: "studio-surfaces",
+      iconToken: "studio.pipeline",
+      tags: Object.freeze(["studio", "dataset-pipeline", "composed-ui"]),
+      keywords: Object.freeze(["pipeline", "transformation", "ingestion", "execution"]),
+      contractCategory: "composed-ui",
+      capabilityFlags: Object.freeze(["nested-studios", "authoring"]),
+    }),
+    propsSchema: Object.freeze({
+      schemaId: "studio.dataset-pipeline-surface.input",
+      schemaVersion: "1.0.0",
+      propertySchema: Object.freeze({
+        schemaId: "studio.dataset-pipeline-surface.properties",
+        schemaVersion: "1.0.0",
+        sections: Object.freeze([
+          Object.freeze({
+            id: "content",
+            label: "Pipeline settings",
+            fields: Object.freeze([
+              Object.freeze({
+                id: "content",
+                path: "content",
+                label: "Draft content",
+                kind: StudioAssetPropertyFieldKinds.textarea,
+                defaultValue: "",
+              }),
+            ]),
+          }),
+        ]),
+      }),
+    }),
+    supportedModes: Object.freeze([
+      StudioAssetRenderModes.full,
+      StudioAssetRenderModes.embedded,
+      StudioAssetRenderModes.inline,
+      StudioAssetRenderModes.readonly,
+    ]),
+    accepts: Object.freeze({
+      context: "studio-host",
+      document: "dataset-pipeline-draft-json",
+      input: Object.freeze({}) as DatasetPipelineStudioSurfaceInput,
+    }),
+    emits: Object.freeze(["studio.intent", "studio.change", "studio.validation"]),
+    hostCapabilities: baseCapabilities,
+    rendering: Object.freeze({ renderer: "react", resolution: "definition-render" }),
+    persistence: Object.freeze({ documentType: "dataset-pipeline-draft-json", serialization: "json" }),
+    childSlots: Object.freeze([defaultComposedUiSlot]),
+    compositionRules: Object.freeze({
+      allowsNestedStudios: true,
+      allowedChildKinds: Object.freeze([StudioUiAssetKinds.atomic, StudioUiAssetKinds.composed]),
+    }),
+  }),
+  render: ({ context, onEvent }) => (
+    <DatasetPipelineStudioDraftAuthoringBoundary
+      content={context.input.content}
+      onChangeContent={context.input.onChangeContent}
+      onStudioEvent={onEvent}
+    />
+  ),
+});
+
 export function createStudioHostSessionState(snapshot: {
   readonly sessionId?: string;
   readonly draftId?: string;
@@ -461,6 +539,7 @@ export function createStudioHostSessionState(snapshot: {
 export const studioSurfaceAssetDefinitions = Object.freeze([
   workflowStudioSurfaceAssetDefinition,
   datasetStudioSurfaceAssetDefinition,
+  datasetPipelineStudioSurfaceAssetDefinition,
   schemaStudioSurfaceAssetDefinition,
   systemStudioSurfaceAssetDefinition,
 ]);
