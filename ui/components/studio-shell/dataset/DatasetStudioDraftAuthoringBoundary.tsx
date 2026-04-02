@@ -22,6 +22,7 @@ interface DatasetStudioDraftAuthoringBoundaryProps {
   readonly experienceAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
   readonly hostMode?: StudioAssetRenderMode;
   readonly onStudioEvent?: (event: StudioEmbeddedEvent) => void;
+  readonly embeddedVariant?: "inputs-outputs";
 }
 
 const defaultDatasetExperienceAssetIds = Object.freeze([
@@ -71,10 +72,14 @@ export default function DatasetStudioDraftAuthoringBoundary({
   experienceAssetIds = defaultDatasetExperienceAssetIds,
   hostMode = StudioAssetRenderModes.full,
   onStudioEvent,
+  embeddedVariant,
 }: DatasetStudioDraftAuthoringBoundaryProps): JSX.Element {
+  const constrainedExperienceAssetIds = embeddedVariant === "inputs-outputs"
+    ? Object.freeze([ExperienceSurfaceAssetIds.loomWizard] as const)
+    : experienceAssetIds;
   const experienceDefinition = useMemo(
-    () => buildDatasetExperienceDefinition(experienceAssetIds),
-    [experienceAssetIds],
+    () => buildDatasetExperienceDefinition(constrainedExperienceAssetIds),
+    [constrainedExperienceAssetIds],
   );
   const [selectedModeId, setSelectedModeId] = useState<"wizard" | "canvas">(
     hostMode === StudioAssetRenderModes.full
@@ -102,6 +107,7 @@ export default function DatasetStudioDraftAuthoringBoundary({
         wizard: () => (
           <DataStudioPreparationWizardPanel
             persistedState={content}
+            embeddedMode={embeddedVariant === "inputs-outputs"}
             onPipelineStateChange={(serializedState) => {
               extensionContext.operations.setDraftContent?.(serializedState);
               onStudioEvent?.(createStudioIntentEvent({

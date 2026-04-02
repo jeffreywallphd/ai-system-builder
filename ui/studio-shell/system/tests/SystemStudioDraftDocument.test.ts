@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   parseSystemStudioDraftDocument,
   serializeSystemStudioCanvasAuthoringConfiguration,
+  serializeSystemStudioEmbeddedDatasetDraftContent,
   serializeSystemStudioPageDefinitions,
 } from "../SystemStudioDraftDocument";
 
@@ -87,5 +88,15 @@ describe("SystemStudioDraftDocument", () => {
 
     const parsed = JSON.parse(content) as { readonly systemSpec?: { readonly pages?: ReadonlyArray<{ readonly heading: string }> } };
     expect(parsed.systemSpec?.pages?.[0]?.heading).toBe("Welcome");
+  });
+
+  it("serializes and parses embedded dataset draft content", () => {
+    const nextContent = serializeSystemStudioEmbeddedDatasetDraftContent({
+      existingContent: JSON.stringify({ systemSpec: { components: [] } }),
+      draftContent: "{\"pipeline\":\"inputs-outputs\"}",
+    });
+
+    const parsed = parseSystemStudioDraftDocument(nextContent);
+    expect(parsed.systemSpec.embeddedStudios?.dataset?.draftContent).toBe("{\"pipeline\":\"inputs-outputs\"}");
   });
 });

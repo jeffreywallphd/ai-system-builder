@@ -625,6 +625,14 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 - Direction 5 stories 5-6 now route System Studio interface design through a dedicated adapter boundary (`SystemCanvasExperienceAdapter`) that translates page-scoped draft document state into the reusable editable canvas contract (selection, create/remove/update panel nodes, move/resize persistence, and normalized bounded-frame coordinates) without leaking system-specific behavior into shared canvas assets.
 - System Studio wizard authoring now starts with a non-technical multi-page setup step (`SystemPageSetupEditor`) and stores page heading/description definitions directly in draft content (`systemSpec.pages`) with page-scoped panel layouts (`canvasAuthoring.pageLayouts`) so each page keeps independent layout state across wizard/canvas mode switches.
+- System Studio now also orchestrates embedded studio assets directly inside wizard flow:
+  - the `Inputs & Outputs` step embeds Dataset Studio through `StudioAssetHostBoundary` and host-managed studio intents/events,
+  - embedded Dataset Studio runs in constrained wizard mode (`embeddedVariant: "inputs-outputs"`) with standalone chrome/advanced canvasing suppressed by default,
+  - Dataset draft state is persisted as shared System draft context (`systemSpec.embeddedStudios.dataset.draftContent`) so the host owns document flow and lifecycle.
+- Inputs/outputs host responsibilities stay explicit:
+  - System Studio remains the orchestration host and event manager,
+  - embedded studios do not own routing/shell navigation/lifecycle in System Studio,
+  - deeper interface JSON editing remains available as a collapsed advanced section (`SystemInterfaceEditor`) to keep default UX plain-language and goal-oriented.
 
 ## Direction 5 extension update: studio surfaces as assetized hostable boundaries (stories 1-2)
 

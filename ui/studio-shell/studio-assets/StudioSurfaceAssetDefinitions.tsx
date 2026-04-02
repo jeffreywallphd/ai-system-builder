@@ -34,6 +34,7 @@ interface DatasetStudioSurfaceInput {
   readonly content: string;
   readonly extensionContext: StudioShellExtensionContext;
   readonly experienceAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
+  readonly embeddedVariant?: "inputs-outputs";
 }
 
 const baseCapabilities = Object.freeze({
@@ -131,6 +132,7 @@ export const datasetStudioSurfaceAssetDefinition: StudioAssetDefinition<DatasetS
       content={context.input.content}
       extensionContext={context.input.extensionContext}
       experienceAssetIds={context.input.experienceAssetIds}
+      embeddedVariant={context.input.embeddedVariant}
       hostMode={context.mode}
       onStudioEvent={onEvent}
     />

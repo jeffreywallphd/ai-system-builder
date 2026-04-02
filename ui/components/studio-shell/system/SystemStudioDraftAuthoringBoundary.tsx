@@ -11,6 +11,7 @@ import type { StudioShellExtensionContext } from "../../../studio-shell/StudioSh
 import {
   parseSystemStudioDraftDocument,
   serializeSystemStudioCanvasAuthoringConfiguration,
+  serializeSystemStudioEmbeddedDatasetDraftContent,
   serializeSystemStudioPageDefinitions,
   type SystemStudioDraftDocument,
 } from "../../../studio-shell/system/SystemStudioDraftDocument";
@@ -34,6 +35,7 @@ import {
   StudioEmbeddedIntentKinds,
   createStudioIntentEvent,
   type StudioEmbeddedEvent,
+  type StudioEmbeddedEventEnvelope,
 } from "../../../studio-shell/studio-assets/StudioEmbeddedEventContracts";
 
 interface SystemStudioDraftAuthoringBoundaryProps {
@@ -168,6 +170,45 @@ export function SystemStudioDraftAuthoringBoundary({
   };
 
   const selectedPagePanels = document.canvasAuthoring.pageLayouts.find((layout) => layout.pageId === resolvedSelectedPageId)?.panels ?? [];
+  const embeddedDatasetContent = document.systemSpec.embeddedStudios?.dataset?.draftContent ?? "";
+
+  const persistEmbeddedDatasetContent = (nextDatasetContent: string): void => {
+    const serialized = serializeSystemStudioEmbeddedDatasetDraftContent({
+      existingContent: content,
+      draftContent: nextDatasetContent,
+    });
+    extensionContext.operations.setDraftContent?.(serialized);
+  };
+
+  const embeddedDatasetExtensionContext: StudioShellExtensionContext = Object.freeze({
+    ...extensionContext,
+    operations: Object.freeze({
+      ...extensionContext.operations,
+      setDraftContent: persistEmbeddedDatasetContent,
+    }),
+  });
+
+  const handleEmbeddedStudioEvent = (envelope: StudioEmbeddedEventEnvelope): void => {
+    const { event } = envelope;
+    if (event.type === "studio.intent" && event.intent.kind === StudioEmbeddedIntentKinds.selectionChange) {
+      onStudioEvent?.(createStudioIntentEvent({
+        kind: StudioEmbeddedIntentKinds.selectionChange,
+        payload: Object.freeze({
+          targetType: event.intent.payload.targetType,
+          targetId: event.intent.payload.targetId,
+        }),
+      }));
+      return;
+    }
+    if (event.type === "studio.intent" && event.intent.kind === StudioEmbeddedIntentKinds.applyRequest) {
+      onStudioEvent?.(createStudioIntentEvent({
+        kind: StudioEmbeddedIntentKinds.applyRequest,
+        payload: Object.freeze({
+          scope: "changes",
+        }),
+      }));
+    }
+  };
 
   const handleCanvasEditingEvent = (event: CanvasSurfaceEditingEvent): void => {
     if (event.type === "selection.change") {
@@ -297,8 +338,19 @@ export function SystemStudioDraftAuthoringBoundary({
       onPagesChange: persistSystemPages,
       canvasDefinition: canvasModel.definition,
       canvasContext: canvasModel.context,
+      embeddedDatasetContent,
+      embeddedDatasetExtensionContext,
+      onEmbeddedStudioEvent: handleEmbeddedStudioEvent,
     }),
-    [content, extensionContext, validationIssues, resolvedSelectedPageId, canvasModel],
+    [
+      content,
+      extensionContext,
+      validationIssues,
+      resolvedSelectedPageId,
+      canvasModel,
+      embeddedDatasetContent,
+      embeddedDatasetExtensionContext,
+    ],
   );
 
   return (
