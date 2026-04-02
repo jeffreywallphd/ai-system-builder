@@ -72,7 +72,7 @@ describe("System studio experience adapters", () => {
     expect(editing?.commands?.map((command) => command.id)).toEqual(["add-panel", "remove-panel", "fit-layout"]);
   });
 
-  it("opens an embedded panel design studio when a canvas panel is selected", () => {
+  it("opens the embedded panel design studio when a canvas panel is selected", () => {
     const content = JSON.stringify({
       systemSpec: {
         pages: [{ pageId: "page-1", title: "Welcome" }],
@@ -87,9 +87,8 @@ describe("System studio experience adapters", () => {
               contentSlots: [],
               sourceLayoutNodeId: "panel-1",
               content: {
-                kind: "embedded-studio",
-                studioAssetId: "workflow-studio",
-                draftContent: "{\"steps\":[]}",
+                kind: "asset-composition",
+                serializedDocument: "{\"schemaVersion\":\"1.1.0\",\"root\":{\"nodeId\":\"panel-1\",\"assetId\":\"ui-composed:panel\",\"assetVersion\":\"1.0.0\",\"slots\":[{\"placementId\":\"panel-content\",\"children\":[]}]}}",
               },
             }],
           }],
@@ -104,7 +103,7 @@ describe("System studio experience adapters", () => {
       selectedPageId: "page-1",
       selectedLayoutNodeId: "panel-1",
       onSelectPage: () => undefined,
-      onPanelDraftContentChange: () => undefined,
+      onPanelCompositionChange: () => undefined,
     });
 
     const inspector = model.definition.renderInspectorRegion?.({
@@ -119,7 +118,7 @@ describe("System studio experience adapters", () => {
     });
     const html = renderToStaticMarkup(<>{inspector}</>);
     expect(html).toContain("Designing: Automation");
-    expect(html).toContain("data-testid=\"studio-asset-host-boundary\"");
+    expect(html).toContain("data-testid=\"panel-design-studio\"");
   });
 
   it("starts wizard flow with multi-page setup", () => {

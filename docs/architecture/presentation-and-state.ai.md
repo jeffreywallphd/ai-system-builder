@@ -605,6 +605,12 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   all parsed/serialized through `SystemStudioDraftDocument` + `SystemSettingsModel`.
 - Direction remains explicit: panel-internal UI composition is authored in dedicated embedded panel design workflows rather than directly in System Studio.
 
+## Direction 5 UI extension update: panel composed-asset slots + child insertion (systems stories 2.2.3-2.2.4)
+
+- Panel assets now persist as first-class composed UI assets (`ui-composed:panel`) with explicit slot definitions, identity metadata, configuration defaults, and serialization-compatible composition payloads (`asset-composition`) inside `PanelAssetContract`.
+- The shared studio-asset registry now registers panel as a composed asset kind (`defaultComposedStudioUiContracts`), so panel composition uses the same discovery, renderer-resolution, and composition-validation seams as other UI assets.
+- System Studio canvas inspector now embeds a dedicated Panel Design Studio (`PanelDesignStudio`) where child UI assets are inserted into panel slots via the existing asset library + insertion + selection + validation infrastructure (`StudioAssetLibraryPanel`, `resolveDefaultInsertionTarget`, `insertStudioAssetIntoCompositionTree`), instead of adding child content from page-layout canvas commands.
+
 
 ## Direction 5 UI extension update: atomic and composed UI asset contract foundation (stories 1.1.1-1.1.2)
 
