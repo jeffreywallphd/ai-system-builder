@@ -5,6 +5,7 @@ import WorkflowStudioDraftAuthoringBoundary from "../../components/studio-shell/
 import { SystemStudioDraftAuthoringBoundary as SystemStudioDraftAuthoringSurface } from "../../components/studio-shell/system/SystemStudioDraftAuthoringBoundary";
 import DatasetStudioDraftAuthoringBoundary from "../../components/studio-shell/dataset/DatasetStudioDraftAuthoringBoundary";
 import {
+  StudioUiAssetKinds,
   StudioAssetRenderModes,
   type StudioAssetDefinition,
   type StudioHostContext,
@@ -46,6 +47,14 @@ const baseCapabilities = Object.freeze({
   canManageSessionState: false,
 });
 
+const defaultComposedUiSlot = Object.freeze({
+  slotId: "main",
+  label: "Main content",
+  required: true,
+  allowsMultiple: false,
+  allowedChildKinds: Object.freeze([StudioUiAssetKinds.atomic, StudioUiAssetKinds.composed]),
+});
+
 export const workflowStudioSurfaceAssetDefinition: StudioAssetDefinition<WorkflowStudioSurfaceInput, StudioEmbeddedEvent> = Object.freeze({
   contract: Object.freeze({
     identity: Object.freeze({
@@ -54,6 +63,13 @@ export const workflowStudioSurfaceAssetDefinition: StudioAssetDefinition<Workflo
       title: "Workflow Studio",
       summary: "Reusable authoring surface for guided and canvas workflow editing.",
     }),
+    kind: StudioUiAssetKinds.composed,
+    metadata: Object.freeze({
+      displayName: "Workflow Studio Surface",
+      description: "Composed studio authoring surface for workflow structures and behavior.",
+      tags: Object.freeze(["studio", "workflow", "composed-ui"]),
+    }),
+    propsSchema: Object.freeze({ schemaId: "studio.workflow-surface.input", schemaVersion: "1.0.0" }),
     supportedModes: Object.freeze([
       StudioAssetRenderModes.full,
       StudioAssetRenderModes.embedded,
@@ -63,6 +79,13 @@ export const workflowStudioSurfaceAssetDefinition: StudioAssetDefinition<Workflo
     accepts: Object.freeze({ context: "studio-host", document: "workflow-draft-json", input: Object.freeze({}) as WorkflowStudioSurfaceInput }),
     emits: Object.freeze(["studio.intent", "studio.change", "studio.validation"]),
     hostCapabilities: baseCapabilities,
+    rendering: Object.freeze({ renderer: "react", resolution: "definition-render" }),
+    persistence: Object.freeze({ documentType: "workflow-draft-json", serialization: "json" }),
+    childSlots: Object.freeze([defaultComposedUiSlot]),
+    compositionRules: Object.freeze({
+      allowsNestedStudios: true,
+      allowedChildKinds: Object.freeze([StudioUiAssetKinds.atomic, StudioUiAssetKinds.composed]),
+    }),
   }),
   render: ({ context, onEvent }) => (
     <WorkflowStudioDraftAuthoringBoundary
@@ -88,6 +111,13 @@ export const systemStudioSurfaceAssetDefinition: StudioAssetDefinition<SystemStu
       title: "System Studio",
       summary: "Reusable authoring surface for system pages and composition.",
     }),
+    kind: StudioUiAssetKinds.composed,
+    metadata: Object.freeze({
+      displayName: "System Studio Surface",
+      description: "Composed studio authoring surface supporting nested studio composition.",
+      tags: Object.freeze(["studio", "system", "composed-ui"]),
+    }),
+    propsSchema: Object.freeze({ schemaId: "studio.system-surface.input", schemaVersion: "1.0.0" }),
     supportedModes: Object.freeze([
       StudioAssetRenderModes.full,
       StudioAssetRenderModes.embedded,
@@ -97,6 +127,13 @@ export const systemStudioSurfaceAssetDefinition: StudioAssetDefinition<SystemStu
     accepts: Object.freeze({ context: "studio-host", document: "system-draft-json", input: Object.freeze({}) as SystemStudioSurfaceInput }),
     emits: Object.freeze(["studio.intent", "studio.change", "studio.validation", "studio.runtime"]),
     hostCapabilities: baseCapabilities,
+    rendering: Object.freeze({ renderer: "react", resolution: "definition-render" }),
+    persistence: Object.freeze({ documentType: "system-draft-json", serialization: "json" }),
+    childSlots: Object.freeze([defaultComposedUiSlot]),
+    compositionRules: Object.freeze({
+      allowsNestedStudios: true,
+      allowedChildKinds: Object.freeze([StudioUiAssetKinds.atomic, StudioUiAssetKinds.composed]),
+    }),
     runtimeHooks: Object.freeze({ canStartRuntime: true }),
   }),
   render: ({ context, onEvent }) => (
@@ -119,6 +156,13 @@ export const datasetStudioSurfaceAssetDefinition: StudioAssetDefinition<DatasetS
       title: "Data Studio",
       summary: "Reusable authoring surface for stage-based data preparation.",
     }),
+    kind: StudioUiAssetKinds.composed,
+    metadata: Object.freeze({
+      displayName: "Dataset Studio Surface",
+      description: "Composed studio authoring surface for multi-step data preparation flows.",
+      tags: Object.freeze(["studio", "dataset", "composed-ui"]),
+    }),
+    propsSchema: Object.freeze({ schemaId: "studio.dataset-surface.input", schemaVersion: "1.0.0" }),
     supportedModes: Object.freeze([
       StudioAssetRenderModes.full,
       StudioAssetRenderModes.embedded,
@@ -128,6 +172,13 @@ export const datasetStudioSurfaceAssetDefinition: StudioAssetDefinition<DatasetS
     accepts: Object.freeze({ context: "studio-host", document: "dataset-draft-json", input: Object.freeze({}) as DatasetStudioSurfaceInput }),
     emits: Object.freeze(["studio.intent", "studio.change", "studio.validation", "studio.run"]),
     hostCapabilities: baseCapabilities,
+    rendering: Object.freeze({ renderer: "react", resolution: "definition-render" }),
+    persistence: Object.freeze({ documentType: "dataset-draft-json", serialization: "json" }),
+    childSlots: Object.freeze([defaultComposedUiSlot]),
+    compositionRules: Object.freeze({
+      allowsNestedStudios: true,
+      allowedChildKinds: Object.freeze([StudioUiAssetKinds.atomic, StudioUiAssetKinds.composed]),
+    }),
   }),
   render: ({ context, onEvent }) => (
     <DatasetStudioDraftAuthoringBoundary
@@ -153,6 +204,22 @@ export function createStudioHostSessionState(snapshot: {
     isBusy: snapshot.isBusy,
     operationError: snapshot.operationError,
   });
+}
+
+export const studioSurfaceAssetDefinitions = Object.freeze([
+  workflowStudioSurfaceAssetDefinition,
+  datasetStudioSurfaceAssetDefinition,
+  systemStudioSurfaceAssetDefinition,
+]);
+
+export function resolveStudioSurfaceAssetDefinitionById(studioId: string): StudioAssetDefinition<unknown, StudioEmbeddedEvent> | undefined {
+  return studioSurfaceAssetDefinitions.find((entry) => entry.contract.identity.studioId === studioId) as StudioAssetDefinition<unknown, StudioEmbeddedEvent> | undefined;
+}
+
+export function listStudioSurfaceAssetDefinitionsByKind(kind: "atomic" | "composed"): ReadonlyArray<StudioAssetDefinition<unknown, StudioEmbeddedEvent>> {
+  return Object.freeze(
+    studioSurfaceAssetDefinitions.filter((entry) => entry.contract.kind === kind) as ReadonlyArray<StudioAssetDefinition<unknown, StudioEmbeddedEvent>>,
+  );
 }
 
 export function createStudioHostContext<TInput>(params: {
