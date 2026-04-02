@@ -2,8 +2,11 @@ import type { JSX } from "react";
 import type { StudioShellValidationIssue } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import type {
   CanvasExperienceAssetDefinition,
+  CanvasSurfaceEditingEvent,
+  CanvasSurfaceEditingModel,
   CanvasSurfaceFocusedTarget,
   CanvasSurfaceGraphSummary,
+  CanvasSurfaceLayoutNodeModel,
 } from "../experience-assets/ConfigurableCanvasSurfaceContracts";
 import type { ExperienceIssueSummary } from "../experience-assets/ExperiencePresentationVocabulary";
 import type { StudioShellExtensionContext } from "../StudioShellExtensions";
@@ -20,11 +23,20 @@ export const SystemCanvasInspectorPanels = Object.freeze({
 export type SystemCanvasInspectorPanelId =
   typeof SystemCanvasInspectorPanels[keyof typeof SystemCanvasInspectorPanels];
 
+export interface SystemCanvasNodeLayoutFrame {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 export interface SystemCanvasExperienceContext {
   readonly extensionContext: StudioShellExtensionContext;
   readonly document: SystemStudioDraftDocument;
   readonly issues: ReadonlyArray<ExperienceIssueSummary>;
   readonly selectedInspectorPanel: SystemCanvasInspectorPanelId;
+  readonly selectedLayoutNodeId?: string;
+  readonly layoutNodes: ReadonlyArray<CanvasSurfaceLayoutNodeModel>;
 }
 
 export interface SystemCanvasExperienceAdapterInput {
@@ -33,6 +45,9 @@ export interface SystemCanvasExperienceAdapterInput {
   readonly validationIssues: ReadonlyArray<StudioShellValidationIssue>;
   readonly selectedInspectorPanel: SystemCanvasInspectorPanelId;
   readonly onSelectInspectorPanel: (panelId: SystemCanvasInspectorPanelId) => void;
+  readonly selectedLayoutNodeId?: string;
+  readonly layoutFramesByNodeId?: Readonly<Record<string, SystemCanvasNodeLayoutFrame>>;
+  readonly onCanvasEditingEvent?: (event: CanvasSurfaceEditingEvent) => void;
 }
 
 function toIssueSummaries(issues: ReadonlyArray<StudioShellValidationIssue>): ReadonlyArray<ExperienceIssueSummary> {
@@ -43,6 +58,17 @@ function toIssueSummaries(issues: ReadonlyArray<StudioShellValidationIssue>): Re
 }
 
 function resolveFocusedTarget(context: SystemCanvasExperienceContext): CanvasSurfaceFocusedTarget {
+  if (context.selectedLayoutNodeId) {
+    const selected = context.layoutNodes.find((node) => node.id === context.selectedLayoutNodeId);
+    if (selected) {
+      return Object.freeze({
+        kind: "node",
+        id: selected.id,
+        label: selected.title,
+      });
+    }
+  }
+
   return Object.freeze({
     kind: "node",
     id: "system-composition",
@@ -65,30 +91,88 @@ function renderInspector(context: SystemCanvasExperienceContext): JSX.Element {
   return <SystemParameterConfigEditor context={context.extensionContext} />;
 }
 
+function resolveLayoutNodes(input: {
+  readonly document: SystemStudioDraftDocument;
+  readonly layoutFramesByNodeId?: Readonly<Record<string, SystemCanvasNodeLayoutFrame>>;
+}): ReadonlyArray<CanvasSurfaceLayoutNodeModel> {
+  const columns = 3;
+  return Object.freeze(input.document.systemSpec.components.map((component, index) => {
+    const alias = component.alias?.trim() || `${component.componentKind} ${index + 1}`;
+    const nodeId = component.alias?.trim() || `${component.assetId}:${index}`;
+    const row = Math.floor(index / columns);
+    const col = index % columns;
+    const defaultFrame = Object.freeze({
+      x: 40 + (col * 280),
+      y: 56 + (row * 186),
+      width: 240,
+      height: 140,
+    });
+    const frame = input.layoutFramesByNodeId?.[nodeId] ?? defaultFrame;
+
+    return Object.freeze({
+      id: nodeId,
+      title: alias,
+      subtitle: component.assetId,
+      x: frame.x,
+      y: frame.y,
+      width: frame.width,
+      height: frame.height,
+      minWidth: 180,
+      minHeight: 112,
+      selectable: true,
+      movable: true,
+      resizable: true,
+    });
+  }));
+}
+
+function resolveEditingModel(context: SystemCanvasExperienceContext): CanvasSurfaceEditingModel {
+  return Object.freeze({
+    nodes: context.layoutNodes,
+    selectedNodeId: context.selectedLayoutNodeId,
+    commands: Object.freeze([
+      Object.freeze({ id: "fit-layout", label: "Reset layout", tone: "ghost" as const }),
+    ]),
+    createNodeDescription: "Double-click to stage a new block. Add details with the composer below.",
+  });
+}
+
 export function createSystemCanvasExperienceDefinition(
   input: SystemCanvasExperienceAdapterInput,
 ): {
   readonly definition: CanvasExperienceAssetDefinition<SystemCanvasExperienceContext>;
   readonly context: SystemCanvasExperienceContext;
 } {
+  const document = parseSystemStudioDraftDocument(input.content);
+  const layoutNodes = resolveLayoutNodes({
+    document,
+    layoutFramesByNodeId: input.layoutFramesByNodeId,
+  });
+
   const context: SystemCanvasExperienceContext = Object.freeze({
     extensionContext: input.extensionContext,
-    document: parseSystemStudioDraftDocument(input.content),
+    document,
     issues: toIssueSummaries(input.validationIssues),
     selectedInspectorPanel: input.selectedInspectorPanel,
+    selectedLayoutNodeId: input.selectedLayoutNodeId,
+    layoutNodes,
   });
 
   const definition: CanvasExperienceAssetDefinition<SystemCanvasExperienceContext> = Object.freeze({
     identity: Object.freeze({
       id: "system-canvas",
-      title: "System Canvas",
-      summary: "Compose systems from reusable assets and bindings.",
+      title: "System canvas",
+      summary: "Arrange reusable components and tune how they connect.",
     }),
     resolveGraphSummary,
     resolveFocusedTarget,
+    resolveEditingModel,
+    onEditingEvent: ({ event }) => {
+      input.onCanvasEditingEvent?.(event);
+    },
     resolvePalette: () => Object.freeze({
-      title: "Compose",
-      description: "Use the component composer as the main system canvas surface.",
+      title: "Builder",
+      description: "Use these tools to edit structure details.",
     }),
     resolveIssues: (canvasContext) => canvasContext.issues,
     renderGraphInteractionShell: ({ context: canvasContext }) => (
@@ -113,6 +197,9 @@ export function createSystemCanvasExperienceDefinition(
       </div>
     ),
     renderInspectorRegion: ({ context: canvasContext }) => renderInspector(canvasContext),
+    renderSupplementaryPanels: ({ extensionContext }) => (
+      <SystemCompositionEditor context={extensionContext} />
+    ),
     resolveInteractionMessage: (canvasContext) => `Bindings configured: ${canvasContext.document.systemSpec.bindings.length}`,
     emptyState: Object.freeze({
       when: (canvasContext) => canvasContext.document.systemSpec.components.length === 0,

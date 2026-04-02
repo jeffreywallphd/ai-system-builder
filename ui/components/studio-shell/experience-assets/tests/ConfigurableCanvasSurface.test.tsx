@@ -45,4 +45,34 @@ describe("ConfigurableCanvasSurface", () => {
     expect(html).toContain('data-testid="configurable-canvas-right-drawer"');
     expect(html).toContain('data-testid="definition-inspector-host"');
   });
+
+  it("renders reusable editing-surface layout nodes", () => {
+    const html = renderToStaticMarkup(
+      <ConfigurableCanvasSurface
+        definition={{
+          identity: { id: "editable-canvas", title: "Editable Canvas" },
+          resolveGraphSummary: () => ({ nodeCount: 1, edgeCount: 0 }),
+          resolveEditingModel: () => ({
+            selectedNodeId: "layout-1",
+            commands: [{ id: "reset", label: "Reset" }],
+            nodes: [{
+              id: "layout-1",
+              title: "Panel",
+              x: 40,
+              y: 48,
+              width: 200,
+              height: 140,
+              minWidth: 160,
+              minHeight: 90,
+            }],
+          }),
+        }}
+        definitionContext={{}}
+      />,
+    );
+
+    expect(html).toContain('data-testid="configurable-canvas-editing-surface"');
+    expect(html).toContain('data-testid="configurable-canvas-layout-node-layout-1"');
+  });
+
 });
