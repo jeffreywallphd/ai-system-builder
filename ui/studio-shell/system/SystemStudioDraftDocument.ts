@@ -154,6 +154,8 @@ export function normalizePanelLayoutBounds(input: unknown): PanelAssetLayoutBoun
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return defaultPanelBounds;
   }
+  // Bounds persist as normalized occupancy intent (0-1) for the usable viewport below
+  // the page header. Runtime rendering applies system-standard section spacing on top.
   const record = input as Partial<PanelAssetLayoutBounds>;
   const x = Number.isFinite(record.x) ? Number(record.x) : defaultPanelBounds.x;
   const y = Number.isFinite(record.y) ? Number(record.y) : defaultPanelBounds.y;

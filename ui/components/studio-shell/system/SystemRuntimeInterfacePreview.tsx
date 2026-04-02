@@ -3,6 +3,10 @@ import { mapPanelAssetToRuntimeInstance } from "../../../studio-shell/experience
 import { resolvePanelCompositionState } from "../../../studio-shell/experience-assets/PanelAssetCompositionState";
 import { createDefaultStudioAssetRegistry } from "../../../studio-shell/studio-assets/StudioAssetRegistry";
 import { parseSystemStudioDraftDocument } from "../../../studio-shell/system/SystemStudioDraftDocument";
+import {
+  defaultSystemPageViewportLayoutInterpretation,
+  mapViewportSectionBoundsToStyle,
+} from "../../../studio-shell/system/SystemPageLayoutInterpretation";
 import type { StudioShellExtensionContext } from "../../../studio-shell/StudioShellExtensions";
 import type { StudioAssetDefinition } from "../../../studio-shell/studio-assets/StudioAssetContracts";
 import { StudioAssetRenderModes } from "../../../studio-shell/studio-assets/StudioAssetContracts";
@@ -66,7 +70,7 @@ export default function SystemRuntimeInterfacePreview({
       <div className="ui-stack ui-stack--2xs">
         <strong>Interface preview</strong>
         <p className="ui-text-small ui-text-secondary">
-          This preview uses your saved page and panel layout so you can confirm the live experience flow.
+          This preview uses your saved section percentages, then applies consistent header space and section spacing to mirror the live experience.
         </p>
       </div>
 
@@ -93,72 +97,75 @@ export default function SystemRuntimeInterfacePreview({
           </header>
           {activePage.panels.length > 0 ? (
             <div className="ui-system-runtime-layout-frame" data-testid="system-runtime-interface-layout">
-              {activePage.panels.map((panel) => (
-                <section
-                  key={panel.instanceId}
-                  className="ui-system-runtime-layout-panel ui-card ui-card--padded ui-stack ui-stack--3xs"
-                  style={{
-                    left: `${panel.layoutBounds.x * 100}%`,
-                    top: `${panel.layoutBounds.y * 100}%`,
-                    width: `${panel.layoutBounds.width * 100}%`,
-                    height: `${panel.layoutBounds.height * 100}%`,
-                  }}
-                  data-testid={`system-runtime-interface-panel-${panel.panelId}`}
-                >
-                  <strong>{panel.title}</strong>
-                  {panel.content?.kind === "embedded-studio" && extensionContext && studioAssetHosts?.[panel.content.studioAssetId] ? (
-                    <StudioAssetHostBoundary
-                      asset={studioAssetHosts[panel.content.studioAssetId].asset}
-                      context={createStudioHostContext({
-                        hostId: `runtime-panel-${panel.instanceId}`,
-                        mode: StudioAssetRenderModes.embedded,
-                        capabilities: Object.freeze({
-                          canNavigate: false,
-                          canShowShellChrome: false,
-                          canMutateDraft: false,
-                          canLaunchRuns: false,
-                          canManageSessionState: false,
-                        }),
-                        input: studioAssetHosts[panel.content.studioAssetId].resolveInput({
-                          panel,
-                          content,
-                          extensionContext,
-                        }),
-                      })}
-                      session={createStudioHostSessionState({
-                        sessionId: extensionContext.snapshot?.activeSessionId,
-                        draftId: extensionContext.snapshot?.draft?.draftId,
-                        isBusy: extensionContext.isBusy,
-                        operationError: extensionContext.operationError,
-                      })}
-                    />
-                  ) : panel.content?.kind === "asset-composition" ? (() => {
-                    const compositionState = resolvePanelCompositionState({
-                      panel,
-                      registry: assetRegistry,
-                    });
-                    if (compositionState.notice) {
+              <div
+                className="ui-system-runtime-layout-viewport"
+                style={{
+                  top: `${defaultSystemPageViewportLayoutInterpretation.headerHeightPercent}%`,
+                }}
+                data-testid="system-runtime-interface-viewport"
+              >
+                {activePage.panels.map((panel) => (
+                  <section
+                    key={panel.instanceId}
+                    className="ui-system-runtime-layout-panel ui-card ui-card--padded ui-stack ui-stack--3xs"
+                    style={mapViewportSectionBoundsToStyle({ bounds: panel.layoutBounds })}
+                    data-testid={`system-runtime-interface-panel-${panel.panelId}`}
+                  >
+                    <strong>{panel.title}</strong>
+                    {panel.content?.kind === "embedded-studio" && extensionContext && studioAssetHosts?.[panel.content.studioAssetId] ? (
+                      <StudioAssetHostBoundary
+                        asset={studioAssetHosts[panel.content.studioAssetId].asset}
+                        context={createStudioHostContext({
+                          hostId: `runtime-panel-${panel.instanceId}`,
+                          mode: StudioAssetRenderModes.embedded,
+                          capabilities: Object.freeze({
+                            canNavigate: false,
+                            canShowShellChrome: false,
+                            canMutateDraft: false,
+                            canLaunchRuns: false,
+                            canManageSessionState: false,
+                          }),
+                          input: studioAssetHosts[panel.content.studioAssetId].resolveInput({
+                            panel,
+                            content,
+                            extensionContext,
+                          }),
+                        })}
+                        session={createStudioHostSessionState({
+                          sessionId: extensionContext.snapshot?.activeSessionId,
+                          draftId: extensionContext.snapshot?.draft?.draftId,
+                          isBusy: extensionContext.isBusy,
+                          operationError: extensionContext.operationError,
+                        })}
+                      />
+                    ) : panel.content?.kind === "asset-composition" ? (() => {
+                      const compositionState = resolvePanelCompositionState({
+                        panel,
+                        registry: assetRegistry,
+                      });
+                      if (compositionState.notice) {
+                        return (
+                          <div className="ui-empty-state" data-testid={`system-runtime-interface-panel-notice-${panel.panelId}-${compositionState.notice.kind}`}>
+                            <strong className="ui-text-small">{compositionState.notice.title}</strong>
+                            <p className="ui-text-small ui-text-secondary">{compositionState.notice.description}</p>
+                          </div>
+                        );
+                      }
                       return (
-                        <div className="ui-empty-state" data-testid={`system-runtime-interface-panel-notice-${panel.panelId}-${compositionState.notice.kind}`}>
-                          <strong className="ui-text-small">{compositionState.notice.title}</strong>
-                          <p className="ui-text-small ui-text-secondary">{compositionState.notice.description}</p>
-                        </div>
+                        <span className="ui-text-small ui-text-secondary" data-testid={`system-runtime-interface-panel-summary-${panel.panelId}`}>
+                          {compositionState.childCount === 1
+                            ? "1 content item is connected."
+                            : `${compositionState.childCount} content items are connected.`}
+                        </span>
                       );
-                    }
-                    return (
-                      <span className="ui-text-small ui-text-secondary" data-testid={`system-runtime-interface-panel-summary-${panel.panelId}`}>
-                        {compositionState.childCount === 1
-                          ? "1 content item is connected."
-                          : `${compositionState.childCount} content items are connected.`}
+                    })() : (
+                      <span className="ui-text-small ui-text-secondary">
+                        {panel.description ?? "No content has been connected yet."}
                       </span>
-                    );
-                  })() : (
-                    <span className="ui-text-small ui-text-secondary">
-                      {panel.description ?? "No content has been connected yet."}
-                    </span>
-                  )}
-                </section>
-              ))}
+                    )}
+                  </section>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="ui-card ui-card--padded" data-testid="system-runtime-interface-empty-panel-state">

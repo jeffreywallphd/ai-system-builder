@@ -37,6 +37,10 @@ export interface PanelContainerConfig {
 }
 
 export interface PanelAssetLayoutBounds {
+  /**
+   * Normalized page-section occupancy intent in the usable viewport below the page header.
+   * Values are percentages in [0,1] and are interpreted with system-standard section margins.
+   */
   readonly x: number;
   readonly y: number;
   readonly width: number;

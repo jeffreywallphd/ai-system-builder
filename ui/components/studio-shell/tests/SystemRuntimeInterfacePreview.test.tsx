@@ -47,6 +47,7 @@ describe("SystemRuntimeInterfacePreview", () => {
     expect(html).toContain("Interface preview");
     expect(html).toContain("Hero panel");
     expect(html).toContain("data-testid=\"system-runtime-interface-pages\"");
+    expect(html).toContain("data-testid=\"system-runtime-interface-viewport\"");
   });
 
   it("renders embedded studio panel content through host-provided studio asset mapping", () => {
