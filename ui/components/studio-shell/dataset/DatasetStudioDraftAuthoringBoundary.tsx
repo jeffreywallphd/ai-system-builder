@@ -10,7 +10,6 @@ import {
   type ExperienceSurfaceAssetId,
 } from "../../../studio-shell/experience-assets/ExperienceSurfaceAssets";
 import type { StudioShellExtensionContext } from "../../../studio-shell/StudioShellExtensions";
-import ExperienceAssetAuthoringBoundary from "../experience-assets/ExperienceAssetAuthoringBoundary";
 import type { ExperienceAssetDefinition } from "../../../studio-shell/experience-assets/ExperienceAssetContracts";
 import StageWizardProgressNavigator from "../../wizard/StageWizardProgressNavigator";
 import DataStudioPreparationCanvasReactFlow from "../../assets/DataStudioPreparationCanvasReactFlow";
@@ -155,6 +154,9 @@ export default function DatasetStudioDraftAuthoringBoundary({
     ? canvasProjection.graph.nodes.find((node) => node.id === selectedCanvasNodeId)
     : undefined;
   const inspectedStageId = selectedCanvasNode?.metadata?.stageId;
+  const selectedMode = experienceDefinition.modes.find((mode) => mode.id === selectedModeId)
+    ?? experienceDefinition.modes.find((mode) => mode.id === experienceDefinition.defaultModeId)
+    ?? experienceDefinition.modes[0];
 
   const renderField = (optionKey: string, fieldLabel: string, value: CanonicalRecordValue, description?: string): JSX.Element => {
     const isToggle = typeof value === "boolean";
@@ -236,20 +238,29 @@ export default function DatasetStudioDraftAuthoringBoundary({
   };
 
   return (
-    <ExperienceAssetAuthoringBoundary
-      asset={experienceDefinition}
-      currentModeId={selectedModeId}
-      onModeChange={hostMode === StudioAssetRenderModes.full ? (modeId) => {
-        setSelectedModeId(modeId);
-        onStudioEvent?.(createStudioIntentEvent({
-          kind: StudioEmbeddedIntentKinds.selectionChange,
-          payload: Object.freeze({ targetType: "item", targetId: modeId }),
-        }));
-      } : undefined}
-      document={content}
-      issues={[]}
-      surfaces={{
-        wizard: () => (
+    <>
+      {experienceDefinition.modes.length > 1 && hostMode === StudioAssetRenderModes.full ? (
+        <div className="ui-row ui-row--wrap" data-testid="dataset-studio-mode-actions">
+          {experienceDefinition.modes.map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              className={`ui-button ui-button--sm ${mode.id === selectedMode?.id ? "ui-button--primary" : "ui-button--ghost"}`}
+              onClick={() => {
+                setSelectedModeId(mode.id as "wizard" | "canvas");
+                onStudioEvent?.(createStudioIntentEvent({
+                  kind: StudioEmbeddedIntentKinds.selectionChange,
+                  payload: Object.freeze({ targetType: "item", targetId: mode.id }),
+                }));
+              }}
+            >
+              {mode.title}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {selectedMode?.id === "wizard" ? (
           <div className="ui-stack ui-stack--sm" data-testid="dataset-studio-wizard-surface">
             <section className="ui-card ui-card--padded ui-stage-wizard ui-stack ui-stack--md">
               <header className="ui-stack ui-stack--2xs">
@@ -378,8 +389,7 @@ export default function DatasetStudioDraftAuthoringBoundary({
               </section>
             ) : null}
           </div>
-        ),
-        canvas: () => (
+      ) : selectedMode?.id === "canvas" ? (
           <section className="ui-workflow-studio-canvas ui-stack ui-stack--sm" data-testid="dataset-studio-canvas-surface">
             <header className="ui-row ui-row--between ui-row--wrap">
               <strong>Data flow canvas</strong>
@@ -423,8 +433,9 @@ export default function DatasetStudioDraftAuthoringBoundary({
               </button>
             </aside>
           </section>
-        ),
-      }}
-    />
+      ) : (
+        <p className="ui-text-muted">No authoring modes are configured for this dataset studio surface.</p>
+      )}
+    </>
   );
 }
