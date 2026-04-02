@@ -699,6 +699,22 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - Inputs & Outputs readiness now reflects authored embedded data setup content in addition to explicit interface fields,
   - advanced options remain collapsed under lower-priority disclosures.
 
+## Direction 5 extension update: narrowed System Studio responsibilities cleanup (stories 2.1.9-2.1.10)
+
+- System Studio is now explicitly scoped to system/page structure and settings:
+  - what pages/screens exist,
+  - what major sections/panels exist on each page,
+  - high-level navigation structure,
+  - system-level defaults/settings.
+- Wizard flow was narrowed to `Pages`, `Page layout`, and `Settings` in `SystemWizardExperienceAdapter`; legacy embedded data/workflow authoring steps were removed from the core System Studio flow.
+- Canvas behavior was narrowed to structure editing in `SystemCanvasExperienceAdapter`; legacy composition/parameter inspector responsibilities were removed and replaced with structure-only guidance.
+- Persistence remains canonical and unchanged:
+  - `systemSpec.pages` for page model,
+  - `systemSpec.canvasAuthoring.pageLayouts` for page canvas layout,
+  - `systemSpec.settings` for navigation/system settings,
+  with parse/serialize ownership still in `SystemStudioDraftDocument` and `SystemSettingsModel`.
+- This keeps System Studio aligned with the intended handoff direction: panel-internal UI composition is authored through dedicated embedded panel design workflows, not directly inside System Studio.
+
 
 ## Direction 5 UI extension update: atomic and composed UI asset contract foundation (stories 1.1.1-1.1.2)
 

@@ -19,8 +19,6 @@ describe("System studio experience adapters", () => {
     content,
     extensionContext,
     validationIssues: [],
-    selectedInspectorPanel: "interfaces",
-    onSelectInspectorPanel: () => undefined,
     selectedPageId: "page-1",
     onSelectPage: () => undefined,
   });
@@ -62,8 +60,6 @@ describe("System studio experience adapters", () => {
       content,
       extensionContext,
       validationIssues: [],
-      selectedInspectorPanel: "interfaces",
-      onSelectInspectorPanel: () => undefined,
       selectedPageId: "page-2",
       onSelectPage: () => undefined,
     });
@@ -94,45 +90,13 @@ describe("System studio experience adapters", () => {
       onPagesChange: () => undefined,
       canvasDefinition: canvasModel.definition,
       canvasContext: canvasModel.context,
-      embeddedDatasetContent: "",
-      embeddedDatasetExtensionContext: extensionContext,
-      embeddedWorkflowContent: "",
-      embeddedWorkflowExtensionContext: extensionContext,
     });
 
     expect(model.definition.pages[0]?.id).toBe(SystemWizardPageIds.pages);
     expect(model.definition.pages[1]?.id).toBe(SystemWizardPageIds.interfaceDesign);
-    expect(model.definition.pages[2]?.id).toBe(SystemWizardPageIds.inputsOutputs);
-    expect(model.definition.pages[3]?.id).toBe(SystemWizardPageIds.behaviorAutomation);
-    expect(model.definition.pages[4]?.id).toBe(SystemWizardPageIds.settings);
+    expect(model.definition.pages[2]?.id).toBe(SystemWizardPageIds.settings);
     const progress = model.definition.resolveProgress({ context: model.context, activePageId: SystemWizardPageIds.pages });
-    expect(progress.totalCount).toBe(5);
-  });
-
-  it("marks Inputs & Outputs step ready when embedded data setup has authored content", () => {
-    const content = JSON.stringify({
-      systemSpec: {
-        pages: [{ pageId: "page-1", title: "Welcome" }],
-      },
-    });
-    const canvasModel = buildCanvasModel(content);
-    const model = createSystemWizardExperienceAdapterModel({
-      content,
-      extensionContext,
-      validationIssues: [],
-      selectedPageId: "page-1",
-      onSelectPage: () => undefined,
-      onPagesChange: () => undefined,
-      canvasDefinition: canvasModel.definition,
-      canvasContext: canvasModel.context,
-      embeddedDatasetContent: "{\"stages\":[{\"stageId\":\"load\"}]}",
-      embeddedDatasetExtensionContext: extensionContext,
-      embeddedWorkflowContent: "",
-      embeddedWorkflowExtensionContext: extensionContext,
-    });
-
-    const inputsOutputsPage = model.definition.pages.find((page) => page.id === SystemWizardPageIds.inputsOutputs);
-    expect(inputsOutputsPage?.resolveStatus?.(model.context)).toBe("ready");
+    expect(progress.totalCount).toBe(3);
   });
 
   it("marks Settings step ready when system settings include a name", () => {
@@ -156,10 +120,6 @@ describe("System studio experience adapters", () => {
       onPagesChange: () => undefined,
       canvasDefinition: canvasModel.definition,
       canvasContext: canvasModel.context,
-      embeddedDatasetContent: "",
-      embeddedDatasetExtensionContext: extensionContext,
-      embeddedWorkflowContent: "",
-      embeddedWorkflowExtensionContext: extensionContext,
     });
 
     const settingsPage = model.definition.pages.find((page) => page.id === SystemWizardPageIds.settings);
