@@ -60,4 +60,62 @@ describe("StudioAssetInspectorPanel", () => {
     expect(html).toContain("Button");
     expect(html).toContain("Run");
   });
+
+
+  it("renders nested selection breadcrumbs", () => {
+    const html = renderToStaticMarkup(
+      <StudioAssetInspectorPanel
+        registry={createDefaultStudioAssetRegistry()}
+        compositionRoot={Object.freeze({
+          nodeId: "root-system",
+          assetId: "system-studio",
+          regions: Object.freeze([
+            Object.freeze({
+              placementId: "workspace",
+              children: Object.freeze([
+                Object.freeze({
+                  nodeId: "selected-workflow",
+                  assetId: "workflow-studio",
+                  slots: Object.freeze([
+                    Object.freeze({
+                      placementId: "main",
+                      children: Object.freeze([
+                        Object.freeze({
+                          nodeId: "selected-button",
+                          assetId: "ui-primitive:button",
+                        }),
+                      ]),
+                    }),
+                  ]),
+                }),
+              ]),
+            }),
+          ]),
+        })}
+        selection={Object.freeze({ selectedNodeId: "selected-button" })}
+      />,
+    );
+
+    expect(html).toContain("System Studio");
+    expect(html).toContain("Workflow Studio");
+    expect(html).toContain("Button");
+  });
+
+
+
+  it("shows stale selection guidance when selected node no longer exists", () => {
+    const html = renderToStaticMarkup(
+      <StudioAssetInspectorPanel
+        registry={createDefaultStudioAssetRegistry()}
+        compositionRoot={Object.freeze({
+          nodeId: "root-system",
+          assetId: "system-studio",
+        })}
+        selection={Object.freeze({ selectedNodeId: "missing-node" })}
+      />,
+    );
+
+    expect(html).toContain("no longer available in this composition");
+  });
+
 });

@@ -103,4 +103,41 @@ describe("StudioAssetLibraryAndInsertion", () => {
       expect(invalid.issues?.some((issue) => issue.code === "slot-cardinality-exceeded")).toBeTrue();
     }
   });
+
+  it("applies schema-driven default config values when inserting assets", () => {
+    const registry = createDefaultStudioAssetRegistry();
+    const root = Object.freeze({
+      nodeId: "root-workflow",
+      assetId: "workflow-studio",
+      assetVersion: "1.0.0",
+    });
+
+    const target = resolveDefaultInsertionTarget({
+      registry,
+      root,
+      parentNodeId: "root-workflow",
+    });
+
+    const inserted = insertStudioAssetIntoCompositionTree({
+      registry,
+      request: {
+        root,
+        assetId: "ui-primitive:button",
+        target: target!,
+        config: Object.freeze({ label: "Launch" }),
+      },
+    });
+
+    expect(inserted.ok).toBeTrue();
+    if (inserted.ok) {
+      expect(inserted.insertedNode.config).toEqual(Object.freeze({
+        label: "Launch",
+        helperText: "",
+        isVisible: true,
+        required: false,
+        readOnly: false,
+      }));
+    }
+  });
+
 });

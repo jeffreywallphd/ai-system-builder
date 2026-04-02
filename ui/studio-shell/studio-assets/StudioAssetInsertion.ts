@@ -11,6 +11,7 @@ import {
   type StudioAssetCompositionValidationIssue,
 } from "./StudioAssetComposition";
 import type { StudioAssetRegistration, StudioAssetRegistry } from "./StudioAssetRegistry";
+import { resolveStudioAssetDefaultConfig } from "./StudioAssetDefaults";
 
 export const StudioAssetInsertionFailureKinds = Object.freeze({
   unknownAsset: "unknown-asset",
@@ -81,7 +82,10 @@ function instantiateNode(input: {
       nodeId: input.nodeId?.trim() || createNodeId(registration.id),
       assetId: registration.id,
       assetVersion: registration.contractVersion,
-      config: input.config ? Object.freeze({ ...input.config }) : undefined,
+      config: resolveStudioAssetDefaultConfig({
+        registration,
+        config: input.config,
+      }),
     }),
   });
 }

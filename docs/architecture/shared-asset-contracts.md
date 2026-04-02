@@ -1078,3 +1078,11 @@ Not implemented in this slice:
   - composed/system assets degrade to summary-mode preview cards,
   - unsupported preview hooks fail gracefully with explicit user-facing fallback text.
 - The Asset Library and Inspector now consume the same preview projection path so preview behavior is reusable across current and future authoring surfaces without introducing a parallel preview architecture.
+
+
+## Direction 5 UI extension update: default UI asset configuration + nested selection navigation (stories 1.2.7-1.2.8)
+
+- UI asset insertion now resolves instance configuration through one shared default-config seam (`ui/studio-shell/studio-assets/StudioAssetDefaults.ts`) derived from existing property-schema defaults, so atomic, composed, and system/page assets receive consistent initial config without a parallel defaults framework.
+- Insertion flows (`StudioAssetInsertion`) now apply those resolved defaults before composition validation/serialization, preserving existing composition-tree persistence, validation, and preview behavior while allowing caller-provided overrides.
+- Selection binding now supports nested hierarchy context (`path`, `focusedNode`, stale-selection detection) in `StudioAssetSelection`, so authoring surfaces can distinguish selected child instances from parent drill-in context and navigate back up safely.
+- Asset Inspector now renders breadcrumb-style hierarchy navigation and stale-selection guidance using the same shared selection model, keeping nested parent/child inspection behavior generic for current and future authoring surfaces.

@@ -18,6 +18,7 @@ export interface StudioAssetLibraryPanelProps {
   readonly compositionRoot?: StudioAssetCompositionNode;
   readonly selection?: StudioAssetSelectionState;
   readonly onChangeSelectedAssetConfig?: (nextConfig: Readonly<Record<string, unknown>>) => void;
+  readonly onChangeSelection?: (nextSelection: StudioAssetSelectionState) => void;
 }
 
 const defaultCategories = Object.freeze([
@@ -52,6 +53,7 @@ export default function StudioAssetLibraryPanel({
   compositionRoot,
   selection,
   onChangeSelectedAssetConfig,
+  onChangeSelection,
 }: StudioAssetLibraryPanelProps): JSX.Element {
   const [query, setQuery] = useState("");
   const sections = useMemo(() => listStudioAssetLibrarySections({
@@ -139,6 +141,7 @@ export default function StudioAssetLibraryPanel({
         compositionRoot={compositionRoot}
         selection={selection}
         onChangeNodeConfig={onChangeSelectedAssetConfig}
+        onChangeSelection={onChangeSelection}
       />
     </section>
   );
