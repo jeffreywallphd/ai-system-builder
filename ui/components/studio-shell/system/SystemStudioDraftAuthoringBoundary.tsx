@@ -20,6 +20,7 @@ import {
   createSystemCanvasExperienceDefinition,
 } from "../../../studio-shell/system/SystemCanvasExperienceAdapter";
 import { defaultPanelSlotId, type PanelAssetContract } from "../../../studio-shell/experience-assets/PanelAssetContracts";
+import { resolveCenteredNormalizedPlacement } from "../../../studio-shell/system/SystemCanvasPlacement";
 import ConfigurableCanvasSurface from "../experience-assets/ConfigurableCanvasSurface";
 import { SystemPageSetupEditor } from "./SystemPageSetupEditor";
 import { SystemSettingsEditor } from "./SystemSettingsEditor";
@@ -43,6 +44,7 @@ const defaultSystemExperienceAssetIds = Object.freeze([
   ExperienceSurfaceAssetIds.loomWizard,
   ExperienceSurfaceAssetIds.loomCanvas,
 ]);
+const defaultNewSectionSize = Object.freeze({ width: 0.22, height: 0.18 });
 
 export function SystemStudioDraftAuthoringBoundary({
   content,
@@ -234,6 +236,10 @@ export function SystemStudioDraftAuthoringBoundary({
     if (event.type === "canvas.command" && event.commandId === "add-panel") {
       const latestPanels = resolveSelectedPagePanelsFromLatest();
       const panelId = createNextPanelId(latestPanels);
+      const placement = resolveCenteredNormalizedPlacement({
+        viewport: event.viewport,
+        nodeSize: defaultNewSectionSize,
+      });
       const panel: PanelAssetContract = Object.freeze({
         panelId,
         assetId: "ui-composed:panel",
@@ -242,7 +248,7 @@ export function SystemStudioDraftAuthoringBoundary({
         regionId: selectedPage?.layout.defaultRegionId,
         title: `${selectedPage?.title ?? "Page"} section ${latestPanels.length + 1}`,
         description: "High-level layout section. Detailed design is handled in the panel studio.",
-        layoutBounds: Object.freeze({ x: 0.05, y: 0.05, width: 0.22, height: 0.18 }),
+        layoutBounds: Object.freeze({ ...placement, ...defaultNewSectionSize }),
         contentSlots: Object.freeze([{ slotId: defaultPanelSlotId, label: "Section content" }]),
         sourceLayoutNodeId: panelId,
       });

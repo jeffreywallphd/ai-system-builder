@@ -91,6 +91,19 @@ export interface CanvasSurfaceDesignFrameModel {
   readonly boundedArea?: CanvasSurfaceBoundedEditingArea;
 }
 
+export interface CanvasSurfaceViewportModel {
+  readonly center: {
+    readonly x: number;
+    readonly y: number;
+  };
+  readonly bounds: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
+}
+
 export interface CanvasSurfaceCommandModel {
   readonly id: string;
   readonly label: string;
@@ -141,6 +154,7 @@ export type CanvasSurfaceEditingEvent =
   | {
     readonly type: "canvas.command";
     readonly commandId: string;
+    readonly viewport?: CanvasSurfaceViewportModel;
   };
 
 export interface CanvasExperienceAssetDefinition<TContext> {
