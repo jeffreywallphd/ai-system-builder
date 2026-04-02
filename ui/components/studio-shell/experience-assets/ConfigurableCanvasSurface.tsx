@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type JSX, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 import type {
   CanvasExperienceAssetDefinition,
   CanvasSurfaceEditingEvent,
@@ -147,6 +147,22 @@ function mapResizeFrame(
   };
 }
 
+type CanvasDragResizeHandle = "se" | "sw" | "ne" | "nw";
+
+interface CanvasNodeInteractionState {
+  readonly mode: "move" | "resize";
+  readonly nodeId: string;
+  readonly pointerId: number;
+  readonly startClientX: number;
+  readonly startClientY: number;
+  readonly nodeStartX: number;
+  readonly nodeStartY: number;
+  readonly nodeStartWidth: number;
+  readonly nodeStartHeight: number;
+  readonly hasCrossedMoveThreshold: boolean;
+  readonly resizeHandle?: CanvasDragResizeHandle;
+}
+
 function ConfigurableCanvasEditingSurface({
   editingModel,
   onEditingEvent,
@@ -154,17 +170,7 @@ function ConfigurableCanvasEditingSurface({
   readonly editingModel: CanvasSurfaceEditingModel;
   readonly onEditingEvent?: (event: CanvasSurfaceEditingEvent) => void;
 }): JSX.Element {
-  const [dragState, setDragState] = useState<{
-    readonly mode: "move" | "resize";
-    readonly nodeId: string;
-    readonly startClientX: number;
-    readonly startClientY: number;
-    readonly nodeStartX: number;
-    readonly nodeStartY: number;
-    readonly nodeStartWidth: number;
-    readonly nodeStartHeight: number;
-    readonly resizeHandle?: "se" | "sw" | "ne" | "nw";
-  } | undefined>(undefined);
+  const [interactionState, setInteractionState] = useState<CanvasNodeInteractionState | undefined>(undefined);
 
   const nodesById = useMemo(
     () => new Map(editingModel.nodes.map((node) => [node.id, node] as const)),
@@ -187,45 +193,46 @@ function ConfigurableCanvasEditingSurface({
     return Math.max(24, Math.round(pixelValue));
   };
 
-  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
-    if (!dragState || !nodesById.get(dragState.nodeId)) {
-      return;
-    }
+  const resolvePointerCoordinates = (event: PointerEvent): { readonly x: number; readonly y: number } => Object.freeze({
+    x: event.clientX,
+    y: event.clientY,
+  });
 
-    const deltaX = event.clientX - dragState.startClientX;
-    const deltaY = event.clientY - dragState.startClientY;
+  const emitNodeMoveChange = (state: CanvasNodeInteractionState, coordinates: { readonly x: number; readonly y: number }): void => {
+    const frameRect = frameRef.current?.getBoundingClientRect();
+    const frameWidth = frameRect?.width ?? 0;
+    const frameHeight = frameRect?.height ?? 0;
+    const deltaX = coordinates.x - state.startClientX;
+    const deltaY = coordinates.y - state.startClientY;
+    onEditingEvent?.({
+      type: "node.position.change",
+      nodeId: state.nodeId,
+      position: Object.freeze({
+        x: toFrameCoordinate(state.nodeStartX + deltaX, frameWidth),
+        y: toFrameCoordinate(state.nodeStartY + deltaY, frameHeight),
+      }),
+    });
+  };
 
-    if (dragState.mode === "move") {
-      const frameRect = frameRef.current?.getBoundingClientRect();
-      const frameWidth = frameRect?.width ?? 0;
-      const frameHeight = frameRect?.height ?? 0;
-      onEditingEvent?.({
-        type: "node.position.change",
-        nodeId: dragState.nodeId,
-        position: Object.freeze({
-          x: toFrameCoordinate(dragState.nodeStartX + deltaX, frameWidth),
-          y: toFrameCoordinate(dragState.nodeStartY + deltaY, frameHeight),
-        }),
-      });
-      return;
-    }
-
+  const emitNodeResizeChange = (state: CanvasNodeInteractionState, coordinates: { readonly x: number; readonly y: number }): void => {
+    const deltaX = coordinates.x - state.startClientX;
+    const deltaY = coordinates.y - state.startClientY;
     const frame = mapResizeFrame({
-      id: dragState.nodeId,
+      id: state.nodeId,
       title: "",
-      x: dragState.nodeStartX,
-      y: dragState.nodeStartY,
-      width: dragState.nodeStartWidth,
-      height: dragState.nodeStartHeight,
+      x: state.nodeStartX,
+      y: state.nodeStartY,
+      width: state.nodeStartWidth,
+      height: state.nodeStartHeight,
       minWidth: 48,
       minHeight: 48,
-    }, deltaX, deltaY, dragState.resizeHandle ?? "se");
+    }, deltaX, deltaY, state.resizeHandle ?? "se");
     const frameRect = frameRef.current?.getBoundingClientRect();
     const frameWidth = frameRect?.width ?? 0;
     const frameHeight = frameRect?.height ?? 0;
     onEditingEvent?.({
       type: "node.resize.change",
-      nodeId: dragState.nodeId,
+      nodeId: state.nodeId,
       frame: Object.freeze({
         x: toFrameCoordinate(frame.x, frameWidth),
         y: toFrameCoordinate(frame.y, frameHeight),
@@ -234,6 +241,58 @@ function ConfigurableCanvasEditingSurface({
       }),
     });
   };
+
+  useEffect(() => {
+    if (!interactionState) {
+      return;
+    }
+
+    const moveThreshold = 3;
+    const handleWindowPointerMove = (event: PointerEvent): void => {
+      if (event.pointerId !== interactionState.pointerId || !nodesById.get(interactionState.nodeId)) {
+        return;
+      }
+
+      const coordinates = resolvePointerCoordinates(event);
+      if (interactionState.mode === "move" && !interactionState.hasCrossedMoveThreshold) {
+        const deltaX = Math.abs(coordinates.x - interactionState.startClientX);
+        const deltaY = Math.abs(coordinates.y - interactionState.startClientY);
+        if (Math.max(deltaX, deltaY) < moveThreshold) {
+          return;
+        }
+        const nextState: CanvasNodeInteractionState = Object.freeze({
+          ...interactionState,
+          hasCrossedMoveThreshold: true,
+        });
+        setInteractionState(nextState);
+        emitNodeMoveChange(nextState, coordinates);
+        return;
+      }
+
+      if (interactionState.mode === "move") {
+        emitNodeMoveChange(interactionState, coordinates);
+        return;
+      }
+
+      emitNodeResizeChange(interactionState, coordinates);
+    };
+
+    const completeInteraction = (event: PointerEvent): void => {
+      if (event.pointerId !== interactionState.pointerId) {
+        return;
+      }
+      setInteractionState(undefined);
+    };
+
+    window.addEventListener("pointermove", handleWindowPointerMove);
+    window.addEventListener("pointerup", completeInteraction);
+    window.addEventListener("pointercancel", completeInteraction);
+    return () => {
+      window.removeEventListener("pointermove", handleWindowPointerMove);
+      window.removeEventListener("pointerup", completeInteraction);
+      window.removeEventListener("pointercancel", completeInteraction);
+    };
+  }, [interactionState, nodesById, onEditingEvent]);
 
   const boundedPadding = editingModel.designFrame?.boundedArea?.padding ?? 16;
   const designFrameRatio = resolveDesignFrameRatio(editingModel);
@@ -252,9 +311,6 @@ function ConfigurableCanvasEditingSurface({
           }),
         });
       }}
-      onPointerMove={handlePointerMove}
-      onPointerUp={() => setDragState(undefined)}
-      onPointerLeave={() => setDragState(undefined)}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onEditingEvent?.({ type: "selection.change", nodeId: undefined });
@@ -313,20 +369,26 @@ function ConfigurableCanvasEditingSurface({
                 if (node.movable === false) {
                   return;
                 }
+                if (event.button !== 0) {
+                  return;
+                }
                 event.preventDefault();
                 event.stopPropagation();
                 const frameRect = frameRef.current?.getBoundingClientRect();
                 const width = frameRect?.width ?? 1;
                 const height = frameRect?.height ?? 1;
-                setDragState({
+                event.currentTarget.setPointerCapture(event.pointerId);
+                setInteractionState({
                   mode: "move",
                   nodeId: node.id,
+                  pointerId: event.pointerId,
                   startClientX: event.clientX,
                   startClientY: event.clientY,
                   nodeStartX: coordinateMode === "normalized" ? node.x * width : node.x,
                   nodeStartY: coordinateMode === "normalized" ? node.y * height : node.y,
                   nodeStartWidth: coordinateMode === "normalized" ? node.width * width : node.width,
                   nodeStartHeight: coordinateMode === "normalized" ? node.height * height : node.height,
+                  hasCrossedMoveThreshold: false,
                 });
               }}
               data-testid={`configurable-canvas-layout-node-${node.id}`}
@@ -343,14 +405,19 @@ function ConfigurableCanvasEditingSurface({
                   className={`ui-configurable-canvas-layout-node__resize ui-configurable-canvas-layout-node__resize--${handle}`}
                   aria-label={`Resize ${node.title}`}
                   onPointerDown={(event) => {
+                    if (event.button !== 0) {
+                      return;
+                    }
                     event.preventDefault();
                     event.stopPropagation();
                     const frameRect = frameRef.current?.getBoundingClientRect();
                     const width = frameRect?.width ?? 1;
                     const height = frameRect?.height ?? 1;
-                    setDragState({
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                    setInteractionState({
                       mode: "resize",
                       nodeId: node.id,
+                      pointerId: event.pointerId,
                       startClientX: event.clientX,
                       startClientY: event.clientY,
                       resizeHandle: handle,
@@ -358,6 +425,7 @@ function ConfigurableCanvasEditingSurface({
                       nodeStartY: coordinateMode === "normalized" ? node.y * height : node.y,
                       nodeStartWidth: coordinateMode === "normalized" ? node.width * width : node.width,
                       nodeStartHeight: coordinateMode === "normalized" ? node.height * height : node.height,
+                      hasCrossedMoveThreshold: true,
                     });
                   }}
                 />
