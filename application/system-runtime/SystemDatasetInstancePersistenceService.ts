@@ -78,7 +78,7 @@ export class SystemDatasetInstancePersistenceService {
       if (!entry.persistedState) {
         issues.push(Object.freeze({
           code: "missing-dataset-instance-state",
-          message: `Dataset instance '${entry.instanceId}' did not include persisted runtime state.`,
+          message: `Saved data for '${entry.instanceId}' is incomplete. We restored the last complete data we could use.`,
           severity: "warning",
         }));
         continue;
@@ -88,24 +88,40 @@ export class SystemDatasetInstancePersistenceService {
       if (!instance || instance.instanceId !== entry.instanceId || instance.systemId !== input.systemId) {
         issues.push(Object.freeze({
           code: "invalid-dataset-instance-state",
-          message: `Dataset instance '${entry.instanceId}' contains incompatible persisted state identity.`,
+          message: `Saved data for '${entry.instanceId}' does not match this system. This part was skipped during restore.`,
           severity: "error",
         }));
         continue;
       }
 
-      this.repository.save(instance);
-      for (const record of imageRecords ?? []) {
-        if (record.instanceId !== entry.instanceId || record.systemId !== input.systemId) {
-          issues.push(Object.freeze({
-            code: "invalid-dataset-instance-state",
-            message: `Dataset instance '${entry.instanceId}' includes image record '${record.recordId}' with mismatched ownership.`,
-            severity: "error",
-          }));
-          continue;
-        }
-        this.repository.saveImageRecord(record);
+      const normalizedRecords = imageRecords ?? [];
+      const invalidRecord = normalizedRecords.find((record) => (
+        record.instanceId !== entry.instanceId || record.systemId !== input.systemId
+      ));
+      if (invalidRecord) {
+        issues.push(Object.freeze({
+          code: "invalid-dataset-instance-state",
+          message: `Saved results for '${entry.instanceId}' were incomplete or mixed with another source. We skipped restoring those results.`,
+          severity: "error",
+        }));
+        continue;
       }
+
+      try {
+        this.repository.save(instance);
+        for (const record of normalizedRecords) {
+          this.repository.saveImageRecord(record);
+        }
+      } catch (error) {
+        const details = error instanceof Error ? error.message : "unknown error";
+        issues.push(Object.freeze({
+          code: "invalid-dataset-instance-state",
+          message: `Couldn't fully restore saved data for '${entry.instanceId}'. Some recent results may need to be checked. (${details})`,
+          severity: "error",
+        }));
+        continue;
+      }
+
     }
 
     return Object.freeze({ issues: Object.freeze(issues) });

@@ -628,3 +628,47 @@ Audit schema now records administrative approval transitions plus decision denia
 - Baseline summaries are computed over real run reports (single-image, repeated recent runs, and multi-result batch-style runs where supported) so bottleneck discovery stays lightweight and maintainable.
 - Cross-studio refresh orchestration now routes through a dedicated synchronization seam (`ui/runtime/ReferenceImageCrossStudioSyncService.ts`) that refreshes shared studio snapshot state before reloading results/history and reconciling active selections.
 - This keeps Data/Workflow/System views aligned on the same underlying persisted runtime graph without navigation hacks or duplicated refresh logic.
+
+## AI Loom image manipulation hardening update: persistence stress/recovery + architecture gap log (stories 5.4.9-5.4.10)
+
+### Implemented hardening (5.4.9)
+- System dataset-instance restore now enforces per-instance restore atomicity: if persisted image-record ownership is mismatched, the instance restore is skipped instead of partially restoring mixed state.
+- Restore error/warning messages now use plain-language user-safe wording so incomplete runtime data is not presented as a clean/fully-restored result.
+- Added stress/recovery coverage over:
+  - larger runtime payloads (hundreds of image records),
+  - repeated save/load cycles with runtime-state updates,
+  - partial/incompatible persisted dataset state during reload,
+  - consistency checks that invalid runtime slices are not silently admitted into live system runtime state.
+
+### Architectural gaps observed from the image vertical slice (5.4.10)
+The image slice proved the shared architecture, but it exposed concrete follow-up work:
+
+#### Immediate follow-up
+1. **Cross-repository atomic write boundary for system-save + runtime-state capture**
+   - Current save flow captures runtime dataset state and writes draft content through separate repository operations.
+   - A crash/interruption between those operations can still produce "new draft envelope + stale runtime store" windows.
+   - Next step: define one application-level transactional save contract that can commit draft + runtime snapshot together (or produce explicit recoverable save status).
+2. **Recovery decision taxonomy standardization**
+   - Reload issues are structured, but recovery actions are still inferred by each caller.
+   - Next step: add a small canonical recovery decision model (`restored-complete`, `restored-partial`, `fallback-last-complete`, `blocked`) so UI and orchestration layers use one interpretation path.
+3. **History/output visibility gate for partial restore**
+   - We now avoid admitting invalid runtime slices, but result/history surfaces still need a shared "confidence" projection so views clearly indicate when recent outputs may be incomplete.
+
+#### Medium-term architectural improvements
+1. **Unified persistence health read-model across studios**
+   - System/Workflow/Data each expose partial fragments of save/load integrity truth.
+   - Add one shared read-model service that projects save completeness, recovery actions, and unresolved references for any studio-backed asset.
+2. **Lineage completeness contract tightening**
+   - Lineage status (`complete`/`partial`/`incomplete`) exists in runtime history paths, but completeness guarantees are not uniformly enforced across all persistence adapters.
+   - Add explicit completeness invariants at serialization and repository-adapter boundaries.
+3. **Cross-studio run/session identity normalization**
+   - Runtime context includes multiple ids (`runId`, `runtimeSessionId`, trace ids), but end-to-end correlation still requires adapter-specific interpretation.
+   - Introduce a stricter shared run identity envelope for system/workflow/dataset projections.
+
+#### Nice-to-have refinements
+1. **Background integrity scans for large historical payloads**
+   - Periodic bounded scans could proactively flag incomplete saved slices before users open them.
+2. **Recovery playbook telemetry dashboard**
+   - Persist aggregate counts for "restored complete/partial/fallback" decisions to guide reliability work.
+3. **Selective payload chunking for very large dataset-instance snapshots**
+   - Current serialization tolerates realistic payloads, but chunking/compression may be needed as record counts grow further.
