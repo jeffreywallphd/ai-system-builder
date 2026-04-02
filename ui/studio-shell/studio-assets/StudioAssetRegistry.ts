@@ -11,6 +11,13 @@ import {
   studioSurfaceAssetDefinitions,
 } from "./StudioSurfaceAssetDefinitions";
 import type { StudioEmbeddedEvent } from "./StudioEmbeddedEventContracts";
+import {
+  deserializeStudioAssetCompositionDocument,
+  serializeStudioAssetCompositionDocument,
+  validateStudioAssetCompositionTree,
+  type StudioAssetCompositionNode,
+  type StudioAssetCompositionValidationResult,
+} from "./StudioAssetComposition";
 
 export const StudioAssetRegistrationCategories = Object.freeze({
   atomicUi: "atomic-ui",
@@ -93,6 +100,55 @@ function freezeRegistration(registration: StudioAssetRegistration): StudioAssetR
   });
 }
 
+function assertContractRegistrationConsistency(contract: StudioAssetContract<unknown>, registrationId: string): void {
+  if (contract.kind === StudioUiAssetKinds.atomic) {
+    if (contract.constraints.allowsChildren) {
+      throw new Error(`Studio asset '${registrationId}' atomic contracts cannot allow children.`);
+    }
+    return;
+  }
+
+  if (contract.kind === StudioUiAssetKinds.composed) {
+    if (contract.childSlots.length === 0) {
+      throw new Error(`Studio asset '${registrationId}' composed contracts require at least one child slot.`);
+    }
+
+    const seen = new Set<string>();
+    for (const slot of contract.childSlots) {
+      const slotId = slot.slotId.trim();
+      if (!slotId) {
+        throw new Error(`Studio asset '${registrationId}' has a composed slot with an empty slotId.`);
+      }
+      if (seen.has(slotId)) {
+        throw new Error(`Studio asset '${registrationId}' defines duplicate slot '${slotId}'.`);
+      }
+      seen.add(slotId);
+      if (slot.allowedChildKinds.length === 0) {
+        throw new Error(`Studio asset '${registrationId}' slot '${slotId}' must allow at least one child kind.`);
+      }
+    }
+    return;
+  }
+
+  if (contract.pageStructure.regions.length === 0) {
+    throw new Error(`Studio asset '${registrationId}' system-page contracts require at least one region.`);
+  }
+  const seen = new Set<string>();
+  for (const region of contract.pageStructure.regions) {
+    const regionId = region.regionId.trim();
+    if (!regionId) {
+      throw new Error(`Studio asset '${registrationId}' has a system-page region with an empty regionId.`);
+    }
+    if (seen.has(regionId)) {
+      throw new Error(`Studio asset '${registrationId}' defines duplicate region '${regionId}'.`);
+    }
+    seen.add(regionId);
+    if (region.allowedChildKinds.length === 0) {
+      throw new Error(`Studio asset '${registrationId}' region '${regionId}' must allow at least one child kind.`);
+    }
+  }
+}
+
 function normalizeRegistration(registration: StudioAssetRegistration): StudioAssetRegistration {
   const id = registration.id.trim();
   if (!id) {
@@ -118,6 +174,8 @@ function normalizeRegistration(registration: StudioAssetRegistration): StudioAss
   if (!contractCategory) {
     throw new Error(`Studio asset registration '${id}' metadata contract category is required.`);
   }
+
+  assertContractRegistrationConsistency(registration.contract, id);
 
   return freezeRegistration({
     ...registration,
@@ -286,6 +344,25 @@ export class StudioAssetRegistry {
 
   public resolveRenderersByCategory(category: StudioAssetRegistrationCategory): ReadonlyArray<StudioAssetRendererResolution> {
     return Object.freeze(this.listByCategory(category).map((entry) => this.resolveRendererById(entry.id)));
+  }
+
+  public validateCompositionTree(root: StudioAssetCompositionNode): StudioAssetCompositionValidationResult {
+    return validateStudioAssetCompositionTree({ root, registry: this });
+  }
+
+  public serializeCompositionTree(root: StudioAssetCompositionNode): string {
+    return serializeStudioAssetCompositionDocument(root);
+  }
+
+  public deserializeCompositionTree(input: { readonly serialized: string; readonly validate?: boolean }): {
+    readonly root: StudioAssetCompositionNode;
+    readonly validation: StudioAssetCompositionValidationResult;
+  } {
+    return deserializeStudioAssetCompositionDocument({
+      serialized: input.serialized,
+      validate: input.validate,
+      registry: this,
+    });
   }
 }
 

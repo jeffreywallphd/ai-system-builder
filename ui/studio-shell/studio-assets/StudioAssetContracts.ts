@@ -136,6 +136,8 @@ export interface ComposedStudioAssetSlotContract {
   readonly required?: boolean;
   readonly allowsMultiple?: boolean;
   readonly allowedChildKinds: ReadonlyArray<StudioUiAssetKind>;
+  readonly allowedChildAssetTypes?: ReadonlyArray<string>;
+  readonly allowedRegistrationCategories?: ReadonlyArray<"atomic-ui" | "composed-ui" | "system-page">;
 }
 
 export interface ComposedStudioAssetContract<TInput = unknown> extends StudioAssetContractBase<TInput> {
@@ -159,8 +161,11 @@ export type SystemPageLayoutKind = typeof SystemPageLayoutKinds[keyof typeof Sys
 export interface SystemPageRegionDescriptor {
   readonly regionId: string;
   readonly label: string;
+  readonly required?: boolean;
   readonly allowsMultiple: boolean;
   readonly allowedChildKinds: ReadonlyArray<StudioUiAssetKind>;
+  readonly allowedChildAssetTypes?: ReadonlyArray<string>;
+  readonly allowedRegistrationCategories?: ReadonlyArray<"atomic-ui" | "composed-ui" | "system-page">;
 }
 
 export interface SystemPageRuntimeNavigationDescriptor {

@@ -712,3 +712,14 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Reusable atomic UI primitive contracts now exist in `ui/studio-shell/studio-assets/StudioUiPrimitiveAssetContracts.ts` for leaf families (`text-input`, `number-input`, `toggle`, `button`, `viewer`) so future interface assets can reuse one contract shape without creating a second taxonomy.
 - Existing studio surface assets are now explicitly composed contracts in `ui/studio-shell/studio-assets/StudioSurfaceAssetDefinitions.tsx`, with slot/composition rules that support nested embeddable studio usage through existing host boundaries.
 - Studio asset definition discovery now includes shared listing/lookup helpers (`studioSurfaceAssetDefinitions`, `resolveStudioSurfaceAssetDefinitionById`, `listStudioSurfaceAssetDefinitionsByKind`) so registration/discovery flows can resolve contracts by identity and kind.
+
+## Direction 5 UI extension update: composition validation + serialization model (stories 1.1.7-1.1.8)
+
+- Studio asset composition now has one shared validation/serialization seam in `ui/studio-shell/studio-assets/StudioAssetComposition.ts` rather than per-surface ad hoc checks.
+- Validation is registry-backed and taxonomy-aware across atomic/composed/system-page contracts:
+  - atomic assets fail when any child slot/region payload is present,
+  - composed assets validate declared slots, allowed child kinds/types/categories, required-slot presence, and slot cardinality,
+  - system-page assets validate declared regions, required-region presence, allowed child kinds/types/categories, and region cardinality.
+- Invalid nesting is explicitly denied through the same rules (for example composed assets cannot host `system-page` children unless their own contract allows it).
+- `StudioAssetRegistry` now integrates this seam directly (`validateCompositionTree`, `serializeCompositionTree`, `deserializeCompositionTree`) so future studio surfaces/design tools can reuse one registry-authoritative flow.
+- Composition persistence now uses a versioned document shape (`schemaVersion=1.0.0`) carrying node identity, asset/registry identity, config payloads, metadata references, and recursive slot/region child relationships.
