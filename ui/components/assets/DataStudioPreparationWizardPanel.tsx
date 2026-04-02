@@ -27,6 +27,7 @@ export interface DataStudioPreparationWizardPanelProps {
   readonly persistedState?: string;
   readonly onPipelineStateChange?: (serializedState: string) => void;
   readonly onSnapshotChange?: (snapshot: DataStudioWizardSnapshot) => void;
+  readonly embeddedMode?: boolean;
 }
 
 export const DataStudioWizardPersistenceStorageKey = "ai-loom.data-studio.preparation.state.v1";
@@ -99,9 +100,10 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
     props.onPipelineStateChange,
   );
   const [snapshot, setSnapshot] = useState<DataStudioWizardSnapshot>(() => adapter.getSnapshot());
-  const [isPaletteOpen, setIsPaletteOpen] = useState(true);
+  const isEmbeddedMode = props.embeddedMode === true;
+  const [isPaletteOpen, setIsPaletteOpen] = useState(!isEmbeddedMode);
   const [paletteSearch, setPaletteSearch] = useState("");
-  const [authoringMode, setAuthoringMode] = useState<"wizard" | "canvas">("wizard");
+  const [authoringMode, setAuthoringMode] = useState<"wizard" | "canvas">(isEmbeddedMode ? "wizard" : "wizard");
   const [selectedCanvasNodeId, setSelectedCanvasNodeId] = useState<string | undefined>(undefined);
   const [activationConditionDraft, setActivationConditionDraft] = useState<string>("");
   const [updateError, setUpdateError] = useState<string | undefined>(undefined);
@@ -333,6 +335,12 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
     );
   };
 
+  useEffect(() => {
+    if (isEmbeddedMode && authoringMode !== "wizard") {
+      setAuthoringMode("wizard");
+    }
+  }, [authoringMode, isEmbeddedMode]);
+
   return (
     <section className="ui-card ui-card--padded ui-stage-wizard ui-stack ui-stack--md" data-testid="data-studio-preparation-wizard-panel">
       <header className="ui-stack ui-stack--2xs">
@@ -360,22 +368,26 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
 
       <div className="ui-toolbar ui-toolbar--panel" data-testid="data-studio-authoring-toolbar">
         <div className="ui-toolbar__group">
-          <button
-            type="button"
-            className={`ui-button ui-button--sm ${authoringMode === "wizard" ? "ui-button--primary" : "ui-button--ghost"}`}
-            onClick={() => setAuthoringMode("wizard")}
-            data-testid="data-studio-authoring-mode-wizard"
-          >
-            Wizard
-          </button>
-          <button
-            type="button"
-            className={`ui-button ui-button--sm ${authoringMode === "canvas" ? "ui-button--primary" : "ui-button--ghost"}`}
-            onClick={() => setAuthoringMode("canvas")}
-            data-testid="data-studio-authoring-mode-canvas"
-          >
-            Canvas
-          </button>
+          {!isEmbeddedMode ? (
+            <>
+              <button
+                type="button"
+                className={`ui-button ui-button--sm ${authoringMode === "wizard" ? "ui-button--primary" : "ui-button--ghost"}`}
+                onClick={() => setAuthoringMode("wizard")}
+                data-testid="data-studio-authoring-mode-wizard"
+              >
+                Wizard
+              </button>
+              <button
+                type="button"
+                className={`ui-button ui-button--sm ${authoringMode === "canvas" ? "ui-button--primary" : "ui-button--ghost"}`}
+                onClick={() => setAuthoringMode("canvas")}
+                data-testid="data-studio-authoring-mode-canvas"
+              >
+                Canvas
+              </button>
+            </>
+          ) : null}
           <button
             type="button"
             className={`ui-button ui-button--sm ${snapshot.presentationMode === DataStudioWizardPresentationModes.simple ? "ui-button--primary" : "ui-button--ghost"}`}
@@ -384,25 +396,29 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
               refreshSnapshot();
             }}
           >
-            Simple Flow
+            Basic
           </button>
-          <button
-            type="button"
-            className={`ui-button ui-button--sm ${snapshot.presentationMode === DataStudioWizardPresentationModes.advanced ? "ui-button--primary" : "ui-button--ghost"}`}
-            onClick={() => {
-              adapter.setAdvancedMode();
-              refreshSnapshot();
-            }}
-          >
-            Advanced Flow
-          </button>
-          <button
-            type="button"
-            className="ui-button ui-button--ghost ui-button--sm"
-            onClick={() => setIsPaletteOpen((current) => !current)}
-          >
-            {isPaletteOpen ? "Hide Nodes" : "Show Nodes"}
-          </button>
+          {!isEmbeddedMode ? (
+            <>
+              <button
+                type="button"
+                className={`ui-button ui-button--sm ${snapshot.presentationMode === DataStudioWizardPresentationModes.advanced ? "ui-button--primary" : "ui-button--ghost"}`}
+                onClick={() => {
+                  adapter.setAdvancedMode();
+                  refreshSnapshot();
+                }}
+              >
+                Advanced Flow
+              </button>
+              <button
+                type="button"
+                className="ui-button ui-button--ghost ui-button--sm"
+                onClick={() => setIsPaletteOpen((current) => !current)}
+              >
+                {isPaletteOpen ? "Hide Nodes" : "Show Nodes"}
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -492,19 +508,21 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
                   </label>
                 </section>
 
-                <DataStudioAdvancedEditingActions
-                  stageId={currentStage.stageId}
-                  stageTitle={currentStage.title}
-                  mode={authoringMode}
-                  onInspectInternals={inspectStageInternals}
-                  onEditInCanvas={focusStageInCanvas}
-                />
+                {!isEmbeddedMode ? (
+                  <DataStudioAdvancedEditingActions
+                    stageId={currentStage.stageId}
+                    stageTitle={currentStage.title}
+                    mode={authoringMode}
+                    onInspectInternals={inspectStageInternals}
+                    onEditInCanvas={focusStageInCanvas}
+                  />
+                ) : null}
               </>
             ) : (
               <span className="ui-subtle">No active stage.</span>
             )}
 
-            <DataStudioStageInternalsPanel internals={stageInternals} />
+            {!isEmbeddedMode ? <DataStudioStageInternalsPanel internals={stageInternals} /> : null}
 
             {updateError ? (
               <p className="ui-text-small ui-text-danger" data-testid="data-studio-wizard-update-error">{updateError}</p>
@@ -610,36 +628,40 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
         </section>
       )}
 
-      <DataStudioNodePaletteDrawer
-        isOpen={isPaletteOpen}
-        searchValue={paletteSearch}
-        stages={paletteStages}
-        onClose={() => setIsPaletteOpen(false)}
-        onSearchChange={setPaletteSearch}
-        onFocusStage={(stageId) => {
-          adapter.goToStage(stageId);
-          refreshSnapshot();
-          focusStageInCanvas(stageId);
-        }}
-        onInspectStage={(stageId) => {
-          inspectStageInternals(stageId);
-          adapter.goToStage(stageId);
-          refreshSnapshot();
-        }}
-      />
+      {!isEmbeddedMode ? (
+        <>
+          <DataStudioNodePaletteDrawer
+            isOpen={isPaletteOpen}
+            searchValue={paletteSearch}
+            stages={paletteStages}
+            onClose={() => setIsPaletteOpen(false)}
+            onSearchChange={setPaletteSearch}
+            onFocusStage={(stageId) => {
+              adapter.goToStage(stageId);
+              refreshSnapshot();
+              focusStageInCanvas(stageId);
+            }}
+            onInspectStage={(stageId) => {
+              inspectStageInternals(stageId);
+              adapter.goToStage(stageId);
+              refreshSnapshot();
+            }}
+          />
 
-      <details className="ui-card ui-card--padded ui-stack ui-stack--2xs">
-        <summary className="ui-text-small">Wizard to Canvas handoff</summary>
-        <span className="ui-text-small ui-text-secondary">
-          Execution readiness: {executionReadiness.executionReady ? "ready" : "blocked"} (
-          {executionReadiness.summary.blockingIssueCount} blocking, {executionReadiness.summary.warningIssueCount} warning)
-        </span>
-        <span className="ui-text-small ui-text-secondary">Current stage: {handoff.currentStageId}</span>
-        <span className="ui-text-small ui-text-secondary">Presentation mode: {handoff.presentationMode}</span>
-        <span className="ui-text-small ui-text-secondary">
-          Graph nodes: {handoff.authoringGraph.nodes.length} | edges: {handoff.authoringGraph.edges.length} | stages: {handoff.stages.length}
-        </span>
-      </details>
+          <details className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+            <summary className="ui-text-small">Wizard to Canvas handoff</summary>
+            <span className="ui-text-small ui-text-secondary">
+              Execution readiness: {executionReadiness.executionReady ? "ready" : "blocked"} (
+              {executionReadiness.summary.blockingIssueCount} blocking, {executionReadiness.summary.warningIssueCount} warning)
+            </span>
+            <span className="ui-text-small ui-text-secondary">Current stage: {handoff.currentStageId}</span>
+            <span className="ui-text-small ui-text-secondary">Presentation mode: {handoff.presentationMode}</span>
+            <span className="ui-text-small ui-text-secondary">
+              Graph nodes: {handoff.authoringGraph.nodes.length} | edges: {handoff.authoringGraph.edges.length} | stages: {handoff.stages.length}
+            </span>
+          </details>
+        </>
+      ) : null}
     </section>
   );
 }

@@ -43,6 +43,11 @@ export interface SystemStudioDraftDocument {
     readonly outputs: NonNullable<SystemAsset["outputs"]>;
     readonly parameters: NonNullable<SystemAsset["parameters"]>;
     readonly pages: ReadonlyArray<SystemStudioPageDefinition>;
+    readonly embeddedStudios?: {
+      readonly dataset?: {
+        readonly draftContent?: string;
+      };
+    };
   };
   readonly canvasAuthoring: SystemStudioCanvasAuthoringConfiguration;
 }
@@ -63,6 +68,11 @@ const emptyDocument: SystemStudioDraftDocument = Object.freeze({
     outputs: Object.freeze([]),
     parameters: Object.freeze([]),
     pages: Object.freeze([defaultSystemPage]),
+    embeddedStudios: Object.freeze({
+      dataset: Object.freeze({
+        draftContent: "",
+      }),
+    }),
   }),
   canvasAuthoring: Object.freeze({
     designFrame: Object.freeze({
@@ -225,6 +235,13 @@ export function parseSystemStudioDraftDocument(content: string): SystemStudioDra
         outputs: Object.freeze(parsed.systemSpec?.outputs ?? []),
         parameters: Object.freeze(parsed.systemSpec?.parameters ?? []),
         pages,
+        embeddedStudios: Object.freeze({
+          dataset: Object.freeze({
+            draftContent: typeof parsed.systemSpec?.embeddedStudios?.dataset?.draftContent === "string"
+              ? parsed.systemSpec.embeddedStudios.dataset.draftContent
+              : "",
+          }),
+        }),
       }),
       canvasAuthoring: Object.freeze({
         ...canvasAuthoring,
@@ -272,6 +289,45 @@ export function serializeSystemStudioPageDefinitions(input: {
   root.systemSpec = {
     ...existingSystemSpec,
     pages: input.pages,
+  };
+
+  return JSON.stringify(root, null, 2);
+}
+
+export function serializeSystemStudioEmbeddedDatasetDraftContent(input: {
+  readonly existingContent: string;
+  readonly draftContent: string;
+}): string {
+  const root = input.existingContent.trim()
+    ? (JSON.parse(input.existingContent) as Record<string, unknown>)
+    : {};
+  const existingSystemSpec = (root.systemSpec && typeof root.systemSpec === "object" && !Array.isArray(root.systemSpec))
+    ? { ...(root.systemSpec as Record<string, unknown>) }
+    : {};
+  const existingEmbeddedStudios = (
+    existingSystemSpec.embeddedStudios
+    && typeof existingSystemSpec.embeddedStudios === "object"
+    && !Array.isArray(existingSystemSpec.embeddedStudios)
+  )
+    ? { ...(existingSystemSpec.embeddedStudios as Record<string, unknown>) }
+    : {};
+  const existingDataset = (
+    existingEmbeddedStudios.dataset
+    && typeof existingEmbeddedStudios.dataset === "object"
+    && !Array.isArray(existingEmbeddedStudios.dataset)
+  )
+    ? { ...(existingEmbeddedStudios.dataset as Record<string, unknown>) }
+    : {};
+
+  root.systemSpec = {
+    ...existingSystemSpec,
+    embeddedStudios: {
+      ...existingEmbeddedStudios,
+      dataset: {
+        ...existingDataset,
+        draftContent: input.draftContent,
+      },
+    },
   };
 
   return JSON.stringify(root, null, 2);

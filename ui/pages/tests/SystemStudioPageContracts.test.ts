@@ -92,6 +92,9 @@ describe("SystemStudioPage contracts", () => {
     expect(wizardAdapterSource).toContain("SystemPageSetupEditor");
     expect(wizardAdapterSource).toContain("SystemInterfaceEditor");
     expect(wizardAdapterSource).toContain("SystemParameterConfigEditor");
+    expect(wizardAdapterSource).toContain("StudioAssetHostBoundary");
+    expect(wizardAdapterSource).toContain("datasetStudioSurfaceAssetDefinition");
+    expect(wizardAdapterSource).toContain("system-studio-wizard-inputs-outputs");
     expect(canvasAdapterSource).toContain("Interface designer");
     expect(canvasAdapterSource).toContain("add-panel");
     expect(canvasAdapterSource).toContain("remove-panel");

@@ -9,6 +9,15 @@ import { SystemInterfaceEditor } from "../../components/studio-shell/SystemInter
 import { SystemParameterConfigEditor } from "../../components/studio-shell/SystemParameterConfigEditor";
 import { SystemPageSetupEditor } from "../../components/studio-shell/system/SystemPageSetupEditor";
 import type { SystemCanvasExperienceContext } from "./SystemCanvasExperienceAdapter";
+import StudioAssetHostBoundary from "../../components/studio-shell/studio-assets/StudioAssetHostBoundary";
+import {
+  createStudioHostContext,
+  createStudioHostSessionState,
+  datasetStudioSurfaceAssetDefinition,
+} from "../studio-assets/StudioSurfaceAssetDefinitions";
+import { StudioAssetRenderModes, type StudioHostContext } from "../studio-assets/StudioAssetContracts";
+import type { StudioEmbeddedEvent, StudioEmbeddedEventEnvelope } from "../studio-assets/StudioEmbeddedEventContracts";
+import { ExperienceSurfaceAssetIds, type ExperienceSurfaceAssetId } from "../experience-assets/ExperienceSurfaceAssets";
 
 export const SystemWizardPageIds = Object.freeze({
   pages: "pages",
@@ -28,6 +37,9 @@ export interface SystemWizardExperienceContext {
   readonly onPagesChange: (pages: SystemStudioDraftDocument["systemSpec"]["pages"]) => void;
   readonly canvasDefinition: CanvasExperienceAssetDefinition<SystemCanvasExperienceContext>;
   readonly canvasContext: SystemCanvasExperienceContext;
+  readonly embeddedDatasetContent: string;
+  readonly embeddedDatasetExtensionContext: StudioShellExtensionContext;
+  readonly onEmbeddedStudioEvent?: (event: StudioEmbeddedEventEnvelope) => void;
 }
 
 export interface SystemWizardExperienceAdapterInput {
@@ -39,6 +51,9 @@ export interface SystemWizardExperienceAdapterInput {
   readonly onPagesChange: (pages: SystemStudioDraftDocument["systemSpec"]["pages"]) => void;
   readonly canvasDefinition: CanvasExperienceAssetDefinition<SystemCanvasExperienceContext>;
   readonly canvasContext: SystemCanvasExperienceContext;
+  readonly embeddedDatasetContent: string;
+  readonly embeddedDatasetExtensionContext: StudioShellExtensionContext;
+  readonly onEmbeddedStudioEvent?: (event: StudioEmbeddedEventEnvelope) => void;
 }
 
 function toStatus(ready: boolean): "ready" | "pending" {
@@ -93,7 +108,74 @@ function renderInterfaceDesignPage(context: SystemWizardExperienceContext): JSX.
 }
 
 function renderInputsOutputsPage(context: SystemWizardExperienceContext): JSX.Element {
-  return <SystemInterfaceEditor context={context.extensionContext} />;
+  const datasetHostContext: StudioHostContext<{
+    readonly content: string;
+    readonly extensionContext: StudioShellExtensionContext;
+    readonly experienceAssetIds: ReadonlyArray<ExperienceSurfaceAssetId>;
+  }> = createStudioHostContext({
+    hostId: "system-studio-wizard-inputs-outputs",
+    mode: StudioAssetRenderModes.embedded,
+    capabilities: Object.freeze({
+      canNavigate: false,
+      canShowShellChrome: false,
+      canMutateDraft: true,
+      canLaunchRuns: false,
+      canManageSessionState: false,
+    }),
+    input: Object.freeze({
+      content: context.embeddedDatasetContent,
+      extensionContext: context.embeddedDatasetExtensionContext,
+      experienceAssetIds: Object.freeze([ExperienceSurfaceAssetIds.loomWizard]),
+      embeddedVariant: "inputs-outputs" as const,
+    }),
+  });
+
+  return (
+    <section className="ui-stack ui-stack--sm" data-testid="system-wizard-inputs-outputs-page">
+      <div className="ui-stack ui-stack--2xs">
+        <strong>Inputs &amp; Outputs</strong>
+        <p className="ui-text-small ui-text-secondary">
+          Set up the data this system uses and the results it produces in one guided place.
+        </p>
+      </div>
+      <section className="ui-card ui-card--padded ui-stack ui-stack--sm">
+        <div className="ui-stack ui-stack--2xs">
+          <strong>Data setup</strong>
+          <p className="ui-text-small ui-text-secondary">
+            Add and refine your data definitions without leaving this step.
+          </p>
+        </div>
+        <StudioAssetHostBoundary
+          asset={datasetStudioSurfaceAssetDefinition}
+          context={datasetHostContext}
+          session={createStudioHostSessionState({
+            sessionId: context.extensionContext.snapshot?.activeSessionId,
+            draftId: context.extensionContext.snapshot?.draft?.draftId,
+            isBusy: context.extensionContext.isBusy,
+            operationError: context.extensionContext.operationError,
+          })}
+          onEvent={(event) => {
+            if (!context.onEmbeddedStudioEvent) {
+              return;
+            }
+            context.onEmbeddedStudioEvent({
+              event: event as StudioEmbeddedEvent,
+              source: Object.freeze({
+                studioType: datasetStudioSurfaceAssetDefinition.contract.identity.studioType,
+                studioId: datasetStudioSurfaceAssetDefinition.contract.identity.studioId,
+                hostId: datasetHostContext.hostId,
+                mode: datasetHostContext.mode,
+              }),
+            });
+          }}
+        />
+      </section>
+      <details className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+        <summary className="ui-text-small">Advanced interface details</summary>
+        <SystemInterfaceEditor context={context.extensionContext} />
+      </details>
+    </section>
+  );
 }
 
 function renderSettingsPage(context: SystemWizardExperienceContext): JSX.Element {
@@ -198,6 +280,9 @@ export function createSystemWizardExperienceAdapterModel(
       onPagesChange: input.onPagesChange,
       canvasDefinition: input.canvasDefinition,
       canvasContext: input.canvasContext,
+      embeddedDatasetContent: input.embeddedDatasetContent,
+      embeddedDatasetExtensionContext: input.embeddedDatasetExtensionContext,
+      onEmbeddedStudioEvent: input.onEmbeddedStudioEvent,
     }),
   });
 }
