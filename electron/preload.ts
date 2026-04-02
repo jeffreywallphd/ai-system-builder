@@ -235,6 +235,9 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     getSystemExecutionResult(executionId: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-runtime:result", executionId) as Promise<string>;
     },
+    ingestReferenceImageUpload(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:reference-image:upload", requestJson) as Promise<string>;
+    },
   },
   registry: {
     listAssets(limit?: number) {

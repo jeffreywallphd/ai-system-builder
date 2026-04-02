@@ -77,6 +77,19 @@ import {
 import { AssetVersion } from "../../../domain/assets/AssetVersion";
 import { UnifiedExecutionEngine } from "../../../application/execution/UnifiedExecutionEngine";
 import { DataStudioPipelineExecutionUnitHandler } from "../../execution/DataStudioPipelineExecutionUnitHandler";
+import {
+  buildReferenceImageDatasetInstanceRequests,
+  ReferenceImageSystemTemplate,
+} from "../../../application/system-studio/ReferenceImageSystemTemplate";
+import { InMemoryDatasetInstanceRepository } from "../../../application/system-runtime/DatasetInstanceRepository";
+import {
+  SystemDatasetInstanceService,
+  type EnsureRoleDatasetInstanceRequest,
+} from "../../../application/system-runtime/SystemDatasetInstanceService";
+import type { DatasetInstanceAssetCatalog, DatasetInstanceAssetDefinition } from "../../../application/system-runtime/DatasetInstanceAssetCatalog";
+import { ZodMediaDatasetValidator } from "../../../application/dataset-studio/adapters/validation/MediaDatasetValidator";
+import { DatasetSchemaIntentIds } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import { createDefaultMediaAdapterBundle } from "../../../application/dataset-studio/adapters/media/MediaAdapterFactory";
 
 export interface StudioShellApiError {
   readonly code:
@@ -153,6 +166,46 @@ export interface RunWorkflowStudioDraftRequest {
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly manualDecisionsByStepId?: Readonly<Record<string, { readonly outcome: "continue" | "approve" | "reject" } | undefined>>;
   readonly maxLoopIterations?: number;
+}
+
+export interface IngestReferenceImageUploadRequest {
+  readonly studioId: string;
+  readonly draftId?: string;
+  readonly fileName: string;
+  readonly mimeType?: string;
+  readonly payloadBase64: string;
+}
+
+export interface IngestReferenceImageUploadReadModel {
+  readonly systemId: string;
+  readonly datasetInstanceId: string;
+  readonly recordId: string;
+  readonly image: {
+    readonly assetId: string;
+    readonly width: number;
+    readonly height: number;
+    readonly format: string;
+  };
+  readonly selectedRecordId: string;
+}
+
+class StaticDatasetInstanceAssetCatalog implements DatasetInstanceAssetCatalog {
+  private readonly byKey = new Map<string, DatasetInstanceAssetDefinition>();
+
+  public constructor(definitions: ReadonlyArray<DatasetInstanceAssetDefinition>) {
+    for (const definition of definitions) {
+      const key = `${definition.assetId}::${definition.versionId ?? ""}`;
+      this.byKey.set(key, definition);
+      if (!definition.versionId) {
+        this.byKey.set(definition.assetId, definition);
+      }
+    }
+  }
+
+  public resolveAsset(input: { readonly assetId: string; readonly versionId?: string; }): DatasetInstanceAssetDefinition | undefined {
+    const keyed = `${input.assetId.trim()}::${input.versionId?.trim() ?? ""}`;
+    return this.byKey.get(keyed) ?? this.byKey.get(input.assetId.trim());
+  }
 }
 
 export interface AssessWorkflowStudioExecutionReadinessRequest {
@@ -518,6 +571,7 @@ export class StudioShellBackendApi {
   private readonly getWorkflowRunDetailUseCase?: GetWorkflowRunDetailUseCase;
   private readonly workflowRunSummaryRepository?: IWorkflowRunSummaryRepository;
   private readonly dataStudioPipelineExecutionService: DataStudioPipelineExecutionService;
+  private readonly referenceImageDatasets: SystemDatasetInstanceService;
   private readonly now: () => Date;
 
   constructor(
@@ -532,6 +586,25 @@ export class StudioShellBackendApi {
       new UnifiedExecutionEngine([new DataStudioPipelineExecutionUnitHandler()]),
     );
     this.service = new DefaultStudioShellApplicationService(repository);
+    const datasetAssetCatalog = new StaticDatasetInstanceAssetCatalog(ReferenceImageSystemTemplate.datasetInstances.map((entry) => Object.freeze({
+      assetId: entry.datasetAssetId,
+      versionId: entry.datasetAssetVersionId,
+      schemaIntentId: DatasetSchemaIntentIds.media,
+      outputShapeKind: "image-metadata-records",
+    })));
+    this.referenceImageDatasets = new SystemDatasetInstanceService(
+      new InMemoryDatasetInstanceRepository(),
+      datasetAssetCatalog,
+      new ZodMediaDatasetValidator(),
+      {
+        assertSystemExists: async (systemId) => {
+          await this.assertReferenceImageSystemOwnership(systemId);
+        },
+      },
+      {
+        imageMetadataExtractor: createDefaultMediaAdapterBundle().metadataExtractor,
+      },
+    );
     this.workflowStudioService = new WorkflowStudioApplicationService(
       this.service,
       undefined,
@@ -911,6 +984,87 @@ export class StudioShellBackendApi {
           })
           : undefined,
         failureMessage: runResult.failureMessage,
+      });
+    });
+  }
+
+  public async ingestReferenceImageUpload(
+    request: IngestReferenceImageUploadRequest,
+  ): Promise<StudioShellApiResponse<IngestReferenceImageUploadReadModel>> {
+    return this.wrap(async () => {
+      const snapshot = await this.requireSnapshot(request.studioId);
+      const draft = snapshot.draft;
+      if (!draft) {
+        throw new StudioShellInvalidRequestError("Open a system draft before uploading an image.");
+      }
+      if (request.draftId?.trim() && draft.draftId !== request.draftId.trim()) {
+        throw new StudioShellInvalidRequestError(`Draft '${request.draftId}' is not the active draft for studio '${request.studioId}'.`);
+      }
+      if (draft.assetId !== ReferenceImageSystemTemplate.systemAsset.assetId) {
+        throw new StudioShellInvalidRequestError("Image upload is only available for the reference image template.");
+      }
+      const runtimeSystemId = this.resolveReferenceRuntimeSystemId(draft);
+
+      const fileName = request.fileName.trim();
+      if (!fileName) {
+        throw new StudioShellInvalidRequestError("Uploaded file name is required.");
+      }
+      const payload = this.decodeBase64Payload(request.payloadBase64);
+      const [inputDataset] = await this.ensureReferenceImageDatasetInstances(runtimeSystemId);
+      if (!inputDataset) {
+        throw new StudioShellInvalidRequestError("Reference image input dataset is unavailable.");
+      }
+
+      const ingested = await this.referenceImageDatasets.ingestImageRecordIntoInstance({
+        systemId: runtimeSystemId,
+        instanceId: inputDataset.instanceId,
+        storageReference: `upload://${runtimeSystemId}/${Date.now()}-${fileName}`,
+        metadata: {
+          ingestionSource: "reference-image-ui-upload",
+          uploadedFileName: fileName,
+          uploadedMimeType: request.mimeType?.trim() || "unknown",
+        },
+        provenance: {
+          sourceType: "upload",
+          sourceReference: `upload:${draft.draftId}:${fileName}`,
+          sourceSystemId: runtimeSystemId,
+          ingestedBy: "studio-shell-ui",
+        },
+        record: {
+          title: fileName,
+          format: this.deriveFileFormat(fileName, request.mimeType),
+          tags: ["input", "upload"],
+        },
+        metadataExtraction: {
+          payload,
+          includeExifInMetadata: true,
+        },
+      });
+      await this.referenceImageDatasets.selectImageRecordInInstance({
+        systemId: runtimeSystemId,
+        instanceId: inputDataset.instanceId,
+        recordId: ingested.recordId,
+        selectionContext: {
+          selectionMode: "single",
+          reason: "latest-upload",
+        },
+      });
+
+      return Object.freeze({
+        systemId: runtimeSystemId,
+        datasetInstanceId: inputDataset.instanceId,
+        recordId: ingested.recordId,
+        image: Object.freeze({
+          assetId: ingested.image.assetRef.assetId
+            ?? ingested.image.assetRef.stableId
+            ?? ingested.image.assetRef.outputId
+            ?? ingested.image.assetRef.path
+            ?? ingested.recordId,
+          width: ingested.image.width,
+          height: ingested.image.height,
+          format: ingested.image.format,
+        }),
+        selectedRecordId: ingested.recordId,
       });
     });
   }
@@ -1845,6 +1999,53 @@ export class StudioShellBackendApi {
       ),
       validationIssues,
     });
+  }
+
+  private async ensureReferenceImageDatasetInstances(systemId: string) {
+    const requests = buildReferenceImageDatasetInstanceRequests(systemId);
+    const ensured: Array<Awaited<ReturnType<SystemDatasetInstanceService["ensureRoleDatasetInstance"]>>> = [];
+    for (const request of requests) {
+      ensured.push(await this.referenceImageDatasets.ensureRoleDatasetInstance(request as EnsureRoleDatasetInstanceRequest));
+    }
+    return ensured;
+  }
+
+  private async assertReferenceImageSystemOwnership(systemId: string): Promise<void> {
+    if (systemId === ReferenceImageSystemTemplate.systemAsset.assetId || systemId.startsWith("system:studio:")) {
+      return;
+    }
+    throw new Error(`not-found:System '${systemId}' is not available for reference image dataset ownership.`);
+  }
+
+  private resolveReferenceRuntimeSystemId(draft: StudioShellSnapshotReadModel["draft"]): string {
+    if (draft?.assetId?.startsWith("system:")) {
+      return draft.assetId;
+    }
+    return `system:studio:${draft?.draftId ?? "unknown"}`;
+  }
+
+  private decodeBase64Payload(value: string): Uint8Array {
+    const normalized = value.trim();
+    if (!normalized) {
+      throw new StudioShellInvalidRequestError("Uploaded file payload is required.");
+    }
+    try {
+      return Uint8Array.from(Buffer.from(normalized, "base64"));
+    } catch {
+      throw new StudioShellInvalidRequestError("Uploaded file payload could not be decoded.");
+    }
+  }
+
+  private deriveFileFormat(fileName: string, mimeType?: string): string {
+    const mime = mimeType?.trim().toLowerCase();
+    if (mime && mime.includes("/")) {
+      return mime.split("/")[1] || "png";
+    }
+    const dot = fileName.lastIndexOf(".");
+    if (dot > -1 && dot < fileName.length - 1) {
+      return fileName.slice(dot + 1).toLowerCase();
+    }
+    return "png";
   }
 
   private async synchronizeWorkflowPersistenceFromStudioDraft(

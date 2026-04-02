@@ -28,6 +28,8 @@ import type {
   WorkflowRunSummaryReadModel,
   WorkflowExecutionReadinessReadModel,
   PersistedWorkflowReadModel,
+  IngestReferenceImageUploadReadModel,
+  IngestReferenceImageUploadRequest,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import type {
   StartSystemRuntimeExecutionRequest,
@@ -232,5 +234,10 @@ export class StudioShellService {
   public async getSystemExecutionResult(executionId: string): Promise<SystemRuntimeApiResponse<RuntimeExecutionResultReadModel>> {
     const raw = await this.requireBridge().getSystemExecutionResult(executionId);
     return JSON.parse(raw) as SystemRuntimeApiResponse<RuntimeExecutionResultReadModel>;
+  }
+
+  public async ingestReferenceImageUpload(request: IngestReferenceImageUploadRequest): Promise<StudioShellApiResponse<IngestReferenceImageUploadReadModel>> {
+    const raw = await this.requireBridge().ingestReferenceImageUpload(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<IngestReferenceImageUploadReadModel>;
   }
 }
