@@ -6,6 +6,7 @@ describe("WorkflowStudioPage contracts", () => {
     const pageSource = readSource("ui/pages/WorkflowStudioPage.tsx");
     const registrationSource = readSource("ui/studio-shell/registrations/WorkflowStudioRegistration.ts");
     const shellSource = readSource("ui/pages/StudioShellPage.tsx");
+    const workflowBoundarySource = readSource("ui/components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary.tsx");
 
     expect(pageSource).toContain("StudioShellPage");
     expect(pageSource).toContain("workflowStudioRegistration");
@@ -52,5 +53,9 @@ describe("WorkflowStudioPage contracts", () => {
     expect(shellSource).toContain("clearHandoffStatus");
     expect(shellSource).toContain('data-testid="studio-shell-left-drawer-toggle"');
     expect(shellSource).toContain('data-testid="studio-shell-right-drawer-toggle"');
+
+    expect(workflowBoundarySource).not.toContain("ExperienceAssetAuthoringBoundary");
+    expect(workflowBoundarySource).toContain("Unsupported experience mode selection");
+    expect(workflowBoundarySource).toContain("buildWorkflowExperienceDefinition");
   });
 });
