@@ -3,7 +3,7 @@ import {
   LegacyNavigationCompatibilityModes,
   LegacyNavigationFeatureFlag,
   type LegacyNavigationCompatibilityMode,
-} from "../features/LegacyNavigationFeatureFlag";
+} from "../features/DEPRECATED_LegacyNavigationFeatureFlag";
 import { ROUTE_PATHS } from "./RouteConfig";
 
 export const LegacyNavigationEntryStates = Object.freeze({

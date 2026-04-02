@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
 import type { CanvasSurfaceEditingEvent } from "../../../studio-shell/experience-assets/ConfigurableCanvasSurfaceContracts";
 import type { StudioShellValidationIssue } from "../../../../infrastructure/api/studio-shell/StudioShellBackendApi";
-import { ExperienceAssetModeIds, type ExperienceAssetDefinition } from "../../../studio-shell/experience-assets/ExperienceAssetContracts";
+import { ExperienceAssetModeIds } from "../../../studio-shell/experience-assets/ExperienceAssetContracts";
 import {
   ExperienceSurfaceAssetIds,
-  resolveExperienceAssetModesFromRegistrations,
   type ExperienceSurfaceAssetId,
 } from "../../../studio-shell/experience-assets/ExperienceSurfaceAssets";
 import type { StudioShellExtensionContext } from "../../../studio-shell/StudioShellExtensions";
@@ -17,18 +16,13 @@ import {
   type SystemStudioDraftDocument,
 } from "../../../studio-shell/system/SystemStudioDraftDocument";
 import {
-  createSystemWizardExperienceAdapterModel,
-  SystemWizardPageIds,
-  type SystemWizardPageId,
-} from "../../../studio-shell/system/SystemWizardExperienceAdapter";
-import {
   createSystemPanelFromCanvasNode,
   createSystemCanvasExperienceDefinition,
 } from "../../../studio-shell/system/SystemCanvasExperienceAdapter";
 import { defaultPanelSlotId, type PanelAssetContract } from "../../../studio-shell/experience-assets/PanelAssetContracts";
-import ExperienceAssetAuthoringBoundary from "../experience-assets/ExperienceAssetAuthoringBoundary";
-import ConfigurableWizardSurface from "../experience-assets/ConfigurableWizardSurface";
 import ConfigurableCanvasSurface from "../experience-assets/ConfigurableCanvasSurface";
+import { SystemPageSetupEditor } from "./SystemPageSetupEditor";
+import { SystemSettingsEditor } from "./SystemSettingsEditor";
 import { StudioAssetRenderModes, type StudioAssetRenderMode } from "../../../studio-shell/studio-assets/StudioAssetContracts";
 import {
   StudioEmbeddedIntentKinds,
@@ -50,49 +44,6 @@ const defaultSystemExperienceAssetIds = Object.freeze([
   ExperienceSurfaceAssetIds.loomCanvas,
 ]);
 
-function buildSystemExperienceDefinition(
-  experienceAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>,
-): ExperienceAssetDefinition<SystemStudioDraftDocument, StudioShellValidationIssue> {
-  const fallbackModes = Object.freeze([
-    Object.freeze({
-      id: ExperienceAssetModeIds.wizard,
-      title: "Wizard",
-      summary: "Guided system composition.",
-      intent: "guided-authoring" as const,
-    }),
-    Object.freeze({
-      id: ExperienceAssetModeIds.canvas,
-      title: "Canvas",
-      summary: "Graph-oriented system composition.",
-      intent: "graph-authoring" as const,
-    }),
-  ]);
-
-  const enabledModeIds = new Set(
-    resolveExperienceAssetModesFromRegistrations({
-      assetIds: experienceAssetIds,
-      fallbackModes,
-    }).map((mode) => mode.id),
-  );
-
-  const modes = fallbackModes.filter((mode) => enabledModeIds.has(mode.id));
-  const hasWizard = modes.some((mode) => mode.id === ExperienceAssetModeIds.wizard);
-  const hasCanvas = modes.some((mode) => mode.id === ExperienceAssetModeIds.canvas);
-
-  return Object.freeze({
-    id: "system-studio-experience",
-    title: "System Studio",
-    defaultModeId: hasWizard ? ExperienceAssetModeIds.wizard : ExperienceAssetModeIds.canvas,
-    modes: Object.freeze(modes),
-    wizard: hasWizard
-      ? Object.freeze({ id: "wizard", title: "Wizard", summary: "Guided system composition." })
-      : undefined,
-    canvas: hasCanvas
-      ? Object.freeze({ id: "canvas", title: "Canvas", summary: "Graph-oriented system composition." })
-      : undefined,
-  });
-}
-
 export function SystemStudioDraftAuthoringBoundary({
   content,
   validationIssues,
@@ -102,7 +53,7 @@ export function SystemStudioDraftAuthoringBoundary({
   onStudioEvent,
 }: SystemStudioDraftAuthoringBoundaryProps): JSX.Element {
   const [selectedModeId, setSelectedModeId] = useState<"wizard" | "canvas">("wizard");
-  const [selectedWizardPageId, setSelectedWizardPageId] = useState<SystemWizardPageId>(SystemWizardPageIds.pages);
+  const [selectedWizardPageId, setSelectedWizardPageId] = useState<string>("pages");
   const [selectedLayoutNodeId, setSelectedLayoutNodeId] = useState<string | undefined>(undefined);
   const [selectedPageId, setSelectedPageId] = useState<string>("page-1");
 
@@ -321,11 +272,6 @@ export function SystemStudioDraftAuthoringBoundary({
       )));
     }
   };
-  const assetDefinition = useMemo(
-    () => buildSystemExperienceDefinition(experienceAssetIds),
-    [experienceAssetIds],
-  );
-
   const canvasModel = useMemo(
     () => createSystemCanvasExperienceDefinition({
       content,
@@ -348,63 +294,90 @@ export function SystemStudioDraftAuthoringBoundary({
     [content, extensionContext, selectedLayoutNodeId, resolvedSelectedPageId, selectedPagePanels, validationIssues],
   );
 
-  const wizardModel = useMemo(
-    () => createSystemWizardExperienceAdapterModel({
-      content,
-      extensionContext,
-      validationIssues,
-      selectedPageId: resolvedSelectedPageId,
-      onSelectPage: (pageId) => {
-        setSelectedPageId(pageId);
-        setSelectedLayoutNodeId(undefined);
-      },
-      onPagesChange: persistSystemPages,
-      canvasDefinition: canvasModel.definition,
-      canvasContext: canvasModel.context,
-    }),
-    [
-      content,
-      extensionContext,
-      validationIssues,
-      resolvedSelectedPageId,
-      canvasModel,
-    ],
-  );
+  const wizardPages = Object.freeze([
+    Object.freeze({ id: "pages", title: "Pages" }),
+    Object.freeze({ id: "interface-design", title: "Page layout" }),
+    Object.freeze({ id: "settings", title: "Settings" }),
+  ]);
+  const activeWizardPageId = wizardPages.some((page) => page.id === selectedWizardPageId)
+    ? selectedWizardPageId
+    : wizardPages[0]?.id ?? "pages";
+
+  const interfaceDesignReady = document.systemSpec.pages.length > 0 && document.systemSpec.pages.every((page) => (
+    (document.canvasAuthoring.pageLayouts.find((entry) => entry.pageId === page.pageId)?.panels.length ?? 0) > 0
+  ));
+  const settingsReady = document.systemSpec.settings.systemName.trim().length > 0;
+  const pagesReady = document.systemSpec.pages.length > 0 && document.systemSpec.pages.every((page) => page.title.trim().length > 0);
+  const readyCount = [pagesReady, interfaceDesignReady, settingsReady].filter(Boolean).length;
 
   return (
     <div className="ui-stack ui-stack--sm" data-testid="system-studio-draft-authoring-boundary">
-      <ExperienceAssetAuthoringBoundary
-        asset={assetDefinition}
-        currentModeId={selectedModeId}
-        onModeChange={hostMode === StudioAssetRenderModes.full ? (modeId) => {
-          setSelectedModeId(modeId);
-          onStudioEvent?.(createStudioIntentEvent({
-            kind: StudioEmbeddedIntentKinds.selectionChange,
-            payload: Object.freeze({
-              targetType: "item",
-              targetId: modeId,
-            }),
-          }));
-        } : undefined}
-        document={document}
-        issues={validationIssues}
-        surfaces={{
-          wizard: () => (
-            <ConfigurableWizardSurface
-              definition={wizardModel.definition}
-              definitionContext={wizardModel.context}
-              activePageId={selectedWizardPageId}
-              onPageChange={(pageId) => setSelectedWizardPageId(pageId as SystemWizardPageId)}
-            />
-          ),
-          canvas: () => (
-            <ConfigurableCanvasSurface
-              definition={canvasModel.definition}
-              definitionContext={canvasModel.context}
-            />
-          ),
-        }}
-      />
+      {hostMode === StudioAssetRenderModes.full ? (
+        <div className="ui-row ui-row--wrap" data-testid="system-studio-mode-actions">
+          {experienceAssetIds.includes(ExperienceSurfaceAssetIds.loomWizard) ? (
+            <button type="button" className={`ui-button ui-button--sm ${selectedModeId === "wizard" ? "ui-button--primary" : "ui-button--ghost"}`} onClick={() => setSelectedModeId("wizard")}>Wizard</button>
+          ) : null}
+          {experienceAssetIds.includes(ExperienceSurfaceAssetIds.loomCanvas) ? (
+            <button type="button" className={`ui-button ui-button--sm ${selectedModeId === "canvas" ? "ui-button--primary" : "ui-button--ghost"}`} onClick={() => setSelectedModeId("canvas")}>Canvas</button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {selectedModeId === ExperienceAssetModeIds.canvas ? (
+        <ConfigurableCanvasSurface definition={canvasModel.definition} definitionContext={canvasModel.context} />
+      ) : (
+        <div className="ui-stack ui-stack--sm">
+          <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="system-studio-wizard-pages-card">
+            <nav className="ui-configurable-wizard__page-nav" aria-label="System authoring wizard pages">
+              <div className="ui-configurable-wizard__page-nav-main">
+                <div className="ui-configurable-wizard__page-buttons">
+                  {wizardPages.map((page) => (
+                    <button key={page.id} type="button" className={`ui-button ui-button--sm ${page.id === activeWizardPageId ? "ui-button--primary" : "ui-button--ghost"}`} onClick={() => setSelectedWizardPageId(page.id)}>{page.title}</button>
+                  ))}
+                </div>
+                <p className="ui-text-muted ui-configurable-wizard__page-progress">Current focus: <strong>{wizardPages.find((page) => page.id === activeWizardPageId)?.title ?? "Pages"}</strong>. Progress: {readyCount}/3 pages ready.</p>
+              </div>
+            </nav>
+            {activeWizardPageId === "pages" ? (
+              <SystemPageSetupEditor pages={document.systemSpec.pages} selectedPageId={resolvedSelectedPageId} onSelectPage={(pageId) => { setSelectedPageId(pageId); setSelectedLayoutNodeId(undefined); }} onPagesChange={persistSystemPages} />
+            ) : null}
+            {activeWizardPageId === "interface-design" ? (
+              <section className="ui-stack ui-stack--sm" data-testid="system-wizard-interface-design-page">
+                <div className="ui-stack ui-stack--2xs">
+                  <p className="ui-text-small ui-text-secondary">Pick a page, then arrange its major sections. Detailed panel content is designed in each panel's embedded studio.</p>
+                  <div className="ui-row ui-row--wrap" data-testid="system-wizard-page-switcher">
+                    {document.systemSpec.pages.map((page) => (
+                      <button key={page.pageId} type="button" className={`ui-button ui-button--sm ${page.pageId === resolvedSelectedPageId ? "ui-button--primary" : "ui-button--ghost"}`} onClick={() => { setSelectedPageId(page.pageId); setSelectedLayoutNodeId(undefined); }}>{page.title}</button>
+                    ))}
+                  </div>
+                </div>
+                <ConfigurableCanvasSurface definition={canvasModel.definition} definitionContext={canvasModel.context} />
+              </section>
+            ) : null}
+            {activeWizardPageId === "settings" ? (
+              <section className="ui-stack ui-stack--sm" data-testid="system-wizard-settings-page">
+                <SystemSettingsEditor context={extensionContext} />
+              </section>
+            ) : null}
+          </section>
+
+          <details className="ui-card ui-card--padded ui-configurable-wizard__readiness" data-testid="configurable-wizard-readiness-summary">
+            <summary className="ui-configurable-wizard__readiness-summary"><strong>System setup readiness</strong></summary>
+            <div className="ui-stack ui-stack--2xs ui-configurable-wizard__readiness-content">
+              <p className="ui-text-muted">{document.systemSpec.pages.length === 0
+                ? "Start by adding your first page."
+                : document.systemSpec.pages.some((page) => page.title.trim().length === 0)
+                  ? "Give each page a title so people can find what they need."
+                  : !interfaceDesignReady
+                    ? "Add at least one panel to each page in Interface Design."
+                    : "Your setup is ready. You can keep refining page structure, navigation, and settings."}</p>
+              {validationIssues.length > 0 ? (
+                <ul className="ui-stack ui-stack--2xs">{validationIssues.map((issue) => <li key={`${issue.code}:${issue.path ?? ""}:${issue.message}`}><span className="ui-text-muted">{issue.message}</span></li>)}</ul>
+              ) : <p className="ui-text-muted">No blocking issues detected.</p>}
+            </div>
+          </details>
+        </div>
+      )}
     </div>
   );
 }

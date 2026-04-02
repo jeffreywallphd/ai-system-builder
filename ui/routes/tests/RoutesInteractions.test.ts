@@ -20,8 +20,8 @@ describe("ui/routes interactions", () => {
     expect(appRouterSource).toContain("path: ROUTE_PATHS.workflowConversation");
     expect(appRouterSource).toContain("<BuildPage />");
     expect(appRouterSource).toContain("element: <SettingsPage />");
-    expect(appRouterSource).toContain("resolveLegacyRouteElement(ROUTE_PATHS.agentStudio");
-    expect(appRouterSource).toContain("resolveLegacyRouteElement(ROUTE_PATHS.studioShell");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.agentStudio, element: <Navigate to={ROUTE_PATHS.build} replace />");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.studioShell, element: <Navigate to={ROUTE_PATHS.build} replace />");
     expect(appRouterSource).toContain("element: <RegistryPage />");
     expect(appRouterSource).toContain("element: <AssetDetailPage />");
     expect(appRouterSource).toContain("element: <WorkflowStudioPage />");
@@ -38,8 +38,8 @@ describe("ui/routes interactions", () => {
     expect(appRouterSource).toContain("element: <PromptTemplateStudioPage />");
     expect(appRouterSource).toContain("element: <EmbeddingIndexStudioPage />");
     expect(appRouterSource).toContain("element: <ConfigProfileStudioPage />");
-    expect(appRouterSource).toContain("resolveLegacyRouteElement(ROUTE_PATHS.mcp");
-    expect(appRouterSource).toContain("resolveLegacyRouteElement(ROUTE_PATHS.context");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.mcp, element: <Navigate to={ROUTE_PATHS.explore} replace />");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.context, element: <Navigate to={ROUTE_PATHS.explore} replace />");
     expect(appRouterSource).toContain("element: <ContextWorkbenchPage />");
   });
 });
