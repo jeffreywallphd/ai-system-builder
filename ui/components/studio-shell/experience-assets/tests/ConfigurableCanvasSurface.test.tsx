@@ -55,13 +55,22 @@ describe("ConfigurableCanvasSurface", () => {
           resolveEditingModel: () => ({
             selectedNodeId: "layout-1",
             commands: [{ id: "reset", label: "Reset" }],
+            designFrame: {
+              mode: "bounded-frame",
+              ratio: { width: 16, height: 9 },
+              boundedArea: { padding: 12 },
+            },
+            coordinateSpace: {
+              mode: "normalized",
+              referenceDimensions: { width: 1600, height: 900 },
+            },
             nodes: [{
               id: "layout-1",
               title: "Panel",
-              x: 40,
-              y: 48,
-              width: 200,
-              height: 140,
+              x: 0.1,
+              y: 0.12,
+              width: 0.3,
+              height: 0.2,
               minWidth: 160,
               minHeight: 90,
             }],
@@ -72,6 +81,7 @@ describe("ConfigurableCanvasSurface", () => {
     );
 
     expect(html).toContain('data-testid="configurable-canvas-editing-surface"');
+    expect(html).toContain('data-testid="configurable-canvas-design-frame"');
     expect(html).toContain('data-testid="configurable-canvas-layout-node-layout-1"');
   });
 

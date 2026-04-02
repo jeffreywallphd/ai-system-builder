@@ -1,4 +1,4 @@
-import { useMemo, useState, type JSX, type PointerEvent as ReactPointerEvent } from "react";
+import { useMemo, useRef, useState, type JSX, type PointerEvent as ReactPointerEvent } from "react";
 import type {
   CanvasExperienceAssetDefinition,
   CanvasSurfaceEditingEvent,
@@ -80,6 +80,25 @@ function clamp(value: number, min: number): number {
   return Number.isFinite(value) ? Math.max(min, value) : min;
 }
 
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(1, value));
+}
+
+function resolveDesignFrameRatio(editingModel: CanvasSurfaceEditingModel): number {
+  const ratio = editingModel.designFrame?.ratio;
+  if (ratio && ratio.width > 0 && ratio.height > 0) {
+    return ratio.width / ratio.height;
+  }
+  const dimensions = editingModel.designFrame?.dimensions;
+  if (dimensions && dimensions.width > 0 && dimensions.height > 0) {
+    return dimensions.width / dimensions.height;
+  }
+  return 16 / 9;
+}
+
 function mapResizeFrame(
   node: CanvasSurfaceLayoutNodeModel,
   deltaX: number,
@@ -140,6 +159,10 @@ function ConfigurableCanvasEditingSurface({
     readonly nodeId: string;
     readonly startClientX: number;
     readonly startClientY: number;
+    readonly nodeStartX: number;
+    readonly nodeStartY: number;
+    readonly nodeStartWidth: number;
+    readonly nodeStartHeight: number;
     readonly resizeHandle?: "se" | "sw" | "ne" | "nw";
   } | undefined>(undefined);
 
@@ -147,14 +170,25 @@ function ConfigurableCanvasEditingSurface({
     () => new Map(editingModel.nodes.map((node) => [node.id, node] as const)),
     [editingModel.nodes],
   );
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const coordinateMode = editingModel.coordinateSpace?.mode ?? "absolute";
+
+  const toFrameCoordinate = (pixelValue: number, frameSize: number): number => {
+    if (coordinateMode === "normalized") {
+      return clamp01(frameSize <= 0 ? 0 : pixelValue / frameSize);
+    }
+    return Math.round(pixelValue);
+  };
+
+  const toFrameSizeCoordinate = (pixelValue: number, frameSize: number): number => {
+    if (coordinateMode === "normalized") {
+      return Math.max(0.04, clamp01(frameSize <= 0 ? 0 : pixelValue / frameSize));
+    }
+    return Math.max(24, Math.round(pixelValue));
+  };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
-    if (!dragState) {
-      return;
-    }
-
-    const node = nodesById.get(dragState.nodeId);
-    if (!node) {
+    if (!dragState || !nodesById.get(dragState.nodeId)) {
       return;
     }
 
@@ -162,41 +196,59 @@ function ConfigurableCanvasEditingSurface({
     const deltaY = event.clientY - dragState.startClientY;
 
     if (dragState.mode === "move") {
+      const frameRect = frameRef.current?.getBoundingClientRect();
+      const frameWidth = frameRect?.width ?? 0;
+      const frameHeight = frameRect?.height ?? 0;
       onEditingEvent?.({
         type: "node.position.change",
-        nodeId: node.id,
+        nodeId: dragState.nodeId,
         position: Object.freeze({
-          x: Math.round(node.x + deltaX),
-          y: Math.round(node.y + deltaY),
+          x: toFrameCoordinate(dragState.nodeStartX + deltaX, frameWidth),
+          y: toFrameCoordinate(dragState.nodeStartY + deltaY, frameHeight),
         }),
       });
       return;
     }
 
-    const frame = mapResizeFrame(node, deltaX, deltaY, dragState.resizeHandle ?? "se");
+    const frame = mapResizeFrame({
+      id: dragState.nodeId,
+      title: "",
+      x: dragState.nodeStartX,
+      y: dragState.nodeStartY,
+      width: dragState.nodeStartWidth,
+      height: dragState.nodeStartHeight,
+      minWidth: 48,
+      minHeight: 48,
+    }, deltaX, deltaY, dragState.resizeHandle ?? "se");
+    const frameRect = frameRef.current?.getBoundingClientRect();
+    const frameWidth = frameRect?.width ?? 0;
+    const frameHeight = frameRect?.height ?? 0;
     onEditingEvent?.({
       type: "node.resize.change",
-      nodeId: node.id,
+      nodeId: dragState.nodeId,
       frame: Object.freeze({
-        x: Math.round(frame.x),
-        y: Math.round(frame.y),
-        width: Math.round(frame.width),
-        height: Math.round(frame.height),
+        x: toFrameCoordinate(frame.x, frameWidth),
+        y: toFrameCoordinate(frame.y, frameHeight),
+        width: toFrameSizeCoordinate(frame.width, frameWidth),
+        height: toFrameSizeCoordinate(frame.height, frameHeight),
       }),
     });
   };
+
+  const boundedPadding = editingModel.designFrame?.boundedArea?.padding ?? 16;
+  const designFrameRatio = resolveDesignFrameRatio(editingModel);
 
   return (
     <div
       className="ui-configurable-canvas-editor ui-canvas-surface"
       data-testid="configurable-canvas-editing-surface"
       onDoubleClick={(event) => {
-        const rect = event.currentTarget.getBoundingClientRect();
+        const rect = frameRef.current?.getBoundingClientRect() ?? event.currentTarget.getBoundingClientRect();
         onEditingEvent?.({
           type: "node.create.request",
           position: Object.freeze({
-            x: Math.round(event.clientX - rect.left),
-            y: Math.round(event.clientY - rect.top),
+            x: toFrameCoordinate(event.clientX - rect.left, rect.width),
+            y: toFrameCoordinate(event.clientY - rect.top, rect.height),
           }),
         });
       }}
@@ -225,71 +277,95 @@ function ConfigurableCanvasEditingSurface({
         </div>
       ) : null}
 
-      {editingModel.nodes.map((node) => {
-        const selected = editingModel.selectedNodeId === node.id;
-        return (
-          <article
-            key={node.id}
-            className={[
-              "ui-configurable-canvas-layout-node",
-              "ui-card",
-              "ui-card--padded",
-              selected ? "ui-configurable-canvas-layout-node--selected" : "",
-            ].filter(Boolean).join(" ")}
-            style={{
-              left: `${node.x}px`,
-              top: `${node.y}px`,
-              width: `${node.width}px`,
-              height: `${node.height}px`,
-            }}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (node.selectable !== false) {
-                onEditingEvent?.({ type: "selection.change", nodeId: node.id });
-              }
-            }}
-            onPointerDown={(event) => {
-              if (node.movable === false) {
-                return;
-              }
-              event.preventDefault();
-              event.stopPropagation();
-              setDragState({
-                mode: "move",
-                nodeId: node.id,
-                startClientX: event.clientX,
-                startClientY: event.clientY,
-              });
-            }}
-            data-testid={`configurable-canvas-layout-node-${node.id}`}
-          >
-            <div className="ui-stack ui-stack--3xs">
-              <strong className="ui-text-small">{node.title}</strong>
-              {node.subtitle ? <span className="ui-text-small ui-text-secondary">{node.subtitle}</span> : null}
-            </div>
+      <div
+        ref={frameRef}
+        className="ui-configurable-canvas-editor__design-frame"
+        style={{
+          inset: `${boundedPadding}px`,
+          aspectRatio: `${designFrameRatio}`,
+        }}
+        data-testid="configurable-canvas-design-frame"
+      >
+        {editingModel.nodes.map((node) => {
+          const selected = editingModel.selectedNodeId === node.id;
+          return (
+            <article
+              key={node.id}
+              className={[
+                "ui-configurable-canvas-layout-node",
+                "ui-card",
+                "ui-card--padded",
+                selected ? "ui-configurable-canvas-layout-node--selected" : "",
+              ].filter(Boolean).join(" ")}
+              style={{
+                left: `${coordinateMode === "normalized" ? node.x * 100 : node.x}${coordinateMode === "normalized" ? "%" : "px"}`,
+                top: `${coordinateMode === "normalized" ? node.y * 100 : node.y}${coordinateMode === "normalized" ? "%" : "px"}`,
+                width: `${coordinateMode === "normalized" ? node.width * 100 : node.width}${coordinateMode === "normalized" ? "%" : "px"}`,
+                height: `${coordinateMode === "normalized" ? node.height * 100 : node.height}${coordinateMode === "normalized" ? "%" : "px"}`,
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (node.selectable !== false) {
+                  onEditingEvent?.({ type: "selection.change", nodeId: node.id });
+                }
+              }}
+              onPointerDown={(event) => {
+                if (node.movable === false) {
+                  return;
+                }
+                event.preventDefault();
+                event.stopPropagation();
+                const frameRect = frameRef.current?.getBoundingClientRect();
+                const width = frameRect?.width ?? 1;
+                const height = frameRect?.height ?? 1;
+                setDragState({
+                  mode: "move",
+                  nodeId: node.id,
+                  startClientX: event.clientX,
+                  startClientY: event.clientY,
+                  nodeStartX: coordinateMode === "normalized" ? node.x * width : node.x,
+                  nodeStartY: coordinateMode === "normalized" ? node.y * height : node.y,
+                  nodeStartWidth: coordinateMode === "normalized" ? node.width * width : node.width,
+                  nodeStartHeight: coordinateMode === "normalized" ? node.height * height : node.height,
+                });
+              }}
+              data-testid={`configurable-canvas-layout-node-${node.id}`}
+            >
+              <div className="ui-stack ui-stack--3xs">
+                <strong className="ui-text-small">{node.title}</strong>
+                {node.subtitle ? <span className="ui-text-small ui-text-secondary">{node.subtitle}</span> : null}
+              </div>
 
-            {node.resizable !== false ? (["nw", "ne", "sw", "se"] as const).map((handle) => (
-              <button
-                key={`${node.id}-${handle}`}
-                type="button"
-                className={`ui-configurable-canvas-layout-node__resize ui-configurable-canvas-layout-node__resize--${handle}`}
-                aria-label={`Resize ${node.title}`}
-                onPointerDown={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setDragState({
-                    mode: "resize",
-                    nodeId: node.id,
-                    startClientX: event.clientX,
-                    startClientY: event.clientY,
-                    resizeHandle: handle,
-                  });
-                }}
-              />
-            )) : null}
-          </article>
-        );
-      })}
+              {node.resizable !== false ? (["nw", "ne", "sw", "se"] as const).map((handle) => (
+                <button
+                  key={`${node.id}-${handle}`}
+                  type="button"
+                  className={`ui-configurable-canvas-layout-node__resize ui-configurable-canvas-layout-node__resize--${handle}`}
+                  aria-label={`Resize ${node.title}`}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const frameRect = frameRef.current?.getBoundingClientRect();
+                    const width = frameRect?.width ?? 1;
+                    const height = frameRect?.height ?? 1;
+                    setDragState({
+                      mode: "resize",
+                      nodeId: node.id,
+                      startClientX: event.clientX,
+                      startClientY: event.clientY,
+                      resizeHandle: handle,
+                      nodeStartX: coordinateMode === "normalized" ? node.x * width : node.x,
+                      nodeStartY: coordinateMode === "normalized" ? node.y * height : node.y,
+                      nodeStartWidth: coordinateMode === "normalized" ? node.width * width : node.width,
+                      nodeStartHeight: coordinateMode === "normalized" ? node.height * height : node.height,
+                    });
+                  }}
+                />
+              )) : null}
+            </article>
+          );
+        })}
+      </div>
 
       <div className="ui-configurable-canvas-editor__hint ui-text-small ui-text-secondary">
         {editingModel.createNodeDescription ?? "Double-click the canvas to add a new block."}

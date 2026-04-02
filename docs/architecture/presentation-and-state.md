@@ -609,3 +609,11 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - The reusable canvas experience contract now supports a neutral editing-surface model (`resolveEditingModel`) and generic event callbacks (`onEditingEvent`) for node selection, create requests, movement, resize, and canvas commands.
 - The shared configurable canvas renderer now includes a reusable rectangular layout-node surface (position + size + min size + resize handles + selection affordances) while remaining prop-driven and callback-driven for studio adapters.
 - System Studio canvas now consumes that reusable editing contract through adapter boundaries, with local layout frame state handled at the authoring boundary and composition orchestration still owned by existing system services/components.
+
+## Direction 5 UI extension update: viewport-ratio framed canvas + panel asset model (systems stories 3-4)
+
+- The reusable canvas contract now supports a bounded design-frame mode (`CanvasSurfaceDesignFrameModel`) with explicit width:height ratio/dimension configuration and bounded editing area hints, so authoring can target viewport-like proportions instead of an unbounded plane.
+- Editing models can now declare coordinate-space semantics (`absolute` or `normalized`) and the shared configurable renderer scales node placement/resizing against a rendered design frame while emitting normalized coordinates for persistence when configured.
+- System Studio draft parsing/serialization now persists canvas authoring metadata (`systemSpec.canvasAuthoring`) including design-frame settings and normalized panel layout bounds, so authored layout remains reusable across different rendered viewport sizes.
+- Added a reusable panel asset contract layer (`PanelAssetContract`, runtime instance mapping) that models stable panel identity, page association, persisted bounds, user-facing metadata, content slots, and preview/runtime representation boundaries.
+- System canvas adapter now maps authored layout nodes into reusable panel assets and runtime panel instances through shared contracts rather than studio-local ad hoc panel structures.

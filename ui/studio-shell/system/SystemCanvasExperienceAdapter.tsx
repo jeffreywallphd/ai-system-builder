@@ -4,11 +4,17 @@ import type {
   CanvasExperienceAssetDefinition,
   CanvasSurfaceEditingEvent,
   CanvasSurfaceEditingModel,
+  CanvasSurfaceDesignFrameModel,
   CanvasSurfaceFocusedTarget,
   CanvasSurfaceGraphSummary,
   CanvasSurfaceLayoutNodeModel,
 } from "../experience-assets/ConfigurableCanvasSurfaceContracts";
 import type { ExperienceIssueSummary } from "../experience-assets/ExperiencePresentationVocabulary";
+import {
+  mapLayoutNodeToPanelAsset,
+  mapPanelAssetToRuntimeInstance,
+  type PanelAssetContract,
+} from "../experience-assets/PanelAssetContracts";
 import type { StudioShellExtensionContext } from "../StudioShellExtensions";
 import { parseSystemStudioDraftDocument, type SystemStudioDraftDocument } from "./SystemStudioDraftDocument";
 import { SystemCompositionEditor } from "../../components/studio-shell/SystemCompositionEditor";
@@ -23,13 +29,6 @@ export const SystemCanvasInspectorPanels = Object.freeze({
 export type SystemCanvasInspectorPanelId =
   typeof SystemCanvasInspectorPanels[keyof typeof SystemCanvasInspectorPanels];
 
-export interface SystemCanvasNodeLayoutFrame {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-}
-
 export interface SystemCanvasExperienceContext {
   readonly extensionContext: StudioShellExtensionContext;
   readonly document: SystemStudioDraftDocument;
@@ -37,6 +36,8 @@ export interface SystemCanvasExperienceContext {
   readonly selectedInspectorPanel: SystemCanvasInspectorPanelId;
   readonly selectedLayoutNodeId?: string;
   readonly layoutNodes: ReadonlyArray<CanvasSurfaceLayoutNodeModel>;
+  readonly designFrame: CanvasSurfaceDesignFrameModel;
+  readonly panels: ReadonlyArray<PanelAssetContract>;
 }
 
 export interface SystemCanvasExperienceAdapterInput {
@@ -46,7 +47,6 @@ export interface SystemCanvasExperienceAdapterInput {
   readonly selectedInspectorPanel: SystemCanvasInspectorPanelId;
   readonly onSelectInspectorPanel: (panelId: SystemCanvasInspectorPanelId) => void;
   readonly selectedLayoutNodeId?: string;
-  readonly layoutFramesByNodeId?: Readonly<Record<string, SystemCanvasNodeLayoutFrame>>;
   readonly onCanvasEditingEvent?: (event: CanvasSurfaceEditingEvent) => void;
 }
 
@@ -93,7 +93,6 @@ function renderInspector(context: SystemCanvasExperienceContext): JSX.Element {
 
 function resolveLayoutNodes(input: {
   readonly document: SystemStudioDraftDocument;
-  readonly layoutFramesByNodeId?: Readonly<Record<string, SystemCanvasNodeLayoutFrame>>;
 }): ReadonlyArray<CanvasSurfaceLayoutNodeModel> {
   const columns = 3;
   return Object.freeze(input.document.systemSpec.components.map((component, index) => {
@@ -102,12 +101,13 @@ function resolveLayoutNodes(input: {
     const row = Math.floor(index / columns);
     const col = index % columns;
     const defaultFrame = Object.freeze({
-      x: 40 + (col * 280),
-      y: 56 + (row * 186),
-      width: 240,
-      height: 140,
+      x: 0.03 + (col * 0.31),
+      y: 0.06 + (row * 0.24),
+      width: 0.27,
+      height: 0.2,
     });
-    const frame = input.layoutFramesByNodeId?.[nodeId] ?? defaultFrame;
+    const persistedPanel = input.document.canvasAuthoring.panels.find((panel) => panel.sourceLayoutNodeId === nodeId);
+    const frame = persistedPanel?.layoutBounds ?? defaultFrame;
 
     return Object.freeze({
       id: nodeId,
@@ -126,6 +126,25 @@ function resolveLayoutNodes(input: {
   }));
 }
 
+function resolvePanels(input: {
+  readonly document: SystemStudioDraftDocument;
+  readonly nodes: ReadonlyArray<CanvasSurfaceLayoutNodeModel>;
+}): ReadonlyArray<PanelAssetContract> {
+  if (input.document.canvasAuthoring.panels.length > 0) {
+    return input.document.canvasAuthoring.panels;
+  }
+  return Object.freeze(input.nodes.map((node) => mapLayoutNodeToPanelAsset({
+    node,
+    pageId: "system-canvas",
+    contentSlots: Object.freeze([
+      Object.freeze({
+        slotId: `${node.id}-content`,
+        label: "Main content",
+      }),
+    ]),
+  })));
+}
+
 function resolveEditingModel(context: SystemCanvasExperienceContext): CanvasSurfaceEditingModel {
   return Object.freeze({
     nodes: context.layoutNodes,
@@ -134,6 +153,11 @@ function resolveEditingModel(context: SystemCanvasExperienceContext): CanvasSurf
       Object.freeze({ id: "fit-layout", label: "Reset layout", tone: "ghost" as const }),
     ]),
     createNodeDescription: "Double-click to stage a new block. Add details with the composer below.",
+    designFrame: context.designFrame,
+    coordinateSpace: Object.freeze({
+      mode: "normalized",
+      referenceDimensions: context.designFrame.dimensions ?? Object.freeze({ width: 1600, height: 900 }),
+    }),
   });
 }
 
@@ -146,8 +170,9 @@ export function createSystemCanvasExperienceDefinition(
   const document = parseSystemStudioDraftDocument(input.content);
   const layoutNodes = resolveLayoutNodes({
     document,
-    layoutFramesByNodeId: input.layoutFramesByNodeId,
   });
+  const panels = resolvePanels({ document, nodes: layoutNodes });
+  const runtimePanels = Object.freeze(panels.map((panel) => mapPanelAssetToRuntimeInstance(panel)));
 
   const context: SystemCanvasExperienceContext = Object.freeze({
     extensionContext: input.extensionContext,
@@ -156,6 +181,8 @@ export function createSystemCanvasExperienceDefinition(
     selectedInspectorPanel: input.selectedInspectorPanel,
     selectedLayoutNodeId: input.selectedLayoutNodeId,
     layoutNodes,
+    designFrame: document.canvasAuthoring.designFrame,
+    panels,
   });
 
   const definition: CanvasExperienceAssetDefinition<SystemCanvasExperienceContext> = Object.freeze({
@@ -200,7 +227,7 @@ export function createSystemCanvasExperienceDefinition(
     renderSupplementaryPanels: ({ extensionContext }) => (
       <SystemCompositionEditor context={extensionContext} />
     ),
-    resolveInteractionMessage: (canvasContext) => `Bindings configured: ${canvasContext.document.systemSpec.bindings.length}`,
+    resolveInteractionMessage: (canvasContext) => `Bindings configured: ${canvasContext.document.systemSpec.bindings.length} · Panels ready for runtime: ${runtimePanels.length}`,
     emptyState: Object.freeze({
       when: (canvasContext) => canvasContext.document.systemSpec.components.length === 0,
       render: () => (

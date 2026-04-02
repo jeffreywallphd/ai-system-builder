@@ -57,6 +57,40 @@ export interface CanvasSurfaceLayoutNodeModel {
   readonly resizable?: boolean;
 }
 
+export interface CanvasSurfaceDesignFrameRatio {
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface CanvasSurfaceDesignFrameDimensions {
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface CanvasSurfaceBoundedEditingArea {
+  readonly padding?: number;
+}
+
+export interface CanvasSurfaceNormalizedCoordinateSpace {
+  readonly mode: "normalized";
+  readonly referenceDimensions: CanvasSurfaceDesignFrameDimensions;
+}
+
+export interface CanvasSurfaceAbsoluteCoordinateSpace {
+  readonly mode: "absolute";
+}
+
+export type CanvasSurfaceCoordinateSpace =
+  | CanvasSurfaceNormalizedCoordinateSpace
+  | CanvasSurfaceAbsoluteCoordinateSpace;
+
+export interface CanvasSurfaceDesignFrameModel {
+  readonly mode: "bounded-frame";
+  readonly ratio?: CanvasSurfaceDesignFrameRatio;
+  readonly dimensions?: CanvasSurfaceDesignFrameDimensions;
+  readonly boundedArea?: CanvasSurfaceBoundedEditingArea;
+}
+
 export interface CanvasSurfaceCommandModel {
   readonly id: string;
   readonly label: string;
@@ -70,6 +104,8 @@ export interface CanvasSurfaceEditingModel {
   readonly commands?: ReadonlyArray<CanvasSurfaceCommandModel>;
   readonly createNodeLabel?: string;
   readonly createNodeDescription?: string;
+  readonly designFrame?: CanvasSurfaceDesignFrameModel;
+  readonly coordinateSpace?: CanvasSurfaceCoordinateSpace;
 }
 
 export type CanvasSurfaceEditingEvent =

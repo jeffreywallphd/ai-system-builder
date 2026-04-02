@@ -1,0 +1,70 @@
+import type { CanvasSurfaceLayoutNodeModel } from "./ConfigurableCanvasSurfaceContracts";
+
+export interface PanelAssetLayoutBounds {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface PanelAssetContentSlot {
+  readonly slotId: string;
+  readonly label?: string;
+}
+
+export interface PanelAssetContract {
+  readonly panelId: string;
+  readonly pageId: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly layoutBounds: PanelAssetLayoutBounds;
+  readonly contentSlots: ReadonlyArray<PanelAssetContentSlot>;
+  readonly sourceLayoutNodeId?: string;
+}
+
+export interface RuntimePanelAssetInstance {
+  readonly instanceId: string;
+  readonly panelId: string;
+  readonly pageId: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly layoutBounds: PanelAssetLayoutBounds;
+  readonly contentSlots: ReadonlyArray<PanelAssetContentSlot>;
+}
+
+export function mapLayoutNodeToPanelAsset(input: {
+  readonly node: CanvasSurfaceLayoutNodeModel;
+  readonly panelId?: string;
+  readonly pageId: string;
+  readonly description?: string;
+  readonly contentSlots?: ReadonlyArray<PanelAssetContentSlot>;
+}): PanelAssetContract {
+  return Object.freeze({
+    panelId: input.panelId ?? input.node.id,
+    pageId: input.pageId,
+    title: input.node.title,
+    description: input.description ?? input.node.subtitle,
+    layoutBounds: Object.freeze({
+      x: input.node.x,
+      y: input.node.y,
+      width: input.node.width,
+      height: input.node.height,
+    }),
+    contentSlots: Object.freeze(input.contentSlots ?? []),
+    sourceLayoutNodeId: input.node.id,
+  });
+}
+
+export function mapPanelAssetToRuntimeInstance(
+  panel: PanelAssetContract,
+): RuntimePanelAssetInstance {
+  return Object.freeze({
+    instanceId: `${panel.pageId}:${panel.panelId}`,
+    panelId: panel.panelId,
+    pageId: panel.pageId,
+    title: panel.title,
+    description: panel.description,
+    layoutBounds: panel.layoutBounds,
+    contentSlots: panel.contentSlots,
+  });
+}
