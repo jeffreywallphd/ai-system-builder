@@ -229,6 +229,8 @@ export interface SystemPageRuntimeNavigationDescriptor {
   readonly title?: string;
   readonly supportsDeepLinking: boolean;
   readonly navGroup?: string;
+  readonly includeInNavigation?: boolean;
+  readonly navPlacement?: "primary" | "secondary";
   readonly requiresRuntimeSession?: boolean;
 }
 

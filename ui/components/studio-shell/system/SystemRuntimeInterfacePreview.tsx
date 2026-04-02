@@ -30,9 +30,13 @@ interface RuntimePageLayoutModel {
   readonly panels: ReturnType<typeof mapPanelAssetToRuntimeInstance>[];
 }
 
-function resolveRuntimePages(content: string): ReadonlyArray<RuntimePageLayoutModel> {
+function resolveRuntimePages(content: string): {
+  readonly pages: ReadonlyArray<RuntimePageLayoutModel>;
+  readonly defaultLandingPageId?: string;
+} {
   const document = parseSystemStudioDraftDocument(content);
-  return Object.freeze(document.systemSpec.pages.map((page) => {
+  return Object.freeze({
+    pages: Object.freeze(document.systemSpec.pages.map((page) => {
     const layout = document.canvasAuthoring.pageLayouts.find((entry) => entry.pageId === page.pageId);
     return Object.freeze({
       pageId: page.pageId,
@@ -40,7 +44,9 @@ function resolveRuntimePages(content: string): ReadonlyArray<RuntimePageLayoutMo
       description: page.description,
       panels: Object.freeze((layout?.panels ?? []).map((panel) => mapPanelAssetToRuntimeInstance(panel))),
     });
-  }));
+    })),
+    defaultLandingPageId: document.systemSpec.settings.defaultLandingPageId,
+  });
 }
 
 export default function SystemRuntimeInterfacePreview({
@@ -48,8 +54,8 @@ export default function SystemRuntimeInterfacePreview({
   extensionContext,
   studioAssetHosts,
 }: SystemRuntimeInterfacePreviewProps): JSX.Element {
-  const pages = useMemo(() => resolveRuntimePages(content), [content]);
-  const [selectedPageId, setSelectedPageId] = useState<string>(pages[0]?.pageId ?? "page-1");
+  const { pages, defaultLandingPageId } = useMemo(() => resolveRuntimePages(content), [content]);
+  const [selectedPageId, setSelectedPageId] = useState<string>(defaultLandingPageId ?? pages[0]?.pageId ?? "page-1");
   const activePage = pages.find((page) => page.pageId === selectedPageId) ?? pages[0];
 
   return (

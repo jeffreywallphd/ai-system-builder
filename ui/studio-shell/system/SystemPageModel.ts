@@ -145,6 +145,10 @@ export function normalizeSystemStudioPageModel(entry: Record<string, unknown>, i
           ? navigationRecord.supportsDeepLinking
           : false,
         navGroup: normalizeOptional(navigationRecord.navGroup),
+        includeInNavigation: typeof navigationRecord.includeInNavigation === "boolean"
+          ? navigationRecord.includeInNavigation
+          : true,
+        navPlacement: navigationRecord.navPlacement === "secondary" ? "secondary" : "primary",
         requiresRuntimeSession: typeof navigationRecord.requiresRuntimeSession === "boolean"
           ? navigationRecord.requiresRuntimeSession
           : false,
@@ -194,6 +198,8 @@ export function createSystemStudioPageModel(input: {
       route: routeSegment ? `/${routeSegment}` : `/${pageId}`,
       title: safeTitle,
       supportsDeepLinking: false,
+      includeInNavigation: true,
+      navPlacement: "primary",
       requiresRuntimeSession: false,
     }),
   });

@@ -737,4 +737,10 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - high-level navigation mode
   - theme/design-token hooks
   - global runtime behavior toggles.
+- System Studio settings now also persist a normalized navigation structure model (`systemSpec.settings.navigation.structure.items`) aligned to `systemSpec.pages` ordering:
+  - ordered page participation entries,
+  - user-facing navigation labels,
+  - visibility/inclusion controls,
+  - grouping and placement hints (`group`, `placement`) for future runtime shell rendering.
+- Navigation structure reconciliation and default landing-page validation are now document-authoritative in the same parse/serialize seams (`SystemStudioDraftDocument` + `SystemSettingsModel`), so deleted/invalid page references fall back gracefully to the first valid visible page.
 - The Settings step now foregrounds this non-technical settings UI and keeps technical parameter editing in a collapsed advanced section, preserving clear separation between page structure authoring, panel-internal authoring, and system-level runtime settings.

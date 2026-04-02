@@ -167,6 +167,26 @@ describe("SystemStudioDraftDocument", () => {
     expect(parsed.systemSpec.settings.runtimeBehavior.confirmBeforeExit).toBe(true);
   });
 
+  it("falls back to a valid landing page when persisted default is missing", () => {
+    const parsed = parseSystemStudioDraftDocument(JSON.stringify({
+      systemSpec: {
+        pages: [
+          { pageId: "page-1", title: "Welcome" },
+          { pageId: "page-2", title: "Review", navigation: { includeInNavigation: false } },
+        ],
+        settings: {
+          defaultLandingPageId: "deleted-page",
+        },
+      },
+    }));
+
+    expect(parsed.systemSpec.settings.defaultLandingPageId).toBe("page-1");
+    expect(parsed.systemSpec.settings.navigation.structure.items).toEqual([
+      expect.objectContaining({ pageId: "page-1", visible: true }),
+      expect.objectContaining({ pageId: "page-2", visible: false }),
+    ]);
+  });
+
   it("keeps panel bounds inside the normalized page frame", () => {
     const parsed = parseSystemStudioDraftDocument(JSON.stringify({
       systemSpec: {

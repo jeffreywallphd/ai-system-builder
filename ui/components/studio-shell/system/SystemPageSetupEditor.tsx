@@ -257,6 +257,27 @@ export function SystemPageSetupEditor({
                       title: page.navigation?.title ?? page.title,
                       supportsDeepLinking: page.navigation?.supportsDeepLinking ?? false,
                       navGroup: page.navigation?.navGroup,
+                      includeInNavigation: page.navigation?.includeInNavigation ?? true,
+                      navPlacement: page.navigation?.navPlacement ?? "primary",
+                      requiresRuntimeSession: page.navigation?.requiresRuntimeSession ?? false,
+                    }),
+                  })}
+                />
+              </label>
+              <label className="ui-field">
+                <span className="ui-field__label">Show in navigation</span>
+                <input
+                  type="checkbox"
+                  className="ui-checkbox"
+                  checked={page.navigation?.includeInNavigation ?? true}
+                  onChange={(event) => updatePage(index, {
+                    navigation: Object.freeze({
+                      route: page.navigation?.route ?? `/${page.pageId}`,
+                      title: page.navigation?.title ?? page.title,
+                      supportsDeepLinking: page.navigation?.supportsDeepLinking ?? false,
+                      navGroup: page.navigation?.navGroup,
+                      includeInNavigation: event.target.checked,
+                      navPlacement: page.navigation?.navPlacement ?? "primary",
                       requiresRuntimeSession: page.navigation?.requiresRuntimeSession ?? false,
                     }),
                   })}
