@@ -12,6 +12,7 @@ import {
   parseSystemStudioDraftDocument,
   serializeSystemStudioCanvasAuthoringConfiguration,
   serializeSystemStudioEmbeddedDatasetDraftContent,
+  serializeSystemStudioEmbeddedWorkflowDraftContent,
   serializeSystemStudioPageDefinitions,
   type SystemStudioDraftDocument,
 } from "../../../studio-shell/system/SystemStudioDraftDocument";
@@ -171,6 +172,7 @@ export function SystemStudioDraftAuthoringBoundary({
 
   const selectedPagePanels = document.canvasAuthoring.pageLayouts.find((layout) => layout.pageId === resolvedSelectedPageId)?.panels ?? [];
   const embeddedDatasetContent = document.systemSpec.embeddedStudios?.dataset?.draftContent ?? "";
+  const embeddedWorkflowContent = document.systemSpec.embeddedStudios?.workflow?.draftContent ?? "";
 
   const persistEmbeddedDatasetContent = (nextDatasetContent: string): void => {
     const serialized = serializeSystemStudioEmbeddedDatasetDraftContent({
@@ -185,6 +187,22 @@ export function SystemStudioDraftAuthoringBoundary({
     operations: Object.freeze({
       ...extensionContext.operations,
       setDraftContent: persistEmbeddedDatasetContent,
+    }),
+  });
+
+  const persistEmbeddedWorkflowContent = (nextWorkflowContent: string): void => {
+    const serialized = serializeSystemStudioEmbeddedWorkflowDraftContent({
+      existingContent: content,
+      draftContent: nextWorkflowContent,
+    });
+    extensionContext.operations.setDraftContent?.(serialized);
+  };
+
+  const embeddedWorkflowExtensionContext: StudioShellExtensionContext = Object.freeze({
+    ...extensionContext,
+    operations: Object.freeze({
+      ...extensionContext.operations,
+      setDraftContent: persistEmbeddedWorkflowContent,
     }),
   });
 
@@ -340,6 +358,8 @@ export function SystemStudioDraftAuthoringBoundary({
       canvasContext: canvasModel.context,
       embeddedDatasetContent,
       embeddedDatasetExtensionContext,
+      embeddedWorkflowContent,
+      embeddedWorkflowExtensionContext,
       onEmbeddedStudioEvent: handleEmbeddedStudioEvent,
     }),
     [
@@ -350,6 +370,8 @@ export function SystemStudioDraftAuthoringBoundary({
       canvasModel,
       embeddedDatasetContent,
       embeddedDatasetExtensionContext,
+      embeddedWorkflowContent,
+      embeddedWorkflowExtensionContext,
     ],
   );
 

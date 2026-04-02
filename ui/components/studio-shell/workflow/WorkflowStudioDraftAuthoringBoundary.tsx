@@ -1,4 +1,11 @@
+import { useMemo, useState } from "react";
 import type { WorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  createEmptyWorkflowDraft,
+  deserializeWorkflowDraft,
+  serializeWorkflowDraft,
+  validateWorkflowDraft,
+} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import type { WorkflowStudioModeId } from "../../../studio-shell/workflow/WorkflowStudioModes";
 import WorkflowStudioCanvasModeSurface from "./WorkflowStudioCanvasModeSurface";
 import WorkflowStudioWizardModeSurface from "./WorkflowStudioWizardModeSurface";
@@ -58,6 +65,7 @@ export interface WorkflowStudioDraftAuthoringBoundaryProps {
   readonly experienceAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
   readonly hostMode?: StudioAssetRenderMode;
   readonly onStudioEvent?: (event: StudioEmbeddedEvent) => void;
+  readonly embeddedVariant?: "behavior-automation";
 }
 
 function buildWorkflowExperienceDefinition(
@@ -126,27 +134,69 @@ export default function WorkflowStudioDraftAuthoringBoundary({
   experienceAssetIds = defaultWorkflowExperienceAssetIds,
   hostMode = StudioAssetRenderModes.full,
   onStudioEvent,
+  embeddedVariant,
 }: WorkflowStudioDraftAuthoringBoundaryProps): JSX.Element {
-  if (!isWorkflowStudio || !workflowModeContext) {
+  if (!isWorkflowStudio) {
     return <textarea className="ui-textarea" rows={8} value={content} onChange={(event) => onChangeContent(event.target.value)} />;
   }
+
+  const [embeddedWizardPageId, setEmbeddedWizardPageId] = useState<WorkflowStudioWizardPageId>(
+    embeddedVariant === "behavior-automation" ? "steps" : "trigger",
+  );
+  const embeddedModeContext = useMemo<NonNullable<WorkflowStudioDraftAuthoringBoundaryProps["workflowModeContext"]>>(() => {
+    let sharedDraft = createEmptyWorkflowDraft();
+    let draftParseError: string | undefined;
+    if (content.trim().length > 0) {
+      try {
+        sharedDraft = deserializeWorkflowDraft(content);
+      } catch (error) {
+        draftParseError = error instanceof Error ? error.message : "Workflow draft is malformed.";
+      }
+    }
+    const draftValidation = validateWorkflowDraft(sharedDraft);
+    const sharedDraftSerialized = serializeWorkflowDraft(sharedDraft);
+    return Object.freeze({
+      selectedModeId: "wizard",
+      selectedWizardPageId: embeddedWizardPageId,
+      sharedDraft,
+      sharedDraftSerialized,
+      draftEditorContent: content,
+      draftParseError,
+      modeValidationIssues: Object.freeze([]),
+      draftValidationIssues: Object.freeze(draftValidation.issues),
+      updateSharedDraft: (updater: (draft: WorkflowDraft) => WorkflowDraft) => {
+        onChangeContent(serializeWorkflowDraft(updater(sharedDraft)));
+        onStudioEvent?.(createStudioIntentEvent({
+          kind: StudioEmbeddedIntentKinds.applyRequest,
+          payload: Object.freeze({ scope: "changes" }),
+        }));
+      },
+      onSelectWizardPage: (pageId: WorkflowStudioWizardPageId) => {
+        setEmbeddedWizardPageId(pageId);
+      },
+    });
+  }, [content, embeddedWizardPageId, onChangeContent, onStudioEvent]);
+  const resolvedWorkflowModeContext = workflowModeContext ?? embeddedModeContext;
+  const constrainedExperienceAssetIds = embeddedVariant === "behavior-automation"
+    ? Object.freeze([ExperienceSurfaceAssetIds.loomWizard] as const)
+    : experienceAssetIds;
 
   return (
     <>
       <ExperienceAssetAuthoringBoundary
-        asset={buildWorkflowExperienceDefinition(experienceAssetIds)}
-        currentModeId={workflowModeContext.selectedModeId}
+        asset={buildWorkflowExperienceDefinition(constrainedExperienceAssetIds)}
+        currentModeId={resolvedWorkflowModeContext.selectedModeId}
         invalidRequestedModeId={invalidModeRouteId}
-        document={workflowModeContext.sharedDraft}
-        issues={workflowModeContext.draftValidationIssues}
+        document={resolvedWorkflowModeContext.sharedDraft}
+        issues={resolvedWorkflowModeContext.draftValidationIssues}
         surfaces={{
           wizard: () => (
             <WorkflowStudioWizardModeLayout>
               <WorkflowStudioWizardModeSurface
-                studioId={workflowModeContext.studioId}
-                selectedWizardPageId={workflowModeContext.selectedWizardPageId}
+                studioId={resolvedWorkflowModeContext.studioId}
+                selectedWizardPageId={resolvedWorkflowModeContext.selectedWizardPageId}
                 onSelectWizardPage={(pageId) => {
-                  workflowModeContext.onSelectWizardPage?.(pageId);
+                  resolvedWorkflowModeContext.onSelectWizardPage?.(pageId);
                   onStudioEvent?.(createStudioIntentEvent({
                     kind: StudioEmbeddedIntentKinds.selectionChange,
                     payload: Object.freeze({
@@ -155,53 +205,53 @@ export default function WorkflowStudioDraftAuthoringBoundary({
                     }),
                   }));
                 }}
-                sharedDraft={workflowModeContext.sharedDraft}
-                sharedDraftSerialized={workflowModeContext.sharedDraftSerialized}
-                draftValidationIssues={workflowModeContext.draftValidationIssues}
-                onUpdateSharedDraft={workflowModeContext.updateSharedDraft}
-                handoffStatus={workflowModeContext.handoffStatus}
-                onSetHandoffStatus={workflowModeContext.setHandoffStatus}
-                onClearHandoffStatus={workflowModeContext.clearHandoffStatus}
+                sharedDraft={resolvedWorkflowModeContext.sharedDraft}
+                sharedDraftSerialized={resolvedWorkflowModeContext.sharedDraftSerialized}
+                draftValidationIssues={resolvedWorkflowModeContext.draftValidationIssues}
+                onUpdateSharedDraft={resolvedWorkflowModeContext.updateSharedDraft}
+                handoffStatus={resolvedWorkflowModeContext.handoffStatus}
+                onSetHandoffStatus={resolvedWorkflowModeContext.setHandoffStatus}
+                onClearHandoffStatus={resolvedWorkflowModeContext.clearHandoffStatus}
               />
             </WorkflowStudioWizardModeLayout>
           ),
           canvas: () => (
             <WorkflowStudioCanvasModeLayout>
               <WorkflowStudioCanvasModeSurface
-                studioId={workflowModeContext.studioId}
-                sharedDraft={workflowModeContext.sharedDraft}
-                draftValidationIssues={workflowModeContext.draftValidationIssues}
-                onUpdateSharedDraft={workflowModeContext.updateSharedDraft}
-                draftEditorContent={workflowModeContext.draftEditorContent}
+                studioId={resolvedWorkflowModeContext.studioId}
+                sharedDraft={resolvedWorkflowModeContext.sharedDraft}
+                draftValidationIssues={resolvedWorkflowModeContext.draftValidationIssues}
+                onUpdateSharedDraft={resolvedWorkflowModeContext.updateSharedDraft}
+                draftEditorContent={resolvedWorkflowModeContext.draftEditorContent}
                 onChangeDraftEditorContent={onChangeContent}
-                drawerState={workflowModeContext.canvasDrawers}
+                drawerState={resolvedWorkflowModeContext.canvasDrawers}
               />
             </WorkflowStudioCanvasModeLayout>
           ),
         }}
       />
 
-      {hostMode === StudioAssetRenderModes.full && invalidWizardPageRouteId ? (
+      {hostMode === StudioAssetRenderModes.full && workflowModeContext && invalidWizardPageRouteId ? (
         <p className="ui-text-muted">
-          Unsupported wizard page route &quot;{invalidWizardPageRouteId}&quot;; using {workflowModeContext.selectedWizardPageId} page.
+          Unsupported wizard page route &quot;{invalidWizardPageRouteId}&quot;; using {resolvedWorkflowModeContext.selectedWizardPageId} page.
         </p>
       ) : null}
 
-      {hostMode === StudioAssetRenderModes.full && workflowModeContext.draftParseError ? (
+      {hostMode === StudioAssetRenderModes.full && workflowModeContext && resolvedWorkflowModeContext.draftParseError ? (
         <p className="ui-text-muted">
           Workflow draft content must be valid canonical workflow JSON before saving.
         </p>
       ) : null}
 
-      {hostMode === StudioAssetRenderModes.full && workflowModeContext.modeValidationIssues.length > 0 ? (
+      {hostMode === StudioAssetRenderModes.full && workflowModeContext && resolvedWorkflowModeContext.modeValidationIssues.length > 0 ? (
         <p className="ui-text-muted">
-          Workflow mode validation: {workflowModeContext.modeValidationIssues.length} issue(s) detected.
+          Workflow mode validation: {resolvedWorkflowModeContext.modeValidationIssues.length} issue(s) detected.
         </p>
       ) : null}
 
-      {hostMode === StudioAssetRenderModes.full && workflowModeContext.draftValidationIssues.length > 0 ? (
+      {hostMode === StudioAssetRenderModes.full && workflowModeContext && resolvedWorkflowModeContext.draftValidationIssues.length > 0 ? (
         <p className="ui-text-muted">
-          Shared workflow draft validation: {workflowModeContext.draftValidationIssues.length} canonical issue(s) detected.
+          Shared workflow draft validation: {resolvedWorkflowModeContext.draftValidationIssues.length} canonical issue(s) detected.
         </p>
       ) : null}
     </>

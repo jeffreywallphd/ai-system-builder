@@ -552,3 +552,17 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - System Studio draft content now persists canvas authoring metadata (`systemSpec.canvasAuthoring`) including design-frame settings and normalized panel bounds, preserving authored layout intent across different render sizes.
 - Added reusable panel asset contracts (`PanelAssetContract` + runtime instance mapping) that define stable panel identity, page association, persisted bounds, user-facing metadata, content slots, and preview/runtime representation boundaries.
 - System canvas adapter now maps layout nodes to those reusable panel contracts/runtime panel instances through shared seams rather than ad hoc studio-specific panel shape.
+
+## Direction 5 UI extension update: embedded behavior studio + panel-hosted studio assets (systems stories 7-8)
+
+- System Studio wizard now embeds a constrained Workflow Studio surface for **Behavior & Automation** authoring through the shared studio-asset host boundary (`StudioAssetHostBoundary` + `workflowStudioSurfaceAssetDefinition`) instead of routing users into standalone Workflow Studio.
+- Embedded behavior authoring is host-managed and contract-driven:
+  - render mode is constrained to `embedded`,
+  - standalone chrome/routing controls remain suppressed,
+  - interaction signaling flows via shared `studio.intent` events rather than direct routing.
+- System draft persistence now includes embedded workflow content (`systemSpec.embeddedStudios.workflow.draftContent`) so behavior authoring remains in the same system-backed document boundary.
+- Panel contracts now support embedded studio-backed content (`PanelAssetContract.content`) while keeping panel/studio/host boundaries separated.
+- Runtime panel rendering resolves studio-backed panels through host-provided mappings (`SystemRuntimeInterfacePreview` `studioAssetHosts`) so:
+  - panel assets stay layout/content descriptors,
+  - studio assets stay reusable behavior surfaces,
+  - host orchestration owns session/context/capability wiring.

@@ -3,7 +3,11 @@ import type {
   CanvasSurfaceDesignFrameModel,
   CanvasSurfaceDesignFrameRatio,
 } from "../experience-assets/ConfigurableCanvasSurfaceContracts";
-import type { PanelAssetContract, PanelAssetLayoutBounds } from "../experience-assets/PanelAssetContracts";
+import type {
+  PanelAssetContract,
+  PanelAssetContent,
+  PanelAssetLayoutBounds,
+} from "../experience-assets/PanelAssetContracts";
 
 const defaultDesignFrameRatio: CanvasSurfaceDesignFrameRatio = Object.freeze({
   width: 16,
@@ -47,6 +51,9 @@ export interface SystemStudioDraftDocument {
       readonly dataset?: {
         readonly draftContent?: string;
       };
+      readonly workflow?: {
+        readonly draftContent?: string;
+      };
     };
   };
   readonly canvasAuthoring: SystemStudioCanvasAuthoringConfiguration;
@@ -70,6 +77,9 @@ const emptyDocument: SystemStudioDraftDocument = Object.freeze({
     pages: Object.freeze([defaultSystemPage]),
     embeddedStudios: Object.freeze({
       dataset: Object.freeze({
+        draftContent: "",
+      }),
+      workflow: Object.freeze({
         draftContent: "",
       }),
     }),
@@ -162,6 +172,7 @@ function normalizeCanvasAuthoringConfig(input: unknown): SystemStudioCanvasAutho
           slotId: slot.slotId?.trim() || `${panelId}-slot-${slotIndex + 1}`,
           label: slot.label?.trim() || undefined,
         }))),
+        content: normalizePanelContent(entry.content),
         sourceLayoutNodeId: entry.sourceLayoutNodeId?.trim() || undefined,
       } satisfies PanelAssetContract);
     }));
@@ -189,6 +200,28 @@ function normalizeCanvasAuthoringConfig(input: unknown): SystemStudioCanvasAutho
   return Object.freeze({
     designFrame,
     pageLayouts: resolvedPageLayouts,
+  });
+}
+
+function normalizePanelContent(input: unknown): PanelAssetContent | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return undefined;
+  }
+  const record = input as Partial<PanelAssetContent>;
+  if (record.kind !== "embedded-studio") {
+    return undefined;
+  }
+  if (!record.studioAssetId?.trim()) {
+    return undefined;
+  }
+  return Object.freeze({
+    kind: "embedded-studio",
+    studioAssetId: record.studioAssetId.trim(),
+    draftContent: typeof record.draftContent === "string" ? record.draftContent : undefined,
+    experienceAssetIds: Array.isArray(record.experienceAssetIds)
+      ? Object.freeze(record.experienceAssetIds.map((value) => String(value).trim()).filter((value) => value.length > 0))
+      : undefined,
+    embeddedVariant: typeof record.embeddedVariant === "string" ? record.embeddedVariant.trim() || undefined : undefined,
   });
 }
 
@@ -239,6 +272,11 @@ export function parseSystemStudioDraftDocument(content: string): SystemStudioDra
           dataset: Object.freeze({
             draftContent: typeof parsed.systemSpec?.embeddedStudios?.dataset?.draftContent === "string"
               ? parsed.systemSpec.embeddedStudios.dataset.draftContent
+              : "",
+          }),
+          workflow: Object.freeze({
+            draftContent: typeof parsed.systemSpec?.embeddedStudios?.workflow?.draftContent === "string"
+              ? parsed.systemSpec.embeddedStudios.workflow.draftContent
               : "",
           }),
         }),
@@ -325,6 +363,45 @@ export function serializeSystemStudioEmbeddedDatasetDraftContent(input: {
       ...existingEmbeddedStudios,
       dataset: {
         ...existingDataset,
+        draftContent: input.draftContent,
+      },
+    },
+  };
+
+  return JSON.stringify(root, null, 2);
+}
+
+export function serializeSystemStudioEmbeddedWorkflowDraftContent(input: {
+  readonly existingContent: string;
+  readonly draftContent: string;
+}): string {
+  const root = input.existingContent.trim()
+    ? (JSON.parse(input.existingContent) as Record<string, unknown>)
+    : {};
+  const existingSystemSpec = (root.systemSpec && typeof root.systemSpec === "object" && !Array.isArray(root.systemSpec))
+    ? { ...(root.systemSpec as Record<string, unknown>) }
+    : {};
+  const existingEmbeddedStudios = (
+    existingSystemSpec.embeddedStudios
+    && typeof existingSystemSpec.embeddedStudios === "object"
+    && !Array.isArray(existingSystemSpec.embeddedStudios)
+  )
+    ? { ...(existingSystemSpec.embeddedStudios as Record<string, unknown>) }
+    : {};
+  const existingWorkflow = (
+    existingEmbeddedStudios.workflow
+    && typeof existingEmbeddedStudios.workflow === "object"
+    && !Array.isArray(existingEmbeddedStudios.workflow)
+  )
+    ? { ...(existingEmbeddedStudios.workflow as Record<string, unknown>) }
+    : {};
+
+  root.systemSpec = {
+    ...existingSystemSpec,
+    embeddedStudios: {
+      ...existingEmbeddedStudios,
+      workflow: {
+        ...existingWorkflow,
         draftContent: input.draftContent,
       },
     },

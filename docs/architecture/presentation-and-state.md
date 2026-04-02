@@ -670,3 +670,14 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - apply/commit requests.
 - Workflow/System/Dataset studio asset definitions now emit typed embedded intents through the shared host boundary, and `StudioShellPage` wires host handling through a single `onEvent` seam.
 - Embedded-mode rendering remains shell-neutral: hosted surfaces do not assume top-level routing, shell lifecycle, or global navigation ownership.
+
+## Direction 5 extension update: system wizard behavior embedding + panel studio-host content (stories 7-8)
+
+- System Studio wizard now embeds a constrained Workflow Studio surface for **Behavior & Automation** authoring through the shared studio-asset host boundary (`StudioAssetHostBoundary` + `workflowStudioSurfaceAssetDefinition`) instead of launching a separate standalone studio route.
+- Embedded Workflow Studio in that step is host-constrained (`embedded` mode, no shell chrome/routing controls), wizard-scoped, and event-routed via shared `studio.intent` contracts so System Studio remains the orchestration owner.
+- System draft content now includes embedded workflow draft persistence (`systemSpec.embeddedStudios.workflow.draftContent`) to keep behavior authoring in the same system-backed document boundary as other wizard data.
+- Panel asset contracts now support embedded studio-backed content (`PanelAssetContract.content`) without hardcoding studio implementations in the panel layer.
+- Runtime panel rendering resolves embedded studio panels through host-provided studio-asset mappings (`SystemRuntimeInterfacePreview` `studioAssetHosts`), preserving clean boundaries:
+  - panel assets define layout/content intent,
+  - studio assets define embedded surface behavior,
+  - host wiring resolves permissions/context/session + event handling.

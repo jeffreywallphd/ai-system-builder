@@ -21,6 +21,7 @@ interface WorkflowStudioSurfaceInput {
   readonly invalidModeRouteId?: string;
   readonly invalidWizardPageRouteId?: string;
   readonly experienceAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
+  readonly embeddedVariant?: "behavior-automation";
 }
 
 interface SystemStudioSurfaceInput {
@@ -72,6 +73,7 @@ export const workflowStudioSurfaceAssetDefinition: StudioAssetDefinition<Workflo
       invalidModeRouteId={context.input.invalidModeRouteId}
       invalidWizardPageRouteId={context.input.invalidWizardPageRouteId}
       experienceAssetIds={context.input.experienceAssetIds}
+      embeddedVariant={context.input.embeddedVariant}
       hostMode={context.mode}
       onStudioEvent={onEvent}
     />

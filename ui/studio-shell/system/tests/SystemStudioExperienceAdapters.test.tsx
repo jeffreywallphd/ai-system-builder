@@ -92,13 +92,18 @@ describe("System studio experience adapters", () => {
       onPagesChange: () => undefined,
       canvasDefinition: canvasModel.definition,
       canvasContext: canvasModel.context,
+      embeddedDatasetContent: "",
+      embeddedDatasetExtensionContext: extensionContext,
+      embeddedWorkflowContent: "",
+      embeddedWorkflowExtensionContext: extensionContext,
     });
 
     expect(model.definition.pages[0]?.id).toBe(SystemWizardPageIds.pages);
     expect(model.definition.pages[1]?.id).toBe(SystemWizardPageIds.interfaceDesign);
     expect(model.definition.pages[2]?.id).toBe(SystemWizardPageIds.inputsOutputs);
-    expect(model.definition.pages[3]?.id).toBe(SystemWizardPageIds.settings);
+    expect(model.definition.pages[3]?.id).toBe(SystemWizardPageIds.behaviorAutomation);
+    expect(model.definition.pages[4]?.id).toBe(SystemWizardPageIds.settings);
     const progress = model.definition.resolveProgress({ context: model.context, activePageId: SystemWizardPageIds.pages });
-    expect(progress.totalCount).toBe(4);
+    expect(progress.totalCount).toBe(5);
   });
 });
