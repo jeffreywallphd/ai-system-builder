@@ -1,5 +1,10 @@
-import type { WorkflowExecutionPlanTranslationRequest } from "./WorkflowExecutionAlignmentContracts";
 import type { UiTriggerEvent } from "./UiTriggerEventContract";
+import {
+  createSystemContextContract,
+  type SystemContextContract,
+  type SystemContextDatasetReference,
+  type SystemContextImageReference,
+} from "../../domain/system-studio/SystemContextContract";
 
 function asRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -29,86 +34,111 @@ function toRuntimeParameters(payload: Readonly<Record<string, unknown>>): Readon
   return Object.freeze(merged);
 }
 
-function toSelectedImage(payload: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> | undefined {
-  const explicit = asRecord(payload.selectedImage);
-  if (explicit) {
-    return Object.freeze({ ...explicit });
+function toSelectedImages(payload: Readonly<Record<string, unknown>>): ReadonlyArray<SystemContextImageReference> {
+  const explicitSelectedImage = asRecord(payload.selectedImage);
+  if (explicitSelectedImage) {
+    const imageId = typeof explicitSelectedImage.imageId === "string" && explicitSelectedImage.imageId.trim().length > 0
+      ? explicitSelectedImage.imageId.trim()
+      : undefined;
+    const explicitAssetRef = asRecord(explicitSelectedImage.assetRef);
+    const assetRef = explicitAssetRef && typeof explicitAssetRef.assetId === "string" && explicitAssetRef.assetId.trim().length > 0
+      ? Object.freeze({
+        assetId: explicitAssetRef.assetId.trim(),
+        versionId: typeof explicitAssetRef.versionId === "string" ? explicitAssetRef.versionId.trim() || undefined : undefined,
+        recordId: typeof explicitAssetRef.recordId === "string" ? explicitAssetRef.recordId.trim() || undefined : undefined,
+        uri: typeof explicitAssetRef.uri === "string" ? explicitAssetRef.uri.trim() || undefined : undefined,
+      })
+      : undefined;
+
+    return Object.freeze([Object.freeze({
+      selectionId: imageId ?? "selected-image-1",
+      imageId,
+      assetRef,
+      metadata: Object.freeze({ ...explicitSelectedImage }),
+    })]);
   }
 
   const imageId = typeof payload.imageId === "string" && payload.imageId.trim().length > 0
     ? payload.imageId.trim()
     : undefined;
   if (!imageId) {
-    return undefined;
+    return Object.freeze([]);
   }
 
-  return Object.freeze({
-    imageId,
-    assetRef: Object.freeze({
-      assetId: imageId,
+  return Object.freeze([
+    Object.freeze({
+      selectionId: imageId,
+      imageId,
+      assetRef: Object.freeze({
+        assetId: imageId,
+      }),
     }),
-  });
+  ]);
+}
+
+function toDatasetReferences(event: UiTriggerEvent): ReadonlyArray<SystemContextDatasetReference> {
+  const references: SystemContextDatasetReference[] = [];
+
+  if (event.context?.datasetAssetId) {
+    references.push(Object.freeze({
+      referenceId: event.context.references?.datasetInstanceId ?? "active-input-dataset",
+      instanceId: event.context.references?.datasetInstanceId,
+      role: "active-input",
+      datasetAssetId: event.context.datasetAssetId,
+      datasetVersionId: event.context.datasetVersionId,
+      systemAssetId: event.context.systemAssetId,
+    }));
+  }
+
+  const systemDatasetInstanceId = typeof event.context?.references?.systemDatasetInstanceId === "string"
+    ? event.context.references.systemDatasetInstanceId.trim()
+    : "";
+  if (systemDatasetInstanceId) {
+    references.push(Object.freeze({
+      referenceId: systemDatasetInstanceId,
+      instanceId: systemDatasetInstanceId,
+      role: typeof event.context?.references?.systemDatasetRole === "string"
+        ? event.context.references.systemDatasetRole
+        : "system-owned",
+      datasetAssetId: event.context?.datasetAssetId,
+      datasetVersionId: event.context?.datasetVersionId,
+      systemAssetId: event.context?.systemAssetId,
+    }));
+  }
+
+  return Object.freeze(references);
 }
 
 export interface UiTriggerSystemContextMapper {
-  readonly map: (event: UiTriggerEvent) => WorkflowExecutionPlanTranslationRequest["context"];
+  readonly map: (event: UiTriggerEvent) => SystemContextContract;
 }
 
 export function createDefaultUiTriggerSystemContextMapper(): UiTriggerSystemContextMapper {
   return Object.freeze({
     map: (event) => {
-      const runtimeParameters = toRuntimeParameters(event.payload);
-      const formValues = asRecord(event.payload.values) ?? runtimeParameters;
+      const parameters = toRuntimeParameters(event.payload);
+      const selectedImages = toSelectedImages(event.payload);
+      const datasets = toDatasetReferences(event);
       const references = event.context?.references ?? {};
-      const metadata: Record<string, unknown> = {
-        systemFormValues: formValues,
-      };
 
-      const selectedImage = toSelectedImage(event.payload);
-      if (selectedImage) {
-        metadata.selectedImage = selectedImage;
-      }
-
-      if (event.context?.datasetAssetId) {
-        metadata.datasetInstances = Object.freeze([
-          Object.freeze({
-            instanceId: event.context.references?.datasetInstanceId ?? "ui-dataset-instance",
-            purpose: "active-input",
-            datasetAssetId: event.context.datasetAssetId,
-            datasetVersionId: event.context.datasetVersionId,
-            systemId: event.context.systemAssetId,
-          }),
-        ]);
-      }
-
-      const systemDatasetInstanceId = typeof references.systemDatasetInstanceId === "string"
-        ? references.systemDatasetInstanceId.trim()
-        : "";
-      if (systemDatasetInstanceId) {
-        metadata.systemDatasetInstanceRefs = Object.freeze([
-          Object.freeze({
-            instanceId: systemDatasetInstanceId,
-            role: typeof references.systemDatasetRole === "string" ? references.systemDatasetRole : "system-owned",
-            datasetAssetId: event.context?.datasetAssetId,
-            systemAssetId: event.context?.systemAssetId,
-          }),
-        ]);
-      }
-
-      const runtimeSessionId = typeof references.runtimeSessionId === "string" && references.runtimeSessionId.trim().length > 0
-        ? references.runtimeSessionId
-        : undefined;
-      if (runtimeSessionId) {
-        metadata.runtimeContext = Object.freeze({
-          runtimeSessionId,
+      return createSystemContextContract({
+        selectedImages,
+        parameters,
+        datasets,
+        runtime: {
+          runtimeSessionId: typeof references.runtimeSessionId === "string" ? references.runtimeSessionId : undefined,
           workflowRunId: event.context?.workflowRunId,
           selectorSessionId: event.context?.selectorSessionId,
-        });
-      }
-
-      return Object.freeze({
-        inputValues: runtimeParameters,
-        metadata: Object.freeze(metadata),
+          systemAssetId: event.context?.systemAssetId,
+          workflowAssetId: event.context?.workflowAssetId,
+          sourceStudio: event.source.studio,
+          triggerEventId: event.eventId,
+          triggerName: event.name,
+        },
+        extensions: {
+          triggerKind: event.kind,
+          uiContextReferences: references,
+        },
       });
     },
   });

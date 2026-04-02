@@ -3,7 +3,7 @@ import { createUiTriggerEvent, UiTriggerEventKinds } from "../UiTriggerEventCont
 import { createDefaultUiTriggerSystemContextMapper } from "../UiTriggerSystemContextMapper";
 
 describe("UiTriggerSystemContextMapper", () => {
-  it("maps selected image, form parameters, dataset references, and runtime context into execution context metadata", () => {
+  it("maps selected image, parameters, dataset references, and runtime metadata into the system context contract", () => {
     const mapper = createDefaultUiTriggerSystemContextMapper();
     const event = createUiTriggerEvent({
       kind: UiTriggerEventKinds.submit,
@@ -33,12 +33,11 @@ describe("UiTriggerSystemContextMapper", () => {
     });
 
     const mapped = mapper.map(event);
-    const metadata = mapped.metadata as Record<string, unknown>;
-    expect((mapped.inputValues as Record<string, unknown>).prompt).toBe("repair scratches");
-    expect((metadata.systemFormValues as Record<string, unknown>).prompt).toBe("repair scratches");
-    expect((metadata.selectedImage as Record<string, unknown>).imageId).toBe("asset:image:selected-1");
-    expect((metadata.datasetInstances as Array<Record<string, unknown>>)[0]?.instanceId).toBe("instance:active-input");
-    expect((metadata.systemDatasetInstanceRefs as Array<Record<string, unknown>>)[0]?.instanceId).toBe("instance:system-output");
-    expect((metadata.runtimeContext as Record<string, unknown>).runtimeSessionId).toBe("runtime-session:123");
+    expect(mapped.parameters.prompt).toBe("repair scratches");
+    expect(mapped.selectedImages[0]?.imageId).toBe("asset:image:selected-1");
+    expect(mapped.datasets[0]?.instanceId).toBe("instance:active-input");
+    expect(mapped.datasets[1]?.instanceId).toBe("instance:system-output");
+    expect(mapped.runtime.runtimeSessionId).toBe("runtime-session:123");
+    expect(mapped.runtime.systemAssetId).toBe("system:image-pipeline");
   });
 });

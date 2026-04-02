@@ -9,6 +9,10 @@ import type {
 import type { UiTriggerEvent } from "./UiTriggerEventContract";
 import { createDefaultUiTriggerSystemContextMapper, type UiTriggerSystemContextMapper } from "./UiTriggerSystemContextMapper";
 import {
+  createDefaultWorkflowSystemContextBindingAdapter,
+  type WorkflowSystemContextBindingAdapter,
+} from "./SystemContextWorkflowInputMapper";
+import {
   WorkflowUiInteractionIssueCodes,
   WorkflowUiInteractionStatusKinds,
   type WorkflowUiInteractionDispatchRecord,
@@ -80,6 +84,7 @@ export class WorkflowUiEventRuntimeDispatcher {
     private readonly runner: UiEventDispatchRunner,
     private readonly traceSink?: WorkflowUiEventTraceSink,
     private readonly systemContextMapper: UiTriggerSystemContextMapper = createDefaultUiTriggerSystemContextMapper(),
+    private readonly systemContextBindingAdapter: WorkflowSystemContextBindingAdapter = createDefaultWorkflowSystemContextBindingAdapter(),
   ) {}
 
   public static fromWorkflowStudioApplicationService(
@@ -207,7 +212,8 @@ export class WorkflowUiEventRuntimeDispatcher {
     });
     notifyStatus(WorkflowUiInteractionStatusKinds.dispatching);
 
-    const context = mergeContext(command.context, this.systemContextMapper.map(command.event));
+    const systemContext = this.systemContextMapper.map(command.event);
+    const context = mergeContext(command.context, this.systemContextBindingAdapter.map(systemContext));
     const settled = await Promise.allSettled(mapped.entries.map(async (entry) => {
       this.traceSink?.record({
         traceId: createWorkflowUiEventTraceId(command.event.eventId, WorkflowUiEventTraceStages.dispatchStarted),

@@ -746,3 +746,15 @@ Not implemented in this slice:
 - Execution results now carry structured output-persistence summaries (`outputPersistence`) so downstream history/UI surfaces can inspect persisted-record counts, target counts, and bounded issues without infrastructure-specific DTO leakage.
 - Persistence failures after successful execution are bounded/predictable: execution result status is promoted to failed with structured persistence issue metadata, and write-plan/materialization denials fail before any dataset writes.
 - Added focused runtime unit/integration coverage for success + bounded failure paths, append-oriented history behavior, comparison grouping semantics, and lineage/traceability metadata propagation.
+
+## AI Loom Image System vertical-slice update: system context contract + mapping seam (stories 4.3.1-4.3.2)
+
+- System context now has a formal internal contract in `domain/system-studio/SystemContextContract.ts` with explicit, inspectable fields for:
+  - selected image references,
+  - parameter values,
+  - dataset references,
+  - runtime metadata,
+  - and an extension bag for additive future context without breaking consumers.
+- Workflow input translation now uses a dedicated adapter seam in `application/workflow-studio/SystemContextWorkflowInputMapper.ts` (`WorkflowSystemContextBindingAdapter`) that maps the system-context contract into workflow execution context/input-binding metadata.
+- UI-trigger system-context gathering remains decoupled from workflow runtime internals via `application/workflow-studio/UiTriggerSystemContextMapper.ts`, which now produces the shared system-context contract before adapter-driven workflow binding translation.
+- This keeps the architecture aligned with shared composition principles: internal contracts first, UI/runtime adapters second, and no direct leakage of component-library or execution-engine-specific state shapes.
