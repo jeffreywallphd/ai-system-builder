@@ -886,3 +886,34 @@
   - reference resolution + workflow pinning checks run on duplicated payloads,
   - runtime dataset-instance restore uses existing persistence adapters and returns typed issues for partial failures,
   - source and duplicate avoid mutable runtime aliasing when duplicate mode is used.
+
+## Direction 5 extension update: partial system modification support (story 5.3.9)
+
+- System Studio now supports canonical partial modifications on existing drafts through `SystemStudioApplicationService.modifySystemDefinition(...)`:
+  - workflow binding replacements (binding id -> workflow asset/version pin),
+  - dataset-instance binding replacements (instance id -> dataset asset/version),
+  - bounded runtime-state patching and UI-configuration patching.
+- Modifications are contract-preserving and non-mutating to source drafts:
+  - the service re-parses the existing canonical serialization contract,
+  - updates runtime/workflow/dataset references in one place,
+  - reserializes through `serializeSystemSerializationDocument(...)`,
+  - and persists through the existing Studio Shell draft update path.
+- Integrity rules remain explicit and inspectable:
+  - missing binding ids or dataset-instance ids are rejected as typed invalid requests,
+  - workflow/dataset references are reprojected into canonical `assetReferences` and dependencies,
+  - post-update reference issues still flow through the existing `SerializedAssetReferenceResolutionService`.
+
+## Direction 5 extension update: save/load UI integration in System Studio (story 5.3.10)
+
+- System Studio now exposes a user-friendly lifecycle panel (`SystemStudioWorkManagementPanel`) with non-technical language for:
+  - save work,
+  - open saved setup (as editable copy),
+  - make a copy,
+  - rename this work.
+- The panel reuses canonical backend seams (no parallel UI save/load logic):
+  - `saveSystemDefinition`,
+  - `loadSystemDefinition`,
+  - `duplicateSystemDefinition`,
+  - `modifySystemDefinition`.
+- Technical/system-level controls are still available, but only in a collapsed-by-default Advanced section near the bottom of the panel.
+- Renderer/browser fallback and desktop bridge contracts now include matching system-definition IPC methods so behavior is consistent across host environments.

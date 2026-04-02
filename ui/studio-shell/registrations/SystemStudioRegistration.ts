@@ -11,6 +11,7 @@ import { SystemCompatibilityInsightsPanel } from "../../components/studio-shell/
 import { SystemRuntimeRunPanel } from "../../components/studio-shell/SystemRuntimeRunPanel";
 import { SystemContextDebugPreviewPanel } from "../../components/studio-shell/SystemContextDebugPreviewPanel";
 import { ReferenceImageExperiencePanel } from "../../components/studio-shell/ReferenceImageExperiencePanel";
+import { SystemStudioWorkManagementPanel } from "../../components/studio-shell/SystemStudioWorkManagementPanel";
 import WorkflowTemplateSelectionPanel from "../../components/studio-shell/workflow/WorkflowTemplateSelectionPanel";
 import type { SystemStudioRegistration } from "../StudioShellExtensions";
 import { createSystemStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
@@ -98,6 +99,14 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
       subtitle: "Bounded execution/runtime metadata authoring for future runtime/deployment orchestration.",
       order: 11,
       render: (context) => createElement(SystemExecutionMetadataEditor, { context }),
+    },
+    {
+      id: "system-studio-work-management",
+      slot: "lifecycle",
+      title: "Save and reopen your work",
+      subtitle: "Easy save, open, copy, and rename actions for this image setup.",
+      order: 10,
+      render: (context) => createElement(SystemStudioWorkManagementPanel, { context }),
     },
     {
       id: "system-studio-reference-image-experience",

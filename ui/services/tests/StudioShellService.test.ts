@@ -28,6 +28,10 @@ describe("StudioShellService", () => {
     expect(source).toContain("updateSystemInterfaces(");
     expect(source).toContain("updateSystemParameters(");
     expect(source).toContain("updateSystemExecutionMetadata(");
+    expect(source).toContain("saveSystemDefinition(");
+    expect(source).toContain("loadSystemDefinition(");
+    expect(source).toContain("duplicateSystemDefinition(");
+    expect(source).toContain("modifySystemDefinition(");
     expect(source).toContain("getSystemCompatibilityInsights(");
     expect(source).toContain("startSystemExecution(");
     expect(source).toContain("getSystemExecutionStatus(");

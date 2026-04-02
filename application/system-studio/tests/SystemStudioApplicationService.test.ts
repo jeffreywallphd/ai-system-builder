@@ -868,4 +868,106 @@ describe("SystemStudioApplicationService", () => {
     expect(runtimeDatasetStore.records.get("studio-asset:draft-copy::dataset-instance:output:record:1")?.systemId).toBe("studio-asset:draft-copy");
     expect(duplicated.issues).toEqual([]);
   });
+
+  it("applies partial modifications to duplicated systems without mutating the source draft", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(createPublishedVersion({
+      assetId: "workflow:image-edit",
+      versionId: "workflow:image-edit:v3",
+      taxonomy: { structuralKind: "composite", semanticRole: "workflow", behaviorKind: "deterministic" },
+    }));
+    await repository.saveAssetVersion(createPublishedVersion({
+      assetId: "workflow:image-edit-next",
+      versionId: "workflow:image-edit-next:v1",
+      taxonomy: { structuralKind: "composite", semanticRole: "workflow", behaviorKind: "deterministic" },
+    }));
+    const ids = ["session-1", "draft-source", "draft-copy"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new SystemStudioApplicationService(studioShell, repository);
+    const ensure = await service.ensureStudioInitialized();
+    const source = await service.createSystemDraft({
+      sessionId: ensure.session.id,
+      draftId: "draft-source",
+      title: "Image System",
+      content: JSON.stringify({
+        systemSpec: {
+          components: [{ componentKind: "composite", assetId: "workflow:image-edit", versionId: "workflow:image-edit:v3", alias: "primary" }],
+          inputs: [],
+          outputs: [],
+          parameters: [],
+          bindings: [],
+          serialization: {
+            contractKind: "ai-loom.system-serialization",
+            schemaVersion: "1.0.0",
+            compatibility: { minimumReaderVersion: "1.0.0", legacySystemSpecSupported: true },
+            definition: { components: [{ componentKind: "composite", assetId: "workflow:image-edit", versionId: "workflow:image-edit:v3", alias: "primary" }], nestedSystems: [], dependencies: [], inputs: [], outputs: [], parameters: [], bindings: [] },
+            assetReferences: { datasets: [{ kind: "dataset", assetId: "dataset:images", versionId: "dataset:images:v1" }], workflows: [{ kind: "workflow", assetId: "workflow:image-edit", versionId: "workflow:image-edit:v3" }] },
+            runtime: {
+              datasetInstances: [{ instanceId: "dataset-instance:input", datasetAssetId: "dataset:images", datasetVersionId: "dataset:images:v1", role: "input-store" }],
+              workflowBindings: [{ bindingId: "component:primary", componentAlias: "primary", workflowAssetId: "workflow:image-edit", workflowVersionId: "workflow:image-edit:v3", pinMode: "version" }],
+            },
+            ui: { configuration: { label: "v1" } },
+          },
+        },
+      }),
+      dependencies: [{ assetId: "workflow:image-edit", versionId: "workflow:image-edit:v3" }, { assetId: "dataset:images", versionId: "dataset:images:v1" }],
+    });
+
+    const duplicate = await service.duplicateSystemDefinition({
+      sessionId: ensure.session.id,
+      sourceDraftId: source.draft.id,
+      duplicateDraftId: "draft-copy",
+      datasetInstanceMode: "reuse",
+    });
+
+    await service.modifySystemDefinition({
+      sessionId: ensure.session.id,
+      draftId: duplicate.duplicateDraft.id,
+      workflowBindings: [{ bindingId: "component:primary", componentAlias: "primary", workflowAssetId: "workflow:image-edit-next", workflowVersionId: "workflow:image-edit-next:v1" }],
+      uiConfigurationPatch: { label: "v2" },
+    });
+
+    const loadedSource = await service.loadSystemDefinition({ studioId: ensure.studio.id, draftId: source.draft.id });
+    const loadedDuplicate = await service.loadSystemDefinition({ studioId: ensure.studio.id, draftId: duplicate.duplicateDraft.id });
+    expect(loadedSource.serialization.runtime.workflowBindings[0]?.workflowAssetId).toBe("workflow:image-edit");
+    expect(loadedDuplicate.serialization.runtime.workflowBindings[0]?.workflowAssetId).toBe("workflow:image-edit-next");
+    expect((loadedDuplicate.uiConfiguration as Record<string, unknown>)?.label).toBe("v2");
+  });
+
+  it("keeps modified duplicated systems saveable and reloadable through canonical serialization", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-source", "draft-copy"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new SystemStudioApplicationService(studioShell, repository);
+    const ensure = await service.ensureStudioInitialized();
+    const source = await service.createSystemDraft({
+      sessionId: ensure.session.id,
+      draftId: "draft-source",
+      title: "Image System",
+      content: JSON.stringify({ systemSpec: { components: [], inputs: [], outputs: [], parameters: [], bindings: [] } }),
+      dependencies: [],
+    });
+    const duplicate = await service.duplicateSystemDefinition({
+      sessionId: ensure.session.id,
+      sourceDraftId: source.draft.id,
+      duplicateDraftId: "draft-copy",
+    });
+
+    await service.modifySystemDefinition({
+      sessionId: ensure.session.id,
+      draftId: duplicate.duplicateDraft.id,
+      runtimeStatePatch: { selectedPreset: "portrait" },
+      uiConfigurationPatch: { displayName: "Portrait Setup" },
+    });
+    const saved = await service.saveSystemDefinition({
+      sessionId: ensure.session.id,
+      draftId: duplicate.duplicateDraft.id,
+    });
+    const loaded = await service.loadSystemDefinition({
+      studioId: ensure.studio.id,
+      draftId: duplicate.duplicateDraft.id,
+    });
+    expect(saved.serialization.runtime.state).toEqual({ selectedPreset: "portrait" });
+    expect((loaded.uiConfiguration as Record<string, unknown>)?.displayName).toBe("Portrait Setup");
+  });
 });

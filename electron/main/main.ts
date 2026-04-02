@@ -556,6 +556,22 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateExecutionMetadata"]>[0];
     return JSON.stringify(await systemStudioBackendApi.updateExecutionMetadata(request));
   });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:save", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["saveSystemDefinition"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.saveSystemDefinition(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:load", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["loadSystemDefinition"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.loadSystemDefinition(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:duplicate", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["duplicateSystemDefinition"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.duplicateSystemDefinition(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:modify", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["modifySystemDefinition"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.modifySystemDefinition(request));
+  });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-compatibility:insights", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["getCompatibilityInsights"]>[0];
     return JSON.stringify(await systemStudioBackendApi.getCompatibilityInsights(request));

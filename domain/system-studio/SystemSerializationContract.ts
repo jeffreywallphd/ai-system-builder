@@ -526,6 +526,7 @@ export function serializeSystemSerializationDocument(input: {
   readonly uiConfiguration?: Readonly<Record<string, unknown>>;
   readonly runtimeDatasetInstances?: ReadonlyArray<SerializedSystemRuntimeDatasetInstanceReference>;
   readonly runtimeWorkflowBindings?: ReadonlyArray<SerializedSystemWorkflowBindingReference>;
+  readonly runtimeState?: Readonly<Record<string, unknown>>;
 }): string {
   const root = parseRootEnvelope(input.existingContent);
   const existingSystemSpec = (root.systemSpec && typeof root.systemSpec === "object" && !Array.isArray(root.systemSpec))
@@ -547,13 +548,14 @@ export function serializeSystemSerializationDocument(input: {
     executionMetadata: input.systemSpec.executionMetadata,
   });
 
-  const normalizedContract: SystemSerializationContract = (input.runtimeDatasetInstances || input.runtimeWorkflowBindings)
+  const normalizedContract: SystemSerializationContract = (input.runtimeDatasetInstances || input.runtimeWorkflowBindings || input.runtimeState)
     ? Object.freeze({
       ...contract,
       runtime: Object.freeze({
         ...contract.runtime,
         datasetInstances: Object.freeze([...(input.runtimeDatasetInstances ?? contract.runtime.datasetInstances)]),
         workflowBindings: Object.freeze([...(input.runtimeWorkflowBindings ?? contract.runtime.workflowBindings)]),
+        state: input.runtimeState ?? contract.runtime.state,
       }),
     })
     : contract;

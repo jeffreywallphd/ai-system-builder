@@ -151,4 +151,50 @@ describe("SystemStudioBackendApi", () => {
     expect(insights.data?.summary.interfaceMismatchCount).toBeGreaterThan(0);
     expect(insights.data?.issues.some((issue) => issue.code === "system-child-reference-missing")).toBeTrue();
   });
+
+  it("supports canonical save/duplicate/modify system-definition operations", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-root", "draft-copy"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const systemService = new SystemStudioApplicationService(studioShell, repository);
+    const api = new SystemStudioBackendApi(repository);
+
+    const ensure = await systemService.ensureStudioInitialized();
+    const created = await systemService.createSystemDraft({
+      studioId: SystemStudioIdentity.defaultStudioId,
+      sessionId: ensure.session.id,
+      draftId: "draft-root",
+      title: "System",
+      content: JSON.stringify({ systemSpec: { components: [], inputs: [], outputs: [], parameters: [], bindings: [] } }),
+    });
+
+    const saved = await api.saveSystemDefinition({
+      studioId: SystemStudioIdentity.defaultStudioId,
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+    });
+    expect(saved.ok).toBeTrue();
+
+    const duplicated = await api.duplicateSystemDefinition({
+      studioId: SystemStudioIdentity.defaultStudioId,
+      sessionId: ensure.session.id,
+      sourceDraftId: created.draft.id,
+      duplicateDraftId: "draft-copy",
+    });
+    expect(duplicated.ok).toBeTrue();
+
+    const modified = await api.modifySystemDefinition({
+      studioId: SystemStudioIdentity.defaultStudioId,
+      sessionId: ensure.session.id,
+      draftId: "draft-copy",
+      runtimeStatePatch: { quickMode: true },
+    });
+    expect(modified.ok).toBeTrue();
+
+    const loaded = await api.loadSystemDefinition({
+      studioId: SystemStudioIdentity.defaultStudioId,
+      draftId: "draft-copy",
+    });
+    expect(loaded.ok).toBeTrue();
+  });
 });
