@@ -1523,6 +1523,7 @@ export default function StudioShellPage({
       },
     },
   };
+  const operationError = error;
 
   return (
     <section className="ui-page ui-stack ui-stack--md" data-testid="studio-shell-page">
