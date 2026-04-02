@@ -16,21 +16,14 @@ describe("SystemStudioPage contracts", () => {
     expect(registrationSource).toContain("createSystemStudioTaxonomy(\"system\", \"deterministic\")");
     expect(registrationSource).toContain('supportsSystemAssets: true');
     expect(registrationSource).toContain('supportsNestedSystemAssets: true');
+    expect(registrationSource).toContain("experienceAssets");
     expect(registrationSource).toContain('slot: "draft-authoring"');
-    expect(registrationSource).toContain("SystemCompositionEditor");
-    expect(registrationSource).toContain("SystemInterfaceEditor");
-    expect(registrationSource).toContain("SystemParameterConfigEditor");
-    expect(registrationSource).toContain("SystemExecutionMetadataEditor");
+    expect(registrationSource).toContain("system-studio-advanced-setup");
+    expect(registrationSource).toContain("system-studio-advanced-validation");
     expect(registrationSource).toContain("SystemRuntimeRunPanel");
-    expect(registrationSource).toContain("SystemContextDebugPreviewPanel");
-    expect(registrationSource).toContain("SystemCompatibilityInsightsPanel");
-    expect(registrationSource).toContain("system-studio-structure-editor");
-    expect(registrationSource).toContain("system-studio-interface-editor");
-    expect(registrationSource).toContain("system-studio-parameter-editor");
-    expect(registrationSource).toContain("system-studio-execution-metadata-editor");
     expect(registrationSource).toContain("system-studio-runtime-run-trigger");
-    expect(registrationSource).toContain("system-studio-context-debug-preview");
-    expect(registrationSource).toContain("system-studio-compatibility-insights");
+    expect(registrationSource).toContain("Advanced setup");
+    expect(registrationSource).toContain("Advanced validation and debug");
     expect(registrationSource).toContain('slot: "dependencies"');
     expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain('slot: "validation"');
@@ -83,6 +76,24 @@ describe("SystemStudioPage contracts", () => {
     expect(executionMetadataSource).toContain("Model binding ID");
     expect(executionMetadataSource).toContain("selected model/checkpoint binding");
     expect(executionMetadataSource).toContain("updateSystemExecutionMetadata");
+  });
+
+  it("uses reusable wizard/canvas experience assets for system draft authoring", () => {
+    const shellPageSource = readSource("ui/pages/StudioShellPage.tsx");
+    const boundarySource = readSource("ui/components/studio-shell/system/SystemStudioDraftAuthoringBoundary.tsx");
+    const wizardAdapterSource = readSource("ui/studio-shell/system/SystemWizardExperienceAdapter.tsx");
+    const canvasAdapterSource = readSource("ui/studio-shell/system/SystemCanvasExperienceAdapter.tsx");
+
+    expect(shellPageSource).toContain("SystemStudioDraftAuthoringBoundary");
+    expect(boundarySource).toContain("ExperienceAssetAuthoringBoundary");
+    expect(boundarySource).toContain("ConfigurableWizardSurface");
+    expect(boundarySource).toContain("ConfigurableCanvasSurface");
+    expect(wizardAdapterSource).toContain("SystemCompositionEditor");
+    expect(wizardAdapterSource).toContain("SystemInterfaceEditor");
+    expect(wizardAdapterSource).toContain("SystemParameterConfigEditor");
+    expect(canvasAdapterSource).toContain("SystemCompositionEditor");
+    expect(canvasAdapterSource).toContain("SystemInterfaceEditor");
+    expect(canvasAdapterSource).toContain("SystemParameterConfigEditor");
   });
 
   it("wires a bounded run trigger panel through the shared System Studio extension surface", () => {

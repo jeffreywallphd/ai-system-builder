@@ -16,6 +16,7 @@ import type {
   WorkflowExecutionReadinessReadModel,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import WorkflowStudioDraftAuthoringBoundary from "../components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary";
+import SystemStudioDraftAuthoringBoundary from "../components/studio-shell/system/SystemStudioDraftAuthoringBoundary";
 import WorkflowStudioExecutionFeedbackPanel, {
   type WorkflowStudioRunFeedback,
 } from "../components/studio-shell/workflow/WorkflowStudioExecutionFeedbackPanel";
@@ -279,6 +280,7 @@ export default function StudioShellPage({
 }: StudioShellPageProps): JSX.Element {
   const studioId = studioRegistration?.studioId ?? "studio-shell-main";
   const isWorkflowStudio = studioRegistration?.role === "workflow";
+  const isSystemStudio = studioRegistration?.kind === "system";
   const defaultDraftTitle = studioRegistration?.defaults.title ?? "Studio Shell Draft";
   const defaultDraftTags = studioRegistration?.defaults.tags ?? ["studio-shell"];
   const defaultContent = studioRegistration?.defaults.contentTemplate ?? "{}";
@@ -1643,56 +1645,65 @@ export default function StudioShellPage({
         ) : null}
 
         <StudioShellPanel title="Asset draft authoring" subtitle="Thin authoring surface over studio-shell draft contracts.">
-          <WorkflowStudioDraftAuthoringBoundary
-            isWorkflowStudio={isWorkflowStudio}
-            content={content}
-            onChangeContent={updateContent}
-            experienceAssetIds={studioRegistration?.shell?.experienceAssets}
-            invalidModeRouteId={isWorkflowStudio ? workflowModeRoute?.invalidModeId : undefined}
-            invalidWizardPageRouteId={isWorkflowStudio ? workflowWizardPageRoute?.invalidPageId : undefined}
-            workflowModeContext={workflowModeStore && workflowModeState
-              ? {
-                studioId,
-                selectedModeId: workflowModeState.selectedModeId,
-                selectedWizardPageId: resolvedWorkflowWizardPageId ?? "trigger",
-                onSelectWizardPage: (pageId: WorkflowStudioWizardPageId) => {
-                  void navigate(
-                    {
-                      pathname: buildWorkflowStudioWizardPagePath(pageId),
-                      search: buildWorkflowStudioSearchWithoutModeParams(),
-                      hash: location.hash,
-                    },
-                    { replace: true },
-                  );
-                },
-                sharedDraft: workflowModeState.sharedDraft,
-                sharedDraftSerialized: workflowModeState.sharedDraftSerialized,
-                draftEditorContent: workflowModeState.draftEditorContent,
-                draftParseError: workflowModeState.draftParseError,
-                modeValidationIssues: workflowModeState.modeValidationIssues,
-                draftValidationIssues: workflowModeState.draftValidationIssues,
-                updateSharedDraft: (updater) => workflowModeStore.updateSharedDraft(updater),
-                handoffStatus: workflowModeState.handoffStatus,
-                setHandoffStatus: (status) => workflowModeStore.setHandoffStatus(status),
-                clearHandoffStatus: () => workflowModeStore.clearHandoffStatus(),
-                canvasDrawers: {
-                  left: leftDrawerConfiguration
-                    ? {
-                      label: leftDrawerConfiguration.label,
-                      isOpen: isLeftDrawerOpen,
-                      onClose: () => setIsLeftDrawerOpen(false),
-                    }
-                    : undefined,
-                  right: rightDrawerConfiguration
-                    ? {
-                      label: rightDrawerConfiguration.label,
-                      isOpen: isRightDrawerOpen,
-                    }
-                    : undefined,
-                },
-              }
-              : undefined}
-          />
+          {isSystemStudio ? (
+            <SystemStudioDraftAuthoringBoundary
+              content={content}
+              validationIssues={validationIssues}
+              extensionContext={extensionContext}
+              experienceAssetIds={studioRegistration?.shell?.experienceAssets}
+            />
+          ) : (
+            <WorkflowStudioDraftAuthoringBoundary
+              isWorkflowStudio={isWorkflowStudio}
+              content={content}
+              onChangeContent={updateContent}
+              experienceAssetIds={studioRegistration?.shell?.experienceAssets}
+              invalidModeRouteId={isWorkflowStudio ? workflowModeRoute?.invalidModeId : undefined}
+              invalidWizardPageRouteId={isWorkflowStudio ? workflowWizardPageRoute?.invalidPageId : undefined}
+              workflowModeContext={workflowModeStore && workflowModeState
+                ? {
+                  studioId,
+                  selectedModeId: workflowModeState.selectedModeId,
+                  selectedWizardPageId: resolvedWorkflowWizardPageId ?? "trigger",
+                  onSelectWizardPage: (pageId: WorkflowStudioWizardPageId) => {
+                    void navigate(
+                      {
+                        pathname: buildWorkflowStudioWizardPagePath(pageId),
+                        search: buildWorkflowStudioSearchWithoutModeParams(),
+                        hash: location.hash,
+                      },
+                      { replace: true },
+                    );
+                  },
+                  sharedDraft: workflowModeState.sharedDraft,
+                  sharedDraftSerialized: workflowModeState.sharedDraftSerialized,
+                  draftEditorContent: workflowModeState.draftEditorContent,
+                  draftParseError: workflowModeState.draftParseError,
+                  modeValidationIssues: workflowModeState.modeValidationIssues,
+                  draftValidationIssues: workflowModeState.draftValidationIssues,
+                  updateSharedDraft: (updater) => workflowModeStore.updateSharedDraft(updater),
+                  handoffStatus: workflowModeState.handoffStatus,
+                  setHandoffStatus: (status) => workflowModeStore.setHandoffStatus(status),
+                  clearHandoffStatus: () => workflowModeStore.clearHandoffStatus(),
+                  canvasDrawers: {
+                    left: leftDrawerConfiguration
+                      ? {
+                        label: leftDrawerConfiguration.label,
+                        isOpen: isLeftDrawerOpen,
+                        onClose: () => setIsLeftDrawerOpen(false),
+                      }
+                      : undefined,
+                    right: rightDrawerConfiguration
+                      ? {
+                        label: rightDrawerConfiguration.label,
+                        isOpen: isRightDrawerOpen,
+                      }
+                      : undefined,
+                  },
+                }
+                : undefined}
+            />
+          )}
           <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row" }}>
             <button
               className="ui-button ui-button--primary"

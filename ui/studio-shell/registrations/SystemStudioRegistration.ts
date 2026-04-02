@@ -3,9 +3,6 @@ import {
   SystemStudioIdentity,
 } from "../../../domain/system-studio/SystemAssetDomain";
 import { createElement } from "react";
-import { SystemCompositionEditor } from "../../components/studio-shell/SystemCompositionEditor";
-import { SystemInterfaceEditor } from "../../components/studio-shell/SystemInterfaceEditor";
-import { SystemParameterConfigEditor } from "../../components/studio-shell/SystemParameterConfigEditor";
 import { SystemExecutionMetadataEditor } from "../../components/studio-shell/SystemExecutionMetadataEditor";
 import { SystemCompatibilityInsightsPanel } from "../../components/studio-shell/SystemCompatibilityInsightsPanel";
 import { SystemRuntimeRunPanel } from "../../components/studio-shell/SystemRuntimeRunPanel";
@@ -15,6 +12,7 @@ import { SystemStudioWorkManagementPanel } from "../../components/studio-shell/S
 import WorkflowTemplateSelectionPanel from "../../components/studio-shell/workflow/WorkflowTemplateSelectionPanel";
 import type { SystemStudioRegistration } from "../StudioShellExtensions";
 import { createSystemStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
+import { ExperienceSurfaceAssetIds } from "../experience-assets/ExperienceSurfaceAssets";
 
 export const systemStudioRegistration: SystemStudioRegistration = Object.freeze({
   studioType: SystemStudioIdentity.studioType,
@@ -31,7 +29,11 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
   }),
   shell: Object.freeze({
     title: SystemStudioIdentity.defaultStudioName,
-    subtitle: "Shared system shell for full AI system/app-template composition with backend-authoritative lifecycle, validation, and publish/version flows.",
+    subtitle: "Compose systems from reusable assets using guided or canvas authoring.",
+    experienceAssets: Object.freeze([
+      ExperienceSurfaceAssetIds.loomWizard,
+      ExperienceSurfaceAssetIds.loomCanvas,
+    ]),
   }),
   defaults: {
     title: "System Asset Draft",
@@ -63,48 +65,16 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
     {
       id: "system-studio-template-selection",
       slot: "draft-authoring",
-      title: "Workflow template selection",
-      subtitle: "Discover starter workflow templates and prepare instantiation payloads for system composition.",
+      title: "Starter templates",
+      subtitle: "Choose a workflow template and prepare it for your system composition.",
       order: 7,
       render: () => createElement(WorkflowTemplateSelectionPanel, { surface: "system-studio" }),
-    },
-    {
-      id: "system-studio-structure-editor",
-      slot: "draft-authoring",
-      title: "System composition canvas / structure editor",
-      subtitle: "Bounded, backend-authoritative structure editor for multi-level system composition.",
-      order: 8,
-      render: (context) => createElement(SystemCompositionEditor, { context }),
-    },
-    {
-      id: "system-studio-interface-editor",
-      slot: "draft-authoring",
-      title: "System input/output definition",
-      subtitle: "First-class authoring for explicit system interfaces (inputs + outputs).",
-      order: 9,
-      render: (context) => createElement(SystemInterfaceEditor, { context }),
-    },
-    {
-      id: "system-studio-parameter-editor",
-      slot: "draft-authoring",
-      title: "System parameter/configuration defaults",
-      subtitle: "First-class authoring for system parameters and bounded default configuration values.",
-      order: 10,
-      render: (context) => createElement(SystemParameterConfigEditor, { context }),
-    },
-    {
-      id: "system-studio-execution-metadata-editor",
-      slot: "draft-authoring",
-      title: "System execution metadata surface",
-      subtitle: "Bounded execution/runtime metadata authoring for future runtime/deployment orchestration.",
-      order: 11,
-      render: (context) => createElement(SystemExecutionMetadataEditor, { context }),
     },
     {
       id: "system-studio-work-management",
       slot: "lifecycle",
       title: "Save and reopen your work",
-      subtitle: "Easy save, open, copy, and rename actions for this image setup.",
+      subtitle: "Easy save, open, copy, and rename actions for this system setup.",
       order: 10,
       render: (context) => createElement(SystemStudioWorkManagementPanel, { context }),
     },
@@ -119,26 +89,45 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
     {
       id: "system-studio-runtime-run-trigger",
       slot: "lifecycle",
-      title: "System runtime run trigger",
-      subtitle: "Bounded run trigger, execution monitoring, and result visualization through StudioShell runtime API contracts.",
+      title: "Run and monitor",
+      subtitle: "Run the system and monitor progress/results.",
       order: 12,
       render: (context) => createElement(SystemRuntimeRunPanel, { context }),
     },
     {
-      id: "system-studio-context-debug-preview",
-      slot: "validation",
-      title: "System context preview + debug",
-      subtitle: "Developer-facing inspection of normalized context, resolution outputs, validation, and enriched trigger payload shape.",
+      id: "system-studio-advanced-setup",
+      slot: "lifecycle",
+      title: "Advanced setup",
+      subtitle: "Optional technical metadata and runtime controls.",
       order: 13,
-      render: (context) => createElement(SystemContextDebugPreviewPanel, { context }),
+      render: (context) => createElement(
+        "details",
+        undefined,
+        createElement("summary", { className: "ui-text-small ui-text-secondary" }, "Advanced setup"),
+        createElement(
+          "div",
+          { className: "ui-stack ui-stack--sm", style: { marginTop: "0.5rem" } },
+          createElement(SystemExecutionMetadataEditor, { context }),
+        ),
+      ),
     },
     {
-      id: "system-studio-compatibility-insights",
+      id: "system-studio-advanced-validation",
       slot: "validation",
-      title: "System compatibility insights (recursive)",
-      subtitle: "Summarized recursive system compatibility signals from shared validation/enforcement outputs.",
+      title: "Advanced validation and debug",
+      subtitle: "Compatibility, context preview, and diagnostics.",
       order: 12,
-      render: (context) => createElement(SystemCompatibilityInsightsPanel, { context }),
+      render: (context) => createElement(
+        "details",
+        undefined,
+        createElement("summary", { className: "ui-text-small ui-text-secondary" }, "Advanced validation and debug"),
+        createElement(
+          "div",
+          { className: "ui-stack ui-stack--sm", style: { marginTop: "0.5rem" } },
+          createElement(SystemCompatibilityInsightsPanel, { context }),
+          createElement(SystemContextDebugPreviewPanel, { context }),
+        ),
+      ),
     },
     {
       id: "system-studio-composition-capabilities",
