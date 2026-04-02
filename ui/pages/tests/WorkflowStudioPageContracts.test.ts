@@ -33,7 +33,8 @@ describe("WorkflowStudioPage contracts", () => {
     expect(registrationSource).toContain('label: "Inspector"');
     expect(registrationSource).toContain('kind: "run-workflow-draft"');
 
-    expect(shellSource).toContain("WorkflowStudioDraftAuthoringBoundary");
+    expect(shellSource).toContain("StudioAssetHostBoundary");
+    expect(shellSource).toContain("workflowStudioSurfaceAssetDefinition");
     expect(shellSource).toContain("workflowModeRoute");
     expect(shellSource).toContain("workflowWizardPageRoute");
     expect(shellSource).toContain("resolvedWorkflowModeId");

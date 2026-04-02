@@ -9,11 +9,13 @@ import ExperienceAssetAuthoringBoundary from "../experience-assets/ExperienceAss
 import DataStudioPreparationWizardPanel from "../../assets/DataStudioPreparationWizardPanel";
 import DatasetStageAuthoringPanel from "../../assets/DatasetStageAuthoringPanel";
 import { useMemo, useState } from "react";
+import { StudioAssetRenderModes, type StudioAssetRenderMode } from "../../../studio-shell/studio-assets/StudioAssetContracts";
 
 interface DatasetStudioDraftAuthoringBoundaryProps {
   readonly content: string;
   readonly extensionContext: StudioShellExtensionContext;
   readonly experienceAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
+  readonly hostMode?: StudioAssetRenderMode;
 }
 
 const defaultDatasetExperienceAssetIds = Object.freeze([
@@ -61,18 +63,23 @@ export default function DatasetStudioDraftAuthoringBoundary({
   content,
   extensionContext,
   experienceAssetIds = defaultDatasetExperienceAssetIds,
+  hostMode = StudioAssetRenderModes.full,
 }: DatasetStudioDraftAuthoringBoundaryProps): JSX.Element {
   const experienceDefinition = useMemo(
     () => buildDatasetExperienceDefinition(experienceAssetIds),
     [experienceAssetIds],
   );
-  const [selectedModeId, setSelectedModeId] = useState<"wizard" | "canvas">(experienceDefinition.defaultModeId as "wizard" | "canvas");
+  const [selectedModeId, setSelectedModeId] = useState<"wizard" | "canvas">(
+    hostMode === StudioAssetRenderModes.full
+      ? experienceDefinition.defaultModeId as "wizard" | "canvas"
+      : "wizard",
+  );
 
   return (
     <ExperienceAssetAuthoringBoundary
       asset={experienceDefinition}
       currentModeId={selectedModeId}
-      onModeChange={(modeId) => setSelectedModeId(modeId)}
+      onModeChange={hostMode === StudioAssetRenderModes.full ? (modeId) => setSelectedModeId(modeId) : undefined}
       document={content}
       issues={[]}
       surfaces={{

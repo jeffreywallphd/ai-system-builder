@@ -15,9 +15,7 @@ import type {
   StudioShellValidationIssue,
   WorkflowExecutionReadinessReadModel,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
-import WorkflowStudioDraftAuthoringBoundary from "../components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary";
-import SystemStudioDraftAuthoringBoundary from "../components/studio-shell/system/SystemStudioDraftAuthoringBoundary";
-import DatasetStudioDraftAuthoringBoundary from "../components/studio-shell/dataset/DatasetStudioDraftAuthoringBoundary";
+import StudioAssetHostBoundary from "../components/studio-shell/studio-assets/StudioAssetHostBoundary";
 import WorkflowStudioExecutionFeedbackPanel, {
   type WorkflowStudioRunFeedback,
 } from "../components/studio-shell/workflow/WorkflowStudioExecutionFeedbackPanel";
@@ -72,6 +70,14 @@ import {
 } from "../routes/InlineAssetCreation";
 import { createWorkflowAssetMetadata } from "../../domain/workflow-studio/WorkflowStudioDomain";
 import { DataStudioWizardPersistenceStorageKey } from "../components/assets/DataStudioPreparationWizardPanel";
+import {
+  createStudioHostContext,
+  createStudioHostSessionState,
+  datasetStudioSurfaceAssetDefinition,
+  systemStudioSurfaceAssetDefinition,
+  workflowStudioSurfaceAssetDefinition,
+} from "../studio-shell/studio-assets/StudioSurfaceAssetDefinitions";
+import { StudioAssetRenderModes } from "../studio-shell/studio-assets/StudioAssetContracts";
 
 interface JsonParseResult<T> {
   readonly ok: boolean;
@@ -1647,68 +1653,104 @@ export default function StudioShellPage({
 
         <StudioShellPanel title="Asset draft authoring" subtitle="Thin authoring surface over studio-shell draft contracts.">
           {isSystemStudio ? (
-            <SystemStudioDraftAuthoringBoundary
-              content={content}
-              validationIssues={validationIssues}
-              extensionContext={extensionContext}
-              experienceAssetIds={studioRegistration?.shell?.experienceAssets}
+            <StudioAssetHostBoundary
+              asset={systemStudioSurfaceAssetDefinition}
+              context={createStudioHostContext({
+                mode: StudioAssetRenderModes.full,
+                input: {
+                  content,
+                  validationIssues,
+                  extensionContext,
+                  experienceAssetIds: studioRegistration?.shell?.experienceAssets,
+                },
+              })}
+              session={createStudioHostSessionState({
+                sessionId,
+                draftId,
+                isBusy,
+                operationError,
+              })}
             />
           ) : studioRegistration?.role === "dataset" ? (
-            <DatasetStudioDraftAuthoringBoundary
-              content={content}
-              extensionContext={extensionContext}
-              experienceAssetIds={studioRegistration?.shell?.experienceAssets}
+            <StudioAssetHostBoundary
+              asset={datasetStudioSurfaceAssetDefinition}
+              context={createStudioHostContext({
+                mode: StudioAssetRenderModes.full,
+                input: {
+                  content,
+                  extensionContext,
+                  experienceAssetIds: studioRegistration?.shell?.experienceAssets,
+                },
+              })}
+              session={createStudioHostSessionState({
+                sessionId,
+                draftId,
+                isBusy,
+                operationError,
+              })}
             />
           ) : (
-            <WorkflowStudioDraftAuthoringBoundary
-              isWorkflowStudio={isWorkflowStudio}
-              content={content}
-              onChangeContent={updateContent}
-              experienceAssetIds={studioRegistration?.shell?.experienceAssets}
-              invalidModeRouteId={isWorkflowStudio ? workflowModeRoute?.invalidModeId : undefined}
-              invalidWizardPageRouteId={isWorkflowStudio ? workflowWizardPageRoute?.invalidPageId : undefined}
-              workflowModeContext={workflowModeStore && workflowModeState
-                ? {
-                  studioId,
-                  selectedModeId: workflowModeState.selectedModeId,
-                  selectedWizardPageId: resolvedWorkflowWizardPageId ?? "trigger",
-                  onSelectWizardPage: (pageId: WorkflowStudioWizardPageId) => {
-                    void navigate(
-                      {
-                        pathname: buildWorkflowStudioWizardPagePath(pageId),
-                        search: buildWorkflowStudioSearchWithoutModeParams(),
-                        hash: location.hash,
+            <StudioAssetHostBoundary
+              asset={workflowStudioSurfaceAssetDefinition}
+              context={createStudioHostContext({
+                mode: StudioAssetRenderModes.full,
+                input: {
+                  isWorkflowStudio,
+                  content,
+                  onChangeContent: updateContent,
+                  invalidModeRouteId: isWorkflowStudio ? workflowModeRoute?.invalidModeId : undefined,
+                  invalidWizardPageRouteId: isWorkflowStudio ? workflowWizardPageRoute?.invalidPageId : undefined,
+                  workflowModeContext: workflowModeStore && workflowModeState
+                    ? {
+                      studioId,
+                      selectedModeId: workflowModeState.selectedModeId,
+                      selectedWizardPageId: resolvedWorkflowWizardPageId ?? "trigger",
+                      onSelectWizardPage: (pageId: WorkflowStudioWizardPageId) => {
+                        void navigate(
+                          {
+                            pathname: buildWorkflowStudioWizardPagePath(pageId),
+                            search: buildWorkflowStudioSearchWithoutModeParams(),
+                            hash: location.hash,
+                          },
+                          { replace: true },
+                        );
                       },
-                      { replace: true },
-                    );
-                  },
-                  sharedDraft: workflowModeState.sharedDraft,
-                  sharedDraftSerialized: workflowModeState.sharedDraftSerialized,
-                  draftEditorContent: workflowModeState.draftEditorContent,
-                  draftParseError: workflowModeState.draftParseError,
-                  modeValidationIssues: workflowModeState.modeValidationIssues,
-                  draftValidationIssues: workflowModeState.draftValidationIssues,
-                  updateSharedDraft: (updater) => workflowModeStore.updateSharedDraft(updater),
-                  handoffStatus: workflowModeState.handoffStatus,
-                  setHandoffStatus: (status) => workflowModeStore.setHandoffStatus(status),
-                  clearHandoffStatus: () => workflowModeStore.clearHandoffStatus(),
-                  canvasDrawers: {
-                    left: leftDrawerConfiguration
-                      ? {
-                        label: leftDrawerConfiguration.label,
-                        isOpen: isLeftDrawerOpen,
-                        onClose: () => setIsLeftDrawerOpen(false),
-                      }
-                      : undefined,
-                    right: rightDrawerConfiguration
-                      ? {
-                        label: rightDrawerConfiguration.label,
-                        isOpen: isRightDrawerOpen,
-                      }
-                      : undefined,
-                  },
-                }
-                : undefined}
+                      sharedDraft: workflowModeState.sharedDraft,
+                      sharedDraftSerialized: workflowModeState.sharedDraftSerialized,
+                      draftEditorContent: workflowModeState.draftEditorContent,
+                      draftParseError: workflowModeState.draftParseError,
+                      modeValidationIssues: workflowModeState.modeValidationIssues,
+                      draftValidationIssues: workflowModeState.draftValidationIssues,
+                      updateSharedDraft: (updater) => workflowModeStore.updateSharedDraft(updater),
+                      handoffStatus: workflowModeState.handoffStatus,
+                      setHandoffStatus: (status) => workflowModeStore.setHandoffStatus(status),
+                      clearHandoffStatus: () => workflowModeStore.clearHandoffStatus(),
+                      canvasDrawers: {
+                        left: leftDrawerConfiguration
+                          ? {
+                            label: leftDrawerConfiguration.label,
+                            isOpen: isLeftDrawerOpen,
+                            onClose: () => setIsLeftDrawerOpen(false),
+                          }
+                          : undefined,
+                        right: rightDrawerConfiguration
+                          ? {
+                            label: rightDrawerConfiguration.label,
+                            isOpen: isRightDrawerOpen,
+                          }
+                          : undefined,
+                      },
+                    }
+                    : undefined,
+                  experienceAssetIds: studioRegistration?.shell?.experienceAssets,
+                },
+              })}
+              session={createStudioHostSessionState({
+                sessionId,
+                draftId,
+                isBusy,
+                operationError,
+              })}
             />
           )}
           <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row" }}>

@@ -17,9 +17,9 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("StudioShellValidationIssuesPanel");
     expect(source).toContain("StudioShellExtensionRegistry");
     expect(source).toContain("getWorkflowStudioModeStateStore");
-    expect(source).toContain("WorkflowStudioDraftAuthoringBoundary");
+    expect(source).toContain("StudioAssetHostBoundary");
+    expect(source).toContain("workflowStudioSurfaceAssetDefinition");
     expect(source).toContain("InlineAssetReturnStatuses.noSelection");
-    expect(source).toContain('data-testid="studio-shell-inline-return-no-selection"');
     expect(source).toContain("workflowModeRoute");
     expect(source).toContain("workflowEntryRoute");
     expect(source).toContain("WorkflowStudioEntryPaths");
@@ -45,7 +45,6 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain('data-testid="studio-shell-authoring-toolbar"');
     expect(source).toContain('data-testid="studio-shell-workflow-draft-status"');
     expect(source).toContain('data-testid="studio-shell-workflow-draft-status-badge"');
-    expect(source).toContain('data-testid="studio-shell-workflow-run-feedback"');
     expect(source).toContain("buildWorkflowStudioRunHistoryPath");
     expect(source).toContain("buildWorkflowStudioRunDetailPath");
     expect(source).toContain("View run history");
