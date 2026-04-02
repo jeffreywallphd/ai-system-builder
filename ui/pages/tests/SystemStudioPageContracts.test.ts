@@ -91,6 +91,11 @@ describe("SystemStudioPage contracts", () => {
     expect(boundarySource).toContain("SystemPageSetupEditor");
     expect(boundarySource).toContain("ConfigurableCanvasSurface");
     expect(boundarySource).toContain("No draft authoring surface is configured");
+    expect(boundarySource).toContain("system-studio-primary-canvas-summary");
+    expect(boundarySource).toContain("The page layout canvas is the main editing space in System Studio");
+    expect(boundarySource).not.toContain("system-studio-mode-actions");
+    expect(boundarySource).toContain("resolveSelectedPagePanelsFromLatest");
+    expect(boundarySource).toContain("createNextPanelId");
     expect(canvasAdapterSource).toContain("Page structure");
     expect(canvasAdapterSource).toContain("add-panel");
     expect(canvasAdapterSource).toContain("Add page section");
