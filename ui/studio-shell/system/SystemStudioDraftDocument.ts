@@ -1,4 +1,9 @@
 import type { SystemAsset } from "../../../domain/system-studio/SystemAssetDomain";
+import {
+  normalizeSystemStudioPageModel,
+  toSerializableSystemStudioPageModel,
+  type SystemStudioPageModel,
+} from "./SystemPageModel";
 import type {
   CanvasSurfaceDesignFrameModel,
   CanvasSurfaceDesignFrameRatio,
@@ -31,11 +36,7 @@ export interface SystemStudioCanvasPageLayout {
   readonly panels: ReadonlyArray<PanelAssetContract>;
 }
 
-export interface SystemStudioPageDefinition {
-  readonly pageId: string;
-  readonly heading: string;
-  readonly description?: string;
-}
+export type SystemStudioPageDefinition = SystemStudioPageModel;
 
 export interface SystemStudioDraftDocument {
   readonly systemSpec: {
@@ -72,8 +73,19 @@ export interface SystemStudioDraftDocument {
 
 const defaultSystemPage: SystemStudioPageDefinition = Object.freeze({
   pageId: "page-1",
-  heading: "Main page",
-  description: "Start here and arrange the panels for this page.",
+  title: "Main page",
+  description: "Start here and arrange the sections for this page.",
+  layout: Object.freeze({
+    layoutKind: "workspace",
+    defaultRegionId: "workspace",
+    regionIds: Object.freeze(["workspace"]),
+  }),
+  navigation: Object.freeze({
+    route: "/",
+    title: "Main page",
+    supportsDeepLinking: false,
+    requiresRuntimeSession: false,
+  }),
 });
 
 const emptyDocument: SystemStudioDraftDocument = Object.freeze({
@@ -122,14 +134,8 @@ const emptyDocument: SystemStudioDraftDocument = Object.freeze({
   }),
 });
 
-function normalizePageDefinition(entry: Partial<SystemStudioPageDefinition>, index: number): SystemStudioPageDefinition {
-  const fallbackId = `page-${index + 1}`;
-  const pageId = entry.pageId?.trim() || fallbackId;
-  return Object.freeze({
-    pageId,
-    heading: entry.heading?.trim() || `Page ${index + 1}`,
-    description: entry.description?.trim() || undefined,
-  });
+function normalizePageDefinition(entry: Record<string, unknown>, index: number): SystemStudioPageDefinition {
+  return normalizeSystemStudioPageModel(entry, index);
 }
 
 function normalizeLayoutBounds(input: unknown): PanelAssetLayoutBounds {
@@ -275,7 +281,7 @@ export function parseSystemStudioDraftDocument(content: string): SystemStudioDra
       };
     };
     const pages = Object.freeze((parsed.systemSpec?.pages ?? [defaultSystemPage]).map((entry, index) => normalizePageDefinition(
-      entry ?? {},
+      (entry ?? {}) as Record<string, unknown>,
       index,
     )));
     const canvasAuthoring = normalizeCanvasAuthoringConfig(parsed.systemSpec?.canvasAuthoring);
@@ -365,7 +371,7 @@ export function serializeSystemStudioPageDefinitions(input: {
 
   root.systemSpec = {
     ...existingSystemSpec,
-    pages: input.pages,
+    pages: input.pages.map((page) => toSerializableSystemStudioPageModel(page)),
   };
 
   return JSON.stringify(root, null, 2);
@@ -402,49 +408,9 @@ export function serializeSystemStudioEmbeddedDatasetDraftContent(input: {
   )
     ? { ...(existingSystemSpec.sharedDocument as Record<string, unknown>) }
     : {};
-  const existingCanvasAuthoring = (
-    existingSystemSpec.canvasAuthoring
-    && typeof existingSystemSpec.canvasAuthoring === "object"
-    && !Array.isArray(existingSystemSpec.canvasAuthoring)
-  )
-    ? (existingSystemSpec.canvasAuthoring as {
-      readonly pageLayouts?: ReadonlyArray<{
-        readonly pageId?: string;
-        readonly panels?: ReadonlyArray<Record<string, unknown>>;
-      }>;
-    })
-    : {};
-
-  const synchronizedPageLayouts = (existingCanvasAuthoring.pageLayouts ?? []).map((layout) => ({
-    ...layout,
-    panels: (layout.panels ?? []).map((panel) => {
-      const content = panel.content;
-      if (!content || typeof content !== "object" || Array.isArray(content)) {
-        return panel;
-      }
-      const embeddedContent = content as { readonly kind?: string; readonly studioAssetId?: string };
-      if (embeddedContent.kind !== "embedded-studio") {
-        return panel;
-      }
-      if (embeddedContent.studioAssetId !== "dataset-studio") {
-        return panel;
-      }
-      return {
-        ...panel,
-        content: {
-          ...(content as Record<string, unknown>),
-          draftContent: input.draftContent,
-        },
-      };
-    }),
-  }));
 
   root.systemSpec = {
     ...existingSystemSpec,
-    canvasAuthoring: {
-      ...existingCanvasAuthoring,
-      pageLayouts: synchronizedPageLayouts,
-    },
     embeddedStudios: {
       ...existingEmbeddedStudios,
       dataset: {
@@ -492,49 +458,9 @@ export function serializeSystemStudioEmbeddedWorkflowDraftContent(input: {
   )
     ? { ...(existingSystemSpec.sharedDocument as Record<string, unknown>) }
     : {};
-  const existingCanvasAuthoring = (
-    existingSystemSpec.canvasAuthoring
-    && typeof existingSystemSpec.canvasAuthoring === "object"
-    && !Array.isArray(existingSystemSpec.canvasAuthoring)
-  )
-    ? (existingSystemSpec.canvasAuthoring as {
-      readonly pageLayouts?: ReadonlyArray<{
-        readonly pageId?: string;
-        readonly panels?: ReadonlyArray<Record<string, unknown>>;
-      }>;
-    })
-    : {};
-
-  const synchronizedPageLayouts = (existingCanvasAuthoring.pageLayouts ?? []).map((layout) => ({
-    ...layout,
-    panels: (layout.panels ?? []).map((panel) => {
-      const content = panel.content;
-      if (!content || typeof content !== "object" || Array.isArray(content)) {
-        return panel;
-      }
-      const embeddedContent = content as { readonly kind?: string; readonly studioAssetId?: string };
-      if (embeddedContent.kind !== "embedded-studio") {
-        return panel;
-      }
-      if (embeddedContent.studioAssetId !== "workflow-studio") {
-        return panel;
-      }
-      return {
-        ...panel,
-        content: {
-          ...(content as Record<string, unknown>),
-          draftContent: input.draftContent,
-        },
-      };
-    }),
-  }));
 
   root.systemSpec = {
     ...existingSystemSpec,
-    canvasAuthoring: {
-      ...existingCanvasAuthoring,
-      pageLayouts: synchronizedPageLayouts,
-    },
     embeddedStudios: {
       ...existingEmbeddedStudios,
       workflow: {

@@ -91,12 +91,14 @@ describe("SystemStudioPage contracts", () => {
     expect(boundarySource).toContain("ConfigurableCanvasSurface");
     expect(wizardAdapterSource).toContain("SystemPageSetupEditor");
     expect(wizardAdapterSource).toContain("SystemInterfaceEditor");
+    expect(wizardAdapterSource).toContain("Detailed panel content is designed in each panel's embedded studio");
     expect(wizardAdapterSource).toContain("SystemParameterConfigEditor");
     expect(wizardAdapterSource).toContain("StudioAssetHostBoundary");
     expect(wizardAdapterSource).toContain("datasetStudioSurfaceAssetDefinition");
     expect(wizardAdapterSource).toContain("system-studio-wizard-inputs-outputs");
-    expect(canvasAdapterSource).toContain("Interface designer");
+    expect(canvasAdapterSource).toContain("Page structure");
     expect(canvasAdapterSource).toContain("add-panel");
+    expect(canvasAdapterSource).toContain("Add section");
     expect(canvasAdapterSource).toContain("remove-panel");
     expect(canvasAdapterSource).toContain("SystemCompositionEditor");
     expect(canvasAdapterSource).toContain("SystemInterfaceEditor");

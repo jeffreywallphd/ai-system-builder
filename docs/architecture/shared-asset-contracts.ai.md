@@ -1044,3 +1044,16 @@
   - safe config carry-forward keeps only overlapping schema field paths from the original instance, then re-validates through the existing registry composition validator.
 - Replacement enforcement stays on existing validation/composition boundaries (parent placement rules, kind/type/category compatibility, cardinality, nesting, version checks) by validating the rewritten composition tree through `StudioAssetRegistry.validateCompositionTree`.
 - Asset Inspector now surfaces a bounded replace flow (`StudioAssetInspectorPanel`) tied to selected instances/composition root and returns replacement outcomes through an optional root-update callback, keeping selection/inspector authoring behavior aligned with shared selection infrastructure.
+
+## Direction 5 UI extension update: System Studio scope narrowing + page model foundation (stories 2.1.1-2.1.2)
+
+- System Studio now treats page composition as its primary authoring unit through a normalized page model (`systemSpec.pages`) that carries:
+  - stable page identity (`pageId`),
+  - display title/description,
+  - page metadata hooks,
+  - layout structure hooks (`layoutKind`, region ids, default region),
+  - optional runtime navigation hooks (`route`, deep-link posture, nav grouping/session requirements).
+- The page model is integrated through existing system-studio draft parsing/serialization seams (not a parallel asset taxonomy) and keeps backward compatibility for legacy `heading` fields in persisted drafts.
+- System Studio canvas/wizard language and affordances now emphasize high-level page structure/sections.
+- Panel-internal authoring is explicitly de-emphasized in the System Studio surface and remains aligned to embedded panel studio flows.
+- Shared embedded dataset/workflow draft persistence now remains in the existing `systemSpec.sharedDocument` seam rather than being mirrored into per-panel embedded content payloads.

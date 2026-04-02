@@ -29,8 +29,8 @@ describe("System studio experience adapters", () => {
     const content = JSON.stringify({
       systemSpec: {
         pages: [
-          { pageId: "page-1", heading: "Welcome" },
-          { pageId: "page-2", heading: "Summary" },
+          { pageId: "page-1", title: "Welcome" },
+          { pageId: "page-2", title: "Summary" },
         ],
         canvasAuthoring: {
           designFrame: {
@@ -77,7 +77,7 @@ describe("System studio experience adapters", () => {
     const content = JSON.stringify({
       systemSpec: {
         pages: [
-          { pageId: "page-1", heading: "Welcome" },
+          { pageId: "page-1", title: "Welcome" },
         ],
       },
     });
@@ -110,7 +110,7 @@ describe("System studio experience adapters", () => {
   it("marks Inputs & Outputs step ready when embedded data setup has authored content", () => {
     const content = JSON.stringify({
       systemSpec: {
-        pages: [{ pageId: "page-1", heading: "Welcome" }],
+        pages: [{ pageId: "page-1", title: "Welcome" }],
       },
     });
     const canvasModel = buildCanvasModel(content);

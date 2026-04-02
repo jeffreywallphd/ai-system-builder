@@ -76,7 +76,7 @@ function resolveFocusedTarget(context: SystemCanvasExperienceContext): CanvasSur
   return Object.freeze({
     kind: "node",
     id: context.selectedPageId,
-    label: context.pages.find((page) => page.pageId === context.selectedPageId)?.heading ?? "Page",
+    label: context.pages.find((page) => page.pageId === context.selectedPageId)?.title ?? "Page",
   });
 }
 
@@ -127,16 +127,16 @@ function resolveEditingModel(context: SystemCanvasExperienceContext): CanvasSurf
     nodes: context.layoutNodes,
     selectedNodeId: context.selectedLayoutNodeId,
     commands: Object.freeze([
-      Object.freeze({ id: "add-panel", label: "Add panel", tone: "primary" as const }),
+      Object.freeze({ id: "add-panel", label: "Add section", tone: "primary" as const }),
       Object.freeze({
         id: "remove-panel",
-        label: "Remove selected panel",
+        label: "Remove selected section",
         tone: "ghost" as const,
         disabled: !context.selectedLayoutNodeId,
       }),
       Object.freeze({ id: "fit-layout", label: "Reset page layout", tone: "ghost" as const }),
     ]),
-    createNodeDescription: "Double-click to add a panel. Drag or resize each panel to design this page.",
+    createNodeDescription: "Double-click to add a panel region. Drag or resize to shape the page layout.",
     designFrame: context.designFrame,
     coordinateSpace: Object.freeze({
       mode: "normalized",
@@ -176,8 +176,8 @@ export function createSystemCanvasExperienceDefinition(
   const definition: CanvasExperienceAssetDefinition<SystemCanvasExperienceContext> = Object.freeze({
     identity: Object.freeze({
       id: "system-canvas",
-      title: "Interface designer",
-      summary: "Lay out each page with simple movable and resizable panels.",
+      title: "Page structure",
+      summary: "Arrange major page sections and panel regions.",
     }),
     resolveGraphSummary,
     resolveFocusedTarget,
@@ -203,7 +203,7 @@ export function createSystemCanvasExperienceDefinition(
               className={`ui-button ui-button--sm ${page.pageId === selectedPageId ? "ui-button--primary" : "ui-button--ghost"}`}
               onClick={() => input.onSelectPage(page.pageId)}
             >
-              {page.heading}
+              {page.title}
             </button>
           ))}
         </div>
@@ -229,14 +229,14 @@ export function createSystemCanvasExperienceDefinition(
     renderSupplementaryPanels: ({ extensionContext }) => (
       <SystemCompositionEditor context={extensionContext} />
     ),
-    resolveInteractionMessage: (canvasContext) => `Page panels: ${canvasContext.layoutNodes.length} · Ready for preview: ${runtimePanels.length}`,
+    resolveInteractionMessage: (canvasContext) => `Page sections: ${canvasContext.layoutNodes.length} · Ready for preview: ${runtimePanels.length}`,
     emptyState: Object.freeze({
       when: (canvasContext) => canvasContext.layoutNodes.length === 0,
       render: () => (
         <div className="ui-card ui-card--padded" data-testid="system-canvas-empty-state">
-          <strong>Add your first panel</strong>
+          <strong>Add your first page section</strong>
           <p className="ui-text-small ui-text-secondary">
-            Start this page with a panel, then move and resize it to build the layout.
+            Start this page with a section, then move and resize it to shape the layout.
           </p>
         </div>
       ),
@@ -256,7 +256,7 @@ export function createSystemPanelFromCanvasNode(input: {
     contentSlots: Object.freeze([
       Object.freeze({
         slotId: `${input.node.id}-content`,
-        label: "Panel content",
+        label: "Panel region",
       }),
     ]),
   });

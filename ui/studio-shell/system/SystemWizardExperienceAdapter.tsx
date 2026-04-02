@@ -91,7 +91,7 @@ function renderInterfaceDesignPage(context: SystemWizardExperienceContext): JSX.
   return (
     <section className="ui-stack ui-stack--sm" data-testid="system-wizard-interface-design-page">
       <div className="ui-stack ui-stack--2xs">
-        <p className="ui-text-small ui-text-secondary">Pick a page, then arrange the sections for that screen.</p>
+        <p className="ui-text-small ui-text-secondary">Pick a page, then arrange its major sections. Detailed panel content is designed in each panel's embedded studio.</p>
         <div className="ui-row ui-row--wrap" data-testid="system-wizard-page-switcher">
           {context.document.systemSpec.pages.map((page) => (
             <button
@@ -100,7 +100,7 @@ function renderInterfaceDesignPage(context: SystemWizardExperienceContext): JSX.
               className={`ui-button ui-button--sm ${page.pageId === context.selectedPageId ? "ui-button--primary" : "ui-button--ghost"}`}
               onClick={() => context.onSelectPage(page.pageId)}
             >
-              {page.heading}
+              {page.title}
             </button>
           ))}
         </div>
@@ -277,7 +277,7 @@ const definition: WizardExperienceAssetDefinition<SystemWizardExperienceContext>
       id: SystemWizardPageIds.pages,
       title: "Pages",
       summary: "Create and describe the pages people will use.",
-      resolveStatus: (context) => toStatus(context.document.systemSpec.pages.every((page) => page.heading.trim().length > 0)),
+      resolveStatus: (context) => toStatus(context.document.systemSpec.pages.every((page) => page.title.trim().length > 0)),
       render: renderPagesPage,
     }),
     Object.freeze({
@@ -317,7 +317,7 @@ const definition: WizardExperienceAssetDefinition<SystemWizardExperienceContext>
     const pages = [
       {
         id: SystemWizardPageIds.pages,
-        ready: context.document.systemSpec.pages.length > 0 && context.document.systemSpec.pages.every((page) => page.heading.trim().length > 0),
+        ready: context.document.systemSpec.pages.length > 0 && context.document.systemSpec.pages.every((page) => page.title.trim().length > 0),
         title: "Pages",
       },
       {
@@ -351,7 +351,7 @@ const definition: WizardExperienceAssetDefinition<SystemWizardExperienceContext>
     title: "System setup readiness",
     description: context.document.systemSpec.pages.length === 0
       ? "Start by adding your first page."
-      : context.document.systemSpec.pages.some((page) => page.heading.trim().length === 0)
+      : context.document.systemSpec.pages.some((page) => page.title.trim().length === 0)
         ? "Give each page a title so people can find what they need."
         : !resolveInterfaceDesignReadiness(context.document)
           ? "Add at least one panel to each page in Interface Design."
