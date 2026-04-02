@@ -21,6 +21,7 @@ import type {
   UpdateSystemInterfacesRequest,
   UpdateSystemParametersRequest,
 } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
+import type { ExperienceSurfaceAssetId } from "./experience-assets/ExperienceSurfaceAssets";
 
 export const StudioShellExtensionSlots = Object.freeze({
   sessionContext: "session-context",
@@ -176,6 +177,7 @@ export interface StudioShellPresentationHints {
   readonly subtitle?: string;
   readonly toolbar?: StudioShellToolbarConfiguration;
   readonly drawers?: StudioShellDrawerConfiguration;
+  readonly experienceAssets?: ReadonlyArray<ExperienceSurfaceAssetId>;
 }
 
 interface BaseStudioRegistration {
@@ -383,6 +385,9 @@ function normalizeRegistration(registration: StudioRegistration): StudioRegistra
           drawers: registration.shell.drawers
             ? normalizeDrawers(studioType, registration.shell.drawers)
             : undefined,
+          experienceAssets: registration.shell.experienceAssets
+            ? Object.freeze([...registration.shell.experienceAssets])
+            : undefined,
         })
         : undefined,
     });
@@ -416,6 +421,9 @@ function normalizeRegistration(registration: StudioRegistration): StudioRegistra
           drawers: registration.shell.drawers
             ? normalizeDrawers(studioType, registration.shell.drawers)
             : undefined,
+          experienceAssets: registration.shell.experienceAssets
+            ? Object.freeze([...registration.shell.experienceAssets])
+            : undefined,
         })
         : undefined,
     });
@@ -444,6 +452,9 @@ function normalizeRegistration(registration: StudioRegistration): StudioRegistra
           : undefined,
         drawers: registration.shell.drawers
           ? normalizeDrawers(studioType, registration.shell.drawers)
+          : undefined,
+        experienceAssets: registration.shell.experienceAssets
+          ? Object.freeze([...registration.shell.experienceAssets])
           : undefined,
       })
       : undefined,

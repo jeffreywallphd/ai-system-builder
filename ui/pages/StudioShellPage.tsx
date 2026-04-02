@@ -1647,6 +1647,7 @@ export default function StudioShellPage({
             isWorkflowStudio={isWorkflowStudio}
             content={content}
             onChangeContent={updateContent}
+            experienceAssetIds={studioRegistration?.shell?.experienceAssets}
             invalidModeRouteId={isWorkflowStudio ? workflowModeRoute?.invalidModeId : undefined}
             invalidWizardPageRouteId={isWorkflowStudio ? workflowWizardPageRoute?.invalidPageId : undefined}
             workflowModeContext={workflowModeStore && workflowModeState
