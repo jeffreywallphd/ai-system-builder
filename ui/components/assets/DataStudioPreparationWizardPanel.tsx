@@ -344,13 +344,13 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
   return (
     <section className="ui-card ui-card--padded ui-stage-wizard ui-stack ui-stack--md" data-testid="data-studio-preparation-wizard-panel">
       <header className="ui-stack ui-stack--2xs">
-        <h3>Data Studio Preparation Wizard</h3>
-        <span className="ui-subtle">Intent-driven stage-oriented authoring over the unified preparation asset graph.</span>
+        <h3>Data Flow Builder</h3>
+        <span className="ui-subtle">Build and refine how data moves through ingestion, cleanup, and transformation steps.</span>
         <span className="ui-subtle">Progress: {snapshot.progressPercent}%</span>
       </header>
 
       <label className="ui-field">
-        <span className="ui-field__label">Pipeline template</span>
+        <span className="ui-field__label">Flow template</span>
         <select
           className="ui-select"
           value={snapshot.template.id}
@@ -408,7 +408,7 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
                   refreshSnapshot();
                 }}
               >
-                Advanced Flow
+                Technical details
               </button>
               <button
                 type="button"
@@ -425,7 +425,7 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
       {authoringMode === "wizard" ? (
         <div className="ui-stage-wizard__layout">
           <StageWizardProgressNavigator
-            title="Data Studio wizard"
+            title="Data flow steps"
             steps={snapshot.stages.map((stage) => ({
               id: stage.stageId,
               name: stage.title,
@@ -444,7 +444,7 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
                 {renderCurrentStage()}
 
                 <section className="ui-card ui-card--padded ui-stack ui-stack--xs">
-                  <strong>Stage controls</strong>
+                  <strong>Stage options</strong>
                   {currentStage.isOptional ? (
                     <>
                       <label className="ui-field">
@@ -567,7 +567,7 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
       ) : (
         <section className="ui-workflow-studio-canvas ui-stack ui-stack--sm" data-testid="data-studio-canvas-mode">
           <header className="ui-row ui-row--between ui-row--wrap">
-            <strong>Data Studio Canvas</strong>
+            <strong>Data flow canvas</strong>
             <div className="ui-row ui-row--wrap">
               <span className="ui-badge ui-badge--neutral">Groups: {canvasProjection.graph.groups.length}</span>
               <span className="ui-badge ui-badge--neutral">Nodes: {canvasProjection.graph.nodes.length}</span>
@@ -587,7 +587,7 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
             onClearSelection={() => setSelectedCanvasNodeId(undefined)}
           />
           <aside className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="data-studio-canvas-inspector">
-            <strong>Stage Inspector</strong>
+            <strong>Stage details</strong>
             {selectedCanvasNode ? (
               <>
                 <span className="ui-text-small">{selectedCanvasNode.label}</span>
@@ -599,7 +599,7 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
                 </span>
               </>
             ) : (
-              <span className="ui-subtle">Select a canvas node to inspect stage metadata.</span>
+              <span className="ui-subtle">Select a stage on the canvas to review details.</span>
             )}
             {inspectedStageId ? (
               <DataStudioAdvancedEditingActions
@@ -621,7 +621,7 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
                 setAuthoringMode("wizard");
               }}
             >
-              Edit selected stage in Wizard
+              Edit selected stage in guided view
             </button>
             <DataStudioStageInternalsPanel internals={stageInternals} />
           </aside>
@@ -649,9 +649,9 @@ export default function DataStudioPreparationWizardPanel(props: DataStudioPrepar
           />
 
           <details className="ui-card ui-card--padded ui-stack ui-stack--2xs">
-            <summary className="ui-text-small">Wizard to Canvas handoff</summary>
+            <summary className="ui-text-small">Technical flow details</summary>
             <span className="ui-text-small ui-text-secondary">
-              Execution readiness: {executionReadiness.executionReady ? "ready" : "blocked"} (
+              Execution readiness: {executionReadiness.executionReady ? "Ready" : "Blocked"} (
               {executionReadiness.summary.blockingIssueCount} blocking, {executionReadiness.summary.warningIssueCount} warning)
             </span>
             <span className="ui-text-small ui-text-secondary">Current stage: {handoff.currentStageId}</span>

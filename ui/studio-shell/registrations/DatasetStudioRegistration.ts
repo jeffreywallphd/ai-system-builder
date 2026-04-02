@@ -17,7 +17,7 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
   allowedBehaviorKinds: Object.freeze(["none"]),
   shell: Object.freeze({
     title: "Data Studio",
-    subtitle: "Prepare and move data through guided pipeline stages. Use Schema Studio for structure design.",
+    subtitle: "Organize data preparation in one place. Use Schema Studio for structure design and Pipeline Studio for reusable flow logic.",
     experienceAssets: Object.freeze([
       ExperienceSurfaceAssetIds.loomWizard,
       ExperienceSurfaceAssetIds.loomCanvas,
@@ -72,11 +72,12 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
     {
       id: "dataset-studio-draft-guidance",
       slot: "draft-authoring",
-      title: "Dataset draft guidance",
-      subtitle: "Keep this workspace focused on ingestion, mapping, cleanup, and execution flow.",
+      title: "Data Studio guidance",
+      subtitle: "Use this page as an organizer for schema and flow work, then return here for preview and preparation.",
       order: 10,
       render: ({ snapshot }) => Object.freeze([
-        "Use Data Studio for pipeline and preparation work. Use Schema Studio for table and field design.",
+        "Use Data Studio as your data workspace home for preparation and preview tasks.",
+        "Go to Schema Studio for table and field design, and Pipeline Studio for reusable flow authoring.",
         "Asset role: dataset (atomic)",
         `Draft asset id: ${snapshot?.draft?.assetId ?? "-"}`,
       ]),

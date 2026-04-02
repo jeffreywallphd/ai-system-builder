@@ -11,7 +11,7 @@ export const datasetPipelineStudioRegistration: CompositeStudioRegistration = Ob
   allowedBehaviorKinds: Object.freeze(["deterministic", "iterative"]),
   shell: Object.freeze({
     title: DatasetPipelineStudioIdentity.defaultStudioName,
-    subtitle: "Shared composite shell for dataset-pipeline authoring with backend-authoritative lifecycle, validation, and publish/version flows.",
+    subtitle: "Build reusable data movement and transformation flows, then publish versioned pipeline assets.",
   }),
   defaults: {
     title: "Dataset Pipeline Asset Draft",
@@ -96,10 +96,10 @@ export const datasetPipelineStudioRegistration: CompositeStudioRegistration = Ob
       id: "dataset-pipeline-studio-draft-guidance",
       slot: "draft-authoring",
       title: "Dataset pipeline draft guidance",
-      subtitle: "Author reusable ingestion and transformation flows. Define structures in Schema Studio, then link them here.",
+      subtitle: "Author data movement and transformation logic here. Define structures in Schema Studio, then link them here.",
       order: 10,
       render: ({ snapshot }) => Object.freeze([
-        "Dataset Pipeline assets organize ingestion, mapping/transformation, enrichment, and execution-oriented data flow behavior.",
+        "Pipeline assets organize ingestion, mapping, transformation, enrichment, and run behavior.",
         "Use Schema Studio to author schemas. In this studio, link input/output schemas instead of designing table structures directly.",
         "Allowed behavior kinds: deterministic, iterative.",
         "Reuse existing source-ingestion, data-cleaning, dataset-transformation, and data-validation vocabulary in pipeline steps.",
