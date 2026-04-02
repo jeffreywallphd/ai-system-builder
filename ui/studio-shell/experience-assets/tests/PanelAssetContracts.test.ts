@@ -31,9 +31,15 @@ describe("PanelAssetContracts", () => {
       title: "Hero",
       layoutBounds: { x: 0, y: 0, width: 1, height: 0.4 },
       contentSlots: [],
+      content: {
+        kind: "embedded-studio",
+        studioAssetId: "workflow-studio",
+        draftContent: "{\"steps\":[]}",
+      },
     });
 
     expect(runtime.instanceId).toBe("home:panel-hero");
     expect(runtime.panelId).toBe("panel-hero");
+    expect(runtime.content?.kind).toBe("embedded-studio");
   });
 });

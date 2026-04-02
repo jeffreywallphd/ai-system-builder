@@ -12,6 +12,16 @@ export interface PanelAssetContentSlot {
   readonly label?: string;
 }
 
+export interface PanelEmbeddedStudioContent {
+  readonly kind: "embedded-studio";
+  readonly studioAssetId: string;
+  readonly draftContent?: string;
+  readonly experienceAssetIds?: ReadonlyArray<string>;
+  readonly embeddedVariant?: string;
+}
+
+export type PanelAssetContent = PanelEmbeddedStudioContent;
+
 export interface PanelAssetContract {
   readonly panelId: string;
   readonly pageId: string;
@@ -19,6 +29,7 @@ export interface PanelAssetContract {
   readonly description?: string;
   readonly layoutBounds: PanelAssetLayoutBounds;
   readonly contentSlots: ReadonlyArray<PanelAssetContentSlot>;
+  readonly content?: PanelAssetContent;
   readonly sourceLayoutNodeId?: string;
 }
 
@@ -30,6 +41,7 @@ export interface RuntimePanelAssetInstance {
   readonly description?: string;
   readonly layoutBounds: PanelAssetLayoutBounds;
   readonly contentSlots: ReadonlyArray<PanelAssetContentSlot>;
+  readonly content?: PanelAssetContent;
 }
 
 export function mapLayoutNodeToPanelAsset(input: {
@@ -51,6 +63,7 @@ export function mapLayoutNodeToPanelAsset(input: {
       height: input.node.height,
     }),
     contentSlots: Object.freeze(input.contentSlots ?? []),
+    content: undefined,
     sourceLayoutNodeId: input.node.id,
   });
 }
@@ -66,5 +79,6 @@ export function mapPanelAssetToRuntimeInstance(
     description: panel.description,
     layoutBounds: panel.layoutBounds,
     contentSlots: panel.contentSlots,
+    content: panel.content,
   });
 }

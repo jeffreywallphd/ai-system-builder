@@ -1,9 +1,26 @@
 import { useMemo, useState } from "react";
 import { mapPanelAssetToRuntimeInstance } from "../../../studio-shell/experience-assets/PanelAssetContracts";
 import { parseSystemStudioDraftDocument } from "../../../studio-shell/system/SystemStudioDraftDocument";
+import type { StudioShellExtensionContext } from "../../../studio-shell/StudioShellExtensions";
+import type { StudioAssetDefinition } from "../../../studio-shell/studio-assets/StudioAssetContracts";
+import { StudioAssetRenderModes } from "../../../studio-shell/studio-assets/StudioAssetContracts";
+import type { StudioEmbeddedEvent } from "../../../studio-shell/studio-assets/StudioEmbeddedEventContracts";
+import { createStudioHostContext, createStudioHostSessionState } from "../../../studio-shell/studio-assets/StudioSurfaceAssetDefinitions";
+import StudioAssetHostBoundary from "../studio-assets/StudioAssetHostBoundary";
 
 interface SystemRuntimeInterfacePreviewProps {
   readonly content: string;
+  readonly extensionContext?: StudioShellExtensionContext;
+  readonly studioAssetHosts?: Readonly<Record<string, RuntimePanelStudioAssetHost>>;
+}
+
+interface RuntimePanelStudioAssetHost {
+  readonly asset: StudioAssetDefinition<unknown, StudioEmbeddedEvent>;
+  readonly resolveInput: (params: {
+    readonly panel: ReturnType<typeof mapPanelAssetToRuntimeInstance>;
+    readonly content: string;
+    readonly extensionContext: StudioShellExtensionContext;
+  }) => unknown;
 }
 
 interface RuntimePageLayoutModel {
@@ -28,6 +45,8 @@ function resolveRuntimePages(content: string): ReadonlyArray<RuntimePageLayoutMo
 
 export default function SystemRuntimeInterfacePreview({
   content,
+  extensionContext,
+  studioAssetHosts,
 }: SystemRuntimeInterfacePreviewProps): JSX.Element {
   const pages = useMemo(() => resolveRuntimePages(content), [content]);
   const [selectedPageId, setSelectedPageId] = useState<string>(pages[0]?.pageId ?? "page-1");
@@ -78,9 +97,37 @@ export default function SystemRuntimeInterfacePreview({
                   data-testid={`system-runtime-interface-panel-${panel.panelId}`}
                 >
                   <strong>{panel.title}</strong>
-                  <span className="ui-text-small ui-text-secondary">
-                    {panel.description ?? "No content has been connected yet."}
-                  </span>
+                  {panel.content?.kind === "embedded-studio" && extensionContext && studioAssetHosts?.[panel.content.studioAssetId] ? (
+                    <StudioAssetHostBoundary
+                      asset={studioAssetHosts[panel.content.studioAssetId].asset}
+                      context={createStudioHostContext({
+                        hostId: `runtime-panel-${panel.instanceId}`,
+                        mode: StudioAssetRenderModes.embedded,
+                        capabilities: Object.freeze({
+                          canNavigate: false,
+                          canShowShellChrome: false,
+                          canMutateDraft: false,
+                          canLaunchRuns: false,
+                          canManageSessionState: false,
+                        }),
+                        input: studioAssetHosts[panel.content.studioAssetId].resolveInput({
+                          panel,
+                          content,
+                          extensionContext,
+                        }),
+                      })}
+                      session={createStudioHostSessionState({
+                        sessionId: extensionContext.snapshot?.activeSessionId,
+                        draftId: extensionContext.snapshot?.draft?.draftId,
+                        isBusy: extensionContext.isBusy,
+                        operationError: extensionContext.operationError,
+                      })}
+                    />
+                  ) : (
+                    <span className="ui-text-small ui-text-secondary">
+                      {panel.description ?? "No content has been connected yet."}
+                    </span>
+                  )}
                 </section>
               ))}
             </div>

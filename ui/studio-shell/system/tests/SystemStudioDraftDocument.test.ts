@@ -3,6 +3,7 @@ import {
   parseSystemStudioDraftDocument,
   serializeSystemStudioCanvasAuthoringConfiguration,
   serializeSystemStudioEmbeddedDatasetDraftContent,
+  serializeSystemStudioEmbeddedWorkflowDraftContent,
   serializeSystemStudioPageDefinitions,
 } from "../SystemStudioDraftDocument";
 
@@ -32,6 +33,11 @@ describe("SystemStudioDraftDocument", () => {
                   title: "Panel A",
                   layoutBounds: { x: 0.2, y: 0.1, width: 0.4, height: 0.3 },
                   contentSlots: [{ slotId: "main" }],
+                  content: {
+                    kind: "embedded-studio",
+                    studioAssetId: "workflow-studio",
+                    draftContent: "{\"steps\":[]}",
+                  },
                   sourceLayoutNodeId: "node-a",
                 },
               ],
@@ -45,6 +51,7 @@ describe("SystemStudioDraftDocument", () => {
     expect(parsed.canvasAuthoring.designFrame.ratio?.width).toBe(4);
     expect(parsed.canvasAuthoring.pageLayouts).toHaveLength(2);
     expect(parsed.canvasAuthoring.pageLayouts[0]?.panels).toHaveLength(1);
+    expect(parsed.canvasAuthoring.pageLayouts[0]?.panels[0]?.content?.kind).toBe("embedded-studio");
     expect(parsed.canvasAuthoring.pageLayouts[1]?.panels).toHaveLength(0);
   });
 
@@ -98,5 +105,15 @@ describe("SystemStudioDraftDocument", () => {
 
     const parsed = parseSystemStudioDraftDocument(nextContent);
     expect(parsed.systemSpec.embeddedStudios?.dataset?.draftContent).toBe("{\"pipeline\":\"inputs-outputs\"}");
+  });
+
+  it("serializes and parses embedded workflow draft content", () => {
+    const nextContent = serializeSystemStudioEmbeddedWorkflowDraftContent({
+      existingContent: JSON.stringify({ systemSpec: { components: [] } }),
+      draftContent: "{\"steps\":[{\"stepId\":\"step-1\"}]}",
+    });
+
+    const parsed = parseSystemStudioDraftDocument(nextContent);
+    expect(parsed.systemSpec.embeddedStudios?.workflow?.draftContent).toBe("{\"steps\":[{\"stepId\":\"step-1\"}]}");
   });
 });
