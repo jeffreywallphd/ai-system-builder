@@ -3,8 +3,10 @@ import { DatasetSchemaIntentIds } from "../../../domain/dataset-studio/schema-in
 import { DatasetInstanceRoles } from "../../../domain/system-runtime/DatasetInstanceDomain";
 import {
   buildReferenceImageDatasetInstanceRequests,
+  ReferenceImagePrimaryWorkflowTemplateAssetId,
   ReferenceImageSystemTemplate,
   ReferenceImageSystemTemplateId,
+  ReferenceImageSystemWorkflowContextMapping,
 } from "../ReferenceImageSystemTemplate";
 
 describe("ReferenceImageSystemTemplate", () => {
@@ -18,6 +20,10 @@ describe("ReferenceImageSystemTemplate", () => {
       "reference-workflow",
       "reference-ui",
     ]);
+    expect(ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId).toBe(ReferenceImagePrimaryWorkflowTemplateAssetId);
+    expect(ReferenceImageSystemTemplate.primaryWorkflowAsset.datasetBindings.workflowInputId).toBe("sourceImage");
+    expect(ReferenceImageSystemTemplate.primaryWorkflowAsset.datasetBindings.workflowOutputId).toBe("images");
+    expect(ReferenceImageSystemTemplate.systemAsset.executionMetadata?.workflowContextMapping?.mappings.length).toBeGreaterThan(0);
   });
 
   it("declares system-owned dataset instance bindings aligned to media schema intent", () => {
@@ -46,5 +52,14 @@ describe("ReferenceImageSystemTemplate", () => {
     ]);
     expect(requests[0]?.seedMetadata?.runtimeOwner).toBe("system-runtime");
     expect(requests[1]?.seedMetadata?.templateId).toBe(ReferenceImageSystemTemplateId);
+  });
+
+  it("provides explicit system context mapping for selected image, parameters, and dataset refs", () => {
+    const mappingIds = ReferenceImageSystemWorkflowContextMapping.mappings.map((entry) => entry.mappingId);
+    expect(mappingIds).toContain("reference-image.input.source-image");
+    expect(mappingIds).toContain("reference-image.input.instruction");
+    expect(mappingIds).toContain("reference-image.metadata.dataset-instances");
+    expect(mappingIds).toContain("reference-image.metadata.system-dataset-refs");
+    expect(mappingIds).toContain("reference-image.metadata.dataset-runtime-handles");
   });
 });
