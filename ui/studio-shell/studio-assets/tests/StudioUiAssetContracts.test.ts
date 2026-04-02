@@ -8,7 +8,11 @@ import {
   listStudioSurfaceAssetDefinitionsByKind,
   resolveStudioSurfaceAssetDefinitionById,
 } from "../StudioSurfaceAssetDefinitions";
-import { createDefaultStudioAssetRegistry, StudioAssetRegistrationCategories } from "../StudioAssetRegistry";
+import {
+  createDefaultStudioAssetRegistry,
+  StudioAssetRegistrationCategories,
+  StudioAssetRendererResolutionKinds,
+} from "../StudioAssetRegistry";
 
 describe("StudioUiAssetContracts", () => {
   it("defines atomic UI primitive contracts with leaf-only constraints", () => {
@@ -73,8 +77,36 @@ describe("StudioUiAssetContracts", () => {
     expect(systemRegistration?.kind).toBe(StudioUiAssetKinds.systemPage);
     expect(systemRegistration?.hooks.propsSchemaId).toBe("studio.system-surface.input");
     expect(systemRegistration?.renderer).toEqual({ renderer: "react", resolution: "definition-render" });
+    expect(systemRegistration?.metadata).toMatchObject({
+      id: "system-studio",
+      assetType: "system-studio",
+      group: "studio-surfaces",
+      iconToken: "studio.system",
+      contractCategory: "system-page",
+    });
+    expect(systemRegistration?.metadata.capabilityFlags).toContain("runtime");
 
     const resolvedDefinition = registry.resolveDefinitionById("workflow-studio");
     expect(resolvedDefinition?.contract.identity.studioId).toBe("workflow-studio");
+  });
+
+  it("resolves runtime renderers by asset id, kind, and category with graceful fallback for missing definitions", () => {
+    const registry = createDefaultStudioAssetRegistry();
+
+    const workflowRenderer = registry.resolveRendererById("workflow-studio");
+    expect(workflowRenderer.kind).toBe(StudioAssetRendererResolutionKinds.resolved);
+    expect(workflowRenderer.render).toBeDefined();
+
+    const missingRenderer = registry.resolveRendererById("ui-primitive:text-input");
+    expect(missingRenderer.kind).toBe(StudioAssetRendererResolutionKinds.missing);
+    expect(missingRenderer.message).toContain("does not expose a runtime renderer definition");
+
+    const composedRenderers = registry.resolveRenderersByKind(StudioUiAssetKinds.composed);
+    expect(composedRenderers.length).toBeGreaterThanOrEqual(2);
+    expect(composedRenderers.every((entry) => entry.kind === StudioAssetRendererResolutionKinds.resolved)).toBe(true);
+
+    const systemCategoryRenderers = registry.resolveRenderersByCategory(StudioAssetRegistrationCategories.systemPage);
+    expect(systemCategoryRenderers.map((entry) => entry.assetId)).toEqual(["system-studio"]);
+    expect(systemCategoryRenderers[0]?.kind).toBe(StudioAssetRendererResolutionKinds.resolved);
   });
 });

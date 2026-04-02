@@ -71,7 +71,12 @@ export type StudioUiAssetKind = typeof StudioUiAssetKinds[keyof typeof StudioUiA
 export interface StudioUiAssetMetadata {
   readonly displayName?: string;
   readonly description?: string;
+  readonly group?: string;
+  readonly iconToken?: string;
   readonly tags?: ReadonlyArray<string>;
+  readonly keywords?: ReadonlyArray<string>;
+  readonly contractCategory?: string;
+  readonly capabilityFlags?: ReadonlyArray<string>;
 }
 
 export interface StudioUiAssetPropsSchemaDescriptor {

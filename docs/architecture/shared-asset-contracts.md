@@ -248,6 +248,22 @@ Not implemented in this slice:
   - system/page surfaces.
 - Registry entries expose deterministic lookup/discovery fields (`id`, `kind`, `category`, metadata, renderer info, props/persistence hooks, and composition metadata) and can resolve rendering definitions by id.
 
+## Direction 5 UI extension update: shared UI asset metadata + runtime renderer resolution (stories 1.1.5-1.1.6)
+
+- Studio UI asset metadata is now normalized as one shared registration model across atomic primitives, composed studio assets, and system/page assets (`ui/studio-shell/studio-assets/StudioAssetContracts.ts`, `ui/studio-shell/studio-assets/StudioAssetRegistry.ts`).
+- Metadata fields now consistently expose:
+  - identity hooks (`metadata.id`, `metadata.assetType`)
+  - display text (`title`, `summary`, `displayName`, `description`)
+  - grouping/classification (`kind`, registration `category`, metadata `group`, `contractCategory`)
+  - visual/discovery hooks (`iconToken`, `tags`, `keywords`)
+  - optional capability flags (`capabilityFlags`) for future inspector/library filtering.
+- Registration normalization now validates and freezes this metadata shape for deterministic discovery and persistence-friendly read behavior.
+- Runtime renderer resolution is now explicit in the registry through bounded lookup helpers:
+  - `resolveRendererById`
+  - `resolveRenderersByKind`
+  - `resolveRenderersByCategory`
+- Resolution is fail-safe and structured (`resolved`, `missing`, `invalid`) so runtime surfaces can degrade gracefully when renderer definitions are absent or mismatched, instead of relying on ad hoc null checks.
+
 ## Direction 5 extension update: derived attributes + media schema validation layer (stories 1.1.5-1.1.6)
 
 - Canonical image-record contracts now include a typed derived-attributes seam (`domain/dataset-studio/contracts/ImageDerivedAttributes.ts`) with bounded fields (`aspectRatio`, `orientation`, `isAnimated`, `pixelCount`, `megapixels`) while preserving canonical record extensibility.
