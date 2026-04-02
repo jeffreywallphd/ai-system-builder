@@ -1164,3 +1164,27 @@ Not implemented in this slice:
   - relationship endpoint validation against declared entities,
   - normalized immutable documents for persistence and downstream registry/read-model use.
 - This slice intentionally keeps scope structural and asset-first: it does not add full schema-field authoring UX, relationship editors, or schema execution behaviors.
+
+## Direction 5 extension update: schema field + relationship model formalization (stories 3.1.3-3.1.4)
+
+- `SchemaEntityDefinition` now carries first-class field contracts (`fields`) instead of only field-collection hooks, aligned with existing domain validation/serialization patterns.
+- Field contracts (`SchemaFieldDefinition`) are intentionally generic and include:
+  - stable identity (`fieldId`),
+  - user-facing and machine-facing naming (`name`, optional `key`),
+  - typed value contract (`type`) with reusable baseline kinds (for relational and non-relational structured schema authoring),
+  - required/optional marker, optional default value hook, optional description/help text, and metadata hooks.
+- Entity-level field normalization now enforces deterministic integrity:
+  - duplicate `fieldId` and duplicate field-name rejection,
+  - inline field-collection references must resolve to declared fields,
+  - inline collection field ids default to the entity field list when omitted.
+- `SchemaRelationshipDefinition` is now formalized as a reusable relationship model for schema assets with:
+  - stable identity (`relationshipId`),
+  - source/target entity references,
+  - optional source/target field references,
+  - optional relationship type + bounded cardinality hints,
+  - optional label/description and metadata for future ERD/canvas authoring.
+- Relationship validation is now entity/field-aware in the same canonical domain seam:
+  - source/target entities must exist,
+  - source/target field references (when provided) must resolve on the referenced entities.
+- Serialization/deserialization compatibility is preserved by accepting legacy relationship `kind` values and normalizing them into the new `type` property at the boundary.
+- This remains a structural foundation slice: it strengthens schema-authoring contracts for future studio/pipeline integration without introducing schema-editing UI workflows or runtime database semantics.

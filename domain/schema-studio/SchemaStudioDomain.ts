@@ -16,6 +16,34 @@ export const SchemaStudioIdentity = Object.freeze({
 
 export const SchemaAssetDocumentVersion = "1.0.0";
 
+export const SchemaFieldTypeKinds = Object.freeze({
+  string: "string",
+  number: "number",
+  boolean: "boolean",
+  date: "date",
+  datetime: "datetime",
+  json: "json",
+  uuid: "uuid",
+  integer: "integer",
+  decimal: "decimal",
+  binary: "binary",
+  reference: "reference",
+  unknown: "unknown",
+} as const);
+
+export type SchemaFieldTypeKind = typeof SchemaFieldTypeKinds[keyof typeof SchemaFieldTypeKinds];
+
+export const SchemaRelationshipCardinalityKinds = Object.freeze({
+  oneToOne: "one-to-one",
+  oneToMany: "one-to-many",
+  manyToOne: "many-to-one",
+  manyToMany: "many-to-many",
+  unknown: "unknown",
+} as const);
+
+export type SchemaRelationshipCardinalityKind =
+  typeof SchemaRelationshipCardinalityKinds[keyof typeof SchemaRelationshipCardinalityKinds];
+
 const OptionalStringSchema = z.string().trim().min(1).optional();
 const MetadataSchema = z.record(z.unknown()).optional();
 
@@ -25,6 +53,17 @@ const SchemaEntityCanvasLayoutSchema = z.object({
   width: z.number().positive().optional(),
   height: z.number().positive().optional(),
   zIndex: z.number().int().optional(),
+}).strict();
+
+const SchemaFieldDefinitionSchema = z.object({
+  fieldId: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+  key: OptionalStringSchema,
+  type: z.string().trim().min(1),
+  required: z.boolean().default(false),
+  defaultValue: z.unknown().optional(),
+  description: OptionalStringSchema,
+  metadata: MetadataSchema,
 }).strict();
 
 const SchemaEntityFieldCollectionHookSchema = z.object({
@@ -40,6 +79,7 @@ const SchemaEntityDefinitionSchema = z.object({
   name: z.string().trim().min(1),
   label: OptionalStringSchema,
   description: OptionalStringSchema,
+  fields: z.array(SchemaFieldDefinitionSchema).default([]),
   fieldCollection: SchemaEntityFieldCollectionHookSchema.optional(),
   metadata: MetadataSchema,
   layout: SchemaEntityCanvasLayoutSchema.optional(),
@@ -49,9 +89,21 @@ const SchemaRelationshipDefinitionSchema = z.object({
   relationshipId: z.string().trim().min(1),
   sourceEntityId: z.string().trim().min(1),
   targetEntityId: z.string().trim().min(1),
-  kind: OptionalStringSchema,
+  sourceFieldId: OptionalStringSchema,
+  targetFieldId: OptionalStringSchema,
+  type: OptionalStringSchema,
+  cardinality: z.enum([
+    SchemaRelationshipCardinalityKinds.oneToOne,
+    SchemaRelationshipCardinalityKinds.oneToMany,
+    SchemaRelationshipCardinalityKinds.manyToOne,
+    SchemaRelationshipCardinalityKinds.manyToMany,
+    SchemaRelationshipCardinalityKinds.unknown,
+  ]).optional(),
   label: OptionalStringSchema,
+  description: OptionalStringSchema,
   metadata: MetadataSchema,
+  /** Compatibility alias for older persisted payloads using `kind`. */
+  kind: OptionalStringSchema,
 }).strict();
 
 const SchemaAssetDefinitionSchema = z.object({
@@ -67,11 +119,46 @@ const SchemaAssetDocumentSchema = z.object({
 }).strict();
 
 export type SchemaEntityCanvasLayout = z.infer<typeof SchemaEntityCanvasLayoutSchema>;
+export type SchemaFieldDefinition = z.infer<typeof SchemaFieldDefinitionSchema>;
 export type SchemaEntityFieldCollectionHook = z.infer<typeof SchemaEntityFieldCollectionHookSchema>;
 export type SchemaEntityDefinition = z.infer<typeof SchemaEntityDefinitionSchema>;
-export type SchemaRelationshipDefinition = z.infer<typeof SchemaRelationshipDefinitionSchema>;
+export type SchemaRelationshipDefinition = Omit<z.infer<typeof SchemaRelationshipDefinitionSchema>, "kind">;
 export type SchemaAssetDefinition = z.infer<typeof SchemaAssetDefinitionSchema>;
 export type SchemaAssetDocument = z.infer<typeof SchemaAssetDocumentSchema>;
+
+function normalizeOptional(value?: string): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function normalizeSchemaFieldDefinition(input: SchemaFieldDefinition): SchemaFieldDefinition {
+  const parsed = SchemaFieldDefinitionSchema.parse(input);
+
+  return Object.freeze({
+    ...parsed,
+    type: normalizeOptional(parsed.type) ?? SchemaFieldTypeKinds.unknown,
+    key: normalizeOptional(parsed.key) ?? parsed.name,
+    description: normalizeOptional(parsed.description),
+  });
+}
+
+function normalizeSchemaRelationshipDefinition(input: z.infer<typeof SchemaRelationshipDefinitionSchema>): SchemaRelationshipDefinition {
+  const parsed = SchemaRelationshipDefinitionSchema.parse(input);
+  const normalizedType = normalizeOptional(parsed.type) ?? normalizeOptional(parsed.kind);
+
+  return Object.freeze({
+    relationshipId: parsed.relationshipId,
+    sourceEntityId: parsed.sourceEntityId,
+    targetEntityId: parsed.targetEntityId,
+    sourceFieldId: normalizeOptional(parsed.sourceFieldId),
+    targetFieldId: normalizeOptional(parsed.targetFieldId),
+    type: normalizedType,
+    cardinality: parsed.cardinality,
+    label: normalizeOptional(parsed.label),
+    description: normalizeOptional(parsed.description),
+    metadata: parsed.metadata,
+  });
+}
 
 export function createSchemaStudioTaxonomy() {
   return createCompositionTaxonomyDescriptor({
@@ -105,16 +192,45 @@ export function createSchemaAssetMetadata(input: {
 
 export function createSchemaEntityDefinition(input: SchemaEntityDefinition): SchemaEntityDefinition {
   const parsed = SchemaEntityDefinitionSchema.parse(input);
+
+  const fields = parsed.fields.map((field) => normalizeSchemaFieldDefinition(field));
+  const knownFieldIds = new Set(fields.map((field) => field.fieldId));
+
+  const duplicateFieldIds = findDuplicateValues(fields.map((field) => field.fieldId));
+  if (duplicateFieldIds.length > 0) {
+    throw new Error(`Schema entity '${parsed.entityId}' contains duplicate field ids: ${duplicateFieldIds.join(", ")}.`);
+  }
+
+  const duplicateFieldNames = findDuplicateValues(fields.map((field) => field.name));
+  if (duplicateFieldNames.length > 0) {
+    throw new Error(`Schema entity '${parsed.entityId}' contains duplicate field names: ${duplicateFieldNames.join(", ")}.`);
+  }
+
   const dedupedFieldIds = parsed.fieldCollection?.fieldIds
     ? [...new Set(parsed.fieldCollection.fieldIds.map((entry) => entry.trim()).filter(Boolean))]
     : undefined;
 
+  if (parsed.fieldCollection?.mode === "inline") {
+    const unresolvedFieldIds = (dedupedFieldIds ?? [])
+      .filter((fieldId) => !knownFieldIds.has(fieldId));
+    if (unresolvedFieldIds.length > 0) {
+      throw new Error(
+        `Schema entity '${parsed.entityId}' fieldCollection references unknown inline fields: ${unresolvedFieldIds.join(", ")}.`,
+      );
+    }
+  }
+
   return Object.freeze({
     ...parsed,
+    fields: Object.freeze(fields),
     fieldCollection: parsed.fieldCollection
       ? Object.freeze({
         ...parsed.fieldCollection,
-        fieldIds: dedupedFieldIds ? Object.freeze(dedupedFieldIds) : undefined,
+        fieldIds: dedupedFieldIds
+          ? Object.freeze(dedupedFieldIds)
+          : parsed.fieldCollection.mode === "inline"
+            ? Object.freeze(fields.map((field) => field.fieldId))
+            : undefined,
       })
       : undefined,
   });
@@ -124,11 +240,10 @@ export function createSchemaAssetDocument(input: SchemaAssetDocument): SchemaAss
   const parsed = SchemaAssetDocumentSchema.parse(input);
 
   const entities = parsed.definition.entities.map((entity) => createSchemaEntityDefinition(entity));
-  const knownEntityIds = new Set(entities.map((entity) => entity.entityId));
+  const entityById = new Map(entities.map((entity) => [entity.entityId, entity]));
 
-  const relationships = parsed.definition.relationships.map((relationship) => Object.freeze({
-    ...relationship,
-  }));
+  const relationships = parsed.definition.relationships
+    .map((relationship) => normalizeSchemaRelationshipDefinition(relationship));
 
   const duplicateEntityIds = findDuplicateValues(entities.map((entity) => entity.entityId));
   if (duplicateEntityIds.length > 0) {
@@ -141,10 +256,31 @@ export function createSchemaAssetDocument(input: SchemaAssetDocument): SchemaAss
   }
 
   const invalidRelationshipIds = relationships
-    .filter((relationship) => !knownEntityIds.has(relationship.sourceEntityId) || !knownEntityIds.has(relationship.targetEntityId))
+    .filter((relationship) => !entityById.has(relationship.sourceEntityId) || !entityById.has(relationship.targetEntityId))
     .map((relationship) => relationship.relationshipId);
   if (invalidRelationshipIds.length > 0) {
     throw new Error(`Schema relationships must reference declared entities. Invalid relationship ids: ${invalidRelationshipIds.join(", ")}.`);
+  }
+
+  for (const relationship of relationships) {
+    const sourceEntity = entityById.get(relationship.sourceEntityId);
+    const targetEntity = entityById.get(relationship.targetEntityId);
+
+    if (!sourceEntity || !targetEntity) {
+      continue;
+    }
+
+    if (relationship.sourceFieldId && !sourceEntity.fields.some((field) => field.fieldId === relationship.sourceFieldId)) {
+      throw new Error(
+        `Schema relationship '${relationship.relationshipId}' references unknown source field '${relationship.sourceFieldId}'.`,
+      );
+    }
+
+    if (relationship.targetFieldId && !targetEntity.fields.some((field) => field.fieldId === relationship.targetFieldId)) {
+      throw new Error(
+        `Schema relationship '${relationship.relationshipId}' references unknown target field '${relationship.targetFieldId}'.`,
+      );
+    }
   }
 
   return Object.freeze({
