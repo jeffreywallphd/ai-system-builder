@@ -847,3 +847,17 @@
   - rehydrates `SystemAsset` for application/runtime consumption,
   - resolves referenced dataset/workflow assets via `SerializedAssetReferenceResolutionService`,
   - returns warning/error issues for unresolved or incompatible references so callers can degrade gracefully.
+
+## Direction 5 extension update: dataset-instance persistence + workflow version binding (stories 5.3.5-5.3.6)
+
+- Canonical system serialization now carries runtime-owned dataset instance state snapshots (not just references) through `runtime.datasetInstances[].persistedState`:
+  - persisted instance snapshot (identity, role, lifecycle/runtime status, ownership, metadata),
+  - persisted image record snapshots for system-owned image stores (input/output/intermediate when present).
+- Save orchestration (`SystemStudioApplicationService.saveSystemDefinition`) now captures dataset-instance runtime state via a bounded adapter seam (`SystemDatasetInstancePersistenceService`) and writes it into the existing canonical system serialization contract (no parallel persistence format).
+- Load orchestration (`SystemStudioApplicationService.loadSystemDefinition`) can restore serialized dataset-instance state back into runtime storage through the same adapter seam and surfaces structured issues when persisted state is missing or invalid (`missing-dataset-instance-state`, `invalid-dataset-instance-state`).
+- Workflow reuse/version pinning is now explicit in canonical runtime metadata:
+  - `runtime.workflowBindings[]` tracks workflow asset bindings by binding id + component alias + workflow asset id + pinned workflow version id,
+  - pin mode is explicit (`pinMode: "version"`) to keep behavior stable now and leave clear extension points for future upgrade policies.
+- Serialized reference resolution/reload behavior now validates workflow bindings alongside existing dataset/workflow asset reference arrays:
+  - unpinned workflow bindings are surfaced as typed issues (`unresolved-workflow-version`) in studio load flows,
+  - runtime execution load rejects unresolved pinned workflow bindings via typed serialized-reference failures.

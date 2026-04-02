@@ -760,6 +760,13 @@ export class SystemRuntimeApplicationService {
       references: [
         ...document.contract?.assetReferences.datasets ?? [],
         ...document.contract?.assetReferences.workflows ?? [],
+        ...document.contract?.runtime.workflowBindings.map((entry) => Object.freeze({
+          kind: "workflow" as const,
+          assetId: entry.workflowAssetId,
+          versionId: entry.workflowVersionId,
+          alias: entry.componentAlias,
+          metadata: { bindingId: entry.bindingId, pinMode: entry.pinMode },
+        })) ?? [],
       ],
     });
     if (resolution.ok) {
@@ -777,7 +784,13 @@ export class SystemRuntimeApplicationService {
       || (entry.code === SerializedAssetReferenceResolutionIssueCodes.missingAsset && Boolean(entry.reference.versionId))
     ));
     if (!blockingIssue) {
-      return;
+      const unpinnedWorkflow = document.contract?.runtime.workflowBindings.find((entry) => !entry.workflowVersionId);
+      if (!unpinnedWorkflow) {
+        return;
+      }
+      throw new Error(
+        `invalid-request:serialized-reference-unresolved-workflow-version:Workflow binding '${unpinnedWorkflow.bindingId}' is missing workflowVersionId.`,
+      );
     }
     throw new Error(`invalid-request:serialized-reference-${blockingIssue.code}:${blockingIssue.message}`);
   }

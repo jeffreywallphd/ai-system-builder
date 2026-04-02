@@ -44,6 +44,10 @@ import {
   type SystemSerializationContract,
 } from "../../domain/system-studio/SystemSerializationContract";
 import { SerializedAssetReferenceResolutionService } from "../system-runtime/SerializedAssetReferenceResolutionService";
+import {
+  SystemDatasetInstancePersistenceService,
+  type RestoreSystemDatasetInstancePersistenceIssue,
+} from "../system-runtime/SystemDatasetInstancePersistenceService";
 
 export interface EnsureSystemStudioResult {
   readonly initialized: boolean;
@@ -286,6 +290,7 @@ export class SystemStudioApplicationService {
   constructor(
     private readonly studioShellService: StudioShellApplicationService,
     private readonly repository: IStudioShellRepository,
+    private readonly datasetInstancePersistence?: SystemDatasetInstancePersistenceService,
     private readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy" | "resolveSystemContract"> = new CompositionAssetContractResolver(),
   ) {
     this.serializedReferenceResolver = new SerializedAssetReferenceResolutionService(repository);
@@ -808,6 +813,8 @@ export class SystemStudioApplicationService {
       dependencies: parsed.contract.definition.dependencies,
       systemSpec: parsed.systemSpec,
       uiConfiguration: parsed.uiConfiguration,
+      runtimeDatasetInstances: this.datasetInstancePersistence?.captureSystemDatasetInstances(loaded.draft.assetId).datasetInstances,
+      runtimeWorkflowBindings: parsed.contract.runtime.workflowBindings,
     });
 
     const updated = await this.studioShellService.updateAssetDraft({
@@ -818,9 +825,17 @@ export class SystemStudioApplicationService {
       dependencies: parsed.contract.definition.dependencies,
     });
 
+    const savedDocument = parseSystemSerializationDocument({
+      content: updated.draft.content,
+      dependencies: updated.draft.dependencies,
+    });
+    if (!savedDocument.contract) {
+      throw new StudioShellInvalidRequestError("Saved system definition is missing canonical serialization contract.");
+    }
+
     return Object.freeze({
       draft: updated.draft,
-      serialization: parsed.contract,
+      serialization: savedDocument.contract,
     });
   }
 
@@ -844,6 +859,10 @@ export class SystemStudioApplicationService {
         dependencies: envelope.dependencies ?? [],
       });
       const issues = await this.resolveSerializedReferenceIssues(parsed.contract);
+      const restoreIssues = this.restoreSerializedDatasetInstanceState({
+        systemId: version.assetId.value,
+        contract: parsed.contract,
+      });
       return Object.freeze({
         source: "version",
         schemaVersion: parsed.schemaVersion,
@@ -857,7 +876,7 @@ export class SystemStudioApplicationService {
           ...parsed.systemSpec,
         }),
         uiConfiguration: parsed.uiConfiguration,
-        issues,
+        issues: Object.freeze([...issues, ...restoreIssues]),
       });
     }
 
@@ -871,6 +890,10 @@ export class SystemStudioApplicationService {
       dependencies: loaded.draft.dependencies,
     });
     const issues = await this.resolveSerializedReferenceIssues(parsed.contract);
+    const restoreIssues = this.restoreSerializedDatasetInstanceState({
+      systemId: loaded.draft.assetId,
+      contract: parsed.contract,
+    });
     return Object.freeze({
       source: "draft",
       schemaVersion: parsed.schemaVersion,
@@ -883,22 +906,58 @@ export class SystemStudioApplicationService {
         ...parsed.systemSpec,
       }),
       uiConfiguration: parsed.uiConfiguration,
-      issues,
+      issues: Object.freeze([...issues, ...restoreIssues]),
     });
   }
 
   private async resolveSerializedReferenceIssues(contract: SystemSerializationContract): Promise<ReadonlyArray<LoadSystemDefinitionIssue>> {
+    const workflowBindingPinningIssues = contract.runtime.workflowBindings
+      .filter((entry) => !entry.workflowVersionId)
+      .map((entry) => Object.freeze({
+        code: "unresolved-workflow-version",
+        message: `Workflow binding '${entry.bindingId}' must pin an explicit workflowVersionId.`,
+        severity: "error" as const,
+      }));
+
     const result = await this.serializedReferenceResolver.resolveReferences({
       serializedSchemaVersion: contract.schemaVersion,
       references: [
         ...contract.assetReferences.datasets,
         ...contract.assetReferences.workflows,
+        ...contract.runtime.workflowBindings.map((entry) => Object.freeze({
+          kind: "workflow" as const,
+          assetId: entry.workflowAssetId,
+          versionId: entry.workflowVersionId,
+          alias: entry.componentAlias,
+          metadata: { bindingId: entry.bindingId, pinMode: entry.pinMode },
+        })),
       ],
     });
-    return Object.freeze(result.issues.map((issue) => Object.freeze({
+    return Object.freeze([
+      ...workflowBindingPinningIssues,
+      ...result.issues.map((issue) => Object.freeze({
       code: issue.code,
       message: issue.message,
       severity: issue.code === "missing-asset" && !issue.reference.versionId ? "warning" : "error",
+      })),
+    ]);
+  }
+
+  private restoreSerializedDatasetInstanceState(input: {
+    readonly systemId: string;
+    readonly contract: SystemSerializationContract;
+  }): ReadonlyArray<LoadSystemDefinitionIssue> {
+    if (!this.datasetInstancePersistence || input.contract.runtime.datasetInstances.length === 0) {
+      return Object.freeze([]);
+    }
+    const restored = this.datasetInstancePersistence.restoreSystemDatasetInstances({
+      systemId: input.systemId,
+      datasetInstances: input.contract.runtime.datasetInstances,
+    });
+    return Object.freeze(restored.issues.map((issue: RestoreSystemDatasetInstancePersistenceIssue) => Object.freeze({
+      code: issue.code,
+      message: issue.message,
+      severity: issue.severity,
     })));
   }
 
