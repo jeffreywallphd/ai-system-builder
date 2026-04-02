@@ -319,6 +319,31 @@ function nextSchemaEntityId(baseSlug: string, existingEntityIds: ReadonlySet<str
   return candidate;
 }
 
+function slugifySchemaFieldName(name: string): string {
+  const normalized = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return normalized || "field";
+}
+
+function nextSchemaFieldId(baseSlug: string, existingFieldIds: ReadonlySet<string>): string {
+  let index = 1;
+  let candidate = `field:${baseSlug}`;
+  while (existingFieldIds.has(candidate)) {
+    index += 1;
+    candidate = `field:${baseSlug}-${index}`;
+  }
+  return candidate;
+}
+
+function nextSchemaRelationshipId(baseSlug: string, existingRelationshipIds: ReadonlySet<string>): string {
+  let index = 1;
+  let candidate = `relationship:${baseSlug}`;
+  while (existingRelationshipIds.has(candidate)) {
+    index += 1;
+    candidate = `relationship:${baseSlug}-${index}`;
+  }
+  return candidate;
+}
+
 function hasDuplicateSchemaEntityName(
   entities: ReadonlyArray<SchemaEntityDefinition>,
   name: string,
@@ -415,6 +440,290 @@ export function updateSchemaEntityInDocument(input: {
     definition: {
       ...normalizedDocument.definition,
       entities: normalizedDocument.definition.entities.map((entity) => entity.entityId === entityId ? updated : entity),
+    },
+  });
+}
+
+function requireEntity(document: SchemaAssetDocument, entityId: string): SchemaEntityDefinition {
+  const existing = document.definition.entities.find((entity) => entity.entityId === entityId);
+  if (!existing) {
+    throw new Error(`Schema entity '${entityId}' was not found.`);
+  }
+  return existing;
+}
+
+export function addSchemaFieldToEntityInDocument(input: {
+  readonly document: SchemaAssetDocument;
+  readonly entityId: string;
+  readonly name: string;
+  readonly key?: string;
+  readonly type: string;
+  readonly required?: boolean;
+  readonly defaultValue?: unknown;
+  readonly description?: string;
+  readonly metadata?: Record<string, unknown>;
+}): SchemaAssetDocument {
+  const normalizedDocument = createSchemaAssetDocument(input.document);
+  const entityId = input.entityId.trim();
+  const normalizedName = input.name.trim();
+  const normalizedType = input.type.trim();
+
+  if (!entityId) {
+    throw new Error("Schema entity id is required.");
+  }
+  if (!normalizedName) {
+    throw new Error("Schema field name is required.");
+  }
+  if (!normalizedType) {
+    throw new Error("Schema field type is required.");
+  }
+
+  const entity = requireEntity(normalizedDocument, entityId);
+  const duplicateByName = entity.fields.some((field) => field.name.trim().toLowerCase() === normalizedName.toLowerCase());
+  if (duplicateByName) {
+    throw new Error(`Schema entity '${entity.name}' already contains a field named '${normalizedName}'.`);
+  }
+
+  const fieldId = nextSchemaFieldId(
+    slugifySchemaFieldName(normalizedName),
+    new Set(entity.fields.map((field) => field.fieldId)),
+  );
+
+  const field = normalizeSchemaFieldDefinition({
+    fieldId,
+    name: normalizedName,
+    key: normalizeOptional(input.key),
+    type: normalizedType,
+    required: input.required ?? false,
+    defaultValue: input.defaultValue,
+    description: normalizeOptional(input.description),
+    metadata: input.metadata,
+  });
+
+  return createSchemaAssetDocument({
+    schemaVersion: normalizedDocument.schemaVersion,
+    definition: {
+      ...normalizedDocument.definition,
+      entities: normalizedDocument.definition.entities.map((entry) => entry.entityId === entityId
+        ? createSchemaEntityDefinition({ ...entry, fields: [...entry.fields, field] })
+        : entry),
+    },
+  });
+}
+
+export function updateSchemaFieldInEntityInDocument(input: {
+  readonly document: SchemaAssetDocument;
+  readonly entityId: string;
+  readonly fieldId: string;
+  readonly name: string;
+  readonly key?: string;
+  readonly type: string;
+  readonly required?: boolean;
+  readonly defaultValue?: unknown;
+  readonly description?: string;
+  readonly metadata?: Record<string, unknown>;
+}): SchemaAssetDocument {
+  const normalizedDocument = createSchemaAssetDocument(input.document);
+  const entityId = input.entityId.trim();
+  const fieldId = input.fieldId.trim();
+  const normalizedName = input.name.trim();
+  const normalizedType = input.type.trim();
+
+  if (!entityId) {
+    throw new Error("Schema entity id is required.");
+  }
+  if (!fieldId) {
+    throw new Error("Schema field id is required.");
+  }
+  if (!normalizedName) {
+    throw new Error("Schema field name is required.");
+  }
+  if (!normalizedType) {
+    throw new Error("Schema field type is required.");
+  }
+
+  const entity = requireEntity(normalizedDocument, entityId);
+  const existing = entity.fields.find((field) => field.fieldId === fieldId);
+  if (!existing) {
+    throw new Error(`Schema field '${fieldId}' was not found.`);
+  }
+
+  const duplicateByName = entity.fields.some((field) => (
+    field.fieldId !== fieldId && field.name.trim().toLowerCase() === normalizedName.toLowerCase()
+  ));
+  if (duplicateByName) {
+    throw new Error(`Schema entity '${entity.name}' already contains a field named '${normalizedName}'.`);
+  }
+
+  const updatedField = normalizeSchemaFieldDefinition({
+    ...existing,
+    name: normalizedName,
+    key: normalizeOptional(input.key),
+    type: normalizedType,
+    required: input.required ?? false,
+    defaultValue: input.defaultValue,
+    description: normalizeOptional(input.description),
+    metadata: input.metadata ?? existing.metadata,
+  });
+
+  return createSchemaAssetDocument({
+    schemaVersion: normalizedDocument.schemaVersion,
+    definition: {
+      ...normalizedDocument.definition,
+      entities: normalizedDocument.definition.entities.map((entry) => entry.entityId === entityId
+        ? createSchemaEntityDefinition({
+          ...entry,
+          fields: entry.fields.map((field) => field.fieldId === fieldId ? updatedField : field),
+        })
+        : entry),
+    },
+  });
+}
+
+export function removeSchemaFieldFromEntityInDocument(input: {
+  readonly document: SchemaAssetDocument;
+  readonly entityId: string;
+  readonly fieldId: string;
+}): SchemaAssetDocument {
+  const normalizedDocument = createSchemaAssetDocument(input.document);
+  const entityId = input.entityId.trim();
+  const fieldId = input.fieldId.trim();
+
+  if (!entityId) {
+    throw new Error("Schema entity id is required.");
+  }
+  if (!fieldId) {
+    throw new Error("Schema field id is required.");
+  }
+
+  const entity = requireEntity(normalizedDocument, entityId);
+  if (!entity.fields.some((field) => field.fieldId === fieldId)) {
+    throw new Error(`Schema field '${fieldId}' was not found.`);
+  }
+
+  return createSchemaAssetDocument({
+    schemaVersion: normalizedDocument.schemaVersion,
+    definition: {
+      ...normalizedDocument.definition,
+      entities: normalizedDocument.definition.entities.map((entry) => entry.entityId === entityId
+        ? createSchemaEntityDefinition({ ...entry, fields: entry.fields.filter((field) => field.fieldId !== fieldId) })
+        : entry),
+      relationships: normalizedDocument.definition.relationships.map((relationship) => {
+        if (relationship.sourceEntityId === entityId && relationship.sourceFieldId === fieldId) {
+          return Object.freeze({ ...relationship, sourceFieldId: undefined });
+        }
+        if (relationship.targetEntityId === entityId && relationship.targetFieldId === fieldId) {
+          return Object.freeze({ ...relationship, targetFieldId: undefined });
+        }
+        return relationship;
+      }),
+    },
+  });
+}
+
+function hasDuplicateRelationshipShape(
+  relationships: ReadonlyArray<SchemaRelationshipDefinition>,
+  candidate: Pick<SchemaRelationshipDefinition, "sourceEntityId" | "targetEntityId" | "sourceFieldId" | "targetFieldId" | "type" | "cardinality">,
+  ignoreRelationshipId?: string,
+): boolean {
+  const sourceField = normalizeOptional(candidate.sourceFieldId);
+  const targetField = normalizeOptional(candidate.targetFieldId);
+  const type = normalizeOptional(candidate.type);
+
+  return relationships.some((relationship) => {
+    if (ignoreRelationshipId && relationship.relationshipId === ignoreRelationshipId) {
+      return false;
+    }
+    return relationship.sourceEntityId === candidate.sourceEntityId
+      && relationship.targetEntityId === candidate.targetEntityId
+      && normalizeOptional(relationship.sourceFieldId) === sourceField
+      && normalizeOptional(relationship.targetFieldId) === targetField
+      && normalizeOptional(relationship.type) === type
+      && relationship.cardinality === candidate.cardinality;
+  });
+}
+
+function normalizeRelationshipUpsertInput(input: {
+  readonly sourceEntityId: string;
+  readonly targetEntityId: string;
+  readonly sourceFieldId?: string;
+  readonly targetFieldId?: string;
+  readonly type?: string;
+  readonly cardinality?: SchemaRelationshipCardinalityKind;
+  readonly label?: string;
+  readonly description?: string;
+  readonly metadata?: Record<string, unknown>;
+}) {
+  const sourceEntityId = input.sourceEntityId.trim();
+  const targetEntityId = input.targetEntityId.trim();
+
+  if (!sourceEntityId || !targetEntityId) {
+    throw new Error("Relationship source and target tables are required.");
+  }
+
+  return Object.freeze({
+    sourceEntityId,
+    targetEntityId,
+    sourceFieldId: normalizeOptional(input.sourceFieldId),
+    targetFieldId: normalizeOptional(input.targetFieldId),
+    type: normalizeOptional(input.type),
+    cardinality: input.cardinality,
+    label: normalizeOptional(input.label),
+    description: normalizeOptional(input.description),
+    metadata: input.metadata,
+  });
+}
+
+export function addSchemaRelationshipToDocument(input: {
+  readonly document: SchemaAssetDocument;
+  readonly sourceEntityId: string;
+  readonly targetEntityId: string;
+  readonly sourceFieldId?: string;
+  readonly targetFieldId?: string;
+  readonly type?: string;
+  readonly cardinality?: SchemaRelationshipCardinalityKind;
+  readonly label?: string;
+  readonly description?: string;
+  readonly metadata?: Record<string, unknown>;
+}): SchemaAssetDocument {
+  const normalizedDocument = createSchemaAssetDocument(input.document);
+  const normalized = normalizeRelationshipUpsertInput(input);
+
+  const source = normalizedDocument.definition.entities.find((entity) => entity.entityId === normalized.sourceEntityId);
+  const target = normalizedDocument.definition.entities.find((entity) => entity.entityId === normalized.targetEntityId);
+
+  if (!source || !target) {
+    throw new Error("Relationship source and target tables must exist in this schema.");
+  }
+
+  if (normalized.sourceFieldId && !source.fields.some((field) => field.fieldId === normalized.sourceFieldId)) {
+    throw new Error(`Source field '${normalized.sourceFieldId}' was not found on table '${source.name}'.`);
+  }
+
+  if (normalized.targetFieldId && !target.fields.some((field) => field.fieldId === normalized.targetFieldId)) {
+    throw new Error(`Target field '${normalized.targetFieldId}' was not found on table '${target.name}'.`);
+  }
+
+  if (hasDuplicateRelationshipShape(normalizedDocument.definition.relationships, normalized)) {
+    throw new Error("This relationship already exists in the schema.");
+  }
+
+  const baseSlug = `${slugifySchemaEntityName(source.name)}-${slugifySchemaEntityName(target.name)}`;
+  const relationshipId = nextSchemaRelationshipId(
+    baseSlug,
+    new Set(normalizedDocument.definition.relationships.map((relationship) => relationship.relationshipId)),
+  );
+
+  const relationship = normalizeSchemaRelationshipDefinition({
+    relationshipId,
+    ...normalized,
+  });
+
+  return createSchemaAssetDocument({
+    schemaVersion: normalizedDocument.schemaVersion,
+    definition: {
+      ...normalizedDocument.definition,
+      relationships: [...normalizedDocument.definition.relationships, relationship],
     },
   });
 }

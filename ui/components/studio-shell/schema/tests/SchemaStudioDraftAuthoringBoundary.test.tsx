@@ -19,19 +19,27 @@ describe("SchemaStudioDraftAuthoringBoundary", () => {
     expect(html).toContain('data-testid="schema-studio-canvas"');
     expect(html).toContain('data-testid="schema-studio-empty-state"');
     expect(html).toContain("Add table");
-    expect(html).toContain("Relationships");
+    expect(html).toContain("Fields");
+    expect(html).toContain("Add relationship");
     expect(html).toContain("Pipelines and execution flows stay in separate studios");
   });
 
-  it("renders tables and relationship placeholders from canonical schema content", () => {
+  it("renders tables, field inspector, and relationships from canonical schema content", () => {
     const content = serializeSchemaAssetDocument({
       schemaVersion: "1.0.0",
       definition: {
-        entities: [{ entityId: "entity:customer", name: "Customer", fields: [] }],
+        entities: [{
+          entityId: "entity:customer",
+          name: "Customer",
+          fields: [{ fieldId: "field:id", name: "id", type: "uuid", required: true }],
+        }],
         relationships: [{
           relationshipId: "relationship:customer-order",
           sourceEntityId: "entity:customer",
           targetEntityId: "entity:customer",
+          sourceFieldId: "field:id",
+          targetFieldId: "field:id",
+          cardinality: "one-to-many",
         }],
       },
     });
@@ -43,9 +51,10 @@ describe("SchemaStudioDraftAuthoringBoundary", () => {
       />,
     );
 
-    expect(html).toContain("Customer (0 fields)");
-    expect(html).toContain("Table details");
+    expect(html).toContain("Customer (1 fields)");
+    expect(html).toContain('data-testid="schema-studio-field-inspector"');
     expect(html).toContain("relationship:customer-order");
+    expect(html).toContain("Connection type");
   });
 
   it("shows a safe parse error for malformed schema content", () => {
