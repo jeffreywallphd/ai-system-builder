@@ -917,3 +917,17 @@
   - `modifySystemDefinition`.
 - Technical/system-level controls are still available, but only in a collapsed-by-default Advanced section near the bottom of the panel.
 - Renderer/browser fallback and desktop bridge contracts now include matching system-definition IPC methods so behavior is consistent across host environments.
+
+## Direction 5 extension update: end-to-end execution flow validation + dataset runtime schema enforcement (stories 5.4.1-5.4.2)
+
+- Reference-image execution now runs through an explicit step-tracking service seam (`ui/runtime/ReferenceImageExecutionFlowService.ts`) that reports user-facing progress/failure states across:
+  - run start,
+  - runtime generation,
+  - output saving,
+  - result refresh.
+- Step state semantics are normalized (`started`, `running`, `completed`, `failed`, `partially-completed`) and surfaced in plain language in System Studio (`Run started`, `Generating result`, `Saving result`, `Couldn’t finish this image`) while preserving technical diagnostics in collapsed advanced details.
+- Runtime output persistence no longer silently defaults malformed image record fields in `WorkflowOutputMaterializationService`:
+  - width/height/format are now required for produced runtime image records,
+  - malformed records are rejected as structured invalid-request failures,
+  - failed/partial save outcomes propagate through persistence status + run-history status instead of silently admitting corrupted records.
+- This keeps dataset integrity/schema enforcement in internal contracts/services (materialization + dataset-instance admission) rather than UI or Comfy-specific transport layers, and ensures output gallery/preview only reflects validated persisted records.

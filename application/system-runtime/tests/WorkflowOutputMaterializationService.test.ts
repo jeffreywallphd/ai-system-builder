@@ -252,6 +252,58 @@ describe("WorkflowOutputMaterializationService", () => {
     } as never)).rejects.toThrow();
   });
 
+  it("rejects malformed runtime image records instead of silently defaulting dimensions/format", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const datasetInstances = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog(),
+      new AllowSystemValidator(),
+    );
+
+    await datasetInstances.ensureOutputImageStoreInstance({
+      instanceId: "instance:outputs",
+      systemId: "system:image",
+      datasetAssetId: "asset:dataset:outputs",
+      datasetAssetVersionId: "v1",
+    });
+
+    const service = new WorkflowOutputMaterializationService(datasetInstances);
+    const result = await service.materialize({
+      systemId: "system:image",
+      datasetInstanceId: "instance:outputs",
+      payload: {
+        materializationId: "mat:run:invalid-shape",
+        workflowRun: {
+          runId: "run:invalid-shape",
+          workflowAssetId: "asset:workflow:image",
+        },
+        producedAssets: [{
+          assetRef: {
+            kind: "generated-output",
+            assetId: "asset:workflow-output:broken",
+            outputId: "asset:workflow-output:broken",
+          },
+          role: "primary",
+          metadata: {
+            filename: "broken.png",
+          },
+          tags: [],
+        }],
+        parameterSnapshot: {},
+        timestamps: {
+          requestedAt: "2026-04-01T10:00:00.000Z",
+          updatedAt: "2026-04-01T10:00:01.000Z",
+        },
+        status: "materialized",
+      },
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.records).toHaveLength(0);
+    expect(result.failures[0]?.code).toBe("invalid-request");
+    expect(result.failures[0]?.message).toContain("missing width");
+  });
+
   it("supports partial success and deterministic idempotent reprocessing for retries", async () => {
     const repository = new InMemoryDatasetInstanceRepository();
     const datasetInstances = new SystemDatasetInstanceService(

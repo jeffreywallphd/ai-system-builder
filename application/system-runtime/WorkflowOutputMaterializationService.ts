@@ -220,12 +220,20 @@ export class WorkflowOutputMaterializationService {
     const producedAsset = input.payload.producedAssets[input.assetIndex]!;
     const metadata = producedAsset.metadata;
 
-    const width = this.readPositiveNumber(metadata.width) ?? 1;
-    const height = this.readPositiveNumber(metadata.height) ?? 1;
+    const width = this.requirePositiveNumber(
+      metadata.width,
+      `Produced image #${input.assetIndex + 1} is missing width.`,
+    );
+    const height = this.requirePositiveNumber(
+      metadata.height,
+      `Produced image #${input.assetIndex + 1} is missing height.`,
+    );
     const mimeType = this.readOptionalString(metadata.mimeType);
-    const format = this.readOptionalString(metadata.format)
-      ?? this.formatFromMimeType(mimeType)
-      ?? "png";
+    const format = this.requireFormat({
+      format: this.readOptionalString(metadata.format),
+      mimeType,
+      fallbackMessage: `Produced image #${input.assetIndex + 1} is missing format details.`,
+    });
 
     return Object.freeze({
       assetRef: (input.persistedArtifact?.assetRef ?? producedAsset.assetRef) as ImageAssetReferenceInput,
@@ -353,6 +361,26 @@ export class WorkflowOutputMaterializationService {
       return undefined;
     }
     return value;
+  }
+
+  private requirePositiveNumber(value: unknown, message: string): number {
+    const parsed = this.readPositiveNumber(value);
+    if (parsed === undefined) {
+      throw new Error(`invalid-request:${message}`);
+    }
+    return parsed;
+  }
+
+  private requireFormat(input: {
+    readonly format?: string;
+    readonly mimeType?: string;
+    readonly fallbackMessage: string;
+  }): string {
+    const resolved = input.format ?? this.formatFromMimeType(input.mimeType);
+    if (!resolved) {
+      throw new Error(`invalid-request:${input.fallbackMessage}`);
+    }
+    return resolved;
   }
 
   private readOptionalString(value: unknown): string | undefined {
