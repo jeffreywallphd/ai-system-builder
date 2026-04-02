@@ -13,6 +13,7 @@ import WorkflowStudioTriggerSectionEditor from "./WorkflowStudioTriggerSectionEd
 import type { WorkflowStudioHandoffStatus } from "../../../studio-shell/workflow/WorkflowStudioHandoffStatus";
 import WorkflowStudioHandoffStatusBanner from "./WorkflowStudioHandoffStatusBanner";
 import { listWorkflowOutputSummaries } from "../../../studio-shell/workflow/WorkflowWizardOutputs";
+import ConfigurableWizardSurface from "../experience-assets/ConfigurableWizardSurface";
 
 export interface WorkflowStudioWizardModeSurfaceProps {
   readonly sharedDraft: WorkflowDraft;
@@ -74,11 +75,6 @@ export default function WorkflowStudioWizardModeSurface({
     ? selectedWizardPageId
     : orderedPageIds[0] ?? WorkflowWizardSectionIds.trigger;
   const activeSection = sectionsById.get(activePageId) ?? progress.sections[0];
-  const activeSectionIndex = orderedPageIds.findIndex((sectionId) => sectionId === activePageId);
-  const previousPageId = activeSectionIndex > 0 ? orderedPageIds[activeSectionIndex - 1] : undefined;
-  const nextPageId = activeSectionIndex >= 0 && activeSectionIndex < orderedPageIds.length - 1
-    ? orderedPageIds[activeSectionIndex + 1]
-    : undefined;
   const firstIncompleteSection = progress.firstIncompleteSectionId
     ? sectionsById.get(progress.firstIncompleteSectionId)
     : undefined;
@@ -96,44 +92,57 @@ export default function WorkflowStudioWizardModeSurface({
     setReadyActionConfirmed(true);
   };
 
-  const renderPageNavigationActions = ({
-    backTestId,
-    nextTestId,
-    className,
-  }: {
-    readonly backTestId: string;
-    readonly nextTestId: string;
-    readonly className?: string;
-  }): JSX.Element => (
-    <div className={`ui-workflow-wizard__navigation-actions ${className ?? ""}`.trim()}>
-      <button
-        type="button"
-        className="ui-button ui-button--primary ui-button--sm"
-        data-testid={backTestId}
-        disabled={!previousPageId}
-        onClick={() => {
-          if (previousPageId) {
-            selectPage(previousPageId);
-          }
-        }}
-      >
-        Back
-      </button>
-      <button
-        type="button"
-        className="ui-button ui-button--primary ui-button--sm"
-        data-testid={nextTestId}
-        disabled={!nextPageId}
-        onClick={() => {
-          if (nextPageId) {
-            selectPage(nextPageId);
-          }
-        }}
-      >
-        Next
-      </button>
-    </div>
-  );
+  const renderPageHost = (pageId: string): JSX.Element => {
+    if (pageId === WorkflowWizardSectionIds.trigger) {
+      return (
+        <div className="ui-stack ui-stack--2xs" data-testid="workflow-wizard-page-trigger">
+          <WorkflowStudioTriggerSectionEditor
+            sharedDraft={sharedDraft}
+            draftValidationIssues={draftValidationIssues}
+            onUpdateSharedDraft={onUpdateSharedDraft}
+          />
+        </div>
+      );
+    }
+
+    if (pageId === WorkflowWizardSectionIds.inputs) {
+      return (
+        <div data-testid="workflow-wizard-page-inputs">
+          <WorkflowStudioInputSectionEditor
+            sharedDraft={sharedDraft}
+            draftValidationIssues={draftValidationIssues}
+            onUpdateSharedDraft={onUpdateSharedDraft}
+            studioId={studioId}
+            onSetHandoffStatus={onSetHandoffStatus}
+          />
+        </div>
+      );
+    }
+
+    if (pageId === WorkflowWizardSectionIds.steps) {
+      return (
+        <div data-testid="workflow-wizard-page-steps">
+          <WorkflowStudioStepSectionEditor
+            sharedDraft={sharedDraft}
+            draftValidationIssues={draftValidationIssues}
+            onUpdateSharedDraft={onUpdateSharedDraft}
+            studioId={studioId}
+            onSetHandoffStatus={onSetHandoffStatus}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div data-testid="workflow-wizard-page-outputs">
+        <WorkflowStudioOutputSectionEditor
+          sharedDraft={sharedDraft}
+          draftValidationIssues={draftValidationIssues}
+          onUpdateSharedDraft={onUpdateSharedDraft}
+        />
+      </div>
+    );
+  };
 
   return (
     <div className="ui-stack ui-stack--sm" data-testid="workflow-studio-wizard-mode-surface">
@@ -142,211 +151,139 @@ export default function WorkflowStudioWizardModeSurface({
         onDismiss={onClearHandoffStatus}
       />
 
-      <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-wizard-pages-card">
-        <nav className="ui-workflow-wizard__page-nav" aria-label="Workflow wizard pages">
-          <div className="ui-workflow-wizard__page-nav-main">
-            <div className="ui-workflow-wizard__page-buttons">
-              {progress.sections.map((section) => (
-                <button
-                  key={section.id}
-                  type="button"
-                  className={`ui-button ui-button--sm ${section.id === activePageId ? "ui-button--primary" : "ui-button--ghost"}`}
-                  data-testid={`workflow-wizard-page-button-${section.id}`}
-                  aria-current={section.id === activePageId ? "page" : undefined}
-                  onClick={() => selectPage(section.id)}
-                >
-                  {section.title}
-                </button>
-              ))}
-            </div>
-            <p className="ui-text-muted ui-workflow-wizard__page-progress" data-testid="workflow-wizard-page-progress">
-              Current focus: <strong>{activeSection?.title ?? "Trigger"}</strong>. Progress: {progress.readySectionCount}/{progress.sections.length} sections ready.
-            </p>
-          </div>
-          {renderPageNavigationActions({
-            backTestId: "workflow-wizard-back-page",
-            nextTestId: "workflow-wizard-next-page",
-            className: "ui-workflow-wizard__navigation-actions--rail",
-          })}
-        </nav>
-        <div data-testid={`workflow-wizard-page-${activePageId}`}>
-          {activePageId === WorkflowWizardSectionIds.trigger ? (
-            <div className="ui-stack ui-stack--2xs">
-              <WorkflowStudioTriggerSectionEditor
-                sharedDraft={sharedDraft}
-                draftValidationIssues={draftValidationIssues}
-                onUpdateSharedDraft={onUpdateSharedDraft}
-              />
-              {renderPageNavigationActions({
-                backTestId: "workflow-wizard-back-page-trigger",
-                nextTestId: "workflow-wizard-next-page-trigger",
-                className: "ui-workflow-wizard__navigation-actions--inline",
-              })}
-            </div>
-          ) : null}
-
-          {activePageId === WorkflowWizardSectionIds.inputs ? (
-            <WorkflowStudioInputSectionEditor
-              sharedDraft={sharedDraft}
-              draftValidationIssues={draftValidationIssues}
-              onUpdateSharedDraft={onUpdateSharedDraft}
-              studioId={studioId}
-              onSetHandoffStatus={onSetHandoffStatus}
-            />
-          ) : null}
-
-          {activePageId === WorkflowWizardSectionIds.steps ? (
-            <WorkflowStudioStepSectionEditor
-              sharedDraft={sharedDraft}
-              draftValidationIssues={draftValidationIssues}
-              onUpdateSharedDraft={onUpdateSharedDraft}
-              studioId={studioId}
-              onSetHandoffStatus={onSetHandoffStatus}
-            />
-          ) : null}
-
-          {activePageId === WorkflowWizardSectionIds.outputs ? (
-            <WorkflowStudioOutputSectionEditor
-              sharedDraft={sharedDraft}
-              draftValidationIssues={draftValidationIssues}
-              onUpdateSharedDraft={onUpdateSharedDraft}
-            />
-          ) : null}
-        </div>
-      </section>
-
-      {activePageId === WorkflowWizardSectionIds.outputs ? (
-        <>
-          <section
-            id="workflow-wizard-terminal-actions"
-            className="ui-card ui-card--padded ui-stack ui-stack--2xs"
-            data-testid="workflow-wizard-terminal-actions"
-          >
-            <strong>Prepare for run handoff</strong>
-            {progress.isWorkflowReady ? (
-              <p className="ui-text-muted">
-                Ready for next-stage handoff. Save and continue to lifecycle/publish controls.
-              </p>
-            ) : (
-              <p className="ui-text-muted">
-                Resolve remaining blockers before handoff. Completed: {progress.completedSectionCount}/{progress.sections.length}.
-              </p>
-            )}
-            {readyActionAttempted && !progress.isWorkflowReady ? (
-              <p className="ui-text-danger" data-testid="workflow-wizard-ready-blocked">
-                Cannot prepare for run yet. Resolve the blocking sections listed above.
-              </p>
-            ) : null}
-            {readyActionConfirmed ? (
-              <p className="ui-text-muted" data-testid="workflow-wizard-ready-confirmed">
-                Wizard handoff marked ready. Continue to <a href="#studio-shell-lifecycle-panel">Lifecycle / publish / version status</a>.
-              </p>
-            ) : null}
-            <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
-              {firstIncompleteSection ? (
-                <button
-                  type="button"
-                  className="ui-button ui-button--ghost ui-button--sm"
-                  data-testid="workflow-wizard-jump-incomplete"
-                  onClick={() => selectPage(firstIncompleteSection.id)}
-                >
-                  Jump to first incomplete
-                </button>
+      <ConfigurableWizardSurface
+        pages={progress.sections.map((section) => ({
+          id: section.id,
+          title: section.title,
+          status: section.statusLabel,
+        }))}
+        activePageId={activePageId}
+        onSelectPage={(pageId) => selectPage(pageId as WorkflowStudioWizardPageId)}
+        progress={{
+          totalCount: progress.sections.length,
+          completeCount: progress.completedSectionCount,
+          readyCount: progress.readySectionCount,
+          focusLabel: activeSection?.title ?? "Trigger",
+        }}
+        readiness={{
+          title: "Workflow readiness summary",
+          description: progress.isWorkflowReady
+            ? "Workflow draft is ready for handoff."
+            : `Workflow draft is not ready yet. ${progress.blockingIssueCount} blocking item(s) remain. Inputs policy: ${progress.readinessPolicy.inputs === "required" ? "required for this wizard pass" : "optional"}.`,
+          issues: progress.blockingIssues.map((issue) => ({
+            id: issue.id,
+            message: `${issue.sectionTitle}: ${issue.message}`,
+            pageId: issue.sectionId,
+          })),
+        }}
+        pageNavigationTestIds={{
+          back: "workflow-wizard-back-page",
+          next: "workflow-wizard-next-page",
+        }}
+        renderPageHost={renderPageHost}
+        renderTerminalArea={(pageId) => pageId === WorkflowWizardSectionIds.outputs ? (
+          <>
+            <section
+              id="workflow-wizard-terminal-actions"
+              className="ui-card ui-card--padded ui-stack ui-stack--2xs"
+              data-testid="workflow-wizard-terminal-actions"
+            >
+              <strong>Prepare for run handoff</strong>
+              {progress.isWorkflowReady ? (
+                <p className="ui-text-muted">
+                  Ready for next-stage handoff. Save and continue to lifecycle/publish controls.
+                </p>
               ) : (
-                <button type="button" className="ui-button ui-button--ghost ui-button--sm" disabled data-testid="workflow-wizard-jump-incomplete">
-                  Jump to first incomplete
-                </button>
+                <p className="ui-text-muted">
+                  Resolve remaining blockers before handoff. Completed: {progress.completedSectionCount}/{progress.sections.length}.
+                </p>
               )}
-              <a className="ui-button ui-button--sm" href="#workflow-wizard-json-preview" data-testid="workflow-wizard-review-draft">
-                Review draft JSON
-              </a>
-              <button
-                type="button"
-                className="ui-button ui-button--primary ui-button--sm"
-                onClick={handleReadyAction}
-                data-testid="workflow-wizard-ready-action"
-              >
-                Prepare for Run
-              </button>
-            </div>
-            <div className="ui-stack ui-stack--2xs ui-workflow-wizard__output-overview" data-testid="workflow-wizard-output-overview">
-              <strong>Configured outputs</strong>
-              {outputSummaries.length > 0 ? (
-                <ul className="ui-stack ui-stack--2xs ui-workflow-wizard__output-summary-list">
-                  {outputSummaries.map((summary) => (
-                    <li key={summary.outputId} className="ui-workflow-wizard__output-summary-item">
-                      <div><strong>{summary.order}. {summary.displayLabel}</strong> <span className="ui-text-secondary">({summary.typeLabel})</span></div>
-                      {summary.detailLines.length > 0 ? (
-                        <div className="ui-text-small ui-text-secondary">{summary.detailLines.join(" · ")}</div>
-                      ) : (
-                        <div className="ui-text-small ui-text-secondary">No additional output details configured.</div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="ui-text-muted">No outputs configured yet.</p>
-              )}
-            </div>
-          </section>
-
-          <label className="ui-stack ui-stack--2xs">
-            <span className="ui-text-small">Shared canonical workflow draft JSON preview</span>
-            <textarea id="workflow-wizard-json-preview" className="ui-textarea" rows={8} value={sharedDraftSerialized} readOnly />
-          </label>
-        </>
-      ) : null}
-
-      <details className="ui-card ui-card--padded ui-workflow-wizard__readiness" data-testid="workflow-wizard-readiness-summary">
-        <summary className="ui-workflow-wizard__readiness-summary">
-          <strong>Workflow readiness summary</strong>
-        </summary>
-        <div className="ui-stack ui-stack--2xs ui-workflow-wizard__readiness-content">
-          <p className="ui-text-muted">
-            {progress.isWorkflowReady
-              ? "Workflow draft is ready for handoff."
-              : `Workflow draft is not ready yet. ${progress.blockingIssueCount} blocking item(s) remain.`}
-            {" "}
-            Inputs policy: {progress.readinessPolicy.inputs === "required" ? "required for this wizard pass" : "optional"}.
-          </p>
-          {progress.blockingIssues.length > 0 ? (
-            <ul className="ui-stack ui-stack--2xs">
-              {progress.blockingIssues.map((issue) => (
-                <li key={issue.id}>
+              {readyActionAttempted && !progress.isWorkflowReady ? (
+                <p className="ui-text-danger" data-testid="workflow-wizard-ready-blocked">
+                  Cannot prepare for run yet. Resolve the blocking sections listed above.
+                </p>
+              ) : null}
+              {readyActionConfirmed ? (
+                <p className="ui-text-muted" data-testid="workflow-wizard-ready-confirmed">
+                  Wizard handoff marked ready. Continue to <a href="#studio-shell-lifecycle-panel">Lifecycle / publish / version status</a>.
+                </p>
+              ) : null}
+              <div className="ui-row ui-row--wrap ui-configurable-wizard__terminal-actions-row">
+                {firstIncompleteSection ? (
                   <button
                     type="button"
                     className="ui-button ui-button--ghost ui-button--sm"
-                    onClick={() => selectPage(issue.sectionId)}
+                    data-testid="workflow-wizard-jump-incomplete"
+                    onClick={() => selectPage(firstIncompleteSection.id)}
                   >
-                    {issue.sectionTitle}: {issue.message}
+                    Jump to first incomplete
                   </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="ui-text-muted">No blocking issues detected.</p>
-          )}
-          <div className="ui-stack ui-stack--2xs ui-workflow-wizard__output-overview" data-testid="workflow-wizard-readiness-output-summary">
-            <strong>Output review</strong>
-            {outputSummaries.length > 0 ? (
-              <ul className="ui-stack ui-stack--2xs ui-workflow-wizard__output-summary-list">
-                {outputSummaries.map((summary) => (
-                  <li key={summary.outputId} className="ui-workflow-wizard__output-summary-item">
-                    <div><strong>{summary.order}. {summary.displayLabel}</strong> <span className="ui-text-secondary">({summary.typeLabel})</span></div>
-                    {summary.detailLines.length > 0 ? (
-                      <div className="ui-text-small ui-text-secondary">{summary.detailLines.join(" · ")}</div>
-                    ) : (
-                      <div className="ui-text-small ui-text-secondary">No additional output details configured.</div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="ui-text-muted">No outputs configured yet.</p>
-            )}
-          </div>
+                ) : (
+                  <button type="button" className="ui-button ui-button--ghost ui-button--sm" disabled data-testid="workflow-wizard-jump-incomplete">
+                    Jump to first incomplete
+                  </button>
+                )}
+                <a className="ui-button ui-button--sm" href="#workflow-wizard-json-preview" data-testid="workflow-wizard-review-draft">
+                  Review draft JSON
+                </a>
+                <button
+                  type="button"
+                  className="ui-button ui-button--primary ui-button--sm"
+                  onClick={handleReadyAction}
+                  data-testid="workflow-wizard-ready-action"
+                >
+                  Prepare for Run
+                </button>
+              </div>
+              <div className="ui-stack ui-stack--2xs ui-workflow-wizard__output-overview" data-testid="workflow-wizard-output-overview">
+                <strong>Configured outputs</strong>
+                {outputSummaries.length > 0 ? (
+                  <ul className="ui-stack ui-stack--2xs ui-workflow-wizard__output-summary-list">
+                    {outputSummaries.map((summary) => (
+                      <li key={summary.outputId} className="ui-workflow-wizard__output-summary-item">
+                        <div><strong>{summary.order}. {summary.displayLabel}</strong> <span className="ui-text-secondary">({summary.typeLabel})</span></div>
+                        {summary.detailLines.length > 0 ? (
+                          <div className="ui-text-small ui-text-secondary">{summary.detailLines.join(" · ")}</div>
+                        ) : (
+                          <div className="ui-text-small ui-text-secondary">No additional output details configured.</div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="ui-text-muted">No outputs configured yet.</p>
+                )}
+              </div>
+            </section>
+
+            <label className="ui-stack ui-stack--2xs">
+              <span className="ui-text-small">Shared canonical workflow draft JSON preview</span>
+              <textarea id="workflow-wizard-json-preview" className="ui-textarea" rows={8} value={sharedDraftSerialized} readOnly />
+            </label>
+          </>
+        ) : null}
+      />
+
+      {activePageId === WorkflowWizardSectionIds.trigger ? (
+        <div className="ui-configurable-wizard__navigation-actions ui-configurable-wizard__navigation-actions--inline">
+          <button
+            type="button"
+            className="ui-button ui-button--primary ui-button--sm"
+            data-testid="workflow-wizard-back-page-trigger"
+            disabled
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            className="ui-button ui-button--primary ui-button--sm"
+            data-testid="workflow-wizard-next-page-trigger"
+            onClick={() => selectPage(WorkflowWizardSectionIds.inputs)}
+          >
+            Next
+          </button>
         </div>
-      </details>
+      ) : null}
     </div>
   );
 }

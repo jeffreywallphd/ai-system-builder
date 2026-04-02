@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
 import {
   createEmptyWorkflowDraft,
   serializeWorkflowDraft,
@@ -24,16 +25,14 @@ describe("WorkflowStudioWizardModeSurface", () => {
       />,
     );
 
-    expect(html).toContain('data-testid="workflow-wizard-readiness-summary"');
-    expect(html).toContain('data-testid="workflow-wizard-pages-card"');
-    expect(html).toContain('data-testid="workflow-wizard-page-progress"');
+    expect(html).toContain('data-testid="configurable-wizard-readiness-summary"');
+    expect(html).toContain('data-testid="configurable-wizard-pages-card"');
+    expect(html).toContain('data-testid="configurable-wizard-page-progress"');
     expect(html).toContain('data-testid="workflow-wizard-back-page-trigger"');
     expect(html).toContain('data-testid="workflow-wizard-next-page-trigger"');
     expect(html).toContain("Workflow draft is not ready yet.");
     expect(html).toContain("Trigger needs at least 1 item.");
     expect(html).not.toContain("Trigger: Needs input");
-    expect(html).toContain("Output review");
-    expect(html).toContain("No outputs configured yet.");
     expect(html).not.toContain("Prepare for Run");
   });
 
@@ -65,6 +64,13 @@ describe("WorkflowStudioWizardModeSurface", () => {
           type: "agent-assistant",
           kind: "asset-backed" as const,
           order: 1,
+          assetRef: Object.freeze({
+            assetKind: "agent-assistant",
+            asset: Object.freeze({
+              assetId: "asset:agent-assistant-a",
+              versionId: "asset:agent-assistant-a:v1",
+            }),
+          }),
         }),
       ]),
       outputs: Object.freeze([
@@ -95,7 +101,6 @@ describe("WorkflowStudioWizardModeSurface", () => {
     expect(html).toContain("No blocking issues detected.");
     expect(html).toContain("Ready for next-stage handoff.");
     expect(html).toContain("Configured outputs");
-    expect(html).toContain("Output review");
     expect(html).toContain("Viewer title: Viewer");
     expect(html).toContain("Prepare for Run");
   });
@@ -103,18 +108,20 @@ describe("WorkflowStudioWizardModeSurface", () => {
   it("renders shared handoff status banner when lifecycle status is present", () => {
     const draft = createEmptyWorkflowDraft();
     const html = renderToStaticMarkup(
-      <WorkflowStudioWizardModeSurface
-        sharedDraft={draft}
-        sharedDraftSerialized={serializeWorkflowDraft(draft)}
-        draftValidationIssues={[]}
-        selectedWizardPageId="inputs"
-        handoffStatus={{
-          kind: WorkflowStudioHandoffStatusKinds.pending,
-          flow: WorkflowStudioHandoffFlowKinds.datasetInput,
-          updatedAt: Date.now(),
-          detail: "Waiting for Dataset Studio handoff return.",
-        }}
-      />,
+      <MemoryRouter>
+        <WorkflowStudioWizardModeSurface
+          sharedDraft={draft}
+          sharedDraftSerialized={serializeWorkflowDraft(draft)}
+          draftValidationIssues={[]}
+          selectedWizardPageId="inputs"
+          handoffStatus={{
+            kind: WorkflowStudioHandoffStatusKinds.pending,
+            flow: WorkflowStudioHandoffFlowKinds.datasetInput,
+            updatedAt: Date.now(),
+            detail: "Waiting for Dataset Studio handoff return.",
+          }}
+        />
+      </MemoryRouter>,
     );
 
     expect(html).toContain('data-testid="workflow-handoff-status-banner"');
