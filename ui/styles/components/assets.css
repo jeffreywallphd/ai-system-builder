@@ -436,6 +436,19 @@
   gap: var(--space-sm);
 }
 
+
+.ui-image-output-gallery-asset,
+.ui-image-history-output-inspector {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.ui-image-selection-action-bar {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+}
+
 .ui-image-output-gallery__paging {
   display: flex;
   align-items: center;

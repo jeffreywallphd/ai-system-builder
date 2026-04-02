@@ -72,6 +72,17 @@ Current Direction 5 target shape remains:
   - `ImageRunHistoryAsset` -> persisted `ImageRunHistoryListing`.
 - This preserves taxonomy intent: bounded reusable atomics plus system-aware composition assets that handle dataset/workflow/run context wiring.
 
+## Image-slice interface asset interaction realization (stories 4.4.7-4.4.8)
+
+- Atomic interface assets now include explicit interaction units for output/result workflows:
+  - output selection action bar,
+  - output detail/inspection pane,
+  - run-history list item selection state/action.
+- Higher-level composed assets now include history/output interaction orchestration:
+  - `ImageOutputGalleryAsset` binds persisted output records to selection, inspection, active-result marking, and reuse-as-input preparation semantics,
+  - `ImageHistoryLinkedOutputInspectorAsset` binds selected run-history entries to linked output-gallery projections using persisted identifiers/contracts.
+- Composition remains taxonomy-aligned: atomics keep narrow reusable contracts while composed assets own dataset/workflow/run/system-context binding behavior.
+
 ## Explicit non-goals in this slice
 - no UI composer rewrite
 - no replacement of workflow or execution backbone

@@ -109,5 +109,10 @@ describe("ImageRunHistoryService", () => {
     const withOutputs = service.getRunWithLinkedOutputs({ systemId: "system:image", runId: "run:1" });
     expect(withOutputs?.linkedOutputs).toHaveLength(1);
     expect(withOutputs?.linkedOutputs[0]?.image.recordId).toBe("record:1");
+
+    const linkedListing = service.listRunsWithLinkedOutputs({ systemId: "system:image", limit: 10 });
+    expect(linkedListing).toHaveLength(1);
+    expect(linkedListing[0]?.run.runId).toBe("run:1");
+    expect(linkedListing[0]?.linkedOutputs[0]?.workflow?.workflowRunId).toBe("run:1");
   });
 });

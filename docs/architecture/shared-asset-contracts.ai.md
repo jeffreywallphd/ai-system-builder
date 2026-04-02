@@ -719,6 +719,16 @@
 - Added repository/service seams in `application/system-runtime/ImageRunHistoryRepository.ts` and `application/system-runtime/ImageRunHistoryService.ts` so run history remains persisted/queryable system state rather than UI-local projections.
 - Run-history detail retrieval now composes with the existing output-gallery dataset integration seam (`OutputGalleryDatasetIntegrationService`) to support durable history -> output linking and future lineage displays through shared contracts.
 
+## AI Loom Image Manipulation vertical-slice update: output selection + history/output linkage contracts (stories 4.4.7-4.4.8)
+
+- Run-history retrieval now includes a linked-output listing seam (`ImageRunHistoryService.listRunsWithLinkedOutputs`) that composes persisted run-history records with dataset-backed output-gallery records for each run id.
+- UI-facing interaction assets consume this contract-first linkage to avoid renderer-local history/output joins and preserve identifier-based traceability (`runId` + persisted record ids).
+- Output selection interaction contracts now explicitly carry bounded result-context semantics:
+  - selected output id,
+  - active result id (system-context candidate),
+  - reusable-input preparation id for later flow binding.
+- The slice remains image-focused, but seams are designed to stay storage/runtime agnostic and reusable for broader media/document result-history inspection patterns.
+
 ## AI Loom Image System vertical-slice update: system context contract + mapping seam (stories 4.3.1-4.3.2)
 
 - System context now has a formal internal contract in `domain/system-studio/SystemContextContract.ts` with explicit, inspectable fields for:

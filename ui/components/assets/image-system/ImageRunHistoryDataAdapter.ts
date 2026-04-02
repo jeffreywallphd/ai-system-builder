@@ -5,6 +5,7 @@ function summarizeRecord(record: ImageRunHistoryListing["runs"][number]): ImageR
   const outputCount = record.outputs.datasetInstance?.persistedRecordIds.length ?? record.outputs.images.length;
   return Object.freeze({
     runId: record.runId,
+    linkedOutputImageIds: Object.freeze(record.outputs.datasetInstance?.persistedRecordIds ?? record.outputs.images.map((image) => image.recordId ?? image.outputId ?? image.stableId).filter((value): value is string => Boolean(value))),
     status: record.status,
     timestamp: record.timestamps.updatedAt,
     workflowSummary: record.workflow.workflowAssetVersionId

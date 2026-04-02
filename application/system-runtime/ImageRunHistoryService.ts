@@ -45,6 +45,10 @@ export interface GetImageRunWithOutputsRequest {
   readonly outputLimit?: number;
 }
 
+export interface ListImageRunHistoryWithOutputsRequest extends ListImageRunHistoryRequest {
+  readonly outputLimitPerRun?: number;
+}
+
 export interface ImageRunHistoryWithOutputs {
   readonly run: ImageRunHistoryRecord;
   readonly linkedOutputs: ReadonlyArray<OutputGalleryItem>;
@@ -175,6 +179,18 @@ export class ImageRunHistoryService {
       },
       runs: queryResult.records,
     });
+  }
+
+  public listRunsWithLinkedOutputs(request: ListImageRunHistoryWithOutputsRequest): ReadonlyArray<ImageRunHistoryWithOutputs> {
+    const listing = this.listRuns(request);
+    const outputLimitPerRun = request.outputLimitPerRun ?? 100;
+    return Object.freeze(listing.runs
+      .map((run) => this.getRunWithLinkedOutputs({
+        systemId: request.systemId,
+        runId: run.runId,
+        outputLimit: outputLimitPerRun,
+      }))
+      .filter((entry): entry is ImageRunHistoryWithOutputs => entry !== undefined));
   }
 
   public getRunWithLinkedOutputs(request: GetImageRunWithOutputsRequest): ImageRunHistoryWithOutputs | undefined {
