@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { CanvasSurfaceEditingEvent } from "../../../studio-shell/experience-assets/ConfigurableCanvasSurfaceContracts";
 import type { StudioShellValidationIssue } from "../../../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import { ExperienceAssetModeIds, type ExperienceAssetDefinition } from "../../../studio-shell/experience-assets/ExperienceAssetContracts";
 import {
@@ -88,6 +89,49 @@ export function SystemStudioDraftAuthoringBoundary({
   const [selectedInspectorPanel, setSelectedInspectorPanel] = useState<SystemCanvasInspectorPanelId>(
     SystemCanvasInspectorPanels.interfaces,
   );
+  const [selectedLayoutNodeId, setSelectedLayoutNodeId] = useState<string | undefined>(undefined);
+  const [layoutFramesByNodeId, setLayoutFramesByNodeId] = useState<Readonly<Record<string, {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  }>>>({});
+
+  const handleCanvasEditingEvent = (event: CanvasSurfaceEditingEvent): void => {
+    if (event.type === "selection.change") {
+      setSelectedLayoutNodeId(event.nodeId);
+      return;
+    }
+
+    if (event.type === "node.position.change") {
+      setLayoutFramesByNodeId((current) => Object.freeze({
+        ...current,
+        [event.nodeId]: Object.freeze({
+          ...(current[event.nodeId] ?? Object.freeze({ x: 0, y: 0, width: 240, height: 140 })),
+          x: event.position.x,
+          y: event.position.y,
+        }),
+      }));
+      return;
+    }
+
+    if (event.type === "node.resize.change") {
+      setLayoutFramesByNodeId((current) => Object.freeze({
+        ...current,
+        [event.nodeId]: Object.freeze({
+          x: event.frame.x,
+          y: event.frame.y,
+          width: event.frame.width,
+          height: event.frame.height,
+        }),
+      }));
+      return;
+    }
+
+    if (event.type === "canvas.command" && event.commandId === "fit-layout") {
+      setLayoutFramesByNodeId({});
+    }
+  };
 
   const document = useMemo(() => parseSystemStudioDraftDocument(content), [content]);
   const assetDefinition = useMemo(
@@ -107,8 +151,11 @@ export function SystemStudioDraftAuthoringBoundary({
       validationIssues,
       selectedInspectorPanel,
       onSelectInspectorPanel: setSelectedInspectorPanel,
+      selectedLayoutNodeId,
+      layoutFramesByNodeId,
+      onCanvasEditingEvent: handleCanvasEditingEvent,
     }),
-    [content, extensionContext, selectedInspectorPanel, validationIssues],
+    [content, extensionContext, layoutFramesByNodeId, selectedInspectorPanel, selectedLayoutNodeId, validationIssues],
   );
 
   return (

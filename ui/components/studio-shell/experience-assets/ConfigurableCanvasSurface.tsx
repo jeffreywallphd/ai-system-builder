@@ -1,9 +1,12 @@
-import type { JSX } from "react";
+import { useMemo, useState, type JSX, type PointerEvent as ReactPointerEvent } from "react";
 import type {
   CanvasExperienceAssetDefinition,
+  CanvasSurfaceEditingEvent,
+  CanvasSurfaceEditingModel,
   CanvasSurfaceFocusedTarget,
   CanvasSurfaceGraphSummary,
   CanvasSurfaceIdentity,
+  CanvasSurfaceLayoutNodeModel,
   CanvasSurfacePaletteModel,
   CanvasSurfaceToolbarActionModel,
 } from "../../../studio-shell/experience-assets/ConfigurableCanvasSurfaceContracts";
@@ -23,7 +26,9 @@ interface ConfigurableCanvasSurfaceDirectProps {
   readonly palette?: CanvasSurfacePaletteModel;
   readonly issues?: ReadonlyArray<ExperienceIssueSummary>;
   readonly toolbarActions?: ReadonlyArray<CanvasSurfaceToolbarActionModel>;
-  readonly renderGraphInteractionShell: (focusedTarget?: CanvasSurfaceFocusedTarget) => JSX.Element;
+  readonly editingModel?: CanvasSurfaceEditingModel;
+  readonly onEditingEvent?: (event: CanvasSurfaceEditingEvent) => void;
+  readonly renderGraphInteractionShell?: (focusedTarget?: CanvasSurfaceFocusedTarget) => JSX.Element;
   readonly renderPaletteRegion?: () => JSX.Element | null;
   readonly renderInspectorRegion?: (focusedTarget?: CanvasSurfaceFocusedTarget) => JSX.Element | null;
   readonly renderSupplementaryPanels?: () => JSX.Element | null;
@@ -41,6 +46,26 @@ interface ConfigurableCanvasSurfaceDefinitionProps<TContext> {
   readonly rightDrawer?: CanvasDrawerState;
 }
 
+interface ResolvedCanvasModel {
+  readonly identity: CanvasSurfaceIdentity;
+  readonly graphSummary: CanvasSurfaceGraphSummary;
+  readonly focusedTarget?: CanvasSurfaceFocusedTarget;
+  readonly palette?: CanvasSurfacePaletteModel;
+  readonly issues: ReadonlyArray<ExperienceIssueSummary>;
+  readonly toolbarActions: ReadonlyArray<CanvasSurfaceToolbarActionModel>;
+  readonly editingModel?: CanvasSurfaceEditingModel;
+  readonly onEditingEvent?: (event: CanvasSurfaceEditingEvent) => void;
+  readonly renderGraphInteractionShell?: (focusedTarget?: CanvasSurfaceFocusedTarget) => JSX.Element;
+  readonly renderPaletteRegion?: () => JSX.Element | null;
+  readonly renderInspectorRegion?: (focusedTarget?: CanvasSurfaceFocusedTarget) => JSX.Element | null;
+  readonly renderSupplementaryPanels?: () => JSX.Element | null;
+  readonly interactionMessage?: string;
+  readonly isEmpty: boolean;
+  readonly renderEmptyState?: () => JSX.Element | null;
+  readonly leftDrawer?: CanvasDrawerState;
+  readonly rightDrawer?: CanvasDrawerState;
+}
+
 export type ConfigurableCanvasSurfaceProps<TContext = never> =
   | ConfigurableCanvasSurfaceDirectProps
   | ConfigurableCanvasSurfaceDefinitionProps<TContext>;
@@ -51,10 +76,232 @@ function isDefinitionProps<TContext>(
   return "definition" in props;
 }
 
+function clamp(value: number, min: number): number {
+  return Number.isFinite(value) ? Math.max(min, value) : min;
+}
+
+function mapResizeFrame(
+  node: CanvasSurfaceLayoutNodeModel,
+  deltaX: number,
+  deltaY: number,
+  handle: "se" | "sw" | "ne" | "nw",
+): { readonly x: number; readonly y: number; readonly width: number; readonly height: number } {
+  const minWidth = node.minWidth ?? 140;
+  const minHeight = node.minHeight ?? 90;
+
+  if (handle === "se") {
+    return {
+      x: node.x,
+      y: node.y,
+      width: clamp(node.width + deltaX, minWidth),
+      height: clamp(node.height + deltaY, minHeight),
+    };
+  }
+
+  if (handle === "sw") {
+    const width = clamp(node.width - deltaX, minWidth);
+    return {
+      x: node.x + (node.width - width),
+      y: node.y,
+      width,
+      height: clamp(node.height + deltaY, minHeight),
+    };
+  }
+
+  if (handle === "ne") {
+    const height = clamp(node.height - deltaY, minHeight);
+    return {
+      x: node.x,
+      y: node.y + (node.height - height),
+      width: clamp(node.width + deltaX, minWidth),
+      height,
+    };
+  }
+
+  const width = clamp(node.width - deltaX, minWidth);
+  const height = clamp(node.height - deltaY, minHeight);
+  return {
+    x: node.x + (node.width - width),
+    y: node.y + (node.height - height),
+    width,
+    height,
+  };
+}
+
+function ConfigurableCanvasEditingSurface({
+  editingModel,
+  onEditingEvent,
+}: {
+  readonly editingModel: CanvasSurfaceEditingModel;
+  readonly onEditingEvent?: (event: CanvasSurfaceEditingEvent) => void;
+}): JSX.Element {
+  const [dragState, setDragState] = useState<{
+    readonly mode: "move" | "resize";
+    readonly nodeId: string;
+    readonly startClientX: number;
+    readonly startClientY: number;
+    readonly resizeHandle?: "se" | "sw" | "ne" | "nw";
+  } | undefined>(undefined);
+
+  const nodesById = useMemo(
+    () => new Map(editingModel.nodes.map((node) => [node.id, node] as const)),
+    [editingModel.nodes],
+  );
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (!dragState) {
+      return;
+    }
+
+    const node = nodesById.get(dragState.nodeId);
+    if (!node) {
+      return;
+    }
+
+    const deltaX = event.clientX - dragState.startClientX;
+    const deltaY = event.clientY - dragState.startClientY;
+
+    if (dragState.mode === "move") {
+      onEditingEvent?.({
+        type: "node.position.change",
+        nodeId: node.id,
+        position: Object.freeze({
+          x: Math.round(node.x + deltaX),
+          y: Math.round(node.y + deltaY),
+        }),
+      });
+      return;
+    }
+
+    const frame = mapResizeFrame(node, deltaX, deltaY, dragState.resizeHandle ?? "se");
+    onEditingEvent?.({
+      type: "node.resize.change",
+      nodeId: node.id,
+      frame: Object.freeze({
+        x: Math.round(frame.x),
+        y: Math.round(frame.y),
+        width: Math.round(frame.width),
+        height: Math.round(frame.height),
+      }),
+    });
+  };
+
+  return (
+    <div
+      className="ui-configurable-canvas-editor ui-canvas-surface"
+      data-testid="configurable-canvas-editing-surface"
+      onDoubleClick={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        onEditingEvent?.({
+          type: "node.create.request",
+          position: Object.freeze({
+            x: Math.round(event.clientX - rect.left),
+            y: Math.round(event.clientY - rect.top),
+          }),
+        });
+      }}
+      onPointerMove={handlePointerMove}
+      onPointerUp={() => setDragState(undefined)}
+      onPointerLeave={() => setDragState(undefined)}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onEditingEvent?.({ type: "selection.change", nodeId: undefined });
+        }
+      }}
+    >
+      {editingModel.commands?.length ? (
+        <div className="ui-configurable-canvas-editor__commands ui-row ui-row--wrap">
+          {editingModel.commands.map((command) => (
+            <button
+              key={command.id}
+              type="button"
+              className={`ui-button ui-button--sm ${command.tone === "primary" ? "ui-button--primary" : command.tone === "ghost" ? "ui-button--ghost" : ""}`.trim()}
+              disabled={command.disabled}
+              onClick={() => onEditingEvent?.({ type: "canvas.command", commandId: command.id })}
+            >
+              {command.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {editingModel.nodes.map((node) => {
+        const selected = editingModel.selectedNodeId === node.id;
+        return (
+          <article
+            key={node.id}
+            className={[
+              "ui-configurable-canvas-layout-node",
+              "ui-card",
+              "ui-card--padded",
+              selected ? "ui-configurable-canvas-layout-node--selected" : "",
+            ].filter(Boolean).join(" ")}
+            style={{
+              left: `${node.x}px`,
+              top: `${node.y}px`,
+              width: `${node.width}px`,
+              height: `${node.height}px`,
+            }}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (node.selectable !== false) {
+                onEditingEvent?.({ type: "selection.change", nodeId: node.id });
+              }
+            }}
+            onPointerDown={(event) => {
+              if (node.movable === false) {
+                return;
+              }
+              event.preventDefault();
+              event.stopPropagation();
+              setDragState({
+                mode: "move",
+                nodeId: node.id,
+                startClientX: event.clientX,
+                startClientY: event.clientY,
+              });
+            }}
+            data-testid={`configurable-canvas-layout-node-${node.id}`}
+          >
+            <div className="ui-stack ui-stack--3xs">
+              <strong className="ui-text-small">{node.title}</strong>
+              {node.subtitle ? <span className="ui-text-small ui-text-secondary">{node.subtitle}</span> : null}
+            </div>
+
+            {node.resizable !== false ? (["nw", "ne", "sw", "se"] as const).map((handle) => (
+              <button
+                key={`${node.id}-${handle}`}
+                type="button"
+                className={`ui-configurable-canvas-layout-node__resize ui-configurable-canvas-layout-node__resize--${handle}`}
+                aria-label={`Resize ${node.title}`}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setDragState({
+                    mode: "resize",
+                    nodeId: node.id,
+                    startClientX: event.clientX,
+                    startClientY: event.clientY,
+                    resizeHandle: handle,
+                  });
+                }}
+              />
+            )) : null}
+          </article>
+        );
+      })}
+
+      <div className="ui-configurable-canvas-editor__hint ui-text-small ui-text-secondary">
+        {editingModel.createNodeDescription ?? "Double-click the canvas to add a new block."}
+      </div>
+    </div>
+  );
+}
+
 export default function ConfigurableCanvasSurface<TContext = never>(
   props: ConfigurableCanvasSurfaceProps<TContext>,
 ): JSX.Element {
-  const resolvedModel = isDefinitionProps(props)
+  const resolvedModel: ResolvedCanvasModel = isDefinitionProps(props)
     ? (() => {
       const focusedTarget = props.definition.resolveFocusedTarget?.(props.definitionContext);
       return {
@@ -64,10 +311,19 @@ export default function ConfigurableCanvasSurface<TContext = never>(
         palette: props.definition.resolvePalette?.(props.definitionContext),
         issues: props.definition.resolveIssues?.(props.definitionContext) ?? [],
         toolbarActions: props.definition.resolveToolbarActions?.(props.definitionContext) ?? [],
-        renderGraphInteractionShell: () => props.definition.renderGraphInteractionShell({
-          context: props.definitionContext,
-          interaction: { focusedTarget },
-        }),
+        editingModel: props.definition.resolveEditingModel?.(props.definitionContext),
+        onEditingEvent: props.definition.onEditingEvent
+          ? (event) => props.definition.onEditingEvent?.({
+            context: props.definitionContext,
+            event,
+          })
+          : undefined,
+        renderGraphInteractionShell: props.definition.renderGraphInteractionShell
+          ? () => props.definition.renderGraphInteractionShell?.({
+            context: props.definitionContext,
+            interaction: { focusedTarget },
+          })
+          : undefined,
         renderPaletteRegion: props.definition.renderPaletteRegion
           ? () => props.definition.renderPaletteRegion?.(props.definitionContext)
           : undefined,
@@ -93,6 +349,8 @@ export default function ConfigurableCanvasSurface<TContext = never>(
       ...props,
       issues: props.issues ?? [],
       toolbarActions: props.toolbarActions ?? [],
+      isEmpty: props.isEmpty ?? false,
+      renderEmptyState: props.renderEmptyState,
     };
 
   const issueCount = resolvedModel.graphSummary.issueCount ?? resolvedModel.issues.length;
@@ -145,7 +403,12 @@ export default function ConfigurableCanvasSurface<TContext = never>(
           </details>
         ) : null}
 
-        {resolvedModel.renderGraphInteractionShell(resolvedModel.focusedTarget)}
+        {resolvedModel.editingModel ? (
+          <ConfigurableCanvasEditingSurface
+            editingModel={resolvedModel.editingModel}
+            onEditingEvent={resolvedModel.onEditingEvent}
+          />
+        ) : resolvedModel.renderGraphInteractionShell ? resolvedModel.renderGraphInteractionShell(resolvedModel.focusedTarget) : null}
 
         {resolvedModel.interactionMessage ? (
           <p className="ui-text-small ui-text-secondary" data-testid="configurable-canvas-interaction-message">

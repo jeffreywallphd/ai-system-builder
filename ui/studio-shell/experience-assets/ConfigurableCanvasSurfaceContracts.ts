@@ -42,6 +42,71 @@ export interface CanvasSurfaceInspectorContext {
   readonly focusedTarget?: CanvasSurfaceFocusedTarget;
 }
 
+export interface CanvasSurfaceLayoutNodeModel {
+  readonly id: string;
+  readonly title: string;
+  readonly subtitle?: string;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly minWidth?: number;
+  readonly minHeight?: number;
+  readonly selectable?: boolean;
+  readonly movable?: boolean;
+  readonly resizable?: boolean;
+}
+
+export interface CanvasSurfaceCommandModel {
+  readonly id: string;
+  readonly label: string;
+  readonly tone?: "primary" | "secondary" | "ghost";
+  readonly disabled?: boolean;
+}
+
+export interface CanvasSurfaceEditingModel {
+  readonly nodes: ReadonlyArray<CanvasSurfaceLayoutNodeModel>;
+  readonly selectedNodeId?: string;
+  readonly commands?: ReadonlyArray<CanvasSurfaceCommandModel>;
+  readonly createNodeLabel?: string;
+  readonly createNodeDescription?: string;
+}
+
+export type CanvasSurfaceEditingEvent =
+  | {
+    readonly type: "selection.change";
+    readonly nodeId?: string;
+  }
+  | {
+    readonly type: "node.create.request";
+    readonly position: {
+      readonly x: number;
+      readonly y: number;
+    };
+  }
+  | {
+    readonly type: "node.position.change";
+    readonly nodeId: string;
+    readonly position: {
+      readonly x: number;
+      readonly y: number;
+    };
+  }
+  | {
+    readonly type: "node.resize.change";
+    readonly nodeId: string;
+    readonly frame: {
+      readonly x: number;
+      readonly y: number;
+      readonly width: number;
+      readonly height: number;
+    };
+  }
+  | {
+    readonly type: "canvas.command";
+    readonly commandId: string;
+  };
+
 export interface CanvasExperienceAssetDefinition<TContext> {
   readonly identity: CanvasSurfaceIdentity;
   readonly resolveGraphSummary: (context: TContext) => CanvasSurfaceGraphSummary;
@@ -49,7 +114,12 @@ export interface CanvasExperienceAssetDefinition<TContext> {
   readonly resolvePalette?: (context: TContext) => CanvasSurfacePaletteModel | undefined;
   readonly resolveIssues?: (context: TContext) => ReadonlyArray<ExperienceIssueSummary>;
   readonly resolveToolbarActions?: (context: TContext) => ReadonlyArray<CanvasSurfaceToolbarActionModel>;
-  readonly renderGraphInteractionShell: (input: {
+  readonly resolveEditingModel?: (context: TContext) => CanvasSurfaceEditingModel | undefined;
+  readonly onEditingEvent?: (input: {
+    readonly context: TContext;
+    readonly event: CanvasSurfaceEditingEvent;
+  }) => void;
+  readonly renderGraphInteractionShell?: (input: {
     readonly context: TContext;
     readonly interaction: CanvasSurfaceGraphInteractionContext;
   }) => JSX.Element;

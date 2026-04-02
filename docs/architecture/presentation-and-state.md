@@ -603,3 +603,9 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Composition remains contract-first and reusable:
   - atomic assets keep narrow rendering contracts,
   - higher-level composed assets bind those atomics to persisted system-owned output/run relationships.
+
+## Direction 5 UI extension update: configurable editing-surface canvas contract (systems stories 1-2)
+
+- The reusable canvas experience contract now supports a neutral editing-surface model (`resolveEditingModel`) and generic event callbacks (`onEditingEvent`) for node selection, create requests, movement, resize, and canvas commands.
+- The shared configurable canvas renderer now includes a reusable rectangular layout-node surface (position + size + min size + resize handles + selection affordances) while remaining prop-driven and callback-driven for studio adapters.
+- System Studio canvas now consumes that reusable editing contract through adapter boundaries, with local layout frame state handled at the authoring boundary and composition orchestration still owned by existing system services/components.
