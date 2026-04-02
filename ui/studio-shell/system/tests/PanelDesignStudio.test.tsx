@@ -26,6 +26,8 @@ describe("PanelDesignStudio", () => {
     expect(html).toContain("Panel");
     expect(html).toContain("Button");
     expect(html).toContain("Adding content to");
+    expect(html).toContain("Section behavior");
+    expect(html).toContain("Layout:");
   });
 
   it("shows an invalid-target message when the selected composition cannot accept children", () => {

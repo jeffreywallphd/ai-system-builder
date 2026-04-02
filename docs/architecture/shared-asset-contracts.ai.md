@@ -1057,3 +1057,13 @@
 - System Studio canvas/wizard language and affordances now emphasize high-level page structure/sections.
 - Panel-internal authoring is explicitly de-emphasized in the System Studio surface and remains aligned to embedded panel studio flows.
 - Shared embedded dataset/workflow draft persistence now remains in the existing `systemSpec.sharedDocument` seam rather than being mirrored into per-panel embedded content payloads.
+
+## Direction 5 UI extension update: panel layout variants + header configuration in embedded panel studio (stories 2.2.7-2.2.8)
+
+- `ui-composed:panel` now exposes schema-driven panel configuration for both layout and header behavior through the existing property schema + Asset Inspector flow (no panel-specific parallel editor contract):
+  - layout mode (`vertical-stack`, `horizontal-split`, `grid`),
+  - spacing (`layout.gap`) and bounded grid columns (`layout.columns`),
+  - header visibility/title/subtitle and lightweight action placeholder hooks (`header.showActions`, `header.primaryActionLabel`).
+- Panel configuration is normalized through shared panel asset helpers (`resolvePanelContainerConfig`) and remains persisted in the composition root config (`asset-composition` content), so serialization/deserialization stays on existing registry-backed seams.
+- Default panel composition roots now seed both layout and header config, and legacy/partial configs degrade safely back to supported defaults instead of throwing.
+- Embedded Panel Design Studio now surfaces a user-friendly section behavior summary while keeping editing in the shared inspector/property-schema model.
