@@ -838,4 +838,17 @@ Not implemented in this slice:
   - validates/admit records through `SystemDatasetInstanceService` schema enforcement,
   - extracts metadata with the existing image metadata extractor contract,
   - persists canonical dataset image records owned by the active reference-image system draft.
+
+## Direction 5 extension update: output dataset persistence + results visualization (stories 5.1.7-5.1.8)
+- Reference-image workflow runs now persist generated outputs into the system-owned output dataset instance via a bounded Studio Shell adapter flow:
+  - runtime output payload -> Comfy materialization mapper -> workflow output materialization service -> output dataset instance ingestion/update.
+- Persisted output records retain traceability fields through existing generation/provenance structures (source image reference, workflow template reference/version, parameter snapshot metadata, run id/materialization id, timestamps).
+- Studio Shell now exposes reference-image-specific backend read/write operations for:
+  - persisting generated outputs from a completed execution result payload, and
+  - listing output gallery entries from the system-owned output dataset instance.
+- The reference-image experience panel now reads from persisted output dataset records (not transient-only UI state) and provides:
+  - an approachable “Generated images” gallery,
+  - selection/open behavior,
+  - a focused single-image viewer, and
+  - optional collapsed “Settings used” details.
 - Start actions now reuse the existing UI trigger + system-context mapping stack (`UiTriggerSystemContextMapper` -> `WorkflowSystemContextBindingAdapter` + `ReferenceImageSystemWorkflowContextMapping`) before invoking runtime start, so selected image refs, user settings, and dataset instance refs flow into execution context without adding a parallel mapping path.

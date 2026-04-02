@@ -56,6 +56,8 @@ export function resolveBrowserStudioShellBridgeFallback(): DesktopStudioShellBri
     getSystemExecutionTrace: (requestJson) => runtimeApi.getExecutionTrace(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     getSystemExecutionResult: (executionId) => runtimeApi.getExecutionResult(executionId).then((response) => JSON.stringify(response)),
     ingestReferenceImageUpload: (requestJson) => studioApi.ingestReferenceImageUpload(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    persistReferenceImageOutputs: (requestJson) => studioApi.persistReferenceImageOutputs(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    listReferenceImageOutputs: (requestJson) => studioApi.listReferenceImageOutputs(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
   });
 
   return fallbackBridge;

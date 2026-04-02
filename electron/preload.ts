@@ -238,6 +238,12 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     ingestReferenceImageUpload(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:reference-image:upload", requestJson) as Promise<string>;
     },
+    persistReferenceImageOutputs(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:reference-image:persist-outputs", requestJson) as Promise<string>;
+    },
+    listReferenceImageOutputs(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:reference-image:list-outputs", requestJson) as Promise<string>;
+    },
   },
   registry: {
     listAssets(limit?: number) {

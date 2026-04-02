@@ -1,10 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ReferenceImageSystemTemplate } from "../../../application/system-studio/ReferenceImageSystemTemplate";
+import type { OutputGalleryItem } from "../../../application/system-runtime/OutputGalleryDataContract";
 import { createDefaultUiTriggerSystemContextMapper } from "../../../application/workflow-studio/UiTriggerSystemContextMapper";
 import { createDefaultWorkflowSystemContextBindingAdapter } from "../../../application/workflow-studio/SystemContextWorkflowInputMapper";
 import { createUiTriggerEvent } from "../../../application/workflow-studio/UiTriggerEventContract";
 import type { FileIngestionPolicy } from "../../../domain/ingestion/interfaces/IFileIngestion";
 import { createBrowserImageUploadIngestionAdapter } from "../assets/image-system/BrowserImageUploadIngestionAdapter";
+import { ImageOutputGallery } from "../assets/image-system/ImageOutputGallery";
+import { ImageViewer } from "../assets/image-system/ImageViewer";
+import { mapOutputGalleryItemToImageViewModel } from "../assets/image-system/ImageOutputGalleryDataAdapter";
 import { ImageUploadPanel } from "../assets/image-system/ImageUploadPanel";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { StudioShellService } from "../../services/StudioShellService";
@@ -108,9 +112,49 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
   const [variationStrength, setVariationStrength] = useState(0.5);
   const [resultCount, setResultCount] = useState(1);
   const [status, setStatus] = useState<string | undefined>();
+  const [resultItems, setResultItems] = useState<ReadonlyArray<OutputGalleryItem>>([]);
+  const [activeResultId, setActiveResultId] = useState<string | undefined>();
   const [isUploading, setIsUploading] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [isLoadingResults, setIsLoadingResults] = useState(false);
   const uploadAdapter = useMemo(() => createBrowserImageUploadIngestionAdapter({ policy: uploadPolicy }), []);
+  const selectedResult = useMemo(
+    () => resultItems.find((item) => item.image.recordId === activeResultId) ?? resultItems[0],
+    [resultItems, activeResultId],
+  );
+  const resultViewModels = useMemo(
+    () => resultItems.map((item) => mapOutputGalleryItemToImageViewModel(item)),
+    [resultItems],
+  );
+  const selectedResultViewModel = useMemo(
+    () => selectedResult ? mapOutputGalleryItemToImageViewModel(selectedResult) : undefined,
+    [selectedResult],
+  );
+
+  const loadResults = () => {
+    if (!draft) {
+      return Promise.resolve();
+    }
+    setIsLoadingResults(true);
+    return studioShell.listReferenceImageOutputs({
+      studioId: context.studioId,
+      draftId: draft.draftId,
+      limit: 24,
+      offset: 0,
+    }).then((response) => {
+      if (!response.ok || !response.data) {
+        return;
+      }
+      setResultItems(response.data.items);
+      if (!activeResultId && response.data.items[0]) {
+        setActiveResultId(response.data.items[0].image.recordId);
+      }
+    }).finally(() => setIsLoadingResults(false));
+  };
+
+  useEffect(() => {
+    void loadResults();
+  }, [draft?.draftId]);
 
   if (!isReferenceImageDraft || !draft) {
     return (
@@ -165,6 +209,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
               setDatasetInstanceId(response.data.datasetInstanceId);
               setStatus("Image uploaded and ready.");
             })
+            .then(loadResults)
             .finally(() => {
               setIsUploading(false);
             });
@@ -217,15 +262,107 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
               resultCount,
             });
             void context.operations.startSystemExecution(request).then((response) => {
-              setStatus(response.ok && response.data
-                ? `Started processing (${response.data.executionId}).`
-                : (response.error?.message ?? "Could not start processing."));
+              if (!response.ok || !response.data) {
+                setStatus(response.error?.message ?? "Could not start processing.");
+                return;
+              }
+              const executionId = response.data.executionId;
+              void studioShell.getSystemExecutionResult(executionId)
+                .then((result) => studioShell.persistReferenceImageOutputs({
+                  studioId: context.studioId,
+                  draftId: draft.draftId,
+                  executionId,
+                  sourceRecordId: selectedRecordId,
+                  sourceAssetId: selectedAssetId,
+                  parameterSnapshot: {
+                    editInstruction,
+                    variationStrength,
+                    resultCount,
+                  },
+                  runtimeResult: result.ok
+                    ? { output: result.data?.output, status: result.data?.status }
+                    : undefined,
+                }))
+                .then((persisted) => {
+                  if (!persisted.ok) {
+                    setStatus(persisted.error?.message ?? `Run started (${executionId}), but results could not be saved.`);
+                    return;
+                  }
+                  const count = persisted.data?.persistedRecordIds.length ?? 0;
+                  setStatus(count > 0
+                    ? `Generated images saved (${count}).`
+                    : "Run finished, but no generated images were returned.");
+                })
+                .then(loadResults);
             }).finally(() => setIsStarting(false));
           }}
         >
           {isStarting ? "Starting..." : "Start"}
         </button>
         {status ? <p className="ui-text-small ui-text-secondary">{status}</p> : null}
+      </section>
+      <section className="ui-image-surface">
+        <header className="ui-image-surface__header">
+          <h3 className="ui-image-surface__title">Generated images</h3>
+        </header>
+        <ImageOutputGallery
+          title="Results"
+          items={resultViewModels}
+          loading={isLoadingResults}
+          emptyMessage="No generated images yet. Start a run to see results here."
+          renderOptions={{
+            fitMode: "cover",
+            zoomCapability: "disabled",
+            placeholderBehavior: "show-placeholder",
+            lazyLoad: true,
+            allowSelectionHighlight: true,
+          }}
+          selection={{
+            mode: "single",
+            selectedIds: activeResultId ? [activeResultId] : [],
+            focusedId: activeResultId,
+          }}
+          onSelectionChanged={(event) => {
+            setActiveResultId(event.selection.focusedId ?? event.selection.selectedIds[0]);
+          }}
+          onItemOpened={(event) => {
+            setActiveResultId(event.imageId);
+          }}
+          presentationMode="grid"
+        />
+        {selectedResultViewModel ? (
+          <div className="ui-stack ui-stack--sm" style={{ marginTop: "0.75rem" }}>
+            <div className="ui-row ui-row--space-between ui-row--middle">
+              <h4 className="ui-text-small" style={{ margin: 0 }}>View details</h4>
+              <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={() => setActiveResultId(selectedResultViewModel.imageId)}>
+                Open
+              </button>
+            </div>
+            <ImageViewer
+              image={selectedResultViewModel}
+              renderOptions={{
+                fitMode: "contain",
+                zoomCapability: "buttons",
+                placeholderBehavior: "show-placeholder",
+                lazyLoad: false,
+                allowSelectionHighlight: true,
+              }}
+              selection={{
+                mode: "single",
+                selectedIds: [selectedResultViewModel.imageId],
+                focusedId: selectedResultViewModel.imageId,
+              }}
+              showMetadata
+            />
+            <details>
+              <summary className="ui-text-small ui-text-secondary">Settings used</summary>
+              <pre className="ui-code-block">{JSON.stringify(selectedResult?.generationParametersSummary ?? {}, null, 2)}</pre>
+            </details>
+            <p className="ui-text-small ui-text-secondary">
+              Created from {selectedResult?.sourceImage?.stableId ?? "your uploaded image"}.
+            </p>
+          </div>
+        ) : null}
       </section>
     </section>
   );

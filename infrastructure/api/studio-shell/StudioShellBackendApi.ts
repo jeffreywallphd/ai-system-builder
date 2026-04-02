@@ -90,6 +90,12 @@ import type { DatasetInstanceAssetCatalog, DatasetInstanceAssetDefinition } from
 import { ZodMediaDatasetValidator } from "../../../application/dataset-studio/adapters/validation/MediaDatasetValidator";
 import { DatasetSchemaIntentIds } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import { createDefaultMediaAdapterBundle } from "../../../application/dataset-studio/adapters/media/MediaAdapterFactory";
+import { WorkflowOutputMaterializationService } from "../../../application/system-runtime/WorkflowOutputMaterializationService";
+import { InMemoryWorkflowOutputArtifactStorage } from "../../../application/system-runtime/WorkflowOutputArtifactStorage";
+import { InMemoryWorkflowOutputProvenanceRepository } from "../../../application/system-runtime/WorkflowOutputProvenanceRepository";
+import { OutputGalleryDatasetIntegrationService } from "../../../application/system-runtime/OutputGalleryDatasetIntegrationService";
+import type { OutputGalleryListing } from "../../../application/system-runtime/OutputGalleryDataContract";
+import { ComfyExecutionResultMaterializationMapper } from "../../comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper";
 
 export interface StudioShellApiError {
   readonly code:
@@ -187,6 +193,36 @@ export interface IngestReferenceImageUploadReadModel {
     readonly format: string;
   };
   readonly selectedRecordId: string;
+}
+
+export interface PersistReferenceImageOutputsRequest {
+  readonly studioId: string;
+  readonly draftId?: string;
+  readonly executionId: string;
+  readonly sourceRecordId?: string;
+  readonly sourceAssetId?: string;
+  readonly parameterSnapshot?: Readonly<Record<string, unknown>>;
+  readonly runtimeResult?: {
+    readonly output?: unknown;
+    readonly status?: string;
+  };
+}
+
+export interface PersistReferenceImageOutputsReadModel {
+  readonly systemId: string;
+  readonly datasetInstanceId: string;
+  readonly executionId: string;
+  readonly materializationId: string;
+  readonly persistedRecordIds: ReadonlyArray<string>;
+  readonly status: "materialized" | "partial" | "failed" | "pending";
+  readonly failureMessages: ReadonlyArray<string>;
+}
+
+export interface ListReferenceImageOutputsRequest {
+  readonly studioId: string;
+  readonly draftId?: string;
+  readonly limit?: number;
+  readonly offset?: number;
 }
 
 class StaticDatasetInstanceAssetCatalog implements DatasetInstanceAssetCatalog {
@@ -572,6 +608,9 @@ export class StudioShellBackendApi {
   private readonly workflowRunSummaryRepository?: IWorkflowRunSummaryRepository;
   private readonly dataStudioPipelineExecutionService: DataStudioPipelineExecutionService;
   private readonly referenceImageDatasets: SystemDatasetInstanceService;
+  private readonly referenceImageOutputMaterialization: WorkflowOutputMaterializationService;
+  private readonly referenceImageOutputGallery: OutputGalleryDatasetIntegrationService;
+  private readonly comfyMaterializationMapper = new ComfyExecutionResultMaterializationMapper();
   private readonly now: () => Date;
 
   constructor(
@@ -605,6 +644,12 @@ export class StudioShellBackendApi {
         imageMetadataExtractor: createDefaultMediaAdapterBundle().metadataExtractor,
       },
     );
+    this.referenceImageOutputMaterialization = new WorkflowOutputMaterializationService(
+      this.referenceImageDatasets,
+      new InMemoryWorkflowOutputArtifactStorage(),
+      new InMemoryWorkflowOutputProvenanceRepository(),
+    );
+    this.referenceImageOutputGallery = new OutputGalleryDatasetIntegrationService(this.referenceImageDatasets);
     this.workflowStudioService = new WorkflowStudioApplicationService(
       this.service,
       undefined,
@@ -1065,6 +1110,109 @@ export class StudioShellBackendApi {
           format: ingested.image.format,
         }),
         selectedRecordId: ingested.recordId,
+      });
+    });
+  }
+
+  public async persistReferenceImageOutputs(
+    request: PersistReferenceImageOutputsRequest,
+  ): Promise<StudioShellApiResponse<PersistReferenceImageOutputsReadModel>> {
+    return this.wrap(async () => {
+      const snapshot = await this.requireSnapshot(request.studioId);
+      const draft = snapshot.draft;
+      if (!draft) {
+        throw new StudioShellInvalidRequestError("Open a system draft before saving generated images.");
+      }
+      if (request.draftId?.trim() && draft.draftId !== request.draftId.trim()) {
+        throw new StudioShellInvalidRequestError(`Draft '${request.draftId}' is not the active draft for studio '${request.studioId}'.`);
+      }
+      if (draft.assetId !== ReferenceImageSystemTemplate.systemAsset.assetId) {
+        throw new StudioShellInvalidRequestError("Generated image saving is only available for the reference image template.");
+      }
+
+      const runtimeSystemId = this.resolveReferenceRuntimeSystemId(draft);
+      const [, outputDataset] = await this.ensureReferenceImageDatasetInstances(runtimeSystemId);
+      if (!outputDataset) {
+        throw new StudioShellInvalidRequestError("Reference image output dataset is unavailable.");
+      }
+      const executionId = request.executionId?.trim();
+      if (!executionId) {
+        throw new StudioShellInvalidRequestError("executionId is required.");
+      }
+
+      const comfyResult = this.extractComfyResultFromRuntimeResult(request.runtimeResult?.output);
+      if (!comfyResult) {
+        return Object.freeze({
+          systemId: runtimeSystemId,
+          datasetInstanceId: outputDataset.instanceId,
+          executionId,
+          materializationId: `mat:${executionId}`,
+          persistedRecordIds: Object.freeze([]),
+          status: "failed",
+          failureMessages: Object.freeze(["No generated images were available to save from this run."]),
+        });
+      }
+
+      const mapped = this.comfyMaterializationMapper.map({
+        workflowRun: {
+          runId: executionId,
+          workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+          workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+        },
+        result: comfyResult,
+        parameterSnapshot: request.parameterSnapshot,
+        sourceImageRef: request.sourceAssetId?.trim()
+          ? Object.freeze({
+            kind: "generated-output" as const,
+            stableId: request.sourceAssetId.trim(),
+            outputId: request.sourceAssetId.trim(),
+          })
+          : undefined,
+        materializationId: `mat:${executionId}`,
+      });
+      const materialized = await this.referenceImageOutputMaterialization.materialize({
+        systemId: runtimeSystemId,
+        datasetInstanceId: outputDataset.instanceId,
+        payload: mapped,
+      });
+
+      return Object.freeze({
+        systemId: runtimeSystemId,
+        datasetInstanceId: outputDataset.instanceId,
+        executionId,
+        materializationId: materialized.materializationId,
+        persistedRecordIds: Object.freeze(materialized.records.map((record) => record.recordId)),
+        status: materialized.status,
+        failureMessages: Object.freeze(materialized.failures.map((failure) => failure.message)),
+      });
+    });
+  }
+
+  public async listReferenceImageOutputs(
+    request: ListReferenceImageOutputsRequest,
+  ): Promise<StudioShellApiResponse<OutputGalleryListing>> {
+    return this.wrap(async () => {
+      const snapshot = await this.requireSnapshot(request.studioId);
+      const draft = snapshot.draft;
+      if (!draft) {
+        throw new StudioShellInvalidRequestError("Open a system draft to view generated images.");
+      }
+      if (request.draftId?.trim() && draft.draftId !== request.draftId.trim()) {
+        throw new StudioShellInvalidRequestError(`Draft '${request.draftId}' is not the active draft for studio '${request.studioId}'.`);
+      }
+      if (draft.assetId !== ReferenceImageSystemTemplate.systemAsset.assetId) {
+        throw new StudioShellInvalidRequestError("Generated image results are only available for the reference image template.");
+      }
+      const runtimeSystemId = this.resolveReferenceRuntimeSystemId(draft);
+      const [, outputDataset] = await this.ensureReferenceImageDatasetInstances(runtimeSystemId);
+      if (!outputDataset) {
+        throw new StudioShellInvalidRequestError("Reference image output dataset is unavailable.");
+      }
+      return this.referenceImageOutputGallery.listOutputGalleryItems({
+        systemId: runtimeSystemId,
+        datasetInstanceId: outputDataset.instanceId,
+        limit: request.limit,
+        offset: request.offset,
       });
     });
   }
@@ -2034,6 +2182,128 @@ export class StudioShellBackendApi {
     } catch {
       throw new StudioShellInvalidRequestError("Uploaded file payload could not be decoded.");
     }
+  }
+
+  private extractComfyResultFromRuntimeResult(
+    runtimeOutput: unknown,
+  ): {
+    readonly executionId: string;
+    readonly status: "queued" | "running" | "completed" | "failed" | "cancelled";
+    readonly outputs: ReadonlyArray<{
+      readonly nodeId: string;
+      readonly kind: "image" | "text" | "binary" | "json";
+      readonly reference: string;
+      readonly metadata?: Readonly<Record<string, unknown>>;
+      readonly assetRef?: {
+        readonly assetId?: string;
+        readonly versionId?: string;
+      };
+    }>;
+    readonly lifecycle: ReadonlyArray<{
+      readonly at: string;
+      readonly state: "queued" | "running" | "completed" | "failed" | "cancelled";
+      readonly message?: string;
+      readonly details?: Readonly<Record<string, unknown>>;
+    }>;
+  } | undefined {
+    const root = this.toOptionalRecord(runtimeOutput);
+    const direct = root && this.tryReadComfyResult(root);
+    if (direct) {
+      return direct;
+    }
+    const payload = root && this.toOptionalRecord(root.payload);
+    const fromPayload = payload && this.tryReadComfyResult(payload);
+    if (fromPayload) {
+      return fromPayload;
+    }
+    const nodeResults = payload && this.toOptionalRecord(payload.nodeResults);
+    if (!nodeResults) {
+      return undefined;
+    }
+
+    for (const value of Object.values(nodeResults)) {
+      const candidate = this.toOptionalRecord(value);
+      if (!candidate) {
+        continue;
+      }
+      const nested = this.tryReadComfyResult(candidate);
+      if (nested) {
+        return nested;
+      }
+      const nestedResult = this.toOptionalRecord(candidate.result);
+      if (nestedResult) {
+        const extracted = this.tryReadComfyResult(nestedResult);
+        if (extracted) {
+          return extracted;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private tryReadComfyResult(
+    candidate: Readonly<Record<string, unknown>>,
+  ): {
+    readonly executionId: string;
+    readonly status: "queued" | "running" | "completed" | "failed" | "cancelled";
+    readonly outputs: ReadonlyArray<{
+      readonly nodeId: string;
+      readonly kind: "image" | "text" | "binary" | "json";
+      readonly reference: string;
+      readonly metadata?: Readonly<Record<string, unknown>>;
+      readonly assetRef?: {
+        readonly assetId?: string;
+        readonly versionId?: string;
+      };
+    }>;
+    readonly lifecycle: ReadonlyArray<{
+      readonly at: string;
+      readonly state: "queued" | "running" | "completed" | "failed" | "cancelled";
+      readonly message?: string;
+      readonly details?: Readonly<Record<string, unknown>>;
+    }>;
+  } | undefined {
+    const outputsRaw = Array.isArray(candidate.outputs) ? candidate.outputs : undefined;
+    const executionId = typeof candidate.executionId === "string"
+      ? candidate.executionId.trim()
+      : "";
+    const statusRaw = typeof candidate.status === "string" ? candidate.status.trim() : "";
+    if (!outputsRaw || !executionId) {
+      return undefined;
+    }
+    if (!["queued", "running", "completed", "failed", "cancelled"].includes(statusRaw)) {
+      return undefined;
+    }
+    return Object.freeze({
+      executionId,
+      status: statusRaw as "queued" | "running" | "completed" | "failed" | "cancelled",
+      outputs: Object.freeze(outputsRaw
+        .map((entry) => this.toOptionalRecord(entry))
+        .filter((entry): entry is Readonly<Record<string, unknown>> => Boolean(entry))
+        .map((entry) => Object.freeze({
+          nodeId: typeof entry.nodeId === "string" && entry.nodeId.trim()
+            ? entry.nodeId.trim()
+            : "node",
+          kind: entry.kind === "image" || entry.kind === "text" || entry.kind === "binary" || entry.kind === "json"
+            ? entry.kind
+            : "json",
+          reference: typeof entry.reference === "string" && entry.reference.trim()
+            ? entry.reference.trim()
+            : `${executionId}:output`,
+          metadata: this.toOptionalRecord(entry.metadata),
+          assetRef: this.toOptionalRecord(entry.assetRef)
+            ? Object.freeze({
+              assetId: typeof this.toOptionalRecord(entry.assetRef)?.assetId === "string"
+                ? String(this.toOptionalRecord(entry.assetRef)?.assetId)
+                : undefined,
+              versionId: typeof this.toOptionalRecord(entry.assetRef)?.versionId === "string"
+                ? String(this.toOptionalRecord(entry.assetRef)?.versionId)
+                : undefined,
+            })
+            : undefined,
+        }))),
+      lifecycle: Object.freeze([]),
+    });
   }
 
   private deriveFileFormat(fileName: string, mimeType?: string): string {
