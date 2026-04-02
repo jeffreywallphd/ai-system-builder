@@ -813,3 +813,16 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Responsibility boundaries remain explicit:
   - **Schema Studio** owns structural schema authoring (tables, fields, relationships, canvas-oriented structure metadata).
   - **Pipeline Studio/Data Studio** own transformation/execution authoring and runtime validation semantics.
+
+## Direction 5 extension update: Data Studio schema authoring separation + Schema Studio handoff entry (stories 3.2.1-3.2.2)
+
+- Data Studio now treats pipeline authoring and schema authoring as separate workflows:
+  - Data Studio wizard/canvas surfaces remain focused on ingestion, mapping, transformation, enrichment, and execution-readiness concerns.
+  - Schema definition and structural modeling are no longer presented as pipeline-stage authoring responsibilities inside Data Studio.
+- Dataset Studio default draft content now initializes from canonical Data Studio pipeline-state serialization (via `DataStudioPreparationWizardStateAdapter`) rather than legacy schema-shaped draft placeholders.
+- Data Studio now includes a first-class Schema Studio entry panel in the primary wizard surface that supports:
+  - creating a new schema via existing inline studio-launch patterns,
+  - opening existing schema assets discovered through the shared registry/query path,
+  - user-facing guidance that clarifies structural schema work vs execution-oriented data-pipeline work.
+- Entry/transition behavior reuses existing shared seams (`InlineAssetCreationService`, `StudioEntryService`, registry semantic-role filtering) rather than adding ad hoc studio-routing state.
+

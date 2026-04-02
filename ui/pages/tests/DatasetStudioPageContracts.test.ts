@@ -6,6 +6,7 @@ describe("DatasetStudioPage contracts", () => {
     const pageSource = readSource("ui/pages/DatasetStudioPage.tsx");
     const registrationSource = readSource("ui/studio-shell/registrations/DatasetStudioRegistration.ts");
     const previewPanelSource = readSource("ui/components/assets/DatasetStudioDraftPreviewPanel.tsx");
+    const boundarySource = readSource("ui/components/studio-shell/dataset/DatasetStudioDraftAuthoringBoundary.tsx");
 
     expect(pageSource).toContain("StudioShellPage");
     expect(pageSource).toContain("datasetStudioRegistration");
@@ -23,11 +24,15 @@ describe("DatasetStudioPage contracts", () => {
     expect(registrationSource).toContain('kind: "run-validation"');
     expect(registrationSource).toContain('kind: "refresh-snapshot"');
     expect(registrationSource).toContain("DatasetStudioDraftPreviewPanel");
+    expect(registrationSource).toContain("DataStudioPreparationWizardStateAdapter");
+    expect(registrationSource).toContain("defaultDataStudioPipelineState");
     expect(registrationSource).toContain('id: "dataset-studio-data-preview-panel"');
     expect(previewPanelSource).toContain("AssetConfigurationPanel");
     expect(previewPanelSource).toContain("getDataStudioAssetRegistry");
     expect(previewPanelSource).toContain("Source Input");
     expect(previewPanelSource).toContain("UnifiedIngestionAssetId");
     expect(previewPanelSource).toContain("Inspect low-level ingestors");
+    expect(boundarySource).toContain("DataStudioSchemaStudioEntryPanel");
+    expect(boundarySource).toContain('data-testid="dataset-studio-wizard-surface"');
   });
 });
