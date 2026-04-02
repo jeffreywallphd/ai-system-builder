@@ -9,10 +9,9 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("StudioShellService");
     expect(source).toContain("StudioShellPanel");
     expect(source).toContain("StudioShellValidationIssuesPanel");
-    expect(source).toContain("Studio/session context");
     expect(source).toContain("Asset draft authoring");
-    expect(source).toContain("Taxonomy / contract / provenance");
-    expect(source).toContain("Dependencies");
+    expect(source).toContain("Return to previous workspace");
+    expect(source).toContain("Workflow details");
     expect(source).toContain("Lifecycle / publish / version status");
     expect(source).toContain("StudioShellValidationIssuesPanel");
     expect(source).toContain("StudioShellExtensionRegistry");
@@ -41,7 +40,6 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("getWorkflowStudioUnsavedPrompt");
     expect(source).toContain("Saving changes...");
     expect(source).toContain("Save failed");
-    expect(source).toContain("Workflow metadata");
     expect(source).toContain("Workflow name");
     expect(source).toContain('label: workflowModeState.selectedModeId === "canvas" ? "Wizard" : "Canvas"');
     expect(source).toContain('data-testid="studio-shell-authoring-toolbar"');
@@ -60,7 +58,6 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("service.loadSnapshot");
     expect(source).toContain("service.createDraft");
     expect(source).toContain("service.updateDraft");
-    expect(source).toContain("service.updateDependencies");
     expect(source).toContain("service.transitionLifecycle");
     expect(source).toContain("service.publishVersion");
     expect(source).toContain("service.validateDraft");

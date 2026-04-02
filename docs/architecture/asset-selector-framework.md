@@ -301,7 +301,7 @@ Future selector-backed asset-type adoption guidance:
   - `run-validation`
   - `set-workflow-mode`
 - Toolbar configuration is registration-owned (not user-authored) and validated/normalized at registration boundaries (required action ids/labels, duplicate-action rejection, workflow-mode validation).
-- `StudioShellPage` now renders draft authoring as a primary top-level section outside and above the shell card grid, while keeping existing session/metadata/dependencies/lifecycle/validation cards and extension slots intact.
+- `StudioShellPage` renders draft authoring as the primary top-level section outside and above the shell card grid, with a simplified details + lifecycle/validation surface while taxonomy/contract/provenance/dependency/session orchestration remains behind shared backend contracts.
 - Workflow Studio now demonstrates per-studio toolbar configuration through registration metadata (`ui/studio-shell/registrations/WorkflowStudioRegistration.ts`) with wizard/canvas mode actions plus save/validate/refresh controls.
 - Toolbar execution reuses existing shell orchestration seams (shared workflow mode state store and existing draft/validation operations) without bypassing selector/session infrastructure or duplicating validation logic.
 

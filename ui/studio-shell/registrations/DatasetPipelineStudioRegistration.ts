@@ -106,22 +106,5 @@ export const datasetPipelineStudioRegistration: CompositeStudioRegistration = Ob
         `Draft asset id: ${snapshot?.draft?.assetId ?? "-"}`,
       ]),
     },
-    {
-      id: "dataset-pipeline-studio-metadata-summary",
-      slot: "metadata",
-      title: "Dataset pipeline taxonomy and contract status",
-      subtitle: "Read-only taxonomy/contract/provenance projection from backend-authoritative draft metadata.",
-      order: 20,
-      render: ({ snapshot }) => {
-        const taxonomy = snapshot?.draft?.metadata.taxonomy;
-        return Object.freeze([
-          `Taxonomy: ${taxonomy
-            ? `${taxonomy.structuralKind}/${taxonomy.semanticRole}/${taxonomy.behaviorKind}`
-            : "missing"}`,
-          `Contract: ${snapshot?.draft?.metadata.contract ? "present" : "missing"}`,
-          `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
-        ]);
-      },
-    },
   ]),
 });

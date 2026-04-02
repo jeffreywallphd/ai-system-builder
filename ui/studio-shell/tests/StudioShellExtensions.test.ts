@@ -98,6 +98,7 @@ describe("StudioRegistrationRegistry", () => {
       "workflow-studio-toolbar-mode-canvas",
       "workflow-studio-toolbar-save",
       "workflow-studio-toolbar-validate",
+      "workflow-studio-toolbar-run-workflow",
       "workflow-studio-toolbar-refresh",
     ]);
     expect(registry.get("workflow-studio")?.shell?.drawers).toEqual({
@@ -235,9 +236,7 @@ describe("SystemStudioRegistry", () => {
     });
     expect(registry.get("system-studio")?.defaults.metadataPatch?.contract).toBeDefined();
     expect(registry.list().map((entry) => entry.studioType)).toEqual(["system-studio"]);
-    expect(registry.listExtensionsBySlot("system-studio", StudioShellExtensionSlots.dependencies).map((entry) => entry.id)).toContain(
-      "system-studio-composition-capabilities",
-    );
+    expect(registry.listExtensionsBySlot("system-studio", StudioShellExtensionSlots.dependencies)).toHaveLength(0);
   });
 
   it("rejects unsupported roles and duplicate system studio types", () => {

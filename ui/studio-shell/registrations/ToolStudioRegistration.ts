@@ -49,22 +49,5 @@ export const toolStudioRegistration: AtomicStudioRegistration = Object.freeze({
         `Draft asset id: ${snapshot?.draft?.assetId ?? "-"}`,
       ]),
     },
-    {
-      id: "tool-studio-capability-summary",
-      slot: "metadata",
-      title: "Tool capability metadata status",
-      subtitle: "Read-only taxonomy/contract/provenance projection from backend-authoritative draft metadata.",
-      order: 20,
-      render: ({ snapshot }) => {
-        const taxonomy = snapshot?.draft?.metadata.taxonomy;
-        return Object.freeze([
-          `Taxonomy: ${taxonomy
-            ? `${taxonomy.structuralKind}/${taxonomy.semanticRole}/${taxonomy.behaviorKind}`
-            : "missing"}`,
-          `Contract: ${snapshot?.draft?.metadata.contract ? "present" : "missing"}`,
-          `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
-        ]);
-      },
-    },
   ]),
 });

@@ -13,7 +13,6 @@ describe("ToolStudioPage contracts", () => {
     expect(registrationSource).toContain("studioType: ToolStudioIdentity.studioType");
     expect(registrationSource).toContain('role: "tool"');
     expect(registrationSource).toContain('slot: "draft-authoring"');
-    expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain('providerKind: "mcp"');
     expect(registrationSource).toContain('createToolStudioTaxonomy("conditional")');
   });

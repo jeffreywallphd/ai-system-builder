@@ -15,7 +15,6 @@ describe("DatasetStudioPage contracts", () => {
     expect(registrationSource).toContain("studioType: DatasetStudioIdentity.studioType");
     expect(registrationSource).toContain('role: "dataset"');
     expect(registrationSource).toContain('slot: "draft-authoring"');
-    expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain("createDatasetStudioTaxonomy()");
     expect(registrationSource).toContain("experienceAssets");
     expect(registrationSource).toContain("ExperienceSurfaceAssetIds.loomWizard");

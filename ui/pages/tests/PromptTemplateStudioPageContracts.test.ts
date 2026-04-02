@@ -13,7 +13,6 @@ describe("PromptTemplateStudioPage contracts", () => {
     expect(registrationSource).toContain("studioType: PromptTemplateStudioIdentity.studioType");
     expect(registrationSource).toContain('role: "prompt-template"');
     expect(registrationSource).toContain('slot: "draft-authoring"');
-    expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain("createPromptTemplateStudioTaxonomy()");
   });
 });

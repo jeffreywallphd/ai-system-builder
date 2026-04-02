@@ -19,16 +19,16 @@ describe("SystemStudioPage contracts", () => {
     expect(registrationSource).toContain("draftAuthoringSurfaces");
     expect(registrationSource).toContain("wizard: true");
     expect(registrationSource).toContain("canvas: false");
-    expect(registrationSource).toContain('slot: "draft-authoring"');
-    expect(registrationSource).toContain("system-studio-advanced-setup");
     expect(registrationSource).toContain("system-studio-advanced-validation");
     expect(registrationSource).toContain("SystemRuntimeRunPanel");
     expect(registrationSource).toContain("system-studio-runtime-run-trigger");
-    expect(registrationSource).toContain("Advanced setup");
     expect(registrationSource).toContain("Advanced validation and debug");
-    expect(registrationSource).toContain('slot: "dependencies"');
-    expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain('slot: "validation"');
+    expect(registrationSource).not.toContain("system-studio-template-selection");
+    expect(registrationSource).not.toContain("system-studio-reference-image-experience");
+    expect(registrationSource).not.toContain("system-studio-advanced-setup");
+    expect(registrationSource).not.toContain("system-studio-composition-capabilities");
+    expect(registrationSource).not.toContain("system-studio-metadata-summary");
   });
 
   it("keeps System Studio wired into shared route and navigation configuration", () => {

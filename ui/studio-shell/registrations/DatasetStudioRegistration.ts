@@ -83,23 +83,6 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
       ]),
     },
     {
-      id: "dataset-studio-metadata-summary",
-      slot: "metadata",
-      title: "Dataset taxonomy and contract status",
-      subtitle: "Read-only projection of backend-authoritative metadata state.",
-      order: 20,
-      render: ({ snapshot }) => {
-        const taxonomy = snapshot?.draft?.metadata.taxonomy;
-        return Object.freeze([
-          `Taxonomy: ${taxonomy
-            ? `${taxonomy.structuralKind}/${taxonomy.semanticRole}/${taxonomy.behaviorKind}`
-            : "missing"}`,
-          `Contract: ${snapshot?.draft?.metadata.contract ? "present" : "missing"}`,
-          `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
-        ]);
-      },
-    },
-    {
       id: "dataset-studio-data-preview-panel",
       slot: "draft-authoring",
       title: "Data preview panel",
