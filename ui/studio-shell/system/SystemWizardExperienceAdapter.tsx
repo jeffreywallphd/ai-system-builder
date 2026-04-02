@@ -1,18 +1,20 @@
 import type { JSX } from "react";
+import ConfigurableCanvasSurface from "../../components/studio-shell/experience-assets/ConfigurableCanvasSurface";
 import type { StudioShellValidationIssue } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { CanvasExperienceAssetDefinition } from "../experience-assets/ConfigurableCanvasSurfaceContracts";
 import type { WizardExperienceAssetDefinition } from "../experience-assets/ConfigurableWizardSurfaceContracts";
 import type { StudioShellExtensionContext } from "../StudioShellExtensions";
 import { parseSystemStudioDraftDocument, type SystemStudioDraftDocument } from "./SystemStudioDraftDocument";
-import { SystemCompositionEditor } from "../../components/studio-shell/SystemCompositionEditor";
 import { SystemInterfaceEditor } from "../../components/studio-shell/SystemInterfaceEditor";
 import { SystemParameterConfigEditor } from "../../components/studio-shell/SystemParameterConfigEditor";
 import { SystemPageSetupEditor } from "../../components/studio-shell/system/SystemPageSetupEditor";
+import type { SystemCanvasExperienceContext } from "./SystemCanvasExperienceAdapter";
 
 export const SystemWizardPageIds = Object.freeze({
   pages: "pages",
-  composition: "composition",
-  interfaces: "interfaces",
-  parameters: "parameters",
+  interfaceDesign: "interface-design",
+  inputsOutputs: "inputs-outputs",
+  settings: "settings",
 });
 
 export type SystemWizardPageId = typeof SystemWizardPageIds[keyof typeof SystemWizardPageIds];
@@ -24,6 +26,8 @@ export interface SystemWizardExperienceContext {
   readonly selectedPageId: string;
   readonly onSelectPage: (pageId: string) => void;
   readonly onPagesChange: (pages: SystemStudioDraftDocument["systemSpec"]["pages"]) => void;
+  readonly canvasDefinition: CanvasExperienceAssetDefinition<SystemCanvasExperienceContext>;
+  readonly canvasContext: SystemCanvasExperienceContext;
 }
 
 export interface SystemWizardExperienceAdapterInput {
@@ -33,14 +37,22 @@ export interface SystemWizardExperienceAdapterInput {
   readonly selectedPageId: string;
   readonly onSelectPage: (pageId: string) => void;
   readonly onPagesChange: (pages: SystemStudioDraftDocument["systemSpec"]["pages"]) => void;
+  readonly canvasDefinition: CanvasExperienceAssetDefinition<SystemCanvasExperienceContext>;
+  readonly canvasContext: SystemCanvasExperienceContext;
 }
 
 function toStatus(ready: boolean): "ready" | "pending" {
   return ready ? "ready" : "pending";
 }
 
-function renderCompositionPage(context: SystemWizardExperienceContext): JSX.Element {
-  return <SystemCompositionEditor context={context.extensionContext} />;
+function resolveInterfaceDesignReadiness(document: SystemStudioDraftDocument): boolean {
+  if (document.systemSpec.pages.length === 0) {
+    return false;
+  }
+  return document.systemSpec.pages.every((page) => {
+    const layout = document.canvasAuthoring.pageLayouts.find((entry) => entry.pageId === page.pageId);
+    return (layout?.panels.length ?? 0) > 0;
+  });
 }
 
 function renderPagesPage(context: SystemWizardExperienceContext): JSX.Element {
@@ -54,48 +66,74 @@ function renderPagesPage(context: SystemWizardExperienceContext): JSX.Element {
   );
 }
 
-function renderInterfacesPage(context: SystemWizardExperienceContext): JSX.Element {
+function renderInterfaceDesignPage(context: SystemWizardExperienceContext): JSX.Element {
+  return (
+    <section className="ui-stack ui-stack--sm" data-testid="system-wizard-interface-design-page">
+      <div className="ui-stack ui-stack--2xs">
+        <p className="ui-text-small ui-text-secondary">Pick a page, then arrange the panels for that page.</p>
+        <div className="ui-row ui-row--wrap" data-testid="system-wizard-page-switcher">
+          {context.document.systemSpec.pages.map((page) => (
+            <button
+              key={page.pageId}
+              type="button"
+              className={`ui-button ui-button--sm ${page.pageId === context.selectedPageId ? "ui-button--primary" : "ui-button--ghost"}`}
+              onClick={() => context.onSelectPage(page.pageId)}
+            >
+              {page.heading}
+            </button>
+          ))}
+        </div>
+      </div>
+      <ConfigurableCanvasSurface
+        definition={context.canvasDefinition}
+        definitionContext={context.canvasContext}
+      />
+    </section>
+  );
+}
+
+function renderInputsOutputsPage(context: SystemWizardExperienceContext): JSX.Element {
   return <SystemInterfaceEditor context={context.extensionContext} />;
 }
 
-function renderParametersPage(context: SystemWizardExperienceContext): JSX.Element {
+function renderSettingsPage(context: SystemWizardExperienceContext): JSX.Element {
   return <SystemParameterConfigEditor context={context.extensionContext} />;
 }
 
 const definition: WizardExperienceAssetDefinition<SystemWizardExperienceContext> = Object.freeze({
   id: "system-authoring-wizard",
   title: "System authoring wizard",
-  summary: "Guided composition flow for system assets.",
+  summary: "Guided setup flow for system assets.",
   pages: Object.freeze([
     Object.freeze({
       id: SystemWizardPageIds.pages,
       title: "Pages",
-      summary: "Create and describe each page in your setup.",
+      summary: "Create and describe the pages people will use.",
       resolveStatus: (context) => toStatus(context.document.systemSpec.pages.every((page) => page.heading.trim().length > 0)),
       render: renderPagesPage,
     }),
     Object.freeze({
-      id: SystemWizardPageIds.composition,
-      title: "Compose",
-      summary: "Pick and arrange system components.",
-      resolveStatus: (context) => toStatus(context.document.systemSpec.components.length > 0),
-      render: renderCompositionPage,
+      id: SystemWizardPageIds.interfaceDesign,
+      title: "Interface Design",
+      summary: "Arrange each page in the design canvas.",
+      resolveStatus: (context) => toStatus(resolveInterfaceDesignReadiness(context.document)),
+      render: renderInterfaceDesignPage,
     }),
     Object.freeze({
-      id: SystemWizardPageIds.interfaces,
-      title: "Inputs & outputs",
-      summary: "Define what goes in and what comes out.",
+      id: SystemWizardPageIds.inputsOutputs,
+      title: "Inputs & Outputs",
+      summary: "Define what information comes in and what is produced.",
       resolveStatus: (context) => toStatus(
         context.document.systemSpec.inputs.length > 0 || context.document.systemSpec.outputs.length > 0,
       ),
-      render: renderInterfacesPage,
+      render: renderInputsOutputsPage,
     }),
     Object.freeze({
-      id: SystemWizardPageIds.parameters,
+      id: SystemWizardPageIds.settings,
       title: "Settings",
-      summary: "Configure reusable system settings.",
+      summary: "Set reusable behavior and defaults.",
       resolveStatus: (context) => toStatus(context.document.systemSpec.parameters.length > 0),
-      render: renderParametersPage,
+      render: renderSettingsPage,
     }),
   ]),
   resolveProgress: ({ context, activePageId }) => {
@@ -105,13 +143,17 @@ const definition: WizardExperienceAssetDefinition<SystemWizardExperienceContext>
         ready: context.document.systemSpec.pages.length > 0 && context.document.systemSpec.pages.every((page) => page.heading.trim().length > 0),
         title: "Pages",
       },
-      { id: SystemWizardPageIds.composition, ready: context.document.systemSpec.components.length > 0, title: "Compose" },
       {
-        id: SystemWizardPageIds.interfaces,
-        ready: context.document.systemSpec.inputs.length > 0 || context.document.systemSpec.outputs.length > 0,
-        title: "Inputs & outputs",
+        id: SystemWizardPageIds.interfaceDesign,
+        ready: resolveInterfaceDesignReadiness(context.document),
+        title: "Interface Design",
       },
-      { id: SystemWizardPageIds.parameters, ready: context.document.systemSpec.parameters.length > 0, title: "Settings" },
+      {
+        id: SystemWizardPageIds.inputsOutputs,
+        ready: context.document.systemSpec.inputs.length > 0 || context.document.systemSpec.outputs.length > 0,
+        title: "Inputs & Outputs",
+      },
+      { id: SystemWizardPageIds.settings, ready: context.document.systemSpec.parameters.length > 0, title: "Settings" },
     ] as const;
     const readyCount = pages.filter((page) => page.ready).length;
     return Object.freeze({
@@ -126,10 +168,10 @@ const definition: WizardExperienceAssetDefinition<SystemWizardExperienceContext>
     description: context.document.systemSpec.pages.length === 0
       ? "Start by adding your first page."
       : context.document.systemSpec.pages.some((page) => page.heading.trim().length === 0)
-        ? "Give each page a title so people know what each page is for."
-        : context.document.systemSpec.components.length > 0
-          ? "Your setup is ready. You can continue refining interfaces and settings."
-          : "Next, add at least one component to make this setup work.",
+        ? "Give each page a title so people can find what they need."
+        : !resolveInterfaceDesignReadiness(context.document)
+          ? "Add at least one panel to each page in Interface Design."
+          : "Your setup is ready. You can keep refining inputs, outputs, and settings.",
     issues: Object.freeze(
       context.issues.map((issue) => Object.freeze({
         id: `${issue.code}:${issue.path ?? ""}:${issue.message}`,
@@ -154,6 +196,8 @@ export function createSystemWizardExperienceAdapterModel(
       selectedPageId: input.selectedPageId,
       onSelectPage: input.onSelectPage,
       onPagesChange: input.onPagesChange,
+      canvasDefinition: input.canvasDefinition,
+      canvasContext: input.canvasContext,
     }),
   });
 }

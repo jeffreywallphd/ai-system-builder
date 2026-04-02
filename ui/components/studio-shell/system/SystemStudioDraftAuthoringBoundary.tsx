@@ -241,21 +241,6 @@ export function SystemStudioDraftAuthoringBoundary({
     [experienceAssetIds],
   );
 
-  const wizardModel = useMemo(
-    () => createSystemWizardExperienceAdapterModel({
-      content,
-      extensionContext,
-      validationIssues,
-      selectedPageId: resolvedSelectedPageId,
-      onSelectPage: (pageId) => {
-        setSelectedPageId(pageId);
-        setSelectedLayoutNodeId(undefined);
-      },
-      onPagesChange: persistSystemPages,
-    }),
-    [content, extensionContext, validationIssues, resolvedSelectedPageId],
-  );
-
   const canvasModel = useMemo(
     () => createSystemCanvasExperienceDefinition({
       content,
@@ -272,6 +257,23 @@ export function SystemStudioDraftAuthoringBoundary({
       onCanvasEditingEvent: handleCanvasEditingEvent,
     }),
     [content, extensionContext, selectedInspectorPanel, selectedLayoutNodeId, resolvedSelectedPageId, validationIssues],
+  );
+
+  const wizardModel = useMemo(
+    () => createSystemWizardExperienceAdapterModel({
+      content,
+      extensionContext,
+      validationIssues,
+      selectedPageId: resolvedSelectedPageId,
+      onSelectPage: (pageId) => {
+        setSelectedPageId(pageId);
+        setSelectedLayoutNodeId(undefined);
+      },
+      onPagesChange: persistSystemPages,
+      canvasDefinition: canvasModel.definition,
+      canvasContext: canvasModel.context,
+    }),
+    [content, extensionContext, validationIssues, resolvedSelectedPageId, canvasModel],
   );
 
   return (
