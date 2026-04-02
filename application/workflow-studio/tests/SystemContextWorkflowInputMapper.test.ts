@@ -43,7 +43,9 @@ describe("SystemContextWorkflowInputMapper", () => {
     expect((metadata.systemFormValues as Record<string, unknown>).strength).toBe(0.5);
     expect((metadata.selectedImage as Record<string, unknown>).imageId).toBe("asset:image:selected-1");
     expect((metadata.datasetInstances as Array<Record<string, unknown>>)[0]?.instanceId).toBe("instance:active-input");
+    expect((metadata.datasetRuntimeHandles as Array<Record<string, unknown>>)[0]?.kind).toBe("dataset-instance");
     expect((metadata.systemDatasetInstanceRefs as Array<Record<string, unknown>>)[0]?.instanceId).toBe("instance:system-output");
+    expect((metadata.datasetResolution as Record<string, unknown>).resolvedCount).toBe(2);
     expect((metadata.runtimeContext as Record<string, unknown>).runtimeSessionId).toBe("runtime-session:123");
   });
 });

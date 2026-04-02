@@ -551,3 +551,10 @@ Audit schema now records administrative approval transitions plus decision denia
   - dataset reference + schema-intent alignment checks,
   - workflow-input contract alignment through existing input-binding preview/resolution contracts.
 - Validation results are structured for execution gating and UI/debug presentation (`valid`, `blockingIssues`, `warningIssues`, `issues`, normalized context, optional workflow binding preview).
+
+## AI Loom image manipulation update: workflow input binding adapter + dataset reference resolution (stories 4.3.5-4.3.6)
+
+- Added a dedicated dataset-resolution seam (`application/workflow-studio/SystemContextDatasetReferenceResolver.ts`) that resolves system-context dataset references into concrete dataset-instance runtime handles, with structured inspectable outcomes (`resolved`, `unresolved`, `issues`, `byReferenceId`).
+- Resolution is contract-first and storage-agnostic: it distinguishes abstract references from resolved runtime handles, checks role/intent compatibility for common image-system roles (`active-input`, `history`, `system-owned-output`), and returns explicit failure diagnostics when instance resolution or compatibility fails.
+- `WorkflowSystemContextBindingAdapter` (`application/workflow-studio/SystemContextWorkflowInputMapper.ts`) now composes that resolver and emits workflow-ready input metadata with normalized runtime-facing dataset payloads (`datasetInstances`, `datasetRuntimeHandles`, `systemDatasetInstanceRefs`, `datasetResolution`) while preserving separation from raw UI state.
+- `SystemContextValidationService` now reuses the same dataset-resolution seam before workflow input binding preview so validation, execution mapping, and inspect/debug surfaces share one dataset resolution truth.
