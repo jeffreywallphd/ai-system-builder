@@ -1019,3 +1019,23 @@ Not implemented in this slice:
   - malformed records are rejected as structured invalid-request failures,
   - failed/partial save outcomes propagate through persistence status + run-history status instead of silently admitting corrupted records.
 - This keeps dataset integrity/schema enforcement in internal contracts/services (materialization + dataset-instance admission) rather than UI or Comfy-specific transport layers, and ensures output gallery/preview only reflects validated persisted records.
+
+## Direction 5 UI extension update: UI asset contract versioning + architecture documentation baseline (stories 1.1.9-1.1.10)
+
+- UI asset contracts now include a first-class contract version marker (`contractVersion`) on the shared base contract in `ui/studio-shell/studio-assets/StudioAssetContracts.ts`.
+- Versioning remains taxonomy-aligned and shared across all UI asset kinds:
+  - atomic UI assets,
+  - composed UI assets,
+  - system/page assets.
+- Registration/discovery in `StudioAssetRegistry` now carries normalized contract version identity (`StudioAssetRegistration.contractVersion`) rather than introducing a parallel version model.
+- Metadata expectations remain shared and unchanged in shape (identity/display/classification/discovery/capability fields), with version identity carried separately for compatibility checks.
+- Renderer resolution expectations remain registry-driven (`resolveRendererById`, `resolveRenderersByKind`, `resolveRenderersByCategory`) and version-agnostic at render time; version checks happen in composition validation/serialization seams.
+- Composition validation (`StudioAssetComposition`) now includes version compatibility checks (`asset-version-mismatch`) when serialized node versions diverge from registered asset contract versions.
+- Serialization/deserialization expectations are now explicitly version-aware:
+  - composition documents have schema versions,
+  - v1 payloads are migrated through a bounded migration seam into current shape,
+  - nodes can carry `assetVersion` so persisted compositions preserve the authored contract version marker.
+- Migration hooks are intentionally lightweight (single bounded migrator path) to keep future schema evolution simple without a full migration framework.
+- Architectural direction remains explicit:
+  - studios are embeddable assets in the same shared registry/discovery system,
+  - recursive composition is supported (including nested system/page structures) through existing composition rules + validation boundaries.

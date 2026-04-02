@@ -8,7 +8,9 @@ import type {
 } from "./StudioAssetContracts";
 import type { StudioAssetRegistration, StudioAssetRegistrationCategory, StudioAssetRegistry } from "./StudioAssetRegistry";
 
-const StudioAssetCompositionSchemaVersion = "1.0.0";
+const StudioAssetCompositionSchemaVersionV1 = "1.0.0";
+const StudioAssetCompositionSchemaVersionV2 = "1.1.0";
+const StudioAssetCompositionSchemaVersion = StudioAssetCompositionSchemaVersionV2;
 
 export const StudioAssetCompositionValidationIssueCodes = Object.freeze({
   unknownAsset: "unknown-asset",
@@ -23,6 +25,7 @@ export const StudioAssetCompositionValidationIssueCodes = Object.freeze({
   regionCardinalityExceeded: "region-cardinality-exceeded",
   atomicCannotContainChildren: "atomic-cannot-contain-children",
   invalidNesting: "invalid-nesting",
+  assetVersionMismatch: "asset-version-mismatch",
 });
 
 export type StudioAssetCompositionValidationIssueCode =
@@ -43,6 +46,7 @@ export interface StudioAssetCompositionPlacementNode {
 export interface StudioAssetCompositionNode {
   readonly nodeId: string;
   readonly assetId: string;
+  readonly assetVersion?: string;
   readonly config?: Readonly<Record<string, unknown>>;
   readonly metadataReferences?: StudioAssetCompositionMetadataReference;
   readonly slots?: ReadonlyArray<StudioAssetCompositionPlacementNode>;
@@ -69,7 +73,7 @@ interface AllowedChildConstraints {
 }
 
 interface StudioAssetCompositionSerializedDocument {
-  readonly schemaVersion: typeof StudioAssetCompositionSchemaVersion;
+  readonly schemaVersion: string;
   readonly root: StudioAssetCompositionNode;
 }
 
@@ -139,10 +143,12 @@ function normalizeCompositionNode(input: unknown, label = "composition node"): S
   const record = input as Record<string, unknown>;
   const nodeId = normalizeString(record.nodeId, `${label} nodeId`);
   const assetId = normalizeString(record.assetId, `${label} assetId`);
+  const assetVersion = typeof record.assetVersion === "string" ? record.assetVersion.trim() || undefined : undefined;
 
   return Object.freeze({
     nodeId,
     assetId,
+    assetVersion,
     config: asOptionalRecord(record.config),
     metadataReferences: normalizeMetadataReferences(record.metadataReferences),
     slots: normalizePlacements(record.slots, "slot"),
@@ -174,6 +180,54 @@ function stableStringify(value: unknown): string {
         return next;
       }, {});
   }, 2);
+}
+
+function migrateCompositionNodeToV2(
+  node: StudioAssetCompositionNode,
+  registry: StudioAssetRegistry,
+): StudioAssetCompositionNode {
+  const registration = registry.getById(node.assetId);
+  const assetVersion = node.assetVersion ?? registration?.contractVersion;
+  const migratePlacement = (placements?: ReadonlyArray<StudioAssetCompositionPlacementNode>) =>
+    placements
+      ? Object.freeze(placements.map((placement) => Object.freeze({
+        placementId: placement.placementId,
+        children: Object.freeze(placement.children.map((child) => migrateCompositionNodeToV2(child, registry))),
+      })))
+      : undefined;
+  return Object.freeze({
+    ...node,
+    assetVersion,
+    slots: migratePlacement(node.slots),
+    regions: migratePlacement(node.regions),
+  });
+}
+
+function migrateToCurrentCompositionDocument(input: {
+  readonly parsed: Record<string, unknown>;
+  readonly registry: StudioAssetRegistry;
+}): StudioAssetCompositionSerializedDocument {
+  const schemaVersion = typeof input.parsed.schemaVersion === "string"
+    ? input.parsed.schemaVersion
+    : StudioAssetCompositionSchemaVersionV1;
+  if (schemaVersion === StudioAssetCompositionSchemaVersion) {
+    return Object.freeze({
+      schemaVersion,
+      root: normalizeCompositionNode(input.parsed.root, "composition root"),
+    });
+  }
+
+  if (schemaVersion === StudioAssetCompositionSchemaVersionV1) {
+    const legacyRoot = normalizeCompositionNode(input.parsed.root, "composition root");
+    return Object.freeze({
+      schemaVersion: StudioAssetCompositionSchemaVersion,
+      root: migrateCompositionNodeToV2(legacyRoot, input.registry),
+    });
+  }
+
+  throw new Error(
+    `Studio composition schema version '${schemaVersion}' is not supported. Expected '${StudioAssetCompositionSchemaVersion}'.`,
+  );
 }
 
 function validatePlacementChildren(input: {
@@ -250,6 +304,14 @@ function validatePlacementChildren(input: {
         code: StudioAssetCompositionValidationIssueCodes.invalidNesting,
         path: childPath,
         message: `Composed asset '${input.parentRegistration.id}' cannot nest system-page child '${childRegistration.id}'.`,
+      });
+    }
+
+    if (child.assetVersion && child.assetVersion !== childRegistration.contractVersion) {
+      input.issues.push({
+        code: StudioAssetCompositionValidationIssueCodes.assetVersionMismatch,
+        path: `${childPath}.assetVersion`,
+        message: `Child asset '${child.assetId}' version '${child.assetVersion}' does not match registered contract version '${childRegistration.contractVersion}'.`,
       });
     }
   }
@@ -439,11 +501,17 @@ export function validateStudioAssetCompositionTree(input: {
   });
 }
 
-export function serializeStudioAssetCompositionDocument(root: StudioAssetCompositionNode): string {
-  const normalizedRoot = normalizeCompositionNode(root, "composition root");
+export function serializeStudioAssetCompositionDocument(input: {
+  readonly root: StudioAssetCompositionNode;
+  readonly registry?: StudioAssetRegistry;
+}): string {
+  const normalizedRoot = normalizeCompositionNode(input.root, "composition root");
+  const root = input.registry
+    ? migrateCompositionNodeToV2(normalizedRoot, input.registry)
+    : normalizedRoot;
   const document: StudioAssetCompositionSerializedDocument = Object.freeze({
     schemaVersion: StudioAssetCompositionSchemaVersion,
-    root: normalizedRoot,
+    root,
   });
   return stableStringify(document);
 }
@@ -458,13 +526,11 @@ export function deserializeStudioAssetCompositionDocument(input: {
 } {
   const serialized = normalizeString(input.serialized, "Serialized studio composition document");
   const parsed = JSON.parse(serialized) as Record<string, unknown>;
-  if (parsed.schemaVersion !== StudioAssetCompositionSchemaVersion) {
-    throw new Error(
-      `Studio composition schema version '${String(parsed.schemaVersion)}' is not supported. Expected '${StudioAssetCompositionSchemaVersion}'.`,
-    );
-  }
-
-  const root = normalizeCompositionNode(parsed.root, "composition root");
+  const migrated = migrateToCurrentCompositionDocument({
+    parsed,
+    registry: input.registry,
+  });
+  const root = migrated.root;
   const validation = validateStudioAssetCompositionTree({ root, registry: input.registry });
   if ((input.validate ?? true) && !validation.valid) {
     const first = validation.issues[0];

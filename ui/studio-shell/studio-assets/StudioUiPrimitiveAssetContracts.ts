@@ -1,4 +1,8 @@
-import { StudioUiAssetKinds, type AtomicStudioAssetContract } from "./StudioAssetContracts";
+import {
+  StudioUiAssetContractVersion,
+  StudioUiAssetKinds,
+  type AtomicStudioAssetContract,
+} from "./StudioAssetContracts";
 
 export const StudioUiPrimitiveKinds = Object.freeze({
   textInput: "text-input",
@@ -19,6 +23,7 @@ export function createAtomicStudioUiPrimitiveContract(input: {
   const id = `ui-primitive:${input.primitiveKind}`;
   const documentType = input.documentType ?? `ui-primitive:${input.primitiveKind}:json`;
   return Object.freeze({
+    contractVersion: StudioUiAssetContractVersion,
     identity: Object.freeze({
       studioType: id,
       studioId: id,

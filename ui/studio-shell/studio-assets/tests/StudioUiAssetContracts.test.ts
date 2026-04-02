@@ -20,6 +20,7 @@ describe("StudioUiAssetContracts", () => {
     expect(defaultAtomicStudioUiPrimitiveContracts.length).toBeGreaterThanOrEqual(5);
     for (const contract of defaultAtomicStudioUiPrimitiveContracts) {
       expect(contract.kind).toBe(StudioUiAssetKinds.atomic);
+      expect(contract.contractVersion).toBe("1.0.0");
       expect(contract.constraints.allowsChildren).toBe(false);
       expect(contract.persistence.serialization).toBe("json");
       expect(contract.rendering.renderer).toBe("react");
@@ -39,6 +40,7 @@ describe("StudioUiAssetContracts", () => {
       if (definition.contract.kind === StudioUiAssetKinds.composed) {
         expect(definition.contract.childSlots.length).toBeGreaterThan(0);
         expect(definition.contract.compositionRules.allowsNestedStudios).toBe(true);
+        expect(definition.contract.contractVersion).toBe("1.0.0");
         expect(definition.contract.persistence.serialization).toBe("json");
       }
     }
@@ -76,6 +78,7 @@ describe("StudioUiAssetContracts", () => {
 
     const systemRegistration = registry.getById("system-studio");
     expect(systemRegistration?.kind).toBe(StudioUiAssetKinds.systemPage);
+    expect(systemRegistration?.contractVersion).toBe("1.0.0");
     expect(systemRegistration?.hooks.propsSchemaId).toBe("studio.system-surface.input");
     expect(systemRegistration?.renderer).toEqual({ renderer: "react", resolution: "definition-render" });
     expect(systemRegistration?.metadata).toMatchObject({
@@ -183,7 +186,50 @@ describe("StudioUiAssetContracts", () => {
 
     expect(parsed.validation.valid).toBeTrue();
     expect(parsed.root.assetId).toBe("system-studio");
+    expect(parsed.root.assetVersion).toBe("1.0.0");
     expect(parsed.root.regions?.map((entry) => entry.placementId)).toEqual(["navigation", "workspace", "inspector"]);
     expect(parsed.root.regions?.[1]?.children[0]?.assetId).toBe("workflow-studio");
+    expect(parsed.root.regions?.[1]?.children[0]?.assetVersion).toBe("1.0.0");
+  });
+
+  it("migrates legacy composition payloads and preserves version-aware validation", () => {
+    const registry = createDefaultStudioAssetRegistry();
+    const serializedLegacy = JSON.stringify({
+      root: {
+        nodeId: "legacy-root",
+        assetId: "workflow-studio",
+        slots: [{
+          placementId: "main",
+          children: [{
+            nodeId: "legacy-viewer",
+            assetId: "ui-primitive:viewer",
+          }],
+        }],
+      },
+    });
+
+    const migrated = registry.deserializeCompositionTree({ serialized: serializedLegacy });
+    expect(migrated.validation.valid).toBeTrue();
+    expect(migrated.root.assetVersion).toBe("1.0.0");
+    expect(migrated.root.slots?.[0]?.children[0]?.assetVersion).toBe("1.0.0");
+
+    const mismatched = registry.deserializeCompositionTree({
+      serialized: JSON.stringify({
+        schemaVersion: "1.1.0",
+        root: {
+          nodeId: "root",
+          assetId: "workflow-studio",
+          assetVersion: "0.9.0",
+          slots: [{
+            placementId: "main",
+            children: [{ nodeId: "viewer", assetId: "ui-primitive:viewer", assetVersion: "0.9.0" }],
+          }],
+        },
+      }),
+      validate: false,
+    });
+
+    expect(mismatched.validation.valid).toBeFalse();
+    expect(mismatched.validation.issues.some((issue) => issue.code === StudioAssetCompositionValidationIssueCodes.assetVersionMismatch)).toBeTrue();
   });
 });
