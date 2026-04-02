@@ -1,7 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createSystemCanvasExperienceDefinition } from "../SystemCanvasExperienceAdapter";
-import { createSystemWizardExperienceAdapterModel, SystemWizardPageIds } from "../DEPRECATED_SystemWizardExperienceAdapter";
 import type { StudioShellExtensionContext } from "../../StudioShellExtensions";
 
 const extensionContext: StudioShellExtensionContext = Object.freeze({
@@ -15,7 +14,7 @@ const extensionContext: StudioShellExtensionContext = Object.freeze({
   }),
 });
 
-describe("System studio experience adapters (deprecated wizard adapter + active canvas adapter)", () => {
+describe("System studio experience adapters", () => {
   const buildCanvasModel = (content: string) => createSystemCanvasExperienceDefinition({
     content,
     extensionContext,
@@ -121,58 +120,13 @@ describe("System studio experience adapters (deprecated wizard adapter + active 
     expect(html).toContain("data-testid=\"panel-design-studio\"");
   });
 
-  it("starts wizard flow with multi-page setup", () => {
-    const content = JSON.stringify({
-      systemSpec: {
-        pages: [
-          { pageId: "page-1", title: "Welcome" },
-        ],
-      },
-    });
-
-    const canvasModel = buildCanvasModel(content);
-    const model = createSystemWizardExperienceAdapterModel({
-      content,
-      extensionContext,
-      validationIssues: [],
-      selectedPageId: "page-1",
-      onSelectPage: () => undefined,
-      onPagesChange: () => undefined,
-      canvasDefinition: canvasModel.definition,
-      canvasContext: canvasModel.context,
-    });
-
-    expect(model.definition.pages[0]?.id).toBe(SystemWizardPageIds.pages);
-    expect(model.definition.pages[1]?.id).toBe(SystemWizardPageIds.interfaceDesign);
-    expect(model.definition.pages[2]?.id).toBe(SystemWizardPageIds.settings);
-    const progress = model.definition.resolveProgress({ context: model.context, activePageId: SystemWizardPageIds.pages });
-    expect(progress.totalCount).toBe(3);
-  });
-
-  it("marks Settings step ready when system settings include a name", () => {
+  it("builds a canvas model with expected page-selection context", () => {
     const content = JSON.stringify({
       systemSpec: {
         pages: [{ pageId: "page-1", title: "Welcome" }],
-        settings: {
-          systemName: "Support assistant",
-          navigation: { mode: "top" },
-          runtimeBehavior: { confirmBeforeExit: false, showHelpTips: true, rememberLastPage: true },
-        },
       },
     });
-    const canvasModel = buildCanvasModel(content);
-    const model = createSystemWizardExperienceAdapterModel({
-      content,
-      extensionContext,
-      validationIssues: [],
-      selectedPageId: "page-1",
-      onSelectPage: () => undefined,
-      onPagesChange: () => undefined,
-      canvasDefinition: canvasModel.definition,
-      canvasContext: canvasModel.context,
-    });
-
-    const settingsPage = model.definition.pages.find((page) => page.id === SystemWizardPageIds.settings);
-    expect(settingsPage?.resolveStatus?.(model.context)).toBe("ready");
+    const model = buildCanvasModel(content);
+    expect(model.context.selectedPageId).toBe("page-1");
   });
 });

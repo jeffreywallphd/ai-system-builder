@@ -122,12 +122,12 @@ Run-history rerun controls now render explicit unsupported-state UX (for non-ter
 - Workflow Studio canvas layout now renders the React Flow canvas surface directly (without the prior layout container card wrapper) while keeping inspector/details within the same mode boundary.
 - Workflow Studio draft authoring now has explicit mode-aware renderer boundaries: shared shell orchestration stays in `StudioShellPage`, while mode-specific surfaces are isolated in `WorkflowStudioDraftAuthoringBoundary` + `WorkflowStudioWizardExperienceSurface` + `WorkflowStudioCanvasExperienceSurface`.
 - Experience-asset authoring keeps the reusable UI-neutral contract seam (`ui/studio-shell/experience-assets/ExperienceAssetContracts.ts`), while active mode switching now resolves directly inside studio-specific boundaries (`WorkflowStudioDraftAuthoringBoundary`, `DatasetStudioDraftAuthoringBoundary`) instead of a shared intermediary renderer.
-- `ExperienceAssetAuthoringBoundary` has been disconnected from active runtime and renamed `DEPRECATED_ExperienceAssetAuthoringBoundary.tsx` as part of the legacy retirement pass; workflow and dataset authoring continue to preserve route-driven wizard/canvas behavior in their canonical studio boundaries.
+- `ExperienceAssetAuthoringBoundary` has been removed from the repository after disconnection from active runtime; workflow and dataset authoring continue to preserve route-driven wizard/canvas behavior in their canonical studio boundaries.
 - Migration audit snapshot for workflow authoring/runtime seams under the studio-shell flow:
   - **Standalone editor route retired from active runtime:** `/workflows/:workflowId` now redirects into Workflow Studio entry routing and no longer mounts the standalone editor page.
-  - **Legacy workflow editor disconnected:** `WorkflowEditorPage` is no longer imported in active router paths and has been renamed `DEPRECATED_WorkflowEditorPage.tsx`.
-  - **Workflow-specific wizard/canvas intermediary surfaces retired:** active runtime now binds through `WorkflowStudioWizardExperienceSurface` and `WorkflowStudioCanvasExperienceSurface`; prior mode layout/surface files are disconnected and prefixed `DEPRECATED_`.
-  - **Legacy compatibility infrastructure retired:** `ExperienceAssetAuthoringBoundary` is disconnected from active studio runtime and marked `DEPRECATED_` for follow-up deletion.
+  - **Legacy workflow editor removed:** `WorkflowEditorPage` is no longer imported in active router paths and has been deleted after deprecation.
+  - **Workflow-specific wizard/canvas intermediary surfaces removed:** active runtime now binds through `WorkflowStudioWizardExperienceSurface` and `WorkflowStudioCanvasExperienceSurface`; prior mode layout/surface files were deleted after disconnection.
+  - **Legacy compatibility infrastructure removed:** `ExperienceAssetAuthoringBoundary` is no longer part of active studio runtime or source.
 
 - Experience-asset presentation now also has a compact neutral vocabulary layer (`ui/studio-shell/experience-assets/ExperiencePresentationVocabulary.ts`) covering document/issue/page/mode/action ids plus reusable action/progress/issue summary models for cross-studio authoring surfaces.
 - Wizard engine mechanics are now extracted into a workflow-neutral renderer (`ui/components/studio-shell/experience-assets/ConfigurableWizardSurface.tsx`) with narrow contracts (`ui/studio-shell/experience-assets/ConfigurableWizardSurfaceContracts.ts`) for ordered page navigation, current-page hosting, progress summary, terminal actions, and readiness summary rendering without workflow-editor imports.
@@ -249,7 +249,7 @@ Current Direction 5 UI status:
 
 Direction 5 Epic 11 final hardening status (stories 11.23-11.24):
 - UX consistency hardening now has shared policy/regression seams in `ui/routes/UxConsistencyPolicy.ts` and `ui/routes/IntentUxRegressionSuite.ts`, focused on intent-first terminology, taxonomy suppression in primary UX, and cross-surface route/origin continuity across Build/Explore/Run plus shell-adjacent surfaces.
-- Legacy UX cleanup policy artifacts are now retained as deprecated references (`ui/routes/DEPRECATED_LegacyNavigationSunset.ts`), while active routing uses canonical path redirects directly in `ui/routes/AppRouter.tsx`.
+- Legacy UX cleanup policy artifacts were removed after sunset; active routing uses canonical path redirects directly in `ui/routes/AppRouter.tsx`.
 - Explore is the user-facing library term in page-level hero copy (`ui/pages/RegistryPage.tsx`), while internal registry route naming remains implementation detail.
 - Legacy compatibility feature-flag gating is now disconnected from active runtime routing; canonical Build/Explore/Run redirects are always enforced for deprecated entry paths.
 
@@ -728,4 +728,4 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Schema references remain first-class links in pipeline definitions (`datasetPipelineSpec.schemas` and `datasetPipelineSpec.sources[].schema`) so structural assets and execution assets stay distinct while still connected.
 
 - Stories 5–6 now make Data Studio’s dataset authoring path asset-native under the Studio Shell: `DatasetStudioDraftAuthoringBoundary` owns the canonical `DataStudioPreparationWizardStateAdapter` state, renders wizard/canvas surfaces directly from that shared state, and no longer mounts the legacy nested intermediary authoring panels in active runtime.
-- Legacy Data Studio intermediary panel implementations are now disconnected from active runtime and renamed with `DEPRECATED_` prefixes (`DEPRECATED_DataStudioPreparationWizardPanel`, `DEPRECATED_DatasetStageAuthoringPanel`, `DEPRECATED_DatasetStageWizardPanel`, `DEPRECATED_DatasetStageCanvasReactFlow`) for follow-up cleanup slices.
+- Legacy Data Studio intermediary panel implementations were disconnected from active runtime and have now been deleted as part of cleanup.
