@@ -3,7 +3,11 @@ import StudioAssetInspectorPanel from "./StudioAssetInspectorPanel";
 import StudioAssetPreviewCard from "./StudioAssetPreviewCard";
 import type { StudioAssetCompositionNode } from "../../../studio-shell/studio-assets/StudioAssetComposition";
 import type { StudioAssetRegistrationCategory, StudioAssetRegistry } from "../../../studio-shell/studio-assets/StudioAssetRegistry";
-import { listStudioAssetLibrarySections, type StudioAssetLibraryEntry } from "../../../studio-shell/studio-assets/StudioAssetLibrary";
+import {
+  listStudioAssetLibraryFilters,
+  listStudioAssetLibrarySections,
+  type StudioAssetLibraryEntry,
+} from "../../../studio-shell/studio-assets/StudioAssetLibrary";
 import type { StudioAssetSelectionState } from "../../../studio-shell/studio-assets/StudioAssetSelection";
 import { bindStudioAssetSelection } from "../../../studio-shell/studio-assets/StudioAssetSelection";
 import { createStudioAssetPreviewModel } from "../../../studio-shell/studio-assets/StudioAssetPreview";
@@ -19,6 +23,7 @@ export interface StudioAssetLibraryPanelProps {
   readonly selection?: StudioAssetSelectionState;
   readonly onChangeSelectedAssetConfig?: (nextConfig: Readonly<Record<string, unknown>>) => void;
   readonly onChangeSelection?: (nextSelection: StudioAssetSelectionState) => void;
+  readonly onReplaceCompositionRoot?: (nextRoot: StudioAssetCompositionNode) => void;
 }
 
 const defaultCategories = Object.freeze([
@@ -54,15 +59,26 @@ export default function StudioAssetLibraryPanel({
   selection,
   onChangeSelectedAssetConfig,
   onChangeSelection,
+  onReplaceCompositionRoot,
 }: StudioAssetLibraryPanelProps): JSX.Element {
   const [query, setQuery] = useState("");
+  const [groupFilter, setGroupFilter] = useState("");
+  const [contractFilter, setContractFilter] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
+  const filterOptions = useMemo(() => listStudioAssetLibraryFilters({
+    registry,
+    categories: categoryFilter,
+  }), [registry, categoryFilter]);
   const sections = useMemo(() => listStudioAssetLibrarySections({
     registry,
     query: {
       searchText: query,
       categories: categoryFilter,
+      groups: groupFilter ? Object.freeze([groupFilter]) : undefined,
+      contractCategories: contractFilter ? Object.freeze([contractFilter]) : undefined,
+      tags: tagFilter ? Object.freeze([tagFilter]) : undefined,
     },
-  }), [registry, query, categoryFilter]);
+  }), [registry, query, categoryFilter, groupFilter, contractFilter, tagFilter]);
 
   const boundSelection = useMemo(
     () => bindStudioAssetSelection({ root: compositionRoot, selection }),
@@ -86,6 +102,36 @@ export default function StudioAssetLibraryPanel({
           placeholder="Search by name, description, or tags"
         />
       </label>
+
+      <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+        <label className="ui-field" style={{ minWidth: "12rem" }}>
+          <span className="ui-field__label">Group</span>
+          <select className="ui-input" value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
+            <option value="">All groups</option>
+            {filterOptions.groups.map((option) => (
+              <option key={option.value} value={option.value}>{option.label} ({option.count})</option>
+            ))}
+          </select>
+        </label>
+        <label className="ui-field" style={{ minWidth: "12rem" }}>
+          <span className="ui-field__label">Asset type</span>
+          <select className="ui-input" value={contractFilter} onChange={(event) => setContractFilter(event.target.value)}>
+            <option value="">All types</option>
+            {filterOptions.contractCategories.map((option) => (
+              <option key={option.value} value={option.value}>{option.label} ({option.count})</option>
+            ))}
+          </select>
+        </label>
+        <label className="ui-field" style={{ minWidth: "12rem" }}>
+          <span className="ui-field__label">Topic</span>
+          <select className="ui-input" value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}>
+            <option value="">All topics</option>
+            {filterOptions.tags.map((option) => (
+              <option key={option.value} value={option.value}>{option.label} ({option.count})</option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       {sections.length === 0 ? (
         <p className="ui-text-small ui-text-secondary">No assets matched this search.</p>
@@ -142,6 +188,7 @@ export default function StudioAssetLibraryPanel({
         selection={selection}
         onChangeNodeConfig={onChangeSelectedAssetConfig}
         onChangeSelection={onChangeSelection}
+        onReplaceCompositionRoot={onReplaceCompositionRoot}
       />
     </section>
   );
