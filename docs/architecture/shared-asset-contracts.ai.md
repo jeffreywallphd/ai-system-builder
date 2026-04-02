@@ -774,3 +774,13 @@
   - user-entered parameters (`editInstruction`, `variationStrength`, `resultCount`) -> workflow inputs,
   - resolved dataset references/handles -> workflow metadata.
 - This keeps mapping contract-first and adapter-driven (`WorkflowSystemContextBindingAdapter`) without leaking execution-library details into system/domain contracts.
+
+## Direction 5 extension update: upload ingestion + UI-triggered workflow start (stories 5.1.5-5.1.6)
+
+- System Studio now includes a reference-image experience panel that keeps user language simple (`Upload image`, `Processing settings`, `Start`, `Results`) while reusing the existing image UI component boundaries.
+- Uploads from that panel flow through a backend API seam (`StudioShellBackendApi.ingestReferenceImageUpload`) which:
+  - provisions system-owned input/output dataset instances from the existing reference-template requests,
+  - validates/admits records through `SystemDatasetInstanceService` schema enforcement,
+  - extracts metadata with the existing image metadata extractor contract,
+  - persists canonical dataset image records owned by the active reference-image system draft.
+- Start actions now reuse the existing UI trigger + system-context mapping stack (`UiTriggerSystemContextMapper` -> `WorkflowSystemContextBindingAdapter` + `ReferenceImageSystemWorkflowContextMapping`) before invoking runtime start, so selected image refs, user settings, and dataset instance refs flow into execution context without adding a parallel mapping path.

@@ -571,6 +571,10 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   ipcMain.handle("ai-loom-desktop-studio-shell:system-runtime:result", async (_event, executionId: string) => {
     return JSON.stringify(await systemRuntimeBackendApi.getExecutionResult(executionId));
   });
+  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:upload", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["ingestReferenceImageUpload"]>[0];
+    return JSON.stringify(await studioShellBackendApi.ingestReferenceImageUpload(request));
+  });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
     event.returnValue = fs.existsSync(targetPath);
   });

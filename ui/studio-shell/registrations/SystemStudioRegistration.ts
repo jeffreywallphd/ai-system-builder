@@ -10,6 +10,7 @@ import { SystemExecutionMetadataEditor } from "../../components/studio-shell/Sys
 import { SystemCompatibilityInsightsPanel } from "../../components/studio-shell/SystemCompatibilityInsightsPanel";
 import { SystemRuntimeRunPanel } from "../../components/studio-shell/SystemRuntimeRunPanel";
 import { SystemContextDebugPreviewPanel } from "../../components/studio-shell/SystemContextDebugPreviewPanel";
+import { ReferenceImageExperiencePanel } from "../../components/studio-shell/ReferenceImageExperiencePanel";
 import WorkflowTemplateSelectionPanel from "../../components/studio-shell/workflow/WorkflowTemplateSelectionPanel";
 import type { SystemStudioRegistration } from "../StudioShellExtensions";
 import { createSystemStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
@@ -97,6 +98,14 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
       subtitle: "Bounded execution/runtime metadata authoring for future runtime/deployment orchestration.",
       order: 11,
       render: (context) => createElement(SystemExecutionMetadataEditor, { context }),
+    },
+    {
+      id: "system-studio-reference-image-experience",
+      slot: "lifecycle",
+      title: "Reference image flow",
+      subtitle: "Upload an image, adjust settings, and start processing from one guided panel.",
+      order: 11,
+      render: (context) => createElement(ReferenceImageExperiencePanel, { context }),
     },
     {
       id: "system-studio-runtime-run-trigger",

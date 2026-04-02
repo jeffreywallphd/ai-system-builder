@@ -144,6 +144,7 @@ export interface DesktopStudioShellBridge {
   getSystemExecutionStatus(executionId: string): Promise<string>;
   getSystemExecutionTrace(requestJson: string): Promise<string>;
   getSystemExecutionResult(executionId: string): Promise<string>;
+  ingestReferenceImageUpload(requestJson: string): Promise<string>;
 }
 
 export interface DesktopRegistryBridge {
