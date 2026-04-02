@@ -12,8 +12,8 @@ describe("SystemStudioDraftDocument", () => {
     const parsed = parseSystemStudioDraftDocument(JSON.stringify({
       systemSpec: {
         pages: [
-          { pageId: "intro", heading: "Welcome", description: "First screen" },
-          { pageId: "review", heading: "Review", description: "Final screen" },
+          { pageId: "intro", title: "Welcome", description: "First screen" },
+          { pageId: "review", title: "Review", description: "Final screen" },
         ],
         components: [],
         canvasAuthoring: {
@@ -89,12 +89,12 @@ describe("SystemStudioDraftDocument", () => {
     const content = serializeSystemStudioPageDefinitions({
       existingContent: JSON.stringify({ systemSpec: { components: [] } }),
       pages: [
-        { pageId: "intro", heading: "Welcome", description: "First page" },
+        { pageId: "intro", title: "Welcome", description: "First page", layout: { layoutKind: "workspace", regionIds: ["workspace"] } },
       ],
     });
 
-    const parsed = JSON.parse(content) as { readonly systemSpec?: { readonly pages?: ReadonlyArray<{ readonly heading: string }> } };
-    expect(parsed.systemSpec?.pages?.[0]?.heading).toBe("Welcome");
+    const parsed = JSON.parse(content) as { readonly systemSpec?: { readonly pages?: ReadonlyArray<{ readonly title: string }> } };
+    expect(parsed.systemSpec?.pages?.[0]?.title).toBe("Welcome");
   });
 
   it("serializes and parses embedded dataset draft content", () => {
@@ -119,33 +119,12 @@ describe("SystemStudioDraftDocument", () => {
     expect(parsed.systemSpec.sharedDocument?.workflowDraftContent).toBe("{\"steps\":[{\"stepId\":\"step-1\"}]}");
   });
 
-  it("keeps panel-hosted embedded studio draft content synchronized with shared document drafts", () => {
+  it("keeps embedded dataset/workflow drafts in shared document fields", () => {
     const baseContent = JSON.stringify({
       systemSpec: {
-        canvasAuthoring: {
-          pageLayouts: [
-            {
-              pageId: "page-1",
-              panels: [
-                {
-                  panelId: "dataset-panel",
-                  pageId: "page-1",
-                  title: "Dataset panel",
-                  layoutBounds: { x: 0, y: 0, width: 0.4, height: 0.3 },
-                  contentSlots: [],
-                  content: { kind: "embedded-studio", studioAssetId: "dataset-studio", draftContent: "old-dataset" },
-                },
-                {
-                  panelId: "workflow-panel",
-                  pageId: "page-1",
-                  title: "Workflow panel",
-                  layoutBounds: { x: 0.4, y: 0, width: 0.4, height: 0.3 },
-                  contentSlots: [],
-                  content: { kind: "embedded-studio", studioAssetId: "workflow-studio", draftContent: "old-workflow" },
-                },
-              ],
-            },
-          ],
+        sharedDocument: {
+          datasetDraftContent: "old-dataset",
+          workflowDraftContent: "old-workflow",
         },
       },
     });
@@ -159,9 +138,9 @@ describe("SystemStudioDraftDocument", () => {
       draftContent: "new-workflow",
     });
     const parsed = parseSystemStudioDraftDocument(withWorkflowUpdate);
-    const panels = parsed.canvasAuthoring.pageLayouts[0]?.panels ?? [];
 
-    expect((panels[0]?.content as { draftContent?: string } | undefined)?.draftContent).toBe("new-dataset");
-    expect((panels[1]?.content as { draftContent?: string } | undefined)?.draftContent).toBe("new-workflow");
+    expect(parsed.systemSpec.sharedDocument?.datasetDraftContent).toBe("new-dataset");
+    expect(parsed.systemSpec.sharedDocument?.workflowDraftContent).toBe("new-workflow");
   });
+
 });

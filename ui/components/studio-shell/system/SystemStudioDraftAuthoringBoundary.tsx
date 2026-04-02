@@ -309,7 +309,7 @@ export function SystemStudioDraftAuthoringBoundary({
         pageId: resolvedSelectedPageId,
         title: `Panel ${selectedPagePanels.length + 1}`,
         layoutBounds: Object.freeze({ x: 0.05, y: 0.05, width: 0.22, height: 0.18 }),
-        contentSlots: Object.freeze([{ slotId: `${panelId}-content`, label: "Panel content" }]),
+        contentSlots: Object.freeze([{ slotId: `${panelId}-content`, label: "Panel region" }]),
         sourceLayoutNodeId: panelId,
       });
       persistPanelsForSelectedPage(Object.freeze([...selectedPagePanels, panel]));

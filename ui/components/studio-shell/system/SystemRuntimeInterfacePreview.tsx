@@ -25,7 +25,7 @@ interface RuntimePanelStudioAssetHost {
 
 interface RuntimePageLayoutModel {
   readonly pageId: string;
-  readonly heading: string;
+  readonly title: string;
   readonly description?: string;
   readonly panels: ReturnType<typeof mapPanelAssetToRuntimeInstance>[];
 }
@@ -36,7 +36,7 @@ function resolveRuntimePages(content: string): ReadonlyArray<RuntimePageLayoutMo
     const layout = document.canvasAuthoring.pageLayouts.find((entry) => entry.pageId === page.pageId);
     return Object.freeze({
       pageId: page.pageId,
-      heading: page.heading,
+      title: page.title,
       description: page.description,
       panels: Object.freeze((layout?.panels ?? []).map((panel) => mapPanelAssetToRuntimeInstance(panel))),
     });
@@ -70,7 +70,7 @@ export default function SystemRuntimeInterfacePreview({
               className={`ui-button ui-button--sm ${page.pageId === activePage?.pageId ? "ui-button--primary" : "ui-button--ghost"}`}
               onClick={() => setSelectedPageId(page.pageId)}
             >
-              {page.heading}
+              {page.title}
             </button>
           ))}
         </div>
@@ -79,7 +79,7 @@ export default function SystemRuntimeInterfacePreview({
       {activePage ? (
         <article className="ui-card ui-card--padded ui-stack ui-stack--xs">
           <header className="ui-stack ui-stack--3xs">
-            <strong>{activePage.heading}</strong>
+            <strong>{activePage.title}</strong>
             {activePage.description ? <span className="ui-text-small ui-text-secondary">{activePage.description}</span> : null}
           </header>
           {activePage.panels.length > 0 ? (

@@ -56,8 +56,19 @@ export function SystemPageSetupEditor({
                 ...pages,
                 Object.freeze({
                   pageId: newPageId,
-                  heading: `Page ${pages.length + 1}`,
+                  title: `Page ${pages.length + 1}` ,
                   description: "",
+                  layout: Object.freeze({
+                    layoutKind: "workspace",
+                    defaultRegionId: "workspace",
+                    regionIds: Object.freeze(["workspace"]),
+                  }),
+                  navigation: Object.freeze({
+                    route: `/${newPageId}` ,
+                    title: `Page ${pages.length + 1}` ,
+                    supportsDeepLinking: false,
+                    requiresRuntimeSession: false,
+                  }),
                 }),
               ]);
               onPagesChange(nextPages);
@@ -79,7 +90,7 @@ export function SystemPageSetupEditor({
                 className={`ui-button ui-button--sm ${selectedPageId === page.pageId ? "ui-button--primary" : "ui-button--ghost"}`}
                 onClick={() => onSelectPage(page.pageId)}
               >
-                {`Open ${page.heading || `Page ${index + 1}`}`}
+                {`Open ${page.title || `Page ${index + 1}`}`}
               </button>
               <div className="ui-row ui-row--wrap ui-row--end">
                 <button
@@ -139,9 +150,9 @@ export function SystemPageSetupEditor({
                 <span className="ui-field__label">Page title</span>
                 <input
                   className="ui-input"
-                  value={page.heading}
+                  value={page.title}
                   placeholder="Example: Welcome"
-                  onChange={(event) => updatePage(index, { heading: event.target.value })}
+                  onChange={(event) => updatePage(index, { title: event.target.value })}
                 />
               </label>
               <label className="ui-field">
@@ -151,6 +162,23 @@ export function SystemPageSetupEditor({
                   value={page.description ?? ""}
                   placeholder="One sentence about what this page helps with"
                   onChange={(event) => updatePage(index, { description: event.target.value })}
+                />
+              </label>
+              <label className="ui-field">
+                <span className="ui-field__label">Page link</span>
+                <input
+                  className="ui-input"
+                  value={page.navigation?.route ?? ""}
+                  placeholder="Example: /welcome"
+                  onChange={(event) => updatePage(index, {
+                    navigation: Object.freeze({
+                      route: event.target.value,
+                      title: page.navigation?.title ?? page.title,
+                      supportsDeepLinking: page.navigation?.supportsDeepLinking ?? false,
+                      navGroup: page.navigation?.navGroup,
+                      requiresRuntimeSession: page.navigation?.requiresRuntimeSession ?? false,
+                    }),
+                  })}
                 />
               </label>
             </div>

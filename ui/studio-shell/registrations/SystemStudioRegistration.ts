@@ -49,8 +49,19 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
           pages: [
             {
               pageId: "page-1",
-              heading: "Main page",
-              description: "Start here and design the main experience.",
+              title: "Main page",
+              description: "Start here and shape the main experience.",
+              layout: {
+                layoutKind: "workspace",
+                defaultRegionId: "workspace",
+                regionIds: ["workspace"],
+              },
+              navigation: {
+                route: "/",
+                title: "Main page",
+                supportsDeepLinking: false,
+                requiresRuntimeSession: false,
+              },
             },
           ],
           canvasAuthoring: {
