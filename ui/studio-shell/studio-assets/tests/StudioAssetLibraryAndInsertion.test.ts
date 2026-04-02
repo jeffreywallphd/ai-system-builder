@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { createDefaultStudioAssetRegistry, StudioAssetRegistrationCategories } from "../StudioAssetRegistry";
-import { listStudioAssetLibrarySections } from "../StudioAssetLibrary";
+import { listStudioAssetLibraryFilters, listStudioAssetLibrarySections } from "../StudioAssetLibrary";
 import {
   insertStudioAssetIntoCompositionTree,
   StudioAssetInsertionFailureKinds,
@@ -34,6 +34,30 @@ describe("StudioAssetLibraryAndInsertion", () => {
     const matchedIds = sections.flatMap((section) => section.entries.map((entry) => entry.id));
     expect(matchedIds).toContain("workflow-studio");
     expect(matchedIds).not.toContain("dataset-studio");
+  });
+
+  it("filters library results by group, tag, and contract category", () => {
+    const registry = createDefaultStudioAssetRegistry();
+    const sections = listStudioAssetLibrarySections({
+      registry,
+      query: {
+        groups: Object.freeze(["studio-surfaces"]),
+        tags: Object.freeze(["workflow"]),
+        contractCategories: Object.freeze(["composed-ui"]),
+      },
+    });
+
+    const matchedIds = sections.flatMap((section) => section.entries.map((entry) => entry.id));
+    expect(matchedIds).toEqual(["workflow-studio"]);
+  });
+
+  it("lists reusable filter options from current registry metadata", () => {
+    const registry = createDefaultStudioAssetRegistry();
+    const filters = listStudioAssetLibraryFilters({ registry });
+
+    expect(filters.groups.some((option) => option.value === "studio-surfaces")).toBeTrue();
+    expect(filters.contractCategories.some((option) => option.value === "composed-ui")).toBeTrue();
+    expect(filters.tags.some((option) => option.value === "workflow")).toBeTrue();
   });
 
   it("inserts an asset instance through container placement rules and validates the composition", () => {

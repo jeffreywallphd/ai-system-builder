@@ -1030,3 +1030,17 @@
 - Insertion flows (`StudioAssetInsertion`) now apply those resolved defaults before composition validation/serialization, preserving existing composition-tree persistence, validation, and preview behavior while allowing caller-provided overrides.
 - Selection binding now supports nested hierarchy context (`path`, `focusedNode`, stale-selection detection) in `StudioAssetSelection`, so authoring surfaces can distinguish selected child instances from parent drill-in context and navigate back up safely.
 - Asset Inspector now renders breadcrumb-style hierarchy navigation and stale-selection guidance using the same shared selection model, keeping nested parent/child inspection behavior generic for current and future authoring surfaces.
+
+## Direction 5 UI extension update: asset-library filter facets + replace-asset flow (stories 1.2.9-1.2.10)
+
+- Asset Library search/filter behavior remains registry-first and taxonomy-aligned (`ui/studio-shell/studio-assets/StudioAssetLibrary.ts`):
+  - query filtering now supports metadata facets (`group`, `contractCategory`, `tags`) in addition to existing keyword search and category scoping,
+  - filter options are projected from currently registered assets (`listStudioAssetLibraryFilters`) so current and future studios share one metadata-driven filter model rather than UI-local hardcoded facets,
+  - unsupported or missing metadata values are handled safely (empty facet options, no crashes) and the panel keeps non-technical primary labels (`Group`, `Asset type`, `Topic`).
+- Asset Library panel UI (`ui/components/studio-shell/studio-assets/StudioAssetLibraryPanel.tsx`) now exposes reusable search + facet controls over the same library query seam, preserving existing grouped taxonomy sections and empty-result behavior.
+- Replace-asset behavior is now implemented as a reusable composition utility (`ui/studio-shell/studio-assets/StudioAssetReplacement.ts`) rather than panel-local mutation logic:
+  - candidate listing (`listCompatibleStudioAssetReplacements`) distinguishes compatible replacement definitions from incompatible entries with explicit compatibility reasons,
+  - replacement execution (`replaceStudioAssetInCompositionTree`) swaps instantiated node asset identity/version while preserving node identity and reusing schema-default config projection,
+  - safe config carry-forward keeps only overlapping schema field paths from the original instance, then re-validates through the existing registry composition validator.
+- Replacement enforcement stays on existing validation/composition boundaries (parent placement rules, kind/type/category compatibility, cardinality, nesting, version checks) by validating the rewritten composition tree through `StudioAssetRegistry.validateCompositionTree`.
+- Asset Inspector now surfaces a bounded replace flow (`StudioAssetInspectorPanel`) tied to selected instances/composition root and returns replacement outcomes through an optional root-update callback, keeping selection/inspector authoring behavior aligned with shared selection infrastructure.

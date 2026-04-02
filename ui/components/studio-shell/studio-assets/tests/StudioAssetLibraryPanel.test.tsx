@@ -14,6 +14,9 @@ describe("StudioAssetLibraryPanel", () => {
     );
 
     expect(html).toContain("Asset Library");
+    expect(html).toContain("Group");
+    expect(html).toContain("Asset type");
+    expect(html).toContain("Topic");
     expect(html).toContain("Atomic UI assets");
     expect(html).toContain("Composed UI assets");
     expect(html).toContain("System &amp; page assets");

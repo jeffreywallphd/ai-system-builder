@@ -59,6 +59,7 @@ describe("StudioAssetInspectorPanel", () => {
 
     expect(html).toContain("Button");
     expect(html).toContain("Run");
+    expect(html).toContain("Replace asset");
   });
 
 

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { StudioAssetCompositionNode } from "../../../studio-shell/studio-assets/StudioAssetComposition";
 import type { StudioAssetRegistry } from "../../../studio-shell/studio-assets/StudioAssetRegistry";
 import {
@@ -12,6 +12,10 @@ import { bindStudioAssetSelection, createStudioAssetSelectionState, navigateStud
 import { resolveStudioAssetDefaultConfig } from "../../../studio-shell/studio-assets/StudioAssetDefaults";
 import type { StudioAssetPreviewModel } from "../../../studio-shell/studio-assets/StudioAssetPreview";
 import { createStudioAssetPreviewModel } from "../../../studio-shell/studio-assets/StudioAssetPreview";
+import {
+  listCompatibleStudioAssetReplacements,
+  replaceStudioAssetInCompositionTree,
+} from "../../../studio-shell/studio-assets/StudioAssetReplacement";
 import StudioAssetPreviewCard from "./StudioAssetPreviewCard";
 
 export interface StudioAssetInspectorPanelProps {
@@ -23,6 +27,7 @@ export interface StudioAssetInspectorPanelProps {
   readonly onChangeSelectedAssetNode?: (nextNode: StudioAssetCompositionNode) => void;
   readonly title?: string;
   readonly onChangeSelection?: (nextSelection: StudioAssetSelectionState) => void;
+  readonly onReplaceCompositionRoot?: (nextRoot: StudioAssetCompositionNode) => void;
 }
 
 function coerceFieldValue(field: StudioAssetPropertyField, value: string): unknown {
@@ -67,7 +72,10 @@ export default function StudioAssetInspectorPanel({
   onChangeSelectedAssetNode,
   title = "Asset Inspector",
   onChangeSelection,
+  onReplaceCompositionRoot,
 }: StudioAssetInspectorPanelProps): JSX.Element {
+  const [replacementAssetId, setReplacementAssetId] = useState<string>("");
+  const [replacementMessage, setReplacementMessage] = useState<string | undefined>();
   const boundSelection = useMemo(
     () => bindStudioAssetSelection({ root: compositionRoot, selection }),
     [compositionRoot, selection],
@@ -94,6 +102,17 @@ export default function StudioAssetInspectorPanel({
   const previewModel: StudioAssetPreviewModel | undefined = registration
     ? createStudioAssetPreviewModel({ registration, config: resolvedConfig })
     : undefined;
+  const replacementCandidates = useMemo(() => {
+    if (!compositionRoot || !activeNode) {
+      return Object.freeze([]);
+    }
+    return listCompatibleStudioAssetReplacements({
+      registry,
+      root: compositionRoot,
+      nodeId: activeNode.nodeId,
+    });
+  }, [compositionRoot, activeNode, registry]);
+  const selectedReplacementAssetId = replacementAssetId || replacementCandidates.find((candidate) => candidate.compatible && candidate.assetId !== activeNode?.assetId)?.assetId;
 
   const handleFieldChange = (field: StudioAssetPropertyField, rawValue: string): void => {
     if (!onChangeNodeConfig && !onChangeSelectedAssetNode) {
@@ -136,6 +155,29 @@ export default function StudioAssetInspectorPanel({
       root: compositionRoot,
       nodeId: boundSelection.focusedNode.nodeId,
     }));
+  };
+
+  const handleReplaceAsset = (): void => {
+    if (!activeNode || !compositionRoot || !onReplaceCompositionRoot || !selectedReplacementAssetId) {
+      return;
+    }
+
+    const replaced = replaceStudioAssetInCompositionTree({
+      registry,
+      request: {
+        root: compositionRoot,
+        nodeId: activeNode.nodeId,
+        replacementAssetId: selectedReplacementAssetId,
+      },
+    });
+
+    if (!replaced.ok) {
+      setReplacementMessage(replaced.issues?.[0]?.message ?? replaced.message);
+      return;
+    }
+
+    setReplacementMessage(undefined);
+    onReplaceCompositionRoot(replaced.root);
   };
 
   const renderField = (field: StudioAssetPropertyField): JSX.Element => {
@@ -280,6 +322,46 @@ export default function StudioAssetInspectorPanel({
         <p className="ui-text-small ui-text-muted">
           This asset does not yet expose editable properties.
         </p>
+      ) : null}
+
+      {activeNode && compositionRoot ? (
+        <section className="ui-stack ui-stack--2xs">
+          <strong className="ui-text-small">Replace asset</strong>
+          <span className="ui-text-small ui-text-secondary">
+            Swap this item with another option that fits in the same spot.
+          </span>
+          <label className="ui-field">
+            <span className="ui-field__label">Choose replacement</span>
+            <select
+              className="ui-input"
+              value={selectedReplacementAssetId ?? ""}
+              onChange={(event) => {
+                setReplacementAssetId(event.target.value);
+                setReplacementMessage(undefined);
+              }}
+            >
+              {replacementCandidates
+                .filter((candidate) => candidate.compatible && candidate.assetId !== activeNode.assetId)
+                .map((candidate) => (
+                  <option key={candidate.assetId} value={candidate.assetId}>
+                    {candidate.title}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {replacementCandidates.filter((candidate) => candidate.compatible && candidate.assetId !== activeNode.assetId).length === 0 ? (
+            <span className="ui-text-small ui-text-muted">No compatible replacements are available for this spot.</span>
+          ) : null}
+          {replacementMessage ? <span className="ui-text-small ui-text-secondary">{replacementMessage}</span> : null}
+          <button
+            type="button"
+            className="ui-button ui-button--sm ui-button--ghost"
+            onClick={handleReplaceAsset}
+            disabled={!onReplaceCompositionRoot || !selectedReplacementAssetId}
+          >
+            Replace
+          </button>
+        </section>
       ) : null}
 
       {sections.map((section) => (
