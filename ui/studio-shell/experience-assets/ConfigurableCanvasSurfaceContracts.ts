@@ -111,6 +111,28 @@ export interface CanvasSurfaceCommandModel {
   readonly disabled?: boolean;
 }
 
+export interface CanvasSurfaceSnapDivisionModel {
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface CanvasSurfaceSnapTimingModel {
+  readonly duringDrag?: boolean;
+  readonly onRelease?: boolean;
+}
+
+export interface CanvasSurfaceSnapTargetModel {
+  readonly position?: boolean;
+  readonly size?: boolean;
+}
+
+export interface CanvasSurfaceSnapModel {
+  readonly enabled: boolean;
+  readonly divisions: CanvasSurfaceSnapDivisionModel;
+  readonly timing?: CanvasSurfaceSnapTimingModel;
+  readonly targets?: CanvasSurfaceSnapTargetModel;
+}
+
 export interface CanvasSurfaceEditingModel {
   readonly nodes: ReadonlyArray<CanvasSurfaceLayoutNodeModel>;
   readonly selectedNodeId?: string;
@@ -119,6 +141,7 @@ export interface CanvasSurfaceEditingModel {
   readonly createNodeDescription?: string;
   readonly designFrame?: CanvasSurfaceDesignFrameModel;
   readonly coordinateSpace?: CanvasSurfaceCoordinateSpace;
+  readonly snap?: CanvasSurfaceSnapModel;
 }
 
 export type CanvasSurfaceEditingEvent =

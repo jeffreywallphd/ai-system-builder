@@ -69,6 +69,12 @@ describe("System studio experience adapters", () => {
     expect(editing?.nodes[0]?.title).toBe("Main panel");
     expect(editing?.nodes[0]?.subtitle).toContain("left-pane");
     expect(editing?.commands?.map((command) => command.id)).toEqual(["add-panel", "remove-panel", "fit-layout"]);
+    expect(editing?.snap).toEqual({
+      enabled: true,
+      divisions: { x: 10, y: 10 },
+      timing: { duringDrag: false, onRelease: true },
+      targets: { position: true, size: false },
+    });
   });
 
   it("opens the embedded panel design studio when a canvas panel is selected", () => {

@@ -739,6 +739,15 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
   cursor: grab;
   user-select: none;
   overflow: visible;
+  transition:
+    left 180ms ease-out,
+    top 180ms ease-out,
+    width 180ms ease-out,
+    height 180ms ease-out;
+}
+
+.ui-configurable-canvas-layout-node--dragging {
+  transition: none;
 }
 
 .ui-configurable-canvas-layout-node--selected {
