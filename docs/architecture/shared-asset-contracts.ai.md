@@ -804,3 +804,10 @@
 - Desktop composition now uses `SqliteImageRunHistoryRepository` for durable run-history storage; browser fallback keeps the same API contract with in-memory persistence.
 - The reference-image panel now includes approachable history UX (`Recent activity`, `Run details`, `Created`, `Source image`, `Open result`, `Settings`) and lets users jump from previous runs back to saved outputs.
 - Added focused integration coverage for the end-to-end vertical slice (upload -> persist outputs -> output listing -> run history listing), including assertions that run-history entries remain associated with persisted output record ids.
+
+## AI Loom Image System vertical-slice update: shared runtime context binding + cross-studio lineage carryover (stories 5.2.5-5.2.6)
+- System Studio reference-image interactions now use `SystemContextContract` as the shared runtime source of truth (selected image, parameters, dataset refs, runtime metadata), and the panel persists that context into `systemSpec.referenceImageRuntimeContext` for save/reload reuse.
+- Runtime start now consumes this shared context directly and forwards it in execution metadata, avoiding per-button ad hoc context assembly.
+- Output persistence now receives the same runtime context and writes lineage-ready run-history records without studio-local reconstruction logic.
+- Run-history lineage now carries compact cross-studio trace fields (source image, source dataset instance/asset, workflow asset/version, system asset/version, runtime session/trace, output dataset/records) plus explicit lineage `status` and `missing` diagnostics.
+- Incomplete lineage paths are explicit (`partial`/`incomplete`) with bounded missing-field hints so history/inspection surfaces can fail safely.

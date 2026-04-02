@@ -5,6 +5,7 @@ import type { OutputGalleryItem } from "../../../application/system-runtime/Outp
 import { createDefaultUiTriggerSystemContextMapper } from "../../../application/workflow-studio/UiTriggerSystemContextMapper";
 import { createDefaultWorkflowSystemContextBindingAdapter } from "../../../application/workflow-studio/SystemContextWorkflowInputMapper";
 import { createUiTriggerEvent } from "../../../application/workflow-studio/UiTriggerEventContract";
+import { createSystemContextContract, type SystemContextContract } from "../../../domain/system-studio/SystemContextContract";
 import type { FileIngestionPolicy } from "../../../domain/ingestion/interfaces/IFileIngestion";
 import { createBrowserImageUploadIngestionAdapter } from "../assets/image-system/BrowserImageUploadIngestionAdapter";
 import { ImageOutputGallery } from "../assets/image-system/ImageOutputGallery";
@@ -40,16 +41,78 @@ interface ReferenceImageExperiencePanelProps {
   readonly context: StudioShellExtensionContext;
 }
 
+export const ReferenceImageRuntimeContextStorageKey = "referenceImageRuntimeContext";
+
+export interface StoredReferenceImageRuntimeContext {
+  readonly selectedRecordId?: string;
+  readonly selectedAssetId?: string;
+  readonly activeResultId?: string;
+  readonly editInstruction?: string;
+  readonly variationStrength?: number;
+  readonly resultCount?: number;
+  readonly runtimeContext: SystemContextContract;
+}
+
+function parseSystemSpecEnvelope(content: string): Record<string, unknown> {
+  try {
+    if (!content.trim()) {
+      return {};
+    }
+    const parsed = JSON.parse(content);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return { ...(parsed as Record<string, unknown>) };
+  } catch {
+    return {};
+  }
+}
+
+export function readStoredReferenceImageRuntimeContext(content: string): StoredReferenceImageRuntimeContext | undefined {
+  const root = parseSystemSpecEnvelope(content);
+  const systemSpec = root.systemSpec;
+  if (!systemSpec || typeof systemSpec !== "object" || Array.isArray(systemSpec)) {
+    return undefined;
+  }
+  const stored = (systemSpec as Record<string, unknown>)[ReferenceImageRuntimeContextStorageKey];
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) {
+    return undefined;
+  }
+  const record = stored as Record<string, unknown>;
+  return Object.freeze({
+    selectedRecordId: typeof record.selectedRecordId === "string" ? record.selectedRecordId : undefined,
+    selectedAssetId: typeof record.selectedAssetId === "string" ? record.selectedAssetId : undefined,
+    activeResultId: typeof record.activeResultId === "string" ? record.activeResultId : undefined,
+    editInstruction: typeof record.editInstruction === "string" ? record.editInstruction : undefined,
+    variationStrength: typeof record.variationStrength === "number" ? record.variationStrength : undefined,
+    resultCount: typeof record.resultCount === "number" ? record.resultCount : undefined,
+    runtimeContext: createSystemContextContract(record.runtimeContext as Partial<SystemContextContract> | undefined),
+  });
+}
+
+export function persistReferenceImageRuntimeContext(content: string, context: StoredReferenceImageRuntimeContext): string {
+  const root = parseSystemSpecEnvelope(content);
+  const systemSpec = root.systemSpec && typeof root.systemSpec === "object" && !Array.isArray(root.systemSpec)
+    ? { ...(root.systemSpec as Record<string, unknown>) }
+    : {};
+  systemSpec[ReferenceImageRuntimeContextStorageKey] = {
+    selectedRecordId: context.selectedRecordId,
+    selectedAssetId: context.selectedAssetId,
+    activeResultId: context.activeResultId,
+    editInstruction: context.editInstruction,
+    variationStrength: context.variationStrength,
+    resultCount: context.resultCount,
+    runtimeContext: context.runtimeContext,
+  };
+  root.systemSpec = systemSpec;
+  return JSON.stringify(root, null, 2);
+}
+
 export function buildReferenceImageStartRequest(input: {
   readonly studioId: string;
   readonly draftId: string;
   readonly systemAssetId: string;
-  readonly datasetInstanceId: string;
-  readonly selectedRecordId: string;
-  readonly selectedAssetId: string;
-  readonly editInstruction: string;
-  readonly variationStrength: number;
-  readonly resultCount: number;
+  readonly runtimeContext: SystemContextContract;
 }) {
   const mapper = createDefaultUiTriggerSystemContextMapper();
   const bindingAdapter = createDefaultWorkflowSystemContextBindingAdapter({
@@ -64,25 +127,21 @@ export function buildReferenceImageStartRequest(input: {
       actionId: "start",
     },
     payload: {
-      imageId: input.selectedAssetId,
+      imageId: input.runtimeContext.selectedImages[0]?.assetRef?.assetId,
       selectedImage: {
-        imageId: input.selectedRecordId,
+        imageId: input.runtimeContext.selectedImages[0]?.imageId,
         assetRef: {
-          assetId: input.selectedAssetId,
-          recordId: input.selectedRecordId,
+          assetId: input.runtimeContext.selectedImages[0]?.assetRef?.assetId,
+          recordId: input.runtimeContext.selectedImages[0]?.assetRef?.recordId,
         },
       },
-      parameters: {
-        editInstruction: input.editInstruction,
-        variationStrength: input.variationStrength,
-        resultCount: input.resultCount,
-      },
+      parameters: input.runtimeContext.parameters,
     },
     context: {
       systemAssetId: input.systemAssetId,
       references: {
-        systemDatasetInstanceId: input.datasetInstanceId,
-        datasetInstanceId: input.datasetInstanceId,
+        systemDatasetInstanceId: input.runtimeContext.datasets[0]?.instanceId,
+        datasetInstanceId: input.runtimeContext.datasets[0]?.instanceId,
         systemDatasetRole: "input-store",
       },
     },
@@ -97,6 +156,7 @@ export function buildReferenceImageStartRequest(input: {
       actorId: "reference-image-ui",
       inputValues: mapped.inputValues,
       metadata: mapped.metadata,
+      runtimeContext: systemContext,
     }),
   });
 }
@@ -177,6 +237,65 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
     void loadResults();
     void loadHistory();
   }, [draft?.draftId]);
+
+  useEffect(() => {
+    const stored = readStoredReferenceImageRuntimeContext(draft.content);
+    if (!stored) {
+      return;
+    }
+    setSelectedRecordId(stored.selectedRecordId);
+    setSelectedAssetId(stored.selectedAssetId);
+    setActiveResultId(stored.activeResultId);
+    setEditInstruction(stored.editInstruction ?? "");
+    setVariationStrength(stored.variationStrength ?? 0.5);
+    setResultCount(stored.resultCount ?? 1);
+    const datasetRef = stored.runtimeContext.datasets.find((entry) => entry.role === "active-input" || entry.role === "input-store");
+    setDatasetInstanceId(datasetRef?.instanceId);
+  }, [draft.draftId]);
+
+  useEffect(() => {
+    const selectedImage = selectedRecordId && selectedAssetId
+      ? Object.freeze([{ selectionId: selectedRecordId, imageId: selectedRecordId, assetRef: { assetId: selectedAssetId, recordId: selectedRecordId } }])
+      : Object.freeze([]);
+    const runtimeContext = createSystemContextContract({
+      selectedImages: selectedImage,
+      parameters: Object.freeze({ editInstruction, variationStrength, resultCount }),
+      datasets: datasetInstanceId
+        ? Object.freeze([{ referenceId: "active-input", instanceId: datasetInstanceId, role: "active-input", datasetAssetId: "asset:dataset:image-reference-input" }])
+        : Object.freeze([]),
+      runtime: {
+        runtimeSessionId: snapshot?.activeSessionId,
+        systemAssetId: draft.assetId,
+        workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+        sourceStudio: "system-studio",
+      },
+      extensions: {
+        workflowInputBinding: ReferenceImageSystemTemplate.primaryWorkflowAsset.datasetBindings.workflowInputId,
+        outputDatasetBinding: ReferenceImageSystemTemplate.primaryWorkflowAsset.datasetBindings.outputDatasetInstanceBindingId,
+      },
+    });
+    context.operations.setDraftContent?.(persistReferenceImageRuntimeContext(draft.content, {
+      selectedRecordId,
+      selectedAssetId,
+      activeResultId,
+      editInstruction,
+      variationStrength,
+      resultCount,
+      runtimeContext,
+    }));
+  }, [
+    activeResultId,
+    context.operations,
+    datasetInstanceId,
+    draft.assetId,
+    draft.content,
+    editInstruction,
+    resultCount,
+    selectedAssetId,
+    selectedRecordId,
+    snapshot?.activeSessionId,
+    variationStrength,
+  ]);
 
   if (!isReferenceImageDraft || !draft) {
     return (
@@ -276,12 +395,36 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
               studioId: context.studioId,
               draftId: draft.draftId,
               systemAssetId: draft.assetId,
-              datasetInstanceId,
-              selectedRecordId,
-              selectedAssetId,
-              editInstruction,
-              variationStrength,
-              resultCount,
+              runtimeContext: createSystemContextContract({
+                selectedImages: [{
+                  selectionId: selectedRecordId,
+                  imageId: selectedRecordId,
+                  assetRef: {
+                    assetId: selectedAssetId,
+                    recordId: selectedRecordId,
+                  },
+                }],
+                parameters: { editInstruction, variationStrength, resultCount },
+                datasets: [{
+                  referenceId: "active-input",
+                  instanceId: datasetInstanceId,
+                  datasetAssetId: "asset:dataset:image-reference-input",
+                  role: "active-input",
+                  systemAssetId: draft.assetId,
+                }, {
+                  referenceId: "system-output",
+                  instanceId: "dataset-instance:reference-image:output",
+                  datasetAssetId: "asset:dataset:image-reference-output",
+                  role: "system-owned-output",
+                  systemAssetId: draft.assetId,
+                }],
+                runtime: {
+                  runtimeSessionId: snapshot?.activeSessionId,
+                  systemAssetId: draft.assetId,
+                  workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+                  sourceStudio: "system-studio",
+                },
+              }),
             });
             void context.operations.startSystemExecution(request).then((response) => {
               if (!response.ok || !response.data) {
@@ -301,6 +444,10 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
                     variationStrength,
                     resultCount,
                   },
+                  runtimeContext: request.context.runtimeContext,
+                  workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+                  workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+                  systemAssetId: draft.assetId,
                   runtimeResult: result.ok
                     ? { output: result.data?.output, status: result.data?.status }
                     : undefined,

@@ -33,6 +33,16 @@ describe("Reference image output persistence flow", () => {
         variationStrength: 0.45,
         resultCount: 1,
       },
+      runtimeContext: {
+        contractVersion: "1.0.0",
+        selectedImages: [{ selectionId: "source-1", imageId: "source-1", assetRef: { assetId: "generated-output:upload://source.png", recordId: "source-1" } }],
+        parameters: { editInstruction: "brighten and sharpen", variationStrength: 0.45, resultCount: 1 },
+        datasets: [{ referenceId: "active-input", instanceId: "dataset-instance:reference-image:input", datasetAssetId: "asset:dataset:image-reference-input", role: "active-input" }],
+        runtime: { systemAssetId: ReferenceImageSystemTemplate.systemAsset.assetId, runtimeSessionId: "session:test:1" },
+      },
+      workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+      workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+      systemAssetId: ReferenceImageSystemTemplate.systemAsset.assetId,
       runtimeResult: {
         output: {
           payload: {
@@ -90,5 +100,55 @@ describe("Reference image output persistence flow", () => {
     expect(history.data?.runs[0]?.runId).toBe("run:output:1");
     expect(history.data?.runs[0]?.outputs.datasetInstance?.persistedRecordIds).toEqual(persisted.data?.persistedRecordIds);
     expect(history.data?.runs[0]?.inputs.parameterSummary.editInstruction).toBe("brighten and sharpen");
+    expect(history.data?.runs[0]?.lineage?.workflowExecutionId).toBe("run:output:1");
+    expect(history.data?.runs[0]?.lineage?.sourceDatasetInstanceId).toBe("dataset-instance:reference-image:input");
+    expect(history.data?.runs[0]?.lineage?.systemAssetId).toBe(ReferenceImageSystemTemplate.systemAsset.assetId);
+    expect(history.data?.runs[0]?.lineage?.status).toBe("complete");
   });
+});
+
+it("records explicit incomplete lineage when runtime output payload is missing", async () => {
+  const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+  const initialized = await api.initializeStudio("studio-system", "System Studio");
+  const created = await api.createDraft({
+    studioId: "studio-system",
+    sessionId: initialized.data!.activeSessionId!,
+    assetId: ReferenceImageSystemTemplate.systemAsset.assetId,
+    content: JSON.stringify({ systemSpec: {} }),
+    metadata: {
+      title: "Reference image",
+      tags: ["system"],
+      taxonomy: {
+        structuralKind: "system",
+        semanticRole: "system",
+        behaviorKind: "deterministic",
+      },
+    },
+  });
+
+  const persisted = await api.persistReferenceImageOutputs({
+    studioId: "studio-system",
+    draftId: created.data!.draft!.draftId,
+    executionId: "run:output:missing",
+    runtimeContext: {
+      contractVersion: "1.0.0",
+      selectedImages: [],
+      parameters: {},
+      datasets: [],
+      runtime: { systemAssetId: ReferenceImageSystemTemplate.systemAsset.assetId },
+    },
+  });
+  expect(persisted.ok).toBeTrue();
+  expect(persisted.data?.status).toBe("failed");
+
+  const history = await api.listReferenceImageRunHistory({
+    studioId: "studio-system",
+    draftId: created.data!.draft!.draftId,
+    limit: 10,
+    offset: 0,
+  });
+
+  expect(history.ok).toBeTrue();
+  expect(history.data?.runs[0]?.lineage?.status).toBe("incomplete");
+  expect(history.data?.runs[0]?.lineage?.missing).toContain("runtime-output");
 });

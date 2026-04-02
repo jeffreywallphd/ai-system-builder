@@ -92,6 +92,7 @@ describe("Reference image vertical slice", () => {
     expect(history.data?.runs[0]?.runId).toBe("run:e2e:1");
     expect(history.data?.runs[0]?.outputs.datasetInstance?.persistedRecordIds).toEqual(persisted.data?.persistedRecordIds);
     expect(history.data?.runs[0]?.inputs.images[0]?.stableId).toBe(upload.data?.image.assetId);
+    expect(history.data?.runs[0]?.lineage?.workflowExecutionId).toBe("run:e2e:1");
+    expect(history.data?.runs[0]?.lineage?.outputDatasetInstanceId).toBe("dataset-instance:reference-image:output");
   });
 });
-
