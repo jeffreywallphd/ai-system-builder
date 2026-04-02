@@ -5,7 +5,9 @@ import {
   parseSystemStudioDraftDocument,
 } from "../../../studio-shell/system/SystemStudioDraftDocument";
 import {
+  SystemNavigationPlacementKinds,
   SystemNavigationModes,
+  type SystemNavigationStructureItem,
   type SystemNavigationMode,
 } from "../../../studio-shell/system/SystemSettingsModel";
 
@@ -27,6 +29,9 @@ export function SystemSettingsEditor({ context }: SystemSettingsEditorProps): JS
   const [systemDescription, setSystemDescription] = useState(settings.systemDescription);
   const [defaultLandingPageId, setDefaultLandingPageId] = useState(settings.defaultLandingPageId ?? "");
   const [navigationMode, setNavigationMode] = useState<SystemNavigationMode>(settings.navigation.mode);
+  const [navigationItems, setNavigationItems] = useState<ReadonlyArray<SystemNavigationStructureItem>>(
+    settings.navigation.structure.items,
+  );
   const [themePresetId, setThemePresetId] = useState(settings.theme.presetId ?? "");
   const [themeTokenSetId, setThemeTokenSetId] = useState(settings.theme.tokenSetId ?? "");
   const [confirmBeforeExit, setConfirmBeforeExit] = useState(settings.runtimeBehavior.confirmBeforeExit);
@@ -38,6 +43,7 @@ export function SystemSettingsEditor({ context }: SystemSettingsEditorProps): JS
     setSystemDescription(settings.systemDescription);
     setDefaultLandingPageId(settings.defaultLandingPageId ?? "");
     setNavigationMode(settings.navigation.mode);
+    setNavigationItems(settings.navigation.structure.items);
     setThemePresetId(settings.theme.presetId ?? "");
     setThemeTokenSetId(settings.theme.tokenSetId ?? "");
     setConfirmBeforeExit(settings.runtimeBehavior.confirmBeforeExit);
@@ -57,6 +63,9 @@ export function SystemSettingsEditor({ context }: SystemSettingsEditorProps): JS
         defaultLandingPageId: defaultLandingPageId.trim() || undefined,
         navigation: {
           mode: navigationMode,
+          structure: Object.freeze({
+            items: navigationItems,
+          }),
         },
         theme: {
           presetId: themePresetId.trim() || undefined,
@@ -93,7 +102,7 @@ export function SystemSettingsEditor({ context }: SystemSettingsEditorProps): JS
         <label className="ui-field">
           <span className="ui-field__label">Default landing screen</span>
           <select className="ui-input" value={defaultLandingPageId} onChange={(event) => setDefaultLandingPageId(event.target.value)}>
-            <option value="">Use first screen</option>
+            <option value="">Use first visible screen</option>
             {pages.map((page) => (
               <option key={page.pageId} value={page.pageId}>
                 {page.title}
@@ -110,6 +119,87 @@ export function SystemSettingsEditor({ context }: SystemSettingsEditorProps): JS
           </select>
         </label>
       </div>
+      <section className="ui-card ui-card--padded ui-stack ui-stack--xs" data-testid="system-settings-navigation-structure">
+        <div className="ui-stack ui-stack--3xs">
+          <strong>Screen navigation</strong>
+          <p className="ui-text-small ui-text-secondary">
+            Choose which screens appear in navigation and how they are labeled.
+          </p>
+        </div>
+        <div className="ui-form-array">
+          {navigationItems.map((item, index) => {
+            const page = pages.find((entry) => entry.pageId === item.pageId);
+            return (
+              <div key={item.pageId} className="ui-form-array__row">
+                <div className="ui-row ui-row--between ui-row--wrap">
+                  <strong>{page?.title ?? item.pageId}</strong>
+                  <span className="ui-text-small ui-text-secondary">Order {index + 1}</span>
+                </div>
+                <div className="ui-form-grid">
+                  <label className="ui-field">
+                    <span className="ui-field__label">Navigation label</span>
+                    <input
+                      className="ui-input"
+                      value={item.label}
+                      onChange={(event) => setNavigationItems(navigationItems.map((entry) => (
+                        entry.pageId === item.pageId
+                          ? Object.freeze({ ...entry, label: event.target.value })
+                          : entry
+                      )))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Group (optional)</span>
+                    <input
+                      className="ui-input"
+                      value={item.group ?? ""}
+                      placeholder="Example: Operations"
+                      onChange={(event) => setNavigationItems(navigationItems.map((entry) => (
+                        entry.pageId === item.pageId
+                          ? Object.freeze({ ...entry, group: event.target.value.trim() || undefined })
+                          : entry
+                      )))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Placement</span>
+                    <select
+                      className="ui-input"
+                      value={item.placement}
+                      onChange={(event) => setNavigationItems(navigationItems.map((entry) => (
+                        entry.pageId === item.pageId
+                          ? Object.freeze({ ...entry, placement: event.target.value as typeof item.placement })
+                          : entry
+                      )))}
+                    >
+                      <option value={SystemNavigationPlacementKinds.primary}>Primary navigation</option>
+                      <option value={SystemNavigationPlacementKinds.secondary}>Secondary navigation</option>
+                    </select>
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Show in navigation</span>
+                    <input
+                      type="checkbox"
+                      className="ui-checkbox"
+                      checked={item.visible}
+                      onChange={(event) => setNavigationItems(navigationItems.map((entry) => (
+                        entry.pageId === item.pageId
+                          ? Object.freeze({ ...entry, visible: event.target.checked })
+                          : entry
+                      )))}
+                    />
+                  </label>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+      {defaultLandingPageId.length > 0 && !pages.some((page) => page.pageId === defaultLandingPageId) ? (
+        <p className="ui-text-small ui-text-secondary">
+          The selected landing screen is no longer available. A valid screen will be used automatically.
+        </p>
+      ) : null}
 
       <div className="ui-form-grid">
         <label className="ui-field">

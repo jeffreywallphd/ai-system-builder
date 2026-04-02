@@ -15,6 +15,7 @@ import {
   serializeSystemStudioEmbeddedDatasetDraftContent,
   serializeSystemStudioEmbeddedWorkflowDraftContent,
   serializeSystemStudioPageDefinitions,
+  serializeSystemStudioSettings,
   type SystemStudioDraftDocument,
 } from "../../../studio-shell/system/SystemStudioDraftDocument";
 import {
@@ -160,7 +161,12 @@ export function SystemStudioDraftAuthoringBoundary({
         ),
       }),
     });
-    extensionContext.operations.setDraftContent?.(serialized);
+    const reconciled = parseSystemStudioDraftDocument(serialized);
+    const serializedWithSettings = serializeSystemStudioSettings({
+      existingContent: serialized,
+      settings: reconciled.systemSpec.settings,
+    });
+    extensionContext.operations.setDraftContent?.(serializedWithSettings);
     onStudioEvent?.(createStudioIntentEvent({
       kind: StudioEmbeddedIntentKinds.applyRequest,
       payload: Object.freeze({ scope: "configuration" }),

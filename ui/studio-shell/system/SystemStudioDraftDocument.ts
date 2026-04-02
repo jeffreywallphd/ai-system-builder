@@ -104,7 +104,9 @@ const emptyDocument: SystemStudioDraftDocument = Object.freeze({
     inputs: Object.freeze([]),
     outputs: Object.freeze([]),
     parameters: Object.freeze([]),
-    settings: normalizeSystemSettingsModel(undefined),
+    settings: normalizeSystemSettingsModel(undefined, {
+      pages: Object.freeze([defaultSystemPage]),
+    }),
     pages: Object.freeze([defaultSystemPage]),
     embeddedStudios: Object.freeze({
       dataset: Object.freeze({
@@ -319,7 +321,9 @@ export function parseSystemStudioDraftDocument(content: string): SystemStudioDra
         inputs: Object.freeze(parsed.systemSpec?.inputs ?? []),
         outputs: Object.freeze(parsed.systemSpec?.outputs ?? []),
         parameters: Object.freeze(parsed.systemSpec?.parameters ?? []),
-        settings: normalizeSystemSettingsModel(parsed.systemSpec?.settings),
+        settings: normalizeSystemSettingsModel(parsed.systemSpec?.settings, {
+          pages,
+        }),
         pages,
         embeddedStudios: Object.freeze({
           dataset: Object.freeze({
