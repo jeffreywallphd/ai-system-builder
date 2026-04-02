@@ -5,8 +5,8 @@ import {
   DatasetStageWizardStateAdapter,
   type DatasetStageWizardSnapshot,
 } from "../../studio-shell/dataset/DatasetStageWizardStateAdapter";
-import DatasetStageWizardPanel from "./DatasetStageWizardPanel";
-import DatasetStageCanvasReactFlow from "./DatasetStageCanvasReactFlow";
+import DatasetStageWizardPanel from "./DEPRECATED_DatasetStageWizardPanel";
+import DatasetStageCanvasReactFlow from "./DEPRECATED_DatasetStageCanvasReactFlow";
 
 export interface DatasetStageAuthoringPanelProps {
   readonly templateId?: string;
