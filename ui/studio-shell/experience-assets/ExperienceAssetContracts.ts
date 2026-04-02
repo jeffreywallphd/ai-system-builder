@@ -1,3 +1,9 @@
+import type {
+  ExperienceActionModel,
+  ExperienceModeId,
+  ExperiencePageId,
+} from "./ExperiencePresentationVocabulary";
+
 export const ExperienceAssetModeIds = Object.freeze({
   wizard: "wizard",
   canvas: "canvas",
@@ -14,7 +20,7 @@ export interface ExperienceAssetModeDefinition {
 
 export interface WizardExperienceDefinition extends ExperienceAssetModeDefinition {
   readonly id: "wizard";
-  readonly pageOrder?: ReadonlyArray<string>;
+  readonly pageOrder?: ReadonlyArray<ExperiencePageId>;
 }
 
 export interface CanvasExperienceDefinition extends ExperienceAssetModeDefinition {
@@ -41,19 +47,13 @@ export interface ExperienceAssetActionContext<TDocument, TIssue> {
   readonly issues: ReadonlyArray<TIssue>;
 }
 
-export interface ExperienceAssetActionDefinition<TDocument, TIssue> {
-  readonly id: string;
-  readonly label: string;
-  readonly description?: string;
-  readonly tone?: "default" | "primary" | "ghost";
-  readonly disabled?: boolean;
-  readonly run?: (context: ExperienceAssetActionContext<TDocument, TIssue>) => void | Promise<void>;
-}
+export interface ExperienceAssetActionDefinition<TDocument, TIssue>
+  extends ExperienceActionModel<ExperienceAssetActionContext<TDocument, TIssue>> {}
 
 export interface ExperienceAssetDefinition<TDocument, TIssue> {
   readonly id: string;
   readonly title: string;
-  readonly defaultModeId: ExperienceAssetModeId;
+  readonly defaultModeId: ExperienceModeId;
   readonly modes: ReadonlyArray<ExperienceAssetModeDefinition>;
   readonly wizard?: WizardExperienceDefinition;
   readonly canvas?: CanvasExperienceDefinition;
