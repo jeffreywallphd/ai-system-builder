@@ -22,23 +22,11 @@ import {
   type SystemStudioPageDefinition,
 } from "./SystemStudioDraftDocument";
 import { systemPageLayoutTemplates } from "./SystemPageModel";
-import { SystemCompositionEditor } from "../../components/studio-shell/SystemCompositionEditor";
-import { SystemInterfaceEditor } from "../../components/studio-shell/SystemInterfaceEditor";
-import { SystemParameterConfigEditor } from "../../components/studio-shell/SystemParameterConfigEditor";
-
-export const SystemCanvasInspectorPanels = Object.freeze({
-  interfaces: "interfaces",
-  parameters: "parameters",
-});
-
-export type SystemCanvasInspectorPanelId =
-  typeof SystemCanvasInspectorPanels[keyof typeof SystemCanvasInspectorPanels];
 
 export interface SystemCanvasExperienceContext {
   readonly extensionContext: StudioShellExtensionContext;
   readonly document: SystemStudioDraftDocument;
   readonly issues: ReadonlyArray<ExperienceIssueSummary>;
-  readonly selectedInspectorPanel: SystemCanvasInspectorPanelId;
   readonly selectedLayoutNodeId?: string;
   readonly selectedPageId: string;
   readonly pages: ReadonlyArray<SystemStudioPageDefinition>;
@@ -51,8 +39,6 @@ export interface SystemCanvasExperienceAdapterInput {
   readonly content: string;
   readonly extensionContext: StudioShellExtensionContext;
   readonly validationIssues: ReadonlyArray<StudioShellValidationIssue>;
-  readonly selectedInspectorPanel: SystemCanvasInspectorPanelId;
-  readonly onSelectInspectorPanel: (panelId: SystemCanvasInspectorPanelId) => void;
   readonly selectedLayoutNodeId?: string;
   readonly selectedPageId: string;
   readonly onSelectPage: (pageId: string) => void;
@@ -87,13 +73,6 @@ function resolveGraphSummary(context: SystemCanvasExperienceContext): CanvasSurf
     edgeCount: 0,
     issueCount: context.issues.length,
   });
-}
-
-function renderInspector(context: SystemCanvasExperienceContext): JSX.Element {
-  if (context.selectedInspectorPanel === SystemCanvasInspectorPanels.interfaces) {
-    return <SystemInterfaceEditor context={context.extensionContext} />;
-  }
-  return <SystemParameterConfigEditor context={context.extensionContext} />;
 }
 
 function resolvePanelsForPage(input: {
@@ -169,7 +148,6 @@ export function createSystemCanvasExperienceDefinition(
     extensionContext: input.extensionContext,
     document,
     issues: toIssueSummaries(input.validationIssues),
-    selectedInspectorPanel: input.selectedInspectorPanel,
     selectedLayoutNodeId: input.selectedLayoutNodeId,
     selectedPageId,
     pages,
@@ -195,9 +173,6 @@ export function createSystemCanvasExperienceDefinition(
       description: "Choose which page you want to design.",
     }),
     resolveIssues: (canvasContext) => canvasContext.issues,
-    renderGraphInteractionShell: ({ context: canvasContext }) => (
-      <SystemCompositionEditor context={canvasContext.extensionContext} />
-    ),
     renderPaletteRegion: () => (
       <div className="ui-stack ui-stack--2xs" data-testid="system-canvas-page-picker">
         <p className="ui-text-small ui-text-secondary">
@@ -227,22 +202,6 @@ export function createSystemCanvasExperienceDefinition(
             (template) => template.layoutKind === pages.find((page) => page.pageId === selectedPageId)?.layout.layoutKind,
           )?.summary ?? "Select a page to view layout regions."}
         </span>
-        <div className="ui-row ui-row--wrap" data-testid="system-canvas-palette-actions">
-          <button
-            type="button"
-            className={`ui-button ui-button--sm ${input.selectedInspectorPanel === SystemCanvasInspectorPanels.interfaces ? "ui-button--primary" : "ui-button--ghost"}`}
-            onClick={() => input.onSelectInspectorPanel(SystemCanvasInspectorPanels.interfaces)}
-          >
-            Inputs & outputs
-          </button>
-          <button
-            type="button"
-            className={`ui-button ui-button--sm ${input.selectedInspectorPanel === SystemCanvasInspectorPanels.parameters ? "ui-button--primary" : "ui-button--ghost"}`}
-            onClick={() => input.onSelectInspectorPanel(SystemCanvasInspectorPanels.parameters)}
-          >
-            Settings
-          </button>
-        </div>
         {selectedPanel ? (
           <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="system-canvas-selected-section-settings">
             <strong className="ui-text-small">Selected section: {selectedPanel.title}</strong>
@@ -286,9 +245,16 @@ export function createSystemCanvasExperienceDefinition(
         ) : null}
       </div>
     ),
-    renderInspectorRegion: ({ context: canvasContext }) => renderInspector(canvasContext),
-    renderSupplementaryPanels: ({ extensionContext }) => (
-      <SystemCompositionEditor context={extensionContext} />
+    renderInspectorRegion: ({ context: canvasContext }) => (
+      <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="system-canvas-structure-guidance">
+        <strong className="ui-text-small">Structure only</strong>
+        <p className="ui-text-small ui-text-secondary">
+          Use this canvas for page-level section placement. Screen navigation and system-wide defaults are set in the Settings step.
+        </p>
+        <p className="ui-text-small ui-text-secondary">
+          Detailed panel content is edited in each panel&apos;s dedicated studio.
+        </p>
+      </section>
     ),
     resolveInteractionMessage: (canvasContext) => `Sections on this page: ${canvasContext.layoutNodes.length} · Panel internals are designed separately`,
     emptyState: Object.freeze({

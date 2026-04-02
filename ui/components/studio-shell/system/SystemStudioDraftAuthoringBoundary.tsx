@@ -12,8 +12,6 @@ import {
   normalizePanelLayoutBounds,
   parseSystemStudioDraftDocument,
   serializeSystemStudioCanvasAuthoringConfiguration,
-  serializeSystemStudioEmbeddedDatasetDraftContent,
-  serializeSystemStudioEmbeddedWorkflowDraftContent,
   serializeSystemStudioPageDefinitions,
   serializeSystemStudioSettings,
   type SystemStudioDraftDocument,
@@ -26,8 +24,6 @@ import {
 import {
   createSystemPanelFromCanvasNode,
   createSystemCanvasExperienceDefinition,
-  SystemCanvasInspectorPanels,
-  type SystemCanvasInspectorPanelId,
 } from "../../../studio-shell/system/SystemCanvasExperienceAdapter";
 import type { PanelAssetContract } from "../../../studio-shell/experience-assets/PanelAssetContracts";
 import ExperienceAssetAuthoringBoundary from "../experience-assets/ExperienceAssetAuthoringBoundary";
@@ -38,7 +34,6 @@ import {
   StudioEmbeddedIntentKinds,
   createStudioIntentEvent,
   type StudioEmbeddedEvent,
-  type StudioEmbeddedEventEnvelope,
 } from "../../../studio-shell/studio-assets/StudioEmbeddedEventContracts";
 
 interface SystemStudioDraftAuthoringBoundaryProps {
@@ -108,9 +103,6 @@ export function SystemStudioDraftAuthoringBoundary({
 }: SystemStudioDraftAuthoringBoundaryProps): JSX.Element {
   const [selectedModeId, setSelectedModeId] = useState<"wizard" | "canvas">("wizard");
   const [selectedWizardPageId, setSelectedWizardPageId] = useState<SystemWizardPageId>(SystemWizardPageIds.pages);
-  const [selectedInspectorPanel, setSelectedInspectorPanel] = useState<SystemCanvasInspectorPanelId>(
-    SystemCanvasInspectorPanels.interfaces,
-  );
   const [selectedLayoutNodeId, setSelectedLayoutNodeId] = useState<string | undefined>(undefined);
   const [selectedPageId, setSelectedPageId] = useState<string>("page-1");
 
@@ -179,66 +171,6 @@ export function SystemStudioDraftAuthoringBoundary({
 
   const selectedPagePanels = document.canvasAuthoring.pageLayouts.find((layout) => layout.pageId === resolvedSelectedPageId)?.panels ?? [];
   const selectedPage = document.systemSpec.pages.find((page) => page.pageId === resolvedSelectedPageId);
-  const embeddedDatasetContent = document.systemSpec.sharedDocument?.datasetDraftContent
-    ?? document.systemSpec.embeddedStudios?.dataset?.draftContent
-    ?? "";
-  const embeddedWorkflowContent = document.systemSpec.sharedDocument?.workflowDraftContent
-    ?? document.systemSpec.embeddedStudios?.workflow?.draftContent
-    ?? "";
-
-  const persistEmbeddedDatasetContent = (nextDatasetContent: string): void => {
-    const serialized = serializeSystemStudioEmbeddedDatasetDraftContent({
-      existingContent: content,
-      draftContent: nextDatasetContent,
-    });
-    extensionContext.operations.setDraftContent?.(serialized);
-  };
-
-  const embeddedDatasetExtensionContext: StudioShellExtensionContext = Object.freeze({
-    ...extensionContext,
-    operations: Object.freeze({
-      ...extensionContext.operations,
-      setDraftContent: persistEmbeddedDatasetContent,
-    }),
-  });
-
-  const persistEmbeddedWorkflowContent = (nextWorkflowContent: string): void => {
-    const serialized = serializeSystemStudioEmbeddedWorkflowDraftContent({
-      existingContent: content,
-      draftContent: nextWorkflowContent,
-    });
-    extensionContext.operations.setDraftContent?.(serialized);
-  };
-
-  const embeddedWorkflowExtensionContext: StudioShellExtensionContext = Object.freeze({
-    ...extensionContext,
-    operations: Object.freeze({
-      ...extensionContext.operations,
-      setDraftContent: persistEmbeddedWorkflowContent,
-    }),
-  });
-
-  const handleEmbeddedStudioEvent = (envelope: StudioEmbeddedEventEnvelope): void => {
-    const { event } = envelope;
-    if (event.type === "studio.intent" && event.intent.kind === StudioEmbeddedIntentKinds.selectionChange) {
-      onStudioEvent?.(createStudioIntentEvent({
-        kind: StudioEmbeddedIntentKinds.selectionChange,
-        payload: Object.freeze({
-          targetType: event.intent.payload.targetType,
-          targetId: event.intent.payload.targetId,
-        }),
-      }));
-      return;
-    }
-    if (event.type === "studio.intent" && event.intent.kind === StudioEmbeddedIntentKinds.applyRequest) {
-      onStudioEvent?.(createStudioIntentEvent({
-        kind: StudioEmbeddedIntentKinds.applyRequest,
-        payload: Object.freeze({
-          scope: "changes",
-        }),
-      }));
-    }
-  };
 
   const handleCanvasEditingEvent = (event: CanvasSurfaceEditingEvent): void => {
     if (event.type === "selection.change") {
@@ -387,8 +319,6 @@ export function SystemStudioDraftAuthoringBoundary({
       content,
       extensionContext,
       validationIssues,
-      selectedInspectorPanel,
-      onSelectInspectorPanel: setSelectedInspectorPanel,
       selectedLayoutNodeId,
       selectedPageId: resolvedSelectedPageId,
       onSelectPage: (pageId) => {
@@ -397,7 +327,7 @@ export function SystemStudioDraftAuthoringBoundary({
       },
       onCanvasEditingEvent: handleCanvasEditingEvent,
     }),
-    [content, extensionContext, selectedInspectorPanel, selectedLayoutNodeId, resolvedSelectedPageId, validationIssues],
+    [content, extensionContext, selectedLayoutNodeId, resolvedSelectedPageId, validationIssues],
   );
 
   const wizardModel = useMemo(
@@ -413,11 +343,6 @@ export function SystemStudioDraftAuthoringBoundary({
       onPagesChange: persistSystemPages,
       canvasDefinition: canvasModel.definition,
       canvasContext: canvasModel.context,
-      embeddedDatasetContent,
-      embeddedDatasetExtensionContext,
-      embeddedWorkflowContent,
-      embeddedWorkflowExtensionContext,
-      onEmbeddedStudioEvent: handleEmbeddedStudioEvent,
     }),
     [
       content,
@@ -425,10 +350,6 @@ export function SystemStudioDraftAuthoringBoundary({
       validationIssues,
       resolvedSelectedPageId,
       canvasModel,
-      embeddedDatasetContent,
-      embeddedDatasetExtensionContext,
-      embeddedWorkflowContent,
-      embeddedWorkflowExtensionContext,
     ],
   );
 

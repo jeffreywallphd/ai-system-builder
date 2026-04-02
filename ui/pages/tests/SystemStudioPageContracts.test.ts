@@ -90,19 +90,19 @@ describe("SystemStudioPage contracts", () => {
     expect(boundarySource).toContain("ConfigurableWizardSurface");
     expect(boundarySource).toContain("ConfigurableCanvasSurface");
     expect(wizardAdapterSource).toContain("SystemPageSetupEditor");
-    expect(wizardAdapterSource).toContain("SystemInterfaceEditor");
     expect(wizardAdapterSource).toContain("Detailed panel content is designed in each panel's embedded studio");
-    expect(wizardAdapterSource).toContain("SystemParameterConfigEditor");
-    expect(wizardAdapterSource).toContain("StudioAssetHostBoundary");
-    expect(wizardAdapterSource).toContain("datasetStudioSurfaceAssetDefinition");
-    expect(wizardAdapterSource).toContain("system-studio-wizard-inputs-outputs");
+    expect(wizardAdapterSource).toContain("Manage navigation and system-wide defaults.");
+    expect(wizardAdapterSource).not.toContain("SystemInterfaceEditor");
+    expect(wizardAdapterSource).not.toContain("SystemParameterConfigEditor");
+    expect(wizardAdapterSource).not.toContain("datasetStudioSurfaceAssetDefinition");
     expect(canvasAdapterSource).toContain("Page structure");
     expect(canvasAdapterSource).toContain("add-panel");
-    expect(canvasAdapterSource).toContain("Add section");
+    expect(canvasAdapterSource).toContain("Add page section");
     expect(canvasAdapterSource).toContain("remove-panel");
-    expect(canvasAdapterSource).toContain("SystemCompositionEditor");
-    expect(canvasAdapterSource).toContain("SystemInterfaceEditor");
-    expect(canvasAdapterSource).toContain("SystemParameterConfigEditor");
+    expect(canvasAdapterSource).toContain("Structure only");
+    expect(canvasAdapterSource).not.toContain("SystemCompositionEditor");
+    expect(canvasAdapterSource).not.toContain("SystemInterfaceEditor");
+    expect(canvasAdapterSource).not.toContain("SystemParameterConfigEditor");
   });
 
   it("wires a bounded run trigger panel through the shared System Studio extension surface", () => {
