@@ -326,3 +326,17 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Added a reusable/versioned mapping contract seam in `domain/system-studio/SystemContextWorkflowMappingConfiguration.ts` for explicit system-context source -> workflow target mapping.
 - `WorkflowSystemContextBindingAdapter` now consumes this mapping configuration (`application/workflow-studio/SystemContextWorkflowInputMapper.ts`) and emits inspectable mapping reports (`systemContextMapping.appliedMappings/issues`) rather than relying on hidden hardcoded wiring.
 - System assets can persist this reusable mapping contract in `SystemExecutionMetadata.workflowContextMapping` (`domain/system-studio/SystemAssetDomain.ts`) for save/load/reuse across System Studio setups.
+
+## AI Loom image manipulation hardening update: cross-studio validation + reload integrity + e2e handoff tests (stories 5.2.7-5.2.9)
+
+- Cross-studio boundary validation is now centralized through `application/system-studio/ReferenceImageCrossStudioIntegrity.ts`, which composes existing shared seams (`SystemContextValidationService`, dataset-resolution logic, and system-context workflow mapping) instead of adding a parallel validation model.
+- The validation boundary now explicitly catches representative handoff failures for the image slice before output materialization:
+  - missing/invalid selected image references,
+  - unresolved dataset instance references,
+  - schema/intent incompatibility for media datasets,
+  - invalid required workflow input mapping,
+  - missing/incompatible system-owned output targets,
+  - corrupted/incomplete runtime context and lineage-required fields.
+- `StudioShellBackendApi.persistReferenceImageOutputs(...)` now performs this contract validation up front and returns recoverable `failed` materialization responses with user-safe failure messages while recording explicit incomplete lineage markers, preventing silent state corruption.
+- System Studio reference-image UI now surfaces boundary failures with plain-language primary messaging and keeps technical diagnostics in a collapsed `Advanced details` disclosure.
+- Save/load integrity is now validated through repository reload integration coverage (`ReferenceImageEndToEndFlow` + output-persistence flow tests), asserting preserved dataset references, workflow linkage, output materialization paths, and lineage trace continuity after rehydration.

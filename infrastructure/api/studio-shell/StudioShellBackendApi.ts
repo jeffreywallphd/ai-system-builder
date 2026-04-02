@@ -81,6 +81,7 @@ import {
   buildReferenceImageDatasetInstanceRequests,
   ReferenceImageSystemTemplate,
 } from "../../../application/system-studio/ReferenceImageSystemTemplate";
+import { validateReferenceImageCrossStudioContext } from "../../../application/system-studio/ReferenceImageCrossStudioIntegrity";
 import { InMemoryDatasetInstanceRepository } from "../../../application/system-runtime/DatasetInstanceRepository";
 import {
   SystemDatasetInstanceService,
@@ -1170,7 +1171,6 @@ export class StudioShellBackendApi {
       if (!executionId) {
         throw new StudioShellInvalidRequestError("executionId is required.");
       }
-
       const comfyResult = this.extractComfyResultFromRuntimeResult(request.runtimeResult?.output);
       if (!comfyResult) {
         const lineageStatus = request.runtimeContext?.selectedImages?.[0]?.assetRef?.assetId ? "partial" : "incomplete";
@@ -1216,6 +1216,54 @@ export class StudioShellBackendApi {
           status: "failed",
           failureMessages: Object.freeze(["No generated images were available to save from this run."]),
         });
+      }
+      if (request.runtimeContext) {
+        const integrity = validateReferenceImageCrossStudioContext(request.runtimeContext, {
+          executionId,
+          workflowAssetId: request.workflowAssetId,
+          workflowAssetVersionId: request.workflowAssetVersionId,
+          systemAssetId: request.systemAssetId,
+          sourceAssetId: request.sourceAssetId,
+          sourceRecordId: request.sourceRecordId,
+        });
+        if (!integrity.valid) {
+          const failureMessages = Object.freeze(integrity.blockingIssues.map((issue) => issue.userMessage));
+          this.referenceImageRunHistory.recordRun({
+            runId: executionId,
+            workflowExecutionId: executionId,
+            systemId: runtimeSystemId,
+            workflowAssetId: request.workflowAssetId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+            workflowAssetVersionId: request.workflowAssetVersionId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+            status: ImageRunHistoryExecutionStatuses.failed,
+            parameterSummary: request.parameterSnapshot,
+            lineage: {
+              status: "incomplete",
+              workflowExecutionId: executionId,
+              sourceImageAssetId: request.runtimeContext.selectedImages?.[0]?.assetRef?.assetId ?? request.sourceAssetId?.trim(),
+              sourceImageRecordId: request.runtimeContext.selectedImages?.[0]?.assetRef?.recordId ?? request.sourceRecordId?.trim(),
+              sourceDatasetInstanceId: request.runtimeContext.datasets.find((entry) => entry.role === "active-input" || entry.role === "input-store")?.instanceId,
+              workflowAssetId: request.workflowAssetId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+              workflowAssetVersionId: request.workflowAssetVersionId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+              systemAssetId: request.systemAssetId?.trim() || request.runtimeContext.runtime.systemAssetId || draft.assetId,
+              systemVersionId: request.systemVersionId?.trim() || draft.lastPublishedVersionId,
+              outputDatasetInstanceId: outputDataset.instanceId,
+              missing: integrity.blockingIssues.map((issue) => issue.code),
+            },
+            timestamps: {
+              requestedAt: this.now().toISOString(),
+              updatedAt: this.now().toISOString(),
+            },
+          });
+          return Object.freeze({
+            systemId: runtimeSystemId,
+            datasetInstanceId: outputDataset.instanceId,
+            executionId,
+            materializationId: `mat:${executionId}`,
+            persistedRecordIds: Object.freeze([]),
+            status: "failed" as const,
+            failureMessages,
+          });
+        }
       }
 
       const mapped = this.comfyMaterializationMapper.map({

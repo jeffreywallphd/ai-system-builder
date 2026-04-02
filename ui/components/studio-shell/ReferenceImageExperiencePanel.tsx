@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ReferenceImageSystemTemplate } from "../../../application/system-studio/ReferenceImageSystemTemplate";
+import { validateReferenceImageCrossStudioContext, type CrossStudioIntegrityIssue } from "../../../application/system-studio/ReferenceImageCrossStudioIntegrity";
 import type { ImageRunHistoryRecord } from "../../../application/system-runtime/ImageRunHistoryDataContract";
 import type { OutputGalleryItem } from "../../../application/system-runtime/OutputGalleryDataContract";
 import { createDefaultUiTriggerSystemContextMapper } from "../../../application/workflow-studio/UiTriggerSystemContextMapper";
@@ -173,6 +174,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
   const [variationStrength, setVariationStrength] = useState(0.5);
   const [resultCount, setResultCount] = useState(1);
   const [status, setStatus] = useState<string | undefined>();
+  const [diagnostics, setDiagnostics] = useState<ReadonlyArray<CrossStudioIntegrityIssue>>([]);
   const [resultItems, setResultItems] = useState<ReadonlyArray<OutputGalleryItem>>([]);
   const [activeResultId, setActiveResultId] = useState<string | undefined>();
   const [isUploading, setIsUploading] = useState(false);
@@ -251,6 +253,11 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
     setResultCount(stored.resultCount ?? 1);
     const datasetRef = stored.runtimeContext.datasets.find((entry) => entry.role === "active-input" || entry.role === "input-store");
     setDatasetInstanceId(datasetRef?.instanceId);
+    const integrity = validateReferenceImageCrossStudioContext(stored.runtimeContext);
+    if (!integrity.valid) {
+      setStatus("Some saved setup details need to be refreshed before starting.");
+      setDiagnostics(integrity.blockingIssues);
+    }
   }, [draft.draftId]);
 
   useEffect(() => {
@@ -391,6 +398,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
               return;
             }
             setIsStarting(true);
+            setDiagnostics([]);
             const request = buildReferenceImageStartRequest({
               studioId: context.studioId,
               draftId: draft.draftId,
@@ -426,6 +434,20 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
                 },
               }),
             });
+            const integrity = validateReferenceImageCrossStudioContext(request.context.runtimeContext, {
+              executionId: "pending",
+              sourceAssetId: selectedAssetId,
+              sourceRecordId: selectedRecordId,
+              workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+              workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+              systemAssetId: draft.assetId,
+            });
+            if (!integrity.valid) {
+              setStatus("Please review your selected image and destinations, then try again.");
+              setDiagnostics(integrity.blockingIssues);
+              setIsStarting(false);
+              return;
+            }
             void context.operations.startSystemExecution(request).then((response) => {
               if (!response.ok || !response.data) {
                 setStatus(response.error?.message ?? "Could not start processing.");
@@ -457,6 +479,15 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
                     setStatus(persisted.error?.message ?? `Run started (${executionId}), but results could not be saved.`);
                     return;
                   }
+                  if ((persisted.data?.failureMessages.length ?? 0) > 0) {
+                    setDiagnostics((persisted.data?.failureMessages ?? []).map((message, index) => ({
+                      code: "runtime-context-corrupted",
+                      severity: "error",
+                      userMessage: message,
+                      technicalMessage: message,
+                      path: `failureMessages[${index}]`,
+                    })));
+                  }
                   const count = persisted.data?.persistedRecordIds.length ?? 0;
                   setStatus(count > 0
                     ? `Generated images saved (${count}).`
@@ -469,6 +500,16 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
           {isStarting ? "Starting..." : "Start"}
         </button>
         {status ? <p className="ui-text-small ui-text-secondary">{status}</p> : null}
+        {diagnostics.length > 0 ? (
+          <details style={{ marginTop: "0.5rem" }}>
+            <summary className="ui-text-small ui-text-secondary">Advanced details</summary>
+            <ul className="ui-text-small ui-text-secondary" style={{ marginTop: "0.5rem", paddingLeft: "1rem" }}>
+              {diagnostics.map((issue, index) => (
+                <li key={`${issue.code}-${index}`}>{issue.technicalMessage}</li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </section>
       <section className="ui-image-surface">
         <header className="ui-image-surface__header">

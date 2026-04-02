@@ -152,3 +152,79 @@ it("records explicit incomplete lineage when runtime output payload is missing",
   expect(history.data?.runs[0]?.lineage?.status).toBe("incomplete");
   expect(history.data?.runs[0]?.lineage?.missing).toContain("runtime-output");
 });
+
+it("fails fast with recoverable diagnostics when runtime context is incomplete", async () => {
+  const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+  const initialized = await api.initializeStudio("studio-system", "System Studio");
+  const created = await api.createDraft({
+    studioId: "studio-system",
+    sessionId: initialized.data!.activeSessionId!,
+    assetId: ReferenceImageSystemTemplate.systemAsset.assetId,
+    content: JSON.stringify({ systemSpec: {} }),
+    metadata: {
+      title: "Reference image",
+      tags: ["system"],
+      taxonomy: {
+        structuralKind: "system",
+        semanticRole: "system",
+        behaviorKind: "deterministic",
+      },
+    },
+  });
+
+  const persisted = await api.persistReferenceImageOutputs({
+    studioId: "studio-system",
+    draftId: created.data!.draft!.draftId,
+    executionId: "run:invalid-context",
+    runtimeContext: {
+      contractVersion: "1.0.0",
+      selectedImages: [],
+      parameters: { resultCount: 1 },
+      datasets: [{
+        referenceId: "active-input",
+        datasetAssetId: "asset:dataset:image-reference-input",
+        role: "active-input",
+      }],
+      runtime: { systemAssetId: ReferenceImageSystemTemplate.systemAsset.assetId },
+    },
+    runtimeResult: {
+      output: {
+        payload: {
+          nodeResults: {
+            workflow: {
+              result: {
+                executionId: "run:invalid-context",
+                status: "completed",
+                outputs: [{
+                  nodeId: "save_image",
+                  kind: "image",
+                  reference: "memory://invalid-context.png",
+                  metadata: {
+                    filename: "invalid-context.png",
+                    width: 512,
+                    height: 512,
+                  },
+                }],
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  expect(persisted.ok).toBeTrue();
+  expect(persisted.data?.status).toBe("failed");
+  expect(persisted.data?.failureMessages.length).toBeGreaterThan(0);
+
+  const history = await api.listReferenceImageRunHistory({
+    studioId: "studio-system",
+    draftId: created.data!.draft!.draftId,
+    limit: 10,
+    offset: 0,
+  });
+
+  expect(history.ok).toBeTrue();
+  expect(history.data?.runs[0]?.lineage?.status).toBe("incomplete");
+  expect(history.data?.runs[0]?.lineage?.missing).toContain("selected-image-missing");
+});

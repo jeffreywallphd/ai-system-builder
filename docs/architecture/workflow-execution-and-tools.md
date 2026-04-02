@@ -583,3 +583,17 @@ Audit schema now records administrative approval transitions plus decision denia
   - default mapping behavior remains compatible with prior 4.3.1-4.3.8 outputs,
   - custom mapping configurations can override/extend binding behavior with inspectable `systemContextMapping` report metadata (`appliedMappings`, issues).
 - System assets can now persist reusable context mapping configuration under bounded execution metadata (`SystemExecutionMetadata.workflowContextMapping` in `domain/system-studio/SystemAssetDomain.ts`) so System Studio setups are save/load/duplicate friendly.
+
+## AI Loom image manipulation hardening update: cross-studio validation + reload integrity + e2e handoff tests (stories 5.2.7-5.2.9)
+
+- Cross-studio boundary validation is now centralized through `application/system-studio/ReferenceImageCrossStudioIntegrity.ts`, which composes existing shared seams (`SystemContextValidationService`, dataset-resolution logic, and system-context workflow mapping) instead of introducing a separate validation model.
+- The validation boundary now explicitly catches representative handoff failures before output materialization:
+  - missing or invalid selected image references,
+  - unresolved dataset instance references,
+  - media schema intent/shape incompatibility,
+  - invalid required workflow input mapping,
+  - missing or incompatible system-owned output targets,
+  - corrupted/incomplete runtime context and lineage-required fields.
+- `StudioShellBackendApi.persistReferenceImageOutputs(...)` now validates these contracts before materialization and returns recoverable `failed` responses with user-safe failure messages while recording explicit incomplete lineage markers.
+- System Studio’s reference-image panel now keeps user messaging non-technical and exposes technical diagnostics in a collapsed `Advanced details` section.
+- Save/load integrity is now covered with repository-reload integration tests (`ReferenceImageEndToEndFlow` + output persistence tests) asserting that dataset/workflow/output/lineage handoff links remain valid after rehydration.
