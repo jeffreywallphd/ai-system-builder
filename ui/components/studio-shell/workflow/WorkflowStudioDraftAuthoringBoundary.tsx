@@ -15,8 +15,7 @@ import type { WorkflowStudioModeValidationIssue } from "../../../studio-shell/wo
 import type { WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import type { WorkflowStudioWizardPageId } from "../../../studio-shell/workflow/WorkflowStudioWizardRouting";
 import type { WorkflowStudioHandoffStatus } from "../../../studio-shell/workflow/WorkflowStudioHandoffStatus";
-import ExperienceAssetAuthoringBoundary from "../experience-assets/ExperienceAssetAuthoringBoundary";
-import { ExperienceAssetModeIds, type ExperienceAssetDefinition } from "../../../studio-shell/experience-assets/ExperienceAssetContracts";
+import { ExperienceAssetModeIds, type ExperienceAssetDefinition, type ExperienceAssetModeDefinition } from "../../../studio-shell/experience-assets/ExperienceAssetContracts";
 import {
   ExperienceSurfaceAssetIds,
   resolveExperienceAssetModesFromRegistrations,
@@ -140,6 +139,43 @@ export default function WorkflowStudioDraftAuthoringBoundary({
     return <textarea className="ui-textarea" rows={8} value={content} onChange={(event) => onChangeContent(event.target.value)} />;
   }
 
+  if (!workflowModeContext) {
+    return (
+      <WorkflowStudioEmbeddedAuthoringBoundary
+        content={content}
+        onChangeContent={onChangeContent}
+        invalidModeRouteId={invalidModeRouteId}
+        invalidWizardPageRouteId={invalidWizardPageRouteId}
+        experienceAssetIds={experienceAssetIds}
+        hostMode={hostMode}
+        onStudioEvent={onStudioEvent}
+        embeddedVariant={embeddedVariant}
+      />
+    );
+  }
+
+  return WorkflowStudioModeSurfaceRenderer({
+    onChangeContent,
+    workflowModeContext,
+    invalidModeRouteId,
+    invalidWizardPageRouteId,
+    experienceAssetIds,
+    hostMode,
+    onStudioEvent,
+    embeddedVariant,
+  });
+}
+
+function WorkflowStudioEmbeddedAuthoringBoundary({
+  content,
+  onChangeContent,
+  invalidModeRouteId,
+  invalidWizardPageRouteId,
+  experienceAssetIds,
+  hostMode,
+  onStudioEvent,
+  embeddedVariant,
+}: Omit<WorkflowStudioDraftAuthoringBoundaryProps, "isWorkflowStudio" | "workflowModeContext">): JSX.Element {
   const [embeddedWizardPageId, setEmbeddedWizardPageId] = useState<WorkflowStudioWizardPageId>(
     embeddedVariant === "behavior-automation" ? "steps" : "trigger",
   );
@@ -176,60 +212,96 @@ export default function WorkflowStudioDraftAuthoringBoundary({
       },
     });
   }, [content, embeddedWizardPageId, onChangeContent, onStudioEvent]);
-  const resolvedWorkflowModeContext = workflowModeContext ?? embeddedModeContext;
+
+  return WorkflowStudioModeSurfaceRenderer({
+    onChangeContent,
+    workflowModeContext: embeddedModeContext,
+    invalidModeRouteId,
+    invalidWizardPageRouteId,
+    experienceAssetIds,
+    hostMode,
+    onStudioEvent,
+    embeddedVariant,
+  });
+}
+
+function WorkflowStudioModeSurfaceRenderer({
+  onChangeContent,
+  workflowModeContext,
+  invalidModeRouteId,
+  invalidWizardPageRouteId,
+  experienceAssetIds = defaultWorkflowExperienceAssetIds,
+  hostMode = StudioAssetRenderModes.full,
+  onStudioEvent,
+  embeddedVariant,
+}: Omit<WorkflowStudioDraftAuthoringBoundaryProps, "isWorkflowStudio" | "content"> & {
+  readonly workflowModeContext: NonNullable<WorkflowStudioDraftAuthoringBoundaryProps["workflowModeContext"]>;
+}): JSX.Element {
+  const resolvedWorkflowModeContext = workflowModeContext;
   const constrainedExperienceAssetIds = embeddedVariant === "behavior-automation"
     ? Object.freeze([ExperienceSurfaceAssetIds.loomWizard] as const)
     : experienceAssetIds;
+  const experience = buildWorkflowExperienceDefinition(constrainedExperienceAssetIds);
+  const activeMode = experience.modes.find((mode) => mode.id === resolvedWorkflowModeContext.selectedModeId)
+    ?? experience.modes.find((mode) => mode.id === experience.defaultModeId)
+    ?? experience.modes[0];
+  const unsupportedModeId = invalidModeRouteId;
+
+  const renderWorkflowModeSurface = (mode: ExperienceAssetModeDefinition): JSX.Element => {
+    if (mode.id === ExperienceAssetModeIds.wizard) {
+      return (
+        <WorkflowStudioWizardModeLayout>
+          {WorkflowStudioWizardModeSurface({
+            studioId: resolvedWorkflowModeContext.studioId,
+            selectedWizardPageId: resolvedWorkflowModeContext.selectedWizardPageId,
+            onSelectWizardPage: (pageId) => {
+              resolvedWorkflowModeContext.onSelectWizardPage?.(pageId);
+              onStudioEvent?.(createStudioIntentEvent({
+                kind: StudioEmbeddedIntentKinds.selectionChange,
+                payload: Object.freeze({
+                  targetType: "wizard-page",
+                  targetId: pageId,
+                }),
+              }));
+            },
+            sharedDraft: resolvedWorkflowModeContext.sharedDraft,
+            sharedDraftSerialized: resolvedWorkflowModeContext.sharedDraftSerialized,
+            draftValidationIssues: resolvedWorkflowModeContext.draftValidationIssues,
+            onUpdateSharedDraft: resolvedWorkflowModeContext.updateSharedDraft,
+            handoffStatus: resolvedWorkflowModeContext.handoffStatus,
+            onSetHandoffStatus: resolvedWorkflowModeContext.setHandoffStatus,
+            onClearHandoffStatus: resolvedWorkflowModeContext.clearHandoffStatus,
+          })}
+        </WorkflowStudioWizardModeLayout>
+      );
+    }
+
+    return (
+      <WorkflowStudioCanvasModeLayout>
+        {WorkflowStudioCanvasModeSurface({
+          studioId: resolvedWorkflowModeContext.studioId,
+          sharedDraft: resolvedWorkflowModeContext.sharedDraft,
+          draftValidationIssues: resolvedWorkflowModeContext.draftValidationIssues,
+          onUpdateSharedDraft: resolvedWorkflowModeContext.updateSharedDraft,
+          draftEditorContent: resolvedWorkflowModeContext.draftEditorContent,
+          onChangeDraftEditorContent: onChangeContent,
+          drawerState: resolvedWorkflowModeContext.canvasDrawers,
+        })}
+      </WorkflowStudioCanvasModeLayout>
+    );
+  };
 
   return (
     <>
-      <ExperienceAssetAuthoringBoundary
-        asset={buildWorkflowExperienceDefinition(constrainedExperienceAssetIds)}
-        currentModeId={resolvedWorkflowModeContext.selectedModeId}
-        invalidRequestedModeId={invalidModeRouteId}
-        document={resolvedWorkflowModeContext.sharedDraft}
-        issues={resolvedWorkflowModeContext.draftValidationIssues}
-        surfaces={{
-          wizard: () => (
-            <WorkflowStudioWizardModeLayout>
-              <WorkflowStudioWizardModeSurface
-                studioId={resolvedWorkflowModeContext.studioId}
-                selectedWizardPageId={resolvedWorkflowModeContext.selectedWizardPageId}
-                onSelectWizardPage={(pageId) => {
-                  resolvedWorkflowModeContext.onSelectWizardPage?.(pageId);
-                  onStudioEvent?.(createStudioIntentEvent({
-                    kind: StudioEmbeddedIntentKinds.selectionChange,
-                    payload: Object.freeze({
-                      targetType: "wizard-page",
-                      targetId: pageId,
-                    }),
-                  }));
-                }}
-                sharedDraft={resolvedWorkflowModeContext.sharedDraft}
-                sharedDraftSerialized={resolvedWorkflowModeContext.sharedDraftSerialized}
-                draftValidationIssues={resolvedWorkflowModeContext.draftValidationIssues}
-                onUpdateSharedDraft={resolvedWorkflowModeContext.updateSharedDraft}
-                handoffStatus={resolvedWorkflowModeContext.handoffStatus}
-                onSetHandoffStatus={resolvedWorkflowModeContext.setHandoffStatus}
-                onClearHandoffStatus={resolvedWorkflowModeContext.clearHandoffStatus}
-              />
-            </WorkflowStudioWizardModeLayout>
-          ),
-          canvas: () => (
-            <WorkflowStudioCanvasModeLayout>
-              <WorkflowStudioCanvasModeSurface
-                studioId={resolvedWorkflowModeContext.studioId}
-                sharedDraft={resolvedWorkflowModeContext.sharedDraft}
-                draftValidationIssues={resolvedWorkflowModeContext.draftValidationIssues}
-                onUpdateSharedDraft={resolvedWorkflowModeContext.updateSharedDraft}
-                draftEditorContent={resolvedWorkflowModeContext.draftEditorContent}
-                onChangeDraftEditorContent={onChangeContent}
-                drawerState={resolvedWorkflowModeContext.canvasDrawers}
-              />
-            </WorkflowStudioCanvasModeLayout>
-          ),
-        }}
-      />
+      {activeMode ? renderWorkflowModeSurface(activeMode) : (
+        <p className="ui-text-muted">No authoring modes are configured for this workflow experience.</p>
+      )}
+
+      {activeMode && unsupportedModeId ? (
+        <p className="ui-text-muted">
+          Unsupported experience mode selection &quot;{unsupportedModeId}&quot;; using {activeMode.id} mode.
+        </p>
+      ) : null}
 
       {hostMode === StudioAssetRenderModes.full && workflowModeContext && invalidWizardPageRouteId ? (
         <p className="ui-text-muted">
