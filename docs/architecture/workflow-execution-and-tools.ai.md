@@ -272,3 +272,22 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Runtime execution output persistence remains adapter-bounded: workflow executors still return workflow-native assets, while the persistence seam maps assets into canonical image-record materialization contracts and writes through `SystemDatasetInstanceService`.
 - Runtime result contracts now expose structured persistence summaries (`status`, `persistedRecordCount`, `targetCount`, `issues`) for downstream run-history and UI inspection without exposing repository/storage internals.
 - Added test coverage validating runtime integration behavior for output/history/comparison dataset writes and bounded failure outcomes when resolution/materialization/persistence cannot complete.
+
+## AI Loom image manipulation UI-trigger integration update (stories 4.2.9-4.2.10)
+
+- UI-triggered execution now has reusable trigger wrappers/components in `ui/components/assets/image-system/WorkflowUiTriggerComponents.tsx` for:
+  - workflow trigger buttons,
+  - workflow-aware form submit wrappers,
+  - image selection trigger surfaces.
+- These wrappers stay adapter-first: they emit normalized `UiTriggerEvent` contracts and hand off via a dispatch adapter (`createWorkflowUiTriggerDispatchAdapter`) that composes the existing `WorkflowUiEventRuntimeDispatcher` path rather than calling workflow internals directly.
+- System context gathering for UI-triggered runs is now a reusable mapping seam (`application/workflow-studio/UiTriggerSystemContextMapper.ts`) consumed by the dispatcher:
+  - selected image context,
+  - current form/runtime parameter values,
+  - dataset references and dataset instance refs,
+  - system-owned dataset instance refs,
+  - lightweight runtime context references.
+- Boundaries remain explicit and inspectable:
+  - UI event generation (`UiTriggerEventContract` + trigger wrappers),
+  - trigger binding resolution (`WorkflowUiTriggerEventAdapter` + image trigger binding config),
+  - parameter/context mapping (`UiTriggerSystemContextMapper`),
+  - workflow execution handoff (`WorkflowUiEventRuntimeDispatcher` -> `runWorkflowDraftTriggered`).

@@ -49,6 +49,17 @@ describe("WorkflowUiEventRuntimeDispatcher", () => {
           instruction: "repair scratches",
         },
       },
+      context: {
+        datasetAssetId: "dataset:images",
+        datasetVersionId: "v5",
+        systemAssetId: "system:image-pipeline",
+        references: {
+          datasetInstanceId: "dataset-instance:active",
+          systemDatasetInstanceId: "dataset-instance:system",
+          systemDatasetRole: "output-image-store",
+          runtimeSessionId: "runtime-session:abc",
+        },
+      },
     });
 
     const calls: Array<Record<string, unknown>> = [];
@@ -90,6 +101,10 @@ describe("WorkflowUiEventRuntimeDispatcher", () => {
     const firstContext = calls[0]?.context as Record<string, unknown>;
     expect((firstContext.inputValues as Record<string, unknown>).instruction).toBe("repair scratches");
     expect(((firstContext.metadata as Record<string, unknown>).systemFormValues as Record<string, unknown>).instruction).toBe("repair scratches");
+    expect((((firstContext.metadata as Record<string, unknown>).datasetInstances as Array<Record<string, unknown>>)[0] as Record<string, unknown>).datasetAssetId).toBe("dataset:images");
+    expect((((firstContext.metadata as Record<string, unknown>).systemDatasetInstanceRefs as Array<Record<string, unknown>>)[0] as Record<string, unknown>).instanceId)
+      .toBe("dataset-instance:system");
+    expect((((firstContext.metadata as Record<string, unknown>).runtimeContext as Record<string, unknown>).runtimeSessionId)).toBe("runtime-session:abc");
   });
 
   it("returns a structured no-match issue when no workflow trigger binding resolves", async () => {

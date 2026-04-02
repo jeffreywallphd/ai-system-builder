@@ -1,6 +1,7 @@
 export * from "./ImageUiContracts";
 export * from "./ImageUiEventAdapters";
 export * from "./ImageUiTriggerEventAdapter";
+export * from "./WorkflowUiTriggerComponents";
 export * from "./ImageRenderingUtils";
 export * from "./ImageRenderFrame";
 export * from "./BrowserImageUploadIngestionAdapter";
