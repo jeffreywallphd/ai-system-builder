@@ -29,7 +29,14 @@ export function createAtomicStudioUiPrimitiveContract(input: {
     metadata: Object.freeze({
       displayName: input.title,
       description: input.summary,
+      group: "ui-primitives",
+      iconToken: `primitive.${input.primitiveKind}`,
       tags: Object.freeze(["ui-primitive", input.primitiveKind, "atomic-ui"]),
+      keywords: Object.freeze([input.primitiveKind, "input", "control"]),
+      contractCategory: "atomic-ui",
+      capabilityFlags: Object.freeze([
+        input.primitiveKind === StudioUiPrimitiveKinds.viewer ? "viewer" : "interactive",
+      ]),
     }),
     propsSchema: Object.freeze({
       schemaId: `studio.ui-primitive.${input.primitiveKind}.props`,

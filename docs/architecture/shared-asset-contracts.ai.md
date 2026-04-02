@@ -215,6 +215,23 @@
   - system/page surfaces.
 - Registry entries expose deterministic lookup/discovery fields (`id`, `kind`, `category`, metadata, renderer info, props/persistence hooks, and composition metadata) and can resolve rendering definitions by id.
 
+## Direction 5 UI extension update: shared UI asset metadata + runtime renderer resolution (stories 1.1.5-1.1.6)
+
+- UI assets now project one normalized metadata seam across atomic, composed, and system/page registrations (`StudioAssetContracts`, `StudioAssetRegistry`), rather than carrying divergent per-asset metadata payloads.
+- Shared metadata now consistently includes:
+  - identity hooks (`metadata.id`, `metadata.assetType`)
+  - display text (`title`, `summary`, `displayName`, `description`)
+  - grouping/classification (`kind`, registration `category`, metadata `group`, `contractCategory`)
+  - discovery hooks (`iconToken`, `tags`, `keywords`)
+  - optional capability flags (`capabilityFlags`) for future inspector/library workflows.
+- Registry normalization validates and freezes these fields for deterministic discovery output and persistence-friendly read behavior.
+- Runtime renderer resolution is now a first-class registry seam with structured outcomes:
+  - `resolveRendererById`
+  - `resolveRenderersByKind`
+  - `resolveRenderersByCategory`
+  - resolution status: `resolved`, `missing`, `invalid`
+- This keeps renderer lookup generic across future UI asset families while allowing graceful runtime fallback when definitions are missing or registration/contract renderer metadata drifts.
+
 ## Direction 5 extension update: derived attributes + media schema validation layer (stories 1.1.5-1.1.6)
 
 - Canonical image records now include a typed derived-attributes seam (`ImageDerivedAttributes`) with bounded inspectable fields (`aspectRatio`, `orientation`, `isAnimated`, `pixelCount`, `megapixels`) while remaining canonical-record-compatible.

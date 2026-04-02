@@ -31,9 +31,16 @@ export interface StudioAssetRegistration {
     readonly resolution: "definition-render";
   };
   readonly metadata: {
+    readonly id: string;
+    readonly assetType: string;
     readonly title: string;
     readonly summary?: string;
+    readonly group: string;
+    readonly iconToken?: string;
     readonly tags: ReadonlyArray<string>;
+    readonly keywords: ReadonlyArray<string>;
+    readonly contractCategory: string;
+    readonly capabilityFlags: ReadonlyArray<string>;
   };
   readonly hooks: {
     readonly propsSchemaId: string;
@@ -50,12 +57,31 @@ export interface StudioAssetRegistration {
   readonly definition?: StudioAssetDefinition<unknown, StudioEmbeddedEvent>;
 }
 
+export const StudioAssetRendererResolutionKinds = Object.freeze({
+  resolved: "resolved",
+  missing: "missing",
+  invalid: "invalid",
+});
+
+export type StudioAssetRendererResolutionKind =
+  typeof StudioAssetRendererResolutionKinds[keyof typeof StudioAssetRendererResolutionKinds];
+
+export interface StudioAssetRendererResolution {
+  readonly kind: StudioAssetRendererResolutionKind;
+  readonly assetId: string;
+  readonly message?: string;
+  readonly registration?: StudioAssetRegistration;
+  readonly render?: StudioAssetDefinition<unknown, StudioEmbeddedEvent>["render"];
+}
+
 function freezeRegistration(registration: StudioAssetRegistration): StudioAssetRegistration {
   return Object.freeze({
     ...registration,
     metadata: Object.freeze({
       ...registration.metadata,
       tags: Object.freeze([...registration.metadata.tags]),
+      keywords: Object.freeze([...registration.metadata.keywords]),
+      capabilityFlags: Object.freeze([...registration.metadata.capabilityFlags]),
     }),
     hooks: Object.freeze({ ...registration.hooks }),
     composition: registration.composition
@@ -78,13 +104,33 @@ function normalizeRegistration(registration: StudioAssetRegistration): StudioAss
     throw new Error(`Studio asset registration '${id}' title is required.`);
   }
 
+  const assetType = registration.metadata.assetType.trim();
+  if (!assetType) {
+    throw new Error(`Studio asset registration '${id}' assetType is required.`);
+  }
+
+  const group = registration.metadata.group.trim();
+  if (!group) {
+    throw new Error(`Studio asset registration '${id}' metadata group is required.`);
+  }
+
+  const contractCategory = registration.metadata.contractCategory.trim();
+  if (!contractCategory) {
+    throw new Error(`Studio asset registration '${id}' metadata contract category is required.`);
+  }
+
   return freezeRegistration({
     ...registration,
     id,
     metadata: {
       ...registration.metadata,
+      id,
+      assetType,
       title,
       summary: registration.metadata.summary?.trim() || undefined,
+      group,
+      iconToken: registration.metadata.iconToken?.trim() || undefined,
+      contractCategory,
     },
   });
 }
@@ -101,6 +147,8 @@ function categoryFromKind(kind: StudioUiAssetKind): StudioAssetRegistrationCateg
 
 function registrationFromContract(contract: StudioAssetContract<unknown>): StudioAssetRegistration {
   const metadataTags = contract.metadata?.tags ?? [];
+  const metadataKeywords = contract.metadata?.keywords ?? [];
+  const capabilityFlags = contract.metadata?.capabilityFlags ?? [];
   const composition = contract.kind === StudioUiAssetKinds.atomic
     ? {
       allowsChildren: false,
@@ -128,9 +176,16 @@ function registrationFromContract(contract: StudioAssetContract<unknown>): Studi
       resolution: contract.rendering.resolution,
     },
     metadata: {
+      id: contract.identity.studioId,
+      assetType: contract.identity.studioType,
       title: contract.identity.title,
       summary: contract.identity.summary,
+      group: contract.metadata?.group ?? categoryFromKind(contract.kind),
+      iconToken: contract.metadata?.iconToken,
       tags: metadataTags,
+      keywords: metadataKeywords,
+      contractCategory: contract.metadata?.contractCategory ?? `${contract.kind}/${categoryFromKind(contract.kind)}`,
+      capabilityFlags,
     },
     hooks: {
       propsSchemaId: contract.propsSchema.schemaId,
@@ -184,6 +239,53 @@ export class StudioAssetRegistry {
 
   public resolveDefinitionById(id: string): StudioAssetDefinition<unknown, StudioEmbeddedEvent> | undefined {
     return this.getById(id)?.definition;
+  }
+
+  public resolveRendererById(id: string): StudioAssetRendererResolution {
+    const normalizedId = id.trim();
+    const registration = this.getById(normalizedId);
+    if (!registration) {
+      return Object.freeze({
+        kind: StudioAssetRendererResolutionKinds.missing,
+        assetId: normalizedId,
+        message: `Studio asset '${normalizedId}' is not registered.`,
+      });
+    }
+
+    const definition = registration.definition;
+    if (!definition) {
+      return Object.freeze({
+        kind: StudioAssetRendererResolutionKinds.missing,
+        assetId: normalizedId,
+        registration,
+        message: `Studio asset '${normalizedId}' does not expose a runtime renderer definition.`,
+      });
+    }
+
+    if (definition.contract.rendering.renderer !== registration.renderer.renderer
+      || definition.contract.rendering.resolution !== registration.renderer.resolution) {
+      return Object.freeze({
+        kind: StudioAssetRendererResolutionKinds.invalid,
+        assetId: normalizedId,
+        registration,
+        message: `Studio asset '${normalizedId}' renderer registration does not match its contract definition.`,
+      });
+    }
+
+    return Object.freeze({
+      kind: StudioAssetRendererResolutionKinds.resolved,
+      assetId: normalizedId,
+      registration,
+      render: definition.render,
+    });
+  }
+
+  public resolveRenderersByKind(kind: StudioUiAssetKind): ReadonlyArray<StudioAssetRendererResolution> {
+    return Object.freeze(this.listByKind(kind).map((entry) => this.resolveRendererById(entry.id)));
+  }
+
+  public resolveRenderersByCategory(category: StudioAssetRegistrationCategory): ReadonlyArray<StudioAssetRendererResolution> {
+    return Object.freeze(this.listByCategory(category).map((entry) => this.resolveRendererById(entry.id)));
   }
 }
 

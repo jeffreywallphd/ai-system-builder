@@ -94,7 +94,12 @@ export const workflowStudioSurfaceAssetDefinition: StudioAssetDefinition<Workflo
     metadata: Object.freeze({
       displayName: "Workflow Studio Surface",
       description: "Composed studio authoring surface for workflow structures and behavior.",
+      group: "studio-surfaces",
+      iconToken: "studio.workflow",
       tags: Object.freeze(["studio", "workflow", "composed-ui"]),
+      keywords: Object.freeze(["workflow", "wizard", "canvas", "orchestration"]),
+      contractCategory: "composed-ui",
+      capabilityFlags: Object.freeze(["nested-studios", "authoring"]),
     }),
     propsSchema: Object.freeze({ schemaId: "studio.workflow-surface.input", schemaVersion: "1.0.0" }),
     supportedModes: Object.freeze([
@@ -142,7 +147,12 @@ export const systemStudioSurfaceAssetDefinition: StudioAssetDefinition<SystemStu
     metadata: Object.freeze({
       displayName: "System Studio Surface",
       description: "Composed studio authoring surface supporting nested studio composition.",
+      group: "studio-surfaces",
+      iconToken: "studio.system",
       tags: Object.freeze(["studio", "system", "composed-ui"]),
+      keywords: Object.freeze(["system", "runtime", "page", "composition"]),
+      contractCategory: "system-page",
+      capabilityFlags: Object.freeze(["nested-pages", "runtime"]),
     }),
     propsSchema: Object.freeze({ schemaId: "studio.system-surface.input", schemaVersion: "1.0.0" }),
     supportedModes: Object.freeze([
@@ -208,7 +218,12 @@ export const datasetStudioSurfaceAssetDefinition: StudioAssetDefinition<DatasetS
     metadata: Object.freeze({
       displayName: "Dataset Studio Surface",
       description: "Composed studio authoring surface for multi-step data preparation flows.",
+      group: "studio-surfaces",
+      iconToken: "studio.dataset",
       tags: Object.freeze(["studio", "dataset", "composed-ui"]),
+      keywords: Object.freeze(["dataset", "preparation", "pipeline", "stages"]),
+      contractCategory: "composed-ui",
+      capabilityFlags: Object.freeze(["nested-studios", "preview"]),
     }),
     propsSchema: Object.freeze({ schemaId: "studio.dataset-surface.input", schemaVersion: "1.0.0" }),
     supportedModes: Object.freeze([
