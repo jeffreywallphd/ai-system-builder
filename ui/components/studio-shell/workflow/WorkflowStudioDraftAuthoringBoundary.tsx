@@ -7,10 +7,8 @@ import {
   validateWorkflowDraft,
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import type { WorkflowStudioModeId } from "../../../studio-shell/workflow/WorkflowStudioModes";
-import WorkflowStudioCanvasModeSurface from "./WorkflowStudioCanvasModeSurface";
-import WorkflowStudioWizardModeSurface from "./WorkflowStudioWizardModeSurface";
-import WorkflowStudioWizardModeLayout from "./WorkflowStudioWizardModeLayout";
-import WorkflowStudioCanvasModeLayout from "./WorkflowStudioCanvasModeLayout";
+import WorkflowStudioCanvasExperienceSurface from "./WorkflowStudioCanvasExperienceSurface";
+import WorkflowStudioWizardExperienceSurface from "./WorkflowStudioWizardExperienceSurface";
 import type { WorkflowStudioModeValidationIssue } from "../../../studio-shell/workflow/WorkflowStudioModeValidation";
 import type { WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import type { WorkflowStudioWizardPageId } from "../../../studio-shell/workflow/WorkflowStudioWizardRouting";
@@ -250,8 +248,8 @@ function WorkflowStudioModeSurfaceRenderer({
   const renderWorkflowModeSurface = (mode: ExperienceAssetModeDefinition): JSX.Element => {
     if (mode.id === ExperienceAssetModeIds.wizard) {
       return (
-        <WorkflowStudioWizardModeLayout>
-          {WorkflowStudioWizardModeSurface({
+        <section className="ui-stack ui-stack--xs" data-testid="workflow-studio-wizard-experience-surface">
+          {WorkflowStudioWizardExperienceSurface({
             studioId: resolvedWorkflowModeContext.studioId,
             selectedWizardPageId: resolvedWorkflowModeContext.selectedWizardPageId,
             onSelectWizardPage: (pageId) => {
@@ -272,13 +270,13 @@ function WorkflowStudioModeSurfaceRenderer({
             onSetHandoffStatus: resolvedWorkflowModeContext.setHandoffStatus,
             onClearHandoffStatus: resolvedWorkflowModeContext.clearHandoffStatus,
           })}
-        </WorkflowStudioWizardModeLayout>
+        </section>
       );
     }
 
     return (
-      <WorkflowStudioCanvasModeLayout>
-        {WorkflowStudioCanvasModeSurface({
+      <section className="ui-stack ui-stack--xs" data-testid="workflow-studio-canvas-experience-surface">
+        {WorkflowStudioCanvasExperienceSurface({
           studioId: resolvedWorkflowModeContext.studioId,
           sharedDraft: resolvedWorkflowModeContext.sharedDraft,
           draftValidationIssues: resolvedWorkflowModeContext.draftValidationIssues,
@@ -287,7 +285,7 @@ function WorkflowStudioModeSurfaceRenderer({
           onChangeDraftEditorContent: onChangeContent,
           drawerState: resolvedWorkflowModeContext.canvasDrawers,
         })}
-      </WorkflowStudioCanvasModeLayout>
+      </section>
     );
   };
 

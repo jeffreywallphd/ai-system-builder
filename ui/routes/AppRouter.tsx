@@ -13,7 +13,7 @@ import ContextPage from "../pages/ContextPage";
 import McpPage from "../pages/McpPage";
 import ManagedServicesPage from "../pages/ManagedServicesPage";
 import NotFoundPage from "../pages/NotFoundPage";
-import WorkflowEditorPage from "../pages/WorkflowEditorPage";
+import LegacyWorkflowEditorRedirectPage from "../pages/LegacyWorkflowEditorRedirectPage";
 import WorkflowConversationPage from "../pages/WorkflowConversationPage";
 import ContextWorkbenchPage from "../pages/ContextWorkbenchPage";
 import WorkflowsPage from "../pages/WorkflowsPage";
@@ -84,7 +84,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.workflows, element: resolveLegacyRouteElement(ROUTE_PATHS.workflows, <WorkflowsPage />, migrationService) },
           {
             path: ROUTE_PATHS.workflowEditor,
-            element: <WorkflowEditorPage />,
+            element: <LegacyWorkflowEditorRedirectPage />,
           },
           {
             path: ROUTE_PATHS.workflowConversation,

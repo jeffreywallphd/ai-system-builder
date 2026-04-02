@@ -6,7 +6,7 @@ describe("ui/pages contract adherence", () => {
     const pages = [
       "ui/pages/HomePage.tsx",
       "ui/pages/WorkflowsPage.tsx",
-      "ui/pages/WorkflowEditorPage.tsx",
+      "ui/pages/DEPRECATED_WorkflowEditorPage.tsx",
       "ui/pages/ModelsPage.tsx",
       "ui/pages/ContextWorkbenchPage.tsx",
       "ui/pages/ContextPage.tsx",
