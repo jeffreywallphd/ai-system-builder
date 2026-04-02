@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createSystemCanvasExperienceDefinition } from "../SystemCanvasExperienceAdapter";
-import { createSystemWizardExperienceAdapterModel, SystemWizardPageIds } from "../SystemWizardExperienceAdapter";
+import { createSystemWizardExperienceAdapterModel, SystemWizardPageIds } from "../DEPRECATED_SystemWizardExperienceAdapter";
 import type { StudioShellExtensionContext } from "../../StudioShellExtensions";
 
 const extensionContext: StudioShellExtensionContext = Object.freeze({
@@ -15,7 +15,7 @@ const extensionContext: StudioShellExtensionContext = Object.freeze({
   }),
 });
 
-describe("System studio experience adapters", () => {
+describe("System studio experience adapters (deprecated wizard adapter + active canvas adapter)", () => {
   const buildCanvasModel = (content: string) => createSystemCanvasExperienceDefinition({
     content,
     extensionContext,

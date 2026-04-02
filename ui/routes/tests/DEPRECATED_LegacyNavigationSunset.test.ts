@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { IntentNavigationFeatureFlag } from "../../features/IntentNavigationFeatureFlag";
-import { LegacyNavigationFeatureFlag } from "../../features/LegacyNavigationFeatureFlag";
+import { LegacyNavigationFeatureFlag } from "../../features/DEPRECATED_LegacyNavigationFeatureFlag";
 import { ROUTE_PATHS } from "../RouteConfig";
-import { NavigationMigrationService } from "../LegacyNavigationSunset";
+import { NavigationMigrationService } from "../DEPRECATED_LegacyNavigationSunset";
 
 describe("NavigationMigrationService", () => {
   it("hides legacy navigation entries when in sunset mode", () => {

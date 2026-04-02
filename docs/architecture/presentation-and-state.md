@@ -318,15 +318,15 @@ Current Direction 5 UI status:
 
 Direction 5 Epic 11 final hardening status (stories 11.23-11.24):
 - UX consistency hardening now has shared policy/regression seams in `ui/routes/UxConsistencyPolicy.ts` and `ui/routes/IntentUxRegressionSuite.ts`, focused on intent-first terminology, taxonomy suppression in primary UX, and cross-surface route/origin continuity across Build/Explore/Run plus shell-adjacent surfaces.
-- Legacy UX cleanup is now explicitly policy-driven through `LegacyUxCleanupPlanner` in `ui/routes/LegacyNavigationSunset.ts`, keeping compatibility behavior tied to existing sunset controls instead of ad hoc route handling.
+- Legacy UX cleanup policy artifacts are now retained as deprecated references (`ui/routes/DEPRECATED_LegacyNavigationSunset.ts`), while active routing uses canonical path redirects directly in `ui/routes/AppRouter.tsx`.
 - Explore is the user-facing library term in page-level hero copy (`ui/pages/RegistryPage.tsx`), while internal registry route naming remains implementation detail.
-- Remaining bounded compatibility paths are intentional and controlled by feature flags (`VITE_FEATURE_INTENT_NAVIGATION`, `VITE_FEATURE_LEGACY_NAVIGATION`) rather than accidental parallel navigation models.
+- Legacy compatibility feature-flag gating is now disconnected from active runtime routing; canonical Build/Explore/Run redirects are always enforced for deprecated entry paths.
 
 Intent UX documentation alignment checklist (implemented scope):
 - Implemented now: Build/Explore/Run primary navigation shell, intent-based Build entry/routing, contextual breadcrumbs/return paths, unified Run launch model, command palette onboarding/recommendations/recents integration, and legacy-route sunset controls.
 - Build now includes a dedicated intent-first automation entry route (`/build/automate`) where users describe automation goals in plain language (`What do you want to automate?`) before launching the existing workflow studio path; intent text is carried forward via build-routing prefill context and URL handoff metadata.
 - Primary route switching is now command-palette-driven in the app shell header; the legacy header link strip is removed, and Home remains accessible through the AI Loom Studio logo link.
-- Partially implemented / bounded: legacy route compatibility remains available behind sunset mode for staged rollout; legacy screens are redirected/hidden by policy rather than fully deleted.
+- Implemented now: deprecated studio-era entry paths are always redirected to canonical Build/Explore/Run routes in active runtime; old compatibility policy code is retained only as deprecated reference files.
 - Future work (not implemented here): full removal of legacy feature-flag compatibility paths after rollout criteria are complete.
 
 Workflow persistence reuse hardening (stories 11.11-11.14):
@@ -714,7 +714,7 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - what major sections/panels exist on each page,
   - high-level navigation structure,
   - system-level defaults/settings.
-- Wizard flow was narrowed to `Pages`, `Page layout`, and `Settings` in `SystemWizardExperienceAdapter`; legacy embedded data/workflow authoring steps were removed from the core System Studio flow.
+- Wizard flow was narrowed to `Pages`, `Page layout`, and `Settings` in `SystemStudioDraftAuthoringBoundary`; legacy embedded data/workflow authoring steps were removed from the core System Studio flow.
 - Canvas behavior was narrowed to structure editing in `SystemCanvasExperienceAdapter`; legacy composition/parameter inspector responsibilities were removed and replaced with structure-only guidance.
 - Persistence remains canonical and unchanged:
   - `systemSpec.pages` for page model,
