@@ -3,15 +3,26 @@ import { Link, useNavigate } from "react-router-dom";
 import { BuildEntryService, BuildIntents, type BuildIntent } from "../routes/BuildEntry";
 import { PersistedWorkflowEntryService, type PersistedWorkflowEntry } from "../routes/PersistedWorkflowEntryService";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
+import { ReferenceImageSystemTemplate } from "../../application/system-studio/ReferenceImageSystemTemplate";
 
 export interface BuildTemplateCard {
   readonly id: string;
   readonly title: string;
   readonly description: string;
   readonly difficulty: "Beginner" | "Intermediate" | "Advanced";
+  readonly actionPath?: string;
+  readonly actionLabel?: string;
 }
 
 const buildTemplateCards: ReadonlyArray<BuildTemplateCard> = Object.freeze([
+  Object.freeze({
+    id: ReferenceImageSystemTemplate.templateId,
+    title: "Reference Image Manipulation System",
+    description: "Compose a system asset with runtime-owned input/output image dataset instances and explicit workflow/UI boundaries.",
+    difficulty: "Intermediate",
+    actionPath: `${ROUTE_PATHS.systemStudio}?buildTemplateId=${encodeURIComponent(ReferenceImageSystemTemplate.templateId)}`,
+    actionLabel: "Open in System Studio",
+  }),
   Object.freeze({
     id: "support-assistant",
     title: "Customer Support Assistant",
@@ -146,6 +157,11 @@ export default function BuildPage(): JSX.Element {
                   <p className="ui-card__subtitle">{template.description}</p>
                 </div>
                 <span className="ui-badge ui-badge--neutral">Difficulty: {template.difficulty}</span>
+                {template.actionPath ? (
+                  <Link className="ui-button ui-button--ghost ui-button--small" to={template.actionPath}>
+                    {template.actionLabel ?? "Open template"}
+                  </Link>
+                ) : null}
               </div>
             </article>
           ))}

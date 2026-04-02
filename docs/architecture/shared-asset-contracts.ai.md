@@ -745,3 +745,20 @@
 
 - Added reusable/versioned mapping configuration contracts in `domain/system-studio/SystemContextWorkflowMappingConfiguration.ts` for explicit source-path -> workflow-target mapping.
 - System assets can persist/reuse these mapping definitions through `SystemExecutionMetadata.workflowContextMapping` in `domain/system-studio/SystemAssetDomain.ts`.
+
+## Direction 5 extension update: reference image system template + system-owned dataset instance plan (stories 5.1.1-5.1.2)
+
+- Added a first-class reference image manipulation **system template contract** (`application/system-studio/ReferenceImageSystemTemplate.ts`) that composes:
+  - input image dataset asset boundary,
+  - output image dataset asset boundary,
+  - workflow-template boundary,
+  - UI boundary placeholder.
+- The template declares explicit system IO contracts (`sourceImage`, `editInstruction`, `editedImages`) and binding edges at the system layer, keeping orchestration concerns in workflow assets.
+- Dataset instances are modeled as **runtime-owned system instances** (not global/static dataset assets) through inspectable binding descriptors with:
+  - per-instance IDs,
+  - dataset asset linkage,
+  - role/purpose (`input-store`/`output-store`),
+  - required media schema intent and canonical image metadata record shape (`image-metadata-records`).
+- Runtime provisioning is represented through `buildReferenceImageDatasetInstanceRequests(systemId)` to produce bounded `EnsureRoleDatasetInstanceRequest` contracts for `SystemDatasetInstanceService` reuse.
+- Build route exposure now includes a `/build` template card that links to System Studio for this reference-image system path, keeping vertical-slice discovery inside the existing Build UX entry surface.
+
