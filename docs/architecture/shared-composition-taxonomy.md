@@ -37,6 +37,13 @@ What is now implemented:
   - `context-bundle` = input preparer
 - These are semantic-role distinctions inside one shared taxonomy (not separate architecture stacks).
 
+## Image-slice interface asset interpretation (stories 4.4.1-4.4.2)
+
+- For image manipulation UI assets, taxonomy/composition guidance is:
+  - atomic interface assets: reusable bounded components like output gallery item/card, output detail pane, metadata summary panel, parameter summary panel.
+  - higher-level composed interface assets: system-bound assemblies that compose those atomic assets and bind them to system context + dataset instances + workflow/run events.
+- In this slice, contract design is generalized for future media/document/system interfaces, while concrete implementation remains image-focused.
+
 What is **not** implemented in this slice:
 
 - no new UI composer

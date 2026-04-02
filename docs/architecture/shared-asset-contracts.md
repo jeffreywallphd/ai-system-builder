@@ -747,6 +747,23 @@ Not implemented in this slice:
 - Persistence failures after successful execution are bounded/predictable: execution result status is promoted to failed with structured persistence issue metadata, and write-plan/materialization denials fail before any dataset writes.
 - Added focused runtime unit/integration coverage for success + bounded failure paths, append-oriented history behavior, comparison grouping semantics, and lineage/traceability metadata propagation.
 
+## AI Loom Image Manipulation vertical-slice update: output gallery data contract + output dataset retrieval (stories 4.4.1-4.4.2)
+
+- Added a canonical internal output-gallery contract in `application/system-runtime/OutputGalleryDataContract.ts`:
+  - image asset/storage reference fields,
+  - system-owned dataset instance reference fields,
+  - workflow/run linkage,
+  - optional source-image linkage,
+  - admitted/updated timestamps,
+  - generation parameter summaries,
+  - image metadata summaries,
+  - tags + derived attributes for reusable filtering/inspection.
+- Added a dataset-backed retrieval seam in `application/system-runtime/OutputGalleryDatasetIntegrationService.ts` that:
+  - reads records from `SystemDatasetInstanceService` (existing system-owned dataset authority),
+  - projects persisted dataset records into the gallery contract with paging and inspectable summaries,
+  - keeps retrieval contract-first and storage-adapter agnostic.
+- This keeps output-gallery state grounded in persisted dataset state (not renderer-local ad hoc output arrays) while remaining reusable for future non-image media/document gallery surfaces via the same contract shape.
+
 ## AI Loom Image System vertical-slice update: system context contract + mapping seam (stories 4.3.1-4.3.2)
 
 - System context now has a formal internal contract in `domain/system-studio/SystemContextContract.ts` with explicit, inspectable fields for:
