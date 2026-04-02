@@ -10,6 +10,7 @@ export * from "./ImageViewer";
 export * from "./ImageParameterMappers";
 export * from "./ImageParameterForm";
 export * from "./ImageOutputGallery";
+export * from "./ImageOutputGalleryDataAdapter";
 export * from "./useSynchronizedImageViewport";
 export * from "./ImageComparisonView";
 export * from "./ImageSystemStateIntegration";

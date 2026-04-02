@@ -465,6 +465,27 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Added a reusable synchronized viewport hook (`ui/components/assets/image-system/useSynchronizedImageViewport.ts`) so comparison and future image surfaces can share one zoom/pan state seam instead of per-component interaction logic.
 - Added explicit state integration/mapping seams in `ui/components/assets/image-system/ImageSystemStateIntegration.ts` so selected image, image collections, parameter values, dataset/system refs, and interaction/loading/error component state can be propagated coherently into upload/viewer/parameter/gallery/comparison component props without introducing a parallel state architecture.
 
+## AI Loom image manipulation update: output gallery contract + dataset-backed interface composition (stories 4.4.1-4.4.2)
+
+- Interface-asset composition guidance is now explicit for the image slice:
+  - **atomic interface assets** stay bounded/reusable (`ImageOutputGallery`, output detail/viewer pane, metadata summary panel, parameter summary panel),
+  - **higher-level composed interface assets** bind those atomic assets to system context, workflow/runtime context, and system-owned dataset state.
+- Added a canonical output gallery data contract in `application/system-runtime/OutputGalleryDataContract.ts` for persisted gallery rows with:
+  - image reference + dataset instance linkage,
+  - workflow/run linkage,
+  - optional source-image linkage,
+  - timestamps,
+  - generation/transform parameter summary,
+  - image metadata summary,
+  - tags + derived attributes.
+- Added dataset integration orchestration in `application/system-runtime/OutputGalleryDatasetIntegrationService.ts`:
+  - retrieves image outputs from system-owned dataset instances through `SystemDatasetInstanceService`,
+  - maps persisted records into the new gallery contract (no ad hoc renderer-local output state),
+  - preserves inspectability/paging semantics for future media/document/system interface reuse.
+- Added UI adapter seam `ui/components/assets/image-system/ImageOutputGalleryDataAdapter.ts`:
+  - maps contract-backed gallery listings into reusable image interface state/view-models,
+  - keeps UI components runtime/storage agnostic while grounding output gallery display in persisted dataset-backed state.
+
 ## Direction 5 UI update: Image component event contracts + style reuse alignment (stories 4.1.9-4.1.10)
 
 - Epic 4.1 image components now emit one standardized UI event envelope (`ImageUiEvent`) with typed event names/payloads in `ui/components/assets/image-system/ImageUiContracts.ts`, covering upload lifecycle, image selection/deselection, parameter change/submit/reset, gallery interactions, comparison target/mode changes, and viewer interactions.
@@ -506,4 +527,3 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Trigger payload mapping now carries both normalized UI metadata and top-level event payload fields, enabling trigger-payload input bindings to resolve business keys directly.
 - Dispatcher results now return structured dispatch records and inspectable issue codes (including blocking validation codes) for invalid/missing UI-derived parameters.
 - Added tests cover dispatch behavior, no-match/error outcomes, payload normalization/mapping, and invalid input handling.
-

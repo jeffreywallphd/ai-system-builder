@@ -10,6 +10,7 @@ import { ImageViewer } from "../image-system/ImageViewer";
 import { createInitialImageInterfaceState, mapStateToComparisonProps, mapStateToOutputGalleryProps } from "../image-system/ImageSystemStateIntegration";
 import { mapAssetContractParametersToImageParameters } from "../image-system/ImageParameterMappers";
 import { DEFAULT_IMAGE_RENDER_OPTIONS, type ImageUiViewModel } from "../image-system/ImageUiContracts";
+import { mapOutputGalleryListingToImageInterfaceState } from "../image-system/ImageOutputGalleryDataAdapter";
 
 describe("image-system components", () => {
   it("maps browser file validation through ingestion policy contracts", () => {
@@ -153,5 +154,64 @@ describe("image-system components", () => {
     expect(galleryProps.datasetContext?.datasetAssetId).toBe("dataset-1");
     expect(comparisonProps.mode).toBe("overlay");
     expect(comparisonProps.items.length).toBe(2);
+  });
+
+  it("adapts dataset-backed output gallery listings into image interface state", () => {
+    const statePatch = mapOutputGalleryListingToImageInterfaceState({
+      kind: "output-gallery-items",
+      summary: {
+        systemId: "system:image",
+        datasetInstanceId: "instance:outputs",
+        datasetAssetId: "asset:dataset:outputs",
+        datasetAssetVersionId: "v1",
+        role: "system-output",
+        totalItems: 1,
+        returnedItems: 1,
+        truncated: false,
+      },
+      window: {
+        offset: 0,
+        limit: 20,
+        hasPreviousWindow: false,
+        hasNextWindow: false,
+      },
+      items: [{
+        itemId: "instance:outputs:record:1:1",
+        image: {
+          recordId: "record:1",
+          selectionId: "record:1",
+          imageReference: "storage://outputs/record-1.png",
+          thumbnailReference: "storage://outputs/record-1-thumb.png",
+          width: 512,
+          height: 512,
+          format: "png",
+        },
+        dataset: {
+          systemId: "system:image",
+          instanceId: "instance:outputs",
+          datasetAssetId: "asset:dataset:outputs",
+          datasetAssetVersionId: "v1",
+          role: "system-output",
+        },
+        workflow: {
+          workflowRunId: "run:1",
+          workflowAssetId: "asset:workflow:image",
+          generationRole: "primary",
+        },
+        timestamps: {
+          admittedAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:10.000Z",
+        },
+        generationParametersSummary: { prompt: "studio portrait" },
+        imageMetadataSummary: { metadata: { prompt: "studio portrait" }, hasAnnotations: false, hasDerived: true },
+        tags: ["generated", "portrait"],
+        derivedAttributes: { orientation: "square" },
+      }],
+    });
+
+    expect(statePatch.datasetRef?.datasetInstanceId).toBe("instance:outputs");
+    expect(statePatch.systemRef?.systemAssetId).toBe("system:image");
+    expect(statePatch.imageCollection[0]?.imageId).toBe("record:1");
+    expect(statePatch.imageCollection[0]?.context?.workflowRunId).toBe("run:1");
   });
 });
