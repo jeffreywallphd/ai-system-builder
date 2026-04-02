@@ -865,4 +865,23 @@ Not implemented in this slice:
 - Start execution in System Studio now reuses that shared context directly and forwards it through runtime start metadata, instead of rebuilding ad hoc trigger-only payloads in each click handler.
 - Output persistence now accepts and carries the same shared runtime context into run-history records, so lineage fields remain stable across Data/Workflow/System boundaries without studio-specific reconstruction.
 - Image run-history lineage now records a compact cross-studio trace surface (source image ref, source dataset instance/asset, workflow asset/version, system asset/version, runtime session/trace handle, output dataset and record ids, explicit `status` + `missing` fields).
+
+## Direction 5 extension update: system serialization + asset reference resolution seams (stories 5.3.1-5.3.2)
+
+- System draft/version content now uses a canonical serialization contract in `domain/system-studio/SystemSerializationContract.ts` (`ai-loom.system-serialization`, `schemaVersion=1.0.0`) with explicit sections for:
+  - version/compatibility metadata,
+  - system definition data (components, dependencies, interfaces, bindings, execution metadata),
+  - asset reference projections (dataset/workflow references),
+  - runtime-owned references/state (dataset-instance references + runtime binding envelope),
+  - UI/presentation configuration payload.
+- Parsing/validation is centralized and zod-backed at this seam:
+  - unsupported serialized versions are rejected via explicit `unsupported-system-serialization-version:*` errors,
+  - legacy `systemSpec` payloads remain loadable through compatibility backfill into the canonical contract shape.
+- System Studio draft create/update paths now serialize through that seam so persisted content carries explicit serialization metadata while preserving legacy fields that current UI/runtime flows still read.
+- Runtime now includes a reusable serialized asset-reference resolution layer in `application/system-runtime/SerializedAssetReferenceResolutionService.ts` that resolves `kind`/`assetId`/`versionId` references with structured result codes:
+  - `missing-asset`,
+  - `incompatible-version`,
+  - `invalid-reference`,
+  - `unsupported-serialized-version`.
+- Runtime system loading (`SystemRuntimeApplicationService`) now applies that resolver and surfaces graceful typed failures (`invalid-request:serialized-reference-*`) when serialized references cannot be resolved.
 - Broken lineage is explicit and safe: failed or partial runs now mark lineage as `incomplete`/`partial` with `missing` field hints instead of silently writing ambiguous history entries.

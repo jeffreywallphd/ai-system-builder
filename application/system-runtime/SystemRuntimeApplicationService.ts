@@ -49,6 +49,11 @@ import {
   type PersistedExecutionRecord,
 } from "./SystemRuntimeExecutionStore";
 import { parsePersistedRuntimeCapabilityBindingEnvelope } from "./RuntimeCapabilityBindingPersistence";
+import { parseSystemSerializationDocument } from "../../domain/system-studio/SystemSerializationContract";
+import {
+  SerializedAssetReferenceResolutionIssueCodes,
+  SerializedAssetReferenceResolutionService,
+} from "./SerializedAssetReferenceResolutionService";
 
 export interface StartSystemRuntimeExecutionRequest {
   readonly studioId?: string;
@@ -236,13 +241,8 @@ function trimOrUndefined(value?: string): string | undefined {
 }
 
 function parseSystemContent(content: string): SystemSpecContent {
-  const raw = content.trim();
-  if (!raw) {
-    return Object.freeze({});
-  }
-
-  const parsed = JSON.parse(raw) as { readonly systemSpec?: SystemSpecContent };
-  return Object.freeze(parsed.systemSpec ?? {});
+  const parsed = parseSystemSerializationDocument({ content });
+  return Object.freeze(parsed.systemSpec);
 }
 
 function resolveRuntimeCapabilityTrace(root: SystemAsset): RuntimeCapabilityExecutionTrace | undefined {
@@ -346,11 +346,14 @@ export class SystemRuntimeApplicationService {
   private readonly orchestration = new ExecutionOrchestrationService(new StepExecutionEngine(), new ExecutionPlanBuilder());
   private readonly runtimeInputValidation = new RuntimeInputValidationService();
   private readonly environmentConfigurationValidator = new ExecutionEnvironmentConfigurationValidator();
+  private readonly serializedReferenceResolver: SerializedAssetReferenceResolutionService;
 
   public constructor(
     private readonly repository: IStudioShellRepository,
     private readonly executionStore: ISystemRuntimeExecutionStore = new InMemorySystemRuntimeExecutionStore(),
-  ) {}
+  ) {
+    this.serializedReferenceResolver = new SerializedAssetReferenceResolutionService(repository);
+  }
 
   public async startExecution(request: StartSystemRuntimeExecutionRequest): Promise<StartSystemRuntimeExecutionResult> {
     const referenceCount = [request.draftId, request.versionId].filter((entry) => Boolean(entry?.trim())).length;
@@ -702,13 +705,19 @@ export class SystemRuntimeApplicationService {
       throw new Error(`invalid-request:Version '${version.versionId}' is missing published system content in metadata.`);
     }
 
+    const parsedDocument = parseSystemSerializationDocument({
+      content: envelope.content,
+      dependencies: envelope.dependencies ?? [],
+    });
+    await this.assertSerializedReferencesResolvable(parsedDocument);
+
     return createSystemAsset({
       assetId: version.assetId.value,
       versionId: version.versionId,
       taxonomy: envelope.metadata?.taxonomy ?? createSystemStudioTaxonomy(),
       provenance: envelope.metadata?.provenance,
       dependencies: envelope.dependencies ?? [],
-      ...parseSystemContent(envelope.content),
+      ...parsedDocument.systemSpec,
     });
   }
 
@@ -727,14 +736,50 @@ export class SystemRuntimeApplicationService {
       return undefined;
     }
 
+    const parsedDocument = parseSystemSerializationDocument({
+      content: envelope.content,
+      dependencies: envelope.dependencies ?? [],
+    });
+    await this.assertSerializedReferencesResolvable(parsedDocument);
+
     return createSystemAsset({
       assetId: version.assetId.value,
       versionId: version.versionId,
       taxonomy: envelope.metadata?.taxonomy ?? createSystemStudioTaxonomy(),
       provenance: envelope.metadata?.provenance,
       dependencies: envelope.dependencies ?? [],
-      ...parseSystemContent(envelope.content),
+      ...parsedDocument.systemSpec,
     });
+  }
+
+  private async assertSerializedReferencesResolvable(
+    document: ReturnType<typeof parseSystemSerializationDocument>,
+  ): Promise<void> {
+    const resolution = await this.serializedReferenceResolver.resolveReferences({
+      serializedSchemaVersion: document.schemaVersion,
+      references: [
+        ...document.contract?.assetReferences.datasets ?? [],
+        ...document.contract?.assetReferences.workflows ?? [],
+      ],
+    });
+    if (resolution.ok) {
+      return;
+    }
+
+    const unsupported = resolution.issues.find((issue) => issue.code === SerializedAssetReferenceResolutionIssueCodes.unsupportedSerializedVersion);
+    if (unsupported) {
+      throw new Error(`invalid-request:${unsupported.code}:${unsupported.message}`);
+    }
+
+    const blockingIssue = resolution.issues.find((entry) => (
+      entry.code === SerializedAssetReferenceResolutionIssueCodes.invalidReference
+      || entry.code === SerializedAssetReferenceResolutionIssueCodes.incompatibleVersion
+      || (entry.code === SerializedAssetReferenceResolutionIssueCodes.missingAsset && Boolean(entry.reference.versionId))
+    ));
+    if (!blockingIssue) {
+      return;
+    }
+    throw new Error(`invalid-request:serialized-reference-${blockingIssue.code}:${blockingIssue.message}`);
   }
 
   private async resolveRootContract(root: SystemAsset): Promise<AssetContractDescriptor> {
