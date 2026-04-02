@@ -81,7 +81,6 @@ describe("SystemStudioPage contracts", () => {
   it("uses reusable wizard/canvas experience assets for system draft authoring", () => {
     const shellPageSource = readSource("ui/pages/StudioShellPage.tsx");
     const boundarySource = readSource("ui/components/studio-shell/system/SystemStudioDraftAuthoringBoundary.tsx");
-    const deprecatedWizardAdapterSource = readSource("ui/studio-shell/system/DEPRECATED_SystemWizardExperienceAdapter.tsx");
     const canvasAdapterSource = readSource("ui/studio-shell/system/SystemCanvasExperienceAdapter.tsx");
 
     expect(shellPageSource).toContain("StudioAssetHostBoundary");
@@ -89,8 +88,6 @@ describe("SystemStudioPage contracts", () => {
     expect(boundarySource).not.toContain("ExperienceAssetAuthoringBoundary");
     expect(boundarySource).toContain("SystemPageSetupEditor");
     expect(boundarySource).toContain("ConfigurableCanvasSurface");
-    expect(deprecatedWizardAdapterSource).toContain("SystemPageSetupEditor");
-    expect(deprecatedWizardAdapterSource).toContain("Detailed panel content is designed in each panel's embedded studio");
     expect(canvasAdapterSource).toContain("Page structure");
     expect(canvasAdapterSource).toContain("add-panel");
     expect(canvasAdapterSource).toContain("Add page section");
