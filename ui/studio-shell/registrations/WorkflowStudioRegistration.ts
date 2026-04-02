@@ -10,6 +10,7 @@ import WorkflowStudioRunHistoryPanel from "../../components/studio-shell/workflo
 import WorkflowTemplateSelectionPanel from "../../components/studio-shell/workflow/WorkflowTemplateSelectionPanel";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
+import { ExperienceSurfaceAssetIds } from "../experience-assets/ExperienceSurfaceAssets";
 
 export const workflowStudioRegistration: CompositeStudioRegistration = Object.freeze({
   studioType: WorkflowStudioIdentity.studioType,
@@ -21,6 +22,10 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
   shell: Object.freeze({
     title: WorkflowStudioIdentity.defaultStudioName,
     subtitle: "Shared composite shell for workflow orchestrator authoring with backend-authoritative lifecycle, validation, and publish/version flows.",
+    experienceAssets: Object.freeze([
+      ExperienceSurfaceAssetIds.loomWizard,
+      ExperienceSurfaceAssetIds.loomCanvas,
+    ]),
     drawers: Object.freeze({
       left: Object.freeze({
         label: "Nodes",

@@ -10,6 +10,11 @@ import type { WorkflowStudioWizardPageId } from "../../../studio-shell/workflow/
 import type { WorkflowStudioHandoffStatus } from "../../../studio-shell/workflow/WorkflowStudioHandoffStatus";
 import ExperienceAssetAuthoringBoundary from "../experience-assets/ExperienceAssetAuthoringBoundary";
 import { ExperienceAssetModeIds, type ExperienceAssetDefinition } from "../../../studio-shell/experience-assets/ExperienceAssetContracts";
+import {
+  ExperienceSurfaceAssetIds,
+  resolveExperienceAssetModesFromRegistrations,
+  type ExperienceSurfaceAssetId,
+} from "../../../studio-shell/experience-assets/ExperienceSurfaceAssets";
 
 export interface WorkflowStudioDraftAuthoringBoundaryProps {
   readonly isWorkflowStudio: boolean;
@@ -44,13 +49,13 @@ export interface WorkflowStudioDraftAuthoringBoundaryProps {
   };
   readonly invalidModeRouteId?: string;
   readonly invalidWizardPageRouteId?: string;
+  readonly experienceAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
 }
 
-const workflowExperienceDefinition: ExperienceAssetDefinition<WorkflowDraft, WorkflowValidationIssue> = Object.freeze({
-  id: "workflow-studio",
-  title: "Workflow Studio",
-  defaultModeId: ExperienceAssetModeIds.wizard,
-  modes: Object.freeze([
+function buildWorkflowExperienceDefinition(
+  experienceAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>,
+): ExperienceAssetDefinition<WorkflowDraft, WorkflowValidationIssue> {
+  const fallbackModes = Object.freeze([
     Object.freeze({
       id: ExperienceAssetModeIds.wizard,
       title: "Wizard",
@@ -63,19 +68,45 @@ const workflowExperienceDefinition: ExperienceAssetDefinition<WorkflowDraft, Wor
       summary: "Graph-oriented workflow authoring.",
       intent: "graph-authoring",
     }),
-  ]),
-  wizard: Object.freeze({
-    id: "wizard",
-    title: "Wizard",
-    summary: "Guided step-by-step workflow authoring.",
-  }),
-  canvas: Object.freeze({
-    id: "canvas",
-    title: "Canvas",
-    summary: "Graph-oriented workflow authoring.",
-    supportsNodePalette: true,
-  }),
-});
+  ]);
+  const resolvedModeIds = new Set(
+    resolveExperienceAssetModesFromRegistrations({
+      assetIds: experienceAssetIds,
+      fallbackModes,
+    }).map((mode) => mode.id),
+  );
+
+  const modes = fallbackModes.filter((mode) => resolvedModeIds.has(mode.id));
+  const hasWizard = modes.some((mode) => mode.id === ExperienceAssetModeIds.wizard);
+  const hasCanvas = modes.some((mode) => mode.id === ExperienceAssetModeIds.canvas);
+
+  return Object.freeze({
+    id: "workflow-studio",
+    title: "Workflow Studio",
+    defaultModeId: hasWizard ? ExperienceAssetModeIds.wizard : ExperienceAssetModeIds.canvas,
+    modes: Object.freeze(modes),
+    wizard: hasWizard
+      ? Object.freeze({
+        id: "wizard",
+        title: "Wizard",
+        summary: "Guided step-by-step workflow authoring.",
+      })
+      : undefined,
+    canvas: hasCanvas
+      ? Object.freeze({
+        id: "canvas",
+        title: "Canvas",
+        summary: "Graph-oriented workflow authoring.",
+        supportsNodePalette: true,
+      })
+      : undefined,
+  });
+}
+
+const defaultWorkflowExperienceAssetIds = Object.freeze([
+  ExperienceSurfaceAssetIds.loomWizard,
+  ExperienceSurfaceAssetIds.loomCanvas,
+]);
 
 export default function WorkflowStudioDraftAuthoringBoundary({
   isWorkflowStudio,
@@ -84,6 +115,7 @@ export default function WorkflowStudioDraftAuthoringBoundary({
   workflowModeContext,
   invalidModeRouteId,
   invalidWizardPageRouteId,
+  experienceAssetIds = defaultWorkflowExperienceAssetIds,
 }: WorkflowStudioDraftAuthoringBoundaryProps): JSX.Element {
   if (!isWorkflowStudio || !workflowModeContext) {
     return <textarea className="ui-textarea" rows={8} value={content} onChange={(event) => onChangeContent(event.target.value)} />;
@@ -92,7 +124,7 @@ export default function WorkflowStudioDraftAuthoringBoundary({
   return (
     <>
       <ExperienceAssetAuthoringBoundary
-        asset={workflowExperienceDefinition}
+        asset={buildWorkflowExperienceDefinition(experienceAssetIds)}
         currentModeId={workflowModeContext.selectedModeId}
         invalidRequestedModeId={invalidModeRouteId}
         document={workflowModeContext.sharedDraft}
