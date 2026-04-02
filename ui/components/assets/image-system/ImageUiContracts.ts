@@ -158,13 +158,22 @@ export interface ImageSelectionChangeEvent {
 export interface ImageUiViewModel {
   readonly imageId: string;
   readonly title?: string;
+  readonly subtitle?: string;
   readonly sourceUrl?: string;
   readonly thumbnailUrl?: string;
   readonly metadata: ImageRenderMetadata;
   readonly tags: ReadonlyArray<string>;
   readonly context?: ImageUiContextRef;
+  readonly previewSummary?: {
+    readonly timestamp?: string;
+    readonly workflowSummary?: string;
+    readonly parameterSummary?: Readonly<Record<string, unknown>>;
+    readonly metadataSummary?: Readonly<Record<string, unknown>>;
+  };
   readonly isPlaceholder?: boolean;
 }
+
+export type ImageCollectionPresentationMode = "grid" | "list";
 
 export interface ImageUploadPanelPropsContract {
   readonly acceptedMimeTypes: ReadonlyArray<string>;
@@ -261,11 +270,25 @@ export interface ImageOutputGalleryPropsContract {
   readonly renderOptions: ImageRenderOptions;
   readonly datasetContext?: ImageDatasetContextRef;
   readonly eventContext?: ImageUiContextRef;
+  readonly presentationMode?: ImageCollectionPresentationMode;
 }
 
 export interface ImageOutputGalleryEventContract extends ImageUiEventEmitterContract {
   readonly onSelectionChanged?: (event: ImageSelectionChangeEvent) => void;
   readonly onItemOpened?: (payload: { readonly imageId: string }) => void;
+}
+
+export interface ImageRunHistoryItemViewModel {
+  readonly runId: string;
+  readonly status: string;
+  readonly timestamp: string;
+  readonly workflowSummary: string;
+  readonly ioSummary: string;
+  readonly parameterSummary?: Readonly<Record<string, unknown>>;
+}
+
+export interface ImageRunHistoryListPropsContract {
+  readonly runs: ReadonlyArray<ImageRunHistoryItemViewModel>;
 }
 
 export interface ImageComparisonPair {

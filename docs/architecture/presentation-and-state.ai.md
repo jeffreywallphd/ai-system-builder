@@ -399,6 +399,28 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - no parallel output/history model detached from dataset-backed output records.
 - Added SQLite persistence adapter `infrastructure/filesystem/system-runtime/SqliteImageRunHistoryRepository.ts` for durable run-history storage aligned with existing repository/migration patterns.
 
+## AI Loom image manipulation update: output gallery + run history interface assets (stories 4.4.5-4.4.6)
+
+- Added explicit atomic image interface assets in `ui/components/assets/image-system` for persisted output/history rendering:
+  - `ImageOutputGalleryCollection` (grid/list presentation),
+  - `ImageRunHistoryList`,
+  - `ImageSummaryPanels` (parameter + metadata summaries reused by gallery/history items).
+- Added higher-level composed interface assets that bind atomic components to persisted internal contracts (no UI-only parallel models):
+  - `ImageOutputGalleryAsset` consumes `OutputGalleryListing` via `ImageOutputGalleryDataAdapter`,
+  - `ImageRunHistoryAsset` consumes `ImageRunHistoryListing` via `ImageRunHistoryDataAdapter`.
+- Output gallery item rendering now surfaces persisted preview information from the dataset-backed gallery contract:
+  - image preview/thumbnail,
+  - timestamp,
+  - workflow/run summary,
+  - parameter and metadata summaries.
+- Run history rendering now surfaces persisted run contract fields:
+  - run status,
+  - timestamp,
+  - workflow summary,
+  - input/output summary,
+  - parameter summary.
+- Styling remains aligned with shared image-surface primitives in `ui/styles/components/assets.css` and extends reusable class-based variants for list presentation and summary panels.
+
 ## Direction 5 UI update: Image component event contracts + style reuse alignment (stories 4.1.9-4.1.10)
 
 - Epic 4.1 image components now emit one standardized UI event envelope (`ImageUiEvent`) with typed event names/payloads in `ui/components/assets/image-system/ImageUiContracts.ts`, covering upload lifecycle, image selection/deselection, parameter change/submit/reset, gallery interactions, comparison target/mode changes, and viewer interactions.

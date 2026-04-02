@@ -3,8 +3,11 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createBrowserImageUploadIngestionAdapter } from "../image-system/BrowserImageUploadIngestionAdapter";
 import { ImageComparisonView } from "../image-system/ImageComparisonView";
+import { ImageOutputGalleryAsset, ImageRunHistoryAsset } from "../image-system/ImageComposedAssets";
 import { ImageOutputGallery } from "../image-system/ImageOutputGallery";
 import { ImageParameterForm } from "../image-system/ImageParameterForm";
+import { mapImageRunHistoryListingToViewModels } from "../image-system/ImageRunHistoryDataAdapter";
+import { ImageRunHistoryList } from "../image-system/ImageRunHistoryList";
 import { ImageUploadPanel } from "../image-system/ImageUploadPanel";
 import { ImageViewer } from "../image-system/ImageViewer";
 import { createInitialImageInterfaceState, mapStateToComparisonProps, mapStateToOutputGalleryProps } from "../image-system/ImageSystemStateIntegration";
@@ -85,6 +88,7 @@ describe("image-system components", () => {
         items: [image],
         renderOptions: DEFAULT_IMAGE_RENDER_OPTIONS,
         datasetContext: { datasetAssetId: "dataset-images", datasetVersionId: "v1" },
+        presentationMode: "list",
       }),
     );
     const comparisonHtml = renderToStaticMarkup(
@@ -106,6 +110,7 @@ describe("image-system components", () => {
     expect(formHtml).toContain("Prompt");
     expect(galleryHtml).toContain("Output gallery");
     expect(galleryHtml).toContain("dataset-images");
+    expect(galleryHtml).toContain("Select");
     expect(comparisonHtml).toContain("Image comparison");
     expect(comparisonHtml).toContain("Before vs After");
   });
@@ -213,5 +218,112 @@ describe("image-system components", () => {
     expect(statePatch.systemRef?.systemAssetId).toBe("system:image");
     expect(statePatch.imageCollection[0]?.imageId).toBe("record:1");
     expect(statePatch.imageCollection[0]?.context?.workflowRunId).toBe("run:1");
+    expect(statePatch.imageCollection[0]?.previewSummary?.workflowSummary).toContain("asset:workflow:image");
+  });
+
+  it("adapts and renders persisted run history read models", () => {
+    const listing = {
+      kind: "image-run-history" as const,
+      summary: {
+        systemId: "system:image",
+        totalRuns: 1,
+        returnedRuns: 1,
+        truncated: false,
+      },
+      window: {
+        offset: 0,
+        limit: 20,
+        hasPreviousWindow: false,
+        hasNextWindow: false,
+      },
+      runs: [{
+        runId: "run:1",
+        workflowExecutionId: "exec:1",
+        system: { systemId: "system:image" },
+        workflow: { workflowAssetId: "asset:workflow:image" },
+        inputs: {
+          parameterSummary: { prompt: "portrait", guidance: 7 },
+          images: [{ stableId: "img:1" }],
+        },
+        outputs: {
+          datasetInstance: {
+            instanceId: "instance:out",
+            datasetAssetId: "asset:dataset:outputs",
+            role: "system-output",
+            persistedRecordIds: ["record:1", "record:2"],
+          },
+          images: [{ recordId: "record:1" }],
+        },
+        status: "completed" as const,
+        timestamps: {
+          requestedAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:10.000Z",
+        },
+      }],
+    };
+
+    const runs = mapImageRunHistoryListingToViewModels(listing);
+    expect(runs[0]?.ioSummary).toBe("1 input / 2 output");
+
+    const historyHtml = renderToStaticMarkup(React.createElement(ImageRunHistoryList, { runs }));
+    expect(historyHtml).toContain("Run history");
+    expect(historyHtml).toContain("asset:workflow:image");
+
+    const composedHistoryHtml = renderToStaticMarkup(React.createElement(ImageRunHistoryAsset, { listing }));
+    expect(composedHistoryHtml).toContain("Persisted run history");
+
+    const composedGalleryHtml = renderToStaticMarkup(React.createElement(ImageOutputGalleryAsset, {
+      mode: "grid",
+      listing: {
+        kind: "output-gallery-items",
+        summary: {
+          systemId: "system:image",
+          datasetInstanceId: "instance:outputs",
+          datasetAssetId: "asset:dataset:outputs",
+          role: "system-output",
+          totalItems: 1,
+          returnedItems: 1,
+          truncated: false,
+        },
+        window: {
+          offset: 0,
+          limit: 20,
+          hasPreviousWindow: false,
+          hasNextWindow: false,
+        },
+        items: [{
+          itemId: "item:1",
+          image: {
+            recordId: "record:1",
+            selectionId: "record:1",
+            imageReference: "storage://outputs/record-1.png",
+            width: 512,
+            height: 512,
+            format: "png",
+          },
+          dataset: {
+            systemId: "system:image",
+            instanceId: "instance:outputs",
+            datasetAssetId: "asset:dataset:outputs",
+            role: "system-output",
+          },
+          workflow: {
+            workflowRunId: "run:1",
+            workflowAssetId: "asset:workflow:image",
+            generationRole: "primary",
+          },
+          timestamps: {
+            admittedAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:10.000Z",
+          },
+          generationParametersSummary: { prompt: "portrait" },
+          imageMetadataSummary: { metadata: { prompt: "portrait" }, hasAnnotations: false, hasDerived: true },
+          tags: [],
+          derivedAttributes: {},
+        }],
+      },
+    }));
+
+    expect(composedGalleryHtml).toContain("Persisted output gallery");
   });
 });

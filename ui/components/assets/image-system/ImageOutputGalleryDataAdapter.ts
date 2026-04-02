@@ -8,6 +8,7 @@ export function mapOutputGalleryItemToImageViewModel(item: OutputGalleryItem): I
     title: item.workflow
       ? `${item.workflow.workflowAssetId} · ${item.workflow.workflowRunId}`
       : item.image.recordId,
+    subtitle: item.workflow?.generationRole,
     sourceUrl: item.image.imageReference,
     thumbnailUrl: item.image.thumbnailReference,
     metadata: Object.freeze({
@@ -22,6 +23,14 @@ export function mapOutputGalleryItemToImageViewModel(item: OutputGalleryItem): I
         : undefined,
     }),
     tags: item.tags,
+    previewSummary: Object.freeze({
+      timestamp: item.timestamps.updatedAt,
+      workflowSummary: item.workflow
+        ? `${item.workflow.workflowAssetId} (${item.workflow.workflowRunId})`
+        : undefined,
+      parameterSummary: item.generationParametersSummary,
+      metadataSummary: item.imageMetadataSummary.metadata,
+    }),
     context: Object.freeze({
       dataset: Object.freeze({
         datasetAssetId: item.dataset.datasetAssetId,
