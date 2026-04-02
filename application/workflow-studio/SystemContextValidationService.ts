@@ -1,6 +1,11 @@
 import type { SystemContextContract } from "../../domain/system-studio/SystemContextContract";
 import type { WorkflowInputBindingDescriptor } from "../../domain/workflow-studio/WorkflowInputBindingDomain";
 import { previewWorkflowInputBindings, type WorkflowInputBindingPreviewResult } from "./WorkflowInputBindingPreviewService";
+import {
+  createDefaultSystemContextDatasetReferenceResolver,
+  type SystemContextDatasetReferenceResolver,
+  SystemContextDatasetResolutionIssueCodes,
+} from "./SystemContextDatasetReferenceResolver";
 
 export type SystemContextValidationSeverity = "error" | "warning";
 
@@ -12,7 +17,9 @@ export interface SystemContextValidationIssue {
     | "dataset-schema-intent-mismatch"
     | "media-schema-image-metadata-missing"
     | "required-parameter-missing"
-    | "workflow-input-unresolved";
+    | "workflow-input-unresolved"
+    | "dataset-reference-unresolved"
+    | "dataset-reference-incompatible";
   readonly severity: SystemContextValidationSeverity;
   readonly message: string;
   readonly path?: string;
@@ -108,6 +115,10 @@ function matchesDatasetContract(
 }
 
 export class SystemContextValidationService {
+  constructor(
+    private readonly datasetReferenceResolver: SystemContextDatasetReferenceResolver = createDefaultSystemContextDatasetReferenceResolver(),
+  ) {}
+
   public validate(request: SystemContextValidationRequest): SystemContextValidationResult {
     const normalizedContext = normalizeContext(request.context);
     const issues: SystemContextValidationIssue[] = [];
@@ -175,6 +186,19 @@ export class SystemContextValidationService {
       }
     });
 
+    const datasetResolution = this.datasetReferenceResolver.resolve({ datasets: normalizedContext.datasets });
+    datasetResolution.issues.forEach((issue) => {
+      issues.push(Object.freeze({
+        code: issue.code === SystemContextDatasetResolutionIssueCodes.incompatibleSchemaIntent
+          ? "dataset-reference-incompatible"
+          : "dataset-reference-unresolved",
+        severity: issue.severity,
+        message: issue.message,
+        path: issue.path,
+        details: issue.details,
+      }));
+    });
+
     request.datasetSchemaContracts?.forEach((contract, contractIndex) => {
       const matched = normalizedContext.datasets.find((dataset) => matchesDatasetContract(dataset, contract));
       if (!matched) {
@@ -230,22 +254,19 @@ export class SystemContextValidationService {
           uiFormValues: normalizedContext.parameters,
           runtimeParameters: normalizedContext.parameters,
           selectedImage,
-          datasetInstances: normalizedContext.datasets
-            .filter((dataset) => Boolean(dataset.instanceId))
+          datasetInstances: datasetResolution.resolved
             .map((dataset) => ({
-              instanceId: dataset.instanceId!,
+              instanceId: dataset.instanceId,
               systemId: dataset.systemAssetId,
               datasetAssetId: dataset.datasetAssetId,
               datasetVersionId: dataset.datasetVersionId,
               purpose: dataset.role,
               schema: {
-                recordValueType: inferValueType(dataset.metadata?.sampleRecordValue) === "unknown"
+                recordValueType: inferValueType(dataset.sampleRecordValue) === "unknown"
                   ? undefined
-                  : inferValueType(dataset.metadata?.sampleRecordValue),
+                  : inferValueType(dataset.sampleRecordValue),
               },
-              records: Array.isArray(dataset.metadata?.sampleRecords)
-                ? (dataset.metadata?.sampleRecords as ReadonlyArray<{ readonly recordId: string; readonly value: unknown }>)
-                : undefined,
+              records: dataset.sampleRecords,
             })),
         },
       });

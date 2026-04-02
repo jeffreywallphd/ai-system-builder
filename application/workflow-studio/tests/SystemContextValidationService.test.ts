@@ -22,7 +22,7 @@ describe("SystemContextValidationService", () => {
         datasetAssetId: "dataset:images",
         role: "active-input",
         metadata: {
-          schemaIntentId: "media",
+          schemaIntentId: "media-input",
           sampleRecordValue: { assetRef: { assetId: "asset:image-1" } },
           sampleRecords: [{ recordId: "record-1", value: { assetRef: { assetId: "asset:image-1" } } }],
         },
@@ -39,7 +39,7 @@ describe("SystemContextValidationService", () => {
       },
       datasetSchemaContracts: [{
         datasetAssetId: "dataset:images",
-        schemaIntentId: "media",
+        schemaIntentId: "media-input",
         expectedRecordValueType: "object",
         required: true,
       }],
@@ -108,6 +108,7 @@ describe("SystemContextValidationService", () => {
     expect(result.blockingIssues.map((issue) => issue.code)).toContain("required-parameter-missing");
     expect(result.blockingIssues.map((issue) => issue.code)).toContain("selected-image-invalid");
     expect(result.blockingIssues.map((issue) => issue.code)).toContain("dataset-schema-intent-mismatch");
+    expect(result.blockingIssues.map((issue) => issue.code)).toContain("dataset-reference-unresolved");
     expect(result.blockingIssues.map((issue) => issue.code)).toContain("workflow-input-unresolved");
   });
 });
