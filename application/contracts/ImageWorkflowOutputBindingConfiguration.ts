@@ -75,8 +75,23 @@ export function createWorkflowOutputBindingDescriptorsFromAssetConfiguration(inp
     readonly sourceDatasetAssetVersionId?: string;
     readonly sourceDatasetInstanceId?: string;
     readonly sourceRecordIds?: ReadonlyArray<string>;
+    readonly handoffId?: string;
+    readonly traceId?: string;
+    readonly workflowBindingId?: string;
+    readonly sourceStudioType?: string;
+    readonly sourceStudioId?: string;
   };
 }): ReadonlyArray<WorkflowOutputBindingDescriptor> {
+  const traceMetadata = Object.fromEntries(
+    Object.entries({
+      handoffId: input.sourceContext?.handoffId,
+      traceId: input.sourceContext?.traceId,
+      workflowBindingId: input.sourceContext?.workflowBindingId,
+      sourceStudioType: input.sourceContext?.sourceStudioType,
+      sourceStudioId: input.sourceContext?.sourceStudioId,
+    }).filter(([, value]) => value !== undefined),
+  ) as Readonly<Record<string, CanonicalRecordValue>>;
+
   return Object.freeze(input.configuration.bindings.map((binding) => {
     const targetType = binding.targetType as WorkflowOutputTargetType;
     const intent = binding.intent ?? suggestIntentForTargetType(targetType);
@@ -113,6 +128,7 @@ export function createWorkflowOutputBindingDescriptorsFromAssetConfiguration(inp
         outputRelationship: {
           relationshipType: "workflow-output-binding",
           direction: "produced-to-target",
+          metadata: Object.freeze(traceMetadata),
         },
       },
       persistence: {

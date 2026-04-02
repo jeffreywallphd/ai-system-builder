@@ -11,6 +11,7 @@ import {
   createWorkflowOutputBindingDescriptorsFromAssetConfiguration,
   type ImageWorkflowOutputBindingConfiguration,
 } from "../contracts/ImageWorkflowOutputBindingConfiguration";
+import { createImageCrossStudioHandoffContract } from "../../domain/studio-handoff/ImageStudioHandoffContract";
 import type { SystemDatasetInstanceService } from "../system-runtime/SystemDatasetInstanceService";
 import { materializeWorkflowOutputRecords } from "./WorkflowOutputRecordMaterializationService";
 import { resolveWorkflowOutputBindingWritePlan } from "./WorkflowOutputBindingResolutionService";
@@ -32,6 +33,13 @@ export interface WorkflowRuntimeOutputPersistenceResult {
     readonly bindingId?: string;
     readonly outputId?: string;
   }>;
+  readonly handoff?: Readonly<{
+    readonly handoffId: string;
+    readonly traceId: string;
+    readonly workflowBindingId?: string;
+    readonly outputDatasetInstanceIds: ReadonlyArray<string>;
+    readonly persistedRecordIds: ReadonlyArray<string>;
+  }>;
 }
 
 export interface WorkflowRuntimeOutputPersistenceService {
@@ -50,6 +58,11 @@ interface OutputBindingRuntimeMetadata {
     readonly sourceDatasetAssetVersionId?: string;
     readonly sourceDatasetInstanceId?: string;
     readonly sourceRecordIds?: ReadonlyArray<string>;
+    readonly handoffId?: string;
+    readonly traceId?: string;
+    readonly workflowBindingId?: string;
+    readonly sourceStudioType?: string;
+    readonly sourceStudioId?: string;
   };
 }
 
@@ -70,10 +83,26 @@ function extractRuntimeMetadata(input: IWorkflowExecutionInput): OutputBindingRu
   const sourceContext = (persistence.sourceContext && typeof persistence.sourceContext === "object")
     ? persistence.sourceContext as OutputBindingRuntimeMetadata["sourceContext"]
     : undefined;
+  const handoffMetadata = metadata?.imageStudioHandoff;
+  const handoffContract = handoffMetadata && typeof handoffMetadata === "object"
+    ? createImageCrossStudioHandoffContract(handoffMetadata as never)
+    : undefined;
+  const traceContext = handoffContract
+    ? Object.freeze({
+      handoffId: handoffContract.handoffId,
+      traceId: handoffContract.runtimeInput.trace.traceId,
+      workflowBindingId: handoffContract.workflow.bindingId,
+      sourceStudioType: handoffContract.sourceStudioType,
+      sourceStudioId: handoffContract.sourceStudioId,
+    })
+    : undefined;
   return Object.freeze({
     systemId,
     configuration,
-    sourceContext,
+    sourceContext: Object.freeze({
+      ...(sourceContext ?? {}),
+      ...(traceContext ?? {}),
+    }),
   });
 }
 
@@ -143,6 +172,7 @@ export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowR
         targetCount: 0,
         results: Object.freeze([]),
         issues: Object.freeze([]),
+        handoff: undefined,
       });
     }
 
@@ -154,6 +184,7 @@ export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowR
         targetCount: 0,
         results: Object.freeze([]),
         issues: Object.freeze([]),
+        handoff: undefined,
       });
     }
 
@@ -192,6 +223,15 @@ export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowR
           bindingId: issue.bindingId,
           outputId: issue.outputId,
         }))),
+        handoff: runtimeMetadata.sourceContext?.handoffId
+          ? Object.freeze({
+            handoffId: runtimeMetadata.sourceContext.handoffId,
+            traceId: runtimeMetadata.sourceContext.traceId ?? runtimeMetadata.sourceContext.handoffId,
+            workflowBindingId: runtimeMetadata.sourceContext.workflowBindingId,
+            outputDatasetInstanceIds: Object.freeze([]),
+            persistedRecordIds: Object.freeze([]),
+          })
+          : undefined,
       });
     }
 
@@ -227,6 +267,15 @@ export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowR
           message: `No workflow output assets were produced for output '${output}'.`,
           outputId: output,
         }))),
+        handoff: runtimeMetadata.sourceContext?.handoffId
+          ? Object.freeze({
+            handoffId: runtimeMetadata.sourceContext.handoffId,
+            traceId: runtimeMetadata.sourceContext.traceId ?? runtimeMetadata.sourceContext.handoffId,
+            workflowBindingId: runtimeMetadata.sourceContext.workflowBindingId,
+            outputDatasetInstanceIds: Object.freeze([]),
+            persistedRecordIds: Object.freeze([]),
+          })
+          : undefined,
       });
     }
 
@@ -327,6 +376,15 @@ export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowR
             bindingId: record.bindingId,
             outputId: record.outputId,
           })]),
+          handoff: runtimeMetadata.sourceContext?.handoffId
+            ? Object.freeze({
+              handoffId: runtimeMetadata.sourceContext.handoffId,
+              traceId: runtimeMetadata.sourceContext.traceId ?? runtimeMetadata.sourceContext.handoffId,
+              workflowBindingId: runtimeMetadata.sourceContext.workflowBindingId,
+              outputDatasetInstanceIds: Object.freeze(persistedResults.map((entry) => entry.targetDatasetInstanceId)),
+              persistedRecordIds: Object.freeze(persistedResults.map((entry) => entry.recordId)),
+            })
+            : undefined,
         });
       }
     }
@@ -344,6 +402,15 @@ export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowR
       targetCount: writePlan.plan.length,
       results: Object.freeze([...persistedResults]),
       issues: Object.freeze([]),
+      handoff: runtimeMetadata.sourceContext?.handoffId
+        ? Object.freeze({
+          handoffId: runtimeMetadata.sourceContext.handoffId,
+          traceId: runtimeMetadata.sourceContext.traceId ?? runtimeMetadata.sourceContext.handoffId,
+          workflowBindingId: runtimeMetadata.sourceContext.workflowBindingId,
+          outputDatasetInstanceIds: Object.freeze([...new Set(persistedResults.map((entry) => entry.targetDatasetInstanceId))]),
+          persistedRecordIds: Object.freeze(persistedResults.map((entry) => entry.recordId)),
+        })
+        : undefined,
     });
   }
 
