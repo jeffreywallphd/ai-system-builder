@@ -21,6 +21,12 @@ import {
   type ReferenceImageExecutionFlowIssue,
   type ReferenceImageExecutionFlowStep,
 } from "../../runtime/ReferenceImageExecutionFlowService";
+import {
+  buildReferenceImagePerformanceBaselines,
+  type ReferenceImagePerformanceBaselineSummary,
+  type ReferenceImagePerformanceRunReport,
+} from "../../runtime/ReferenceImagePerformanceTelemetry";
+import { ReferenceImageCrossStudioSyncService } from "../../runtime/ReferenceImageCrossStudioSyncService";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
   acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
@@ -183,6 +189,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
   const [diagnostics, setDiagnostics] = useState<ReadonlyArray<CrossStudioIntegrityIssue>>([]);
   const [flowSteps, setFlowSteps] = useState<ReadonlyArray<ReferenceImageExecutionFlowStep>>([]);
   const [flowIssues, setFlowIssues] = useState<ReadonlyArray<ReferenceImageExecutionFlowIssue>>([]);
+  const [performanceReports, setPerformanceReports] = useState<ReadonlyArray<ReferenceImagePerformanceRunReport>>([]);
   const [resultItems, setResultItems] = useState<ReadonlyArray<OutputGalleryItem>>([]);
   const [activeResultId, setActiveResultId] = useState<string | undefined>();
   const [isUploading, setIsUploading] = useState(false);
@@ -194,6 +201,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
   const historyLoadRequestId = useRef(0);
   const uploadAdapter = useMemo(() => createBrowserImageUploadIngestionAdapter({ policy: uploadPolicy }), []);
   const executionFlowService = useMemo(() => new ReferenceImageExecutionFlowService(), []);
+  const syncService = useMemo(() => new ReferenceImageCrossStudioSyncService(), []);
   const selectedResult = useMemo(
     () => resultItems.find((item) => item.image.recordId === activeResultId) ?? resultItems[0],
     [resultItems, activeResultId],
@@ -207,9 +215,14 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
     [selectedResult],
   );
 
+  const performanceBaselines = useMemo<ReadonlyArray<ReferenceImagePerformanceBaselineSummary>>(
+    () => buildReferenceImagePerformanceBaselines(performanceReports),
+    [performanceReports],
+  );
+
   const loadResults = () => {
     if (!draft) {
-      return Promise.resolve();
+      return Promise.resolve(Object.freeze([]) as ReadonlyArray<OutputGalleryItem>);
     }
     const requestId = resultLoadRequestId.current + 1;
     resultLoadRequestId.current = requestId;
@@ -221,15 +234,16 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
       offset: 0,
     }).then((response) => {
       if (!response.ok || !response.data) {
-        return;
+        return Object.freeze([]) as ReadonlyArray<OutputGalleryItem>;
       }
       if (requestId !== resultLoadRequestId.current) {
-        return;
+        return response.data.items;
       }
       setResultItems(response.data.items);
       if (!activeResultId && response.data.items[0]) {
         setActiveResultId(response.data.items[0].image.recordId);
       }
+      return response.data.items;
     }).finally(() => {
       if (requestId === resultLoadRequestId.current) {
         setIsLoadingResults(false);
@@ -239,7 +253,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
 
   const loadHistory = () => {
     if (!draft) {
-      return Promise.resolve();
+      return Promise.resolve(Object.freeze([]) as ReadonlyArray<ImageRunHistoryRecord>);
     }
     const requestId = historyLoadRequestId.current + 1;
     historyLoadRequestId.current = requestId;
@@ -251,12 +265,13 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
       offset: 0,
     }).then((response) => {
       if (!response.ok || !response.data) {
-        return;
+        return Object.freeze([]) as ReadonlyArray<ImageRunHistoryRecord>;
       }
       if (requestId !== historyLoadRequestId.current) {
-        return;
+        return response.data.runs;
       }
       setRunHistory(response.data.runs);
+      return response.data.runs;
     }).finally(() => {
       if (requestId === historyLoadRequestId.current) {
         setIsLoadingHistory(false);
@@ -520,7 +535,19 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
                 runtimeResult,
               }),
               refreshViews: async () => {
-                await Promise.all([loadResults(), loadHistory()]);
+                const sync = await syncService.synchronize({
+                  refreshSharedStudioSnapshot: () => context.operations.refresh(),
+                  loadLatestResults: () => loadResults(),
+                  loadLatestHistory: () => loadHistory(),
+                  previousActiveResultId: activeResultId,
+                  selectedSourceRecordId: selectedRecordId,
+                });
+                setResultItems(sync.outputs);
+                setRunHistory(sync.history);
+                setActiveResultId(sync.activeResultId);
+                if (!selectedRecordId && sync.selectedSourceRecordId) {
+                  setSelectedRecordId(sync.selectedSourceRecordId);
+                }
               },
               onSnapshot: (snapshot) => {
                 setFlowSteps(snapshot.steps);
@@ -534,6 +561,9 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
                         ? "Something went wrong while creating this image."
                         : snapshot.steps[snapshot.steps.length - 1]?.userLabel,
                 );
+              },
+              onPerformanceReport: (report) => {
+                setPerformanceReports((current) => Object.freeze([...current.slice(-9), report]));
               },
             }).finally(() => setIsStarting(false));
           }}
@@ -564,6 +594,23 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
                 <li key={`${issue.stepId}-${issue.code}-${index}`}>{issue.technicalMessage ?? issue.userMessage}</li>
               ))}
             </ul>
+          </details>
+        ) : null}
+        {performanceReports.length > 0 ? (
+          <details style={{ marginTop: "0.5rem" }}>
+            <summary className="ui-text-small ui-text-secondary">Advanced timing</summary>
+            <div className="ui-stack ui-stack--2xs" style={{ marginTop: "0.5rem" }}>
+              {performanceReports.slice(-1).map((report) => (
+                <p key={report.runId ?? String(report.finishedAt)} className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                  Last run: {Math.round(report.totalDurationMs)} ms, saved {report.persistedItemCount} item(s).
+                </p>
+              ))}
+              {performanceBaselines.map((baseline) => (
+                <p key={baseline.scenario} className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                  {baseline.scenario}: avg {Math.round(baseline.averageDurationMs)} ms across {baseline.runCount} run(s), {baseline.throughputItemsPerSecond.toFixed(2)} item/s, slowest {baseline.slowestPhase?.phaseId ?? "n/a"}.
+                </p>
+              ))}
+            </div>
           </details>
         ) : null}
       </section>

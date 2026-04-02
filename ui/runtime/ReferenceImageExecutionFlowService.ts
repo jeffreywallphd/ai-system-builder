@@ -4,6 +4,11 @@ import type {
   PersistReferenceImageOutputsRequest,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import type { RuntimeExecutionResultReadModel } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+import {
+  ReferenceImagePerformancePhaseIds,
+  ReferenceImagePerformanceTelemetrySession,
+  type ReferenceImagePerformanceRunReport,
+} from "./ReferenceImagePerformanceTelemetry";
 
 export const ReferenceImageExecutionStepIds = Object.freeze({
   trigger: "trigger",
@@ -53,19 +58,20 @@ export interface RunReferenceImageExecutionFlowRequest {
     readonly runtimeResult?: RuntimeExecutionResultReadModel;
   }) => PersistReferenceImageOutputsRequest;
   readonly onSnapshot: (snapshot: ReferenceImageExecutionFlowSnapshot) => void;
+  readonly onPerformanceReport?: (report: ReferenceImagePerformanceRunReport) => void;
 }
 
 function labelForStep(stepId: ReferenceImageExecutionStepId): string {
   if (stepId === ReferenceImageExecutionStepIds.trigger) {
-    return "Run started";
+    return "Preparing";
   }
   if (stepId === ReferenceImageExecutionStepIds.execution) {
-    return "Generating result";
+    return "Working";
   }
   if (stepId === ReferenceImageExecutionStepIds.persistence) {
-    return "Saving result";
+    return "Saving";
   }
-  return "Refreshing results";
+  return "Finished";
 }
 
 export class ReferenceImageExecutionFlowService {
@@ -73,6 +79,9 @@ export class ReferenceImageExecutionFlowService {
     const issues: ReferenceImageExecutionFlowIssue[] = [];
     const steps = new Map<ReferenceImageExecutionStepId, ReferenceImageExecutionFlowStep>();
     let executionId: string | undefined;
+    let persistedItemCount = 0;
+    let batchItemCount = 0;
+    const telemetry = new ReferenceImagePerformanceTelemetrySession();
 
     const publish = (overallStatus: ReferenceImageExecutionFlowSnapshot["overallStatus"]) => {
       const snapshot = Object.freeze({
@@ -89,6 +98,7 @@ export class ReferenceImageExecutionFlowService {
       steps.set(stepId, Object.freeze({ stepId, status, userLabel: labelForStep(stepId), details }));
     };
 
+    telemetry.startPhase(ReferenceImagePerformancePhaseIds.preparation);
     upsertStep(ReferenceImageExecutionStepIds.trigger, "started");
     publish("running");
 
@@ -103,11 +113,16 @@ export class ReferenceImageExecutionFlowService {
         userMessage: "Couldn’t finish this image.",
         technicalMessage: started.errorMessage,
       }));
-      return publish("failed");
+      telemetry.endPhase(ReferenceImagePerformancePhaseIds.preparation);
+      const failed = publish("failed");
+      request.onPerformanceReport?.(telemetry.finalize({ runId: executionId, status: failed.overallStatus, persistedItemCount, batchItemCount }));
+      return failed;
     }
     executionId = started.executionId;
+    telemetry.endPhase(ReferenceImagePerformancePhaseIds.preparation);
     upsertStep(ReferenceImageExecutionStepIds.trigger, "completed", executionId);
 
+    telemetry.startPhase(ReferenceImagePerformancePhaseIds.execution);
     upsertStep(ReferenceImageExecutionStepIds.execution, "running");
     publish("running");
     const result = await request.getExecutionResult(executionId);
@@ -131,7 +146,9 @@ export class ReferenceImageExecutionFlowService {
     } else {
       upsertStep(ReferenceImageExecutionStepIds.execution, "completed");
     }
+    telemetry.endPhase(ReferenceImagePerformancePhaseIds.execution);
 
+    telemetry.startPhase(ReferenceImagePerformancePhaseIds.persistence);
     upsertStep(ReferenceImageExecutionStepIds.persistence, "running");
     publish("running");
     const persisted = await request.persistOutputs(request.persistenceRequestFactory({ executionId, runtimeResult }));
@@ -144,6 +161,8 @@ export class ReferenceImageExecutionFlowService {
         technicalMessage: persisted.errorMessage,
       }));
     } else if (persisted.data.executionOutcome === "partial-failure" || persisted.data.status === "partial") {
+      persistedItemCount = persisted.data.persistedRecordIds.length;
+      batchItemCount = Math.max(batchItemCount, persisted.data.persistedRecordIds.length);
       upsertStep(ReferenceImageExecutionStepIds.persistence, "partially-completed", "Some results were saved.");
       for (const message of persisted.data.failureMessages) {
         issues.push(Object.freeze({
@@ -154,6 +173,8 @@ export class ReferenceImageExecutionFlowService {
         }));
       }
     } else if (persisted.data.executionOutcome === "non-recoverable-failure") {
+      persistedItemCount = persisted.data.persistedRecordIds.length;
+      batchItemCount = Math.max(batchItemCount, persisted.data.persistedRecordIds.length);
       upsertStep(ReferenceImageExecutionStepIds.persistence, "failed", "Something went wrong while creating this image.");
       for (const message of persisted.data.failureMessages) {
         issues.push(Object.freeze({
@@ -164,6 +185,8 @@ export class ReferenceImageExecutionFlowService {
         }));
       }
     } else if (persisted.data.executionOutcome === "recoverable-failure" || persisted.data.status === "failed") {
+      persistedItemCount = persisted.data.persistedRecordIds.length;
+      batchItemCount = Math.max(batchItemCount, persisted.data.persistedRecordIds.length);
       upsertStep(ReferenceImageExecutionStepIds.persistence, "failed", "Something went wrong while creating this image.");
       for (const message of persisted.data.failureMessages) {
         issues.push(Object.freeze({
@@ -174,10 +197,14 @@ export class ReferenceImageExecutionFlowService {
         }));
       }
     } else {
+      persistedItemCount = persisted.data.persistedRecordIds.length;
+      batchItemCount = Math.max(batchItemCount, persisted.data.persistedRecordIds.length);
       upsertStep(ReferenceImageExecutionStepIds.persistence, "completed", `Saved ${persisted.data.persistedRecordIds.length} image(s).`);
     }
+    telemetry.endPhase(ReferenceImagePerformancePhaseIds.persistence);
 
-    upsertStep(ReferenceImageExecutionStepIds.refresh, "running", "Preparing image preview");
+    telemetry.startPhase(ReferenceImagePerformancePhaseIds.refresh);
+    upsertStep(ReferenceImageExecutionStepIds.refresh, "running", "Refreshing saved results");
     publish("running");
     try {
       await request.refreshViews();
@@ -191,10 +218,18 @@ export class ReferenceImageExecutionFlowService {
         technicalMessage: error instanceof Error ? error.message : "Result refresh failed.",
       }));
     }
+    telemetry.endPhase(ReferenceImagePerformancePhaseIds.refresh);
 
     const hasFailed = Array.from(steps.values()).some((entry) => entry.status === "failed");
     const hasPartial = Array.from(steps.values()).some((entry) => entry.status === "partially-completed");
-    return publish(hasFailed ? "failed" : hasPartial ? "partially-completed" : "completed");
+    const finalSnapshot = publish(hasFailed ? "failed" : hasPartial ? "partially-completed" : "completed");
+    request.onPerformanceReport?.(telemetry.finalize({
+      runId: executionId,
+      status: finalSnapshot.overallStatus,
+      persistedItemCount,
+      batchItemCount: batchItemCount > 0 ? batchItemCount : persistedItemCount,
+    }));
+    return finalSnapshot;
   }
 }
 
