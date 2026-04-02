@@ -1,6 +1,12 @@
 import type { IAsset } from "../../domain/assets/interfaces/IAsset";
 import { ImageAssetReferenceKinds, type ImageAssetReferenceInput } from "../../domain/dataset-studio/contracts/ImageAssetReference";
 import type { IWorkflowExecutionInput, IWorkflowExecutionResult } from "../ports/interfaces/IWorkflowExecutor";
+import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+import {
+  ImageRunHistoryExecutionStatuses,
+  type ImageRunHistoryRecord,
+} from "../system-runtime/ImageRunHistoryDataContract";
+import type { ImageRunHistoryService } from "../system-runtime/ImageRunHistoryService";
 import {
   createWorkflowOutputBindingDescriptorsFromAssetConfiguration,
   type ImageWorkflowOutputBindingConfiguration,
@@ -96,8 +102,35 @@ function toProducedImage(asset: IAsset, outputId: string, outputIndex: number) {
   });
 }
 
+function toCanonicalRecordValue(value: unknown): CanonicalRecordValue {
+  if (
+    value === null
+    || typeof value === "string"
+    || typeof value === "number"
+    || typeof value === "boolean"
+  ) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => toCanonicalRecordValue(entry));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, toCanonicalRecordValue(entry)]));
+  }
+  return `${value}`;
+}
+
+function toCanonicalSummary(
+  value: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, CanonicalRecordValue>> {
+  return Object.freeze(Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, toCanonicalRecordValue(entry)])));
+}
+
 export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowRuntimeOutputPersistenceService {
-  public constructor(private readonly datasetInstanceService: SystemDatasetInstanceService) {}
+  public constructor(
+    private readonly datasetInstanceService: SystemDatasetInstanceService,
+    private readonly runHistoryService?: ImageRunHistoryService,
+  ) {}
 
   public async persist(request: {
     readonly input: IWorkflowExecutionInput;
@@ -142,6 +175,12 @@ export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowR
     });
 
     if (!writePlan.ready) {
+      this.recordHistory({
+        request,
+        runtimeMetadata,
+        status: ImageRunHistoryExecutionStatuses.failed,
+        persistedResults: [],
+      });
       return Object.freeze({
         status: "failed",
         persistedRecordCount: 0,
@@ -172,6 +211,12 @@ export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowR
     });
 
     if (materialized.missingOutputs.length > 0) {
+      this.recordHistory({
+        request,
+        runtimeMetadata,
+        status: ImageRunHistoryExecutionStatuses.failed,
+        persistedResults: [],
+      });
       return Object.freeze({
         status: "failed",
         persistedRecordCount: 0,
@@ -265,6 +310,12 @@ export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowR
         }));
       } catch (error) {
         const message = error instanceof Error ? error.message : "workflow-output-persistence-failed";
+        this.recordHistory({
+          request,
+          runtimeMetadata,
+          status: ImageRunHistoryExecutionStatuses.failed,
+          persistedResults,
+        });
         return Object.freeze({
           status: "failed",
           persistedRecordCount: persistedResults.length,
@@ -280,12 +331,78 @@ export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowR
       }
     }
 
+    this.recordHistory({
+      request,
+      runtimeMetadata,
+      status: ImageRunHistoryExecutionStatuses.completed,
+      persistedResults,
+    });
+
     return Object.freeze({
       status: "persisted",
       persistedRecordCount: persistedResults.length,
       targetCount: writePlan.plan.length,
       results: Object.freeze([...persistedResults]),
       issues: Object.freeze([]),
+    });
+  }
+
+  private recordHistory(input: {
+    readonly request: {
+      readonly input: IWorkflowExecutionInput;
+      readonly result: IWorkflowExecutionResult;
+    };
+    readonly runtimeMetadata: OutputBindingRuntimeMetadata;
+    readonly status: ImageRunHistoryRecord["status"];
+    readonly persistedResults: ReadonlyArray<WorkflowRuntimeOutputPersistenceResult["results"][number]>;
+  }): void {
+    if (!this.runHistoryService) {
+      return;
+    }
+
+    const inputImages = (input.runtimeMetadata.sourceContext?.sourceImageStableIds ?? [])
+      .map((stableId) => stableId.trim())
+      .filter(Boolean)
+      .map((stableId) => Object.freeze({ stableId }));
+    const outputImages = input.request.result.outputAssets
+      .filter((asset) => asset.kind === "image")
+      .map((asset) => Object.freeze({ outputId: asset.id }));
+    const firstTarget = input.persistedResults[0];
+    const outputDatasetInstance = firstTarget
+      ? Object.freeze({
+        instanceId: firstTarget.targetDatasetInstanceId,
+        datasetAssetId: input.runtimeMetadata.configuration.bindings[0]?.datasetAssetId ?? "unknown-dataset-asset",
+        datasetAssetVersionId: input.runtimeMetadata.configuration.bindings[0]?.datasetAssetVersionId,
+        role: "output-store",
+        purpose: undefined,
+        persistedRecordIds: input.persistedResults.map((entry) => entry.recordId),
+      })
+      : undefined;
+
+    this.runHistoryService.recordRun({
+      runId: input.request.result.executionId,
+      workflowExecutionId: input.request.result.executionId,
+      systemId: input.runtimeMetadata.systemId,
+      workflowAssetId: input.request.input.workflow.id,
+      workflowAssetVersionId: input.request.input.workflow.metadata?.version,
+      inputImages,
+      outputImages,
+      outputDatasetInstance,
+      parameterSummary: toCanonicalSummary((input.request.input.parameters ?? {}) as Record<string, unknown>),
+      status: input.status,
+      lineage: Object.freeze({
+        parentRunId: typeof input.request.input.parameters?.parentRunId === "string"
+          ? input.request.input.parameters.parentRunId
+          : undefined,
+        triggerEventId: typeof input.request.input.parameters?.triggerEventId === "string"
+          ? input.request.input.parameters.triggerEventId
+          : undefined,
+      }),
+      timestamps: Object.freeze({
+        startedAt: input.request.result.startedAt,
+        completedAt: input.request.result.completedAt,
+        updatedAt: input.request.result.completedAt ?? new Date().toISOString(),
+      }),
     });
   }
 }
