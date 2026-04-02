@@ -38,6 +38,10 @@ import {
 } from "../studio-shell/AtomicStudioAssetEnforcement";
 import type { AssetVersion } from "../../domain/assets/AssetVersion";
 import { parsePersistedRuntimeCapabilityBindingEnvelope } from "../system-runtime/RuntimeCapabilityBindingPersistence";
+import {
+  parseSystemSerializationDocument,
+  serializeSystemSerializationDocument,
+} from "../../domain/system-studio/SystemSerializationContract";
 
 export interface EnsureSystemStudioResult {
   readonly initialized: boolean;
@@ -166,69 +170,44 @@ function normalizeSystemExecutionMetadataInput(
 }
 
 function parseSystemContent(content: string): SystemSpecContent {
-  if (!content.trim()) {
-    return Object.freeze({});
-  }
-
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(content);
-  } catch {
-    throw new StudioShellInvalidRequestError("System draft content must be valid JSON.");
+    const parsed = parseSystemSerializationDocument({ content });
+    return Object.freeze({
+      components: parsed.systemSpec.components,
+      nestedSystems: parsed.systemSpec.nestedSystems,
+      inputs: parsed.systemSpec.inputs,
+      outputs: parsed.systemSpec.outputs,
+      parameters: parsed.systemSpec.parameters,
+      bindings: parsed.systemSpec.bindings,
+      executionMetadata: parsed.systemSpec.executionMetadata,
+    });
+  } catch (error) {
+    throw new StudioShellInvalidRequestError(
+      error instanceof Error
+        ? error.message
+        : "System draft content must be valid JSON.",
+    );
   }
-
-  if (!parsed || typeof parsed !== "object") {
-    throw new StudioShellInvalidRequestError("System draft content must be a JSON object.");
-  }
-
-  const root = parsed as { readonly systemSpec?: unknown };
-  const spec = (root.systemSpec && typeof root.systemSpec === "object")
-    ? root.systemSpec as {
-      readonly components?: ReadonlyArray<SystemAsset["components"][number]>;
-      readonly nestedSystems?: ReadonlyArray<SystemAsset["nestedSystems"][number]>;
-      readonly inputs?: ReadonlyArray<SystemAsset["inputs"][number]>;
-      readonly outputs?: ReadonlyArray<SystemAsset["outputs"][number]>;
-      readonly parameters?: ReadonlyArray<SystemAsset["parameters"][number]>;
-      readonly bindings?: ReadonlyArray<SystemAsset["bindings"][number]>;
-      readonly executionMetadata?: SystemExecutionMetadata;
-    }
-    : undefined;
-
-  return Object.freeze({
-    components: spec?.components,
-    nestedSystems: spec?.nestedSystems,
-    inputs: spec?.inputs,
-    outputs: spec?.outputs,
-    parameters: spec?.parameters,
-    bindings: spec?.bindings,
-    executionMetadata: spec?.executionMetadata,
-  });
-}
-
-function parseSystemContentEnvelope(content: string): Record<string, unknown> {
-  if (!content.trim()) {
-    return {};
-  }
-  const parsed = JSON.parse(content) as unknown;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return {};
-  }
-  return { ...(parsed as Record<string, unknown>) };
 }
 
 function serializeSystemContent(input: {
   readonly content: string;
   readonly spec: SystemSpecContent;
+  readonly dependencies?: ReadonlyArray<AssetDraftDependencyReference>;
 }): string {
-  const root = parseSystemContentEnvelope(input.content);
-  const existingSpec = (root.systemSpec && typeof root.systemSpec === "object" && !Array.isArray(root.systemSpec))
-    ? root.systemSpec as Record<string, unknown>
-    : {};
-  root.systemSpec = {
-    ...existingSpec,
-    ...input.spec,
-  };
-  return JSON.stringify(root, null, 2);
+  return serializeSystemSerializationDocument({
+    existingContent: input.content,
+    dependencies: input.dependencies ?? [],
+    systemSpec: {
+      components: input.spec.components ?? [],
+      nestedSystems: input.spec.nestedSystems ?? [],
+      inputs: input.spec.inputs ?? [],
+      outputs: input.spec.outputs ?? [],
+      parameters: input.spec.parameters ?? [],
+      bindings: input.spec.bindings ?? [],
+      executionMetadata: input.spec.executionMetadata,
+    },
+  });
 }
 
 function splitStandaloneDependencies(input: {
@@ -323,11 +302,25 @@ export class SystemStudioApplicationService {
       resolveChildContract: async (component) => this.resolveComponentContract(component),
     });
 
+    const normalizedContent = serializeSystemContent({
+      content: command.content,
+      dependencies: provisional.dependencies,
+      spec: {
+        components: provisional.components,
+        nestedSystems: provisional.nestedSystems,
+        inputs: provisional.inputs,
+        outputs: provisional.outputs,
+        parameters: provisional.parameters,
+        bindings: provisional.bindings,
+        executionMetadata: provisional.executionMetadata,
+      },
+    });
+
     return this.studioShellService.createAssetDraft({
       studioId,
       sessionId: command.sessionId,
       draftId: command.draftId,
-      content: command.content,
+      content: normalizedContent,
       metadata: createSystemAssetMetadata({
         title: command.title,
         summary: command.summary,
@@ -360,6 +353,19 @@ export class SystemStudioApplicationService {
       dependencies,
       ...parseSystemContent(content),
     });
+    const normalizedContent = serializeSystemContent({
+      content,
+      dependencies: systemAsset.dependencies,
+      spec: {
+        components: systemAsset.components,
+        nestedSystems: systemAsset.nestedSystems,
+        inputs: systemAsset.inputs,
+        outputs: systemAsset.outputs,
+        parameters: systemAsset.parameters,
+        bindings: systemAsset.bindings,
+        executionMetadata: systemAsset.executionMetadata,
+      },
+    });
 
     const contract = await this.contractResolver.resolveSystemContract({
       root: systemAsset,
@@ -371,7 +377,7 @@ export class SystemStudioApplicationService {
       studioId,
       sessionId: command.sessionId,
       draftId: command.draftId,
-      content: command.content,
+      content: normalizedContent,
       metadataPatch: {
         summary: command.summary,
         tags: command.tags,
@@ -526,6 +532,7 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
+        dependencies,
         spec: {
           components: nextSystem.components,
           nestedSystems: buildNestedSystemReferences(nextSystem),
@@ -569,6 +576,7 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
+        dependencies,
         spec: {
           components: nextSystem.components,
           nestedSystems: buildNestedSystemReferences(nextSystem),
@@ -603,6 +611,7 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
+        dependencies: loaded.draft.dependencies,
         spec: {
           components,
           nestedSystems: buildNestedSystemReferences(createSystemAsset({
@@ -647,6 +656,7 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
+        dependencies: collectSystemDirectDependencies(nextSystem),
         spec: {
           components: nextSystem.components,
           nestedSystems: buildNestedSystemReferences(nextSystem),
@@ -686,6 +696,7 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
+        dependencies: collectSystemDirectDependencies(nextSystem),
         spec: {
           components: nextSystem.components,
           nestedSystems: buildNestedSystemReferences(nextSystem),
@@ -728,6 +739,7 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
+        dependencies: collectSystemDirectDependencies(nextSystem),
         spec: {
           components: nextSystem.components,
           nestedSystems: buildNestedSystemReferences(nextSystem),
