@@ -74,6 +74,7 @@ import {
   createStudioHostContext,
   createStudioHostSessionState,
   datasetStudioSurfaceAssetDefinition,
+  schemaStudioSurfaceAssetDefinition,
   systemStudioSurfaceAssetDefinition,
   workflowStudioSurfaceAssetDefinition,
 } from "../studio-shell/studio-assets/StudioSurfaceAssetDefinitions";
@@ -1689,6 +1690,24 @@ export default function StudioShellPage({
                   content,
                   extensionContext,
                   experienceAssetIds: studioRegistration?.shell?.experienceAssets,
+                },
+              })}
+              session={createStudioHostSessionState({
+                sessionId,
+                draftId,
+                isBusy,
+                operationError,
+              })}
+              onEvent={handleStudioAssetEvent}
+            />
+          ) : studioRegistration?.role === "schema" ? (
+            <StudioAssetHostBoundary
+              asset={schemaStudioSurfaceAssetDefinition}
+              context={createStudioHostContext({
+                mode: StudioAssetRenderModes.full,
+                input: {
+                  content,
+                  onChangeContent: updateContent,
                 },
               })}
               session={createStudioHostSessionState({

@@ -48,8 +48,10 @@ describe("StudioUiAssetContracts", () => {
 
   it("supports discovery by composed asset identity through shared definition list", () => {
     const resolved = resolveStudioSurfaceAssetDefinitionById("workflow-studio");
+    const schema = resolveStudioSurfaceAssetDefinitionById("schema-studio");
     expect(resolved).toBeDefined();
     expect(resolved?.contract.kind).toBe(StudioUiAssetKinds.composed);
+    expect(schema?.contract.kind).toBe(StudioUiAssetKinds.composed);
   });
 
   it("defines system studio as a system-page contract with page structure and navigation settings", () => {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
 import {
+  addSchemaEntityToDocument,
+  createEmptySchemaAssetDocument,
   createSchemaAssetDocument,
   createSchemaAssetMetadata,
   createSchemaEntityDefinition,
@@ -10,6 +12,7 @@ import {
   SchemaRelationshipCardinalityKinds,
   serializeSchemaAssetDocument,
   SchemaStudioIdentity,
+  updateSchemaEntityInDocument,
 } from "../SchemaStudioDomain";
 
 describe("SchemaStudioDomain", () => {
@@ -143,5 +146,59 @@ describe("SchemaStudioDomain", () => {
         }],
       },
     })).toThrow("references unknown source field");
+  });
+
+  it("adds schema entities through canonical document helpers with stable identity and duplicate checks", () => {
+    const withCustomer = addSchemaEntityToDocument({
+      document: createEmptySchemaAssetDocument(),
+      name: "Customer",
+      description: "Stores customer records.",
+      layout: { x: 120, y: 80 },
+    });
+
+    expect(withCustomer.definition.entities).toHaveLength(1);
+    expect(withCustomer.definition.entities[0]?.entityId).toBe("entity:customer");
+    expect(withCustomer.definition.entities[0]?.description).toBe("Stores customer records.");
+
+    const withOrder = addSchemaEntityToDocument({
+      document: withCustomer,
+      name: "Order",
+    });
+    expect(withOrder.definition.entities[1]?.entityId).toBe("entity:order");
+
+    expect(() => addSchemaEntityToDocument({
+      document: withOrder,
+      name: "Customer",
+    })).toThrow("already contains an entity named");
+  });
+
+  it("updates schema entities through canonical helpers and rejects conflicting names", () => {
+    const seed = createSchemaAssetDocument({
+      schemaVersion: "1.0.0",
+      definition: {
+        entities: [
+          { entityId: "entity:customer", name: "Customer" },
+          { entityId: "entity:order", name: "Order" },
+        ],
+        relationships: [],
+      },
+    });
+
+    const updated = updateSchemaEntityInDocument({
+      document: seed,
+      entityId: "entity:order",
+      name: "Purchase",
+      description: "Tracks purchase rows.",
+      label: "Purchase",
+    });
+
+    expect(updated.definition.entities.find((entity) => entity.entityId === "entity:order")?.name).toBe("Purchase");
+    expect(updated.definition.entities.find((entity) => entity.entityId === "entity:order")?.description).toBe("Tracks purchase rows.");
+
+    expect(() => updateSchemaEntityInDocument({
+      document: updated,
+      entityId: "entity:order",
+      name: "Customer",
+    })).toThrow("already contains an entity named");
   });
 });

@@ -13,6 +13,7 @@ import { ROUTE_PATHS } from "./RouteConfig";
 const semanticRoleToStudioRoute: Readonly<Partial<Record<TaxonomySemanticRole, string>>> = Object.freeze({
   model: ROUTE_PATHS.modelStudio,
   dataset: ROUTE_PATHS.datasetStudio,
+  schema: ROUTE_PATHS.schemaStudio,
   tool: ROUTE_PATHS.toolStudio,
   "prompt-template": ROUTE_PATHS.promptTemplateStudio,
   "embedding-index": ROUTE_PATHS.embeddingIndexStudio,
@@ -30,6 +31,7 @@ const semanticRoleToStudioRoute: Readonly<Partial<Record<TaxonomySemanticRole, s
 const studioTypeToRoute: Readonly<Record<string, string>> = Object.freeze({
   "model-studio": ROUTE_PATHS.modelStudio,
   "dataset-studio": ROUTE_PATHS.datasetStudio,
+  "schema-studio": ROUTE_PATHS.schemaStudio,
   "tool-studio": ROUTE_PATHS.toolStudio,
   "prompt-template-studio": ROUTE_PATHS.promptTemplateStudio,
   "embedding-index-studio": ROUTE_PATHS.embeddingIndexStudio,

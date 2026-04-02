@@ -4,6 +4,7 @@ import type { WorkflowStudioDraftAuthoringBoundaryProps } from "../../components
 import WorkflowStudioDraftAuthoringBoundary from "../../components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary";
 import { SystemStudioDraftAuthoringBoundary as SystemStudioDraftAuthoringSurface } from "../../components/studio-shell/system/SystemStudioDraftAuthoringBoundary";
 import DatasetStudioDraftAuthoringBoundary from "../../components/studio-shell/dataset/DatasetStudioDraftAuthoringBoundary";
+import SchemaStudioDraftAuthoringBoundary from "../../components/studio-shell/schema/SchemaStudioDraftAuthoringBoundary";
 import {
   StudioAssetPropertyFieldKinds,
   StudioUiAssetKinds,
@@ -41,6 +42,11 @@ interface DatasetStudioSurfaceInput {
   readonly extensionContext: StudioShellExtensionContext;
   readonly experienceAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
   readonly embeddedVariant?: "inputs-outputs";
+}
+
+interface SchemaStudioSurfaceInput {
+  readonly content: string;
+  readonly onChangeContent: (nextContent: string) => void;
 }
 
 const baseCapabilities = Object.freeze({
@@ -369,6 +375,75 @@ export const datasetStudioSurfaceAssetDefinition: StudioAssetDefinition<DatasetS
   ),
 });
 
+export const schemaStudioSurfaceAssetDefinition: StudioAssetDefinition<SchemaStudioSurfaceInput, StudioEmbeddedEvent> = Object.freeze({
+  contract: Object.freeze({
+    contractVersion: StudioUiAssetContractVersion,
+    identity: Object.freeze({
+      studioType: "schema-studio",
+      studioId: "schema-studio",
+      title: "Schema Studio",
+      summary: "Reusable authoring surface for schema structure and table modeling.",
+    }),
+    kind: StudioUiAssetKinds.composed,
+    metadata: Object.freeze({
+      displayName: "Schema Studio Surface",
+      description: "Composed studio authoring surface for schema tables and relationships.",
+      group: "studio-surfaces",
+      iconToken: "studio.schema",
+      tags: Object.freeze(["studio", "schema", "composed-ui"]),
+      keywords: Object.freeze(["schema", "tables", "relationships", "erd"]),
+      contractCategory: "composed-ui",
+      capabilityFlags: Object.freeze(["nested-studios", "authoring"]),
+    }),
+    propsSchema: Object.freeze({
+      schemaId: "studio.schema-surface.input",
+      schemaVersion: "1.0.0",
+      propertySchema: Object.freeze({
+        schemaId: "studio.schema-surface.properties",
+        schemaVersion: "1.0.0",
+        sections: Object.freeze([
+          Object.freeze({
+            id: "content",
+            label: "Schema settings",
+            fields: Object.freeze([
+              Object.freeze({
+                id: "content",
+                path: "content",
+                label: "Draft content",
+                kind: StudioAssetPropertyFieldKinds.textarea,
+                defaultValue: "",
+              }),
+            ]),
+          }),
+        ]),
+      }),
+    }),
+    supportedModes: Object.freeze([
+      StudioAssetRenderModes.full,
+      StudioAssetRenderModes.embedded,
+      StudioAssetRenderModes.inline,
+      StudioAssetRenderModes.readonly,
+    ]),
+    accepts: Object.freeze({ context: "studio-host", document: "schema-draft-json", input: Object.freeze({}) as SchemaStudioSurfaceInput }),
+    emits: Object.freeze(["studio.intent", "studio.change", "studio.validation"]),
+    hostCapabilities: baseCapabilities,
+    rendering: Object.freeze({ renderer: "react", resolution: "definition-render" }),
+    persistence: Object.freeze({ documentType: "schema-draft-json", serialization: "json" }),
+    childSlots: Object.freeze([defaultComposedUiSlot]),
+    compositionRules: Object.freeze({
+      allowsNestedStudios: true,
+      allowedChildKinds: Object.freeze([StudioUiAssetKinds.atomic, StudioUiAssetKinds.composed]),
+    }),
+  }),
+  render: ({ context, onEvent }) => (
+    <SchemaStudioDraftAuthoringBoundary
+      content={context.input.content}
+      onChangeContent={context.input.onChangeContent}
+      onStudioEvent={onEvent}
+    />
+  ),
+});
+
 export function createStudioHostSessionState(snapshot: {
   readonly sessionId?: string;
   readonly draftId?: string;
@@ -386,6 +461,7 @@ export function createStudioHostSessionState(snapshot: {
 export const studioSurfaceAssetDefinitions = Object.freeze([
   workflowStudioSurfaceAssetDefinition,
   datasetStudioSurfaceAssetDefinition,
+  schemaStudioSurfaceAssetDefinition,
   systemStudioSurfaceAssetDefinition,
 ]);
 

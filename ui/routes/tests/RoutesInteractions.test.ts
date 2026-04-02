@@ -33,6 +33,7 @@ describe("ui/routes interactions", () => {
     expect(appRouterSource).toContain("element: <ToolChainStudioPage />");
     expect(appRouterSource).toContain("element: <ModelStudioPage />");
     expect(appRouterSource).toContain("element: <DatasetStudioPage />");
+    expect(appRouterSource).toContain("element: <SchemaStudioPage />");
     expect(appRouterSource).toContain("element: <ToolStudioPage />");
     expect(appRouterSource).toContain("element: <PromptTemplateStudioPage />");
     expect(appRouterSource).toContain("element: <EmbeddingIndexStudioPage />");

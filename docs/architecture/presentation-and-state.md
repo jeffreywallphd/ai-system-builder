@@ -771,3 +771,17 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - grouping and placement hints (`group`, `placement`) for future runtime shell rendering.
 - Navigation structure reconciliation and default landing-page validation are now document-authoritative in the same parse/serialize seams (`SystemStudioDraftDocument` + `SystemSettingsModel`), so deleted/invalid page references fall back gracefully to the first valid visible page.
 - The Settings step now foregrounds this non-technical settings UI and keeps technical parameter editing in a collapsed advanced section, preserving clear separation between page structure authoring, panel-internal authoring, and system-level runtime settings.
+
+## Direction 5 UI extension update: Schema Studio canvas + entity authoring slice (stories 3.1.5-3.1.6)
+
+- Schema Studio now has a dedicated composed studio surface contract (`schema-studio`) in `ui/studio-shell/studio-assets/StudioSurfaceAssetDefinitions.tsx`, aligned to existing studio-shell renderer, host-context, and persistence contracts (`schema-draft-json` over JSON serialization).
+- Authoring now runs through a dedicated Schema Studio boundary (`ui/components/studio-shell/schema/SchemaStudioDraftAuthoringBoundary.tsx`) instead of falling back to workflow metaphors:
+  - schema-level context is presented as a schema canvas,
+  - entities/tables render as selectable modeling units,
+  - relationships render as a bounded summary/placeholder for future edge-authoring flows.
+- Entity create/edit flows now use canonical schema-domain helpers (`domain/schema-studio/SchemaStudioDomain.ts`) rather than ad hoc UI-only state:
+  - `createEmptySchemaAssetDocument`,
+  - `addSchemaEntityToDocument`,
+  - `updateSchemaEntityInDocument`.
+- Schema entity updates persist through existing studio-shell draft content mutation (`onChangeContent`) and embedded-intent event signaling (`studio.intent` apply/selection), preserving existing host-owned save/validation/session infrastructure.
+- Schema Studio is now routed and registered as a first-class atomic studio (`ui/studio-shell/registrations/SchemaStudioRegistration.ts`, `ui/pages/SchemaStudioPage.tsx`, route mapping updates), keeping taxonomy and registration patterns aligned with existing model/dataset/tool studios.

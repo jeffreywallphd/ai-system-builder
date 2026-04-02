@@ -46,6 +46,7 @@ export const ROUTE_PATHS = Object.freeze({
   systemStudio: "/studio-shell/system",
   modelStudio: "/studio-shell/model",
   datasetStudio: "/studio-shell/dataset",
+  schemaStudio: "/studio-shell/schema",
   toolStudio: "/studio-shell/tool",
   promptTemplateStudio: "/studio-shell/prompt-template",
   embeddingIndexStudio: "/studio-shell/embedding-index",
@@ -257,6 +258,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "dataset-studio",
     path: ROUTE_PATHS.datasetStudio,
     title: "Dataset Studio",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "schema-studio",
+    path: ROUTE_PATHS.schemaStudio,
+    title: "Schema Studio",
     showInNavigation: false,
   }),
   Object.freeze({
