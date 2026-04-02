@@ -83,7 +83,7 @@ export class DataStudioPreparationWizardStateAdapter {
     this.canvasProjectionService = new DataStudioWizardCanvasProjectionService();
     this.pipelineValidationService = new DataStudioPipelineValidationService();
     if (wizardOrOptions?.persistedState) {
-      this.wizard.importPipelineState(wizardOrOptions.persistedState);
+      this.importPipelineState(wizardOrOptions.persistedState);
     }
   }
 
