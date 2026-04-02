@@ -30,7 +30,11 @@ import type {
   PersistedWorkflowReadModel,
   IngestReferenceImageUploadReadModel,
   IngestReferenceImageUploadRequest,
+  ListReferenceImageOutputsRequest,
+  PersistReferenceImageOutputsReadModel,
+  PersistReferenceImageOutputsRequest,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { OutputGalleryListing } from "../../application/system-runtime/OutputGalleryDataContract";
 import type {
   StartSystemRuntimeExecutionRequest,
   StartSystemRuntimeExecutionResponse,
@@ -239,5 +243,19 @@ export class StudioShellService {
   public async ingestReferenceImageUpload(request: IngestReferenceImageUploadRequest): Promise<StudioShellApiResponse<IngestReferenceImageUploadReadModel>> {
     const raw = await this.requireBridge().ingestReferenceImageUpload(JSON.stringify(request));
     return JSON.parse(raw) as StudioShellApiResponse<IngestReferenceImageUploadReadModel>;
+  }
+
+  public async persistReferenceImageOutputs(
+    request: PersistReferenceImageOutputsRequest,
+  ): Promise<StudioShellApiResponse<PersistReferenceImageOutputsReadModel>> {
+    const raw = await this.requireBridge().persistReferenceImageOutputs(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<PersistReferenceImageOutputsReadModel>;
+  }
+
+  public async listReferenceImageOutputs(
+    request: ListReferenceImageOutputsRequest,
+  ): Promise<StudioShellApiResponse<OutputGalleryListing>> {
+    const raw = await this.requireBridge().listReferenceImageOutputs(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<OutputGalleryListing>;
   }
 }

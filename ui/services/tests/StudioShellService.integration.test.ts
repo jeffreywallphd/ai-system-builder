@@ -184,6 +184,15 @@ function installBridge(
       }
       return runtimeApi.getExecutionResult(executionId).then((response) => JSON.stringify(response));
     },
+    ingestReferenceImageUpload(requestJson: string) {
+      return api.ingestReferenceImageUpload(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    persistReferenceImageOutputs(requestJson: string) {
+      return api.persistReferenceImageOutputs(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    listReferenceImageOutputs(requestJson: string) {
+      return api.listReferenceImageOutputs(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
   };
 
   (globalThis as { window?: Window }).window = {

@@ -33,6 +33,9 @@ describe("StudioShellService", () => {
     expect(source).toContain("getSystemExecutionStatus(");
     expect(source).toContain("getSystemExecutionTrace(");
     expect(source).toContain("getSystemExecutionResult(");
+    expect(source).toContain("ingestReferenceImageUpload(");
+    expect(source).toContain("persistReferenceImageOutputs(");
+    expect(source).toContain("listReferenceImageOutputs(");
     expect(source).not.toContain("fetch(");
   });
 });
