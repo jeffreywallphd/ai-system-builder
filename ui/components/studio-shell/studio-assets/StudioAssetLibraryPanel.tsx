@@ -1,8 +1,12 @@
 import { useMemo, useState } from "react";
 import StudioAssetInspectorPanel from "./StudioAssetInspectorPanel";
+import StudioAssetPreviewCard from "./StudioAssetPreviewCard";
 import type { StudioAssetCompositionNode } from "../../../studio-shell/studio-assets/StudioAssetComposition";
 import type { StudioAssetRegistrationCategory, StudioAssetRegistry } from "../../../studio-shell/studio-assets/StudioAssetRegistry";
 import { listStudioAssetLibrarySections, type StudioAssetLibraryEntry } from "../../../studio-shell/studio-assets/StudioAssetLibrary";
+import type { StudioAssetSelectionState } from "../../../studio-shell/studio-assets/StudioAssetSelection";
+import { bindStudioAssetSelection } from "../../../studio-shell/studio-assets/StudioAssetSelection";
+import { createStudioAssetPreviewModel } from "../../../studio-shell/studio-assets/StudioAssetPreview";
 
 export interface StudioAssetLibraryPanelProps {
   readonly registry: StudioAssetRegistry;
@@ -11,6 +15,8 @@ export interface StudioAssetLibraryPanelProps {
   readonly categoryFilter?: ReadonlyArray<StudioAssetRegistrationCategory>;
   readonly onInsertAsset?: (entry: StudioAssetLibraryEntry) => void;
   readonly selectedAssetNode?: StudioAssetCompositionNode;
+  readonly compositionRoot?: StudioAssetCompositionNode;
+  readonly selection?: StudioAssetSelectionState;
   readonly onChangeSelectedAssetConfig?: (nextConfig: Readonly<Record<string, unknown>>) => void;
 }
 
@@ -43,6 +49,8 @@ export default function StudioAssetLibraryPanel({
   categoryFilter = defaultCategories,
   onInsertAsset,
   selectedAssetNode,
+  compositionRoot,
+  selection,
   onChangeSelectedAssetConfig,
 }: StudioAssetLibraryPanelProps): JSX.Element {
   const [query, setQuery] = useState("");
@@ -53,6 +61,12 @@ export default function StudioAssetLibraryPanel({
       categories: categoryFilter,
     },
   }), [registry, query, categoryFilter]);
+
+  const boundSelection = useMemo(
+    () => bindStudioAssetSelection({ root: compositionRoot, selection }),
+    [compositionRoot, selection],
+  );
+  const activeNode = boundSelection.selectedNode ?? selectedAssetNode;
 
   return (
     <section className="ui-stack ui-stack--sm" data-testid="studio-asset-library-panel">
@@ -83,31 +97,36 @@ export default function StudioAssetLibraryPanel({
               </div>
 
               <ul className="ui-stack ui-stack--2xs" style={{ listStyle: "none", margin: 0, padding: 0 }}>
-                {section.entries.map((entry) => (
-                  <li key={entry.id} className="ui-row ui-row--between ui-row--wrap" style={{ gap: "0.5rem" }}>
-                    <div className="ui-stack ui-stack--3xs" style={{ minWidth: "12rem" }}>
-                      <div>
-                        <span aria-hidden="true">{formatIcon(entry.iconToken)} </span>
-                        <strong>{entry.title}</strong>
+                {section.entries.map((entry) => {
+                  const registration = registry.getById(entry.id);
+                  const preview = registration ? createStudioAssetPreviewModel({ registration }) : undefined;
+                  return (
+                    <li key={entry.id} className="ui-row ui-row--between ui-row--wrap" style={{ gap: "0.5rem" }}>
+                      <div className="ui-stack ui-stack--3xs" style={{ minWidth: "12rem", maxWidth: "26rem" }}>
+                        <div>
+                          <span aria-hidden="true">{formatIcon(entry.iconToken)} </span>
+                          <strong>{entry.title}</strong>
+                        </div>
+                        {entry.description ? (
+                          <span className="ui-text-small ui-text-secondary">{entry.description}</span>
+                        ) : null}
+                        <span className="ui-text-small ui-text-secondary">
+                          {entry.group} · {entry.contractCategory}
+                        </span>
+                        {preview ? <StudioAssetPreviewCard preview={preview} compact /> : null}
                       </div>
-                      {entry.description ? (
-                        <span className="ui-text-small ui-text-secondary">{entry.description}</span>
+                      {onInsertAsset ? (
+                        <button
+                          type="button"
+                          className="ui-button ui-button--sm ui-button--ghost"
+                          onClick={() => onInsertAsset(entry)}
+                        >
+                          Insert
+                        </button>
                       ) : null}
-                      <span className="ui-text-small ui-text-secondary">
-                        {entry.group} · {entry.contractCategory}
-                      </span>
-                    </div>
-                    {onInsertAsset ? (
-                      <button
-                        type="button"
-                        className="ui-button ui-button--sm ui-button--ghost"
-                        onClick={() => onInsertAsset(entry)}
-                      >
-                        Insert
-                      </button>
-                    ) : null}
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
@@ -116,7 +135,9 @@ export default function StudioAssetLibraryPanel({
 
       <StudioAssetInspectorPanel
         registry={registry}
-        selectedAssetNode={selectedAssetNode}
+        selectedAssetNode={activeNode}
+        compositionRoot={compositionRoot}
+        selection={selection}
         onChangeNodeConfig={onChangeSelectedAssetConfig}
       />
     </section>

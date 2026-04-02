@@ -30,5 +30,34 @@ describe("StudioAssetInspectorPanel", () => {
     expect(html).toContain("Display");
     expect(html).toContain("Behavior");
     expect(html).toContain("Label");
+    expect(html).toContain("studio-asset-preview-card");
+  });
+
+  it("binds selected instance from composition + selection context", () => {
+    const html = renderToStaticMarkup(
+      <StudioAssetInspectorPanel
+        registry={createDefaultStudioAssetRegistry()}
+        compositionRoot={Object.freeze({
+          nodeId: "root-system",
+          assetId: "system-studio",
+          regions: Object.freeze([
+            Object.freeze({
+              placementId: "workspace",
+              children: Object.freeze([
+                Object.freeze({
+                  nodeId: "selected-button",
+                  assetId: "ui-primitive:button",
+                  config: Object.freeze({ label: "Run" }),
+                }),
+              ]),
+            }),
+          ]),
+        })}
+        selection={Object.freeze({ selectedNodeId: "selected-button" })}
+      />,
+    );
+
+    expect(html).toContain("Button");
+    expect(html).toContain("Run");
   });
 });
