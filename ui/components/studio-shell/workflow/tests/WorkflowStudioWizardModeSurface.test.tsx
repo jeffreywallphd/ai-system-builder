@@ -6,7 +6,7 @@ import {
   createEmptyWorkflowDraft,
   serializeWorkflowDraft,
 } from "../../../../../domain/workflow-studio/WorkflowStudioDomain";
-import WorkflowStudioWizardModeSurface from "../WorkflowStudioWizardModeSurface";
+import WorkflowStudioWizardModeSurface from "../WorkflowStudioWizardExperienceSurface";
 import {
   WorkflowStudioHandoffFlowKinds,
   WorkflowStudioHandoffStatusKinds,

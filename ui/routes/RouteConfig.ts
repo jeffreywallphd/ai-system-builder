@@ -107,7 +107,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
   Object.freeze({
     key: "workflow-editor",
     path: ROUTE_PATHS.workflowEditor,
-    title: "Workflow Editor",
+    title: "Legacy Workflow Editor Redirect",
     showInNavigation: false,
   }),
   Object.freeze({
