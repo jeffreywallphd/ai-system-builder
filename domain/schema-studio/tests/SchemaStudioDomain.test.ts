@@ -6,6 +6,8 @@ import {
   createSchemaEntityDefinition,
   createSchemaStudioTaxonomy,
   deserializeSchemaAssetDocument,
+  SchemaFieldTypeKinds,
+  SchemaRelationshipCardinalityKinds,
   serializeSchemaAssetDocument,
   SchemaStudioIdentity,
 } from "../SchemaStudioDomain";
@@ -32,30 +34,53 @@ describe("SchemaStudioDomain", () => {
       entityId: "entity:customer",
       name: "customer",
       label: "Customer",
+      fields: [
+        { fieldId: "field:id", name: "id", type: SchemaFieldTypeKinds.uuid, required: true },
+        { fieldId: "field:email", name: "email", key: " email ", type: SchemaFieldTypeKinds.string },
+      ],
       fieldCollection: {
         mode: "inline",
-        fieldIds: ["id", "email", "id", " email "],
+        fieldIds: ["field:id", "field:email", "field:id", " field:email "],
       },
     });
 
-    expect(entity.fieldCollection?.fieldIds).toEqual(["id", "email"]);
+    expect(entity.fields[1]?.key).toBe("email");
+    expect(entity.fieldCollection?.fieldIds).toEqual(["field:id", "field:email"]);
   });
 
-  it("creates a serializable schema asset document with relationship validation", () => {
+  it("creates a serializable schema asset document with field and relationship validation", () => {
     const document = createSchemaAssetDocument({
       schemaVersion: "1.0.0",
       definition: {
         dialect: "relational",
         entities: [
-          { entityId: "entity:customer", name: "customer", label: "Customer" },
-          { entityId: "entity:order", name: "order", label: "Order" },
+          {
+            entityId: "entity:customer",
+            name: "customer",
+            label: "Customer",
+            fields: [
+              { fieldId: "field:customer-id", name: "customer_id", type: SchemaFieldTypeKinds.uuid, required: true },
+            ],
+          },
+          {
+            entityId: "entity:order",
+            name: "order",
+            label: "Order",
+            fields: [
+              { fieldId: "field:order-id", name: "order_id", type: SchemaFieldTypeKinds.uuid, required: true },
+              { fieldId: "field:customer-id", name: "customer_id", type: SchemaFieldTypeKinds.uuid, required: true },
+            ],
+          },
         ],
         relationships: [
           {
             relationshipId: "relationship:customer-order",
             sourceEntityId: "entity:customer",
+            sourceFieldId: "field:customer-id",
             targetEntityId: "entity:order",
-            kind: "one-to-many",
+            targetFieldId: "field:customer-id",
+            type: "foreign-key",
+            cardinality: SchemaRelationshipCardinalityKinds.oneToMany,
           },
         ],
       },
@@ -65,6 +90,26 @@ describe("SchemaStudioDomain", () => {
     const rehydrated = deserializeSchemaAssetDocument(serialized);
 
     expect(rehydrated).toEqual(document);
+  });
+
+  it("accepts legacy relationship kind while normalizing to type", () => {
+    const document = createSchemaAssetDocument({
+      schemaVersion: "1.0.0",
+      definition: {
+        entities: [
+          { entityId: "entity:a", name: "A" },
+          { entityId: "entity:b", name: "B" },
+        ],
+        relationships: [{
+          relationshipId: "relationship:a-b",
+          sourceEntityId: "entity:a",
+          targetEntityId: "entity:b",
+          kind: "one-to-many",
+        }],
+      },
+    });
+
+    expect(document.definition.relationships[0]?.type).toBe("one-to-many");
   });
 
   it("rejects invalid relationship references", () => {
@@ -79,5 +124,24 @@ describe("SchemaStudioDomain", () => {
         }],
       },
     })).toThrow("Schema relationships must reference declared entities");
+  });
+
+  it("rejects relationship field references when fields are missing", () => {
+    expect(() => createSchemaAssetDocument({
+      schemaVersion: "1.0.0",
+      definition: {
+        entities: [
+          { entityId: "entity:a", name: "A", fields: [{ fieldId: "field:a", name: "a", type: "string" }] },
+          { entityId: "entity:b", name: "B", fields: [{ fieldId: "field:b", name: "b", type: "string" }] },
+        ],
+        relationships: [{
+          relationshipId: "relationship:a-b",
+          sourceEntityId: "entity:a",
+          targetEntityId: "entity:b",
+          sourceFieldId: "field:missing",
+          targetFieldId: "field:b",
+        }],
+      },
+    })).toThrow("references unknown source field");
   });
 });

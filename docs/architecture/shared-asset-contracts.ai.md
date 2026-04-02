@@ -1098,3 +1098,13 @@
 - Bounded relationship declarations (`SchemaRelationshipDefinition`) are included with entity-id endpoint references so future ERD-style modeling can layer in without introducing runtime/pipeline semantics here.
 - Deterministic validation + persistence helpers are now explicit (`createSchemaAssetDocument`, `serializeSchemaAssetDocument`, `deserializeSchemaAssetDocument`) with duplicate-id checks and relationship endpoint validation.
 - Scope remains intentionally foundational: no full field editor, no ERD interaction tooling, and no execution behavior stack is introduced in this slice.
+
+## Direction 5 extension update: schema field + relationship model formalization (stories 3.1.3-3.1.4)
+
+- `SchemaEntityDefinition` now carries first-class field contracts (`fields`) instead of only field-collection hooks, aligned with existing domain validation/serialization patterns.
+- Field contracts (`SchemaFieldDefinition`) are intentionally generic and include stable identity, display/machine naming, typed value hooks, required/default semantics, optional descriptions, and metadata extension hooks.
+- Entity-level normalization now enforces duplicate-id/name rejection, validates inline field-collection references against declared fields, and defaults inline collection ids to declared entity fields when omitted.
+- `SchemaRelationshipDefinition` is now formalized with stable identity, source/target entity refs, optional source/target field refs, optional type/cardinality hooks, optional label/description, and metadata for future ERD/canvas authoring.
+- Relationship validation is now field-aware: referenced entities must exist and referenced fields must resolve on those entities when provided.
+- Serialization compatibility is preserved by accepting legacy `kind` values and normalizing them into the new relationship `type` field.
+- Scope remains foundational and asset-first: no full schema editor/canvas runtime behaviors are added in this pass.
