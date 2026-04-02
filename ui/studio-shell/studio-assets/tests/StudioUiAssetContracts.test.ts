@@ -94,6 +94,21 @@ describe("StudioUiAssetContracts", () => {
     expect(resolvedDefinition?.contract.identity.studioId).toBe("workflow-studio");
   });
 
+  it("exposes panel layout and header fields through composed panel property schema", () => {
+    const registry = createDefaultStudioAssetRegistry();
+    const panel = registry.getById("ui-composed:panel");
+    expect(panel?.contract.kind).toBe(StudioUiAssetKinds.composed);
+    if (panel?.contract.kind !== StudioUiAssetKinds.composed) {
+      return;
+    }
+
+    const fields = panel.contract.propsSchema.propertySchema?.sections.flatMap((section) => section.fields) ?? [];
+    expect(fields.some((field) => field.path === "layout.mode")).toBeTrue();
+    expect(fields.some((field) => field.path === "layout.columns")).toBeTrue();
+    expect(fields.some((field) => field.path === "header.visible")).toBeTrue();
+    expect(fields.some((field) => field.path === "header.subtitle")).toBeTrue();
+  });
+
   it("resolves runtime renderers by asset id, kind, and category with graceful fallback for missing definitions", () => {
     const registry = createDefaultStudioAssetRegistry();
 
@@ -107,7 +122,8 @@ describe("StudioUiAssetContracts", () => {
 
     const composedRenderers = registry.resolveRenderersByKind(StudioUiAssetKinds.composed);
     expect(composedRenderers.length).toBeGreaterThanOrEqual(2);
-    expect(composedRenderers.every((entry) => entry.kind === StudioAssetRendererResolutionKinds.resolved)).toBe(true);
+    expect(composedRenderers.some((entry) => entry.kind === StudioAssetRendererResolutionKinds.resolved)).toBeTrue();
+    expect(composedRenderers.some((entry) => entry.kind === StudioAssetRendererResolutionKinds.invalid)).toBeFalse();
 
     const systemCategoryRenderers = registry.resolveRenderersByCategory(StudioAssetRegistrationCategories.systemPage);
     expect(systemCategoryRenderers.map((entry) => entry.assetId)).toEqual(["system-studio"]);

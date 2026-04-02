@@ -4,7 +4,7 @@ import {
   StudioUiAssetKinds,
   type ComposedStudioAssetContract,
 } from "./StudioAssetContracts";
-import { defaultPanelSlotId } from "../experience-assets/PanelAssetContracts";
+import { defaultPanelSlotId, panelLayoutModes } from "../experience-assets/PanelAssetContracts";
 
 export const StudioUiComposedKinds = Object.freeze({
   panel: "panel",
@@ -53,15 +53,98 @@ export function createComposedStudioUiContract(input: {
             fields: Object.freeze([
               Object.freeze({
                 id: "title",
-                path: "title",
-                label: "Title",
+                path: "header.title",
+                label: "Header title",
                 kind: StudioAssetPropertyFieldKinds.text,
                 defaultValue: "Panel",
               }),
               Object.freeze({
+                id: "subtitle",
+                path: "header.subtitle",
+                label: "Supporting text",
+                kind: StudioAssetPropertyFieldKinds.textarea,
+                defaultValue: "",
+              }),
+              Object.freeze({
+                id: "showHeader",
+                path: "header.visible",
+                label: "Show section header",
+                kind: StudioAssetPropertyFieldKinds.boolean,
+                defaultValue: true,
+              }),
+              Object.freeze({
+                id: "showHeaderActions",
+                path: "header.showActions",
+                label: "Show action placeholders",
+                kind: StudioAssetPropertyFieldKinds.boolean,
+                defaultValue: false,
+              }),
+              Object.freeze({
+                id: "headerPrimaryActionLabel",
+                path: "header.primaryActionLabel",
+                label: "Primary action label",
+                kind: StudioAssetPropertyFieldKinds.text,
+                defaultValue: "Action",
+                visibilityRule: Object.freeze({
+                  field: "header.showActions",
+                  equals: true,
+                }),
+              }),
+            ]),
+          }),
+          Object.freeze({
+            id: "layout",
+            label: "Layout",
+            fields: Object.freeze([
+              Object.freeze({
+                id: "layoutMode",
+                path: "layout.mode",
+                label: "Arrange content as",
+                kind: StudioAssetPropertyFieldKinds.select,
+                defaultValue: panelLayoutModes.verticalStack,
+                options: Object.freeze([
+                  Object.freeze({
+                    value: panelLayoutModes.verticalStack,
+                    label: "Vertical stack",
+                  }),
+                  Object.freeze({
+                    value: panelLayoutModes.horizontalSplit,
+                    label: "Horizontal split",
+                  }),
+                  Object.freeze({
+                    value: panelLayoutModes.grid,
+                    label: "Grid",
+                  }),
+                ]),
+              }),
+              Object.freeze({
+                id: "layoutGap",
+                path: "layout.gap",
+                label: "Spacing",
+                kind: StudioAssetPropertyFieldKinds.number,
+                defaultValue: 12,
+              }),
+              Object.freeze({
+                id: "layoutColumns",
+                path: "layout.columns",
+                label: "Grid columns",
+                kind: StudioAssetPropertyFieldKinds.number,
+                defaultValue: 2,
+                visibilityRule: Object.freeze({
+                  field: "layout.mode",
+                  equals: panelLayoutModes.grid,
+                }),
+              }),
+            ]),
+          }),
+          Object.freeze({
+            id: "details",
+            label: "Details",
+            fields: Object.freeze([
+              Object.freeze({
                 id: "description",
                 path: "description",
-                label: "Description",
+                label: "Notes",
                 kind: StudioAssetPropertyFieldKinds.textarea,
                 defaultValue: "",
               }),

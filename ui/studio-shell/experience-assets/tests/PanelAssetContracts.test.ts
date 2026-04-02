@@ -1,7 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import {
+  createDefaultPanelCompositionRoot,
   mapLayoutNodeToPanelAsset,
   mapPanelAssetToRuntimeInstance,
+  resolvePanelContainerConfig,
 } from "../PanelAssetContracts";
 
 describe("PanelAssetContracts", () => {
@@ -44,5 +46,48 @@ describe("PanelAssetContracts", () => {
     expect(runtime.panelId).toBe("panel-hero");
     expect(runtime.assetId).toBe("ui-composed:panel");
     expect(runtime.content?.kind).toBe("asset-composition");
+  });
+
+  it("normalizes panel layout and header settings from root config", () => {
+    const config = resolvePanelContainerConfig({
+      panel: {
+        title: "Overview",
+        description: "Quick status",
+      },
+      config: Object.freeze({
+        layout: Object.freeze({
+          mode: "grid",
+          columns: 3,
+          gap: 16,
+        }),
+        header: Object.freeze({
+          visible: true,
+          title: "Executive summary",
+          subtitle: "Daily snapshot",
+          showActions: true,
+          primaryActionLabel: "Refresh",
+        }),
+      }),
+    });
+
+    expect(config.layout.mode).toBe("grid");
+    expect(config.layout.columns).toBe(3);
+    expect(config.header.title).toBe("Executive summary");
+    expect(config.header.actions[0]?.label).toBe("Refresh");
+  });
+
+  it("seeds default panel composition roots with layout and header config", () => {
+    const root = createDefaultPanelCompositionRoot({
+      panelId: "panel-1",
+      pageId: "page-1",
+      title: "Main section",
+      description: "Section description",
+      layoutBounds: { x: 0, y: 0, width: 0.4, height: 0.4 },
+      contentSlots: [{ slotId: "panel-content" }],
+    });
+
+    expect(root.config?.layout).toBeDefined();
+    expect(root.config?.header).toBeDefined();
+    expect((root.config?.header as { title?: string }).title).toBe("Main section");
   });
 });

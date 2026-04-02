@@ -3,7 +3,9 @@ import StudioAssetLibraryPanel from "../studio-assets/StudioAssetLibraryPanel";
 import {
   createDefaultPanelCompositionRoot,
   defaultPanelSlotId,
+  resolvePanelContainerConfig,
   type PanelAssetCompositionContent,
+  type PanelContainerConfig,
   type PanelAssetContract,
 } from "../../../studio-shell/experience-assets/PanelAssetContracts";
 import type { StudioAssetCompositionNode } from "../../../studio-shell/studio-assets/StudioAssetComposition";
@@ -66,7 +68,18 @@ function parsePanelComposition(input: {
         serialized: content.serializedDocument,
         validate: true,
       });
-      return parsed.root;
+      const containerConfig = resolvePanelContainerConfig({
+        panel: input.panel,
+        config: parsed.root.config,
+      });
+      return Object.freeze({
+        ...parsed.root,
+        config: Object.freeze({
+          ...(parsed.root.config ?? {}),
+          layout: containerConfig.layout,
+          header: containerConfig.header,
+        }),
+      });
     } catch {
       return createDefaultPanelCompositionRoot(input.panel);
     }
@@ -143,6 +156,10 @@ export default function PanelDesignStudio({ panel, onChangePanel }: PanelDesignS
     () => collectCompositionNodeSummaries({ root: compositionRoot, registry }),
     [compositionRoot, registry],
   );
+  const panelContainerConfig = useMemo<PanelContainerConfig>(() => resolvePanelContainerConfig({
+    panel,
+    config: compositionRoot.config,
+  }), [panel, compositionRoot.config]);
 
   useEffect(() => {
     const selectedNodeId = selection.selectedNodeId?.trim();
@@ -205,6 +222,31 @@ export default function PanelDesignStudio({ panel, onChangePanel }: PanelDesignS
             No compatible assets are available for this location. Select a different container to continue.
           </p>
         ) : null}
+      </section>
+      <section className="ui-panel ui-stack ui-stack--2xs" data-testid="panel-design-studio-layout-header-summary">
+        <strong className="ui-text-small">Section behavior</strong>
+        <p className="ui-text-small ui-text-secondary">
+          Use the inspector settings below to tune how this section arranges content and how its header appears.
+        </p>
+        <div className="ui-row ui-row--wrap">
+          <span className="ui-badge ui-badge--neutral">
+            Layout: {panelContainerConfig.layout.mode === "vertical-stack"
+              ? "Vertical stack"
+              : panelContainerConfig.layout.mode === "horizontal-split"
+                ? "Horizontal split"
+                : "Grid"}
+          </span>
+          <span className="ui-badge ui-badge--neutral">Spacing: {panelContainerConfig.layout.gap}px</span>
+          {panelContainerConfig.layout.mode === "grid" ? (
+            <span className="ui-badge ui-badge--neutral">Columns: {panelContainerConfig.layout.columns ?? 2}</span>
+          ) : null}
+          <span className="ui-badge ui-badge--neutral">
+            Header: {panelContainerConfig.header.visible ? "Visible" : "Hidden"}
+          </span>
+          {panelContainerConfig.header.actions.length > 0 ? (
+            <span className="ui-badge ui-badge--neutral">Header actions: {panelContainerConfig.header.actions.length}</span>
+          ) : null}
+        </div>
       </section>
 
       {statusMessage ? <p className="ui-text-small ui-text-secondary">{statusMessage}</p> : null}
