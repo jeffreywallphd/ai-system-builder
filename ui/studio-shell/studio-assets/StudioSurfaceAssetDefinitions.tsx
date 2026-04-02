@@ -6,9 +6,11 @@ import { SystemStudioDraftAuthoringBoundary as SystemStudioDraftAuthoringSurface
 import DatasetStudioDraftAuthoringBoundary from "../../components/studio-shell/dataset/DatasetStudioDraftAuthoringBoundary";
 import {
   StudioUiAssetKinds,
+  SystemPageLayoutKinds,
   StudioAssetRenderModes,
   type StudioAssetDefinition,
   type StudioHostContext,
+  type StudioUiAssetKind,
   type StudioSessionState,
 } from "./StudioAssetContracts";
 import type { StudioEmbeddedEvent } from "./StudioEmbeddedEventContracts";
@@ -54,6 +56,31 @@ const defaultComposedUiSlot = Object.freeze({
   allowsMultiple: false,
   allowedChildKinds: Object.freeze([StudioUiAssetKinds.atomic, StudioUiAssetKinds.composed]),
 });
+
+const defaultSystemPageRegions = Object.freeze([
+  Object.freeze({
+    regionId: "navigation",
+    label: "Navigation rail",
+    allowsMultiple: false,
+    allowedChildKinds: Object.freeze([StudioUiAssetKinds.atomic, StudioUiAssetKinds.composed]),
+  }),
+  Object.freeze({
+    regionId: "workspace",
+    label: "Primary workspace",
+    allowsMultiple: false,
+    allowedChildKinds: Object.freeze([
+      StudioUiAssetKinds.atomic,
+      StudioUiAssetKinds.composed,
+      StudioUiAssetKinds.systemPage,
+    ]),
+  }),
+  Object.freeze({
+    regionId: "inspector",
+    label: "Inspector panel",
+    allowsMultiple: false,
+    allowedChildKinds: Object.freeze([StudioUiAssetKinds.atomic, StudioUiAssetKinds.composed]),
+  }),
+]);
 
 export const workflowStudioSurfaceAssetDefinition: StudioAssetDefinition<WorkflowStudioSurfaceInput, StudioEmbeddedEvent> = Object.freeze({
   contract: Object.freeze({
@@ -111,7 +138,7 @@ export const systemStudioSurfaceAssetDefinition: StudioAssetDefinition<SystemStu
       title: "System Studio",
       summary: "Reusable authoring surface for system pages and composition.",
     }),
-    kind: StudioUiAssetKinds.composed,
+    kind: StudioUiAssetKinds.systemPage,
     metadata: Object.freeze({
       displayName: "System Studio Surface",
       description: "Composed studio authoring surface supporting nested studio composition.",
@@ -129,10 +156,31 @@ export const systemStudioSurfaceAssetDefinition: StudioAssetDefinition<SystemStu
     hostCapabilities: baseCapabilities,
     rendering: Object.freeze({ renderer: "react", resolution: "definition-render" }),
     persistence: Object.freeze({ documentType: "system-draft-json", serialization: "json" }),
-    childSlots: Object.freeze([defaultComposedUiSlot]),
+    pageStructure: Object.freeze({
+      layoutKind: SystemPageLayoutKinds.workspace,
+      regions: defaultSystemPageRegions,
+      defaultRegionId: "workspace",
+    }),
+    layoutResponsibilities: Object.freeze([
+      "compose-child-assets",
+      "host-runtime-status",
+      "present-system-navigation",
+    ]),
+    panelReferences: Object.freeze(["system-components", "system-bindings", "system-runtime"]),
+    navigation: Object.freeze({
+      route: "/studio-shell/system",
+      title: "System Studio",
+      supportsDeepLinking: true,
+      navGroup: "studio-shell",
+      requiresRuntimeSession: false,
+    }),
     compositionRules: Object.freeze({
-      allowsNestedStudios: true,
-      allowedChildKinds: Object.freeze([StudioUiAssetKinds.atomic, StudioUiAssetKinds.composed]),
+      allowsNestedPages: true,
+      allowedChildKinds: Object.freeze([
+        StudioUiAssetKinds.atomic,
+        StudioUiAssetKinds.composed,
+        StudioUiAssetKinds.systemPage,
+      ]),
     }),
     runtimeHooks: Object.freeze({ canStartRuntime: true }),
   }),
@@ -216,10 +264,16 @@ export function resolveStudioSurfaceAssetDefinitionById(studioId: string): Studi
   return studioSurfaceAssetDefinitions.find((entry) => entry.contract.identity.studioId === studioId) as StudioAssetDefinition<unknown, StudioEmbeddedEvent> | undefined;
 }
 
-export function listStudioSurfaceAssetDefinitionsByKind(kind: "atomic" | "composed"): ReadonlyArray<StudioAssetDefinition<unknown, StudioEmbeddedEvent>> {
+export function listStudioSurfaceAssetDefinitionsByKind(kind: StudioUiAssetKind): ReadonlyArray<StudioAssetDefinition<unknown, StudioEmbeddedEvent>> {
   return Object.freeze(
     studioSurfaceAssetDefinitions.filter((entry) => entry.contract.kind === kind) as ReadonlyArray<StudioAssetDefinition<unknown, StudioEmbeddedEvent>>,
   );
+}
+
+export function listStudioSurfaceAssetDefinitionsByContractKind(
+  kind: StudioUiAssetKind,
+): ReadonlyArray<StudioAssetDefinition<unknown, StudioEmbeddedEvent>> {
+  return listStudioSurfaceAssetDefinitionsByKind(kind);
 }
 
 export function createStudioHostContext<TInput>(params: {

@@ -63,6 +63,7 @@ export interface StudioAssetEvent<TPayload = unknown> {
 export const StudioUiAssetKinds = Object.freeze({
   atomic: "atomic",
   composed: "composed",
+  systemPage: "system-page",
 });
 
 export type StudioUiAssetKind = typeof StudioUiAssetKinds[keyof typeof StudioUiAssetKinds];
@@ -141,9 +142,50 @@ export interface ComposedStudioAssetContract<TInput = unknown> extends StudioAss
   };
 }
 
+export const SystemPageLayoutKinds = Object.freeze({
+  singleColumn: "single-column",
+  twoPane: "two-pane",
+  workspace: "workspace",
+  custom: "custom",
+});
+
+export type SystemPageLayoutKind = typeof SystemPageLayoutKinds[keyof typeof SystemPageLayoutKinds];
+
+export interface SystemPageRegionDescriptor {
+  readonly regionId: string;
+  readonly label: string;
+  readonly allowsMultiple: boolean;
+  readonly allowedChildKinds: ReadonlyArray<StudioUiAssetKind>;
+}
+
+export interface SystemPageRuntimeNavigationDescriptor {
+  readonly route: string;
+  readonly title?: string;
+  readonly supportsDeepLinking: boolean;
+  readonly navGroup?: string;
+  readonly requiresRuntimeSession?: boolean;
+}
+
+export interface SystemPageAssetContract<TInput = unknown> extends StudioAssetContractBase<TInput> {
+  readonly kind: "system-page";
+  readonly pageStructure: {
+    readonly layoutKind: SystemPageLayoutKind;
+    readonly regions: ReadonlyArray<SystemPageRegionDescriptor>;
+    readonly defaultRegionId?: string;
+  };
+  readonly layoutResponsibilities: ReadonlyArray<string>;
+  readonly panelReferences?: ReadonlyArray<string>;
+  readonly navigation?: SystemPageRuntimeNavigationDescriptor;
+  readonly compositionRules: {
+    readonly allowsNestedPages: boolean;
+    readonly allowedChildKinds: ReadonlyArray<StudioUiAssetKind>;
+  };
+}
+
 export type StudioAssetContract<TInput = unknown> =
   | AtomicStudioAssetContract<TInput>
-  | ComposedStudioAssetContract<TInput>;
+  | ComposedStudioAssetContract<TInput>
+  | SystemPageAssetContract<TInput>;
 
 export interface StudioAssetDefinition<TInput = unknown, TEvent = StudioAssetEvent> {
   readonly contract: StudioAssetContract<TInput>;

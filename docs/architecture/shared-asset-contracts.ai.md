@@ -200,6 +200,21 @@
 - Library integrations are confined to media adapter modules (`application/dataset-studio/adapters/media/*`) using `file-type`, `image-size`, and `exifr`; domain contracts remain library-independent.
 - `ImageIngestorAsset` now composes extraction + normalization + image-record validation before producing canonical image metadata outputs, so ingestion reliably populates image-record fields (`assetRef`, dimensions, format, mime/exif hints) while degrading gracefully when EXIF data is absent.
 
+## Direction 5 UI extension update: system/page asset contract + unified UI asset registration (stories 1.1.3-1.1.4)
+
+- Studio UI contracts now include a first-class `system-page` kind (`ui/studio-shell/studio-assets/StudioAssetContracts.ts`) so page/layout/navigation assets are explicit rather than overloaded as generic composed assets.
+- `SystemPageAssetContract` adds reusable page-level contract seams for:
+  - page/layout structure (`layoutKind`, `regions`, `defaultRegionId`),
+  - layout responsibilities and panel references,
+  - navigation/runtime-relevant settings (`route`, deep-link posture, nav grouping),
+  - renderer/persistence compatibility through shared studio-asset base fields.
+- `system-studio` now declares that `system-page` contract shape in `StudioSurfaceAssetDefinitions`, including explicit region definitions (`navigation`, `workspace`, `inspector`) and bounded nested-page composition metadata.
+- A shared registration/discovery seam now exists in `ui/studio-shell/studio-assets/StudioAssetRegistry.ts` and reuses existing studio asset definitions/contracts:
+  - atomic UI primitives,
+  - composed studio surfaces,
+  - system/page surfaces.
+- Registry entries expose deterministic lookup/discovery fields (`id`, `kind`, `category`, metadata, renderer info, props/persistence hooks, and composition metadata) and can resolve rendering definitions by id.
+
 ## Direction 5 extension update: derived attributes + media schema validation layer (stories 1.1.5-1.1.6)
 
 - Canonical image records now include a typed derived-attributes seam (`ImageDerivedAttributes`) with bounded inspectable fields (`aspectRatio`, `orientation`, `isAnimated`, `pixelCount`, `megapixels`) while remaining canonical-record-compatible.
