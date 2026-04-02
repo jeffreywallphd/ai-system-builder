@@ -13,7 +13,6 @@ describe("ConfigProfileStudioPage contracts", () => {
     expect(registrationSource).toContain("studioType: ConfigProfileStudioIdentity.studioType");
     expect(registrationSource).toContain('role: "config-profile"');
     expect(registrationSource).toContain('slot: "draft-authoring"');
-    expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain("createConfigProfileStudioTaxonomy()");
   });
 });

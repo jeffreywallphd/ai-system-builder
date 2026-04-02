@@ -3,13 +3,10 @@ import {
   SystemStudioIdentity,
 } from "../../../domain/system-studio/SystemAssetDomain";
 import { createElement } from "react";
-import { SystemExecutionMetadataEditor } from "../../components/studio-shell/SystemExecutionMetadataEditor";
 import { SystemCompatibilityInsightsPanel } from "../../components/studio-shell/SystemCompatibilityInsightsPanel";
 import { SystemRuntimeRunPanel } from "../../components/studio-shell/SystemRuntimeRunPanel";
 import { SystemContextDebugPreviewPanel } from "../../components/studio-shell/SystemContextDebugPreviewPanel";
-import { ReferenceImageExperiencePanel } from "../../components/studio-shell/ReferenceImageExperiencePanel";
 import { SystemStudioWorkManagementPanel } from "../../components/studio-shell/SystemStudioWorkManagementPanel";
-import WorkflowTemplateSelectionPanel from "../../components/studio-shell/workflow/WorkflowTemplateSelectionPanel";
 import type { SystemStudioRegistration } from "../StudioShellExtensions";
 import { createSystemStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -103,14 +100,6 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
   },
   extensions: Object.freeze([
     {
-      id: "system-studio-template-selection",
-      slot: "draft-authoring",
-      title: "Starter templates",
-      subtitle: "Choose a workflow template and prepare it for your system composition.",
-      order: 7,
-      render: () => createElement(WorkflowTemplateSelectionPanel, { surface: "system-studio" }),
-    },
-    {
       id: "system-studio-work-management",
       slot: "lifecycle",
       title: "Save and reopen your work",
@@ -119,37 +108,12 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
       render: (context) => createElement(SystemStudioWorkManagementPanel, { context }),
     },
     {
-      id: "system-studio-reference-image-experience",
-      slot: "lifecycle",
-      title: "Reference image flow",
-      subtitle: "Upload an image, adjust settings, and start processing from one guided panel.",
-      order: 11,
-      render: (context) => createElement(ReferenceImageExperiencePanel, { context }),
-    },
-    {
       id: "system-studio-runtime-run-trigger",
       slot: "lifecycle",
       title: "Run and monitor",
       subtitle: "Run the system and monitor progress/results.",
       order: 12,
       render: (context) => createElement(SystemRuntimeRunPanel, { context }),
-    },
-    {
-      id: "system-studio-advanced-setup",
-      slot: "lifecycle",
-      title: "Advanced setup",
-      subtitle: "Optional technical metadata and runtime controls.",
-      order: 13,
-      render: (context) => createElement(
-        "details",
-        undefined,
-        createElement("summary", { className: "ui-text-small ui-text-secondary" }, "Advanced setup"),
-        createElement(
-          "div",
-          { className: "ui-stack ui-stack--sm", style: { marginTop: "0.5rem" } },
-          createElement(SystemExecutionMetadataEditor, { context }),
-        ),
-      ),
     },
     {
       id: "system-studio-advanced-validation",
@@ -168,36 +132,6 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
           createElement(SystemContextDebugPreviewPanel, { context }),
         ),
       ),
-    },
-    {
-      id: "system-studio-composition-capabilities",
-      slot: "dependencies",
-      title: "System composition capabilities",
-      subtitle: "Registration metadata truth for system-of-systems composition scope.",
-      order: 15,
-      render: () => Object.freeze([
-        "Supports atomic dependencies: yes",
-        "Supports composite dependencies: yes",
-        "Supports system dependencies: yes",
-        "Supports nested system composition: yes",
-      ]),
-    },
-    {
-      id: "system-studio-metadata-summary",
-      slot: "metadata",
-      title: "System taxonomy and contract status",
-      subtitle: "Read-only taxonomy/contract/provenance projection from backend-authoritative draft metadata.",
-      order: 20,
-      render: ({ snapshot }) => {
-        const taxonomy = snapshot?.draft?.metadata.taxonomy;
-        return Object.freeze([
-          `Taxonomy: ${taxonomy
-            ? `${taxonomy.structuralKind}/${taxonomy.semanticRole}/${taxonomy.behaviorKind}`
-            : "missing"}`,
-          `Contract: ${snapshot?.draft?.metadata.contract ? "present" : "missing"}`,
-          `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
-        ]);
-      },
     },
   ]),
 });

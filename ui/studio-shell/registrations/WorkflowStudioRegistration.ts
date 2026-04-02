@@ -7,7 +7,6 @@ import {
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import WorkflowStudioModePanel from "../../components/studio-shell/workflow/WorkflowStudioModePanel";
 import WorkflowStudioRunHistoryPanel from "../../components/studio-shell/workflow/WorkflowStudioRunHistoryPanel";
-import WorkflowTemplateSelectionPanel from "../../components/studio-shell/workflow/WorkflowTemplateSelectionPanel";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 import { ExperienceSurfaceAssetIds } from "../experience-assets/ExperienceSurfaceAssets";
@@ -100,14 +99,6 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
   },
   extensions: Object.freeze([
     {
-      id: "workflow-studio-template-selection",
-      slot: "draft-authoring",
-      title: "Workflow template selection",
-      subtitle: "Select, preview, and instantiate starter workflow-template assets into a working draft configuration.",
-      order: 7,
-      render: () => createElement(WorkflowTemplateSelectionPanel, { surface: "workflow-studio" }),
-    },
-    {
       id: "workflow-studio-mode-abstraction",
       slot: "draft-authoring",
       title: "Workflow mode abstraction",
@@ -127,23 +118,6 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
         workflowId: snapshot?.draft?.assetId,
         workflowName: snapshot?.draft?.metadata.title,
       }),
-    },
-    {
-      id: "workflow-studio-metadata-summary",
-      slot: "metadata",
-      title: "Workflow taxonomy and contract status",
-      subtitle: "Read-only taxonomy/contract/provenance projection from backend-authoritative draft metadata.",
-      order: 20,
-      render: ({ snapshot }) => {
-        const taxonomy = snapshot?.draft?.metadata.taxonomy;
-        return Object.freeze([
-          `Taxonomy: ${taxonomy
-            ? `${taxonomy.structuralKind}/${taxonomy.semanticRole}/${taxonomy.behaviorKind}`
-            : "missing"}`,
-          `Contract: ${snapshot?.draft?.metadata.contract ? "present" : "missing"}`,
-          `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
-        ]);
-      },
     },
   ]),
 });

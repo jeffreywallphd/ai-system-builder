@@ -14,7 +14,6 @@ describe("DatasetPipelineStudioPage contracts", () => {
     expect(registrationSource).toContain('kind: "composite"');
     expect(registrationSource).toContain('role: "dataset-pipeline"');
     expect(registrationSource).toContain('slot: "draft-authoring"');
-    expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain('createDatasetPipelineStudioTaxonomy("deterministic")');
   });
 });
