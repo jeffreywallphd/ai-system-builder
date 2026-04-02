@@ -78,6 +78,7 @@ import {
   workflowStudioSurfaceAssetDefinition,
 } from "../studio-shell/studio-assets/StudioSurfaceAssetDefinitions";
 import { StudioAssetRenderModes } from "../studio-shell/studio-assets/StudioAssetContracts";
+import type { StudioEmbeddedEvent } from "../studio-shell/studio-assets/StudioEmbeddedEventContracts";
 
 interface JsonParseResult<T> {
   readonly ok: boolean;
@@ -1129,6 +1130,12 @@ export default function StudioShellPage({
     void saveDraftFromAuthoringAsync();
   };
 
+  const handleStudioAssetEvent = (event: StudioEmbeddedEvent): void => {
+    if (event.intent.kind === "studio.intent.commit-request") {
+      saveDraftFromAuthoring();
+    }
+  };
+
   const runValidationFromAuthoring = (): void => {
     if (isWorkflowStudio) {
       setIsWorkflowReadinessPending(true);
@@ -1670,6 +1677,7 @@ export default function StudioShellPage({
                 isBusy,
                 operationError,
               })}
+              onEvent={handleStudioAssetEvent}
             />
           ) : studioRegistration?.role === "dataset" ? (
             <StudioAssetHostBoundary
@@ -1688,6 +1696,7 @@ export default function StudioShellPage({
                 isBusy,
                 operationError,
               })}
+              onEvent={handleStudioAssetEvent}
             />
           ) : (
             <StudioAssetHostBoundary
@@ -1751,6 +1760,7 @@ export default function StudioShellPage({
                 isBusy,
                 operationError,
               })}
+              onEvent={handleStudioAssetEvent}
             />
           )}
           <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row" }}>

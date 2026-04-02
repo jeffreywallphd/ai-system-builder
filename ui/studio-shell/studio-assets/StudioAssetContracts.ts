@@ -35,6 +35,15 @@ export interface StudioHostContext<TInput = unknown> {
   readonly mode: StudioAssetRenderMode;
   readonly capabilities: StudioAssetHostCapabilities;
   readonly input: TInput;
+  readonly layout?: {
+    readonly minWidth?: number;
+    readonly minHeight?: number;
+    readonly maxWidth?: number;
+    readonly maxHeight?: number;
+    readonly width?: string | number;
+    readonly height?: string | number;
+  };
+  readonly injectedContext?: Record<string, unknown>;
   readonly documentAccess?: {
     readonly readOnly: boolean;
     readDocument?: () => string;
@@ -83,6 +92,7 @@ export interface StudioHostBoundaryProps<TInput = unknown, TEvent = StudioAssetE
   readonly context: StudioHostContext<TInput>;
   readonly session: StudioSessionState;
   readonly onEvent?: (event: TEvent) => void;
+  readonly className?: string;
 }
 
 export function supportsStudioAssetMode(

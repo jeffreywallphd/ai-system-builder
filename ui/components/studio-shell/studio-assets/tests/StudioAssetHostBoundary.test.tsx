@@ -12,6 +12,11 @@ import {
 import { StudioAssetRenderModes, type StudioAssetDefinition } from "../../../../studio-shell/studio-assets/StudioAssetContracts";
 import { createEmptyWorkflowDraft, serializeWorkflowDraft } from "../../../../../domain/workflow-studio/WorkflowStudioDomain";
 import type { StudioShellExtensionContext } from "../../../../studio-shell/StudioShellExtensions";
+import {
+  StudioEmbeddedIntentKinds,
+  createStudioIntentEvent,
+  type StudioEmbeddedEvent,
+} from "../../../../studio-shell/studio-assets/StudioEmbeddedEventContracts";
 
 const extensionContext: StudioShellExtensionContext = Object.freeze({
   studioId: "studio-1",
@@ -122,5 +127,75 @@ describe("StudioAssetHostBoundary", () => {
     expect(datasetHtml).toContain('data-testid="data-studio-preparation-wizard-panel"');
     expect(datasetHtml).not.toContain('data-testid="experience-asset-mode-actions"');
     expect(systemHtml).toContain('data-testid="system-studio-draft-authoring-boundary"');
+  });
+
+  it("applies host sizing constraints from context", () => {
+    const html = renderToStaticMarkup(
+      <StudioAssetHostBoundary
+        asset={datasetStudioSurfaceAssetDefinition}
+        context={createStudioHostContext({
+          mode: StudioAssetRenderModes.embedded,
+          layout: Object.freeze({ minHeight: 320, maxWidth: 640, width: "100%" }),
+          input: {
+            content: "{}",
+            extensionContext,
+          },
+        })}
+        session={createStudioHostSessionState({ isBusy: false })}
+      />,
+    );
+
+    expect(html).toContain("min-height:320px");
+    expect(html).toContain("max-width:640px");
+    expect(html).toContain("width:100%");
+  });
+
+  it("blocks navigation intents when host navigation capability is disabled", () => {
+    let emittedCount = 0;
+    const emittingAsset: StudioAssetDefinition<{ readonly value: string }, StudioEmbeddedEvent> = Object.freeze({
+      contract: Object.freeze({
+        identity: Object.freeze({ studioType: "test", studioId: "test", title: "Test" }),
+        supportedModes: Object.freeze([StudioAssetRenderModes.embedded]),
+        accepts: Object.freeze({ context: "test", document: "test", input: Object.freeze({ value: "" }) }),
+        emits: Object.freeze(["studio.intent"]),
+        hostCapabilities: Object.freeze({
+          canNavigate: false,
+          canShowShellChrome: false,
+          canMutateDraft: false,
+          canLaunchRuns: false,
+          canManageSessionState: false,
+        }),
+      }),
+      render: ({ onEvent }) => {
+        onEvent?.(createStudioIntentEvent({
+          kind: StudioEmbeddedIntentKinds.openResource,
+          payload: Object.freeze({ resourceType: "workflow", resourceId: "wf-1" }),
+        }));
+        return <div>emit</div>;
+      },
+    });
+
+    renderToStaticMarkup(
+      <StudioAssetHostBoundary
+        asset={emittingAsset}
+        context={createStudioHostContext({
+          mode: StudioAssetRenderModes.embedded,
+          capabilities: Object.freeze({
+            canNavigate: false,
+            canShowShellChrome: true,
+            canMutateDraft: true,
+            canLaunchRuns: false,
+            canManageSessionState: false,
+          }),
+          input: { value: "x" },
+        })}
+        session={createStudioHostSessionState({ isBusy: false })}
+        onEvent={() => {
+          emittedCount += 1;
+        }}
+      />,
+    );
+
+    expect(emittedCount).toBe(0);
   });
 });

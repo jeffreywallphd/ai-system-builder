@@ -10,6 +10,7 @@ import {
   type StudioHostContext,
   type StudioSessionState,
 } from "./StudioAssetContracts";
+import type { StudioEmbeddedEvent } from "./StudioEmbeddedEventContracts";
 import type { ExperienceSurfaceAssetId } from "../experience-assets/ExperienceSurfaceAssets";
 
 interface WorkflowStudioSurfaceInput {
@@ -43,7 +44,7 @@ const baseCapabilities = Object.freeze({
   canManageSessionState: false,
 });
 
-export const workflowStudioSurfaceAssetDefinition: StudioAssetDefinition<WorkflowStudioSurfaceInput> = Object.freeze({
+export const workflowStudioSurfaceAssetDefinition: StudioAssetDefinition<WorkflowStudioSurfaceInput, StudioEmbeddedEvent> = Object.freeze({
   contract: Object.freeze({
     identity: Object.freeze({
       studioType: "workflow-studio",
@@ -61,7 +62,7 @@ export const workflowStudioSurfaceAssetDefinition: StudioAssetDefinition<Workflo
     emits: Object.freeze(["studio.intent", "studio.change", "studio.validation"]),
     hostCapabilities: baseCapabilities,
   }),
-  render: ({ context }) => (
+  render: ({ context, onEvent }) => (
     <WorkflowStudioDraftAuthoringBoundary
       isWorkflowStudio={context.input.isWorkflowStudio}
       content={context.input.content}
@@ -71,11 +72,12 @@ export const workflowStudioSurfaceAssetDefinition: StudioAssetDefinition<Workflo
       invalidWizardPageRouteId={context.input.invalidWizardPageRouteId}
       experienceAssetIds={context.input.experienceAssetIds}
       hostMode={context.mode}
+      onStudioEvent={onEvent}
     />
   ),
 });
 
-export const systemStudioSurfaceAssetDefinition: StudioAssetDefinition<SystemStudioSurfaceInput> = Object.freeze({
+export const systemStudioSurfaceAssetDefinition: StudioAssetDefinition<SystemStudioSurfaceInput, StudioEmbeddedEvent> = Object.freeze({
   contract: Object.freeze({
     identity: Object.freeze({
       studioType: "system-studio",
@@ -94,18 +96,19 @@ export const systemStudioSurfaceAssetDefinition: StudioAssetDefinition<SystemStu
     hostCapabilities: baseCapabilities,
     runtimeHooks: Object.freeze({ canStartRuntime: true }),
   }),
-  render: ({ context }) => (
+  render: ({ context, onEvent }) => (
     <SystemStudioDraftAuthoringSurface
       content={context.input.content}
       validationIssues={context.input.validationIssues}
       extensionContext={context.input.extensionContext}
       experienceAssetIds={context.input.experienceAssetIds}
       hostMode={context.mode}
+      onStudioEvent={onEvent}
     />
   ),
 });
 
-export const datasetStudioSurfaceAssetDefinition: StudioAssetDefinition<DatasetStudioSurfaceInput> = Object.freeze({
+export const datasetStudioSurfaceAssetDefinition: StudioAssetDefinition<DatasetStudioSurfaceInput, StudioEmbeddedEvent> = Object.freeze({
   contract: Object.freeze({
     identity: Object.freeze({
       studioType: "dataset-studio",
@@ -123,12 +126,13 @@ export const datasetStudioSurfaceAssetDefinition: StudioAssetDefinition<DatasetS
     emits: Object.freeze(["studio.intent", "studio.change", "studio.validation", "studio.run"]),
     hostCapabilities: baseCapabilities,
   }),
-  render: ({ context }) => (
+  render: ({ context, onEvent }) => (
     <DatasetStudioDraftAuthoringBoundary
       content={context.input.content}
       extensionContext={context.input.extensionContext}
       experienceAssetIds={context.input.experienceAssetIds}
       hostMode={context.mode}
+      onStudioEvent={onEvent}
     />
   ),
 });
@@ -150,11 +154,19 @@ export function createStudioHostSessionState(snapshot: {
 export function createStudioHostContext<TInput>(params: {
   readonly input: TInput;
   readonly mode?: StudioHostContext<TInput>["mode"];
+  readonly hostId?: string;
+  readonly capabilities?: StudioHostContext<TInput>["capabilities"];
+  readonly layout?: StudioHostContext<TInput>["layout"];
+  readonly documentAccess?: StudioHostContext<TInput>["documentAccess"];
+  readonly injectedContext?: StudioHostContext<TInput>["injectedContext"];
 }): StudioHostContext<TInput> {
   return Object.freeze({
-    hostId: "studio-shell",
+    hostId: params.hostId ?? "studio-shell",
     mode: params.mode ?? StudioAssetRenderModes.full,
-    capabilities: baseCapabilities,
+    capabilities: params.capabilities ?? baseCapabilities,
     input: params.input,
+    layout: params.layout,
+    documentAccess: params.documentAccess,
+    injectedContext: params.injectedContext,
   });
 }

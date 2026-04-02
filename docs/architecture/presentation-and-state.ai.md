@@ -40,6 +40,17 @@ Workflow Studio run detail now also exposes rerun actions on the same surface: `
 - Embedded-mode behavior now suppresses standalone-oriented controls in the reusable surfaces:
   - Workflow surface hides standalone route/validation notices in non-`full` modes.
   - System and Dataset surfaces disable mode-switch chrome in non-`full` modes and keep scoped authoring content.
+
+## Direction 5 extension update: embedded studio host rendering + event intent contract (stories 3-4)
+
+- Studio host context now includes host-provided embedding constraints and injection seams in `ui/studio-shell/studio-assets/StudioAssetContracts.ts`:
+  - `layout` constraints for hosted surfaces (`min/max/width/height`),
+  - `documentAccess` and `injectedContext` for host-provided document/context boundaries,
+  - explicit host capability projection carried into embedded rendering.
+- `StudioAssetHostBoundary` is now the reusable embedding boundary for wizard/canvas/panel/system surfaces, with mode support enforcement, host sizing, capability-aware event gating, and a single host-managed event bridge callback.
+- Embedded studio events are standardized in `ui/studio-shell/studio-assets/StudioEmbeddedEventContracts.ts` as host-managed intents (open related resource, request full view, selection/focus changes, apply/commit requests) instead of embedded direct routing/shell ownership.
+- Workflow/System/Dataset studio definitions now emit those typed intents through the shared host boundary, and `StudioShellPage` consumes the host event seam for orchestration hooks.
+- Embedded rendering remains shell-neutral: hosted surfaces do not own global routing, shell lifecycle, or top-level navigation assumptions.
 Edit-and-rerun stays user-facing and structured (target/parameters/execution-metadata/property-overrides JSON fields) rather than raw log parsing or ad hoc debug-only controls.
 Related-run lineage navigation now also uses that same execution-history service seam (related-run cluster projection + detail-panel navigation) instead of page-level custom grouping logic.
 Workflow observability entry points now also appear on adjacent workflow surfaces (persisted workflow list cards, workflow draft status, and workflow execution feedback), so navigation to run history/run detail is part of the normal build/run/editor flow rather than an isolated panel-only path.
