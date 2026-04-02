@@ -4,6 +4,9 @@ import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 import DatasetStudioDraftPreviewPanel from "../../components/assets/DatasetStudioDraftPreviewPanel";
 import { ExperienceSurfaceAssetIds } from "../experience-assets/ExperienceSurfaceAssets";
+import { DataStudioPreparationWizardStateAdapter } from "../data/DataStudioPreparationWizardStateAdapter";
+
+const defaultDataStudioPipelineState = new DataStudioPreparationWizardStateAdapter().exportPipelineStateJson();
 
 export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze({
   studioType: DatasetStudioIdentity.studioType,
@@ -14,7 +17,7 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
   allowedBehaviorKinds: Object.freeze(["none"]),
   shell: Object.freeze({
     title: "Data Studio",
-    subtitle: "Stage-based data preparation authoring with wizard-first progression over one canonical asset graph.",
+    subtitle: "Prepare and move data through guided pipeline stages. Use Schema Studio for structure design.",
     experienceAssets: Object.freeze([
       ExperienceSurfaceAssetIds.loomWizard,
       ExperienceSurfaceAssetIds.loomCanvas,
@@ -55,7 +58,7 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
   defaults: {
     title: "Dataset Asset Draft",
     tags: Object.freeze(["dataset", "studio-shell"]),
-    contentTemplate: JSON.stringify({ datasetSpec: { format: "jsonl", schema: {}, source: "" } }, null, 2),
+    contentTemplate: defaultDataStudioPipelineState,
     metadataPatch: createAtomicStudioMetadataPatch({
       title: "Dataset Asset Draft",
       tags: ["dataset", "studio-shell"],
@@ -70,10 +73,10 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
       id: "dataset-studio-draft-guidance",
       slot: "draft-authoring",
       title: "Dataset draft guidance",
-      subtitle: "Dataset structure/versioning is authored as an atomic asset; pipelines remain composite assets.",
+      subtitle: "Keep this workspace focused on ingestion, mapping, cleanup, and execution flow.",
       order: 10,
       render: ({ snapshot }) => Object.freeze([
-        "Keep dataset authoring atomic: schema/profile/version in the asset, execution in behaviors.",
+        "Use Data Studio for pipeline and preparation work. Use Schema Studio for table and field design.",
         "Asset role: dataset (atomic)",
         `Draft asset id: ${snapshot?.draft?.assetId ?? "-"}`,
       ]),

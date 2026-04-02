@@ -9,7 +9,7 @@ describe("DataStudioPreparationWizardPanel", () => {
 
     expect(html).toContain("Data Studio Preparation Wizard");
     expect(html).toContain("Pipeline template");
-    expect(html).toContain("Simple Flow");
+    expect(html).toContain("Basic");
     expect(html).toContain("Advanced Flow");
     expect(html).toContain("Canvas");
     expect(html).toContain("Advanced editing");
