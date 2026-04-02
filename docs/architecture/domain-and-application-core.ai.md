@@ -1691,3 +1691,17 @@ Explicitly later than this scope:
 - UI trigger lifecycle traceability is now captured through internal trace contracts in `application/workflow-studio/WorkflowUiEventTrace.ts`:
   - normalized event identity/source, binding/workflow refs, payload summaries, dispatch status/outcomes, and correlation ids,
   - trace sink adapter boundary allows persistence/logging evolution without leaking React/browser event structures into shared or durable traces.
+
+## Direction 5 update: Dataset-pipeline schema linkage in ingestion + pipeline configuration (stories 3.2.5-3.2.6)
+
+- Dataset-pipeline document contracts now support schema linkage at both levels:
+  - pipeline-level input/output schema references (`datasetPipelineSpec.schemas.input/output`),
+  - ingestion-source-level schema references (`datasetPipelineSpec.sources[].schema`) for source-specific structure alignment.
+- Pipeline draft normalization and update helpers continue to be domain-owned in `domain/dataset-pipeline-studio/DatasetPipelineAssetDocument.ts`, with schema reference parsing/cleanup centralized there (no UI-local schema-link persistence model).
+- Dataset Pipeline Studio authoring now uses registry-backed schema discovery for linking:
+  - select/update/clear flows for input schema and output schema,
+  - per-source schema selection for ingestion sources,
+  - graceful unresolved/missing-schema status projection without blocking draft editing.
+- The authoring UX keeps structure linkage separate from schema authoring:
+  - Schema Studio remains the place to define table/field structure,
+  - Dataset Pipeline Studio links those schema assets for ingestion and pipeline contracts.

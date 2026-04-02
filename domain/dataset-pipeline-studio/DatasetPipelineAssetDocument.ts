@@ -20,6 +20,7 @@ const DatasetPipelineSourceSchema = z.object({
   datasetRef: OptionalStringSchema,
   ingestionMode: OptionalStringSchema,
   description: OptionalStringSchema,
+  schema: DatasetPipelineSchemaReferenceSchema.optional(),
 });
 
 const DatasetPipelineStepSchema = z.object({
@@ -144,6 +145,41 @@ export function updateDatasetPipelineSchemaReference(input: {
     datasetPipelineSpec: {
       ...normalized.datasetPipelineSpec,
       schemas: hasAnyReference ? nextSchemas : undefined,
+    },
+  });
+}
+
+export function updateDatasetPipelineSourceSchemaReference(input: {
+  readonly document: DatasetPipelineAssetDocument;
+  readonly sourceIndex: number;
+  readonly reference?: DatasetPipelineSchemaReference;
+}): DatasetPipelineAssetDocument {
+  const normalized = normalizeDatasetPipelineAssetDocument(input.document);
+  const source = normalized.datasetPipelineSpec.sources[input.sourceIndex];
+  if (!source) {
+    return normalized;
+  }
+
+  const nextSources = normalized.datasetPipelineSpec.sources.map((entry, index) => {
+    if (index !== input.sourceIndex) {
+      return entry;
+    }
+    const nextReference = normalizeSchemaReference(input.reference);
+    if (!nextReference) {
+      const { schema: _schema, ...rest } = entry;
+      return rest;
+    }
+    return {
+      ...entry,
+      schema: nextReference,
+    };
+  });
+
+  return normalizeDatasetPipelineAssetDocument({
+    ...normalized,
+    datasetPipelineSpec: {
+      ...normalized.datasetPipelineSpec,
+      sources: nextSources,
     },
   });
 }
