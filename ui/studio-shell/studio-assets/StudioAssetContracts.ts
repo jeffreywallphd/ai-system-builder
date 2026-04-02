@@ -79,9 +79,62 @@ export interface StudioUiAssetMetadata {
   readonly capabilityFlags?: ReadonlyArray<string>;
 }
 
+export const StudioAssetPropertyFieldKinds = Object.freeze({
+  text: "text",
+  textarea: "textarea",
+  number: "number",
+  boolean: "boolean",
+  select: "select",
+  json: "json",
+});
+
+export type StudioAssetPropertyFieldKind =
+  typeof StudioAssetPropertyFieldKinds[keyof typeof StudioAssetPropertyFieldKinds];
+
+export interface StudioAssetPropertyVisibilityRule {
+  readonly field: string;
+  readonly equals?: string | number | boolean;
+  readonly notEquals?: string | number | boolean;
+}
+
+export interface StudioAssetPropertyField {
+  readonly id: string;
+  readonly path: string;
+  readonly label: string;
+  readonly kind: StudioAssetPropertyFieldKind;
+  readonly description?: string;
+  readonly helpText?: string;
+  readonly placeholder?: string;
+  readonly defaultValue?: unknown;
+  readonly required?: boolean;
+  readonly readOnly?: boolean;
+  readonly hidden?: boolean;
+  readonly visibilityRule?: StudioAssetPropertyVisibilityRule;
+  readonly options?: ReadonlyArray<{
+    readonly value: string;
+    readonly label: string;
+    readonly description?: string;
+  }>;
+}
+
+export interface StudioAssetPropertySection {
+  readonly id: string;
+  readonly label: string;
+  readonly description?: string;
+  readonly fields: ReadonlyArray<StudioAssetPropertyField>;
+  readonly collapsedByDefault?: boolean;
+}
+
+export interface StudioAssetPropertySchema {
+  readonly schemaId: string;
+  readonly schemaVersion: string;
+  readonly sections: ReadonlyArray<StudioAssetPropertySection>;
+}
+
 export interface StudioUiAssetPropsSchemaDescriptor {
   readonly schemaId: string;
   readonly schemaVersion: string;
+  readonly propertySchema?: StudioAssetPropertySchema;
 }
 
 export interface StudioUiAssetPersistenceDescriptor {

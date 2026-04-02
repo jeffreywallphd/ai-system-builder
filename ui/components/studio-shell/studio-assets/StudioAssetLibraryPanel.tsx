@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import StudioAssetInspectorPanel from "./StudioAssetInspectorPanel";
+import type { StudioAssetCompositionNode } from "../../../studio-shell/studio-assets/StudioAssetComposition";
 import type { StudioAssetRegistrationCategory, StudioAssetRegistry } from "../../../studio-shell/studio-assets/StudioAssetRegistry";
 import { listStudioAssetLibrarySections, type StudioAssetLibraryEntry } from "../../../studio-shell/studio-assets/StudioAssetLibrary";
 
@@ -8,6 +10,8 @@ export interface StudioAssetLibraryPanelProps {
   readonly description?: string;
   readonly categoryFilter?: ReadonlyArray<StudioAssetRegistrationCategory>;
   readonly onInsertAsset?: (entry: StudioAssetLibraryEntry) => void;
+  readonly selectedAssetNode?: StudioAssetCompositionNode;
+  readonly onChangeSelectedAssetConfig?: (nextConfig: Readonly<Record<string, unknown>>) => void;
 }
 
 const defaultCategories = Object.freeze([
@@ -38,6 +42,8 @@ export default function StudioAssetLibraryPanel({
   description = "Browse reusable interface assets and insert them where they fit.",
   categoryFilter = defaultCategories,
   onInsertAsset,
+  selectedAssetNode,
+  onChangeSelectedAssetConfig,
 }: StudioAssetLibraryPanelProps): JSX.Element {
   const [query, setQuery] = useState("");
   const sections = useMemo(() => listStudioAssetLibrarySections({
@@ -107,6 +113,12 @@ export default function StudioAssetLibraryPanel({
           ))}
         </div>
       )}
+
+      <StudioAssetInspectorPanel
+        registry={registry}
+        selectedAssetNode={selectedAssetNode}
+        onChangeNodeConfig={onChangeSelectedAssetConfig}
+      />
     </section>
   );
 }

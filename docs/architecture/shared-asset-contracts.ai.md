@@ -991,3 +991,17 @@
 - A generic insertion seam now creates instance nodes from registered definitions and inserts them into composition trees through existing slot/region contracts and validation rules (`ui/studio-shell/studio-assets/StudioAssetInsertion.ts`).
 - Insertion outcomes are explicit and structured (`ok` success vs typed failure kinds for unknown asset/parent, invalid placement, and validation-denied insert), keeping the distinction between definition browsing and composition instantiation explicit.
 - Composition validation enforcement is reused from the existing registry-backed composition validator (`StudioAssetRegistry.validateCompositionTree`), including placement rules, allowed child kinds/types/categories, and cardinality checks.
+
+## Direction 5 UI extension update: asset inspector + schema-driven property contracts (stories 1.2.3-1.2.4)
+
+- Studio UI asset contracts now expose an optional reusable property-schema contract (`StudioAssetPropertySchema`) directly on `propsSchema` so definition-level editor metadata and instance-level configuration stay aligned across the existing taxonomy (`atomic`, `composed`, `system-page`) instead of introducing a parallel inspector format.
+- Property schema contracts support:
+  - simple fields,
+  - grouped sections,
+  - labels/help text/placeholders,
+  - default values,
+  - editor kinds (`text`, `textarea`, `number`, `boolean`, `select`, `json`),
+  - optional hidden/read-only and conditional visibility rules.
+- Shared schema utilities (`ui/studio-shell/studio-assets/StudioAssetPropertySchema.ts`) provide default projection, visibility filtering, required-field validation, and nested field-path updates for instantiated asset config documents.
+- A reusable Asset Inspector panel (`ui/components/studio-shell/studio-assets/StudioAssetInspectorPanel.tsx`) now renders selected instance metadata and schema-driven property editors with validation feedback/unsupported-property messaging, and is surfaced alongside the existing library panel through optional selected-instance props (`StudioAssetLibraryPanel`).
+- Base property schemas are now registered for atomic UI primitives and current composed/system studio surfaces via existing definition registration seams (`StudioUiPrimitiveAssetContracts`, `StudioSurfaceAssetDefinitions`), preserving definition-vs-instance boundaries while enabling inspector-driven editing without hardcoded per-asset forms.

@@ -1,4 +1,5 @@
 import {
+  StudioAssetPropertyFieldKinds,
   StudioUiAssetContractVersion,
   StudioUiAssetKinds,
   type AtomicStudioAssetContract,
@@ -46,6 +47,62 @@ export function createAtomicStudioUiPrimitiveContract(input: {
     propsSchema: Object.freeze({
       schemaId: `studio.ui-primitive.${input.primitiveKind}.props`,
       schemaVersion: "1.0.0",
+      propertySchema: Object.freeze({
+        schemaId: `studio.ui-primitive.${input.primitiveKind}.properties`,
+        schemaVersion: "1.0.0",
+        sections: Object.freeze([
+          Object.freeze({
+            id: "display",
+            label: "Display",
+            description: "Basic presentation settings for this UI primitive.",
+            fields: Object.freeze([
+              Object.freeze({
+                id: "label",
+                path: "label",
+                label: "Label",
+                kind: StudioAssetPropertyFieldKinds.text,
+                helpText: "Friendly text shown to people using this control.",
+                defaultValue: input.title,
+              }),
+              Object.freeze({
+                id: "helperText",
+                path: "helperText",
+                label: "Help text",
+                kind: StudioAssetPropertyFieldKinds.textarea,
+                helpText: "Optional support text shown below the control.",
+                defaultValue: "",
+              }),
+              Object.freeze({
+                id: "isVisible",
+                path: "isVisible",
+                label: "Show this element",
+                kind: StudioAssetPropertyFieldKinds.boolean,
+                defaultValue: true,
+              }),
+            ]),
+          }),
+          Object.freeze({
+            id: "behavior",
+            label: "Behavior",
+            fields: Object.freeze([
+              Object.freeze({
+                id: "required",
+                path: "required",
+                label: "Required",
+                kind: StudioAssetPropertyFieldKinds.boolean,
+                defaultValue: false,
+              }),
+              Object.freeze({
+                id: "readOnly",
+                path: "readOnly",
+                label: "Read-only",
+                kind: StudioAssetPropertyFieldKinds.boolean,
+                defaultValue: input.primitiveKind === StudioUiPrimitiveKinds.viewer,
+              }),
+            ]),
+          }),
+        ]),
+      }),
     }),
     supportedModes: Object.freeze(["full", "embedded", "inline", "readonly"]),
     accepts: Object.freeze({
