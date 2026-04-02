@@ -1681,3 +1681,13 @@ Explicitly later than this scope:
 - Data Studio now has a canonical persistent authoring-state contract in `application/data-studio/DataStudioPipelineState.ts`, modeling pipeline identity/metadata, stage-level state, stage asset-group bindings, transitions, authoring-flow metadata, and wizard/canvas compatibility projection hooks over one unified-preparation asset source.
 - `DataStudioPreparationWizard` now exports/imports this persistent state directly, so wizard progression and later canvas projection can operate on one serializable, validation-backed representation rather than transient component-local state.
 - Prepared-data persistence now includes an explicit prepared-storage stage service (`application/dataset-studio/PreparedStorageStageService.ts`) and output contracts (`PreparedStorageStageOutput` in `StageIntegrationContracts.ts`) that bind prepared dataset identity, storage target/reference, upstream asset/pipeline references, and lineage metadata through bounded application seams.
+
+## Direction 5 UI update: UI-trigger normalized error/feedback + traceability (stories 4.2.7-4.2.8)
+
+- UI-triggered workflow dispatch now has a normalized interaction error/result contract in `application/workflow-studio/WorkflowUiInteractionContracts.ts`:
+  - deterministic issue codes for invalid event payloads, binding failures, parameter-mapping failures, dispatch failures, and execution-launch failures,
+  - framework-agnostic feedback sink hooks (`onStatus`, `onIssue`, `onDispatchRecord`) for UI status rendering without coupling image/system/workflow components to runtime internals.
+- Runtime UI dispatch now emits typed interaction status transitions (received, validation-failed, no-binding-matched, dispatching, launch-blocked/failed/launched, execution-failed) through the dispatcher seam.
+- UI trigger lifecycle traceability is now captured through internal trace contracts in `application/workflow-studio/WorkflowUiEventTrace.ts`:
+  - normalized event identity/source, binding/workflow refs, payload summaries, dispatch status/outcomes, and correlation ids,
+  - trace sink adapter boundary allows persistence/logging evolution without leaking React/browser event structures into shared or durable traces.
