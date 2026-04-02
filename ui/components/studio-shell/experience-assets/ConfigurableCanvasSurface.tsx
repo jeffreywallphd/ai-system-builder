@@ -8,6 +8,7 @@ import type {
   CanvasSurfaceIdentity,
   CanvasSurfaceLayoutNodeModel,
   CanvasSurfacePaletteModel,
+  CanvasSurfaceSnapModel,
   CanvasSurfaceToolbarActionModel,
   CanvasSurfaceViewportModel,
 } from "../../../studio-shell/experience-assets/ConfigurableCanvasSurfaceContracts";
@@ -86,6 +87,44 @@ function clamp01(value: number): number {
     return 0;
   }
   return Math.max(0, Math.min(1, value));
+}
+
+function clampToBounds(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.max(min, Math.min(max, value));
+}
+
+function resolveSnapStep(divisions: number): number {
+  const safeDivisions = Number.isFinite(divisions) && divisions > 0 ? Math.floor(divisions) : 1;
+  return 1 / safeDivisions;
+}
+
+function snapNormalized(value: number, divisions: number): number {
+  const step = resolveSnapStep(divisions);
+  return clamp01(Math.round(value / step) * step);
+}
+
+function resolveEffectiveSnapModel(snap: CanvasSurfaceSnapModel | undefined): CanvasSurfaceSnapModel | undefined {
+  if (!snap?.enabled) {
+    return undefined;
+  }
+  return Object.freeze({
+    ...snap,
+    divisions: Object.freeze({
+      x: Number.isFinite(snap.divisions.x) && snap.divisions.x > 0 ? Math.floor(snap.divisions.x) : 1,
+      y: Number.isFinite(snap.divisions.y) && snap.divisions.y > 0 ? Math.floor(snap.divisions.y) : 1,
+    }),
+    timing: Object.freeze({
+      duringDrag: snap.timing?.duringDrag ?? false,
+      onRelease: snap.timing?.onRelease ?? true,
+    }),
+    targets: Object.freeze({
+      position: snap.targets?.position ?? true,
+      size: snap.targets?.size ?? false,
+    }),
+  });
 }
 
 function resolveDesignFrameRatio(editingModel: CanvasSurfaceEditingModel): number {
@@ -179,6 +218,7 @@ function ConfigurableCanvasEditingSurface({
   );
   const frameRef = useRef<HTMLDivElement | null>(null);
   const coordinateMode = editingModel.coordinateSpace?.mode ?? "absolute";
+  const snapModel = resolveEffectiveSnapModel(editingModel.snap);
 
   const toFrameCoordinate = (pixelValue: number, frameSize: number): number => {
     if (coordinateMode === "normalized") {
@@ -224,13 +264,16 @@ function ConfigurableCanvasEditingSurface({
     const frameHeight = frameRect?.height ?? 0;
     const deltaX = coordinates.x - state.startClientX;
     const deltaY = coordinates.y - state.startClientY;
+    let x = toFrameCoordinate(state.nodeStartX + deltaX, frameWidth);
+    let y = toFrameCoordinate(state.nodeStartY + deltaY, frameHeight);
+    if (snapModel?.targets?.position && snapModel.timing?.duringDrag && coordinateMode === "normalized") {
+      x = snapNormalized(x, snapModel.divisions.x);
+      y = snapNormalized(y, snapModel.divisions.y);
+    }
     onEditingEvent?.({
       type: "node.position.change",
       nodeId: state.nodeId,
-      position: Object.freeze({
-        x: toFrameCoordinate(state.nodeStartX + deltaX, frameWidth),
-        y: toFrameCoordinate(state.nodeStartY + deltaY, frameHeight),
-      }),
+      position: Object.freeze({ x, y }),
     });
   };
 
@@ -250,15 +293,27 @@ function ConfigurableCanvasEditingSurface({
     const frameRect = frameRef.current?.getBoundingClientRect();
     const frameWidth = frameRect?.width ?? 0;
     const frameHeight = frameRect?.height ?? 0;
+    let nextFrame = Object.freeze({
+      x: toFrameCoordinate(frame.x, frameWidth),
+      y: toFrameCoordinate(frame.y, frameHeight),
+      width: toFrameSizeCoordinate(frame.width, frameWidth),
+      height: toFrameSizeCoordinate(frame.height, frameHeight),
+    });
+    if (snapModel?.targets?.size && snapModel.timing?.duringDrag && coordinateMode === "normalized") {
+      const snappedWidth = snapNormalized(nextFrame.width, snapModel.divisions.x);
+      const snappedHeight = snapNormalized(nextFrame.height, snapModel.divisions.y);
+      nextFrame = Object.freeze({
+        ...nextFrame,
+        width: snappedWidth,
+        height: snappedHeight,
+        x: clampToBounds(nextFrame.x, 0, Math.max(0, 1 - snappedWidth)),
+        y: clampToBounds(nextFrame.y, 0, Math.max(0, 1 - snappedHeight)),
+      });
+    }
     onEditingEvent?.({
       type: "node.resize.change",
       nodeId: state.nodeId,
-      frame: Object.freeze({
-        x: toFrameCoordinate(frame.x, frameWidth),
-        y: toFrameCoordinate(frame.y, frameHeight),
-        width: toFrameSizeCoordinate(frame.width, frameWidth),
-        height: toFrameSizeCoordinate(frame.height, frameHeight),
-      }),
+      frame: nextFrame,
     });
   };
 
@@ -301,6 +356,61 @@ function ConfigurableCanvasEditingSurface({
       if (event.pointerId !== interactionState.pointerId) {
         return;
       }
+      const coordinates = resolvePointerCoordinates(event);
+      if (coordinateMode === "normalized" && snapModel?.timing?.onRelease) {
+        if (interactionState.mode === "move" && snapModel.targets?.position && interactionState.hasCrossedMoveThreshold) {
+          const frameRect = frameRef.current?.getBoundingClientRect();
+          const frameWidth = frameRect?.width ?? 0;
+          const frameHeight = frameRect?.height ?? 0;
+          const deltaX = coordinates.x - interactionState.startClientX;
+          const deltaY = coordinates.y - interactionState.startClientY;
+          const rawX = toFrameCoordinate(interactionState.nodeStartX + deltaX, frameWidth);
+          const rawY = toFrameCoordinate(interactionState.nodeStartY + deltaY, frameHeight);
+          onEditingEvent?.({
+            type: "node.position.change",
+            nodeId: interactionState.nodeId,
+            position: Object.freeze({
+              x: snapNormalized(rawX, snapModel.divisions.x),
+              y: snapNormalized(rawY, snapModel.divisions.y),
+            }),
+          });
+        }
+        if (interactionState.mode === "resize" && snapModel.targets?.size) {
+          const deltaX = coordinates.x - interactionState.startClientX;
+          const deltaY = coordinates.y - interactionState.startClientY;
+          const frame = mapResizeFrame({
+            id: interactionState.nodeId,
+            title: "",
+            x: interactionState.nodeStartX,
+            y: interactionState.nodeStartY,
+            width: interactionState.nodeStartWidth,
+            height: interactionState.nodeStartHeight,
+            minWidth: 48,
+            minHeight: 48,
+          }, deltaX, deltaY, interactionState.resizeHandle ?? "se");
+          const frameRect = frameRef.current?.getBoundingClientRect();
+          const frameWidth = frameRect?.width ?? 0;
+          const frameHeight = frameRect?.height ?? 0;
+          const rawFrame = Object.freeze({
+            x: toFrameCoordinate(frame.x, frameWidth),
+            y: toFrameCoordinate(frame.y, frameHeight),
+            width: toFrameSizeCoordinate(frame.width, frameWidth),
+            height: toFrameSizeCoordinate(frame.height, frameHeight),
+          });
+          const snappedWidth = snapNormalized(rawFrame.width, snapModel.divisions.x);
+          const snappedHeight = snapNormalized(rawFrame.height, snapModel.divisions.y);
+          onEditingEvent?.({
+            type: "node.resize.change",
+            nodeId: interactionState.nodeId,
+            frame: Object.freeze({
+              x: clampToBounds(rawFrame.x, 0, Math.max(0, 1 - snappedWidth)),
+              y: clampToBounds(rawFrame.y, 0, Math.max(0, 1 - snappedHeight)),
+              width: snappedWidth,
+              height: snappedHeight,
+            }),
+          });
+        }
+      }
       setInteractionState(undefined);
     };
 
@@ -312,7 +422,7 @@ function ConfigurableCanvasEditingSurface({
       window.removeEventListener("pointerup", completeInteraction);
       window.removeEventListener("pointercancel", completeInteraction);
     };
-  }, [interactionState, nodesById, onEditingEvent]);
+  }, [coordinateMode, interactionState, nodesById, onEditingEvent, snapModel]);
 
   const boundedPadding = editingModel.designFrame?.boundedArea?.padding ?? 16;
   const designFrameRatio = resolveDesignFrameRatio(editingModel);
@@ -376,6 +486,7 @@ function ConfigurableCanvasEditingSurface({
                   "ui-card",
                   "ui-card--padded",
                   selected ? "ui-configurable-canvas-layout-node--selected" : "",
+                  interactionState?.nodeId === node.id ? "ui-configurable-canvas-layout-node--dragging" : "",
                 ].filter(Boolean).join(" ")}
                 style={{
                   left: `${coordinateMode === "normalized" ? node.x * 100 : node.x}${coordinateMode === "normalized" ? "%" : "px"}`,

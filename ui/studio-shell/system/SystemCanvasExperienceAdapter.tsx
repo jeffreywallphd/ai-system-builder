@@ -130,6 +130,18 @@ function resolveEditingModel(context: SystemCanvasExperienceContext): CanvasSurf
       mode: "normalized",
       referenceDimensions: context.designFrame.dimensions ?? Object.freeze({ width: 1600, height: 900 }),
     }),
+    snap: Object.freeze({
+      enabled: true,
+      divisions: Object.freeze({ x: 10, y: 10 }),
+      timing: Object.freeze({
+        duringDrag: false,
+        onRelease: true,
+      }),
+      targets: Object.freeze({
+        position: true,
+        size: false,
+      }),
+    }),
   });
 }
 
