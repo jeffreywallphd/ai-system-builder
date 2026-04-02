@@ -296,3 +296,92 @@ it("blocks persistence when upstream execution status is failed", async () => {
   expect(persisted.data?.executionOutcome).toBe("non-recoverable-failure");
   expect(persisted.data?.persistenceBlocked).toBeTrue();
 });
+
+it("keeps output/history views synchronized across repeated saves for the same draft", async () => {
+  const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+  const initialized = await api.initializeStudio("studio-system", "System Studio");
+  const created = await api.createDraft({
+    studioId: "studio-system",
+    sessionId: initialized.data!.activeSessionId!,
+    assetId: ReferenceImageSystemTemplate.systemAsset.assetId,
+    content: JSON.stringify({ systemSpec: {} }),
+    metadata: {
+      title: "Reference image",
+      tags: ["system"],
+      taxonomy: {
+        structuralKind: "system",
+        semanticRole: "system",
+        behaviorKind: "deterministic",
+      },
+    },
+  });
+
+  const draftId = created.data!.draft!.draftId;
+  for (const index of [1, 2]) {
+    const runId = `run:sync:${index}`;
+    const persistResult = await api.persistReferenceImageOutputs({
+      studioId: "studio-system",
+      draftId,
+      executionId: runId,
+      sourceAssetId: "generated-output:upload://source.png",
+      parameterSnapshot: { editInstruction: `variation ${index}`, resultCount: 1 },
+      runtimeContext: {
+        contractVersion: "1.0.0",
+        selectedImages: [{ selectionId: "source-1", imageId: "source-1", assetRef: { assetId: "generated-output:upload://source.png", recordId: "source-1" } }],
+        parameters: { editInstruction: `variation ${index}`, resultCount: 1 },
+        datasets: [{ referenceId: "active-input", instanceId: "dataset-instance:reference-image:input", datasetAssetId: "asset:dataset:image-reference-input", role: "active-input" }],
+        runtime: { systemAssetId: ReferenceImageSystemTemplate.systemAsset.assetId, runtimeSessionId: `session:sync:${index}` },
+      },
+      workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+      workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+      systemAssetId: ReferenceImageSystemTemplate.systemAsset.assetId,
+      runtimeResult: {
+        output: {
+          payload: {
+            nodeResults: {
+              workflow: {
+                result: {
+                  executionId: runId,
+                  status: "completed",
+                  outputs: [{
+                    nodeId: "save_image",
+                    kind: "image",
+                    reference: `memory://generated-sync-${index}.png`,
+                    metadata: {
+                      filename: `generated-sync-${index}.png`,
+                      format: "png",
+                      width: 1024,
+                      height: 768,
+                    },
+                  }],
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(persistResult.ok).toBeTrue();
+    expect(persistResult.data?.persistedRecordIds.length).toBe(1);
+  }
+
+  const listed = await api.listReferenceImageOutputs({
+    studioId: "studio-system",
+    draftId,
+    limit: 10,
+    offset: 0,
+  });
+  expect(listed.ok).toBeTrue();
+  expect(listed.data?.summary.totalItems).toBe(2);
+
+  const history = await api.listReferenceImageRunHistory({
+    studioId: "studio-system",
+    draftId,
+    limit: 10,
+    offset: 0,
+  });
+  expect(history.ok).toBeTrue();
+  expect(history.data?.summary.totalRuns).toBe(2);
+  expect(history.data?.runs[0]?.lineage?.workflowAssetId).toBe(ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId);
+  expect(history.data?.runs[0]?.lineage?.workflowAssetVersionId).toBe(ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId);
+});

@@ -9,6 +9,7 @@ describe("ReferenceImageExecutionFlowService", () => {
   it("emits plain-language step status across trigger, execution, save, and refresh", async () => {
     const service = new ReferenceImageExecutionFlowService();
     const snapshots: ReadonlyArray<unknown>[] = [];
+    const performanceReports: ReadonlyArray<unknown>[] = [];
 
     const final = await service.run({
       startExecution: async () => ({ ok: true, executionId: "run:1" }),
@@ -54,14 +55,18 @@ describe("ReferenceImageExecutionFlowService", () => {
       onSnapshot: (snapshot) => {
         snapshots.push([snapshot]);
       },
+      onPerformanceReport: (report) => {
+        performanceReports.push([report]);
+      },
     });
 
     expect(final.overallStatus).toBe("completed");
-    expect(final.steps.some((step) => step.userLabel === "Run started" && step.status === "completed")).toBeTrue();
-    expect(final.steps.some((step) => step.userLabel === "Generating result")).toBeTrue();
-    expect(final.steps.some((step) => step.userLabel === "Saving result")).toBeTrue();
-    expect(final.steps.some((step) => step.userLabel === "Refreshing results")).toBeTrue();
+    expect(final.steps.some((step) => step.userLabel === "Preparing" && step.status === "completed")).toBeTrue();
+    expect(final.steps.some((step) => step.userLabel === "Working")).toBeTrue();
+    expect(final.steps.some((step) => step.userLabel === "Saving")).toBeTrue();
+    expect(final.steps.some((step) => step.userLabel === "Finished")).toBeTrue();
     expect(snapshots.length).toBeGreaterThan(0);
+    expect(performanceReports.length).toBe(1);
   });
 
   it("builds persistence requests with runtime output payload projection", () => {

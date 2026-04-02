@@ -620,3 +620,11 @@ Audit schema now records administrative approval transitions plus decision denia
   - persisted output dataset linkage prefers explicit output-target binding identity,
   - run-history lineage records now include structured completeness status + missing-field markers (`complete` / `partial` / `incomplete`) and output record references.
 - This keeps output/result/history views grounded in persisted normalized state and reduces ambiguity/orphaned lineage across successful, failed, and partial runs.
+
+## AI Loom image manipulation hardening update: performance baseline instrumentation + cross-studio state sync (stories 5.4.7-5.4.8)
+- Reference-image execution now records bounded phase telemetry through one runtime seam (`ui/runtime/ReferenceImagePerformanceTelemetry.ts`) instead of scattering `performance.now()` calls in components.
+- Measured phases align with the current architecture and user flow: intake/load, preparation/start, runtime work, persistence/save, and UI refresh.
+- System Studio now projects plain-language primary status (`Preparing`, `Working`, `Saving`, `Finished`) while technical timing/baseline details are surfaced in a collapsed advanced section.
+- Baseline summaries are computed over real run reports (single-image, repeated recent runs, and multi-result batch-style runs where supported) so bottleneck discovery stays lightweight and maintainable.
+- Cross-studio refresh orchestration now routes through a dedicated synchronization seam (`ui/runtime/ReferenceImageCrossStudioSyncService.ts`) that refreshes shared studio snapshot state before reloading results/history and reconciling active selections.
+- This keeps Data/Workflow/System views aligned on the same underlying persisted runtime graph without navigation hacks or duplicated refresh logic.
