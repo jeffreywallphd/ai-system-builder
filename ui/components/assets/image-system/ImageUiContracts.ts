@@ -3,7 +3,8 @@ export type ImageComponentId =
   | "image-viewer"
   | "parameter-form"
   | "output-gallery"
-  | "comparison-view";
+  | "comparison-view"
+  | "run-history";
 
 export type ImageRenderFitMode = "contain" | "cover" | "fill" | "scale-down";
 
@@ -278,8 +279,26 @@ export interface ImageOutputGalleryEventContract extends ImageUiEventEmitterCont
   readonly onItemOpened?: (payload: { readonly imageId: string }) => void;
 }
 
+
+export interface ImageOutputSelectionDetails {
+  readonly selectedImageId?: string;
+  readonly activeResultImageId?: string;
+  readonly reusableInputImageId?: string;
+}
+
+export interface ImageOutputSelectionActionEvent {
+  readonly sourceComponent: ImageComponentId;
+  readonly details: ImageOutputSelectionDetails;
+}
+
+export interface ImageRunHistorySelectionEvent {
+  readonly sourceComponent: ImageComponentId;
+  readonly runId: string;
+}
+
 export interface ImageRunHistoryItemViewModel {
   readonly runId: string;
+  readonly linkedOutputImageIds: ReadonlyArray<string>;
   readonly status: string;
   readonly timestamp: string;
   readonly workflowSummary: string;
@@ -289,6 +308,11 @@ export interface ImageRunHistoryItemViewModel {
 
 export interface ImageRunHistoryListPropsContract {
   readonly runs: ReadonlyArray<ImageRunHistoryItemViewModel>;
+  readonly selectedRunId?: string;
+}
+
+export interface ImageRunHistoryListEventContract extends ImageUiEventEmitterContract {
+  readonly onRunSelected?: (event: ImageRunHistorySelectionEvent) => void;
 }
 
 export interface ImageComparisonPair {

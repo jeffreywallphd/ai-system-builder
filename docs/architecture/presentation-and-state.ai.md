@@ -421,6 +421,17 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - parameter summary.
 - Styling remains aligned with shared image-surface primitives in `ui/styles/components/assets.css` and extends reusable class-based variants for list presentation and summary panels.
 
+## AI Loom image manipulation update: output selection + history/output interaction composition (stories 4.4.7-4.4.8)
+
+- Output gallery composition now supports bounded selection/inspection interactions through reusable atomic assets and composed state wiring:
+  - output selection action bar (`selected`, `active result`, `prepared reuse-as-input`),
+  - output detail pane with persisted metadata/parameter summaries,
+  - composed gallery asset state that remains grounded in dataset-backed output records (no ad hoc UI-only output model).
+- Run history list now supports explicit run selection semantics (`onRunSelected`, selected run id) while remaining reusable as an atomic list surface.
+- Added a higher-level composed `ImageHistoryLinkedOutputInspectorAsset` that binds run-history selection to linked output gallery rendering using persisted run-history -> output contracts.
+- Linkage reads remain system-owned data: `ImageRunHistoryService.listRunsWithLinkedOutputs` composes persisted run-history retrieval with output-gallery dataset retrieval instead of fragile renderer-local joins.
+- These seams provide a direct foundation for later lineage and result/history interactions while keeping the current slice image-focused and contract-driven.
+
 ## Direction 5 UI update: Image component event contracts + style reuse alignment (stories 4.1.9-4.1.10)
 
 - Epic 4.1 image components now emit one standardized UI event envelope (`ImageUiEvent`) with typed event names/payloads in `ui/components/assets/image-system/ImageUiContracts.ts`, covering upload lifecycle, image selection/deselection, parameter change/submit/reset, gallery interactions, comparison target/mode changes, and viewer interactions.
