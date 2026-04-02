@@ -13,3 +13,4 @@ export * from "./ImageOutputGallery";
 export * from "./useSynchronizedImageViewport";
 export * from "./ImageComparisonView";
 export * from "./ImageSystemStateIntegration";
+export * from "./ImageSystemStudioContextAdapter";

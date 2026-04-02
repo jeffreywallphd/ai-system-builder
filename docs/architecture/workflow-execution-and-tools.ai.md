@@ -297,3 +297,19 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - `UiTriggerSystemContextMapper` now maps trigger events into the shared `SystemContextContract` rather than directly emitting workflow-execution metadata objects.
 - A dedicated workflow adapter seam (`WorkflowSystemContextBindingAdapter` in `application/workflow-studio/SystemContextWorkflowInputMapper.ts`) translates that contract into workflow execution context metadata/input values.
 - `WorkflowUiEventRuntimeDispatcher` composes both seams (`UiTriggerSystemContextMapper` + `WorkflowSystemContextBindingAdapter`) so state gathering and workflow binding translation remain independently swappable.
+
+## AI Loom image manipulation update: System Studio context extraction + contract validation (stories 4.3.3-4.3.4)
+
+- Added a dedicated System Studio extraction seam (`application/workflow-studio/SystemStudioContextExtraction.ts`) that maps studio-facing state snapshots into normalized `SystemContextContract` objects.
+- The extraction seam is workflow-agnostic and contract-first:
+  - selected image state -> `selectedImages`,
+  - parameter form state -> `parameters` (with lightweight normalization),
+  - dataset selection/reference state -> `datasets`,
+  - runtime/system metadata -> `runtime`.
+- Added a UI adapter seam (`ui/components/assets/image-system/ImageSystemStudioContextAdapter.ts`) so image-system component state (`ImageInterfaceState`) is translated at the boundary and raw component structures do not leak into workflow/runtime contracts.
+- Added `SystemContextValidationService` (`application/workflow-studio/SystemContextValidationService.ts`) to provide inspectable, reusable validation outputs for:
+  - required context/parameter checks,
+  - selected-image/media-structure checks,
+  - dataset reference + schema-intent alignment checks,
+  - workflow-input contract alignment through existing input-binding preview/resolution contracts.
+- Validation results are structured for execution gating and UI/debug presentation (`valid`, `blockingIssues`, `warningIssues`, `issues`, normalized context, optional workflow binding preview).
