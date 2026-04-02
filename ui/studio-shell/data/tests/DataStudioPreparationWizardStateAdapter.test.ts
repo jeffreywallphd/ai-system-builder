@@ -109,6 +109,15 @@ describe("DataStudioPreparationWizardStateAdapter", () => {
     expect(snapshot.stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection)?.options.sourceKind).toBe("json");
   });
 
+  it("ignores non-pipeline persisted state payloads and falls back to a fresh wizard snapshot", () => {
+    const restored = new DataStudioPreparationWizardStateAdapter({
+      persistedState: JSON.stringify({ datasetSpec: { format: "jsonl", schema: {}, source: "" } }),
+    });
+    const snapshot = restored.getSnapshot();
+    expect(snapshot.currentStageId).toBe(PipelineStageIds.SourceSelection);
+    expect(snapshot.stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection)?.options.sourceKind).toBe("auto");
+  });
+
   it("surfaces execution readiness diagnostics from the canonical pipeline validation service", () => {
     const adapter = new DataStudioPreparationWizardStateAdapter();
     const blocked = adapter.assessExecutionReadiness();
@@ -129,4 +138,3 @@ describe("DataStudioPreparationWizardStateAdapter", () => {
     expect(ready.blockingIssues).toHaveLength(0);
   });
 });
-
