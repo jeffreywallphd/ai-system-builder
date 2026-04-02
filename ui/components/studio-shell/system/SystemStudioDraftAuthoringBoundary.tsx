@@ -30,6 +30,11 @@ import ExperienceAssetAuthoringBoundary from "../experience-assets/ExperienceAss
 import ConfigurableWizardSurface from "../experience-assets/ConfigurableWizardSurface";
 import ConfigurableCanvasSurface from "../experience-assets/ConfigurableCanvasSurface";
 import { StudioAssetRenderModes, type StudioAssetRenderMode } from "../../../studio-shell/studio-assets/StudioAssetContracts";
+import {
+  StudioEmbeddedIntentKinds,
+  createStudioIntentEvent,
+  type StudioEmbeddedEvent,
+} from "../../../studio-shell/studio-assets/StudioEmbeddedEventContracts";
 
 interface SystemStudioDraftAuthoringBoundaryProps {
   readonly content: string;
@@ -37,6 +42,7 @@ interface SystemStudioDraftAuthoringBoundaryProps {
   readonly extensionContext: StudioShellExtensionContext;
   readonly experienceAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
   readonly hostMode?: StudioAssetRenderMode;
+  readonly onStudioEvent?: (event: StudioEmbeddedEvent) => void;
 }
 
 const defaultSystemExperienceAssetIds = Object.freeze([
@@ -93,6 +99,7 @@ export function SystemStudioDraftAuthoringBoundary({
   extensionContext,
   experienceAssetIds = defaultSystemExperienceAssetIds,
   hostMode = StudioAssetRenderModes.full,
+  onStudioEvent,
 }: SystemStudioDraftAuthoringBoundaryProps): JSX.Element {
   const [selectedModeId, setSelectedModeId] = useState<"wizard" | "canvas">("wizard");
   const [selectedWizardPageId, setSelectedWizardPageId] = useState<SystemWizardPageId>(SystemWizardPageIds.pages);
@@ -123,6 +130,10 @@ export function SystemStudioDraftAuthoringBoundary({
       }),
     });
     extensionContext.operations.setDraftContent?.(serialized);
+    onStudioEvent?.(createStudioIntentEvent({
+      kind: StudioEmbeddedIntentKinds.applyRequest,
+      payload: Object.freeze({ scope: "changes" }),
+    }));
   };
 
   const persistSystemPages = (pages: SystemStudioDraftDocument["systemSpec"]["pages"]): void => {
@@ -146,6 +157,10 @@ export function SystemStudioDraftAuthoringBoundary({
       }),
     });
     extensionContext.operations.setDraftContent?.(serialized);
+    onStudioEvent?.(createStudioIntentEvent({
+      kind: StudioEmbeddedIntentKinds.applyRequest,
+      payload: Object.freeze({ scope: "configuration" }),
+    }));
     if (!pages.some((page) => page.pageId === resolvedSelectedPageId)) {
       setSelectedPageId(pages[0]?.pageId ?? "page-1");
       setSelectedLayoutNodeId(undefined);
@@ -157,6 +172,13 @@ export function SystemStudioDraftAuthoringBoundary({
   const handleCanvasEditingEvent = (event: CanvasSurfaceEditingEvent): void => {
     if (event.type === "selection.change") {
       setSelectedLayoutNodeId(event.nodeId);
+      onStudioEvent?.(createStudioIntentEvent({
+        kind: StudioEmbeddedIntentKinds.selectionChange,
+        payload: Object.freeze({
+          targetType: "canvas-node",
+          targetId: event.nodeId,
+        }),
+      }));
       return;
     }
 
@@ -284,7 +306,16 @@ export function SystemStudioDraftAuthoringBoundary({
       <ExperienceAssetAuthoringBoundary
         asset={assetDefinition}
         currentModeId={selectedModeId}
-        onModeChange={hostMode === StudioAssetRenderModes.full ? (modeId) => setSelectedModeId(modeId) : undefined}
+        onModeChange={hostMode === StudioAssetRenderModes.full ? (modeId) => {
+          setSelectedModeId(modeId);
+          onStudioEvent?.(createStudioIntentEvent({
+            kind: StudioEmbeddedIntentKinds.selectionChange,
+            payload: Object.freeze({
+              targetType: "item",
+              targetId: modeId,
+            }),
+          }));
+        } : undefined}
         document={document}
         issues={validationIssues}
         surfaces={{

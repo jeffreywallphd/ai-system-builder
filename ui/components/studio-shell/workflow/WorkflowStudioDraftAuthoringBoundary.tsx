@@ -16,6 +16,11 @@ import {
   type ExperienceSurfaceAssetId,
 } from "../../../studio-shell/experience-assets/ExperienceSurfaceAssets";
 import { StudioAssetRenderModes, type StudioAssetRenderMode } from "../../../studio-shell/studio-assets/StudioAssetContracts";
+import {
+  StudioEmbeddedIntentKinds,
+  createStudioIntentEvent,
+  type StudioEmbeddedEvent,
+} from "../../../studio-shell/studio-assets/StudioEmbeddedEventContracts";
 
 export interface WorkflowStudioDraftAuthoringBoundaryProps {
   readonly isWorkflowStudio: boolean;
@@ -52,6 +57,7 @@ export interface WorkflowStudioDraftAuthoringBoundaryProps {
   readonly invalidWizardPageRouteId?: string;
   readonly experienceAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
   readonly hostMode?: StudioAssetRenderMode;
+  readonly onStudioEvent?: (event: StudioEmbeddedEvent) => void;
 }
 
 function buildWorkflowExperienceDefinition(
@@ -119,6 +125,7 @@ export default function WorkflowStudioDraftAuthoringBoundary({
   invalidWizardPageRouteId,
   experienceAssetIds = defaultWorkflowExperienceAssetIds,
   hostMode = StudioAssetRenderModes.full,
+  onStudioEvent,
 }: WorkflowStudioDraftAuthoringBoundaryProps): JSX.Element {
   if (!isWorkflowStudio || !workflowModeContext) {
     return <textarea className="ui-textarea" rows={8} value={content} onChange={(event) => onChangeContent(event.target.value)} />;
@@ -138,7 +145,16 @@ export default function WorkflowStudioDraftAuthoringBoundary({
               <WorkflowStudioWizardModeSurface
                 studioId={workflowModeContext.studioId}
                 selectedWizardPageId={workflowModeContext.selectedWizardPageId}
-                onSelectWizardPage={workflowModeContext.onSelectWizardPage}
+                onSelectWizardPage={(pageId) => {
+                  workflowModeContext.onSelectWizardPage?.(pageId);
+                  onStudioEvent?.(createStudioIntentEvent({
+                    kind: StudioEmbeddedIntentKinds.selectionChange,
+                    payload: Object.freeze({
+                      targetType: "wizard-page",
+                      targetId: pageId,
+                    }),
+                  }));
+                }}
                 sharedDraft={workflowModeContext.sharedDraft}
                 sharedDraftSerialized={workflowModeContext.sharedDraftSerialized}
                 draftValidationIssues={workflowModeContext.draftValidationIssues}

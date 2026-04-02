@@ -643,3 +643,22 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Embedded-mode behavior now suppresses standalone-oriented controls in the reusable surfaces:
   - Workflow surface hides standalone route/validation notices in non-`full` modes.
   - System and Dataset surfaces disable mode-switch chrome in non-`full` modes and keep scoped authoring content.
+
+## Direction 5 extension update: embedded studio host rendering + event intent contract (stories 3-4)
+
+- Studio host context now supports host-provided embedding constraints and injection seams in `ui/studio-shell/studio-assets/StudioAssetContracts.ts`:
+  - `layout` constraints for hosted surfaces (`min/max/width/height`),
+  - `documentAccess` and `injectedContext` for host-provided document/context boundaries,
+  - explicit host capability projection carried into embedded rendering.
+- `StudioAssetHostBoundary` now acts as a reusable embedding boundary for wizard/canvas/panel/system surfaces by:
+  - enforcing mode support checks,
+  - applying host sizing constraints,
+  - bridging embedded events through one host-owned callback path,
+  - guarding host-disallowed navigation/full-view intents by capability.
+- Embedded studio events are now standardized in `ui/studio-shell/studio-assets/StudioEmbeddedEventContracts.ts` as host-manageable intents rather than direct routing/shell ownership:
+  - open related resource requests,
+  - request full studio view,
+  - selection/focus changes,
+  - apply/commit requests.
+- Workflow/System/Dataset studio asset definitions now emit typed embedded intents through the shared host boundary, and `StudioShellPage` wires host handling through a single `onEvent` seam.
+- Embedded-mode rendering remains shell-neutral: hosted surfaces do not assume top-level routing, shell lifecycle, or global navigation ownership.

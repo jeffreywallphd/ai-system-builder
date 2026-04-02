@@ -10,12 +10,18 @@ import DataStudioPreparationWizardPanel from "../../assets/DataStudioPreparation
 import DatasetStageAuthoringPanel from "../../assets/DatasetStageAuthoringPanel";
 import { useMemo, useState } from "react";
 import { StudioAssetRenderModes, type StudioAssetRenderMode } from "../../../studio-shell/studio-assets/StudioAssetContracts";
+import {
+  StudioEmbeddedIntentKinds,
+  createStudioIntentEvent,
+  type StudioEmbeddedEvent,
+} from "../../../studio-shell/studio-assets/StudioEmbeddedEventContracts";
 
 interface DatasetStudioDraftAuthoringBoundaryProps {
   readonly content: string;
   readonly extensionContext: StudioShellExtensionContext;
   readonly experienceAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
   readonly hostMode?: StudioAssetRenderMode;
+  readonly onStudioEvent?: (event: StudioEmbeddedEvent) => void;
 }
 
 const defaultDatasetExperienceAssetIds = Object.freeze([
@@ -64,6 +70,7 @@ export default function DatasetStudioDraftAuthoringBoundary({
   extensionContext,
   experienceAssetIds = defaultDatasetExperienceAssetIds,
   hostMode = StudioAssetRenderModes.full,
+  onStudioEvent,
 }: DatasetStudioDraftAuthoringBoundaryProps): JSX.Element {
   const experienceDefinition = useMemo(
     () => buildDatasetExperienceDefinition(experienceAssetIds),
@@ -79,14 +86,29 @@ export default function DatasetStudioDraftAuthoringBoundary({
     <ExperienceAssetAuthoringBoundary
       asset={experienceDefinition}
       currentModeId={selectedModeId}
-      onModeChange={hostMode === StudioAssetRenderModes.full ? (modeId) => setSelectedModeId(modeId) : undefined}
+      onModeChange={hostMode === StudioAssetRenderModes.full ? (modeId) => {
+        setSelectedModeId(modeId);
+        onStudioEvent?.(createStudioIntentEvent({
+          kind: StudioEmbeddedIntentKinds.selectionChange,
+          payload: Object.freeze({
+            targetType: "item",
+            targetId: modeId,
+          }),
+        }));
+      } : undefined}
       document={content}
       issues={[]}
       surfaces={{
         wizard: () => (
           <DataStudioPreparationWizardPanel
             persistedState={content}
-            onPipelineStateChange={(serializedState) => extensionContext.operations.setDraftContent?.(serializedState)}
+            onPipelineStateChange={(serializedState) => {
+              extensionContext.operations.setDraftContent?.(serializedState);
+              onStudioEvent?.(createStudioIntentEvent({
+                kind: StudioEmbeddedIntentKinds.applyRequest,
+                payload: Object.freeze({ scope: "changes" }),
+              }));
+            }}
           />
         ),
         canvas: () => <DatasetStageAuthoringPanel mode="canvas" showModeToggle={false} />,
