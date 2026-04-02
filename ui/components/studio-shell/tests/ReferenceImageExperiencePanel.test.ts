@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { buildReferenceImageStartRequest } from "../ReferenceImageExperiencePanel";
+import { createSystemContextContract } from "../../../../domain/system-studio/SystemContextContract";
 
 describe("ReferenceImageExperiencePanel", () => {
   it("builds system-start context from UI trigger mapping with selected image and settings", () => {
@@ -7,12 +8,27 @@ describe("ReferenceImageExperiencePanel", () => {
       studioId: "studio-system",
       draftId: "draft-system",
       systemAssetId: "asset:system:reference-image-manipulation",
-      datasetInstanceId: "dataset-instance:reference-image:input",
-      selectedRecordId: "record:image-1",
-      selectedAssetId: "generated-output:upload://demo",
-      editInstruction: "add a watercolor style",
-      variationStrength: 0.65,
-      resultCount: 2,
+      runtimeContext: createSystemContextContract({
+        selectedImages: [{
+          selectionId: "record:image-1",
+          imageId: "record:image-1",
+          assetRef: {
+            assetId: "generated-output:upload://demo",
+            recordId: "record:image-1",
+          },
+        }],
+        parameters: {
+          editInstruction: "add a watercolor style",
+          variationStrength: 0.65,
+          resultCount: 2,
+        },
+        datasets: [{
+          referenceId: "active-input",
+          instanceId: "dataset-instance:reference-image:input",
+          datasetAssetId: "asset:dataset:image-reference-input",
+          role: "active-input",
+        }],
+      }),
     });
 
     expect(request.context.inputValues.sourceImage).toBe("generated-output:upload://demo");
