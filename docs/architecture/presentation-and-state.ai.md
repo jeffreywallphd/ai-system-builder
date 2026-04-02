@@ -22,6 +22,24 @@ Execution-state wording for the workflow editor is now intentionally projected t
 Workflow Studio observability now also uses the same thin renderer -> backend-service approach: run-history list/detail views are rendered via `WorkflowStudioRunHistoryPanel` and loaded through `ui/services/StudioShellService.ts` (`listWorkflowRuns`, `getWorkflowRunDetail`) rather than UI-owned persistence/query logic.
 Workflow Studio run observability now keeps hierarchy and disclosure bounded in that same surface: run-level summary first, step-by-step expandable inspection second, and structured diagnostics/failure-location cues rendered from backend read models (no UI-side diagnostic inference/parsing).
 Workflow Studio run detail now also exposes rerun actions on the same surface: `Rerun as-is` and `Edit and rerun` both submit to the studio-shell backend contract, start from canonical persisted execution context, and then navigate to the newly created derived run detail record.
+
+## Direction 5 extension update: studio surfaces as assetized hostable boundaries (stories 1-2)
+
+- Studio authoring surfaces now expose a reusable host contract seam in `ui/studio-shell/studio-assets/StudioAssetContracts.ts`:
+  - `StudioAssetContract`
+  - `StudioAssetDefinition`
+  - `StudioHostContext`
+  - `StudioSessionState`
+  - explicit render modes: `full`, `embedded`, `inline`, `readonly`.
+- A reusable host renderer boundary now exists in `ui/components/studio-shell/studio-assets/StudioAssetHostBoundary.tsx`, and checks contract-supported modes before rendering a studio surface.
+- System/Workflow/Dataset studio surfaces now map through studio-specific adapter definitions in `ui/studio-shell/studio-assets/StudioSurfaceAssetDefinitions.tsx`, separating:
+  - studio definition metadata/contracts,
+  - host/rendering orchestration,
+  - studio-specific adapter wiring.
+- `StudioShellPage` now consumes those asset definitions through the shared host boundary instead of directly coupling to surface components, preserving standalone shell behavior while enabling embeddable studio-host usage.
+- Embedded-mode behavior now suppresses standalone-oriented controls in the reusable surfaces:
+  - Workflow surface hides standalone route/validation notices in non-`full` modes.
+  - System and Dataset surfaces disable mode-switch chrome in non-`full` modes and keep scoped authoring content.
 Edit-and-rerun stays user-facing and structured (target/parameters/execution-metadata/property-overrides JSON fields) rather than raw log parsing or ad hoc debug-only controls.
 Related-run lineage navigation now also uses that same execution-history service seam (related-run cluster projection + detail-panel navigation) instead of page-level custom grouping logic.
 Workflow observability entry points now also appear on adjacent workflow surfaces (persisted workflow list cards, workflow draft status, and workflow execution feedback), so navigation to run history/run detail is part of the normal build/run/editor flow rather than an isolated panel-only path.

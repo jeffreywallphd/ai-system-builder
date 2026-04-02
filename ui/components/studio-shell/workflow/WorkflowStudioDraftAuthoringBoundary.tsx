@@ -15,6 +15,7 @@ import {
   resolveExperienceAssetModesFromRegistrations,
   type ExperienceSurfaceAssetId,
 } from "../../../studio-shell/experience-assets/ExperienceSurfaceAssets";
+import { StudioAssetRenderModes, type StudioAssetRenderMode } from "../../../studio-shell/studio-assets/StudioAssetContracts";
 
 export interface WorkflowStudioDraftAuthoringBoundaryProps {
   readonly isWorkflowStudio: boolean;
@@ -50,6 +51,7 @@ export interface WorkflowStudioDraftAuthoringBoundaryProps {
   readonly invalidModeRouteId?: string;
   readonly invalidWizardPageRouteId?: string;
   readonly experienceAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
+  readonly hostMode?: StudioAssetRenderMode;
 }
 
 function buildWorkflowExperienceDefinition(
@@ -116,6 +118,7 @@ export default function WorkflowStudioDraftAuthoringBoundary({
   invalidModeRouteId,
   invalidWizardPageRouteId,
   experienceAssetIds = defaultWorkflowExperienceAssetIds,
+  hostMode = StudioAssetRenderModes.full,
 }: WorkflowStudioDraftAuthoringBoundaryProps): JSX.Element {
   if (!isWorkflowStudio || !workflowModeContext) {
     return <textarea className="ui-textarea" rows={8} value={content} onChange={(event) => onChangeContent(event.target.value)} />;
@@ -162,25 +165,25 @@ export default function WorkflowStudioDraftAuthoringBoundary({
         }}
       />
 
-      {invalidWizardPageRouteId ? (
+      {hostMode === StudioAssetRenderModes.full && invalidWizardPageRouteId ? (
         <p className="ui-text-muted">
           Unsupported wizard page route &quot;{invalidWizardPageRouteId}&quot;; using {workflowModeContext.selectedWizardPageId} page.
         </p>
       ) : null}
 
-      {workflowModeContext.draftParseError ? (
+      {hostMode === StudioAssetRenderModes.full && workflowModeContext.draftParseError ? (
         <p className="ui-text-muted">
           Workflow draft content must be valid canonical workflow JSON before saving.
         </p>
       ) : null}
 
-      {workflowModeContext.modeValidationIssues.length > 0 ? (
+      {hostMode === StudioAssetRenderModes.full && workflowModeContext.modeValidationIssues.length > 0 ? (
         <p className="ui-text-muted">
           Workflow mode validation: {workflowModeContext.modeValidationIssues.length} issue(s) detected.
         </p>
       ) : null}
 
-      {workflowModeContext.draftValidationIssues.length > 0 ? (
+      {hostMode === StudioAssetRenderModes.full && workflowModeContext.draftValidationIssues.length > 0 ? (
         <p className="ui-text-muted">
           Shared workflow draft validation: {workflowModeContext.draftValidationIssues.length} canonical issue(s) detected.
         </p>

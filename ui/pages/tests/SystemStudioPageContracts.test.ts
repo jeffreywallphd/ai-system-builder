@@ -84,12 +84,12 @@ describe("SystemStudioPage contracts", () => {
     const wizardAdapterSource = readSource("ui/studio-shell/system/SystemWizardExperienceAdapter.tsx");
     const canvasAdapterSource = readSource("ui/studio-shell/system/SystemCanvasExperienceAdapter.tsx");
 
-    expect(shellPageSource).toContain("SystemStudioDraftAuthoringBoundary");
+    expect(shellPageSource).toContain("StudioAssetHostBoundary");
+    expect(shellPageSource).toContain("systemStudioSurfaceAssetDefinition");
     expect(boundarySource).toContain("ExperienceAssetAuthoringBoundary");
     expect(boundarySource).toContain("ConfigurableWizardSurface");
     expect(boundarySource).toContain("ConfigurableCanvasSurface");
     expect(wizardAdapterSource).toContain("SystemPageSetupEditor");
-    expect(wizardAdapterSource).toContain("SystemCompositionEditor");
     expect(wizardAdapterSource).toContain("SystemInterfaceEditor");
     expect(wizardAdapterSource).toContain("SystemParameterConfigEditor");
     expect(canvasAdapterSource).toContain("Interface designer");

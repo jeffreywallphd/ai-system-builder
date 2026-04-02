@@ -90,10 +90,10 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
       />,
     );
 
-    expect(html).toContain("Unsupported experience mode route");
+    expect(html).toContain("Unsupported experience mode selection");
     expect(html).toContain("unsupported-mode");
     expect(html).toContain("using canvas mode");
-    expect(html.match(/Unsupported experience mode route/g)?.length).toBe(1);
+    expect(html.match(/Unsupported experience mode selection/g)?.length).toBe(1);
   });
 
   it("surfaces shared validation hook feedback without throwing", () => {

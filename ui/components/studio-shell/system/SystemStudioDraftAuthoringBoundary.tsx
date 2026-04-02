@@ -29,12 +29,14 @@ import type { PanelAssetContract } from "../../../studio-shell/experience-assets
 import ExperienceAssetAuthoringBoundary from "../experience-assets/ExperienceAssetAuthoringBoundary";
 import ConfigurableWizardSurface from "../experience-assets/ConfigurableWizardSurface";
 import ConfigurableCanvasSurface from "../experience-assets/ConfigurableCanvasSurface";
+import { StudioAssetRenderModes, type StudioAssetRenderMode } from "../../../studio-shell/studio-assets/StudioAssetContracts";
 
 interface SystemStudioDraftAuthoringBoundaryProps {
   readonly content: string;
   readonly validationIssues: ReadonlyArray<StudioShellValidationIssue>;
   readonly extensionContext: StudioShellExtensionContext;
   readonly experienceAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
+  readonly hostMode?: StudioAssetRenderMode;
 }
 
 const defaultSystemExperienceAssetIds = Object.freeze([
@@ -90,6 +92,7 @@ export function SystemStudioDraftAuthoringBoundary({
   validationIssues,
   extensionContext,
   experienceAssetIds = defaultSystemExperienceAssetIds,
+  hostMode = StudioAssetRenderModes.full,
 }: SystemStudioDraftAuthoringBoundaryProps): JSX.Element {
   const [selectedModeId, setSelectedModeId] = useState<"wizard" | "canvas">("wizard");
   const [selectedWizardPageId, setSelectedWizardPageId] = useState<SystemWizardPageId>(SystemWizardPageIds.pages);
@@ -281,7 +284,7 @@ export function SystemStudioDraftAuthoringBoundary({
       <ExperienceAssetAuthoringBoundary
         asset={assetDefinition}
         currentModeId={selectedModeId}
-        onModeChange={(modeId) => setSelectedModeId(modeId)}
+        onModeChange={hostMode === StudioAssetRenderModes.full ? (modeId) => setSelectedModeId(modeId) : undefined}
         document={document}
         issues={validationIssues}
         surfaces={{

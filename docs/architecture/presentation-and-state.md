@@ -625,3 +625,21 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 - Direction 5 stories 5-6 now route System Studio interface design through a dedicated adapter boundary (`SystemCanvasExperienceAdapter`) that translates page-scoped draft document state into the reusable editable canvas contract (selection, create/remove/update panel nodes, move/resize persistence, and normalized bounded-frame coordinates) without leaking system-specific behavior into shared canvas assets.
 - System Studio wizard authoring now starts with a non-technical multi-page setup step (`SystemPageSetupEditor`) and stores page heading/description definitions directly in draft content (`systemSpec.pages`) with page-scoped panel layouts (`canvasAuthoring.pageLayouts`) so each page keeps independent layout state across wizard/canvas mode switches.
+
+## Direction 5 extension update: studio surfaces as assetized hostable boundaries (stories 1-2)
+
+- Studio authoring surfaces now expose a reusable host contract seam in `ui/studio-shell/studio-assets/StudioAssetContracts.ts`:
+  - `StudioAssetContract`
+  - `StudioAssetDefinition`
+  - `StudioHostContext`
+  - `StudioSessionState`
+  - explicit render modes: `full`, `embedded`, `inline`, `readonly`.
+- A reusable host renderer boundary now exists in `ui/components/studio-shell/studio-assets/StudioAssetHostBoundary.tsx`, and checks contract-supported modes before rendering a studio surface.
+- System/Workflow/Dataset studio surfaces now map through studio-specific adapter definitions in `ui/studio-shell/studio-assets/StudioSurfaceAssetDefinitions.tsx`, separating:
+  - studio definition metadata/contracts,
+  - host/rendering orchestration,
+  - studio-specific adapter wiring.
+- `StudioShellPage` now consumes those asset definitions through the shared host boundary instead of directly coupling to surface components, preserving standalone shell behavior while enabling embeddable studio-host usage.
+- Embedded-mode behavior now suppresses standalone-oriented controls in the reusable surfaces:
+  - Workflow surface hides standalone route/validation notices in non-`full` modes.
+  - System and Dataset surfaces disable mode-switch chrome in non-`full` modes and keep scoped authoring content.
