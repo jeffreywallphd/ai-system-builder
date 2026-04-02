@@ -133,3 +133,23 @@ Included Workflow-origin context:
 `InlineAssetCreation` still supports legacy selector query params (`selectorLaunch`, `selectorSessionId`, etc.).  
 When those are absent, it now falls back to the canonical `studioHandoff` contract.
 
+
+
+## Stories 5.2.1 / 5.2.2 image vertical-slice contracts and normalized identity resolution
+- Added a canonical image-slice handoff contract model in `domain/studio-handoff/ImageStudioHandoffContract.ts` that standardizes cross-studio Data Studio -> Workflow Studio -> System Studio payloads for:
+  - asset references and versioned references,
+  - dataset instance references,
+  - workflow references and system bindings,
+  - runtime input payloads and runtime output payloads,
+  - event payload structures,
+  - lineage/trace identifiers (`handoffId`, `traceId`),
+  - persisted cross-studio relationship records.
+- Added an application-layer resolver seam in `application/studio-handoff/ImageStudioReferenceResolver.ts` so image slice flows use one normalized identity-resolution path rather than studio-specific ad hoc resolution logic.
+- Resolver outcomes are explicit and inspectable for broken/missing/ambiguous/incompatible reference states:
+  - `missing`
+  - `broken`
+  - `ambiguous`
+  - `incompatible`
+- Added focused contract/resolution coverage:
+  - `domain/studio-handoff/tests/ImageStudioHandoffContract.test.ts`
+  - `application/studio-handoff/tests/ImageStudioReferenceResolver.test.ts`
