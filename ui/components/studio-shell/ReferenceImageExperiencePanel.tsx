@@ -15,6 +15,12 @@ import { mapOutputGalleryItemToImageViewModel } from "../assets/image-system/Ima
 import { ImageUploadPanel } from "../assets/image-system/ImageUploadPanel";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { StudioShellService } from "../../services/StudioShellService";
+import {
+  ReferenceImageExecutionFlowService,
+  createReferenceImageOutputPersistenceRequest,
+  type ReferenceImageExecutionFlowIssue,
+  type ReferenceImageExecutionFlowStep,
+} from "../../runtime/ReferenceImageExecutionFlowService";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
   acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
@@ -175,6 +181,8 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
   const [resultCount, setResultCount] = useState(1);
   const [status, setStatus] = useState<string | undefined>();
   const [diagnostics, setDiagnostics] = useState<ReadonlyArray<CrossStudioIntegrityIssue>>([]);
+  const [flowSteps, setFlowSteps] = useState<ReadonlyArray<ReferenceImageExecutionFlowStep>>([]);
+  const [flowIssues, setFlowIssues] = useState<ReadonlyArray<ReferenceImageExecutionFlowIssue>>([]);
   const [resultItems, setResultItems] = useState<ReadonlyArray<OutputGalleryItem>>([]);
   const [activeResultId, setActiveResultId] = useState<string | undefined>();
   const [isUploading, setIsUploading] = useState(false);
@@ -183,6 +191,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [runHistory, setRunHistory] = useState<ReadonlyArray<ImageRunHistoryRecord>>([]);
   const uploadAdapter = useMemo(() => createBrowserImageUploadIngestionAdapter({ policy: uploadPolicy }), []);
+  const executionFlowService = useMemo(() => new ReferenceImageExecutionFlowService(), []);
   const selectedResult = useMemo(
     () => resultItems.find((item) => item.image.recordId === activeResultId) ?? resultItems[0],
     [resultItems, activeResultId],
@@ -454,64 +463,82 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
               setIsStarting(false);
               return;
             }
-            void context.operations.startSystemExecution(request).then((response) => {
-              if (!response.ok || !response.data) {
-                setStatus(response.error?.message ?? "Could not start processing.");
-                return;
-              }
-              const executionId = response.data.executionId;
-              void studioShell.getSystemExecutionResult(executionId)
-                .then((result) => studioShell.persistReferenceImageOutputs({
-                  studioId: context.studioId,
-                  draftId: draft.draftId,
-                  executionId,
-                  sourceRecordId: selectedRecordId,
-                  sourceAssetId: selectedAssetId,
-                  parameterSnapshot: {
-                    editInstruction,
-                    variationStrength,
-                    resultCount,
-                  },
-                  runtimeContext: request.context.runtimeContext,
-                  workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
-                  workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
-                  systemAssetId: draft.assetId,
-                  runtimeResult: result.ok
-                    ? { output: result.data?.output, status: result.data?.status }
-                    : undefined,
-                }))
-                .then((persisted) => {
-                  if (!persisted.ok) {
-                    setStatus(persisted.error?.message ?? `Run started (${executionId}), but results could not be saved.`);
-                    return;
-                  }
-                  if ((persisted.data?.failureMessages.length ?? 0) > 0) {
-                    setDiagnostics((persisted.data?.failureMessages ?? []).map((message, index) => ({
-                      code: "runtime-context-corrupted",
-                      severity: "error",
-                      userMessage: message,
-                      technicalMessage: message,
-                      path: `failureMessages[${index}]`,
-                    })));
-                  }
-                  const count = persisted.data?.persistedRecordIds.length ?? 0;
-                  setStatus(count > 0
-                    ? `Generated images saved (${count}).`
-                    : "Run finished, but no generated images were returned.");
-                })
-                .then(() => Promise.all([loadResults(), loadHistory()]));
+            void executionFlowService.run({
+              startExecution: async () => {
+                const response = await context.operations.startSystemExecution(request);
+                return response.ok && response.data
+                  ? { ok: true, executionId: response.data.executionId }
+                  : { ok: false, errorMessage: response.error?.message ?? "Could not start processing." };
+              },
+              getExecutionResult: async (executionId) => {
+                const result = await studioShell.getSystemExecutionResult(executionId);
+                return result.ok
+                  ? { ok: true, data: result.data }
+                  : { ok: false, errorMessage: result.error?.message ?? "Could not read run results." };
+              },
+              persistOutputs: async (persistRequest) => {
+                const persisted = await studioShell.persistReferenceImageOutputs(persistRequest);
+                return persisted.ok
+                  ? { ok: true, data: persisted.data }
+                  : { ok: false, errorMessage: persisted.error?.message };
+              },
+              persistenceRequestFactory: ({ executionId, runtimeResult }) => createReferenceImageOutputPersistenceRequest({
+                studioId: context.studioId,
+                draftId: draft.draftId,
+                executionId,
+                sourceRecordId: selectedRecordId,
+                sourceAssetId: selectedAssetId,
+                parameterSnapshot: {
+                  editInstruction,
+                  variationStrength,
+                  resultCount,
+                },
+                runtimeContext: request.context.runtimeContext,
+                workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+                workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+                systemAssetId: draft.assetId,
+                runtimeResult,
+              }),
+              refreshViews: async () => {
+                await Promise.all([loadResults(), loadHistory()]);
+              },
+              onSnapshot: (snapshot) => {
+                setFlowSteps(snapshot.steps);
+                setFlowIssues(snapshot.issues);
+                setStatus(
+                  snapshot.overallStatus === "completed"
+                    ? "Run finished and results are ready."
+                    : snapshot.overallStatus === "partially-completed"
+                      ? "Run finished, but some results could not be saved."
+                      : snapshot.overallStatus === "failed"
+                        ? "Couldn’t finish this image."
+                        : snapshot.steps[snapshot.steps.length - 1]?.userLabel,
+                );
+              },
             }).finally(() => setIsStarting(false));
           }}
         >
           {isStarting ? "Starting..." : "Start"}
         </button>
         {status ? <p className="ui-text-small ui-text-secondary">{status}</p> : null}
-        {diagnostics.length > 0 ? (
+        {flowSteps.length > 0 ? (
+          <div className="ui-stack ui-stack--2xs">
+            {flowSteps.map((step) => (
+              <p key={step.stepId} className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                {step.userLabel}: {step.status.replace("-", " ")}{step.details ? ` — ${step.details}` : ""}
+              </p>
+            ))}
+          </div>
+        ) : null}
+        {diagnostics.length > 0 || flowIssues.length > 0 ? (
           <details style={{ marginTop: "0.5rem" }}>
             <summary className="ui-text-small ui-text-secondary">Advanced details</summary>
             <ul className="ui-text-small ui-text-secondary" style={{ marginTop: "0.5rem", paddingLeft: "1rem" }}>
               {diagnostics.map((issue, index) => (
                 <li key={`${issue.code}-${index}`}>{issue.technicalMessage}</li>
+              ))}
+              {flowIssues.map((issue, index) => (
+                <li key={`${issue.stepId}-${issue.code}-${index}`}>{issue.technicalMessage ?? issue.userMessage}</li>
               ))}
             </ul>
           </details>
