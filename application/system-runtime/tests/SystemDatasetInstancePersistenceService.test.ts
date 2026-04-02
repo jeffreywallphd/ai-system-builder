@@ -1,7 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { createDatasetInstance } from "../../../domain/system-runtime/DatasetInstanceDomain";
 import { createDatasetInstanceImageRecord } from "../../../domain/system-runtime/DatasetInstanceRecordDomain";
-import { SystemDatasetInstancePersistenceService } from "../SystemDatasetInstancePersistenceService";
+import {
+  DatasetInstanceDuplicationModes,
+  SystemDatasetInstancePersistenceService,
+} from "../SystemDatasetInstancePersistenceService";
 
 describe("SystemDatasetInstancePersistenceService", () => {
   it("captures and restores system-owned dataset instance state including image records", () => {
@@ -117,5 +120,87 @@ describe("SystemDatasetInstancePersistenceService", () => {
       "missing-dataset-instance-state",
       "invalid-dataset-instance-state",
     ]);
+  });
+
+  it("duplicates dataset instances into isolated runtime state for another system", () => {
+    const store = {
+      listBySystemId: () => [],
+      listImageRecordsBySystemId: () => [],
+      save: (instance: ReturnType<typeof createDatasetInstance>) => instance,
+      saveImageRecord: (record: ReturnType<typeof createDatasetInstanceImageRecord>) => record,
+    };
+    const service = new SystemDatasetInstancePersistenceService(store);
+    const record = createDatasetInstanceImageRecord({
+      recordId: "record:output:1",
+      instanceId: "dataset-instance:output",
+      systemId: "system:source",
+      datasetAssetId: "dataset:image-output",
+      image: {
+        assetRef: { kind: "canonical-asset", stableId: "canonical-asset:image:1", assetId: "asset:image:1" },
+        width: 512,
+        height: 512,
+        format: "png",
+        mimeType: "image/png",
+        metadata: {},
+        tags: [],
+      },
+      metadata: {},
+      provenance: {},
+      admittedAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+      mutationVersion: 1,
+    });
+    const sourceInstance = createDatasetInstance({
+      instanceId: "dataset-instance:output",
+      systemId: "system:source",
+      datasetAssetId: "dataset:image-output",
+      role: "output-store",
+      lifecycleStatus: "ready",
+      runtimeStatus: "idle",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    });
+    const duplicated = service.duplicateSystemDatasetInstances({
+      sourceSystemId: "system:source",
+      targetSystemId: "system:target",
+      mode: DatasetInstanceDuplicationModes.duplicate,
+      datasetInstances: [{
+        instanceId: "dataset-instance:output",
+        datasetAssetId: "dataset:image-output",
+        role: "output-store",
+        persistedState: {
+          instance: sourceInstance,
+          imageRecords: [record],
+        },
+      }],
+    });
+
+    const duplicateInstance = duplicated.datasetInstances[0];
+    expect(duplicated.issues).toEqual([]);
+    expect(duplicateInstance?.instanceId).toBe("system:target::dataset-instance:output");
+    expect(duplicateInstance?.persistedState?.instance?.systemId).toBe("system:target");
+    expect(duplicateInstance?.persistedState?.imageRecords?.[0]?.systemId).toBe("system:target");
+    expect(duplicateInstance?.persistedState?.instance).not.toBe(sourceInstance);
+  });
+
+  it("can explicitly reuse dataset instances without duplication", () => {
+    const store = {
+      listBySystemId: () => [],
+      listImageRecordsBySystemId: () => [],
+      save: (instance: ReturnType<typeof createDatasetInstance>) => instance,
+      saveImageRecord: (record: ReturnType<typeof createDatasetInstanceImageRecord>) => record,
+    };
+    const service = new SystemDatasetInstancePersistenceService(store);
+    const datasetInstances = Object.freeze([{ instanceId: "dataset-instance:shared", datasetAssetId: "dataset:image", role: "input-store" as const }]);
+
+    const reused = service.duplicateSystemDatasetInstances({
+      sourceSystemId: "system:source",
+      targetSystemId: "system:target",
+      mode: DatasetInstanceDuplicationModes.reuse,
+      datasetInstances,
+    });
+
+    expect(reused.issues).toEqual([]);
+    expect(reused.datasetInstances[0]).toEqual(datasetInstances[0]);
   });
 });

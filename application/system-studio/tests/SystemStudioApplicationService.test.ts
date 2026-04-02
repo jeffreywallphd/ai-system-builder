@@ -755,4 +755,117 @@ describe("SystemStudioApplicationService", () => {
       draftId: created.draft.id,
     })).rejects.toThrow("JSON");
   });
+
+  it("duplicates systems with isolated dataset instances while preserving workflow bindings and ui configuration", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(createPublishedVersion({
+      assetId: "dataset:images",
+      versionId: "dataset:images:v1",
+      taxonomy: { structuralKind: "atomic", semanticRole: "dataset", behaviorKind: "none" },
+    }));
+    await repository.saveAssetVersion(createPublishedVersion({
+      assetId: "workflow:image-edit",
+      versionId: "workflow:image-edit:v3",
+      taxonomy: { structuralKind: "composite", semanticRole: "workflow", behaviorKind: "deterministic" },
+    }));
+    const runtimeDatasetStore = {
+      instances: new Map<string, ReturnType<typeof createDatasetInstance>>(),
+      records: new Map<string, ReturnType<typeof createDatasetInstanceImageRecord>>(),
+      listBySystemId(systemId: string) {
+        return [...this.instances.values()].filter((entry) => entry.systemId === systemId);
+      },
+      listImageRecordsBySystemId(input: { readonly systemId: string; readonly instanceId: string }) {
+        return [...this.records.values()].filter((entry) => entry.systemId === input.systemId && entry.instanceId === input.instanceId);
+      },
+      save(instance: ReturnType<typeof createDatasetInstance>) {
+        this.instances.set(instance.instanceId, instance);
+        return instance;
+      },
+      saveImageRecord(record: ReturnType<typeof createDatasetInstanceImageRecord>) {
+        this.records.set(`${record.instanceId}:${record.recordId}`, record);
+        return record;
+      },
+    };
+    const ids = ["session-1", "draft-source", "draft-copy"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new SystemStudioApplicationService(
+      studioShell,
+      repository,
+      new SystemDatasetInstancePersistenceService(runtimeDatasetStore),
+    );
+    const ensure = await service.ensureStudioInitialized();
+    const source = await service.createSystemDraft({
+      sessionId: ensure.session.id,
+      draftId: "draft-source",
+      title: "Image System",
+      content: JSON.stringify({
+        systemSpec: {
+          components: [{ componentKind: "composite", assetId: "workflow:image-edit", versionId: "workflow:image-edit:v3", alias: "primary" }],
+          inputs: [],
+          outputs: [],
+          parameters: [],
+          bindings: [],
+          referenceImageRuntimeContext: { selectedRecordId: "record:1" },
+          canvasLayout: { sections: ["upload", "results"] },
+        },
+      }),
+      dependencies: [{ assetId: "dataset:images", versionId: "dataset:images:v1" }],
+    });
+    runtimeDatasetStore.save(createDatasetInstance({
+      instanceId: "dataset-instance:output",
+      systemId: source.draft.assetId,
+      datasetAssetId: "dataset:images",
+      role: "output-store",
+      lifecycleStatus: "ready",
+      runtimeStatus: "idle",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    }));
+    runtimeDatasetStore.saveImageRecord(createDatasetInstanceImageRecord({
+      recordId: "record:1",
+      instanceId: "dataset-instance:output",
+      systemId: source.draft.assetId,
+      datasetAssetId: "dataset:images",
+      image: {
+        assetRef: { kind: "canonical-asset", stableId: "canonical-asset:image:1", assetId: "asset:image:1" },
+        width: 512,
+        height: 512,
+        format: "png",
+        mimeType: "image/png",
+        metadata: {},
+        tags: [],
+      },
+      metadata: {},
+      provenance: {},
+      admittedAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+      mutationVersion: 1,
+    }));
+    await service.saveSystemDefinition({ sessionId: ensure.session.id, draftId: source.draft.id });
+
+    const duplicated = await service.duplicateSystemDefinition({
+      sessionId: ensure.session.id,
+      sourceDraftId: source.draft.id,
+      duplicateDraftId: "draft-copy",
+      title: "Image System Copy",
+    });
+    const loadedDuplicate = await service.loadSystemDefinition({
+      studioId: ensure.studio.id,
+      draftId: duplicated.duplicateDraft.id,
+    });
+    const loadedSource = await service.loadSystemDefinition({
+      studioId: ensure.studio.id,
+      draftId: source.draft.id,
+    });
+
+    expect(duplicated.duplicateDraft.assetId).toBe("studio-asset:draft-copy");
+    expect(loadedDuplicate.serialization.assetReferences.datasets).toEqual(loadedSource.serialization.assetReferences.datasets);
+    expect(loadedDuplicate.serialization.runtime.workflowBindings).toEqual(loadedSource.serialization.runtime.workflowBindings);
+    expect(loadedDuplicate.uiConfiguration).toEqual(loadedSource.uiConfiguration);
+    expect(loadedDuplicate.serialization.runtime.datasetInstances[0]?.instanceId).toBe("studio-asset:draft-copy::dataset-instance:output");
+    expect(runtimeDatasetStore.instances.get("dataset-instance:output")?.systemId).toBe(source.draft.assetId);
+    expect(runtimeDatasetStore.instances.get("studio-asset:draft-copy::dataset-instance:output")?.systemId).toBe("studio-asset:draft-copy");
+    expect(runtimeDatasetStore.records.get("studio-asset:draft-copy::dataset-instance:output:record:1")?.systemId).toBe("studio-asset:draft-copy");
+    expect(duplicated.issues).toEqual([]);
+  });
 });

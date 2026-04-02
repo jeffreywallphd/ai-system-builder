@@ -918,3 +918,28 @@ Not implemented in this slice:
 - Serialized reference resolution/reload behavior now validates workflow bindings alongside existing dataset/workflow asset reference arrays:
   - unpinned workflow bindings are surfaced as typed issues (`unresolved-workflow-version`) in studio load flows,
   - runtime execution load rejects unresolved pinned workflow bindings via typed serialized-reference failures.
+
+## Direction 5 extension update: dataset asset reuse vs dataset instance duplication (story 5.3.7)
+
+- Runtime persistence now exposes an explicit duplication mode seam in `SystemDatasetInstancePersistenceService.duplicateSystemDatasetInstances(...)`:
+  - `mode="reuse"` keeps existing runtime dataset-instance references as-is (intentional shared-instance posture),
+  - `mode="duplicate"` creates isolated instance copies for a target system id (new instance id + remapped persisted state ownership).
+- This makes the contract distinction explicit:
+  - dataset assets (`assetReferences.datasets`) stay reusable across systems,
+  - dataset instances (`runtime.datasetInstances`) are runtime-owned state and can now be explicitly reused vs duplicated.
+- Duplicate-mode behavior is bounded and inspectable:
+  - persisted instance + image-record ownership is remapped to the target system id,
+  - missing/invalid persisted state yields structured issues (`missing-dataset-instance-state`, `invalid-dataset-instance-state`) so callers can report partial duplication outcomes safely.
+
+## Direction 5 extension update: full system duplication (story 5.3.8)
+
+- System Studio now has canonical deep-copy orchestration through `SystemStudioApplicationService.duplicateSystemDefinition(...)`:
+  - creates a new draft/system identity,
+  - duplicates serialized runtime dataset instances by default (`datasetInstanceMode="duplicate"`),
+  - preserves reusable dataset/workflow asset references,
+  - preserves workflow version bindings and UI configuration via the same canonical serialization/save/load contract.
+- Duplication reuses existing serialization boundaries (`parseSystemSerializationDocument` + `serializeSystemSerializationDocument`) instead of introducing a one-off clone format.
+- Duplicate load safety remains structured:
+  - reference resolution + workflow pinning checks run on duplicated payloads,
+  - runtime dataset-instance restore uses existing persistence adapters and returns typed issues for partial failures,
+  - source and duplicate avoid mutable runtime aliasing when duplicate mode is used.
