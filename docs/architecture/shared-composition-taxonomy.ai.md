@@ -61,6 +61,17 @@ Current Direction 5 target shape remains:
   - higher-level composed interface assets: system-bound assemblies that compose those atomic assets and bind them to system context + dataset instances + workflow/run events.
 - In this slice, contract design is generalized for future media/document/system interfaces, while concrete implementation remains image-focused.
 
+## Image-slice interface asset realization (stories 4.4.5-4.4.6)
+
+- Atomic interface assets now include reusable output/history renderers:
+  - `ImageOutputGalleryCollection` and card composition for grid/list output presentation,
+  - `ImageRunHistoryList` + run-history item surface,
+  - reusable parameter/metadata summary panels shared across output and run-history rows.
+- Higher-level composed interface assets now bind those atomic assets to persisted system state contracts:
+  - `ImageOutputGalleryAsset` -> dataset-backed `OutputGalleryListing`,
+  - `ImageRunHistoryAsset` -> persisted `ImageRunHistoryListing`.
+- This preserves taxonomy intent: bounded reusable atomics plus system-aware composition assets that handle dataset/workflow/run context wiring.
+
 ## Explicit non-goals in this slice
 - no UI composer rewrite
 - no replacement of workflow or execution backbone

@@ -1,12 +1,11 @@
 import { useMemo, useState, type JSX } from "react";
 import type {
+  ImageCollectionPresentationMode,
   ImageOutputGalleryEventContract,
   ImageOutputGalleryPropsContract,
-  ImageSelectionChangeEvent,
 } from "./ImageUiContracts";
-import { ImageRenderFrame } from "./ImageRenderFrame";
 import { emitImageUiEvent } from "./ImageUiEventAdapters";
-import { isImageSelectionActive } from "./ImageRenderingUtils";
+import { ImageOutputGalleryCollection } from "./ImageOutputGalleryCollection";
 
 export interface ImageOutputGalleryProps extends ImageOutputGalleryPropsContract, ImageOutputGalleryEventContract {
   readonly title?: string;
@@ -15,17 +14,7 @@ export interface ImageOutputGalleryProps extends ImageOutputGalleryPropsContract
   readonly errorMessage?: string;
   readonly emptyMessage?: string;
   readonly pageSize?: number;
-}
-
-function createSelectionEvent(selectedIds: ReadonlyArray<string>, focusedId: string): ImageSelectionChangeEvent {
-  return {
-    sourceComponent: "output-gallery",
-    selection: Object.freeze({
-      mode: "multi",
-      selectedIds,
-      focusedId,
-    }),
-  };
+  readonly presentationMode?: ImageCollectionPresentationMode;
 }
 
 export function ImageOutputGallery({
@@ -43,6 +32,7 @@ export function ImageOutputGallery({
   errorMessage,
   emptyMessage = "No images available.",
   pageSize = 12,
+  presentationMode = "grid",
 }: ImageOutputGalleryProps): JSX.Element {
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
@@ -77,69 +67,49 @@ export function ImageOutputGallery({
           {items.length} image{items.length === 1 ? "" : "s"}
         </span>
       </header>
-      <div className="ui-image-output-gallery__grid">
-        {visibleItems.map((item) => {
-          const selected = isImageSelectionActive(selection, item.imageId);
-          const currentSelection = selection?.selectedIds ?? [];
-          return (
-            <article key={item.imageId} className={["ui-image-output-gallery__item", "ui-image-item-card", selected ? "ui-image-output-gallery__item--selected ui-image-item-card--selected" : ""].filter(Boolean).join(" ")}>
-              <button
-                type="button"
-                className="ui-image-output-gallery__button"
-                onClick={() => {
-                  onItemOpened?.({ imageId: item.imageId });
-                  emitImageUiEvent(onEvent, {
-                    type: "gallery-item-opened",
-                    sourceComponent: "output-gallery",
-                    context: eventContext ?? item.context,
-                    payload: { imageId: item.imageId },
-                  });
-                }}
-              >
-                <ImageRenderFrame image={item} renderOptions={renderOptions} selected={selected} className="ui-image-output-gallery__frame" />
-              </button>
-              <div className="ui-image-output-gallery__meta">
-                <span className="ui-text-small">{item.title ?? item.imageId}</span>
-                <button
-                  type="button"
-                  className={`ui-button ui-button--sm ${selected ? "ui-button--primary" : "ui-button--ghost"}`}
-                  onClick={() => {
-                    const selectedSet = new Set(currentSelection);
-                    if (selectedSet.has(item.imageId)) {
-                      selectedSet.delete(item.imageId);
-                    } else {
-                      selectedSet.add(item.imageId);
-                    }
-                    const selectedIds = Object.freeze([...selectedSet]);
-                    onSelectionChanged?.(createSelectionEvent(selectedIds, item.imageId));
-                    emitImageUiEvent(onEvent, {
-                      type: selected ? "image-deselected" : "image-selected",
-                      sourceComponent: "output-gallery",
-                      context: eventContext ?? item.context,
-                      payload: {
-                        imageId: item.imageId,
-                        selectionMode: "multi",
-                      },
-                    });
-                    emitImageUiEvent(onEvent, {
-                      type: "gallery-item-selected",
-                      sourceComponent: "output-gallery",
-                      context: eventContext ?? item.context,
-                      payload: {
-                        imageId: item.imageId,
-                        selected: !selected,
-                        selectedIds,
-                      },
-                    });
-                  }}
-                >
-                  {selected ? "Deselect" : "Select"}
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
+      <ImageOutputGalleryCollection
+        items={visibleItems}
+        selection={selection}
+        renderOptions={renderOptions}
+        mode={presentationMode}
+        onItemOpened={(payload) => {
+          onItemOpened?.(payload);
+          emitImageUiEvent(onEvent, {
+            type: "gallery-item-opened",
+            sourceComponent: "output-gallery",
+            context: eventContext,
+            payload,
+          });
+        }}
+        onSelectionChanged={(selectionEvent) => {
+          onSelectionChanged?.(selectionEvent);
+          const selectedIds = selectionEvent.selection.selectedIds;
+          const imageId = selectionEvent.selection.focusedId ?? selectedIds[selectedIds.length - 1];
+          if (!imageId) {
+            return;
+          }
+          const selected = selectedIds.includes(imageId);
+          emitImageUiEvent(onEvent, {
+            type: selected ? "image-selected" : "image-deselected",
+            sourceComponent: "output-gallery",
+            context: eventContext,
+            payload: {
+              imageId,
+              selectionMode: "multi",
+            },
+          });
+          emitImageUiEvent(onEvent, {
+            type: "gallery-item-selected",
+            sourceComponent: "output-gallery",
+            context: eventContext,
+            payload: {
+              imageId,
+              selected,
+              selectedIds,
+            },
+          });
+        }}
+      />
       <footer className="ui-image-output-gallery__paging">
         <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1}>
           Previous
