@@ -233,6 +233,8 @@ export interface PersistReferenceImageOutputsReadModel {
   readonly persistedRecordIds: ReadonlyArray<string>;
   readonly status: "materialized" | "partial" | "failed" | "pending";
   readonly failureMessages: ReadonlyArray<string>;
+  readonly executionOutcome: "success" | "partial-failure" | "recoverable-failure" | "non-recoverable-failure";
+  readonly persistenceBlocked: boolean;
 }
 
 export interface ListReferenceImageOutputsRequest {
@@ -1171,6 +1173,56 @@ export class StudioShellBackendApi {
       if (!executionId) {
         throw new StudioShellInvalidRequestError("executionId is required.");
       }
+      const runtimeExecutionStatus = this.normalizeRuntimeExecutionStatus(request.runtimeResult?.status);
+      if (runtimeExecutionStatus === "failed" || runtimeExecutionStatus === "cancelled") {
+        const failureMessage = runtimeExecutionStatus === "cancelled"
+          ? "Image creation was cancelled before results were saved."
+          : "Something went wrong while creating this image.";
+        this.referenceImageRunHistory.recordRun({
+          runId: executionId,
+          workflowExecutionId: executionId,
+          systemId: runtimeSystemId,
+          workflowAssetId: request.workflowAssetId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+          workflowAssetVersionId: request.workflowAssetVersionId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+          status: ImageRunHistoryExecutionStatuses.failed,
+          inputImages: request.sourceAssetId?.trim()
+            ? Object.freeze([Object.freeze({
+              stableId: request.sourceAssetId.trim(),
+              outputId: request.sourceAssetId.trim(),
+              recordId: request.sourceRecordId?.trim(),
+            })])
+            : undefined,
+          parameterSummary: request.parameterSnapshot,
+          lineage: {
+            status: "incomplete",
+            workflowExecutionId: executionId,
+            sourceImageAssetId: request.runtimeContext?.selectedImages?.[0]?.assetRef?.assetId ?? request.sourceAssetId?.trim(),
+            sourceImageRecordId: request.runtimeContext?.selectedImages?.[0]?.assetRef?.recordId ?? request.sourceRecordId?.trim(),
+            sourceDatasetInstanceId: request.runtimeContext?.datasets.find((entry) => entry.role === "active-input" || entry.role === "input-store")?.instanceId,
+            workflowAssetId: request.workflowAssetId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+            workflowAssetVersionId: request.workflowAssetVersionId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+            systemAssetId: request.systemAssetId?.trim() || request.runtimeContext?.runtime.systemAssetId || draft.assetId,
+            systemVersionId: request.systemVersionId?.trim() || draft.lastPublishedVersionId,
+            outputDatasetInstanceId: outputDataset.instanceId,
+            missing: [runtimeExecutionStatus],
+          },
+          timestamps: {
+            requestedAt: this.now().toISOString(),
+            updatedAt: this.now().toISOString(),
+          },
+        });
+        return Object.freeze({
+          systemId: runtimeSystemId,
+          datasetInstanceId: outputDataset.instanceId,
+          executionId,
+          materializationId: `mat:${executionId}`,
+          persistedRecordIds: Object.freeze([]),
+          status: "failed",
+          failureMessages: Object.freeze([failureMessage]),
+          executionOutcome: "non-recoverable-failure" as const,
+          persistenceBlocked: true,
+        });
+      }
       const comfyResult = this.extractComfyResultFromRuntimeResult(request.runtimeResult?.output);
       if (!comfyResult) {
         const lineageStatus = request.runtimeContext?.selectedImages?.[0]?.assetRef?.assetId ? "partial" : "incomplete";
@@ -1215,6 +1267,8 @@ export class StudioShellBackendApi {
           persistedRecordIds: Object.freeze([]),
           status: "failed",
           failureMessages: Object.freeze(["No generated images were available to save from this run."]),
+          executionOutcome: "recoverable-failure" as const,
+          persistenceBlocked: true,
         });
       }
       if (request.runtimeContext) {
@@ -1262,6 +1316,8 @@ export class StudioShellBackendApi {
             persistedRecordIds: Object.freeze([]),
             status: "failed" as const,
             failureMessages,
+            executionOutcome: "recoverable-failure" as const,
+            persistenceBlocked: true,
           });
         }
       }
@@ -1355,6 +1411,8 @@ export class StudioShellBackendApi {
         persistedRecordIds: Object.freeze(materialized.records.map((record) => record.recordId)),
         status: materialized.status,
         failureMessages: Object.freeze(materialized.failures.map((failure) => failure.message)),
+        executionOutcome: this.classifyReferenceImageExecutionOutcome(materialized.status),
+        persistenceBlocked: materialized.status === "failed",
       });
     });
   }
@@ -2436,6 +2494,44 @@ export class StudioShellBackendApi {
       }
     }
     return undefined;
+  }
+
+  private normalizeRuntimeExecutionStatus(status: unknown): "queued" | "running" | "completed" | "failed" | "cancelled" | undefined {
+    if (typeof status !== "string") {
+      return undefined;
+    }
+    const normalized = status.trim().toLowerCase();
+    if (normalized === "queued" || normalized === "pending" || normalized === "accepted") {
+      return "queued";
+    }
+    if (normalized === "running" || normalized === "in-progress") {
+      return "running";
+    }
+    if (normalized === "completed" || normalized === "succeeded" || normalized === "success") {
+      return "completed";
+    }
+    if (normalized === "failed" || normalized === "error") {
+      return "failed";
+    }
+    if (normalized === "cancelled" || normalized === "canceled") {
+      return "cancelled";
+    }
+    return undefined;
+  }
+
+  private classifyReferenceImageExecutionOutcome(
+    status: PersistReferenceImageOutputsReadModel["status"],
+  ): PersistReferenceImageOutputsReadModel["executionOutcome"] {
+    if (status === "materialized") {
+      return "success";
+    }
+    if (status === "partial") {
+      return "partial-failure";
+    }
+    if (status === "failed") {
+      return "recoverable-failure";
+    }
+    return "recoverable-failure";
   }
 
   private tryReadComfyResult(

@@ -143,7 +143,7 @@ export class ReferenceImageExecutionFlowService {
         userMessage: "We couldn’t save this result.",
         technicalMessage: persisted.errorMessage,
       }));
-    } else if (persisted.data.status === "partial") {
+    } else if (persisted.data.executionOutcome === "partial-failure" || persisted.data.status === "partial") {
       upsertStep(ReferenceImageExecutionStepIds.persistence, "partially-completed", "Some results were saved.");
       for (const message of persisted.data.failureMessages) {
         issues.push(Object.freeze({
@@ -153,13 +153,23 @@ export class ReferenceImageExecutionFlowService {
           technicalMessage: message,
         }));
       }
-    } else if (persisted.data.status === "failed") {
-      upsertStep(ReferenceImageExecutionStepIds.persistence, "failed", "We couldn’t save this result because some image information was incomplete.");
+    } else if (persisted.data.executionOutcome === "non-recoverable-failure") {
+      upsertStep(ReferenceImageExecutionStepIds.persistence, "failed", "Something went wrong while creating this image.");
+      for (const message of persisted.data.failureMessages) {
+        issues.push(Object.freeze({
+          stepId: ReferenceImageExecutionStepIds.persistence,
+          code: "save-non-recoverable",
+          userMessage: "Something went wrong while creating this image.",
+          technicalMessage: message,
+        }));
+      }
+    } else if (persisted.data.executionOutcome === "recoverable-failure" || persisted.data.status === "failed") {
+      upsertStep(ReferenceImageExecutionStepIds.persistence, "failed", "Something went wrong while creating this image.");
       for (const message of persisted.data.failureMessages) {
         issues.push(Object.freeze({
           stepId: ReferenceImageExecutionStepIds.persistence,
           code: "save-rejected",
-          userMessage: "We couldn’t save this result because some image information was incomplete.",
+          userMessage: "Something went wrong while creating this image.",
           technicalMessage: message,
         }));
       }
@@ -169,8 +179,18 @@ export class ReferenceImageExecutionFlowService {
 
     upsertStep(ReferenceImageExecutionStepIds.refresh, "running", "Preparing image preview");
     publish("running");
-    await request.refreshViews();
-    upsertStep(ReferenceImageExecutionStepIds.refresh, "completed");
+    try {
+      await request.refreshViews();
+      upsertStep(ReferenceImageExecutionStepIds.refresh, "completed");
+    } catch (error) {
+      upsertStep(ReferenceImageExecutionStepIds.refresh, "failed", "Couldn’t refresh results.");
+      issues.push(Object.freeze({
+        stepId: ReferenceImageExecutionStepIds.refresh,
+        code: "refresh-failed",
+        userMessage: "Couldn’t refresh results.",
+        technicalMessage: error instanceof Error ? error.message : "Result refresh failed.",
+      }));
+    }
 
     const hasFailed = Array.from(steps.values()).some((entry) => entry.status === "failed");
     const hasPartial = Array.from(steps.values()).some((entry) => entry.status === "partially-completed");

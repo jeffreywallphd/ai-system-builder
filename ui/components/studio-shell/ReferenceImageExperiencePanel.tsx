@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ReferenceImageSystemTemplate } from "../../../application/system-studio/ReferenceImageSystemTemplate";
 import { validateReferenceImageCrossStudioContext, type CrossStudioIntegrityIssue } from "../../../application/system-studio/ReferenceImageCrossStudioIntegrity";
 import type { ImageRunHistoryRecord } from "../../../application/system-runtime/ImageRunHistoryDataContract";
@@ -190,6 +190,8 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [runHistory, setRunHistory] = useState<ReadonlyArray<ImageRunHistoryRecord>>([]);
+  const resultLoadRequestId = useRef(0);
+  const historyLoadRequestId = useRef(0);
   const uploadAdapter = useMemo(() => createBrowserImageUploadIngestionAdapter({ policy: uploadPolicy }), []);
   const executionFlowService = useMemo(() => new ReferenceImageExecutionFlowService(), []);
   const selectedResult = useMemo(
@@ -209,6 +211,8 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
     if (!draft) {
       return Promise.resolve();
     }
+    const requestId = resultLoadRequestId.current + 1;
+    resultLoadRequestId.current = requestId;
     setIsLoadingResults(true);
     return studioShell.listReferenceImageOutputs({
       studioId: context.studioId,
@@ -219,17 +223,26 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
       if (!response.ok || !response.data) {
         return;
       }
+      if (requestId !== resultLoadRequestId.current) {
+        return;
+      }
       setResultItems(response.data.items);
       if (!activeResultId && response.data.items[0]) {
         setActiveResultId(response.data.items[0].image.recordId);
       }
-    }).finally(() => setIsLoadingResults(false));
+    }).finally(() => {
+      if (requestId === resultLoadRequestId.current) {
+        setIsLoadingResults(false);
+      }
+    });
   };
 
   const loadHistory = () => {
     if (!draft) {
       return Promise.resolve();
     }
+    const requestId = historyLoadRequestId.current + 1;
+    historyLoadRequestId.current = requestId;
     setIsLoadingHistory(true);
     return studioShell.listReferenceImageRunHistory({
       studioId: context.studioId,
@@ -240,8 +253,15 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
       if (!response.ok || !response.data) {
         return;
       }
+      if (requestId !== historyLoadRequestId.current) {
+        return;
+      }
       setRunHistory(response.data.runs);
-    }).finally(() => setIsLoadingHistory(false));
+    }).finally(() => {
+      if (requestId === historyLoadRequestId.current) {
+        setIsLoadingHistory(false);
+      }
+    });
   };
 
   useEffect(() => {
@@ -330,7 +350,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
   return (
     <section className="ui-stack ui-stack--sm">
       <ImageUploadPanel
-        title="Upload image"
+        title="Choose an image"
         acceptedMimeTypes={["image/png", "image/jpeg", "image/webp"]}
         maxUploadCount={1}
         ingestionAdapter={uploadAdapter}
@@ -364,13 +384,13 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
             }))
             .then((response) => {
               if (!response.ok || !response.data) {
-                setStatus(response.error?.message ?? "Upload failed.");
+              setStatus(response.error?.message ?? "We couldn’t upload this image.");
                 return;
               }
               setSelectedRecordId(response.data.recordId);
               setSelectedAssetId(response.data.image.assetId);
               setDatasetInstanceId(response.data.datasetInstanceId);
-              setStatus("Image uploaded and ready.");
+              setStatus("Image ready. You can change settings and create a new version.");
             })
             .then(() => Promise.all([loadResults(), loadHistory()]))
             .finally(() => {
@@ -380,14 +400,14 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
       />
       <section className="ui-image-surface">
         <header className="ui-image-surface__header">
-          <h3 className="ui-image-surface__title">Processing settings</h3>
+          <h3 className="ui-image-surface__title">Change settings</h3>
         </header>
         <label className="ui-form-field">
-          <span className="ui-form-field__label">Edit instructions</span>
+          <span className="ui-form-field__label">What should change?</span>
           <textarea className="ui-input" value={editInstruction} onChange={(event) => setEditInstruction(event.currentTarget.value)} rows={3} />
         </label>
         <details>
-          <summary className="ui-text-small ui-text-secondary">Advanced</summary>
+          <summary className="ui-text-small ui-text-secondary">Advanced options</summary>
           <div className="ui-grid ui-grid--2" style={{ marginTop: "0.5rem" }}>
             <label className="ui-form-field">
               <span className="ui-form-field__label">Variation strength</span>
@@ -402,12 +422,12 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
       </section>
       <section className="ui-image-surface">
         <header className="ui-image-surface__header">
-          <h3 className="ui-image-surface__title">Results</h3>
+          <h3 className="ui-image-surface__title">Create new version</h3>
         </header>
         <button
           type="button"
           className="ui-button ui-button--primary"
-          disabled={!selectedRecordId || !selectedAssetId || !datasetInstanceId || isStarting || !context.operations.startSystemExecution}
+          disabled={!selectedRecordId || !selectedAssetId || !datasetInstanceId || isStarting || !context.operations.startSystemExecution || !editInstruction.trim()}
           onClick={() => {
             if (!selectedRecordId || !selectedAssetId || !datasetInstanceId || !context.operations.startSystemExecution) {
               return;
@@ -458,7 +478,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
               systemAssetId: draft.assetId,
             });
             if (!integrity.valid) {
-              setStatus("Please review your selected image and destinations, then try again.");
+              setStatus("Please choose an image and check your settings, then try again.");
               setDiagnostics(integrity.blockingIssues);
               setIsStarting(false);
               return;
@@ -507,19 +527,22 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
                 setFlowIssues(snapshot.issues);
                 setStatus(
                   snapshot.overallStatus === "completed"
-                    ? "Run finished and results are ready."
+                    ? "Done. Your new image version is ready."
                     : snapshot.overallStatus === "partially-completed"
-                      ? "Run finished, but some results could not be saved."
+                      ? "Finished with warnings. Some versions could not be saved."
                       : snapshot.overallStatus === "failed"
-                        ? "Couldn’t finish this image."
+                        ? "Something went wrong while creating this image."
                         : snapshot.steps[snapshot.steps.length - 1]?.userLabel,
                 );
               },
             }).finally(() => setIsStarting(false));
           }}
         >
-          {isStarting ? "Starting..." : "Start"}
+          {isStarting ? "Creating..." : "Create new version"}
         </button>
+        {!editInstruction.trim() ? (
+          <p className="ui-text-small ui-text-secondary">Add instructions to create a new version.</p>
+        ) : null}
         {status ? <p className="ui-text-small ui-text-secondary">{status}</p> : null}
         {flowSteps.length > 0 ? (
           <div className="ui-stack ui-stack--2xs">
@@ -546,13 +569,13 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
       </section>
       <section className="ui-image-surface">
         <header className="ui-image-surface__header">
-          <h3 className="ui-image-surface__title">Generated images</h3>
+          <h3 className="ui-image-surface__title">Saved versions</h3>
         </header>
         <ImageOutputGallery
           title="Results"
           items={resultViewModels}
           loading={isLoadingResults}
-          emptyMessage="No generated images yet. Start a run to see results here."
+          emptyMessage="No saved versions yet. Create a new version to see it here."
           renderOptions={{
             fitMode: "cover",
             zoomCapability: "disabled",
@@ -576,7 +599,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
         {selectedResultViewModel ? (
           <div className="ui-stack ui-stack--sm" style={{ marginTop: "0.75rem" }}>
             <div className="ui-row ui-row--space-between ui-row--middle">
-              <h4 className="ui-text-small" style={{ margin: 0 }}>View details</h4>
+              <h4 className="ui-text-small" style={{ margin: 0 }}>Preview</h4>
               <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={() => setActiveResultId(selectedResultViewModel.imageId)}>
                 Open
               </button>
@@ -602,7 +625,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
               <pre className="ui-code-block">{JSON.stringify(selectedResult?.generationParametersSummary ?? {}, null, 2)}</pre>
             </details>
             <p className="ui-text-small ui-text-secondary">
-              Created from {selectedResult?.sourceImage?.stableId ?? "your uploaded image"}.
+              Created from {selectedResult?.sourceImage?.stableId ?? "your chosen image"}.
             </p>
           </div>
         ) : null}
@@ -613,7 +636,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
         </header>
         {isLoadingHistory ? <p className="ui-text-small ui-text-secondary">Loading activity...</p> : null}
         {runHistory.length === 0 && !isLoadingHistory ? (
-          <p className="ui-text-small ui-text-secondary">No previous results yet.</p>
+          <p className="ui-text-small ui-text-secondary">No activity yet.</p>
         ) : null}
         <div className="ui-stack ui-stack--xs">
           {runHistory.map((run) => (

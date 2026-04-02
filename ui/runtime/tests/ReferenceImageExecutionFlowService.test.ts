@@ -41,6 +41,8 @@ describe("ReferenceImageExecutionFlowService", () => {
           persistedRecordIds: ["record:1"],
           status: "materialized",
           failureMessages: [],
+          executionOutcome: "success",
+          persistenceBlocked: false,
         },
       }),
       persistenceRequestFactory: ({ executionId }) => ({
@@ -105,5 +107,46 @@ describe("ReferenceImageExecutionFlowService", () => {
     expect(request.runtimeResult?.status).toBe("succeeded");
     expect(request.runtimeResult?.output).toEqual({ image: "ok" });
     expect(request.parameterSnapshot.prompt).toBe("make it warmer");
+  });
+
+  it("reports failed overall status when persistence returns non-recoverable failure", async () => {
+    const service = new ReferenceImageExecutionFlowService();
+    const final = await service.run({
+      startExecution: async () => ({ ok: true, executionId: "run:2" }),
+      getExecutionResult: async () => ({
+        ok: true,
+        data: {
+          executionId: "run:2",
+          status: "failed",
+          rootAssetId: "asset:system",
+          outputSummary: { hasOutput: false, hasError: true, outputFieldCount: 0, contractOutputIds: [] },
+          nodeResults: [],
+          nestedSystemResults: [],
+          diagnostics: [],
+          executedVersionMap: { nodeVersionIds: {} },
+          nestedExecutionLineage: [],
+        },
+      }),
+      persistOutputs: async () => ({
+        ok: true,
+        data: {
+          systemId: "system:1",
+          datasetInstanceId: "dataset-instance:output",
+          executionId: "run:2",
+          materializationId: "mat:run:2",
+          persistedRecordIds: [],
+          status: "failed",
+          failureMessages: ["Runtime execution failed before output materialization."],
+          executionOutcome: "non-recoverable-failure",
+          persistenceBlocked: true,
+        },
+      }),
+      persistenceRequestFactory: ({ executionId }) => ({ studioId: "studio-system", draftId: "draft-1", executionId }),
+      refreshViews: async () => {},
+      onSnapshot: () => {},
+    });
+
+    expect(final.overallStatus).toBe("failed");
+    expect(final.issues.some((issue) => issue.code === "save-non-recoverable")).toBeTrue();
   });
 });
