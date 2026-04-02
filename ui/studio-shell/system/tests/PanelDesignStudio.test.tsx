@@ -50,5 +50,29 @@ describe("PanelDesignStudio", () => {
 
     expect(html).toContain("cannot hold child content");
     expect(html).toContain("Select a container item to browse assets you can add here.");
+    expect(html).toContain('data-testid="panel-design-studio-notice-empty"');
   });
+
+  it("shows a recoverable notice when saved panel composition cannot be read", () => {
+    const html = renderToStaticMarkup(
+      <PanelDesignStudio
+        panel={Object.freeze({
+          panelId: "panel-bad",
+          pageId: "page-1",
+          title: "Broken panel",
+          layoutBounds: Object.freeze({ x: 0, y: 0, width: 0.5, height: 0.4 }),
+          contentSlots: Object.freeze([{ slotId: "panel-content", label: "Panel content" }]),
+          content: Object.freeze({
+            kind: "asset-composition",
+            serializedDocument: "not-json",
+          }),
+        })}
+        onChangePanel={() => undefined}
+      />,
+    );
+
+    expect(html).toContain('data-testid="panel-design-studio-notice-invalid-configuration"');
+    expect(html).toContain("Saved content could not be loaded");
+  });
+
 });
