@@ -41,7 +41,9 @@ import { parsePersistedRuntimeCapabilityBindingEnvelope } from "../system-runtim
 import {
   parseSystemSerializationDocument,
   serializeSystemSerializationDocument,
+  type SystemSerializationContract,
 } from "../../domain/system-studio/SystemSerializationContract";
+import { SerializedAssetReferenceResolutionService } from "../system-runtime/SerializedAssetReferenceResolutionService";
 
 export interface EnsureSystemStudioResult {
   readonly initialized: boolean;
@@ -152,6 +154,38 @@ export interface UpdateSystemExecutionMetadataCommand {
   readonly executionMetadata?: SystemExecutionMetadata;
 }
 
+export interface SaveSystemDefinitionCommand {
+  readonly studioId?: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+}
+
+export interface SaveSystemDefinitionResult {
+  readonly draft: AssetDraftResult["draft"];
+  readonly serialization: SystemSerializationContract;
+}
+
+export interface LoadSystemDefinitionCommand {
+  readonly studioId?: string;
+  readonly draftId?: string;
+  readonly versionId?: string;
+}
+
+export interface LoadSystemDefinitionIssue {
+  readonly code: string;
+  readonly message: string;
+  readonly severity: "warning" | "error";
+}
+
+export interface LoadSystemDefinitionResult {
+  readonly source: "draft" | "version";
+  readonly schemaVersion: string;
+  readonly serialization: SystemSerializationContract;
+  readonly system: SystemAsset;
+  readonly uiConfiguration?: Readonly<Record<string, unknown>>;
+  readonly issues: ReadonlyArray<LoadSystemDefinitionIssue>;
+}
+
 function normalizeSystemExecutionMetadataInput(
   input?: SystemExecutionMetadata,
 ): SystemExecutionMetadata | undefined {
@@ -247,11 +281,15 @@ function tryReadPublishedDraftEnvelope(version: AssetVersion): {
 }
 
 export class SystemStudioApplicationService {
+  private readonly serializedReferenceResolver: SerializedAssetReferenceResolutionService;
+
   constructor(
     private readonly studioShellService: StudioShellApplicationService,
     private readonly repository: IStudioShellRepository,
     private readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy" | "resolveSystemContract"> = new CompositionAssetContractResolver(),
-  ) {}
+  ) {
+    this.serializedReferenceResolver = new SerializedAssetReferenceResolutionService(repository);
+  }
 
   public async ensureStudioInitialized(
     studioId: string = SystemStudioIdentity.defaultStudioId,
@@ -752,6 +790,116 @@ export class SystemStudioApplicationService {
       }),
       dependencies: collectSystemDirectDependencies(nextSystem),
     });
+  }
+
+  public async saveSystemDefinition(command: SaveSystemDefinitionCommand): Promise<SaveSystemDefinitionResult> {
+    const studioId = command.studioId?.trim() || SystemStudioIdentity.defaultStudioId;
+    const loaded = await this.studioShellService.loadAssetDraft({ studioId, draftId: command.draftId });
+    if (!loaded) {
+      throw new StudioShellInvalidRequestError(`Draft '${command.draftId}' is not available in studio '${studioId}'.`);
+    }
+
+    const parsed = parseSystemSerializationDocument({
+      content: loaded.draft.content,
+      dependencies: loaded.draft.dependencies,
+    });
+    const normalizedContent = serializeSystemSerializationDocument({
+      existingContent: loaded.draft.content,
+      dependencies: parsed.contract.definition.dependencies,
+      systemSpec: parsed.systemSpec,
+      uiConfiguration: parsed.uiConfiguration,
+    });
+
+    const updated = await this.studioShellService.updateAssetDraft({
+      studioId,
+      sessionId: command.sessionId,
+      draftId: command.draftId,
+      content: normalizedContent,
+      dependencies: parsed.contract.definition.dependencies,
+    });
+
+    return Object.freeze({
+      draft: updated.draft,
+      serialization: parsed.contract,
+    });
+  }
+
+  public async loadSystemDefinition(command: LoadSystemDefinitionCommand): Promise<LoadSystemDefinitionResult> {
+    const refs = [command.draftId?.trim(), command.versionId?.trim()].filter((entry) => Boolean(entry)).length;
+    if (refs !== 1) {
+      throw new StudioShellInvalidRequestError("Exactly one of draftId or versionId is required.");
+    }
+
+    if (command.versionId?.trim()) {
+      const version = await this.repository.getAssetVersion(command.versionId.trim());
+      if (!version) {
+        throw new StudioShellInvalidRequestError(`Version '${command.versionId}' is not available.`);
+      }
+      const envelope = tryReadPublishedDraftEnvelope(version);
+      if (!envelope.content) {
+        throw new StudioShellInvalidRequestError(`Version '${version.versionId}' does not include system content.`);
+      }
+      const parsed = parseSystemSerializationDocument({
+        content: envelope.content,
+        dependencies: envelope.dependencies ?? [],
+      });
+      const issues = await this.resolveSerializedReferenceIssues(parsed.contract);
+      return Object.freeze({
+        source: "version",
+        schemaVersion: parsed.schemaVersion,
+        serialization: parsed.contract,
+        system: createSystemAsset({
+          assetId: version.assetId.value,
+          versionId: version.versionId,
+          taxonomy: envelope.metadata?.taxonomy ?? createSystemStudioTaxonomy(),
+          provenance: envelope.metadata?.provenance,
+          dependencies: envelope.dependencies ?? [],
+          ...parsed.systemSpec,
+        }),
+        uiConfiguration: parsed.uiConfiguration,
+        issues,
+      });
+    }
+
+    const studioId = command.studioId?.trim() || SystemStudioIdentity.defaultStudioId;
+    const loaded = await this.studioShellService.loadAssetDraft({ studioId, draftId: command.draftId! });
+    if (!loaded) {
+      throw new StudioShellInvalidRequestError(`Draft '${command.draftId}' is not available in studio '${studioId}'.`);
+    }
+    const parsed = parseSystemSerializationDocument({
+      content: loaded.draft.content,
+      dependencies: loaded.draft.dependencies,
+    });
+    const issues = await this.resolveSerializedReferenceIssues(parsed.contract);
+    return Object.freeze({
+      source: "draft",
+      schemaVersion: parsed.schemaVersion,
+      serialization: parsed.contract,
+      system: createSystemAsset({
+        assetId: loaded.draft.assetId,
+        taxonomy: loaded.draft.metadata.taxonomy ?? createSystemStudioTaxonomy(),
+        provenance: loaded.draft.metadata.provenance,
+        dependencies: loaded.draft.dependencies,
+        ...parsed.systemSpec,
+      }),
+      uiConfiguration: parsed.uiConfiguration,
+      issues,
+    });
+  }
+
+  private async resolveSerializedReferenceIssues(contract: SystemSerializationContract): Promise<ReadonlyArray<LoadSystemDefinitionIssue>> {
+    const result = await this.serializedReferenceResolver.resolveReferences({
+      serializedSchemaVersion: contract.schemaVersion,
+      references: [
+        ...contract.assetReferences.datasets,
+        ...contract.assetReferences.workflows,
+      ],
+    });
+    return Object.freeze(result.issues.map((issue) => Object.freeze({
+      code: issue.code,
+      message: issue.message,
+      severity: issue.code === "missing-asset" && !issue.reference.versionId ? "warning" : "error",
+    })));
   }
 
   private async resolveSystemFromReference(reference: SystemCompositionReference): Promise<SystemAsset | undefined> {

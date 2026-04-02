@@ -885,3 +885,22 @@ Not implemented in this slice:
   - `unsupported-serialized-version`.
 - Runtime system loading (`SystemRuntimeApplicationService`) now applies that resolver and surfaces graceful typed failures (`invalid-request:serialized-reference-*`) when serialized references cannot be resolved.
 - Broken lineage is explicit and safe: failed or partial runs now mark lineage as `incomplete`/`partial` with `missing` field hints instead of silently writing ambiguous history entries.
+
+## Direction 5 extension update: canonical system save/load operations (stories 5.3.3-5.3.4)
+
+- System Studio now exposes explicit save/load orchestration methods over the same canonical serialization contract (`SystemStudioApplicationService.saveSystemDefinition` / `loadSystemDefinition`) rather than introducing a parallel format.
+- Save operations re-parse/validate draft content through `parseSystemSerializationDocument`, then reserialize through `serializeSystemSerializationDocument`, so persisted drafts always carry canonical serialization metadata and remain reloadable.
+- Saved payloads preserve:
+  - system definition (components/interfaces/parameters/bindings),
+  - dataset/workflow references,
+  - runtime binding envelope and runtime-owned dataset-instance references when present,
+  - UI configuration state.
+- Load operations now return a structured reconstruction result containing:
+  - canonical serialization metadata + schema version,
+  - reconstructed in-memory `SystemAsset`,
+  - UI configuration payload,
+  - structured resolution issues (`warning`/`error`) from the serialized asset-reference resolution seam.
+- Unresolved references are handled gracefully for load inspection:
+  - missing unpinned assets can surface as warnings,
+  - incompatible/missing pinned references surface as errors,
+  - schema incompatibility remains explicit via structured issue codes.

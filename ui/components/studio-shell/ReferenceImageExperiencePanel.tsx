@@ -241,6 +241,9 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
   }, [draft?.draftId]);
 
   useEffect(() => {
+    if (!draft) {
+      return;
+    }
     const stored = readStoredReferenceImageRuntimeContext(draft.content);
     if (!stored) {
       return;
@@ -258,9 +261,12 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
       setStatus("Some saved setup details need to be refreshed before starting.");
       setDiagnostics(integrity.blockingIssues);
     }
-  }, [draft.draftId]);
+  }, [draft?.draftId, draft?.content]);
 
   useEffect(() => {
+    if (!draft) {
+      return;
+    }
     const selectedImage = selectedRecordId && selectedAssetId
       ? Object.freeze([{ selectionId: selectedRecordId, imageId: selectedRecordId, assetRef: { assetId: selectedAssetId, recordId: selectedRecordId } }])
       : Object.freeze([]);
@@ -294,8 +300,8 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
     activeResultId,
     context.operations,
     datasetInstanceId,
-    draft.assetId,
-    draft.content,
+    draft?.assetId,
+    draft?.content,
     editInstruction,
     resultCount,
     selectedAssetId,

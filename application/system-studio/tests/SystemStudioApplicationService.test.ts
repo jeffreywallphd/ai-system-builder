@@ -477,4 +477,125 @@ describe("SystemStudioApplicationService", () => {
       },
     })).rejects.toThrow("unsupported-runtime-capability-binding-persistence-version:0.9.0");
   });
+
+  it("saves canonical system definitions and preserves ui/runtime/workflow-dataset bindings", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(createPublishedVersion({
+      assetId: "dataset:input",
+      versionId: "dataset:input:v1",
+      taxonomy: { structuralKind: "atomic", semanticRole: "dataset", behaviorKind: "none" },
+    }));
+    await repository.saveAssetVersion(createPublishedVersion({
+      assetId: "workflow:image-edit",
+      versionId: "workflow:image-edit:v3",
+      taxonomy: { structuralKind: "composite", semanticRole: "workflow", behaviorKind: "deterministic" },
+    }));
+    const ids = ["session-1", "draft-root"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new SystemStudioApplicationService(studioShell, repository);
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createSystemDraft({
+      sessionId: ensure.session.id,
+      draftId: "draft-root",
+      title: "System Root",
+      content: JSON.stringify({
+        systemSpec: {
+          components: [{ componentKind: "composite", assetId: "workflow:image-edit", versionId: "workflow:image-edit:v3", alias: "primary" }],
+          inputs: [{ inputId: "sourceImage", valueType: "image", required: true }],
+          outputs: [{ outputId: "editedImages", valueType: "image[]" }],
+          parameters: [{ parameterId: "instruction", valueType: "string" }],
+          bindings: [{ bindingId: "workflow-input", source: { scope: "system-input", endpointId: "sourceImage" }, target: { scope: "component-input", endpointId: "sourceImage", componentAlias: "primary" } }],
+          referenceImageRuntimeContext: { selectedRecordId: "img:1" },
+          canvasLayout: { sections: ["upload", "results"] },
+          executionMetadata: {
+            runtimeCapabilityBindings: { schemaVersion: "1.0.0", bindings: [] },
+          },
+        },
+      }),
+      dependencies: [{ assetId: "dataset:input", versionId: "dataset:input:v1" }],
+    });
+
+    const saved = await service.saveSystemDefinition({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+    });
+    expect(saved.serialization.contractKind).toBe("ai-loom.system-serialization");
+    expect(saved.serialization.assetReferences.datasets.some((entry) => entry.assetId === "dataset:input")).toBeTrue();
+    expect(saved.serialization.assetReferences.workflows.some((entry) => entry.assetId === "workflow:image-edit")).toBeTrue();
+    expect(saved.serialization.runtime.datasetInstances).toEqual([]);
+    expect(saved.serialization.ui.configuration).toEqual(expect.objectContaining({
+      referenceImageRuntimeContext: { selectedRecordId: "img:1" },
+      canvasLayout: { sections: ["upload", "results"] },
+    }));
+  });
+
+  it("loads system definitions with structured issues for unresolved references and version incompatibilities", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(createPublishedVersion({
+      assetId: "dataset:images",
+      versionId: "dataset:images:v2",
+      taxonomy: { structuralKind: "atomic", semanticRole: "dataset", behaviorKind: "none" },
+    }));
+    await repository.saveAssetVersion(createPublishedVersion({
+      assetId: "workflow:image-edit",
+      versionId: "workflow:image-edit:v1",
+      taxonomy: { structuralKind: "composite", semanticRole: "workflow", behaviorKind: "deterministic" },
+    }));
+    const ids = ["session-1", "draft-root"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new SystemStudioApplicationService(studioShell, repository);
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createSystemDraft({
+      sessionId: ensure.session.id,
+      draftId: "draft-root",
+      title: "System Root",
+      content: JSON.stringify({
+        systemSpec: {
+          components: [{ componentKind: "composite", assetId: "workflow:image-edit", versionId: "workflow:image-edit:v1", alias: "primary" }],
+          inputs: [],
+          outputs: [],
+          parameters: [],
+          bindings: [],
+        },
+      }),
+      dependencies: [
+        { assetId: "dataset:images", versionId: "dataset:images:v1" },
+        { assetId: "workflow:missing", versionId: "workflow:missing:v1" },
+      ],
+    });
+
+    const loaded = await service.loadSystemDefinition({
+      studioId: ensure.studio.id,
+      draftId: created.draft.id,
+    });
+    expect(loaded.source).toBe("draft");
+    expect(loaded.system.components[0]?.assetId).toBe("workflow:image-edit");
+    expect(loaded.issues.map((entry) => entry.code)).toEqual(expect.arrayContaining([
+      "incompatible-version",
+      "missing-asset",
+    ]));
+  });
+
+  it("rejects invalid serialized payloads during system-definition load", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-root"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new SystemStudioApplicationService(studioShell, repository);
+    const ensure = await service.ensureStudioInitialized();
+    const created = await studioShell.createAssetDraft({
+      studioId: ensure.studio.id,
+      sessionId: ensure.session.id,
+      draftId: "draft-root",
+      content: "{ malformed",
+      metadata: {
+        title: "Broken",
+      },
+      dependencies: [],
+    });
+
+    await expect(service.loadSystemDefinition({
+      studioId: ensure.studio.id,
+      draftId: created.draft.id,
+    })).rejects.toThrow("JSON");
+  });
 });
