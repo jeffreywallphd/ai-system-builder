@@ -1,7 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { CanvasSurfaceEditingEvent } from "../../../studio-shell/experience-assets/ConfigurableCanvasSurfaceContracts";
 import type { StudioShellValidationIssue } from "../../../../infrastructure/api/studio-shell/StudioShellBackendApi";
-import { ExperienceAssetModeIds } from "../../../studio-shell/experience-assets/ExperienceAssetContracts";
 import {
   ExperienceSurfaceAssetIds,
   resolveExperienceAssetModesFromRegistrations,
@@ -60,35 +59,31 @@ export function SystemStudioDraftAuthoringBoundary({
     () => resolveExperienceAssetModesFromRegistrations({ assetIds: experienceAssetIds }),
     [experienceAssetIds],
   );
-  const [selectedModeId, setSelectedModeId] = useState<"wizard" | "canvas">(
-    supportedModes.some((mode) => mode.id === ExperienceAssetModeIds.wizard)
-      ? "wizard"
-      : "canvas",
-  );
 
   const document = useMemo(() => parseSystemStudioDraftDocument(content), [content]);
-  const resolvedModeId = supportedModes.some((mode) => mode.id === selectedModeId)
-    ? selectedModeId
-    : (supportedModes[0]?.id ?? "wizard");
+  const latestContentRef = useRef(content);
+  latestContentRef.current = content;
 
   const resolvedSelectedPageId = document.systemSpec.pages.some((page) => page.pageId === selectedPageId)
     ? selectedPageId
     : (document.systemSpec.pages[0]?.pageId ?? "page-1");
 
   const persistPanelsForSelectedPage = (panels: ReadonlyArray<PanelAssetContract>): void => {
-    const nextLayouts = document.canvasAuthoring.pageLayouts.map((layout) => (
+    const latestDocument = parseSystemStudioDraftDocument(latestContentRef.current);
+    const nextLayouts = latestDocument.canvasAuthoring.pageLayouts.map((layout) => (
       layout.pageId === resolvedSelectedPageId
         ? Object.freeze({ ...layout, panels })
         : layout
     ));
 
     const serialized = serializeSystemStudioCanvasAuthoringConfiguration({
-      existingContent: content,
+      existingContent: latestContentRef.current,
       canvasAuthoring: Object.freeze({
-        ...document.canvasAuthoring,
+        ...latestDocument.canvasAuthoring,
         pageLayouts: Object.freeze(nextLayouts),
       }),
     });
+    latestContentRef.current = serialized;
     extensionContext.operations.setDraftContent?.(serialized);
     onStudioEvent?.(createStudioIntentEvent({
       kind: StudioEmbeddedIntentKinds.applyRequest,
@@ -96,11 +91,26 @@ export function SystemStudioDraftAuthoringBoundary({
     }));
   };
 
+  const resolveSelectedPagePanelsFromLatest = (): ReadonlyArray<PanelAssetContract> => {
+    const latestDocument = parseSystemStudioDraftDocument(latestContentRef.current);
+    return latestDocument.canvasAuthoring.pageLayouts.find((layout) => layout.pageId === resolvedSelectedPageId)?.panels ?? [];
+  };
+
+  const createNextPanelId = (panels: ReadonlyArray<PanelAssetContract>): string => {
+    const usedIds = new Set(panels.map((panel) => panel.panelId));
+    let index = panels.length + 1;
+    while (usedIds.has(`panel-${index}`)) {
+      index += 1;
+    }
+    return `panel-${index}`;
+  };
+
   const updateSelectedPagePanel = (input: {
     readonly panelId: string;
     readonly update: (panel: PanelAssetContract) => PanelAssetContract;
   }): void => {
-    persistPanelsForSelectedPage(selectedPagePanels.map((panel) => {
+    const latestPanels = resolveSelectedPagePanelsFromLatest();
+    persistPanelsForSelectedPage(latestPanels.map((panel) => {
       if ((panel.panelId !== input.panelId) && (panel.sourceLayoutNodeId !== input.panelId)) {
         return panel;
       }
@@ -161,8 +171,9 @@ export function SystemStudioDraftAuthoringBoundary({
     }
 
     if (event.type === "node.position.change") {
-      persistPanelsForSelectedPage(selectedPagePanels.map((panel) => (
-        panel.sourceLayoutNodeId === event.nodeId
+      const latestPanels = resolveSelectedPagePanelsFromLatest();
+      persistPanelsForSelectedPage(latestPanels.map((panel) => (
+        (panel.sourceLayoutNodeId ?? panel.panelId) === event.nodeId
           ? Object.freeze({
             ...panel,
             layoutBounds: normalizePanelLayoutBounds({
@@ -177,8 +188,9 @@ export function SystemStudioDraftAuthoringBoundary({
     }
 
     if (event.type === "node.resize.change") {
-      persistPanelsForSelectedPage(selectedPagePanels.map((panel) => (
-        panel.sourceLayoutNodeId === event.nodeId
+      const latestPanels = resolveSelectedPagePanelsFromLatest();
+      persistPanelsForSelectedPage(latestPanels.map((panel) => (
+        (panel.sourceLayoutNodeId ?? panel.panelId) === event.nodeId
           ? Object.freeze({
             ...panel,
             layoutBounds: normalizePanelLayoutBounds({
@@ -194,20 +206,21 @@ export function SystemStudioDraftAuthoringBoundary({
     }
 
     if (event.type === "node.create.request") {
-      const nodeId = `panel-${selectedPagePanels.length + 1}`;
+      const latestPanels = resolveSelectedPagePanelsFromLatest();
+      const nodeId = createNextPanelId(latestPanels);
       const panel = createSystemPanelFromCanvasNode({
         pageId: resolvedSelectedPageId,
         regionId: selectedPage?.layout.defaultRegionId,
         node: Object.freeze({
           id: nodeId,
-          title: `${selectedPage?.title ?? "Page"} section ${selectedPagePanels.length + 1}`,
+          title: `${selectedPage?.title ?? "Page"} section ${latestPanels.length + 1}`,
           x: event.position.x,
           y: event.position.y,
           width: 0.22,
           height: 0.18,
         }),
       });
-      persistPanelsForSelectedPage(Object.freeze([...selectedPagePanels, panel]));
+      persistPanelsForSelectedPage(Object.freeze([...latestPanels, panel]));
       setSelectedLayoutNodeId(panel.sourceLayoutNodeId ?? panel.panelId);
       return;
     }
@@ -219,25 +232,29 @@ export function SystemStudioDraftAuthoringBoundary({
     }
 
     if (event.type === "canvas.command" && event.commandId === "add-panel") {
-      const panelId = `panel-${selectedPagePanels.length + 1}`;
+      const latestPanels = resolveSelectedPagePanelsFromLatest();
+      const panelId = createNextPanelId(latestPanels);
       const panel: PanelAssetContract = Object.freeze({
         panelId,
+        assetId: "ui-composed:panel",
+        panelType: "composed-panel",
         pageId: resolvedSelectedPageId,
         regionId: selectedPage?.layout.defaultRegionId,
-        title: `${selectedPage?.title ?? "Page"} section ${selectedPagePanels.length + 1}`,
+        title: `${selectedPage?.title ?? "Page"} section ${latestPanels.length + 1}`,
         description: "High-level layout section. Detailed design is handled in the panel studio.",
         layoutBounds: Object.freeze({ x: 0.05, y: 0.05, width: 0.22, height: 0.18 }),
         contentSlots: Object.freeze([{ slotId: defaultPanelSlotId, label: "Section content" }]),
         sourceLayoutNodeId: panelId,
       });
-      persistPanelsForSelectedPage(Object.freeze([...selectedPagePanels, panel]));
+      persistPanelsForSelectedPage(Object.freeze([...latestPanels, panel]));
       setSelectedLayoutNodeId(panel.sourceLayoutNodeId ?? panel.panelId);
       return;
     }
 
     if (event.type === "canvas.command" && event.commandId === "remove-panel" && selectedLayoutNodeId) {
+      const latestPanels = resolveSelectedPagePanelsFromLatest();
       persistPanelsForSelectedPage(Object.freeze(
-        selectedPagePanels.filter((panel) => panel.sourceLayoutNodeId !== selectedLayoutNodeId && panel.panelId !== selectedLayoutNodeId),
+        latestPanels.filter((panel) => (panel.sourceLayoutNodeId ?? panel.panelId) !== selectedLayoutNodeId),
       ));
       setSelectedLayoutNodeId(undefined);
       return;
@@ -248,7 +265,8 @@ export function SystemStudioDraftAuthoringBoundary({
       if (!nextRegionId) {
         return;
       }
-      persistPanelsForSelectedPage(selectedPagePanels.map((panel) => (
+      const latestPanels = resolveSelectedPagePanelsFromLatest();
+      persistPanelsForSelectedPage(latestPanels.map((panel) => (
         (panel.sourceLayoutNodeId ?? panel.panelId) === selectedLayoutNodeId
           ? Object.freeze({
             ...panel,
@@ -270,7 +288,8 @@ export function SystemStudioDraftAuthoringBoundary({
       if (!preset) {
         return;
       }
-      persistPanelsForSelectedPage(selectedPagePanels.map((panel) => (
+      const latestPanels = resolveSelectedPagePanelsFromLatest();
+      persistPanelsForSelectedPage(latestPanels.map((panel) => (
         (panel.sourceLayoutNodeId ?? panel.panelId) === selectedLayoutNodeId
           ? Object.freeze({
             ...panel,
@@ -324,27 +343,22 @@ export function SystemStudioDraftAuthoringBoundary({
 
   return (
     <div className="ui-stack ui-stack--sm" data-testid="system-studio-draft-authoring-boundary">
-      {hostMode === StudioAssetRenderModes.full ? (
-        <div className="ui-row ui-row--wrap" data-testid="system-studio-mode-actions">
-          {supportedModes.some((mode) => mode.id === ExperienceAssetModeIds.wizard) ? (
-            <button type="button" className={`ui-button ui-button--sm ${selectedModeId === "wizard" ? "ui-button--primary" : "ui-button--ghost"}`} onClick={() => setSelectedModeId("wizard")}>Wizard</button>
-          ) : null}
-          {supportedModes.some((mode) => mode.id === ExperienceAssetModeIds.canvas) ? (
-            <button type="button" className={`ui-button ui-button--sm ${selectedModeId === "canvas" ? "ui-button--primary" : "ui-button--ghost"}`} onClick={() => setSelectedModeId("canvas")}>Canvas</button>
-          ) : null}
-        </div>
-      ) : null}
-
       {supportedModes.length === 0 ? (
         <section className="ui-card ui-card--padded">
           <p className="ui-text-small ui-text-secondary">
             No draft authoring surface is configured for this system experience.
           </p>
         </section>
-      ) : resolvedModeId === ExperienceAssetModeIds.canvas ? (
-        <ConfigurableCanvasSurface definition={canvasModel.definition} definitionContext={canvasModel.context} />
       ) : (
         <div className="ui-stack ui-stack--sm">
+          {hostMode === StudioAssetRenderModes.full ? (
+            <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="system-studio-primary-canvas-summary">
+              <strong>Page structure canvas</strong>
+              <p className="ui-text-small ui-text-secondary">
+                The page layout canvas is the main editing space in System Studio. Use Pages and Settings to support that layout work.
+              </p>
+            </section>
+          ) : null}
           <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="system-studio-wizard-pages-card">
             <nav className="ui-configurable-wizard__page-nav" aria-label="System authoring wizard pages">
               <div className="ui-configurable-wizard__page-nav-main">

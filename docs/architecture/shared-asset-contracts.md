@@ -1127,6 +1127,13 @@ Not implemented in this slice:
 - System Studio now uses **wizard-only** system-level draft authoring by registration contract (no system-level mode-toggle canvas), while still keeping the **page-level structure canvas** inside the wizard’s page-layout step.
 - Missing/disabled draft-authoring surfaces now degrade gracefully with explicit no-surface messaging instead of empty/placeholder shells.
 
+## Direction 5 UI cleanup update: System Studio primary-canvas clarity + section-add persistence hardening (cleanup stories 3-4)
+
+- System Studio now removes lingering standalone canvas-role affordances inside the system draft authoring boundary so there is one clear canvas role: the page-structure canvas hosted in the wizard page-layout step.
+- Wizard copy now explicitly frames the page-structure canvas as the main layout editing surface, while keeping page setup and settings as supporting flows.
+- Page section add/update/remove persistence now always reconciles against the latest serialized draft content snapshot before writing updates, preventing freshly added sections from being dropped by stale in-memory panel arrays during rapid edit/reconcile cycles.
+- Section creation now assigns stable composed-panel metadata (`assetId`, `panelType`) and collision-safe ids from current persisted page panels, preserving compatibility with existing selection, panel-design handoff, and future drag/resize flows.
+
 ## Direction 5 UI extension update: panel layout variants + header configuration in embedded panel studio (stories 2.2.7-2.2.8)
 
 - `ui-composed:panel` now exposes schema-driven panel configuration for both layout and header behavior through the existing property schema + Asset Inspector flow (no panel-specific parallel editor contract):
