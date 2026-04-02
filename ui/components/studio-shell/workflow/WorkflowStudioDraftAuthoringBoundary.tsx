@@ -8,6 +8,8 @@ import type { WorkflowStudioModeValidationIssue } from "../../../studio-shell/wo
 import type { WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import type { WorkflowStudioWizardPageId } from "../../../studio-shell/workflow/WorkflowStudioWizardRouting";
 import type { WorkflowStudioHandoffStatus } from "../../../studio-shell/workflow/WorkflowStudioHandoffStatus";
+import ExperienceAssetAuthoringBoundary from "../experience-assets/ExperienceAssetAuthoringBoundary";
+import { ExperienceAssetModeIds, type ExperienceAssetDefinition } from "../../../studio-shell/experience-assets/ExperienceAssetContracts";
 
 export interface WorkflowStudioDraftAuthoringBoundaryProps {
   readonly isWorkflowStudio: boolean;
@@ -44,6 +46,37 @@ export interface WorkflowStudioDraftAuthoringBoundaryProps {
   readonly invalidWizardPageRouteId?: string;
 }
 
+const workflowExperienceDefinition: ExperienceAssetDefinition<WorkflowDraft, WorkflowValidationIssue> = Object.freeze({
+  id: "workflow-studio",
+  title: "Workflow Studio",
+  defaultModeId: ExperienceAssetModeIds.wizard,
+  modes: Object.freeze([
+    Object.freeze({
+      id: ExperienceAssetModeIds.wizard,
+      title: "Wizard",
+      summary: "Guided step-by-step workflow authoring.",
+      intent: "guided-authoring",
+    }),
+    Object.freeze({
+      id: ExperienceAssetModeIds.canvas,
+      title: "Canvas",
+      summary: "Graph-oriented workflow authoring.",
+      intent: "graph-authoring",
+    }),
+  ]),
+  wizard: Object.freeze({
+    id: "wizard",
+    title: "Wizard",
+    summary: "Guided step-by-step workflow authoring.",
+  }),
+  canvas: Object.freeze({
+    id: "canvas",
+    title: "Canvas",
+    summary: "Graph-oriented workflow authoring.",
+    supportsNodePalette: true,
+  }),
+});
+
 export default function WorkflowStudioDraftAuthoringBoundary({
   isWorkflowStudio,
   content,
@@ -58,40 +91,44 @@ export default function WorkflowStudioDraftAuthoringBoundary({
 
   return (
     <>
-      {workflowModeContext.selectedModeId === "wizard" ? (
-        <WorkflowStudioWizardModeLayout>
-          <WorkflowStudioWizardModeSurface
-            studioId={workflowModeContext.studioId}
-            selectedWizardPageId={workflowModeContext.selectedWizardPageId}
-            onSelectWizardPage={workflowModeContext.onSelectWizardPage}
-            sharedDraft={workflowModeContext.sharedDraft}
-            sharedDraftSerialized={workflowModeContext.sharedDraftSerialized}
-            draftValidationIssues={workflowModeContext.draftValidationIssues}
-            onUpdateSharedDraft={workflowModeContext.updateSharedDraft}
-            handoffStatus={workflowModeContext.handoffStatus}
-            onSetHandoffStatus={workflowModeContext.setHandoffStatus}
-            onClearHandoffStatus={workflowModeContext.clearHandoffStatus}
-          />
-        </WorkflowStudioWizardModeLayout>
-      ) : (
-        <WorkflowStudioCanvasModeLayout>
-          <WorkflowStudioCanvasModeSurface
-            studioId={workflowModeContext.studioId}
-            sharedDraft={workflowModeContext.sharedDraft}
-            draftValidationIssues={workflowModeContext.draftValidationIssues}
-            onUpdateSharedDraft={workflowModeContext.updateSharedDraft}
-            draftEditorContent={workflowModeContext.draftEditorContent}
-            onChangeDraftEditorContent={onChangeContent}
-            drawerState={workflowModeContext.canvasDrawers}
-          />
-        </WorkflowStudioCanvasModeLayout>
-      )}
-
-      {invalidModeRouteId ? (
-        <p className="ui-text-muted">
-          Unsupported workflow mode route &quot;{invalidModeRouteId}&quot;; using {workflowModeContext.selectedModeId} mode.
-        </p>
-      ) : null}
+      <ExperienceAssetAuthoringBoundary
+        asset={workflowExperienceDefinition}
+        activeModeId={workflowModeContext.selectedModeId}
+        invalidModeId={invalidModeRouteId}
+        document={workflowModeContext.sharedDraft}
+        issues={workflowModeContext.draftValidationIssues}
+        surfaces={{
+          wizard: () => (
+            <WorkflowStudioWizardModeLayout>
+              <WorkflowStudioWizardModeSurface
+                studioId={workflowModeContext.studioId}
+                selectedWizardPageId={workflowModeContext.selectedWizardPageId}
+                onSelectWizardPage={workflowModeContext.onSelectWizardPage}
+                sharedDraft={workflowModeContext.sharedDraft}
+                sharedDraftSerialized={workflowModeContext.sharedDraftSerialized}
+                draftValidationIssues={workflowModeContext.draftValidationIssues}
+                onUpdateSharedDraft={workflowModeContext.updateSharedDraft}
+                handoffStatus={workflowModeContext.handoffStatus}
+                onSetHandoffStatus={workflowModeContext.setHandoffStatus}
+                onClearHandoffStatus={workflowModeContext.clearHandoffStatus}
+              />
+            </WorkflowStudioWizardModeLayout>
+          ),
+          canvas: () => (
+            <WorkflowStudioCanvasModeLayout>
+              <WorkflowStudioCanvasModeSurface
+                studioId={workflowModeContext.studioId}
+                sharedDraft={workflowModeContext.sharedDraft}
+                draftValidationIssues={workflowModeContext.draftValidationIssues}
+                onUpdateSharedDraft={workflowModeContext.updateSharedDraft}
+                draftEditorContent={workflowModeContext.draftEditorContent}
+                onChangeDraftEditorContent={onChangeContent}
+                drawerState={workflowModeContext.canvasDrawers}
+              />
+            </WorkflowStudioCanvasModeLayout>
+          ),
+        }}
+      />
 
       {invalidWizardPageRouteId ? (
         <p className="ui-text-muted">
