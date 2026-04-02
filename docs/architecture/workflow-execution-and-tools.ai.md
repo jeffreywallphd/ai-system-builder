@@ -320,3 +320,9 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Resolution is contract-first and storage-agnostic: it distinguishes abstract references from resolved runtime handles, checks role/intent compatibility for common image-system roles (`active-input`, `history`, `system-owned-output`), and returns explicit failure diagnostics when instance resolution or compatibility fails.
 - `WorkflowSystemContextBindingAdapter` (`application/workflow-studio/SystemContextWorkflowInputMapper.ts`) now composes that resolver and emits workflow-ready input metadata with normalized runtime-facing dataset payloads (`datasetInstances`, `datasetRuntimeHandles`, `systemDatasetInstanceRefs`, `datasetResolution`) while preserving separation from raw UI state.
 - `SystemContextValidationService` now reuses the same dataset-resolution seam before workflow input binding preview so validation, execution mapping, and inspect/debug surfaces share one dataset resolution truth.
+
+## AI Loom image manipulation update: reusable system-context mapping configuration (story 4.3.9)
+
+- Added a reusable/versioned mapping contract seam in `domain/system-studio/SystemContextWorkflowMappingConfiguration.ts` for explicit system-context source -> workflow target mapping.
+- `WorkflowSystemContextBindingAdapter` now consumes this mapping configuration (`application/workflow-studio/SystemContextWorkflowInputMapper.ts`) and emits inspectable mapping reports (`systemContextMapping.appliedMappings/issues`) rather than relying on hidden hardcoded wiring.
+- System assets can persist this reusable mapping contract in `SystemExecutionMetadata.workflowContextMapping` (`domain/system-studio/SystemAssetDomain.ts`) for save/load/reuse across System Studio setups.
