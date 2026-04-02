@@ -558,3 +558,16 @@ Audit schema now records administrative approval transitions plus decision denia
 - Resolution is contract-first and storage-agnostic: it distinguishes abstract references from resolved runtime handles, checks role/intent compatibility for common image-system roles (`active-input`, `history`, `system-owned-output`), and returns explicit failure diagnostics when instance resolution or compatibility fails.
 - `WorkflowSystemContextBindingAdapter` (`application/workflow-studio/SystemContextWorkflowInputMapper.ts`) now composes that resolver and emits workflow-ready input metadata with normalized runtime-facing dataset payloads (`datasetInstances`, `datasetRuntimeHandles`, `systemDatasetInstanceRefs`, `datasetResolution`) while preserving separation from raw UI state.
 - `SystemContextValidationService` now reuses the same dataset-resolution seam before workflow input binding preview so validation, execution mapping, and inspect/debug surfaces share one dataset resolution truth.
+
+## AI Loom image manipulation update: UI event payload enrichment + System Studio context preview/debug (stories 4.3.7-4.3.8)
+
+- UI-trigger workflow dispatch now enriches trigger activation payloads through a dedicated contract seam (`application/workflow-studio/UiTriggerEventPayloadEnrichmentService.ts`) that preserves existing trigger contracts while attaching normalized system context outputs.
+- Enriched payloads now include standardized, inspectable fields for:
+  - selected-image/parameter/dataset/runtime context (`systemContext`, `systemContextSummary`),
+  - dataset resolution diagnostics (`datasetContext.resolution`),
+  - workflow context binding projection (`workflowContextBinding`),
+  - envelope metadata for debugging/lineage (`__systemContextEnvelope`).
+- Dispatch integration remains adapter-first: `WorkflowUiEventRuntimeDispatcher` composes `UiTriggerSystemContextMapper` + `WorkflowSystemContextBindingAdapter` + payload enricher without coupling UI components to runtime internals.
+- System Studio now includes a bounded developer-facing context preview/debug surface:
+  - orchestration service (`application/workflow-studio/SystemContextDebugPreviewService.ts`) that executes extraction -> validation -> dataset resolution -> workflow binding -> enriched payload preview,
+  - reusable extension panel (`ui/components/studio-shell/SystemContextDebugPreviewPanel.tsx`) wired through System Studio registration (`system-studio-context-debug-preview`) for pre-dispatch inspection.

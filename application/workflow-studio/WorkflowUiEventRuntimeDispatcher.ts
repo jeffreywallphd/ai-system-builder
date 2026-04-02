@@ -13,6 +13,10 @@ import {
   type WorkflowSystemContextBindingAdapter,
 } from "./SystemContextWorkflowInputMapper";
 import {
+  createDefaultUiTriggerEventPayloadEnricher,
+  type UiTriggerEventPayloadEnricher,
+} from "./UiTriggerEventPayloadEnrichmentService";
+import {
   WorkflowUiInteractionIssueCodes,
   WorkflowUiInteractionStatusKinds,
   type WorkflowUiInteractionDispatchRecord,
@@ -85,6 +89,7 @@ export class WorkflowUiEventRuntimeDispatcher {
     private readonly traceSink?: WorkflowUiEventTraceSink,
     private readonly systemContextMapper: UiTriggerSystemContextMapper = createDefaultUiTriggerSystemContextMapper(),
     private readonly systemContextBindingAdapter: WorkflowSystemContextBindingAdapter = createDefaultWorkflowSystemContextBindingAdapter(),
+    private readonly payloadEnricher: UiTriggerEventPayloadEnricher = createDefaultUiTriggerEventPayloadEnricher(),
   ) {}
 
   public static fromWorkflowStudioApplicationService(
@@ -215,6 +220,15 @@ export class WorkflowUiEventRuntimeDispatcher {
     const systemContext = this.systemContextMapper.map(command.event);
     const context = mergeContext(command.context, this.systemContextBindingAdapter.map(systemContext));
     const settled = await Promise.allSettled(mapped.entries.map(async (entry) => {
+      const enrichedEntry = Object.freeze({
+        ...entry,
+        payload: this.payloadEnricher.enrich({
+          event: command.event,
+          triggerEntry: entry,
+          systemContext,
+          workflowContext: context,
+        }),
+      });
       this.traceSink?.record({
         traceId: createWorkflowUiEventTraceId(command.event.eventId, WorkflowUiEventTraceStages.dispatchStarted),
         occurredAt: new Date().toISOString(),
@@ -231,15 +245,15 @@ export class WorkflowUiEventRuntimeDispatcher {
         content: command.content,
         request: command.request,
         context,
-        trigger: entry,
+        trigger: enrichedEntry,
         inputs: command.inputs,
         manualDecisionsByStepId: command.manualDecisionsByStepId,
         maxLoopIterations: command.maxLoopIterations,
       });
 
       return Object.freeze({
-        triggerId: entry.triggerId,
-        triggerType: entry.triggerType,
+        triggerId: enrichedEntry.triggerId,
+        triggerType: enrichedEntry.triggerType,
         launchStatus: run.launchStatus,
         executionId: run.executionStatus.executionId,
         blockingIssueCodes: Object.freeze(run.validation.blockingIssues.map((issue) => issue.code)),

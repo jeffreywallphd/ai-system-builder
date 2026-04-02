@@ -9,6 +9,7 @@ import { SystemParameterConfigEditor } from "../../components/studio-shell/Syste
 import { SystemExecutionMetadataEditor } from "../../components/studio-shell/SystemExecutionMetadataEditor";
 import { SystemCompatibilityInsightsPanel } from "../../components/studio-shell/SystemCompatibilityInsightsPanel";
 import { SystemRuntimeRunPanel } from "../../components/studio-shell/SystemRuntimeRunPanel";
+import { SystemContextDebugPreviewPanel } from "../../components/studio-shell/SystemContextDebugPreviewPanel";
 import WorkflowTemplateSelectionPanel from "../../components/studio-shell/workflow/WorkflowTemplateSelectionPanel";
 import type { SystemStudioRegistration } from "../StudioShellExtensions";
 import { createSystemStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
@@ -104,6 +105,14 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
       subtitle: "Bounded run trigger, execution monitoring, and result visualization through StudioShell runtime API contracts.",
       order: 12,
       render: (context) => createElement(SystemRuntimeRunPanel, { context }),
+    },
+    {
+      id: "system-studio-context-debug-preview",
+      slot: "validation",
+      title: "System context preview + debug",
+      subtitle: "Developer-facing inspection of normalized context, resolution outputs, validation, and enriched trigger payload shape.",
+      order: 13,
+      render: (context) => createElement(SystemContextDebugPreviewPanel, { context }),
     },
     {
       id: "system-studio-compatibility-insights",

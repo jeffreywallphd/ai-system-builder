@@ -22,12 +22,14 @@ describe("SystemStudioPage contracts", () => {
     expect(registrationSource).toContain("SystemParameterConfigEditor");
     expect(registrationSource).toContain("SystemExecutionMetadataEditor");
     expect(registrationSource).toContain("SystemRuntimeRunPanel");
+    expect(registrationSource).toContain("SystemContextDebugPreviewPanel");
     expect(registrationSource).toContain("SystemCompatibilityInsightsPanel");
     expect(registrationSource).toContain("system-studio-structure-editor");
     expect(registrationSource).toContain("system-studio-interface-editor");
     expect(registrationSource).toContain("system-studio-parameter-editor");
     expect(registrationSource).toContain("system-studio-execution-metadata-editor");
     expect(registrationSource).toContain("system-studio-runtime-run-trigger");
+    expect(registrationSource).toContain("system-studio-context-debug-preview");
     expect(registrationSource).toContain("system-studio-compatibility-insights");
     expect(registrationSource).toContain('slot: "dependencies"');
     expect(registrationSource).toContain('slot: "metadata"');
@@ -105,5 +107,16 @@ describe("SystemStudioPage contracts", () => {
     expect(compatibilitySource).toContain("bindingIncompatibilityCount");
     expect(compatibilitySource).toContain("unresolvedNestedSystemCount");
     expect(compatibilitySource).toContain("configurationMismatchCount");
+  });
+
+  it("renders a bounded system context preview/debug surface for trigger payload inspection", () => {
+    const source = readSource("ui/components/studio-shell/SystemContextDebugPreviewPanel.tsx");
+    expect(source).toContain("data-testid=\"system-context-debug-preview-panel\"");
+    expect(source).toContain("System context preview + debug");
+    expect(source).toContain("normalized context");
+    expect(source).toContain("Dataset resolution output");
+    expect(source).toContain("Workflow context binding output");
+    expect(source).toContain("Enriched trigger payload preview");
+    expect(source).toContain("SystemContextDebugPreviewService");
   });
 });

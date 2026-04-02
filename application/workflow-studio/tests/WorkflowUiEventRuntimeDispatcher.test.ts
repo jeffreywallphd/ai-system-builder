@@ -105,6 +105,10 @@ describe("WorkflowUiEventRuntimeDispatcher", () => {
     expect((((firstContext.metadata as Record<string, unknown>).systemDatasetInstanceRefs as Array<Record<string, unknown>>)[0] as Record<string, unknown>).instanceId)
       .toBe("dataset-instance:system");
     expect((((firstContext.metadata as Record<string, unknown>).runtimeContext as Record<string, unknown>).runtimeSessionId)).toBe("runtime-session:abc");
+    const firstTrigger = calls[0]?.trigger as Record<string, unknown>;
+    const triggerPayload = firstTrigger.payload as Record<string, unknown>;
+    expect((triggerPayload.systemContextSummary as Record<string, unknown>).datasetReferenceCount).toBe(2);
+    expect((((triggerPayload.systemContext as Record<string, unknown>).runtime as Record<string, unknown>).runtimeSessionId)).toBe("runtime-session:abc");
   });
 
   it("returns a structured no-match issue when no workflow trigger binding resolves", async () => {
