@@ -3,6 +3,7 @@ import {
   createDefaultExperienceSurfaceAssetRegistry,
   ExperienceSurfaceAssetIds,
   ExperienceSurfaceAssetRegistry,
+  resolveDraftAuthoringExperienceAssetIds,
   resolveExperienceAssetModesFromRegistrations,
 } from "../ExperienceSurfaceAssets";
 
@@ -26,6 +27,20 @@ describe("ExperienceSurfaceAssetRegistry", () => {
     expect(modes).toHaveLength(1);
     expect(modes[0]?.id).toBe("wizard");
     expect(modes[0]?.title).toBe("Wizard");
+  });
+
+  it("resolves optional draft-authoring surface contracts to experience asset ids", () => {
+    expect(resolveDraftAuthoringExperienceAssetIds({
+      surfaces: { wizard: true, canvas: false },
+    })).toEqual([ExperienceSurfaceAssetIds.loomWizard]);
+
+    expect(resolveDraftAuthoringExperienceAssetIds({
+      surfaces: { wizard: false, canvas: true },
+    })).toEqual([ExperienceSurfaceAssetIds.loomCanvas]);
+
+    expect(resolveDraftAuthoringExperienceAssetIds({
+      surfaces: { wizard: false, canvas: false },
+    })).toEqual([]);
   });
 
   it("prevents duplicate registrations", () => {

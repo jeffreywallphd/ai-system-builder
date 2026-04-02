@@ -81,6 +81,7 @@ import {
 } from "../studio-shell/studio-assets/StudioSurfaceAssetDefinitions";
 import { StudioAssetRenderModes } from "../studio-shell/studio-assets/StudioAssetContracts";
 import type { StudioEmbeddedEvent } from "../studio-shell/studio-assets/StudioEmbeddedEventContracts";
+import { resolveDraftAuthoringExperienceAssetIds } from "../studio-shell/experience-assets/ExperienceSurfaceAssets";
 
 interface JsonParseResult<T> {
   readonly ok: boolean;
@@ -291,6 +292,10 @@ export default function StudioShellPage({
   const studioId = studioRegistration?.studioId ?? "studio-shell-main";
   const isWorkflowStudio = studioRegistration?.role === "workflow";
   const isSystemStudio = studioRegistration?.kind === "system";
+  const draftAuthoringExperienceAssetIds = resolveDraftAuthoringExperienceAssetIds({
+    explicitAssetIds: studioRegistration?.shell?.experienceAssets,
+    surfaces: studioRegistration?.shell?.draftAuthoringSurfaces,
+  });
   const defaultDraftTitle = studioRegistration?.defaults.title ?? "Studio Shell Draft";
   const defaultDraftTags = studioRegistration?.defaults.tags ?? ["studio-shell"];
   const defaultContent = studioRegistration?.defaults.contentTemplate ?? "{}";
@@ -1671,7 +1676,7 @@ export default function StudioShellPage({
                   content,
                   validationIssues,
                   extensionContext,
-                  experienceAssetIds: studioRegistration?.shell?.experienceAssets,
+                  experienceAssetIds: draftAuthoringExperienceAssetIds,
                 },
               })}
               session={createStudioHostSessionState({
@@ -1690,7 +1695,7 @@ export default function StudioShellPage({
                 input: {
                   content,
                   extensionContext,
-                  experienceAssetIds: studioRegistration?.shell?.experienceAssets,
+                  experienceAssetIds: draftAuthoringExperienceAssetIds,
                 },
               })}
               session={createStudioHostSessionState({
@@ -1790,7 +1795,7 @@ export default function StudioShellPage({
                       },
                     }
                     : undefined,
-                  experienceAssetIds: studioRegistration?.shell?.experienceAssets,
+                  experienceAssetIds: draftAuthoringExperienceAssetIds,
                 },
               })}
               session={createStudioHostSessionState({

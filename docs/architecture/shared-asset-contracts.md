@@ -1114,6 +1114,19 @@ Not implemented in this slice:
 - Panel-internal authoring is explicitly de-emphasized in the System Studio surface and remains aligned to embedded panel studio flows.
 - Shared embedded dataset/workflow draft persistence now remains in the existing `systemSpec.sharedDocument` seam rather than being mirrored into per-panel embedded content payloads.
 
+## Direction 5 UI cleanup update: optional draft-authoring surfaces + System Studio canvas scope (cleanup stories 1-2)
+
+- Draft-authoring surface selection is now contract-level and explicitly optional in studio registration shell hints:
+  - registrations can now express `draftAuthoringSurfaces.wizard` and `draftAuthoringSurfaces.canvas` independently,
+  - experience-asset id lists remain supported for compatibility, but surface resolution is now centralized (`resolveDraftAuthoringExperienceAssetIds`) instead of studio-local conditionals.
+- Shared shell runtime now passes resolved draft-authoring surface configuration through one path (`StudioShellPage` -> surface boundary input), so studios can cleanly support:
+  - wizard only,
+  - canvas only,
+  - both wizard and canvas,
+  - neither surface.
+- System Studio now uses **wizard-only** system-level draft authoring by registration contract (no system-level mode-toggle canvas), while still keeping the **page-level structure canvas** inside the wizard’s page-layout step.
+- Missing/disabled draft-authoring surfaces now degrade gracefully with explicit no-surface messaging instead of empty/placeholder shells.
+
 ## Direction 5 UI extension update: panel layout variants + header configuration in embedded panel studio (stories 2.2.7-2.2.8)
 
 - `ui-composed:panel` now exposes schema-driven panel configuration for both layout and header behavior through the existing property schema + Asset Inspector flow (no panel-specific parallel editor contract):

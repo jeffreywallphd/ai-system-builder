@@ -97,6 +97,39 @@ export function createDefaultExperienceSurfaceAssetRegistry(): ExperienceSurface
   return registry;
 }
 
+export interface DraftAuthoringSurfaceConfiguration {
+  readonly wizard?: boolean;
+  readonly canvas?: boolean;
+}
+
+export function resolveDraftAuthoringExperienceAssetIds(input: {
+  readonly explicitAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
+  readonly surfaces?: DraftAuthoringSurfaceConfiguration;
+  readonly defaultAssetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
+}): ReadonlyArray<ExperienceSurfaceAssetId> {
+  if (input.explicitAssetIds) {
+    return Object.freeze([...input.explicitAssetIds]);
+  }
+
+  if (input.surfaces) {
+    const surfaceAssetIds: ExperienceSurfaceAssetId[] = [];
+    if (input.surfaces.wizard) {
+      surfaceAssetIds.push(ExperienceSurfaceAssetIds.loomWizard);
+    }
+    if (input.surfaces.canvas) {
+      surfaceAssetIds.push(ExperienceSurfaceAssetIds.loomCanvas);
+    }
+    return Object.freeze(surfaceAssetIds);
+  }
+
+  return Object.freeze(
+    [...(input.defaultAssetIds ?? [
+      ExperienceSurfaceAssetIds.loomWizard,
+      ExperienceSurfaceAssetIds.loomCanvas,
+    ])],
+  );
+}
+
 export function resolveExperienceAssetModesFromRegistrations(input: {
   readonly assetIds?: ReadonlyArray<ExperienceSurfaceAssetId>;
   readonly fallbackModes?: ReadonlyArray<ExperienceAssetModeDefinition>;
