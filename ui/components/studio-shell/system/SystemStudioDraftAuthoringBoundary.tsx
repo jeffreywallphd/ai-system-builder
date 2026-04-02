@@ -171,6 +171,7 @@ export function SystemStudioDraftAuthoringBoundary({
   };
 
   const selectedPagePanels = document.canvasAuthoring.pageLayouts.find((layout) => layout.pageId === resolvedSelectedPageId)?.panels ?? [];
+  const selectedPage = document.systemSpec.pages.find((page) => page.pageId === resolvedSelectedPageId);
   const embeddedDatasetContent = document.systemSpec.sharedDocument?.datasetDraftContent
     ?? document.systemSpec.embeddedStudios?.dataset?.draftContent
     ?? "";
@@ -279,12 +280,12 @@ export function SystemStudioDraftAuthoringBoundary({
     }
 
     if (event.type === "node.create.request") {
-      const nodeId = `panel-node-${Date.now()}`;
+      const nodeId = `panel-${selectedPagePanels.length + 1}`;
       const panel = createSystemPanelFromCanvasNode({
         pageId: resolvedSelectedPageId,
         node: Object.freeze({
           id: nodeId,
-          title: `Panel ${selectedPagePanels.length + 1}`,
+          title: `${selectedPage?.title ?? "Page"} section ${selectedPagePanels.length + 1}`,
           x: event.position.x,
           y: event.position.y,
           width: 0.22,
@@ -307,9 +308,10 @@ export function SystemStudioDraftAuthoringBoundary({
       const panel: PanelAssetContract = Object.freeze({
         panelId,
         pageId: resolvedSelectedPageId,
-        title: `Panel ${selectedPagePanels.length + 1}`,
+        title: `${selectedPage?.title ?? "Page"} section ${selectedPagePanels.length + 1}`,
+        description: "High-level layout section. Detailed design is handled in the panel studio.",
         layoutBounds: Object.freeze({ x: 0.05, y: 0.05, width: 0.22, height: 0.18 }),
-        contentSlots: Object.freeze([{ slotId: `${panelId}-content`, label: "Panel region" }]),
+        contentSlots: Object.freeze([{ slotId: `${panelId}-content`, label: "Section content" }]),
         sourceLayoutNodeId: panelId,
       });
       persistPanelsForSelectedPage(Object.freeze([...selectedPagePanels, panel]));

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { normalizeSystemStudioPageModel, toSerializableSystemStudioPageModel } from "../SystemPageModel";
+import {
+  createSystemStudioPageModel,
+  normalizeSystemStudioPageModel,
+  toSerializableSystemStudioPageModel,
+} from "../SystemPageModel";
 
 describe("SystemPageModel", () => {
   it("normalizes modern and legacy page fields into a stable page model", () => {
@@ -31,5 +35,20 @@ describe("SystemPageModel", () => {
 
     expect(serialized.title).toBe("Review");
     expect(serialized.heading).toBe("Review");
+  });
+
+  it("creates new pages with template-backed layout and route defaults", () => {
+    const created = createSystemStudioPageModel({
+      existingPages: Object.freeze([
+        normalizeSystemStudioPageModel({ pageId: "page-1", title: "Welcome" }, 0),
+      ]),
+      title: "Project Review",
+      layoutKind: "two-pane",
+    });
+
+    expect(created.pageId).toBe("page-2");
+    expect(created.layout.layoutKind).toBe("two-pane");
+    expect(created.layout.regionIds).toEqual(["left-pane", "right-pane"]);
+    expect(created.navigation?.route).toBe("/project-review");
   });
 });
