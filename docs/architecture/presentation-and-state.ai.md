@@ -581,3 +581,19 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - reduced duplicate step-local chrome/headings in embedded sections,
   - Inputs & Outputs readiness now recognizes authored embedded data setup state,
   - advanced controls remain collapsed and lower in the experience.
+
+
+## Direction 5 UI extension update: atomic and composed UI asset contract foundation (stories 1.1.1-1.1.2)
+
+- Studio UI asset contracts now explicitly distinguish leaf and container assets in `ui/studio-shell/studio-assets/StudioAssetContracts.ts`:
+  - `StudioUiAssetKinds` (`atomic` | `composed`),
+  - `AtomicStudioAssetContract` with leaf-only constraints (`allowsChildren: false`) and bounded capabilities,
+  - `ComposedStudioAssetContract` with explicit child-slot contracts and composition rules.
+- Shared contract metadata now includes reusable authoring/runtime descriptors for both kinds:
+  - metadata (`displayName`, `description`, tags),
+  - props schema descriptor (`schemaId`, `schemaVersion`),
+  - rendering resolution descriptor (`react` + `definition-render`),
+  - persistence descriptor (`documentType`, JSON serialization).
+- Reusable atomic UI primitive contracts now exist in `ui/studio-shell/studio-assets/StudioUiPrimitiveAssetContracts.ts` for leaf families (`text-input`, `number-input`, `toggle`, `button`, `viewer`) so future interface assets can reuse one contract shape without creating a second taxonomy.
+- Existing studio surface assets are now explicitly composed contracts in `ui/studio-shell/studio-assets/StudioSurfaceAssetDefinitions.tsx`, with slot/composition rules that support nested embeddable studio usage through existing host boundaries.
+- Studio asset definition discovery now includes shared listing/lookup helpers (`studioSurfaceAssetDefinitions`, `resolveStudioSurfaceAssetDefinitionById`, `listStudioSurfaceAssetDefinitionsByKind`) so registration/discovery flows can resolve contracts by identity and kind.

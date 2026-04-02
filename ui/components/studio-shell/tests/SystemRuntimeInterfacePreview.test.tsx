@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type { StudioAssetDefinition } from "../../../studio-shell/studio-assets/StudioAssetContracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import SystemRuntimeInterfacePreview from "../system/SystemRuntimeInterfacePreview";
-import { StudioAssetRenderModes } from "../../../studio-shell/studio-assets/StudioAssetContracts";
+import { StudioAssetRenderModes, StudioUiAssetKinds } from "../../../studio-shell/studio-assets/StudioAssetContracts";
 
 describe("SystemRuntimeInterfacePreview", () => {
   it("renders authored page layout panels and empty-state pages from draft content", () => {
@@ -53,6 +53,8 @@ describe("SystemRuntimeInterfacePreview", () => {
           studioId: "test-studio",
           title: "Test studio",
         }),
+        kind: StudioUiAssetKinds.atomic,
+        propsSchema: Object.freeze({ schemaId: "test-studio.input", schemaVersion: "1.0.0" }),
         supportedModes: Object.freeze([StudioAssetRenderModes.embedded]),
         accepts: Object.freeze({
           context: "studio-host",
@@ -67,6 +69,10 @@ describe("SystemRuntimeInterfacePreview", () => {
           canLaunchRuns: false,
           canManageSessionState: false,
         }),
+        rendering: Object.freeze({ renderer: "react", resolution: "definition-render" }),
+        persistence: Object.freeze({ documentType: "test", serialization: "json" }),
+        capabilities: Object.freeze({ interactive: false, viewer: true }),
+        constraints: Object.freeze({ allowsChildren: false }),
       }),
       render: () => <div data-testid="embedded-studio-panel">Embedded panel studio</div>,
     });

@@ -60,8 +60,39 @@ export interface StudioAssetEvent<TPayload = unknown> {
   readonly payload?: TPayload;
 }
 
-export interface StudioAssetContract<TInput = unknown, TEvent = StudioAssetEvent> {
+export const StudioUiAssetKinds = Object.freeze({
+  atomic: "atomic",
+  composed: "composed",
+});
+
+export type StudioUiAssetKind = typeof StudioUiAssetKinds[keyof typeof StudioUiAssetKinds];
+
+export interface StudioUiAssetMetadata {
+  readonly displayName?: string;
+  readonly description?: string;
+  readonly tags?: ReadonlyArray<string>;
+}
+
+export interface StudioUiAssetPropsSchemaDescriptor {
+  readonly schemaId: string;
+  readonly schemaVersion: string;
+}
+
+export interface StudioUiAssetPersistenceDescriptor {
+  readonly documentType: string;
+  readonly serialization: "json";
+}
+
+export interface StudioUiAssetRenderingDescriptor {
+  readonly renderer: "react";
+  readonly resolution: "definition-render";
+}
+
+interface StudioAssetContractBase<TInput> {
   readonly identity: StudioAssetIdentity;
+  readonly kind: StudioUiAssetKind;
+  readonly metadata?: StudioUiAssetMetadata;
+  readonly propsSchema: StudioUiAssetPropsSchemaDescriptor;
   readonly supportedModes: ReadonlyArray<StudioAssetRenderMode>;
   readonly accepts: {
     readonly context: string;
@@ -70,6 +101,8 @@ export interface StudioAssetContract<TInput = unknown, TEvent = StudioAssetEvent
   };
   readonly emits: ReadonlyArray<string>;
   readonly hostCapabilities: StudioAssetHostCapabilities;
+  readonly rendering: StudioUiAssetRenderingDescriptor;
+  readonly persistence: StudioUiAssetPersistenceDescriptor;
   readonly previewHooks?: {
     readonly canRenderPreview: boolean;
   };
@@ -78,8 +111,42 @@ export interface StudioAssetContract<TInput = unknown, TEvent = StudioAssetEvent
   };
 }
 
+export interface AtomicStudioAssetCapabilities {
+  readonly interactive: boolean;
+  readonly viewer: boolean;
+}
+
+export interface AtomicStudioAssetContract<TInput = unknown> extends StudioAssetContractBase<TInput> {
+  readonly kind: "atomic";
+  readonly capabilities: AtomicStudioAssetCapabilities;
+  readonly constraints: {
+    readonly allowsChildren: false;
+  };
+}
+
+export interface ComposedStudioAssetSlotContract {
+  readonly slotId: string;
+  readonly label?: string;
+  readonly required?: boolean;
+  readonly allowsMultiple?: boolean;
+  readonly allowedChildKinds: ReadonlyArray<StudioUiAssetKind>;
+}
+
+export interface ComposedStudioAssetContract<TInput = unknown> extends StudioAssetContractBase<TInput> {
+  readonly kind: "composed";
+  readonly childSlots: ReadonlyArray<ComposedStudioAssetSlotContract>;
+  readonly compositionRules: {
+    readonly allowsNestedStudios: boolean;
+    readonly allowedChildKinds: ReadonlyArray<StudioUiAssetKind>;
+  };
+}
+
+export type StudioAssetContract<TInput = unknown> =
+  | AtomicStudioAssetContract<TInput>
+  | ComposedStudioAssetContract<TInput>;
+
 export interface StudioAssetDefinition<TInput = unknown, TEvent = StudioAssetEvent> {
-  readonly contract: StudioAssetContract<TInput, TEvent>;
+  readonly contract: StudioAssetContract<TInput>;
   render(props: {
     readonly context: StudioHostContext<TInput>;
     readonly session: StudioSessionState;
@@ -96,7 +163,7 @@ export interface StudioHostBoundaryProps<TInput = unknown, TEvent = StudioAssetE
 }
 
 export function supportsStudioAssetMode(
-  contract: StudioAssetContract<unknown, unknown>,
+  contract: StudioAssetContract<unknown>,
   mode: StudioAssetRenderMode,
 ): boolean {
   return contract.supportedModes.includes(mode);

@@ -9,7 +9,11 @@ import {
   systemStudioSurfaceAssetDefinition,
   workflowStudioSurfaceAssetDefinition,
 } from "../../../../studio-shell/studio-assets/StudioSurfaceAssetDefinitions";
-import { StudioAssetRenderModes, type StudioAssetDefinition } from "../../../../studio-shell/studio-assets/StudioAssetContracts";
+import {
+  StudioAssetRenderModes,
+  StudioUiAssetKinds,
+  type StudioAssetDefinition,
+} from "../../../../studio-shell/studio-assets/StudioAssetContracts";
 import { createEmptyWorkflowDraft, serializeWorkflowDraft } from "../../../../../domain/workflow-studio/WorkflowStudioDomain";
 import type { StudioShellExtensionContext } from "../../../../studio-shell/StudioShellExtensions";
 import {
@@ -35,6 +39,8 @@ describe("StudioAssetHostBoundary", () => {
     const unsupportedAsset: StudioAssetDefinition<{ readonly value: string }> = Object.freeze({
       contract: Object.freeze({
         identity: Object.freeze({ studioType: "test", studioId: "test", title: "Test" }),
+        kind: StudioUiAssetKinds.atomic,
+        propsSchema: Object.freeze({ schemaId: "test.input", schemaVersion: "1.0.0" }),
         supportedModes: Object.freeze([StudioAssetRenderModes.full]),
         accepts: Object.freeze({ context: "test", document: "test", input: Object.freeze({ value: "" }) }),
         emits: Object.freeze([]),
@@ -45,6 +51,10 @@ describe("StudioAssetHostBoundary", () => {
           canLaunchRuns: false,
           canManageSessionState: false,
         }),
+        rendering: Object.freeze({ renderer: "react", resolution: "definition-render" }),
+        persistence: Object.freeze({ documentType: "test", serialization: "json" }),
+        capabilities: Object.freeze({ interactive: false, viewer: true }),
+        constraints: Object.freeze({ allowsChildren: false }),
       }),
       render: () => <div>never</div>,
     });
@@ -155,6 +165,8 @@ describe("StudioAssetHostBoundary", () => {
     const emittingAsset: StudioAssetDefinition<{ readonly value: string }, StudioEmbeddedEvent> = Object.freeze({
       contract: Object.freeze({
         identity: Object.freeze({ studioType: "test", studioId: "test", title: "Test" }),
+        kind: StudioUiAssetKinds.atomic,
+        propsSchema: Object.freeze({ schemaId: "test.input", schemaVersion: "1.0.0" }),
         supportedModes: Object.freeze([StudioAssetRenderModes.embedded]),
         accepts: Object.freeze({ context: "test", document: "test", input: Object.freeze({ value: "" }) }),
         emits: Object.freeze(["studio.intent"]),
@@ -165,6 +177,10 @@ describe("StudioAssetHostBoundary", () => {
           canLaunchRuns: false,
           canManageSessionState: false,
         }),
+        rendering: Object.freeze({ renderer: "react", resolution: "definition-render" }),
+        persistence: Object.freeze({ documentType: "test", serialization: "json" }),
+        capabilities: Object.freeze({ interactive: true, viewer: false }),
+        constraints: Object.freeze({ allowsChildren: false }),
       }),
       render: ({ onEvent }) => {
         onEvent?.(createStudioIntentEvent({
