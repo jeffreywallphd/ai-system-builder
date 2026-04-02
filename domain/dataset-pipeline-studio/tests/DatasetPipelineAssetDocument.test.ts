@@ -93,4 +93,37 @@ describe("DatasetPipelineAssetDocument", () => {
     });
     expect(removed.datasetPipelineSpec.sources[0]?.schema).toBeUndefined();
   });
+
+  it("migrates legacy datasetSpec payloads to the pipeline document shape", () => {
+    const parsed = deserializeDatasetPipelineAssetDocumentForEditing(JSON.stringify({
+      datasetSpec: {
+        source: "dataset:legacy:v1",
+        format: "jsonl",
+        schema: { type: "object", properties: { id: { type: "string" } } },
+      },
+    }));
+
+    expect(parsed.document.datasetPipelineSpec.sources[0]?.datasetRef).toBe("dataset:legacy:v1");
+    expect(parsed.document.datasetPipelineSpec.schemas?.input?.inlineDefinition).toEqual({
+      type: "object",
+      properties: { id: { type: "string" } },
+    });
+    expect(parsed.issues[0]).toContain("legacy dataset definition");
+  });
+
+  it("normalizes legacy datasetPipelineSpec.schema into schemas.input linkage", () => {
+    const parsed = deserializeDatasetPipelineAssetDocumentForEditing(JSON.stringify({
+      datasetPipelineSpec: {
+        schema: { type: "object", properties: { email: { type: "string" } } },
+        sources: [{ datasetRef: "dataset:customers:v1" }],
+      },
+    }));
+
+    expect(parsed.document.datasetPipelineSpec.schemas?.input?.inlineDefinition).toEqual({
+      type: "object",
+      properties: { email: { type: "string" } },
+    });
+    expect(parsed.document.datasetPipelineSpec.sources[0]?.datasetRef).toBe("dataset:customers:v1");
+    expect(parsed.issues[0]).toContain("legacy pipeline schema definition");
+  });
 });

@@ -56,6 +56,78 @@ export interface DatasetPipelineAssetDocumentParseResult {
   readonly issues: ReadonlyArray<string>;
 }
 
+function asRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Readonly<Record<string, unknown>>
+    : undefined;
+}
+
+function readString(record: Readonly<Record<string, unknown>> | undefined, key: string): string | undefined {
+  if (!record) {
+    return undefined;
+  }
+  const value = record[key];
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function migrateLegacyDatasetPipelineSpec(raw: Readonly<Record<string, unknown>>): {
+  readonly datasetPipelineSpec: Readonly<Record<string, unknown>>;
+  readonly issues: ReadonlyArray<string>;
+} {
+  const issues: string[] = [];
+  const providedSpec = asRecord(raw.datasetPipelineSpec);
+  if (providedSpec) {
+    const nextSpec: Record<string, unknown> = { ...providedSpec };
+    if (!providedSpec.schemas && providedSpec.schema) {
+      nextSpec.schemas = Object.freeze({
+        input: Object.freeze({
+          inlineDefinition: providedSpec.schema,
+        }),
+      });
+      delete nextSpec.schema;
+      issues.push("Converted a legacy pipeline schema definition into pipeline input schema linkage.");
+    }
+    return Object.freeze({
+      datasetPipelineSpec: Object.freeze(nextSpec),
+      issues: Object.freeze(issues),
+    });
+  }
+
+  const datasetSpec = asRecord(raw.datasetSpec);
+  if (!datasetSpec) {
+    return Object.freeze({
+      datasetPipelineSpec: Object.freeze({}),
+      issues: Object.freeze([]),
+    });
+  }
+
+  const source = readString(datasetSpec, "source");
+  const format = readString(datasetSpec, "format");
+  const schema = datasetSpec.schema;
+  issues.push("Converted legacy dataset definition into the pipeline draft format used by Pipeline Studio.");
+
+  const migrated = Object.freeze({
+    sources: source
+      ? Object.freeze([Object.freeze({
+        datasetRef: source,
+        ingestionMode: format ?? "batch",
+      })])
+      : Object.freeze([]),
+    steps: Object.freeze([]),
+    schemas: schema
+      ? Object.freeze({
+        input: Object.freeze({
+          inlineDefinition: schema,
+        }),
+      })
+      : undefined,
+  });
+  return Object.freeze({
+    datasetPipelineSpec: migrated,
+    issues: Object.freeze(issues),
+  });
+}
+
 function normalizeSchemaReference(reference?: DatasetPipelineSchemaReference): DatasetPipelineSchemaReference | undefined {
   if (!reference) {
     return undefined;
@@ -105,15 +177,17 @@ export function deserializeDatasetPipelineAssetDocumentForEditing(content: strin
 
   try {
     const raw = JSON.parse(content) as unknown;
+    const rawRecord = asRecord(raw) ?? {};
+    const migrated = migrateLegacyDatasetPipelineSpec(rawRecord);
     const document = normalizeDatasetPipelineAssetDocument(
       DatasetPipelineAssetDocumentSchema.parse({
-        schemaVersion: typeof (raw as { readonly schemaVersion?: unknown })?.schemaVersion === "string"
-          ? (raw as { readonly schemaVersion?: string }).schemaVersion
+        schemaVersion: typeof rawRecord.schemaVersion === "string"
+          ? rawRecord.schemaVersion
           : DatasetPipelineAssetDocumentVersion,
-        datasetPipelineSpec: (raw as { readonly datasetPipelineSpec?: unknown })?.datasetPipelineSpec ?? {},
+        datasetPipelineSpec: migrated.datasetPipelineSpec,
       }),
     );
-    return Object.freeze({ document, issues: Object.freeze([]) });
+    return Object.freeze({ document, issues: migrated.issues });
   } catch {
     return Object.freeze({
       document: createEmptyDatasetPipelineAssetDocument(),

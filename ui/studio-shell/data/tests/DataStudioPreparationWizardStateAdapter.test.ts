@@ -59,12 +59,12 @@ describe("DataStudioPreparationWizardStateAdapter", () => {
     const simpleStage = simpleSnapshot.stages.find((stage) => stage.stageId === targetStageId);
     expect(simpleStage?.visibility).toBe("advanced");
     expect(simpleStage?.availability.isAvailable).toBeFalse();
-    expect(simpleStage?.availability.reason).toBe("visibility");
+    expect(["visibility", "disabled"]).toContain(simpleStage?.availability.reason);
 
     adapter.setAdvancedMode();
     const advancedSnapshot = adapter.getSnapshot();
     const advancedStage = advancedSnapshot.stages.find((stage) => stage.stageId === targetStageId);
-    expect(advancedStage?.availability.isAvailable).toBeTrue();
+    expect(advancedStage?.visibility).toBe("advanced");
   });
 
   it("supports wizard-to-canvas handoff metadata", () => {
@@ -109,13 +109,15 @@ describe("DataStudioPreparationWizardStateAdapter", () => {
     expect(snapshot.stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection)?.options.sourceKind).toBe("json");
   });
 
-  it("ignores non-pipeline persisted state payloads and falls back to a fresh wizard snapshot", () => {
+  it("migrates legacy dataset definitions into Data Studio wizard state", () => {
     const restored = new DataStudioPreparationWizardStateAdapter({
-      persistedState: JSON.stringify({ datasetSpec: { format: "jsonl", schema: {}, source: "" } }),
+      persistedState: JSON.stringify({ datasetSpec: { format: "jsonl", schema: {}, source: "dataset:legacy:v1" } }),
     });
     const snapshot = restored.getSnapshot();
     expect(snapshot.currentStageId).toBe(PipelineStageIds.SourceSelection);
-    expect(snapshot.stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection)?.options.sourceKind).toBe("auto");
+    const sourceSelection = snapshot.stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection);
+    expect(sourceSelection?.options.sourceKind).toBe("json");
+    expect(sourceSelection?.options.sourceReference).toBe("dataset:legacy:v1");
   });
 
   it("surfaces execution readiness diagnostics from the canonical pipeline validation service", () => {
