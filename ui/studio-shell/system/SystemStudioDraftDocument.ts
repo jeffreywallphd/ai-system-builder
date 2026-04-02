@@ -4,6 +4,11 @@ import {
   toSerializableSystemStudioPageModel,
   type SystemStudioPageModel,
 } from "./SystemPageModel";
+import {
+  normalizeSystemSettingsModel,
+  toSerializableSystemSettingsModel,
+  type SystemSettingsModel,
+} from "./SystemSettingsModel";
 import type {
   CanvasSurfaceDesignFrameModel,
   CanvasSurfaceDesignFrameRatio,
@@ -47,6 +52,7 @@ export interface SystemStudioDraftDocument {
     readonly inputs: NonNullable<SystemAsset["inputs"]>;
     readonly outputs: NonNullable<SystemAsset["outputs"]>;
     readonly parameters: NonNullable<SystemAsset["parameters"]>;
+    readonly settings: SystemSettingsModel;
     readonly pages: ReadonlyArray<SystemStudioPageDefinition>;
     readonly embeddedStudios?: {
       readonly dataset?: {
@@ -65,6 +71,7 @@ export interface SystemStudioDraftDocument {
         readonly datasetDefinitions?: "systemSpec.sharedDocument.datasetDraftContent";
         readonly workflowDefinitions?: "systemSpec.sharedDocument.workflowDraftContent";
         readonly settingsMetadata?: "systemSpec.parameters";
+        readonly systemSettings?: "systemSpec.settings";
       };
     };
   };
@@ -97,6 +104,7 @@ const emptyDocument: SystemStudioDraftDocument = Object.freeze({
     inputs: Object.freeze([]),
     outputs: Object.freeze([]),
     parameters: Object.freeze([]),
+    settings: normalizeSystemSettingsModel(undefined),
     pages: Object.freeze([defaultSystemPage]),
     embeddedStudios: Object.freeze({
       dataset: Object.freeze({
@@ -115,6 +123,7 @@ const emptyDocument: SystemStudioDraftDocument = Object.freeze({
         datasetDefinitions: "systemSpec.sharedDocument.datasetDraftContent",
         workflowDefinitions: "systemSpec.sharedDocument.workflowDraftContent",
         settingsMetadata: "systemSpec.parameters",
+        systemSettings: "systemSpec.settings",
       }),
     }),
   }),
@@ -138,7 +147,7 @@ function normalizePageDefinition(entry: Record<string, unknown>, index: number):
   return normalizeSystemStudioPageModel(entry, index);
 }
 
-function normalizeLayoutBounds(input: unknown): PanelAssetLayoutBounds {
+export function normalizePanelLayoutBounds(input: unknown): PanelAssetLayoutBounds {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return defaultPanelBounds;
   }
@@ -147,11 +156,15 @@ function normalizeLayoutBounds(input: unknown): PanelAssetLayoutBounds {
   const y = Number.isFinite(record.y) ? Number(record.y) : defaultPanelBounds.y;
   const width = Number.isFinite(record.width) ? Number(record.width) : defaultPanelBounds.width;
   const height = Number.isFinite(record.height) ? Number(record.height) : defaultPanelBounds.height;
+  const boundedWidth = Math.max(0.05, Math.min(1, width));
+  const boundedHeight = Math.max(0.05, Math.min(1, height));
+  const boundedX = Math.max(0, Math.min(1, x));
+  const boundedY = Math.max(0, Math.min(1, y));
   return Object.freeze({
-    x: Math.max(0, Math.min(1, x)),
-    y: Math.max(0, Math.min(1, y)),
-    width: Math.max(0.05, Math.min(1, width)),
-    height: Math.max(0.05, Math.min(1, height)),
+    x: Math.min(boundedX, 1 - boundedWidth),
+    y: Math.min(boundedY, 1 - boundedHeight),
+    width: boundedWidth,
+    height: boundedHeight,
   });
 }
 
@@ -193,9 +206,10 @@ function normalizeCanvasAuthoringConfig(input: unknown): SystemStudioCanvasAutho
       return Object.freeze({
         panelId,
         pageId: entry.pageId?.trim() || "default",
+        regionId: entry.regionId?.trim() || undefined,
         title: entry.title?.trim() || `Panel ${index + 1}`,
         description: entry.description?.trim() || undefined,
-        layoutBounds: normalizeLayoutBounds(entry.layoutBounds),
+        layoutBounds: normalizePanelLayoutBounds(entry.layoutBounds),
         contentSlots: Object.freeze((entry.contentSlots ?? []).map((slot, slotIndex) => Object.freeze({
           slotId: slot.slotId?.trim() || `${panelId}-slot-${slotIndex + 1}`,
           label: slot.label?.trim() || undefined,
@@ -305,6 +319,7 @@ export function parseSystemStudioDraftDocument(content: string): SystemStudioDra
         inputs: Object.freeze(parsed.systemSpec?.inputs ?? []),
         outputs: Object.freeze(parsed.systemSpec?.outputs ?? []),
         parameters: Object.freeze(parsed.systemSpec?.parameters ?? []),
+        settings: normalizeSystemSettingsModel(parsed.systemSpec?.settings),
         pages,
         embeddedStudios: Object.freeze({
           dataset: Object.freeze({
@@ -323,6 +338,7 @@ export function parseSystemStudioDraftDocument(content: string): SystemStudioDra
             datasetDefinitions: "systemSpec.sharedDocument.datasetDraftContent",
             workflowDefinitions: "systemSpec.sharedDocument.workflowDraftContent",
             settingsMetadata: "systemSpec.parameters",
+            systemSettings: "systemSpec.settings",
           }),
         }),
       }),
@@ -472,6 +488,25 @@ export function serializeSystemStudioEmbeddedWorkflowDraftContent(input: {
       ...existingSharedDocument,
       workflowDraftContent: input.draftContent,
     },
+  };
+
+  return JSON.stringify(root, null, 2);
+}
+
+export function serializeSystemStudioSettings(input: {
+  readonly existingContent: string;
+  readonly settings: SystemSettingsModel;
+}): string {
+  const root = input.existingContent.trim()
+    ? (JSON.parse(input.existingContent) as Record<string, unknown>)
+    : {};
+  const existingSystemSpec = (root.systemSpec && typeof root.systemSpec === "object" && !Array.isArray(root.systemSpec))
+    ? { ...(root.systemSpec as Record<string, unknown>) }
+    : {};
+
+  root.systemSpec = {
+    ...existingSystemSpec,
+    settings: toSerializableSystemSettingsModel(input.settings),
   };
 
   return JSON.stringify(root, null, 2);

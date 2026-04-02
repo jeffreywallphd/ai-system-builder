@@ -9,6 +9,7 @@ import {
 } from "../../../studio-shell/experience-assets/ExperienceSurfaceAssets";
 import type { StudioShellExtensionContext } from "../../../studio-shell/StudioShellExtensions";
 import {
+  normalizePanelLayoutBounds,
   parseSystemStudioDraftDocument,
   serializeSystemStudioCanvasAuthoringConfiguration,
   serializeSystemStudioEmbeddedDatasetDraftContent,
@@ -251,7 +252,7 @@ export function SystemStudioDraftAuthoringBoundary({
         panel.sourceLayoutNodeId === event.nodeId
           ? Object.freeze({
             ...panel,
-            layoutBounds: Object.freeze({
+            layoutBounds: normalizePanelLayoutBounds({
               ...panel.layoutBounds,
               x: event.position.x,
               y: event.position.y,
@@ -267,7 +268,7 @@ export function SystemStudioDraftAuthoringBoundary({
         panel.sourceLayoutNodeId === event.nodeId
           ? Object.freeze({
             ...panel,
-            layoutBounds: Object.freeze({
+            layoutBounds: normalizePanelLayoutBounds({
               x: event.frame.x,
               y: event.frame.y,
               width: event.frame.width,
@@ -283,6 +284,7 @@ export function SystemStudioDraftAuthoringBoundary({
       const nodeId = `panel-${selectedPagePanels.length + 1}`;
       const panel = createSystemPanelFromCanvasNode({
         pageId: resolvedSelectedPageId,
+        regionId: selectedPage?.layout.defaultRegionId,
         node: Object.freeze({
           id: nodeId,
           title: `${selectedPage?.title ?? "Page"} section ${selectedPagePanels.length + 1}`,
@@ -308,6 +310,7 @@ export function SystemStudioDraftAuthoringBoundary({
       const panel: PanelAssetContract = Object.freeze({
         panelId,
         pageId: resolvedSelectedPageId,
+        regionId: selectedPage?.layout.defaultRegionId,
         title: `${selectedPage?.title ?? "Page"} section ${selectedPagePanels.length + 1}`,
         description: "High-level layout section. Detailed design is handled in the panel studio.",
         layoutBounds: Object.freeze({ x: 0.05, y: 0.05, width: 0.22, height: 0.18 }),
@@ -324,6 +327,48 @@ export function SystemStudioDraftAuthoringBoundary({
         selectedPagePanels.filter((panel) => panel.sourceLayoutNodeId !== selectedLayoutNodeId && panel.panelId !== selectedLayoutNodeId),
       ));
       setSelectedLayoutNodeId(undefined);
+      return;
+    }
+
+    if (event.type === "canvas.command" && event.commandId.startsWith("assign-region:") && selectedLayoutNodeId) {
+      const nextRegionId = event.commandId.replace("assign-region:", "").trim();
+      if (!nextRegionId) {
+        return;
+      }
+      persistPanelsForSelectedPage(selectedPagePanels.map((panel) => (
+        (panel.sourceLayoutNodeId ?? panel.panelId) === selectedLayoutNodeId
+          ? Object.freeze({
+            ...panel,
+            regionId: nextRegionId,
+          })
+          : panel
+      )));
+      return;
+    }
+
+    if (event.type === "canvas.command" && event.commandId.startsWith("panel-size:") && selectedLayoutNodeId) {
+      const presetId = event.commandId.replace("panel-size:", "").trim();
+      const presets = Object.freeze({
+        compact: Object.freeze({ width: 0.2, height: 0.16 }),
+        balanced: Object.freeze({ width: 0.32, height: 0.24 }),
+        featured: Object.freeze({ width: 0.56, height: 0.36 }),
+      });
+      const preset = presets[presetId as keyof typeof presets];
+      if (!preset) {
+        return;
+      }
+      persistPanelsForSelectedPage(selectedPagePanels.map((panel) => (
+        (panel.sourceLayoutNodeId ?? panel.panelId) === selectedLayoutNodeId
+          ? Object.freeze({
+            ...panel,
+            layoutBounds: normalizePanelLayoutBounds({
+              ...panel.layoutBounds,
+              width: preset.width,
+              height: preset.height,
+            }),
+          })
+          : panel
+      )));
     }
   };
   const assetDefinition = useMemo(

@@ -25,6 +25,7 @@ export type PanelAssetContent = PanelEmbeddedStudioContent;
 export interface PanelAssetContract {
   readonly panelId: string;
   readonly pageId: string;
+  readonly regionId?: string;
   readonly title: string;
   readonly description?: string;
   readonly layoutBounds: PanelAssetLayoutBounds;
@@ -37,6 +38,7 @@ export interface RuntimePanelAssetInstance {
   readonly instanceId: string;
   readonly panelId: string;
   readonly pageId: string;
+  readonly regionId?: string;
   readonly title: string;
   readonly description?: string;
   readonly layoutBounds: PanelAssetLayoutBounds;
@@ -48,12 +50,14 @@ export function mapLayoutNodeToPanelAsset(input: {
   readonly node: CanvasSurfaceLayoutNodeModel;
   readonly panelId?: string;
   readonly pageId: string;
+  readonly regionId?: string;
   readonly description?: string;
   readonly contentSlots?: ReadonlyArray<PanelAssetContentSlot>;
 }): PanelAssetContract {
   return Object.freeze({
     panelId: input.panelId ?? input.node.id,
     pageId: input.pageId,
+    regionId: input.regionId,
     title: input.node.title,
     description: input.description ?? input.node.subtitle,
     layoutBounds: Object.freeze({
@@ -75,6 +79,7 @@ export function mapPanelAssetToRuntimeInstance(
     instanceId: `${panel.pageId}:${panel.panelId}`,
     panelId: panel.panelId,
     pageId: panel.pageId,
+    regionId: panel.regionId,
     title: panel.title,
     description: panel.description,
     layoutBounds: panel.layoutBounds,

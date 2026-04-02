@@ -46,6 +46,18 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
           nestedSystems: [],
           dependencies: [],
           bindings: [],
+          settings: {
+            systemName: "System Asset Draft",
+            systemDescription: "",
+            defaultLandingPageId: "page-1",
+            navigation: { mode: "top" },
+            theme: {},
+            runtimeBehavior: {
+              confirmBeforeExit: false,
+              showHelpTips: true,
+              rememberLastPage: true,
+            },
+          },
           pages: [
             {
               pageId: "page-1",

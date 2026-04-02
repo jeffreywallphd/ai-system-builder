@@ -8,6 +8,7 @@ import { parseSystemStudioDraftDocument, type SystemStudioDraftDocument } from "
 import { SystemInterfaceEditor } from "../../components/studio-shell/SystemInterfaceEditor";
 import { SystemParameterConfigEditor } from "../../components/studio-shell/SystemParameterConfigEditor";
 import { SystemPageSetupEditor } from "../../components/studio-shell/system/SystemPageSetupEditor";
+import { SystemSettingsEditor } from "../../components/studio-shell/system/SystemSettingsEditor";
 import type { SystemCanvasExperienceContext } from "./SystemCanvasExperienceAdapter";
 import StudioAssetHostBoundary from "../../components/studio-shell/studio-assets/StudioAssetHostBoundary";
 import {
@@ -195,7 +196,15 @@ function renderInputsOutputsPage(context: SystemWizardExperienceContext): JSX.El
 }
 
 function renderSettingsPage(context: SystemWizardExperienceContext): JSX.Element {
-  return <SystemParameterConfigEditor context={context.extensionContext} />;
+  return (
+    <section className="ui-stack ui-stack--sm" data-testid="system-wizard-settings-page">
+      <SystemSettingsEditor context={context.extensionContext} />
+      <details className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+        <summary className="ui-text-small">Advanced parameters</summary>
+        <SystemParameterConfigEditor context={context.extensionContext} />
+      </details>
+    </section>
+  );
 }
 
 function renderBehaviorAutomationPage(context: SystemWizardExperienceContext): JSX.Element {
@@ -309,7 +318,7 @@ const definition: WizardExperienceAssetDefinition<SystemWizardExperienceContext>
       id: SystemWizardPageIds.settings,
       title: "Settings",
       summary: "Set reusable behavior and defaults.",
-      resolveStatus: (context) => toStatus(context.document.systemSpec.parameters.length > 0),
+      resolveStatus: (context) => toStatus(context.document.systemSpec.settings.systemName.trim().length > 0),
       render: renderSettingsPage,
     }),
   ]),
@@ -337,7 +346,7 @@ const definition: WizardExperienceAssetDefinition<SystemWizardExperienceContext>
         ready: context.embeddedWorkflowContent.trim().length > 0,
         title: "Behavior & Automation",
       },
-      { id: SystemWizardPageIds.settings, ready: context.document.systemSpec.parameters.length > 0, title: "Settings" },
+      { id: SystemWizardPageIds.settings, ready: context.document.systemSpec.settings.systemName.trim().length > 0, title: "Settings" },
     ] as const;
     const readyCount = pages.filter((page) => page.ready).length;
     return Object.freeze({

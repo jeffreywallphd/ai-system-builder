@@ -725,3 +725,16 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Invalid nesting is explicitly denied through the same rules (for example composed assets cannot host `system-page` children unless their own contract allows it).
 - `StudioAssetRegistry` now integrates this seam directly (`validateCompositionTree`, `serializeCompositionTree`, `deserializeCompositionTree`) so future studio surfaces/design tools can reuse one registry-authoritative flow.
 - Composition persistence now uses a versioned document shape (`schemaVersion=1.0.0`) carrying node identity, asset/registry identity, config payloads, metadata references, and recursive slot/region child relationships.
+
+## Direction 5 UI extension update: System page-canvas layout behavior + settings model (stories 2.1.5-2.1.6)
+
+- System Studio page-canvas authoring now preserves high-level section placement metadata in page layouts (`panel.regionId`) so sections can be intentionally assigned to page regions while still using the existing panel/system asset taxonomy.
+- Page-canvas interactions now support quick layout allocation presets (compact/balanced/featured) in addition to drag/resize, and all panel bounds are normalized/clamped within the bounded design frame before persistence.
+- The persisted page layout source of truth remains unchanged (`systemSpec.canvasAuthoring.pageLayouts`) and still round-trips through `SystemStudioDraftDocument` parse/serialize seams (no parallel persistence model).
+- System Studio now includes an explicit top-level settings model at `systemSpec.settings` for user-facing runtime/system concerns:
+  - system name/description
+  - default landing page
+  - high-level navigation mode
+  - theme/design-token hooks
+  - global runtime behavior toggles.
+- The Settings step now foregrounds this non-technical settings UI and keeps technical parameter editing in a collapsed advanced section, preserving clear separation between page structure authoring, panel-internal authoring, and system-level runtime settings.
