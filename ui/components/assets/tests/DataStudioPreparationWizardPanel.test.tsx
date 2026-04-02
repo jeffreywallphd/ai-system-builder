@@ -7,17 +7,17 @@ describe("DataStudioPreparationWizardPanel", () => {
   it("renders wizard shell, stage navigation, reusable stage UX, and advanced entry points", () => {
     const html = renderToStaticMarkup(React.createElement(DataStudioPreparationWizardPanel));
 
-    expect(html).toContain("Data Studio Preparation Wizard");
-    expect(html).toContain("Pipeline template");
+    expect(html).toContain("Data Flow Builder");
+    expect(html).toContain("Flow template");
     expect(html).toContain("Basic");
-    expect(html).toContain("Advanced Flow");
+    expect(html).toContain("Technical details");
     expect(html).toContain("Canvas");
-    expect(html).toContain("Advanced editing");
-    expect(html).toContain("Inspect internals");
+    expect(html).toContain("Advanced tools");
+    expect(html).toContain("Inspect technical details");
     expect(html).toContain("Edit in Canvas");
-    expect(html).toContain("Internals");
-    expect(html).toContain("Asset Nodes");
-    expect(html).toContain("Wizard to Canvas handoff");
+    expect(html).toContain("Technical details");
+    expect(html).toContain("Pipeline stages");
+    expect(html).toContain("Technical flow details");
     expect(html).toContain("Back");
     expect(html).toContain("Next");
   });

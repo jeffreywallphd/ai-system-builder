@@ -8,6 +8,7 @@ import type { StudioShellExtensionContext } from "../../../studio-shell/StudioSh
 import ExperienceAssetAuthoringBoundary from "../experience-assets/ExperienceAssetAuthoringBoundary";
 import DataStudioPreparationWizardPanel from "../../assets/DataStudioPreparationWizardPanel";
 import DataStudioSchemaStudioEntryPanel from "../../assets/data-studio/DataStudioSchemaStudioEntryPanel";
+import DataStudioPipelineStudioEntryPanel from "../../assets/data-studio/DataStudioPipelineStudioEntryPanel";
 import DatasetStageAuthoringPanel from "../../assets/DatasetStageAuthoringPanel";
 import { useMemo, useState } from "react";
 import { StudioAssetRenderModes, type StudioAssetRenderMode } from "../../../studio-shell/studio-assets/StudioAssetContracts";
@@ -118,7 +119,18 @@ export default function DatasetStudioDraftAuthoringBoundary({
                 }));
               }}
             />
-            {embeddedVariant !== "inputs-outputs" ? <DataStudioSchemaStudioEntryPanel /> : null}
+            {embeddedVariant !== "inputs-outputs" ? (
+              <section className="ui-stack ui-stack--sm">
+                <header className="ui-stack ui-stack--2xs">
+                  <strong>Data workspaces</strong>
+                  <span className="ui-subtle">Choose where to work next: structure design in Schema Studio or flow design in Pipeline Studio.</span>
+                </header>
+                <div className="ui-grid ui-grid--2col">
+                  <DataStudioSchemaStudioEntryPanel />
+                  <DataStudioPipelineStudioEntryPanel />
+                </div>
+              </section>
+            ) : null}
           </div>
         ),
         canvas: () => <DatasetStageAuthoringPanel mode="canvas" showModeToggle={false} />,

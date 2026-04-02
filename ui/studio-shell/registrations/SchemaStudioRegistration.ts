@@ -17,7 +17,7 @@ export const schemaStudioRegistration: AtomicStudioRegistration = Object.freeze(
   allowedBehaviorKinds: Object.freeze(["none"]),
   shell: Object.freeze({
     title: "Schema Studio",
-    subtitle: "Design table structures and relationships for your data definitions.",
+    subtitle: "Design table structures and relationships. Keep data movement and transformations in Pipeline Studio.",
     toolbar: Object.freeze({
       actions: Object.freeze([
         {

@@ -10,7 +10,7 @@ import {
 import { StudioEntryService } from "../../../routes/StudioRouteMapping";
 import { DataStudioWorkspaceDefinitions } from "../../../studio-shell/data/DataStudioNavigationVocabulary";
 
-interface DataStudioSchemaStudioEntryPanelProps {
+interface DataStudioPipelineStudioEntryPanelProps {
   readonly maxItems?: number;
 }
 
@@ -22,16 +22,16 @@ function describeAsset(asset: RegistryAsset): string {
   return `Updated ${new Date(asset.updatedAt).toLocaleDateString()}`;
 }
 
-export default function DataStudioSchemaStudioEntryPanel({
+export default function DataStudioPipelineStudioEntryPanel({
   maxItems = 5,
-}: DataStudioSchemaStudioEntryPanelProps): JSX.Element {
-  const copy = DataStudioWorkspaceDefinitions.schema;
+}: DataStudioPipelineStudioEntryPanelProps): JSX.Element {
+  const copy = DataStudioWorkspaceDefinitions.pipeline;
   const location = useLocation();
   const navigate = useNavigate();
   const registryService = useMemo(() => new RegistryService(), []);
   const inlineCreationService = useMemo(() => new InlineAssetCreationService(), []);
   const studioEntryService = useMemo(() => new StudioEntryService(), []);
-  const [schemas, setSchemas] = useState<ReadonlyArray<RegistryAsset>>(Object.freeze([]));
+  const [pipelines, setPipelines] = useState<ReadonlyArray<RegistryAsset>>(Object.freeze([]));
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
 
@@ -40,7 +40,7 @@ export default function DataStudioSchemaStudioEntryPanel({
     setIsLoading(true);
     void (async () => {
       const response = await registryService.filterAssets({
-        semanticRoles: Object.freeze(["schema"]),
+        semanticRoles: Object.freeze(["dataset-pipeline"]),
         limit: maxItems,
       });
 
@@ -49,15 +49,15 @@ export default function DataStudioSchemaStudioEntryPanel({
       }
 
       if (!response.ok || !response.data) {
-        setSchemas(Object.freeze([]));
-        setLoadError(response.error?.message ?? "Unable to load schema assets right now.");
+        setPipelines(Object.freeze([]));
+        setLoadError(response.error?.message ?? "Unable to load pipeline assets right now.");
         setIsLoading(false);
         return;
       }
 
       const sorted = [...response.data]
         .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-      setSchemas(Object.freeze(sorted.slice(0, maxItems)));
+      setPipelines(Object.freeze(sorted.slice(0, maxItems)));
       setLoadError(undefined);
       setIsLoading(false);
     })();
@@ -67,14 +67,14 @@ export default function DataStudioSchemaStudioEntryPanel({
     };
   }, [maxItems, registryService]);
 
-  const launchCreateSchema = () => {
+  const launchCreatePipeline = () => {
     const launch = inlineCreationService.launch({
-      requestedRole: "schema",
+      requestedRole: "dataset-pipeline",
       mode: InlineAssetCreationModes.inlineContext,
       context: {
         source: "studio-shell",
-        sourceIntentKey: "data-studio-create-schema",
-        sourceIntentLabel: "Create schema from Data Studio",
+        sourceIntentKey: "data-studio-create-pipeline",
+        sourceIntentLabel: "Create pipeline from Data Studio",
       },
       returnTarget: {
         routePath: `${location.pathname}${location.search}${location.hash}`,
@@ -86,9 +86,9 @@ export default function DataStudioSchemaStudioEntryPanel({
     void navigate(launch.launchPath);
   };
 
-  const openSchema = (asset: RegistryAsset) => {
+  const openPipeline = (asset: RegistryAsset) => {
     const route = studioEntryService.buildStudioRoute({
-      requestedRole: "schema",
+      requestedRole: "dataset-pipeline",
       mode: StudioEntryModes.asset,
       asset: {
         assetId: asset.assetId,
@@ -106,43 +106,41 @@ export default function DataStudioSchemaStudioEntryPanel({
   };
 
   return (
-    <section className="ui-card ui-card--padded ui-stack ui-stack--sm" data-testid="data-studio-schema-entry-panel">
+    <section className="ui-card ui-card--padded ui-stack ui-stack--sm" data-testid="data-studio-pipeline-entry-panel">
       <header className="ui-stack ui-stack--2xs">
         <strong>{copy.heading}</strong>
-        <p className="ui-subtle">
-          {copy.summary}
-        </p>
+        <p className="ui-subtle">{copy.summary}</p>
         <div className="ui-row ui-row--wrap">
           <button
             type="button"
             className="ui-button ui-button--ghost"
-            onClick={launchCreateSchema}
+            onClick={launchCreatePipeline}
           >
             {copy.primaryCtaLabel}
           </button>
         </div>
       </header>
 
-      {isLoading ? <span className="ui-subtle">Loading available schemas...</span> : null}
+      {isLoading ? <span className="ui-subtle">Loading available pipelines...</span> : null}
       {loadError ? <span className="ui-text-danger">{loadError}</span> : null}
 
-      {!isLoading && !loadError && schemas.length === 0 ? (
+      {!isLoading && !loadError && pipelines.length === 0 ? (
         <div className="ui-subtle">{copy.emptyStateLabel}</div>
       ) : null}
 
-      {!isLoading && schemas.length > 0 ? (
+      {!isLoading && pipelines.length > 0 ? (
         <div className="ui-stack ui-stack--xs">
-          <strong>Open existing schema</strong>
-          {schemas.map((asset) => (
+          <strong>Open existing pipeline</strong>
+          {pipelines.map((asset) => (
             <article key={`${asset.assetId}:${asset.versionId ?? "latest"}`} className="ui-card ui-card--padded ui-stack ui-stack--2xs">
               <div className="ui-row ui-row--between ui-row--wrap">
                 <span>{asset.name}</span>
                 <button
                   type="button"
                   className="ui-button ui-button--ghost ui-button--sm"
-                  onClick={() => openSchema(asset)}
+                  onClick={() => openPipeline(asset)}
                 >
-                  Open in Schema Studio
+                  Open in Pipeline Studio
                 </button>
               </div>
               <span className="ui-subtle">{describeAsset(asset)}</span>

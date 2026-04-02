@@ -34,8 +34,8 @@ describe("DataStudioStageUxComponents", () => {
     );
 
     expect(html).toContain(stage.title);
-    expect(html).toContain("Advanced editing");
-    expect(html).toContain("Inspect internals");
+    expect(html).toContain("Advanced tools");
+    expect(html).toContain("Inspect technical details");
     expect(html).toContain("Stage options (canonical)");
     expect(html).toContain("Graph references");
   });
@@ -56,9 +56,9 @@ describe("DataStudioStageUxComponents", () => {
       />,
     );
 
-    expect(html).toContain("Asset Nodes");
+    expect(html).toContain("Pipeline stages");
     expect(html).toContain("Focus stage");
-    expect(html).toContain("Inspect internals");
+    expect(html).toContain("Inspect technical details");
     expect(html).toContain(stages[0]?.title ?? "");
   });
 });
