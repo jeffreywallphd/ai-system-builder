@@ -73,6 +73,7 @@ import { DataStudioWizardPersistenceStorageKey } from "../components/assets/Data
 import {
   createStudioHostContext,
   createStudioHostSessionState,
+  datasetPipelineStudioSurfaceAssetDefinition,
   datasetStudioSurfaceAssetDefinition,
   schemaStudioSurfaceAssetDefinition,
   systemStudioSurfaceAssetDefinition,
@@ -1703,6 +1704,24 @@ export default function StudioShellPage({
           ) : studioRegistration?.role === "schema" ? (
             <StudioAssetHostBoundary
               asset={schemaStudioSurfaceAssetDefinition}
+              context={createStudioHostContext({
+                mode: StudioAssetRenderModes.full,
+                input: {
+                  content,
+                  onChangeContent: updateContent,
+                },
+              })}
+              session={createStudioHostSessionState({
+                sessionId,
+                draftId,
+                isBusy,
+                operationError,
+              })}
+              onEvent={handleStudioAssetEvent}
+            />
+          ) : studioRegistration?.role === "dataset-pipeline" ? (
+            <StudioAssetHostBoundary
+              asset={datasetPipelineStudioSurfaceAssetDefinition}
               context={createStudioHostContext({
                 mode: StudioAssetRenderModes.full,
                 input: {

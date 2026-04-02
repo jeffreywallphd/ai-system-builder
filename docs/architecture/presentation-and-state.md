@@ -826,3 +826,11 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - user-facing guidance that clarifies structural schema work vs execution-oriented data-pipeline work.
 - Entry/transition behavior reuses existing shared seams (`InlineAssetCreationService`, `StudioEntryService`, registry semantic-role filtering) rather than adding ad hoc studio-routing state.
 
+
+## Direction 5 UI update: Dataset Pipeline Studio responsibility focus + schema linkage foundation (stories 3.2.3-3.2.4)
+
+- Dataset Pipeline Studio now renders through a dedicated dataset-pipeline authoring boundary (`DatasetPipelineStudioDraftAuthoringBoundary`) instead of falling back to workflow authoring surfaces.
+- The pipeline authoring surface now emphasizes ingestion/transformation/execution flow setup and explicitly positions schema authoring in Schema Studio.
+- Pipeline draft content now has a formalized schema-linkage shape (`datasetPipelineSpec.schemas.input|output`) for referencing input/output schemas via asset references and optional inline structural definitions.
+- Schema linkage remains persistence-aligned with existing Studio Shell draft/version flows by staying inside canonical draft content serialization rather than introducing local-only UI state.
+- Unresolved or invalid schema links are surfaced as non-blocking authoring warnings, preserving forward compatibility for future schema-aware mapping/validation enhancements.
