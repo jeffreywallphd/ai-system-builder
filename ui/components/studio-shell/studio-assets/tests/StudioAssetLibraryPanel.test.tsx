@@ -5,7 +5,7 @@ import { createDefaultStudioAssetRegistry } from "../../../../studio-shell/studi
 import StudioAssetLibraryPanel from "../StudioAssetLibraryPanel";
 
 describe("StudioAssetLibraryPanel", () => {
-  it("renders grouped registry assets with insertion actions", () => {
+  it("renders grouped registry assets with insertion actions and atomic previews", () => {
     const html = renderToStaticMarkup(
       <StudioAssetLibraryPanel
         registry={createDefaultStudioAssetRegistry()}
@@ -18,5 +18,6 @@ describe("StudioAssetLibraryPanel", () => {
     expect(html).toContain("Composed UI assets");
     expect(html).toContain("System &amp; page assets");
     expect(html).toContain("Insert");
+    expect(html).toContain("studio-asset-preview-card");
   });
 });

@@ -8,11 +8,19 @@ import {
   validateStudioAssetPropertySchema,
 } from "../../../studio-shell/studio-assets/StudioAssetPropertySchema";
 import type { StudioAssetPropertyField } from "../../../studio-shell/studio-assets/StudioAssetContracts";
+import type { StudioAssetSelectionState } from "../../../studio-shell/studio-assets/StudioAssetSelection";
+import { bindStudioAssetSelection } from "../../../studio-shell/studio-assets/StudioAssetSelection";
+import type { StudioAssetPreviewModel } from "../../../studio-shell/studio-assets/StudioAssetPreview";
+import { createStudioAssetPreviewModel } from "../../../studio-shell/studio-assets/StudioAssetPreview";
+import StudioAssetPreviewCard from "./StudioAssetPreviewCard";
 
 export interface StudioAssetInspectorPanelProps {
   readonly registry: StudioAssetRegistry;
   readonly selectedAssetNode?: StudioAssetCompositionNode;
+  readonly compositionRoot?: StudioAssetCompositionNode;
+  readonly selection?: StudioAssetSelectionState;
   readonly onChangeNodeConfig?: (nextConfig: Readonly<Record<string, unknown>>) => void;
+  readonly onChangeSelectedAssetNode?: (nextNode: StudioAssetCompositionNode) => void;
   readonly title?: string;
 }
 
@@ -52,14 +60,22 @@ function getValueByPath(config: Readonly<Record<string, unknown>>, path: string)
 export default function StudioAssetInspectorPanel({
   registry,
   selectedAssetNode,
+  compositionRoot,
+  selection,
   onChangeNodeConfig,
+  onChangeSelectedAssetNode,
   title = "Asset Inspector",
 }: StudioAssetInspectorPanelProps): JSX.Element {
-  const registration = selectedAssetNode ? registry.getById(selectedAssetNode.assetId) : undefined;
+  const boundSelection = useMemo(
+    () => bindStudioAssetSelection({ root: compositionRoot, selection }),
+    [compositionRoot, selection],
+  );
+  const activeNode = boundSelection.selectedNode ?? selectedAssetNode;
+  const registration = activeNode ? registry.getById(activeNode.assetId) : undefined;
   const propertySchema = registration?.contract.propsSchema.propertySchema;
   const baseConfig = useMemo(
-    () => Object.freeze({ ...(selectedAssetNode?.config ?? {}) }),
-    [selectedAssetNode?.config],
+    () => Object.freeze({ ...(activeNode?.config ?? {}) }),
+    [activeNode?.config],
   );
   const resolvedConfig = propertySchema
     ? applyStudioAssetPropertySchemaDefaults({ schema: propertySchema, config: baseConfig })
@@ -71,8 +87,12 @@ export default function StudioAssetInspectorPanel({
     ? validateStudioAssetPropertySchema({ schema: propertySchema, config: resolvedConfig })
     : Object.freeze([]);
 
+  const previewModel: StudioAssetPreviewModel | undefined = registration
+    ? createStudioAssetPreviewModel({ registration, config: resolvedConfig })
+    : undefined;
+
   const handleFieldChange = (field: StudioAssetPropertyField, rawValue: string): void => {
-    if (!onChangeNodeConfig) {
+    if (!onChangeNodeConfig && !onChangeSelectedAssetNode) {
       return;
     }
     const value = coerceFieldValue(field, rawValue);
@@ -81,13 +101,19 @@ export default function StudioAssetInspectorPanel({
       fieldPath: field.path,
       value,
     });
-    onChangeNodeConfig(nextConfig);
+    onChangeNodeConfig?.(nextConfig);
+    if (activeNode) {
+      onChangeSelectedAssetNode?.(Object.freeze({
+        ...activeNode,
+        config: nextConfig,
+      }));
+    }
   };
 
   const renderField = (field: StudioAssetPropertyField): JSX.Element => {
-    const fieldId = `asset-inspector-${selectedAssetNode?.nodeId ?? "none"}-${field.id}`;
+    const fieldId = `asset-inspector-${activeNode?.nodeId ?? "none"}-${field.id}`;
     const currentValue = getValueByPath(resolvedConfig, field.path);
-    const disabled = field.readOnly || !onChangeNodeConfig;
+    const disabled = field.readOnly || (!onChangeNodeConfig && !onChangeSelectedAssetNode);
     if (field.kind === "boolean") {
       return (
         <label key={field.id} className="ui-field">
@@ -171,13 +197,14 @@ export default function StudioAssetInspectorPanel({
         </span>
       </div>
 
-      {registration && selectedAssetNode ? (
+      {registration && activeNode ? (
         <div className="ui-stack ui-stack--2xs">
           <span className="ui-text-small"><strong>{registration.metadata.title}</strong></span>
           <span className="ui-text-small ui-text-secondary">{registration.kind} · {registration.metadata.assetType}</span>
           {registration.metadata.summary ? (
             <span className="ui-text-small ui-text-secondary">{registration.metadata.summary}</span>
           ) : null}
+          {previewModel ? <StudioAssetPreviewCard preview={previewModel} compact /> : null}
         </div>
       ) : (
         <p className="ui-text-small ui-text-muted">No asset selected.</p>

@@ -1005,3 +1005,20 @@
 - Shared schema utilities (`ui/studio-shell/studio-assets/StudioAssetPropertySchema.ts`) provide default projection, visibility filtering, required-field validation, and nested field-path updates for instantiated asset config documents.
 - A reusable Asset Inspector panel (`ui/components/studio-shell/studio-assets/StudioAssetInspectorPanel.tsx`) now renders selected instance metadata and schema-driven property editors with validation feedback/unsupported-property messaging, and is surfaced alongside the existing library panel through optional selected-instance props (`StudioAssetLibraryPanel`).
 - Base property schemas are now registered for atomic UI primitives and current composed/system studio surfaces via existing definition registration seams (`StudioUiPrimitiveAssetContracts`, `StudioSurfaceAssetDefinitions`), preserving definition-vs-instance boundaries while enabling inspector-driven editing without hardcoded per-asset forms.
+
+
+## Direction 5 UI extension update: selection-bound inspector editing + atomic preview rendering (stories 1.2.5-1.2.6)
+
+- Asset Inspector binding now reuses the existing authoring-selection pattern (root document + selected instance id) through a shared selection utility (`ui/studio-shell/studio-assets/StudioAssetSelection.ts`) instead of introducing inspector-local selection state.
+- Selection binding is definition/instance explicit:
+  - registered asset definitions are still resolved from `StudioAssetRegistry`,
+  - selected instantiated nodes are resolved from composition trees by node id,
+  - inspector edits update selected instance config payloads while keeping registration metadata immutable.
+- `StudioAssetInspectorPanel` now supports selection-context binding (`compositionRoot` + `selection`) and updates cleanly across no-selection/selection-change transitions, while preserving the previous direct selected-node prop for compatibility.
+- Validation/error feedback remains schema-driven via existing property schema utilities; unsupported assets still render friendly empty/fallback messaging.
+- Atomic preview rendering is now a reusable contract-level projection (`StudioAssetPreview`) with a lightweight React rendering surface (`StudioAssetPreviewCard`) that avoids full runtime/page orchestration.
+- Preview behavior stays taxonomy-aligned:
+  - atomic assets render control-level previews,
+  - composed/system assets degrade to summary-mode preview cards,
+  - unsupported preview hooks fail gracefully with explicit user-facing fallback text.
+- The Asset Library and Inspector now consume the same preview projection path so preview behavior is reusable across current and future authoring surfaces without introducing a parallel preview architecture.
