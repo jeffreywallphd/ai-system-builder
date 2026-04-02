@@ -25,7 +25,7 @@ import {
   createSystemPanelFromCanvasNode,
   createSystemCanvasExperienceDefinition,
 } from "../../../studio-shell/system/SystemCanvasExperienceAdapter";
-import type { PanelAssetContract } from "../../../studio-shell/experience-assets/PanelAssetContracts";
+import { defaultPanelSlotId, type PanelAssetContract } from "../../../studio-shell/experience-assets/PanelAssetContracts";
 import ExperienceAssetAuthoringBoundary from "../experience-assets/ExperienceAssetAuthoringBoundary";
 import ConfigurableWizardSurface from "../experience-assets/ConfigurableWizardSurface";
 import ConfigurableCanvasSurface from "../experience-assets/ConfigurableCanvasSurface";
@@ -264,14 +264,7 @@ export function SystemStudioDraftAuthoringBoundary({
         title: `${selectedPage?.title ?? "Page"} section ${selectedPagePanels.length + 1}`,
         description: "High-level layout section. Detailed design is handled in the panel studio.",
         layoutBounds: Object.freeze({ x: 0.05, y: 0.05, width: 0.22, height: 0.18 }),
-        contentSlots: Object.freeze([{ slotId: `${panelId}-content`, label: "Section content" }]),
-        content: Object.freeze({
-          kind: "embedded-studio",
-          studioAssetId: "workflow-studio",
-          draftContent: "",
-          experienceAssetIds: Object.freeze(["loom-wizard"]),
-          embeddedVariant: "behavior-automation",
-        }),
+        contentSlots: Object.freeze([{ slotId: defaultPanelSlotId, label: "Section content" }]),
         sourceLayoutNodeId: panelId,
       });
       persistPanelsForSelectedPage(Object.freeze([...selectedPagePanels, panel]));
@@ -345,43 +338,10 @@ export function SystemStudioDraftAuthoringBoundary({
         setSelectedLayoutNodeId(undefined);
       },
       onCanvasEditingEvent: handleCanvasEditingEvent,
-      onPanelDraftContentChange: ({ panelId, draftContent }) => {
+      onPanelCompositionChange: ({ panelId, panel: nextPanel }) => {
         updateSelectedPagePanel({
           panelId,
-          update: (panel) => Object.freeze({
-            ...panel,
-            content: panel.content?.kind === "embedded-studio"
-              ? Object.freeze({
-                ...panel.content,
-                draftContent,
-              })
-              : Object.freeze({
-                kind: "embedded-studio",
-                studioAssetId: "workflow-studio",
-                draftContent,
-                experienceAssetIds: Object.freeze(["loom-wizard"]),
-                embeddedVariant: "behavior-automation",
-              }),
-          }),
-        });
-      },
-      onConnectSelectedPanelStudio: ({ panelId, studioAssetId }) => {
-        updateSelectedPagePanel({
-          panelId,
-          update: (panel) => Object.freeze({
-            ...panel,
-            content: Object.freeze({
-              kind: "embedded-studio",
-              studioAssetId,
-              draftContent: panel.content?.kind === "embedded-studio" ? panel.content.draftContent ?? "" : "",
-              experienceAssetIds: panel.content?.kind === "embedded-studio" && panel.content.experienceAssetIds
-                ? panel.content.experienceAssetIds
-                : Object.freeze(["loom-wizard"]),
-              embeddedVariant: panel.content?.kind === "embedded-studio" && panel.content.embeddedVariant
-                ? panel.content.embeddedVariant
-                : "behavior-automation",
-            }),
-          }),
+          update: () => Object.freeze(nextPanel),
         });
       },
     }),

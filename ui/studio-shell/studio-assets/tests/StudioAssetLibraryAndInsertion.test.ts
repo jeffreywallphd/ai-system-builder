@@ -92,6 +92,46 @@ describe("StudioAssetLibraryAndInsertion", () => {
     }
   });
 
+  it("treats panel assets as composed containers with slot-based child insertion", () => {
+    const registry = createDefaultStudioAssetRegistry();
+    const root = Object.freeze({
+      nodeId: "panel-1",
+      assetId: "ui-composed:panel",
+      assetVersion: "1.0.0",
+      slots: Object.freeze([
+        Object.freeze({
+          placementId: "panel-content",
+          children: Object.freeze([]),
+        }),
+      ]),
+    });
+
+    const target = resolveDefaultInsertionTarget({
+      registry,
+      root,
+      parentNodeId: root.nodeId,
+    });
+    expect(target).toEqual(Object.freeze({
+      parentNodeId: "panel-1",
+      placementKind: "slot",
+      placementId: "panel-content",
+    }));
+
+    const inserted = insertStudioAssetIntoCompositionTree({
+      registry,
+      request: {
+        root,
+        assetId: "ui-primitive:text-input",
+        target: target!,
+      },
+    });
+
+    expect(inserted.ok).toBeTrue();
+    if (inserted.ok) {
+      expect(inserted.root.slots?.[0]?.children).toHaveLength(1);
+    }
+  });
+
   it("returns structured failure when insertion violates slot cardinality", () => {
     const registry = createDefaultStudioAssetRegistry();
     const root = Object.freeze({

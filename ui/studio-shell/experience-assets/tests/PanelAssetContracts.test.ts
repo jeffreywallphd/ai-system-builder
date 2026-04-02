@@ -21,6 +21,7 @@ describe("PanelAssetContracts", () => {
 
     expect(panel.panelId).toBe("node-a");
     expect(panel.pageId).toBe("home");
+    expect(panel.assetId).toBe("ui-composed:panel");
     expect(panel.layoutBounds.width).toBe(0.3);
   });
 
@@ -31,15 +32,17 @@ describe("PanelAssetContracts", () => {
       title: "Hero",
       layoutBounds: { x: 0, y: 0, width: 1, height: 0.4 },
       contentSlots: [],
+      assetId: "ui-composed:panel",
+      panelType: "composed-panel",
       content: {
-        kind: "embedded-studio",
-        studioAssetId: "workflow-studio",
-        draftContent: "{\"steps\":[]}",
+        kind: "asset-composition",
+        serializedDocument: "{\"schemaVersion\":\"1.1.0\",\"root\":{\"nodeId\":\"panel-hero\",\"assetId\":\"ui-composed:panel\"}}",
       },
     });
 
     expect(runtime.instanceId).toBe("home:panel-hero");
     expect(runtime.panelId).toBe("panel-hero");
-    expect(runtime.content?.kind).toBe("embedded-studio");
+    expect(runtime.assetId).toBe("ui-composed:panel");
+    expect(runtime.content?.kind).toBe("asset-composition");
   });
 });

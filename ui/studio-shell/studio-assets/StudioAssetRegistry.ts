@@ -7,6 +7,7 @@ import {
 import {
   defaultAtomicStudioUiPrimitiveContracts,
 } from "./StudioUiPrimitiveAssetContracts";
+import { defaultComposedStudioUiContracts } from "./StudioUiComposedAssetContracts";
 import {
   studioSurfaceAssetDefinitions,
 } from "./StudioSurfaceAssetDefinitions";
@@ -379,6 +380,7 @@ export class StudioAssetRegistry {
 export function createDefaultStudioAssetRegistry(): StudioAssetRegistry {
   const registry = new StudioAssetRegistry();
   registry.registerMany(defaultAtomicStudioUiPrimitiveContracts.map((contract) => registrationFromContract(contract)));
+  registry.registerMany(defaultComposedStudioUiContracts.map((contract) => registrationFromContract(contract)));
   registry.registerMany(
     studioSurfaceAssetDefinitions
       .map((definition) => definition as StudioAssetDefinition<unknown, StudioEmbeddedEvent>)

@@ -18,6 +18,7 @@ import type {
   PanelAssetContent,
   PanelAssetLayoutBounds,
 } from "../experience-assets/PanelAssetContracts";
+import { defaultPanelSlotId, panelComposedAssetId } from "../experience-assets/PanelAssetContracts";
 
 const defaultDesignFrameRatio: CanvasSurfaceDesignFrameRatio = Object.freeze({
   width: 16,
@@ -207,15 +208,22 @@ function normalizeCanvasAuthoringConfig(input: unknown): SystemStudioCanvasAutho
       const panelId = entry.panelId?.trim() || `panel-${index + 1}`;
       return Object.freeze({
         panelId,
+        assetId: entry.assetId?.trim() || panelComposedAssetId,
+        panelType: "composed-panel",
         pageId: entry.pageId?.trim() || "default",
         regionId: entry.regionId?.trim() || undefined,
         title: entry.title?.trim() || `Panel ${index + 1}`,
         description: entry.description?.trim() || undefined,
         layoutBounds: normalizePanelLayoutBounds(entry.layoutBounds),
-        contentSlots: Object.freeze((entry.contentSlots ?? []).map((slot, slotIndex) => Object.freeze({
-          slotId: slot.slotId?.trim() || `${panelId}-slot-${slotIndex + 1}`,
-          label: slot.label?.trim() || undefined,
-        }))),
+        contentSlots: Object.freeze(
+          (entry.contentSlots && entry.contentSlots.length > 0
+            ? entry.contentSlots
+            : [Object.freeze({ slotId: defaultPanelSlotId, label: "Panel content" })]
+          ).map((slot, slotIndex) => Object.freeze({
+            slotId: slot.slotId?.trim() || `${panelId}-slot-${slotIndex + 1}`,
+            label: slot.label?.trim() || undefined,
+          })),
+        ),
         content: normalizePanelContent(entry.content),
         sourceLayoutNodeId: entry.sourceLayoutNodeId?.trim() || undefined,
       } satisfies PanelAssetContract);
@@ -253,6 +261,14 @@ function normalizePanelContent(input: unknown): PanelAssetContent | undefined {
   }
   const record = input as Partial<PanelAssetContent>;
   if (record.kind !== "embedded-studio") {
+    if (record.kind === "asset-composition"
+      && typeof (record as { readonly serializedDocument?: string }).serializedDocument === "string"
+      && (record as { readonly serializedDocument?: string }).serializedDocument!.trim().length > 0) {
+      return Object.freeze({
+        kind: "asset-composition",
+        serializedDocument: (record as { readonly serializedDocument: string }).serializedDocument,
+      });
+    }
     return undefined;
   }
   if (!record.studioAssetId?.trim()) {

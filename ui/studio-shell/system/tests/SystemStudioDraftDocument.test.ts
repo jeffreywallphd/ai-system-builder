@@ -35,9 +35,8 @@ describe("SystemStudioDraftDocument", () => {
                   layoutBounds: { x: 0.2, y: 0.1, width: 0.4, height: 0.3 },
                   contentSlots: [{ slotId: "main" }],
                   content: {
-                    kind: "embedded-studio",
-                    studioAssetId: "workflow-studio",
-                    draftContent: "{\"steps\":[]}",
+                    kind: "asset-composition",
+                    serializedDocument: "{\"schemaVersion\":\"1.1.0\",\"root\":{\"nodeId\":\"panel-a\",\"assetId\":\"ui-composed:panel\",\"assetVersion\":\"1.0.0\",\"slots\":[{\"placementId\":\"panel-content\",\"children\":[]}]}}",
                   },
                   sourceLayoutNodeId: "node-a",
                 },
@@ -52,7 +51,8 @@ describe("SystemStudioDraftDocument", () => {
     expect(parsed.canvasAuthoring.designFrame.ratio?.width).toBe(4);
     expect(parsed.canvasAuthoring.pageLayouts).toHaveLength(2);
     expect(parsed.canvasAuthoring.pageLayouts[0]?.panels).toHaveLength(1);
-    expect(parsed.canvasAuthoring.pageLayouts[0]?.panels[0]?.content?.kind).toBe("embedded-studio");
+    expect(parsed.canvasAuthoring.pageLayouts[0]?.panels[0]?.assetId).toBe("ui-composed:panel");
+    expect(parsed.canvasAuthoring.pageLayouts[0]?.panels[0]?.content?.kind).toBe("asset-composition");
     expect(parsed.canvasAuthoring.pageLayouts[1]?.panels).toHaveLength(0);
   });
 
