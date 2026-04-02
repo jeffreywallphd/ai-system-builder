@@ -830,3 +830,20 @@
   - `unsupported-serialized-version`.
 - Runtime system reconstruction now validates/uses this resolver when loading from versions (`SystemRuntimeApplicationService`) and surfaces graceful, typed `invalid-request:serialized-reference-*` failures for unresolved serialized references instead of opaque parse/load exceptions.
 - Incomplete lineage paths are explicit (`partial`/`incomplete`) with bounded missing-field hints so history/inspection surfaces can fail safely.
+
+## Direction 5 extension update: canonical system save/load operations (stories 5.3.3-5.3.4)
+
+- System Studio now has explicit save/load orchestration over the existing canonical serialization contract (`SystemStudioApplicationService.saveSystemDefinition` / `loadSystemDefinition`) rather than a second persistence format.
+- Save behavior is canonical and repository-boundary-safe:
+  - parse + validate via `parseSystemSerializationDocument`,
+  - canonical reserialization via `serializeSystemSerializationDocument`,
+  - persistence through existing Studio Shell draft update flows.
+- Saved definitions preserve the full vertical-slice payload needed for deterministic reload:
+  - system definition + bindings,
+  - dataset/workflow references,
+  - runtime binding configuration and runtime-owned reference envelopes,
+  - UI configuration.
+- Load behavior now returns reconstructed system state plus structured issues:
+  - rehydrates `SystemAsset` for application/runtime consumption,
+  - resolves referenced dataset/workflow assets via `SerializedAssetReferenceResolutionService`,
+  - returns warning/error issues for unresolved or incompatible references so callers can degrade gracefully.
