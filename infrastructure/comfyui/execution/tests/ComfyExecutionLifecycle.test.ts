@@ -21,11 +21,15 @@ describe("ComfyExecutionLifecycle", () => {
       code: "queue-timeout",
       category: "timeout",
       retriable: true,
+      diagnostics: expect.objectContaining({ failureClass: "environment-configuration" }),
     });
     expect(mapComfyError(new Error("Prompt was cancelled"))).toMatchObject({
       code: "execution-cancelled",
       category: "cancellation",
       retriable: false,
+    });
+    expect(mapComfyError(new Error("Missing model checkpoint SDXL"))).toMatchObject({
+      diagnostics: expect.objectContaining({ failureClass: "user-correctable" }),
     });
   });
 

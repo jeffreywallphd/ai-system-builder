@@ -13,6 +13,12 @@ export type ComfyExecutionFailureStage =
   | "output-normalization"
   | "unknown";
 
+type ComfyFailureClass =
+  | "user-correctable"
+  | "environment-configuration"
+  | "runtime-execution"
+  | "partial-completion";
+
 export function mapComfyProgressToLifecycleEvent(progress: {
   readonly promptId: string;
   readonly status: ComfyAdapterLifecycleStatus;
@@ -39,6 +45,7 @@ export function mapComfyError(
     error instanceof Error ? error.message : "Unknown ComfyUI execution error.";
 
   const normalized = message.toLowerCase();
+  const failureClass = classifyFailure(normalized);
 
   if (options?.stage === "request-mapping") {
     return buildError("request-mapping-failed", message, {
@@ -46,7 +53,7 @@ export function mapComfyError(
       severity: "error",
       retriable: false,
       context: options.context,
-      diagnostics: buildDiagnostics(error, options?.stage),
+      diagnostics: buildDiagnostics(error, options?.stage, failureClass),
     });
   }
 
@@ -56,7 +63,7 @@ export function mapComfyError(
       severity: "error",
       retriable: false,
       context: options.context,
-      diagnostics: buildDiagnostics(error, options?.stage),
+      diagnostics: buildDiagnostics(error, options?.stage, failureClass),
     });
   }
 
@@ -66,7 +73,7 @@ export function mapComfyError(
       severity: "error",
       retriable: true,
       context: options.context,
-      diagnostics: buildDiagnostics(error, options?.stage),
+      diagnostics: buildDiagnostics(error, options?.stage, failureClass),
     });
   }
 
@@ -76,7 +83,7 @@ export function mapComfyError(
       severity: "warning",
       retriable: true,
       context: options?.context,
-      diagnostics: buildDiagnostics(error, options?.stage),
+      diagnostics: buildDiagnostics(error, options?.stage, failureClass),
     });
   }
 
@@ -86,7 +93,7 @@ export function mapComfyError(
       severity: "info",
       retriable: false,
       context: options?.context,
-      diagnostics: buildDiagnostics(error, options?.stage),
+      diagnostics: buildDiagnostics(error, options?.stage, failureClass),
     });
   }
 
@@ -96,17 +103,17 @@ export function mapComfyError(
       severity: "error",
       retriable: true,
       context: options?.context,
-      diagnostics: buildDiagnostics(error, options?.stage),
+      diagnostics: buildDiagnostics(error, options?.stage, failureClass),
     });
   }
 
   return buildError("unknown", message, {
-    category: "unknown",
-    severity: "error",
-    retriable: false,
-    context: options?.context,
-    diagnostics: buildDiagnostics(error, options?.stage),
-  });
+      category: "unknown",
+      severity: "error",
+      retriable: false,
+      context: options?.context,
+      diagnostics: buildDiagnostics(error, options?.stage, failureClass),
+    });
 }
 
 function toPercent(status: ComfyAdapterLifecycleStatus): number | undefined {
@@ -146,10 +153,38 @@ function buildError(
 function buildDiagnostics(
   error: unknown,
   stage: ComfyExecutionFailureStage | undefined,
+  failureClass: ComfyFailureClass,
 ): Readonly<Record<string, unknown>> {
   return Object.freeze({
     stage: stage ?? "unknown",
+    failureClass,
     errorType: error instanceof Error ? error.name : typeof error,
     rawMessage: error instanceof Error ? error.message : String(error),
   });
+}
+
+function classifyFailure(normalizedMessage: string): ComfyFailureClass {
+  if (normalizedMessage.includes("partial output")) {
+    return "partial-completion";
+  }
+  if (
+    normalizedMessage.includes("missing model")
+    || normalizedMessage.includes("checkpoint")
+    || normalizedMessage.includes("missing node")
+    || normalizedMessage.includes("invalid prompt")
+    || normalizedMessage.includes("invalid parameter")
+    || normalizedMessage.includes("validation")
+    || normalizedMessage.includes("malformed")
+  ) {
+    return "user-correctable";
+  }
+  if (
+    normalizedMessage.includes("connection")
+    || normalizedMessage.includes("network")
+    || normalizedMessage.includes("econn")
+    || normalizedMessage.includes("timed out")
+  ) {
+    return "environment-configuration";
+  }
+  return "runtime-execution";
 }

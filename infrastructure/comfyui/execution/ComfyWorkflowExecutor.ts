@@ -24,7 +24,7 @@ import type {
 import { ComfyExecutionService } from "../../../application/execution/comfyui/ComfyExecutionService";
 import { createComfyExecutionContext } from "../../../application/execution/comfyui/ComfyExecutionContext";
 import { mapComfyError, mapComfyProgressToLifecycleEvent } from "./ComfyExecutionLifecycle";
-import { ComfyQueueClient } from "./ComfyQueueClient";
+import { ComfyPromptExecutionError, ComfyQueueClient } from "./ComfyQueueClient";
 import { ComfyAdapterObservability, type IComfyAdapterLogger } from "./ComfyAdapterObservability";
 import { ComfyExecutionRequestMapper } from "./mappers/ComfyExecutionRequestMapper";
 import { ComfyExecutionResultMapper } from "./mappers/ComfyExecutionResultMapper";
@@ -177,6 +177,16 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
             messages: normalized.messages,
           });
         } catch (error: unknown) {
+          const partialOutputs = error instanceof ComfyPromptExecutionError && error.completion
+            ? this.resultMapper.map({
+              completion: error.completion,
+              consumedAssetRefs: request.inputAssetRefs,
+              executionContext: request.context,
+            }).outputs
+            : [];
+          const mappedError = partialOutputs.length > 0
+            ? new Error(`${error instanceof Error ? error.message : "ComfyUI execution failed."} Partial outputs were captured before the run stopped.`)
+            : error;
           const normalizedError = mapComfyError(error, {
             stage: "execution",
             context: mapped.executionContext,
@@ -198,10 +208,15 @@ export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
           return Object.freeze({
             executionId: promptId,
             status: normalizedError.code === "execution-cancelled" ? "cancelled" : "failed",
-            outputs: [],
+            outputs: Object.freeze([...partialOutputs]),
             lifecycle: Object.freeze(lifecycle.slice()),
-            error: normalizedError,
-            messages: [normalizedError.message],
+            error: mapComfyError(mappedError, {
+              stage: "execution",
+              context: mapped.executionContext,
+            }),
+            messages: partialOutputs.length > 0
+              ? [normalizedError.message, "Some output files were generated before the run failed."]
+              : [normalizedError.message],
           });
         }
       },
