@@ -199,6 +199,36 @@ function normalizeStringArray(values: ReadonlyArray<string> | undefined): Readon
     .filter((value) => value.length > 0))]);
 }
 
+function asRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Readonly<Record<string, unknown>>
+    : undefined;
+}
+
+function readTrimmedString(record: Readonly<Record<string, unknown>> | undefined, key: string): string | undefined {
+  if (!record) {
+    return undefined;
+  }
+  const value = record[key];
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function inferSourceKindFromLegacyFormat(format?: string): string | undefined {
+  if (!format) {
+    return undefined;
+  }
+  if (format === "json" || format === "jsonl" || format === "csv") {
+    return "json";
+  }
+  if (format === "image" || format === "images") {
+    return "image";
+  }
+  if (format === "document" || format === "text") {
+    return "document";
+  }
+  return undefined;
+}
+
 function updateStageConfig(
   asset: UnifiedPreparationAssetDefinition,
   stageId: PipelineStageId,
@@ -673,9 +703,16 @@ export class DataStudioPreparationWizard {
   }
 
   public importPipelineState(input: DataStudioPipelineState | string): DataStudioWizardSnapshot {
-    const state = typeof input === "string"
-      ? deserializeDataStudioPipelineState(input)
-      : input;
+    let state: DataStudioPipelineState;
+    if (typeof input === "string") {
+      try {
+        state = deserializeDataStudioPipelineState(input);
+      } catch {
+        return this.importLegacyDataStudioState(input);
+      }
+    } else {
+      state = input;
+    }
     const templateExists = this.templateRegistry
       .listTemplates()
       .some((template) => template.id === state.flow.templateId);
@@ -694,6 +731,52 @@ export class DataStudioPreparationWizard {
     this.persistentIdentity = Object.freeze({
       ...state.identity,
     });
+    this.refreshResolution();
+    return this.getSnapshot();
+  }
+
+  private importLegacyDataStudioState(value: string): DataStudioWizardSnapshot {
+    const legacyRecord = asRecord(JSON.parse(value) as unknown);
+    const datasetSpec = asRecord(legacyRecord?.datasetSpec);
+    const datasetPipelineSpec = asRecord(legacyRecord?.datasetPipelineSpec);
+    if (!datasetSpec && !datasetPipelineSpec) {
+      throw new Error("Persisted state is not a recognized Data Studio pipeline format.");
+    }
+
+    const snapshot = this.getSnapshot();
+    const sourceSelection = snapshot.stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection);
+    const ingestion = snapshot.stages.find((stage) => stage.stageId === PipelineStageIds.UnifiedIngestion);
+    const pipelineSource = asRecord((datasetPipelineSpec?.sources as ReadonlyArray<unknown> | undefined)?.[0]);
+    const pipelineRuntime = asRecord(datasetPipelineSpec?.runtime);
+    const pipelineSchemas = asRecord(datasetPipelineSpec?.schemas);
+
+    if (sourceSelection) {
+      this.setStageOptions(PipelineStageIds.SourceSelection, Object.freeze({
+        ...sourceSelection.options,
+        sourceReference: readTrimmedString(pipelineSource, "datasetRef")
+          ?? readTrimmedString(datasetSpec, "source")
+          ?? readTrimmedString(sourceSelection.options as Readonly<Record<string, unknown>>, "sourceReference"),
+        sourceKind: readTrimmedString(pipelineSource, "ingestionMode")
+          ?? inferSourceKindFromLegacyFormat(readTrimmedString(datasetSpec, "format"))
+          ?? readTrimmedString(sourceSelection.options as Readonly<Record<string, unknown>>, "sourceKind")
+          ?? "auto",
+        legacySchemaDefinition: datasetSpec?.schema,
+        inputSchemaAssetId: readTrimmedString(asRecord(pipelineSchemas?.input), "assetId"),
+        outputSchemaAssetId: readTrimmedString(asRecord(pipelineSchemas?.output), "assetId"),
+      }));
+    }
+
+    if (ingestion) {
+      this.setStageOptions(PipelineStageIds.UnifiedIngestion, Object.freeze({
+        ...ingestion.options,
+        outputTarget: readTrimmedString(asRecord(datasetPipelineSpec?.outputs), "datasetVersionTarget")
+          ?? readTrimmedString(ingestion.options as Readonly<Record<string, unknown>>, "outputTarget")
+          ?? "records",
+        executionMode: readTrimmedString(pipelineRuntime, "executionMode"),
+      }));
+    }
+
+    this.bumpPersistentRevision();
     this.refreshResolution();
     return this.getSnapshot();
   }

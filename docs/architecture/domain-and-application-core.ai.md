@@ -1705,3 +1705,17 @@ Explicitly later than this scope:
 - The authoring UX keeps structure linkage separate from schema authoring:
   - Schema Studio remains the place to define table/field structure,
   - Dataset Pipeline Studio links those schema assets for ingestion and pipeline contracts.
+
+## Direction 5 update: legacy data-definition compatibility seam (story 3.2.9)
+
+- Data Studio persisted-state import now uses a pragmatic two-step path in `DataStudioPreparationWizard`:
+  - try canonical `deserializeDataStudioPipelineState`,
+  - if that fails, attempt bounded translation of legacy `datasetSpec`/mixed `datasetPipelineSpec` payloads into current stage options.
+- The compatibility seam is intentionally narrow and load-time only:
+  - no separate migration framework,
+  - no parallel persistence model,
+  - canonical save/export still writes current `DataStudioPipelineState`.
+- Dataset Pipeline draft parsing in `domain/dataset-pipeline-studio/DatasetPipelineAssetDocument.ts` now normalizes legacy contracts into current pipeline-document shape before zod validation:
+  - `datasetSpec` -> `datasetPipelineSpec`,
+  - `datasetPipelineSpec.schema` -> `datasetPipelineSpec.schemas.input.inlineDefinition`.
+- Recoverable migrations now emit explicit parse issues so legacy/mixed drafts are visible to authors while remaining editable and serializable in current format.

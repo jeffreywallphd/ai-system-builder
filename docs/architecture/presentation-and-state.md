@@ -835,3 +835,18 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Pipeline draft content now has a formalized schema-linkage shape (`datasetPipelineSpec.schemas.input|output`) for referencing input/output schemas via asset references and optional inline structural definitions.
 - Schema linkage remains persistence-aligned with existing Studio Shell draft/version flows by staying inside canonical draft content serialization rather than introducing local-only UI state.
 - Unresolved or invalid schema links are surfaced as non-blocking authoring warnings, preserving forward compatibility for future schema-aware mapping/validation enhancements.
+
+## Direction 5 update: Data-definition compatibility cleanup + studio responsibility documentation (stories 3.2.9-3.2.10)
+
+- Data Studio now includes bounded load-time compatibility for legacy persisted draft shapes:
+  - `DataStudioPreparationWizard.importPipelineState` first attempts canonical `DataStudioPipelineState` deserialization,
+  - if deserialization fails, legacy `datasetSpec` or mixed `datasetPipelineSpec` payloads are translated in place into current stage options (source reference/kind, output target, schema-link hints) instead of hard-failing authoring.
+- Dataset Pipeline Studio draft parsing now includes a lightweight migration seam in `deserializeDatasetPipelineAssetDocumentForEditing`:
+  - legacy `datasetSpec` payloads are translated into `datasetPipelineSpec`,
+  - legacy `datasetPipelineSpec.schema` is normalized into `datasetPipelineSpec.schemas.input.inlineDefinition`,
+  - recoverable migrations surface concise warning text in the authoring panel instead of silently dropping structure.
+- Responsibility split is now explicit and stable:
+  - **Data Studio** is the high-level workspace and organizer across data authoring flows,
+  - **Schema Studio** is dedicated to structural schema definition and editing,
+  - **Pipeline Studio** is dedicated to ingestion/mapping/transformation/enrichment/execution flow authoring and schema linkage.
+- Schema references remain first-class links in pipeline definitions (`datasetPipelineSpec.schemas` and `datasetPipelineSpec.sources[].schema`) so structural assets and execution assets stay distinct while still connected.
