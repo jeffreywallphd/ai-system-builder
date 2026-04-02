@@ -1108,3 +1108,20 @@
 - Relationship validation is now field-aware: referenced entities must exist and referenced fields must resolve on those entities when provided.
 - Serialization compatibility is preserved by accepting legacy `kind` values and normalizing them into the new relationship `type` field.
 - Scope remains foundational and asset-first: no full schema editor/canvas runtime behaviors are added in this pass.
+
+## Direction 5 extension update: schema persistence/validation completion slice (stories 3.1.9-3.1.10)
+
+- Schema domain now exposes a reusable structural validation seam (`validateSchemaAssetDocument`) aligned to existing issue-list validation patterns and returning deterministic diagnostics without mutating persisted data.
+- Current validation scope is intentionally lightweight and structural:
+  - duplicate entity/table names,
+  - duplicate field names inside each entity/table,
+  - missing relationship entity references,
+  - missing relationship field references,
+  - incomplete field definitions and obviously incomplete relationship bindings.
+- Schema parsing now has a safe-edit compatibility seam (`deserializeSchemaAssetDocumentForEditing`) for malformed/legacy payloads:
+  - strict parse remains the canonical persistence contract,
+  - safe-edit parse normalizes recoverable sections and emits explicit warning issues when payloads are incomplete.
+- Persistence/registration/versioning alignment is preserved:
+  - schema assets remain first-class atomic `schema` assets in existing taxonomy,
+  - schema documents remain versioned (`schemaVersion=1.0.0`) and serialize through canonical schema-domain helpers,
+  - Schema Studio edits continue through existing studio draft content flows (no parallel persistence model).

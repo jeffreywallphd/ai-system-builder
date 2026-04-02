@@ -799,3 +799,17 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Field edits persist through canonical schema-domain helpers (`addSchemaFieldToEntityInDocument`, `updateSchemaFieldInEntityInDocument`, `removeSchemaFieldFromEntityInDocument`) and the same host-owned draft persistence/event infrastructure.
 - Removing a field clears dangling relationship field refs for relationships targeting that field, preserving document validity while keeping relationship records intact for follow-up edits.
 - Scope remains intentionally bounded to schema-structure authoring: pipelines/execution semantics remain outside Schema Studio and continue to be authored in their dedicated studios.
+
+## Direction 5 UI extension update: Schema Studio persistence hardening + validation feedback (stories 3.1.9-3.1.10)
+
+- Schema Studio editing remains bound to the host-owned draft content string (`content` + `onChangeContent`) and canonical schema-domain serialization (`serializeSchemaAssetDocument`), so table/field/relationship edits mutate the persisted schema asset draft payload directly instead of maintaining a parallel transient model.
+- Schema draft loading now supports a bounded safe-edit parse path (`deserializeSchemaAssetDocumentForEditing`) that keeps authoring available for malformed/legacy draft payloads by normalizing recoverable sections and surfacing a clear warning state instead of hard-failing the editor.
+- Authoring UI now surfaces lightweight schema validation feedback (`validateSchemaAssetDocument`) in-context for creation/edit/inspector flows, including:
+  - duplicate table names,
+  - duplicate field names within a table,
+  - missing table/field relationship references,
+  - obviously incomplete relationship bindings.
+- Validation intentionally stays structural and persistence-aligned: it does not attempt full database constraint semantics, query-plan checks, or pipeline execution validation.
+- Responsibility boundaries remain explicit:
+  - **Schema Studio** owns structural schema authoring (tables, fields, relationships, canvas-oriented structure metadata).
+  - **Pipeline Studio/Data Studio** own transformation/execution authoring and runtime validation semantics.

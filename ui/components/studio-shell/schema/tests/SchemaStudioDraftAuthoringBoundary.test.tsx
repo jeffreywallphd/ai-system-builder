@@ -66,6 +66,28 @@ describe("SchemaStudioDraftAuthoringBoundary", () => {
     );
 
     expect(html).toContain('data-testid="schema-studio-parse-error"');
-    expect(html).toContain("Schema draft content is invalid");
+    expect(html).toContain("Some saved schema content was incomplete");
+  });
+
+  it("renders schema validation feedback for loaded issues", () => {
+    const content = serializeSchemaAssetDocument({
+      schemaVersion: "1.0.0",
+      definition: {
+        entities: [
+          { entityId: "entity:a", name: "Customer", fields: [{ fieldId: "field:id", name: "id", type: "uuid" }] },
+          { entityId: "entity:b", name: "Customer", fields: [{ fieldId: "field:id2", name: "id", type: "uuid" }] },
+        ],
+        relationships: [],
+      },
+    });
+    const html = renderToStaticMarkup(
+      <SchemaStudioDraftAuthoringBoundary
+        content={content}
+        onChangeContent={() => undefined}
+      />,
+    );
+
+    expect(html).toContain('data-testid="schema-studio-validation-summary"');
+    expect(html).toContain("blocking issue(s) found");
   });
 });
