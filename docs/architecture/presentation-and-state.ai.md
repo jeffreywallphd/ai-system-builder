@@ -504,3 +504,11 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - The reusable canvas experience contract now supports a neutral editing-surface model (`resolveEditingModel`) plus generic event callbacks (`onEditingEvent`) for node selection, create requests, movement, resize, and canvas commands.
 - The shared configurable canvas renderer now includes reusable rectangular layout-node primitives (x/y + width/height + minimum size + resize handles + selection affordances) while staying prop-driven and callback-driven for studio adapters.
 - System Studio canvas now consumes that reusable editing contract at adapter boundaries, with layout frame state owned in the authoring boundary and composition orchestration still routed through existing system services/components.
+
+## Direction 5 UI extension update: viewport-ratio framed canvas + panel asset model (systems stories 3-4)
+
+- The reusable canvas contract now includes a bounded design-frame mode (`CanvasSurfaceDesignFrameModel`) with explicit ratio/dimension inputs and bounded editing-area hints so authoring can target viewport-like proportions.
+- Editing models now expose coordinate-space configuration (`absolute` or `normalized`) and the shared configurable canvas renderer scales node placement/resizing against the rendered design frame while emitting normalized coordinates when configured.
+- System Studio draft content now persists canvas authoring metadata (`systemSpec.canvasAuthoring`) including design-frame settings and normalized panel bounds, preserving authored layout intent across different render sizes.
+- Added reusable panel asset contracts (`PanelAssetContract` + runtime instance mapping) that define stable panel identity, page association, persisted bounds, user-facing metadata, content slots, and preview/runtime representation boundaries.
+- System canvas adapter now maps layout nodes to those reusable panel contracts/runtime panel instances through shared seams rather than ad hoc studio-specific panel shape.

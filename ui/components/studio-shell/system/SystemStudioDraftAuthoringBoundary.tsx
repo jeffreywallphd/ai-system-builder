@@ -8,7 +8,11 @@ import {
   type ExperienceSurfaceAssetId,
 } from "../../../studio-shell/experience-assets/ExperienceSurfaceAssets";
 import type { StudioShellExtensionContext } from "../../../studio-shell/StudioShellExtensions";
-import { parseSystemStudioDraftDocument, type SystemStudioDraftDocument } from "../../../studio-shell/system/SystemStudioDraftDocument";
+import {
+  parseSystemStudioDraftDocument,
+  serializeSystemStudioCanvasAuthoringConfiguration,
+  type SystemStudioDraftDocument,
+} from "../../../studio-shell/system/SystemStudioDraftDocument";
 import {
   createSystemWizardExperienceAdapterModel,
   SystemWizardPageIds,
@@ -19,6 +23,7 @@ import {
   SystemCanvasInspectorPanels,
   type SystemCanvasInspectorPanelId,
 } from "../../../studio-shell/system/SystemCanvasExperienceAdapter";
+import type { PanelAssetContract } from "../../../studio-shell/experience-assets/PanelAssetContracts";
 import ExperienceAssetAuthoringBoundary from "../experience-assets/ExperienceAssetAuthoringBoundary";
 import ConfigurableWizardSurface from "../experience-assets/ConfigurableWizardSurface";
 import ConfigurableCanvasSurface from "../experience-assets/ConfigurableCanvasSurface";
@@ -90,12 +95,19 @@ export function SystemStudioDraftAuthoringBoundary({
     SystemCanvasInspectorPanels.interfaces,
   );
   const [selectedLayoutNodeId, setSelectedLayoutNodeId] = useState<string | undefined>(undefined);
-  const [layoutFramesByNodeId, setLayoutFramesByNodeId] = useState<Readonly<Record<string, {
-    readonly x: number;
-    readonly y: number;
-    readonly width: number;
-    readonly height: number;
-  }>>>({});
+
+  const document = useMemo(() => parseSystemStudioDraftDocument(content), [content]);
+
+  const persistPanels = (panels: ReadonlyArray<PanelAssetContract>): void => {
+    const serialized = serializeSystemStudioCanvasAuthoringConfiguration({
+      existingContent: content,
+      canvasAuthoring: Object.freeze({
+        ...document.canvasAuthoring,
+        panels,
+      }),
+    });
+    extensionContext.operations.setDraftContent?.(serialized);
+  };
 
   const handleCanvasEditingEvent = (event: CanvasSurfaceEditingEvent): void => {
     if (event.type === "selection.change") {
@@ -104,36 +116,42 @@ export function SystemStudioDraftAuthoringBoundary({
     }
 
     if (event.type === "node.position.change") {
-      setLayoutFramesByNodeId((current) => Object.freeze({
-        ...current,
-        [event.nodeId]: Object.freeze({
-          ...(current[event.nodeId] ?? Object.freeze({ x: 0, y: 0, width: 240, height: 140 })),
-          x: event.position.x,
-          y: event.position.y,
-        }),
-      }));
+      persistPanels(document.canvasAuthoring.panels.map((panel) => (
+        panel.sourceLayoutNodeId === event.nodeId
+          ? Object.freeze({
+            ...panel,
+            layoutBounds: Object.freeze({
+              ...panel.layoutBounds,
+              x: event.position.x,
+              y: event.position.y,
+            }),
+          })
+          : panel
+      )));
       return;
     }
 
     if (event.type === "node.resize.change") {
-      setLayoutFramesByNodeId((current) => Object.freeze({
-        ...current,
-        [event.nodeId]: Object.freeze({
-          x: event.frame.x,
-          y: event.frame.y,
-          width: event.frame.width,
-          height: event.frame.height,
-        }),
-      }));
+      persistPanels(document.canvasAuthoring.panels.map((panel) => (
+        panel.sourceLayoutNodeId === event.nodeId
+          ? Object.freeze({
+            ...panel,
+            layoutBounds: Object.freeze({
+              x: event.frame.x,
+              y: event.frame.y,
+              width: event.frame.width,
+              height: event.frame.height,
+            }),
+          })
+          : panel
+      )));
       return;
     }
 
     if (event.type === "canvas.command" && event.commandId === "fit-layout") {
-      setLayoutFramesByNodeId({});
+      persistPanels([]);
     }
   };
-
-  const document = useMemo(() => parseSystemStudioDraftDocument(content), [content]);
   const assetDefinition = useMemo(
     () => buildSystemExperienceDefinition(experienceAssetIds),
     [experienceAssetIds],
@@ -152,10 +170,9 @@ export function SystemStudioDraftAuthoringBoundary({
       selectedInspectorPanel,
       onSelectInspectorPanel: setSelectedInspectorPanel,
       selectedLayoutNodeId,
-      layoutFramesByNodeId,
       onCanvasEditingEvent: handleCanvasEditingEvent,
     }),
-    [content, extensionContext, layoutFramesByNodeId, selectedInspectorPanel, selectedLayoutNodeId, validationIssues],
+    [content, extensionContext, selectedInspectorPanel, selectedLayoutNodeId, validationIssues],
   );
 
   return (

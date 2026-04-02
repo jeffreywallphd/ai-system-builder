@@ -706,6 +706,17 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
   background-size: 24px 24px;
 }
 
+.ui-configurable-canvas-editor__design-frame {
+  position: absolute;
+  width: auto;
+  max-width: 100%;
+  margin: auto;
+  border: 1px solid rgba(120, 187, 255, 0.28);
+  border-radius: var(--radius-md);
+  background: rgba(18, 26, 38, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(120, 187, 255, 0.08);
+}
+
 .ui-configurable-canvas-editor__commands {
   position: absolute;
   top: var(--space-sm);
