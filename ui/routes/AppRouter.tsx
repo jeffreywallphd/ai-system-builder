@@ -30,6 +30,7 @@ import ToolChainStudioPage from "../pages/ToolChainStudioPage";
 import SystemStudioPage from "../pages/SystemStudioPage";
 import ModelStudioPage from "../pages/ModelStudioPage";
 import DatasetStudioPage from "../pages/DatasetStudioPage";
+import SchemaStudioPage from "../pages/SchemaStudioPage";
 import ToolStudioPage from "../pages/ToolStudioPage";
 import PromptTemplateStudioPage from "../pages/PromptTemplateStudioPage";
 import EmbeddingIndexStudioPage from "../pages/EmbeddingIndexStudioPage";
@@ -111,6 +112,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.systemStudio, element: <SystemStudioPage /> },
           { path: ROUTE_PATHS.modelStudio, element: <ModelStudioPage /> },
           { path: ROUTE_PATHS.datasetStudio, element: <DatasetStudioPage /> },
+          { path: ROUTE_PATHS.schemaStudio, element: <SchemaStudioPage /> },
           { path: ROUTE_PATHS.toolStudio, element: <ToolStudioPage /> },
           { path: ROUTE_PATHS.promptTemplateStudio, element: <PromptTemplateStudioPage /> },
           { path: ROUTE_PATHS.embeddingIndexStudio, element: <EmbeddingIndexStudioPage /> },

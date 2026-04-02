@@ -126,6 +126,16 @@ export type SchemaRelationshipDefinition = Omit<z.infer<typeof SchemaRelationshi
 export type SchemaAssetDefinition = z.infer<typeof SchemaAssetDefinitionSchema>;
 export type SchemaAssetDocument = z.infer<typeof SchemaAssetDocumentSchema>;
 
+export function createEmptySchemaAssetDocument(): SchemaAssetDocument {
+  return Object.freeze({
+    schemaVersion: SchemaAssetDocumentVersion,
+    definition: Object.freeze({
+      entities: Object.freeze([]),
+      relationships: Object.freeze([]),
+    }),
+  });
+}
+
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
@@ -291,6 +301,121 @@ export function createSchemaAssetDocument(input: SchemaAssetDocument): SchemaAss
       relationships: Object.freeze(relationships),
       metadata: parsed.definition.metadata,
     }),
+  });
+}
+
+function slugifySchemaEntityName(name: string): string {
+  const normalized = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return normalized || "entity";
+}
+
+function nextSchemaEntityId(baseSlug: string, existingEntityIds: ReadonlySet<string>): string {
+  let index = 1;
+  let candidate = `entity:${baseSlug}`;
+  while (existingEntityIds.has(candidate)) {
+    index += 1;
+    candidate = `entity:${baseSlug}-${index}`;
+  }
+  return candidate;
+}
+
+function hasDuplicateSchemaEntityName(
+  entities: ReadonlyArray<SchemaEntityDefinition>,
+  name: string,
+  ignoreEntityId?: string,
+): boolean {
+  const normalizedTarget = name.trim().toLowerCase();
+  return entities.some((entity) => {
+    if (ignoreEntityId && entity.entityId === ignoreEntityId) {
+      return false;
+    }
+    return entity.name.trim().toLowerCase() === normalizedTarget;
+  });
+}
+
+export function addSchemaEntityToDocument(input: {
+  readonly document: SchemaAssetDocument;
+  readonly name: string;
+  readonly description?: string;
+  readonly label?: string;
+  readonly metadata?: Record<string, unknown>;
+  readonly layout?: SchemaEntityCanvasLayout;
+}): SchemaAssetDocument {
+  const normalizedDocument = createSchemaAssetDocument(input.document);
+  const normalizedName = input.name.trim();
+  if (!normalizedName) {
+    throw new Error("Schema entity name is required.");
+  }
+  if (hasDuplicateSchemaEntityName(normalizedDocument.definition.entities, normalizedName)) {
+    throw new Error(`Schema already contains an entity named '${normalizedName}'.`);
+  }
+
+  const entityId = nextSchemaEntityId(
+    slugifySchemaEntityName(normalizedName),
+    new Set(normalizedDocument.definition.entities.map((entity) => entity.entityId)),
+  );
+
+  const nextEntity = createSchemaEntityDefinition({
+    entityId,
+    name: normalizedName,
+    label: normalizeOptional(input.label),
+    description: normalizeOptional(input.description),
+    fields: [],
+    metadata: input.metadata,
+    layout: input.layout,
+  });
+
+  return createSchemaAssetDocument({
+    schemaVersion: normalizedDocument.schemaVersion,
+    definition: {
+      ...normalizedDocument.definition,
+      entities: [...normalizedDocument.definition.entities, nextEntity],
+    },
+  });
+}
+
+export function updateSchemaEntityInDocument(input: {
+  readonly document: SchemaAssetDocument;
+  readonly entityId: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly label?: string;
+  readonly metadata?: Record<string, unknown>;
+  readonly layout?: SchemaEntityCanvasLayout;
+}): SchemaAssetDocument {
+  const normalizedDocument = createSchemaAssetDocument(input.document);
+  const entityId = input.entityId.trim();
+  if (!entityId) {
+    throw new Error("Schema entity id is required.");
+  }
+  const normalizedName = input.name.trim();
+  if (!normalizedName) {
+    throw new Error("Schema entity name is required.");
+  }
+  if (hasDuplicateSchemaEntityName(normalizedDocument.definition.entities, normalizedName, entityId)) {
+    throw new Error(`Schema already contains an entity named '${normalizedName}'.`);
+  }
+
+  const existing = normalizedDocument.definition.entities.find((entity) => entity.entityId === entityId);
+  if (!existing) {
+    throw new Error(`Schema entity '${entityId}' was not found.`);
+  }
+
+  const updated = createSchemaEntityDefinition({
+    ...existing,
+    name: normalizedName,
+    label: normalizeOptional(input.label),
+    description: normalizeOptional(input.description),
+    metadata: input.metadata ?? existing.metadata,
+    layout: input.layout ?? existing.layout,
+  });
+
+  return createSchemaAssetDocument({
+    schemaVersion: normalizedDocument.schemaVersion,
+    definition: {
+      ...normalizedDocument.definition,
+      entities: normalizedDocument.definition.entities.map((entity) => entity.entityId === entityId ? updated : entity),
+    },
   });
 }
 

@@ -19,6 +19,7 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("getWorkflowStudioModeStateStore");
     expect(source).toContain("StudioAssetHostBoundary");
     expect(source).toContain("workflowStudioSurfaceAssetDefinition");
+    expect(source).toContain("schemaStudioSurfaceAssetDefinition");
     expect(source).toContain("InlineAssetReturnStatuses.noSelection");
     expect(source).toContain("workflowModeRoute");
     expect(source).toContain("workflowEntryRoute");
