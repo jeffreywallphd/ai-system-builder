@@ -47,6 +47,39 @@ function createExecutionInput(): IWorkflowExecutionInput {
       toJSON: () => ({}),
     },
     executionMetadata: {
+      imageStudioHandoff: {
+        handoffId: "handoff:image:5.2.4",
+        sourceStudioType: "data-studio",
+        sourceStudioId: "studio:data",
+        targetStudioType: "workflow-studio",
+        targetStudioId: "studio:workflow",
+        primaryAsset: { assetId: "asset:image:input", versionId: "asset:image:input:v1" },
+        referencedAssets: [],
+        datasetInstances: [],
+        workflow: { workflow: { assetId: "asset:workflow:image", versionId: "asset:workflow:image:v7" }, bindingId: "binding:workflow:image" },
+        systemBinding: {
+          system: { assetId: "system:image", versionId: "system:image:v1" },
+          workflow: { workflow: { assetId: "asset:workflow:image", versionId: "asset:workflow:image:v7" }, bindingId: "binding:workflow:image" },
+          datasets: [],
+        },
+        runtimeInput: {
+          context: { selectedImages: [], parameters: {}, datasets: [], runtime: {} },
+          workflow: { workflow: { assetId: "asset:workflow:image", versionId: "asset:workflow:image:v7" }, bindingId: "binding:workflow:image" },
+          systemBinding: {
+            system: { assetId: "system:image", versionId: "system:image:v1" },
+            workflow: { workflow: { assetId: "asset:workflow:image", versionId: "asset:workflow:image:v7" }, bindingId: "binding:workflow:image" },
+            datasets: [],
+          },
+          trace: {
+            handoffId: "handoff:image:5.2.4",
+            traceId: "trace:image:5.2.4",
+            sourceStudioType: "data-studio",
+            sourceStudioId: "studio:data",
+          },
+        },
+        events: [],
+        persistedRelationships: [],
+      },
       workflowOutputPersistence: {
         systemId: "system:image",
         configuration: createImageWorkflowOutputBindingConfiguration({
@@ -98,9 +131,19 @@ describe("DefaultWorkflowRuntimeOutputPersistenceService", () => {
 
     expect(result.status).toBe("persisted");
     expect(result.persistedRecordCount).toBe(3);
+    expect(result.handoff).toEqual(expect.objectContaining({
+      handoffId: "handoff:image:5.2.4",
+      traceId: "trace:image:5.2.4",
+    }));
     expect(datasetService.listImageRecordsForInstance({ systemId: "system:image", instanceId: "instance:out" })).toHaveLength(1);
     const history = datasetService.listImageRecordsForInstance({ systemId: "system:image", instanceId: "instance:hist" });
     expect(history[0]?.metadata.historyEntryId).toBeString();
+    expect((history[0]?.metadata.lineage as Record<string, unknown>).outputRelationship).toEqual(expect.objectContaining({
+      metadata: expect.objectContaining({
+        handoffId: "handoff:image:5.2.4",
+        traceId: "trace:image:5.2.4",
+      }),
+    }));
     const comparison = datasetService.listImageRecordsForInstance({ systemId: "system:image", instanceId: "instance:cmp" });
     expect(comparison[0]?.metadata.comparisonSetId).toBe("set:abc");
   });

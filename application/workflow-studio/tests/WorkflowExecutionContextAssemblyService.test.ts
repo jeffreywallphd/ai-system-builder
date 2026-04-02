@@ -230,4 +230,135 @@ describe("assembleWorkflowExecutionContext", () => {
     ]));
     expect(result.issues.some((issue) => `${issue.code}:${issue.message}`.toLowerCase().includes("comfy"))).toBeFalse();
   });
+
+  it("maps image studio handoff runtime context into dataset + selected-image binding resolution", () => {
+    const result = assembleWorkflowExecutionContext({
+      inputBindings: [{
+        inputId: "sourceImage",
+        sourceType: "runtime-parameter",
+        required: true,
+        valueType: "object",
+        bindingKey: "inputs.sourceImage",
+        metadata: {
+          systemInputBinding: {
+            bindingId: "binding.source-image",
+            sources: [{
+              sourceId: "handoff-selected",
+              kind: "selected-image",
+              path: "assetRef",
+              priority: 1,
+              required: true,
+            }],
+          },
+        },
+      }, {
+        inputId: "historyCollection",
+        sourceType: "runtime-parameter",
+        required: true,
+        valueType: "array",
+        bindingKey: "inputs.historyCollection",
+        metadata: {
+          systemInputBinding: {
+            bindingId: "binding.history-collection",
+            sources: [{
+              sourceId: "handoff-history",
+              kind: "dataset-instance-reference",
+              purpose: "history",
+              priority: 1,
+              required: true,
+              resolution: { shape: "collection" },
+            }],
+          },
+        },
+      }],
+      context: {
+        metadata: {
+          imageStudioHandoff: {
+            handoffId: "handoff:image:5.2.3",
+            sourceStudioType: "data-studio",
+            sourceStudioId: "studio:data",
+            targetStudioType: "workflow-studio",
+            targetStudioId: "studio:workflow",
+            primaryAsset: { assetId: "asset:image:1", versionId: "asset:image:1:v1" },
+            referencedAssets: [],
+            datasetInstances: [{
+              referenceId: "history-store",
+              instanceId: "instance:history",
+              dataset: { assetId: "asset:dataset:history", versionId: "asset:dataset:history:v1" },
+              role: "history",
+            }],
+            workflow: { workflow: { assetId: "asset:workflow:image", versionId: "asset:workflow:image:v1" }, bindingId: "binding:workflow:image" },
+            systemBinding: {
+              system: { assetId: "system:image", versionId: "system:image:v1" },
+              workflow: { workflow: { assetId: "asset:workflow:image", versionId: "asset:workflow:image:v1" }, bindingId: "binding:workflow:image" },
+              datasets: [{
+                referenceId: "history-store",
+                instanceId: "instance:history",
+                dataset: { assetId: "asset:dataset:history", versionId: "asset:dataset:history:v1" },
+                role: "history",
+              }],
+            },
+            runtimeInput: {
+              context: {
+                selectedImages: [{
+                  selectionId: "sel:1",
+                  imageId: "image:1",
+                  assetRef: { assetId: "asset:image:source", versionId: "asset:image:source:v2" },
+                }],
+                parameters: {},
+                datasets: [{
+                  referenceId: "history-store",
+                  instanceId: "instance:history",
+                  datasetAssetId: "asset:dataset:history",
+                  datasetVersionId: "asset:dataset:history:v1",
+                  role: "history",
+                }],
+                runtime: {},
+                extensions: {
+                  datasetSampleRecords: {
+                    "history-store": [
+                      { recordId: "record:1", value: { assetId: "asset:image:history:1" } },
+                      { recordId: "record:2", value: { assetId: "asset:image:history:2" } },
+                    ],
+                  },
+                },
+              },
+              workflow: { workflow: { assetId: "asset:workflow:image", versionId: "asset:workflow:image:v1" }, bindingId: "binding:workflow:image" },
+              systemBinding: {
+                system: { assetId: "system:image", versionId: "system:image:v1" },
+                workflow: { workflow: { assetId: "asset:workflow:image", versionId: "asset:workflow:image:v1" }, bindingId: "binding:workflow:image" },
+                datasets: [{
+                  referenceId: "history-store",
+                  instanceId: "instance:history",
+                  dataset: { assetId: "asset:dataset:history", versionId: "asset:dataset:history:v1" },
+                  role: "history",
+                }],
+              },
+              trace: {
+                handoffId: "handoff:image:5.2.3",
+                traceId: "trace:image:5.2.3",
+                sourceStudioType: "data-studio",
+                sourceStudioId: "studio:data",
+              },
+            },
+            events: [],
+            persistedRelationships: [],
+          },
+        },
+      },
+    });
+
+    expect(result.context.resolvedInputValues.sourceImage).toEqual({
+      assetId: "asset:image:source",
+      versionId: "asset:image:source:v2",
+    });
+    expect(result.context.resolvedInputValues.historyCollection).toEqual([
+      { assetId: "asset:image:history:1" },
+      { assetId: "asset:image:history:2" },
+    ]);
+    expect((result.context.metadata as Record<string, unknown>).imageStudioHandoffRuntime).toEqual(expect.objectContaining({
+      handoffId: "handoff:image:5.2.3",
+      traceId: "trace:image:5.2.3",
+    }));
+  });
 });

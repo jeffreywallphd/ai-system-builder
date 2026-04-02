@@ -13,6 +13,7 @@ import {
   WorkflowInputBindingSourceKinds,
   type WorkflowInputBindingDescriptor,
 } from "../../domain/workflow-studio/WorkflowInputBindingDomain";
+import { createImageCrossStudioHandoffContract } from "../../domain/studio-handoff/ImageStudioHandoffContract";
 import { resolveWorkflowInputBindings } from "./WorkflowInputBindingResolutionService";
 
 export interface AssembleWorkflowExecutionContextRequest {
@@ -190,6 +191,17 @@ function toDomainBindingDescriptor(binding: WorkflowExecutionInputBinding): {
 export function assembleWorkflowExecutionContext(
   request: AssembleWorkflowExecutionContextRequest,
 ): AssembleWorkflowExecutionContextResult {
+  const metadataRecord = asRecord(request.context.metadata);
+  const handoffMetadata = asRecord(metadataRecord?.imageStudioHandoff);
+  let handoffContract: ReturnType<typeof createImageCrossStudioHandoffContract> | undefined;
+  if (handoffMetadata) {
+    try {
+      handoffContract = createImageCrossStudioHandoffContract(handoffMetadata as never);
+    } catch {
+      handoffContract = undefined;
+    }
+  }
+
   const runtimeInputValues = Object.freeze({ ...(request.context.inputValues ?? {}) });
   const triggerPayload = Object.freeze({ ...(request.context.triggerPayload ?? {}) });
   const resolvedInputs: WorkflowExecutionResolvedInputValue[] = [];
@@ -208,8 +220,23 @@ export function assembleWorkflowExecutionContext(
       domainBindings.push(mapped.descriptor);
     }
   }
+
+  const handoffDatasetSampleRecords = ((handoffContract?.runtimeInput.context.extensions as Record<string, unknown> | undefined)
+    ?.datasetSampleRecords ?? {}) as Record<string, ReadonlyArray<{ readonly recordId: string; readonly value: unknown }>>;
+  const handoffDatasetInstances = handoffContract?.runtimeInput.context.datasets.map((dataset) => Object.freeze({
+    // createSystemContextContract strips non-contract fields from dataset refs;
+    // sample records are carried in runtime extensions for record/collection binding resolution.
+    records: handoffDatasetSampleRecords[dataset.referenceId],
+    systemId: handoffContract?.systemBinding.system.assetId,
+    instanceId: dataset.instanceId,
+    datasetAssetId: dataset.datasetAssetId,
+    datasetVersionId: dataset.datasetVersionId,
+    purpose: dataset.role,
+    schema: Object.freeze({ recordValueType: "object" as const }),
+  }));
   const datasetInstances = (request.context.metadata?.datasetInstances
     ?? request.context.metadata?.datasetInstanceReferences
+    ?? handoffDatasetInstances
     ?? []) as ReadonlyArray<{
       readonly systemId?: string;
       readonly instanceId: string;
@@ -226,6 +253,7 @@ export function assembleWorkflowExecutionContext(
       }>;
     }>;
 
+  const handoffSelected = handoffContract?.runtimeInput.context.selectedImages[0];
   const resolution = resolveWorkflowInputBindings({
     bindings: domainBindings,
     context: {
@@ -235,7 +263,16 @@ export function assembleWorkflowExecutionContext(
         ?? {},
       runtimeParameters: runtimeInputValues,
       triggerPayload,
-      selectedImage: (request.context.metadata?.selectedImage ?? {}) as Readonly<Record<string, unknown>>,
+      selectedImage: (request.context.metadata?.selectedImage
+        ?? (handoffSelected
+          ? {
+            selectionId: handoffSelected.selectionId,
+            imageId: handoffSelected.imageId,
+            assetRef: handoffSelected.assetRef,
+            metadata: handoffSelected.metadata,
+          }
+          : {})
+      ) as Readonly<Record<string, unknown>>,
       datasetInstances,
     },
   });
@@ -267,11 +304,11 @@ export function assembleWorkflowExecutionContext(
             ? "selected-image-context"
             : record.sourceKind === WorkflowInputBindingSourceKinds.datasetInstanceReference
               ? "dataset-instance-reference"
-        : record.sourceKind === WorkflowInputBindingSourceKinds.triggerPayload
-          ? "trigger-activation"
-          : record.resolutionKind === "default"
-            ? "runtime-default"
-            : "runtime-parameter";
+              : record.sourceKind === WorkflowInputBindingSourceKinds.triggerPayload
+                ? "trigger-activation"
+                : record.resolutionKind === "default"
+                  ? "runtime-default"
+                  : "runtime-parameter";
 
     resolvedInputs.push(Object.freeze({
       inputId: binding.inputId,
@@ -321,17 +358,31 @@ export function assembleWorkflowExecutionContext(
   const issues = Object.freeze([
     ...bindingIssues,
     ...resolution.diagnostics.map((diagnostic) => Object.freeze({
-    code: diagnostic.code,
-    stage: WorkflowExecutionValidationStages.preExecution,
-    severity: diagnostic.severity,
-    message: diagnostic.message,
-    path: diagnostic.path ?? `draft.inputs.${diagnostic.inputId}`,
-  })),
+      code: diagnostic.code,
+      stage: WorkflowExecutionValidationStages.preExecution,
+      severity: diagnostic.severity,
+      message: diagnostic.message,
+      path: diagnostic.path ?? `draft.inputs.${diagnostic.inputId}`,
+    })),
   ]);
 
   return Object.freeze({
     context: Object.freeze({
       ...request.context,
+      metadata: Object.freeze({
+        ...(request.context.metadata ?? {}),
+        ...(handoffContract
+          ? {
+            imageStudioHandoffRuntime: Object.freeze({
+              handoffId: handoffContract.handoffId,
+              traceId: handoffContract.runtimeInput.trace.traceId,
+              workflowBindingId: handoffContract.workflow.bindingId,
+              sourceStudioType: handoffContract.sourceStudioType,
+              sourceStudioId: handoffContract.sourceStudioId,
+            }),
+          }
+          : {}),
+      }),
       resolvedRuntimeInputs: Object.freeze({ ...resolvedRuntimeInputs }),
       resolvedInputValues: Object.freeze({ ...resolvedInputValues }),
       resolvedInputBindings: Object.freeze({ ...resolvedInputBindings }),
