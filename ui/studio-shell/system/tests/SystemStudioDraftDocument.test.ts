@@ -2,12 +2,17 @@ import { describe, expect, it } from "bun:test";
 import {
   parseSystemStudioDraftDocument,
   serializeSystemStudioCanvasAuthoringConfiguration,
+  serializeSystemStudioPageDefinitions,
 } from "../SystemStudioDraftDocument";
 
 describe("SystemStudioDraftDocument", () => {
-  it("parses persisted canvas authoring panels and design frame", () => {
+  it("parses persisted page layouts and page definitions", () => {
     const parsed = parseSystemStudioDraftDocument(JSON.stringify({
       systemSpec: {
+        pages: [
+          { pageId: "intro", heading: "Welcome", description: "First screen" },
+          { pageId: "review", heading: "Review", description: "Final screen" },
+        ],
         components: [],
         canvasAuthoring: {
           designFrame: {
@@ -16,26 +21,33 @@ describe("SystemStudioDraftDocument", () => {
             dimensions: { width: 1200, height: 900 },
             boundedArea: { padding: 24 },
           },
-          panels: [
+          pageLayouts: [
             {
-              panelId: "panel-a",
-              pageId: "default",
-              title: "Panel A",
-              layoutBounds: { x: 0.2, y: 0.1, width: 0.4, height: 0.3 },
-              contentSlots: [{ slotId: "main" }],
-              sourceLayoutNodeId: "node-a",
+              pageId: "intro",
+              panels: [
+                {
+                  panelId: "panel-a",
+                  pageId: "intro",
+                  title: "Panel A",
+                  layoutBounds: { x: 0.2, y: 0.1, width: 0.4, height: 0.3 },
+                  contentSlots: [{ slotId: "main" }],
+                  sourceLayoutNodeId: "node-a",
+                },
+              ],
             },
           ],
         },
       },
     }));
 
+    expect(parsed.systemSpec.pages).toHaveLength(2);
     expect(parsed.canvasAuthoring.designFrame.ratio?.width).toBe(4);
-    expect(parsed.canvasAuthoring.panels).toHaveLength(1);
-    expect(parsed.canvasAuthoring.panels[0]?.layoutBounds.width).toBe(0.4);
+    expect(parsed.canvasAuthoring.pageLayouts).toHaveLength(2);
+    expect(parsed.canvasAuthoring.pageLayouts[0]?.panels).toHaveLength(1);
+    expect(parsed.canvasAuthoring.pageLayouts[1]?.panels).toHaveLength(0);
   });
 
-  it("serializes canvas authoring config back into draft content", () => {
+  it("serializes page layouts back into draft content", () => {
     const content = serializeSystemStudioCanvasAuthoringConfiguration({
       existingContent: JSON.stringify({ systemSpec: { components: [] } }),
       canvasAuthoring: {
@@ -44,19 +56,36 @@ describe("SystemStudioDraftDocument", () => {
           ratio: { width: 16, height: 9 },
           dimensions: { width: 1600, height: 900 },
         },
-        panels: [
+        pageLayouts: [
           {
-            panelId: "panel-a",
-            pageId: "default",
-            title: "Panel A",
-            layoutBounds: { x: 0, y: 0, width: 0.5, height: 0.5 },
-            contentSlots: [],
+            pageId: "intro",
+            panels: [
+              {
+                panelId: "panel-a",
+                pageId: "intro",
+                title: "Panel A",
+                layoutBounds: { x: 0, y: 0, width: 0.5, height: 0.5 },
+                contentSlots: [],
+              },
+            ],
           },
         ],
       },
     });
 
-    const parsed = JSON.parse(content) as { readonly systemSpec?: { readonly canvasAuthoring?: { readonly panels?: ReadonlyArray<unknown> } } };
-    expect(parsed.systemSpec?.canvasAuthoring?.panels).toHaveLength(1);
+    const parsed = JSON.parse(content) as { readonly systemSpec?: { readonly canvasAuthoring?: { readonly pageLayouts?: ReadonlyArray<unknown> } } };
+    expect(parsed.systemSpec?.canvasAuthoring?.pageLayouts).toHaveLength(1);
+  });
+
+  it("serializes page definitions", () => {
+    const content = serializeSystemStudioPageDefinitions({
+      existingContent: JSON.stringify({ systemSpec: { components: [] } }),
+      pages: [
+        { pageId: "intro", heading: "Welcome", description: "First page" },
+      ],
+    });
+
+    const parsed = JSON.parse(content) as { readonly systemSpec?: { readonly pages?: ReadonlyArray<{ readonly heading: string }> } };
+    expect(parsed.systemSpec?.pages?.[0]?.heading).toBe("Welcome");
   });
 });

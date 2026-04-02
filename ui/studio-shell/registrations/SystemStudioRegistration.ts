@@ -46,6 +46,24 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
           nestedSystems: [],
           dependencies: [],
           bindings: [],
+          pages: [
+            {
+              pageId: "page-1",
+              heading: "Main page",
+              description: "Start here and design the main experience.",
+            },
+          ],
+          canvasAuthoring: {
+            designFrame: {
+              mode: "bounded-frame",
+              ratio: { width: 16, height: 9 },
+              dimensions: { width: 1600, height: 900 },
+              boundedArea: { padding: 20 },
+            },
+            pageLayouts: [
+              { pageId: "page-1", panels: [] },
+            ],
+          },
           notes: "System assets may compose atomic, composite, and other system assets.",
         },
       },

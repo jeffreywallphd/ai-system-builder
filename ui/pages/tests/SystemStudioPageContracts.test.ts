@@ -88,9 +88,13 @@ describe("SystemStudioPage contracts", () => {
     expect(boundarySource).toContain("ExperienceAssetAuthoringBoundary");
     expect(boundarySource).toContain("ConfigurableWizardSurface");
     expect(boundarySource).toContain("ConfigurableCanvasSurface");
+    expect(wizardAdapterSource).toContain("SystemPageSetupEditor");
     expect(wizardAdapterSource).toContain("SystemCompositionEditor");
     expect(wizardAdapterSource).toContain("SystemInterfaceEditor");
     expect(wizardAdapterSource).toContain("SystemParameterConfigEditor");
+    expect(canvasAdapterSource).toContain("Interface designer");
+    expect(canvasAdapterSource).toContain("add-panel");
+    expect(canvasAdapterSource).toContain("remove-panel");
     expect(canvasAdapterSource).toContain("SystemCompositionEditor");
     expect(canvasAdapterSource).toContain("SystemInterfaceEditor");
     expect(canvasAdapterSource).toContain("SystemParameterConfigEditor");
