@@ -10,6 +10,8 @@ import DatasetStageCanvasReactFlow from "./DatasetStageCanvasReactFlow";
 
 export interface DatasetStageAuthoringPanelProps {
   readonly templateId?: string;
+  readonly mode?: "wizard" | "canvas";
+  readonly showModeToggle?: boolean;
 }
 
 export default function DatasetStageAuthoringPanel(props: DatasetStageAuthoringPanelProps): JSX.Element {
@@ -18,7 +20,9 @@ export default function DatasetStageAuthoringPanel(props: DatasetStageAuthoringP
     [props.templateId],
   );
 
-  const [mode, setMode] = useState<"wizard" | "canvas">("wizard");
+  const [localMode, setLocalMode] = useState<"wizard" | "canvas">(props.mode ?? "wizard");
+  const mode = props.mode ?? localMode;
+  const showModeToggle = props.showModeToggle ?? true;
   const [snapshot, setSnapshot] = useState<DatasetStageWizardSnapshot>(() => adapter.getSnapshot());
   const [selectedStageId, setSelectedStageId] = useState<string | undefined>(snapshot.currentStageId);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
@@ -56,24 +60,26 @@ export default function DatasetStageAuthoringPanel(props: DatasetStageAuthoringP
           <h3>Dataset Stage Authoring</h3>
           <span className="ui-subtle">Wizard and Canvas share one stage-flow source of truth.</span>
         </div>
-        <div className="ui-row ui-row--wrap">
-          <button
-            type="button"
-            className={`ui-button ${mode === "wizard" ? "ui-button--primary" : "ui-button--ghost"}`}
-            onClick={() => setMode("wizard")}
-            data-testid="dataset-stage-authoring-mode-wizard"
-          >
-            Wizard
-          </button>
-          <button
-            type="button"
-            className={`ui-button ${mode === "canvas" ? "ui-button--primary" : "ui-button--ghost"}`}
-            onClick={() => setMode("canvas")}
-            data-testid="dataset-stage-authoring-mode-canvas"
-          >
-            Canvas
-          </button>
-        </div>
+        {showModeToggle ? (
+          <div className="ui-row ui-row--wrap">
+            <button
+              type="button"
+              className={`ui-button ${mode === "wizard" ? "ui-button--primary" : "ui-button--ghost"}`}
+              onClick={() => setLocalMode("wizard")}
+              data-testid="dataset-stage-authoring-mode-wizard"
+            >
+              Wizard
+            </button>
+            <button
+              type="button"
+              className={`ui-button ${mode === "canvas" ? "ui-button--primary" : "ui-button--ghost"}`}
+              onClick={() => setLocalMode("canvas")}
+              data-testid="dataset-stage-authoring-mode-canvas"
+            >
+              Canvas
+            </button>
+          </div>
+        ) : null}
       </header>
 
       {mode === "wizard" ? (

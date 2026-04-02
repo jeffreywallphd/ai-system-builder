@@ -5,6 +5,7 @@ import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefau
 import DatasetStudioDraftPreviewPanel from "../../components/assets/DatasetStudioDraftPreviewPanel";
 import DatasetStageAuthoringPanel from "../../components/assets/DatasetStageAuthoringPanel";
 import DataStudioPreparationWizardPanel from "../../components/assets/DataStudioPreparationWizardPanel";
+import { ExperienceSurfaceAssetIds } from "../experience-assets/ExperienceSurfaceAssets";
 
 export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze({
   studioType: DatasetStudioIdentity.studioType,
@@ -16,6 +17,10 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
   shell: Object.freeze({
     title: "Data Studio",
     subtitle: "Stage-based data preparation authoring with wizard-first progression over one canonical asset graph.",
+    experienceAssets: Object.freeze([
+      ExperienceSurfaceAssetIds.loomWizard,
+      ExperienceSurfaceAssetIds.loomCanvas,
+    ]),
     toolbar: Object.freeze({
       actions: Object.freeze([
         {

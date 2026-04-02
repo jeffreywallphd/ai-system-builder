@@ -17,6 +17,7 @@ import type {
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import WorkflowStudioDraftAuthoringBoundary from "../components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary";
 import SystemStudioDraftAuthoringBoundary from "../components/studio-shell/system/SystemStudioDraftAuthoringBoundary";
+import DatasetStudioDraftAuthoringBoundary from "../components/studio-shell/dataset/DatasetStudioDraftAuthoringBoundary";
 import WorkflowStudioExecutionFeedbackPanel, {
   type WorkflowStudioRunFeedback,
 } from "../components/studio-shell/workflow/WorkflowStudioExecutionFeedbackPanel";
@@ -1649,6 +1650,12 @@ export default function StudioShellPage({
             <SystemStudioDraftAuthoringBoundary
               content={content}
               validationIssues={validationIssues}
+              extensionContext={extensionContext}
+              experienceAssetIds={studioRegistration?.shell?.experienceAssets}
+            />
+          ) : studioRegistration?.role === "dataset" ? (
+            <DatasetStudioDraftAuthoringBoundary
+              content={content}
               extensionContext={extensionContext}
               experienceAssetIds={studioRegistration?.shell?.experienceAssets}
             />
