@@ -171,8 +171,12 @@ export function SystemStudioDraftAuthoringBoundary({
   };
 
   const selectedPagePanels = document.canvasAuthoring.pageLayouts.find((layout) => layout.pageId === resolvedSelectedPageId)?.panels ?? [];
-  const embeddedDatasetContent = document.systemSpec.embeddedStudios?.dataset?.draftContent ?? "";
-  const embeddedWorkflowContent = document.systemSpec.embeddedStudios?.workflow?.draftContent ?? "";
+  const embeddedDatasetContent = document.systemSpec.sharedDocument?.datasetDraftContent
+    ?? document.systemSpec.embeddedStudios?.dataset?.draftContent
+    ?? "";
+  const embeddedWorkflowContent = document.systemSpec.sharedDocument?.workflowDraftContent
+    ?? document.systemSpec.embeddedStudios?.workflow?.draftContent
+    ?? "";
 
   const persistEmbeddedDatasetContent = (nextDatasetContent: string): void => {
     const serialized = serializeSystemStudioEmbeddedDatasetDraftContent({

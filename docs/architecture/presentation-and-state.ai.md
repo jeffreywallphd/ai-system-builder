@@ -566,3 +566,18 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - panel assets stay layout/content descriptors,
   - studio assets stay reusable behavior surfaces,
   - host orchestration owns session/context/capability wiring.
+
+## Direction 5 UI extension update: shared system document synchronization + guided flow polish (systems stories 9-10)
+
+- System Studio now uses one host-owned system draft document boundary for embedded studio synchronization:
+  - `systemSpec.pages` remains canonical for page definitions.
+  - `systemSpec.canvasAuthoring.pageLayouts` remains canonical for panel layout definitions.
+  - `systemSpec.sharedDocument.datasetDraftContent` and `systemSpec.sharedDocument.workflowDraftContent` now carry shared embedded Dataset/Workflow authored state.
+  - legacy `systemSpec.embeddedStudios.*.draftContent` is mirrored for compatibility.
+- Embedded Dataset/Workflow serialization now also synchronizes panel-hosted embedded studio content (`PanelAssetContract.content.draftContent`) so panel surfaces and wizard-embedded surfaces do not drift into conflicting local copies.
+- Host-managed embedded contexts now include explicit shared-document boundaries (`documentAccess`, `injectedContext`) so embedded surfaces stay route-neutral while editing host-owned shared state.
+- Guided composition UX continuity was refined across wizard steps:
+  - simplified non-technical step copy,
+  - reduced duplicate step-local chrome/headings in embedded sections,
+  - Inputs & Outputs readiness now recognizes authored embedded data setup state,
+  - advanced controls remain collapsed and lower in the experience.

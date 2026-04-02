@@ -55,6 +55,17 @@ export interface SystemStudioDraftDocument {
         readonly draftContent?: string;
       };
     };
+    readonly sharedDocument?: {
+      readonly datasetDraftContent?: string;
+      readonly workflowDraftContent?: string;
+      readonly synchronization?: {
+        readonly pageDefinitions?: "systemSpec.pages";
+        readonly panelLayouts?: "systemSpec.canvasAuthoring.pageLayouts";
+        readonly datasetDefinitions?: "systemSpec.sharedDocument.datasetDraftContent";
+        readonly workflowDefinitions?: "systemSpec.sharedDocument.workflowDraftContent";
+        readonly settingsMetadata?: "systemSpec.parameters";
+      };
+    };
   };
   readonly canvasAuthoring: SystemStudioCanvasAuthoringConfiguration;
 }
@@ -81,6 +92,17 @@ const emptyDocument: SystemStudioDraftDocument = Object.freeze({
       }),
       workflow: Object.freeze({
         draftContent: "",
+      }),
+    }),
+    sharedDocument: Object.freeze({
+      datasetDraftContent: "",
+      workflowDraftContent: "",
+      synchronization: Object.freeze({
+        pageDefinitions: "systemSpec.pages",
+        panelLayouts: "systemSpec.canvasAuthoring.pageLayouts",
+        datasetDefinitions: "systemSpec.sharedDocument.datasetDraftContent",
+        workflowDefinitions: "systemSpec.sharedDocument.workflowDraftContent",
+        settingsMetadata: "systemSpec.parameters",
       }),
     }),
   }),
@@ -257,6 +279,16 @@ export function parseSystemStudioDraftDocument(content: string): SystemStudioDra
       index,
     )));
     const canvasAuthoring = normalizeCanvasAuthoringConfig(parsed.systemSpec?.canvasAuthoring);
+    const sharedDatasetDraftContent = typeof parsed.systemSpec?.sharedDocument?.datasetDraftContent === "string"
+      ? parsed.systemSpec.sharedDocument.datasetDraftContent
+      : typeof parsed.systemSpec?.embeddedStudios?.dataset?.draftContent === "string"
+        ? parsed.systemSpec.embeddedStudios.dataset.draftContent
+        : "";
+    const sharedWorkflowDraftContent = typeof parsed.systemSpec?.sharedDocument?.workflowDraftContent === "string"
+      ? parsed.systemSpec.sharedDocument.workflowDraftContent
+      : typeof parsed.systemSpec?.embeddedStudios?.workflow?.draftContent === "string"
+        ? parsed.systemSpec.embeddedStudios.workflow.draftContent
+        : "";
 
     return Object.freeze({
       systemSpec: Object.freeze({
@@ -270,14 +302,21 @@ export function parseSystemStudioDraftDocument(content: string): SystemStudioDra
         pages,
         embeddedStudios: Object.freeze({
           dataset: Object.freeze({
-            draftContent: typeof parsed.systemSpec?.embeddedStudios?.dataset?.draftContent === "string"
-              ? parsed.systemSpec.embeddedStudios.dataset.draftContent
-              : "",
+            draftContent: sharedDatasetDraftContent,
           }),
           workflow: Object.freeze({
-            draftContent: typeof parsed.systemSpec?.embeddedStudios?.workflow?.draftContent === "string"
-              ? parsed.systemSpec.embeddedStudios.workflow.draftContent
-              : "",
+            draftContent: sharedWorkflowDraftContent,
+          }),
+        }),
+        sharedDocument: Object.freeze({
+          datasetDraftContent: sharedDatasetDraftContent,
+          workflowDraftContent: sharedWorkflowDraftContent,
+          synchronization: Object.freeze({
+            pageDefinitions: "systemSpec.pages",
+            panelLayouts: "systemSpec.canvasAuthoring.pageLayouts",
+            datasetDefinitions: "systemSpec.sharedDocument.datasetDraftContent",
+            workflowDefinitions: "systemSpec.sharedDocument.workflowDraftContent",
+            settingsMetadata: "systemSpec.parameters",
           }),
         }),
       }),
@@ -356,15 +395,66 @@ export function serializeSystemStudioEmbeddedDatasetDraftContent(input: {
   )
     ? { ...(existingEmbeddedStudios.dataset as Record<string, unknown>) }
     : {};
+  const existingSharedDocument = (
+    existingSystemSpec.sharedDocument
+    && typeof existingSystemSpec.sharedDocument === "object"
+    && !Array.isArray(existingSystemSpec.sharedDocument)
+  )
+    ? { ...(existingSystemSpec.sharedDocument as Record<string, unknown>) }
+    : {};
+  const existingCanvasAuthoring = (
+    existingSystemSpec.canvasAuthoring
+    && typeof existingSystemSpec.canvasAuthoring === "object"
+    && !Array.isArray(existingSystemSpec.canvasAuthoring)
+  )
+    ? (existingSystemSpec.canvasAuthoring as {
+      readonly pageLayouts?: ReadonlyArray<{
+        readonly pageId?: string;
+        readonly panels?: ReadonlyArray<Record<string, unknown>>;
+      }>;
+    })
+    : {};
+
+  const synchronizedPageLayouts = (existingCanvasAuthoring.pageLayouts ?? []).map((layout) => ({
+    ...layout,
+    panels: (layout.panels ?? []).map((panel) => {
+      const content = panel.content;
+      if (!content || typeof content !== "object" || Array.isArray(content)) {
+        return panel;
+      }
+      const embeddedContent = content as { readonly kind?: string; readonly studioAssetId?: string };
+      if (embeddedContent.kind !== "embedded-studio") {
+        return panel;
+      }
+      if (embeddedContent.studioAssetId !== "dataset-studio") {
+        return panel;
+      }
+      return {
+        ...panel,
+        content: {
+          ...(content as Record<string, unknown>),
+          draftContent: input.draftContent,
+        },
+      };
+    }),
+  }));
 
   root.systemSpec = {
     ...existingSystemSpec,
+    canvasAuthoring: {
+      ...existingCanvasAuthoring,
+      pageLayouts: synchronizedPageLayouts,
+    },
     embeddedStudios: {
       ...existingEmbeddedStudios,
       dataset: {
         ...existingDataset,
         draftContent: input.draftContent,
       },
+    },
+    sharedDocument: {
+      ...existingSharedDocument,
+      datasetDraftContent: input.draftContent,
     },
   };
 
@@ -395,15 +485,66 @@ export function serializeSystemStudioEmbeddedWorkflowDraftContent(input: {
   )
     ? { ...(existingEmbeddedStudios.workflow as Record<string, unknown>) }
     : {};
+  const existingSharedDocument = (
+    existingSystemSpec.sharedDocument
+    && typeof existingSystemSpec.sharedDocument === "object"
+    && !Array.isArray(existingSystemSpec.sharedDocument)
+  )
+    ? { ...(existingSystemSpec.sharedDocument as Record<string, unknown>) }
+    : {};
+  const existingCanvasAuthoring = (
+    existingSystemSpec.canvasAuthoring
+    && typeof existingSystemSpec.canvasAuthoring === "object"
+    && !Array.isArray(existingSystemSpec.canvasAuthoring)
+  )
+    ? (existingSystemSpec.canvasAuthoring as {
+      readonly pageLayouts?: ReadonlyArray<{
+        readonly pageId?: string;
+        readonly panels?: ReadonlyArray<Record<string, unknown>>;
+      }>;
+    })
+    : {};
+
+  const synchronizedPageLayouts = (existingCanvasAuthoring.pageLayouts ?? []).map((layout) => ({
+    ...layout,
+    panels: (layout.panels ?? []).map((panel) => {
+      const content = panel.content;
+      if (!content || typeof content !== "object" || Array.isArray(content)) {
+        return panel;
+      }
+      const embeddedContent = content as { readonly kind?: string; readonly studioAssetId?: string };
+      if (embeddedContent.kind !== "embedded-studio") {
+        return panel;
+      }
+      if (embeddedContent.studioAssetId !== "workflow-studio") {
+        return panel;
+      }
+      return {
+        ...panel,
+        content: {
+          ...(content as Record<string, unknown>),
+          draftContent: input.draftContent,
+        },
+      };
+    }),
+  }));
 
   root.systemSpec = {
     ...existingSystemSpec,
+    canvasAuthoring: {
+      ...existingCanvasAuthoring,
+      pageLayouts: synchronizedPageLayouts,
+    },
     embeddedStudios: {
       ...existingEmbeddedStudios,
       workflow: {
         ...existingWorkflow,
         draftContent: input.draftContent,
       },
+    },
+    sharedDocument: {
+      ...existingSharedDocument,
+      workflowDraftContent: input.draftContent,
     },
   };
 

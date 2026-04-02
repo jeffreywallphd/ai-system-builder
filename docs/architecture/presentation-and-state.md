@@ -681,3 +681,18 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - panel assets define layout/content intent,
   - studio assets define embedded surface behavior,
   - host wiring resolves permissions/context/session + event handling.
+
+## Direction 5 extension update: shared system document synchronization + guided flow polish (stories 9-10)
+
+- System Studio now treats one system-backed draft document as the synchronization boundary for embedded authoring surfaces:
+  - `systemSpec.pages` remains the source of truth for page definitions.
+  - `systemSpec.canvasAuthoring.pageLayouts` remains the source of truth for panel layouts.
+  - `systemSpec.sharedDocument.datasetDraftContent` and `systemSpec.sharedDocument.workflowDraftContent` now hold shared embedded Dataset/Workflow authoring state.
+  - legacy `systemSpec.embeddedStudios.*.draftContent` remains mirrored for compatibility.
+- Embedded Dataset and Workflow updates now synchronize through shared serializers in `SystemStudioDraftDocument` so panel-hosted embedded studio content stays aligned with the same shared document state (no parallel panel-local draft truth).
+- Embedded studio host contexts now carry explicit host-provided document/context boundaries (`documentAccess`, `injectedContext`) so embedded surfaces can remain routing-neutral while still operating against shared host-owned draft context.
+- Guided System Studio flow continuity was polished to reduce stitched-tool seams:
+  - page copy was simplified for non-technical users,
+  - duplicated in-page headings were reduced in embedded steps,
+  - Inputs & Outputs readiness now reflects authored embedded data setup content in addition to explicit interface fields,
+  - advanced options remain collapsed under lower-priority disclosures.
