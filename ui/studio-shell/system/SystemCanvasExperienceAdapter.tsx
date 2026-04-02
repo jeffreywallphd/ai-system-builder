@@ -110,7 +110,9 @@ function resolveLayoutNodes(input: {
   return Object.freeze(input.panels.map((panel) => Object.freeze({
     id: panel.sourceLayoutNodeId ?? panel.panelId,
     title: panel.title,
-    subtitle: panel.description ?? "High-level section",
+    subtitle: panel.regionId
+      ? `${panel.description ?? "High-level section"} · Region: ${panel.regionId}`
+      : panel.description ?? "High-level section",
     x: panel.layoutBounds.x,
     y: panel.layoutBounds.y,
     width: panel.layoutBounds.width,
@@ -158,6 +160,8 @@ export function createSystemCanvasExperienceDefinition(
     ? input.selectedPageId
     : pages[0]?.pageId ?? "page-1";
   const panels = resolvePanelsForPage({ document, selectedPageId });
+  const selectedPage = pages.find((page) => page.pageId === selectedPageId);
+  const selectedPanel = panels.find((panel) => (panel.sourceLayoutNodeId ?? panel.panelId) === input.selectedLayoutNodeId);
   const layoutNodes = resolveLayoutNodes({ panels });
   const runtimePanels = Object.freeze(panels.map((panel) => mapPanelAssetToRuntimeInstance(panel)));
 
@@ -212,7 +216,7 @@ export function createSystemCanvasExperienceDefinition(
           ))}
         </div>
         <div className="ui-row ui-row--wrap">
-          {(pages.find((page) => page.pageId === selectedPageId)?.layout.regionIds ?? []).map((regionId) => (
+          {(selectedPage?.layout.regionIds ?? []).map((regionId) => (
             <span key={regionId} className="ui-badge ui-badge--neutral">
               {regionId}
             </span>
@@ -239,6 +243,47 @@ export function createSystemCanvasExperienceDefinition(
             Settings
           </button>
         </div>
+        {selectedPanel ? (
+          <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="system-canvas-selected-section-settings">
+            <strong className="ui-text-small">Selected section: {selectedPanel.title}</strong>
+            <span className="ui-text-small ui-text-secondary">Place this section in a page region and choose a quick size.</span>
+            <div className="ui-row ui-row--wrap">
+              {(selectedPage?.layout.regionIds ?? []).map((regionId) => (
+                <button
+                  key={regionId}
+                  type="button"
+                  className={`ui-button ui-button--sm ${selectedPanel.regionId === regionId ? "ui-button--primary" : "ui-button--ghost"}`}
+                  onClick={() => input.onCanvasEditingEvent?.({ type: "canvas.command", commandId: `assign-region:${regionId}` })}
+                >
+                  {regionId}
+                </button>
+              ))}
+            </div>
+            <div className="ui-row ui-row--wrap">
+              <button
+                type="button"
+                className="ui-button ui-button--ghost ui-button--sm"
+                onClick={() => input.onCanvasEditingEvent?.({ type: "canvas.command", commandId: "panel-size:compact" })}
+              >
+                Compact
+              </button>
+              <button
+                type="button"
+                className="ui-button ui-button--ghost ui-button--sm"
+                onClick={() => input.onCanvasEditingEvent?.({ type: "canvas.command", commandId: "panel-size:balanced" })}
+              >
+                Balanced
+              </button>
+              <button
+                type="button"
+                className="ui-button ui-button--ghost ui-button--sm"
+                onClick={() => input.onCanvasEditingEvent?.({ type: "canvas.command", commandId: "panel-size:featured" })}
+              >
+                Featured
+              </button>
+            </div>
+          </section>
+        ) : null}
       </div>
     ),
     renderInspectorRegion: ({ context: canvasContext }) => renderInspector(canvasContext),
@@ -265,10 +310,12 @@ export function createSystemCanvasExperienceDefinition(
 export function createSystemPanelFromCanvasNode(input: {
   readonly node: CanvasSurfaceLayoutNodeModel;
   readonly pageId: string;
+  readonly regionId?: string;
 }): PanelAssetContract {
   return mapLayoutNodeToPanelAsset({
     node: input.node,
     pageId: input.pageId,
+    regionId: input.regionId,
     contentSlots: Object.freeze([
       Object.freeze({
         slotId: `${input.node.id}-content`,

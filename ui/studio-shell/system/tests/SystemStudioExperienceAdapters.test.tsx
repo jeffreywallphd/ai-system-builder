@@ -45,6 +45,7 @@ describe("System studio experience adapters", () => {
                 {
                   panelId: "panel-1",
                   pageId: "page-2",
+                  regionId: "left-pane",
                   title: "Main panel",
                   layoutBounds: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
                   contentSlots: [],
@@ -70,6 +71,7 @@ describe("System studio experience adapters", () => {
     const editing = model.definition.resolveEditingModel?.(model.context);
     expect(editing?.nodes).toHaveLength(1);
     expect(editing?.nodes[0]?.title).toBe("Main panel");
+    expect(editing?.nodes[0]?.subtitle).toContain("left-pane");
     expect(editing?.commands?.map((command) => command.id)).toEqual(["add-panel", "remove-panel", "fit-layout"]);
   });
 
@@ -131,5 +133,36 @@ describe("System studio experience adapters", () => {
 
     const inputsOutputsPage = model.definition.pages.find((page) => page.id === SystemWizardPageIds.inputsOutputs);
     expect(inputsOutputsPage?.resolveStatus?.(model.context)).toBe("ready");
+  });
+
+  it("marks Settings step ready when system settings include a name", () => {
+    const content = JSON.stringify({
+      systemSpec: {
+        pages: [{ pageId: "page-1", title: "Welcome" }],
+        settings: {
+          systemName: "Support assistant",
+          navigation: { mode: "top" },
+          runtimeBehavior: { confirmBeforeExit: false, showHelpTips: true, rememberLastPage: true },
+        },
+      },
+    });
+    const canvasModel = buildCanvasModel(content);
+    const model = createSystemWizardExperienceAdapterModel({
+      content,
+      extensionContext,
+      validationIssues: [],
+      selectedPageId: "page-1",
+      onSelectPage: () => undefined,
+      onPagesChange: () => undefined,
+      canvasDefinition: canvasModel.definition,
+      canvasContext: canvasModel.context,
+      embeddedDatasetContent: "",
+      embeddedDatasetExtensionContext: extensionContext,
+      embeddedWorkflowContent: "",
+      embeddedWorkflowExtensionContext: extensionContext,
+    });
+
+    const settingsPage = model.definition.pages.find((page) => page.id === SystemWizardPageIds.settings);
+    expect(settingsPage?.resolveStatus?.(model.context)).toBe("ready");
   });
 });

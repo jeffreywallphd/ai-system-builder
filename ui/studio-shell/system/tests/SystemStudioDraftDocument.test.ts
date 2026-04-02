@@ -5,6 +5,7 @@ import {
   serializeSystemStudioEmbeddedDatasetDraftContent,
   serializeSystemStudioEmbeddedWorkflowDraftContent,
   serializeSystemStudioPageDefinitions,
+  serializeSystemStudioSettings,
 } from "../SystemStudioDraftDocument";
 
 describe("SystemStudioDraftDocument", () => {
@@ -141,6 +142,57 @@ describe("SystemStudioDraftDocument", () => {
 
     expect(parsed.systemSpec.sharedDocument?.datasetDraftContent).toBe("new-dataset");
     expect(parsed.systemSpec.sharedDocument?.workflowDraftContent).toBe("new-workflow");
+  });
+
+  it("serializes and parses system settings", () => {
+    const withSettings = serializeSystemStudioSettings({
+      existingContent: JSON.stringify({ systemSpec: { components: [] } }),
+      settings: {
+        systemName: "Customer Support Assistant",
+        systemDescription: "Helps the team route and answer support requests.",
+        defaultLandingPageId: "page-2",
+        navigation: { mode: "side" },
+        theme: { presetId: "neutral-light", tokenSetId: "tokens-v1" },
+        runtimeBehavior: {
+          confirmBeforeExit: true,
+          showHelpTips: false,
+          rememberLastPage: true,
+        },
+      },
+    });
+
+    const parsed = parseSystemStudioDraftDocument(withSettings);
+    expect(parsed.systemSpec.settings.systemName).toBe("Customer Support Assistant");
+    expect(parsed.systemSpec.settings.navigation.mode).toBe("side");
+    expect(parsed.systemSpec.settings.runtimeBehavior.confirmBeforeExit).toBe(true);
+  });
+
+  it("keeps panel bounds inside the normalized page frame", () => {
+    const parsed = parseSystemStudioDraftDocument(JSON.stringify({
+      systemSpec: {
+        pages: [{ pageId: "page-1", title: "Main page" }],
+        canvasAuthoring: {
+          pageLayouts: [
+            {
+              pageId: "page-1",
+              panels: [
+                {
+                  panelId: "panel-overflow",
+                  pageId: "page-1",
+                  title: "Overflow",
+                  layoutBounds: { x: 0.9, y: 0.88, width: 0.4, height: 0.3 },
+                  contentSlots: [],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    }));
+
+    const bounds = parsed.canvasAuthoring.pageLayouts[0]?.panels[0]?.layoutBounds;
+    expect(bounds?.x).toBeLessThanOrEqual(0.6);
+    expect(bounds?.y).toBeLessThanOrEqual(0.7);
   });
 
 });
