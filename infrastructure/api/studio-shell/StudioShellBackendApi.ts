@@ -106,6 +106,7 @@ import {
   type ImageRunHistoryRepository,
 } from "../../../application/system-runtime/ImageRunHistoryRepository";
 import { ComfyExecutionResultMaterializationMapper } from "../../comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper";
+import type { SystemContextContract } from "../../../domain/system-studio/SystemContextContract";
 
 export interface StudioShellApiError {
   readonly code:
@@ -212,6 +213,11 @@ export interface PersistReferenceImageOutputsRequest {
   readonly sourceRecordId?: string;
   readonly sourceAssetId?: string;
   readonly parameterSnapshot?: Readonly<Record<string, unknown>>;
+  readonly runtimeContext?: SystemContextContract;
+  readonly workflowAssetId?: string;
+  readonly workflowAssetVersionId?: string;
+  readonly systemAssetId?: string;
+  readonly systemVersionId?: string;
   readonly runtimeResult?: {
     readonly output?: unknown;
     readonly status?: string;
@@ -1167,12 +1173,13 @@ export class StudioShellBackendApi {
 
       const comfyResult = this.extractComfyResultFromRuntimeResult(request.runtimeResult?.output);
       if (!comfyResult) {
+        const lineageStatus = request.runtimeContext?.selectedImages?.[0]?.assetRef?.assetId ? "partial" : "incomplete";
         this.referenceImageRunHistory.recordRun({
           runId: executionId,
           workflowExecutionId: executionId,
           systemId: runtimeSystemId,
-          workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
-          workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+          workflowAssetId: request.workflowAssetId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+          workflowAssetVersionId: request.workflowAssetVersionId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
           status: ImageRunHistoryExecutionStatuses.failed,
           inputImages: request.sourceAssetId?.trim()
             ? Object.freeze([Object.freeze({
@@ -1182,6 +1189,19 @@ export class StudioShellBackendApi {
             })])
             : undefined,
           parameterSummary: request.parameterSnapshot,
+          lineage: {
+            status: lineageStatus,
+            workflowExecutionId: executionId,
+            sourceImageAssetId: request.runtimeContext?.selectedImages?.[0]?.assetRef?.assetId,
+            sourceImageRecordId: request.runtimeContext?.selectedImages?.[0]?.assetRef?.recordId,
+            sourceDatasetInstanceId: request.runtimeContext?.datasets.find((entry) => entry.role === "active-input" || entry.role === "input-store")?.instanceId,
+            workflowAssetId: request.workflowAssetId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+            workflowAssetVersionId: request.workflowAssetVersionId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+            systemAssetId: request.systemAssetId?.trim() || request.runtimeContext?.runtime.systemAssetId || draft.assetId,
+            systemVersionId: request.systemVersionId?.trim() || draft.lastPublishedVersionId,
+            outputDatasetInstanceId: outputDataset.instanceId,
+            missing: lineageStatus === "incomplete" ? ["source-image-ref", "runtime-output"] : ["runtime-output"],
+          },
           timestamps: {
             requestedAt: this.now().toISOString(),
             updatedAt: this.now().toISOString(),
@@ -1224,8 +1244,8 @@ export class StudioShellBackendApi {
         runId: executionId,
         workflowExecutionId: executionId,
         systemId: runtimeSystemId,
-        workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
-        workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+        workflowAssetId: request.workflowAssetId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+        workflowAssetVersionId: request.workflowAssetVersionId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
         status: materialized.status === "materialized"
           ? ImageRunHistoryExecutionStatuses.completed
           : materialized.status === "partial"
@@ -1255,6 +1275,23 @@ export class StudioShellBackendApi {
           outputId: record.image.assetRef.outputId,
           recordId: record.recordId,
         }))),
+        lineage: {
+          status: request.runtimeContext?.selectedImages?.[0]?.assetRef?.assetId ? "complete" : "partial",
+          workflowExecutionId: executionId,
+          sourceImageAssetId: request.runtimeContext?.selectedImages?.[0]?.assetRef?.assetId ?? request.sourceAssetId?.trim(),
+          sourceImageRecordId: request.runtimeContext?.selectedImages?.[0]?.assetRef?.recordId ?? request.sourceRecordId?.trim(),
+          sourceDatasetInstanceId: request.runtimeContext?.datasets.find((entry) => entry.role === "active-input" || entry.role === "input-store")?.instanceId,
+          sourceDatasetAssetId: request.runtimeContext?.datasets.find((entry) => entry.role === "active-input" || entry.role === "input-store")?.datasetAssetId,
+          workflowAssetId: request.workflowAssetId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+          workflowAssetVersionId: request.workflowAssetVersionId?.trim() || ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+          systemAssetId: request.systemAssetId?.trim() || request.runtimeContext?.runtime.systemAssetId || draft.assetId,
+          systemVersionId: request.systemVersionId?.trim() || draft.lastPublishedVersionId,
+          runtimeSessionId: request.runtimeContext?.runtime.runtimeSessionId,
+          outputDatasetInstanceId: outputDataset.instanceId,
+          outputRecordIds: Object.freeze(materialized.records.map((record) => record.recordId)),
+          traceId: request.runtimeContext?.runtime.triggerEventId,
+          missing: [],
+        },
         timestamps: {
           requestedAt: this.now().toISOString(),
           completedAt: this.now().toISOString(),

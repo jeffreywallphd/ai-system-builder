@@ -22,6 +22,12 @@ describe("ImageRunLineageDataContract", () => {
           images: [{ recordId: "record:1" }],
         },
         status: "completed",
+        lineage: {
+          status: "complete",
+          workflowExecutionId: "exec:run:lineage:1",
+          traceId: "trace:lineage:1",
+          systemAssetId: "asset:system:reference-image-manipulation",
+        },
         timestamps: {
           requestedAt: "2026-04-02T00:00:00.000Z",
           updatedAt: "2026-04-02T00:00:10.000Z",
@@ -60,6 +66,8 @@ describe("ImageRunLineageDataContract", () => {
 
     expect(lineage.summary.runId).toBe("run:lineage:1");
     expect(lineage.summary.datasetInstanceId).toBe("instance:outputs");
+    expect(lineage.summary.lineageStatus).toBe("complete");
+    expect(lineage.summary.traceId).toBe("trace:lineage:1");
     expect(lineage.nodes.some((node) => node.kind === "workflow-run")).toBeTrue();
     expect(lineage.edges.some((edge) => edge.kind === "input-to-run")).toBeTrue();
     expect(lineage.edges.some((edge) => edge.kind === "run-to-output")).toBeTrue();
