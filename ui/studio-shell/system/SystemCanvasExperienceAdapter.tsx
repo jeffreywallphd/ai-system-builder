@@ -139,7 +139,8 @@ function resolveEditingModel(context: SystemCanvasExperienceContext): CanvasSurf
       }),
       targets: Object.freeze({
         position: true,
-        size: false,
+        size: true,
+        bounds: true,
       }),
     }),
   });
@@ -194,7 +195,7 @@ export function createSystemCanvasExperienceDefinition(
     renderPaletteRegion: () => (
       <div className="ui-stack ui-stack--2xs" data-testid="system-canvas-page-picker">
         <p className="ui-text-small ui-text-secondary">
-          Build the high-level page structure here. Detailed panel content is authored inside each panel's own studio.
+          Build the high-level page structure here. Section bounds are saved as percentages of the area below the page header.
         </p>
         <div className="ui-row ui-row--wrap">
           {pages.map((page) => (
@@ -269,6 +270,9 @@ export function createSystemCanvasExperienceDefinition(
           <strong className="ui-text-small">Structure only</strong>
           <p className="ui-text-small ui-text-secondary">
             Use this canvas for page-level section placement. Screen navigation and system-wide defaults are set in the Settings step.
+          </p>
+          <p className="ui-text-small ui-text-secondary">
+            Saved section bounds map to viewport percentages below the page header, with consistent spacing applied automatically in preview/runtime.
           </p>
           <p className="ui-text-small ui-text-secondary">
             Detailed panel content is edited in each panel&apos;s dedicated studio.

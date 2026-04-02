@@ -106,6 +106,58 @@ function snapNormalized(value: number, divisions: number): number {
   return clamp01(Math.round(value / step) * step);
 }
 
+function normalizeSnappedFrame(input: {
+  readonly frame: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  readonly divisions: { readonly x: number; readonly y: number };
+}): { readonly x: number; readonly y: number; readonly width: number; readonly height: number } {
+  const minWidth = resolveSnapStep(input.divisions.x);
+  const minHeight = resolveSnapStep(input.divisions.y);
+  const left = snapNormalized(input.frame.x, input.divisions.x);
+  const top = snapNormalized(input.frame.y, input.divisions.y);
+  const right = snapNormalized(input.frame.x + input.frame.width, input.divisions.x);
+  const bottom = snapNormalized(input.frame.y + input.frame.height, input.divisions.y);
+  const boundedRight = Math.max(left + minWidth, Math.min(1, right));
+  const boundedBottom = Math.max(top + minHeight, Math.min(1, bottom));
+  const width = Math.max(minWidth, boundedRight - left);
+  const height = Math.max(minHeight, boundedBottom - top);
+  return Object.freeze({
+    x: clampToBounds(left, 0, Math.max(0, 1 - width)),
+    y: clampToBounds(top, 0, Math.max(0, 1 - height)),
+    width: clampToBounds(width, minWidth, 1),
+    height: clampToBounds(height, minHeight, 1),
+  });
+}
+
+function resolveReleaseSnappedFrame(input: {
+  readonly frame: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  readonly snapModel: CanvasSurfaceSnapModel;
+}): { readonly x: number; readonly y: number; readonly width: number; readonly height: number } {
+  if (input.snapModel.targets?.bounds) {
+    return normalizeSnappedFrame({
+      frame: input.frame,
+      divisions: input.snapModel.divisions,
+    });
+  }
+  const snappedWidth = input.snapModel.targets?.size
+    ? snapNormalized(input.frame.width, input.snapModel.divisions.x)
+    : input.frame.width;
+  const snappedHeight = input.snapModel.targets?.size
+    ? snapNormalized(input.frame.height, input.snapModel.divisions.y)
+    : input.frame.height;
+  const snappedX = input.snapModel.targets?.position
+    ? snapNormalized(input.frame.x, input.snapModel.divisions.x)
+    : input.frame.x;
+  const snappedY = input.snapModel.targets?.position
+    ? snapNormalized(input.frame.y, input.snapModel.divisions.y)
+    : input.frame.y;
+  return Object.freeze({
+    x: clampToBounds(snappedX, 0, Math.max(0, 1 - snappedWidth)),
+    y: clampToBounds(snappedY, 0, Math.max(0, 1 - snappedHeight)),
+    width: clampToBounds(snappedWidth, resolveSnapStep(input.snapModel.divisions.x), 1),
+    height: clampToBounds(snappedHeight, resolveSnapStep(input.snapModel.divisions.y), 1),
+  });
+}
+
 function resolveEffectiveSnapModel(snap: CanvasSurfaceSnapModel | undefined): CanvasSurfaceSnapModel | undefined {
   if (!snap?.enabled) {
     return undefined;
@@ -123,6 +175,7 @@ function resolveEffectiveSnapModel(snap: CanvasSurfaceSnapModel | undefined): Ca
     targets: Object.freeze({
       position: snap.targets?.position ?? true,
       size: snap.targets?.size ?? false,
+      bounds: snap.targets?.bounds ?? false,
     }),
   });
 }
@@ -358,24 +411,32 @@ function ConfigurableCanvasEditingSurface({
       }
       const coordinates = resolvePointerCoordinates(event);
       if (coordinateMode === "normalized" && snapModel?.timing?.onRelease) {
-        if (interactionState.mode === "move" && snapModel.targets?.position && interactionState.hasCrossedMoveThreshold) {
+        if (interactionState.mode === "move" && interactionState.hasCrossedMoveThreshold) {
           const frameRect = frameRef.current?.getBoundingClientRect();
           const frameWidth = frameRect?.width ?? 0;
           const frameHeight = frameRect?.height ?? 0;
           const deltaX = coordinates.x - interactionState.startClientX;
           const deltaY = coordinates.y - interactionState.startClientY;
-          const rawX = toFrameCoordinate(interactionState.nodeStartX + deltaX, frameWidth);
-          const rawY = toFrameCoordinate(interactionState.nodeStartY + deltaY, frameHeight);
+          const rawFrame = Object.freeze({
+            x: toFrameCoordinate(interactionState.nodeStartX + deltaX, frameWidth),
+            y: toFrameCoordinate(interactionState.nodeStartY + deltaY, frameHeight),
+            width: interactionState.nodeStartWidth,
+            height: interactionState.nodeStartHeight,
+          });
+          const snappedFrame = resolveReleaseSnappedFrame({
+            frame: rawFrame,
+            snapModel,
+          });
           onEditingEvent?.({
             type: "node.position.change",
             nodeId: interactionState.nodeId,
             position: Object.freeze({
-              x: snapNormalized(rawX, snapModel.divisions.x),
-              y: snapNormalized(rawY, snapModel.divisions.y),
+              x: snappedFrame.x,
+              y: snappedFrame.y,
             }),
           });
         }
-        if (interactionState.mode === "resize" && snapModel.targets?.size) {
+        if (interactionState.mode === "resize") {
           const deltaX = coordinates.x - interactionState.startClientX;
           const deltaY = coordinates.y - interactionState.startClientY;
           const frame = mapResizeFrame({
@@ -397,17 +458,14 @@ function ConfigurableCanvasEditingSurface({
             width: toFrameSizeCoordinate(frame.width, frameWidth),
             height: toFrameSizeCoordinate(frame.height, frameHeight),
           });
-          const snappedWidth = snapNormalized(rawFrame.width, snapModel.divisions.x);
-          const snappedHeight = snapNormalized(rawFrame.height, snapModel.divisions.y);
+          const snappedFrame = resolveReleaseSnappedFrame({
+            frame: rawFrame,
+            snapModel,
+          });
           onEditingEvent?.({
             type: "node.resize.change",
             nodeId: interactionState.nodeId,
-            frame: Object.freeze({
-              x: clampToBounds(rawFrame.x, 0, Math.max(0, 1 - snappedWidth)),
-              y: clampToBounds(rawFrame.y, 0, Math.max(0, 1 - snappedHeight)),
-              width: snappedWidth,
-              height: snappedHeight,
-            }),
+            frame: snappedFrame,
           });
         }
       }

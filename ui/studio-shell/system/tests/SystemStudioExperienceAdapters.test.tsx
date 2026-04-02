@@ -73,7 +73,7 @@ describe("System studio experience adapters", () => {
       enabled: true,
       divisions: { x: 10, y: 10 },
       timing: { duringDrag: false, onRelease: true },
-      targets: { position: true, size: false },
+      targets: { position: true, size: true, bounds: true },
     });
   });
 

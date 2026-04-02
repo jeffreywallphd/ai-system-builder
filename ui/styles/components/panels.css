@@ -77,6 +77,8 @@
 }
 
 .ui-system-runtime-layout-frame {
+  --ui-system-runtime-section-gap: var(--space-sm);
+  --ui-system-runtime-section-min-size: 48px;
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
@@ -84,6 +86,14 @@
   border-radius: var(--radius-md);
   background: var(--color-bg-elevated);
   overflow: hidden;
+}
+
+.ui-system-runtime-layout-viewport {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: var(--space-sm);
 }
 
 .ui-system-runtime-layout-panel {

@@ -124,6 +124,7 @@ export interface CanvasSurfaceSnapTimingModel {
 export interface CanvasSurfaceSnapTargetModel {
   readonly position?: boolean;
   readonly size?: boolean;
+  readonly bounds?: boolean;
 }
 
 export interface CanvasSurfaceSnapModel {
