@@ -71,7 +71,9 @@ export interface ComfyImageManipulationExecutionSubmission {
     readonly templateVersionId: string;
     readonly nodeCount: number;
     readonly boundInputCount: number;
+    readonly executionPath: "non-faceid" | "faceid";
     readonly extensionBindings: ReadonlyArray<Readonly<Record<string, unknown>>>;
+    readonly subworkflowBindings?: ReadonlyArray<Readonly<Record<string, unknown>>>;
   }>;
 }
 

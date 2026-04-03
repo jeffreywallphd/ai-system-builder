@@ -672,3 +672,9 @@ The image slice proved the shared architecture, but it exposed concrete follow-u
    - Persist aggregate counts for "restored complete/partial/fallback" decisions to guide reliability work.
 3. **Selective payload chunking for very large dataset-instance snapshots**
    - Current serialization tolerates realistic payloads, but chunking/compression may be needed as record counts grow further.
+
+## AI Loom image manipulation hardening update: override-driven graph mapping + execution path branching (stories 5.3-5.4)
+
+- `ComfyImageManipulationGraphRequestBuilder` now composes execution from explicit strategy selection (`non-faceid` vs `faceid`) instead of scattered conditionals.
+- FaceID dependency checks are strategy-scoped: reference bindings/model requirements are enforced only when FaceID is enabled.
+- Graph request inspection payloads now include selected execution path and FaceID subworkflow binding summaries for debugging without exposing raw filesystem paths or leaking Comfy transport internals.

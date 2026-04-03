@@ -1353,3 +1353,11 @@
   - prompt/model/VAE and FaceID mapping presence on instantiated workflow parameter bindings,
   - non-FaceID default path runnability with output/storage binding readiness,
   - execution metadata presence for runtime backend/capability assertions.
+
+## AI Loom image manipulation update: explicit property-to-node override mapping + FaceID execution strategy metadata (stories 5.3-5.4)
+
+- `ComfyImageManipulationPropertyMappingAsset` now resolves property-schema inputs into a small validated override contract (`nodeOverrides`) with explicit direct vs extension modes, rather than loose mutation-oriented graph binding bags.
+- Mapping coverage now explicitly includes positive/negative prompts, checkpoint, VAE, steps, CFG, sampler, scheduler, seed, denoise/strength, width/height extension overrides, result-count extension override, and FaceID controls (enable, references, model, weight, start/end step fractions).
+- Mapping output remains inspectable and adapter-boundary safe through explicit override metadata (`bindingId`, `group`, `sourcePath`, `nodeId`, `inputName`, `mode`) plus `subworkflowBindings` for FaceID path composition.
+- Default template configuration continues to resolve into a runnable non-FaceID override set without additional user input.
+- FaceID execution intent is now strategy-ready in mapping output (`subworkflowBindings`) so execution adapters can branch cleanly while keeping non-FaceID defaults stable.
