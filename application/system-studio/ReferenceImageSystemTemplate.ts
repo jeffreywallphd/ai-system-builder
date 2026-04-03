@@ -12,6 +12,7 @@ import {
 import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "../../domain/taxonomy/CompositionTaxonomy";
 import { DatasetInstanceRoles, type DatasetInstanceRole } from "../../domain/system-runtime/DatasetInstanceDomain";
 import type { EnsureRoleDatasetInstanceRequest } from "../system-runtime/SystemDatasetInstanceService";
+import type { StorageBindingArea } from "../system-runtime/StorageInstanceProvisioningContract";
 import {
   ImageManipulationFaceIdReferenceDatasetAssetId,
   ImageManipulationInputDatasetAssetId,
@@ -114,6 +115,7 @@ export interface ReferenceImageDatasetInstanceTemplate {
   readonly requiredSchemaIntentId: typeof DatasetSchemaIntentIds.media;
   readonly requiredOutputShapeKind: "image-metadata-records";
   readonly runtimeOwner: "system-runtime";
+  readonly storageBindingArea: StorageBindingArea;
   readonly optional?: boolean;
 }
 
@@ -266,6 +268,7 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
       requiredSchemaIntentId: DatasetSchemaIntentIds.media,
       requiredOutputShapeKind: "image-metadata-records",
       runtimeOwner: "system-runtime",
+      storageBindingArea: "input",
     }),
     Object.freeze({
       bindingId: "output-image-dataset",
@@ -276,6 +279,7 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
       requiredSchemaIntentId: DatasetSchemaIntentIds.media,
       requiredOutputShapeKind: "image-metadata-records",
       runtimeOwner: "system-runtime",
+      storageBindingArea: "output",
     }),
     Object.freeze({
       bindingId: "reference-image-dataset",
@@ -286,6 +290,7 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
       requiredSchemaIntentId: DatasetSchemaIntentIds.media,
       requiredOutputShapeKind: "image-metadata-records",
       runtimeOwner: "system-runtime",
+      storageBindingArea: "input",
       optional: true,
     }),
   ]),
@@ -317,6 +322,12 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
 
 export interface BuildReferenceImageDatasetInstanceRequestsOptions {
   readonly includeOptionalReferenceDatasets?: boolean;
+  readonly storageBindingByArea?: Readonly<Partial<Record<StorageBindingArea, {
+    readonly storageInstanceId: string;
+    readonly storageInstanceRef: string;
+    readonly bindingId: string;
+    readonly bindingReference: string;
+  }>>>;
 }
 
 export function buildReferenceImageDatasetInstanceRequests(
@@ -338,12 +349,22 @@ export function buildReferenceImageDatasetInstanceRequests(
     datasetAssetVersionId: entry.datasetAssetVersionId,
     role: entry.role,
     purpose: entry.purpose,
-    requiredSchemaIntentId: entry.requiredSchemaIntentId,
-    requiredOutputShapeKind: entry.requiredOutputShapeKind,
-    seedMetadata: Object.freeze({
-      templateId: ReferenceImageSystemTemplate.templateId,
-      runtimeOwner: entry.runtimeOwner,
-      datasetBindingId: entry.bindingId,
-    }),
-  })));
+      requiredSchemaIntentId: entry.requiredSchemaIntentId,
+      requiredOutputShapeKind: entry.requiredOutputShapeKind,
+      storageBinding: options.storageBindingByArea?.[entry.storageBindingArea]
+        ? Object.freeze({
+          storageInstanceId: options.storageBindingByArea[entry.storageBindingArea]!.storageInstanceId,
+          storageInstanceRef: options.storageBindingByArea[entry.storageBindingArea]!.storageInstanceRef,
+          bindingArea: entry.storageBindingArea,
+          bindingId: options.storageBindingByArea[entry.storageBindingArea]!.bindingId,
+          bindingReference: options.storageBindingByArea[entry.storageBindingArea]!.bindingReference,
+        })
+        : undefined,
+      seedMetadata: Object.freeze({
+        templateId: ReferenceImageSystemTemplate.templateId,
+        runtimeOwner: entry.runtimeOwner,
+        datasetBindingId: entry.bindingId,
+        storageBindingArea: entry.storageBindingArea,
+      }),
+    })));
 }

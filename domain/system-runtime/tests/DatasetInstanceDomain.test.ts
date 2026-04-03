@@ -30,6 +30,13 @@ describe("DatasetInstanceDomain", () => {
       role: "input-store",
       lifecycleStatus: "ready",
       runtimeStatus: "idle",
+      storageBinding: {
+        storageInstanceId: "storage-instance:reference-runtime",
+        storageInstanceRef: "storage-instance://storage-instance%3Areference-runtime",
+        bindingArea: "input",
+        bindingId: "storage-binding:reference-runtime:input",
+        bindingReference: "storage-instance://storage-instance%3Areference-runtime/input",
+      },
       seedMetadata: { bucket: "incoming" },
       createdAt: "2026-04-01T00:00:00.000Z",
       updatedAt: "2026-04-01T00:00:00.000Z",
@@ -46,6 +53,7 @@ describe("DatasetInstanceDomain", () => {
       },
     });
     expect(patched.purpose).toBe("incoming-images");
+    expect(patched.storageBinding?.bindingArea).toBe("input");
     expect(patched.seedMetadata?.bucket).toBe("incoming-v2");
     expect(patched.updatedAt).toBe("2026-04-01T00:01:00.000Z");
 
@@ -63,5 +71,21 @@ describe("DatasetInstanceDomain", () => {
       nextLifecycleStatus: "ready",
       updatedAt: "2026-04-01T00:03:00.000Z",
     })).toThrow("cannot transition lifecycle");
+  });
+
+  it("rejects path-like dataset storage binding configuration", () => {
+    expect(() => createDatasetInstance({
+      instanceId: "dataset-instance:test-2",
+      systemId: "system:test",
+      datasetAssetId: "asset:test-dataset",
+      role: "input-store",
+      storageBinding: {
+        storageInstanceId: "/tmp/storage",
+        storageInstanceRef: "storage-instance://tmp-storage",
+        bindingArea: "input",
+        bindingId: "storage-binding:tmp-storage:input",
+        bindingReference: "storage-instance://tmp-storage/input",
+      },
+    })).toThrow("storage bindings must use storage-instance identities");
   });
 });

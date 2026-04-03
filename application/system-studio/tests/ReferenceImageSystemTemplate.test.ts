@@ -37,11 +37,13 @@ describe("ReferenceImageSystemTemplate", () => {
     expect(inputBinding?.role).toBe(DatasetInstanceRoles.inputStore);
     expect(inputBinding?.requiredSchemaIntentId).toBe(DatasetSchemaIntentIds.media);
     expect(inputBinding?.requiredOutputShapeKind).toBe("image-metadata-records");
+    expect(inputBinding?.storageBindingArea).toBe("input");
 
     expect(outputBinding?.runtimeOwner).toBe("system-runtime");
     expect(outputBinding?.role).toBe(DatasetInstanceRoles.outputStore);
     expect(outputBinding?.requiredSchemaIntentId).toBe(DatasetSchemaIntentIds.media);
     expect(outputBinding?.requiredOutputShapeKind).toBe("image-metadata-records");
+    expect(outputBinding?.storageBindingArea).toBe("output");
   });
 
   it("builds runtime-owned dataset ensure requests scoped by system id", () => {
@@ -55,6 +57,29 @@ describe("ReferenceImageSystemTemplate", () => {
     ]);
     expect(requests[0]?.seedMetadata?.runtimeOwner).toBe("system-runtime");
     expect(requests[1]?.seedMetadata?.templateId).toBe(ReferenceImageSystemTemplateId);
+    expect(requests[0]?.seedMetadata?.storageBindingArea).toBe("input");
+  });
+
+  it("projects storage-instance logical bindings into dataset ensure requests", () => {
+    const requests = buildReferenceImageDatasetInstanceRequests("system:reference-image", {
+      storageBindingByArea: {
+        input: {
+          storageInstanceId: "storage-instance:shared-reference-runtime",
+          storageInstanceRef: "storage-instance://storage-instance%3Ashared-reference-runtime",
+          bindingId: "storage-binding:shared-reference-runtime:input",
+          bindingReference: "storage-instance://storage-instance%3Ashared-reference-runtime/input",
+        },
+        output: {
+          storageInstanceId: "storage-instance:shared-reference-runtime",
+          storageInstanceRef: "storage-instance://storage-instance%3Ashared-reference-runtime",
+          bindingId: "storage-binding:shared-reference-runtime:output",
+          bindingReference: "storage-instance://storage-instance%3Ashared-reference-runtime/output",
+        },
+      },
+    });
+
+    expect(requests[0]?.storageBinding?.bindingReference).toBe("storage-instance://storage-instance%3Ashared-reference-runtime/input");
+    expect(requests[1]?.storageBinding?.bindingReference).toBe("storage-instance://storage-instance%3Ashared-reference-runtime/output");
   });
 
   it("provides explicit system context mapping for selected image, parameters, and dataset refs", () => {
