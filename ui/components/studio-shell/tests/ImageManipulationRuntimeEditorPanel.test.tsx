@@ -59,6 +59,8 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
 
     expect(html).toContain("Image preview");
     expect(html).toContain("Image browser");
+    expect(html).toContain("Selected photos");
     expect(html).toContain("Create image");
+    expect(html).toContain("Status: Ready");
   });
 });
