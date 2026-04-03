@@ -38,6 +38,9 @@ export class WorkflowTemplatePreviewService {
           type: entry.valueType,
           description: entry.description,
           targetDatasetAssetId: outputBinding?.targetDatasetAssetId,
+          targetDatasetInstanceRef: outputBinding?.targetDatasetInstanceRef,
+          targetStorageInstanceRef: outputBinding?.targetStorageInstanceRef,
+          targetStorageBindingId: outputBinding?.targetStorageBindingId,
         });
       })),
       parameters: Object.freeze((template.parameters ?? []).map((entry) => Object.freeze({
@@ -51,6 +54,17 @@ export class WorkflowTemplatePreviewService {
         workflowAssetId: entry.workflowAssetId,
         workflowAssetVersionId: entry.workflowAssetVersionId,
       }))),
+      executionMetadata: template.executionMetadata
+        ? Object.freeze({
+          runtimeProfile: template.executionMetadata.runtime.runtimeProfile,
+          backendId: template.executionMetadata.runtime.backendId,
+          requiredCapabilities: template.executionMetadata.runtime.requiredCapabilities,
+          requiredDependencies: template.executionMetadata.runtime.requiredDependencies,
+          workflowMode: template.executionMetadata.capability.workflowMode,
+          supportsFaceId: template.executionMetadata.capability.supportsFaceId,
+          supportsBatchExecution: template.executionMetadata.capability.supportsBatchExecution,
+        })
+        : undefined,
     });
   }
 }

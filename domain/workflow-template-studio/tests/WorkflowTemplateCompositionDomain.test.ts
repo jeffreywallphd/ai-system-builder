@@ -26,6 +26,9 @@ describe("WorkflowTemplateCompositionDomain", () => {
         workflowAssetId: "asset:workflow:base",
         workflowOutputId: "images",
         targetDatasetAssetId: "asset:dataset:images",
+        targetDatasetInstanceRef: "dataset-instance-ref:system:output",
+        targetStorageInstanceRef: "storage-instance://storage-instance%3Asystem-output",
+        targetStorageBindingId: "output-images",
       }],
       parameterMappings: [{
         parameterId: "steps",
@@ -36,6 +39,7 @@ describe("WorkflowTemplateCompositionDomain", () => {
 
     expect(composition.contractVersion).toBe("1.0.0");
     expect(composition.workflowInterfaces[0]?.workflowAssetId).toBe("asset:workflow:base");
+    expect(composition.outputBindings[0]?.targetDatasetInstanceRef).toBe("dataset-instance-ref:system:output");
   });
 
   it("validates parameter definitions with zod-aware defaults", () => {
@@ -87,5 +91,18 @@ describe("WorkflowTemplateCompositionDomain", () => {
       validation: { enumValues: ["basic", "advanced"] },
       dependencyRules: [{ kind: "requires-when-set", parameterId: "mode" }],
     })).toThrow("cannot depend on itself");
+
+    expect(() => createWorkflowTemplateComposition({
+      workflowInterfaces: [{ workflowAssetId: "asset:workflow:base" }],
+      inputBindings: [],
+      outputBindings: [{
+        bindingId: "output-1",
+        templateOutputId: "images",
+        workflowAssetId: "asset:workflow:base",
+        workflowOutputId: "images",
+        targetStorageInstanceRef: "/tmp/outputs",
+      }],
+      parameterMappings: [],
+    })).toThrow("logical reference");
   });
 });

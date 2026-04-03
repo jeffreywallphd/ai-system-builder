@@ -29,6 +29,9 @@ describe("ImageManipulationWorkflowTemplate", () => {
 
     const outputBinding = ImageManipulationWorkflowTemplate.composition?.outputBindings[0];
     expect(outputBinding?.targetDatasetAssetId).toBe("asset:dataset:image-reference-output");
+    expect(outputBinding?.targetDatasetInstanceRef).toBe("dataset-instance-ref:reference-image:output");
+    expect(outputBinding?.targetStorageInstanceRef?.startsWith("storage-instance://")).toBeTrue();
+    expect(outputBinding?.targetStorageBindingId).toBe("output-images");
 
     const graphDependency = ImageManipulationWorkflowTemplate.workflowAssets.find((entry) => (
       entry.assetId === ComfyImageManipulationBaseGraphAssetId
@@ -37,6 +40,15 @@ describe("ImageManipulationWorkflowTemplate", () => {
 
     expect(ImageManipulationWorkflowTemplate.metadata.baseGraphAssetId).toBe(ComfyImageManipulationBaseGraphAssetId);
     expect(ImageManipulationWorkflowTemplate.metadata.defaultExecutable).toBe("true");
+  });
+
+  it("publishes inspectable execution metadata for runtime/backends and FaceID dependencies", () => {
+    const executionMetadata = ImageManipulationWorkflowTemplate.executionMetadata;
+    expect(executionMetadata?.runtime.runtimeProfile).toBe("comfyui");
+    expect(executionMetadata?.runtime.requiredCapabilities).toContain("storage-instance-dataset-bindings");
+    expect(executionMetadata?.capability.workflowMode).toBe("image-to-image");
+    expect(executionMetadata?.faceId?.referenceDatasetAssetId).toBe("asset:dataset:image-faceid-reference");
+    expect(executionMetadata?.hints?.outputHandling).toContain("bind-output-to-dataset-instance");
   });
 
   it("ships defaults for required config parameters", () => {

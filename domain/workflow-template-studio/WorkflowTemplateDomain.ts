@@ -49,6 +49,30 @@ export interface WorkflowTemplateAssetReference {
   readonly versionId?: string;
 }
 
+export interface WorkflowTemplateExecutionMetadata {
+  readonly runtime: {
+    readonly backendId: string;
+    readonly runtimeProfile: "comfyui" | "interpreted" | "python-delegated";
+    readonly requiredCapabilities: ReadonlyArray<string>;
+    readonly requiredDependencies: ReadonlyArray<string>;
+  };
+  readonly capability: {
+    readonly workflowMode: "image-to-image" | "text-to-image" | "upscaling";
+    readonly supportsFaceId: boolean;
+    readonly supportsBatchExecution: boolean;
+  };
+  readonly faceId?: {
+    readonly referenceDatasetAssetId: string;
+    readonly referenceBindingParameterId: string;
+    readonly requiredWhenEnabled: boolean;
+    readonly dependencyAssetIds: ReadonlyArray<string>;
+  };
+  readonly hints?: {
+    readonly adapterHints?: ReadonlyArray<string>;
+    readonly outputHandling?: ReadonlyArray<string>;
+  };
+}
+
 export interface WorkflowTemplateDefinition {
   readonly templateId: string;
   readonly versionId: string;
@@ -62,6 +86,7 @@ export interface WorkflowTemplateDefinition {
   readonly composition?: WorkflowTemplateComposition;
   readonly parameters?: ReadonlyArray<WorkflowTemplateParameterDefinition>;
   readonly workflowAssets: ReadonlyArray<WorkflowTemplateAssetReference>;
+  readonly executionMetadata?: WorkflowTemplateExecutionMetadata;
   readonly tags: ReadonlyArray<string>;
   readonly metadata: Readonly<Record<string, string>>;
 }
@@ -81,6 +106,71 @@ function normalizeOptional(value?: string): string | undefined {
 
 function normalizeTags(tags?: ReadonlyArray<string>): ReadonlyArray<string> {
   return Object.freeze([...new Set((tags ?? []).map((entry) => entry.trim()).filter(Boolean))]);
+}
+
+function normalizeOptionalStringList(values?: ReadonlyArray<string>): ReadonlyArray<string> | undefined {
+  if (!values) return undefined;
+  return Object.freeze([...new Set(values.map((entry) => entry.trim()).filter(Boolean))]);
+}
+
+function normalizeRequiredStringList(values: ReadonlyArray<string>, label: string): ReadonlyArray<string> {
+  const normalized = normalizeOptionalStringList(values) ?? [];
+  if (normalized.length === 0) {
+    throw new Error(`${label} requires at least one value.`);
+  }
+  return normalized;
+}
+
+function normalizeExecutionMetadata(value?: WorkflowTemplateExecutionMetadata): WorkflowTemplateExecutionMetadata | undefined {
+  if (!value) return undefined;
+
+  const runtimeCapabilities = normalizeRequiredStringList(
+    value.runtime.requiredCapabilities,
+    "Workflow template execution metadata runtime capabilities",
+  );
+  const runtimeDependencies = normalizeRequiredStringList(
+    value.runtime.requiredDependencies,
+    "Workflow template execution metadata runtime dependencies",
+  );
+
+  const normalizedFaceId = value.faceId
+    ? Object.freeze({
+      referenceDatasetAssetId: normalizeRequired(
+        value.faceId.referenceDatasetAssetId,
+        "Workflow template execution metadata FaceID reference dataset asset id",
+      ),
+      referenceBindingParameterId: normalizeRequired(
+        value.faceId.referenceBindingParameterId,
+        "Workflow template execution metadata FaceID reference binding parameter id",
+      ),
+      requiredWhenEnabled: Boolean(value.faceId.requiredWhenEnabled),
+      dependencyAssetIds: normalizeRequiredStringList(
+        value.faceId.dependencyAssetIds,
+        "Workflow template execution metadata FaceID dependency assets",
+      ),
+    })
+    : undefined;
+
+  return Object.freeze({
+    runtime: Object.freeze({
+      backendId: normalizeRequired(value.runtime.backendId, "Workflow template execution metadata backend id"),
+      runtimeProfile: value.runtime.runtimeProfile,
+      requiredCapabilities: runtimeCapabilities,
+      requiredDependencies: runtimeDependencies,
+    }),
+    capability: Object.freeze({
+      workflowMode: value.capability.workflowMode,
+      supportsFaceId: Boolean(value.capability.supportsFaceId),
+      supportsBatchExecution: Boolean(value.capability.supportsBatchExecution),
+    }),
+    faceId: normalizedFaceId,
+    hints: value.hints
+      ? Object.freeze({
+        adapterHints: normalizeOptionalStringList(value.hints.adapterHints),
+        outputHandling: normalizeOptionalStringList(value.hints.outputHandling),
+      })
+      : undefined,
+  });
 }
 
 export function createWorkflowTemplateDefinition(input: WorkflowTemplateDefinition): WorkflowTemplateDefinition {
@@ -132,6 +222,7 @@ export function createWorkflowTemplateDefinition(input: WorkflowTemplateDefiniti
     composition: input.composition ? createWorkflowTemplateComposition(input.composition) : undefined,
     parameters,
     workflowAssets,
+    executionMetadata: normalizeExecutionMetadata(input.executionMetadata),
     tags: normalizeTags(input.tags),
     metadata: Object.freeze(Object.fromEntries(
       Object.entries(input.metadata ?? {})

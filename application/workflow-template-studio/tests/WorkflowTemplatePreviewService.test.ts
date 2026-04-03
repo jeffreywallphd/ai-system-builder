@@ -65,10 +65,31 @@ describe("WorkflowTemplatePreviewService", () => {
         composition: {
           workflowInterfaces: [{ workflowAssetId: "asset:workflow:starter", inputIds: ["prompt"], outputIds: ["images"], parameterIds: ["steps"] }],
           inputBindings: [{ bindingId: "in-1", templateInputId: "prompt", workflowAssetId: "asset:workflow:starter", workflowInputId: "prompt", required: true }],
-          outputBindings: [{ bindingId: "out-1", templateOutputId: "images", workflowAssetId: "asset:workflow:starter", workflowOutputId: "images" }],
+          outputBindings: [{
+            bindingId: "out-1",
+            templateOutputId: "images",
+            workflowAssetId: "asset:workflow:starter",
+            workflowOutputId: "images",
+            targetDatasetInstanceRef: "dataset-instance-ref:starter:output",
+            targetStorageInstanceRef: "storage-instance://storage-instance%3Atemplate-starter",
+            targetStorageBindingId: "output-images",
+          }],
           parameterMappings: [{ parameterId: "steps", workflowAssetId: "asset:workflow:starter", workflowParameterId: "steps" }],
         },
         workflowAssets: [{ role: "workflow-definition", assetId: "asset:workflow:starter" }],
+        executionMetadata: {
+          runtime: {
+            backendId: "runtime:comfyui",
+            runtimeProfile: "comfyui",
+            requiredCapabilities: ["workflow-template-execution"],
+            requiredDependencies: ["comfyui>=0.2"],
+          },
+          capability: {
+            workflowMode: "text-to-image",
+            supportsFaceId: false,
+            supportsBatchExecution: false,
+          },
+        },
         tags: [],
         metadata: {},
       },
@@ -78,7 +99,9 @@ describe("WorkflowTemplatePreviewService", () => {
     expect(preview?.name).toBe("Image Starter");
     expect(preview?.expectedInputs[0]?.inputId).toBe("prompt");
     expect(preview?.outputs[0]?.outputId).toBe("images");
+    expect(preview?.outputs[0]?.targetDatasetInstanceRef).toBe("dataset-instance-ref:starter:output");
     expect(preview?.parameters[0]?.defaultValue).toBe(20);
     expect(preview?.referencedWorkflowAssets[0]?.workflowAssetId).toBe("asset:workflow:starter");
+    expect(preview?.executionMetadata?.runtimeProfile).toBe("comfyui");
   });
 });

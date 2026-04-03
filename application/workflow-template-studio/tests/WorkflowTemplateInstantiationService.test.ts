@@ -65,7 +65,16 @@ describe("WorkflowTemplateInstantiationService", () => {
         composition: {
           workflowInterfaces: [{ workflowAssetId: "asset:workflow:starter", inputIds: ["prompt"], outputIds: ["images"], parameterIds: ["steps"] }],
           inputBindings: [{ bindingId: "in-1", templateInputId: "prompt", workflowAssetId: "asset:workflow:starter", workflowInputId: "prompt", required: true }],
-          outputBindings: [{ bindingId: "out-1", templateOutputId: "images", workflowAssetId: "asset:workflow:starter", workflowOutputId: "images", targetDatasetAssetId: "asset:dataset:images" }],
+          outputBindings: [{
+            bindingId: "out-1",
+            templateOutputId: "images",
+            workflowAssetId: "asset:workflow:starter",
+            workflowOutputId: "images",
+            targetDatasetAssetId: "asset:dataset:images",
+            targetDatasetInstanceRef: "dataset-instance-ref:starter:output",
+            targetStorageInstanceRef: "storage-instance://storage-instance%3Atemplate-starter",
+            targetStorageBindingId: "output-images",
+          }],
           parameterMappings: [{ parameterId: "steps", workflowAssetId: "asset:workflow:starter", workflowParameterId: "steps" }],
           systemContextMappings: [{ mappingId: "ctx-1", contextKey: "workspaceId", workflowAssetId: "asset:workflow:starter", targetKind: "workflow-parameter", targetId: "workspaceId" }],
         },
@@ -92,6 +101,7 @@ describe("WorkflowTemplateInstantiationService", () => {
     expect(instance.resolvedParameters.steps).toBe(30);
     expect(instance.boundInputs[0]?.value).toBe("hello");
     expect(instance.boundOutputs[0]?.bindings[0]?.targetDatasetAssetId).toBe("asset:dataset:images");
+    expect(instance.boundOutputs[0]?.bindings[0]?.targetStorageInstanceRef?.startsWith("storage-instance://")).toBeTrue();
     expect(instance.systemContextBindings[0]?.value).toBe("ws-1");
   });
 
