@@ -11,8 +11,8 @@ describe("BuildPage", () => {
     expect(source).toContain("buildWorkflowRunHistoryPath");
     expect(source).toContain("View run history");
     expect(source).toContain('data-testid="build-persisted-workflow-list"');
-    expect(source).toContain("Reference Image Manipulation System");
+    expect(source).toContain("SystemBuildTemplateCatalog");
     expect(source).toContain("buildTemplateId");
-    expect(source).toContain("Open in System Studio");
+    expect(source).toContain("actionLabel ?? \"Open template\"");
   });
 });

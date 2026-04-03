@@ -1229,3 +1229,10 @@ Not implemented in this slice:
   - schema assets remain first-class atomic `schema` role assets,
   - schema documents remain versioned (`schemaVersion=1.0.0`) and serialize through canonical domain helpers,
   - Schema Studio edits continue to flow through the existing studio draft content infrastructure.
+
+## AI Loom image manipulation update: Build-flow system template registration + primary workflow binding hardening (stories 1.5-1.6)
+
+- Build now resolves image manipulation as a real **system build template asset entry** through `application/system-studio/SystemBuildTemplateCatalog.ts` instead of a detached page-local card definition.
+- Build-to-System-Studio handoff carries a stable `buildTemplateId` that resolves to seeded draft defaults (asset id, metadata, dependencies, and serialized system composition content) so first save persists the canonical system asset id (`asset:system:reference-image-manipulation`) via the existing studio-shell draft path.
+- Seeded system draft content composes the existing image input/output/optional FaceID datasets and binds the primary workflow template component (`asset:workflow-template:image-to-image:starter`) through normal system `components` + `bindings` structure.
+- This keeps workflow binding explicit and inspectable at the system asset layer, while deferring schema-to-node mapping/runtime adapter details to later stories.

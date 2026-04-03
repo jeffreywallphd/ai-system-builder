@@ -1136,3 +1136,10 @@
   - schema assets remain first-class atomic `schema` assets in existing taxonomy,
   - schema documents remain versioned (`schemaVersion=1.0.0`) and serialize through canonical schema-domain helpers,
   - Schema Studio edits continue through existing studio draft content flows (no parallel persistence model).
+
+## AI Loom image manipulation update: Build-flow system template registration + primary workflow binding hardening (stories 1.5-1.6)
+
+- Build now resolves image manipulation as a real **system build template asset entry** through `application/system-studio/SystemBuildTemplateCatalog.ts` rather than a page-local detached card.
+- Build-to-System-Studio handoff carries `buildTemplateId` and resolves seeded draft defaults (asset id, metadata, dependencies, serialized composition content), so first save uses the canonical system asset id through the existing studio-shell `createDraft` path.
+- Seeded system draft content composes existing image input/output/optional FaceID dataset assets and binds the primary workflow template component (`asset:workflow-template:image-to-image:starter`) via standard system `components` + `bindings`.
+- This keeps system-level workflow binding explicit for downstream schema/runtime work without introducing execution-adapter shortcuts in this slice.

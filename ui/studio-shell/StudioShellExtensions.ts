@@ -124,6 +124,7 @@ export interface SystemStudioCompositionCapabilities {
 export interface StudioDraftDefaults {
   readonly title: string;
   readonly tags: ReadonlyArray<string>;
+  readonly assetId?: string;
   readonly contentTemplate?: string;
   readonly metadataPatch?: AssetMetadataPatch;
   readonly dependencies?: ReadonlyArray<AssetDraftDependencyReference>;
