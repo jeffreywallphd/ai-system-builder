@@ -1351,3 +1351,15 @@ Not implemented in this slice:
 - FaceID now has an explicit optional contract group (`enabled`, `referenceBindings`, `weight`, `startStepFraction`, `endStepFraction`) with schema-driven runtime mapping metadata and non-technical user-facing labels/descriptions.
 - FaceID reference bindings use dataset-native logical references (`datasetBindingId`, `datasetAssetId`) and reject raw file paths, preserving system-managed storage architecture boundaries.
 - FaceID step-window consistency is validated (`startStepFraction <= endStepFraction`) and preview output now summarizes whether identity guidance is enabled plus selected/default configuration.
+
+## AI Loom image manipulation update: defaults, validation, and user-facing metadata hardening (stories 3.7-3.8)
+
+- `ComfyImageManipulationPropertySchema` now ships a fully runnable default configuration contract (`createComfyImageManipulationDefaultConfig`/`resolveComfyImageManipulationConfig`) that resolves every field group without requiring additional user input.
+- Validation now returns consistent structured issues (`scope`, `code`, `path`, `message`) for field-level and cross-field checks so downstream preview/inspector surfaces can render deterministic validation states without ad hoc parsing.
+- Cross-field checks now explicitly cover:
+  - required positive prompt semantics,
+  - download target compatibility with multi-result output counts,
+  - FaceID timing window ordering (`startStepFraction <= endStepFraction`),
+  - FaceID reference requirements only when FaceID is enabled.
+- User-facing schema labels/descriptions were refined for non-technical readability while preserving inspectable runtime mapping metadata for advanced controls (for example, exposing user-friendly labels with technical metadata retained for CFG/seed/sampler/scheduler mappings).
+- Preview summaries now reflect resolved default state and user-friendly wording (including identity-guidance summary phrasing) rather than raw partial input.

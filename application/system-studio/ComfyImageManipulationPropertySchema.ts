@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const ComfyImageManipulationPropertySchemaId = "property-schema:image-manipulation";
-export const ComfyImageManipulationPropertySchemaVersion = "1.2.0";
+export const ComfyImageManipulationPropertySchemaVersion = "1.3.0";
 
 export const ComfyConditioningMapping = Object.freeze({
   positivePrompt: "desired-features",
@@ -93,6 +93,8 @@ export interface ComfyImageManipulationConfig {
 }
 
 export interface ComfyImageManipulationConfigValidationIssue {
+  readonly scope: "field" | "cross-field";
+  readonly code: string;
   readonly path: string;
   readonly message: string;
 }
@@ -154,11 +156,19 @@ const ComfyImageManipulationConfigSchema = z.object({
         datasetBindingId: z.string().trim().regex(/^[a-z0-9-]+$/),
         datasetAssetId: z.string().trim().startsWith("asset:dataset:"),
       }),
-    ).min(1).max(8).default(faceIdDefaults.referenceBindings),
+    ).max(8).default(faceIdDefaults.referenceBindings),
     weight: z.number().min(0).max(2).default(faceIdDefaults.weight),
     startStepFraction: z.number().min(0).max(1).default(faceIdDefaults.startStepFraction),
     endStepFraction: z.number().min(0).max(1).default(faceIdDefaults.endStepFraction),
   }).superRefine((value, ctx) => {
+    if (value.enabled && value.referenceBindings.length < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["referenceBindings"],
+        message: "Add at least one identity reference image when identity guidance is turned on.",
+      });
+    }
+
     if (value.startStepFraction > value.endStepFraction) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -171,6 +181,22 @@ const ComfyImageManipulationConfigSchema = z.object({
     resultCount: z.number().int().min(1).max(4).default(outputDefaults.resultCount),
     outputTarget: z.enum(["history", "download"]).default(outputDefaults.outputTarget),
   }).default(outputDefaults),
+}).superRefine((value, ctx) => {
+  if (value.prompts.positivePrompt.trim().length < 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["prompts", "positivePrompt"],
+      message: "Describe what you want to create is required.",
+    });
+  }
+
+  if (value.output.resultCount > 1 && value.output.outputTarget === "download") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["output", "outputTarget"],
+      message: "Download supports one image at a time. Save to History for multiple results.",
+    });
+  }
 });
 
 function normalizeInput(input: unknown): Record<string, unknown> {
@@ -261,8 +287,8 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
           type: "string",
           required: true,
           defaultValue: modelDefaults.faceIdModel,
-          label: "Face reference model",
-          description: "Choose the model used when applying face-reference guidance.",
+          label: "Identity model",
+          description: "Choose the model used when identity guidance is enabled.",
           validation: Object.freeze({ nonEmpty: true }),
           metadata: Object.freeze({
             role: "faceid",
@@ -325,8 +351,8 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
           type: "number",
           required: true,
           defaultValue: generationDefaults.variationStrength,
-          label: "Variation strength",
-          description: "Controls how much the new image can differ from the source image.",
+          label: "Creativity level",
+          description: "Higher values allow bigger visual changes from the source image.",
           validation: Object.freeze({ min: 0, max: 1 }),
         }),
         Object.freeze({
@@ -345,11 +371,13 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
           type: "number",
           required: true,
           defaultValue: generationDefaults.cfg,
-          label: "Prompt strength",
-          description: "Controls how strongly the image follows your instructions.",
+          label: "Instruction strength",
+          description: "Higher values follow your instructions more closely.",
           validation: Object.freeze({ min: 1, max: 30 }),
           metadata: Object.freeze({
             runtimeBinding: "comfy.cfg",
+            technicalLabel: "CFG",
+            progressiveDisclosure: "advanced",
           }),
         }),
         Object.freeze({
@@ -358,11 +386,12 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
           type: "enum",
           required: true,
           defaultValue: generationDefaults.sampler,
-          label: "Sampling method",
-          description: "Choose the sampling method used to build each image.",
+          label: "Render method",
+          description: "Choose how the system builds each image.",
           validation: Object.freeze({ options: [...comfySamplerOptions] }),
           metadata: Object.freeze({
             runtimeBinding: "comfy.sampler_name",
+            progressiveDisclosure: "advanced",
           }),
         }),
         Object.freeze({
@@ -371,11 +400,12 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
           type: "enum",
           required: true,
           defaultValue: generationDefaults.scheduler,
-          label: "Scheduling method",
-          description: "Choose how steps are distributed during generation.",
+          label: "Step timing",
+          description: "Choose how rendering effort is distributed across steps.",
           validation: Object.freeze({ options: [...comfySchedulerOptions] }),
           metadata: Object.freeze({
             runtimeBinding: "comfy.scheduler",
+            progressiveDisclosure: "advanced",
           }),
         }),
         Object.freeze({
@@ -384,12 +414,14 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
           type: "integer",
           required: true,
           defaultValue: generationDefaults.seed,
-          label: "Seed",
-          description: "Use the same number to repeat results, or change it for a new variation.",
+          label: "Variation code",
+          description: "Reuse this number for similar results, or change it for new variations.",
           validation: Object.freeze({ min: 0, max: 2147483647 }),
           metadata: Object.freeze({
             deterministicByDefault: true,
             randomizationMode: "future-compatible",
+            technicalLabel: "Seed",
+            progressiveDisclosure: "advanced",
           }),
         }),
       ]),
@@ -452,8 +484,8 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
           type: "number",
           required: true,
           defaultValue: faceIdDefaults.startStepFraction,
-          label: "Identity start",
-          description: "Set when identity guidance begins during generation.",
+          label: "Identity start timing",
+          description: "Choose when identity guidance begins while rendering.",
           validation: Object.freeze({ min: 0, max: 1 }),
           metadata: Object.freeze({
             runtimeBinding: "comfy.faceid.start_at",
@@ -466,8 +498,8 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
           type: "number",
           required: true,
           defaultValue: faceIdDefaults.endStepFraction,
-          label: "Identity end",
-          description: "Set when identity guidance stops during generation.",
+          label: "Identity end timing",
+          description: "Choose when identity guidance stops while rendering.",
           validation: Object.freeze({ min: 0, max: 1, gtePath: "faceId.startStepFraction" }),
           metadata: Object.freeze({
             runtimeBinding: "comfy.faceid.end_at",
@@ -528,10 +560,17 @@ export function validateComfyImageManipulationConfig(input: unknown): ReadonlyAr
     return Object.freeze([]);
   }
 
-  return Object.freeze(parsed.error.issues.map((issue) => Object.freeze({
-    path: issue.path.join("."),
-    message: issue.message,
-  })));
+  return Object.freeze(parsed.error.issues.map((issue) => {
+    const path = issue.path.join(".");
+    const scope = issue.code === z.ZodIssueCode.custom ? "cross-field" : "field";
+    const code = issue.code === z.ZodIssueCode.custom ? "cross-field-invalid" : "invalid-value";
+    return Object.freeze({
+      scope,
+      code,
+      path,
+      message: issue.message,
+    });
+  }));
 }
 
 export function resolveComfyImageManipulationConfig(input: unknown): ComfyImageManipulationConfig {
@@ -582,7 +621,7 @@ export function createComfyImageManipulationConfigPreview(input: unknown): Comfy
     summary: Object.freeze({
       positivePromptPreview: truncate(resolved.prompts.positivePrompt, 80),
       hasNegativePrompt: resolved.prompts.negativePrompt.trim().length > 0,
-      modelSummary: `base=${resolved.models.checkpointModel}, vae=${resolved.models.vaeModel}, face=${resolved.models.faceIdModel}`,
+      modelSummary: `Base model: ${resolved.models.checkpointModel}; detail model: ${resolved.models.vaeModel}; identity model: ${resolved.models.faceIdModel}`,
       width: resolved.generation.width,
       height: resolved.generation.height,
       denoiseStrength: resolved.generation.denoiseStrength,
@@ -595,7 +634,7 @@ export function createComfyImageManipulationConfigPreview(input: unknown): Comfy
       outputTarget: resolved.output.outputTarget,
       faceIdEnabled: resolved.faceId.enabled,
       faceIdSummary: resolved.faceId.enabled
-        ? `enabled (${resolved.faceId.referenceBindings.length} reference${resolved.faceId.referenceBindings.length === 1 ? "" : "s"}, weight=${resolved.faceId.weight}, range=${resolved.faceId.startStepFraction}-${resolved.faceId.endStepFraction})`
+        ? `on (${resolved.faceId.referenceBindings.length} reference${resolved.faceId.referenceBindings.length === 1 ? "" : "s"}, influence=${resolved.faceId.weight}, timing=${resolved.faceId.startStepFraction}-${resolved.faceId.endStepFraction})`
         : "disabled",
     }),
   });

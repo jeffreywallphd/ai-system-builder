@@ -13,7 +13,7 @@ import {
 describe("ComfyImageManipulationPropertySchema", () => {
   it("defines a versioned and inspectable property schema asset", () => {
     expect(ComfyImageManipulationPropertySchema.id).toBe("property-schema:image-manipulation");
-    expect(ComfyImageManipulationPropertySchema.version).toBe("1.2.0");
+    expect(ComfyImageManipulationPropertySchema.version).toBe("1.3.0");
     expect(ComfyImageManipulationPropertySchema.capabilities.composable).toBeTrue();
     expect(ComfyImageManipulationPropertySchema.capabilities.inspectable).toBeTrue();
     expect(ComfyImageManipulationPropertySchema.capabilities.previewable).toBeTrue();
@@ -59,6 +59,7 @@ describe("ComfyImageManipulationPropertySchema", () => {
     });
 
     expect(issues.some((issue) => issue.path === "prompts.positivePrompt")).toBeTrue();
+    expect(issues.some((issue) => issue.path === "prompts.positivePrompt" && issue.code === "cross-field-invalid")).toBeTrue();
 
     const resolved = resolveComfyImageManipulationConfig({
       prompts: {
@@ -87,7 +88,7 @@ describe("ComfyImageManipulationPropertySchema", () => {
         seed: 123,
       },
       output: {
-        resultCount: 2,
+        resultCount: 1,
         outputTarget: "download",
       },
     });
@@ -107,7 +108,7 @@ describe("ComfyImageManipulationPropertySchema", () => {
     expect(preview.schemaId).toBe(ComfyImageManipulationPropertySchema.id);
     expect(preview.summary.positivePromptPreview.length).toBeLessThanOrEqual(81);
     expect(preview.summary.hasNegativePrompt).toBeTrue();
-    expect(preview.summary.modelSummary).toContain("base=system-default");
+    expect(preview.summary.modelSummary).toContain("Base model: system-default");
     expect(preview.summary.sampler).toBe("euler");
     expect(preview.summary.scheduler).toBe("normal");
     expect(preview.summary.seed).toBe(1337);
@@ -153,6 +154,8 @@ describe("ComfyImageManipulationPropertySchema", () => {
       referenceKind: "dataset-binding",
       supportsMultiple: true,
     }));
+    expect(sampler?.label).toBe("Render method");
+    expect(scheduler?.label).toBe("Step timing");
   });
 
   it("validates generation ranges and selection values", () => {
@@ -205,6 +208,22 @@ describe("ComfyImageManipulationPropertySchema", () => {
     expect(issues.some((issue) => issue.path === "faceId.endStepFraction")).toBeTrue();
   });
 
+  it("enforces cross-field rules for result destination and FaceID references", () => {
+    const issues = validateComfyImageManipulationConfig({
+      output: {
+        resultCount: 3,
+        outputTarget: "download",
+      },
+      faceId: {
+        enabled: true,
+        referenceBindings: [],
+      },
+    });
+
+    expect(issues.some((issue) => issue.path === "output.outputTarget" && issue.scope === "cross-field")).toBeTrue();
+    expect(issues.some((issue) => issue.path === "faceId.referenceBindings" && issue.code === "cross-field-invalid")).toBeTrue();
+  });
+
   it("summarizes enabled FaceID guidance in preview output", () => {
     const preview = createComfyImageManipulationConfigPreview({
       faceId: {
@@ -220,7 +239,7 @@ describe("ComfyImageManipulationPropertySchema", () => {
     });
 
     expect(preview.summary.faceIdEnabled).toBeTrue();
-    expect(preview.summary.faceIdSummary).toContain("enabled (2 references");
-    expect(preview.summary.faceIdSummary).toContain("range=0.1-0.9");
+    expect(preview.summary.faceIdSummary).toContain("on (2 references");
+    expect(preview.summary.faceIdSummary).toContain("timing=0.1-0.9");
   });
 });
