@@ -442,7 +442,19 @@ export class SystemDatasetInstanceService {
       instanceId: request.instanceId,
     });
     if (instance.lifecycleStatus === DatasetInstanceLifecycleStatuses.archived) {
-      return instance;
+      if (!request.cleanupStatus) {
+        return instance;
+      }
+      return this.repository.save(patchDatasetInstance({
+        instance,
+        patch: {
+          runtimeStatus: DatasetInstanceRuntimeStatuses.unavailable,
+          lifecycleMetadata: {
+            ...(instance.lifecycleMetadata ?? {}),
+            cleanupStatus: request.cleanupStatus,
+          },
+        },
+      }));
     }
 
     const transitioned = transitionDatasetInstanceLifecycle({

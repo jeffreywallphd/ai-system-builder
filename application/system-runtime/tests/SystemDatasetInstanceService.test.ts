@@ -1598,6 +1598,14 @@ describe("SystemDatasetInstanceService", () => {
     expect(archived.runtimeStatus).toBe("unavailable");
     expect(archived.lifecycleMetadata?.cleanupStatus).toBe("pending");
 
+    const archivedCleanupCompleted = await service.archiveDatasetInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      cleanupStatus: "completed",
+    });
+    expect(archivedCleanupCompleted.lifecycleStatus).toBe("archived");
+    expect(archivedCleanupCompleted.lifecycleMetadata?.cleanupStatus).toBe("completed");
+
     await expect(service.ingestImageRecordIntoInstance({
       systemId: "system:image-pipeline",
       instanceId: instance.instanceId,

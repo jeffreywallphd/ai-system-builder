@@ -13,6 +13,7 @@ export interface StorageInstanceLifecycleInfrastructure {
   archive(metadata: StorageInstanceMetadata): Promise<void> | void;
   cleanup(metadata: StorageInstanceMetadata): Promise<void> | void;
   delete(metadata: StorageInstanceMetadata): Promise<void> | void;
+  inspect?(metadata: StorageInstanceMetadata): Promise<void> | void;
 }
 
 export interface StorageInstanceLifecycleDeleteResult {
@@ -26,6 +27,7 @@ export class NoopStorageInstanceLifecycleInfrastructure implements StorageInstan
   public archive(): void {}
   public cleanup(): void {}
   public delete(): void {}
+  public inspect(): void {}
 }
 
 export class StorageInstanceLifecycleService {
@@ -57,6 +59,12 @@ export class StorageInstanceLifecycleService {
     const metadata = await this.requireInstance(instanceId);
     await this.infrastructure.cleanup(metadata);
     return this.saveWithLifecycle(metadata, { state: metadata.lifecycle.state });
+  }
+
+  public async inspect(instanceId: string): Promise<StorageInstanceMetadata> {
+    const metadata = await this.requireInstance(instanceId);
+    await this.infrastructure.inspect?.(metadata);
+    return metadata;
   }
 
   public async detach(input: {
