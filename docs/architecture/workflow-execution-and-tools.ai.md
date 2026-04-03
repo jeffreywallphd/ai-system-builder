@@ -427,3 +427,9 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Reference-image storage provisioning now requests deterministic shared bindings for all four areas and still materializes under infrastructure-managed `/storage/{instanceId}/{area}` directories.
 - Runtime output materialization and upload intake now resolve bindings by logical area (`output` for materialization, `input` for uploads) instead of relying on a single implicit storage binding.
 - Storage/system separation is explicit in infrastructure tests: provisioning remains rooted under `/storage/...` and does not claim `/systems/...` ownership.
+
+## AI Loom image manipulation template binding + ingestion contract update (stories 6.3-6.4)
+
+- Reference-image template draft creation now provisions storage + dataset-instance runtime defaults immediately for template-backed system drafts, so input/output dataset bindings are executable without waiting for first upload/output interaction.
+- Runtime dataset provisioning now resolves by logical template binding ids (`input-image-dataset`, `output-image-dataset`) instead of positional array assumptions in higher-layer orchestration.
+- Upload ingestion now routes through dataset binding areas (`storageBindingArea: "input"`) and dataset-instance contracts, removing ad hoc upload-path construction from higher layers.

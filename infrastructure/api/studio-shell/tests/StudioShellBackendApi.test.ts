@@ -208,6 +208,102 @@ describe("StudioShellBackendApi", () => {
     expect(direct.error?.message).toContain("Storage path configuration is infrastructure-owned");
   });
 
+  it("provisions reference-image template dataset storage bindings at draft creation time", async () => {
+    class CountingProvisioner implements StorageInstanceProvisioningContract {
+      public calls: string[] = [];
+
+      public async provision(request: Parameters<StorageInstanceProvisioningContract["provision"]>[0]) {
+        this.calls.push(request.instanceId);
+        return createStorageInstanceProvisioningResult({
+          instanceId: request.instanceId,
+          storageInstanceRef: `storage-instance://${encodeURIComponent(request.instanceId)}`,
+          provider: "test-provisioner",
+          contractVersion: request.contractVersion,
+          bindings: request.requestedBindings.map((area) => ({
+            bindingId: `storage-binding:${request.instanceId}:${area}`,
+            area,
+            reference: `storage-instance://${encodeURIComponent(request.instanceId)}/${area}`,
+            provider: "test-provisioner",
+            metadata: {},
+          })),
+          metadata: {},
+        });
+      }
+    }
+
+    const provisioner = new CountingProvisioner();
+    const api = new StudioShellBackendApi(
+      new InMemoryStudioShellRepository(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { storageInstanceProvisioner: provisioner },
+    );
+
+    const initialized = await api.initializeStudio("studio-system", "System Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+    const created = await api.createDraft({
+      studioId: "studio-system",
+      sessionId,
+      assetId: "asset:system:reference-image-manipulation",
+      content: JSON.stringify({ systemSpec: {} }),
+      metadata: {
+        title: "Reference image",
+        tags: ["system"],
+        taxonomy: {
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "deterministic",
+        },
+      },
+    });
+
+    expect(created.ok).toBeTrue();
+    expect(provisioner.calls).toEqual(["storage-instance:asset:system:reference-image-manipulation:image-runtime"]);
+
+    const listed = await api.listReferenceImageOutputs({
+      studioId: "studio-system",
+      draftId: created.data!.draft!.draftId,
+    });
+    expect(listed.ok).toBeTrue();
+    expect(provisioner.calls).toEqual(["storage-instance:asset:system:reference-image-manipulation:image-runtime"]);
+  });
+
+  it("ignores caller-provided upload path hints and ingests through dataset storage bindings", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    const initialized = await api.initializeStudio("studio-system", "System Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+    const created = await api.createDraft({
+      studioId: "studio-system",
+      sessionId,
+      assetId: "asset:system:reference-image-manipulation",
+      content: JSON.stringify({ systemSpec: {} }),
+      metadata: {
+        title: "Reference image",
+        tags: ["system"],
+        taxonomy: {
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "deterministic",
+        },
+      },
+    });
+
+    const upload = await api.ingestReferenceImageUpload({
+      studioId: "studio-system",
+      draftId: created.data!.draft!.draftId,
+      fileName: "demo.png",
+      mimeType: "image/png",
+      payloadBase64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z2YcAAAAASUVORK5CYII=",
+      storageReference: "file://user/controlled/path.png",
+    } as unknown as Parameters<StudioShellBackendApi["ingestReferenceImageUpload"]>[0]);
+
+    expect(upload.ok).toBeTrue();
+    expect(upload.data?.image.assetId).toContain("generated-output:storage-instance://");
+    expect(upload.data?.image.assetId).not.toContain("file://user/controlled/path.png");
+  });
+
   it("starts rerun from historical execution context and persists run lineage metadata", async () => {
     const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
     const workflowPersistenceRepository = new InMemoryWorkflowPersistenceRepository();
