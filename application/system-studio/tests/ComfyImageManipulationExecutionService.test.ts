@@ -4,13 +4,12 @@ import { ComfyImageManipulationBaseGraph } from "../ComfyImageManipulationBaseGr
 import { createComfyImageManipulationDefaultConfig } from "../ComfyImageManipulationPropertySchema";
 import { ComfyImageManipulationExecutionContractVersion } from "../ComfyImageManipulationExecutionAdapterContract";
 import { ComfyImageManipulationExecutionService } from "../ComfyImageManipulationExecutionService";
+import { buildComfyImageManipulationExecutionSubmission } from "../ComfyImageManipulationGraphRequestBuilder";
 
 const makeAdapter = () => {
   let pollCount = 0;
   return {
-    buildGraphRequest: () => {
-      throw new Error("not-used");
-    },
+    buildGraphRequest: buildComfyImageManipulationExecutionSubmission,
     submitExecution: async () => ({ executionId: "exec-service-1" }),
     getExecutionProgress: async () => {
       pollCount += 1;
@@ -61,11 +60,38 @@ describe("ComfyImageManipulationExecutionService", () => {
       runtimeMetadata: {
         executionId: "exec-service-1",
       },
+      runtimeEnvironment: {
+        apiBaseUrl: "http://127.0.0.1:8188",
+      },
       pollIntervalMs: 0,
     });
 
     expect(result.executionId).toBe("exec-service-1");
     expect(result.lifecycle.some((entry) => entry.status === "queued")).toBeTrue();
     expect(result.final.status).toBe("succeeded");
+  });
+
+  it("returns normalized failed lifecycle when readiness validation is blocked", async () => {
+    const service = new ComfyImageManipulationExecutionService(makeAdapter());
+
+    const result = await service.execute({
+      contractVersion: ComfyImageManipulationExecutionContractVersion,
+      workflowTemplate: ImageManipulationWorkflowTemplate,
+      baseGraph: ComfyImageManipulationBaseGraph,
+      resolvedConfig: createComfyImageManipulationDefaultConfig(),
+      datasetHandles: [{
+        kind: "dataset-instance",
+        referenceId: "input-image-dataset",
+        instanceId: "dataset-instance-ref:reference-image:input",
+      }],
+      runtimeMetadata: {
+        executionId: "exec-service-readiness-failed",
+      },
+      pollIntervalMs: 0,
+    });
+
+    expect(result.final.status).toBe("failed");
+    expect(result.final.error?.code).toBe("invalid-request");
+    expect(result.lifecycle.length).toBe(1);
   });
 });
