@@ -1,5 +1,6 @@
 import type { EnsureRoleDatasetInstanceRequest } from "../system-runtime/SystemDatasetInstanceService";
 import {
+  type BuildReferenceImageDatasetInstanceRequestsOptions,
   buildReferenceImageDatasetInstanceRequests,
   ReferenceImagePrimaryWorkflowTemplateAssetId,
   ReferenceImagePrimaryWorkflowTemplateVersionId,
@@ -47,6 +48,9 @@ export const ImageManipulationSystemTemplate: ImageManipulationSystemTemplateDef
 
 export const ImageManipulationSystemWorkflowContextMapping = ReferenceImageSystemWorkflowContextMapping;
 
-export function buildImageManipulationDatasetInstanceRequests(systemId: string): ReadonlyArray<EnsureRoleDatasetInstanceRequest> {
-  return buildReferenceImageDatasetInstanceRequests(systemId);
+export function buildImageManipulationDatasetInstanceRequests(
+  systemId: string,
+  options?: BuildReferenceImageDatasetInstanceRequestsOptions,
+): ReadonlyArray<EnsureRoleDatasetInstanceRequest> {
+  return buildReferenceImageDatasetInstanceRequests(systemId, options);
 }

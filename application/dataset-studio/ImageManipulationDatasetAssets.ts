@@ -19,6 +19,7 @@ import {
 
 export const ImageManipulationInputDatasetAssetId = "asset:dataset:image-reference-input";
 export const ImageManipulationOutputDatasetAssetId = "asset:dataset:image-reference-output";
+export const ImageManipulationFaceIdReferenceDatasetAssetId = "asset:dataset:image-faceid-reference";
 
 function createImageDatasetAsset(input: {
   readonly assetId: string;
@@ -120,6 +121,17 @@ export function createImageManipulationOutputImageDatasetAsset(): DataAssetBase 
   });
 }
 
+export function createImageManipulationFaceIdReferenceDatasetAsset(): DataAssetBase {
+  return createImageDatasetAsset({
+    assetId: ImageManipulationFaceIdReferenceDatasetAssetId,
+    name: "Image Manipulation FaceID Reference Dataset",
+    summary: "Optional FaceID reference image dataset for identity-preserving image manipulation flows.",
+    tags: Object.freeze(["image", "dataset", "faceid", "reference", "runtime", "optional"]),
+    revision: 1,
+    writeBehavior: "workflow-and-system",
+  });
+}
+
 export function registerImageManipulationDatasetAssets(
   registry: DataAssetRegistry,
 ): ReadonlyArray<DataAssetRegistryEntry> {
@@ -173,5 +185,30 @@ export function registerImageManipulationDatasetAssets(
     schemaIntentId: "media",
   });
 
-  return Object.freeze([inputEntry, outputEntry]);
+  const faceIdReferenceEntry = registry.register({
+    asset: createImageManipulationFaceIdReferenceDatasetAsset(),
+    specialization: DataAssetRegistrySpecializations.dataset,
+    category: "image-manipulation",
+    display: {
+      title: "Image Manipulation FaceID Reference Dataset",
+      summary: "Optional FaceID reference images used for identity-consistent conditioning.",
+      tags: ["image", "faceid", "reference", "runtime", "optional"],
+    },
+    inspectability: {
+      supportedSourceKinds: ["dataset-instance", "workflow-output"],
+      supportedFileExtensions: [".png", ".jpg", ".jpeg", ".webp"],
+      supportedMediaTypes: ["image/png", "image/jpeg", "image/webp"],
+      keyConfigKeys: [],
+      previewModes: ["image-metadata-summary"],
+      executionModes: ["runtime-read", "runtime-write"],
+    },
+    discoverability: {
+      scope: DataAssetDiscoverabilityScopes.advanced,
+      defaultEntryPoint: false,
+      inspectable: true,
+    },
+    schemaIntentId: "media",
+  });
+
+  return Object.freeze([inputEntry, outputEntry, faceIdReferenceEntry]);
 }

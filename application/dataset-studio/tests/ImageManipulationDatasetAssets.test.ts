@@ -1,8 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import { getDataStudioAssetRegistry } from "../DataStudioAssetRegistryCatalog";
 import {
+  createImageManipulationFaceIdReferenceDatasetAsset,
   createImageManipulationInputImageDatasetAsset,
+  createImageManipulationOutputImageDatasetAsset,
+  ImageManipulationFaceIdReferenceDatasetAssetId,
   ImageManipulationInputDatasetAssetId,
+  ImageManipulationOutputDatasetAssetId,
 } from "../ImageManipulationDatasetAssets";
 
 describe("ImageManipulationDatasetAssets", () => {
@@ -26,5 +30,31 @@ describe("ImageManipulationDatasetAssets", () => {
     expect(entry?.descriptor.schemaIntent.id).toBe("media");
     expect(entry?.descriptor.discoverability.inspectable).toBeTrue();
     expect(entry?.descriptor.inspectability.previewModes).toContain("image-metadata-summary");
+  });
+
+  it("defines an output dataset asset for generated image results with runtime-managed write behavior", () => {
+    const asset = createImageManipulationOutputImageDatasetAsset();
+    const inspection = asset.inspect();
+
+    expect(inspection.metadata.identity.assetId).toBe(ImageManipulationOutputDatasetAssetId);
+    expect(inspection.metadata.runtime.mutability.writeBehavior).toBe("system-only");
+    expect(inspection.metadata.runtime.accessPatterns).toContain("append-write");
+    expect(inspection.metadata.runtime.accessPatterns).toContain("point-lookup");
+    expect(inspection.metadata.runtime.usability).toBe("runtime-operational");
+  });
+
+  it("defines an optional FaceID reference dataset asset and registers it for discovery", () => {
+    const asset = createImageManipulationFaceIdReferenceDatasetAsset();
+    const inspection = asset.inspect();
+
+    expect(inspection.metadata.identity.assetId).toBe(ImageManipulationFaceIdReferenceDatasetAssetId);
+    expect(inspection.metadata.runtime.mutability.writeBehavior).toBe("workflow-and-system");
+    expect(inspection.metadata.display.tags).toContain("faceid");
+    expect(inspection.outputShapeKind).toBe("image-metadata-records");
+
+    const entry = getDataStudioAssetRegistry().get({ assetId: ImageManipulationFaceIdReferenceDatasetAssetId });
+    expect(entry).toBeDefined();
+    expect(entry?.descriptor.schemaIntent.id).toBe("media");
+    expect(entry?.descriptor.display.tags).toContain("optional");
   });
 });

@@ -13,6 +13,7 @@ describe("ImageManipulationSystemTemplate", () => {
     expect(ImageManipulationSystemTemplate.systemAsset.components.map((entry) => entry.alias)).toEqual([
       "input-image-dataset-asset",
       "output-image-dataset-asset",
+      "reference-image-dataset-asset",
       "reference-workflow",
       "reference-ui",
     ]);
@@ -38,5 +39,14 @@ describe("ImageManipulationSystemTemplate", () => {
       "asset:dataset:image-reference-input",
       "asset:dataset:image-reference-output",
     ]);
+  });
+
+  it("can include optional FaceID reference dataset provisioning when explicitly requested", () => {
+    const requests = buildImageManipulationDatasetInstanceRequests("system:image-manipulation", {
+      includeOptionalReferenceDatasets: true,
+    });
+
+    expect(requests).toHaveLength(3);
+    expect(requests.map((entry) => entry.datasetAssetId)).toContain("asset:dataset:image-faceid-reference");
   });
 });
