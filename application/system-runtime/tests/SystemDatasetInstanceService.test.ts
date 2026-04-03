@@ -461,6 +461,125 @@ describe("SystemDatasetInstanceService", () => {
     expect(comparison.purpose).toBe("image-compare-inspection");
   });
 
+  it("supports cross-system dataset-instance reuse through explicit access bindings", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([{
+        assetId: "image-ingestor-v1",
+        versionId: "1.0.0",
+        schemaIntentId: DatasetSchemaIntentIds.media,
+        outputShapeKind: "image-metadata-records",
+      }]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:owner", "system:consumer"]),
+    );
+
+    const ownerInstance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:shared-input",
+      systemId: "system:owner",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+      storageBindings: [{
+        storageInstanceId: "storage-instance:shared-runtime",
+        storageInstanceRef: "storage-instance://storage-instance%3Ashared-runtime",
+        bindingArea: "input",
+        bindingId: "storage-binding:storage-instance:shared-runtime:input",
+        bindingReference: "storage-instance://storage-instance%3Ashared-runtime/input",
+      }],
+    });
+    const bound = await service.bindDatasetInstanceByRole({
+      systemId: "system:consumer",
+      instanceId: ownerInstance.instanceId,
+      role: "input",
+    });
+    expect(bound.systemId).toBe("system:consumer");
+    expect(bound.instanceId).toBe(ownerInstance.instanceId);
+
+    const reused = await service.ensureRoleDatasetInstance({
+      instanceId: ownerInstance.instanceId,
+      systemId: "system:consumer",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+      role: "input-store",
+      purpose: "incoming-images",
+      reuseFromInstanceId: ownerInstance.instanceId,
+    });
+    expect(reused.instanceId).toBe(ownerInstance.instanceId);
+    expect(reused.accessBindings?.map((entry) => entry.accessorId)).toContain("system:consumer");
+    expect(reused.storageBindings?.[0]?.storageInstanceId).toBe("storage-instance:shared-runtime");
+
+    const ingested = await service.ingestImageRecordIntoInstance({
+      systemId: "system:consumer",
+      instanceId: ownerInstance.instanceId,
+      record: {
+        assetRef: { assetId: "asset:image:shared-consumer" },
+        width: 512,
+        height: 512,
+        format: "png",
+      },
+    });
+    expect(ingested.instanceId).toBe(ownerInstance.instanceId);
+    expect(ingested.systemId).toBe("system:owner");
+
+    const listed = service.listImageRecordsForInstance({
+      systemId: "system:consumer",
+      instanceId: ownerInstance.instanceId,
+    });
+    expect(listed.length).toBe(1);
+    expect(listed[0]?.recordId).toBe(ingested.recordId);
+  });
+
+  it("supports shared dataset-instance access between a parent system and embedded subsystem", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([{
+        assetId: "image-exporter-v1",
+        versionId: "1.0.0",
+        schemaIntentId: DatasetSchemaIntentIds.media,
+        outputShapeKind: "image-metadata-records",
+      }]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:root"]),
+    );
+    const parentSystemId = "system:root";
+    const embeddedSubsystemId = "system:root::subsystem:enhance";
+    const shared = await service.ensureOutputImageStoreInstance({
+      instanceId: "dataset-instance:shared-output",
+      systemId: parentSystemId,
+      datasetAssetId: "image-exporter-v1",
+      datasetAssetVersionId: "1.0.0",
+    });
+    await service.bindDatasetInstanceByRole({
+      systemId: embeddedSubsystemId,
+      instanceId: shared.instanceId,
+      role: "output",
+      accessorKind: "embedded-subsystem",
+      accessorRole: "embedded-output-store",
+    });
+
+    const ingested = await service.ingestImageRecordIntoInstance({
+      systemId: embeddedSubsystemId,
+      instanceId: shared.instanceId,
+      record: {
+        assetRef: { assetId: "asset:image:embedded-output" },
+        width: 768,
+        height: 768,
+        format: "png",
+      },
+    });
+    expect(ingested.systemId).toBe(parentSystemId);
+
+    const parentRead = service.getImageRecordFromInstance({
+      systemId: parentSystemId,
+      instanceId: shared.instanceId,
+      recordId: ingested.recordId,
+    });
+    expect(parentRead?.recordId).toBe(ingested.recordId);
+    expect(service.listSystemDatasetBindings(embeddedSubsystemId).some((binding) => binding.instanceId === shared.instanceId)).toBeTrue();
+  });
+
   it("creates optional intermediate stores with lifecycle metadata via shared dataset instance contracts", async () => {
     const repository = new InMemoryDatasetInstanceRepository();
     const service = new SystemDatasetInstanceService(
@@ -770,7 +889,7 @@ describe("SystemDatasetInstanceService", () => {
       instanceId: "dataset-instance:ownership-check",
       role: "input",
       purpose: "incoming-images",
-    })).rejects.toThrow("is owned by system 'system:image-pipeline'");
+    })).rejects.toThrow("System 'system:other' is not available");
 
     await expect(service.bindDatasetInstanceByRole({
       systemId: "system:image-pipeline",
@@ -1016,7 +1135,7 @@ describe("SystemDatasetInstanceService", () => {
       systemId: "system:other",
       instanceId: instance.instanceId,
       recordId: "record:image-owned",
-    })).toThrow("is owned by system 'system:image-pipeline'");
+    })).toThrow("is not bound to system/subsystem 'system:other'");
   });
 
   it("lists and queries ingested records by image query contracts (tags/format/dimensions/metadata/derived/identifiers)", async () => {
@@ -1454,7 +1573,7 @@ describe("SystemDatasetInstanceService", () => {
     expect(() => service.loadDatasetInstance({
       systemId: "system:other",
       instanceId: instance.instanceId,
-    })).toThrow("is owned by system 'system:image-pipeline'");
+    })).toThrow("is not bound to system/subsystem 'system:other'");
 
     const reset = await service.resetDatasetInstanceState({
       systemId: "system:image-pipeline",

@@ -152,6 +152,7 @@ export interface DesktopStudioShellBridge {
   persistReferenceImageOutputs(requestJson: string): Promise<string>;
   listReferenceImageOutputs(requestJson: string): Promise<string>;
   listReferenceImageRunHistory(requestJson: string): Promise<string>;
+  chainReferenceImageDatasetItemToInput(requestJson: string): Promise<string>;
 }
 
 export interface DesktopRegistryBridge {

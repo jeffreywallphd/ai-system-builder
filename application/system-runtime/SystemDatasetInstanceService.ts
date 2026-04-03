@@ -8,14 +8,18 @@ import type { IImageRecordValidator } from "../../domain/dataset-studio/contract
 import type { IImageMetadataExtractor } from "../../domain/dataset-studio/interfaces/ImageMetadataExtraction";
 import { createDefaultMediaAdapterBundle } from "../dataset-studio/adapters/media/MediaAdapterFactory";
 import {
+  createSystemDatasetBinding,
   createSystemDatasetBindingFromInstance,
+  mapDatasetInstanceRoleToSystemBindingRole,
   mapSystemBindingRoleToDatasetInstanceRole,
   type SystemDatasetBinding,
   type SystemDatasetBindingRole,
 } from "../../domain/system-runtime/SystemDatasetBindingDomain";
 import {
+  attachDatasetInstanceAccessBinding,
   createDatasetInstance,
   findDatasetInstanceStorageBinding,
+  hasDatasetInstanceAccessBinding,
   patchDatasetInstance,
   transitionDatasetInstanceLifecycle,
   DatasetInstanceLifecycleStatuses,
@@ -88,6 +92,7 @@ export interface EnsureRoleDatasetInstanceRequest {
   readonly storageBinding?: DatasetInstance["storageBinding"];
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
   readonly lifecycleMetadata?: DatasetInstance["lifecycleMetadata"];
+  readonly reuseFromInstanceId?: string;
 }
 
 export interface EnsureInputImageStoreInstanceRequest {
@@ -145,6 +150,8 @@ export interface BindSystemDatasetInstanceByRoleRequest {
   readonly instanceId: string;
   readonly role: SystemDatasetBindingRole;
   readonly purpose?: string;
+  readonly accessorKind?: "system" | "embedded-subsystem";
+  readonly accessorRole?: string;
 }
 
 export interface GetSystemDatasetBindingByRoleRequest {
@@ -326,6 +333,7 @@ export class SystemDatasetInstanceService {
   private readonly lineageSink?: DatasetOperationalLineageSink;
   private readonly datasetEventPublisher?: DatasetEventPublisher;
   private readonly selectedRecordByInstanceKey = new Map<string, string>();
+  private readonly boundInstanceByRoleKey = new Map<string, string>();
 
   public constructor(
     private readonly repository: DatasetInstanceRepository,
@@ -382,10 +390,11 @@ export class SystemDatasetInstanceService {
     if (!systemId || !instanceId) {
       return undefined;
     }
-    return this.repository.getBySystemAndId({
-      systemId,
-      instanceId,
-    });
+    const instance = this.repository.getById(instanceId);
+    if (!instance) {
+      return undefined;
+    }
+    return this.hasInstanceAccess(instance, systemId) ? instance : undefined;
   }
 
   public loadDatasetInstance(request: {
@@ -476,6 +485,11 @@ export class SystemDatasetInstanceService {
       throw new Error(`not-found:Dataset instance '${instance.instanceId}' was not found.`);
     }
     this.selectedRecordByInstanceKey.delete(this.createInstanceSelectionKey(instance.systemId, instance.instanceId));
+    for (const [key, value] of this.boundInstanceByRoleKey.entries()) {
+      if (value === instance.instanceId) {
+        this.boundInstanceByRoleKey.delete(key);
+      }
+    }
     return Object.freeze({
       instanceId: instance.instanceId,
       removedImageRecordCount,
@@ -483,7 +497,26 @@ export class SystemDatasetInstanceService {
   }
 
   public listSystemDatasetBindings(systemId: string): ReadonlyArray<SystemDatasetBinding> {
-    return Object.freeze(this.repository.listBySystemId(systemId).map(createSystemDatasetBindingFromInstance));
+    const direct = this.repository.listBySystemId(systemId).map(createSystemDatasetBindingFromInstance);
+    const roleKeys = [...this.boundInstanceByRoleKey.entries()]
+      .filter(([key]) => key.startsWith(`${systemId.trim()}::`))
+      .map(([, instanceId]) => instanceId);
+    const indirect = roleKeys
+      .map((instanceId) => this.repository.getById(instanceId))
+      .filter((instance): instance is DatasetInstance => Boolean(instance))
+      .map((instance) => createSystemDatasetBinding({
+        systemId: systemId.trim(),
+        instanceId: instance.instanceId,
+        datasetAssetId: instance.datasetAssetId,
+        datasetAssetVersionId: instance.datasetAssetVersionId,
+        role: mapDatasetInstanceRoleToSystemBindingRole(instance.role),
+        purpose: instance.purpose,
+      }));
+    const deduped = new Map<string, SystemDatasetBinding>();
+    for (const binding of [...direct, ...indirect]) {
+      deduped.set(`${binding.role}::${binding.purpose ?? ""}::${binding.instanceId}`, binding);
+    }
+    return Object.freeze([...deduped.values()]);
   }
 
   public getSystemDatasetBindingByRole(request: GetSystemDatasetBindingByRoleRequest): SystemDatasetBinding | undefined {
@@ -493,25 +526,29 @@ export class SystemDatasetInstanceService {
 
   public getBoundDatasetInstanceByRole(request: GetSystemDatasetBindingByRoleRequest): DatasetInstance | undefined {
     const role = mapSystemBindingRoleToDatasetInstanceRole(request.role);
-    return this.repository.findBySystemAndRole({
+    const direct = this.repository.findBySystemAndRole({
       systemId: request.systemId,
       role,
       purpose: request.purpose,
     });
+    if (direct) {
+      return direct;
+    }
+    const mapped = this.boundInstanceByRoleKey.get(this.createRoleBindingKey({
+      systemId: request.systemId,
+      role,
+      purpose: request.purpose,
+    }));
+    return mapped ? this.repository.getById(mapped) : undefined;
   }
 
   public async bindDatasetInstanceByRole(request: BindSystemDatasetInstanceByRoleRequest): Promise<SystemDatasetBinding> {
     await this.assertSystemExists(request.systemId);
 
+    const requestedSystemId = request.systemId.trim();
     const instance = this.repository.getById(request.instanceId);
     if (!instance) {
       throw new Error(`not-found:Dataset instance '${request.instanceId}' was not found.`);
-    }
-
-    if (instance.systemId !== request.systemId.trim()) {
-      throw new Error(
-        `invalid-request:Dataset instance '${instance.instanceId}' is owned by system '${instance.systemId}', not '${request.systemId.trim()}'.`,
-      );
     }
 
     const expectedRole = mapSystemBindingRoleToDatasetInstanceRole(request.role);
@@ -529,17 +566,36 @@ export class SystemDatasetInstanceService {
     }
 
     const existing = this.repository.findBySystemAndRole({
-      systemId: request.systemId,
+      systemId: requestedSystemId,
       role: expectedRole,
       purpose: requestedPurpose ?? instance.purpose,
     });
     if (existing && existing.instanceId !== instance.instanceId) {
       throw new Error(
-        `conflict:System '${request.systemId}' already has a '${expectedRole}' dataset instance for purpose '${requestedPurpose ?? instance.purpose ?? ""}'.`,
+        `conflict:System '${requestedSystemId}' already has a '${expectedRole}' dataset instance for purpose '${requestedPurpose ?? instance.purpose ?? ""}'.`,
       );
     }
 
-    return createSystemDatasetBindingFromInstance(instance);
+    const bound = attachDatasetInstanceAccessBinding({
+      instance,
+      accessorId: requestedSystemId,
+      accessorKind: request.accessorKind ?? "system",
+      role: request.accessorRole ?? request.role,
+    });
+    const saved = this.repository.save(bound);
+    this.boundInstanceByRoleKey.set(this.createRoleBindingKey({
+      systemId: requestedSystemId,
+      role: expectedRole,
+      purpose: requestedPurpose ?? saved.purpose,
+    }), saved.instanceId);
+    return createSystemDatasetBinding({
+      systemId: requestedSystemId,
+      instanceId: saved.instanceId,
+      datasetAssetId: saved.datasetAssetId,
+      datasetAssetVersionId: saved.datasetAssetVersionId,
+      role: mapDatasetInstanceRoleToSystemBindingRole(saved.role),
+      purpose: saved.purpose,
+    });
   }
 
   public async ensureRoleDatasetInstance(request: EnsureRoleDatasetInstanceRequest): Promise<DatasetInstance> {
@@ -560,6 +616,86 @@ export class SystemDatasetInstanceService {
       throw new Error(
         `invalid-request:Dataset asset '${asset.assetId}@${asset.versionId ?? "latest"}' has output shape '${asset.outputShapeKind}', expected '${request.requiredOutputShapeKind}'.`,
       );
+    }
+
+    const reuseFromInstanceId = normalizeOptional(request.reuseFromInstanceId);
+    if (reuseFromInstanceId) {
+      const reusable = this.repository.getById(reuseFromInstanceId);
+      if (!reusable) {
+        throw new Error(`not-found:Dataset instance '${reuseFromInstanceId}' was not found.`);
+      }
+      if (reusable.role !== request.role) {
+        throw new Error(
+          `invalid-request:Dataset instance '${reusable.instanceId}' has role '${reusable.role}', expected '${request.role}'.`,
+        );
+      }
+      if (reusable.datasetAssetId !== request.datasetAssetId
+        || normalizeOptional(reusable.datasetAssetVersionId) !== normalizeOptional(request.datasetAssetVersionId)) {
+        throw new Error(
+          `invalid-request:Dataset instance '${reusable.instanceId}' is linked to '${reusable.datasetAssetId}@${reusable.datasetAssetVersionId ?? "latest"}', expected '${request.datasetAssetId}@${request.datasetAssetVersionId ?? "latest"}'.`,
+        );
+      }
+      if (normalizeOptional(reusable.purpose) !== normalizeOptional(request.purpose)) {
+        throw new Error(
+          `invalid-request:Dataset instance '${reusable.instanceId}' purpose '${reusable.purpose ?? ""}' does not match requested purpose '${request.purpose ?? ""}'.`,
+        );
+      }
+      if (!this.areStorageBindingsEquivalent(reusable.storageBindings, normalizedStorageBindings)) {
+        throw new Error(
+          `invalid-request:Dataset instance '${reusable.instanceId}' storage binding linkage does not match the requested bindings.`,
+        );
+      }
+      const bound = attachDatasetInstanceAccessBinding({
+        instance: reusable,
+        accessorId: request.systemId,
+        accessorKind: request.systemId.includes("::subsystem:") ? "embedded-subsystem" : "system",
+        role: request.role,
+      });
+      const saved = this.repository.save(bound);
+      this.boundInstanceByRoleKey.set(this.createRoleBindingKey({
+        systemId: request.systemId,
+        role: request.role,
+        purpose: request.purpose,
+      }), saved.instanceId);
+      return saved;
+    }
+
+    const existingById = this.repository.getById(request.instanceId);
+    if (existingById && existingById.systemId !== request.systemId) {
+      if (existingById.role !== request.role) {
+        throw new Error(
+          `conflict:Dataset instance '${existingById.instanceId}' is already associated with role '${existingById.role}'.`,
+        );
+      }
+      if (existingById.datasetAssetId !== request.datasetAssetId
+        || normalizeOptional(existingById.datasetAssetVersionId) !== normalizeOptional(request.datasetAssetVersionId)) {
+        throw new Error(
+          `conflict:Dataset instance '${existingById.instanceId}' already exists with different dataset asset linkage.`,
+        );
+      }
+      if (normalizeOptional(existingById.purpose) !== normalizeOptional(request.purpose)) {
+        throw new Error(
+          `conflict:Dataset instance '${existingById.instanceId}' already exists with purpose '${existingById.purpose ?? ""}', requested '${request.purpose ?? ""}'.`,
+        );
+      }
+      if (!this.areStorageBindingsEquivalent(existingById.storageBindings, normalizedStorageBindings)) {
+        throw new Error(
+          `conflict:Dataset instance '${existingById.instanceId}' already exists with different storage binding linkage.`,
+        );
+      }
+      const bound = attachDatasetInstanceAccessBinding({
+        instance: existingById,
+        accessorId: request.systemId,
+        accessorKind: request.systemId.includes("::subsystem:") ? "embedded-subsystem" : "system",
+        role: request.role,
+      });
+      const saved = this.repository.save(bound);
+      this.boundInstanceByRoleKey.set(this.createRoleBindingKey({
+        systemId: request.systemId,
+        role: request.role,
+        purpose: request.purpose,
+      }), saved.instanceId);
+      return saved;
     }
 
     const existing = this.repository.findBySystemAndRole({
@@ -845,7 +981,7 @@ export class SystemDatasetInstanceService {
       instanceId: request.instanceId,
     });
     const items = this.repository.queryImageRecordsBySystemId({
-      systemId: request.systemId,
+      systemId: instance.systemId,
       instanceId: request.instanceId,
       query: request.query,
     });
@@ -871,7 +1007,7 @@ export class SystemDatasetInstanceService {
       instanceId: request.instanceId,
     });
     const page = this.repository.queryImageRecordPageBySystemId({
-      systemId: request.systemId,
+      systemId: instance.systemId,
       instanceId: request.instanceId,
       query: request.query,
       window: Object.freeze({
@@ -923,7 +1059,7 @@ export class SystemDatasetInstanceService {
     });
     const recordId = normalizeRequired(request.recordId, "recordId");
     const found = this.repository.getImageRecordBySystemAndId({
-      systemId: request.systemId,
+      systemId: instance.systemId,
       instanceId: request.instanceId,
       recordId,
     });
@@ -954,7 +1090,7 @@ export class SystemDatasetInstanceService {
     }
     const records = Object.freeze(recordIds
       .map((recordId) => this.repository.getImageRecordBySystemAndId({
-        systemId: request.systemId,
+        systemId: instance.systemId,
         instanceId: request.instanceId,
         recordId: recordId!,
       }))
@@ -1602,6 +1738,14 @@ export class SystemDatasetInstanceService {
     return `${systemId}::${instanceId}`;
   }
 
+  private createRoleBindingKey(input: {
+    readonly systemId: string;
+    readonly role: DatasetInstanceRole;
+    readonly purpose?: string;
+  }): string {
+    return `${input.systemId.trim()}::${input.role}::${normalizeOptional(input.purpose) ?? ""}`;
+  }
+
   private isGeneratedRecord(record: DatasetInstanceImageRecord): boolean {
     return record.image.assetRef?.kind === "generated-output"
       || record.storage?.provider === "generated-output"
@@ -1767,17 +1911,13 @@ export class SystemDatasetInstanceService {
   }): DatasetInstance {
     const systemId = normalizeRequired(input.systemId, "systemId");
     const instanceId = normalizeRequired(input.instanceId, "instanceId");
-    const instance = this.repository.getBySystemAndId({
-      systemId,
-      instanceId,
-    });
+    const instance = this.repository.getById(instanceId);
     if (!instance) {
-      const existingById = this.repository.getById(instanceId);
-      if (!existingById) {
-        throw new Error(`not-found:Dataset instance '${instanceId}' was not found.`);
-      }
+      throw new Error(`not-found:Dataset instance '${instanceId}' was not found.`);
+    }
+    if (!this.hasInstanceAccess(instance, systemId)) {
       throw new Error(
-        `invalid-request:Dataset instance '${existingById.instanceId}' is owned by system '${existingById.systemId}', not '${systemId}'.`,
+        `invalid-request:Dataset instance '${instance.instanceId}' is not bound to system/subsystem '${systemId}'.`,
       );
     }
     return instance;
@@ -1796,7 +1936,10 @@ export class SystemDatasetInstanceService {
     if (!normalized.startsWith("system:")) {
       throw new Error("invalid-request:systemId must be a canonical system asset id.");
     }
-    await this.systemValidator?.assertSystemExists(normalized);
+    const validatorScopeId = normalized.includes("::subsystem:")
+      ? normalized.split("::subsystem:")[0] ?? normalized
+      : normalized;
+    await this.systemValidator?.assertSystemExists(validatorScopeId);
   }
 
   private async assertAssetLinked(input: {
@@ -1814,6 +1957,17 @@ export class SystemDatasetInstanceService {
       );
     }
     return asset;
+  }
+
+  private hasInstanceAccess(instance: DatasetInstance, systemId: string): boolean {
+    const normalizedSystemId = normalizeRequired(systemId, "systemId");
+    if (instance.systemId === normalizedSystemId) {
+      return true;
+    }
+    return hasDatasetInstanceAccessBinding({
+      instance,
+      accessorId: normalizedSystemId,
+    });
   }
 
 }

@@ -59,6 +59,22 @@ export interface DatasetInstanceStorageBinding {
   readonly bindingReference: string;
 }
 
+export const DatasetInstanceAccessBindingKinds = Object.freeze({
+  system: "system",
+  embeddedSubsystem: "embedded-subsystem",
+} as const);
+
+export type DatasetInstanceAccessBindingKind =
+  typeof DatasetInstanceAccessBindingKinds[keyof typeof DatasetInstanceAccessBindingKinds];
+
+export interface DatasetInstanceAccessBinding {
+  readonly bindingId: string;
+  readonly accessorId: string;
+  readonly accessorKind: DatasetInstanceAccessBindingKind;
+  readonly role?: string;
+  readonly attachedAt: string;
+}
+
 export const DatasetInstanceStorageContractVersion = "2.0.0";
 
 export interface DatasetInstance {
@@ -74,6 +90,7 @@ export interface DatasetInstance {
   readonly lifecycleStatus: DatasetInstanceLifecycleStatus;
   readonly runtimeStatus: DatasetInstanceRuntimeStatus;
   readonly storageBinding?: DatasetInstanceStorageBinding;
+  readonly accessBindings?: ReadonlyArray<DatasetInstanceAccessBinding>;
   readonly seedMetadata?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly lifecycleMetadata?: DatasetInstanceLifecycleMetadata;
   readonly createdAt: string;
@@ -88,6 +105,7 @@ export interface DatasetInstancePatch {
   readonly storageContractVersion?: string | null;
   readonly storageBindings?: ReadonlyArray<DatasetInstanceStorageBinding> | null;
   readonly storageBinding?: DatasetInstanceStorageBinding | null;
+  readonly accessBindings?: ReadonlyArray<DatasetInstanceAccessBinding> | null;
   readonly seedMetadata?: Readonly<Record<string, CanonicalRecordValue>> | null;
   readonly lifecycleMetadata?: DatasetInstanceLifecycleMetadata | null;
   readonly updatedAt?: string;
@@ -189,6 +207,65 @@ function normalizeStorageContractVersion(value?: string): string | undefined {
     throw new Error("Dataset instance storageContractVersion must be a non-empty string when provided.");
   }
   return normalized;
+}
+
+function normalizeAccessBindingKind(value: DatasetInstanceAccessBindingKind): DatasetInstanceAccessBindingKind {
+  if (Object.values(DatasetInstanceAccessBindingKinds).includes(value)) {
+    return value;
+  }
+  throw new Error(`Dataset instance access binding kind '${value}' is not supported.`);
+}
+
+function normalizeAccessBinding(input: DatasetInstanceAccessBinding): DatasetInstanceAccessBinding {
+  const bindingId = normalizeRequired(input.bindingId, "Dataset instance access binding bindingId");
+  const accessorId = normalizeRequired(input.accessorId, "Dataset instance access binding accessorId");
+  const attachedAt = normalizeTimestamp(input.attachedAt, "Dataset instance access binding attachedAt");
+  return Object.freeze({
+    bindingId,
+    accessorId,
+    accessorKind: normalizeAccessBindingKind(input.accessorKind),
+    role: normalizeOptional(input.role),
+    attachedAt,
+  });
+}
+
+function createOwnerAccessBinding(input: {
+  readonly instanceId: string;
+  readonly systemId: string;
+  readonly createdAt: string;
+}): DatasetInstanceAccessBinding {
+  const systemId = normalizeRequired(input.systemId, "Dataset instance system id");
+  return Object.freeze({
+    bindingId: `dataset-instance-binding:${input.instanceId}:owner`,
+    accessorId: systemId,
+    accessorKind: DatasetInstanceAccessBindingKinds.system,
+    role: "owner",
+    attachedAt: input.createdAt,
+  });
+}
+
+function normalizeAccessBindings(input: {
+  readonly instanceId: string;
+  readonly systemId: string;
+  readonly createdAt: string;
+  readonly accessBindings?: ReadonlyArray<DatasetInstanceAccessBinding>;
+}): ReadonlyArray<DatasetInstanceAccessBinding> {
+  const normalized = (input.accessBindings ?? [])
+    .map((binding) => normalizeAccessBinding(binding));
+  const ownerBinding = createOwnerAccessBinding({
+    instanceId: input.instanceId,
+    systemId: input.systemId,
+    createdAt: input.createdAt,
+  });
+  const bindings = [ownerBinding, ...normalized];
+  const byBindingId = new Map<string, DatasetInstanceAccessBinding>();
+  for (const binding of bindings) {
+    if (byBindingId.has(binding.bindingId)) {
+      continue;
+    }
+    byBindingId.set(binding.bindingId, binding);
+  }
+  return Object.freeze([...byBindingId.values()]);
 }
 
 function normalizeTimestamp(value: string | undefined, label: string): string {
@@ -303,6 +380,7 @@ export function createDatasetInstance(input: {
   readonly lifecycleStatus?: DatasetInstanceLifecycleStatus;
   readonly runtimeStatus?: DatasetInstanceRuntimeStatus;
   readonly storageBinding?: DatasetInstanceStorageBinding;
+  readonly accessBindings?: ReadonlyArray<DatasetInstanceAccessBinding>;
   readonly seedMetadata?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly lifecycleMetadata?: DatasetInstanceLifecycleMetadata;
   readonly createdAt?: string;
@@ -321,9 +399,11 @@ export function createDatasetInstance(input: {
     ? normalizeStorageContractVersion(input.storageContractVersion) ?? DatasetInstanceStorageContractVersion
     : undefined;
 
+  const instanceId = normalizeRequired(input.instanceId, "Dataset instance id");
+  const systemId = normalizeRequired(input.systemId, "Dataset instance system id");
   return Object.freeze({
-    instanceId: normalizeRequired(input.instanceId, "Dataset instance id"),
-    systemId: normalizeRequired(input.systemId, "Dataset instance system id"),
+    instanceId,
+    systemId,
     datasetAssetId: normalizeRequired(input.datasetAssetId, "Dataset instance dataset asset id"),
     datasetAssetVersionId: normalizeOptional(input.datasetAssetVersionId),
     role: normalizeRole(input.role),
@@ -333,6 +413,12 @@ export function createDatasetInstance(input: {
     lifecycleStatus: normalizeLifecycleStatus(input.lifecycleStatus ?? DatasetInstanceLifecycleStatuses.provisioning),
     runtimeStatus: normalizeRuntimeStatus(input.runtimeStatus ?? DatasetInstanceRuntimeStatuses.idle),
     storageBinding: normalizedStorageBindings?.[0],
+    accessBindings: normalizeAccessBindings({
+      instanceId,
+      systemId,
+      createdAt,
+      accessBindings: input.accessBindings,
+    }),
     seedMetadata: normalizeSeedMetadata(input.seedMetadata),
     lifecycleMetadata: normalizeLifecycleMetadata(input.lifecycleMetadata),
     createdAt,
@@ -424,6 +510,9 @@ export function patchDatasetInstance(input: {
   const patchedStorageContractVersion = patch.storageContractVersion === null
     ? undefined
     : patch.storageContractVersion ?? input.instance.storageContractVersion;
+  const patchedAccessBindings = patch.accessBindings === null
+    ? undefined
+    : patch.accessBindings ?? input.instance.accessBindings;
 
   return createDatasetInstance({
     ...input.instance,
@@ -437,6 +526,7 @@ export function patchDatasetInstance(input: {
     runtimeStatus: patch.runtimeStatus ?? input.instance.runtimeStatus,
     storageContractVersion: patchedStorageContractVersion,
     storageBindings: patchedStorageBindings,
+    accessBindings: patchedAccessBindings,
     seedMetadata: patch.seedMetadata === null
       ? undefined
       : patch.seedMetadata ?? input.instance.seedMetadata,
@@ -444,6 +534,53 @@ export function patchDatasetInstance(input: {
       ? undefined
       : patch.lifecycleMetadata ?? input.instance.lifecycleMetadata,
     updatedAt,
+  });
+}
+
+export function hasDatasetInstanceAccessBinding(input: {
+  readonly instance: DatasetInstance;
+  readonly accessorId: string;
+}): boolean {
+  const accessorId = normalizeRequired(input.accessorId, "Dataset instance accessorId");
+  return (input.instance.accessBindings ?? []).some((binding) => binding.accessorId === accessorId);
+}
+
+export function attachDatasetInstanceAccessBinding(input: {
+  readonly instance: DatasetInstance;
+  readonly accessorId: string;
+  readonly accessorKind: DatasetInstanceAccessBindingKind;
+  readonly role?: string;
+  readonly bindingId?: string;
+  readonly attachedAt?: string;
+}): DatasetInstance {
+  const accessorId = normalizeRequired(input.accessorId, "Dataset instance accessorId");
+  if (hasDatasetInstanceAccessBinding({
+    instance: input.instance,
+    accessorId,
+  })) {
+    return input.instance;
+  }
+  const attachedAt = normalizeTimestamp(
+    input.attachedAt,
+    "Dataset instance access binding attachedAt",
+  );
+  const accessBindings = [
+    ...(input.instance.accessBindings ?? []),
+    Object.freeze({
+      bindingId: normalizeOptional(input.bindingId)
+        ?? `dataset-instance-binding:${input.instance.instanceId}:${encodeURIComponent(accessorId)}`,
+      accessorId,
+      accessorKind: normalizeAccessBindingKind(input.accessorKind),
+      role: normalizeOptional(input.role),
+      attachedAt,
+    } satisfies DatasetInstanceAccessBinding),
+  ];
+  return patchDatasetInstance({
+    instance: input.instance,
+    patch: {
+      accessBindings,
+      updatedAt: attachedAt,
+    },
   });
 }
 

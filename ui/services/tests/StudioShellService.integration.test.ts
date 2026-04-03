@@ -220,6 +220,9 @@ function installBridge(
     listReferenceImageRunHistory(requestJson: string) {
       return api.listReferenceImageRunHistory(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
+    chainReferenceImageDatasetItemToInput(requestJson: string) {
+      return api.chainReferenceImageDatasetItemToInput(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
   };
 
   (globalThis as { window?: Window }).window = {

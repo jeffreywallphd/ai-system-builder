@@ -30,6 +30,8 @@ import type {
   PersistedWorkflowReadModel,
   IngestReferenceImageUploadReadModel,
   IngestReferenceImageUploadRequest,
+  ChainReferenceImageDatasetItemReadModel,
+  ChainReferenceImageDatasetItemRequest,
   ListReferenceImageRunHistoryRequest,
   ListReferenceImageOutputsRequest,
   PersistReferenceImageOutputsReadModel,
@@ -296,5 +298,12 @@ export class StudioShellService {
   ): Promise<StudioShellApiResponse<ImageRunHistoryListing>> {
     const raw = await this.requireBridge().listReferenceImageRunHistory(JSON.stringify(request));
     return JSON.parse(raw) as StudioShellApiResponse<ImageRunHistoryListing>;
+  }
+
+  public async chainReferenceImageDatasetItemToInput(
+    request: ChainReferenceImageDatasetItemRequest,
+  ): Promise<StudioShellApiResponse<ChainReferenceImageDatasetItemReadModel>> {
+    const raw = await this.requireBridge().chainReferenceImageDatasetItemToInput(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<ChainReferenceImageDatasetItemReadModel>;
   }
 }
