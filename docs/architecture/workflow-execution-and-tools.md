@@ -678,3 +678,18 @@ The image slice proved the shared architecture, but it exposed concrete follow-u
 - `ComfyImageManipulationGraphRequestBuilder` now composes execution from explicit strategy selection (`non-faceid` vs `faceid`) instead of scattered conditionals.
 - FaceID dependency checks are strategy-scoped: reference bindings/model requirements are enforced only when FaceID is enabled.
 - Graph request inspection payloads now include selected execution path and FaceID subworkflow binding summaries for debugging without exposing raw filesystem paths or leaking Comfy transport internals.
+
+## AI Loom image manipulation hardening update: adapter readiness validation + focused adapter tests (stories 5.9-5.10)
+
+- Added a concrete execution-readiness validation seam (`ComfyImageManipulationExecutionValidation`) for the image-manipulation adapter path with a stable inspectable result contract.
+- Validation now checks:
+  - workflow template resolution and contract compatibility,
+  - property-to-node mapping resolution,
+  - required dataset/storage bindings,
+  - runtime configuration availability,
+  - required model/dependency availability for the selected path,
+  - FaceID-only requirements when FaceID is enabled,
+  - output materialization prerequisites.
+- Readiness failures are now surfaced as normalized execution-ready failures (`invalid-request`/`validation`) instead of ad hoc runtime throws.
+- `ComfyImageManipulationExecutionService` now runs readiness validation before adapter submission and returns normalized failed lifecycle snapshots when blocked.
+- Focused automated tests now cover adapter contract behavior, graph/request shape, property mapping correctness, FaceID branching, runtime resolution, lifecycle transitions, materialization binding integration points, normalized error behavior, validation contract behavior, and default-template execution readiness with no extra user input.

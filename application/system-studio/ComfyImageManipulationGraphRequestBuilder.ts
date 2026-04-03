@@ -2,7 +2,6 @@ import {
   ComfyImageManipulationExecutionContractVersion,
   type ComfyImageManipulationExecutionSubmission,
   type ComfyImageManipulationGraphBuildRequest,
-  type ComfyImageManipulationMaterializationBinding,
   type ComfyPromptGraphNode,
 } from "./ComfyImageManipulationExecutionAdapterContract";
 import {
@@ -13,42 +12,25 @@ import {
 import {
   resolveComfyImageManipulationGraphBindings,
   type ComfyNodeInputOverride,
-  type ResolveComfyImageManipulationGraphBindingsResult,
 } from "./ComfyImageManipulationPropertyMappingAsset";
-import { resolveComfyInputDatasetBinding } from "./ComfyImageManipulationDatasetBindingAsset";
-import { resolveComfyImageManipulationRuntimeConfiguration } from "./ComfyImageManipulationRuntimeResolution";
-
-const TEMPLATE_IDS = new Set([
-  "asset:workflow-template:image-manipulation:default",
-  "asset:workflow-template:image-to-image:starter",
-]);
+import {
+  createComfyExecutionReadinessFailure,
+  ComfyImageManipulationExecutionReadinessError,
+  validateComfyImageManipulationExecutionReadiness,
+} from "./ComfyImageManipulationExecutionValidation";
 
 interface ComfyExecutionPathStrategy {
   readonly pathKind: "non-faceid" | "faceid";
-  validate(mapping: ResolveComfyImageManipulationGraphBindingsResult): void;
-  selectOverrides(mapping: ResolveComfyImageManipulationGraphBindingsResult): ReadonlyArray<ComfyNodeInputOverride>;
+  selectOverrides(mapping: ReturnType<typeof resolveComfyImageManipulationGraphBindings>): ReadonlyArray<ComfyNodeInputOverride>;
 }
 
 const NonFaceIdExecutionPathStrategy: ComfyExecutionPathStrategy = Object.freeze({
   pathKind: "non-faceid",
-  validate: () => undefined,
   selectOverrides: (mapping) => mapping.directNodeOverrides,
 });
 
 const FaceIdExecutionPathStrategy: ComfyExecutionPathStrategy = Object.freeze({
   pathKind: "faceid",
-  validate: (mapping) => {
-    const faceId = mapping.subworkflowBindings[0];
-    if (!faceId?.enabled) {
-      throw new Error("invalid-request:FaceID execution strategy requires FaceID to be enabled.");
-    }
-    if (!faceId.model || faceId.model.trim().length < 1) {
-      throw new Error("invalid-request:FaceID model selection is required when FaceID is enabled.");
-    }
-    if (faceId.referenceBindings.length < 1) {
-      throw new Error("invalid-request:FaceID reference dataset bindings are required when FaceID is enabled.");
-    }
-  },
   selectOverrides: (mapping) => mapping.nodeOverrides,
 });
 
@@ -58,25 +40,20 @@ export function buildComfyImageManipulationExecutionSubmission(
   if (request.contractVersion !== ComfyImageManipulationExecutionContractVersion) {
     throw new Error(`invalid-request:Unsupported Comfy image manipulation execution contract version '${request.contractVersion}'.`);
   }
-
-  if (!TEMPLATE_IDS.has(request.workflowTemplate.templateId)) {
-    throw new Error(`invalid-request:Unsupported image manipulation template '${request.workflowTemplate.templateId}'.`);
+  const readiness = validateComfyImageManipulationExecutionReadiness(request);
+  if (!readiness.ready) {
+    const failure = createComfyExecutionReadinessFailure(readiness, request.runtimeMetadata.executionId);
+    throw new ComfyImageManipulationExecutionReadinessError(readiness, failure);
   }
 
-  const graph = createComfyImageManipulationBaseGraph(request.baseGraph ?? ComfyImageManipulationBaseGraph);
-  const mapping = resolveComfyImageManipulationGraphBindings(request.resolvedConfig);
-  const sourceDatasetBinding = resolveComfyInputDatasetBinding({ handles: request.datasetHandles });
+  const graph = readiness.graph ?? createComfyImageManipulationBaseGraph(request.baseGraph ?? ComfyImageManipulationBaseGraph);
+  const mapping = readiness.mapping ?? resolveComfyImageManipulationGraphBindings(request.resolvedConfig);
+  const sourceDatasetBinding = readiness.sourceDatasetBinding;
+  const runtimeResolution = readiness.runtimeResolution;
+  if (!sourceDatasetBinding || !runtimeResolution) {
+    throw new Error("invalid-request:Comfy image manipulation execution readiness is incomplete.");
+  }
   const strategy = resolveExecutionPathStrategy(mapping);
-  strategy.validate(mapping);
-  const runtimeResolution = resolveComfyImageManipulationRuntimeConfiguration({
-    workflowTemplate: request.workflowTemplate,
-    datasetHandles: request.datasetHandles,
-    runtimeEnvironment: request.runtimeEnvironment,
-    capabilityBinding: request.runtimeCapabilityBinding,
-  });
-  if (runtimeResolution.diagnostics.issues.length > 0) {
-    throw new Error(`invalid-request:${runtimeResolution.diagnostics.issues.join(" ")}`);
-  }
 
   const prompt = mapPromptGraph(
     graph,
@@ -84,7 +61,7 @@ export function buildComfyImageManipulationExecutionSubmission(
     sourceDatasetBinding.datasetRef.logicalRef,
     request.resolvedConfig as unknown as Record<string, unknown>,
   );
-  const materializationBindings = resolveMaterializationBindings(request);
+  const materializationBindings = readiness.materializationBindings;
   const executionRequestId = request.runtimeMetadata.executionId
     ?? `${request.workflowTemplate.templateId}:${Date.now().toString(36)}`;
 
@@ -114,7 +91,7 @@ export function buildComfyImageManipulationExecutionSubmission(
 }
 
 function resolveExecutionPathStrategy(
-  mapping: ResolveComfyImageManipulationGraphBindingsResult,
+  mapping: ReturnType<typeof resolveComfyImageManipulationGraphBindings>,
 ): ComfyExecutionPathStrategy {
   return mapping.subworkflowBindings[0]?.enabled
     ? FaceIdExecutionPathStrategy
@@ -190,20 +167,6 @@ function readConfigPath(config: Readonly<Record<string, unknown>>, path: string)
       if (!current || typeof current !== "object") return undefined;
       return (current as Record<string, unknown>)[segment];
     }, config);
-}
-
-function resolveMaterializationBindings(
-  request: ComfyImageManipulationGraphBuildRequest,
-): ReadonlyArray<ComfyImageManipulationMaterializationBinding> {
-  const bindings = request.workflowTemplate.composition?.outputBindings ?? [];
-
-  return Object.freeze(bindings.map((binding) => Object.freeze({
-    bindingId: binding.bindingId,
-    targetDatasetAssetId: binding.targetDatasetAssetId ?? "",
-    targetDatasetInstanceRef: binding.targetDatasetInstanceRef,
-    targetStorageInstanceRef: binding.targetStorageInstanceRef,
-    targetStorageBindingId: binding.targetStorageBindingId,
-  }))).filter((entry) => entry.targetDatasetAssetId.trim().length > 0);
 }
 
 function countBoundInputs(prompt: Readonly<Record<string, ComfyPromptGraphNode>>): number {
