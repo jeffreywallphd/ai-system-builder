@@ -88,6 +88,7 @@ import {
   type EnsureRoleDatasetInstanceRequest,
 } from "../../../application/system-runtime/SystemDatasetInstanceService";
 import type { StorageInstanceProvisioningContract } from "../../../application/system-runtime/StorageInstanceProvisioningContract";
+import { assertNoUserManagedStoragePaths } from "../../../application/system-runtime/StoragePathPolicyValidation";
 import {
   DeterministicStorageInstanceProvisioner,
   InMemoryStorageInstanceMetadataRepository,
@@ -2583,27 +2584,13 @@ export class StudioShellBackendApi {
   }
 
   private assertNoStoragePathConfiguration(input: unknown): void {
-    const root = this.toOptionalRecord(input);
-    if (!root) {
-      return;
-    }
-    const hasForbiddenPathField = (node: Readonly<Record<string, unknown>>): boolean => {
-      for (const [key, value] of Object.entries(node)) {
-        const normalizedKey = key.toLowerCase();
-        if (normalizedKey.includes("path") || normalizedKey.includes("directory") || normalizedKey.includes("filesystem")) {
-          return true;
-        }
-        const nested = this.toOptionalRecord(value);
-        if (nested && hasForbiddenPathField(nested)) {
-          return true;
-        }
-      }
-      return false;
-    };
-    if (hasForbiddenPathField(root)) {
-      throw new StudioShellInvalidRequestError(
+    try {
+      assertNoUserManagedStoragePaths(
+        input,
         "Storage path configuration is infrastructure-owned and cannot be provided by initialization callers.",
       );
+    } catch (error) {
+      throw new StudioShellInvalidRequestError((error as Error).message);
     }
   }
 

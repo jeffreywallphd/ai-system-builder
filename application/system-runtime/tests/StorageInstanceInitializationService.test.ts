@@ -113,7 +113,11 @@ describe("StorageInstanceInitializationService", () => {
         ownerId: "system:reference-image",
       },
       requestedBindings: ["input", "output"],
-      storageDirectory: "/tmp/custom-path",
-    } as unknown)).rejects.toThrow("Unrecognized key(s) in object: 'storageDirectory'");
+      metadata: {
+        execution: {
+          inputDirectory: "/tmp/custom-path",
+        },
+      },
+    } as unknown)).rejects.toThrow("Storage path configuration is infrastructure-owned");
   });
 });

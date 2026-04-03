@@ -85,7 +85,11 @@ export function parseStorageLogicalReference(reference: string): {
     throw new Error(`Storage reference '${reference}' must use the storage-instance:// scheme.`);
   }
   const withoutScheme = normalized.slice("storage-instance://".length);
-  const [encodedInstanceId, area] = withoutScheme.split("/");
+  const segments = withoutScheme.split("/");
+  if (segments.length > 2) {
+    throw new Error(`Storage reference '${reference}' must target an instance root or a single logical area.`);
+  }
+  const [encodedInstanceId, area] = segments;
   if (!encodedInstanceId) {
     throw new Error(`Storage reference '${reference}' is missing an instance id.`);
   }

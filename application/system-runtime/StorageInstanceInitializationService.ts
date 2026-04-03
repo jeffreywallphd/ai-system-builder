@@ -13,6 +13,7 @@ import {
   type StorageAttachmentOwnerKind,
   type StorageInstanceMetadata,
 } from "./StorageInstanceMetadataModel";
+import { assertNoUserManagedStoragePaths } from "./StoragePathPolicyValidation";
 
 const StorageInstanceOwnerSchema = z.object({
   ownerKind: z.nativeEnum(StorageAttachmentOwnerKinds),
@@ -229,39 +230,10 @@ export class StorageInstanceInitializationService {
   }
 
   private assertNoPathConfiguration(input: unknown): void {
-    const root = this.toRecord(input);
-    if (!root) {
-      return;
-    }
-    if (this.hasForbiddenPathField(root)) {
-      throw new Error("Storage path configuration is infrastructure-owned and cannot be provided by initialization callers.");
-    }
-  }
-
-  private hasForbiddenPathField(node: Readonly<Record<string, unknown>>): boolean {
-    for (const [key, value] of Object.entries(node)) {
-      const normalizedKey = key.toLowerCase();
-      if (
-        normalizedKey.includes("path")
-        || normalizedKey.includes("directory")
-        || normalizedKey.includes("filesystem")
-        || normalizedKey.includes("storageRoot".toLowerCase())
-      ) {
-        return true;
-      }
-      const nested = this.toRecord(value);
-      if (nested && this.hasForbiddenPathField(nested)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private toRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return undefined;
-    }
-    return value as Readonly<Record<string, unknown>>;
+    assertNoUserManagedStoragePaths(
+      input,
+      "Storage path configuration is infrastructure-owned and cannot be provided by initialization callers.",
+    );
   }
 }
 
