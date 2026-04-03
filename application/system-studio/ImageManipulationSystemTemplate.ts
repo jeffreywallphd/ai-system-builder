@@ -9,6 +9,8 @@ import {
   ReferenceImageSystemWorkflowContextMapping,
 } from "./ReferenceImageSystemTemplate";
 import { ComfyImageManipulationPropertySchemaId } from "./ComfyImageManipulationPropertySchema";
+import { ComfyImageManipulationDatasetBindingAssetId } from "./ComfyImageManipulationDatasetBindingAsset";
+import { ComfyImageManipulationPropertyMappingAssetId } from "./ComfyImageManipulationPropertyMappingAsset";
 
 export const ImageManipulationSystemTemplateId = ReferenceImageSystemTemplateId;
 export const ImageManipulationPrimaryWorkflowTemplateAssetId = ReferenceImagePrimaryWorkflowTemplateAssetId;
@@ -29,6 +31,8 @@ export interface ImageManipulationSystemTemplateDefinition {
     readonly optionalReferenceDatasetBindingId: "reference-image-dataset";
     readonly workflowTemplateBindingId: "primary-image-workflow";
     readonly propertySchemaBindingId: typeof ComfyImageManipulationPropertySchemaId;
+    readonly propertyMappingBindingId: typeof ComfyImageManipulationPropertyMappingAssetId;
+    readonly inputDatasetWorkflowBindingId: typeof ComfyImageManipulationDatasetBindingAssetId;
     readonly pageBindingId: "system-page:image-manipulation";
     readonly runtimeBindingId: "runtime:image-manipulation";
   };
@@ -42,6 +46,8 @@ export const ImageManipulationSystemTemplate: ImageManipulationSystemTemplateDef
     optionalReferenceDatasetBindingId: "reference-image-dataset",
     workflowTemplateBindingId: "primary-image-workflow",
     propertySchemaBindingId: ComfyImageManipulationPropertySchemaId,
+    propertyMappingBindingId: ComfyImageManipulationPropertyMappingAssetId,
+    inputDatasetWorkflowBindingId: ComfyImageManipulationDatasetBindingAssetId,
     pageBindingId: "system-page:image-manipulation",
     runtimeBindingId: "runtime:image-manipulation",
   }),
