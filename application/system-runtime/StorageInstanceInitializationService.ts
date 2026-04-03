@@ -26,7 +26,7 @@ const StorageInstanceInitializationRequestSchema = z.object({
   strategy: z.enum(["provision", "attach"]).default("provision"),
   instanceId: z.string().trim().min(1).optional(),
   attachInstanceId: z.string().trim().min(1).optional(),
-  requestedBindings: z.array(z.enum(["input", "output", "intermediate"])).min(1).default(["input", "output", "intermediate"]),
+  requestedBindings: z.array(z.enum(["input", "output", "reference", "intermediate"])).min(1).default(["input", "output", "intermediate"]),
   display: z.object({
     name: z.string().trim().min(1).optional(),
     summary: z.string().trim().min(1).optional(),

@@ -11,13 +11,13 @@ describe("StorageInstanceProvisioningContract", () => {
   it("normalizes provisioning requests with deduplicated logical binding areas", () => {
     const request = createStorageInstanceProvisioningRequest({
       instanceId: "storage-instance:alpha",
-      requestedBindings: ["input", "output", "input"],
+      requestedBindings: ["input", "output", "reference", "input"],
       reuseExisting: true,
       contractVersion: "1.0.0",
       metadata: { source: "tests" },
     });
 
-    expect(request.requestedBindings).toEqual(["input", "output"]);
+    expect(request.requestedBindings).toEqual(["input", "output", "reference"]);
     expect(request.contractVersion).toBe("1.0.0");
   });
 

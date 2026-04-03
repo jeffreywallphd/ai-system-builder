@@ -124,6 +124,7 @@ import {
 } from "../../../application/system-runtime/ImageRunHistoryRepository";
 import { ComfyExecutionResultMaterializationMapper } from "../../comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper";
 import type { SystemContextContract } from "../../../domain/system-studio/SystemContextContract";
+import { findDatasetInstanceStorageBinding } from "../../../domain/system-runtime/DatasetInstanceDomain";
 
 export interface StudioShellApiError {
   readonly code:
@@ -1180,14 +1181,18 @@ export class StudioShellBackendApi {
       if (!inputDataset) {
         throw new StudioShellInvalidRequestError("Reference image input dataset is unavailable.");
       }
-      if (!inputDataset.storageBinding) {
-        throw new StudioShellInvalidRequestError("Reference image input dataset is missing a storage binding.");
+      const inputStorageBinding = findDatasetInstanceStorageBinding({
+        instance: inputDataset,
+        area: "input",
+      });
+      if (!inputStorageBinding) {
+        throw new StudioShellInvalidRequestError("Reference image input dataset is missing an input storage binding.");
       }
 
       const ingested = await this.referenceImageDatasets.ingestImageRecordIntoInstance({
         systemId: runtimeSystemId,
         instanceId: inputDataset.instanceId,
-        storageReference: `${inputDataset.storageBinding.bindingReference}/uploads/${Date.now()}-${encodeURIComponent(fileName)}`,
+        storageReference: `${inputStorageBinding.bindingReference}/uploads/${Date.now()}-${encodeURIComponent(fileName)}`,
         metadata: {
           ingestionSource: "reference-image-ui-upload",
           uploadedFileName: fileName,
@@ -2635,7 +2640,7 @@ export class StudioShellBackendApi {
           ownerId,
           role: ownerRole,
         },
-        requestedBindings: ["input", "output", "intermediate"],
+        requestedBindings: ["input", "output", "reference", "intermediate"],
         display: {
           name: "Reference image runtime storage",
           summary: "Reusable runtime storage instance for image manipulation input/output/intermediate areas.",

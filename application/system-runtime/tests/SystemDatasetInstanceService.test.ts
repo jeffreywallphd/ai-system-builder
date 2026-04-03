@@ -230,7 +230,7 @@ describe("SystemDatasetInstanceService", () => {
     expect(service.listSystemDatasetInstances("system:image-pipeline").length).toBe(1);
   });
 
-  it("binds dataset instances to storage-instance logical bindings instead of filesystem paths", async () => {
+  it("binds dataset instances to versioned logical storage bindings instead of filesystem paths", async () => {
     const repository = new InMemoryDatasetInstanceRepository();
     const service = new SystemDatasetInstanceService(
       repository,
@@ -249,14 +249,25 @@ describe("SystemDatasetInstanceService", () => {
       systemId: "system:image-pipeline",
       datasetAssetId: "image-ingestor-v1",
       datasetAssetVersionId: "1.0.0",
-      storageBinding: {
-        storageInstanceId: "storage-instance:shared-reference-runtime",
-        storageInstanceRef: "storage-instance://storage-instance%3Ashared-reference-runtime",
-        bindingArea: "input",
-        bindingId: "storage-binding:storage-instance:shared-reference-runtime:input",
-        bindingReference: "storage-instance://storage-instance%3Ashared-reference-runtime/input",
-      },
+      storageContractVersion: "2.0.0",
+      storageBindings: [
+        {
+          storageInstanceId: "storage-instance:shared-reference-runtime",
+          storageInstanceRef: "storage-instance://storage-instance%3Ashared-reference-runtime",
+          bindingArea: "input",
+          bindingId: "storage-binding:storage-instance:shared-reference-runtime:input",
+          bindingReference: "storage-instance://storage-instance%3Ashared-reference-runtime/input",
+        },
+        {
+          storageInstanceId: "storage-instance:shared-reference-runtime",
+          storageInstanceRef: "storage-instance://storage-instance%3Ashared-reference-runtime",
+          bindingArea: "reference",
+          bindingId: "storage-binding:storage-instance:shared-reference-runtime:reference",
+          bindingReference: "storage-instance://storage-instance%3Ashared-reference-runtime/reference",
+        },
+      ],
     });
+    expect(created.storageBindings?.map((entry) => entry.bindingArea)).toEqual(["input", "reference"]);
     expect(created.storageBinding?.bindingReference).toBe("storage-instance://storage-instance%3Ashared-reference-runtime/input");
 
     await expect(service.ensureInputImageStoreInstance({
@@ -264,13 +275,13 @@ describe("SystemDatasetInstanceService", () => {
       systemId: "system:image-pipeline",
       datasetAssetId: "image-ingestor-v1",
       datasetAssetVersionId: "1.0.0",
-      storageBinding: {
+      storageBindings: [{
         storageInstanceId: "storage-instance:shared-reference-runtime",
         storageInstanceRef: "storage-instance://storage-instance%3Ashared-reference-runtime",
         bindingArea: "input",
         bindingId: "/tmp/input-path",
         bindingReference: "storage-instance://storage-instance%3Ashared-reference-runtime/input",
-      },
+      }],
     } as unknown as Parameters<SystemDatasetInstanceService["ensureInputImageStoreInstance"]>[0])).rejects.toThrow(
       "different storage binding linkage",
     );
@@ -294,13 +305,13 @@ describe("SystemDatasetInstanceService", () => {
       datasetAssetVersionId: "1.0.0",
       role: "input-store",
       purpose: "incoming-images-v2",
-      storageBinding: {
+      storageBindings: [{
         storageInstanceId: "storage-instance:shared-reference-runtime",
         storageInstanceRef: "storage-instance://storage-instance%3Ashared-reference-runtime",
         bindingArea: "input",
         bindingId: "storage-binding:storage-instance:shared-reference-runtime:input",
         bindingReference: "storage-instance://storage-instance%3Ashared-reference-runtime/input/uploads",
-      },
+      }],
     })).rejects.toThrow("must target an instance root or a single logical area");
 
     await expect(service.ensureRoleDatasetInstance({
@@ -310,17 +321,42 @@ describe("SystemDatasetInstanceService", () => {
       datasetAssetVersionId: "1.0.0",
       role: "input-store",
       purpose: "incoming-images-v3",
-      storageBinding: {
+      storageBindings: [{
         storageInstanceId: "storage-instance:shared-reference-runtime",
         storageInstanceRef: "storage-instance://storage-instance%3Ashared-reference-runtime/input",
         bindingArea: "input",
         bindingId: "storage-binding:storage-instance:shared-reference-runtime:input",
         bindingReference: "storage-instance://storage-instance%3Ashared-reference-runtime/input",
-      },
+      }],
     })).rejects.toThrow("storageInstanceRef must target only the storage instance root reference");
+
+    await expect(service.ensureRoleDatasetInstance({
+      instanceId: "dataset-instance:duplicate-area",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+      role: "input-store",
+      purpose: "incoming-images-v4",
+      storageBindings: [
+        {
+          storageInstanceId: "storage-instance:shared-reference-runtime",
+          storageInstanceRef: "storage-instance://storage-instance%3Ashared-reference-runtime",
+          bindingArea: "input",
+          bindingId: "storage-binding:shared-reference-runtime:input-a",
+          bindingReference: "storage-instance://storage-instance%3Ashared-reference-runtime/input",
+        },
+        {
+          storageInstanceId: "storage-instance:shared-reference-runtime",
+          storageInstanceRef: "storage-instance://storage-instance%3Ashared-reference-runtime",
+          bindingArea: "input",
+          bindingId: "storage-binding:shared-reference-runtime:input-b",
+          bindingReference: "storage-instance://storage-instance%3Ashared-reference-runtime/input",
+        },
+      ],
+    })).rejects.toThrow("duplicate area");
   });
 
-  it("supports multiple dataset instances across different logical areas of one shared storage instance", async () => {
+  it("supports reference/intermediate/output dataset bindings across one shared storage instance", async () => {
     const repository = new InMemoryDatasetInstanceRepository();
     const service = new SystemDatasetInstanceService(
       repository,
@@ -356,18 +392,34 @@ describe("SystemDatasetInstanceService", () => {
       datasetAssetVersionId: "1.0.0",
       role: "intermediate-store",
       purpose: "workflow-intermediate-images",
-      storageBinding: {
+      storageBindings: [{
         storageInstanceId: "storage-instance:shared-reference-runtime",
         storageInstanceRef: "storage-instance://storage-instance%3Ashared-reference-runtime",
         bindingArea: "intermediate",
         bindingId: "storage-binding:storage-instance:shared-reference-runtime:intermediate",
         bindingReference: "storage-instance://storage-instance%3Ashared-reference-runtime/intermediate",
-      },
+      }],
+    });
+    const reference = await service.ensureRoleDatasetInstance({
+      instanceId: "dataset-instance:reference-images",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-exporter-v1",
+      datasetAssetVersionId: "1.0.0",
+      role: "input-store",
+      purpose: "workflow-reference-images",
+      storageBindings: [{
+        storageInstanceId: "storage-instance:shared-reference-runtime",
+        storageInstanceRef: "storage-instance://storage-instance%3Ashared-reference-runtime",
+        bindingArea: "reference",
+        bindingId: "storage-binding:storage-instance:shared-reference-runtime:reference",
+        bindingReference: "storage-instance://storage-instance%3Ashared-reference-runtime/reference",
+      }],
     });
 
     expect(output.storageBinding?.bindingArea).toBe("output");
     expect(intermediate.storageBinding?.bindingArea).toBe("intermediate");
-    expect(service.listSystemDatasetInstances("system:image-pipeline").length).toBe(2);
+    expect(reference.storageBinding?.bindingArea).toBe("reference");
+    expect(service.listSystemDatasetInstances("system:image-pipeline").length).toBe(3);
   });
 
   it("models canonical workflow output target types through a composable ensure path", async () => {

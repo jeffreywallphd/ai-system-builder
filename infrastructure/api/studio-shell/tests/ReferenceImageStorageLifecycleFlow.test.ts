@@ -30,6 +30,7 @@ describe("Reference image storage lifecycle flow", () => {
       ownerRole: "reference-image-runtime",
     });
     expect(storage.ok).toBeTrue();
+    expect(storage.data?.storage.bindings.some((binding) => binding.area === "reference")).toBeTrue();
     const instanceId = storage.data!.storage.instanceId;
 
     for (const operation of ["initialize", "reset", "cleanup", "archive"] as const) {

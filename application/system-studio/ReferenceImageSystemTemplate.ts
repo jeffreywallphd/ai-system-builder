@@ -298,7 +298,7 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
       requiredSchemaIntentId: DatasetSchemaIntentIds.media,
       requiredOutputShapeKind: "image-metadata-records",
       runtimeOwner: "system-runtime",
-      storageBindingArea: "input",
+      storageBindingArea: "reference",
       optional: true,
     }),
   ]),
@@ -361,14 +361,14 @@ export function buildReferenceImageDatasetInstanceRequests(
     purpose: entry.purpose,
       requiredSchemaIntentId: entry.requiredSchemaIntentId,
       requiredOutputShapeKind: entry.requiredOutputShapeKind,
-      storageBinding: options.storageBindingByArea?.[entry.storageBindingArea]
-        ? Object.freeze({
+      storageBindings: options.storageBindingByArea?.[entry.storageBindingArea]
+        ? Object.freeze([Object.freeze({
           storageInstanceId: options.storageBindingByArea[entry.storageBindingArea]!.storageInstanceId,
           storageInstanceRef: options.storageBindingByArea[entry.storageBindingArea]!.storageInstanceRef,
           bindingArea: entry.storageBindingArea,
           bindingId: options.storageBindingByArea[entry.storageBindingArea]!.bindingId,
           bindingReference: options.storageBindingByArea[entry.storageBindingArea]!.bindingReference,
-        })
+        })])
         : undefined,
       seedMetadata: Object.freeze({
         templateId: ReferenceImageSystemTemplate.templateId,
