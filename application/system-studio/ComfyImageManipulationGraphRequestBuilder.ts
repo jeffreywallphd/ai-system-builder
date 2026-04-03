@@ -12,6 +12,7 @@ import {
 } from "./ComfyImageManipulationBaseGraph";
 import {
   resolveComfyImageManipulationGraphBindings,
+  type ComfyNodeInputOverride,
   type ResolveComfyImageManipulationGraphBindingsResult,
 } from "./ComfyImageManipulationPropertyMappingAsset";
 import { resolveComfyInputDatasetBinding } from "./ComfyImageManipulationDatasetBindingAsset";
@@ -20,6 +21,35 @@ const TEMPLATE_IDS = new Set([
   "asset:workflow-template:image-manipulation:default",
   "asset:workflow-template:image-to-image:starter",
 ]);
+
+interface ComfyExecutionPathStrategy {
+  readonly pathKind: "non-faceid" | "faceid";
+  validate(mapping: ResolveComfyImageManipulationGraphBindingsResult): void;
+  selectOverrides(mapping: ResolveComfyImageManipulationGraphBindingsResult): ReadonlyArray<ComfyNodeInputOverride>;
+}
+
+const NonFaceIdExecutionPathStrategy: ComfyExecutionPathStrategy = Object.freeze({
+  pathKind: "non-faceid",
+  validate: () => undefined,
+  selectOverrides: (mapping) => mapping.directNodeOverrides,
+});
+
+const FaceIdExecutionPathStrategy: ComfyExecutionPathStrategy = Object.freeze({
+  pathKind: "faceid",
+  validate: (mapping) => {
+    const faceId = mapping.subworkflowBindings[0];
+    if (!faceId?.enabled) {
+      throw new Error("invalid-request:FaceID execution strategy requires FaceID to be enabled.");
+    }
+    if (!faceId.model || faceId.model.trim().length < 1) {
+      throw new Error("invalid-request:FaceID model selection is required when FaceID is enabled.");
+    }
+    if (faceId.referenceBindings.length < 1) {
+      throw new Error("invalid-request:FaceID reference dataset bindings are required when FaceID is enabled.");
+    }
+  },
+  selectOverrides: (mapping) => mapping.nodeOverrides,
+});
 
 export function buildComfyImageManipulationExecutionSubmission(
   request: ComfyImageManipulationGraphBuildRequest,
@@ -35,8 +65,15 @@ export function buildComfyImageManipulationExecutionSubmission(
   const graph = createComfyImageManipulationBaseGraph(request.baseGraph ?? ComfyImageManipulationBaseGraph);
   const mapping = resolveComfyImageManipulationGraphBindings(request.resolvedConfig);
   const sourceDatasetBinding = resolveComfyInputDatasetBinding({ handles: request.datasetHandles });
+  const strategy = resolveExecutionPathStrategy(mapping);
+  strategy.validate(mapping);
 
-  const prompt = mapPromptGraph(graph, mapping, sourceDatasetBinding.datasetRef.logicalRef, request.resolvedConfig as unknown as Record<string, unknown>);
+  const prompt = mapPromptGraph(
+    graph,
+    strategy.selectOverrides(mapping),
+    sourceDatasetBinding.datasetRef.logicalRef,
+    request.resolvedConfig as unknown as Record<string, unknown>,
+  );
   const materializationBindings = resolveMaterializationBindings(request);
   const executionRequestId = request.runtimeMetadata.executionId
     ?? `${request.workflowTemplate.templateId}:${Date.now().toString(36)}`;
@@ -58,30 +95,40 @@ export function buildComfyImageManipulationExecutionSubmission(
       templateVersionId: request.workflowTemplate.versionId,
       nodeCount: graph.nodes.length,
       boundInputCount: countBoundInputs(prompt),
-      extensionBindings: Object.freeze(mapping.extensionBindings.map((entry) => Object.freeze({ ...entry }))),
+      executionPath: strategy.pathKind,
+      extensionBindings: Object.freeze(mapping.extensionNodeOverrides.map((entry) => Object.freeze({ ...entry }))),
+      subworkflowBindings: Object.freeze(mapping.subworkflowBindings.map((entry) => Object.freeze({ ...entry }))),
     }),
   });
 }
 
+function resolveExecutionPathStrategy(
+  mapping: ResolveComfyImageManipulationGraphBindingsResult,
+): ComfyExecutionPathStrategy {
+  return mapping.subworkflowBindings[0]?.enabled
+    ? FaceIdExecutionPathStrategy
+    : NonFaceIdExecutionPathStrategy;
+}
+
 function mapPromptGraph(
   graph: ReturnType<typeof createComfyImageManipulationBaseGraph>,
-  mapping: ResolveComfyImageManipulationGraphBindingsResult,
+  nodeOverrides: ReadonlyArray<ComfyNodeInputOverride>,
   sourceImageLogicalRef: string,
   resolvedConfig: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, ComfyPromptGraphNode>> {
   const prompt: Record<string, ComfyPromptGraphNode> = {};
-  const graphBindings = {
-    ...mapping.graphBindings,
-    "2.image": sourceImageLogicalRef,
-  };
+  const overrideBindings = new Map<string, unknown>(
+    nodeOverrides.map((entry) => [`${entry.nodeId}.${entry.inputName}`, entry.value]),
+  );
+  overrideBindings.set("2.image", sourceImageLogicalRef);
 
   for (const node of graph.nodes) {
     const mappedInputs: Record<string, unknown> = {};
 
     for (const [inputName, value] of Object.entries(node.inputs)) {
       const key = `${node.nodeId}.${inputName}`;
-      if (key in graphBindings) {
-        mappedInputs[inputName] = graphBindings[key];
+      if (overrideBindings.has(key)) {
+        mappedInputs[inputName] = overrideBindings.get(key);
         continue;
       }
 
@@ -94,21 +141,6 @@ function mapPromptGraph(
       _meta: Object.freeze({
         title: node.title,
         purpose: node.purpose,
-      }),
-    });
-  }
-
-  for (const extension of mapping.extensionBindings) {
-    const nodeId = asOptionalString(extension.nodeId);
-    const inputName = asOptionalString(extension.inputName);
-    if (!nodeId || !inputName || !prompt[nodeId]) {
-      continue;
-    }
-    prompt[nodeId] = Object.freeze({
-      ...prompt[nodeId],
-      inputs: Object.freeze({
-        ...prompt[nodeId].inputs,
-        [inputName]: extension.value,
       }),
     });
   }
@@ -166,8 +198,4 @@ function resolveMaterializationBindings(
 function countBoundInputs(prompt: Readonly<Record<string, ComfyPromptGraphNode>>): number {
   return Object.values(prompt)
     .reduce((total, node) => total + Object.keys(node.inputs).length, 0);
-}
-
-function asOptionalString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }

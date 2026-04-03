@@ -398,3 +398,9 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 1. Add bounded background integrity scans for large historical payloads.
 2. Emit aggregate recovery telemetry for reliability prioritization.
 3. Explore chunked runtime snapshot persistence for very large dataset-instance payloads.
+
+## AI Loom image manipulation hardening update: override-driven graph mapping + execution path branching (stories 5.3-5.4)
+
+- `ComfyImageManipulationGraphRequestBuilder` now composes execution from explicit strategy selection (`non-faceid` vs `faceid`) instead of scattered conditionals.
+- FaceID dependency checks are strategy-scoped: reference bindings/model requirements are enforced only when FaceID is enabled.
+- Graph request inspection payloads now include selected execution path and FaceID subworkflow binding summaries for debugging without exposing raw filesystem paths or leaking Comfy transport internals.

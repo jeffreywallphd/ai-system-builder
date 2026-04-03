@@ -2,7 +2,6 @@ import { z } from "zod";
 import {
   ComfyImageManipulationPropertySchemaId,
   ComfyImageManipulationPropertySchemaVersion,
-  type ComfyImageManipulationConfig,
   resolveComfyImageManipulationConfig,
 } from "./ComfyImageManipulationPropertySchema";
 import {
@@ -45,6 +44,19 @@ const bindingSchema = z.object({
 
 export type ComfyImageManipulationPropertyBinding = z.infer<typeof bindingSchema>;
 
+const nodeInputOverrideSchema = z.object({
+  bindingId: z.string().trim().min(1),
+  nodeId: z.string().trim().min(1),
+  inputName: z.string().trim().min(1),
+  value: z.unknown(),
+  group: z.enum(BindingGroupValues),
+  sourcePath: z.string().trim().min(1),
+  mode: z.enum(["direct", "extension"]),
+  notes: z.string().trim().optional(),
+});
+
+export type ComfyNodeInputOverride = z.infer<typeof nodeInputOverrideSchema>;
+
 export interface ComfyImageManipulationPropertyMappingAsset {
   readonly assetId: typeof ComfyImageManipulationPropertyMappingAssetId;
   readonly versionId: typeof ComfyImageManipulationPropertyMappingVersionId;
@@ -59,7 +71,7 @@ export interface ComfyImageManipulationPropertyMappingAsset {
     readonly graphAssetId: typeof ComfyImageManipulationBaseGraphAssetId;
     readonly graphVersionId: typeof ComfyImageManipulationBaseGraphVersionId;
     readonly graphContractVersion: typeof ComfyImageManipulationBaseGraphContractVersion;
-    readonly bindingValueType: "comfy-graph-input-bindings";
+    readonly bindingValueType: "comfy-graph-input-overrides";
   };
   readonly configSurface: {
     readonly supportsPromptBindings: true;
@@ -78,7 +90,7 @@ export const ComfyImageManipulationPropertyMappingAsset: ComfyImageManipulationP
   assetId: ComfyImageManipulationPropertyMappingAssetId,
   versionId: ComfyImageManipulationPropertyMappingVersionId,
   contractVersion: ComfyImageManipulationPropertyMappingContractVersion,
-  summary: "Maps image manipulation property-schema fields into Comfy base-graph node parameter bindings.",
+  summary: "Maps image manipulation property-schema fields into Comfy base-graph node overrides.",
   inputContract: Object.freeze({
     propertySchemaId: ComfyImageManipulationPropertySchemaId,
     propertySchemaVersion: ComfyImageManipulationPropertySchemaVersion,
@@ -88,7 +100,7 @@ export const ComfyImageManipulationPropertyMappingAsset: ComfyImageManipulationP
     graphAssetId: ComfyImageManipulationBaseGraphAssetId,
     graphVersionId: ComfyImageManipulationBaseGraphVersionId,
     graphContractVersion: ComfyImageManipulationBaseGraphContractVersion,
-    bindingValueType: "comfy-graph-input-bindings",
+    bindingValueType: "comfy-graph-input-overrides",
   }),
   configSurface: Object.freeze({
     supportsPromptBindings: true,
@@ -103,90 +115,30 @@ export const ComfyImageManipulationPropertyMappingAsset: ComfyImageManipulationP
   bindings: Object.freeze([
     Object.freeze({ bindingId: "binding.prompt.positive", group: BindingGroups.prompts, schemaPath: "prompts.positivePrompt", graphNodeId: "4", graphInputName: "text" }),
     Object.freeze({ bindingId: "binding.prompt.negative", group: BindingGroups.prompts, schemaPath: "prompts.negativePrompt", graphNodeId: "5", graphInputName: "text" }),
-    Object.freeze({ bindingId: "binding.generation.seed", group: BindingGroups.generation, schemaPath: "generation.seed", graphNodeId: "6", graphInputName: "seed" }),
+    Object.freeze({ bindingId: "binding.model.checkpoint", group: BindingGroups.models, schemaPath: "models.checkpointModel", graphNodeId: "1", graphInputName: "ckpt_name" }),
+    Object.freeze({ bindingId: "binding.model.vae", group: BindingGroups.models, schemaPath: "models.vaeModel", graphNodeId: "9", graphInputName: "vae_name" }),
     Object.freeze({ bindingId: "binding.generation.steps", group: BindingGroups.generation, schemaPath: "generation.steps", graphNodeId: "6", graphInputName: "steps" }),
     Object.freeze({ bindingId: "binding.generation.cfg", group: BindingGroups.generation, schemaPath: "generation.cfg", graphNodeId: "6", graphInputName: "cfg" }),
     Object.freeze({ bindingId: "binding.generation.sampler", group: BindingGroups.generation, schemaPath: "generation.sampler", graphNodeId: "6", graphInputName: "sampler_name" }),
     Object.freeze({ bindingId: "binding.generation.scheduler", group: BindingGroups.generation, schemaPath: "generation.scheduler", graphNodeId: "6", graphInputName: "scheduler" }),
+    Object.freeze({ bindingId: "binding.generation.seed", group: BindingGroups.generation, schemaPath: "generation.seed", graphNodeId: "6", graphInputName: "seed" }),
     Object.freeze({ bindingId: "binding.generation.denoise", group: BindingGroups.generation, schemaPath: "generation.denoiseStrength", graphNodeId: "6", graphInputName: "denoise" }),
-    Object.freeze({ bindingId: "binding.model.checkpoint", group: BindingGroups.models, schemaPath: "models.checkpointModel", graphNodeId: "1", graphInputName: "ckpt_name" }),
-    Object.freeze({ bindingId: "binding.model.vae", group: BindingGroups.models, schemaPath: "models.vaeModel", graphNodeId: "9", graphInputName: "vae_name" }),
-    Object.freeze({
-      bindingId: "binding.image.source",
-      group: BindingGroups.image,
-      schemaPath: "image.sourceImage",
-      graphNodeId: "2",
-      graphInputName: "image",
-      required: false,
-      extensionHook: true,
-      notes: "Source image binding resolves through logical dataset references at runtime.",
-    }),
-    Object.freeze({
-      bindingId: "binding.image.result-count-extension",
-      group: BindingGroups.image,
-      schemaPath: "output.resultCount",
-      graphNodeId: "6",
-      graphInputName: "batch_size",
-      required: false,
-      extensionHook: true,
-      notes: "Reserved for advanced graph variants that expose explicit batch sizing.",
-    }),
-    Object.freeze({
-      bindingId: "binding.faceid.enabled-extension",
-      group: BindingGroups.faceId,
-      schemaPath: "faceId.enabled",
-      graphNodeId: "6",
-      graphInputName: "faceid_enabled",
-      required: false,
-      extensionHook: true,
-      notes: "Reserved for optional FaceID conditioning composition.",
-    }),
-    Object.freeze({
-      bindingId: "binding.faceid.references-extension",
-      group: BindingGroups.faceId,
-      schemaPath: "faceId.referenceBindings",
-      graphNodeId: "faceid-conditioning",
-      graphInputName: "references",
-      required: false,
-      extensionHook: true,
-      notes: "Logical FaceID dataset reference bindings for optional FaceID conditioning composition.",
-    }),
-    Object.freeze({
-      bindingId: "binding.faceid.weight-extension",
-      group: BindingGroups.faceId,
-      schemaPath: "faceId.weight",
-      graphNodeId: "faceid-conditioning",
-      graphInputName: "weight",
-      required: false,
-      extensionHook: true,
-      notes: "FaceID conditioning weight control binding.",
-    }),
-    Object.freeze({
-      bindingId: "binding.faceid.start-step-extension",
-      group: BindingGroups.faceId,
-      schemaPath: "faceId.startStepFraction",
-      graphNodeId: "faceid-conditioning",
-      graphInputName: "start_step_fraction",
-      required: false,
-      extensionHook: true,
-      notes: "FaceID conditioning start-timing control binding.",
-    }),
-    Object.freeze({
-      bindingId: "binding.faceid.end-step-extension",
-      group: BindingGroups.faceId,
-      schemaPath: "faceId.endStepFraction",
-      graphNodeId: "faceid-conditioning",
-      graphInputName: "end_step_fraction",
-      required: false,
-      extensionHook: true,
-      notes: "FaceID conditioning end-timing control binding.",
-    }),
+    Object.freeze({ bindingId: "binding.generation.width-extension", group: BindingGroups.generation, schemaPath: "generation.width", graphNodeId: "image-dimensions", graphInputName: "width", required: false, extensionHook: true, notes: "Inspectable width override for graph variants with explicit dimension controls." }),
+    Object.freeze({ bindingId: "binding.generation.height-extension", group: BindingGroups.generation, schemaPath: "generation.height", graphNodeId: "image-dimensions", graphInputName: "height", required: false, extensionHook: true, notes: "Inspectable height override for graph variants with explicit dimension controls." }),
+    Object.freeze({ bindingId: "binding.output.result-count-extension", group: BindingGroups.image, schemaPath: "output.resultCount", graphNodeId: "6", graphInputName: "batch_size", required: false, extensionHook: true, notes: "Reserved for graph variants that expose explicit batch size." }),
+    Object.freeze({ bindingId: "binding.faceid.enabled-extension", group: BindingGroups.faceId, schemaPath: "faceId.enabled", graphNodeId: "faceid-conditioning", graphInputName: "enabled", required: false, extensionHook: true, notes: "Reserved for optional FaceID conditioning composition." }),
+    Object.freeze({ bindingId: "binding.faceid.references-extension", group: BindingGroups.faceId, schemaPath: "faceId.referenceBindings", graphNodeId: "faceid-conditioning", graphInputName: "references", required: false, extensionHook: true, notes: "Logical FaceID dataset reference bindings." }),
+    Object.freeze({ bindingId: "binding.faceid.model-extension", group: BindingGroups.faceId, schemaPath: "models.faceIdModel", graphNodeId: "faceid-conditioning", graphInputName: "faceid_model", required: false, extensionHook: true, notes: "FaceID model selection for optional FaceID path." }),
+    Object.freeze({ bindingId: "binding.faceid.weight-extension", group: BindingGroups.faceId, schemaPath: "faceId.weight", graphNodeId: "faceid-conditioning", graphInputName: "weight", required: false, extensionHook: true, notes: "FaceID conditioning weight control binding." }),
+    Object.freeze({ bindingId: "binding.faceid.start-step-extension", group: BindingGroups.faceId, schemaPath: "faceId.startStepFraction", graphNodeId: "faceid-conditioning", graphInputName: "start_step_fraction", required: false, extensionHook: true, notes: "FaceID conditioning start-timing control binding." }),
+    Object.freeze({ bindingId: "binding.faceid.end-step-extension", group: BindingGroups.faceId, schemaPath: "faceId.endStepFraction", graphNodeId: "faceid-conditioning", graphInputName: "end_step_fraction", required: false, extensionHook: true, notes: "FaceID conditioning end-timing control binding." }),
   ]),
 });
 
 export interface FaceIdSubworkflowBinding {
   readonly subworkflowId: "faceid-conditioning";
   readonly enabled: boolean;
+  readonly model: string;
   readonly referenceBindings: ReadonlyArray<{
     readonly datasetBindingId: string;
     readonly datasetAssetId: string;
@@ -197,8 +149,11 @@ export interface FaceIdSubworkflowBinding {
 }
 
 export interface ResolveComfyImageManipulationGraphBindingsResult {
+  readonly nodeOverrides: ReadonlyArray<ComfyNodeInputOverride>;
+  readonly directNodeOverrides: ReadonlyArray<ComfyNodeInputOverride>;
+  readonly extensionNodeOverrides: ReadonlyArray<ComfyNodeInputOverride>;
   readonly graphBindings: Readonly<Record<string, unknown>>;
-  readonly extensionBindings: ReadonlyArray<Readonly<Record<string, unknown>>>;
+  readonly extensionBindings: ReadonlyArray<ComfyNodeInputOverride>;
   readonly subworkflowBindings: ReadonlyArray<FaceIdSubworkflowBinding>;
 }
 
@@ -218,8 +173,8 @@ export function resolveComfyImageManipulationGraphBindings(
   input: unknown,
 ): ResolveComfyImageManipulationGraphBindingsResult {
   const resolvedConfig = resolveComfyImageManipulationConfig(input) as unknown as Readonly<Record<string, unknown>>;
-  const graphBindings: Record<string, unknown> = {};
-  const extensionBindings: Array<Readonly<Record<string, unknown>>> = [];
+  const directNodeOverrides: ComfyNodeInputOverride[] = [];
+  const extensionNodeOverrides: ComfyNodeInputOverride[] = [];
 
   for (const rawBinding of ComfyImageManipulationPropertyMappingAsset.bindings) {
     const binding = bindingSchema.parse(rawBinding);
@@ -230,22 +185,33 @@ export function resolveComfyImageManipulationGraphBindings(
       }
       continue;
     }
+
+    const parsed = nodeInputOverrideSchema.parse({
+      bindingId: binding.bindingId,
+      nodeId: binding.graphNodeId,
+      inputName: binding.graphInputName,
+      value,
+      group: binding.group,
+      sourcePath: binding.schemaPath,
+      mode: binding.extensionHook ? "extension" : "direct",
+      notes: binding.notes,
+    });
+
     if (binding.extensionHook) {
-      extensionBindings.push(Object.freeze({
-        bindingId: binding.bindingId,
-        nodeId: binding.graphNodeId,
-        inputName: binding.graphInputName,
-        value,
-        group: binding.group as BindingGroup,
-      }));
-      continue;
+      extensionNodeOverrides.push(Object.freeze(parsed));
+    } else {
+      directNodeOverrides.push(Object.freeze(parsed));
     }
-    graphBindings[`${binding.graphNodeId}.${binding.graphInputName}`] = value;
   }
+
+  const graphBindings = Object.freeze(Object.fromEntries(
+    directNodeOverrides.map((entry) => [`${entry.nodeId}.${entry.inputName}`, entry.value]),
+  ));
 
   const faceIdSubworkflowBinding: FaceIdSubworkflowBinding = Object.freeze({
     subworkflowId: "faceid-conditioning",
     enabled: Boolean(readConfigPath(resolvedConfig, "faceId.enabled")),
+    model: String(readConfigPath(resolvedConfig, "models.faceIdModel") ?? "system-default"),
     referenceBindings: Object.freeze((readConfigPath(resolvedConfig, "faceId.referenceBindings") as ReadonlyArray<{
       readonly datasetBindingId: string;
       readonly datasetAssetId: string;
@@ -256,8 +222,11 @@ export function resolveComfyImageManipulationGraphBindings(
   });
 
   return Object.freeze({
-    graphBindings: Object.freeze(graphBindings),
-    extensionBindings: Object.freeze(extensionBindings),
+    nodeOverrides: Object.freeze([...directNodeOverrides, ...extensionNodeOverrides]),
+    directNodeOverrides: Object.freeze(directNodeOverrides),
+    extensionNodeOverrides: Object.freeze(extensionNodeOverrides),
+    graphBindings,
+    extensionBindings: Object.freeze(extensionNodeOverrides),
     subworkflowBindings: Object.freeze([faceIdSubworkflowBinding]),
   });
 }

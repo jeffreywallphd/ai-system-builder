@@ -33,7 +33,67 @@ describe("ComfyImageManipulationGraphRequestBuilder", () => {
     expect(submission.graph.prompt["2"]?.inputs.image).toBe("dataset-instance://dataset-instance-ref%3Areference-image%3Ainput");
     expect(submission.graph.outputNodeIds).toEqual(["8"]);
     expect(submission.materializationBindings.length).toBeGreaterThan(0);
-    expect(submission.inspection.extensionBindings.some((entry) => entry.bindingId === "binding.faceid.enabled-extension")).toBeTrue();
+    expect(submission.inspection.executionPath).toBe("non-faceid");
+    expect(submission.inspection.extensionBindings.some((entry) => entry.bindingId === "binding.generation.width-extension")).toBeTrue();
+  });
+
+  it("uses the FaceID execution path when enabled", () => {
+    const config = {
+      ...createComfyImageManipulationDefaultConfig(),
+      faceId: {
+        enabled: true,
+        referenceBindings: [{ datasetBindingId: "faceid-reference", datasetAssetId: "asset:dataset:image-faceid-reference" }],
+        weight: 0.8,
+        startStepFraction: 0,
+        endStepFraction: 1,
+      },
+    };
+
+    const submission = buildComfyImageManipulationExecutionSubmission({
+      contractVersion: ComfyImageManipulationExecutionContractVersion,
+      workflowTemplate: ImageManipulationWorkflowTemplate,
+      baseGraph: ComfyImageManipulationBaseGraph,
+      resolvedConfig: config,
+      datasetHandles: [
+        {
+          kind: "dataset-instance",
+          referenceId: "input-image-dataset",
+          instanceId: "dataset-instance-ref:reference-image:input",
+        },
+      ],
+      runtimeMetadata: {},
+    });
+
+    expect(submission.inspection.executionPath).toBe("faceid");
+    expect((submission.inspection.subworkflowBindings?.[0] as { enabled?: boolean } | undefined)?.enabled).toBeTrue();
+  });
+
+  it("validates FaceID dependencies only when FaceID is enabled", () => {
+    const config = {
+      ...createComfyImageManipulationDefaultConfig(),
+      faceId: {
+        enabled: true,
+        referenceBindings: [],
+        weight: 0.8,
+        startStepFraction: 0,
+        endStepFraction: 1,
+      },
+    };
+
+    expect(() => buildComfyImageManipulationExecutionSubmission({
+      contractVersion: ComfyImageManipulationExecutionContractVersion,
+      workflowTemplate: ImageManipulationWorkflowTemplate,
+      baseGraph: ComfyImageManipulationBaseGraph,
+      resolvedConfig: config,
+      datasetHandles: [
+        {
+          kind: "dataset-instance",
+          referenceId: "input-image-dataset",
+          instanceId: "dataset-instance-ref:reference-image:input",
+        },
+      ],
+      runtimeMetadata: {},
+    })).toThrow();
   });
 
   it("keeps public request binding values logical and path-safe", () => {

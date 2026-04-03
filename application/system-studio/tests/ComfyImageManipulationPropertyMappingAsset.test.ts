@@ -13,10 +13,19 @@ describe("ComfyImageManipulationPropertyMappingAsset", () => {
     expect(ComfyImageManipulationPropertyMappingAsset.configSurface.supportsFaceIdBindings).toBeTrue();
   });
 
-  it("maps schema fields into deterministic Comfy graph binding keys", () => {
+  it("maps schema fields into validated node override contracts", () => {
     const mapped = resolveComfyImageManipulationGraphBindings({
       prompts: { positivePrompt: "A cozy neon studio", negativePrompt: "grain" },
-      generation: { steps: 28, cfg: 7.25, denoiseStrength: 0.52, sampler: "euler", scheduler: "normal", seed: 33 },
+      generation: {
+        width: 1024,
+        height: 768,
+        steps: 28,
+        cfg: 7.25,
+        denoiseStrength: 0.52,
+        sampler: "euler",
+        scheduler: "normal",
+        seed: 33,
+      },
       models: { checkpointModel: "sdxl.safetensors", vaeModel: "vae-ft-mse-840000-ema-pruned.safetensors", faceIdModel: "faceid-default" },
       output: { resultCount: 2 },
       faceId: {
@@ -33,23 +42,19 @@ describe("ComfyImageManipulationPropertyMappingAsset", () => {
     expect(mapped.graphBindings["1.ckpt_name"]).toBe("sdxl.safetensors");
     expect(mapped.graphBindings["9.vae_name"]).toBe("vae-ft-mse-840000-ema-pruned.safetensors");
     expect(mapped.graphBindings["6.steps"]).toBe(28);
-    expect(mapped.extensionBindings.some((entry) => entry.bindingId === "binding.faceid.enabled-extension")).toBeTrue();
-    expect(mapped.extensionBindings.some((entry) => entry.bindingId === "binding.faceid.references-extension")).toBeTrue();
-    expect(mapped.extensionBindings.some((entry) => entry.bindingId === "binding.faceid.weight-extension")).toBeTrue();
-    expect(mapped.extensionBindings.some((entry) => entry.bindingId === "binding.faceid.start-step-extension")).toBeTrue();
-    expect(mapped.extensionBindings.some((entry) => entry.bindingId === "binding.faceid.end-step-extension")).toBeTrue();
-    expect(mapped.extensionBindings.some((entry) => entry.bindingId === "binding.image.result-count-extension")).toBeTrue();
-    expect(mapped.extensionBindings.some((entry) => entry.bindingId === "binding.model.vae")).toBeFalse();
+    expect(mapped.directNodeOverrides.some((entry) => entry.mode === "direct")).toBeTrue();
+    expect(mapped.extensionNodeOverrides.some((entry) => entry.bindingId === "binding.generation.width-extension")).toBeTrue();
+    expect(mapped.extensionNodeOverrides.some((entry) => entry.bindingId === "binding.generation.height-extension")).toBeTrue();
+    expect(mapped.extensionNodeOverrides.some((entry) => entry.bindingId === "binding.output.result-count-extension")).toBeTrue();
+    expect(mapped.extensionNodeOverrides.some((entry) => entry.bindingId === "binding.faceid.model-extension")).toBeTrue();
     expect(mapped.subworkflowBindings[0]).toEqual(expect.objectContaining({
       subworkflowId: "faceid-conditioning",
       enabled: true,
+      model: "faceid-default",
       weight: 0.9,
       startStepFraction: 0.2,
       endStepFraction: 0.8,
     }));
-    expect(mapped.subworkflowBindings[0]?.referenceBindings).toEqual([
-      { datasetBindingId: "faceid-reference", datasetAssetId: "asset:dataset:image-faceid-reference" },
-    ]);
   });
 
   it("keeps non-FaceID execution structurally valid when FaceID is disabled", () => {
