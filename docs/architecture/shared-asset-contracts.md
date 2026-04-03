@@ -1506,3 +1506,10 @@ Not implemented in this slice:
 - `SystemDatasetInstanceService` binding flows now support reuse of an existing dataset instance id across systems (`reuseFromInstanceId`) and prevent accidental overwrite when another system references the same instance id.
 - Reference-image backend now exposes dataset-binding chaining (`chainReferenceImageDatasetItemToInput`) so saved outputs can be reintroduced as later inputs through dataset instance contracts, not raw path transfer.
 - Chaining remains bounded to existing binding ids (`output-image-dataset`/`reference-image-dataset` -> `input-image-dataset` or `reference-image-dataset`) and preserves default template readiness.
+
+## AI Loom image manipulation update: runtime window launch contract foundation (stories 8.1-8.2)
+
+- Added a dedicated versioned runtime window launch contract (`application/system-runtime/SystemRuntimeWindowLaunchContract.ts`) for opening runnable systems in separate windows.
+- Contract fields are explicitly bounded to logical references and runtime bindings: launch target identity, system/template resolution inputs, runtime context payload, dataset/storage bindings, initial selection state, launch mode/window intent, and expected launch-result metadata.
+- Storage semantics remain non-exclusive by contract: bindings can declare shared ownership scope and use storage-instance logical references without raw filesystem paths.
+- Added a reusable resolver/mapper seam (`SystemRuntimeWindowLaunchResolver`) so callers can compose small inspectable launch requests while preserving default runnable behavior for image-manipulation templates.

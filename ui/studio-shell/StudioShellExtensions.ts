@@ -13,6 +13,10 @@ import type {
   SystemRuntimeApiResponse,
 } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import type {
+  LaunchSystemRuntimeWindowReadModel,
+  LaunchSystemRuntimeWindowRequest,
+} from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
+import type {
   AddSystemChildComponentRequest,
   RemoveSystemChildComponentRequest,
   ReorderSystemChildComponentRequest,
@@ -38,6 +42,7 @@ export type StudioShellExtensionSlot = typeof StudioShellExtensionSlots[keyof ty
 export interface StudioShellExtensionOperations {
   refresh(): Promise<void>;
   setDraftContent?(content: string): void;
+  launchRuntimeWindow?(request: LaunchSystemRuntimeWindowRequest): Promise<SystemRuntimeApiResponse<LaunchSystemRuntimeWindowReadModel>>;
   startSystemExecution?(request: StartSystemRuntimeExecutionRequest): Promise<SystemRuntimeApiResponse<StartSystemRuntimeExecutionResponse>>;
   getSystemExecutionStatus?(executionId: string): Promise<SystemRuntimeApiResponse<RuntimeExecutionStatusReadModel>>;
   getSystemExecutionTrace?(request: { readonly executionId: string; readonly eventLimit?: number; readonly logLimit?: number }): Promise<SystemRuntimeApiResponse<RuntimeExecutionTraceReadModel>>;
