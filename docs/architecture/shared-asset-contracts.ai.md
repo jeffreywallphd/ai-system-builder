@@ -1361,3 +1361,20 @@
 - Mapping output remains inspectable and adapter-boundary safe through explicit override metadata (`bindingId`, `group`, `sourcePath`, `nodeId`, `inputName`, `mode`) plus `subworkflowBindings` for FaceID path composition.
 - Default template configuration continues to resolve into a runnable non-FaceID override set without additional user input.
 - FaceID execution intent is now strategy-ready in mapping output (`subworkflowBindings`) so execution adapters can branch cleanly while keeping non-FaceID defaults stable.
+
+## AI Loom image manipulation update: runtime configuration injection + execution lifecycle tracking (stories 5.5-5.6)
+
+- Added runtime configuration resolution seam in `application/system-studio/ComfyImageManipulationRuntimeResolution.ts` that composes:
+  - workflow-template runtime metadata,
+  - runtime-environment metadata,
+  - runtime capability binding contracts (when present),
+  - dataset runtime handles (including storage-instance refs).
+- `ComfyImageManipulationGraphRequestBuilder` now consumes that seam directly and carries the normalized result in submission inspection metadata (`inspection.runtimeResolution`) so runtime launch decisions are inspectable/testable without introducing a separate runtime path.
+- Runtime endpoint/config resolution now fails fast when no valid endpoint is available from template/runtime metadata, keeping default-template runnability validation explicit.
+- Added reusable lifecycle normalization in `application/system-studio/ComfyImageManipulationExecutionLifecycle.ts` with stable statuses:
+  - `queued`,
+  - `running`,
+  - `succeeded`,
+  - `failed`,
+  - `canceled`.
+- Added `ComfyImageManipulationExecutionService` to compose graph-builder + adapter execution and emit normalized lifecycle snapshots for runtime-page and standalone-runtime-window consumption while keeping infrastructure-specific details in diagnostics.

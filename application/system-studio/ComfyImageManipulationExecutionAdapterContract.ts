@@ -12,6 +12,11 @@ import type {
   ComfyAdapterErrorCode,
   ComfyAdapterLifecycleStatus,
 } from "../execution/comfyui/ComfyAdapterContract";
+import type {
+  ComfyImageManipulationRuntimeResolution,
+  ComfyRuntimeEnvironmentResolutionInput,
+} from "./ComfyImageManipulationRuntimeResolution";
+import type { RuntimeCapabilityBindingContract } from "../system-runtime/RuntimeCapabilityBindingContract";
 
 export const ComfyImageManipulationExecutionContractVersion = "1.0.0";
 
@@ -47,6 +52,8 @@ export interface ComfyImageManipulationGraphBuildRequest {
   readonly resolvedConfig: ComfyImageManipulationConfig;
   readonly datasetHandles: ReadonlyArray<ComfyImageManipulationDatasetRuntimeHandle>;
   readonly runtimeMetadata: ComfyImageManipulationExecutionRuntimeMetadata;
+  readonly runtimeEnvironment?: ComfyRuntimeEnvironmentResolutionInput;
+  readonly runtimeCapabilityBinding?: RuntimeCapabilityBindingContract;
 }
 
 export interface ComfyImageManipulationMaterializationBinding {
@@ -72,6 +79,7 @@ export interface ComfyImageManipulationExecutionSubmission {
     readonly nodeCount: number;
     readonly boundInputCount: number;
     readonly executionPath: "non-faceid" | "faceid";
+    readonly runtimeResolution: ComfyImageManipulationRuntimeResolution;
     readonly extensionBindings: ReadonlyArray<Readonly<Record<string, unknown>>>;
     readonly subworkflowBindings?: ReadonlyArray<Readonly<Record<string, unknown>>>;
   }>;
