@@ -451,6 +451,25 @@ Not implemented in this slice:
 - `/systems/` remains available for ordinary system files, but storage-instance payload directories now model reusable storage attached by logical binding semantics rather than `systemId`-owned path assumptions.
 - This slice intentionally introduces the contract + local provisioner seam without forcing broad runtime rewiring yet; follow-on stories should integrate this seam into output artifact storage and dataset-instance provisioning orchestration paths.
 
+## AI Loom Image System vertical-slice update: storage-instance metadata + initialization integration (stories 2.3-2.4)
+
+- Added an explicit storage-instance metadata contract in `application/system-runtime/StorageInstanceMetadataModel.ts` with:
+  - stable identity + contract version (`instanceId`, `storageInstanceRef`, `provider`, `contractVersion`),
+  - bounded display metadata (`name`, `summary`, `tags`),
+  - lifecycle state/timestamps (`provisioning|ready|archived`),
+  - logical bindings (`input|output|intermediate` references),
+  - shareability flags and owner attachment records (`system` + `embedded-subsystem`).
+- Added an application initialization seam in `application/system-runtime/StorageInstanceInitializationService.ts` that composes the existing provisioning contract from stories 2.1/2.2 and metadata persistence:
+  - supports `provision` (new instance) and `attach` (reuse shared instance),
+  - ensures repeated attachment of an existing shared instance does not force reprovisioning,
+  - enforces no user-managed filesystem/path configuration in initialization payloads.
+- `StudioShellBackendApi` now routes reference-image dataset initialization through this storage-instance initialization seam before ensuring dataset instances, so runtime initialization uses storage contracts instead of raw location assumptions.
+- Desktop composition now injects `LocalStorageInstanceProvisioner` into studio-shell runtime wiring (`electron/main/main.ts`) with infrastructure-owned storage root under `/storage/{instanceId}/...` semantics (`{app-storage}/storage/...` on disk).
+- This preserves layer boundaries:
+  - UI/API initialization requests carry system/owner/binding intent only,
+  - application orchestrates provisioning + attach metadata,
+  - infrastructure provisioners own filesystem details and path materialization.
+
 ## AI Loom Image System vertical-slice update: system-owned binary output storage + provenance persistence (stories 2.3.5-2.3.6)
 
 - Workflow output materialization now supports explicit binary artifact persistence through an internal storage seam (`application/system-runtime/WorkflowOutputArtifactStorage.ts`) rather than executor-specific paths.
