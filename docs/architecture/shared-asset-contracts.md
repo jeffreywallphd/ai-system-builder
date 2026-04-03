@@ -443,6 +443,14 @@ Not implemented in this slice:
   - dataset-instance mutation continues through system-owned runtime dataset services.
 
 
+## AI Loom Image System vertical-slice update: storage-instance provisioning contract + local filesystem provisioner (stories 2.1-2.2)
+
+- Added a reusable, versioned storage-instance provisioning seam in `application/system-runtime/StorageInstanceProvisioningContract.ts` so systems and embedded subsystems can request shareable storage instances without carrying raw filesystem path configuration in UI/application contracts.
+- The contract keeps provisioning input compact/inspectable (`instanceId`, requested logical binding areas, metadata, contract version), supports deterministic binding references (`storage-instance://{instanceId}/{area}`), and returns logical area bindings (`input`/`output`/`intermediate`) suitable for downstream dataset/workflow binding flows.
+- Added a local filesystem implementation in `infrastructure/filesystem/system-runtime/LocalStorageInstanceProvisioner.ts` that automatically provisions deterministic directories under a storage root (`/storage/{instanceId}/input|output|intermediate`) and returns local filesystem details only as an infrastructure-specific extension of the canonical contract result.
+- `/systems/` remains available for ordinary system files, but storage-instance payload directories now model reusable storage attached by logical binding semantics rather than `systemId`-owned path assumptions.
+- This slice intentionally introduces the contract + local provisioner seam without forcing broad runtime rewiring yet; follow-on stories should integrate this seam into output artifact storage and dataset-instance provisioning orchestration paths.
+
 ## AI Loom Image System vertical-slice update: system-owned binary output storage + provenance persistence (stories 2.3.5-2.3.6)
 
 - Workflow output materialization now supports explicit binary artifact persistence through an internal storage seam (`application/system-runtime/WorkflowOutputArtifactStorage.ts`) rather than executor-specific paths.
