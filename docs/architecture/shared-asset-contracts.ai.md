@@ -1400,3 +1400,13 @@
 - Studio-shell API now exposes both output-dataset read by record id and generalized dataset-item list/read by logical binding id, preserving logical dataset/storage references in caller-facing contracts.
 - Reference-image upload ingestion now supports explicit optional FaceID dataset targeting through binding ids (`reference-image-dataset`) and routes writes through dataset/storage contracts with logical binding areas (`reference`).
 - Default image template runnability remains unchanged: input/output datasets are still provisioned by default, while optional FaceID dataset provisioning stays explicit and reusable.
+
+## AI Loom image manipulation update: cross-system/subsystem dataset-instance access + output-input chaining (stories 6.7-6.8)
+
+- Dataset-instance domain contracts now include explicit access bindings so instance identity and accessor bindings are modeled separately (`instanceId` vs bound system/subsystem ids).
+- Access bindings are additive and non-exclusive:
+  - owner system binding remains explicit,
+  - additional system bindings and embedded-subsystem bindings can be attached without changing dataset instance identity or storage identity.
+- `SystemDatasetInstanceService` binding flows now support reuse of an existing dataset instance id across systems (`reuseFromInstanceId`) and prevent accidental overwrite when another system references the same instance id.
+- Reference-image backend now exposes dataset-binding chaining (`chainReferenceImageDatasetItemToInput`) so saved outputs can be reintroduced as later inputs through dataset instance contracts, not raw path transfer.
+- Chaining remains bounded to existing binding ids (`output-image-dataset`/`reference-image-dataset` -> `input-image-dataset` or `reference-image-dataset`) and preserves default template readiness.

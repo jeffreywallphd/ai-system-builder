@@ -319,6 +319,29 @@ export interface GetReferenceImageDatasetItemRequest {
   readonly recordId: string;
 }
 
+export interface ChainReferenceImageDatasetItemRequest {
+  readonly studioId: string;
+  readonly draftId?: string;
+  readonly sourceDatasetBindingId: Exclude<ReferenceImageDatasetBindingId, "input-image-dataset">;
+  readonly sourceRecordId: string;
+  readonly targetDatasetBindingId?: Extract<ReferenceImageDatasetBindingId, "input-image-dataset" | "reference-image-dataset">;
+}
+
+export interface ChainReferenceImageDatasetItemReadModel {
+  readonly systemId: string;
+  readonly source: {
+    readonly datasetBindingId: Exclude<ReferenceImageDatasetBindingId, "input-image-dataset">;
+    readonly datasetInstanceId: string;
+    readonly recordId: string;
+  };
+  readonly target: {
+    readonly datasetBindingId: Extract<ReferenceImageDatasetBindingId, "input-image-dataset" | "reference-image-dataset">;
+    readonly datasetInstanceId: string;
+    readonly recordId: string;
+    readonly selectedRecordId?: string;
+  };
+}
+
 export interface ListReferenceImageRunHistoryRequest {
   readonly studioId: string;
   readonly draftId?: string;
@@ -1687,6 +1710,94 @@ export class StudioShellBackendApi {
     });
   }
 
+  public async chainReferenceImageDatasetItemToInput(
+    request: ChainReferenceImageDatasetItemRequest,
+  ): Promise<StudioShellApiResponse<ChainReferenceImageDatasetItemReadModel>> {
+    return this.wrap(async () => {
+      const source = await this.resolveReferenceImageDatasetForBinding({
+        studioId: request.studioId,
+        draftId: request.draftId,
+        datasetBindingId: request.sourceDatasetBindingId,
+      });
+      const targetBindingId = request.targetDatasetBindingId ?? "input-image-dataset";
+      const target = await this.resolveReferenceImageDatasetForBinding({
+        studioId: request.studioId,
+        draftId: request.draftId,
+        datasetBindingId: targetBindingId,
+      });
+      const sourceRecordId = request.sourceRecordId?.trim();
+      if (!sourceRecordId) {
+        throw new StudioShellInvalidRequestError("sourceRecordId is required.");
+      }
+      const sourceRecord = this.referenceImageDatasets.getImageRecordFromInstance({
+        systemId: source.systemId,
+        instanceId: source.instanceId,
+        recordId: sourceRecordId,
+      });
+      if (!sourceRecord) {
+        throw new StudioShellInvalidRequestError(
+          `Reference image source record '${sourceRecordId}' was not found in dataset binding '${request.sourceDatasetBindingId}'.`,
+        );
+      }
+      const targetStorageBindingArea = targetBindingId === "reference-image-dataset"
+        ? "reference"
+        : "input";
+      const chained = await this.referenceImageDatasets.ingestImageRecordIntoInstance({
+        systemId: target.systemId,
+        instanceId: target.instanceId,
+        storageBindingArea: targetStorageBindingArea,
+        record: {
+          ...sourceRecord.image,
+          tags: Object.freeze([
+            ...new Set([...(sourceRecord.image.tags ?? []), "chained-input"]),
+          ]),
+        },
+        metadata: {
+          ...sourceRecord.metadata,
+          chainedFrom: Object.freeze({
+            sourceDatasetBindingId: request.sourceDatasetBindingId,
+            sourceDatasetInstanceId: source.instanceId,
+            sourceRecordId,
+          }),
+        },
+        provenance: {
+          sourceType: "dataset-instance-chain",
+          sourceReference: `dataset-instance:${source.instanceId}:record:${sourceRecordId}`,
+          sourceSystemId: source.systemId,
+          sourceRunId: sourceRecord.generation?.runId,
+          ingestedBy: "studio-shell-dataset-chain",
+        },
+      });
+      let selectedRecordId: string | undefined;
+      if (targetBindingId === "input-image-dataset") {
+        await this.referenceImageDatasets.selectImageRecordInInstance({
+          systemId: target.systemId,
+          instanceId: target.instanceId,
+          recordId: chained.recordId,
+          selectionContext: {
+            selectionMode: "single",
+            reason: "output-to-input-chain",
+          },
+        });
+        selectedRecordId = chained.recordId;
+      }
+      return Object.freeze({
+        systemId: target.systemId,
+        source: Object.freeze({
+          datasetBindingId: request.sourceDatasetBindingId,
+          datasetInstanceId: source.instanceId,
+          recordId: sourceRecordId,
+        }),
+        target: Object.freeze({
+          datasetBindingId: targetBindingId,
+          datasetInstanceId: target.instanceId,
+          recordId: chained.recordId,
+          selectedRecordId,
+        }),
+      });
+    });
+  }
+
   private async listReferenceImageDatasetItemsInternal(request: {
     readonly studioId: string;
     readonly draftId?: string;
@@ -1730,7 +1841,7 @@ export class StudioShellBackendApi {
   private async resolveReferenceImageDatasetForBinding(input: {
     readonly studioId: string;
     readonly draftId?: string;
-    readonly datasetBindingId: Exclude<ReferenceImageDatasetBindingId, "input-image-dataset">;
+    readonly datasetBindingId: ReferenceImageDatasetBindingId;
   }): Promise<{
     readonly systemId: string;
     readonly instanceId: string;

@@ -440,3 +440,19 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Studio-shell reference-image APIs now expose bounded dataset-item reads for the output dataset (`getReferenceImageOutput`) and generalized dataset-item list/read access by logical binding id (`listReferenceImageDatasetItems` / `getReferenceImageDatasetItem`).
 - Reference-image upload ingestion now supports optional FaceID reference dataset targeting (`targetDatasetBindingId: "reference-image-dataset"`) while keeping default input-upload behavior unchanged.
 - Optional FaceID dataset provisioning remains explicit and on-demand (`includeOptionalReferenceDatasets`) so the default template path is runnable without extra configuration, while still enabling reusable reference dataset flows when FaceID/reference conditioning is needed.
+
+## AI Loom image manipulation shared dataset/storage reuse + chaining update (stories 6.7-6.8)
+
+- Dataset-instance access is now modeled as explicit reusable bindings (owner identity remains on the instance, while additional system/subsystem access bindings are attached and validated separately).
+- `SystemDatasetInstanceService` now resolves instance access by:
+  - dataset instance identity (`instanceId`),
+  - owner identity (`instance.systemId`),
+  - bound accessor identity (`system:*` or `system:*::subsystem:*` binding entries),
+  rather than assuming one exclusive system owner for all consumers.
+- Role binding and ensure flows now support reuse semantics for existing instance ids across systems/subsystems (`bindDatasetInstanceByRole` + `ensureRoleDatasetInstance` reuse paths), preventing cross-system overwrite behavior for shared runtime ids.
+- Output/input chaining now has a backend-authoritative dataset-binding operation (`chainReferenceImageDatasetItemToInput`) that:
+  - reads source records from bound output/reference dataset instances,
+  - re-ingests into bound input/reference dataset instances through dataset contracts,
+  - updates input selection when chaining to `input-image-dataset`,
+  - keeps higher layers path-free (no raw filesystem path handoff).
+- Default template runnability is preserved: initial input/output provisioning still works without user configuration, and chaining is additive.

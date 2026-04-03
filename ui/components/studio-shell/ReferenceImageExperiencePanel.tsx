@@ -196,6 +196,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
   const [isStarting, setIsStarting] = useState(false);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isChaining, setIsChaining] = useState(false);
   const [runHistory, setRunHistory] = useState<ReadonlyArray<ImageRunHistoryRecord>>([]);
   const resultLoadRequestId = useRef(0);
   const historyLoadRequestId = useRef(0);
@@ -647,9 +648,43 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
           <div className="ui-stack ui-stack--sm" style={{ marginTop: "0.75rem" }}>
             <div className="ui-row ui-row--space-between ui-row--middle">
               <h4 className="ui-text-small" style={{ margin: 0 }}>Preview</h4>
-              <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={() => setActiveResultId(selectedResultViewModel.imageId)}>
-                Open
-              </button>
+              <div className="ui-row ui-row--xs">
+                <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={() => setActiveResultId(selectedResultViewModel.imageId)}>
+                  Open
+                </button>
+                <button
+                  type="button"
+                  className="ui-button ui-button--ghost ui-button--sm"
+                  disabled={isChaining}
+                  onClick={() => {
+                    if (!selectedResult || !draft) {
+                      return;
+                    }
+                    setIsChaining(true);
+                    setStatus(undefined);
+                    void studioShell.chainReferenceImageDatasetItemToInput({
+                      studioId: context.studioId,
+                      draftId: draft.draftId,
+                      sourceDatasetBindingId: "output-image-dataset",
+                      sourceRecordId: selectedResult.image.recordId,
+                      targetDatasetBindingId: "input-image-dataset",
+                    }).then((response) => {
+                      if (!response.ok || !response.data) {
+                        setStatus(response.error?.message ?? "Couldn't reuse this result as input.");
+                        return;
+                      }
+                      setSelectedRecordId(response.data.target.selectedRecordId ?? response.data.target.recordId);
+                      setDatasetInstanceId(response.data.target.datasetInstanceId);
+                      setSelectedAssetId(selectedResult.image.imageReference ?? selectedResult.image.thumbnailReference ?? selectedResult.image.recordId);
+                      setStatus("Result prepared as the next input image.");
+                    }).finally(() => {
+                      setIsChaining(false);
+                    });
+                  }}
+                >
+                  {isChaining ? "Preparing..." : "Use as next input"}
+                </button>
+              </div>
             </div>
             <ImageViewer
               image={selectedResultViewModel}

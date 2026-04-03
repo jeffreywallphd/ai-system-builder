@@ -644,6 +644,7 @@ export class SqliteDatasetInstanceRepository implements DatasetInstanceStorageAd
       storageContractVersion: snapshot.storageContractVersion,
       storageBindings: snapshot.storageBindings,
       storageBinding: snapshot.storageBinding,
+      accessBindings: snapshot.accessBindings,
       lifecycleStatus: snapshot.lifecycleStatus,
       runtimeStatus: snapshot.runtimeStatus,
       seedMetadata: snapshot.seedMetadata,
