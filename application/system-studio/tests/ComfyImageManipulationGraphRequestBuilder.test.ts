@@ -25,6 +25,9 @@ describe("ComfyImageManipulationGraphRequestBuilder", () => {
         systemAssetId: "asset:system:reference-image-manipulation",
         runtimeProfile: "comfyui",
       },
+      runtimeEnvironment: {
+        apiBaseUrl: "http://127.0.0.1:8188",
+      },
     });
 
     expect(submission.executionRequestId).toBe("exec-image-1");
@@ -34,6 +37,7 @@ describe("ComfyImageManipulationGraphRequestBuilder", () => {
     expect(submission.graph.outputNodeIds).toEqual(["8"]);
     expect(submission.materializationBindings.length).toBeGreaterThan(0);
     expect(submission.inspection.executionPath).toBe("non-faceid");
+    expect(submission.inspection.runtimeResolution.runtimeProfile).toBe("comfyui");
     expect(submission.inspection.extensionBindings.some((entry) => entry.bindingId === "binding.generation.width-extension")).toBeTrue();
   });
 
@@ -62,6 +66,9 @@ describe("ComfyImageManipulationGraphRequestBuilder", () => {
         },
       ],
       runtimeMetadata: {},
+      runtimeEnvironment: {
+        apiBaseUrl: "http://127.0.0.1:8188",
+      },
     });
 
     expect(submission.inspection.executionPath).toBe("faceid");
@@ -93,6 +100,9 @@ describe("ComfyImageManipulationGraphRequestBuilder", () => {
         },
       ],
       runtimeMetadata: {},
+      runtimeEnvironment: {
+        apiBaseUrl: "http://127.0.0.1:8188",
+      },
     })).toThrow();
   });
 
@@ -110,6 +120,9 @@ describe("ComfyImageManipulationGraphRequestBuilder", () => {
         },
       ],
       runtimeMetadata: {},
+      runtimeEnvironment: {
+        apiBaseUrl: "http://127.0.0.1:8188",
+      },
     })).toThrow();
   });
 
@@ -127,6 +140,9 @@ describe("ComfyImageManipulationGraphRequestBuilder", () => {
         },
       ],
       runtimeMetadata: {},
+      runtimeEnvironment: {
+        apiBaseUrl: "http://127.0.0.1:8188",
+      },
     })).toThrow("Unsupported Comfy image manipulation execution contract version");
   });
 });

@@ -16,6 +16,7 @@ import {
   type ResolveComfyImageManipulationGraphBindingsResult,
 } from "./ComfyImageManipulationPropertyMappingAsset";
 import { resolveComfyInputDatasetBinding } from "./ComfyImageManipulationDatasetBindingAsset";
+import { resolveComfyImageManipulationRuntimeConfiguration } from "./ComfyImageManipulationRuntimeResolution";
 
 const TEMPLATE_IDS = new Set([
   "asset:workflow-template:image-manipulation:default",
@@ -67,6 +68,15 @@ export function buildComfyImageManipulationExecutionSubmission(
   const sourceDatasetBinding = resolveComfyInputDatasetBinding({ handles: request.datasetHandles });
   const strategy = resolveExecutionPathStrategy(mapping);
   strategy.validate(mapping);
+  const runtimeResolution = resolveComfyImageManipulationRuntimeConfiguration({
+    workflowTemplate: request.workflowTemplate,
+    datasetHandles: request.datasetHandles,
+    runtimeEnvironment: request.runtimeEnvironment,
+    capabilityBinding: request.runtimeCapabilityBinding,
+  });
+  if (runtimeResolution.diagnostics.issues.length > 0) {
+    throw new Error(`invalid-request:${runtimeResolution.diagnostics.issues.join(" ")}`);
+  }
 
   const prompt = mapPromptGraph(
     graph,
@@ -96,6 +106,7 @@ export function buildComfyImageManipulationExecutionSubmission(
       nodeCount: graph.nodes.length,
       boundInputCount: countBoundInputs(prompt),
       executionPath: strategy.pathKind,
+      runtimeResolution,
       extensionBindings: Object.freeze(mapping.extensionNodeOverrides.map((entry) => Object.freeze({ ...entry }))),
       subworkflowBindings: Object.freeze(mapping.subworkflowBindings.map((entry) => Object.freeze({ ...entry }))),
     }),
