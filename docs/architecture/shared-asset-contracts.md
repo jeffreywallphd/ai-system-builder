@@ -1383,3 +1383,15 @@ Not implemented in this slice:
   - bounded FaceID extension anchors for future composition,
   - parse/serialize helpers for later mapper/adapter integration.
 - The reference image system template now points to this concrete image-manipulation workflow template asset by default, preserving out-of-box executable template behavior in the current vertical slice.
+
+## AI Loom image manipulation update: Comfy property mapping asset + logical input dataset workflow binding (stories 4.3-4.4)
+
+- Added a dedicated Comfy property mapping asset (`application/system-studio/ComfyImageManipulationPropertyMappingAsset.ts`) with explicit asset identity/versioning, contract metadata, and inspectable schema-path -> graph-node/input bindings.
+- Mapping coverage is explicit for prompt, generation-control, model, and image binding groups against the current base graph structure, with extension-hook entries reserved for FaceID/advanced graph variants.
+- Added a dedicated logical dataset-binding asset (`application/system-studio/ComfyImageManipulationDatasetBindingAsset.ts`) that resolves source-image workflow binding from dataset runtime handles and rejects raw filesystem-path style values.
+- Updated image-manipulation system template contracts to pin these assets as first-class workflow composition dependencies (`ReferenceImageSystemTemplate.ts`, `ImageManipulationSystemTemplate.ts`) and enforce them in structural validation (`ImageManipulationSystemTemplateValidation.ts`).
+- Added focused tests for mapping resolution + dataset binding resolution and extended template-level assertions/validation coverage in:
+  - `application/system-studio/tests/ComfyImageManipulationPropertyMappingAsset.test.ts`
+  - `application/system-studio/tests/ComfyImageManipulationDatasetBindingAsset.test.ts`
+  - `application/system-studio/tests/ImageManipulationSystemTemplate.test.ts`
+  - `application/system-studio/tests/ReferenceImageSystemTemplate.test.ts`

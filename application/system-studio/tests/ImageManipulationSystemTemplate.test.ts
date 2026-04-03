@@ -37,8 +37,17 @@ describe("ImageManipulationSystemTemplate", () => {
     expect(ImageManipulationSystemTemplate.compositionBindings.optionalReferenceDatasetBindingId).toBe("reference-image-dataset");
     expect(ImageManipulationSystemTemplate.compositionBindings.workflowTemplateBindingId).toBe("primary-image-workflow");
     expect(ImageManipulationSystemTemplate.compositionBindings.propertySchemaBindingId).toBe("property-schema:image-manipulation");
+    expect(ImageManipulationSystemTemplate.compositionBindings.propertyMappingBindingId).toBe("asset:config-profile:comfy-image-manipulation-property-mapping");
+    expect(ImageManipulationSystemTemplate.compositionBindings.inputDatasetWorkflowBindingId).toBe("asset:config-profile:comfy-image-manipulation-dataset-binding");
     expect(ImageManipulationSystemTemplate.compositionBindings.pageBindingId).toBe("system-page:image-manipulation");
     expect(ImageManipulationSystemTemplate.compositionBindings.runtimeBindingId).toBe("runtime:image-manipulation");
+
+    expect(ImageManipulationSystemTemplate.primaryWorkflowAsset.datasetBindings.inputDatasetBindingAssetId).toBe(
+      "asset:config-profile:comfy-image-manipulation-dataset-binding",
+    );
+    expect(ImageManipulationSystemTemplate.primaryWorkflowAsset.datasetBindings.propertyMappingAssetId).toBe(
+      "asset:config-profile:comfy-image-manipulation-property-mapping",
+    );
 
     expect(ImageManipulationSystemTemplate.systemAsset.executionMetadata?.runtime?.environment).toBe(
       ImageManipulationRuntimeTargets.runtimeEnvironment,
@@ -153,6 +162,26 @@ describe("ImageManipulationSystemTemplate", () => {
 
     expect(validation.status).toBe("invalid");
     expect(validation.errors.map((entry) => entry.code)).toContain("workflow-template-binding-invalid");
+  });
+
+  it("fails validation when workflow mapping assets are replaced", () => {
+    const invalid = {
+      ...ImageManipulationSystemTemplate,
+      primaryWorkflowAsset: {
+        ...ImageManipulationSystemTemplate.primaryWorkflowAsset,
+        datasetBindings: {
+          ...ImageManipulationSystemTemplate.primaryWorkflowAsset.datasetBindings,
+          inputDatasetBindingAssetId: "asset:config-profile:other-dataset-binding",
+          propertyMappingAssetId: "asset:config-profile:other-property-mapping",
+        },
+      },
+    };
+
+    const validation = validateImageManipulationSystemTemplate(invalid);
+
+    expect(validation.status).toBe("invalid");
+    expect(validation.errors.map((entry) => entry.code)).toContain("workflow-input-dataset-binding-asset-invalid");
+    expect(validation.errors.map((entry) => entry.code)).toContain("workflow-property-mapping-asset-invalid");
   });
 
   it("fails validation when execution runtime metadata is removed", () => {

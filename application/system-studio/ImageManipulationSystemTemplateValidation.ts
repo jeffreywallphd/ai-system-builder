@@ -15,6 +15,8 @@ import {
   ImageManipulationPrimaryWorkflowTemplateAssetId,
   type ImageManipulationSystemTemplateDefinition,
 } from "./ImageManipulationSystemTemplate";
+import { ComfyImageManipulationDatasetBindingAssetId } from "./ComfyImageManipulationDatasetBindingAsset";
+import { ComfyImageManipulationPropertyMappingAssetId } from "./ComfyImageManipulationPropertyMappingAsset";
 
 export const ImageManipulationRuntimeTargets = Object.freeze({
   runtimeEnvironment: "comfyui",
@@ -192,6 +194,32 @@ export function validateImageManipulationSystemTemplate(
       metadata: {
         expected: ImageManipulationPrimaryWorkflowTemplateAssetId,
         actual: template.primaryWorkflowAsset.workflowTemplateAssetId,
+      },
+    }));
+  }
+  if (template.primaryWorkflowAsset.datasetBindings.inputDatasetBindingAssetId !== ComfyImageManipulationDatasetBindingAssetId) {
+    errors.push(createIssue({
+      code: "workflow-input-dataset-binding-asset-invalid",
+      message: "Image manipulation template must bind the canonical input dataset workflow-binding asset.",
+      assetId,
+      layer: "referential",
+      path: "primaryWorkflowAsset.datasetBindings.inputDatasetBindingAssetId",
+      metadata: {
+        expected: ComfyImageManipulationDatasetBindingAssetId,
+        actual: template.primaryWorkflowAsset.datasetBindings.inputDatasetBindingAssetId,
+      },
+    }));
+  }
+  if (template.primaryWorkflowAsset.datasetBindings.propertyMappingAssetId !== ComfyImageManipulationPropertyMappingAssetId) {
+    errors.push(createIssue({
+      code: "workflow-property-mapping-asset-invalid",
+      message: "Image manipulation template must bind the canonical Comfy property mapping asset.",
+      assetId,
+      layer: "referential",
+      path: "primaryWorkflowAsset.datasetBindings.propertyMappingAssetId",
+      metadata: {
+        expected: ComfyImageManipulationPropertyMappingAssetId,
+        actual: template.primaryWorkflowAsset.datasetBindings.propertyMappingAssetId,
       },
     }));
   }

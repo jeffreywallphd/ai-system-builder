@@ -24,6 +24,12 @@ describe("ReferenceImageSystemTemplate", () => {
     expect(ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId).toBe(ReferenceImagePrimaryWorkflowTemplateAssetId);
     expect(ReferenceImageSystemTemplate.primaryWorkflowAsset.datasetBindings.workflowInputId).toBe("sourceImage");
     expect(ReferenceImageSystemTemplate.primaryWorkflowAsset.datasetBindings.workflowOutputId).toBe("images");
+    expect(ReferenceImageSystemTemplate.primaryWorkflowAsset.datasetBindings.inputDatasetBindingAssetId).toBe(
+      "asset:config-profile:comfy-image-manipulation-dataset-binding",
+    );
+    expect(ReferenceImageSystemTemplate.primaryWorkflowAsset.datasetBindings.propertyMappingAssetId).toBe(
+      "asset:config-profile:comfy-image-manipulation-property-mapping",
+    );
     expect(ReferenceImageSystemTemplate.systemAsset.executionMetadata?.runtime?.environment).toBe("comfyui");
     expect(ReferenceImageSystemTemplate.systemAsset.executionMetadata?.orchestration?.mode).toBe("workflow-template-driven");
     expect(ReferenceImageSystemTemplate.systemAsset.executionMetadata?.workflowContextMapping?.mappings.length).toBeGreaterThan(0);

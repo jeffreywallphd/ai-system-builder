@@ -23,6 +23,8 @@ import {
   ImageManipulationWorkflowTemplateAssetId,
   ImageManipulationWorkflowTemplateVersionId,
 } from "../workflow-template-studio/ImageManipulationWorkflowTemplate";
+import { ComfyImageManipulationDatasetBindingAssetId } from "./ComfyImageManipulationDatasetBindingAsset";
+import { ComfyImageManipulationPropertyMappingAssetId } from "./ComfyImageManipulationPropertyMappingAsset";
 
 export const ReferenceImageSystemTemplateId = "template:system:reference-image-manipulation";
 export const ReferenceImagePrimaryWorkflowTemplateAssetId = ImageManipulationWorkflowTemplateAssetId;
@@ -144,6 +146,8 @@ export interface ReferenceImageSystemTemplateDefinition {
       readonly workflowInputId: string;
       readonly outputDatasetInstanceBindingId: "output-image-dataset";
       readonly workflowOutputId: string;
+      readonly inputDatasetBindingAssetId: typeof ComfyImageManipulationDatasetBindingAssetId;
+      readonly propertyMappingAssetId: typeof ComfyImageManipulationPropertyMappingAssetId;
     }>;
     readonly parameterInputIds: ReadonlyArray<string>;
     readonly contextMapping: SystemContextWorkflowMappingConfiguration;
@@ -313,6 +317,8 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
       workflowInputId: "sourceImage",
       outputDatasetInstanceBindingId: "output-image-dataset",
       workflowOutputId: "images",
+      inputDatasetBindingAssetId: ComfyImageManipulationDatasetBindingAssetId,
+      propertyMappingAssetId: ComfyImageManipulationPropertyMappingAssetId,
     }),
     parameterInputIds: Object.freeze(["instruction", "variationStrength", "resultCount"]),
     contextMapping: ReferenceImageSystemWorkflowContextMapping,
