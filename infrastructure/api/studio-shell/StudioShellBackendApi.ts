@@ -124,7 +124,6 @@ import {
 } from "../../../application/system-runtime/ImageRunHistoryRepository";
 import { ComfyExecutionResultMaterializationMapper } from "../../comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper";
 import type { SystemContextContract } from "../../../domain/system-studio/SystemContextContract";
-import { findDatasetInstanceStorageBinding } from "../../../domain/system-runtime/DatasetInstanceDomain";
 
 export interface StudioShellApiError {
   readonly code:
@@ -819,6 +818,7 @@ export class StudioShellBackendApi {
   public async createDraft(command: CreateAssetDraftCommand): Promise<StudioShellApiResponse<StudioShellSnapshotReadModel>> {
     return this.wrap(async () => {
       await this.service.createAssetDraft(command);
+      await this.provisionReferenceImageTemplateRuntimeDefaults(command.studioId);
       await this.synchronizeWorkflowPersistenceFromStudioDraft(command.studioId);
       return this.requireSnapshot(command.studioId);
     });
@@ -1177,22 +1177,16 @@ export class StudioShellBackendApi {
         throw new StudioShellInvalidRequestError("Uploaded file name is required.");
       }
       const payload = this.decodeBase64Payload(request.payloadBase64);
-      const [inputDataset] = await this.ensureReferenceImageDatasetInstances(runtimeSystemId);
+      const datasets = await this.ensureReferenceImageDatasetInstances(runtimeSystemId);
+      const inputDataset = datasets.get("input-image-dataset");
       if (!inputDataset) {
         throw new StudioShellInvalidRequestError("Reference image input dataset is unavailable.");
-      }
-      const inputStorageBinding = findDatasetInstanceStorageBinding({
-        instance: inputDataset,
-        area: "input",
-      });
-      if (!inputStorageBinding) {
-        throw new StudioShellInvalidRequestError("Reference image input dataset is missing an input storage binding.");
       }
 
       const ingested = await this.referenceImageDatasets.ingestImageRecordIntoInstance({
         systemId: runtimeSystemId,
         instanceId: inputDataset.instanceId,
-        storageReference: `${inputStorageBinding.bindingReference}/uploads/${Date.now()}-${encodeURIComponent(fileName)}`,
+        storageBindingArea: "input",
         metadata: {
           ingestionSource: "reference-image-ui-upload",
           uploadedFileName: fileName,
@@ -1260,7 +1254,8 @@ export class StudioShellBackendApi {
       }
 
       const runtimeSystemId = this.resolveReferenceRuntimeSystemId(draft);
-      const [, outputDataset] = await this.ensureReferenceImageDatasetInstances(runtimeSystemId);
+      const datasets = await this.ensureReferenceImageDatasetInstances(runtimeSystemId);
+      const outputDataset = datasets.get("output-image-dataset");
       if (!outputDataset) {
         throw new StudioShellInvalidRequestError("Reference image output dataset is unavailable.");
       }
@@ -1618,7 +1613,8 @@ export class StudioShellBackendApi {
         throw new StudioShellInvalidRequestError("Generated image results are only available for the reference image template.");
       }
       const runtimeSystemId = this.resolveReferenceRuntimeSystemId(draft);
-      const [, outputDataset] = await this.ensureReferenceImageDatasetInstances(runtimeSystemId);
+      const datasets = await this.ensureReferenceImageDatasetInstances(runtimeSystemId);
+      const outputDataset = datasets.get("output-image-dataset");
       if (!outputDataset) {
         throw new StudioShellInvalidRequestError("Reference image output dataset is unavailable.");
       }
@@ -2589,7 +2585,7 @@ export class StudioShellBackendApi {
     });
   }
 
-  private async ensureReferenceImageDatasetInstances(systemId: string) {
+  private async ensureReferenceImageDatasetInstances(systemId: string): Promise<ReadonlyMap<string, Awaited<ReturnType<SystemDatasetInstanceService["ensureRoleDatasetInstance"]>>>> {
     const storage = await this.initializeReferenceImageStorage({
       systemId,
       ownerKind: "system",
@@ -2607,11 +2603,25 @@ export class StudioShellBackendApi {
     const requests = buildReferenceImageDatasetInstanceRequests(systemId, {
       storageBindingByArea,
     });
-    const ensured: Array<Awaited<ReturnType<SystemDatasetInstanceService["ensureRoleDatasetInstance"]>>> = [];
+    const ensuredByBindingId = new Map<string, Awaited<ReturnType<SystemDatasetInstanceService["ensureRoleDatasetInstance"]>>>();
     for (const request of requests) {
-      ensured.push(await this.referenceImageDatasets.ensureRoleDatasetInstance(request as EnsureRoleDatasetInstanceRequest));
+      const ensured = await this.referenceImageDatasets.ensureRoleDatasetInstance(request as EnsureRoleDatasetInstanceRequest);
+      const bindingId = request.seedMetadata?.datasetBindingId;
+      if (bindingId) {
+        ensuredByBindingId.set(bindingId, ensured);
+      }
     }
-    return ensured;
+    return ensuredByBindingId;
+  }
+
+  private async provisionReferenceImageTemplateRuntimeDefaults(studioId: string): Promise<void> {
+    const snapshot = await this.requireSnapshot(studioId);
+    const draft = snapshot.draft;
+    if (!draft || draft.assetId !== ReferenceImageSystemTemplate.systemAsset.assetId) {
+      return;
+    }
+    const runtimeSystemId = this.resolveReferenceRuntimeSystemId(draft);
+    await this.ensureReferenceImageDatasetInstances(runtimeSystemId);
   }
 
   public async initializeReferenceImageStorage(

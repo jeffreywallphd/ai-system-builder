@@ -920,6 +920,53 @@ describe("SystemDatasetInstanceService", () => {
     expect(listed[0]?.recordId).toBe("record:image-1");
   });
 
+  it("ingests image records using dataset storage binding areas without caller-provided storage paths", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const service = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog([
+        {
+          assetId: "image-ingestor-v1",
+          versionId: "1.0.0",
+          schemaIntentId: DatasetSchemaIntentIds.media,
+          outputShapeKind: "image-metadata-records",
+        },
+      ]),
+      new ZodMediaDatasetValidator(),
+      new AllowListSystemValidator(["system:image-pipeline"]),
+    );
+
+    const instance = await service.ensureInputImageStoreInstance({
+      instanceId: "dataset-instance:binding-ingest",
+      systemId: "system:image-pipeline",
+      datasetAssetId: "image-ingestor-v1",
+      datasetAssetVersionId: "1.0.0",
+      storageBindings: [
+        {
+          storageInstanceId: "storage-instance:shared-reference-runtime",
+          storageInstanceRef: "storage-instance://storage-instance%3Ashared-reference-runtime",
+          bindingArea: "input",
+          bindingId: "storage-binding:shared-reference-runtime:input",
+          bindingReference: "storage-instance://storage-instance%3Ashared-reference-runtime/input",
+        },
+      ],
+    });
+
+    const ingested = await service.ingestImageRecordIntoInstance({
+      systemId: "system:image-pipeline",
+      instanceId: instance.instanceId,
+      storageBindingArea: "input",
+      record: {
+        width: 1024,
+        height: 1024,
+        format: "png",
+      },
+    });
+
+    expect(ingested.storage?.reference).toBe("storage-instance://storage-instance%3Ashared-reference-runtime/input");
+    expect(ingested.image.assetRef?.stableId).toBe("generated-output:storage-instance://storage-instance%3Ashared-reference-runtime/input");
+  });
+
   it("rejects invalid ingested image records and enforces system ownership on retrieval", async () => {
     const repository = new InMemoryDatasetInstanceRepository();
     const service = new SystemDatasetInstanceService(

@@ -15,6 +15,7 @@ import {
 } from "../../domain/system-runtime/SystemDatasetBindingDomain";
 import {
   createDatasetInstance,
+  findDatasetInstanceStorageBinding,
   patchDatasetInstance,
   transitionDatasetInstanceLifecycle,
   DatasetInstanceLifecycleStatuses,
@@ -50,7 +51,7 @@ import {
   type DatasetEventPublisher,
 } from "../dataset-events/DatasetEventPublisher";
 import { DatasetEventActorKinds, DatasetEventTypes } from "../../domain/dataset-studio/contracts/DatasetEvent";
-import { parseStorageLogicalReference } from "./StorageInstanceProvisioningContract";
+import { parseStorageLogicalReference, type StorageBindingArea } from "./StorageInstanceProvisioningContract";
 import { assertNoUserManagedStoragePaths } from "./StoragePathPolicyValidation";
 
 export interface SystemDatasetOwnershipValidator {
@@ -170,6 +171,7 @@ export interface IngestDatasetInstanceImageRecordRequest {
   readonly record: unknown;
   readonly recordId?: string;
   readonly storageReference?: string;
+  readonly storageBindingArea?: StorageBindingArea;
   readonly storageProvider?: string;
   readonly metadata?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly provenance?: DatasetInstanceImageRecordProvenance;
@@ -184,6 +186,7 @@ export interface IngestDatasetInstanceImageRecordsRequest {
     readonly record: unknown;
     readonly recordId?: string;
     readonly storageReference?: string;
+    readonly storageBindingArea?: StorageBindingArea;
     readonly storageProvider?: string;
     readonly metadata?: Readonly<Record<string, CanonicalRecordValue>>;
     readonly provenance?: DatasetInstanceImageRecordProvenance;
@@ -755,10 +758,15 @@ export class SystemDatasetInstanceService {
       instanceId: request.instanceId,
     });
     this.assertInstanceMutable(instance, "ingest image record");
+    const storageReference = this.resolveIngestionStorageReference({
+      instance,
+      explicitReference: request.storageReference,
+      bindingArea: request.storageBindingArea,
+    });
 
     const candidate = await this.prepareImageRecordCandidate({
       record: request.record,
-      storageReference: request.storageReference,
+      storageReference,
       metadataExtraction: request.metadataExtraction,
     });
     const admitted = this.schemaEnforcementService.admitRecordForInstance({
@@ -775,7 +783,7 @@ export class SystemDatasetInstanceService {
       datasetAssetVersionId: instance.datasetAssetVersionId,
       image,
       storage: this.createStorageReference({
-        explicitReference: request.storageReference,
+        explicitReference: storageReference,
         explicitProvider: request.storageProvider,
         image,
       }),
@@ -818,6 +826,7 @@ export class SystemDatasetInstanceService {
         record: record.record,
         recordId: record.recordId,
         storageReference: record.storageReference,
+        storageBindingArea: record.storageBindingArea,
         storageProvider: record.storageProvider,
         metadata: record.metadata,
         provenance: record.provenance,
@@ -1614,6 +1623,32 @@ export class SystemDatasetInstanceService {
       reference,
       provider: normalizeOptional(input.explicitProvider),
     });
+  }
+
+  private resolveIngestionStorageReference(input: {
+    readonly instance: DatasetInstance;
+    readonly explicitReference?: string;
+    readonly bindingArea?: StorageBindingArea;
+  }): string | undefined {
+    const explicitReference = normalizeOptional(input.explicitReference);
+    if (explicitReference) {
+      return explicitReference;
+    }
+
+    if (!input.bindingArea) {
+      return undefined;
+    }
+
+    const binding = findDatasetInstanceStorageBinding({
+      instance: input.instance,
+      area: input.bindingArea,
+    });
+    if (!binding) {
+      throw new Error(
+        `invalid-request:Dataset instance '${input.instance.instanceId}' does not expose storage binding area '${input.bindingArea}'.`,
+      );
+    }
+    return binding.bindingReference;
   }
 
   private toOptionalPositiveNumber(value: unknown): number | undefined {
