@@ -41,7 +41,9 @@ describe("ReferenceImageExecutionFlowService", () => {
           materializationId: "mat:run:1",
           persistedRecordIds: ["record:1"],
           status: "materialized",
+          userMessage: "Done. Your new image version is ready.",
           failureMessages: [],
+          diagnostics: [],
           executionOutcome: "success",
           persistenceBlocked: false,
         },
@@ -103,7 +105,11 @@ describe("ReferenceImageExecutionFlowService", () => {
         },
         nodeResults: [],
         nestedSystemResults: [],
-        diagnostics: [],
+        diagnostics: [{
+          source: "trace-log",
+          severity: "warning",
+          message: "sample diagnostic",
+        }],
         executedVersionMap: { nodeVersionIds: {} },
         nestedExecutionLineage: [],
       },
@@ -111,6 +117,7 @@ describe("ReferenceImageExecutionFlowService", () => {
 
     expect(request.runtimeResult?.status).toBe("succeeded");
     expect(request.runtimeResult?.output).toEqual({ image: "ok" });
+    expect(request.runtimeResult?.diagnostics?.[0]?.message).toBe("sample diagnostic");
     expect(request.parameterSnapshot.prompt).toBe("make it warmer");
   });
 
@@ -141,7 +148,9 @@ describe("ReferenceImageExecutionFlowService", () => {
           materializationId: "mat:run:2",
           persistedRecordIds: [],
           status: "failed",
+          userMessage: "Something went wrong while creating this image.",
           failureMessages: ["Runtime execution failed before output materialization."],
+          diagnostics: [],
           executionOutcome: "non-recoverable-failure",
           persistenceBlocked: true,
         },

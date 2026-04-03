@@ -389,8 +389,38 @@ export class WorkflowOutputMaterializationService {
   }
 
   private resolveStorageReference(assetRef: WorkflowOutputMaterializationPayload["producedAssets"][number]["assetRef"]): string | undefined {
-    return [assetRef.path, assetRef.uri, assetRef.outputId, assetRef.stableId, assetRef.assetId]
-      .find((value): value is string => typeof value === "string" && value.trim().length > 0);
+    return [assetRef.outputId, assetRef.stableId, assetRef.assetId, assetRef.uri, assetRef.path]
+      .find((value): value is string => this.isLogicalStorageReference(value));
+  }
+
+  private isLogicalStorageReference(value: unknown): value is string {
+    if (typeof value !== "string") {
+      return false;
+    }
+    const normalized = value.trim();
+    if (!normalized) {
+      return false;
+    }
+    const lower = normalized.toLowerCase();
+    if (lower.startsWith("storage-instance://")) {
+      return true;
+    }
+    if (lower.startsWith("dataset-instance://")) {
+      return true;
+    }
+    if (lower.startsWith("generated-output:storage-instance://")) {
+      return true;
+    }
+    if (lower.startsWith("asset:")) {
+      return true;
+    }
+    if (lower.startsWith("memory://") || lower.startsWith("file://")) {
+      return false;
+    }
+    if (/^[a-z]:[\\/]/i.test(normalized) || normalized.startsWith("\\\\")) {
+      return false;
+    }
+    return false;
   }
 
   private readMetadataRecord(metadata: Readonly<Record<string, CanonicalRecordValue>>): Readonly<Record<string, CanonicalRecordValue>> {

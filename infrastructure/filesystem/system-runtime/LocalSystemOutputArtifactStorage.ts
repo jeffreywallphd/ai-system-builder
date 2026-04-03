@@ -50,7 +50,7 @@ export class LocalSystemOutputArtifactStorage implements WorkflowOutputArtifactS
         kind: "generated-output",
         stableId,
         outputId: storageReference,
-        path: absolutePath,
+        path: storageReference,
         sourceSystem: "storage-instance-output-storage",
         sourceContext: Object.freeze({
           storageInstanceId: request.datasetStorageBinding.storageInstanceId,

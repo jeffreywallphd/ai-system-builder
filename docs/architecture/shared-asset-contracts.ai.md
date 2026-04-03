@@ -1378,3 +1378,18 @@
   - `failed`,
   - `canceled`.
 - Added `ComfyImageManipulationExecutionService` to compose graph-builder + adapter execution and emit normalized lifecycle snapshots for runtime-page and standalone-runtime-window consumption while keeping infrastructure-specific details in diagnostics.
+
+## AI Loom image manipulation update: output materialization + normalized diagnostics hardening (stories 5.7-5.8)
+
+- Output materialization now prefers logical storage-instance references over ephemeral runtime/file-path style references:
+  - mapper output no longer projects Comfy filename fields into public `assetRef.path`,
+  - materialization resolves storage references from logical ids first and falls back to dataset-instance storage bindings for runtime-only references (for example `memory://...`).
+- This keeps persisted dataset records and output-gallery/runtime surfaces aligned to shareable storage-instance direction (`storage-instance://...`) instead of adapter-local filesystem/runtime paths.
+- Reference-image persistence responses now include a stable normalized diagnostics contract (`userMessage` + structured `diagnostics[]`) while keeping primary messages non-technical.
+- Normalized diagnostics now cover bounded failure stages used by this slice:
+  - request construction,
+  - runtime configuration resolution,
+  - execution submission/lifecycle,
+  - model/dependency availability,
+  - output materialization.
+- UI execution-flow integration now preserves technical diagnostics for advanced/collapsed inspection while continuing to show plain-language primary status messaging.

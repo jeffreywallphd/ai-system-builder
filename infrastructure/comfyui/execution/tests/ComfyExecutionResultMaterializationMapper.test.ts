@@ -63,7 +63,8 @@ describe("ComfyExecutionResultMaterializationMapper", () => {
     expect(payload.producedAssets[0]?.outputIndex).toBe(0);
     expect(payload.producedAssets[1]?.outputIndex).toBe(1);
     expect(payload.producedAssets[0]?.outputGroupId).toBe("group:portrait:1");
-    expect(payload.producedAssets[0]?.assetRef.path).toBe("hero.png");
+    expect(payload.producedAssets[0]?.assetRef.path).toBeUndefined();
+    expect(payload.producedAssets[0]?.metadata.outputFileName).toBe("hero.png");
     expect(payload.parameterSnapshot).toEqual({
       prompt: "A portrait",
       cfg: 7,

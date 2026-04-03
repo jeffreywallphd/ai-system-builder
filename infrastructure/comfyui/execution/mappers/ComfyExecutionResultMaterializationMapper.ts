@@ -45,7 +45,6 @@ export class ComfyExecutionResultMaterializationMapper {
           assetVersionId: output.assetRef?.versionId,
           outputId: output.reference,
           stableId: output.reference,
-          path: this.readOptionalString(output.metadata?.filename),
           sourceSystem: "comfyui",
         }),
         role: index === 0
@@ -55,6 +54,7 @@ export class ComfyExecutionResultMaterializationMapper {
           nodeId: output.nodeId,
           kind: output.kind,
           reference: output.reference,
+          outputFileName: this.readOptionalString(output.metadata?.filename),
           ...(output.metadata ?? {}),
         }),
         tags: Object.freeze(this.normalizeTags([output.kind, index === 0 ? "primary" : "variant"])),

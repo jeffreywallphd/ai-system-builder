@@ -225,6 +225,59 @@ describe("WorkflowOutputMaterializationService", () => {
     expect(result.failures).toEqual([]);
   });
 
+  it("prefers storage-instance logical references over ephemeral runtime output references", async () => {
+    const repository = new InMemoryDatasetInstanceRepository();
+    const datasetInstances = new SystemDatasetInstanceService(
+      repository,
+      new StaticAssetCatalog(),
+      new AllowSystemValidator(),
+    );
+    await datasetInstances.ensureOutputImageStoreInstance({
+      instanceId: "instance:outputs",
+      systemId: "system:image",
+      datasetAssetId: "asset:dataset:outputs",
+      datasetAssetVersionId: "v1",
+      storageBinding: outputStorageBinding,
+    });
+
+    const service = new WorkflowOutputMaterializationService(datasetInstances);
+    const result = await service.materialize({
+      systemId: "system:image",
+      datasetInstanceId: "instance:outputs",
+      payload: {
+        materializationId: "mat:logical-ref:1",
+        workflowRun: {
+          runId: "run:logical-ref:1",
+          workflowAssetId: "asset:workflow:image",
+        },
+        producedAssets: [{
+          assetRef: {
+            kind: "generated-output",
+            outputId: "memory://comfy/output-1",
+            stableId: "generated-output:memory://comfy/output-1",
+            path: "C:/temp/raw-output.png",
+          },
+          role: "primary",
+          metadata: {
+            width: 640,
+            height: 640,
+            format: "png",
+          },
+          tags: ["primary"],
+        }],
+        parameterSnapshot: {},
+        timestamps: {
+          requestedAt: "2026-04-01T10:00:00.000Z",
+          updatedAt: "2026-04-01T10:00:02.000Z",
+        },
+        status: "materialized",
+      },
+    });
+
+    expect(result.status).toBe("materialized");
+    expect(result.records[0]?.storage?.reference).toContain("storage-instance://storage-instance%3Atest-runtime/output/runs/run%3Alogical-ref%3A1/mat%3Alogical-ref%3A1/0");
+  });
+
   it("surfaces canonical materialization contract validation failures", async () => {
     const repository = new InMemoryDatasetInstanceRepository();
     const datasetInstances = new SystemDatasetInstanceService(
