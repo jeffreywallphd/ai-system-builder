@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const StorageBindingAreaSchema = z.enum(["input", "output", "intermediate"]);
+export const StorageBindingAreaSchema = z.enum(["input", "output", "intermediate"]);
 export type StorageBindingArea = z.infer<typeof StorageBindingAreaSchema>;
 
 export const StorageInstanceProvisioningRequestSchema = z.object({

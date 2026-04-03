@@ -24,6 +24,8 @@ import {
   WorkflowRunStatuses,
   WorkflowRunTriggerSources,
 } from "../../../../domain/workflow-studio/WorkflowRunHistoryDomain";
+import type { StorageInstanceProvisioningContract } from "../../../../application/system-runtime/StorageInstanceProvisioningContract";
+import { createStorageInstanceProvisioningResult } from "../../../../application/system-runtime/StorageInstanceProvisioningContract";
 
 describe("StudioShellBackendApi", () => {
   it("lists workflow run summaries and projects structured run detail for workflow studio observability", async () => {
@@ -120,6 +122,71 @@ describe("StudioShellBackendApi", () => {
       answer: "ok",
     });
     expect(detail.data?.diagnostics?.some((entry) => entry.scope === "step" && entry.location?.stepId === "node-a")).toBeTrue();
+  });
+
+  it("initializes reference-image storage through provisioning contract and can attach existing shared instances", async () => {
+    class CountingProvisioner implements StorageInstanceProvisioningContract {
+      public calls: string[] = [];
+
+      public async provision(request: Parameters<StorageInstanceProvisioningContract["provision"]>[0]) {
+        this.calls.push(request.instanceId);
+        return createStorageInstanceProvisioningResult({
+          instanceId: request.instanceId,
+          storageInstanceRef: `storage-instance://${encodeURIComponent(request.instanceId)}`,
+          provider: "test-provisioner",
+          contractVersion: request.contractVersion,
+          bindings: request.requestedBindings.map((area) => ({
+            bindingId: `storage-binding:${request.instanceId}:${area}`,
+            area,
+            reference: `storage-instance://${encodeURIComponent(request.instanceId)}/${area}`,
+            provider: "test-provisioner",
+            metadata: {},
+          })),
+          metadata: {},
+        });
+      }
+    }
+
+    const provisioner = new CountingProvisioner();
+    const api = new StudioShellBackendApi(
+      new InMemoryStudioShellRepository(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { storageInstanceProvisioner: provisioner },
+    );
+
+    const root = await api.initializeReferenceImageStorage({
+      systemId: "asset:system:reference-image-manipulation",
+      ownerKind: "system",
+      storageInstanceId: "storage-instance:shared-reference-runtime",
+    });
+    expect(root.ok).toBeTrue();
+    expect(root.data?.storage.instanceId).toBe("storage-instance:shared-reference-runtime");
+    expect(provisioner.calls).toEqual(["storage-instance:shared-reference-runtime"]);
+
+    const embedded = await api.initializeReferenceImageStorage({
+      systemId: "asset:system:reference-image-manipulation",
+      ownerKind: "embedded-subsystem",
+      attachToStorageInstanceId: "storage-instance:shared-reference-runtime",
+    });
+    expect(embedded.ok).toBeTrue();
+    expect(embedded.data?.storage.attachments.map((entry) => entry.ownerKind)).toEqual(["system", "embedded-subsystem"]);
+    expect(provisioner.calls).toEqual(["storage-instance:shared-reference-runtime"]);
+  });
+
+  it("rejects reference-image storage initialization when callers try to provide storage directories", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    const direct = await (api as unknown as {
+      initializeReferenceImageStorage: (request: unknown) => Promise<{ ok: boolean; error?: { message: string } }>;
+    }).initializeReferenceImageStorage({
+      systemId: "asset:system:reference-image-manipulation",
+      ownerKind: "system",
+      storageDirectory: "/tmp/nope",
+    });
+    expect(direct.ok).toBeFalse();
+    expect(direct.error?.message).toContain("Storage path configuration is infrastructure-owned");
   });
 
   it("starts rerun from historical execution context and persists run lineage metadata", async () => {

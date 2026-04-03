@@ -87,6 +87,14 @@ import {
   SystemDatasetInstanceService,
   type EnsureRoleDatasetInstanceRequest,
 } from "../../../application/system-runtime/SystemDatasetInstanceService";
+import type { StorageInstanceProvisioningContract } from "../../../application/system-runtime/StorageInstanceProvisioningContract";
+import {
+  DeterministicStorageInstanceProvisioner,
+  InMemoryStorageInstanceMetadataRepository,
+  StorageInstanceInitializationService,
+  type StorageInstanceMetadataRepository,
+} from "../../../application/system-runtime/StorageInstanceInitializationService";
+import type { StorageAttachmentOwnerKind, StorageInstanceMetadata } from "../../../application/system-runtime/StorageInstanceMetadataModel";
 import type { DatasetInstanceAssetCatalog, DatasetInstanceAssetDefinition } from "../../../application/system-runtime/DatasetInstanceAssetCatalog";
 import { ZodMediaDatasetValidator } from "../../../application/dataset-studio/adapters/validation/MediaDatasetValidator";
 import { DatasetSchemaIntentIds } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
@@ -250,6 +258,14 @@ export interface ListReferenceImageRunHistoryRequest {
   readonly limit?: number;
   readonly offset?: number;
   readonly status?: ImageRunHistoryExecutionStatus;
+}
+
+export interface InitializeReferenceImageStorageRequest {
+  readonly systemId: string;
+  readonly ownerKind?: StorageAttachmentOwnerKind;
+  readonly ownerRole?: string;
+  readonly storageInstanceId?: string;
+  readonly attachToStorageInstanceId?: string;
 }
 
 class StaticDatasetInstanceAssetCatalog implements DatasetInstanceAssetCatalog {
@@ -638,6 +654,7 @@ export class StudioShellBackendApi {
   private readonly referenceImageOutputMaterialization: WorkflowOutputMaterializationService;
   private readonly referenceImageOutputGallery: OutputGalleryDatasetIntegrationService;
   private readonly referenceImageRunHistory: ImageRunHistoryService;
+  private readonly storageInitialization: StorageInstanceInitializationService;
   private readonly comfyMaterializationMapper = new ComfyExecutionResultMaterializationMapper();
   private readonly now: () => Date;
 
@@ -647,6 +664,10 @@ export class StudioShellBackendApi {
     workflowRunSummaryRepository?: IWorkflowRunSummaryRepository,
     now: () => Date = () => new Date(),
     imageRunHistoryRepository?: ImageRunHistoryRepository,
+    options?: {
+      readonly storageInstanceProvisioner?: StorageInstanceProvisioningContract;
+      readonly storageInstanceMetadataRepository?: StorageInstanceMetadataRepository;
+    },
   ) {
     this.now = now;
     this.workflowRunSummaryRepository = workflowRunSummaryRepository;
@@ -682,6 +703,11 @@ export class StudioShellBackendApi {
     this.referenceImageRunHistory = new ImageRunHistoryService(
       imageRunHistoryRepository ?? new InMemoryImageRunHistoryRepository(),
       this.referenceImageOutputGallery,
+      this.now,
+    );
+    this.storageInitialization = new StorageInstanceInitializationService(
+      options?.storageInstanceProvisioner ?? new DeterministicStorageInstanceProvisioner(),
+      options?.storageInstanceMetadataRepository ?? new InMemoryStorageInstanceMetadataRepository(),
       this.now,
     );
     this.workflowStudioService = new WorkflowStudioApplicationService(
@@ -2405,12 +2431,79 @@ export class StudioShellBackendApi {
   }
 
   private async ensureReferenceImageDatasetInstances(systemId: string) {
+    await this.initializeReferenceImageStorage({
+      systemId,
+      ownerKind: "system",
+      ownerRole: "reference-image-runtime",
+    });
     const requests = buildReferenceImageDatasetInstanceRequests(systemId);
     const ensured: Array<Awaited<ReturnType<SystemDatasetInstanceService["ensureRoleDatasetInstance"]>>> = [];
     for (const request of requests) {
       ensured.push(await this.referenceImageDatasets.ensureRoleDatasetInstance(request as EnsureRoleDatasetInstanceRequest));
     }
     return ensured;
+  }
+
+  public async initializeReferenceImageStorage(
+    request: InitializeReferenceImageStorageRequest,
+  ): Promise<StudioShellApiResponse<{ readonly storage: StorageInstanceMetadata }>> {
+    return this.wrap(async () => {
+      this.assertNoStoragePathConfiguration(request);
+      const systemId = request.systemId.trim();
+      await this.assertReferenceImageSystemOwnership(systemId);
+      const ownerKind = request.ownerKind ?? "system";
+      const ownerRole = request.ownerRole?.trim() || "reference-image-runtime";
+      const sharedAttachment = request.attachToStorageInstanceId?.trim();
+      const explicitInstanceId = request.storageInstanceId?.trim() || `storage-instance:${systemId}:image-runtime`;
+      const initialized = await this.storageInitialization.initialize({
+        strategy: sharedAttachment ? "attach" : "provision",
+        instanceId: explicitInstanceId,
+        attachInstanceId: sharedAttachment,
+        owner: {
+          ownerKind,
+          ownerId: systemId,
+          role: ownerRole,
+        },
+        requestedBindings: ["input", "output", "intermediate"],
+        display: {
+          name: "Reference image runtime storage",
+          summary: "Reusable runtime storage instance for image manipulation input/output/intermediate areas.",
+          tags: ["reference-image", ownerKind],
+        },
+        metadata: {
+          systemId,
+          ownerKind,
+        },
+      });
+      return Object.freeze({
+        storage: initialized.metadata,
+      });
+    });
+  }
+
+  private assertNoStoragePathConfiguration(input: unknown): void {
+    const root = this.toOptionalRecord(input);
+    if (!root) {
+      return;
+    }
+    const hasForbiddenPathField = (node: Readonly<Record<string, unknown>>): boolean => {
+      for (const [key, value] of Object.entries(node)) {
+        const normalizedKey = key.toLowerCase();
+        if (normalizedKey.includes("path") || normalizedKey.includes("directory") || normalizedKey.includes("filesystem")) {
+          return true;
+        }
+        const nested = this.toOptionalRecord(value);
+        if (nested && hasForbiddenPathField(nested)) {
+          return true;
+        }
+      }
+      return false;
+    };
+    if (hasForbiddenPathField(root)) {
+      throw new StudioShellInvalidRequestError(
+        "Storage path configuration is infrastructure-owned and cannot be provided by initialization callers.",
+      );
+    }
   }
 
   private async assertReferenceImageSystemOwnership(systemId: string): Promise<void> {
