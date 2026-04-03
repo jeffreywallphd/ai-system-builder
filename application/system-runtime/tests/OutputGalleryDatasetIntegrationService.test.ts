@@ -98,4 +98,49 @@ describe("OutputGalleryDatasetIntegrationService", () => {
     expect(item?.tags).toContain("portrait");
     expect(item?.derivedAttributes.orientation).toBe("square");
   });
+
+  it("reads a single gallery item by record id through dataset service contracts", async () => {
+    const datasetService = new SystemDatasetInstanceService(
+      new InMemoryDatasetInstanceRepository(),
+      new StaticAssetCatalog(),
+      undefined,
+      new AllowAnySystem(),
+    );
+    await datasetService.ensureOutputImageStoreInstance({
+      systemId: "system:image",
+      instanceId: "instance:outputs",
+      datasetAssetId: "asset:dataset:outputs",
+      datasetAssetVersionId: "v1",
+    });
+
+    await datasetService.ingestImageRecordIntoInstance({
+      systemId: "system:image",
+      instanceId: "instance:outputs",
+      recordId: "record:single",
+      record: {
+        assetRef: {
+          kind: "generated-output",
+          outputId: "storage-instance://storage-instance%3Atest/output/generated.png",
+          stableId: "generated-output:storage-instance://storage-instance%3Atest/output/generated.png",
+        },
+        width: 800,
+        height: 600,
+        format: "png",
+        metadata: { prompt: "single" },
+        tags: ["generated"],
+      },
+      metadata: { parameterSnapshot: { prompt: "single" } },
+    });
+
+    const service = new OutputGalleryDatasetIntegrationService(datasetService);
+    const item = service.getOutputGalleryItem({
+      systemId: "system:image",
+      datasetInstanceId: "instance:outputs",
+      recordId: "record:single",
+    });
+
+    expect(item.image.recordId).toBe("record:single");
+    expect(item.dataset.instanceId).toBe("instance:outputs");
+    expect(item.image.imageReference?.startsWith("generated-output:storage-instance://")).toBeTrue();
+  });
 });

@@ -1393,3 +1393,10 @@
   - model/dependency availability,
   - output materialization.
 - UI execution-flow integration now preserves technical diagnostics for advanced/collapsed inspection while continuing to show plain-language primary status messaging.
+
+## AI Loom image manipulation update: dataset-oriented output retrieval + optional FaceID dataset intake (stories 6.5-6.6)
+
+- Output-gallery integration now includes a first-class record-read contract (`getOutputGalleryItem`) alongside listing, so retrieval stays dataset/service-oriented instead of filesystem-coupled.
+- Studio-shell API now exposes both output-dataset read by record id and generalized dataset-item list/read by logical binding id, preserving logical dataset/storage references in caller-facing contracts.
+- Reference-image upload ingestion now supports explicit optional FaceID dataset targeting through binding ids (`reference-image-dataset`) and routes writes through dataset/storage contracts with logical binding areas (`reference`).
+- Default image template runnability remains unchanged: input/output datasets are still provisioned by default, while optional FaceID dataset provisioning stays explicit and reusable.

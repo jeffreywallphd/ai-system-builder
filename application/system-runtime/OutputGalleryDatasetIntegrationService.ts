@@ -16,6 +16,12 @@ export interface ListOutputGalleryItemsRequest {
   readonly offset?: number;
 }
 
+export interface GetOutputGalleryItemRequest {
+  readonly systemId: string;
+  readonly datasetInstanceId: string;
+  readonly recordId: string;
+}
+
 function normalizeLimit(limit: number | undefined): number {
   if (limit === undefined) {
     return 50;
@@ -108,7 +114,6 @@ function toOutputGalleryItem(
         assetId: sourceRef.assetId,
         assetVersionId: sourceRef.assetVersionId,
         uri: sourceRef.uri,
-        path: sourceRef.path,
         outputId: sourceRef.outputId,
       })
       : undefined,
@@ -129,6 +134,25 @@ function toOutputGalleryItem(
 
 export class OutputGalleryDatasetIntegrationService {
   public constructor(private readonly datasetInstances: SystemDatasetInstanceService) {}
+
+  public getOutputGalleryItem(request: GetOutputGalleryItemRequest): OutputGalleryItem {
+    const instance = this.datasetInstances.loadDatasetInstance({
+      systemId: request.systemId,
+      instanceId: request.datasetInstanceId,
+    });
+    const record = this.datasetInstances.getImageRecordFromInstance({
+      systemId: request.systemId,
+      instanceId: request.datasetInstanceId,
+      recordId: request.recordId,
+    });
+    if (!record) {
+      throw new Error(`not-found:Image record '${request.recordId}' was not found in dataset instance '${request.datasetInstanceId}'.`);
+    }
+    return toOutputGalleryItem(record, {
+      role: instance.role,
+      purpose: instance.purpose,
+    });
+  }
 
   public listOutputGalleryItems(request: ListOutputGalleryItemsRequest): OutputGalleryListing {
     const limit = normalizeLimit(request.limit);
