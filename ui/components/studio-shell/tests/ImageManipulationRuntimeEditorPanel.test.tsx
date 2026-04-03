@@ -62,5 +62,12 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(html).toContain("Selected photos");
     expect(html).toContain("Create image");
     expect(html).toContain("Status: Ready");
+    expect(html).toContain("Settings ready");
+    expect(html).toContain("Choose a source photo first");
+    expect(html).toContain("Advanced details");
+    expect(html).toContain("Results (0)");
+    expect(html).toContain("Source (0)");
+    expect(html).toContain("Face reference (0)");
+    expect(html).toContain("disabled=\"\"");
   });
 });
