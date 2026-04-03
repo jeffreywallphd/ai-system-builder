@@ -40,8 +40,8 @@ describe("ImageGallerySlider", () => {
       errorMessage: "Gallery unavailable.",
     }));
 
-    expect(loadingHtml).toContain("Loading images");
-    expect(emptyHtml).toContain("No images are ready yet");
+    expect(loadingHtml).toContain("Results is loading");
+    expect(emptyHtml).toContain("No images in results");
     expect(errorHtml).toContain("Gallery unavailable");
   });
 

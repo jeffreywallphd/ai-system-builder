@@ -16,6 +16,7 @@ import { createBrowserImageUploadIngestionAdapter } from "../assets/image-system
 import { ImageUploadPanel } from "../assets/image-system/ImageUploadPanel";
 import { ImageGallerySlider } from "../assets/image-system/ImageGallerySlider";
 import { ImagePreviewPanel } from "../assets/image-system/ImagePreviewPanel";
+import { ImageStatusNotice } from "../assets/image-system/ImageStatusNotice";
 import { mapOutputGalleryItemToImageViewModel } from "../assets/image-system/ImageOutputGalleryDataAdapter";
 import type { ImageUiViewModel } from "../assets/image-system/ImageUiContracts";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
@@ -143,6 +144,50 @@ interface LoadCollectionsOptions {
   readonly preferredOutputRecordId?: string;
   readonly preferredReferenceRecordId?: string;
   readonly preferLatestOutput?: boolean;
+  readonly hydration?: boolean;
+}
+
+function getCollectionLoadErrorMessage(datasetBindingId: ReferenceImageDatasetBindingId): string {
+  if (datasetBindingId === "input-image-dataset") {
+    return "We couldn't load your source photos right now.";
+  }
+  if (datasetBindingId === "reference-image-dataset") {
+    return "We couldn't load your face reference photos right now.";
+  }
+  return "We couldn't load your created images right now.";
+}
+
+function resolveRunStatusTone(state: ImageManipulationRunLifecycleSnapshot["state"]): "neutral" | "warning" | "danger" | "success" {
+  if (state === "success") {
+    return "success";
+  }
+  if (state === "failure") {
+    return "danger";
+  }
+  if (state === "validating") {
+    return "warning";
+  }
+  return "neutral";
+}
+
+function resolveRunStatusMessage(runLifecycle: ImageManipulationRunLifecycleSnapshot, fallbackStatusMessage?: string): string {
+  return runLifecycle.message ?? fallbackStatusMessage ?? "Adjust your settings, then create a new image.";
+}
+
+function toFriendlyValidationMessage(path: string): string {
+  if (path.startsWith("prompts.")) {
+    return "Update your instructions to continue.";
+  }
+  if (path.startsWith("output.")) {
+    return "Review your result settings before running.";
+  }
+  if (path.startsWith("faceId.")) {
+    return "Review your face reference settings before running.";
+  }
+  if (path.startsWith("models.")) {
+    return "Review advanced model settings before running.";
+  }
+  return "Review your settings before running.";
 }
 
 export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulationRuntimeEditorPanelProps): JSX.Element {
@@ -169,6 +214,7 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
   const [outputLoadError, setOutputLoadError] = useState<string | undefined>();
   const [sourceLoadError, setSourceLoadError] = useState<string | undefined>();
   const [referenceLoadError, setReferenceLoadError] = useState<string | undefined>();
+  const [isHydrating, setIsHydrating] = useState(false);
 
   const [statusMessage, setStatusMessage] = useState<string | undefined>();
   const [runLifecycle, setRunLifecycle] = useState<ImageManipulationRunLifecycleSnapshot>(() => createIdleImageManipulationRunLifecycleState());
@@ -177,6 +223,19 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
   const [flowIssues, setFlowIssues] = useState<ReadonlyArray<ReferenceImageExecutionFlowIssue>>([]);
 
   const validationIssues = useMemo(() => validateComfyImageManipulationConfig(config), [config]);
+  const validationSummaryMessage = useMemo(() => {
+    if (validationIssues.length < 1) {
+      return "Your settings are ready. You can create an image.";
+    }
+    return toFriendlyValidationMessage(validationIssues[0]?.path ?? "");
+  }, [validationIssues]);
+  const validationSummaryDetails = useMemo(() => {
+    if (validationIssues.length < 1) {
+      return Object.freeze([] as string[]);
+    }
+    const unique = Array.from(new Set(validationIssues.map((issue) => issue.message.trim()).filter((message) => message.length > 0)));
+    return Object.freeze(unique.slice(0, 3));
+  }, [validationIssues]);
 
   const sourceViewModels = useMemo(
     () => mapItemsToDisplayViewModels(sourceItems, "source"),
@@ -237,6 +296,8 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
     : selection.activePreviewRole === "reference"
       ? referenceLoadError
       : outputLoadError;
+  const hasCollectionLoadError = Boolean(sourceLoadError || outputLoadError || referenceLoadError);
+  const runStatusMessage = resolveRunStatusMessage(runLifecycle, statusMessage);
 
   const activeGallery = useMemo(() => {
     if (selection.activePreviewRole === "source") {
@@ -314,7 +375,7 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
 
     return request.then((response) => {
       if (!response.ok || !response.data) {
-        setError(response.error?.message ?? "Couldn't load images right now.");
+        setError(getCollectionLoadErrorMessage(datasetBindingId));
         return Object.freeze([]);
       }
       return response.data.items;
@@ -327,11 +388,15 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
       setOutputItems(Object.freeze([]));
       setReferenceItems(Object.freeze([]));
       setSelection(createInitialImageManipulationSelectionState());
+      setIsHydrating(false);
       return Promise.resolve(Object.freeze({
         sources: Object.freeze([]),
         outputs: Object.freeze([]),
         references: Object.freeze([]),
       }));
+    }
+    if (options.hydration) {
+      setIsHydrating(true);
     }
 
     const requestId = requestIdRef.current + 1;
@@ -379,18 +444,23 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
         outputs: nextOutputs,
         references: nextReferences,
       });
+    }).finally(() => {
+      if (options.hydration) {
+        setIsHydrating(false);
+      }
     });
   };
 
   useEffect(() => {
-    void loadCollections();
+    void loadCollections({ hydration: true });
   }, [draft?.draftId]);
 
   if (!isTemplateDraft || !draft) {
     return (
-      <section className="ui-image-surface ui-image-surface--status">
-        This editor appears when the image manipulation template is open.
-      </section>
+      <ImageStatusNotice
+        title="Image editor unavailable"
+        message="This editor appears when the image manipulation template is open."
+      />
     );
   }
 
@@ -405,10 +475,21 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
     || validationIssues.length > 0
     || isRunInProgress;
 
-  const currentMessage = runLifecycle.message ?? statusMessage;
-
   return (
     <section className="ui-image-editor-page ui-stack ui-stack--sm">
+      {isHydrating ? (
+        <ImageStatusNotice
+          title="Loading editor"
+          message="Getting your photos and settings ready."
+        />
+      ) : null}
+      {hasCollectionLoadError ? (
+        <ImageStatusNotice
+          title="Some images are unavailable"
+          message="You can keep editing settings and try loading images again from the browser tabs."
+          tone="warning"
+        />
+      ) : null}
       <div className="ui-image-editor-page__layout">
         <aside className="ui-image-editor-page__left-column ui-stack ui-stack--sm">
           <ImageUploadPanel
@@ -444,7 +525,7 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
                 }))
                 .then((response) => {
                   if (!response.ok || !response.data) {
-                    setStatusMessage(response.error?.message ?? "Could not upload this photo.");
+                    setStatusMessage("We couldn't upload this photo.");
                     return undefined;
                   }
                   setDatasetInstanceId(response.data.datasetInstanceId);
@@ -477,16 +558,55 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
               setConfig(createComfyImageManipulationDefaultConfig({ presetId: nextPresetId }));
             }}
           />
+          {validationIssues.length > 0 ? (
+            <section className="ui-stack ui-stack--2xs">
+              <ImageStatusNotice
+                title="Update settings to continue"
+                message={validationSummaryMessage}
+                tone="warning"
+              />
+              <ul className="ui-text-small ui-text-secondary">
+                {validationSummaryDetails.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            </section>
+          ) : (
+            <ImageStatusNotice
+              title="Settings ready"
+              message={validationSummaryMessage}
+              tone="success"
+            />
+          )}
           <section className="ui-image-surface ui-stack ui-stack--xs">
             <header className="ui-image-surface__header">
               <h3 className="ui-image-surface__title">Selected photos</h3>
             </header>
+            {isLoadingSources ? (
+              <ImageStatusNotice
+                title="Loading source photos"
+                message="Your uploaded photos will appear here."
+              />
+            ) : null}
+            {!isLoadingSources && sourceItems.length < 1 ? (
+              <ImageStatusNotice
+                title="No source photo yet"
+                message="Choose a photo to start creating edits."
+              />
+            ) : null}
+            {sourceLoadError ? (
+              <ImageStatusNotice
+                title="Source photos unavailable"
+                message={sourceLoadError}
+                tone="danger"
+              />
+            ) : null}
             <label className="ui-form-field">
               <span className="ui-form-field__label">Source photo</span>
               <select
                 className="ui-input"
                 value={selection.sourceRecordId ?? ""}
-                disabled={sourceItems.length < 1}
+                disabled={sourceItems.length < 1 || isLoadingSources}
                 onChange={(event) => {
                   const next = event.currentTarget.value || undefined;
                   setSelection((current) => setRoleSelection(current, {
@@ -509,7 +629,7 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
               <select
                 className="ui-input"
                 value={selection.referenceRecordId ?? ""}
-                disabled={referenceItems.length < 1}
+                disabled={referenceItems.length < 1 || isLoadingReferences}
                 onChange={(event) => {
                   const nextReferenceRecordId = event.currentTarget.value || undefined;
                   setSelection((current) => setRoleSelection(current, {
@@ -527,6 +647,13 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
                 ))}
               </select>
             </label>
+            {referenceLoadError ? (
+              <ImageStatusNotice
+                title="Face reference photos unavailable"
+                message={referenceLoadError}
+                tone="danger"
+              />
+            ) : null}
             <p className="ui-text-small ui-text-secondary">
               These selections stay linked to system-managed image collections.
             </p>
@@ -685,10 +812,18 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
             >
               {isRunInProgress ? "Creating..." : "Create image"}
             </button>
-            <p className="ui-text-small ui-text-secondary">
-              Status: {runStateLabels[runLifecycle.state]}
-            </p>
-            {currentMessage ? <p className="ui-text-small ui-text-secondary">{currentMessage}</p> : null}
+            {!selectedSourceRecordId && !isLoadingSources ? (
+              <ImageStatusNotice
+                title="Choose a source photo first"
+                message="Add or select a source photo before creating an image."
+                tone="warning"
+              />
+            ) : null}
+            <ImageStatusNotice
+              title={`Status: ${runStateLabels[runLifecycle.state]}`}
+              message={runStatusMessage}
+              tone={resolveRunStatusTone(runLifecycle.state)}
+            />
             <details>
               <summary className="ui-text-small ui-text-secondary">Advanced details</summary>
               {flowSteps.map((step) => (

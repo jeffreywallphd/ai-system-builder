@@ -444,6 +444,7 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
             runtimeBinding: "comfy.checkpoint",
             optionSource: "runtime-installed-models",
             fallbackResolution: "system-default",
+            progressiveDisclosure: "advanced",
           }),
         }),
         Object.freeze({
@@ -460,6 +461,7 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
             runtimeBinding: "comfy.vae",
             optionSource: "runtime-installed-models",
             fallbackResolution: "system-default",
+            progressiveDisclosure: "advanced",
           }),
         }),
         Object.freeze({
@@ -476,6 +478,7 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
             runtimeBinding: "comfy.faceid",
             optionSource: "runtime-installed-models",
             fallbackResolution: "system-default",
+            progressiveDisclosure: "advanced",
           }),
         }),
       ]),
@@ -671,6 +674,7 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
           metadata: Object.freeze({
             runtimeBinding: "comfy.faceid.start_at",
             stepRangeNormalized: true,
+            progressiveDisclosure: "advanced",
           }),
         }),
         Object.freeze({
@@ -685,6 +689,7 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
           metadata: Object.freeze({
             runtimeBinding: "comfy.faceid.end_at",
             stepRangeNormalized: true,
+            progressiveDisclosure: "advanced",
           }),
         }),
       ]),

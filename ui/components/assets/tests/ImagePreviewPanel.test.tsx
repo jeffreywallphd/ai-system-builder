@@ -30,8 +30,8 @@ describe("ImagePreviewPanel", () => {
       errorMessage: "Could not load preview.",
     }));
 
-    expect(emptyHtml).toContain("Choose an image to preview");
-    expect(loadingHtml).toContain("Loading image");
+    expect(emptyHtml).toContain("No image selected");
+    expect(loadingHtml).toContain("Loading preview");
     expect(errorHtml).toContain("Could not load preview");
   });
 

@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 import type { ImageRenderOptions, ImageUiViewModel } from "./ImageUiContracts";
 import { ImageViewer } from "./ImageViewer";
+import { ImageStatusNotice } from "./ImageStatusNotice";
 
 export interface ImagePreviewPanelProps {
   readonly title?: string;
@@ -50,11 +51,31 @@ export function ImagePreviewPanel({
           {subtitle ? <span className="ui-text-small ui-text-secondary">{subtitle}</span> : null}
         </div>
       </header>
-      {loading ? <p className="ui-text-small ui-text-secondary">Loading image...</p> : null}
-      {!loading && errorMessage ? <p className="ui-text-small ui-text-danger">{errorMessage}</p> : null}
-      {!loading && !errorMessage && !normalizedImage ? <p className="ui-text-small ui-text-secondary">{emptyMessage}</p> : null}
+      {loading ? (
+        <ImageStatusNotice
+          title="Loading preview"
+          message="Getting this image ready."
+        />
+      ) : null}
+      {!loading && errorMessage ? (
+        <ImageStatusNotice
+          title="Preview unavailable"
+          message={errorMessage}
+          tone="danger"
+        />
+      ) : null}
+      {!loading && !errorMessage && !normalizedImage ? (
+        <ImageStatusNotice
+          title="No image selected"
+          message={emptyMessage}
+        />
+      ) : null}
       {!loading && !errorMessage && normalizedImage && !hasVisibleImage ? (
-        <p className="ui-text-small ui-text-secondary">{unavailableMessage}</p>
+        <ImageStatusNotice
+          title="Image not available"
+          message={unavailableMessage}
+          tone="warning"
+        />
       ) : null}
       {!loading && !errorMessage && normalizedImage && hasVisibleImage ? (
         <ImageViewer
