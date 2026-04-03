@@ -35,6 +35,10 @@ describe("StorageInstanceLifecycleService", () => {
     const cleanup = await lifecycle.cleanup("storage-instance:lifecycle:alpha");
     expect(cleanup.lifecycle.state).toBe("ready");
 
+    const inspected = await lifecycle.inspect("storage-instance:lifecycle:alpha");
+    expect(inspected.instanceId).toBe("storage-instance:lifecycle:alpha");
+    expect(inspected.bindings.map((binding) => binding.area)).toEqual(["input", "output", "intermediate"]);
+
     const archived = await lifecycle.archive("storage-instance:lifecycle:alpha");
     expect(archived.lifecycle.state).toBe("archived");
     expect(archived.lifecycle.archivedAt).toBe("2026-04-03T01:00:00.000Z");

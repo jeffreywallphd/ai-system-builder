@@ -124,6 +124,7 @@ import {
 } from "../../../application/system-runtime/ImageRunHistoryRepository";
 import { ComfyExecutionResultMaterializationMapper } from "../../comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper";
 import type { SystemContextContract } from "../../../domain/system-studio/SystemContextContract";
+import type { DatasetInstance } from "../../../domain/system-runtime/DatasetInstanceDomain";
 
 export interface StudioShellApiError {
   readonly code:
@@ -363,7 +364,23 @@ export interface InitializeReferenceImageStorageRequest {
 export interface ManageReferenceImageStorageLifecycleRequest {
   readonly systemId: string;
   readonly storageInstanceId: string;
-  readonly operation: "initialize" | "reset" | "archive" | "cleanup";
+  readonly operation: "initialize" | "reset" | "archive" | "cleanup" | "inspect";
+}
+
+export interface ReferenceImageStorageLifecycleDatasetSummary {
+  readonly datasetBindingId?: string;
+  readonly instanceId: string;
+  readonly lifecycleStatus: string;
+  readonly runtimeStatus: string;
+  readonly cleanupStatus?: string;
+  readonly imageRecordCount: number;
+  readonly storageBindingAreas: ReadonlyArray<string>;
+}
+
+export interface ManageReferenceImageStorageLifecycleReadModel {
+  readonly operation: ManageReferenceImageStorageLifecycleRequest["operation"];
+  readonly storage: StorageInstanceMetadata;
+  readonly datasets: ReadonlyArray<ReferenceImageStorageLifecycleDatasetSummary>;
 }
 
 export interface DeleteReferenceImageStorageRequest {
@@ -2938,20 +2955,58 @@ export class StudioShellBackendApi {
 
   public async manageReferenceImageStorageLifecycle(
     request: ManageReferenceImageStorageLifecycleRequest,
-  ): Promise<StudioShellApiResponse<{ readonly storage: StorageInstanceMetadata }>> {
+  ): Promise<StudioShellApiResponse<ManageReferenceImageStorageLifecycleReadModel>> {
     return this.wrap(async () => {
       const systemId = request.systemId.trim();
       await this.assertReferenceImageSystemOwnership(systemId);
       const instanceId = request.storageInstanceId.trim();
       const operation = request.operation;
+      const boundBefore = this.listReferenceImageDatasetInstancesBoundToStorage(systemId, instanceId);
+
       const storage = operation === "initialize"
         ? await this.storageLifecycle.initialize(instanceId)
         : operation === "reset"
           ? await this.storageLifecycle.reset(instanceId)
           : operation === "archive"
             ? await this.storageLifecycle.archive(instanceId)
-            : await this.storageLifecycle.cleanup(instanceId);
-      return Object.freeze({ storage });
+            : operation === "cleanup"
+              ? await this.storageLifecycle.cleanup(instanceId)
+              : await this.storageLifecycle.inspect(instanceId);
+
+      if (operation === "reset") {
+        for (const dataset of boundBefore) {
+          await this.referenceImageDatasets.resetDatasetInstanceState({
+            systemId,
+            instanceId: dataset.instanceId,
+          });
+        }
+      } else if (operation === "archive") {
+        for (const dataset of boundBefore) {
+          await this.referenceImageDatasets.archiveDatasetInstance({
+            systemId,
+            instanceId: dataset.instanceId,
+            cleanupStatus: "pending",
+          });
+        }
+      } else if (operation === "cleanup") {
+        for (const dataset of boundBefore) {
+          if (dataset.lifecycleStatus !== "archived") {
+            continue;
+          }
+          await this.referenceImageDatasets.archiveDatasetInstance({
+            systemId,
+            instanceId: dataset.instanceId,
+            cleanupStatus: "completed",
+          });
+        }
+      }
+
+      const boundAfter = this.listReferenceImageDatasetInstancesBoundToStorage(systemId, instanceId);
+      return Object.freeze({
+        operation,
+        storage,
+        datasets: Object.freeze(boundAfter.map((dataset) => this.summarizeReferenceImageStorageDataset(systemId, dataset))),
+      });
     });
   }
 
@@ -2997,6 +3052,43 @@ export class StudioShellBackendApi {
     } catch (error) {
       throw new StudioShellInvalidRequestError((error as Error).message);
     }
+  }
+
+  private listReferenceImageDatasetInstancesBoundToStorage(
+    systemId: string,
+    storageInstanceId: string,
+  ): ReadonlyArray<DatasetInstance> {
+    return Object.freeze(this.referenceImageDatasets
+      .listSystemDatasetInstances(systemId)
+      .filter((instance) =>
+        instance.storageBindings?.some((binding) => binding.storageInstanceId === storageInstanceId)
+        || instance.storageBinding?.storageInstanceId === storageInstanceId
+      ));
+  }
+
+  private summarizeReferenceImageStorageDataset(
+    systemId: string,
+    instance: DatasetInstance,
+  ): ReferenceImageStorageLifecycleDatasetSummary {
+    const imageRecordCount = this.referenceImageDatasets.listImageRecordsForInstance({
+      systemId,
+      instanceId: instance.instanceId,
+    }).length;
+    const storageBindingAreas = instance.storageBindings?.map((binding) => binding.bindingArea)
+      ?? (instance.storageBinding ? [instance.storageBinding.bindingArea] : []);
+    const seedMetadata = this.toOptionalRecord(instance.seedMetadata);
+    const datasetBindingId = typeof seedMetadata?.datasetBindingId === "string"
+      ? seedMetadata.datasetBindingId
+      : undefined;
+    return Object.freeze({
+      datasetBindingId,
+      instanceId: instance.instanceId,
+      lifecycleStatus: instance.lifecycleStatus,
+      runtimeStatus: instance.runtimeStatus,
+      cleanupStatus: instance.lifecycleMetadata?.cleanupStatus,
+      imageRecordCount,
+      storageBindingAreas: Object.freeze([...new Set(storageBindingAreas)]),
+    });
   }
 
   private async assertReferenceImageSystemOwnership(systemId: string): Promise<void> {

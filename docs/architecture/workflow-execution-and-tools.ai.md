@@ -456,3 +456,17 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
   - updates input selection when chaining to `input-image-dataset`,
   - keeps higher layers path-free (no raw filesystem path handoff).
 - Default template runnability is preserved: initial input/output provisioning still works without user configuration, and chaining is additive.
+
+## AI Loom image manipulation storage/dataset lifecycle + validation hardening update (stories 6.9-6.10)
+
+- Storage lifecycle operations now expose explicit service-level inspectability (`initialize` / `reset` / `archive` / `cleanup` / `inspect`) through `StorageInstanceLifecycleService`, and studio-shell lifecycle orchestration now returns inspectable storage + bound-dataset lifecycle summaries.
+- Lifecycle orchestration semantics for bound dataset instances are now explicit and contract-driven:
+  - `reset`: clears bound dataset image records for the requesting system and keeps dataset/storage bindings intact,
+  - `archive`: archives bound dataset instances and marks cleanup status pending,
+  - `cleanup`: runs storage intermediate cleanup and marks already archived bound dataset cleanup status completed,
+  - `inspect`: reads current storage + dataset lifecycle state without mutating records.
+- Shared-storage behavior remains safe for reuse:
+  - storage safe-delete still requires archived state and zero attachments,
+  - lifecycle dataset operations are scoped to the requesting system bindings and do not assume exclusive storage ownership.
+- Validation hardening now includes explicit backend rejection coverage for user-supplied storage path configuration in reference-image storage initialization flows.
+- End-to-end coverage now includes shared-storage lifecycle scope/isolation and inspectability checks while preserving default template runnability without extra user setup.
