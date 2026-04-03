@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const ComfyImageManipulationPropertySchemaId = "property-schema:image-manipulation";
-export const ComfyImageManipulationPropertySchemaVersion = "1.1.0";
+export const ComfyImageManipulationPropertySchemaVersion = "1.2.0";
 
 export const ComfyConditioningMapping = Object.freeze({
   positivePrompt: "desired-features",
@@ -14,6 +14,9 @@ const promptDefaults = Object.freeze({
 });
 
 const generationDefaults = Object.freeze({
+  width: 1024,
+  height: 1024,
+  denoiseStrength: 0.6,
   variationStrength: 0.6,
   steps: 30,
   cfg: 7,
@@ -33,6 +36,19 @@ const modelDefaults = Object.freeze({
   faceIdModel: "system-default",
 });
 
+const faceIdDefaults = Object.freeze({
+  enabled: false,
+  referenceBindings: Object.freeze([
+    Object.freeze({
+      datasetBindingId: "faceid-reference",
+      datasetAssetId: "asset:dataset:image-faceid-reference",
+    }),
+  ]),
+  weight: 0.8,
+  startStepFraction: 0,
+  endStepFraction: 1,
+});
+
 const comfySamplerOptions = Object.freeze(["euler", "dpmpp_2m", "euler_a", "lms"] as const);
 const comfySchedulerOptions = Object.freeze(["normal", "karras", "exponential", "sgm_uniform"] as const);
 
@@ -50,12 +66,25 @@ export interface ComfyImageManipulationConfig {
     readonly faceIdModel: string;
   };
   readonly generation: {
+    readonly width: number;
+    readonly height: number;
+    readonly denoiseStrength: number;
     readonly variationStrength: number;
     readonly steps: number;
     readonly cfg: number;
     readonly sampler: ComfySamplerOption;
     readonly scheduler: ComfySchedulerOption;
     readonly seed: number;
+  };
+  readonly faceId: {
+    readonly enabled: boolean;
+    readonly referenceBindings: ReadonlyArray<{
+      readonly datasetBindingId: string;
+      readonly datasetAssetId: string;
+    }>;
+    readonly weight: number;
+    readonly startStepFraction: number;
+    readonly endStepFraction: number;
   };
   readonly output: {
     readonly resultCount: number;
@@ -79,12 +108,12 @@ export interface ComfyImageManipulationPropertySchemaDefinition {
     readonly versioned: true;
   };
   readonly fields: ReadonlyArray<{
-    readonly groupId: "prompts" | "models" | "generation" | "output";
+    readonly groupId: "prompts" | "models" | "generation" | "faceId" | "output";
     readonly groupLabel: string;
     readonly entries: ReadonlyArray<{
       readonly id: string;
       readonly path: string;
-      readonly type: "string" | "number" | "integer" | "enum";
+      readonly type: "string" | "number" | "integer" | "enum" | "boolean" | "dataset-reference-list";
       readonly required: boolean;
       readonly defaultValue: unknown;
       readonly label: string;
@@ -108,6 +137,9 @@ const ComfyImageManipulationConfigSchema = z.object({
     faceIdModel: z.string().trim().min(1).default(modelDefaults.faceIdModel),
   }).default(modelDefaults),
   generation: z.object({
+    width: z.number().int().min(256).max(2048).multipleOf(64).default(generationDefaults.width),
+    height: z.number().int().min(256).max(2048).multipleOf(64).default(generationDefaults.height),
+    denoiseStrength: z.number().min(0).max(1).default(generationDefaults.denoiseStrength),
     variationStrength: z.number().min(0).max(1).default(generationDefaults.variationStrength),
     steps: z.number().int().min(1).max(200).default(generationDefaults.steps),
     cfg: z.number().min(1).max(30).default(generationDefaults.cfg),
@@ -115,6 +147,26 @@ const ComfyImageManipulationConfigSchema = z.object({
     scheduler: z.enum(comfySchedulerOptions).default(generationDefaults.scheduler),
     seed: z.number().int().min(0).max(2147483647).default(generationDefaults.seed),
   }).default(generationDefaults),
+  faceId: z.object({
+    enabled: z.boolean().default(faceIdDefaults.enabled),
+    referenceBindings: z.array(
+      z.object({
+        datasetBindingId: z.string().trim().regex(/^[a-z0-9-]+$/),
+        datasetAssetId: z.string().trim().startsWith("asset:dataset:"),
+      }),
+    ).min(1).max(8).default(faceIdDefaults.referenceBindings),
+    weight: z.number().min(0).max(2).default(faceIdDefaults.weight),
+    startStepFraction: z.number().min(0).max(1).default(faceIdDefaults.startStepFraction),
+    endStepFraction: z.number().min(0).max(1).default(faceIdDefaults.endStepFraction),
+  }).superRefine((value, ctx) => {
+    if (value.startStepFraction > value.endStepFraction) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endStepFraction"],
+        message: "Face guidance end step must be greater than or equal to the start step.",
+      });
+    }
+  }).default(faceIdDefaults),
   output: z.object({
     resultCount: z.number().int().min(1).max(4).default(outputDefaults.resultCount),
     outputTarget: z.enum(["history", "download"]).default(outputDefaults.outputTarget),
@@ -226,6 +278,48 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
       groupLabel: "Generation",
       entries: Object.freeze([
         Object.freeze({
+          id: "width",
+          path: "generation.width",
+          type: "integer",
+          required: true,
+          defaultValue: generationDefaults.width,
+          label: "Image width",
+          description: "Set the output image width in pixels.",
+          validation: Object.freeze({ min: 256, max: 2048, multipleOf: 64 }),
+          metadata: Object.freeze({
+            runtimeBinding: "comfy.width",
+            sizingMode: "discrete-pixel-grid",
+          }),
+        }),
+        Object.freeze({
+          id: "height",
+          path: "generation.height",
+          type: "integer",
+          required: true,
+          defaultValue: generationDefaults.height,
+          label: "Image height",
+          description: "Set the output image height in pixels.",
+          validation: Object.freeze({ min: 256, max: 2048, multipleOf: 64 }),
+          metadata: Object.freeze({
+            runtimeBinding: "comfy.height",
+            sizingMode: "discrete-pixel-grid",
+          }),
+        }),
+        Object.freeze({
+          id: "denoiseStrength",
+          path: "generation.denoiseStrength",
+          type: "number",
+          required: true,
+          defaultValue: generationDefaults.denoiseStrength,
+          label: "Edit strength",
+          description: "Higher values change more of the original image.",
+          validation: Object.freeze({ min: 0, max: 1 }),
+          metadata: Object.freeze({
+            runtimeBinding: "comfy.denoise",
+            executionUse: "image-to-image-strength",
+          }),
+        }),
+        Object.freeze({
           id: "variationStrength",
           path: "generation.variationStrength",
           type: "number",
@@ -301,6 +395,88 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
       ]),
     }),
     Object.freeze({
+      groupId: "faceId",
+      groupLabel: "Identity guidance",
+      entries: Object.freeze([
+        Object.freeze({
+          id: "enabled",
+          path: "faceId.enabled",
+          type: "boolean",
+          required: true,
+          defaultValue: faceIdDefaults.enabled,
+          label: "Keep face identity",
+          description: "Turn on identity guidance to keep a person’s face consistent.",
+          validation: Object.freeze({ required: true }),
+          metadata: Object.freeze({
+            runtimeBinding: "comfy.faceid.enabled",
+            progressiveDisclosure: "advanced-optional",
+          }),
+        }),
+        Object.freeze({
+          id: "referenceBindings",
+          path: "faceId.referenceBindings",
+          type: "dataset-reference-list",
+          required: true,
+          defaultValue: faceIdDefaults.referenceBindings,
+          label: "Identity reference images",
+          description: "Choose one or more reference images from the FaceID dataset.",
+          validation: Object.freeze({
+            minItems: 1,
+            maxItems: 8,
+            datasetBindingIdPattern: "^[a-z0-9-]+$",
+            datasetAssetIdPrefix: "asset:dataset:",
+          }),
+          metadata: Object.freeze({
+            runtimeBinding: "comfy.faceid.references",
+            referenceKind: "dataset-binding",
+            supportedDatasetBindingIds: ["faceid-reference"],
+            supportsMultiple: true,
+          }),
+        }),
+        Object.freeze({
+          id: "weight",
+          path: "faceId.weight",
+          type: "number",
+          required: true,
+          defaultValue: faceIdDefaults.weight,
+          label: "Identity influence",
+          description: "Increase to match the reference face more strongly.",
+          validation: Object.freeze({ min: 0, max: 2 }),
+          metadata: Object.freeze({
+            runtimeBinding: "comfy.faceid.weight",
+          }),
+        }),
+        Object.freeze({
+          id: "startStepFraction",
+          path: "faceId.startStepFraction",
+          type: "number",
+          required: true,
+          defaultValue: faceIdDefaults.startStepFraction,
+          label: "Identity start",
+          description: "Set when identity guidance begins during generation.",
+          validation: Object.freeze({ min: 0, max: 1 }),
+          metadata: Object.freeze({
+            runtimeBinding: "comfy.faceid.start_at",
+            stepRangeNormalized: true,
+          }),
+        }),
+        Object.freeze({
+          id: "endStepFraction",
+          path: "faceId.endStepFraction",
+          type: "number",
+          required: true,
+          defaultValue: faceIdDefaults.endStepFraction,
+          label: "Identity end",
+          description: "Set when identity guidance stops during generation.",
+          validation: Object.freeze({ min: 0, max: 1, gtePath: "faceId.startStepFraction" }),
+          metadata: Object.freeze({
+            runtimeBinding: "comfy.faceid.end_at",
+            stepRangeNormalized: true,
+          }),
+        }),
+      ]),
+    }),
+    Object.freeze({
       groupId: "output",
       groupLabel: "Output",
       entries: Object.freeze([
@@ -331,6 +507,13 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
     prompts: Object.freeze({ ...promptDefaults }),
     models: Object.freeze({ ...modelDefaults }),
     generation: Object.freeze({ ...generationDefaults }),
+    faceId: Object.freeze({
+      enabled: faceIdDefaults.enabled,
+      referenceBindings: faceIdDefaults.referenceBindings.map((entry) => Object.freeze({ ...entry })),
+      weight: faceIdDefaults.weight,
+      startStepFraction: faceIdDefaults.startStepFraction,
+      endStepFraction: faceIdDefaults.endStepFraction,
+    }),
     output: Object.freeze({ ...outputDefaults }),
   }),
 });
@@ -373,12 +556,17 @@ export interface ComfyImageManipulationConfigPreview {
     readonly hasNegativePrompt: boolean;
     readonly modelSummary: string;
     readonly variationStrength: number;
+    readonly width: number;
+    readonly height: number;
+    readonly denoiseStrength: number;
     readonly sampler: ComfySamplerOption;
     readonly scheduler: ComfySchedulerOption;
     readonly cfg: number;
     readonly seed: number;
     readonly resultCount: number;
     readonly outputTarget: "history" | "download";
+    readonly faceIdEnabled: boolean;
+    readonly faceIdSummary: string;
   };
 }
 
@@ -395,6 +583,9 @@ export function createComfyImageManipulationConfigPreview(input: unknown): Comfy
       positivePromptPreview: truncate(resolved.prompts.positivePrompt, 80),
       hasNegativePrompt: resolved.prompts.negativePrompt.trim().length > 0,
       modelSummary: `base=${resolved.models.checkpointModel}, vae=${resolved.models.vaeModel}, face=${resolved.models.faceIdModel}`,
+      width: resolved.generation.width,
+      height: resolved.generation.height,
+      denoiseStrength: resolved.generation.denoiseStrength,
       variationStrength: resolved.generation.variationStrength,
       sampler: resolved.generation.sampler,
       scheduler: resolved.generation.scheduler,
@@ -402,6 +593,10 @@ export function createComfyImageManipulationConfigPreview(input: unknown): Comfy
       seed: resolved.generation.seed,
       resultCount: resolved.output.resultCount,
       outputTarget: resolved.output.outputTarget,
+      faceIdEnabled: resolved.faceId.enabled,
+      faceIdSummary: resolved.faceId.enabled
+        ? `enabled (${resolved.faceId.referenceBindings.length} reference${resolved.faceId.referenceBindings.length === 1 ? "" : "s"}, weight=${resolved.faceId.weight}, range=${resolved.faceId.startStepFraction}-${resolved.faceId.endStepFraction})`
+        : "disabled",
     }),
   });
 }
