@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { BuildEntryService, BuildIntents, type BuildIntent } from "../routes/BuildEntry";
 import { PersistedWorkflowEntryService, type PersistedWorkflowEntry } from "../routes/PersistedWorkflowEntryService";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
-import { ImageManipulationSystemTemplate } from "../../application/system-studio/ImageManipulationSystemTemplate";
+import { SystemBuildTemplateCatalog } from "../../application/system-studio/SystemBuildTemplateCatalog";
 
 export interface BuildTemplateCard {
   readonly id: string;
@@ -15,14 +15,10 @@ export interface BuildTemplateCard {
 }
 
 const buildTemplateCards: ReadonlyArray<BuildTemplateCard> = Object.freeze([
-  Object.freeze({
-    id: ImageManipulationSystemTemplate.templateId,
-    title: "Reference Image Manipulation System",
-    description: "Compose a system asset with runtime-owned input/output image dataset instances and explicit workflow/UI boundaries.",
-    difficulty: "Intermediate",
-    actionPath: `${ROUTE_PATHS.systemStudio}?buildTemplateId=${encodeURIComponent(ImageManipulationSystemTemplate.templateId)}`,
-    actionLabel: "Open in System Studio",
-  }),
+  ...SystemBuildTemplateCatalog.map((entry) => Object.freeze({
+    ...entry.card,
+    actionPath: `${ROUTE_PATHS.systemStudio}?buildTemplateId=${encodeURIComponent(entry.templateId)}`,
+  })),
   Object.freeze({
     id: "support-assistant",
     title: "Customer Support Assistant",
@@ -60,6 +56,7 @@ const buildTemplateCards: ReadonlyArray<BuildTemplateCard> = Object.freeze([
     difficulty: "Advanced",
   }),
 ]);
+
 
 export default function BuildPage(): JSX.Element {
   const navigate = useNavigate();

@@ -1061,6 +1061,7 @@ export default function StudioShellPage({
       saveResult = await runAndRefreshWithResult(() => service.createDraft({
         studioId,
         sessionId,
+        assetId: studioRegistration?.defaults.assetId,
         content: contentToSave,
         metadata,
       }));

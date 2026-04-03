@@ -8,7 +8,9 @@ describe("SystemStudioPage contracts", () => {
 
     expect(pageSource).toContain("StudioShellPage");
     expect(pageSource).toContain("systemStudioRegistration");
-    expect(pageSource).toContain("studioRegistration={systemStudioRegistration}");
+    expect(pageSource).toContain("resolveSystemBuildTemplate");
+    expect(pageSource).toContain("buildTemplateId");
+    expect(pageSource).toContain("assetId: selectedTemplate.draftSeed.assetId");
 
     expect(registrationSource).toContain("studioType: SystemStudioIdentity.studioType");
     expect(registrationSource).toContain('kind: "system"');
