@@ -1329,3 +1329,16 @@ Not implemented in this slice:
 - This remains declarative metadata only (no runtime process start, install management, health polling, or execution adapter behavior is introduced in this slice).
 - Added reusable image-system template validation in `application/system-studio/ImageManipulationSystemTemplateValidation.ts` returning inspectable `AssetValidationResult` contracts.
 - Validation enforces required system identity metadata, required input/output dataset bindings, optional FaceID dataset semantics, required primary workflow template binding, and required Comfy runtime execution metadata/capabilities.
+
+## AI Loom image manipulation update: property schema model + generation controls (stories 3.3-3.4)
+
+- `ComfyImageManipulationPropertySchema` now includes a first-class **Models** group with checkpoint, VAE, and FaceID selectors plus inspectable mapping metadata (`runtimeBinding`, `optionSource`, fallback strategy).
+- Default model values remain runnable with no user input via system-managed fallback resolution (`system-default`) while preserving forward compatibility with runtime-installed model discovery.
+- Generation controls now expose explicit Comfy-aligned parameters in the schema surface:
+  - `steps`,
+  - `cfg` (prompt strength),
+  - `sampler`,
+  - `scheduler`,
+  - deterministic `seed` (defaulted to a fixed integer).
+- Validation now enforces bounded ranges and allowed option sets for generation controls, and rejects empty model selections.
+- Preview summaries now include selected/default model configuration and concise generation behavior details, keeping schema assets inspectable and previewable without introducing UI-specific logic.

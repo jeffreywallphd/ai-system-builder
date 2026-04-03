@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const ComfyImageManipulationPropertySchemaId = "property-schema:image-manipulation";
-export const ComfyImageManipulationPropertySchemaVersion = "1.0.0";
+export const ComfyImageManipulationPropertySchemaVersion = "1.1.0";
 
 export const ComfyConditioningMapping = Object.freeze({
   positivePrompt: "desired-features",
@@ -16,8 +16,10 @@ const promptDefaults = Object.freeze({
 const generationDefaults = Object.freeze({
   variationStrength: 0.6,
   steps: 30,
-  guidance: 7,
-  seed: -1,
+  cfg: 7,
+  sampler: "euler",
+  scheduler: "normal",
+  seed: 1337,
 });
 
 const outputDefaults = Object.freeze({
@@ -25,15 +27,34 @@ const outputDefaults = Object.freeze({
   outputTarget: "history",
 });
 
+const modelDefaults = Object.freeze({
+  checkpointModel: "system-default",
+  vaeModel: "system-default",
+  faceIdModel: "system-default",
+});
+
+const comfySamplerOptions = Object.freeze(["euler", "dpmpp_2m", "euler_a", "lms"] as const);
+const comfySchedulerOptions = Object.freeze(["normal", "karras", "exponential", "sgm_uniform"] as const);
+
+type ComfySamplerOption = (typeof comfySamplerOptions)[number];
+type ComfySchedulerOption = (typeof comfySchedulerOptions)[number];
+
 export interface ComfyImageManipulationConfig {
   readonly prompts: {
     readonly positivePrompt: string;
     readonly negativePrompt: string;
   };
+  readonly models: {
+    readonly checkpointModel: string;
+    readonly vaeModel: string;
+    readonly faceIdModel: string;
+  };
   readonly generation: {
     readonly variationStrength: number;
     readonly steps: number;
-    readonly guidance: number;
+    readonly cfg: number;
+    readonly sampler: ComfySamplerOption;
+    readonly scheduler: ComfySchedulerOption;
     readonly seed: number;
   };
   readonly output: {
@@ -58,7 +79,7 @@ export interface ComfyImageManipulationPropertySchemaDefinition {
     readonly versioned: true;
   };
   readonly fields: ReadonlyArray<{
-    readonly groupId: "prompts" | "generation" | "output";
+    readonly groupId: "prompts" | "models" | "generation" | "output";
     readonly groupLabel: string;
     readonly entries: ReadonlyArray<{
       readonly id: string;
@@ -70,6 +91,7 @@ export interface ComfyImageManipulationPropertySchemaDefinition {
       readonly description: string;
       readonly validation: Readonly<Record<string, unknown>>;
       readonly mapping?: "desired-features" | "features-to-avoid";
+      readonly metadata?: Readonly<Record<string, unknown>>;
     }>;
   }>;
   readonly defaultConfig: ComfyImageManipulationConfig;
@@ -80,11 +102,18 @@ const ComfyImageManipulationConfigSchema = z.object({
     positivePrompt: z.string().trim().min(1, "Describe what you want to create is required.").default(promptDefaults.positivePrompt),
     negativePrompt: z.string().trim().default(promptDefaults.negativePrompt),
   }).default(promptDefaults),
+  models: z.object({
+    checkpointModel: z.string().trim().min(1).default(modelDefaults.checkpointModel),
+    vaeModel: z.string().trim().min(1).default(modelDefaults.vaeModel),
+    faceIdModel: z.string().trim().min(1).default(modelDefaults.faceIdModel),
+  }).default(modelDefaults),
   generation: z.object({
     variationStrength: z.number().min(0).max(1).default(generationDefaults.variationStrength),
     steps: z.number().int().min(1).max(200).default(generationDefaults.steps),
-    guidance: z.number().min(0).max(30).default(generationDefaults.guidance),
-    seed: z.number().int().default(generationDefaults.seed),
+    cfg: z.number().min(1).max(30).default(generationDefaults.cfg),
+    sampler: z.enum(comfySamplerOptions).default(generationDefaults.sampler),
+    scheduler: z.enum(comfySchedulerOptions).default(generationDefaults.scheduler),
+    seed: z.number().int().min(0).max(2147483647).default(generationDefaults.seed),
   }).default(generationDefaults),
   output: z.object({
     resultCount: z.number().int().min(1).max(4).default(outputDefaults.resultCount),
@@ -139,6 +168,60 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
       ]),
     }),
     Object.freeze({
+      groupId: "models",
+      groupLabel: "Models",
+      entries: Object.freeze([
+        Object.freeze({
+          id: "checkpointModel",
+          path: "models.checkpointModel",
+          type: "string",
+          required: true,
+          defaultValue: modelDefaults.checkpointModel,
+          label: "Base model",
+          description: "Choose the main model used for image generation.",
+          validation: Object.freeze({ nonEmpty: true }),
+          metadata: Object.freeze({
+            role: "checkpoint",
+            runtimeBinding: "comfy.checkpoint",
+            optionSource: "runtime-installed-models",
+            fallbackResolution: "system-default",
+          }),
+        }),
+        Object.freeze({
+          id: "vaeModel",
+          path: "models.vaeModel",
+          type: "string",
+          required: true,
+          defaultValue: modelDefaults.vaeModel,
+          label: "Detail model",
+          description: "Choose how image details are encoded and decoded.",
+          validation: Object.freeze({ nonEmpty: true }),
+          metadata: Object.freeze({
+            role: "vae",
+            runtimeBinding: "comfy.vae",
+            optionSource: "runtime-installed-models",
+            fallbackResolution: "system-default",
+          }),
+        }),
+        Object.freeze({
+          id: "faceIdModel",
+          path: "models.faceIdModel",
+          type: "string",
+          required: true,
+          defaultValue: modelDefaults.faceIdModel,
+          label: "Face reference model",
+          description: "Choose the model used when applying face-reference guidance.",
+          validation: Object.freeze({ nonEmpty: true }),
+          metadata: Object.freeze({
+            role: "faceid",
+            runtimeBinding: "comfy.faceid",
+            optionSource: "runtime-installed-models",
+            fallbackResolution: "system-default",
+          }),
+        }),
+      ]),
+    }),
+    Object.freeze({
       groupId: "generation",
       groupLabel: "Generation",
       entries: Object.freeze([
@@ -163,14 +246,43 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
           validation: Object.freeze({ min: 1, max: 200 }),
         }),
         Object.freeze({
-          id: "guidance",
-          path: "generation.guidance",
+          id: "cfg",
+          path: "generation.cfg",
           type: "number",
           required: true,
-          defaultValue: generationDefaults.guidance,
-          label: "Prompt guidance",
-          description: "Controls how strongly the image follows your description.",
-          validation: Object.freeze({ min: 0, max: 30 }),
+          defaultValue: generationDefaults.cfg,
+          label: "Prompt strength",
+          description: "Controls how strongly the image follows your instructions.",
+          validation: Object.freeze({ min: 1, max: 30 }),
+          metadata: Object.freeze({
+            runtimeBinding: "comfy.cfg",
+          }),
+        }),
+        Object.freeze({
+          id: "sampler",
+          path: "generation.sampler",
+          type: "enum",
+          required: true,
+          defaultValue: generationDefaults.sampler,
+          label: "Sampling method",
+          description: "Choose the sampling method used to build each image.",
+          validation: Object.freeze({ options: [...comfySamplerOptions] }),
+          metadata: Object.freeze({
+            runtimeBinding: "comfy.sampler_name",
+          }),
+        }),
+        Object.freeze({
+          id: "scheduler",
+          path: "generation.scheduler",
+          type: "enum",
+          required: true,
+          defaultValue: generationDefaults.scheduler,
+          label: "Scheduling method",
+          description: "Choose how steps are distributed during generation.",
+          validation: Object.freeze({ options: [...comfySchedulerOptions] }),
+          metadata: Object.freeze({
+            runtimeBinding: "comfy.scheduler",
+          }),
         }),
         Object.freeze({
           id: "seed",
@@ -179,8 +291,12 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
           required: true,
           defaultValue: generationDefaults.seed,
           label: "Seed",
-          description: "Use -1 for a fresh variation each run, or set a number for repeatability.",
-          validation: Object.freeze({ minimum: -1 }),
+          description: "Use the same number to repeat results, or change it for a new variation.",
+          validation: Object.freeze({ min: 0, max: 2147483647 }),
+          metadata: Object.freeze({
+            deterministicByDefault: true,
+            randomizationMode: "future-compatible",
+          }),
         }),
       ]),
     }),
@@ -213,6 +329,7 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
   ]),
   defaultConfig: Object.freeze({
     prompts: Object.freeze({ ...promptDefaults }),
+    models: Object.freeze({ ...modelDefaults }),
     generation: Object.freeze({ ...generationDefaults }),
     output: Object.freeze({ ...outputDefaults }),
   }),
@@ -254,7 +371,12 @@ export interface ComfyImageManipulationConfigPreview {
   readonly summary: {
     readonly positivePromptPreview: string;
     readonly hasNegativePrompt: boolean;
+    readonly modelSummary: string;
     readonly variationStrength: number;
+    readonly sampler: ComfySamplerOption;
+    readonly scheduler: ComfySchedulerOption;
+    readonly cfg: number;
+    readonly seed: number;
     readonly resultCount: number;
     readonly outputTarget: "history" | "download";
   };
@@ -272,7 +394,12 @@ export function createComfyImageManipulationConfigPreview(input: unknown): Comfy
     summary: Object.freeze({
       positivePromptPreview: truncate(resolved.prompts.positivePrompt, 80),
       hasNegativePrompt: resolved.prompts.negativePrompt.trim().length > 0,
+      modelSummary: `base=${resolved.models.checkpointModel}, vae=${resolved.models.vaeModel}, face=${resolved.models.faceIdModel}`,
       variationStrength: resolved.generation.variationStrength,
+      sampler: resolved.generation.sampler,
+      scheduler: resolved.generation.scheduler,
+      cfg: resolved.generation.cfg,
+      seed: resolved.generation.seed,
       resultCount: resolved.output.resultCount,
       outputTarget: resolved.output.outputTarget,
     }),
