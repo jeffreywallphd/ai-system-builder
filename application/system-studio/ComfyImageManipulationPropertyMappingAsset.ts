@@ -104,16 +104,7 @@ export const ComfyImageManipulationPropertyMappingAsset: ComfyImageManipulationP
     Object.freeze({ bindingId: "binding.generation.scheduler", group: BindingGroups.generation, schemaPath: "generation.scheduler", graphNodeId: "6", graphInputName: "scheduler" }),
     Object.freeze({ bindingId: "binding.generation.denoise", group: BindingGroups.generation, schemaPath: "generation.denoiseStrength", graphNodeId: "6", graphInputName: "denoise" }),
     Object.freeze({ bindingId: "binding.model.checkpoint", group: BindingGroups.models, schemaPath: "models.checkpointModel", graphNodeId: "1", graphInputName: "ckpt_name" }),
-    Object.freeze({
-      bindingId: "binding.model.vae-extension",
-      group: BindingGroups.models,
-      schemaPath: "models.vaeModel",
-      graphNodeId: "1",
-      graphInputName: "vae_name",
-      required: false,
-      extensionHook: true,
-      notes: "Reserved for graph variants that expose explicit VAE selection.",
-    }),
+    Object.freeze({ bindingId: "binding.model.vae", group: BindingGroups.models, schemaPath: "models.vaeModel", graphNodeId: "9", graphInputName: "vae_name" }),
     Object.freeze({
       bindingId: "binding.image.source",
       group: BindingGroups.image,

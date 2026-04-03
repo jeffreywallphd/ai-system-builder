@@ -22,9 +22,12 @@ describe("ComfyImageManipulationPropertyMappingAsset", () => {
     });
 
     expect(mapped.graphBindings["4.text"]).toBe("A cozy neon studio");
+    expect(mapped.graphBindings["5.text"]).toBe("grain");
     expect(mapped.graphBindings["1.ckpt_name"]).toBe("sdxl.safetensors");
+    expect(mapped.graphBindings["9.vae_name"]).toBe("vae-ft-mse-840000-ema-pruned.safetensors");
     expect(mapped.graphBindings["6.steps"]).toBe(28);
     expect(mapped.extensionBindings.some((entry) => entry.bindingId === "binding.faceid.enabled-extension")).toBeTrue();
     expect(mapped.extensionBindings.some((entry) => entry.bindingId === "binding.image.result-count-extension")).toBeTrue();
+    expect(mapped.extensionBindings.some((entry) => entry.bindingId === "binding.model.vae")).toBeFalse();
   });
 });

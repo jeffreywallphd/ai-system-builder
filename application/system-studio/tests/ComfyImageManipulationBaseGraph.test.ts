@@ -17,6 +17,11 @@ describe("ComfyImageManipulationBaseGraph", () => {
     expect(graph.nodes.some((node) => node.classType === "CLIPTextEncode" && node.nodeId === "4")).toBeTrue();
     expect(graph.nodes.some((node) => node.classType === "CLIPTextEncode" && node.nodeId === "5")).toBeTrue();
     expect(graph.nodes.some((node) => node.classType === "KSampler")).toBeTrue();
+    expect(graph.nodes.some((node) => node.classType === "VAELoader" && node.nodeId === "9")).toBeTrue();
+    const encodeNode = graph.nodes.find((node) => node.nodeId === "3");
+    const decodeNode = graph.nodes.find((node) => node.nodeId === "7");
+    expect(encodeNode?.inputs.vae).toEqual(["9", 0]);
+    expect(decodeNode?.inputs.vae).toEqual(["9", 0]);
     expect(graph.outputNodeIds).toEqual(["8"]);
   });
 

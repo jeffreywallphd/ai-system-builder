@@ -44,5 +44,19 @@ describe("ImageManipulationWorkflowTemplate", () => {
     for (const parameter of requiredParameters) {
       expect(defaultById.has(parameter.parameterId)).toBeTrue();
     }
+
+    expect(defaultById.get("positivePrompt")).toBeTypeOf("string");
+    expect(defaultById.get("checkpointModel")).toBe("system-default");
+    expect(defaultById.get("vaeModel")).toBe("system-default");
+  });
+
+  it("keeps positive/negative prompt and model selection mappings inspectable", () => {
+    const mappingById = new Map((ImageManipulationWorkflowTemplate.composition?.parameterMappings ?? [])
+      .map((mapping) => [mapping.parameterId, mapping.workflowParameterId] as const));
+
+    expect(mappingById.get("positivePrompt")).toBe("positivePrompt");
+    expect(mappingById.get("negativePrompt")).toBe("negativePrompt");
+    expect(mappingById.get("checkpointModel")).toBe("checkpointModel");
+    expect(mappingById.get("vaeModel")).toBe("vaeModel");
   });
 });
