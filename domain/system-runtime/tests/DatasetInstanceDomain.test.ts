@@ -1,8 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import {
+  DatasetInstanceStorageContractVersion,
   createDatasetInstance,
+  findDatasetInstanceStorageBinding,
   isDatasetInstanceLifecycleTransitionAllowed,
   patchDatasetInstance,
+  resolveDatasetInstanceStorageBinding,
   transitionDatasetInstanceLifecycle,
 } from "../DatasetInstanceDomain";
 
@@ -30,13 +33,22 @@ describe("DatasetInstanceDomain", () => {
       role: "input-store",
       lifecycleStatus: "ready",
       runtimeStatus: "idle",
-      storageBinding: {
-        storageInstanceId: "storage-instance:reference-runtime",
-        storageInstanceRef: "storage-instance://storage-instance%3Areference-runtime",
-        bindingArea: "input",
-        bindingId: "storage-binding:reference-runtime:input",
-        bindingReference: "storage-instance://storage-instance%3Areference-runtime/input",
-      },
+      storageBindings: [
+        {
+          storageInstanceId: "storage-instance:reference-runtime",
+          storageInstanceRef: "storage-instance://storage-instance%3Areference-runtime",
+          bindingArea: "input",
+          bindingId: "storage-binding:reference-runtime:input",
+          bindingReference: "storage-instance://storage-instance%3Areference-runtime/input",
+        },
+        {
+          storageInstanceId: "storage-instance:reference-runtime",
+          storageInstanceRef: "storage-instance://storage-instance%3Areference-runtime",
+          bindingArea: "output",
+          bindingId: "storage-binding:reference-runtime:output",
+          bindingReference: "storage-instance://storage-instance%3Areference-runtime/output",
+        },
+      ],
       seedMetadata: { bucket: "incoming" },
       createdAt: "2026-04-01T00:00:00.000Z",
       updatedAt: "2026-04-01T00:00:00.000Z",
@@ -53,7 +65,10 @@ describe("DatasetInstanceDomain", () => {
       },
     });
     expect(patched.purpose).toBe("incoming-images");
-    expect(patched.storageBinding?.bindingArea).toBe("input");
+    expect(patched.storageContractVersion).toBe(DatasetInstanceStorageContractVersion);
+    expect(patched.storageBindings?.length).toBe(2);
+    expect(findDatasetInstanceStorageBinding({ instance: patched, area: "output" })?.bindingArea).toBe("output");
+    expect(resolveDatasetInstanceStorageBinding({ instance: patched, preferredArea: "input" })?.bindingArea).toBe("input");
     expect(patched.seedMetadata?.bucket).toBe("incoming-v2");
     expect(patched.updatedAt).toBe("2026-04-01T00:01:00.000Z");
 
@@ -79,13 +94,13 @@ describe("DatasetInstanceDomain", () => {
       systemId: "system:test",
       datasetAssetId: "asset:test-dataset",
       role: "input-store",
-      storageBinding: {
+      storageBindings: [{
         storageInstanceId: "/tmp/storage",
         storageInstanceRef: "storage-instance://tmp-storage",
         bindingArea: "input",
         bindingId: "storage-binding:tmp-storage:input",
         bindingReference: "storage-instance://tmp-storage/input",
-      },
+      }],
     })).toThrow("storage bindings must use storage-instance identities");
   });
 });

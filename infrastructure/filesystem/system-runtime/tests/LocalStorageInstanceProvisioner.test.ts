@@ -11,7 +11,7 @@ describe("LocalStorageInstanceProvisioner", () => {
       const provisioner = new LocalStorageInstanceProvisioner({ storageRootDirectory: storageRoot });
       const result = await provisioner.provision({
         instanceId: "instance:image-pipeline",
-        requestedBindings: ["input", "output", "intermediate"],
+        requestedBindings: ["input", "output", "reference", "intermediate"],
         reuseExisting: true,
         metadata: {},
       });
@@ -22,11 +22,13 @@ describe("LocalStorageInstanceProvisioner", () => {
       expect(result.filesystem.bindings.map((entry) => entry.relativePath)).toEqual([
         "instance:image-pipeline/input",
         "instance:image-pipeline/output",
+        "instance:image-pipeline/reference",
         "instance:image-pipeline/intermediate",
       ]);
       expect(result.bindings.map((entry) => entry.reference)).toEqual([
         "storage-instance://instance%3Aimage-pipeline/input",
         "storage-instance://instance%3Aimage-pipeline/output",
+        "storage-instance://instance%3Aimage-pipeline/reference",
         "storage-instance://instance%3Aimage-pipeline/intermediate",
       ]);
     } finally {
@@ -77,6 +79,25 @@ describe("LocalStorageInstanceProvisioner", () => {
       );
     } finally {
       rmSync(storageRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps storage provisioning isolated from sibling /systems directories", async () => {
+    const appRoot = mkdtempSync(path.join(tmpdir(), "storage-systems-separation-"));
+    const storageRoot = path.join(appRoot, "storage");
+    const systemsRoot = path.join(appRoot, "systems");
+    try {
+      const provisioner = new LocalStorageInstanceProvisioner({ storageRootDirectory: storageRoot });
+      const result = await provisioner.provision({
+        instanceId: "instance:shared",
+        requestedBindings: ["input", "output"],
+        reuseExisting: true,
+        metadata: {},
+      });
+      expect(result.filesystem.instanceDirectory.startsWith(storageRoot)).toBeTrue();
+      expect(result.filesystem.instanceDirectory.startsWith(systemsRoot)).toBeFalse();
+    } finally {
+      rmSync(appRoot, { recursive: true, force: true });
     }
   });
 });

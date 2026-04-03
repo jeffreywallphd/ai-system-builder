@@ -38,6 +38,7 @@ describe("ReferenceImageSystemTemplate", () => {
   it("declares system-owned dataset instance bindings aligned to media schema intent", () => {
     const inputBinding = ReferenceImageSystemTemplate.datasetInstances.find((entry) => entry.bindingId === "input-image-dataset");
     const outputBinding = ReferenceImageSystemTemplate.datasetInstances.find((entry) => entry.bindingId === "output-image-dataset");
+    const referenceBinding = ReferenceImageSystemTemplate.datasetInstances.find((entry) => entry.bindingId === "reference-image-dataset");
 
     expect(inputBinding?.runtimeOwner).toBe("system-runtime");
     expect(inputBinding?.role).toBe(DatasetInstanceRoles.inputStore);
@@ -50,6 +51,7 @@ describe("ReferenceImageSystemTemplate", () => {
     expect(outputBinding?.requiredSchemaIntentId).toBe(DatasetSchemaIntentIds.media);
     expect(outputBinding?.requiredOutputShapeKind).toBe("image-metadata-records");
     expect(outputBinding?.storageBindingArea).toBe("output");
+    expect(referenceBinding?.storageBindingArea).toBe("reference");
   });
 
   it("builds runtime-owned dataset ensure requests scoped by system id", () => {
@@ -84,8 +86,8 @@ describe("ReferenceImageSystemTemplate", () => {
       },
     });
 
-    expect(requests[0]?.storageBinding?.bindingReference).toBe("storage-instance://storage-instance%3Ashared-reference-runtime/input");
-    expect(requests[1]?.storageBinding?.bindingReference).toBe("storage-instance://storage-instance%3Ashared-reference-runtime/output");
+    expect(requests[0]?.storageBindings?.[0]?.bindingReference).toBe("storage-instance://storage-instance%3Ashared-reference-runtime/input");
+    expect(requests[1]?.storageBindings?.[0]?.bindingReference).toBe("storage-instance://storage-instance%3Ashared-reference-runtime/output");
   });
 
   it("provides explicit system context mapping for selected image, parameters, and dataset refs", () => {

@@ -31,6 +31,12 @@ describe("LocalStorageInstanceLifecycleInfrastructure", () => {
         provider: "local",
       },
       {
+        bindingId: "storage-binding:storage-instance:test:reference",
+        area: "reference",
+        reference: "storage-instance://storage-instance%3Atest/reference",
+        provider: "local",
+      },
+      {
         bindingId: "storage-binding:storage-instance:test:intermediate",
         area: "intermediate",
         reference: "storage-instance://storage-instance%3Atest/intermediate",
@@ -50,6 +56,7 @@ describe("LocalStorageInstanceLifecycleInfrastructure", () => {
 
       const inputDir = path.join(root, "storage-instance:test", "input");
       const outputDir = path.join(root, "storage-instance:test", "output");
+      const referenceDir = path.join(root, "storage-instance:test", "reference");
       const intermediateDir = path.join(root, "storage-instance:test", "intermediate");
       mkdirSync(path.join(intermediateDir, "tmp"), { recursive: true });
       writeFileSync(path.join(intermediateDir, "tmp", "scratch.txt"), "temp");
@@ -62,6 +69,7 @@ describe("LocalStorageInstanceLifecycleInfrastructure", () => {
       lifecycle.reset(metadata);
       expect(readdirSync(inputDir)).toEqual([]);
       expect(readdirSync(outputDir)).toEqual([]);
+      expect(readdirSync(referenceDir)).toEqual([]);
 
       lifecycle.delete(metadata);
       expect(() => readdirSync(path.join(root, "storage-instance:test"))).toThrow();

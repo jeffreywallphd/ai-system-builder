@@ -1,11 +1,11 @@
 import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { DatasetInstance } from "../../domain/system-runtime/DatasetInstanceDomain";
+import type { DatasetInstanceStorageBinding } from "../../domain/system-runtime/DatasetInstanceDomain";
 import type { WorkflowOutputMaterializationPayload } from "./WorkflowOutputMaterializationContract";
 
 export interface PersistWorkflowOutputArtifactRequest {
   readonly systemId: string;
   readonly datasetInstanceId: string;
-  readonly datasetStorageBinding: NonNullable<DatasetInstance["storageBinding"]>;
+  readonly datasetStorageBinding: DatasetInstanceStorageBinding;
   readonly workflowRunId: string;
   readonly materializationId: string;
   readonly assetIndex: number;

@@ -4,7 +4,11 @@ import type {
   DatasetInstanceImageGeneration,
   DatasetInstanceImageRecord,
 } from "../../domain/system-runtime/DatasetInstanceRecordDomain";
-import type { DatasetInstance } from "../../domain/system-runtime/DatasetInstanceDomain";
+import {
+  findDatasetInstanceStorageBinding,
+  resolveDatasetInstanceStorageBinding,
+  type DatasetInstanceStorageBinding,
+} from "../../domain/system-runtime/DatasetInstanceDomain";
 import type { SystemDatasetInstanceService } from "./SystemDatasetInstanceService";
 import type { WorkflowOutputArtifactStorage } from "./WorkflowOutputArtifactStorage";
 import type { WorkflowOutputProvenanceRepository } from "./WorkflowOutputProvenanceRepository";
@@ -71,7 +75,10 @@ export class WorkflowOutputMaterializationService {
           assetIndex,
           systemId: request.systemId,
           datasetInstanceId: request.datasetInstanceId,
-          datasetStorageBinding: datasetInstance.storageBinding,
+          datasetStorageBinding: resolveDatasetInstanceStorageBinding({
+            instance: datasetInstance,
+            preferredArea: "output",
+          }),
         });
         const image = this.buildImageRecordShape({ payload, assetIndex, generation, persistedArtifact });
         const metadata = this.readMetadataRecord({
@@ -106,7 +113,10 @@ export class WorkflowOutputMaterializationService {
                 reference: persistedArtifact?.storageReference
                   ?? this.resolveStorageReference(producedAsset.assetRef)
                   ?? this.resolveStorageReferenceFromBinding({
-                    bindingReference: datasetInstance.storageBinding?.bindingReference,
+                    bindingReference: findDatasetInstanceStorageBinding({
+                      instance: datasetInstance,
+                      area: "output",
+                    })?.bindingReference,
                     workflowRunId: payload.workflowRun.runId,
                     materializationId: payload.materializationId,
                     assetIndex,
@@ -132,7 +142,10 @@ export class WorkflowOutputMaterializationService {
             storageReference: persistedArtifact?.storageReference
               ?? this.resolveStorageReference(producedAsset.assetRef)
               ?? this.resolveStorageReferenceFromBinding({
-                bindingReference: datasetInstance.storageBinding?.bindingReference,
+                bindingReference: findDatasetInstanceStorageBinding({
+                  instance: datasetInstance,
+                  area: "output",
+                })?.bindingReference,
                 workflowRunId: payload.workflowRun.runId,
                 materializationId: payload.materializationId,
                 assetIndex,
@@ -277,7 +290,7 @@ export class WorkflowOutputMaterializationService {
     readonly assetIndex: number;
     readonly systemId: string;
     readonly datasetInstanceId: string;
-    readonly datasetStorageBinding?: DatasetInstance["storageBinding"];
+    readonly datasetStorageBinding?: DatasetInstanceStorageBinding;
   }) {
     if (!this.artifactStorage) {
       return undefined;
@@ -313,8 +326,8 @@ export class WorkflowOutputMaterializationService {
   }
 
   private resolveStorageBinding(
-    binding: DatasetInstance["storageBinding"] | undefined,
-  ): NonNullable<DatasetInstance["storageBinding"]> {
+    binding: DatasetInstanceStorageBinding | undefined,
+  ): DatasetInstanceStorageBinding {
     if (!binding) {
       throw new Error("artifact-persist-failed:Dataset instance is missing a storage binding.");
     }

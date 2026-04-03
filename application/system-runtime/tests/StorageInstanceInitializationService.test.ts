@@ -21,11 +21,12 @@ describe("StorageInstanceInitializationService", () => {
         ownerId: "system:reference-image",
         role: "runtime-io",
       },
-      requestedBindings: ["input", "output", "intermediate"],
+      requestedBindings: ["input", "output", "reference", "intermediate"],
     });
 
     expect(initialized.provisioned).toBeTrue();
     expect(initialized.metadata.instanceId).toBe("storage-instance:reference-image:runtime");
+    expect(initialized.metadata.bindings.map((entry) => entry.area)).toEqual(["input", "output", "reference", "intermediate"]);
     expect(initialized.metadata.attachments.map((entry) => entry.ownerId)).toEqual(["system:reference-image"]);
   });
 
@@ -81,7 +82,7 @@ describe("StorageInstanceInitializationService", () => {
         ownerId: "system:a",
         role: "runtime-io",
       },
-      requestedBindings: ["input", "output", "intermediate"],
+      requestedBindings: ["input", "output", "reference", "intermediate"],
     });
     const second = await service.initialize({
       strategy: "attach",

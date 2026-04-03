@@ -48,6 +48,23 @@ describe("SqliteDatasetInstanceRepository", () => {
         datasetAssetVersionId: "1.0.0",
         role: "input-store",
         purpose: "incoming-images",
+        storageContractVersion: "2.0.0",
+        storageBindings: [
+          {
+            storageInstanceId: "storage-instance:shared",
+            storageInstanceRef: "storage-instance://storage-instance%3Ashared",
+            bindingArea: "input",
+            bindingId: "storage-binding:storage-instance:shared:input",
+            bindingReference: "storage-instance://storage-instance%3Ashared/input",
+          },
+          {
+            storageInstanceId: "storage-instance:shared",
+            storageInstanceRef: "storage-instance://storage-instance%3Ashared",
+            bindingArea: "reference",
+            bindingId: "storage-binding:storage-instance:shared:reference",
+            bindingReference: "storage-instance://storage-instance%3Ashared/reference",
+          },
+        ],
         lifecycleStatus: DatasetInstanceLifecycleStatuses.ready,
         runtimeStatus: DatasetInstanceRuntimeStatuses.idle,
         seedMetadata: {
@@ -72,6 +89,8 @@ describe("SqliteDatasetInstanceRepository", () => {
       expect(reloaded?.datasetAssetVersionId).toBe("1.0.0");
       expect(reloaded?.role).toBe("input-store");
       expect(reloaded?.purpose).toBe("incoming-images");
+      expect(reloaded?.storageContractVersion).toBe("2.0.0");
+      expect(reloaded?.storageBindings?.map((entry) => entry.bindingArea)).toEqual(["input", "reference"]);
       expect(reloaded?.lifecycleStatus).toBe("ready");
       expect(reloaded?.runtimeStatus).toBe("idle");
       expect(reloaded?.seedMetadata?.bucket).toBe("seed-input");

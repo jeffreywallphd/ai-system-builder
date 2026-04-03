@@ -419,3 +419,11 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Readiness failures now surface as normalized execution-ready failures (`invalid-request`/`validation`) instead of ad hoc thrown execution errors.
 - `ComfyImageManipulationExecutionService` now preflights readiness before adapter submission and returns normalized failed lifecycle snapshots when execution is blocked.
 - Focused adapter tests now cover contract behavior, request/graph shape, mapping correctness, FaceID branching, runtime resolution, lifecycle transitions, output materialization binding integration points, normalized error behavior, validation behavior, and default-template execution readiness without extra user input.
+
+## AI Loom image manipulation storage-instance alignment update (stories 6.1-6.2)
+
+- Dataset-instance storage linkage is now explicitly versioned and multi-binding (`storageContractVersion` + `storageBindings[]`) so one dataset instance can expose logical collection bindings without path leakage.
+- Logical binding areas now include `input`, `output`, `reference`, and `intermediate`; contracts remain `storage-instance://...` references only.
+- Reference-image storage provisioning now requests deterministic shared bindings for all four areas and still materializes under infrastructure-managed `/storage/{instanceId}/{area}` directories.
+- Runtime output materialization and upload intake now resolve bindings by logical area (`output` for materialization, `input` for uploads) instead of relying on a single implicit storage binding.
+- Storage/system separation is explicit in infrastructure tests: provisioning remains rooted under `/storage/...` and does not claim `/systems/...` ownership.

@@ -164,6 +164,7 @@ describe("StudioShellBackendApi", () => {
     });
     expect(root.ok).toBeTrue();
     expect(root.data?.storage.instanceId).toBe("storage-instance:shared-reference-runtime");
+    expect(root.data?.storage.bindings.map((entry) => entry.area)).toEqual(["input", "output", "reference", "intermediate"]);
     expect(provisioner.calls).toEqual(["storage-instance:shared-reference-runtime"]);
 
     const embedded = await api.initializeReferenceImageStorage({

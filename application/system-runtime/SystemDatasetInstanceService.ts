@@ -66,6 +66,8 @@ export interface CreateSystemDatasetInstanceRequest {
   readonly purpose?: string;
   readonly lifecycleStatus?: DatasetInstance["lifecycleStatus"];
   readonly runtimeStatus?: DatasetInstance["runtimeStatus"];
+  readonly storageContractVersion?: DatasetInstance["storageContractVersion"];
+  readonly storageBindings?: DatasetInstance["storageBindings"];
   readonly storageBinding?: DatasetInstance["storageBinding"];
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
   readonly lifecycleMetadata?: DatasetInstance["lifecycleMetadata"];
@@ -80,6 +82,8 @@ export interface EnsureRoleDatasetInstanceRequest {
   readonly purpose?: string;
   readonly requiredSchemaIntentId?: string;
   readonly requiredOutputShapeKind?: string;
+  readonly storageContractVersion?: DatasetInstance["storageContractVersion"];
+  readonly storageBindings?: DatasetInstance["storageBindings"];
   readonly storageBinding?: DatasetInstance["storageBinding"];
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
   readonly lifecycleMetadata?: DatasetInstance["lifecycleMetadata"];
@@ -90,6 +94,8 @@ export interface EnsureInputImageStoreInstanceRequest {
   readonly systemId: string;
   readonly datasetAssetId: string;
   readonly datasetAssetVersionId?: string;
+  readonly storageContractVersion?: DatasetInstance["storageContractVersion"];
+  readonly storageBindings?: DatasetInstance["storageBindings"];
   readonly storageBinding?: DatasetInstance["storageBinding"];
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
 }
@@ -99,6 +105,8 @@ export interface EnsureOutputImageStoreInstanceRequest {
   readonly systemId: string;
   readonly datasetAssetId: string;
   readonly datasetAssetVersionId?: string;
+  readonly storageContractVersion?: DatasetInstance["storageContractVersion"];
+  readonly storageBindings?: DatasetInstance["storageBindings"];
   readonly storageBinding?: DatasetInstance["storageBinding"];
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
 }
@@ -110,6 +118,8 @@ export interface EnsureWorkflowOutputTargetInstanceRequest {
   readonly datasetAssetId: string;
   readonly datasetAssetVersionId?: string;
   readonly purpose?: string;
+  readonly storageContractVersion?: DatasetInstance["storageContractVersion"];
+  readonly storageBindings?: DatasetInstance["storageBindings"];
   readonly storageBinding?: DatasetInstance["storageBinding"];
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
 }
@@ -122,6 +132,8 @@ export interface EnsureIntermediateStoreInstanceRequest {
   readonly purpose?: string;
   readonly requiredSchemaIntentId?: string;
   readonly requiredOutputShapeKind?: string;
+  readonly storageContractVersion?: DatasetInstance["storageContractVersion"];
+  readonly storageBindings?: DatasetInstance["storageBindings"];
   readonly storageBinding?: DatasetInstance["storageBinding"];
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
   readonly lifecycleMetadata?: DatasetInstance["lifecycleMetadata"];
@@ -335,7 +347,8 @@ export class SystemDatasetInstanceService {
 
   public async createDatasetInstance(request: CreateSystemDatasetInstanceRequest): Promise<DatasetInstance> {
     this.assertNoPathConfiguration(request);
-    this.assertLogicalStorageBinding(request.storageBinding);
+    const normalizedStorageBindings = this.normalizeRequestedStorageBindings(request);
+    this.assertLogicalStorageBindings(normalizedStorageBindings);
     await this.assertSystemExists(request.systemId);
     await this.assertAssetLinked({
       datasetAssetId: request.datasetAssetId,
@@ -351,7 +364,8 @@ export class SystemDatasetInstanceService {
       purpose: request.purpose,
       lifecycleStatus: request.lifecycleStatus ?? DatasetInstanceLifecycleStatuses.ready,
       runtimeStatus: request.runtimeStatus ?? DatasetInstanceRuntimeStatuses.idle,
-      storageBinding: request.storageBinding,
+      storageContractVersion: request.storageContractVersion,
+      storageBindings: normalizedStorageBindings,
       seedMetadata: request.seedMetadata,
       lifecycleMetadata: request.lifecycleMetadata,
     });
@@ -527,7 +541,8 @@ export class SystemDatasetInstanceService {
 
   public async ensureRoleDatasetInstance(request: EnsureRoleDatasetInstanceRequest): Promise<DatasetInstance> {
     this.assertNoPathConfiguration(request);
-    this.assertLogicalStorageBinding(request.storageBinding);
+    const normalizedStorageBindings = this.normalizeRequestedStorageBindings(request);
+    this.assertLogicalStorageBindings(normalizedStorageBindings);
     await this.assertSystemExists(request.systemId);
     const asset = await this.assertAssetLinked({
       datasetAssetId: request.datasetAssetId,
@@ -556,7 +571,7 @@ export class SystemDatasetInstanceService {
           `conflict:System '${request.systemId}' already has a '${request.role}' dataset instance for purpose '${request.purpose ?? ""}' with different asset linkage.`,
         );
       }
-      if (!this.areStorageBindingsEquivalent(existing.storageBinding, request.storageBinding)) {
+      if (!this.areStorageBindingsEquivalent(existing.storageBindings, normalizedStorageBindings)) {
         throw new Error(
           `conflict:System '${request.systemId}' already has a '${request.role}' dataset instance for purpose '${request.purpose ?? ""}' with different storage binding linkage.`,
         );
@@ -571,7 +586,8 @@ export class SystemDatasetInstanceService {
       datasetAssetVersionId: request.datasetAssetVersionId,
       role: request.role,
       purpose: request.purpose,
-      storageBinding: request.storageBinding,
+      storageContractVersion: request.storageContractVersion,
+      storageBindings: normalizedStorageBindings,
       seedMetadata: request.seedMetadata,
       lifecycleStatus: DatasetInstanceLifecycleStatuses.ready,
       runtimeStatus: DatasetInstanceRuntimeStatuses.idle,
@@ -589,6 +605,8 @@ export class SystemDatasetInstanceService {
       purpose: "incoming-images",
       requiredSchemaIntentId: DatasetSchemaIntentIds.media,
       requiredOutputShapeKind: "image-metadata-records",
+      storageContractVersion: request.storageContractVersion,
+      storageBindings: request.storageBindings,
       storageBinding: request.storageBinding,
       seedMetadata: request.seedMetadata,
     });
@@ -601,6 +619,8 @@ export class SystemDatasetInstanceService {
       systemId: request.systemId,
       datasetAssetId: request.datasetAssetId,
       datasetAssetVersionId: request.datasetAssetVersionId,
+      storageContractVersion: request.storageContractVersion,
+      storageBindings: request.storageBindings,
       storageBinding: request.storageBinding,
       seedMetadata: request.seedMetadata,
     });
@@ -625,6 +645,8 @@ export class SystemDatasetInstanceService {
       }),
       requiredSchemaIntentId: DatasetSchemaIntentIds.media,
       requiredOutputShapeKind: "image-metadata-records",
+      storageContractVersion: request.storageContractVersion,
+      storageBindings: request.storageBindings,
       storageBinding: request.storageBinding,
       seedMetadata: request.seedMetadata,
     });
@@ -642,6 +664,8 @@ export class SystemDatasetInstanceService {
       purpose: normalizeOptional(request.purpose) ?? "workflow-intermediate-images",
       requiredSchemaIntentId: request.requiredSchemaIntentId,
       requiredOutputShapeKind: request.requiredOutputShapeKind,
+      storageContractVersion: request.storageContractVersion,
+      storageBindings: request.storageBindings,
       storageBinding: request.storageBinding,
       seedMetadata: request.seedMetadata,
       lifecycleMetadata: request.lifecycleMetadata,
@@ -1611,21 +1635,44 @@ export class SystemDatasetInstanceService {
     return `${instanceId}:image-record:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`;
   }
 
+  private normalizeRequestedStorageBindings(input: {
+    readonly storageBindings?: DatasetInstance["storageBindings"];
+    readonly storageBinding?: DatasetInstance["storageBinding"];
+  }): ReadonlyArray<NonNullable<DatasetInstance["storageBindings"]>[number]> | undefined {
+    const normalized = input.storageBindings
+      ?? (input.storageBinding ? [input.storageBinding] : undefined);
+    if (!normalized || normalized.length === 0) {
+      return undefined;
+    }
+    return Object.freeze(normalized);
+  }
+
   private areStorageBindingsEquivalent(
-    existing?: DatasetInstance["storageBinding"],
-    requested?: DatasetInstance["storageBinding"],
+    existing?: DatasetInstance["storageBindings"],
+    requested?: DatasetInstance["storageBindings"],
   ): boolean {
-    if (!existing && !requested) {
+    if ((!existing || existing.length === 0) && (!requested || requested.length === 0)) {
       return true;
     }
-    if (!existing || !requested) {
+    if (!existing || !requested || existing.length !== requested.length) {
       return false;
     }
-    return existing.storageInstanceId === requested.storageInstanceId
-      && existing.storageInstanceRef === requested.storageInstanceRef
-      && existing.bindingArea === requested.bindingArea
-      && existing.bindingId === requested.bindingId
-      && existing.bindingReference === requested.bindingReference;
+    const existingSorted = [...existing].sort((left, right) => left.bindingId.localeCompare(right.bindingId));
+    const requestedSorted = [...requested].sort((left, right) => left.bindingId.localeCompare(right.bindingId));
+    for (let index = 0; index < existingSorted.length; index += 1) {
+      const left = existingSorted[index]!;
+      const right = requestedSorted[index]!;
+      if (
+        left.storageInstanceId !== right.storageInstanceId
+        || left.storageInstanceRef !== right.storageInstanceRef
+        || left.bindingArea !== right.bindingArea
+        || left.bindingId !== right.bindingId
+        || left.bindingReference !== right.bindingReference
+      ) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private assertNoPathConfiguration(input: unknown): void {
@@ -1642,25 +1689,32 @@ export class SystemDatasetInstanceService {
     return value as Readonly<Record<string, unknown>>;
   }
 
-  private assertLogicalStorageBinding(binding?: DatasetInstance["storageBinding"]): void {
-    if (!binding) {
+  private assertLogicalStorageBindings(bindings?: DatasetInstance["storageBindings"]): void {
+    if (!bindings || bindings.length === 0) {
       return;
     }
-    const instanceReference = parseStorageLogicalReference(binding.storageInstanceRef);
-    if (instanceReference.area) {
-      throw new Error("invalid-request:Dataset instance storageInstanceRef must target only the storage instance root reference.");
-    }
-    const bindingReference = parseStorageLogicalReference(binding.bindingReference);
-    if (!bindingReference.area) {
-      throw new Error("invalid-request:Dataset instance bindingReference must include a logical storage area.");
-    }
-    if (bindingReference.area !== binding.bindingArea) {
-      throw new Error(
-        `invalid-request:Dataset instance binding area '${binding.bindingArea}' does not match bindingReference area '${bindingReference.area}'.`,
-      );
-    }
-    if (instanceReference.instanceId !== binding.storageInstanceId || bindingReference.instanceId !== binding.storageInstanceId) {
-      throw new Error("invalid-request:Dataset instance storage binding references must resolve to the declared storageInstanceId.");
+    const seenAreas = new Set<string>();
+    for (const binding of bindings) {
+      if (seenAreas.has(binding.bindingArea)) {
+        throw new Error(`invalid-request:Dataset instance storage bindings contain duplicate area '${binding.bindingArea}'.`);
+      }
+      seenAreas.add(binding.bindingArea);
+      const instanceReference = parseStorageLogicalReference(binding.storageInstanceRef);
+      if (instanceReference.area) {
+        throw new Error("invalid-request:Dataset instance storageInstanceRef must target only the storage instance root reference.");
+      }
+      const bindingReference = parseStorageLogicalReference(binding.bindingReference);
+      if (!bindingReference.area) {
+        throw new Error("invalid-request:Dataset instance bindingReference must include a logical storage area.");
+      }
+      if (bindingReference.area !== binding.bindingArea) {
+        throw new Error(
+          `invalid-request:Dataset instance binding area '${binding.bindingArea}' does not match bindingReference area '${bindingReference.area}'.`,
+        );
+      }
+      if (instanceReference.instanceId !== binding.storageInstanceId || bindingReference.instanceId !== binding.storageInstanceId) {
+        throw new Error("invalid-request:Dataset instance storage binding references must resolve to the declared storageInstanceId.");
+      }
     }
   }
 
