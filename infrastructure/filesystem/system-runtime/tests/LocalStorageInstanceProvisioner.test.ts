@@ -52,4 +52,31 @@ describe("LocalStorageInstanceProvisioner", () => {
       rmSync(storageRoot, { recursive: true, force: true });
     }
   });
+
+  it("keeps distinct storage instances isolated under separate deterministic roots", async () => {
+    const storageRoot = mkdtempSync(path.join(tmpdir(), "storage-instance-root-"));
+    try {
+      const provisioner = new LocalStorageInstanceProvisioner({ storageRootDirectory: storageRoot });
+      const alpha = await provisioner.provision({
+        instanceId: "instance:alpha",
+        requestedBindings: ["input", "output"],
+        reuseExisting: true,
+        metadata: {},
+      });
+      const beta = await provisioner.provision({
+        instanceId: "instance:beta",
+        requestedBindings: ["input", "output"],
+        reuseExisting: true,
+        metadata: {},
+      });
+
+      expect(alpha.filesystem.instanceDirectory).toBe(path.join(storageRoot, "instance:alpha"));
+      expect(beta.filesystem.instanceDirectory).toBe(path.join(storageRoot, "instance:beta"));
+      expect(alpha.filesystem.bindings.map((entry) => entry.absolutePath)).not.toEqual(
+        beta.filesystem.bindings.map((entry) => entry.absolutePath),
+      );
+    } finally {
+      rmSync(storageRoot, { recursive: true, force: true });
+    }
+  });
 });

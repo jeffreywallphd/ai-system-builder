@@ -50,6 +50,8 @@ import {
   type DatasetEventPublisher,
 } from "../dataset-events/DatasetEventPublisher";
 import { DatasetEventActorKinds, DatasetEventTypes } from "../../domain/dataset-studio/contracts/DatasetEvent";
+import { parseStorageLogicalReference } from "./StorageInstanceProvisioningContract";
+import { assertNoUserManagedStoragePaths } from "./StoragePathPolicyValidation";
 
 export interface SystemDatasetOwnershipValidator {
   assertSystemExists(systemId: string): Promise<void> | void;
@@ -333,6 +335,7 @@ export class SystemDatasetInstanceService {
 
   public async createDatasetInstance(request: CreateSystemDatasetInstanceRequest): Promise<DatasetInstance> {
     this.assertNoPathConfiguration(request);
+    this.assertLogicalStorageBinding(request.storageBinding);
     await this.assertSystemExists(request.systemId);
     await this.assertAssetLinked({
       datasetAssetId: request.datasetAssetId,
@@ -524,6 +527,7 @@ export class SystemDatasetInstanceService {
 
   public async ensureRoleDatasetInstance(request: EnsureRoleDatasetInstanceRequest): Promise<DatasetInstance> {
     this.assertNoPathConfiguration(request);
+    this.assertLogicalStorageBinding(request.storageBinding);
     await this.assertSystemExists(request.systemId);
     const asset = await this.assertAssetLinked({
       datasetAssetId: request.datasetAssetId,
@@ -1625,27 +1629,10 @@ export class SystemDatasetInstanceService {
   }
 
   private assertNoPathConfiguration(input: unknown): void {
-    const root = this.toOptionalRecord(input);
-    if (!root) {
-      return;
-    }
-    if (this.hasForbiddenPathField(root)) {
-      throw new Error("invalid-request:Dataset instance storage configuration must use storage-instance references instead of raw filesystem paths.");
-    }
-  }
-
-  private hasForbiddenPathField(node: Readonly<Record<string, unknown>>): boolean {
-    for (const [key, value] of Object.entries(node)) {
-      const normalized = key.toLowerCase();
-      if (normalized.includes("path") || normalized.includes("directory") || normalized.includes("filesystem")) {
-        return true;
-      }
-      const nested = this.toOptionalRecord(value);
-      if (nested && this.hasForbiddenPathField(nested)) {
-        return true;
-      }
-    }
-    return false;
+    assertNoUserManagedStoragePaths(
+      input,
+      "invalid-request:Dataset instance storage configuration must use storage-instance references instead of raw filesystem paths.",
+    );
   }
 
   private toOptionalRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
@@ -1653,6 +1640,28 @@ export class SystemDatasetInstanceService {
       return undefined;
     }
     return value as Readonly<Record<string, unknown>>;
+  }
+
+  private assertLogicalStorageBinding(binding?: DatasetInstance["storageBinding"]): void {
+    if (!binding) {
+      return;
+    }
+    const instanceReference = parseStorageLogicalReference(binding.storageInstanceRef);
+    if (instanceReference.area) {
+      throw new Error("invalid-request:Dataset instance storageInstanceRef must target only the storage instance root reference.");
+    }
+    const bindingReference = parseStorageLogicalReference(binding.bindingReference);
+    if (!bindingReference.area) {
+      throw new Error("invalid-request:Dataset instance bindingReference must include a logical storage area.");
+    }
+    if (bindingReference.area !== binding.bindingArea) {
+      throw new Error(
+        `invalid-request:Dataset instance binding area '${binding.bindingArea}' does not match bindingReference area '${bindingReference.area}'.`,
+      );
+    }
+    if (instanceReference.instanceId !== binding.storageInstanceId || bindingReference.instanceId !== binding.storageInstanceId) {
+      throw new Error("invalid-request:Dataset instance storage binding references must resolve to the declared storageInstanceId.");
+    }
   }
 
   private async requireOwnedDatasetInstance(input: {

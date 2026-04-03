@@ -3,6 +3,7 @@ import {
   createStorageInstanceProvisioningRequest,
   createStorageInstanceProvisioningResult,
   createStorageLogicalReference,
+  parseStorageLogicalReference,
   validateStorageInstanceProvisioningRequest,
 } from "../StorageInstanceProvisioningContract";
 
@@ -50,5 +51,11 @@ describe("StorageInstanceProvisioningContract", () => {
       instanceId: " ",
       requestedBindings: [],
     })).toThrow();
+  });
+
+  it("rejects storage references that include nested path segments beyond logical binding area", () => {
+    expect(() => parseStorageLogicalReference(
+      "storage-instance://storage-instance%3Aalpha/output/runs/run-1",
+    )).toThrow("must target an instance root or a single logical area");
   });
 });

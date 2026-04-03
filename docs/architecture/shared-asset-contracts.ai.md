@@ -509,11 +509,31 @@
   - delete (remove instance root).
 - `StudioShellBackendApi` now exposes storage lifecycle operations (`manageReferenceImageStorageLifecycle`, `deleteReferenceImageStorage`) aligned with storage-instance semantics instead of system-exclusive ownership assumptions.
 
-## AI Loom Image System vertical-slice update: system-owned binary output storage + provenance persistence (stories 2.3.5-2.3.6)
+## AI Loom Image System vertical-slice update: explicit path-configuration rejection + storage-instance validation/test hardening (stories 2.9-2.10)
+
+- Added one reusable storage-path policy validator seam (`application/system-runtime/StoragePathPolicyValidation.ts`) and applied it in:
+  - storage initialization orchestration (`StorageInstanceInitializationService`),
+  - dataset-instance ensure/create orchestration (`SystemDatasetInstanceService`),
+  - Studio Shell reference-image storage initialization request handling (`StudioShellBackendApi`).
+- Validation now fails clearly and inspectably when callers attempt raw path/directory/filesystem configuration keys (including nested metadata payloads); requests must use storage-instance ids/references + logical bindings only.
+- Dataset binding validation now enforces logical-reference correctness beyond prefix checks:
+  - `storageInstanceRef` must reference only the instance root (`storage-instance://{instanceId}`),
+  - `bindingReference` must reference exactly one logical area (`storage-instance://{instanceId}/{area}`),
+  - binding area/reference/instance identity must stay consistent.
+- Storage reference parsing (`parseStorageLogicalReference`) now rejects nested path segments for logical binding references, preventing accidental acceptance of direct path-style binding payloads.
+- Test coverage now explicitly includes:
+  - nested path-key rejection,
+  - logical-binding reference strictness,
+  - deterministic provisioning + cross-instance isolation,
+  - shared attachment reuse across multiple systems and embedded subsystems,
+  - lifecycle safe-delete behavior under shared attachments.
+- No UI/CSS changes were required for this slice; behavior is enforced in domain/application/backend contract layers.
+
+## AI Loom Image System vertical-slice update: storage-instance-bound binary output storage + provenance persistence (stories 2.3.5-2.3.6)
 
 - Workflow output materialization now supports explicit binary artifact persistence through an internal storage seam (`application/system-runtime/WorkflowOutputArtifactStorage.ts`) rather than executor-specific paths.
-- The filesystem implementation (`infrastructure/filesystem/system-runtime/LocalSystemOutputArtifactStorage.ts`) now governs pathing/naming under a system-owned root with:
-  - deterministic namespace segments (`systemId`/`datasetInstanceId`/`workflowRunId`/`materializationId`),
+- The filesystem implementation (`infrastructure/filesystem/system-runtime/LocalSystemOutputArtifactStorage.ts`) now governs pathing/naming under storage-instance logical bindings (`/storage/{instanceId}/{area}/...`) with:
+  - deterministic namespace segments (`workflowRunId`/`materializationId`),
   - filename normalization independent of backend names,
   - collision-safe suffixing,
   - stable generated output refs and inspectable storage metadata (`fileName`, `relativePath`, `sha256`, `sizeBytes`, collision index).
