@@ -146,3 +146,18 @@
   - `application/system-runtime/tests/RuntimeCapabilityBindingPersistence.test.ts`
   - `application/system-studio/tests/SystemStudioApplicationService.test.ts` (runtime-capability persistence/reload, provider payload leakage prevention, unsupported-version rejection)
   - `ui/pages/tests/SystemStudioPageContracts.test.ts` (bounded runtime-capability editor contract surface)
+
+## Story 5.1 + 5.2 update
+- Added a concrete image-manipulation execution adapter contract at
+  `application/system-studio/ComfyImageManipulationExecutionAdapterContract.ts`.
+  - Covers request/graph build input, execution submission payload, progress polling snapshot, normalized success/failure outputs, and output materialization hook bindings.
+  - Keeps versioning + inspectability explicit (`contractVersion`, graph/template/version metadata, extension-binding inspection payloads).
+  - Stays asset-aligned by carrying logical dataset/storage binding references and workflow-template output materialization bindings.
+- Added a concrete request/graph builder at
+  `application/system-studio/ComfyImageManipulationGraphRequestBuilder.ts`.
+  - Transforms default image manipulation workflow-template context (resolved config + dataset runtime handles + runtime metadata + base graph) into a runnable Comfy `prompt` graph.
+  - Resolves logical source-image dataset references through the existing dataset-binding asset contract.
+  - Reuses the existing property-mapping asset for deterministic property-to-node mapping and extension readiness (including FaceID hooks) without adding a parallel mapping model.
+  - Produces inspectable submission output for debugging and runtime handoff.
+- Added focused tests in
+  `application/system-studio/tests/ComfyImageManipulationGraphRequestBuilder.test.ts` for default runnable graph output, logical-reference safety (no path leakage), and version-contract enforcement.
