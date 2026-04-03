@@ -92,6 +92,16 @@ describe("Reference image output persistence flow", () => {
     expect(listed.data?.items[0]?.workflow?.workflowRunId).toBe("run:output:1");
     expect(listed.data?.items[0]?.sourceImage?.stableId).toBe("generated-output:upload://source.png");
     expect(listed.data?.items[0]?.generationParametersSummary.editInstruction).toBe("brighten and sharpen");
+    expect(listed.data?.items[0]?.sourceImage?.path).toBeUndefined();
+
+    const outputItem = await api.getReferenceImageOutput({
+      studioId: "studio-system",
+      draftId: created.data!.draft!.draftId,
+      recordId: persisted.data!.persistedRecordIds[0]!,
+    });
+    expect(outputItem.ok).toBeTrue();
+    expect(outputItem.data?.image.recordId).toBe(persisted.data?.persistedRecordIds[0]);
+    expect(outputItem.data?.sourceImage?.path).toBeUndefined();
 
     const history = await api.listReferenceImageRunHistory({
       studioId: "studio-system",

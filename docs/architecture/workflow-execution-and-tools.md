@@ -707,3 +707,10 @@ The image slice proved the shared architecture, but it exposed concrete follow-u
 - Reference-image template draft creation now provisions storage + dataset-instance runtime defaults immediately for template-backed system drafts, so input/output dataset bindings are executable without waiting for first upload/output interaction.
 - Runtime dataset provisioning now resolves by logical template binding ids (`input-image-dataset`, `output-image-dataset`) instead of positional array assumptions in higher-layer orchestration.
 - Upload ingestion now routes through dataset binding areas (`storageBindingArea: "input"`) and dataset-instance contracts, removing ad hoc upload-path construction from higher layers.
+
+## AI Loom image manipulation dataset retrieval + optional FaceID reference flow update (stories 6.5-6.6)
+
+- Output retrieval now includes dataset-oriented listing and record-read paths (`OutputGalleryDatasetIntegrationService.listOutputGalleryItems` + `getOutputGalleryItem`) so higher layers can consume materialized outputs without direct filesystem coupling.
+- Studio-shell reference-image APIs now expose bounded dataset-item reads for the output dataset (`getReferenceImageOutput`) and generalized dataset-item list/read access by logical binding id (`listReferenceImageDatasetItems` / `getReferenceImageDatasetItem`).
+- Reference-image upload ingestion now supports optional FaceID reference dataset targeting (`targetDatasetBindingId: "reference-image-dataset"`) while keeping default input-upload behavior unchanged.
+- Optional FaceID dataset provisioning remains explicit and on-demand (`includeOptionalReferenceDatasets`) so the default template path is runnable without extra configuration, while still enabling reusable reference dataset flows when FaceID/reference conditioning is needed.

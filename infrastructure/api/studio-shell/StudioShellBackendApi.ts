@@ -111,7 +111,7 @@ import {
 } from "../../../application/system-runtime/WorkflowOutputArtifactStorage";
 import { InMemoryWorkflowOutputProvenanceRepository } from "../../../application/system-runtime/WorkflowOutputProvenanceRepository";
 import { OutputGalleryDatasetIntegrationService } from "../../../application/system-runtime/OutputGalleryDatasetIntegrationService";
-import type { OutputGalleryListing } from "../../../application/system-runtime/OutputGalleryDataContract";
+import type { OutputGalleryItem, OutputGalleryListing } from "../../../application/system-runtime/OutputGalleryDataContract";
 import {
   ImageRunHistoryExecutionStatuses,
   type ImageRunHistoryExecutionStatus,
@@ -208,10 +208,17 @@ export interface IngestReferenceImageUploadRequest {
   readonly fileName: string;
   readonly mimeType?: string;
   readonly payloadBase64: string;
+  readonly targetDatasetBindingId?: ReferenceImageDatasetBindingId;
 }
+
+export type ReferenceImageDatasetBindingId =
+  | "input-image-dataset"
+  | "output-image-dataset"
+  | "reference-image-dataset";
 
 export interface IngestReferenceImageUploadReadModel {
   readonly systemId: string;
+  readonly datasetBindingId: ReferenceImageDatasetBindingId;
   readonly datasetInstanceId: string;
   readonly recordId: string;
   readonly image: {
@@ -289,6 +296,27 @@ export interface ListReferenceImageOutputsRequest {
   readonly draftId?: string;
   readonly limit?: number;
   readonly offset?: number;
+}
+
+export interface GetReferenceImageOutputRequest {
+  readonly studioId: string;
+  readonly draftId?: string;
+  readonly recordId: string;
+}
+
+export interface ListReferenceImageDatasetItemsRequest {
+  readonly studioId: string;
+  readonly draftId?: string;
+  readonly datasetBindingId: Exclude<ReferenceImageDatasetBindingId, "input-image-dataset">;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface GetReferenceImageDatasetItemRequest {
+  readonly studioId: string;
+  readonly draftId?: string;
+  readonly datasetBindingId: Exclude<ReferenceImageDatasetBindingId, "input-image-dataset">;
+  readonly recordId: string;
 }
 
 export interface ListReferenceImageRunHistoryRequest {
@@ -1177,56 +1205,69 @@ export class StudioShellBackendApi {
         throw new StudioShellInvalidRequestError("Uploaded file name is required.");
       }
       const payload = this.decodeBase64Payload(request.payloadBase64);
-      const datasets = await this.ensureReferenceImageDatasetInstances(runtimeSystemId);
-      const inputDataset = datasets.get("input-image-dataset");
-      if (!inputDataset) {
-        throw new StudioShellInvalidRequestError("Reference image input dataset is unavailable.");
+      const datasetBindingId = request.targetDatasetBindingId ?? "input-image-dataset";
+      const includeOptionalReferenceDatasets = datasetBindingId === "reference-image-dataset";
+      const datasets = await this.ensureReferenceImageDatasetInstances(runtimeSystemId, {
+        includeOptionalReferenceDatasets,
+      });
+      const targetDataset = datasets.get(datasetBindingId);
+      if (!targetDataset) {
+        throw new StudioShellInvalidRequestError(`Reference image dataset binding '${datasetBindingId}' is unavailable.`);
       }
+      const storageBindingArea = datasetBindingId === "reference-image-dataset" ? "reference" : "input";
+      const ingestionSource = datasetBindingId === "reference-image-dataset"
+        ? "reference-image-ui-faceid-upload"
+        : "reference-image-ui-upload";
 
       const ingested = await this.referenceImageDatasets.ingestImageRecordIntoInstance({
         systemId: runtimeSystemId,
-        instanceId: inputDataset.instanceId,
-        storageBindingArea: "input",
+        instanceId: targetDataset.instanceId,
+        storageBindingArea,
         metadata: {
-          ingestionSource: "reference-image-ui-upload",
+          ingestionSource,
+          datasetBindingId,
           uploadedFileName: fileName,
           uploadedMimeType: request.mimeType?.trim() || "unknown",
         },
         provenance: {
           sourceType: "upload",
-          sourceReference: `upload:${draft.draftId}:${fileName}`,
+          sourceReference: `upload:${datasetBindingId}:${draft.draftId}:${fileName}`,
           sourceSystemId: runtimeSystemId,
           ingestedBy: "studio-shell-ui",
         },
         record: {
           title: fileName,
           format: this.deriveFileFormat(fileName, request.mimeType),
-          tags: ["input", "upload"],
+          tags: datasetBindingId === "reference-image-dataset"
+            ? ["reference", "faceid", "upload"]
+            : ["input", "upload"],
         },
         metadataExtraction: {
           payload,
           includeExifInMetadata: true,
         },
       });
-      await this.referenceImageDatasets.selectImageRecordInInstance({
-        systemId: runtimeSystemId,
-        instanceId: inputDataset.instanceId,
-        recordId: ingested.recordId,
-        selectionContext: {
-          selectionMode: "single",
-          reason: "latest-upload",
-        },
-      });
+      if (datasetBindingId === "input-image-dataset") {
+        await this.referenceImageDatasets.selectImageRecordInInstance({
+          systemId: runtimeSystemId,
+          instanceId: targetDataset.instanceId,
+          recordId: ingested.recordId,
+          selectionContext: {
+            selectionMode: "single",
+            reason: "latest-upload",
+          },
+        });
+      }
 
       return Object.freeze({
         systemId: runtimeSystemId,
-        datasetInstanceId: inputDataset.instanceId,
+        datasetBindingId,
+        datasetInstanceId: targetDataset.instanceId,
         recordId: ingested.recordId,
         image: Object.freeze({
           assetId: ingested.image.assetRef.assetId
             ?? ingested.image.assetRef.stableId
             ?? ingested.image.assetRef.outputId
-            ?? ingested.image.assetRef.path
             ?? ingested.recordId,
           width: ingested.image.width,
           height: ingested.image.height,
@@ -1601,29 +1642,142 @@ export class StudioShellBackendApi {
     request: ListReferenceImageOutputsRequest,
   ): Promise<StudioShellApiResponse<OutputGalleryListing>> {
     return this.wrap(async () => {
-      const snapshot = await this.requireSnapshot(request.studioId);
-      const draft = snapshot.draft;
-      if (!draft) {
-        throw new StudioShellInvalidRequestError("Open a system draft to view generated images.");
-      }
-      if (request.draftId?.trim() && draft.draftId !== request.draftId.trim()) {
-        throw new StudioShellInvalidRequestError(`Draft '${request.draftId}' is not the active draft for studio '${request.studioId}'.`);
-      }
-      if (draft.assetId !== ReferenceImageSystemTemplate.systemAsset.assetId) {
-        throw new StudioShellInvalidRequestError("Generated image results are only available for the reference image template.");
-      }
-      const runtimeSystemId = this.resolveReferenceRuntimeSystemId(draft);
-      const datasets = await this.ensureReferenceImageDatasetInstances(runtimeSystemId);
-      const outputDataset = datasets.get("output-image-dataset");
-      if (!outputDataset) {
-        throw new StudioShellInvalidRequestError("Reference image output dataset is unavailable.");
-      }
-      return this.referenceImageOutputGallery.listOutputGalleryItems({
-        systemId: runtimeSystemId,
-        datasetInstanceId: outputDataset.instanceId,
+      return this.listReferenceImageDatasetItemsInternal({
+        studioId: request.studioId,
+        draftId: request.draftId,
+        datasetBindingId: "output-image-dataset",
         limit: request.limit,
         offset: request.offset,
       });
+    });
+  }
+
+  public async getReferenceImageOutput(
+    request: GetReferenceImageOutputRequest,
+  ): Promise<StudioShellApiResponse<OutputGalleryItem>> {
+    return this.wrap(async () => {
+      return this.getReferenceImageDatasetItemInternal({
+        studioId: request.studioId,
+        draftId: request.draftId,
+        datasetBindingId: "output-image-dataset",
+        recordId: request.recordId,
+      });
+    });
+  }
+
+  public async listReferenceImageDatasetItems(
+    request: ListReferenceImageDatasetItemsRequest,
+  ): Promise<StudioShellApiResponse<OutputGalleryListing>> {
+    return this.wrap(async () => {
+      return this.listReferenceImageDatasetItemsInternal({
+        studioId: request.studioId,
+        draftId: request.draftId,
+        datasetBindingId: request.datasetBindingId,
+        limit: request.limit,
+        offset: request.offset,
+      });
+    });
+  }
+
+  public async getReferenceImageDatasetItem(
+    request: GetReferenceImageDatasetItemRequest,
+  ): Promise<StudioShellApiResponse<OutputGalleryItem>> {
+    return this.wrap(async () => {
+      return this.getReferenceImageDatasetItemInternal(request);
+    });
+  }
+
+  private async listReferenceImageDatasetItemsInternal(request: {
+    readonly studioId: string;
+    readonly draftId?: string;
+    readonly datasetBindingId: Exclude<ReferenceImageDatasetBindingId, "input-image-dataset">;
+    readonly limit?: number;
+    readonly offset?: number;
+  }): Promise<OutputGalleryListing> {
+    const dataset = await this.resolveReferenceImageDatasetForBinding({
+      studioId: request.studioId,
+      draftId: request.draftId,
+      datasetBindingId: request.datasetBindingId,
+    });
+    return this.referenceImageOutputGallery.listOutputGalleryItems({
+      systemId: dataset.systemId,
+      datasetInstanceId: dataset.instanceId,
+      limit: request.limit,
+      offset: request.offset,
+    });
+  }
+
+  private async getReferenceImageDatasetItemInternal(
+    request: {
+      readonly studioId: string;
+      readonly draftId?: string;
+      readonly datasetBindingId: Exclude<ReferenceImageDatasetBindingId, "input-image-dataset">;
+      readonly recordId: string;
+    },
+  ): Promise<OutputGalleryItem> {
+    const dataset = await this.resolveReferenceImageDatasetForBinding({
+      studioId: request.studioId,
+      draftId: request.draftId,
+      datasetBindingId: request.datasetBindingId,
+    });
+    return this.referenceImageOutputGallery.getOutputGalleryItem({
+      systemId: dataset.systemId,
+      datasetInstanceId: dataset.instanceId,
+      recordId: request.recordId,
+    });
+  }
+
+  private async resolveReferenceImageDatasetForBinding(input: {
+    readonly studioId: string;
+    readonly draftId?: string;
+    readonly datasetBindingId: Exclude<ReferenceImageDatasetBindingId, "input-image-dataset">;
+  }): Promise<{
+    readonly systemId: string;
+    readonly instanceId: string;
+  }> {
+    const { runtimeSystemId } = await this.resolveReferenceImageDraftContext({
+      studioId: input.studioId,
+      draftId: input.draftId,
+      emptyDraftMessage: "Open a system draft to view images.",
+      nonTemplateMessage: "Image datasets are only available for the reference image template.",
+    });
+    const includeOptionalReferenceDatasets = input.datasetBindingId === "reference-image-dataset";
+    const datasets = await this.ensureReferenceImageDatasetInstances(runtimeSystemId, {
+      includeOptionalReferenceDatasets,
+    });
+    const dataset = datasets.get(input.datasetBindingId);
+    if (!dataset) {
+      throw new StudioShellInvalidRequestError(`Reference image dataset binding '${input.datasetBindingId}' is unavailable.`);
+    }
+    return Object.freeze({
+      systemId: runtimeSystemId,
+      instanceId: dataset.instanceId,
+    });
+  }
+
+  private async resolveReferenceImageDraftContext(input: {
+    readonly studioId: string;
+    readonly draftId?: string;
+    readonly emptyDraftMessage: string;
+    readonly nonTemplateMessage: string;
+  }): Promise<{
+    readonly draft: NonNullable<StudioShellSnapshotReadModel["draft"]>;
+    readonly runtimeSystemId: string;
+  }> {
+    const snapshot = await this.requireSnapshot(input.studioId);
+    const draft = snapshot.draft;
+    if (!draft) {
+      throw new StudioShellInvalidRequestError(input.emptyDraftMessage);
+    }
+    if (input.draftId?.trim() && draft.draftId !== input.draftId.trim()) {
+      throw new StudioShellInvalidRequestError(`Draft '${input.draftId}' is not the active draft for studio '${input.studioId}'.`);
+    }
+    if (draft.assetId !== ReferenceImageSystemTemplate.systemAsset.assetId) {
+      throw new StudioShellInvalidRequestError(input.nonTemplateMessage);
+    }
+    return Object.freeze({
+      draft,
+      runtimeSystemId: this.resolveReferenceRuntimeSystemId(draft),
     });
   }
 
@@ -2585,7 +2739,10 @@ export class StudioShellBackendApi {
     });
   }
 
-  private async ensureReferenceImageDatasetInstances(systemId: string): Promise<ReadonlyMap<string, Awaited<ReturnType<SystemDatasetInstanceService["ensureRoleDatasetInstance"]>>>> {
+  private async ensureReferenceImageDatasetInstances(
+    systemId: string,
+    options: { readonly includeOptionalReferenceDatasets?: boolean } = {},
+  ): Promise<ReadonlyMap<string, Awaited<ReturnType<SystemDatasetInstanceService["ensureRoleDatasetInstance"]>>>> {
     const storage = await this.initializeReferenceImageStorage({
       systemId,
       ownerKind: "system",
@@ -2601,6 +2758,7 @@ export class StudioShellBackendApi {
       })])))
       : undefined;
     const requests = buildReferenceImageDatasetInstanceRequests(systemId, {
+      includeOptionalReferenceDatasets: options.includeOptionalReferenceDatasets,
       storageBindingByArea,
     });
     const ensuredByBindingId = new Map<string, Awaited<ReturnType<SystemDatasetInstanceService["ensureRoleDatasetInstance"]>>>();
