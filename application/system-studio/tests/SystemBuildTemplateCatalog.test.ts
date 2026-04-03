@@ -35,6 +35,16 @@ describe("SystemBuildTemplateCatalog", () => {
       readonly systemSpec?: {
         readonly components?: ReadonlyArray<{ readonly assetId: string }>;
         readonly bindings?: ReadonlyArray<{ readonly bindingId: string }>;
+        readonly canvasAuthoring?: {
+          readonly pageLayouts?: ReadonlyArray<{
+            readonly panels?: ReadonlyArray<{
+              readonly content?: {
+                readonly kind?: string;
+                readonly studioAssetId?: string;
+              };
+            }>;
+          }>;
+        };
       };
     };
 
@@ -45,6 +55,10 @@ describe("SystemBuildTemplateCatalog", () => {
       ImageManipulationSystemTemplate.datasetInstances[0]?.datasetAssetId,
     );
     expect(parsed.systemSpec?.bindings?.length ?? 0).toBeGreaterThan(0);
+    expect(parsed.systemSpec?.canvasAuthoring?.pageLayouts?.[0]?.panels?.[0]?.content?.kind).toBe("embedded-studio");
+    expect(parsed.systemSpec?.canvasAuthoring?.pageLayouts?.[0]?.panels?.[0]?.content?.studioAssetId).toBe(
+      ImageManipulationSystemTemplate.compositionBindings.pageBindingId,
+    );
   });
 
   it("returns undefined for unregistered template ids in the Build flow lookup path", () => {

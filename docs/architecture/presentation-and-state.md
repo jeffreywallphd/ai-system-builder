@@ -865,3 +865,13 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 - Stories 5–6 now make Data Studio’s dataset authoring path asset-native under the Studio Shell: `DatasetStudioDraftAuthoringBoundary` owns the canonical `DataStudioPreparationWizardStateAdapter` state, renders wizard/canvas surfaces directly from that shared state, and no longer mounts the legacy nested intermediary authoring panels in active runtime.
 - Legacy Data Studio intermediary panel implementations were disconnected from active runtime and have now been deleted as part of cleanup.
+
+## AI Loom image manipulation update: runtime editor page asset + schema-driven settings surface (stories 7.1-7.2)
+
+- System runtime preview now supports a dedicated image editor runtime page asset (`ui/studio-shell/studio-assets/ImageManipulationEditorPageAsset.tsx`) bound to the image manipulation template page binding id (`system-page:image-manipulation`).
+- The build-template seed now includes a default page panel wired to that embedded runtime page asset (`application/system-studio/SystemBuildTemplateCatalog.ts`), so image manipulation systems open with a ready-to-run editor surface by default.
+- The runtime editor UI is now rendered through a dedicated panel (`ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`) with the required layout:
+  - left: schema-driven settings editor,
+  - right top: image preview,
+  - right bottom: horizontal results gallery strip.
+- Settings are rendered from the existing Comfy image manipulation property schema (`ComfyImageManipulationPropertySchema`) through a reusable editor component (`ui/components/assets/image-system/ComfyImageManipulationPropertyEditor.tsx`) with grouped non-technical sections and collapsed advanced controls.
