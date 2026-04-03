@@ -792,6 +792,10 @@
   - role/purpose (`input-store`/`output-store`),
   - required media schema intent and canonical image metadata record shape (`image-metadata-records`).
 - Runtime provisioning is represented through `buildReferenceImageDatasetInstanceRequests(systemId)` to produce bounded `EnsureRoleDatasetInstanceRequest` contracts for `SystemDatasetInstanceService` reuse.
+- Image manipulation dataset contracts now include two additional concrete media dataset assets through the shared registry seam (`application/dataset-studio/ImageManipulationDatasetAssets.ts`):
+  - a generated output dataset asset (`asset:dataset:image-reference-output`) for run-produced image results, gallery listing, preview selection, and downstream output-to-input reuse,
+  - an optional FaceID reference dataset asset (`asset:dataset:image-faceid-reference`) for one-or-more conditioning references without exposing user-managed raw path contracts.
+- The reference-image system template now composes the optional FaceID dataset as a first-class dataset component and marks its dataset-instance template entry as optional; provisioning remains explicit through `buildReferenceImageDatasetInstanceRequests(systemId, { includeOptionalReferenceDatasets })` so default system startup behavior is unchanged.
 - Build route exposure now includes a `/build` template card that links to System Studio for this reference-image system path, keeping vertical-slice discovery inside the existing Build UX entry surface.
 
 ## Direction 5 extension update: primary image workflow binding + system context mapping (stories 5.1.3-5.1.4)

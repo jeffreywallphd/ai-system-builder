@@ -13,6 +13,7 @@ import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds }
 import { DatasetInstanceRoles, type DatasetInstanceRole } from "../../domain/system-runtime/DatasetInstanceDomain";
 import type { EnsureRoleDatasetInstanceRequest } from "../system-runtime/SystemDatasetInstanceService";
 import {
+  ImageManipulationFaceIdReferenceDatasetAssetId,
   ImageManipulationInputDatasetAssetId,
   ImageManipulationOutputDatasetAssetId,
 } from "../dataset-studio/ImageManipulationDatasetAssets";
@@ -104,7 +105,7 @@ export const ReferenceImageSystemWorkflowContextMapping: SystemContextWorkflowMa
 });
 
 export interface ReferenceImageDatasetInstanceTemplate {
-  readonly bindingId: "input-image-dataset" | "output-image-dataset";
+  readonly bindingId: "input-image-dataset" | "output-image-dataset" | "reference-image-dataset";
   readonly instanceId: string;
   readonly role: DatasetInstanceRole;
   readonly purpose: string;
@@ -113,6 +114,7 @@ export interface ReferenceImageDatasetInstanceTemplate {
   readonly requiredSchemaIntentId: typeof DatasetSchemaIntentIds.media;
   readonly requiredOutputShapeKind: "image-metadata-records";
   readonly runtimeOwner: "system-runtime";
+  readonly optional?: boolean;
 }
 
 export interface ReferenceImageSystemTemplateDefinition {
@@ -186,6 +188,16 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
         },
       },
       {
+        componentKind: "atomic",
+        assetId: ImageManipulationFaceIdReferenceDatasetAssetId,
+        alias: "reference-image-dataset-asset",
+        taxonomy: {
+          structuralKind: TaxonomyStructuralKinds.atomic,
+          semanticRole: TaxonomySemanticRoles.dataset,
+          behaviorKind: TaxonomyBehaviorKinds.none,
+        },
+      },
+      {
         componentKind: "composite",
         assetId: ReferenceImagePrimaryWorkflowTemplate.templateId,
         versionId: ReferenceImagePrimaryWorkflowTemplate.versionId,
@@ -249,6 +261,17 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
       requiredOutputShapeKind: "image-metadata-records",
       runtimeOwner: "system-runtime",
     }),
+    Object.freeze({
+      bindingId: "reference-image-dataset",
+      instanceId: "dataset-instance:reference-image:faceid",
+      role: DatasetInstanceRoles.inputStore,
+      purpose: "optional-faceid-reference-images",
+      datasetAssetId: ImageManipulationFaceIdReferenceDatasetAssetId,
+      requiredSchemaIntentId: DatasetSchemaIntentIds.media,
+      requiredOutputShapeKind: "image-metadata-records",
+      runtimeOwner: "system-runtime",
+      optional: true,
+    }),
   ]),
   workflowBindingBoundary: Object.freeze({
     componentAlias: "reference-workflow",
@@ -276,13 +299,23 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
   }),
 });
 
-export function buildReferenceImageDatasetInstanceRequests(systemId: string): ReadonlyArray<EnsureRoleDatasetInstanceRequest> {
+export interface BuildReferenceImageDatasetInstanceRequestsOptions {
+  readonly includeOptionalReferenceDatasets?: boolean;
+}
+
+export function buildReferenceImageDatasetInstanceRequests(
+  systemId: string,
+  options: BuildReferenceImageDatasetInstanceRequestsOptions = {},
+): ReadonlyArray<EnsureRoleDatasetInstanceRequest> {
   const normalizedSystemId = systemId.trim();
   if (!normalizedSystemId) {
     throw new Error("Reference image system template requires a systemId.");
   }
 
-  return Object.freeze(ReferenceImageSystemTemplate.datasetInstances.map((entry) => Object.freeze({
+  const includeOptional = options.includeOptionalReferenceDatasets ?? false;
+  return Object.freeze(ReferenceImageSystemTemplate.datasetInstances
+    .filter((entry) => includeOptional || entry.optional !== true)
+    .map((entry) => Object.freeze({
     systemId: normalizedSystemId,
     instanceId: entry.instanceId,
     datasetAssetId: entry.datasetAssetId,
