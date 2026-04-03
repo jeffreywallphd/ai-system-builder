@@ -31,6 +31,7 @@ describe("ui/routes contract adherence", () => {
     expect(source).toContain('workflowStudioMode: "/studio-shell/workflow/:modeId"');
     expect(source).toContain('workflowStudioWizardPage: "/studio-shell/workflow/wizard/:wizardPageId"');
     expect(source).toContain('systemStudio: "/studio-shell/system"');
+    expect(source).toContain('schemaStudio: "/studio-shell/schema"');
     expect(source).toContain('settings: "/settings"');
     expect(source).toContain('notFound: "*"');
   });

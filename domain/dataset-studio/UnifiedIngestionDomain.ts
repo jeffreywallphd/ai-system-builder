@@ -1,4 +1,5 @@
-import type { CanonicalDataShape, CanonicalDataShapeKind } from "./CanonicalDataShapes";
+import type { CanonicalDataShape, CanonicalDataShapeKind, CanonicalRecordValue } from "./CanonicalDataShapes";
+import type { DatasetSchemaIntentId } from "./schema-intents/DatasetSchemaIntent";
 
 export const UnifiedIngestionContractVersion = "1.0.0";
 
@@ -134,6 +135,8 @@ export interface UnifiedIngestionAdvancedConfiguration {
   readonly documentMaxPages?: number;
   readonly imageExtractExif?: boolean;
   readonly imageNormalizeOrientation?: boolean;
+  readonly imageTags?: ReadonlyArray<string>;
+  readonly imageAnnotations?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly enableContentSniffing?: boolean;
 }
 
@@ -284,6 +287,7 @@ export interface UnifiedIngestionExecutionMetadata {
     readonly completedAt: string;
     readonly configurationMode: UnifiedIngestionConfigMode;
     readonly outputTarget: UnifiedIngestionOutputTargetKind;
+    readonly schemaIntentId?: DatasetSchemaIntentId;
     readonly stageCount: number;
     readonly pipelineId?: string;
     readonly orderedStageIds?: ReadonlyArray<string>;
@@ -331,6 +335,7 @@ export interface UnifiedIngestionBatchExecutionMetadata {
     readonly completedAt: string;
     readonly outputTarget: UnifiedIngestionOutputTargetKind;
     readonly configurationMode: UnifiedIngestionConfigMode;
+    readonly schemaIntentId?: DatasetSchemaIntentId;
     readonly continueOnError: boolean;
     readonly requestedConcurrency: number;
   };
@@ -372,6 +377,7 @@ export interface UnifiedIngestionNormalizedOutput {
   readonly metadata: {
     readonly outputTarget: UnifiedIngestionOutputTargetKind;
     readonly configurationMode: UnifiedIngestionConfigMode;
+    readonly schemaIntentId?: DatasetSchemaIntentId;
     readonly sourceId: string;
     readonly sourceReference: string;
     readonly sourceAssetId?: string;

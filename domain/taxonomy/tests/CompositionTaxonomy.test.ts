@@ -54,7 +54,12 @@ describe("Composition taxonomy descriptor", () => {
     expect(assertAllowedCompositionTaxonomyCombination(descriptor)).toEqual(descriptor);
   });
 
-  it("supports revised combinations for config-profile, dataset-pipeline, and app-template", () => {
+  it("supports revised combinations for schema, config-profile, dataset-pipeline, and app-template", () => {
+    const schema = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.atomic,
+      semanticRole: TaxonomySemanticRoles.schema,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
     const configProfile = createCompositionTaxonomyDescriptor({
       structuralKind: TaxonomyStructuralKinds.atomic,
       semanticRole: TaxonomySemanticRoles.configProfile,
@@ -71,6 +76,7 @@ describe("Composition taxonomy descriptor", () => {
       behaviorKind: TaxonomyBehaviorKinds.conditional,
     });
 
+    expect(assertAllowedCompositionTaxonomyCombination(schema)).toEqual(schema);
     expect(assertAllowedCompositionTaxonomyCombination(configProfile)).toEqual(configProfile);
     expect(assertAllowedCompositionTaxonomyCombination(datasetPipeline)).toEqual(datasetPipeline);
     expect(assertAllowedCompositionTaxonomyCombination(appTemplate)).toEqual(appTemplate);

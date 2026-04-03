@@ -333,7 +333,7 @@ describe("WorkflowStudioRunHistoryPanel", () => {
       </MemoryRouter>,
     );
 
-    expect(html).toContain("Workflow editor");
+    expect(html).toContain("Workflow studio");
     expect(html).toContain("Run history");
     expect(html).toContain("workflowEntry=resume-draft");
   });

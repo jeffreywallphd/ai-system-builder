@@ -13,7 +13,6 @@ describe("ModelStudioPage contracts", () => {
     expect(registrationSource).toContain('studioType: ModelStudioIdentity.studioType');
     expect(registrationSource).toContain('role: "model"');
     expect(registrationSource).toContain('slot: "draft-authoring"');
-    expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain("createModelStudioTaxonomy()");
   });
 });

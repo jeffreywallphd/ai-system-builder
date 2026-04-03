@@ -42,7 +42,12 @@ import {
   DatasetIngestionStageAssetIds,
   DatasetTransformationStageAssetIds,
 } from "../../domain/dataset-studio/StagePipelineDomain";
+import type {
+  IImageTransformer,
+  ImageTransformationResult,
+} from "../../domain/dataset-studio/interfaces/ImageInspection";
 import type { ResolvedDataSource } from "./DataConverterContracts";
+import { createDefaultMediaAdapterBundle } from "./adapters/media/MediaAdapterFactory";
 import {
   DocumentPdfIngestorAsset,
   type DocumentPdfIngestorConfig,
@@ -370,7 +375,7 @@ function resolveImageStageOrder(options: ImagePreparationPipelineOptions): Reado
 function mergeConfig(
   stageId: PipelineStageId,
   defaults: Readonly<Record<string, CanonicalRecordValue>>,
-  overrides: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>> | undefined,
+  overrides: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>> | undefined,
 ): Readonly<Record<string, CanonicalRecordValue>> {
   return Object.freeze({
     ...defaults,
@@ -380,7 +385,7 @@ function mergeConfig(
 function toPipelineDefinition(input: {
   readonly stageOrder: ReadonlyArray<PipelineStageId>;
   readonly tabularShape?: z.output<typeof TabularShapeSchema>;
-  readonly stageConfigOverrides?: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>;
+  readonly stageConfigOverrides?: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>>;
   readonly isDocument?: boolean;
   readonly documentOptions?: DocumentPreparationPipelineOptions;
 }): PipelineDefinition {
@@ -1807,72 +1812,21 @@ export const SharpImageTransformationConfigSchema = z.object({
 
 export type SharpImageTransformationConfig = z.output<typeof SharpImageTransformationConfigSchema>;
 
-export interface SharpImageTransformationResult {
-  readonly payload: Uint8Array;
-  readonly width?: number;
-  readonly height?: number;
-  readonly format?: string;
-  readonly transformed: boolean;
-}
+export type SharpImageTransformationResult = ImageTransformationResult;
 
 export class SharpImageTransformationService {
+  private readonly transformer: IImageTransformer;
+
+  constructor(input?: { readonly transformer?: IImageTransformer }) {
+    this.transformer = input?.transformer ?? createDefaultMediaAdapterBundle().imageTransformer;
+  }
+
   public async transform(
     payload: Uint8Array,
     configInput?: Partial<SharpImageTransformationConfig>,
   ): Promise<SharpImageTransformationResult> {
     const config = SharpImageTransformationConfigSchema.parse(configInput ?? {});
-    const transformed = Boolean(config.resizeWidth || config.resizeHeight || config.grayscale || config.targetFormat !== "keep");
-
-    if (!transformed) {
-      return Object.freeze({
-        payload,
-        transformed: false,
-      });
-    }
-
-    const sharpRecord = await import("sharp") as Readonly<Record<string, unknown>>;
-    const sharpFactory = (sharpRecord.default ?? sharpRecord) as
-      | ((input: Uint8Array) => {
-        resize(width?: number, height?: number): unknown;
-        grayscale(value?: boolean): unknown;
-        toFormat(format: string): unknown;
-        toBuffer(opts?: Readonly<Record<string, unknown>>): Promise<{ data: Uint8Array; info?: { width?: number; height?: number; format?: string } } | Uint8Array>;
-      })
-      | undefined;
-
-    if (typeof sharpFactory !== "function") {
-      throw new Error("'sharp' API is unavailable.");
-    }
-
-    type SharpPipeline = {
-      resize(width?: number, height?: number): SharpPipeline;
-      grayscale(value?: boolean): SharpPipeline;
-      toFormat(format: string): SharpPipeline;
-      toBuffer(opts?: Readonly<Record<string, unknown>>): Promise<{ data: Uint8Array; info?: { width?: number; height?: number; format?: string } } | Uint8Array>;
-    };
-    let pipeline = sharpFactory(payload) as unknown as SharpPipeline;
-
-    if (config.resizeWidth || config.resizeHeight) {
-      pipeline = pipeline.resize(config.resizeWidth, config.resizeHeight);
-    }
-    if (config.grayscale) {
-      pipeline = pipeline.grayscale(true);
-    }
-    if (config.targetFormat !== "keep") {
-      pipeline = pipeline.toFormat(config.targetFormat);
-    }
-
-    const result = await pipeline.toBuffer({ resolveWithObject: true });
-    const data = result instanceof Uint8Array ? result : result.data;
-    const info = result instanceof Uint8Array ? undefined : result.info;
-
-    return Object.freeze({
-      payload: data,
-      width: info?.width,
-      height: info?.height,
-      format: info?.format,
-      transformed: true,
-    });
+    return this.transformer.transform(payload, config);
   }
 }
 

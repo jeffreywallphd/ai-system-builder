@@ -11,7 +11,7 @@ export const datasetPipelineStudioRegistration: CompositeStudioRegistration = Ob
   allowedBehaviorKinds: Object.freeze(["deterministic", "iterative"]),
   shell: Object.freeze({
     title: DatasetPipelineStudioIdentity.defaultStudioName,
-    subtitle: "Shared composite shell for dataset-pipeline authoring with backend-authoritative lifecycle, validation, and publish/version flows.",
+    subtitle: "Build reusable data movement and transformation flows, then publish versioned pipeline assets.",
   }),
   defaults: {
     title: "Dataset Pipeline Asset Draft",
@@ -27,6 +27,14 @@ export const datasetPipelineStudioRegistration: CompositeStudioRegistration = Ob
     contentTemplate: JSON.stringify(
       {
         datasetPipelineSpec: {
+          schemas: {
+            input: {
+              assetId: "asset:schema:source",
+            },
+            output: {
+              assetId: "asset:schema:prepared",
+            },
+          },
           sources: [
             {
               datasetRef: "dataset:raw:v1",
@@ -58,6 +66,9 @@ export const datasetPipelineStudioRegistration: CompositeStudioRegistration = Ob
           outputs: {
             datasetVersionTarget: "dataset:prepared:v-next",
           },
+          runtime: {
+            executionMode: "on-demand",
+          },
         },
       },
       null,
@@ -85,31 +96,15 @@ export const datasetPipelineStudioRegistration: CompositeStudioRegistration = Ob
       id: "dataset-pipeline-studio-draft-guidance",
       slot: "draft-authoring",
       title: "Dataset pipeline draft guidance",
-      subtitle: "Author reusable data preparation pipelines with explicit ingestion, cleaning, transformation, and validation steps.",
+      subtitle: "Author data movement and transformation logic here. Define structures in Schema Studio, then link them here.",
       order: 10,
       render: ({ snapshot }) => Object.freeze([
-        "Dataset Pipeline assets are composite structures that organize dataset preparation behavior over dependent dataset/tool/config assets.",
+        "Pipeline assets organize ingestion, mapping, transformation, enrichment, and run behavior.",
+        "Use Schema Studio to author schemas. In this studio, link input/output schemas instead of designing table structures directly.",
         "Allowed behavior kinds: deterministic, iterative.",
         "Reuse existing source-ingestion, data-cleaning, dataset-transformation, and data-validation vocabulary in pipeline steps.",
         `Draft asset id: ${snapshot?.draft?.assetId ?? "-"}`,
       ]),
-    },
-    {
-      id: "dataset-pipeline-studio-metadata-summary",
-      slot: "metadata",
-      title: "Dataset pipeline taxonomy and contract status",
-      subtitle: "Read-only taxonomy/contract/provenance projection from backend-authoritative draft metadata.",
-      order: 20,
-      render: ({ snapshot }) => {
-        const taxonomy = snapshot?.draft?.metadata.taxonomy;
-        return Object.freeze([
-          `Taxonomy: ${taxonomy
-            ? `${taxonomy.structuralKind}/${taxonomy.semanticRole}/${taxonomy.behaviorKind}`
-            : "missing"}`,
-          `Contract: ${snapshot?.draft?.metadata.contract ? "present" : "missing"}`,
-          `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
-        ]);
-      },
     },
   ]),
 });

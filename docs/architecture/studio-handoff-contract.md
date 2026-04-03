@@ -133,3 +133,30 @@ Included Workflow-origin context:
 `InlineAssetCreation` still supports legacy selector query params (`selectorLaunch`, `selectorSessionId`, etc.).  
 When those are absent, it now falls back to the canonical `studioHandoff` contract.
 
+
+
+## Stories 5.2.1 / 5.2.2 image vertical-slice contracts and normalized identity resolution
+- Added a canonical image-slice handoff contract model in `domain/studio-handoff/ImageStudioHandoffContract.ts` that standardizes cross-studio Data Studio -> Workflow Studio -> System Studio payloads for:
+  - asset references and versioned references,
+  - dataset instance references,
+  - workflow references and system bindings,
+  - runtime input payloads and runtime output payloads,
+  - event payload structures,
+  - lineage/trace identifiers (`handoffId`, `traceId`),
+  - persisted cross-studio relationship records.
+- Added an application-layer resolver seam in `application/studio-handoff/ImageStudioReferenceResolver.ts` so image slice flows use one normalized identity-resolution path rather than studio-specific ad hoc resolution logic.
+- Resolver outcomes are explicit and inspectable for broken/missing/ambiguous/incompatible reference states:
+  - `missing`
+  - `broken`
+  - `ambiguous`
+  - `incompatible`
+- Added focused contract/resolution coverage:
+  - `domain/studio-handoff/tests/ImageStudioHandoffContract.test.ts`
+  - `application/studio-handoff/tests/ImageStudioReferenceResolver.test.ts`
+
+## Stories 5.2.3 / 5.2.4 image input/output handoff integration
+- Workflow execution context assembly now accepts canonical image handoff payloads in workflow metadata (`metadata.imageStudioHandoff`) and validates shape through `createImageCrossStudioHandoffContract` before resolving inputs.
+- Handoff runtime input context is projected into the existing reusable input-binding resolver context (`selectedImage`, `datasetInstances`) so selected-record and dataset-collection bindings resolve through shared contracts instead of studio-local mapping.
+- Assembly now emits compact runtime handoff trace metadata (`imageStudioHandoffRuntime`) that preserves `handoffId`, `traceId`, workflow binding id, and source studio identity for downstream runtime/output seams.
+- Runtime output persistence now propagates handoff trace metadata into output-binding lineage (`outputRelationship.metadata`) and returns a bounded handoff persistence summary (`handoffId`, `traceId`, persisted target instances/record ids).
+- This completes the Data Studio -> Workflow Studio -> system-owned dataset handoff path for the image slice while staying on the same 5.2.1/5.2.2 contract and identity-resolution model.

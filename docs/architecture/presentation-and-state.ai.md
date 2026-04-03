@@ -22,6 +22,35 @@ Execution-state wording for the workflow editor is now intentionally projected t
 Workflow Studio observability now also uses the same thin renderer -> backend-service approach: run-history list/detail views are rendered via `WorkflowStudioRunHistoryPanel` and loaded through `ui/services/StudioShellService.ts` (`listWorkflowRuns`, `getWorkflowRunDetail`) rather than UI-owned persistence/query logic.
 Workflow Studio run observability now keeps hierarchy and disclosure bounded in that same surface: run-level summary first, step-by-step expandable inspection second, and structured diagnostics/failure-location cues rendered from backend read models (no UI-side diagnostic inference/parsing).
 Workflow Studio run detail now also exposes rerun actions on the same surface: `Rerun as-is` and `Edit and rerun` both submit to the studio-shell backend contract, start from canonical persisted execution context, and then navigate to the newly created derived run detail record.
+
+## Direction 5 extension update: studio surfaces as assetized hostable boundaries (stories 1-2)
+
+- Studio authoring surfaces now expose a reusable host contract seam in `ui/studio-shell/studio-assets/StudioAssetContracts.ts`:
+  - `StudioAssetContract`
+  - `StudioAssetDefinition`
+  - `StudioHostContext`
+  - `StudioSessionState`
+  - explicit render modes: `full`, `embedded`, `inline`, `readonly`.
+- A reusable host renderer boundary now exists in `ui/components/studio-shell/studio-assets/StudioAssetHostBoundary.tsx`, and checks contract-supported modes before rendering a studio surface.
+- System/Workflow/Dataset studio surfaces now map through studio-specific adapter definitions in `ui/studio-shell/studio-assets/StudioSurfaceAssetDefinitions.tsx`, separating:
+  - studio definition metadata/contracts,
+  - host/rendering orchestration,
+  - studio-specific adapter wiring.
+- `StudioShellPage` now consumes those asset definitions through the shared host boundary instead of directly coupling to surface components, preserving standalone shell behavior while enabling embeddable studio-host usage.
+- Embedded-mode behavior now suppresses standalone-oriented controls in the reusable surfaces:
+  - Workflow surface hides standalone route/validation notices in non-`full` modes.
+  - System and Dataset surfaces disable mode-switch chrome in non-`full` modes and keep scoped authoring content.
+
+## Direction 5 extension update: embedded studio host rendering + event intent contract (stories 3-4)
+
+- Studio host context now includes host-provided embedding constraints and injection seams in `ui/studio-shell/studio-assets/StudioAssetContracts.ts`:
+  - `layout` constraints for hosted surfaces (`min/max/width/height`),
+  - `documentAccess` and `injectedContext` for host-provided document/context boundaries,
+  - explicit host capability projection carried into embedded rendering.
+- `StudioAssetHostBoundary` is now the reusable embedding boundary for wizard/canvas/panel/system surfaces, with mode support enforcement, host sizing, capability-aware event gating, and a single host-managed event bridge callback.
+- Embedded studio events are standardized in `ui/studio-shell/studio-assets/StudioEmbeddedEventContracts.ts` as host-managed intents (open related resource, request full view, selection/focus changes, apply/commit requests) instead of embedded direct routing/shell ownership.
+- Workflow/System/Dataset studio definitions now emit those typed intents through the shared host boundary, and `StudioShellPage` consumes the host event seam for orchestration hooks.
+- Embedded rendering remains shell-neutral: hosted surfaces do not own global routing, shell lifecycle, or top-level navigation assumptions.
 Edit-and-rerun stays user-facing and structured (target/parameters/execution-metadata/property-overrides JSON fields) rather than raw log parsing or ad hoc debug-only controls.
 Related-run lineage navigation now also uses that same execution-history service seam (related-run cluster projection + detail-panel navigation) instead of page-level custom grouping logic.
 Workflow observability entry points now also appear on adjacent workflow surfaces (persisted workflow list cards, workflow draft status, and workflow execution feedback), so navigation to run history/run detail is part of the normal build/run/editor flow rather than an isolated panel-only path.
@@ -91,8 +120,24 @@ Run-history rerun controls now render explicit unsupported-state UX (for non-ter
 - Canvas input/step node editors now include selector-backed dataset + agent linkage through shared asset-selector session/adapter/shell seams, writing canonical references into `inputs[].asset` and `steps[].assetRef` while preserving wizard/canvas shared-draft synchronization.
 - Workflow Studio Canvas Mode now renders the left `Nodes` drawer as a real overlay drawer: fixed beneath the app header, anchored far-left on tablet/desktop, full-width on mobile, with a fixed close affordance and scrollable node section content.
 - Workflow Studio canvas layout now renders the React Flow canvas surface directly (without the prior layout container card wrapper) while keeping inspector/details within the same mode boundary.
-- Workflow Studio draft authoring now has explicit mode-aware renderer boundaries: shared shell orchestration stays in `StudioShellPage`, while mode-specific surfaces are isolated in `WorkflowStudioDraftAuthoringBoundary` + `WorkflowStudioWizardModeSurface` + `WorkflowStudioCanvasModeSurface`.
-- Workflow Studio mode surfaces now render through explicit mode-specific layout containers (`WorkflowStudioWizardModeLayout`, `WorkflowStudioCanvasModeLayout`) so Wizard and Canvas UI structure can evolve independently without copying shared shell/session/draft logic.
+- Workflow Studio draft authoring now has explicit mode-aware renderer boundaries: shared shell orchestration stays in `StudioShellPage`, while mode-specific surfaces are isolated in `WorkflowStudioDraftAuthoringBoundary` + `WorkflowStudioWizardExperienceSurface` + `WorkflowStudioCanvasExperienceSurface`.
+- Experience-asset authoring keeps the reusable UI-neutral contract seam (`ui/studio-shell/experience-assets/ExperienceAssetContracts.ts`), while active mode switching now resolves directly inside studio-specific boundaries (`WorkflowStudioDraftAuthoringBoundary`, `DatasetStudioDraftAuthoringBoundary`) instead of a shared intermediary renderer.
+- `ExperienceAssetAuthoringBoundary` has been removed from the repository after disconnection from active runtime; workflow and dataset authoring continue to preserve route-driven wizard/canvas behavior in their canonical studio boundaries.
+- Migration audit snapshot for workflow authoring/runtime seams under the studio-shell flow:
+  - **Standalone editor route retired from active runtime:** `/workflows/:workflowId` now redirects into Workflow Studio entry routing and no longer mounts the standalone editor page.
+  - **Legacy workflow editor removed:** `WorkflowEditorPage` is no longer imported in active router paths and has been deleted after deprecation.
+  - **Workflow-specific wizard/canvas intermediary surfaces removed:** active runtime now binds through `WorkflowStudioWizardExperienceSurface` and `WorkflowStudioCanvasExperienceSurface`; prior mode layout/surface files were deleted after disconnection.
+  - **Legacy compatibility infrastructure removed:** `ExperienceAssetAuthoringBoundary` is no longer part of active studio runtime or source.
+
+- Experience-asset presentation now also has a compact neutral vocabulary layer (`ui/studio-shell/experience-assets/ExperiencePresentationVocabulary.ts`) covering document/issue/page/mode/action ids plus reusable action/progress/issue summary models for cross-studio authoring surfaces.
+- Wizard engine mechanics are now extracted into a workflow-neutral renderer (`ui/components/studio-shell/experience-assets/ConfigurableWizardSurface.tsx`) with narrow contracts (`ui/studio-shell/experience-assets/ConfigurableWizardSurfaceContracts.ts`) for ordered page navigation, current-page hosting, progress summary, terminal actions, and readiness summary rendering without workflow-editor imports.
+- Canvas engine mechanics are now extracted into a workflow-neutral renderer (`ui/components/studio-shell/experience-assets/ConfigurableCanvasSurface.tsx`) with narrow contracts (`ui/studio-shell/experience-assets/ConfigurableCanvasSurfaceContracts.ts`) for graph shell hosting, focused-target handling, palette/inspector regions, interaction messaging, and optional drawer orchestration without workflow-editor imports.
+- Studio-shell orchestration remains host-owned around these reusable surfaces: save/run/validate/lifecycle orchestration and backend persistence/execution calls stay in `StudioShellPage` + `StudioShellService`/backend contracts, while wizard/canvas experience surfaces consume document/mode/issue state plus host-provided callbacks.
+- Wizard and canvas are now first-class registered experience assets (`loom-wizard`, `loom-canvas`) via `ui/studio-shell/experience-assets/ExperienceSurfaceAssets.ts`, and Workflow Studio declares usage through registration configuration (`workflowStudioRegistration.shell.experienceAssets`) rather than hardcoded mode metadata.
+- Experience-asset canvas definition format now exists as a bounded contract (`CanvasExperienceAssetDefinition`) so studios can map document-to-graph summaries, palette/inspector hooks, and graph interaction hosts into the reusable canvas surface without embedding workflow-specific domain semantics.
+- Workflow Studio Canvas now binds through an explicit workflow adapter seam (`ui/studio-shell/workflow/WorkflowCanvasExperienceAdapter.tsx`) that maps workflow draft/view-model semantics into `CanvasExperienceAssetDefinition` for the reusable canvas engine, while keeping workflow-specific editing behavior outside generic canvas contracts.
+- Reusable experience surfaces now expose route-neutral state/callback contracts (`currentModeId`/`onModeChange`, `currentPageId`/`onPageChange`) so workflow route parsing/synchronization stays in workflow-host integration layers rather than inside generic wizard/canvas boundary components.
+- Workflow Studio mode surfaces now render directly as asset-native experience surfaces (`WorkflowStudioWizardExperienceSurface`, `WorkflowStudioCanvasExperienceSurface`) inside the draft authoring boundary without workflow-specific layout wrappers in active runtime paths.
 - Wizard Mode now uses reusable section framework primitives (`WizardSection`, `SectionHeader`, `SectionBody`) and always renders Trigger, Inputs, Steps, and Outputs sections in top-to-bottom order.
 - Wizard Trigger now uses a registry-backed interactive editor (`WorkflowStudioTriggerSectionEditor` + `ui/studio-shell/workflow/WorkflowWizardTriggers.ts`) that enumerates supported trigger types from `WorkflowTriggerTypeRegistry` metadata, adds trigger instances from registry defaults, and supports type switching/removal while writing directly to canonical `WorkflowDraft.triggers` in shared mode state.
 - Wizard trigger editing now includes multi-trigger management (add/select/edit/reorder/remove) through id-based operations with stable ordering and safe selected-trigger fallback when rows are removed.
@@ -133,6 +178,7 @@ Run-history rerun controls now render explicit unsupported-state UX (for non-ter
 - Workflow Studio execution feedback now renders through one reusable panel (`ui/components/studio-shell/workflow/WorkflowStudioExecutionFeedbackPanel.tsx`) that projects canonical readiness, launch lifecycle, failure summary, and bounded result-handoff status from backend run/readiness contracts.
 - Workflow Studio `Run Validation` now requests canonical execution-readiness checks through `StudioShellService.assessWorkflowExecutionReadiness` so launch eligibility/blocked semantics stay backend-authoritative.
 - Story 4.14 now rebalances the wizard surface for authoring focus: active wizard page content renders directly under page buttons, wizard focus/progress text lives directly beneath those page buttons, Back/Next controls sit on the page-nav rail (with an additional inline Trigger-page Back/Next row), and readiness diagnostics remain in a bottom-of-stack collapsed disclosure.
+- Stories 5–6 now drive Workflow Studio wizard mode through a reusable wizard asset definition contract (`ui/studio-shell/experience-assets/ConfigurableWizardSurfaceContracts.ts`) and a workflow-specific adapter (`ui/studio-shell/workflow/WorkflowWizardExperienceAdapter.tsx`) that maps workflow pages/progress/readiness/issues/renderers/terminal behavior into the generic configurable wizard surface.
 - Navigation/progression concerns remain UI-only orchestration; all section edits still mutate only shared canonical `WorkflowStudioModeStateStore.sharedDraft`.
 - Phase 9.12 (stories 3.7â€“3.8) now routes Context Bundle Studio through that same shell renderer (`ui/pages/ContextBundleStudioPage.tsx` -> `StudioShellPage` with `contextBundleStudioRegistration`) so composite context-bundle input-preparer authoring uses the shared session/draft/metadata/dependency/validation/lifecycle/publish/version surfaces.
 - Context-bundle-specific renderer behavior remains registration-bounded (`draft-authoring`, `metadata` slots) while business rules stay backend/application-owned via shared composite validation and enforcement seams.
@@ -163,6 +209,25 @@ Current Direction 5 UI status:
 - Direction 5 story 5.21 now adds end-to-end System Studio consistency coverage over the real service -> bridge -> backend -> application -> SQLite seam, including child-component operations, system interface/parameter/execution-metadata authoring, publish, and reload consistency.
 - Direction 5 story 5.22 now adds explicit atomic/composite/system interop coverage for System Studio through the same real seam, validating pinned dependency propagation, mixed child-kind composition, clean compatibility-insights reporting, and persisted upstream lineage after publish/reload.
 - Direction 5 story 5.23 now extends registry integration validation coverage for system assets so list/detail/graph/lineage views remain coherent for nested system-of-systems and versioned system lineage scenarios over real API + SQLite seams.
+- Direction 5 stories 5-6 now route System Studio interface design through a dedicated adapter boundary (`SystemCanvasExperienceAdapter`) that translates page-scoped draft document state into the reusable editable canvas contract (selection, create/remove/update panel nodes, move/resize persistence, and normalized bounded-frame coordinates) without leaking system-specific behavior into shared canvas assets.
+- Cleanup stories 5-6 now harden page-structure drag/resize interactions on that same reusable canvas contract (`ConfigurableCanvasSurface`) with a unified pointer-interaction session (selection vs drag vs resize), pointer-capture-safe move/resize handling, and direct persistence through existing `node.position.change` / `node.resize.change` flows so section bounds survive rerender and reload without introducing a parallel interaction model.
+- Page-structure canvas improvements stories 3-4 now extend that same reusable canvas contract with an **optional snap model** (`CanvasSurfaceSnapModel`) that any canvas can opt into through `CanvasSurfaceEditingModel.snap` (axis divisions, drag/release timing, and position/size targets) without adding a parallel interaction model.
+- Stories 5-6 now extend that same shared snap contract with release-time **bounds normalization** (`top/bottom/left/right`) so drag/resize completion snaps both position and size to nearest valid tenth-aligned bounds and persists the normalized frame through the existing selection/persistence flow.
+- Page-structure canvas improvements stories 7-8 now complete placement guardrails through the same reusable canvas + validation seams: overlap is tolerated only while a newly added section is in initial placement, while drag/resize release commits validate snapped normalized bounds against occupied viewport regions and reject persisted overlaps with explicit user-facing guidance.
+- System Studio page-structure bounds are now interpreted as normalized **viewport occupancy intent below the page header**; runtime preview applies the saved percentages inside a header-offset viewport with consistent system spacing between sections rather than treating stored bounds as literal absolute coordinates.
+- System Studio wizard authoring now starts with a non-technical multi-page setup step (`SystemPageSetupEditor`) and stores page heading/description definitions directly in draft content (`systemSpec.pages`) with page-scoped panel layouts (`canvasAuthoring.pageLayouts`) so each page keeps independent layout state across wizard/canvas mode switches.
+- Direction 5 stories 7-8 now complete the four-step System Studio wizard flow as `Pages`, `Interface Design`, `Inputs & Outputs`, and `Settings` through the same reusable experience-asset wizard surface (no one-off system wizard engine).
+- Direction 5 stories 5-6 are now completed as an embedded-studio orchestration slice inside the System Studio wizard:
+  - System Studio remains the host/orchestrator and now embeds Dataset Studio in the `Inputs & Outputs` step through `StudioAssetHostBoundary` + shared studio event intent contracts.
+  - Embedded Dataset Studio runs in constrained wizard mode (`embeddedVariant: "inputs-outputs"`), suppresses standalone chrome/advanced canvasing by default, and persists state into shared System draft content (`systemSpec.embeddedStudios.dataset.draftContent`) instead of taking over shell routing/lifecycle.
+  - System-owned interface editing remains available as a collapsed advanced section in the same step (`SystemInterfaceEditor`), preserving simple default UX while keeping deeper controls accessible.
+- Wizard page 2 now embeds the reusable canvas surface directly in the guided flow and renders plain page-switching controls above the canvas; active page selection stays synchronized to `systemSpec.pages` and `canvasAuthoring.pageLayouts`, preserving per-page panel layouts while switching.
+- System Studio page authoring now includes a dedicated screen list + creation flow (`SystemPageSetupEditor`) backed by reusable page-model templates (`SystemPageModel`) so new pages are created as first-class draft assets (title/description/layout/navigation defaults) and persisted through shared draft content serialization (`systemSpec.pages` + `canvasAuthoring.pageLayouts`) rather than local-only UI state.
+- System Studio canvas authoring now explicitly frames panel nodes as high-level page sections (`SystemCanvasExperienceAdapter`), keeps page-level region context visible in the canvas palette, and reinforces that detailed panel internals are authored in panel-specific studios, preserving future embedded panel-design handoff direction.
+- System Studio page-canvas sections are now intentionally clickable design targets (distinct from page-level focus), and selecting a section opens a bounded embedded panel-design studio host in the inspector region; unsupported/missing panel studio definitions now surface graceful non-destructive fallback messaging.
+- Direction 5 stories 9-10 now project authored System Studio page layouts into runtime-facing interface preview composition (`SystemRuntimeInterfacePreview`), so selected runtime pages and panel placement come from persisted `systemSpec.pages` + `canvasAuthoring.pageLayouts` (including empty-page fallback states) rather than decorative canvas metadata.
+- Workflow Studio and Dataset Studio now both declare and consume shared wizard/canvas experience assets (`loom-wizard`, `loom-canvas`) through studio-bounded authoring boundaries (`WorkflowStudioDraftAuthoringBoundary`, `DatasetStudioDraftAuthoringBoundary`) while keeping domain mapping/orchestration inside studio adapters.
+- Wizard pages 3 and 4 now render bounded interface/parameter authoring surfaces as user-facing `Inputs & Outputs` and `Settings`, keeping technical depth in existing editor internals while maintaining simple top-level wizard language.
 - Direction 5 stories 6.15â€“6.16 now keep System Studio runtime observability bounded and API-driven inside the existing run-trigger extension: `SystemRuntimeRunPanel` composes `ExecutionMonitorPanel` + `ExecutionResultPanel` (status/progress/node + nested-system state, bounded trace/log, recovery indicators, result/output/node/nested summaries, and diagnostics) sourced from `getSystemExecutionStatus/getSystemExecutionTrace/getSystemExecutionResult` without renderer-side runtime/result re-derivation.
 - Still intentionally out of scope in renderer: speculative rich visual graph tooling and runtime execution-binding authoring beyond current structural composition/editing + shared shell lifecycle/publish flows.
 
@@ -185,18 +250,19 @@ Current Direction 5 UI status:
   - structured ingestion warnings/errors render from normalized ingestion issue contracts instead of raw exception text.
 - Dataset Studio ingestion configuration now defaults to a simple mode in `AssetConfigurationPanel` and reveals advanced fields only through an explicit mode toggle, driven by config-schema visibility metadata (`simple`/`advanced`) rather than UI-local field lists.
 - Dataset Studio source-input authoring now also includes a bounded advanced-source toggle for directory patterns and optional source filtering limits, while keeping default source entry minimal for common flows.
+- Data Studio navigation/language now makes schema vs flow responsibilities explicit: Dataset Studio presents side-by-side entry cards for `Schema Studio` (structure definitions) and `Pipeline Studio` (data movement/transformation flow definitions), while technical graph internals remain secondary disclosures in the same authoring surface.
 
 Direction 5 Epic 11 final hardening status (stories 11.23-11.24):
 - UX consistency hardening now has shared policy/regression seams in `ui/routes/UxConsistencyPolicy.ts` and `ui/routes/IntentUxRegressionSuite.ts`, focused on intent-first terminology, taxonomy suppression in primary UX, and cross-surface route/origin continuity across Build/Explore/Run plus shell-adjacent surfaces.
-- Legacy UX cleanup is now explicitly policy-driven through `LegacyUxCleanupPlanner` in `ui/routes/LegacyNavigationSunset.ts`, keeping compatibility behavior tied to existing sunset controls instead of ad hoc route handling.
+- Legacy UX cleanup policy artifacts were removed after sunset; active routing uses canonical path redirects directly in `ui/routes/AppRouter.tsx`.
 - Explore is the user-facing library term in page-level hero copy (`ui/pages/RegistryPage.tsx`), while internal registry route naming remains implementation detail.
-- Remaining bounded compatibility paths are intentional and controlled by feature flags (`VITE_FEATURE_INTENT_NAVIGATION`, `VITE_FEATURE_LEGACY_NAVIGATION`) rather than accidental parallel navigation models.
+- Legacy compatibility feature-flag gating is now disconnected from active runtime routing; canonical Build/Explore/Run redirects are always enforced for deprecated entry paths.
 
 Intent UX documentation alignment checklist (implemented scope):
 - Implemented now: Build/Explore/Run primary navigation shell, intent-based Build entry/routing, contextual breadcrumbs/return paths, unified Run launch model, command palette onboarding/recommendations/recents integration, and legacy-route sunset controls.
 - Build now includes a dedicated intent-first automation entry route (`/build/automate`) where users describe automation goals in plain language (`What do you want to automate?`) before launching the existing workflow studio path; intent text is carried forward via build-routing prefill context and URL handoff metadata.
 - Primary route switching is now command-palette-driven in the app shell header; the legacy header link strip is removed, and Home remains accessible through the AI Loom Studio logo link.
-- Partially implemented / bounded: legacy route compatibility remains available behind sunset mode for staged rollout; legacy screens are redirected/hidden by policy rather than fully deleted.
+- Implemented now: deprecated studio-era entry paths are always redirected to canonical Build/Explore/Run routes in active runtime; old compatibility policy code is retained only as deprecated reference files.
 - Future work (not implemented here): full removal of legacy feature-flag compatibility paths after rollout criteria are complete.
 
 Workflow persistence reuse hardening (stories 11.11-11.14):
@@ -322,3 +388,350 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Data Studio wizard initialization now prefers persisted draft content from Studio Shell snapshots (with local storage fallback), preserving load fidelity across refresh/reopen while keeping Wizard and Canvas as two views over one canonical pipeline state.
 - Studio Shell backend now exposes Data Studio version-aware retrieval seams (`listDataStudioPipelines`, `loadDataStudioPipeline`) and enriches published asset-version metadata with inspectable Data Studio pipeline summaries plus serialized canonical pipeline state.
 - Snapshot/version read models now include optional Data Studio pipeline version summary metadata for inspection without introducing a dedicated history UI surface.
+
+## Direction 5 UI update: Image system contracts + shared rendering utilities (stories 4.1.1-4.1.2)
+
+- Internal image UI contracts are now centralized in `ui/components/assets/image-system/ImageUiContracts.ts` for upload panel, image viewer, parameter form, output gallery, and comparison view props/events/state/context references.
+- Shared rendering helpers now live in `ui/components/assets/image-system/ImageRenderingUtils.ts` and provide bounded metadata normalization, fit/layout sizing, placeholder behavior, loading/lazy-load helpers, and selection-friendly rendering checks.
+- A reusable render primitive `ImageRenderFrame` (`ui/components/assets/image-system/ImageRenderFrame.tsx`) now composes that contract/util layer, and existing renderer surfaces (`ui/components/assets/AssetViewer.tsx`, `ui/components/assets/DataPreviewSurface.tsx`) reuse it rather than ad hoc image branches.
+
+## Direction 5 UI update: Image upload panel + single-image viewer (stories 4.1.3-4.1.4)
+
+- Reusable image upload/view components now live in `ui/components/assets/image-system`:
+  - `ImageUploadPanel` (drag/drop + picker + validation feedback + preview-friendly thumbnails),
+  - `ImageViewer` (single-image frame + fit controls + bounded zoom + metadata overlay + selection + loading/empty/error states).
+- Upload validation stays adapter-bounded and ingestion-contract aligned:
+  - `ImageUiContracts` adds explicit upload validation/result contracts plus `ImageUploadIngestionAdapter`.
+  - `BrowserImageUploadIngestionAdapter` maps browser `File` payloads through existing ingestion policy contracts (`FileIngestionPolicyService`) without coupling UI to a concrete ingestion pipeline implementation.
+- Rendering remains aligned with stories 4.1.1-4.1.2:
+  - `ImageViewer` composes shared render utilities and `ImageRenderFrame`.
+  - `image-system/index.ts` now exports upload/viewer components and adapter seams for reuse in future result/history/comparison/gallery/detail panes.
+
+## Direction 5 UI update: Image parameter form + output gallery (stories 4.1.5-4.1.6)
+
+- Image parameter authoring now has a reusable schema-driven form component (`ui/components/assets/image-system/ImageParameterForm.tsx`) that:
+  - renders from internal parameter contracts (`ImageParameterDefinition`) instead of hardcoded workflow-engine forms,
+  - supports text/number/boolean/select/range controls with default values, required semantics, and bounded validation feedback,
+  - emits value + validation issues through one contract event path (`ImageParameterFormEventContract`) for clean system/workflow binding.
+- Image/workflow parameter mapping remains adapter-bounded via `ImageParameterMappers.ts`:
+  - `mapAssetContractParametersToImageParameters` projects shared asset contract parameter descriptors into UI form definitions without coupling UI to a specific workflow runtime schema.
+- Image output presentation now has a reusable gallery surface (`ImageOutputGallery.tsx`) that provides:
+  - image collection rendering via shared `ImageRenderFrame`,
+  - selection state/events, item-open events, and bounded dataset-context display,
+  - loading/empty/error status states and bounded pagination (`pageSize`) for incremental display.
+- `image-system/index.ts` now exports parameter-form/gallery/mapper seams alongside prior upload/viewer primitives so remaining image-system slices can compose one shared contract/rendering stack.
+
+## Direction 5 UI update: Image comparison view + state integration (stories 4.1.7-4.1.8)
+
+- Image comparison now has a reusable view component (`ui/components/assets/image-system/ImageComparisonView.tsx`) with bounded side-by-side and overlay modes, shared internal image view models, synchronized zoom/pan through a reusable viewport hook (`useSynchronizedImageViewport.ts`), and explicit loading/empty/error/selection/focus handling.
+- Epic 4.1 image components now have an explicit state-integration seam (`ImageSystemStateIntegration.ts`) that keeps selected image, image collections, parameter values, dataset/system context references, and component interaction/loading/error state in one mapper/reducer path while projecting component-specific props for upload/viewer/parameter/gallery/comparison surfaces.
+
+## AI Loom image manipulation update: output gallery contract + dataset-backed interface composition (stories 4.4.1-4.4.2)
+
+- Interface-asset composition guidance is now explicit for the image slice:
+  - **atomic interface assets** stay bounded/reusable (`ImageOutputGallery`, output detail/viewer pane, metadata summary panel, parameter summary panel),
+  - **higher-level composed interface assets** bind those atomic assets to system context, workflow/runtime context, and system-owned dataset state.
+- Added a canonical output gallery data contract in `application/system-runtime/OutputGalleryDataContract.ts` for persisted gallery rows with:
+  - image reference + dataset instance linkage,
+  - workflow/run linkage,
+  - optional source-image linkage,
+  - timestamps,
+  - generation/transform parameter summary,
+  - image metadata summary,
+  - tags + derived attributes.
+- Added dataset integration orchestration in `application/system-runtime/OutputGalleryDatasetIntegrationService.ts`:
+  - retrieves image outputs from system-owned dataset instances through `SystemDatasetInstanceService`,
+  - maps persisted records into the new gallery contract (no ad hoc renderer-local output state),
+  - preserves inspectability/paging semantics for future media/document/system interface reuse.
+- Added UI adapter seam `ui/components/assets/image-system/ImageOutputGalleryDataAdapter.ts`:
+  - maps contract-backed gallery listings into reusable image interface state/view-models,
+  - keeps UI components runtime/storage agnostic while grounding output gallery display in persisted dataset-backed state.
+
+## AI Loom image manipulation update: run history model + persisted retrieval seams (stories 4.4.3-4.4.4)
+
+- Added canonical run-history contracts in `application/system-runtime/ImageRunHistoryDataContract.ts`:
+  - run/workflow execution references,
+  - system/workflow asset references,
+  - input/output image references,
+  - output dataset-instance linkage,
+  - parameter summary and execution status,
+  - timestamps and bounded lineage fields (`parentRunId`, trigger linkage, output grouping).
+- Added storage-agnostic run-history repository seams in `application/system-runtime/ImageRunHistoryRepository.ts` with in-memory implementation for application-layer orchestration/tests.
+- Added `application/system-runtime/ImageRunHistoryService.ts` retrieval APIs for System Studio interface assets:
+  - list prior runs (`listRuns`) with paging,
+  - fetch a run plus linked outputs (`getRunWithLinkedOutputs`) by joining persisted run history and output-gallery dataset-backed records.
+- Runtime output persistence now records run-history entries through the same image-output pipeline (`application/workflow-studio/WorkflowRuntimeOutputPersistenceService.ts`) when a run-history service is composed:
+  - no renderer-local/transient history arrays,
+  - no parallel output/history model detached from dataset-backed output records.
+- Added SQLite persistence adapter `infrastructure/filesystem/system-runtime/SqliteImageRunHistoryRepository.ts` for durable run-history storage aligned with existing repository/migration patterns.
+
+## AI Loom image manipulation update: output gallery + run history interface assets (stories 4.4.5-4.4.6)
+
+- Added explicit atomic image interface assets in `ui/components/assets/image-system` for persisted output/history rendering:
+  - `ImageOutputGalleryCollection` (grid/list presentation),
+  - `ImageRunHistoryList`,
+  - `ImageSummaryPanels` (parameter + metadata summaries reused by gallery/history items).
+- Added higher-level composed interface assets that bind atomic components to persisted internal contracts (no UI-only parallel models):
+  - `ImageOutputGalleryAsset` consumes `OutputGalleryListing` via `ImageOutputGalleryDataAdapter`,
+  - `ImageRunHistoryAsset` consumes `ImageRunHistoryListing` via `ImageRunHistoryDataAdapter`.
+- Output gallery item rendering now surfaces persisted preview information from the dataset-backed gallery contract:
+  - image preview/thumbnail,
+  - timestamp,
+  - workflow/run summary,
+  - parameter and metadata summaries.
+- Run history rendering now surfaces persisted run contract fields:
+  - run status,
+  - timestamp,
+  - workflow summary,
+  - input/output summary,
+  - parameter summary.
+- Styling remains aligned with shared image-surface primitives in `ui/styles/components/assets.css` and extends reusable class-based variants for list presentation and summary panels.
+
+## AI Loom image manipulation update: output selection + history/output interaction composition (stories 4.4.7-4.4.8)
+
+- Output gallery composition now supports bounded selection/inspection interactions through reusable atomic assets and composed state wiring:
+  - output selection action bar (`selected`, `active result`, `prepared reuse-as-input`),
+  - output detail pane with persisted metadata/parameter summaries,
+  - composed gallery asset state that remains grounded in dataset-backed output records (no ad hoc UI-only output model).
+- Run history list now supports explicit run selection semantics (`onRunSelected`, selected run id) while remaining reusable as an atomic list surface.
+- Added a higher-level composed `ImageHistoryLinkedOutputInspectorAsset` that binds run-history selection to linked output gallery rendering using persisted run-history -> output contracts.
+- Linkage reads remain system-owned data: `ImageRunHistoryService.listRunsWithLinkedOutputs` composes persisted run-history retrieval with output-gallery dataset retrieval instead of fragile renderer-local joins.
+- These seams provide a direct foundation for later lineage and result/history interactions while keeping the current slice image-focused and contract-driven.
+
+## Direction 5 UI update: Image component event contracts + style reuse alignment (stories 4.1.9-4.1.10)
+
+- Epic 4.1 image components now emit one standardized UI event envelope (`ImageUiEvent`) with typed event names/payloads in `ui/components/assets/image-system/ImageUiContracts.ts`, covering upload lifecycle, image selection/deselection, parameter change/submit/reset, gallery interactions, comparison target/mode changes, and viewer interactions.
+- Component-side event emission is centralized through a reusable adapter seam (`ui/components/assets/image-system/ImageUiEventAdapters.ts`) so upload/viewer/form/gallery/comparison components remain workflow-runtime agnostic while still exposing structured context-rich events for later trigger mapping.
+- Image component styling now reuses shared image-surface primitives in `ui/styles/components/assets.css` (`ui-image-surface*`, `ui-image-item-card*`, `ui-image-control-group`) to reduce duplicated panel/status/item/control styling across upload panel, viewer, parameter form, output gallery, and comparison view.
+
+## Direction 5 UI update: UI trigger event contract + workflow adapter seam (stories 4.2.1-4.2.2)
+
+- Workflow execution now has a reusable internal UI trigger contract in `application/workflow-studio/UiTriggerEventContract.ts`:
+  - framework-agnostic event shape (`click`/`submit`/`selection`) with explicit source/context references and structured payload support,
+  - normalization + validation helpers (`createUiTriggerEvent`, `validateUiTriggerEvent`) that reject malformed timestamps and reserved framework event keys (`nativeEvent`, `target`, `currentTarget`),
+  - trigger-kind mapping (`mapUiTriggerKindToWorkflowSourceKind`) aligned with existing execution trigger source kinds.
+- Trigger-to-workflow translation is now bounded in `application/workflow-studio/WorkflowUiTriggerEventAdapter.ts`:
+  - matches normalized UI events against existing workflow manual trigger plans (`userButtonClick`, `userManual`, `userInitiatedRun`) without changing workflow trigger semantics,
+  - emits normalized `WorkflowExecutionTriggerEntry` records for downstream validation/execution path reuse.
+- Image-system UI surfaces now use a thin adapter seam in `ui/components/assets/image-system/ImageUiTriggerEventAdapter.ts`:
+  - translates image component events into the shared UI trigger contract for bounded use cases (button-like gallery open, parameter submit, image selection),
+  - keeps React/browser event details out of workflow-facing contracts, preserving easy library/component swap paths.
+
+## Direction 5 UI update: Trigger binding extension + declarative UI trigger config (stories 4.2.3-4.2.4)
+
+- Trigger execution entry contracts now include explicit UI-ready trigger metadata in `application/workflow-studio/WorkflowTriggerExecutionEntryService.ts`:
+  - existing source kinds remain unchanged (`manual-user`, `temporal`, `state-data`),
+  - entries can now carry `contextReferences` and `bindingMetadata` so runtime context preserves trigger source/type/payload plus binding lineage without adding a parallel trigger model.
+- Declarative UI-to-workflow binding configuration is now an asset-level contract in `application/contracts/ImageWorkflowUiTriggerBindingConfiguration.ts`:
+  - bindings are versioned/typed/validated and reference normalized UI event kinds (`click`, `submit`, `selection`) rather than raw browser/React events,
+  - selectors cover `sourceComponentId` and optional `actionId`/`eventName`, then target workflow trigger ids/types.
+- Image workflow assets now include `uiTriggerBindings` beside existing input/output binding configs (`ImageToImageWorkflowAsset`, `RestyleWorkflowAsset`, `EnhanceUpscaleWorkflowAsset`, `BatchTransformWorkflowAsset`), keeping UI-trigger wiring inspectable, versionable, and reusable.
+- `application/workflow-studio/WorkflowUiTriggerEventAdapter.ts` now consumes declarative binding configs when provided and falls back to existing manual-trigger matching when absent, preserving compatibility with prior dataset/system/manual trigger semantics.
+
+## Direction 5 UI update: Runtime UI-event dispatch + parameter passing (stories 4.2.5-4.2.6)
+
+- Runtime dispatch is now implemented as an application-layer seam (`application/workflow-studio/WorkflowUiEventRuntimeDispatcher.ts`) that consumes normalized UI events, resolves declarative UI trigger bindings, and dispatches into the existing `WorkflowStudioApplicationService.runWorkflowDraftTriggered` path without replacing the trigger/runtime pipeline.
+- Dispatch remains boundary-clean and asynchronous:
+  - UI event normalization stays in `UiTriggerEventContract`/UI adapters,
+  - binding lookup stays in `WorkflowUiTriggerEventAdapter`,
+  - runtime handoff stays in the existing workflow execution service.
+- UI-derived parameter passing now maps into workflow-facing contracts (runtime parameters, form values, selected image context, dataset references) via context patching in the dispatcher, so raw React/browser event objects do not leak into workflow execution.
+- Trigger payload mapping now carries both normalized UI metadata and top-level event payload fields, enabling trigger-payload input bindings to resolve business keys directly.
+- Dispatcher results now return structured dispatch records and inspectable issue codes (including blocking validation codes) for invalid/missing UI-derived parameters.
+- Added tests cover dispatch behavior, no-match/error outcomes, payload normalization/mapping, and invalid input handling.
+
+## AI Loom image manipulation update: lineage mini-view + system interaction space composition (stories 4.4.9-4.4.10)
+
+- Added a minimal persisted lineage contract for image runs in `application/system-runtime/ImageRunLineageDataContract.ts`.
+  - Scope is intentionally bounded for this slice: input image refs -> workflow/run -> output image refs -> output dataset instance.
+  - Lineage is built from persisted run-history and output-gallery relationships (`ImageRunHistoryWithOutputs`) using stable identifiers.
+- `ImageRunHistoryService` now exposes `getRunLineage(...)` as a retrieval seam over persisted state rather than UI-only graph assembly.
+- Added a lightweight reusable atomic interface asset `ImageLineageMiniView` (`ui/components/assets/image-system/ImageLineageMiniView.tsx`) that renders inspectable lineage edges/nodes without introducing a graph-library-specific domain contract.
+- Extended composed image interface assets for cohesive System Studio experience:
+  - `ImageHistoryLinkedOutputInspectorAsset` now includes lineage inspection for the selected persisted run/output linkage.
+  - `ImageResultHistoryInteractionSpaceAsset` composes run history, output gallery selection/inspection, history->output linking, and lineage mini-view into one system interaction space.
+- Composition remains contract-first and reusable:
+  - atomic assets keep narrow rendering contracts,
+  - higher-level composed assets bind those atomics to persisted system-owned output/run relationships.
+
+## Direction 5 UI extension update: configurable editing-surface canvas contract (systems stories 1-2)
+
+- The reusable canvas experience contract now supports a neutral editing-surface model (`resolveEditingModel`) plus generic event callbacks (`onEditingEvent`) for node selection, create requests, movement, resize, and canvas commands.
+- The shared configurable canvas renderer now includes reusable rectangular layout-node primitives (x/y + width/height + minimum size + resize handles + selection affordances) while staying prop-driven and callback-driven for studio adapters.
+- System Studio canvas now consumes that reusable editing contract at adapter boundaries, with layout frame state owned in the authoring boundary and composition orchestration still routed through existing system services/components.
+- Canvas command controls now render in a reusable control bar above the interactive canvas frame (instead of overlaying the frame), and command events can include a viewport snapshot so add-section actions can place new sections at the visual center of the active canvas.
+
+## Direction 5 UI extension update: viewport-ratio framed canvas + panel asset model (systems stories 3-4)
+
+- The reusable canvas contract now includes a bounded design-frame mode (`CanvasSurfaceDesignFrameModel`) with explicit ratio/dimension inputs and bounded editing-area hints so authoring can target viewport-like proportions.
+- Editing models now expose coordinate-space configuration (`absolute` or `normalized`) and the shared configurable canvas renderer scales node placement/resizing against the rendered design frame while emitting normalized coordinates when configured.
+- System Studio draft content now persists canvas authoring metadata (`systemSpec.canvasAuthoring`) including design-frame settings and normalized panel bounds, preserving authored layout intent across different render sizes.
+- System Studio page-canvas authoring now also preserves page-region placement (`panel.regionId`) and bounded quick layout allocations (compact/balanced/featured) through the same persisted `systemSpec.canvasAuthoring.pageLayouts` flow, keeping panel editing focused on high-level page structure and future panel-studio handoff compatibility.
+- System Studio now includes an explicit high-level settings model persisted as `systemSpec.settings` (name/description/default landing page/navigation mode/theme hooks/runtime behavior toggles), with non-technical primary settings UI and advanced parameter editing collapsed as secondary controls.
+- System Studio settings now also persist a normalized navigation structure model (`systemSpec.settings.navigation.structure.items`) aligned to `systemSpec.pages` order, including navigation labels, inclusion/visibility controls, and bounded grouping/placement hints for future runtime shell behavior.
+- Navigation structure + default landing page resolution is now reconciled through existing draft parse/serialize seams (`SystemStudioDraftDocument` + `SystemSettingsModel`), so missing/deleted landing-page references degrade safely to a valid visible page without adding parallel state.
+- Added reusable panel asset contracts (`PanelAssetContract` + runtime instance mapping) that define stable panel identity, page association, persisted bounds, user-facing metadata, content slots, and preview/runtime representation boundaries.
+- System canvas adapter now maps layout nodes to those reusable panel contracts/runtime panel instances through shared seams rather than ad hoc studio-specific panel shape.
+
+## Direction 5 UI extension update: embedded behavior studio + panel-hosted studio assets (systems stories 7-8)
+
+- System Studio wizard now embeds a constrained Workflow Studio surface for **Behavior & Automation** authoring through the shared studio-asset host boundary (`StudioAssetHostBoundary` + `workflowStudioSurfaceAssetDefinition`) instead of routing users into standalone Workflow Studio.
+- Embedded behavior authoring is host-managed and contract-driven:
+  - render mode is constrained to `embedded`,
+  - standalone chrome/routing controls remain suppressed,
+  - interaction signaling flows via shared `studio.intent` events rather than direct routing.
+- System draft persistence now includes embedded workflow content (`systemSpec.embeddedStudios.workflow.draftContent`) so behavior authoring remains in the same system-backed document boundary.
+- Panel contracts now support embedded studio-backed content (`PanelAssetContract.content`) while keeping panel/studio/host boundaries separated.
+- Runtime panel rendering resolves studio-backed panels through host-provided mappings (`SystemRuntimeInterfacePreview` `studioAssetHosts`) so:
+  - panel assets stay layout/content descriptors,
+  - studio assets stay reusable behavior surfaces,
+  - host orchestration owns session/context/capability wiring.
+
+## Direction 5 UI extension update: shared system document synchronization + guided flow polish (systems stories 9-10)
+
+- System Studio now uses one host-owned system draft document boundary for embedded studio synchronization:
+  - `systemSpec.pages` remains canonical for page definitions.
+  - `systemSpec.canvasAuthoring.pageLayouts` remains canonical for panel layout definitions.
+  - `systemSpec.sharedDocument.datasetDraftContent` and `systemSpec.sharedDocument.workflowDraftContent` now carry shared embedded Dataset/Workflow authored state.
+  - legacy `systemSpec.embeddedStudios.*.draftContent` is mirrored for compatibility.
+- Embedded Dataset/Workflow serialization now also synchronizes panel-hosted embedded studio content (`PanelAssetContract.content.draftContent`) so panel surfaces and wizard-embedded surfaces do not drift into conflicting local copies.
+- Host-managed embedded contexts now include explicit shared-document boundaries (`documentAccess`, `injectedContext`) so embedded surfaces stay route-neutral while editing host-owned shared state.
+- Guided composition UX continuity was refined across wizard steps:
+  - simplified non-technical step copy,
+  - reduced duplicate step-local chrome/headings in embedded sections,
+  - Inputs & Outputs readiness now recognizes authored embedded data setup state,
+  - advanced controls remain collapsed and lower in the experience.
+
+## Direction 5 UI extension update: narrowed System Studio responsibilities cleanup (stories 2.1.9-2.1.10)
+
+- System Studio is now explicitly bounded to page/system structure + settings:
+  - define which pages/screens exist,
+  - define major page sections/panels per page,
+  - configure high-level navigation structure,
+  - configure system-level defaults/settings.
+- Wizard flow was narrowed to `Pages`, `Page layout`, and `Settings` (`ui/components/studio-shell/system/SystemStudioDraftAuthoringBoundary.tsx`); legacy embedded data/workflow authoring steps were removed from the primary System Studio path.
+- Canvas scope was narrowed to structure editing (`ui/studio-shell/system/SystemCanvasExperienceAdapter.tsx`); legacy composition/parameter inspector responsibilities were removed and replaced by structure-only guidance.
+- Persistence/model boundaries remain canonical and unchanged:
+  - `systemSpec.pages` (page model),
+  - `systemSpec.canvasAuthoring.pageLayouts` (page canvas layout),
+  - `systemSpec.settings` (navigation/system settings),
+  all parsed/serialized through `SystemStudioDraftDocument` + `SystemSettingsModel`.
+- Direction remains explicit: panel-internal UI composition is authored in dedicated embedded panel design workflows rather than directly in System Studio.
+
+## Direction 5 UI extension update: panel composed-asset slots + child insertion (systems stories 2.2.3-2.2.4)
+
+- Panel assets now persist as first-class composed UI assets (`ui-composed:panel`) with explicit slot definitions, identity metadata, configuration defaults, and serialization-compatible composition payloads (`asset-composition`) inside `PanelAssetContract`.
+- The shared studio-asset registry now registers panel as a composed asset kind (`defaultComposedStudioUiContracts`), so panel composition uses the same discovery, renderer-resolution, and composition-validation seams as other UI assets.
+- System Studio canvas inspector now embeds a dedicated Panel Design Studio (`PanelDesignStudio`) where child UI assets are inserted into panel slots via the existing asset library + insertion + selection + validation infrastructure (`StudioAssetLibraryPanel`, `resolveDefaultInsertionTarget`, `insertStudioAssetIntoCompositionTree`), instead of adding child content from page-layout canvas commands.
+- Panel Design Studio now keeps Asset Library and Asset Inspector integrated in one embedded authoring surface:
+  - library entries are contextual to the selected panel/child insertion target and constrained by existing slot + composition validation rules,
+  - panel root and nested child selections share one selection context and bind directly into the existing schema-driven Asset Inspector flow,
+  - invalid-target/no-compatible/empty-result states are surfaced explicitly without breaking host-owned System Studio layout boundaries.
+
+
+## Direction 5 UI extension update: atomic and composed UI asset contract foundation (stories 1.1.1-1.1.2)
+
+- Studio UI asset contracts now explicitly distinguish leaf and container assets in `ui/studio-shell/studio-assets/StudioAssetContracts.ts`:
+  - `StudioUiAssetKinds` (`atomic` | `composed`),
+  - `AtomicStudioAssetContract` with leaf-only constraints (`allowsChildren: false`) and bounded capabilities,
+  - `ComposedStudioAssetContract` with explicit child-slot contracts and composition rules.
+- Shared contract metadata now includes reusable authoring/runtime descriptors for both kinds:
+  - metadata (`displayName`, `description`, tags),
+  - props schema descriptor (`schemaId`, `schemaVersion`),
+  - rendering resolution descriptor (`react` + `definition-render`),
+  - persistence descriptor (`documentType`, JSON serialization).
+- Reusable atomic UI primitive contracts now exist in `ui/studio-shell/studio-assets/StudioUiPrimitiveAssetContracts.ts` for leaf families (`text-input`, `number-input`, `toggle`, `button`, `viewer`) so future interface assets can reuse one contract shape without creating a second taxonomy.
+- Existing studio surface assets are now explicitly composed contracts in `ui/studio-shell/studio-assets/StudioSurfaceAssetDefinitions.tsx`, with slot/composition rules that support nested embeddable studio usage through existing host boundaries.
+- Studio asset definition discovery now includes shared listing/lookup helpers (`studioSurfaceAssetDefinitions`, `resolveStudioSurfaceAssetDefinitionById`, `listStudioSurfaceAssetDefinitionsByKind`) so registration/discovery flows can resolve contracts by identity and kind.
+
+## Direction 5 UI extension update: composition validation + serialization model (stories 1.1.7-1.1.8)
+
+- Studio asset composition now has one shared validation/serialization seam in `ui/studio-shell/studio-assets/StudioAssetComposition.ts` rather than per-surface ad hoc checks.
+- Validation is registry-backed and taxonomy-aware across atomic/composed/system-page contracts:
+  - atomic assets fail when any child slot/region payload is present,
+  - composed assets validate declared slots, allowed child kinds/types/categories, required-slot presence, and slot cardinality,
+  - system-page assets validate declared regions, required-region presence, allowed child kinds/types/categories, and region cardinality.
+- Invalid nesting is explicitly denied through the same rules (for example composed assets cannot host `system-page` children unless their own contract allows it).
+- `StudioAssetRegistry` now integrates this seam directly (`validateCompositionTree`, `serializeCompositionTree`, `deserializeCompositionTree`) so future studio surfaces/design tools can reuse one registry-authoritative flow.
+- Composition persistence now uses a versioned document shape (`schemaVersion=1.0.0`) carrying node identity, asset/registry identity, config payloads, metadata references, and recursive slot/region child relationships.
+
+## Direction 5 UI extension update: Schema Studio canvas + entity authoring slice (stories 3.1.5-3.1.6)
+
+- Schema Studio now has a dedicated composed studio surface contract (`schema-studio`) in `ui/studio-shell/studio-assets/StudioSurfaceAssetDefinitions.tsx`, aligned to existing studio-shell renderer, host-context, and persistence contracts (`schema-draft-json` over JSON serialization).
+- Authoring now runs through a dedicated Schema Studio boundary (`ui/components/studio-shell/schema/SchemaStudioDraftAuthoringBoundary.tsx`) instead of falling back to workflow metaphors:
+  - schema-level context is presented as a schema canvas,
+  - entities/tables render as selectable modeling units,
+  - relationships render as a bounded summary/placeholder for future edge-authoring flows.
+- Entity create/edit flows now use canonical schema-domain helpers (`domain/schema-studio/SchemaStudioDomain.ts`) rather than ad hoc UI-only state:
+  - `createEmptySchemaAssetDocument`,
+  - `addSchemaEntityToDocument`,
+  - `updateSchemaEntityInDocument`.
+- Schema entity updates persist through existing studio-shell draft content mutation (`onChangeContent`) and embedded-intent event signaling (`studio.intent` apply/selection), preserving existing host-owned save/validation/session infrastructure.
+- Schema Studio is now routed and registered as a first-class atomic studio (`ui/studio-shell/registrations/SchemaStudioRegistration.ts`, `ui/pages/SchemaStudioPage.tsx`, route mapping updates), keeping taxonomy and registration patterns aligned with existing model/dataset/tool studios.
+
+## Direction 5 UI extension update: Schema Studio relationships + field inspector slice (stories 3.1.7-3.1.8)
+
+- Schema Studio authoring now includes first-pass relationship creation UX in the existing schema boundary (`ui/components/studio-shell/schema/SchemaStudioDraftAuthoringBoundary.tsx`) without introducing a parallel graph editor stack.
+- Relationship creation persists directly through canonical schema-domain helpers (`addSchemaRelationshipToDocument`) and existing draft mutation flow (`onChangeContent` + schema serialization), so links are validated and saved as schema asset structure instead of UI-local state.
+- Relationship authoring supports source/target table selection, optional source/target field binding, cardinality hints, optional labels/descriptions, and an optional technical `type` in a secondary advanced-details area to keep primary UI language approachable.
+- Duplicate/incomplete/invalid relationship definitions are denied through shared domain validation (missing entities/fields, duplicate relationship shape) with user-facing error messaging in the authoring panel.
+- Schema Studio now includes a field inspector panel bound to the currently selected table:
+  - field list + selection,
+  - add/remove actions,
+  - edit controls for name/key/type/required/default/description.
+- Field edits persist through canonical schema-domain helpers (`addSchemaFieldToEntityInDocument`, `updateSchemaFieldInEntityInDocument`, `removeSchemaFieldFromEntityInDocument`) and the same host-owned draft persistence/event infrastructure.
+- Removing a field clears dangling relationship field refs for relationships targeting that field, preserving document validity while keeping relationship records intact for follow-up edits.
+- Scope remains intentionally bounded to schema-structure authoring: pipelines/execution semantics remain outside Schema Studio and continue to be authored in their dedicated studios.
+
+## Direction 5 UI extension update: Schema Studio persistence hardening + validation feedback (stories 3.1.9-3.1.10)
+
+- Schema Studio editing remains bound to host-owned draft content (`content` + `onChangeContent`) and canonical schema serialization (`serializeSchemaAssetDocument`), so table/field/relationship edits are persisted in the real schema asset draft payload rather than UI-local transient copies.
+- Schema draft loading now uses a bounded safe-edit parse seam (`deserializeSchemaAssetDocumentForEditing`) to keep authoring available for malformed/legacy drafts by normalizing recoverable sections and surfacing warning state instead of hard-failing the editor.
+- Authoring now renders lightweight in-context schema validation feedback (`validateSchemaAssetDocument`) for create/edit/inspector flows:
+  - duplicate table names,
+  - duplicate field names within a table,
+  - missing table/field references in relationships,
+  - obviously incomplete relationship bindings.
+- Validation scope remains intentionally structural and persistence-aligned: no full database-rule engine, migration semantics, or pipeline/runtime execution checks.
+- Responsibility boundaries remain explicit:
+  - **Schema Studio** owns structural schema authoring (tables, fields, relationships, canvas-structure metadata).
+  - **Pipeline Studio/Data Studio** own transformation/execution authoring and runtime validation semantics.
+
+## Direction 5 extension update: Data Studio schema authoring separation + Schema Studio handoff entry (stories 3.2.1-3.2.2)
+
+- Data Studio now treats pipeline authoring and schema authoring as separate workflows:
+  - Data Studio wizard/canvas surfaces remain focused on ingestion, mapping, transformation, enrichment, and execution-readiness concerns.
+  - Schema definition and structural modeling are no longer presented as pipeline-stage authoring responsibilities inside Data Studio.
+- Dataset Studio default draft content now initializes from canonical Data Studio pipeline-state serialization (via `DataStudioPreparationWizardStateAdapter`) rather than legacy schema-shaped draft placeholders.
+- Data Studio now includes a first-class Schema Studio entry panel in the primary wizard surface that supports:
+  - creating a new schema via existing inline studio-launch patterns,
+  - opening existing schema assets discovered through the shared registry/query path,
+  - user-facing guidance that clarifies structural schema work vs execution-oriented data-pipeline work.
+- Entry/transition behavior reuses existing shared seams (`InlineAssetCreationService`, `StudioEntryService`, registry semantic-role filtering) rather than adding ad hoc studio-routing state.
+
+
+## Direction 5 UI update: Dataset Pipeline Studio responsibility focus + schema linkage foundation (stories 3.2.3-3.2.4)
+
+- Dataset Pipeline Studio now renders through a dedicated dataset-pipeline authoring boundary (`DatasetPipelineStudioDraftAuthoringBoundary`) instead of falling back to workflow authoring surfaces.
+- The pipeline authoring surface now emphasizes ingestion/transformation/execution flow setup and explicitly positions schema authoring in Schema Studio.
+- Pipeline draft content now has a formalized schema-linkage shape (`datasetPipelineSpec.schemas.input|output`) for referencing input/output schemas via asset references and optional inline structural definitions.
+- Schema linkage remains persistence-aligned with existing Studio Shell draft/version flows by staying inside canonical draft content serialization rather than introducing local-only UI state.
+- Unresolved or invalid schema links are surfaced as non-blocking authoring warnings, preserving forward compatibility for future schema-aware mapping/validation enhancements.
+
+## Direction 5 update: data-definition compatibility cleanup + studio responsibility documentation (stories 3.2.9-3.2.10)
+
+- Data Studio now includes bounded load-time compatibility for legacy persisted draft shapes:
+  - `DataStudioPreparationWizard.importPipelineState` first attempts canonical `DataStudioPipelineState` deserialization,
+  - if deserialization fails, legacy `datasetSpec` or mixed `datasetPipelineSpec` payloads are translated in place into current stage options (source reference/kind, output target, schema-link hints) instead of hard-failing authoring.
+- Dataset Pipeline Studio draft parsing now includes a lightweight migration seam in `deserializeDatasetPipelineAssetDocumentForEditing`:
+  - legacy `datasetSpec` payloads are translated into `datasetPipelineSpec`,
+  - legacy `datasetPipelineSpec.schema` is normalized into `datasetPipelineSpec.schemas.input.inlineDefinition`,
+  - recoverable migrations surface concise warning text in the authoring panel instead of silently dropping structure.
+- Responsibility split is now explicit and stable:
+  - **Data Studio** is the high-level workspace and organizer across data authoring flows,
+  - **Schema Studio** is dedicated to structural schema definition and editing,
+  - **Pipeline Studio** is dedicated to ingestion/mapping/transformation/enrichment/execution flow authoring and schema linkage.
+- Schema references remain first-class links in pipeline definitions (`datasetPipelineSpec.schemas` and `datasetPipelineSpec.sources[].schema`) so structural assets and execution assets stay distinct while still connected.
+
+- Stories 5–6 now make Data Studio’s dataset authoring path asset-native under the Studio Shell: `DatasetStudioDraftAuthoringBoundary` owns the canonical `DataStudioPreparationWizardStateAdapter` state, renders wizard/canvas surfaces directly from that shared state, and no longer mounts the legacy nested intermediary authoring panels in active runtime.
+- Legacy Data Studio intermediary panel implementations were disconnected from active runtime and have now been deleted as part of cleanup.

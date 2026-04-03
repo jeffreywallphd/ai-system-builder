@@ -8,12 +8,6 @@ import {
 } from "../../../domain/assets/AssetMetadata";
 import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
 import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
-import {
-  WorkflowExecutionEvent,
-  WorkflowExecutionHandle,
-  WorkflowExecutionProgress,
-  WorkflowExecutionResult,
-} from "../../../application/ports/WorkflowExecutor";
 import type {
   IWorkflowExecutionEvent,
   IWorkflowExecutionHandle,
@@ -21,213 +15,279 @@ import type {
   IWorkflowExecutionResult,
   IWorkflowExecutor,
 } from "../../../application/ports/interfaces/IWorkflowExecutor";
-import { ComfyWorkflowAdapter } from "../adapters/ComfyWorkflowAdapter";
 import type {
-  ComfyHistoryPromptEntryDto,
-  ComfyHistoryPromptOutputDto,
-  ComfyWorkflowDto,
-} from "../dto/ComfyWorkflowDto";
-import { ComfyApiClient } from "./ComfyApiClient";
-import { ComfyQueueClient, type IComfyPromptProgress } from "./ComfyQueueClient";
+  IComfyAdapterLifecycleEvent,
+  IComfyAdapterRequest,
+  IComfyAdapterResult,
+  IComfyExecutionAdapter,
+} from "../../../application/execution/comfyui/ComfyAdapterContract";
+import { ComfyExecutionService } from "../../../application/execution/comfyui/ComfyExecutionService";
+import { createComfyExecutionContext } from "../../../application/execution/comfyui/ComfyExecutionContext";
+import { mapComfyError, mapComfyProgressToLifecycleEvent } from "./ComfyExecutionLifecycle";
+import { ComfyPromptExecutionError, ComfyQueueClient } from "./ComfyQueueClient";
+import { ComfyAdapterObservability, type IComfyAdapterLogger } from "./ComfyAdapterObservability";
+import { ComfyExecutionRequestMapper } from "./mappers/ComfyExecutionRequestMapper";
+import { ComfyExecutionResultMapper } from "./mappers/ComfyExecutionResultMapper";
 
 export interface IComfyWorkflowExecutorOptions {
-  readonly workflowAdapter?: ComfyWorkflowAdapter;
-  readonly apiClient: ComfyApiClient;
-  readonly queueClient: ComfyQueueClient;
+  readonly adapter: IComfyExecutionAdapter;
+  readonly buildViewUrl?: (params: {
+    readonly filename: string;
+    readonly subfolder?: string;
+    readonly type?: string;
+  }) => string;
 }
 
-export class ComfyWorkflowExecutor implements IWorkflowExecutor {
-  private readonly workflowAdapter: ComfyWorkflowAdapter;
-  private readonly apiClient: ComfyApiClient;
-  private readonly queueClient: ComfyQueueClient;
+export interface IComfyQueueExecutionAdapterOptions {
+  readonly queueClient: ComfyQueueClient;
+  readonly requestMapper?: ComfyExecutionRequestMapper;
+  readonly resultMapper?: ComfyExecutionResultMapper;
+  readonly logger?: IComfyAdapterLogger;
+}
 
-  constructor(options: IComfyWorkflowExecutorOptions) {
-    this.workflowAdapter = options.workflowAdapter ?? new ComfyWorkflowAdapter();
-    this.apiClient = options.apiClient;
-    this.queueClient = options.queueClient;
+export class ComfyQueueExecutionAdapter implements IComfyExecutionAdapter {
+  public readonly capabilities = Object.freeze({
+    runtimeId: "comfyui" as const,
+    supportsCancellation: true,
+    supportsProgressPolling: true,
+    supportsAssetReferences: true,
+  });
+
+  private readonly requestMapper: ComfyExecutionRequestMapper;
+  private readonly resultMapper: ComfyExecutionResultMapper;
+  private readonly observability: ComfyAdapterObservability;
+
+  constructor(private readonly options: IComfyQueueExecutionAdapterOptions) {
+    this.requestMapper = options.requestMapper ?? new ComfyExecutionRequestMapper();
+    this.resultMapper = options.resultMapper ?? new ComfyExecutionResultMapper();
+    this.observability = new ComfyAdapterObservability(options.logger);
   }
 
-  public async startExecution(
-    input: IWorkflowExecutionInput
-  ): Promise<IWorkflowExecutionHandle> {
-    if (!this.canExecute(input)) {
-      throw new Error(
-        `ComfyWorkflowExecutor cannot execute workflow '${input.workflow.id}'.`
-      );
+  public async start(
+    request: IComfyAdapterRequest,
+    onLifecycleEvent?: (event: IComfyAdapterLifecycleEvent) => void,
+  ): Promise<{
+    readonly executionId: string;
+    cancel(): Promise<void>;
+    waitForCompletion(): Promise<IComfyAdapterResult>;
+  }> {
+    this.observability.requestAccepted({
+      context: request.context,
+      runtimeOptions: request.context?.runtime.options,
+    });
+
+    const startedAt = Date.now();
+    let mapped;
+    try {
+      mapped = this.requestMapper.map(request);
+    } catch (error: unknown) {
+      return this.createImmediateFailureHandle(request, error, "request-mapping");
     }
 
-    const effectiveWorkflow = this.applyPropertyOverrides(
-      input.workflow,
-      input.propertyOverrides
-    );
+    let promptId: string;
+    try {
+      const queued = await this.options.queueClient.enqueuePrompt(mapped.payload);
+      promptId = queued.prompt_id?.trim() ?? "";
 
-    const envelope = this.workflowAdapter.adaptWorkflowEnvelope(
-      effectiveWorkflow
-    ) as ComfyWorkflowDto;
-    const queued = await this.queueClient.enqueuePrompt(envelope);
-    const promptId = queued.prompt_id;
-
-    if (!promptId?.trim()) {
-      throw new Error("ComfyUI did not return a prompt_id.");
+      if (!promptId) {
+        throw new Error("ComfyUI did not return a prompt_id.");
+      }
+    } catch (error: unknown) {
+      return this.createImmediateFailureHandle(request, error, "connection");
     }
+    this.observability.executionStarted({ executionId: promptId, context: mapped.executionContext });
 
-    const listeners = new Set<(event: IWorkflowExecutionEvent) => void>();
+    const lifecycle: IComfyAdapterLifecycleEvent[] = [];
 
-    let currentProgress = new WorkflowExecutionProgress({
+    const emitLifecycle = (event: IComfyAdapterLifecycleEvent): void => {
+      lifecycle.push(event);
+      onLifecycleEvent?.(event);
+    };
+
+    emitLifecycle(Object.freeze({
       executionId: promptId,
       status: "queued",
       percent: 0,
       message: "Prompt queued in ComfyUI.",
-    });
+    }));
 
-    const emit = (event: IWorkflowExecutionEvent): void => {
-      if (event.progress) {
-        currentProgress = WorkflowExecutionProgress.from(event.progress);
-      }
-
-      for (const listener of listeners) {
-        listener(event);
-      }
-    };
-
-    emit(
-      new WorkflowExecutionEvent({
-        executionId: promptId,
-        kind: "workflow-started",
-        status: "queued",
-        progress: currentProgress,
-        message: "Workflow submitted to ComfyUI.",
-      })
-    );
-
-    const completionPromise = (async (): Promise<IWorkflowExecutionResult> => {
-      try {
-        const historyEntry = await this.queueClient.waitForCompletion(
-          promptId,
-          (progress) => {
-            const event = this.toProgressEvent(progress);
-            emit(event);
-          }
-        );
-
-        const outputAssets = this.mapAssetsFromHistory(
-          effectiveWorkflow,
-          promptId,
-          historyEntry
-        );
-
-        const result = new WorkflowExecutionResult({
-          executionId: promptId,
-          status: "completed",
-          outputAssets,
-          messages: historyEntry.status?.messages?.map((message) =>
-            typeof message === "string" ? message : JSON.stringify(message)
-          ),
-        });
-
-        emit(
-          new WorkflowExecutionEvent({
-            executionId: promptId,
-            kind: "workflow-completed",
-            status: "completed",
-            progress: new WorkflowExecutionProgress({
-              executionId: promptId,
-              status: "completed",
-              percent: 100,
-              message: "Workflow completed.",
-            }),
-            message: "Workflow completed.",
-            payload: {
-              outputAssetCount: outputAssets.length,
-            },
-          })
-        );
-
-        for (const asset of outputAssets) {
-          emit(
-            new WorkflowExecutionEvent({
-              executionId: promptId,
-              kind: "asset-produced",
-              status: "completed",
-              asset,
-            })
-          );
-        }
-
-        return result;
-      } catch (error: unknown) {
-        const result = new WorkflowExecutionResult({
-          executionId: promptId,
-          status: "failed",
-          outputAssets: [],
-          errorMessage:
-            error instanceof Error
-              ? error.message
-              : "Unknown ComfyUI execution error.",
-        });
-
-        emit(
-          new WorkflowExecutionEvent({
-            executionId: promptId,
-            kind: "workflow-failed",
-            status: "failed",
-            progress: new WorkflowExecutionProgress({
-              executionId: promptId,
-              status: "failed",
-              percent: currentProgress.percent,
-              message: result.errorMessage,
-            }),
-            message: result.errorMessage,
-          })
-        );
-
-        return result;
-      }
-    })();
-
-    return new WorkflowExecutionHandle({
+    return Object.freeze({
       executionId: promptId,
-      input,
-      initialProgress: currentProgress,
-      completionPromise,
       cancel: async () => {
-        await this.queueClient.cancelPrompt(promptId);
-        emit(
-          new WorkflowExecutionEvent({
-            executionId: promptId,
-            kind: "workflow-cancelled",
-            status: "cancelled",
-            progress: new WorkflowExecutionProgress({
-              executionId: promptId,
-              status: "cancelled",
-              percent: currentProgress.percent,
-              message: "Workflow cancelled.",
-            }),
-            message: "Workflow cancelled.",
-          })
-        );
+        await this.options.queueClient.cancelPrompt(promptId);
+        this.observability.executionCancelled({
+          executionId: promptId,
+          context: mapped.executionContext,
+          durationMs: Date.now() - startedAt,
+        });
+        emitLifecycle(Object.freeze({
+          executionId: promptId,
+          status: "cancelled",
+          message: "Workflow cancelled.",
+        }));
       },
-      subscribe: (listener) => {
-        listeners.add(listener);
-        return () => {
-          listeners.delete(listener);
-        };
+      waitForCompletion: async (): Promise<IComfyAdapterResult> => {
+        try {
+          const completion = await this.options.queueClient.waitForCompletion(
+            promptId,
+            (progress) => emitLifecycle(mapComfyProgressToLifecycleEvent(progress)),
+          );
+
+          let normalized;
+          try {
+            normalized = this.resultMapper.map({
+              completion,
+              consumedAssetRefs: request.inputAssetRefs,
+              executionContext: request.context,
+            });
+          } catch (error: unknown) {
+            const normalizedError = mapComfyError(error, {
+              stage: "output-normalization",
+              context: mapped.executionContext,
+            });
+            this.observability.executionFailed({
+              executionId: promptId,
+              context: mapped.executionContext,
+              durationMs: Date.now() - startedAt,
+              error: normalizedError,
+            });
+
+            return Object.freeze({
+              executionId: promptId,
+              status: "failed" as const,
+              outputs: [],
+              lifecycle: Object.freeze(lifecycle.slice()),
+              error: normalizedError,
+              messages: [normalizedError.message],
+            });
+          }
+
+          this.observability.executionCompleted({
+            executionId: promptId,
+            context: mapped.executionContext,
+            durationMs: Date.now() - startedAt,
+            outputCount: normalized.outputs.length,
+          });
+
+          return Object.freeze({
+            executionId: promptId,
+            status: "completed",
+            outputs: normalized.outputs,
+            lifecycle: Object.freeze(lifecycle.slice()),
+            messages: normalized.messages,
+          });
+        } catch (error: unknown) {
+          const partialOutputs = error instanceof ComfyPromptExecutionError && error.completion
+            ? this.resultMapper.map({
+              completion: error.completion,
+              consumedAssetRefs: request.inputAssetRefs,
+              executionContext: request.context,
+            }).outputs
+            : [];
+          const mappedError = partialOutputs.length > 0
+            ? new Error(`${error instanceof Error ? error.message : "ComfyUI execution failed."} Partial outputs were captured before the run stopped.`)
+            : error;
+          const normalizedError = mapComfyError(error, {
+            stage: "execution",
+            context: mapped.executionContext,
+          });
+          if (normalizedError.code === "execution-cancelled") {
+            this.observability.executionCancelled({
+              executionId: promptId,
+              context: mapped.executionContext,
+              durationMs: Date.now() - startedAt,
+            });
+          } else {
+            this.observability.executionFailed({
+              executionId: promptId,
+              context: mapped.executionContext,
+              durationMs: Date.now() - startedAt,
+              error: normalizedError,
+            });
+          }
+          return Object.freeze({
+            executionId: promptId,
+            status: normalizedError.code === "execution-cancelled" ? "cancelled" : "failed",
+            outputs: Object.freeze([...partialOutputs]),
+            lifecycle: Object.freeze(lifecycle.slice()),
+            error: mapComfyError(mappedError, {
+              stage: "execution",
+              context: mapped.executionContext,
+            }),
+            messages: partialOutputs.length > 0
+              ? [normalizedError.message, "Some output files were generated before the run failed."]
+              : [normalizedError.message],
+          });
+        }
       },
     });
   }
 
+  private createImmediateFailureHandle(
+    request: IComfyAdapterRequest,
+    error: unknown,
+    stage: "connection" | "request-mapping",
+  ): Promise<{
+    readonly executionId: string;
+    cancel(): Promise<void>;
+    waitForCompletion(): Promise<IComfyAdapterResult>;
+  }> {
+    const normalizedError = mapComfyError(error, {
+      stage,
+      context: request.context,
+    });
+    this.observability.executionFailed({
+      executionId: request.context?.identifiers.executionId,
+      context: request.context,
+      error: normalizedError,
+    });
+
+    const executionId = request.context?.identifiers.executionId
+      ?? request.workflow.id;
+
+    return Promise.resolve(Object.freeze({
+      executionId,
+      cancel: async () => undefined,
+      waitForCompletion: async () => Object.freeze({
+        executionId,
+        status: "failed" as const,
+        outputs: [],
+        lifecycle: [],
+        error: normalizedError,
+        messages: [normalizedError.message],
+      }),
+    }));
+  }
+}
+
+export class ComfyWorkflowExecutor implements IWorkflowExecutor {
+  private readonly executionService: ComfyExecutionService;
+
+  constructor(private readonly options: IComfyWorkflowExecutorOptions) {
+    this.executionService = new ComfyExecutionService(options.adapter, {
+      toAdapterRequest: (input) => this.toAdapterRequest(input),
+      toWorkflowAssets: (input, result) => this.mapAssetsFromAdapterResult(input.workflow, result),
+    });
+  }
+
+  public async startExecution(input: IWorkflowExecutionInput): Promise<IWorkflowExecutionHandle> {
+    if (!this.canExecute(input)) {
+      throw new Error(`ComfyWorkflowExecutor cannot execute workflow '${input.workflow.id}'.`);
+    }
+
+    return this.executionService.startExecution(input);
+  }
+
   public async execute(
     input: IWorkflowExecutionInput,
-    onEvent?: (event: IWorkflowExecutionEvent) => void
+    onEvent?: (event: IWorkflowExecutionEvent) => void,
   ): Promise<IWorkflowExecutionResult> {
     const handle = await this.startExecution(input);
 
     let unsubscribe: (() => void) | undefined;
-
     if (onEvent && typeof handle.subscribe === "function") {
       const maybeUnsubscribe = await handle.subscribe(onEvent);
-      unsubscribe =
-        typeof maybeUnsubscribe === "function" ? maybeUnsubscribe : undefined;
+      unsubscribe = typeof maybeUnsubscribe === "function" ? maybeUnsubscribe : undefined;
     }
 
     try {
@@ -238,220 +298,121 @@ export class ComfyWorkflowExecutor implements IWorkflowExecutor {
   }
 
   public canExecute(input: IWorkflowExecutionInput): boolean {
-    const runtime =
-      typeof input.target?.runtime === "string"
-        ? input.target.runtime.toLowerCase()
-        : input.workflow.runtimeProfile?.preferredRuntime?.toLowerCase();
+    const runtime = typeof input.target?.runtime === "string"
+      ? input.target.runtime.toLowerCase()
+      : input.workflow.runtimeProfile?.preferredRuntime?.toLowerCase();
 
-    if (runtime && runtime !== "comfyui") {
-      return false;
-    }
-
-    return true;
+    return !runtime || runtime === "comfyui";
   }
 
-  private applyPropertyOverrides(
+  private toAdapterRequest(input: IWorkflowExecutionInput): IComfyAdapterRequest {
+    const context = createComfyExecutionContext(input);
+
+    return {
+      workflow: input.workflow,
+      propertyOverrides: input.propertyOverrides,
+      runtimeParameters: input.parameters,
+      context,
+      inputAssetRefs: context.inputs.selectedAssetRefs,
+    };
+  }
+
+  private mapAssetsFromAdapterResult(
     workflow: IWorkflow,
-    overrides?: Readonly<Record<string, Readonly<Record<string, unknown>>>>
-  ): IWorkflow {
-    if (!overrides || Object.keys(overrides).length === 0) {
-      return workflow;
-    }
-
-    let updatedWorkflow = workflow;
-
-    for (const [nodeId, propertyOverrides] of Object.entries(overrides)) {
-      const node = updatedWorkflow.getNode(nodeId);
-
-      if (!node) {
-        throw new Error(`Property overrides reference unknown node '${nodeId}'.`);
-      }
-
-      let updatedNode = node;
-
-      for (const [propertyId, value] of Object.entries(propertyOverrides)) {
-        if (!updatedNode.getProperty(propertyId)) {
-          throw new Error(
-            `Property overrides reference unknown property '${propertyId}' on node '${nodeId}'.`
-          );
-        }
-
-        updatedNode = updatedNode.withPropertyValue(propertyId, value);
-      }
-
-      updatedWorkflow = updatedWorkflow.updateNode(updatedNode);
-    }
-
-    return updatedWorkflow;
-  }
-
-  private toProgressEvent(progress: IComfyPromptProgress): IWorkflowExecutionEvent {
-    const mappedStatus =
-      progress.status === "queued"
-        ? "running"
-        : progress.status === "running"
-          ? "running"
-          : progress.status === "completed"
-            ? "completed"
-            : progress.status === "cancelled"
-              ? "cancelled"
-              : "failed";
-
-    const executionProgress = new WorkflowExecutionProgress({
-      executionId: progress.promptId,
-      status: mappedStatus,
-      percent:
-        progress.status === "queued"
-          ? 5
-          : progress.status === "running"
-            ? 50
-            : progress.status === "completed"
-              ? 100
-              : undefined,
-      message: progress.message,
-    });
-
-    return new WorkflowExecutionEvent({
-      executionId: progress.promptId,
-      kind: "workflow-progress",
-      status: mappedStatus,
-      progress: executionProgress,
-      message: progress.message,
-      payload:
-        progress.queuePosition !== undefined
-          ? { queuePosition: progress.queuePosition }
-          : undefined,
-    });
-  }
-
-  private mapAssetsFromHistory(
-    workflow: IWorkflow,
-    promptId: string,
-    historyEntry: ComfyHistoryPromptEntryDto
+    result: IComfyAdapterResult,
   ): ReadonlyArray<IAsset> {
-    const assets: IAsset[] = [];
-    const outputs = historyEntry.outputs ?? {};
+    return Object.freeze(result.outputs.map((output) => {
+      if (output.kind === "text") {
+        return this.createTextAsset({
+          workflow,
+          executionId: result.executionId,
+          nodeId: output.nodeId,
+          reference: output.reference,
+          text: typeof output.metadata?.text === "string" ? output.metadata.text : "",
+          consumedAssetIds: output.lineage?.consumedAssetRefs?.map((assetRef) => assetRef.assetId),
+        });
+      }
 
-    for (const [nodeId, output] of Object.entries(outputs)) {
-      assets.push(...this.mapNodeOutputAssets(workflow, promptId, nodeId, output));
-    }
-
-    return Object.freeze(assets);
+      return this.createFileAsset({
+        workflow,
+        executionId: result.executionId,
+        nodeId: output.nodeId,
+        kind: output.kind,
+        filename: typeof output.metadata?.filename === "string"
+          ? output.metadata.filename
+          : output.reference,
+        subfolder: typeof output.metadata?.subfolder === "string"
+          ? output.metadata.subfolder
+          : undefined,
+        type: typeof output.metadata?.type === "string"
+          ? output.metadata.type
+          : undefined,
+        format: typeof output.metadata?.format === "string"
+          ? output.metadata.format
+          : undefined,
+        consumedAssetIds: output.lineage?.consumedAssetRefs?.map((assetRef) => assetRef.assetId),
+      });
+    }));
   }
 
-  private mapNodeOutputAssets(
-    workflow: IWorkflow,
-    promptId: string,
-    nodeId: string,
-    output: ComfyHistoryPromptOutputDto
-  ): IAsset[] {
-    const assets: IAsset[] = [];
-
-    for (const image of output.images ?? []) {
-      assets.push(
-        this.createFileAsset({
-          workflow,
-          promptId,
-          nodeId,
-          filename: image.filename,
-          subfolder: image.subfolder,
-          type: image.type,
-          kind: "image",
-          format: getFileExtension(image.filename),
-        })
-      );
-    }
-
-    for (const gif of output.gifs ?? []) {
-      assets.push(
-        this.createFileAsset({
-          workflow,
-          promptId,
-          nodeId,
-          filename: gif.filename,
-          subfolder: gif.subfolder,
-          type: gif.type,
-          kind: "video",
-          format: gif.format || getFileExtension(gif.filename),
-        })
-      );
-    }
-
-    for (const audio of output.audio ?? []) {
-      assets.push(
-        this.createFileAsset({
-          workflow,
-          promptId,
-          nodeId,
-          filename: audio.filename,
-          subfolder: audio.subfolder,
-          type: audio.type,
-          kind: "audio",
-          format: audio.format || getFileExtension(audio.filename),
-        })
-      );
-    }
-
-    for (let index = 0; index < (output.text ?? []).length; index += 1) {
-      const textOutput = output.text![index];
-
-      assets.push(
-        new Asset({
-          id: `${promptId}:${nodeId}:text:${index}`,
-          name: `${workflow.metadata.name}-${nodeId}-text-${index}`,
-          kind: "text",
-          status: "available",
-          source: new AssetSourceInfo({
-            type: "generated",
-            workflowId: workflow.id,
-            nodeId,
-            executionId: promptId,
-            runtime: "comfyui" as never,
-            provider: "comfyui",
-          }),
-          location: new AssetLocation({
-            accessMethod: "virtual",
-            location: undefined,
-            format: "txt",
-            contentType: "text/plain",
-          }),
-          technicalMetadata: new AssetTechnicalMetadata({
-            tokenCount: undefined,
-          }),
-          semanticMetadata: new AssetSemanticMetadata({
-            description: textOutput.text,
-            tags: ["comfyui", "text-output"],
-          }),
-          relationships: [],
-          audit: new AssetAuditInfo({
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          }),
-        })
-      );
-    }
-
-    return assets;
+  private createTextAsset(params: {
+    readonly workflow: IWorkflow;
+    readonly executionId: string;
+    readonly nodeId: string;
+    readonly reference: string;
+    readonly text: string;
+    readonly consumedAssetIds?: ReadonlyArray<string>;
+  }): IAsset {
+    return new Asset({
+      id: params.reference,
+      name: `${params.workflow.metadata.name}-${params.nodeId}-text`,
+      kind: "text",
+      status: "available",
+      source: new AssetSourceInfo({
+        type: "generated",
+        workflowId: params.workflow.id,
+        nodeId: params.nodeId,
+        executionId: params.executionId,
+        runtime: "comfyui" as never,
+        provider: "comfyui",
+      }),
+      location: new AssetLocation({
+        accessMethod: "virtual",
+        location: undefined,
+        format: "txt",
+        contentType: "text/plain",
+      }),
+      technicalMetadata: new AssetTechnicalMetadata({}),
+      semanticMetadata: new AssetSemanticMetadata({
+        description: params.text,
+        tags: ["comfyui", "text-output", ...(params.consumedAssetIds ?? []).map((id) => `input:${id}`)],
+      }),
+      relationships: [],
+      audit: new AssetAuditInfo({ createdAt: new Date(), updatedAt: new Date() }),
+    });
   }
 
   private createFileAsset(params: {
     readonly workflow: IWorkflow;
-    readonly promptId: string;
+    readonly executionId: string;
     readonly nodeId: string;
     readonly filename: string;
     readonly subfolder?: string;
     readonly type?: string;
     readonly kind: IAsset["kind"];
     readonly format?: string;
+    readonly consumedAssetIds?: ReadonlyArray<string>;
   }): IAsset {
-    const url = this.apiClient.buildViewUrl({
-      filename: params.filename,
-      subfolder: params.subfolder,
-      type: params.type,
-    });
+    const url = this.options.buildViewUrl
+      ? this.options.buildViewUrl({
+          filename: params.filename,
+          subfolder: params.subfolder,
+          type: params.type,
+        })
+      : params.filename;
 
     return new Asset({
-      id: `${params.promptId}:${params.nodeId}:${params.kind}:${params.filename}`,
+      id: `${params.executionId}:${params.nodeId}:${params.kind}:${params.filename}`,
       name: params.filename,
       kind: params.kind,
       status: "available",
@@ -459,7 +420,7 @@ export class ComfyWorkflowExecutor implements IWorkflowExecutor {
         type: "generated",
         workflowId: params.workflow.id,
         nodeId: params.nodeId,
-        executionId: params.promptId,
+        executionId: params.executionId,
         runtime: "comfyui" as never,
         provider: "comfyui",
       }),
@@ -471,34 +432,20 @@ export class ComfyWorkflowExecutor implements IWorkflowExecutor {
       }),
       technicalMetadata: new AssetTechnicalMetadata({}),
       semanticMetadata: new AssetSemanticMetadata({
-        tags: ["comfyui", params.kind],
+        tags: ["comfyui", params.kind, ...(params.consumedAssetIds ?? []).map((id) => `input:${id}`)],
       }),
       relationships: [],
-      audit: new AssetAuditInfo({
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }),
+      audit: new AssetAuditInfo({ createdAt: new Date(), updatedAt: new Date() }),
     });
   }
 }
 
-function getFileExtension(filename: string): string | undefined {
-  const index = filename.lastIndexOf(".");
-  return index >= 0 ? filename.slice(index + 1).toLowerCase() : undefined;
-}
-
-function inferContentType(
-  kind: IAsset["kind"],
-  format?: string
-): string | undefined {
+function inferContentType(kind: IAsset["kind"], format?: string): string | undefined {
   const normalizedFormat = format?.trim().toLowerCase();
 
   if (kind === "image") {
     if (normalizedFormat === "png") return "image/png";
-    if (normalizedFormat === "jpg" || normalizedFormat === "jpeg") {
-      return "image/jpeg";
-    }
-
+    if (normalizedFormat === "jpg" || normalizedFormat === "jpeg") return "image/jpeg";
     if (normalizedFormat === "webp") return "image/webp";
     return "image/*";
   }

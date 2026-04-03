@@ -155,6 +155,17 @@ describe("SystemAssetDomain", () => {
         publish: { visibility: "team", exportTargets: ["registry", "registry"] },
         executionProfile: { profileId: "profile:latency", latencyTier: "low-latency" },
         operations: { ownerTeam: "runtime", supportContact: "ops@loom.local" },
+        workflowContextMapping: {
+          mappings: [
+            {
+              mappingId: "map.prompt",
+              sourceRoot: "parameters",
+              sourcePath: "prompt",
+              targetKind: "workflow-input",
+              targetPath: "prompt",
+            },
+          ],
+        },
       },
     });
 
@@ -163,6 +174,21 @@ describe("SystemAssetDomain", () => {
     expect(system.executionMetadata?.orchestration?.hints).toEqual(["retryable"]);
     expect(system.executionMetadata?.publish?.exportTargets).toEqual(["registry"]);
     expect(system.executionMetadata?.executionProfile?.latencyTier).toBe("low-latency");
+    expect(system.executionMetadata?.workflowContextMapping?.mappings[0]?.mappingId).toBe("map.prompt");
+  });
+
+  it("rejects invalid workflow context mapping definitions in execution metadata", () => {
+    expect(() => createSystemAsset({
+      assetId: "system:execution-metadata-invalid",
+      executionMetadata: {
+        workflowContextMapping: {
+          mappings: [
+            { mappingId: "duplicate", sourceRoot: "parameters", targetKind: "workflow-input", targetPath: "a" },
+            { mappingId: "duplicate", sourceRoot: "runtime", targetKind: "workflow-metadata", targetPath: "b" },
+          ],
+        },
+      },
+    })).toThrow("must be unique");
   });
 
   it("rejects invalid system binding shapes and unknown endpoint references", () => {

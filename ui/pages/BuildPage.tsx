@@ -3,15 +3,22 @@ import { Link, useNavigate } from "react-router-dom";
 import { BuildEntryService, BuildIntents, type BuildIntent } from "../routes/BuildEntry";
 import { PersistedWorkflowEntryService, type PersistedWorkflowEntry } from "../routes/PersistedWorkflowEntryService";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
+import { SystemBuildTemplateCatalog } from "../../application/system-studio/SystemBuildTemplateCatalog";
 
 export interface BuildTemplateCard {
   readonly id: string;
   readonly title: string;
   readonly description: string;
   readonly difficulty: "Beginner" | "Intermediate" | "Advanced";
+  readonly actionPath?: string;
+  readonly actionLabel?: string;
 }
 
 const buildTemplateCards: ReadonlyArray<BuildTemplateCard> = Object.freeze([
+  ...SystemBuildTemplateCatalog.map((entry) => Object.freeze({
+    ...entry.card,
+    actionPath: `${ROUTE_PATHS.systemStudio}?buildTemplateId=${encodeURIComponent(entry.templateId)}`,
+  })),
   Object.freeze({
     id: "support-assistant",
     title: "Customer Support Assistant",
@@ -49,6 +56,7 @@ const buildTemplateCards: ReadonlyArray<BuildTemplateCard> = Object.freeze([
     difficulty: "Advanced",
   }),
 ]);
+
 
 export default function BuildPage(): JSX.Element {
   const navigate = useNavigate();
@@ -146,6 +154,11 @@ export default function BuildPage(): JSX.Element {
                   <p className="ui-card__subtitle">{template.description}</p>
                 </div>
                 <span className="ui-badge ui-badge--neutral">Difficulty: {template.difficulty}</span>
+                {template.actionPath ? (
+                  <Link className="ui-button ui-button--ghost ui-button--small" to={template.actionPath}>
+                    {template.actionLabel ?? "Open template"}
+                  </Link>
+                ) : null}
               </div>
             </article>
           ))}

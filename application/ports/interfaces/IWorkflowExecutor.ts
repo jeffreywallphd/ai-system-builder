@@ -224,6 +224,26 @@ export interface IWorkflowExecutionEvent {
   readonly nodeProvenance?: INodeExecutionProvenance;
 }
 
+
+export interface IWorkflowOutputPersistenceSummary {
+  readonly status: "skipped" | "persisted" | "failed";
+  readonly persistedRecordCount: number;
+  readonly targetCount: number;
+  readonly results: ReadonlyArray<Readonly<{
+    readonly recordId: string;
+    readonly bindingId: string;
+    readonly outputId: string;
+    readonly targetDatasetInstanceId: string;
+    readonly writeMode: string;
+  }>>;
+  readonly issues: ReadonlyArray<Readonly<{
+    readonly code: string;
+    readonly message: string;
+    readonly bindingId?: string;
+    readonly outputId?: string;
+  }>>;
+}
+
 export interface IWorkflowExecutionResult {
   readonly executionId: string;
   readonly status: Extract<
@@ -250,6 +270,36 @@ export interface IWorkflowExecutionResult {
    * Structured description of how execution actually ran.
    */
   readonly provenance?: IWorkflowExecutionProvenance;
+
+  /**
+   * Optional normalized execution inspection summary for preview/debugging flows.
+   */
+  readonly outputPersistence?: IWorkflowOutputPersistenceSummary;
+
+  readonly inspection?: Readonly<{
+    readonly summary: Readonly<{
+      readonly runtime?: string;
+      readonly status: "completed" | "failed" | "cancelled";
+      readonly outputCount: number;
+      readonly lifecycleEventCount?: number;
+      readonly messageCount?: number;
+      readonly hasError: boolean;
+    }>;
+    readonly outputs?: ReadonlyArray<Readonly<{
+      readonly nodeId?: string;
+      readonly kind?: string;
+      readonly reference?: string;
+      readonly assetId?: string;
+      readonly metadata?: Readonly<Record<string, unknown>>;
+    }>>;
+    readonly diagnostics?: Readonly<{
+      readonly errorCode?: string;
+      readonly errorCategory?: string;
+      readonly errorSeverity?: string;
+      readonly message?: string;
+      readonly retriable?: boolean;
+    }>;
+  }>;
 }
 
 export interface IWorkflowExecutionHandle {

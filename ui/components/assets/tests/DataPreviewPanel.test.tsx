@@ -35,7 +35,6 @@ describe("DataPreviewPanel", () => {
     const html = renderToStaticMarkup(React.createElement(DataPreviewPanel, { executionResult: result }));
 
     expect(html).toContain("Execution Metadata");
-    expect(html).toContain("record-1");
     expect(html).toContain("Validation");
   });
 });

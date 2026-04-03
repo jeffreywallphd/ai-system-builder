@@ -9,6 +9,7 @@ import WorkflowStudioModePanel from "../../components/studio-shell/workflow/Work
 import WorkflowStudioRunHistoryPanel from "../../components/studio-shell/workflow/WorkflowStudioRunHistoryPanel";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
+import { ExperienceSurfaceAssetIds } from "../experience-assets/ExperienceSurfaceAssets";
 
 export const workflowStudioRegistration: CompositeStudioRegistration = Object.freeze({
   studioType: WorkflowStudioIdentity.studioType,
@@ -20,6 +21,10 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
   shell: Object.freeze({
     title: WorkflowStudioIdentity.defaultStudioName,
     subtitle: "Shared composite shell for workflow orchestrator authoring with backend-authoritative lifecycle, validation, and publish/version flows.",
+    experienceAssets: Object.freeze([
+      ExperienceSurfaceAssetIds.loomWizard,
+      ExperienceSurfaceAssetIds.loomCanvas,
+    ]),
     drawers: Object.freeze({
       left: Object.freeze({
         label: "Nodes",
@@ -113,23 +118,6 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
         workflowId: snapshot?.draft?.assetId,
         workflowName: snapshot?.draft?.metadata.title,
       }),
-    },
-    {
-      id: "workflow-studio-metadata-summary",
-      slot: "metadata",
-      title: "Workflow taxonomy and contract status",
-      subtitle: "Read-only taxonomy/contract/provenance projection from backend-authoritative draft metadata.",
-      order: 20,
-      render: ({ snapshot }) => {
-        const taxonomy = snapshot?.draft?.metadata.taxonomy;
-        return Object.freeze([
-          `Taxonomy: ${taxonomy
-            ? `${taxonomy.structuralKind}/${taxonomy.semanticRole}/${taxonomy.behaviorKind}`
-            : "missing"}`,
-          `Contract: ${snapshot?.draft?.metadata.contract ? "present" : "missing"}`,
-          `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
-        ]);
-      },
     },
   ]),
 });

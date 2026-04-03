@@ -10,6 +10,7 @@ import { ROUTE_PATHS } from "../RouteConfig";
 describe("StudioRouteMapping", () => {
   it("maps semantic roles to existing studio routes", () => {
     expect(resolveStudioRouteFromAsset({ taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" } })).toBe(ROUTE_PATHS.modelStudio);
+    expect(resolveStudioRouteFromAsset({ taxonomy: { structuralKind: "atomic", semanticRole: "schema", behaviorKind: "none" } })).toBe(ROUTE_PATHS.schemaStudio);
     expect(resolveStudioRouteFromAsset({ taxonomy: { structuralKind: "composite", semanticRole: "workflow", behaviorKind: "deterministic" } })).toBe(ROUTE_PATHS.workflowStudio);
     expect(resolveStudioRouteFromAsset({ taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" } })).toBe(ROUTE_PATHS.systemStudio);
     expect(resolveStudioRouteFromAsset({ taxonomy: { structuralKind: "system", semanticRole: "app-template", behaviorKind: "conditional" } })).toBe(ROUTE_PATHS.systemStudio);

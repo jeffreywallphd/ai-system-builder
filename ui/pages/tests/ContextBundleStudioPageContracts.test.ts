@@ -14,7 +14,6 @@ describe("ContextBundleStudioPage contracts", () => {
     expect(registrationSource).toContain('kind: "composite"');
     expect(registrationSource).toContain('role: "context-bundle"');
     expect(registrationSource).toContain('slot: "draft-authoring"');
-    expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain('createContextBundleStudioTaxonomy("none")');
   });
 });

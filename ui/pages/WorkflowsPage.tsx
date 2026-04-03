@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import WorkflowBrowser from "../components/workflow/WorkflowBrowser";
 import WorkflowFormView from "../components/workflow/WorkflowFormView";
 import PageTabs from "../components/navigation/PageTabs";
@@ -12,7 +12,10 @@ import type { UiSettingsState } from "../settings/UiSettingsStore";
 import type { ContextStoreState } from "../state/ContextStore";
 import type { IModelStoreState } from "../state/ModelStore";
 import type { IWorkflowStoreState } from "../state/WorkflowStore";
-import WorkflowEditorPage from "./WorkflowEditorPage";
+import {
+  buildWorkflowStudioCreateNewPath,
+  buildWorkflowStudioOpenExistingPath,
+} from "../studio-shell/workflow/WorkflowStudioEntryRouting";
 
 type WorkflowsTabId = "find" | "create" | "execute";
 
@@ -74,13 +77,13 @@ export default function WorkflowsPage(): JSX.Element {
     workflowProjectionService,
     contextStore,
     modelStore,
-    nodeStore,
     operationalStatus,
   } = useUiDependencies();
   const [workflowState, setWorkflowState] = useState<IWorkflowStoreState>(fallbackWorkflowState);
   const [contextState, setContextState] = useState<ContextStoreState>(fallbackContextState);
   const [modelState, setModelState] = useState<IModelStoreState>(fallbackModelState);
   const [settingsState, setSettingsState] = useState<UiSettingsState>(() => settingsStore.getState());
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<WorkflowsTabId>("find");
   const browserPresenter = useMemo(() => new WorkflowBrowserPresenter(), []);
@@ -134,18 +137,6 @@ export default function WorkflowsPage(): JSX.Element {
     setActiveTab(destinationTab);
   };
 
-  const createNewWorkflow = async (): Promise<void> => {
-    await workflowStore.createWorkflow({
-      metadata: {
-        name: "Untitled Workflow",
-        description: "",
-        tags: [],
-      },
-      validateOnCreate: false,
-    });
-    setActiveTab("create");
-  };
-
   return (
     <section className="ui-page">
       <div className="ui-page__hero">
@@ -173,7 +164,7 @@ export default function WorkflowsPage(): JSX.Element {
           type="button"
           className="ui-button ui-button--primary ui-button--md"
           onClick={() => {
-            void createNewWorkflow().catch(() => undefined);
+            navigate(buildWorkflowStudioCreateNewPath());
           }}
         >
           New Workflow
@@ -228,7 +219,7 @@ export default function WorkflowsPage(): JSX.Element {
               isLoading={workflowState.isLoading}
               onQueryChange={setQuery}
               onLoadIntoCanvas={(workflowId) => {
-                void openWorkflow(workflowId, "create").catch(() => undefined);
+                navigate(buildWorkflowStudioOpenExistingPath(workflowId));
               }}
               onLoadIntoExecutor={(workflowId) => {
                 void openWorkflow(workflowId, "execute").catch(() => undefined);
@@ -245,31 +236,30 @@ export default function WorkflowsPage(): JSX.Element {
         className="ui-page-tab-panel"
         hidden={activeTab !== "create"}
       >
-        {currentWorkflow ? (
-          <WorkflowEditorPage
-            workflowStore={workflowStore}
-            nodeStore={nodeStore}
-            showHeader={false}
-          />
-        ) : (
-          <div className="ui-card">
-            <div className="ui-card__body ui-empty-state">
-              <h2>Create Flows</h2>
-              <p className="ui-text-secondary">
-                Start a new workflow or load one from the Find Flows tab to open the canvas editor here.
-              </p>
-              <button
-                type="button"
+        <div className="ui-card">
+          <div className="ui-card__body ui-stack ui-stack--sm">
+            <h2>Create Flows</h2>
+            <p className="ui-text-secondary">
+              Workflow authoring now runs through Workflow Studio so wizard/canvas editing, handoff, validation, and run readiness stay on the shared studio-shell architecture.
+            </p>
+            <div className="ui-row ui-row--wrap">
+              <Link
                 className="ui-button ui-button--primary ui-button--md"
-                onClick={() => {
-                  void createNewWorkflow().catch(() => undefined);
-                }}
+                to={buildWorkflowStudioCreateNewPath()}
               >
-                Start a new workflow
-              </button>
+                Open Workflow Studio
+              </Link>
+              {currentWorkflow?.id ? (
+                <Link
+                  className="ui-button ui-button--secondary ui-button--md"
+                  to={buildWorkflowStudioOpenExistingPath(currentWorkflow.id)}
+                >
+                  Edit selected workflow
+                </Link>
+              ) : null}
             </div>
           </div>
-        )}
+        </div>
       </section>
 
       <section

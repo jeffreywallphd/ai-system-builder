@@ -8,7 +8,9 @@ describe("SystemStudioPage contracts", () => {
 
     expect(pageSource).toContain("StudioShellPage");
     expect(pageSource).toContain("systemStudioRegistration");
-    expect(pageSource).toContain("studioRegistration={systemStudioRegistration}");
+    expect(pageSource).toContain("resolveSystemBuildTemplate");
+    expect(pageSource).toContain("buildTemplateId");
+    expect(pageSource).toContain("assetId: selectedTemplate.draftSeed.assetId");
 
     expect(registrationSource).toContain("studioType: SystemStudioIdentity.studioType");
     expect(registrationSource).toContain('kind: "system"');
@@ -16,22 +18,19 @@ describe("SystemStudioPage contracts", () => {
     expect(registrationSource).toContain("createSystemStudioTaxonomy(\"system\", \"deterministic\")");
     expect(registrationSource).toContain('supportsSystemAssets: true');
     expect(registrationSource).toContain('supportsNestedSystemAssets: true');
-    expect(registrationSource).toContain('slot: "draft-authoring"');
-    expect(registrationSource).toContain("SystemCompositionEditor");
-    expect(registrationSource).toContain("SystemInterfaceEditor");
-    expect(registrationSource).toContain("SystemParameterConfigEditor");
-    expect(registrationSource).toContain("SystemExecutionMetadataEditor");
+    expect(registrationSource).toContain("draftAuthoringSurfaces");
+    expect(registrationSource).toContain("wizard: true");
+    expect(registrationSource).toContain("canvas: false");
+    expect(registrationSource).toContain("system-studio-advanced-validation");
     expect(registrationSource).toContain("SystemRuntimeRunPanel");
-    expect(registrationSource).toContain("SystemCompatibilityInsightsPanel");
-    expect(registrationSource).toContain("system-studio-structure-editor");
-    expect(registrationSource).toContain("system-studio-interface-editor");
-    expect(registrationSource).toContain("system-studio-parameter-editor");
-    expect(registrationSource).toContain("system-studio-execution-metadata-editor");
     expect(registrationSource).toContain("system-studio-runtime-run-trigger");
-    expect(registrationSource).toContain("system-studio-compatibility-insights");
-    expect(registrationSource).toContain('slot: "dependencies"');
-    expect(registrationSource).toContain('slot: "metadata"');
+    expect(registrationSource).toContain("Advanced validation and debug");
     expect(registrationSource).toContain('slot: "validation"');
+    expect(registrationSource).not.toContain("system-studio-template-selection");
+    expect(registrationSource).not.toContain("system-studio-reference-image-experience");
+    expect(registrationSource).not.toContain("system-studio-advanced-setup");
+    expect(registrationSource).not.toContain("system-studio-composition-capabilities");
+    expect(registrationSource).not.toContain("system-studio-metadata-summary");
   });
 
   it("keeps System Studio wired into shared route and navigation configuration", () => {
@@ -77,7 +76,36 @@ describe("SystemStudioPage contracts", () => {
     expect(parameterSource).toContain("updateSystemParameters");
     expect(executionMetadataSource).toContain("data-testid=\"system-execution-metadata-editor\"");
     expect(executionMetadataSource).toContain("System execution metadata");
+    expect(executionMetadataSource).toContain("Runtime capability binding (bounded)");
+    expect(executionMetadataSource).toContain("Model binding ID");
+    expect(executionMetadataSource).toContain("selected model/checkpoint binding");
     expect(executionMetadataSource).toContain("updateSystemExecutionMetadata");
+  });
+
+  it("uses reusable wizard/canvas experience assets for system draft authoring", () => {
+    const shellPageSource = readSource("ui/pages/StudioShellPage.tsx");
+    const boundarySource = readSource("ui/components/studio-shell/system/SystemStudioDraftAuthoringBoundary.tsx");
+    const canvasAdapterSource = readSource("ui/studio-shell/system/SystemCanvasExperienceAdapter.tsx");
+
+    expect(shellPageSource).toContain("StudioAssetHostBoundary");
+    expect(shellPageSource).toContain("systemStudioSurfaceAssetDefinition");
+    expect(boundarySource).not.toContain("ExperienceAssetAuthoringBoundary");
+    expect(boundarySource).toContain("SystemPageSetupEditor");
+    expect(boundarySource).toContain("ConfigurableCanvasSurface");
+    expect(boundarySource).toContain("No draft authoring surface is configured");
+    expect(boundarySource).toContain("system-studio-primary-canvas-summary");
+    expect(boundarySource).toContain("The page layout canvas is the main editing space in System Studio");
+    expect(boundarySource).not.toContain("system-studio-mode-actions");
+    expect(boundarySource).toContain("resolveSelectedPagePanelsFromLatest");
+    expect(boundarySource).toContain("createNextPanelId");
+    expect(canvasAdapterSource).toContain("Page structure");
+    expect(canvasAdapterSource).toContain("add-panel");
+    expect(canvasAdapterSource).toContain("Add page section");
+    expect(canvasAdapterSource).toContain("remove-panel");
+    expect(canvasAdapterSource).toContain("Structure only");
+    expect(canvasAdapterSource).not.toContain("SystemCompositionEditor");
+    expect(canvasAdapterSource).not.toContain("SystemInterfaceEditor");
+    expect(canvasAdapterSource).not.toContain("SystemParameterConfigEditor");
   });
 
   it("wires a bounded run trigger panel through the shared System Studio extension surface", () => {
@@ -102,5 +130,16 @@ describe("SystemStudioPage contracts", () => {
     expect(compatibilitySource).toContain("bindingIncompatibilityCount");
     expect(compatibilitySource).toContain("unresolvedNestedSystemCount");
     expect(compatibilitySource).toContain("configurationMismatchCount");
+  });
+
+  it("renders a bounded system context preview/debug surface for trigger payload inspection", () => {
+    const source = readSource("ui/components/studio-shell/SystemContextDebugPreviewPanel.tsx");
+    expect(source).toContain("data-testid=\"system-context-debug-preview-panel\"");
+    expect(source).toContain("System context preview + debug");
+    expect(source).toContain("normalized context");
+    expect(source).toContain("Dataset resolution output");
+    expect(source).toContain("Workflow context binding output");
+    expect(source).toContain("Enriched trigger payload preview");
+    expect(source).toContain("SystemContextDebugPreviewService");
   });
 });

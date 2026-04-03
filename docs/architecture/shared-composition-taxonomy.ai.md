@@ -6,7 +6,7 @@ Provide one compact, reusable classification model for workflows/assets/context/
 ## Core model
 `domain/taxonomy/CompositionTaxonomy.ts` defines:
 - `structuralKind`: `atomic` | `composite` | `system`
-- `semanticRole`: `model` | `dataset` | `tool` | `prompt-template` | `embedding-index` | `config-profile` | `workflow` | `agent` | `context-bundle` | `dataset-pipeline` | `training-recipe` | `tool-chain` | `app-template` | `system`
+- `semanticRole`: `model` | `dataset` | `tool` | `prompt-template` | `embedding-index` | `config-profile` | `workflow` | `workflow-template` | `agent` | `context-bundle` | `dataset-pipeline` | `training-recipe` | `tool-chain` | `app-template` | `system`
 - `behaviorKind`: `none` | `deterministic` | `conditional` | `iterative` | `autonomous` (with `dynamic` normalized as a compatibility alias)
 
 Behavior is a property of the same structural object, not a separate top-level architecture.
@@ -54,6 +54,35 @@ Current Direction 5 target shape remains:
   - `context-bundle` = input preparer
 - These are semantic-role distinctions inside one shared taxonomy (not separate architecture stacks).
 
+## Image-slice interface asset interpretation (stories 4.4.1-4.4.2)
+
+- For image manipulation UI assets, taxonomy/composition guidance is:
+  - atomic interface assets: reusable bounded components like output gallery item/card, output detail pane, metadata summary panel, parameter summary panel.
+  - higher-level composed interface assets: system-bound assemblies that compose those atomic assets and bind them to system context + dataset instances + workflow/run events.
+- In this slice, contract design is generalized for future media/document/system interfaces, while concrete implementation remains image-focused.
+
+## Image-slice interface asset realization (stories 4.4.5-4.4.6)
+
+- Atomic interface assets now include reusable output/history renderers:
+  - `ImageOutputGalleryCollection` and card composition for grid/list output presentation,
+  - `ImageRunHistoryList` + run-history item surface,
+  - reusable parameter/metadata summary panels shared across output and run-history rows.
+- Higher-level composed interface assets now bind those atomic assets to persisted system state contracts:
+  - `ImageOutputGalleryAsset` -> dataset-backed `OutputGalleryListing`,
+  - `ImageRunHistoryAsset` -> persisted `ImageRunHistoryListing`.
+- This preserves taxonomy intent: bounded reusable atomics plus system-aware composition assets that handle dataset/workflow/run context wiring.
+
+## Image-slice interface asset interaction realization (stories 4.4.7-4.4.8)
+
+- Atomic interface assets now include explicit interaction units for output/result workflows:
+  - output selection action bar,
+  - output detail/inspection pane,
+  - run-history list item selection state/action.
+- Higher-level composed assets now include history/output interaction orchestration:
+  - `ImageOutputGalleryAsset` binds persisted output records to selection, inspection, active-result marking, and reuse-as-input preparation semantics,
+  - `ImageHistoryLinkedOutputInspectorAsset` binds selected run-history entries to linked output-gallery projections using persisted identifiers/contracts.
+- Composition remains taxonomy-aligned: atomics keep narrow reusable contracts while composed assets own dataset/workflow/run/system-context binding behavior.
+
 ## Explicit non-goals in this slice
 - no UI composer rewrite
 - no replacement of workflow or execution backbone
@@ -72,3 +101,14 @@ Current Direction 5 target shape remains:
   - autonomous => planner-capable execution profile
 - Behavior kind `none` stays non-executable in this runtime mapping layer (returns no runtime behavior profile).
 - Workflow/agent/system resolution is provided through `RuntimeBehaviorAlignmentService` and delegates classification to the existing `CompositionTaxonomyClassifier` seam.
+
+## Image-slice lineage + system interaction realization (stories 4.4.9-4.4.10)
+
+- Added `ImageLineageMiniView` as an additional atomic interface asset for bounded lineage inspection (input -> run -> output -> dataset).
+- Added `ImageResultHistoryInteractionSpaceAsset` as a higher-level composed interface asset that integrates:
+  - output gallery,
+  - run history,
+  - selection/inspection behavior,
+  - history->output linking,
+  - lineage mini-view.
+- Lineage and interaction composition are driven by persisted run-history + output-gallery contracts (`ImageRunHistoryWithOutputs`) and stable record/run/instance ids.

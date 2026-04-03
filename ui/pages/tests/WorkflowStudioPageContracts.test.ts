@@ -6,6 +6,7 @@ describe("WorkflowStudioPage contracts", () => {
     const pageSource = readSource("ui/pages/WorkflowStudioPage.tsx");
     const registrationSource = readSource("ui/studio-shell/registrations/WorkflowStudioRegistration.ts");
     const shellSource = readSource("ui/pages/StudioShellPage.tsx");
+    const workflowBoundarySource = readSource("ui/components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary.tsx");
 
     expect(pageSource).toContain("StudioShellPage");
     expect(pageSource).toContain("workflowStudioRegistration");
@@ -26,14 +27,14 @@ describe("WorkflowStudioPage contracts", () => {
     expect(registrationSource).toContain("workflow-studio-run-history");
     expect(registrationSource).toContain('slot: "draft-authoring"');
     expect(registrationSource).toContain('slot: "session-context"');
-    expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain('createWorkflowStudioTaxonomy("deterministic")');
     expect(registrationSource).toContain("drawers: Object.freeze(");
     expect(registrationSource).toContain('label: "Nodes"');
     expect(registrationSource).toContain('label: "Inspector"');
     expect(registrationSource).toContain('kind: "run-workflow-draft"');
 
-    expect(shellSource).toContain("WorkflowStudioDraftAuthoringBoundary");
+    expect(shellSource).toContain("StudioAssetHostBoundary");
+    expect(shellSource).toContain("workflowStudioSurfaceAssetDefinition");
     expect(shellSource).toContain("workflowModeRoute");
     expect(shellSource).toContain("workflowWizardPageRoute");
     expect(shellSource).toContain("resolvedWorkflowModeId");
@@ -51,5 +52,9 @@ describe("WorkflowStudioPage contracts", () => {
     expect(shellSource).toContain("clearHandoffStatus");
     expect(shellSource).toContain('data-testid="studio-shell-left-drawer-toggle"');
     expect(shellSource).toContain('data-testid="studio-shell-right-drawer-toggle"');
+
+    expect(workflowBoundarySource).not.toContain("ExperienceAssetAuthoringBoundary");
+    expect(workflowBoundarySource).toContain("Unsupported experience mode selection");
+    expect(workflowBoundarySource).toContain("buildWorkflowExperienceDefinition");
   });
 });

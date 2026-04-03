@@ -78,6 +78,7 @@ import { SystemStudioBackendApi } from "../../infrastructure/api/system-studio/S
 import { SystemRuntimeBackendApi } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import { SqliteSystemRuntimeExecutionStore } from "../../infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
 import { SqliteExecutionAuditRepository } from "../../infrastructure/filesystem/system-runtime/SqliteExecutionAuditRepository";
+import { SqliteImageRunHistoryRepository } from "../../infrastructure/filesystem/system-runtime/SqliteImageRunHistoryRepository";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -313,6 +314,8 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     studioShellRepository,
     workflowPersistenceRepository,
     workflowRunSummaryRepository,
+    undefined,
+    new SqliteImageRunHistoryRepository(path.join(storagePaths.assetsDirectory, "system-image-run-history.sqlite")),
   );
   const systemStudioBackendApi = new SystemStudioBackendApi(studioShellRepository);
   const runtimeExecutionStore = new SqliteSystemRuntimeExecutionStore(path.join(storagePaths.assetsDirectory, "system-runtime.sqlite"));
@@ -553,6 +556,22 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateExecutionMetadata"]>[0];
     return JSON.stringify(await systemStudioBackendApi.updateExecutionMetadata(request));
   });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:save", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["saveSystemDefinition"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.saveSystemDefinition(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:load", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["loadSystemDefinition"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.loadSystemDefinition(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:duplicate", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["duplicateSystemDefinition"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.duplicateSystemDefinition(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:modify", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["modifySystemDefinition"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.modifySystemDefinition(request));
+  });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-compatibility:insights", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["getCompatibilityInsights"]>[0];
     return JSON.stringify(await systemStudioBackendApi.getCompatibilityInsights(request));
@@ -570,6 +589,22 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-runtime:result", async (_event, executionId: string) => {
     return JSON.stringify(await systemRuntimeBackendApi.getExecutionResult(executionId));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:upload", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["ingestReferenceImageUpload"]>[0];
+    return JSON.stringify(await studioShellBackendApi.ingestReferenceImageUpload(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:persist-outputs", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["persistReferenceImageOutputs"]>[0];
+    return JSON.stringify(await studioShellBackendApi.persistReferenceImageOutputs(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:list-outputs", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listReferenceImageOutputs"]>[0];
+    return JSON.stringify(await studioShellBackendApi.listReferenceImageOutputs(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:list-run-history", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listReferenceImageRunHistory"]>[0];
+    return JSON.stringify(await studioShellBackendApi.listReferenceImageRunHistory(request));
   });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
     event.returnValue = fs.existsSync(targetPath);

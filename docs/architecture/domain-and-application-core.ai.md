@@ -1681,3 +1681,41 @@ Explicitly later than this scope:
 - Data Studio now has a canonical persistent authoring-state contract in `application/data-studio/DataStudioPipelineState.ts`, modeling pipeline identity/metadata, stage-level state, stage asset-group bindings, transitions, authoring-flow metadata, and wizard/canvas compatibility projection hooks over one unified-preparation asset source.
 - `DataStudioPreparationWizard` now exports/imports this persistent state directly, so wizard progression and later canvas projection can operate on one serializable, validation-backed representation rather than transient component-local state.
 - Prepared-data persistence now includes an explicit prepared-storage stage service (`application/dataset-studio/PreparedStorageStageService.ts`) and output contracts (`PreparedStorageStageOutput` in `StageIntegrationContracts.ts`) that bind prepared dataset identity, storage target/reference, upstream asset/pipeline references, and lineage metadata through bounded application seams.
+
+## Direction 5 UI update: UI-trigger normalized error/feedback + traceability (stories 4.2.7-4.2.8)
+
+- UI-triggered workflow dispatch now has a normalized interaction error/result contract in `application/workflow-studio/WorkflowUiInteractionContracts.ts`:
+  - deterministic issue codes for invalid event payloads, binding failures, parameter-mapping failures, dispatch failures, and execution-launch failures,
+  - framework-agnostic feedback sink hooks (`onStatus`, `onIssue`, `onDispatchRecord`) for UI status rendering without coupling image/system/workflow components to runtime internals.
+- Runtime UI dispatch now emits typed interaction status transitions (received, validation-failed, no-binding-matched, dispatching, launch-blocked/failed/launched, execution-failed) through the dispatcher seam.
+- UI trigger lifecycle traceability is now captured through internal trace contracts in `application/workflow-studio/WorkflowUiEventTrace.ts`:
+  - normalized event identity/source, binding/workflow refs, payload summaries, dispatch status/outcomes, and correlation ids,
+  - trace sink adapter boundary allows persistence/logging evolution without leaking React/browser event structures into shared or durable traces.
+
+## Direction 5 update: Dataset-pipeline schema linkage in ingestion + pipeline configuration (stories 3.2.5-3.2.6)
+
+- Dataset-pipeline document contracts now support schema linkage at both levels:
+  - pipeline-level input/output schema references (`datasetPipelineSpec.schemas.input/output`),
+  - ingestion-source-level schema references (`datasetPipelineSpec.sources[].schema`) for source-specific structure alignment.
+- Pipeline draft normalization and update helpers continue to be domain-owned in `domain/dataset-pipeline-studio/DatasetPipelineAssetDocument.ts`, with schema reference parsing/cleanup centralized there (no UI-local schema-link persistence model).
+- Dataset Pipeline Studio authoring now uses registry-backed schema discovery for linking:
+  - select/update/clear flows for input schema and output schema,
+  - per-source schema selection for ingestion sources,
+  - graceful unresolved/missing-schema status projection without blocking draft editing.
+- The authoring UX keeps structure linkage separate from schema authoring:
+  - Schema Studio remains the place to define table/field structure,
+  - Dataset Pipeline Studio links those schema assets for ingestion and pipeline contracts.
+
+## Direction 5 update: legacy data-definition compatibility seam (story 3.2.9)
+
+- Data Studio persisted-state import now uses a pragmatic two-step path in `DataStudioPreparationWizard`:
+  - try canonical `deserializeDataStudioPipelineState`,
+  - if that fails, attempt bounded translation of legacy `datasetSpec`/mixed `datasetPipelineSpec` payloads into current stage options.
+- The compatibility seam is intentionally narrow and load-time only:
+  - no separate migration framework,
+  - no parallel persistence model,
+  - canonical save/export still writes current `DataStudioPipelineState`.
+- Dataset Pipeline draft parsing in `domain/dataset-pipeline-studio/DatasetPipelineAssetDocument.ts` now normalizes legacy contracts into current pipeline-document shape before zod validation:
+  - `datasetSpec` -> `datasetPipelineSpec`,
+  - `datasetPipelineSpec.schema` -> `datasetPipelineSpec.schemas.input.inlineDefinition`.
+- Recoverable migrations now emit explicit parse issues so legacy/mixed drafts are visible to authors while remaining editable and serializable in current format.

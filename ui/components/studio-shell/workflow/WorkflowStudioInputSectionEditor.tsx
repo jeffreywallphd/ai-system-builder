@@ -4,6 +4,11 @@ import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../domain/
 import { WorkflowDraftInputSourceTypes } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import { serializeWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
+  type WorkflowInputBindingSourceDescriptor,
+  WorkflowInputBindingSourceKinds,
+} from "../../../../domain/workflow-studio/WorkflowInputBindingDomain";
+import { previewWorkflowInputBindings } from "../../../../application/workflow-studio/WorkflowInputBindingPreviewService";
+import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionState,
 } from "../../../../application/studio-entry/AssetSelectorSessionStore";
@@ -25,6 +30,13 @@ import {
   removeDatasetInputSelection,
   replaceDatasetInputSelections,
 } from "../../../studio-shell/workflow/WorkflowWizardDatasetInputs";
+import {
+  createDefaultBindingSource,
+  createSingleSourceBinding,
+  listWorkflowInputBindings,
+  removeWorkflowInputBinding,
+  upsertWorkflowInputBinding,
+} from "../../../studio-shell/workflow/WorkflowWizardInputBindings";
 import {
   WorkflowStudioHandoffFlowKinds,
   WorkflowStudioHandoffStatusKinds,
@@ -81,6 +93,26 @@ function buildDatasetLabel(input: {
 
 const datasetSelectorTargetId = "workflow-inputs:dataset";
 const datasetSelectorOriginatingField = "inputs.dataset";
+const bindingSourceKinds = Object.values(WorkflowInputBindingSourceKinds);
+
+function summarizeBindingReference(source: WorkflowInputBindingSourceDescriptor): string {
+  switch (source.kind) {
+    case WorkflowInputBindingSourceKinds.uiFormValue:
+      return source.formKey;
+    case WorkflowInputBindingSourceKinds.runtimeParameter:
+      return source.parameterKey;
+    case WorkflowInputBindingSourceKinds.triggerPayload:
+      return source.payloadKey;
+    case WorkflowInputBindingSourceKinds.selectedImage:
+      return source.path ?? "assetRef";
+    case WorkflowInputBindingSourceKinds.datasetInstanceReference:
+      return source.instanceId ?? source.purpose ?? "";
+    case WorkflowInputBindingSourceKinds.constantValue:
+      return typeof source.value === "string" ? source.value : JSON.stringify(source.value);
+    default:
+      return "";
+  }
+}
 
 export default function WorkflowStudioInputSectionEditor({
   sharedDraft,
@@ -159,6 +191,21 @@ export default function WorkflowStudioInputSectionEditor({
     () => draftValidationIssues.filter((issue) => issue.path?.startsWith("draft.inputs[")),
     [draftValidationIssues],
   );
+  const inputBindings = useMemo(() => listWorkflowInputBindings(sharedDraft), [sharedDraft]);
+  const bindingPreview = useMemo(() => previewWorkflowInputBindings({
+    bindings: inputBindings,
+    context: {
+      uiFormValues: Object.freeze({ sourceImage: "ui:sourceImage", stylePreset: "ui:stylePreset", instruction: "ui:instruction" }),
+      selectedImage: Object.freeze({ assetRef: Object.freeze({ assetId: "asset:image:selected" }) }),
+      datasetInstances: Object.freeze(datasetInputs.map((entry) => Object.freeze({
+        instanceId: `instance:${entry.id}`,
+        datasetAssetId: entry.asset.assetId,
+        datasetVersionId: entry.asset.versionId,
+        purpose: "active-input",
+        records: Object.freeze([{ recordId: "record:0", value: Object.freeze({ assetRef: { assetId: entry.asset.assetId } }) }]),
+      }))),
+    },
+  }), [datasetInputs, inputBindings]);
   const sectionHasErrors = datasetValidationIssues.length > 0;
 
   const launchDatasetStudioFromSelector = (): void => {
@@ -567,6 +614,114 @@ export default function WorkflowStudioInputSectionEditor({
             </ul>
           </div>
         ) : null}
+
+        <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-input-binding-authoring">
+          <strong>Input binding authoring</strong>
+          <span className="ui-text-small ui-text-secondary">
+            Configure explicit workflow input bindings using canonical source kinds and inspect validation/preview results.
+          </span>
+          {sharedDraft.inputs.length === 0 ? (
+            <span className="ui-text-small ui-text-secondary">Add workflow inputs before authoring bindings.</span>
+          ) : (
+            <div className="ui-stack ui-stack--2xs">
+              {sharedDraft.inputs.map((input) => {
+                const existing = inputBindings.find((entry) => entry.inputId === input.id);
+                const source = existing?.sources[0];
+                const previewItem = bindingPreview.items.find((item) => item.inputId === input.id);
+                const sourceKind = source?.kind ?? WorkflowInputBindingSourceKinds.runtimeParameter;
+                const sourceReference = source ? summarizeBindingReference(source) : input.id;
+                return (
+                  <div key={`binding-${input.id}`} className="ui-card ui-card--flat ui-stack ui-stack--2xs">
+                    <div className="ui-row ui-row--between ui-row--wrap" style={{ gap: "0.5rem" }}>
+                      <strong>{input.title?.trim() || input.id}</strong>
+                      <span className="ui-text-small ui-text-secondary">{input.id}</span>
+                    </div>
+                    <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem", alignItems: "flex-end" }}>
+                      <label className="ui-stack ui-stack--2xs">
+                        <span className="ui-text-small">Source type</span>
+                        <select
+                          className="ui-input"
+                          value={sourceKind}
+                          data-testid={`workflow-input-binding-source-kind-${input.id}`}
+                          onChange={(event) => {
+                            if (!onUpdateSharedDraft) {
+                              return;
+                            }
+                            const nextSource = createDefaultBindingSource({
+                              inputId: input.id,
+                              kind: event.target.value as WorkflowInputBindingSourceDescriptor["kind"],
+                              reference: sourceReference,
+                            });
+                            onUpdateSharedDraft((draft) => upsertWorkflowInputBinding(draft, createSingleSourceBinding({
+                              inputId: input.id,
+                              required: input.required,
+                              valueType: input.valueType,
+                              source: nextSource,
+                            })));
+                          }}
+                        >
+                          {bindingSourceKinds.map((kind) => (
+                            <option key={`${input.id}:${kind}`} value={kind}>{kind}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="ui-stack ui-stack--2xs" style={{ minWidth: "14rem", flex: "1 1 14rem" }}>
+                        <span className="ui-text-small">Source reference</span>
+                        <input
+                          className="ui-input"
+                          value={sourceReference}
+                          data-testid={`workflow-input-binding-source-reference-${input.id}`}
+                          onChange={(event) => {
+                            if (!onUpdateSharedDraft) {
+                              return;
+                            }
+                            const nextSource = createDefaultBindingSource({
+                              inputId: input.id,
+                              kind: sourceKind,
+                              reference: event.target.value,
+                            });
+                            onUpdateSharedDraft((draft) => upsertWorkflowInputBinding(draft, createSingleSourceBinding({
+                              inputId: input.id,
+                              required: input.required,
+                              valueType: input.valueType,
+                              source: nextSource,
+                            })));
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="ui-button ui-button--ghost ui-button--sm"
+                        data-testid={`workflow-input-binding-clear-${input.id}`}
+                        onClick={() => {
+                          if (!onUpdateSharedDraft) {
+                            return;
+                          }
+                          onUpdateSharedDraft((draft) => removeWorkflowInputBinding(draft, input.id));
+                        }}
+                      >
+                        Clear binding
+                      </button>
+                    </div>
+                    <div className="ui-text-small ui-text-secondary">
+                      Validation: {previewItem?.diagnostics.length ? `${previewItem.diagnostics.length} issue(s)` : "no issues"} ·
+                      Preview: {previewItem?.resolved ? `${previewItem.valueSummary?.summary ?? "resolved"}` : "unresolved"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {bindingPreview.diagnostics.length > 0 ? (
+            <ul className="ui-stack ui-stack--2xs">
+              {bindingPreview.diagnostics.map((diagnostic, index) => (
+                <li key={`binding-diagnostic-${diagnostic.bindingId}-${index}`} className={diagnostic.severity === "error" ? "ui-text-danger" : "ui-text-small"}>
+                  {diagnostic.bindingId}: {diagnostic.message}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
 
         {datasetValidationIssues.length > 0 ? (
           <ul className="ui-stack ui-stack--2xs">

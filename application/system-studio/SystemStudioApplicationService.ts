@@ -37,6 +37,18 @@ import {
   type StudioAssetEnforcementIssue,
 } from "../studio-shell/AtomicStudioAssetEnforcement";
 import type { AssetVersion } from "../../domain/assets/AssetVersion";
+import { parsePersistedRuntimeCapabilityBindingEnvelope } from "../system-runtime/RuntimeCapabilityBindingPersistence";
+import {
+  parseSystemSerializationDocument,
+  serializeSystemSerializationDocument,
+  type SystemSerializationContract,
+} from "../../domain/system-studio/SystemSerializationContract";
+import { SerializedAssetReferenceResolutionService } from "../system-runtime/SerializedAssetReferenceResolutionService";
+import {
+  DatasetInstanceDuplicationModes,
+  SystemDatasetInstancePersistenceService,
+  type RestoreSystemDatasetInstancePersistenceIssue,
+} from "../system-runtime/SystemDatasetInstancePersistenceService";
 
 export interface EnsureSystemStudioResult {
   readonly initialized: boolean;
@@ -147,70 +159,139 @@ export interface UpdateSystemExecutionMetadataCommand {
   readonly executionMetadata?: SystemExecutionMetadata;
 }
 
-function parseSystemContent(content: string): SystemSpecContent {
-  if (!content.trim()) {
-    return Object.freeze({});
+export interface SaveSystemDefinitionCommand {
+  readonly studioId?: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+}
+
+export interface SaveSystemDefinitionResult {
+  readonly draft: AssetDraftResult["draft"];
+  readonly serialization: SystemSerializationContract;
+}
+
+export interface LoadSystemDefinitionCommand {
+  readonly studioId?: string;
+  readonly draftId?: string;
+  readonly versionId?: string;
+}
+
+export interface LoadSystemDefinitionIssue {
+  readonly code: string;
+  readonly message: string;
+  readonly severity: "warning" | "error";
+}
+
+export interface LoadSystemDefinitionResult {
+  readonly source: "draft" | "version";
+  readonly schemaVersion: string;
+  readonly serialization: SystemSerializationContract;
+  readonly system: SystemAsset;
+  readonly uiConfiguration?: Readonly<Record<string, unknown>>;
+  readonly issues: ReadonlyArray<LoadSystemDefinitionIssue>;
+}
+
+export interface DuplicateSystemDefinitionCommand {
+  readonly studioId?: string;
+  readonly sessionId: string;
+  readonly sourceDraftId: string;
+  readonly duplicateDraftId?: string;
+  readonly duplicateAssetId?: string;
+  readonly title?: string;
+  readonly summary?: string;
+  readonly datasetInstanceMode?: "duplicate" | "reuse";
+}
+
+export interface DuplicateSystemDefinitionResult {
+  readonly sourceDraftId: string;
+  readonly duplicateDraft: AssetDraftResult["draft"];
+  readonly issues: ReadonlyArray<LoadSystemDefinitionIssue>;
+}
+
+export interface WorkflowBindingModification {
+  readonly bindingId: string;
+  readonly workflowAssetId: string;
+  readonly workflowVersionId?: string;
+  readonly componentAlias?: string;
+}
+
+export interface DatasetBindingModification {
+  readonly instanceId: string;
+  readonly datasetAssetId: string;
+  readonly datasetVersionId?: string;
+}
+
+export interface ModifySystemDefinitionCommand {
+  readonly studioId?: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+  readonly workflowBindings?: ReadonlyArray<WorkflowBindingModification>;
+  readonly datasetBindings?: ReadonlyArray<DatasetBindingModification>;
+  readonly runtimeStatePatch?: Readonly<Record<string, unknown>>;
+  readonly uiConfigurationPatch?: Readonly<Record<string, unknown>>;
+}
+
+export interface ModifySystemDefinitionResult {
+  readonly draft: AssetDraftResult["draft"];
+  readonly issues: ReadonlyArray<LoadSystemDefinitionIssue>;
+}
+
+function normalizeSystemExecutionMetadataInput(
+  input?: SystemExecutionMetadata,
+): SystemExecutionMetadata | undefined {
+  if (!input) {
+    return undefined;
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    throw new StudioShellInvalidRequestError("System draft content must be valid JSON.");
-  }
-
-  if (!parsed || typeof parsed !== "object") {
-    throw new StudioShellInvalidRequestError("System draft content must be a JSON object.");
-  }
-
-  const root = parsed as { readonly systemSpec?: unknown };
-  const spec = (root.systemSpec && typeof root.systemSpec === "object")
-    ? root.systemSpec as {
-      readonly components?: ReadonlyArray<SystemAsset["components"][number]>;
-      readonly nestedSystems?: ReadonlyArray<SystemAsset["nestedSystems"][number]>;
-      readonly inputs?: ReadonlyArray<SystemAsset["inputs"][number]>;
-      readonly outputs?: ReadonlyArray<SystemAsset["outputs"][number]>;
-      readonly parameters?: ReadonlyArray<SystemAsset["parameters"][number]>;
-      readonly bindings?: ReadonlyArray<SystemAsset["bindings"][number]>;
-      readonly executionMetadata?: SystemExecutionMetadata;
-    }
+  const runtimeCapabilityBindings = input.runtimeCapabilityBindings
+    ? parsePersistedRuntimeCapabilityBindingEnvelope(input.runtimeCapabilityBindings)
     : undefined;
 
   return Object.freeze({
-    components: spec?.components,
-    nestedSystems: spec?.nestedSystems,
-    inputs: spec?.inputs,
-    outputs: spec?.outputs,
-    parameters: spec?.parameters,
-    bindings: spec?.bindings,
-    executionMetadata: spec?.executionMetadata,
+    ...input,
+    runtimeCapabilityBindings,
   });
 }
 
-function parseSystemContentEnvelope(content: string): Record<string, unknown> {
-  if (!content.trim()) {
-    return {};
+function parseSystemContent(content: string): SystemSpecContent {
+  try {
+    const parsed = parseSystemSerializationDocument({ content });
+    return Object.freeze({
+      components: parsed.systemSpec.components,
+      nestedSystems: parsed.systemSpec.nestedSystems,
+      inputs: parsed.systemSpec.inputs,
+      outputs: parsed.systemSpec.outputs,
+      parameters: parsed.systemSpec.parameters,
+      bindings: parsed.systemSpec.bindings,
+      executionMetadata: parsed.systemSpec.executionMetadata,
+    });
+  } catch (error) {
+    throw new StudioShellInvalidRequestError(
+      error instanceof Error
+        ? error.message
+        : "System draft content must be valid JSON.",
+    );
   }
-  const parsed = JSON.parse(content) as unknown;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return {};
-  }
-  return { ...(parsed as Record<string, unknown>) };
 }
 
 function serializeSystemContent(input: {
   readonly content: string;
   readonly spec: SystemSpecContent;
+  readonly dependencies?: ReadonlyArray<AssetDraftDependencyReference>;
 }): string {
-  const root = parseSystemContentEnvelope(input.content);
-  const existingSpec = (root.systemSpec && typeof root.systemSpec === "object" && !Array.isArray(root.systemSpec))
-    ? root.systemSpec as Record<string, unknown>
-    : {};
-  root.systemSpec = {
-    ...existingSpec,
-    ...input.spec,
-  };
-  return JSON.stringify(root, null, 2);
+  return serializeSystemSerializationDocument({
+    existingContent: input.content,
+    dependencies: input.dependencies ?? [],
+    systemSpec: {
+      components: input.spec.components ?? [],
+      nestedSystems: input.spec.nestedSystems ?? [],
+      inputs: input.spec.inputs ?? [],
+      outputs: input.spec.outputs ?? [],
+      parameters: input.spec.parameters ?? [],
+      bindings: input.spec.bindings ?? [],
+      executionMetadata: input.spec.executionMetadata,
+    },
+  });
 }
 
 function splitStandaloneDependencies(input: {
@@ -250,11 +331,16 @@ function tryReadPublishedDraftEnvelope(version: AssetVersion): {
 }
 
 export class SystemStudioApplicationService {
+  private readonly serializedReferenceResolver: SerializedAssetReferenceResolutionService;
+
   constructor(
     private readonly studioShellService: StudioShellApplicationService,
     private readonly repository: IStudioShellRepository,
+    private readonly datasetInstancePersistence?: SystemDatasetInstancePersistenceService,
     private readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy" | "resolveSystemContract"> = new CompositionAssetContractResolver(),
-  ) {}
+  ) {
+    this.serializedReferenceResolver = new SerializedAssetReferenceResolutionService(repository);
+  }
 
   public async ensureStudioInitialized(
     studioId: string = SystemStudioIdentity.defaultStudioId,
@@ -305,11 +391,25 @@ export class SystemStudioApplicationService {
       resolveChildContract: async (component) => this.resolveComponentContract(component),
     });
 
+    const normalizedContent = serializeSystemContent({
+      content: command.content,
+      dependencies: provisional.dependencies,
+      spec: {
+        components: provisional.components,
+        nestedSystems: provisional.nestedSystems,
+        inputs: provisional.inputs,
+        outputs: provisional.outputs,
+        parameters: provisional.parameters,
+        bindings: provisional.bindings,
+        executionMetadata: provisional.executionMetadata,
+      },
+    });
+
     return this.studioShellService.createAssetDraft({
       studioId,
       sessionId: command.sessionId,
       draftId: command.draftId,
-      content: command.content,
+      content: normalizedContent,
       metadata: createSystemAssetMetadata({
         title: command.title,
         summary: command.summary,
@@ -342,6 +442,19 @@ export class SystemStudioApplicationService {
       dependencies,
       ...parseSystemContent(content),
     });
+    const normalizedContent = serializeSystemContent({
+      content,
+      dependencies: systemAsset.dependencies,
+      spec: {
+        components: systemAsset.components,
+        nestedSystems: systemAsset.nestedSystems,
+        inputs: systemAsset.inputs,
+        outputs: systemAsset.outputs,
+        parameters: systemAsset.parameters,
+        bindings: systemAsset.bindings,
+        executionMetadata: systemAsset.executionMetadata,
+      },
+    });
 
     const contract = await this.contractResolver.resolveSystemContract({
       root: systemAsset,
@@ -353,7 +466,7 @@ export class SystemStudioApplicationService {
       studioId,
       sessionId: command.sessionId,
       draftId: command.draftId,
-      content: command.content,
+      content: normalizedContent,
       metadataPatch: {
         summary: command.summary,
         tags: command.tags,
@@ -508,6 +621,7 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
+        dependencies,
         spec: {
           components: nextSystem.components,
           nestedSystems: buildNestedSystemReferences(nextSystem),
@@ -551,6 +665,7 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
+        dependencies,
         spec: {
           components: nextSystem.components,
           nestedSystems: buildNestedSystemReferences(nextSystem),
@@ -585,6 +700,7 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
+        dependencies: loaded.draft.dependencies,
         spec: {
           components,
           nestedSystems: buildNestedSystemReferences(createSystemAsset({
@@ -629,6 +745,7 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
+        dependencies: collectSystemDirectDependencies(nextSystem),
         spec: {
           components: nextSystem.components,
           nestedSystems: buildNestedSystemReferences(nextSystem),
@@ -668,6 +785,7 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
+        dependencies: collectSystemDirectDependencies(nextSystem),
         spec: {
           components: nextSystem.components,
           nestedSystems: buildNestedSystemReferences(nextSystem),
@@ -690,6 +808,7 @@ export class SystemStudioApplicationService {
     }
 
     const spec = parseSystemContent(loaded.draft.content);
+    const executionMetadata = normalizeSystemExecutionMetadataInput(command.executionMetadata);
     const nextSystem = createSystemAsset({
       assetId: loaded.draft.assetId,
       taxonomy: loaded.draft.metadata.taxonomy ?? createSystemStudioTaxonomy(),
@@ -700,7 +819,7 @@ export class SystemStudioApplicationService {
       outputs: spec.outputs,
       parameters: spec.parameters,
       bindings: spec.bindings,
-      executionMetadata: command.executionMetadata,
+      executionMetadata,
     });
 
     return this.updateSystemDraft({
@@ -709,6 +828,7 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
+        dependencies: collectSystemDirectDependencies(nextSystem),
         spec: {
           components: nextSystem.components,
           nestedSystems: buildNestedSystemReferences(nextSystem),
@@ -721,6 +841,406 @@ export class SystemStudioApplicationService {
       }),
       dependencies: collectSystemDirectDependencies(nextSystem),
     });
+  }
+
+  public async saveSystemDefinition(command: SaveSystemDefinitionCommand): Promise<SaveSystemDefinitionResult> {
+    const studioId = command.studioId?.trim() || SystemStudioIdentity.defaultStudioId;
+    const loaded = await this.studioShellService.loadAssetDraft({ studioId, draftId: command.draftId });
+    if (!loaded) {
+      throw new StudioShellInvalidRequestError(`Draft '${command.draftId}' is not available in studio '${studioId}'.`);
+    }
+
+    const parsed = parseSystemSerializationDocument({
+      content: loaded.draft.content,
+      dependencies: loaded.draft.dependencies,
+    });
+    const normalizedContent = serializeSystemSerializationDocument({
+      existingContent: loaded.draft.content,
+      dependencies: parsed.contract.definition.dependencies,
+      systemSpec: parsed.systemSpec,
+      uiConfiguration: parsed.uiConfiguration,
+      runtimeDatasetInstances: this.datasetInstancePersistence?.captureSystemDatasetInstances(loaded.draft.assetId).datasetInstances,
+      runtimeWorkflowBindings: parsed.contract.runtime.workflowBindings,
+      runtimeState: parsed.contract.runtime.state,
+    });
+
+    const updated = await this.studioShellService.updateAssetDraft({
+      studioId,
+      sessionId: command.sessionId,
+      draftId: command.draftId,
+      content: normalizedContent,
+      dependencies: parsed.contract.definition.dependencies,
+    });
+
+    const savedDocument = parseSystemSerializationDocument({
+      content: updated.draft.content,
+      dependencies: updated.draft.dependencies,
+    });
+    if (!savedDocument.contract) {
+      throw new StudioShellInvalidRequestError("Saved system definition is missing canonical serialization contract.");
+    }
+
+    return Object.freeze({
+      draft: updated.draft,
+      serialization: savedDocument.contract,
+    });
+  }
+
+  public async loadSystemDefinition(command: LoadSystemDefinitionCommand): Promise<LoadSystemDefinitionResult> {
+    const refs = [command.draftId?.trim(), command.versionId?.trim()].filter((entry) => Boolean(entry)).length;
+    if (refs !== 1) {
+      throw new StudioShellInvalidRequestError("Exactly one of draftId or versionId is required.");
+    }
+
+    if (command.versionId?.trim()) {
+      const version = await this.repository.getAssetVersion(command.versionId.trim());
+      if (!version) {
+        throw new StudioShellInvalidRequestError(`Version '${command.versionId}' is not available.`);
+      }
+      const envelope = tryReadPublishedDraftEnvelope(version);
+      if (!envelope.content) {
+        throw new StudioShellInvalidRequestError(`Version '${version.versionId}' does not include system content.`);
+      }
+      const parsed = parseSystemSerializationDocument({
+        content: envelope.content,
+        dependencies: envelope.dependencies ?? [],
+      });
+      const issues = await this.resolveSerializedReferenceIssues(parsed.contract);
+      const restoreIssues = this.restoreSerializedDatasetInstanceState({
+        systemId: version.assetId.value,
+        contract: parsed.contract,
+      });
+      return Object.freeze({
+        source: "version",
+        schemaVersion: parsed.schemaVersion,
+        serialization: parsed.contract,
+        system: createSystemAsset({
+          assetId: version.assetId.value,
+          versionId: version.versionId,
+          taxonomy: envelope.metadata?.taxonomy ?? createSystemStudioTaxonomy(),
+          provenance: envelope.metadata?.provenance,
+          dependencies: envelope.dependencies ?? [],
+          ...parsed.systemSpec,
+        }),
+        uiConfiguration: parsed.uiConfiguration,
+        issues: Object.freeze([...issues, ...restoreIssues]),
+      });
+    }
+
+    const studioId = command.studioId?.trim() || SystemStudioIdentity.defaultStudioId;
+    const loaded = await this.studioShellService.loadAssetDraft({ studioId, draftId: command.draftId! });
+    if (!loaded) {
+      throw new StudioShellInvalidRequestError(`Draft '${command.draftId}' is not available in studio '${studioId}'.`);
+    }
+    const parsed = parseSystemSerializationDocument({
+      content: loaded.draft.content,
+      dependencies: loaded.draft.dependencies,
+    });
+    const issues = await this.resolveSerializedReferenceIssues(parsed.contract);
+    const restoreIssues = this.restoreSerializedDatasetInstanceState({
+      systemId: loaded.draft.assetId,
+      contract: parsed.contract,
+    });
+    return Object.freeze({
+      source: "draft",
+      schemaVersion: parsed.schemaVersion,
+      serialization: parsed.contract,
+      system: createSystemAsset({
+        assetId: loaded.draft.assetId,
+        taxonomy: loaded.draft.metadata.taxonomy ?? createSystemStudioTaxonomy(),
+        provenance: loaded.draft.metadata.provenance,
+        dependencies: loaded.draft.dependencies,
+        ...parsed.systemSpec,
+      }),
+      uiConfiguration: parsed.uiConfiguration,
+      issues: Object.freeze([...issues, ...restoreIssues]),
+    });
+  }
+
+  public async duplicateSystemDefinition(command: DuplicateSystemDefinitionCommand): Promise<DuplicateSystemDefinitionResult> {
+    const studioId = command.studioId?.trim() || SystemStudioIdentity.defaultStudioId;
+    const loaded = await this.studioShellService.loadAssetDraft({ studioId, draftId: command.sourceDraftId });
+    if (!loaded) {
+      throw new StudioShellInvalidRequestError(`Draft '${command.sourceDraftId}' is not available in studio '${studioId}'.`);
+    }
+
+    const parsed = parseSystemSerializationDocument({
+      content: loaded.draft.content,
+      dependencies: loaded.draft.dependencies,
+    });
+
+    const duplicateDraftId = command.duplicateDraftId?.trim() || `${loaded.draft.id}:copy`;
+    const duplicateAssetId = command.duplicateAssetId?.trim() || `studio-asset:${duplicateDraftId}`;
+    const datasetInstanceMode = command.datasetInstanceMode ?? DatasetInstanceDuplicationModes.duplicate;
+
+    const datasetInstanceDuplication = this.datasetInstancePersistence
+      ? this.datasetInstancePersistence.duplicateSystemDatasetInstances({
+        sourceSystemId: loaded.draft.assetId,
+        targetSystemId: duplicateAssetId,
+        datasetInstances: parsed.contract.runtime.datasetInstances,
+        mode: datasetInstanceMode,
+      })
+      : Object.freeze({
+        datasetInstances: parsed.contract.runtime.datasetInstances,
+        issues: Object.freeze([] as ReadonlyArray<RestoreSystemDatasetInstancePersistenceIssue>),
+      });
+
+    const duplicatedContent = serializeSystemSerializationDocument({
+      existingContent: loaded.draft.content,
+      dependencies: parsed.contract.definition.dependencies,
+      systemSpec: parsed.systemSpec,
+      uiConfiguration: parsed.uiConfiguration,
+      runtimeDatasetInstances: datasetInstanceDuplication.datasetInstances,
+      runtimeWorkflowBindings: parsed.contract.runtime.workflowBindings,
+      runtimeState: parsed.contract.runtime.state,
+    });
+
+    const duplicated = await this.studioShellService.createAssetDraft({
+      studioId,
+      sessionId: command.sessionId,
+      draftId: duplicateDraftId,
+      assetId: duplicateAssetId,
+      content: duplicatedContent,
+      metadata: {
+        ...loaded.draft.metadata,
+        title: command.title?.trim() || `${loaded.draft.metadata.title} copy`,
+        summary: command.summary?.trim() || loaded.draft.metadata.summary,
+      },
+      dependencies: parsed.contract.definition.dependencies,
+    });
+
+    const referenceIssues = await this.resolveSerializedReferenceIssues(parsed.contract);
+    const restoreIssues = this.restoreSerializedDatasetInstanceState({
+      systemId: duplicated.draft.assetId,
+      contract: parseSystemSerializationDocument({
+        content: duplicated.draft.content,
+        dependencies: duplicated.draft.dependencies,
+      }).contract,
+    });
+    const duplicationIssues = datasetInstanceDuplication.issues.map((issue) => Object.freeze({
+      code: issue.code,
+      message: issue.message,
+      severity: issue.severity,
+    }));
+
+    return Object.freeze({
+      sourceDraftId: command.sourceDraftId,
+      duplicateDraft: duplicated.draft,
+      issues: Object.freeze([...referenceIssues, ...duplicationIssues, ...restoreIssues]),
+    });
+  }
+
+  public async modifySystemDefinition(command: ModifySystemDefinitionCommand): Promise<ModifySystemDefinitionResult> {
+    const studioId = command.studioId?.trim() || SystemStudioIdentity.defaultStudioId;
+    const loaded = await this.studioShellService.loadAssetDraft({ studioId, draftId: command.draftId });
+    if (!loaded) {
+      throw new StudioShellInvalidRequestError(`Draft '${command.draftId}' is not available in studio '${studioId}'.`);
+    }
+
+    const parsed = parseSystemSerializationDocument({
+      content: loaded.draft.content,
+      dependencies: loaded.draft.dependencies,
+    });
+    const workflowBindings = [...parsed.contract.runtime.workflowBindings];
+    const workflowBindingLookup = new Map(workflowBindings.map((entry) => [entry.bindingId, entry]));
+    for (const change of command.workflowBindings ?? []) {
+      const normalizedBindingId = change.bindingId.trim();
+      if (!normalizedBindingId) {
+        continue;
+      }
+      const next = Object.freeze({
+        bindingId: normalizedBindingId,
+        componentAlias: change.componentAlias?.trim() || workflowBindingLookup.get(normalizedBindingId)?.componentAlias,
+        workflowAssetId: change.workflowAssetId.trim(),
+        workflowVersionId: change.workflowVersionId?.trim() || undefined,
+        pinMode: "version" as const,
+      });
+      if (!next.workflowAssetId) {
+        throw new StudioShellInvalidRequestError(`Workflow binding '${normalizedBindingId}' requires workflowAssetId.`);
+      }
+      workflowBindingLookup.set(normalizedBindingId, next);
+    }
+    const nextWorkflowBindings = Object.freeze([...workflowBindingLookup.values()]);
+
+    const datasetInstances = [...parsed.contract.runtime.datasetInstances];
+    const datasetInstanceLookup = new Map(datasetInstances.map((entry) => [entry.instanceId, entry]));
+    for (const change of command.datasetBindings ?? []) {
+      const normalizedInstanceId = change.instanceId.trim();
+      if (!normalizedInstanceId) {
+        continue;
+      }
+      const existing = datasetInstanceLookup.get(normalizedInstanceId);
+      if (!existing) {
+        throw new StudioShellInvalidRequestError(`Dataset binding '${normalizedInstanceId}' is not present in this system.`);
+      }
+      const datasetAssetId = change.datasetAssetId.trim();
+      if (!datasetAssetId) {
+        throw new StudioShellInvalidRequestError(`Dataset binding '${normalizedInstanceId}' requires datasetAssetId.`);
+      }
+      datasetInstanceLookup.set(normalizedInstanceId, Object.freeze({
+        ...existing,
+        datasetAssetId,
+        datasetVersionId: change.datasetVersionId?.trim() || undefined,
+      }));
+    }
+    const nextDatasetInstances = Object.freeze([...datasetInstanceLookup.values()]);
+
+    const workflowReferenceMap = new Map<string, SystemSerializationContract["assetReferences"]["workflows"][number]>();
+    for (const reference of parsed.contract.assetReferences.workflows) {
+      workflowReferenceMap.set(`${reference.assetId}::${reference.versionId ?? ""}`, reference);
+    }
+    for (const binding of nextWorkflowBindings) {
+      const key = `${binding.workflowAssetId}::${binding.workflowVersionId ?? ""}`;
+      workflowReferenceMap.set(key, Object.freeze({
+        kind: "workflow" as const,
+        assetId: binding.workflowAssetId,
+        versionId: binding.workflowVersionId,
+        alias: binding.componentAlias,
+        metadata: { bindingId: binding.bindingId, pinMode: binding.pinMode },
+      }));
+    }
+    const nextWorkflowReferences = Object.freeze([...workflowReferenceMap.values()]);
+
+    const datasetReferenceMap = new Map<string, SystemSerializationContract["assetReferences"]["datasets"][number]>();
+    for (const reference of parsed.contract.assetReferences.datasets) {
+      datasetReferenceMap.set(`${reference.assetId}::${reference.versionId ?? ""}`, reference);
+    }
+    for (const instance of nextDatasetInstances) {
+      if (!instance.datasetAssetId) {
+        continue;
+      }
+      const key = `${instance.datasetAssetId}::${instance.datasetVersionId ?? ""}`;
+      datasetReferenceMap.set(key, Object.freeze({
+        kind: "dataset" as const,
+        assetId: instance.datasetAssetId,
+        versionId: instance.datasetVersionId,
+        alias: instance.role,
+        metadata: { instanceId: instance.instanceId },
+      }));
+    }
+    const nextDatasetReferences = Object.freeze([...datasetReferenceMap.values()]);
+
+    const workflowBindingByAlias = new Map(
+      nextWorkflowBindings
+        .filter((entry) => Boolean(entry.componentAlias?.trim()))
+        .map((entry) => [entry.componentAlias!.trim(), entry] as const),
+    );
+    const nextComponents = parsed.systemSpec.components.map((component) => {
+      const alias = component.alias?.trim();
+      if (!alias) {
+        return component;
+      }
+      const binding = workflowBindingByAlias.get(alias);
+      if (!binding || component.componentKind !== "composite") {
+        return component;
+      }
+      return Object.freeze({
+        ...component,
+        assetId: binding.workflowAssetId,
+        versionId: binding.workflowVersionId,
+      });
+    });
+
+    const nextRuntimeState = command.runtimeStatePatch
+      ? Object.freeze({
+        ...(parsed.contract.runtime.state ?? {}),
+        ...command.runtimeStatePatch,
+      })
+      : parsed.contract.runtime.state;
+    const nextUiConfiguration = command.uiConfigurationPatch
+      ? Object.freeze({
+        ...(parsed.uiConfiguration ?? {}),
+        ...command.uiConfigurationPatch,
+      })
+      : parsed.uiConfiguration;
+    const retainedDependencies = parsed.contract.definition.dependencies.filter(
+      (entry) => !entry.assetId.includes("workflow") && !entry.assetId.includes("dataset"),
+    );
+    const nextDependencies = Object.freeze([
+      ...retainedDependencies,
+      ...nextWorkflowReferences.map((entry) => Object.freeze({ assetId: entry.assetId, versionId: entry.versionId })),
+      ...nextDatasetReferences.map((entry) => Object.freeze({ assetId: entry.assetId, versionId: entry.versionId })),
+    ]);
+
+    const nextContent = serializeSystemSerializationDocument({
+      existingContent: loaded.draft.content,
+      dependencies: nextDependencies,
+      systemSpec: {
+        ...parsed.systemSpec,
+        components: nextComponents,
+      },
+      uiConfiguration: nextUiConfiguration,
+      runtimeDatasetInstances: nextDatasetInstances,
+      runtimeWorkflowBindings: nextWorkflowBindings,
+      runtimeState: nextRuntimeState,
+    });
+    const updated = await this.studioShellService.updateAssetDraft({
+      studioId,
+      sessionId: command.sessionId,
+      draftId: command.draftId,
+      content: nextContent,
+      dependencies: nextDependencies,
+    });
+    const updatedParsed = parseSystemSerializationDocument({
+      content: updated.draft.content,
+      dependencies: updated.draft.dependencies,
+    });
+    const issues = await this.resolveSerializedReferenceIssues(updatedParsed.contract);
+    return Object.freeze({
+      draft: updated.draft,
+      issues,
+    });
+  }
+
+  private async resolveSerializedReferenceIssues(contract: SystemSerializationContract): Promise<ReadonlyArray<LoadSystemDefinitionIssue>> {
+    const workflowBindingPinningIssues = contract.runtime.workflowBindings
+      .filter((entry) => !entry.workflowVersionId)
+      .map((entry) => Object.freeze({
+        code: "unresolved-workflow-version",
+        message: `Workflow binding '${entry.bindingId}' must pin an explicit workflowVersionId.`,
+        severity: "error" as const,
+      }));
+
+    const result = await this.serializedReferenceResolver.resolveReferences({
+      serializedSchemaVersion: contract.schemaVersion,
+      references: [
+        ...contract.assetReferences.datasets,
+        ...contract.assetReferences.workflows,
+        ...contract.runtime.workflowBindings.map((entry) => Object.freeze({
+          kind: "workflow" as const,
+          assetId: entry.workflowAssetId,
+          versionId: entry.workflowVersionId,
+          alias: entry.componentAlias,
+          metadata: { bindingId: entry.bindingId, pinMode: entry.pinMode },
+        })),
+      ],
+    });
+    return Object.freeze([
+      ...workflowBindingPinningIssues,
+      ...result.issues.map((issue) => Object.freeze({
+      code: issue.code,
+      message: issue.message,
+      severity: issue.code === "missing-asset" && !issue.reference.versionId ? "warning" : "error",
+      })),
+    ]);
+  }
+
+  private restoreSerializedDatasetInstanceState(input: {
+    readonly systemId: string;
+    readonly contract: SystemSerializationContract;
+  }): ReadonlyArray<LoadSystemDefinitionIssue> {
+    if (!this.datasetInstancePersistence || input.contract.runtime.datasetInstances.length === 0) {
+      return Object.freeze([]);
+    }
+    const restored = this.datasetInstancePersistence.restoreSystemDatasetInstances({
+      systemId: input.systemId,
+      datasetInstances: input.contract.runtime.datasetInstances,
+    });
+    return Object.freeze(restored.issues.map((issue: RestoreSystemDatasetInstancePersistenceIssue) => Object.freeze({
+      code: issue.code,
+      message: issue.message,
+      severity: issue.severity,
+    })));
   }
 
   private async resolveSystemFromReference(reference: SystemCompositionReference): Promise<SystemAsset | undefined> {

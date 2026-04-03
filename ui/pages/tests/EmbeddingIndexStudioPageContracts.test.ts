@@ -13,7 +13,6 @@ describe("EmbeddingIndexStudioPage contracts", () => {
     expect(registrationSource).toContain("studioType: EmbeddingIndexStudioIdentity.studioType");
     expect(registrationSource).toContain('role: "embedding-index"');
     expect(registrationSource).toContain('slot: "draft-authoring"');
-    expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain("createEmbeddingIndexStudioTaxonomy()");
   });
 });

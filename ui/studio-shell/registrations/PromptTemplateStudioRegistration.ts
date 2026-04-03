@@ -48,22 +48,5 @@ export const promptTemplateStudioRegistration: AtomicStudioRegistration = Object
         `Draft asset id: ${snapshot?.draft?.assetId ?? "-"}`,
       ]),
     },
-    {
-      id: "prompt-template-studio-metadata-summary",
-      slot: "metadata",
-      title: "Prompt template taxonomy and contract status",
-      subtitle: "Read-only projection of backend-authoritative metadata state.",
-      order: 20,
-      render: ({ snapshot }) => {
-        const taxonomy = snapshot?.draft?.metadata.taxonomy;
-        return Object.freeze([
-          `Taxonomy: ${taxonomy
-            ? `${taxonomy.structuralKind}/${taxonomy.semanticRole}/${taxonomy.behaviorKind}`
-            : "missing"}`,
-          `Contract: ${snapshot?.draft?.metadata.contract ? "present" : "missing"}`,
-          `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
-        ]);
-      },
-    },
   ]),
 });

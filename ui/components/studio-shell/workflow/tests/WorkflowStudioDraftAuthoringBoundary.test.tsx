@@ -24,9 +24,9 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
       />,
     );
 
-    expect(html).toContain('data-testid="workflow-studio-wizard-mode-layout"');
-    expect(html).toContain('data-testid="workflow-studio-wizard-mode-surface"');
-    expect(html).toContain('data-testid="workflow-wizard-pages-card"');
+    expect(html).toContain('data-testid="workflow-studio-wizard-experience-surface"');
+    expect(html).toContain('data-testid="workflow-studio-wizard-experience-surface"');
+    expect(html).toContain('data-testid="configurable-wizard-pages-card"');
     expect(html).toContain("Trigger Section");
     expect(html).not.toContain("Inputs Section");
     expect(html).not.toContain("Steps Section");
@@ -37,8 +37,8 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
     expect(html).not.toContain("Trigger: Needs input");
     expect(html).not.toContain("Prepare for run handoff");
     expect(html).not.toContain("Prepare for Run");
-    expect(html).not.toContain('data-testid="workflow-studio-canvas-mode-layout"');
-    expect(html).not.toContain('data-testid="workflow-studio-canvas-mode-surface"');
+    expect(html).not.toContain('data-testid="workflow-studio-canvas-experience-surface"');
+    expect(html).not.toContain('data-testid="workflow-studio-canvas-experience-surface"');
   });
 
   it("isolates canvas rendering behind the canvas mode surface", () => {
@@ -60,14 +60,14 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
       />,
     );
 
-    expect(html).toContain('data-testid="workflow-studio-canvas-mode-layout"');
-    expect(html).toContain('data-testid="workflow-studio-canvas-mode-surface"');
+    expect(html).toContain('data-testid="workflow-studio-canvas-experience-surface"');
+    expect(html).toContain('data-testid="workflow-studio-canvas-experience-surface"');
     expect(html).toContain('data-testid="workflow-studio-canvas-reactflow"');
     expect(html).toContain('data-testid="workflow-studio-canvas-graph-details"');
     expect(html).toContain('data-testid="workflow-canvas-empty-state"');
     expect(html).not.toContain("Canvas layout container");
-    expect(html).not.toContain('data-testid="workflow-studio-wizard-mode-layout"');
-    expect(html).not.toContain('data-testid="workflow-studio-wizard-mode-surface"');
+    expect(html).not.toContain('data-testid="workflow-studio-wizard-experience-surface"');
+    expect(html).not.toContain('data-testid="workflow-studio-wizard-experience-surface"');
   });
 
   it("shows a safe fallback message for unsupported direct mode routes", () => {
@@ -90,10 +90,10 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
       />,
     );
 
-    expect(html).toContain("Unsupported workflow mode route");
+    expect(html).toContain("Unsupported experience mode selection");
     expect(html).toContain("unsupported-mode");
     expect(html).toContain("using canvas mode");
-    expect(html.match(/Unsupported workflow mode route/g)?.length).toBe(1);
+    expect(html.match(/Unsupported experience mode selection/g)?.length).toBe(1);
   });
 
   it("surfaces shared validation hook feedback without throwing", () => {

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import { DataSourceReferenceKinds } from "../DataConverterContracts";
+import { ImageAssetReferenceKinds } from "../../../domain/dataset-studio/contracts/ImageAssetReference";
 import {
   ImageIngestorAsset,
   ImageIngestorErrorCodes,
   type IImageExifReader,
   type IImageMetadataProbe,
 } from "../ImageIngestorAsset";
+import { ZodMediaDatasetValidator } from "../adapters/validation/MediaDatasetValidator";
 
 class StubMetadataProbe implements IImageMetadataProbe {
   constructor(
@@ -52,6 +54,11 @@ describe("ImageIngestorAsset", () => {
         diagnostics: Object.freeze([]),
       },
       imageId: "photo-1",
+      tags: [" hero ", "hero", "catalog"],
+      annotations: {
+        caption: "Homepage hero",
+        labels: ["primary", "reviewed"],
+      },
     });
 
     expect(result.ok).toBeTrue();
@@ -64,6 +71,18 @@ describe("ImageIngestorAsset", () => {
     expect(result.preview.width).toBe(1200);
     expect(result.preview.exifHighlights?.Make).toBe("Canon");
     expect(result.preview.normalized.ingestor).toBe("image-ingestor-v1");
+    expect(result.metadata.derived).toBeDefined();
+    expect(result.metadata.tags).toEqual(["hero", "catalog"]);
+    const annotations = result.metadata.annotations as Record<string, unknown>;
+    expect(annotations.caption).toBe("Homepage hero");
+    const derived = result.metadata.derived as Record<string, unknown>;
+    expect(derived.orientation).toBe("landscape");
+    expect(derived.aspectRatio).toBeCloseTo(1.5, 6);
+    const mediaValidation = new ZodMediaDatasetValidator().validateShape(result.output);
+    expect(mediaValidation.valid).toBeTrue();
+    expect(mediaValidation.diagnostics.errorCount).toBe(0);
+    const assetRef = result.metadata.assetRef as Record<string, unknown>;
+    expect(assetRef.kind).toBe(ImageAssetReferenceKinds.generatedOutput);
   });
 
   it("normalizes dimensions for rotated orientation when enabled", async () => {
@@ -95,6 +114,47 @@ describe("ImageIngestorAsset", () => {
     expect(result.preview.height).toBe(600);
   });
 
+  it("normalizes local and external source references into standardized assetRef contracts", async () => {
+    const ingestor = new ImageIngestorAsset({
+      metadataProbe: new StubMetadataProbe({ width: 128, height: 128, format: "png" }),
+      exifReader: new StubExifReader(),
+    });
+
+    const local = await ingestor.execute({
+      source: {
+        kind: DataSourceReferenceKinds.localFile,
+        reference: "C:\\images\\local.png",
+        payload: new Uint8Array([1]),
+        fileName: "local.png",
+        contentType: "image/png",
+        diagnostics: Object.freeze([]),
+      },
+    });
+    expect(local.ok).toBeTrue();
+    if (local.ok) {
+      const localRef = local.metadata.assetRef as Record<string, unknown>;
+      expect(localRef.kind).toBe(ImageAssetReferenceKinds.localFile);
+      expect(localRef.path).toBe("C:\\images\\local.png");
+    }
+
+    const external = await ingestor.execute({
+      source: {
+        kind: DataSourceReferenceKinds.url,
+        reference: "https://example.com/a.png",
+        payload: new Uint8Array([2]),
+        fileName: "a.png",
+        contentType: "image/png",
+        diagnostics: Object.freeze([]),
+      },
+    });
+    expect(external.ok).toBeTrue();
+    if (external.ok) {
+      const externalRef = external.metadata.assetRef as Record<string, unknown>;
+      expect(externalRef.kind).toBe(ImageAssetReferenceKinds.externalUri);
+      expect(externalRef.uri).toBe("https://example.com/a.png");
+    }
+  });
+
   it("returns structured failures for unsupported image types", async () => {
     const ingestor = new ImageIngestorAsset({
       metadataProbe: new StubMetadataProbe({ width: 10, height: 10, format: "png" }),
@@ -117,6 +177,30 @@ describe("ImageIngestorAsset", () => {
       throw new Error("Expected unsupported type failure.");
     }
     expect(result.diagnostics[0]?.code).toBe(ImageIngestorErrorCodes.unsupportedType);
+  });
+
+  it("accepts image payloads with unsupported extensions when metadata detection confirms an image", async () => {
+    const ingestor = new ImageIngestorAsset({
+      metadataProbe: new StubMetadataProbe({ width: 32, height: 32, format: "png" }),
+      exifReader: new StubExifReader(),
+    });
+
+    const result = await ingestor.execute({
+      source: {
+        kind: "in-memory",
+        reference: "in-memory",
+        payload: new Uint8Array([1, 2, 3]),
+        fileName: "frame.bin",
+        contentType: "application/octet-stream",
+        diagnostics: Object.freeze([]),
+      },
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      throw new Error("Expected metadata-confirmed image success.");
+    }
+    expect(result.metadata.format).toBe("png");
   });
 
   it("returns extraction failures for unreadable/corrupt images", async () => {

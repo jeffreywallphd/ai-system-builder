@@ -24,6 +24,7 @@ import { ModelTrainingExecutionUnitHandler } from "./ModelTrainingExecutionUnitH
 import { WorkflowExecutionUnitHandler } from "./WorkflowExecutionUnitHandler";
 import type { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
 import type { WorkflowRunHistoryService } from "../../application/workflow-run-history/WorkflowRunHistoryService";
+import type { WorkflowRuntimeOutputPersistenceService } from "../../application/workflow-studio/WorkflowRuntimeOutputPersistenceService";
 import { DesktopBridgeWorkflowRunSummaryRepository } from "../workflows/DesktopBridgeWorkflowRunSummaryRepository";
 import { LocalStorageWorkflowRunSummaryRepository } from "../workflows/LocalStorageWorkflowRunSummaryRepository";
 import { InMemoryWorkflowRunSummaryRepository } from "../workflows/InMemoryWorkflowRunSummaryRepository";
@@ -96,6 +97,7 @@ export interface CreateUnifiedExecutionInfrastructureOptions {
   readonly mcpServerManager?: IMcpServerManager;
   readonly executionAssetLineageRecorder?: ExecutionAssetLineageRecorder;
   readonly workflowRunHistoryService?: WorkflowRunHistoryService;
+  readonly workflowOutputPersistenceService?: WorkflowRuntimeOutputPersistenceService;
 }
 
 export function createUnifiedExecutionInfrastructure(
@@ -105,6 +107,7 @@ export function createUnifiedExecutionInfrastructure(
     options.workflowExecutor,
     options.executionAssetLineageRecorder,
     options.workflowRunHistoryService,
+    options.workflowOutputPersistenceService,
   ), new DataStudioPipelineExecutionUnitHandler()];
 
   if (options.datasetGenerationService) {
@@ -169,6 +172,7 @@ export function createExecutionApplicationInfrastructure(
     mcpServerManager: options.mcpServerManager,
     executionAssetLineageRecorder: options.executionAssetLineageRecorder,
     workflowRunHistoryService: options.workflowRunHistoryService,
+    workflowOutputPersistenceService: options.workflowOutputPersistenceService,
   });
   const history = createExecutionHistoryInfrastructure(options.executionRunRepository);
 

@@ -59,6 +59,14 @@ describe("WorkflowExecutionAlignmentContracts", () => {
         versionId: "asset:dataset-1:v2",
       },
     });
+    expect(datasetBinding.dataset?.compatibility).toEqual({
+      kind: "dataset-reference",
+      contractVersion: "1.0.0",
+      assetRef: {
+        assetId: "asset:dataset-1",
+        versionId: "asset:dataset-1:v2",
+      },
+    });
     expect(runtimeBinding).toMatchObject({
       inputId: "input-prompt",
       sourceType: "runtime-parameter",
@@ -238,6 +246,14 @@ describe("WorkflowDefinitionExecutionPlanTranslator", () => {
           split: "train",
           limit: 1000,
         },
+        compatibility: {
+          kind: "dataset-reference",
+          contractVersion: "1.0.0",
+          assetRef: {
+            assetId: "asset:dataset-orders",
+            versionId: "asset:dataset-orders:v3",
+          },
+        },
       },
       "prompt-input": "Summarize",
       "temperature-input": 0.2,
@@ -252,6 +268,14 @@ describe("WorkflowDefinitionExecutionPlanTranslator", () => {
         split: "train",
         limit: 1000,
       },
+      compatibility: {
+        kind: "dataset-reference",
+        contractVersion: "1.0.0",
+        assetRef: {
+          assetId: "asset:dataset-orders",
+          versionId: "asset:dataset-orders:v3",
+        },
+      },
     }]);
     expect(result.plan?.executionContext.resolvedRuntimeInputs).toEqual({
       prompt: "Summarize",
@@ -264,10 +288,79 @@ describe("WorkflowDefinitionExecutionPlanTranslator", () => {
           split: "train",
           limit: 1000,
         },
+        compatibility: {
+          kind: "dataset-reference",
+          contractVersion: "1.0.0",
+          assetRef: {
+            assetId: "asset:dataset-orders",
+            versionId: "asset:dataset-orders:v3",
+          },
+        },
       },
       "mode-input": "concise",
     });
     expect(result.plan?.executionContext.unresolvedInputs).toEqual([]);
+  });
+
+  it("exposes media dataset compatibility contracts through the standard dataset-input path", () => {
+    const result = translateWorkflowDefinitionToExecutionPlan({
+      draft: {
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        inputs: [{
+          id: "dataset-media",
+          type: "dataset-input",
+          sourceType: "dataset-asset",
+          required: true,
+          asset: {
+            assetId: "asset:dataset:images",
+            versionId: "2.1.0",
+          },
+          selection: {
+            schemaIntentId: "media",
+            shapeKind: "image-metadata-records",
+            fields: ["assetRef", "width", "height", "format", "thumbnailSource"],
+          },
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+        }],
+      },
+    });
+
+    expect(result.success).toBeTrue();
+    const selected = result.plan?.executionContext.selectedAssets.datasets[0];
+    expect(selected).toBeDefined();
+    expect(selected?.compatibility).toEqual({
+      kind: "media-image-records",
+      contractVersion: "1.0.0",
+      delivery: "dataset-reference",
+      schemaIntentId: "media",
+      recordContract: {
+        id: "image-record",
+        version: "1.1.0",
+        minimumCompatibleVersion: "1.0.0",
+      },
+      stableFieldKeys: [
+        "assetRef",
+        "width",
+        "height",
+        "format",
+        "metadata",
+        "tags",
+        "derived",
+        "annotations",
+      ],
+      selectedFieldKeys: ["assetRef", "width", "height", "format"],
+    });
   });
 
   it("resolves runtime parameters from trigger activation payload when manual inputs are absent", () => {

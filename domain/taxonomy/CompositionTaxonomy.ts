@@ -9,11 +9,13 @@ export type TaxonomyStructuralKind = typeof TaxonomyStructuralKinds[keyof typeof
 export const TaxonomySemanticRoles = Object.freeze({
   model: "model",
   dataset: "dataset",
+  schema: "schema",
   tool: "tool",
   promptTemplate: "prompt-template",
   embeddingIndex: "embedding-index",
   configProfile: "config-profile",
   workflow: "workflow",
+  workflowTemplate: "workflow-template",
   agent: "agent",
   contextBundle: "context-bundle",
   datasetPipeline: "dataset-pipeline",
@@ -48,6 +50,7 @@ const allowedTaxonomyCombinationsBySemanticRole: Readonly<Record<TaxonomySemanti
 ]>>> = Object.freeze({
   [TaxonomySemanticRoles.model]: Object.freeze([[TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none]]),
   [TaxonomySemanticRoles.dataset]: Object.freeze([[TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none]]),
+  [TaxonomySemanticRoles.schema]: Object.freeze([[TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none]]),
   [TaxonomySemanticRoles.tool]: Object.freeze([
     [TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.deterministic],
     [TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.conditional],
@@ -56,6 +59,11 @@ const allowedTaxonomyCombinationsBySemanticRole: Readonly<Record<TaxonomySemanti
   [TaxonomySemanticRoles.embeddingIndex]: Object.freeze([[TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none]]),
   [TaxonomySemanticRoles.configProfile]: Object.freeze([[TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none]]),
   [TaxonomySemanticRoles.workflow]: Object.freeze([
+    [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.deterministic],
+    [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.conditional],
+    [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.iterative],
+  ]),
+  [TaxonomySemanticRoles.workflowTemplate]: Object.freeze([
     [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.deterministic],
     [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.conditional],
     [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.iterative],

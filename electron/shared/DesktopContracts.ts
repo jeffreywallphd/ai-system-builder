@@ -139,11 +139,19 @@ export interface DesktopStudioShellBridge {
   updateSystemInterfaces(requestJson: string): Promise<string>;
   updateSystemParameters(requestJson: string): Promise<string>;
   updateSystemExecutionMetadata(requestJson: string): Promise<string>;
+  saveSystemDefinition(requestJson: string): Promise<string>;
+  loadSystemDefinition(requestJson: string): Promise<string>;
+  duplicateSystemDefinition(requestJson: string): Promise<string>;
+  modifySystemDefinition(requestJson: string): Promise<string>;
   getSystemCompatibilityInsights(requestJson: string): Promise<string>;
   startSystemExecution(requestJson: string): Promise<string>;
   getSystemExecutionStatus(executionId: string): Promise<string>;
   getSystemExecutionTrace(requestJson: string): Promise<string>;
   getSystemExecutionResult(executionId: string): Promise<string>;
+  ingestReferenceImageUpload(requestJson: string): Promise<string>;
+  persistReferenceImageOutputs(requestJson: string): Promise<string>;
+  listReferenceImageOutputs(requestJson: string): Promise<string>;
+  listReferenceImageRunHistory(requestJson: string): Promise<string>;
 }
 
 export interface DesktopRegistryBridge {

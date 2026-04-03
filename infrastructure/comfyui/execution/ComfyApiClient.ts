@@ -4,10 +4,12 @@ import type {
   ComfyQueueStateDto,
   ComfyWorkflowDto,
 } from "../dto/ComfyWorkflowDto";
+import type { ComfyAdapterConfig } from "./ComfyAdapterConfig";
 
 export interface IComfyApiClientOptions {
-  readonly baseUrl: string;
+  readonly baseUrl?: string;
   readonly timeoutMs?: number;
+  readonly config?: ComfyAdapterConfig;
 }
 
 function normalizeBaseUrl(value: string): string {
@@ -25,8 +27,9 @@ export class ComfyApiClient {
   private readonly timeoutMs: number;
 
   constructor(options: IComfyApiClientOptions) {
-    this.baseUrl = normalizeBaseUrl(options.baseUrl);
-    this.timeoutMs = options.timeoutMs ?? 30_000;
+    const config = options.config;
+    this.baseUrl = normalizeBaseUrl(options.baseUrl ?? config?.baseUrl ?? "");
+    this.timeoutMs = options.timeoutMs ?? config?.requestTimeoutMs ?? 30_000;
   }
 
   public async queuePrompt(

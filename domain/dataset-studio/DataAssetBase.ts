@@ -62,12 +62,91 @@ export interface DataAssetCapabilityMetadata {
   readonly executable: boolean;
 }
 
+export const DataAssetRuntimeUsabilityModes = Object.freeze({
+  authoringOnly: "authoring-only",
+  runtimeReadable: "runtime-readable",
+  runtimeOperational: "runtime-operational",
+} as const);
+
+export type DataAssetRuntimeUsabilityMode =
+  typeof DataAssetRuntimeUsabilityModes[keyof typeof DataAssetRuntimeUsabilityModes];
+
+export const DataAssetRuntimeInstanceOwnershipKinds = Object.freeze({
+  asset: "asset",
+  system: "system",
+} as const);
+
+export type DataAssetRuntimeInstanceOwnershipKind =
+  typeof DataAssetRuntimeInstanceOwnershipKinds[keyof typeof DataAssetRuntimeInstanceOwnershipKinds];
+
+export const DataAssetRuntimeStateScopes = Object.freeze({
+  sharedAsset: "shared-asset",
+  systemInstance: "system-instance",
+  workflowRun: "workflow-run",
+} as const);
+
+export type DataAssetRuntimeStateScope =
+  typeof DataAssetRuntimeStateScopes[keyof typeof DataAssetRuntimeStateScopes];
+
+export const DataAssetRuntimeMutabilityModes = Object.freeze({
+  immutable: "immutable",
+  appendOnly: "append-only",
+  mutable: "mutable",
+} as const);
+
+export type DataAssetRuntimeMutabilityMode =
+  typeof DataAssetRuntimeMutabilityModes[keyof typeof DataAssetRuntimeMutabilityModes];
+
+export const DataAssetRuntimeWriteBehaviorKinds = Object.freeze({
+  never: "never",
+  systemOnly: "system-only",
+  workflowAndSystem: "workflow-and-system",
+} as const);
+
+export type DataAssetRuntimeWriteBehaviorKind =
+  typeof DataAssetRuntimeWriteBehaviorKinds[keyof typeof DataAssetRuntimeWriteBehaviorKinds];
+
+export const DataAssetRuntimeAccessPatterns = Object.freeze({
+  scanRead: "scan-read",
+  pointLookup: "point-lookup",
+  randomRead: "random-read",
+  appendWrite: "append-write",
+  upsertWrite: "upsert-write",
+  overwriteWrite: "overwrite-write",
+} as const);
+
+export type DataAssetRuntimeAccessPattern =
+  typeof DataAssetRuntimeAccessPatterns[keyof typeof DataAssetRuntimeAccessPatterns];
+
+export interface DataAssetRuntimeOperationalContract {
+  readonly usability: DataAssetRuntimeUsabilityMode;
+  readonly instanceOwnership: {
+    readonly owner: DataAssetRuntimeInstanceOwnershipKind;
+    readonly stateScope: DataAssetRuntimeStateScope;
+  };
+  readonly mutability: {
+    readonly mode: DataAssetRuntimeMutabilityMode;
+    readonly writeBehavior: DataAssetRuntimeWriteBehaviorKind;
+  };
+  readonly accessPatterns: ReadonlyArray<DataAssetRuntimeAccessPattern>;
+}
+
+export interface DataAssetInspectableVersionMetadata {
+  readonly datasetVersionId?: string;
+  readonly schemaVersion: string;
+  readonly contractVersion: string;
+  readonly revision: number;
+  readonly publishedVersionId?: string;
+}
+
 export interface DataAssetMetadataSnapshot {
   readonly identity: DataAssetIdentityMetadata;
   readonly display: DataAssetDisplayMetadata;
   readonly version: DataAssetVersionDescriptor;
+  readonly versioning: DataAssetInspectableVersionMetadata;
   readonly contracts: DataAssetContractReferenceMetadata;
   readonly capabilities: DataAssetCapabilityMetadata;
+  readonly runtime: DataAssetRuntimeOperationalContract;
   readonly configKeys: ReadonlyArray<string>;
   readonly composableInputShapeKinds: ReadonlyArray<CanonicalDataShapeKind>;
   readonly dependencies: ReadonlyArray<DataAssetDependencyReference>;
@@ -91,6 +170,68 @@ export interface DataAssetInspection {
   readonly schemaVersion: string;
   readonly contractVersion: string;
   readonly revision: number;
+}
+
+function normalizeRuntimeContract(
+  runtime?: Partial<DataAssetRuntimeOperationalContract>,
+): DataAssetRuntimeOperationalContract {
+  const usability = runtime?.usability ?? DataAssetRuntimeUsabilityModes.runtimeReadable;
+  if (!Object.values(DataAssetRuntimeUsabilityModes).includes(usability)) {
+    throw new Error("DataAssetRuntimeOperationalContract.usability is invalid.");
+  }
+
+  const owner = runtime?.instanceOwnership?.owner ?? DataAssetRuntimeInstanceOwnershipKinds.asset;
+  if (!Object.values(DataAssetRuntimeInstanceOwnershipKinds).includes(owner)) {
+    throw new Error("DataAssetRuntimeOperationalContract.instanceOwnership.owner is invalid.");
+  }
+
+  const stateScope = runtime?.instanceOwnership?.stateScope ?? DataAssetRuntimeStateScopes.sharedAsset;
+  if (!Object.values(DataAssetRuntimeStateScopes).includes(stateScope)) {
+    throw new Error("DataAssetRuntimeOperationalContract.instanceOwnership.stateScope is invalid.");
+  }
+
+  const mode = runtime?.mutability?.mode ?? DataAssetRuntimeMutabilityModes.immutable;
+  if (!Object.values(DataAssetRuntimeMutabilityModes).includes(mode)) {
+    throw new Error("DataAssetRuntimeOperationalContract.mutability.mode is invalid.");
+  }
+
+  const writeBehavior = runtime?.mutability?.writeBehavior ?? DataAssetRuntimeWriteBehaviorKinds.never;
+  if (!Object.values(DataAssetRuntimeWriteBehaviorKinds).includes(writeBehavior)) {
+    throw new Error("DataAssetRuntimeOperationalContract.mutability.writeBehavior is invalid.");
+  }
+
+  if (mode === DataAssetRuntimeMutabilityModes.immutable
+    && writeBehavior !== DataAssetRuntimeWriteBehaviorKinds.never) {
+    throw new Error("Immutable runtime datasets must use write behavior 'never'.");
+  }
+
+  const accessPatterns = [...new Set((runtime?.accessPatterns ?? [
+    DataAssetRuntimeAccessPatterns.scanRead,
+  ])
+    .map((entry) => entry.trim() as DataAssetRuntimeAccessPattern)
+    .filter(Boolean))];
+  for (const pattern of accessPatterns) {
+    if (!Object.values(DataAssetRuntimeAccessPatterns).includes(pattern)) {
+      throw new Error(`DataAssetRuntimeOperationalContract.accessPatterns contains unsupported pattern '${pattern}'.`);
+    }
+  }
+
+  const hasWritePattern = accessPatterns.some((pattern) => [
+    DataAssetRuntimeAccessPatterns.appendWrite,
+    DataAssetRuntimeAccessPatterns.upsertWrite,
+    DataAssetRuntimeAccessPatterns.overwriteWrite,
+  ].includes(pattern));
+
+  if (writeBehavior === DataAssetRuntimeWriteBehaviorKinds.never && hasWritePattern) {
+    throw new Error("Read-only runtime datasets cannot declare write access patterns.");
+  }
+
+  return Object.freeze({
+    usability,
+    instanceOwnership: Object.freeze({ owner, stateScope }),
+    mutability: Object.freeze({ mode, writeBehavior }),
+    accessPatterns: Object.freeze(accessPatterns),
+  });
 }
 
 function normalizeOptional(value?: string): string | undefined {
@@ -170,6 +311,7 @@ export abstract class DataAssetBase extends Asset {
   public readonly dependencies: ReadonlyArray<DataAssetDependencyReference>;
   public readonly composableInputShapeKinds: ReadonlyArray<CanonicalDataShapeKind>;
   public readonly supportsPreview: boolean;
+  public readonly runtime: DataAssetRuntimeOperationalContract;
 
   protected constructor(params: {
     readonly id: string;
@@ -183,6 +325,7 @@ export abstract class DataAssetBase extends Asset {
     readonly dependencies?: ReadonlyArray<DataAssetDependencyReference>;
     readonly composableInputShapeKinds?: ReadonlyArray<CanonicalDataShapeKind>;
     readonly supportsPreview?: boolean;
+    readonly runtime?: Partial<DataAssetRuntimeOperationalContract>;
     readonly status?: "draft" | "pending" | "available" | "missing" | "failed" | "archived" | "deleted";
     readonly technicalMetadata?: IAssetTechnicalMetadata;
     readonly semanticMetadata?: IAssetSemanticMetadata;
@@ -224,6 +367,7 @@ export abstract class DataAssetBase extends Asset {
     this.dependencies = normalizeDependencies(params.dependencies);
     this.composableInputShapeKinds = normalizeComposableKinds(params.composableInputShapeKinds);
     this.supportsPreview = params.supportsPreview ?? true;
+    this.runtime = normalizeRuntimeContract(params.runtime);
   }
 
   public abstract toCanonicalDataShape(): CanonicalDataShape;
@@ -258,6 +402,13 @@ export abstract class DataAssetBase extends Asset {
         tags,
       } satisfies DataAssetDisplayMetadata),
       version: parseDataAssetVersion(versionId),
+      versioning: Object.freeze({
+        datasetVersionId: versionId,
+        schemaVersion: this.versionMetadata.schemaVersion,
+        contractVersion: this.contract.version,
+        revision: this.versionMetadata.revision,
+        publishedVersionId: this.versionMetadata.publishedVersionId,
+      } satisfies DataAssetInspectableVersionMetadata),
       contracts: Object.freeze({
         input: this.contract.input!,
         output: this.contract.output!,
@@ -268,6 +419,7 @@ export abstract class DataAssetBase extends Asset {
         previewable: this.supportsPreview,
         executable: true,
       } satisfies DataAssetCapabilityMetadata),
+      runtime: this.runtime,
       configKeys,
       composableInputShapeKinds: this.composableInputShapeKinds,
       dependencies: this.dependencies,
@@ -282,4 +434,3 @@ export abstract class DataAssetBase extends Asset {
     });
   }
 }
-

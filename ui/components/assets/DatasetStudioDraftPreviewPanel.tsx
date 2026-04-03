@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DataPreviewModel } from "../../../application/data-studio/DataPreviewEngine";
+import { buildDatasetInspectionViewModel } from "../../../application/data-studio/DatasetInspectionViewModel";
+import {
+  DatasetPreviewSelectionModes,
+  DatasetPreviewSelectionState,
+} from "../../../application/data-studio/DatasetPreviewSelectionModel";
 import { BatchIngestionAssetId, BatchIngestionFramework, BatchIngestionStrategyKinds, BatchIngestorKinds } from "../../../application/dataset-studio/BatchIngestionFramework";
 import { resolveDataAssetConfigDefaults } from "../../../application/dataset-studio/DataAssetConfiguration";
 import { type DataAssetExecutionResult, DefaultDataAssetExecutionFramework } from "../../../application/dataset-studio/DataAssetExecutionFramework";
@@ -35,6 +40,7 @@ import AssetConfigurationPanel from "./AssetConfigurationPanel";
 import type { AssetConfigurationMode } from "./AssetConfigurationPanel";
 import DataPreviewPanel from "./DataPreviewPanel";
 import DataPreviewSurface from "./DataPreviewSurface";
+import DatasetInspectionPanel from "./DatasetInspectionPanel";
 
 export interface DatasetStudioDraftPreviewPanelProps {
   readonly draftId?: string;
@@ -243,11 +249,63 @@ export default function DatasetStudioDraftPreviewPanel({
   const [executionResult, setExecutionResult] = useState<DataAssetExecutionResult | undefined>();
   const [previewModel, setPreviewModel] = useState<DataPreviewModel | undefined>();
   const [previewIssues, setPreviewIssues] = useState<ReadonlyArray<DataStudioValidationIssue>>(Object.freeze([]));
+  const [selectionMode, setSelectionMode] = useState<"single" | "multi">(DatasetPreviewSelectionModes.multi);
+  const [selectedImageSelectionIds, setSelectedImageSelectionIds] = useState<ReadonlyArray<string>>(Object.freeze([]));
+  const [selectionState, setSelectionState] = useState<DatasetPreviewSelectionState | undefined>(undefined);
 
   const panelIssues = useMemo(
     () => Object.freeze([...configValidationIssues, ...previewIssues]),
     [configValidationIssues, previewIssues],
   );
+
+  useEffect(() => {
+    if (!selectedEntry) {
+      setSelectionState(undefined);
+      setSelectedImageSelectionIds(Object.freeze([]));
+      return;
+    }
+    const next = new DatasetPreviewSelectionState(selectedEntry.descriptor.assetId, selectionMode);
+    setSelectionState(next);
+    setSelectedImageSelectionIds(next.snapshot().selectedSelectionIds);
+  }, [selectedEntry?.descriptor.assetId, selectionMode]);
+
+  useEffect(() => {
+    if (!selectionState) {
+      return;
+    }
+    const preview = executionResult?.preview ?? previewModel;
+    if (preview?.kind !== "image-metadata-records") {
+      setSelectedImageSelectionIds(Object.freeze([]));
+      return;
+    }
+    const snapshot = selectionState.syncWithWindow(preview.items);
+    setSelectedImageSelectionIds(snapshot.selectedSelectionIds);
+  }, [executionResult, previewModel, selectionState]);
+
+  const inspectionModel = useMemo(
+    () => selectedEntry
+      ? buildDatasetInspectionViewModel({
+        descriptor: selectedEntry.descriptor,
+        executionResult,
+        previewModel,
+        previewIssues,
+      })
+      : undefined,
+    [executionResult, previewIssues, previewModel, selectedEntry],
+  );
+
+  const handleToggleImageSelection = (selectionId: string) => {
+    const preview = executionResult?.preview ?? previewModel;
+    if (!selectionState || preview?.kind !== "image-metadata-records") {
+      return;
+    }
+    const item = preview.items.find((entry) => entry.selectionId === selectionId);
+    if (!item) {
+      return;
+    }
+    const snapshot = selectionState.toggle(item);
+    setSelectedImageSelectionIds(snapshot.selectedSelectionIds);
+  };
 
   useEffect(() => {
     if (!selectedAssetId || !selectedEntry) {
@@ -904,6 +962,24 @@ export default function DatasetStudioDraftPreviewPanel({
         onModeChange={selectedAssetId === UnifiedIngestionAssetId ? setUnifiedMode : undefined}
         onApply={handleApplyConfig}
       />
+      <section className="ui-card ui-card--padded ui-stack ui-stack--xs" data-testid="dataset-preview-selection-controls">
+        <div className="ui-row ui-row--between ui-row--wrap">
+          <strong>Dataset record selection</strong>
+          <span className="ui-badge ui-badge--neutral">{selectedImageSelectionIds.length} selected</span>
+        </div>
+        <label className="ui-field">
+          <span className="ui-field__label">Selection mode</span>
+          <select
+            className="ui-select"
+            value={selectionMode}
+            onChange={(event) => setSelectionMode(event.currentTarget.value as "single" | "multi")}
+          >
+            <option value={DatasetPreviewSelectionModes.multi}>multi</option>
+            <option value={DatasetPreviewSelectionModes.single}>single</option>
+          </select>
+        </label>
+        <span className="ui-subtle">Selection identifiers are stable record ids from preview contracts for downstream binding.</span>
+      </section>
 
       {selectedAssetId === UnifiedIngestionAssetId && unifiedPreviewSummary ? (
         <section className="ui-card ui-card--padded ui-stack ui-stack--xs" data-testid="dataset-preview-unified-detection-summary">
@@ -1046,11 +1122,20 @@ export default function DatasetStudioDraftPreviewPanel({
           isLoading={isLoading}
           executionResult={executionResult}
           emptyMessage="Provide source input to preview ingestion output."
+          imageSelectionMode={selectionMode}
+          selectedImageSelectionIds={selectedImageSelectionIds}
+          onToggleImageSelection={handleToggleImageSelection}
         />
       ) : null}
 
       {!executionResult && previewModel ? (
-        <DataPreviewSurface preview={previewModel} title="Ingestion Preview" />
+        <DataPreviewSurface
+          preview={previewModel}
+          title="Ingestion Preview"
+          imageSelectionMode={selectionMode}
+          selectedImageSelectionIds={selectedImageSelectionIds}
+          onToggleImageSelection={handleToggleImageSelection}
+        />
       ) : null}
 
       {!executionResult && !previewModel && !isLoading ? (
@@ -1061,6 +1146,7 @@ export default function DatasetStudioDraftPreviewPanel({
       ) : null}
 
       {renderIssueList(previewIssues)}
+      <DatasetInspectionPanel model={inspectionModel} isLoading={isLoading} />
     </section>
   );
 }

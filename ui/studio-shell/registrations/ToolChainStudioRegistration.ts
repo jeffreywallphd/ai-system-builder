@@ -86,22 +86,5 @@ export const toolChainStudioRegistration: CompositeStudioRegistration = Object.f
         `Draft asset id: ${snapshot?.draft?.assetId ?? "-"}`,
       ]),
     },
-    {
-      id: "tool-chain-studio-metadata-summary",
-      slot: "metadata",
-      title: "Tool chain taxonomy and contract status",
-      subtitle: "Read-only taxonomy/contract/provenance projection from backend-authoritative draft metadata.",
-      order: 20,
-      render: ({ snapshot }) => {
-        const taxonomy = snapshot?.draft?.metadata.taxonomy;
-        return Object.freeze([
-          `Taxonomy: ${taxonomy
-            ? `${taxonomy.structuralKind}/${taxonomy.semanticRole}/${taxonomy.behaviorKind}`
-            : "missing"}`,
-          `Contract: ${snapshot?.draft?.metadata.contract ? "present" : "missing"}`,
-          `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
-        ]);
-      },
-    },
   ]),
 });

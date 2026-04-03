@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { ImageAssetReferenceKinds } from "../../../domain/dataset-studio/contracts/ImageAssetReference";
 import {
   CsvIngestorAsset,
   CsvIngestorErrorCodes,
@@ -179,6 +180,8 @@ describe("Ingestion contracts + normalization", () => {
     expect(result.normalized.preview.kind).toBe("image-metadata-records");
     expect(result.normalized.log.asset.assetId).toBe(ImageIngestorAsset.assetId);
     expect(result.preview.normalized.log.preview).toBeFalse();
+    const assetRef = result.metadata.assetRef as Record<string, unknown>;
+    expect(assetRef.kind).toBe(ImageAssetReferenceKinds.generatedOutput);
   });
 
   it("emits consistent normalized preview envelopes across ingestors", async () => {

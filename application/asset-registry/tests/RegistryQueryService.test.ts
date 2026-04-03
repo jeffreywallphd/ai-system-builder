@@ -529,3 +529,45 @@ describe("RegistryQueryService", () => {
     expect(detail?.systemDetails?.runtimeActivity?.recentExecutions[0]?.rootVersionId).toBe("asset:runtime-system:v1");
   });
 });
+
+it("classifies workflow-template assets for registry discovery", async () => {
+  const templateAsset = buildAsset("asset:workflow-template", "Workflow Template", "workflow-template");
+  const templateVersion = buildVersion({
+    assetId: "asset:workflow-template",
+    versionId: "asset:workflow-template:v1",
+    metadata: {
+      metadata: {
+        provenance: {
+          creatorId: "template-author",
+          sourceType: "generated",
+          sourceLabel: "workflow-template-studio",
+        },
+      },
+    },
+  });
+
+  const service = new RegistryQueryService(
+    new InMemoryAssetRecordRepository([templateAsset]),
+    new InMemoryAssetVersionRepository([templateVersion]),
+    new InMemoryLineageRepository([]),
+    {
+      async resolveCanonicalEntityContract() {
+        return undefined;
+      },
+      resolveContractForTaxonomy(descriptor) {
+        if (descriptor.semanticRole === "workflow-template") {
+          return {
+            version: "1.0.0",
+            parameters: [{ id: "supportedIntent", required: true }],
+            execution: { invocationMode: "deferred", sideEffects: "none" },
+          };
+        }
+        return undefined;
+      },
+    },
+  );
+
+  const rows = await service.queryRegistry({ semanticRoles: ["workflow-template"] });
+  expect(rows).toHaveLength(1);
+  expect(rows[0]?.taxonomy?.semanticRole).toBe("workflow-template");
+});

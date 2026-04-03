@@ -134,6 +134,8 @@ This gives the codebase one real production seam for synchronous workflow runs, 
 - Trigger-aware execution entry is now explicit and shared (`application/workflow-studio/WorkflowTriggerExecutionEntryService.ts` + `WorkflowStudioApplicationService.runWorkflowDraftTriggered`): manual/user, temporal, and state/data activations all route through one validation -> translation -> context assembly -> runtime launch path instead of separate trigger pipelines.
 - Trigger activation semantics now enforce draft association and kind alignment at translation time (`trigger-activation-not-found`, `trigger-activation-kind-mismatch`) so trigger launches fail deterministically when activation context does not match authored trigger definitions.
 - Workflow output handling now runs through a canonical runtime delivery seam (`application/workflow-studio/WorkflowExecutionOutputDeliveryService.ts`) that maps authored output plans into explicit delivery results for viewer, file-export, system-record, and prompt-response-chat destinations; output-delivery failures are explicit runtime issues instead of silent no-ops.
+- Workflow output binding declarations are now explicit asset configuration (`application/contracts/ImageWorkflowOutputBindingConfiguration.ts`) and map into canonical output-binding descriptors used by write-plan resolution/materialization paths; this keeps target selection, write behavior, and target-specific options inspectable and reusable.
+- Persisted workflow image records now include a typed lineage envelope (workflow/version/run, source image or dataset context, binding target, and output relationship metadata) across output/history/comparison dataset targets via `application/workflow-studio/WorkflowOutputRecordMaterializationService.ts`.
 - Workflow Studio run orchestration now emits structured execution lifecycle/status reports (`queued` -> `running` -> `completed|failed`) with typed failure classification (`validation-failure`, `translation-failure`, `unsupported-configuration`, `runtime-failure`, `output-delivery-failure`, `launch-failure`) on the same manual/trigger entry path.
 - Workflow Studio now also exposes a canonical pre-launch execution-readiness check over the same validation pipeline (`StudioShellBackendApi.assessWorkflowExecutionReadiness`) so UI launch eligibility/blocked state is based on backend validation truth rather than UI-local heuristics.
 - Workflow run feedback projections now include bounded output handoff summaries (per-output destination/target delivery status) so Workflow Studio can report result delivery outcomes without exposing runtime-internal payload details.
@@ -500,3 +502,173 @@ Audit schema now records administrative approval transitions plus decision denia
   - execution-unit handling in `infrastructure/execution/DataStudioPipelineExecutionUnitHandler.ts`,
   - handler registration in shared execution infrastructure composition (`createExecutionInfrastructure*.ts`).
 - Studio Shell now exposes backend-authoritative Data Studio readiness/run operations (`assessDataStudioExecutionReadiness`, `runDataStudioPipeline`) and toolbar-aligned renderer wiring (`run-data-pipeline`) while preserving workflow-specific semantics.
+
+
+## AI Loom image manipulation runtime integration update (stories 3.3.9-3.3.10)
+
+- Runtime output persistence now composes the existing image output-binding contracts/resolution/materialization seams directly inside workflow execution handling (post-success execution, pre-history completion) through `WorkflowExecutionUnitHandler` + `WorkflowRuntimeOutputPersistenceService`.
+- Runtime execution output persistence remains adapter-bounded: workflow executors still return workflow-native assets, while the persistence seam maps assets into canonical image-record materialization contracts and writes through `SystemDatasetInstanceService`.
+- Runtime result contracts now expose structured persistence summaries (`status`, `persistedRecordCount`, `targetCount`, `issues`) for downstream run-history and UI inspection without exposing repository/storage internals.
+- Added test coverage validating runtime integration behavior for output/history/comparison dataset writes and bounded failure outcomes when resolution/materialization/persistence cannot complete.
+
+## AI Loom image manipulation UI-trigger integration update (stories 4.2.9-4.2.10)
+
+- UI-triggered execution now has reusable trigger wrappers/components in `ui/components/assets/image-system/WorkflowUiTriggerComponents.tsx` for:
+  - workflow trigger buttons,
+  - workflow-aware form submit wrappers,
+  - image selection trigger surfaces.
+- These wrappers stay adapter-first: they emit normalized `UiTriggerEvent` contracts and hand off via a dispatch adapter (`createWorkflowUiTriggerDispatchAdapter`) that composes the existing `WorkflowUiEventRuntimeDispatcher` path rather than calling workflow internals directly.
+- System context gathering for UI-triggered runs is now a reusable mapping seam (`application/workflow-studio/UiTriggerSystemContextMapper.ts`) consumed by the dispatcher:
+  - selected image context,
+  - current form/runtime parameter values,
+  - dataset references and dataset instance refs,
+  - system-owned dataset instance refs,
+  - lightweight runtime context references.
+- Boundaries remain explicit and inspectable:
+  - UI event generation (`UiTriggerEventContract` + trigger wrappers),
+  - trigger binding resolution (`WorkflowUiTriggerEventAdapter` + image trigger binding config),
+  - parameter/context mapping (`UiTriggerSystemContextMapper`),
+  - workflow execution handoff (`WorkflowUiEventRuntimeDispatcher` -> `runWorkflowDraftTriggered`).
+
+## AI Loom image manipulation update: system-context to input-binding adapters (stories 4.3.1-4.3.2)
+
+- `UiTriggerSystemContextMapper` now maps trigger events into the shared `SystemContextContract` rather than directly emitting workflow-execution metadata objects.
+- A dedicated workflow adapter seam (`WorkflowSystemContextBindingAdapter` in `application/workflow-studio/SystemContextWorkflowInputMapper.ts`) translates that contract into workflow execution context metadata/input values.
+- `WorkflowUiEventRuntimeDispatcher` composes both seams (`UiTriggerSystemContextMapper` + `WorkflowSystemContextBindingAdapter`) so state gathering and workflow binding translation remain independently swappable.
+
+## AI Loom image manipulation update: System Studio context extraction + contract validation (stories 4.3.3-4.3.4)
+
+- Added a dedicated System Studio extraction seam (`application/workflow-studio/SystemStudioContextExtraction.ts`) that maps studio-facing state snapshots into normalized `SystemContextContract` objects.
+- The extraction seam is workflow-agnostic and contract-first:
+  - selected image state -> `selectedImages`,
+  - parameter form state -> `parameters` (with lightweight normalization),
+  - dataset selection/reference state -> `datasets`,
+  - runtime/system metadata -> `runtime`.
+- Added a UI adapter seam (`ui/components/assets/image-system/ImageSystemStudioContextAdapter.ts`) so image-system component state (`ImageInterfaceState`) is translated at the boundary and raw component structures do not leak into workflow/runtime contracts.
+- Added `SystemContextValidationService` (`application/workflow-studio/SystemContextValidationService.ts`) to provide inspectable, reusable validation outputs for:
+  - required context/parameter checks,
+  - selected-image/media-structure checks,
+  - dataset reference + schema-intent alignment checks,
+  - workflow-input contract alignment through existing input-binding preview/resolution contracts.
+- Validation results are structured for execution gating and UI/debug presentation (`valid`, `blockingIssues`, `warningIssues`, `issues`, normalized context, optional workflow binding preview).
+
+## AI Loom image manipulation update: workflow input binding adapter + dataset reference resolution (stories 4.3.5-4.3.6)
+
+- Added a dedicated dataset-resolution seam (`application/workflow-studio/SystemContextDatasetReferenceResolver.ts`) that resolves system-context dataset references into concrete dataset-instance runtime handles, with structured inspectable outcomes (`resolved`, `unresolved`, `issues`, `byReferenceId`).
+- Resolution is contract-first and storage-agnostic: it distinguishes abstract references from resolved runtime handles, checks role/intent compatibility for common image-system roles (`active-input`, `history`, `system-owned-output`), and returns explicit failure diagnostics when instance resolution or compatibility fails.
+- `WorkflowSystemContextBindingAdapter` (`application/workflow-studio/SystemContextWorkflowInputMapper.ts`) now composes that resolver and emits workflow-ready input metadata with normalized runtime-facing dataset payloads (`datasetInstances`, `datasetRuntimeHandles`, `systemDatasetInstanceRefs`, `datasetResolution`) while preserving separation from raw UI state.
+- `SystemContextValidationService` now reuses the same dataset-resolution seam before workflow input binding preview so validation, execution mapping, and inspect/debug surfaces share one dataset resolution truth.
+
+## AI Loom image manipulation update: UI event payload enrichment + System Studio context preview/debug (stories 4.3.7-4.3.8)
+
+- UI-trigger workflow dispatch now enriches trigger activation payloads through a dedicated contract seam (`application/workflow-studio/UiTriggerEventPayloadEnrichmentService.ts`) that preserves existing trigger contracts while attaching normalized system context outputs.
+- Enriched payloads now include standardized, inspectable fields for:
+  - selected-image/parameter/dataset/runtime context (`systemContext`, `systemContextSummary`),
+  - dataset resolution diagnostics (`datasetContext.resolution`),
+  - workflow context binding projection (`workflowContextBinding`),
+  - envelope metadata for debugging/lineage (`__systemContextEnvelope`).
+- Dispatch integration remains adapter-first: `WorkflowUiEventRuntimeDispatcher` composes `UiTriggerSystemContextMapper` + `WorkflowSystemContextBindingAdapter` + payload enricher without coupling UI components to runtime internals.
+- System Studio now includes a bounded developer-facing context preview/debug surface:
+  - orchestration service (`application/workflow-studio/SystemContextDebugPreviewService.ts`) that executes extraction -> validation -> dataset resolution -> workflow binding -> enriched payload preview,
+  - reusable extension panel (`ui/components/studio-shell/SystemContextDebugPreviewPanel.tsx`) wired through System Studio registration (`system-studio-context-debug-preview`) for pre-dispatch inspection.
+
+## AI Loom image manipulation update: reusable system-context mapping configuration (story 4.3.9)
+
+- System-context to workflow-input binding now uses an explicit reusable mapping configuration contract (`domain/system-studio/SystemContextWorkflowMappingConfiguration.ts`) with:
+  - versioned mapping configuration envelopes,
+  - source roots/path selectors (`parameters`, `selected-image`, `datasets`, `dataset-resolution`, etc.),
+  - workflow target selectors (`workflow-input`, `workflow-metadata`),
+  - optional transformer ids, default values, and required flags.
+- `WorkflowSystemContextBindingAdapter` (`application/workflow-studio/SystemContextWorkflowInputMapper.ts`) now applies this contract instead of embedding ad hoc field wiring:
+  - default mapping behavior remains compatible with prior 4.3.1-4.3.8 outputs,
+  - custom mapping configurations can override/extend binding behavior with inspectable `systemContextMapping` report metadata (`appliedMappings`, issues).
+- System assets can now persist reusable context mapping configuration under bounded execution metadata (`SystemExecutionMetadata.workflowContextMapping` in `domain/system-studio/SystemAssetDomain.ts`) so System Studio setups are save/load/duplicate friendly.
+
+## AI Loom image manipulation hardening update: cross-studio validation + reload integrity + e2e handoff tests (stories 5.2.7-5.2.9)
+
+- Cross-studio boundary validation is now centralized through `application/system-studio/ReferenceImageCrossStudioIntegrity.ts`, which composes existing shared seams (`SystemContextValidationService`, dataset-resolution logic, and system-context workflow mapping) instead of introducing a separate validation model.
+- The validation boundary now explicitly catches representative handoff failures before output materialization:
+  - missing or invalid selected image references,
+  - unresolved dataset instance references,
+  - media schema intent/shape incompatibility,
+  - invalid required workflow input mapping,
+  - missing or incompatible system-owned output targets,
+  - corrupted/incomplete runtime context and lineage-required fields.
+- `StudioShellBackendApi.persistReferenceImageOutputs(...)` now validates these contracts before materialization and returns recoverable `failed` responses with user-safe failure messages while recording explicit incomplete lineage markers.
+- System Studio’s reference-image panel now keeps user messaging non-technical and exposes technical diagnostics in a collapsed `Advanced details` section.
+- Save/load integrity is now covered with repository-reload integration tests (`ReferenceImageEndToEndFlow` + output persistence tests) asserting that dataset/workflow/output/lineage handoff links remain valid after rehydration.
+
+## AI Loom image manipulation hardening update: execution outcome contracts + resilient interaction loop (stories 5.4.3-5.4.4)
+
+- Reference-image output persistence now returns explicit execution-outcome contracts (`success`, `partial-failure`, `recoverable-failure`, `non-recoverable-failure`) plus `persistenceBlocked` so runtime/presentation layers consume normalized backend truth instead of inferring state from ad hoc message strings.
+- Persistence now fails fast when upstream runtime status is terminal (`failed`/`cancelled`), blocking malformed or incomplete output payloads from dataset materialization.
+- The System Studio reference-image interaction flow now guards against stale async refresh responses and duplicate launch actions while runs are in progress, reducing stale state and accidental duplicate invocations.
+- Primary interaction copy now uses plain-language user-facing labels and feedback (`Choose an image`, `Change settings`, `Create new version`, `Something went wrong while creating this image`) while technical diagnostics remain available under collapsed advanced details.
+
+## AI Loom image manipulation hardening update: ComfyUI failure normalization + output/lineage consistency (stories 5.4.5-5.4.6)
+
+- Comfy runtime error normalization now classifies representative failure modes into stable internal categories (`user-correctable`, `environment-configuration`, `runtime-execution`, `partial-completion`) without leaking raw Comfy transport/history payloads above adapter boundaries.
+- Queue/runtime hardening now captures and normalizes:
+  - prompt rejection with node-level validation errors,
+  - missing/incompatible node/model/checkpoint style failures,
+  - malformed/invalid prompt parameter paths,
+  - network/timeout/cancellation/runtime failures,
+  - partial-output failure scenarios where files were generated before terminal failure.
+- Adapter results now preserve partial outputs on failed runs when recoverable output records exist, so upper layers can distinguish failed-with-artifacts from failed-without-output.
+- Workflow output persistence/run history now treat partial persistence as first-class state:
+  - failed persistence after partial writes records run-history status `partial` (not `completed`),
+  - persisted output dataset linkage prefers explicit output-target binding identity,
+  - run-history lineage records now include structured completeness status + missing-field markers (`complete` / `partial` / `incomplete`) and output record references.
+- This keeps output/result/history views grounded in persisted normalized state and reduces ambiguity/orphaned lineage across successful, failed, and partial runs.
+
+## AI Loom image manipulation hardening update: performance baseline instrumentation + cross-studio state sync (stories 5.4.7-5.4.8)
+- Reference-image execution now records bounded phase telemetry through one runtime seam (`ui/runtime/ReferenceImagePerformanceTelemetry.ts`) instead of scattering `performance.now()` calls in components.
+- Measured phases align with the current architecture and user flow: intake/load, preparation/start, runtime work, persistence/save, and UI refresh.
+- System Studio now projects plain-language primary status (`Preparing`, `Working`, `Saving`, `Finished`) while technical timing/baseline details are surfaced in a collapsed advanced section.
+- Baseline summaries are computed over real run reports (single-image, repeated recent runs, and multi-result batch-style runs where supported) so bottleneck discovery stays lightweight and maintainable.
+- Cross-studio refresh orchestration now routes through a dedicated synchronization seam (`ui/runtime/ReferenceImageCrossStudioSyncService.ts`) that refreshes shared studio snapshot state before reloading results/history and reconciling active selections.
+- This keeps Data/Workflow/System views aligned on the same underlying persisted runtime graph without navigation hacks or duplicated refresh logic.
+
+## AI Loom image manipulation hardening update: persistence stress/recovery + architecture gap log (stories 5.4.9-5.4.10)
+
+### Implemented hardening (5.4.9)
+- System dataset-instance restore now enforces per-instance restore atomicity: if persisted image-record ownership is mismatched, the instance restore is skipped instead of partially restoring mixed state.
+- Restore error/warning messages now use plain-language user-safe wording so incomplete runtime data is not presented as a clean/fully-restored result.
+- Added stress/recovery coverage over:
+  - larger runtime payloads (hundreds of image records),
+  - repeated save/load cycles with runtime-state updates,
+  - partial/incompatible persisted dataset state during reload,
+  - consistency checks that invalid runtime slices are not silently admitted into live system runtime state.
+
+### Architectural gaps observed from the image vertical slice (5.4.10)
+The image slice proved the shared architecture, but it exposed concrete follow-up work:
+
+#### Immediate follow-up
+1. **Cross-repository atomic write boundary for system-save + runtime-state capture**
+   - Current save flow captures runtime dataset state and writes draft content through separate repository operations.
+   - A crash/interruption between those operations can still produce "new draft envelope + stale runtime store" windows.
+   - Next step: define one application-level transactional save contract that can commit draft + runtime snapshot together (or produce explicit recoverable save status).
+2. **Recovery decision taxonomy standardization**
+   - Reload issues are structured, but recovery actions are still inferred by each caller.
+   - Next step: add a small canonical recovery decision model (`restored-complete`, `restored-partial`, `fallback-last-complete`, `blocked`) so UI and orchestration layers use one interpretation path.
+3. **History/output visibility gate for partial restore**
+   - We now avoid admitting invalid runtime slices, but result/history surfaces still need a shared "confidence" projection so views clearly indicate when recent outputs may be incomplete.
+
+#### Medium-term architectural improvements
+1. **Unified persistence health read-model across studios**
+   - System/Workflow/Data each expose partial fragments of save/load integrity truth.
+   - Add one shared read-model service that projects save completeness, recovery actions, and unresolved references for any studio-backed asset.
+2. **Lineage completeness contract tightening**
+   - Lineage status (`complete`/`partial`/`incomplete`) exists in runtime history paths, but completeness guarantees are not uniformly enforced across all persistence adapters.
+   - Add explicit completeness invariants at serialization and repository-adapter boundaries.
+3. **Cross-studio run/session identity normalization**
+   - Runtime context includes multiple ids (`runId`, `runtimeSessionId`, trace ids), but end-to-end correlation still requires adapter-specific interpretation.
+   - Introduce a stricter shared run identity envelope for system/workflow/dataset projections.
+
+#### Nice-to-have refinements
+1. **Background integrity scans for large historical payloads**
+   - Periodic bounded scans could proactively flag incomplete saved slices before users open them.
+2. **Recovery playbook telemetry dashboard**
+   - Persist aggregate counts for "restored complete/partial/fallback" decisions to guide reliability work.
+3. **Selective payload chunking for very large dataset-instance snapshots**
+   - Current serialization tolerates realistic payloads, but chunking/compression may be needed as record counts grow further.

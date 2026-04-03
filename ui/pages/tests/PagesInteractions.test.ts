@@ -19,7 +19,8 @@ describe("ui/pages interactions", () => {
     expect(home).toContain('import { ROUTE_PATHS } from "../routes/RouteConfig"');
     expect(home).toContain("to={ROUTE_PATHS.workflows}");
     expect(workflows).toContain("Find Flows");
-    expect(workflows).toContain("WorkflowEditorPage");
+    expect(workflows).not.toContain("WorkflowEditorPage");
+    expect(workflows).toContain("buildWorkflowStudioCreateNewPath");
     expect(workflows).toContain("WorkflowBrowser");
     expect(workflows).toContain("workflowStore.refreshWorkflows");
     expect(models).toContain("to={ROUTE_PATHS.settings}");
@@ -38,8 +39,8 @@ describe("ui/pages interactions", () => {
     expect(studioShell).toContain("BuildIntents.automateTask");
     expect(registry).toContain('data-testid="registry-page"');
     expect(registry).toContain("RegistryService");
-    expect(registry).toContain("AssetFilterPanel");
-    expect(registry).toContain("AssetList");
+    expect(registry).toContain("ExploreFilterPanel");
+    expect(registry).toContain("ExploreAssetList");
     expect(build).toContain("buildEntryService.getLandingModel()");
     expect(build).toContain("Build from a Template");
     expect(build).toContain("BuildIntents.automateTask");
@@ -53,30 +54,6 @@ describe("ui/pages interactions", () => {
     expect(notFound).toContain("to={ROUTE_PATHS.home}");
   });
 
-  it("wires workflow editor actions to workflow and node stores", () => {
-    const editor = readSource("ui/pages/WorkflowEditorPage.tsx");
-
-    expect(editor).toContain("WorkflowMetadataPanel");
-    expect(editor).toContain("WorkflowValidationPanel");
-    expect(editor).toContain("WorkflowExecutionStatusPanel");
-    expect(editor).toContain("WorkflowCanvasToolbar");
-    expect(editor).toContain("ConnectionInspector");
-    expect(editor).toContain("NodePalette");
-    expect(editor).toContain("useUiDependencies");
-    expect(editor).toContain("workflowStore.renameCurrentWorkflow");
-    expect(editor).toContain("workflowStore.updateCurrentWorkflowDescription");
-    expect(editor).toContain("workflowStore.clearSelection()");
-    expect(editor).toContain("workflowStore.removeConnection(connectionId)");
-    expect(editor).toContain("workflowStore.executeCurrentWorkflow");
-    expect(editor).toContain("contextWorkbenchHref");
-    expect(editor).toContain("ROUTE_PATHS.workflowContextWorkbench");
-    expect(editor).not.toContain("seedStarterNode");
-    expect(editor).toContain("ui-canvas-shell__view--active");
-    expect(editor).toContain("onViewModeChange={setViewMode}");
-    expect(editor).toContain('if (workflowId === "new")');
-    expect(editor).toContain("if (!createdNewWorkflowRef.current)");
-  });
-
   it("guards workflow editor navigation and clears stale editor state outside the tool", () => {
     const layout = readSource("ui/layout/AppLayout.tsx");
     const store = readSource("ui/state/WorkflowStore.ts");
@@ -87,15 +64,6 @@ describe("ui/pages interactions", () => {
     expect(layout).toContain("workflowStore.clearEditorSession()");
     expect(layout).toContain("workflowStore.saveCurrentWorkflow()");
     expect(store).toContain("public clearEditorSession(): void");
-  });
-
-  it("keeps validation UI dismissible within the canvas experience", () => {
-    const editor = readSource("ui/pages/WorkflowEditorPage.tsx");
-
-    expect(editor).toContain("dismissedValidationMessages");
-    expect(editor).toContain("visibleValidationMessages");
-    expect(editor).toContain("ui-validation-overlay--locked");
-    expect(editor).toContain("Close");
   });
 
 });

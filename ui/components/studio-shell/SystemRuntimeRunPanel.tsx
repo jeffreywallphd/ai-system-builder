@@ -4,6 +4,8 @@ import type { StudioShellExtensionContext } from "../../studio-shell/StudioShell
 import { ExecutionMonitorPanel } from "./runtime/ExecutionMonitorPanel";
 import { ExecutionResultPanel } from "./runtime/ExecutionResultPanel";
 import { UxRuntimeService } from "../../runtime/UxRuntimeService";
+import SystemRuntimeInterfacePreview from "./system/SystemRuntimeInterfacePreview";
+import { workflowStudioSurfaceAssetDefinition } from "../../studio-shell/studio-assets/StudioSurfaceAssetDefinitions";
 
 interface SystemRuntimeRunPanelProps {
   readonly context: StudioShellExtensionContext;
@@ -19,6 +21,22 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
   const [isRunning, setIsRunning] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const runtimePanelStudioAssetHosts = useMemo(() => Object.freeze({
+    [workflowStudioSurfaceAssetDefinition.contract.identity.studioType]: Object.freeze({
+      asset: workflowStudioSurfaceAssetDefinition,
+      resolveInput: ({ panel, extensionContext }: { readonly panel: { readonly content?: { readonly draftContent?: string; readonly embeddedVariant?: string; readonly experienceAssetIds?: ReadonlyArray<string> } }; readonly extensionContext: StudioShellExtensionContext }) => Object.freeze({
+        content: panel.content?.draftContent ?? "",
+        onChangeContent: () => undefined,
+        isWorkflowStudio: true,
+        experienceAssetIds: Array.isArray(panel.content?.experienceAssetIds)
+          ? panel.content?.experienceAssetIds
+          : Object.freeze(["loom-wizard"]),
+        embeddedVariant: panel.content?.embeddedVariant === "behavior-automation" ? "behavior-automation" : undefined,
+        workflowModeContext: undefined,
+        extensionContext,
+      }),
+    }),
+  }), []);
 
   const draft = context.snapshot?.draft;
   const canRun = useMemo(() => {
@@ -65,6 +83,11 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
       <p className="ui-text-muted">
         Trigger bounded runtime execution for the current System Studio draft and monitor runtime progression/results through the real backend API path.
       </p>
+      <SystemRuntimeInterfacePreview
+        content={draft?.content ?? ""}
+        extensionContext={context}
+        studioAssetHosts={runtimePanelStudioAssetHosts}
+      />
       <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
         <button
           className="ui-button ui-button--primary"

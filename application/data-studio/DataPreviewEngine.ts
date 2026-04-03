@@ -1,8 +1,7 @@
-﻿import type {
+import type {
   CanonicalDataMetadata,
   CanonicalDataShape,
   CanonicalDataShapeKind,
-  CanonicalImageStructuredItem,
   CanonicalRecordValue,
   CanonicalTableColumn,
   CanonicalTableRow,
@@ -14,11 +13,24 @@ import type {
   DataConverterResult,
   DataConverterSuccessResult,
 } from "../dataset-studio/DataConverterContracts";
+import {
+  buildImageDatasetPreview,
+  type ImageDatasetPreviewItem,
+} from "./ImageDatasetPreviewBuilder";
 
 export interface DataPreviewEngineOptions {
   readonly maxItems?: number;
   readonly maxColumns?: number;
   readonly maxTextLength?: number;
+  readonly windowOffset?: number;
+}
+
+export interface DataPreviewWindow {
+  readonly offset: number;
+  readonly limit: number;
+  readonly returned: number;
+  readonly hasPreviousWindow: boolean;
+  readonly hasNextWindow: boolean;
 }
 
 export interface DataPreviewSummary {
@@ -86,7 +98,8 @@ export interface DataTextItemsPreviewModel extends DataPreviewBase {
 
 export interface DataImageMetadataPreviewModel extends DataPreviewBase {
   readonly kind: "image-metadata-records";
-  readonly items: ReadonlyArray<CanonicalImageStructuredItem>;
+  readonly items: ReadonlyArray<ImageDatasetPreviewItem>;
+  readonly window: DataPreviewWindow;
 }
 
 export interface DataPreviewErrorModel extends DataPreviewBase {
@@ -106,6 +119,7 @@ function normalizeOptions(options?: DataPreviewEngineOptions): Required<DataPrev
     maxItems: Math.max(1, options?.maxItems ?? 10),
     maxColumns: Math.max(1, options?.maxColumns ?? 8),
     maxTextLength: Math.max(16, options?.maxTextLength ?? 220),
+    windowOffset: Math.max(0, Math.floor(options?.windowOffset ?? 0)),
   });
 }
 
@@ -164,7 +178,6 @@ export class DataPreviewEngine implements IDataPreviewEngine {
     diagnostics: ReadonlyArray<DataConverterDiagnostic> = Object.freeze([]),
   ): DataPreviewModel {
     const normalizedOptions = normalizeOptions(options);
-    const diagnosticsSummary = summarizeDiagnostics(diagnostics);
     const metadata = summarizeMetadata(shape.metadata);
 
     switch (shape.kind) {
@@ -178,7 +191,7 @@ export class DataPreviewEngine implements IDataPreviewEngine {
           kind: "records",
           summary: summarizeCounts(shape.records.length, records.length),
           metadata,
-          diagnostics: diagnosticsSummary,
+          diagnostics: summarizeDiagnostics(diagnostics),
           records: Object.freeze(records),
         });
       }
@@ -192,7 +205,7 @@ export class DataPreviewEngine implements IDataPreviewEngine {
           kind: "table",
           summary: summarizeCounts(shape.rows.length, rows.length),
           metadata,
-          diagnostics: diagnosticsSummary,
+          diagnostics: summarizeDiagnostics(diagnostics),
           columns: Object.freeze(columns),
           rows: Object.freeze(rows),
         });
@@ -204,18 +217,32 @@ export class DataPreviewEngine implements IDataPreviewEngine {
           kind: "text-items",
           summary: summarizeCounts(shape.items.length, items.length),
           metadata,
-          diagnostics: diagnosticsSummary,
+          diagnostics: summarizeDiagnostics(diagnostics),
           items: Object.freeze(items),
         });
       }
       case "image-metadata-records": {
-        const items = shape.items.slice(0, normalizedOptions.maxItems);
+        const imagePreview = buildImageDatasetPreview(shape, {
+          offset: normalizedOptions.windowOffset,
+          limit: normalizedOptions.maxItems,
+        });
+        const combinedDiagnostics = Object.freeze([
+          ...diagnostics,
+          ...imagePreview.diagnostics,
+        ]);
         return Object.freeze({
           kind: "image-metadata-records",
-          summary: summarizeCounts(shape.items.length, items.length),
+          summary: summarizeCounts(imagePreview.totalCount, imagePreview.items.length),
           metadata,
-          diagnostics: diagnosticsSummary,
-          items: Object.freeze(items),
+          diagnostics: summarizeDiagnostics(combinedDiagnostics),
+          items: imagePreview.items,
+          window: Object.freeze({
+            offset: imagePreview.offset,
+            limit: imagePreview.limit,
+            returned: imagePreview.items.length,
+            hasPreviousWindow: imagePreview.offset > 0,
+            hasNextWindow: imagePreview.offset + imagePreview.items.length < imagePreview.totalCount,
+          }),
         });
       }
       default:

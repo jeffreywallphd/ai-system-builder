@@ -10,6 +10,10 @@ import type {
   WorkflowDraftStepType,
   WorkflowValidationIssue,
 } from "../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  buildWorkflowDatasetCompatibilityContract,
+  type WorkflowDatasetCompatibilityContract,
+} from "./WorkflowDatasetCompatibilityContracts";
 
 export const WorkflowExecutionValidationStages = Object.freeze({
   preTranslation: "pre-translation",
@@ -66,6 +70,7 @@ export interface WorkflowExecutionResolvedDatasetAsset {
   readonly versionId?: string;
   readonly format?: "jsonl" | "json" | "csv" | "parquet";
   readonly selection?: Readonly<Record<string, unknown>>;
+  readonly compatibility?: WorkflowDatasetCompatibilityContract;
 }
 
 export interface WorkflowExecutionResolvedInputValue {
@@ -79,6 +84,9 @@ export interface WorkflowExecutionResolvedInputValue {
     | "runtime-parameter"
     | "runtime-default"
     | "trigger-activation"
+    | "ui-form-value"
+    | "selected-image-context"
+    | "dataset-instance-reference"
     | "dataset-asset"
     | "static-value";
   readonly value: unknown;
@@ -107,7 +115,9 @@ export interface WorkflowExecutionInputBinding {
     readonly versionId?: string;
     readonly format?: "jsonl" | "json" | "csv" | "parquet";
     readonly selection?: Readonly<Record<string, unknown>>;
+    readonly compatibility?: WorkflowDatasetCompatibilityContract;
   }>;
+  readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 export interface WorkflowExecutionTriggerDescriptor {
@@ -343,6 +353,11 @@ export function createTranslationSuccessResult<TPlan>(
 
 export function mapWorkflowInputToExecutionBinding(input: WorkflowDraftInput): WorkflowExecutionInputBinding {
   if (input.sourceType === "dataset-asset") {
+    const compatibility = buildWorkflowDatasetCompatibilityContract({
+      assetId: input.asset.assetId,
+      versionId: input.asset.versionId,
+      selection: input.selection,
+    });
     return Object.freeze({
       inputId: input.id,
       sourceType: input.sourceType,
@@ -354,6 +369,7 @@ export function mapWorkflowInputToExecutionBinding(input: WorkflowDraftInput): W
         versionId: input.asset.versionId,
         format: input.format,
         selection: input.selection ? Object.freeze({ ...input.selection }) : undefined,
+        compatibility,
       }),
     });
   }
@@ -366,6 +382,7 @@ export function mapWorkflowInputToExecutionBinding(input: WorkflowDraftInput): W
       valueType: input.valueType,
       bindingKey: `inputs.${input.parameterKey}`,
       defaultValue: input.defaultValue,
+      metadata: input.metadata,
     });
   }
 
@@ -376,6 +393,6 @@ export function mapWorkflowInputToExecutionBinding(input: WorkflowDraftInput): W
     valueType: input.valueType,
     bindingKey: `inputs.${input.id}.static`,
     staticValue: input.value,
+    metadata: input.metadata,
   });
 }
-

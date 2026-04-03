@@ -6,6 +6,9 @@ export interface DataPreviewPanelProps {
   readonly isLoading?: boolean;
   readonly executionResult?: DataAssetExecutionResult;
   readonly emptyMessage?: string;
+  readonly imageSelectionMode?: "single" | "multi";
+  readonly selectedImageSelectionIds?: ReadonlyArray<string>;
+  readonly onToggleImageSelection?: (selectionId: string) => void;
 }
 
 function renderValidationSummary(result: DataAssetExecutionResult): JSX.Element | null {
@@ -78,6 +81,9 @@ export default function DataPreviewPanel({
   isLoading = false,
   executionResult,
   emptyMessage = "Run conversion/execution to inspect a preview sample.",
+  imageSelectionMode = "single",
+  selectedImageSelectionIds,
+  onToggleImageSelection,
 }: DataPreviewPanelProps): JSX.Element {
   if (isLoading) {
     return (
@@ -100,10 +106,15 @@ export default function DataPreviewPanel({
   return (
     <section className="ui-stack ui-stack--sm" data-testid="data-preview-panel">
       {renderExecutionMetadata(executionResult)}
-      <DataPreviewSurface preview={executionResult.preview} title={title} />
+      <DataPreviewSurface
+        preview={executionResult.preview}
+        title={title}
+        imageSelectionMode={imageSelectionMode}
+        selectedImageSelectionIds={selectedImageSelectionIds}
+        onToggleImageSelection={onToggleImageSelection}
+      />
       {renderValidationSummary(executionResult)}
     </section>
   );
 }
-
 

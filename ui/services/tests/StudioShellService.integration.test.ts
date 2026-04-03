@@ -154,6 +154,30 @@ function installBridge(
       }
       return systemApi.updateExecutionMetadata(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
+    saveSystemDefinition(requestJson: string) {
+      if (!systemApi) {
+        return unsupportedSystemOperation();
+      }
+      return systemApi.saveSystemDefinition(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    loadSystemDefinition(requestJson: string) {
+      if (!systemApi) {
+        return unsupportedSystemOperation();
+      }
+      return systemApi.loadSystemDefinition(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    duplicateSystemDefinition(requestJson: string) {
+      if (!systemApi) {
+        return unsupportedSystemOperation();
+      }
+      return systemApi.duplicateSystemDefinition(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    modifySystemDefinition(requestJson: string) {
+      if (!systemApi) {
+        return unsupportedSystemOperation();
+      }
+      return systemApi.modifySystemDefinition(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
     getSystemCompatibilityInsights(requestJson: string) {
       if (!systemApi) {
         return unsupportedSystemOperation();
@@ -183,6 +207,18 @@ function installBridge(
         return unsupportedSystemOperation();
       }
       return runtimeApi.getExecutionResult(executionId).then((response) => JSON.stringify(response));
+    },
+    ingestReferenceImageUpload(requestJson: string) {
+      return api.ingestReferenceImageUpload(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    persistReferenceImageOutputs(requestJson: string) {
+      return api.persistReferenceImageOutputs(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    listReferenceImageOutputs(requestJson: string) {
+      return api.listReferenceImageOutputs(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    listReferenceImageRunHistory(requestJson: string) {
+      return api.listReferenceImageRunHistory(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
   };
 

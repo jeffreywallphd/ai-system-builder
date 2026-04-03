@@ -3,8 +3,10 @@ import { createElement } from "react";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 import DatasetStudioDraftPreviewPanel from "../../components/assets/DatasetStudioDraftPreviewPanel";
-import DatasetStageAuthoringPanel from "../../components/assets/DatasetStageAuthoringPanel";
-import DataStudioPreparationWizardPanel from "../../components/assets/DataStudioPreparationWizardPanel";
+import { ExperienceSurfaceAssetIds } from "../experience-assets/ExperienceSurfaceAssets";
+import { DataStudioPreparationWizardStateAdapter } from "../data/DataStudioPreparationWizardStateAdapter";
+
+const defaultDataStudioPipelineState = new DataStudioPreparationWizardStateAdapter().exportPipelineStateJson();
 
 export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze({
   studioType: DatasetStudioIdentity.studioType,
@@ -15,7 +17,11 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
   allowedBehaviorKinds: Object.freeze(["none"]),
   shell: Object.freeze({
     title: "Data Studio",
-    subtitle: "Stage-based data preparation authoring with wizard-first progression over one canonical asset graph.",
+    subtitle: "Organize data preparation in one place. Use Schema Studio for structure design and Pipeline Studio for reusable flow logic.",
+    experienceAssets: Object.freeze([
+      ExperienceSurfaceAssetIds.loomWizard,
+      ExperienceSurfaceAssetIds.loomCanvas,
+    ]),
     toolbar: Object.freeze({
       actions: Object.freeze([
         {
@@ -52,7 +58,7 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
   defaults: {
     title: "Dataset Asset Draft",
     tags: Object.freeze(["dataset", "studio-shell"]),
-    contentTemplate: JSON.stringify({ datasetSpec: { format: "jsonl", schema: {}, source: "" } }, null, 2),
+    contentTemplate: defaultDataStudioPipelineState,
     metadataPatch: createAtomicStudioMetadataPatch({
       title: "Dataset Asset Draft",
       tags: ["dataset", "studio-shell"],
@@ -66,50 +72,15 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
     {
       id: "dataset-studio-draft-guidance",
       slot: "draft-authoring",
-      title: "Dataset draft guidance",
-      subtitle: "Dataset structure/versioning is authored as an atomic asset; pipelines remain composite assets.",
+      title: "Data Studio guidance",
+      subtitle: "Use this page as an organizer for schema and flow work, then return here for preview and preparation.",
       order: 10,
       render: ({ snapshot }) => Object.freeze([
-        "Keep dataset authoring atomic: schema/profile/version in the asset, execution in behaviors.",
+        "Use Data Studio as your data workspace home for preparation and preview tasks.",
+        "Go to Schema Studio for table and field design, and Pipeline Studio for reusable flow authoring.",
         "Asset role: dataset (atomic)",
         `Draft asset id: ${snapshot?.draft?.assetId ?? "-"}`,
       ]),
-    },
-    {
-      id: "dataset-studio-metadata-summary",
-      slot: "metadata",
-      title: "Dataset taxonomy and contract status",
-      subtitle: "Read-only projection of backend-authoritative metadata state.",
-      order: 20,
-      render: ({ snapshot }) => {
-        const taxonomy = snapshot?.draft?.metadata.taxonomy;
-        return Object.freeze([
-          `Taxonomy: ${taxonomy
-            ? `${taxonomy.structuralKind}/${taxonomy.semanticRole}/${taxonomy.behaviorKind}`
-            : "missing"}`,
-          `Contract: ${snapshot?.draft?.metadata.contract ? "present" : "missing"}`,
-          `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
-        ]);
-      },
-    },
-    {
-      id: "data-studio-preparation-wizard-panel",
-      slot: "draft-authoring",
-      title: "Data preparation wizard",
-      subtitle: "Stage progression, validation hooks, and dynamic stage rendering over unified preparation metadata.",
-      order: 12,
-      render: ({ snapshot, operations }) => createElement(DataStudioPreparationWizardPanel, {
-        persistedState: snapshot?.draft?.content,
-        onPipelineStateChange: (serializedState) => operations.setDraftContent?.(serializedState),
-      }),
-    },
-    {
-      id: "dataset-studio-stage-authoring-panel",
-      slot: "draft-authoring",
-      title: "Stage authoring",
-      subtitle: "Stage-aware wizard and canvas authoring powered by shared WizardFlowEngine state.",
-      order: 15,
-      render: () => createElement(DatasetStageAuthoringPanel),
     },
     {
       id: "dataset-studio-data-preview-panel",

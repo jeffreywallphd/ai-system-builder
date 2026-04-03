@@ -14,7 +14,6 @@ describe("ToolChainStudioPage contracts", () => {
     expect(registrationSource).toContain('kind: "composite"');
     expect(registrationSource).toContain('role: "tool-chain"');
     expect(registrationSource).toContain('slot: "draft-authoring"');
-    expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain("createToolChainStudioTaxonomy()");
   });
 });

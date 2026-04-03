@@ -4,6 +4,7 @@ import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-sh
 import type { AssetVersion } from "../../../domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../studio-shell/DefaultStudioShellApplicationService";
 import { WorkflowExecutionTriggerSourceKinds } from "../WorkflowExecutionAlignmentContracts";
+import { mapDatasetEventToWorkflowTriggerEntries, WorkflowDatasetEventNames } from "../WorkflowDatasetEventTriggerAdapter";
 import { WorkflowStudioApplicationService } from "../WorkflowStudioApplicationService";
 import {
   createEmptyWorkflowDraft,
@@ -702,6 +703,78 @@ describe("WorkflowStudioApplicationService", () => {
     expect(stateLaunched.validation.ready).toBeTrue();
     expect(stateLaunched.validation.plan?.executionContext.resolvedInputValues).toEqual({
       "input-customer-id": "customer-42",
+    });
+  });
+
+  it("runs dataset-event trigger entries through existing workflow state-trigger orchestration", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+    const draft = {
+      ...createEmptyWorkflowDraft(),
+      triggers: [{
+        id: "trigger-dataset-selected",
+        kind: WorkflowDraftTriggerKinds.state,
+        type: WorkflowDraftTriggerTypes.stateSystemEvent,
+        config: {
+          sourceType: "system",
+          eventCategory: "system-state-changed",
+          eventName: WorkflowDatasetEventNames.imageSelected,
+        },
+      }],
+      inputs: [{
+        id: "input-dataset-event-type",
+        type: "runtime-input",
+        sourceType: "runtime-parameter",
+        parameterKey: "datasetEventType",
+        required: true,
+      }],
+      steps: [{
+        id: "step-1",
+        type: "action",
+        kind: "action",
+        order: 1,
+      }],
+    } as const;
+    const mapped = mapDatasetEventToWorkflowTriggerEntries({
+      draft,
+      event: {
+        eventId: "dataset-event-42",
+        eventType: "image_selected",
+        occurredAt: "2026-04-01T00:00:00.000Z",
+        contractVersion: "1.0.0",
+        dataset: { assetId: "dataset:image" },
+        instance: {
+          systemId: "system:image",
+          instanceId: "instance:output",
+          dataset: { assetId: "dataset:image" },
+        },
+        actor: {
+          actorKind: "system",
+          source: "system-runtime",
+        },
+        payload: {
+          record: {
+            dataset: { assetId: "dataset:image" },
+            selectionId: "record-99",
+            recordId: "record-99",
+          },
+        },
+      },
+    });
+    expect(mapped.issues).toHaveLength(0);
+    expect(mapped.entries).toHaveLength(1);
+
+    const result = await service.runWorkflowDraftTriggered({
+      content: serializeWorkflowDraft(draft),
+      trigger: mapped.entries[0]!,
+    });
+
+    expect(result.launchStatus).toBe("launched");
+    expect(result.executionStatus.state).toBe("completed");
+    expect(result.validation.ready).toBeTrue();
+    expect(result.validation.plan?.executionContext.resolvedInputValues).toEqual({
+      "input-dataset-event-type": "image_selected",
     });
   });
 

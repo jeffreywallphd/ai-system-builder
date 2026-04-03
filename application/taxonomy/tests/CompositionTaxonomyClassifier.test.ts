@@ -65,13 +65,21 @@ describe("CompositionTaxonomyClassifier", () => {
     expect(classifier.classifyAsset(genericAsset)).toBeUndefined();
   });
 
-  it("maps prompt and embedding assets to additional semantic roles", () => {
+  it("maps prompt, workflow-template, and embedding assets to additional semantic roles", () => {
     const promptAsset = new Asset({
       id: "asset:prompt:p1",
       name: "Prompt",
       kind: "prompt",
       source: new AssetSourceInfo({ type: "uploaded" }),
       location: new AssetLocation({ accessMethod: "virtual", location: "memory://prompt" }),
+      status: "available",
+    });
+    const workflowTemplateAsset = new Asset({
+      id: "asset:workflow-template:t1",
+      name: "Workflow Template",
+      kind: "workflow-template",
+      source: new AssetSourceInfo({ type: "generated" }),
+      location: new AssetLocation({ accessMethod: "virtual", location: "memory://template" }),
       status: "available",
     });
     const embeddingAsset = new Asset({
@@ -87,6 +95,11 @@ describe("CompositionTaxonomyClassifier", () => {
       structuralKind: "atomic",
       semanticRole: "prompt-template",
       behaviorKind: "none",
+    });
+    expect(classifier.classifyAsset(workflowTemplateAsset)).toEqual({
+      structuralKind: "composite",
+      semanticRole: "workflow-template",
+      behaviorKind: "deterministic",
     });
     expect(classifier.classifyAsset(embeddingAsset)).toEqual({
       structuralKind: "atomic",

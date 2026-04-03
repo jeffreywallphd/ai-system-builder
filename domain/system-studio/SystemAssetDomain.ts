@@ -14,6 +14,10 @@ import {
   type CompositionTaxonomyDescriptor,
   type TaxonomyBehaviorKind,
 } from "../taxonomy/CompositionTaxonomy";
+import {
+  createSystemContextWorkflowMappingConfiguration,
+  type SystemContextWorkflowMappingConfiguration,
+} from "./SystemContextWorkflowMappingConfiguration";
 
 export const SystemStudioIdentity = Object.freeze({
   studioType: "system-studio",
@@ -86,6 +90,11 @@ export interface SystemExecutionMetadata {
     readonly supportContact?: string;
     readonly notes?: string;
   };
+  readonly runtimeCapabilityBindings?: {
+    readonly schemaVersion?: string;
+    readonly bindings?: ReadonlyArray<Record<string, unknown>>;
+  };
+  readonly workflowContextMapping?: SystemContextWorkflowMappingConfiguration;
 }
 
 export const SystemBindingEndpointScopes = Object.freeze({
@@ -288,6 +297,17 @@ function normalizeSystemExecutionMetadata(input?: SystemExecutionMetadata): Syst
         notes: normalizeOptional(input.operations.notes),
       })
       : undefined,
+    runtimeCapabilityBindings: input.runtimeCapabilityBindings
+      ? Object.freeze({
+        schemaVersion: normalizeOptional(input.runtimeCapabilityBindings.schemaVersion),
+        bindings: Array.isArray(input.runtimeCapabilityBindings.bindings)
+          ? Object.freeze(input.runtimeCapabilityBindings.bindings.map((entry) => Object.freeze({ ...(entry ?? {}) })))
+          : undefined,
+      })
+      : undefined,
+    workflowContextMapping: input.workflowContextMapping
+      ? createSystemContextWorkflowMappingConfiguration(input.workflowContextMapping)
+      : undefined,
   });
 
   const hasEntries = Boolean(
@@ -301,7 +321,10 @@ function normalizeSystemExecutionMetadata(input?: SystemExecutionMetadata): Syst
     || normalized.executionProfile?.latencyTier
     || normalized.operations?.ownerTeam
     || normalized.operations?.supportContact
-    || normalized.operations?.notes,
+    || normalized.operations?.notes
+    || normalized.runtimeCapabilityBindings?.schemaVersion
+    || normalized.runtimeCapabilityBindings?.bindings?.length
+    || normalized.workflowContextMapping?.mappings?.length
   );
   return hasEntries ? normalized : undefined;
 }

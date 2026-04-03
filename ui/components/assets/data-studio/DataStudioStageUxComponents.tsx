@@ -90,9 +90,9 @@ export function DataStudioStageMetadataPanel(props: DataStudioStageMetadataPanel
 export function DataStudioAdvancedEditingActions(props: DataStudioAdvancedEditingActionsProps): JSX.Element {
   return (
     <section className="ui-card ui-card--padded ui-stack ui-stack--xs" data-testid="data-studio-advanced-editing-actions">
-      <strong>Advanced editing</strong>
+      <strong>Advanced tools</strong>
       <span className="ui-text-small ui-text-secondary">
-        Inspect underlying graph internals for this stage or continue editing in Canvas mode.
+        Use optional technical tools for this stage, or continue editing in canvas mode.
       </span>
       <div className="ui-row ui-row--wrap">
         <button
@@ -101,7 +101,7 @@ export function DataStudioAdvancedEditingActions(props: DataStudioAdvancedEditin
           data-testid="data-studio-inspect-internals"
           onClick={() => props.onInspectInternals(props.stageId)}
         >
-          Inspect internals
+          Inspect technical details
         </button>
         <button
           type="button"
@@ -131,8 +131,8 @@ export function DataStudioStageInternalsPanel(props: DataStudioStageInternalsPan
   if (!props.internals) {
     return (
       <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="data-studio-stage-internals-panel">
-        <strong>Internals</strong>
-        <span className="ui-subtle">Choose a stage and click Inspect internals to view graph-level details.</span>
+        <strong>Technical details</strong>
+        <span className="ui-subtle">Choose a stage and click Inspect technical details to view graph-level details.</span>
       </section>
     );
   }
@@ -141,7 +141,7 @@ export function DataStudioStageInternalsPanel(props: DataStudioStageInternalsPan
   return (
     <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="data-studio-stage-internals-panel">
       <div className="ui-row ui-row--between ui-row--wrap">
-        <strong>Internals: {internals.stageTitle}</strong>
+        <strong>Technical details: {internals.stageTitle}</strong>
         <span className="ui-badge ui-badge--neutral">{stageStatusLabel(internals.status)}</span>
       </div>
       <div className="ui-meta-grid">
@@ -188,8 +188,8 @@ export function DataStudioNodePaletteDrawer(props: DataStudioNodePaletteDrawerPr
       <section className="ui-workflow-canvas-drawer-panel ui-stack ui-stack--sm">
         <header className="ui-workflow-canvas-drawer-panel__header ui-stack ui-stack--2xs">
           <div className="ui-stack ui-stack--3xs">
-            <strong>Asset Nodes</strong>
-            <span className="ui-text-small ui-text-secondary">Stage-aware node palette for Data Studio assets.</span>
+            <strong>Pipeline stages</strong>
+            <span className="ui-text-small ui-text-secondary">Browse and jump to stages in your data flow.</span>
           </div>
           <button
             type="button"
@@ -235,7 +235,7 @@ export function DataStudioNodePaletteDrawer(props: DataStudioNodePaletteDrawerPr
                     className="ui-button ui-button--ghost ui-button--sm"
                     onClick={() => props.onInspectStage(stage.stageId)}
                   >
-                    Inspect internals
+                    Inspect technical details
                   </button>
                 </div>
               </article>

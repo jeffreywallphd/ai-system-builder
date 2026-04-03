@@ -5,7 +5,6 @@ describe("ui/pages unit coverage", () => {
   it("defines all primary pages", () => {
     const home = readSource("ui/pages/HomePage.tsx");
     const workflows = readSource("ui/pages/WorkflowsPage.tsx");
-    const editor = readSource("ui/pages/WorkflowEditorPage.tsx");
     const models = readSource("ui/pages/ModelsPage.tsx");
     const context = readSource("ui/pages/ContextPage.tsx");
     const assets = readSource("ui/pages/AssetsPage.tsx");
@@ -14,7 +13,6 @@ describe("ui/pages unit coverage", () => {
 
     expect(home).toContain("AI Loom Studio");
     expect(workflows).toContain("New Workflow");
-    expect(editor).toContain("Workflow Editor");
     expect(models).toContain("Download Models");
     expect(context).toContain("Context Engineering");
     expect(assets).toContain("Browse generated and stored workflow assets");

@@ -15,6 +15,9 @@ import {
   type ResolvedDataSource,
 } from "./DataConverterContracts";
 import type { DataAssetExecutionRequest } from "./DataAssetExecutionFramework";
+import { createDefaultMediaValidationAdapters } from "./adapters/validation/MediaValidationFactory";
+
+const defaultMediaDatasetValidator = createDefaultMediaValidationAdapters().mediaDatasetValidator;
 
 export const DataStudioValidationSections = Object.freeze({
   canonicalShape: "canonical-shape",
@@ -257,6 +260,18 @@ function validateShapeKind(
   }
 
   if (shape.kind === "image-metadata-records") {
+    const mediaValidation = defaultMediaDatasetValidator.validateShape(shape);
+    for (const mediaIssue of mediaValidation.issues) {
+      pushIssue(issues, {
+        code: mediaIssue.code,
+        section: DataStudioValidationSections.canonicalShape,
+        severity: mediaIssue.severity,
+        message: mediaIssue.message,
+        path: mediaIssue.path,
+        details: mediaIssue.details,
+      });
+    }
+
     for (const [index, item] of shape.items.entries()) {
       if (!normalizeOptional(item.itemId)) {
         pushIssue(issues, {
@@ -717,6 +732,27 @@ export function validateDataPreviewModel(preview: DataPreviewModel): ReadonlyArr
       message: "Preview image metadata sample count does not match items length.",
       path: "items",
     });
+  }
+
+  if (preview.kind === "image-metadata-records") {
+    if (preview.window.returned !== preview.items.length) {
+      pushIssue(issues, {
+        code: "preview-image-window-returned-count-mismatch",
+        section: DataStudioValidationSections.previewModel,
+        severity: DataStudioValidationIssueSeverities.warning,
+        message: "Preview image window returned count does not match item length.",
+        path: "window.returned",
+      });
+    }
+    if (preview.window.offset < 0) {
+      pushIssue(issues, {
+        code: "preview-image-window-offset-invalid",
+        section: DataStudioValidationSections.previewModel,
+        severity: DataStudioValidationIssueSeverities.error,
+        message: "Preview image window offset cannot be negative.",
+        path: "window.offset",
+      });
+    }
   }
 
   if (preview.kind === "error" && !normalizeOptional(preview.message)) {

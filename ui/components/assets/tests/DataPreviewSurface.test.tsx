@@ -24,7 +24,25 @@ describe("DataPreviewSurface", () => {
       items: [{ itemId: "item-1", text: "hello world" }],
     }));
     const imagePreview = engine.buildFromCanonicalShape(createCanonicalImageMetadataRecordsShape({
-      items: [{ itemId: "img-1", label: "invoice" }],
+      items: [{
+        itemId: "img-1",
+        attributes: {
+          assetRef: {
+            assetId: "asset:image:invoice",
+          },
+          width: 512,
+          height: 320,
+          format: "png",
+          tags: ["invoice"],
+          annotations: {
+            caption: "Invoice scan",
+            labels: ["finance"],
+          },
+          derived: {
+            orientation: "landscape",
+          },
+        },
+      }],
     }));
 
     const recordsHtml = renderToStaticMarkup(React.createElement(DataPreviewSurface, { preview: recordsPreview }));
@@ -35,7 +53,44 @@ describe("DataPreviewSurface", () => {
     expect(recordsHtml).toContain("record-1");
     expect(tableHtml).toContain("Name");
     expect(textHtml).toContain("item-1");
+    expect(imageHtml).toContain("asset:image:invoice");
+    expect(imageHtml).toContain("512x320");
     expect(imageHtml).toContain("invoice");
+    expect(imageHtml).toContain("Showing 1-1 of 1");
+    expect(imageHtml).toContain("Select");
+    expect(imageHtml).toContain("selection: single");
+  });
+
+  it("renders graceful image preview fallbacks for missing preview source", () => {
+    const engine = new DataPreviewEngine();
+    const imagePreview = engine.buildFromCanonicalShape(createCanonicalImageMetadataRecordsShape({
+      items: [{
+        itemId: "img-missing",
+        attributes: {
+          width: 256,
+          format: "jpeg",
+        },
+      }],
+    }));
+    const html = renderToStaticMarkup(React.createElement(DataPreviewSurface, { preview: imagePreview }));
+
+    expect(html).toContain("No preview");
+    expect(html).toContain("Missing width or height");
+  });
+
+  it("renders image window controls for paged previews", () => {
+    const engine = new DataPreviewEngine();
+    const imagePreview = engine.buildFromCanonicalShape(createCanonicalImageMetadataRecordsShape({
+      items: [
+        { itemId: "img-1", attributes: { width: 10, height: 10, format: "png" } },
+        { itemId: "img-2", attributes: { width: 12, height: 12, format: "jpeg" } },
+      ],
+    }), { maxItems: 1, windowOffset: 1 });
+    const html = renderToStaticMarkup(React.createElement(DataPreviewSurface, { preview: imagePreview }));
+
+    expect(html).toContain("Showing 2-2 of 2");
+    expect(html).toContain("Previous");
+    expect(html).toContain("Next");
   });
 
   it("renders error previews with diagnostics", () => {

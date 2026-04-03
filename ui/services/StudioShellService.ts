@@ -28,7 +28,15 @@ import type {
   WorkflowRunSummaryReadModel,
   WorkflowExecutionReadinessReadModel,
   PersistedWorkflowReadModel,
+  IngestReferenceImageUploadReadModel,
+  IngestReferenceImageUploadRequest,
+  ListReferenceImageRunHistoryRequest,
+  ListReferenceImageOutputsRequest,
+  PersistReferenceImageOutputsReadModel,
+  PersistReferenceImageOutputsRequest,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { ImageRunHistoryListing } from "../../application/system-runtime/ImageRunHistoryDataContract";
+import type { OutputGalleryListing } from "../../application/system-runtime/OutputGalleryDataContract";
 import type {
   StartSystemRuntimeExecutionRequest,
   StartSystemRuntimeExecutionResponse,
@@ -48,6 +56,10 @@ import type {
   UpdateSystemExecutionMetadataRequest,
   UpdateSystemInterfacesRequest,
   UpdateSystemParametersRequest,
+  SaveSystemDefinitionRequest,
+  LoadSystemDefinitionRequest,
+  DuplicateSystemDefinitionRequest,
+  ModifySystemDefinitionRequest,
 } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import { resolveDesktopStudioShellBridge } from "../composition/DesktopStudioShellBridgeAdapter";
 import { resolveBrowserStudioShellBridgeFallback } from "../composition/BrowserStudioShellBridgeFallback";
@@ -209,6 +221,32 @@ export class StudioShellService {
     return JSON.parse(raw) as SystemStudioApiResponse<{ readonly updated: boolean }>;
   }
 
+  public async saveSystemDefinition(request: SaveSystemDefinitionRequest): Promise<SystemStudioApiResponse<{
+    readonly draft: StudioShellSnapshotReadModel["draft"];
+    readonly serialization: Readonly<Record<string, unknown>>;
+  }>> {
+    const raw = await this.requireBridge().saveSystemDefinition(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<{
+      readonly draft: StudioShellSnapshotReadModel["draft"];
+      readonly serialization: Readonly<Record<string, unknown>>;
+    }>;
+  }
+
+  public async loadSystemDefinition(request: LoadSystemDefinitionRequest): Promise<SystemStudioApiResponse<Readonly<Record<string, unknown>>>> {
+    const raw = await this.requireBridge().loadSystemDefinition(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<Readonly<Record<string, unknown>>>;
+  }
+
+  public async duplicateSystemDefinition(request: DuplicateSystemDefinitionRequest): Promise<SystemStudioApiResponse<Readonly<Record<string, unknown>>>> {
+    const raw = await this.requireBridge().duplicateSystemDefinition(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<Readonly<Record<string, unknown>>>;
+  }
+
+  public async modifySystemDefinition(request: ModifySystemDefinitionRequest): Promise<SystemStudioApiResponse<Readonly<Record<string, unknown>>>> {
+    const raw = await this.requireBridge().modifySystemDefinition(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<Readonly<Record<string, unknown>>>;
+  }
+
   public async getSystemCompatibilityInsights(request: ListSystemChildComponentsRequest): Promise<SystemStudioApiResponse<SystemCompatibilityInsightsReadModel>> {
     const raw = await this.requireBridge().getSystemCompatibilityInsights(JSON.stringify(request));
     return JSON.parse(raw) as SystemStudioApiResponse<SystemCompatibilityInsightsReadModel>;
@@ -232,5 +270,31 @@ export class StudioShellService {
   public async getSystemExecutionResult(executionId: string): Promise<SystemRuntimeApiResponse<RuntimeExecutionResultReadModel>> {
     const raw = await this.requireBridge().getSystemExecutionResult(executionId);
     return JSON.parse(raw) as SystemRuntimeApiResponse<RuntimeExecutionResultReadModel>;
+  }
+
+  public async ingestReferenceImageUpload(request: IngestReferenceImageUploadRequest): Promise<StudioShellApiResponse<IngestReferenceImageUploadReadModel>> {
+    const raw = await this.requireBridge().ingestReferenceImageUpload(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<IngestReferenceImageUploadReadModel>;
+  }
+
+  public async persistReferenceImageOutputs(
+    request: PersistReferenceImageOutputsRequest,
+  ): Promise<StudioShellApiResponse<PersistReferenceImageOutputsReadModel>> {
+    const raw = await this.requireBridge().persistReferenceImageOutputs(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<PersistReferenceImageOutputsReadModel>;
+  }
+
+  public async listReferenceImageOutputs(
+    request: ListReferenceImageOutputsRequest,
+  ): Promise<StudioShellApiResponse<OutputGalleryListing>> {
+    const raw = await this.requireBridge().listReferenceImageOutputs(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<OutputGalleryListing>;
+  }
+
+  public async listReferenceImageRunHistory(
+    request: ListReferenceImageRunHistoryRequest,
+  ): Promise<StudioShellApiResponse<ImageRunHistoryListing>> {
+    const raw = await this.requireBridge().listReferenceImageRunHistory(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<ImageRunHistoryListing>;
   }
 }

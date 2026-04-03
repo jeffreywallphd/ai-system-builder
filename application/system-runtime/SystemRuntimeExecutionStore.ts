@@ -27,6 +27,15 @@ export interface ExecutionMetadataSnapshot {
   readonly parentExecutionId?: string;
   readonly parentNodeId?: string;
   readonly childExecutionIds: ReadonlyArray<string>;
+  readonly runtimeCapability?: {
+    readonly bindingId: string;
+    readonly providerId: string;
+    readonly profileId: string;
+    readonly selectedModelBindingId: string;
+    readonly resolvedAt?: string;
+    readonly resolverVersion?: string;
+    readonly stale: boolean;
+  };
 }
 
 export interface PersistedExecutionRecord {

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { CanonicalDataAsset } from "../../../domain/dataset-studio/CanonicalDataAsset";
-import { createCanonicalRecordsShape } from "../../../domain/dataset-studio/CanonicalDataShapes";
+import {
+  createCanonicalImageMetadataRecordsShape,
+  createCanonicalRecordsShape,
+} from "../../../domain/dataset-studio/CanonicalDataShapes";
 import {
   DataAssetRegistry,
   DataAssetRegistrySpecializations,
@@ -55,7 +58,11 @@ describe("DataAssetRegistry", () => {
     expect(entry.descriptor.category).toBe("dataset");
     expect(entry.descriptor.versionId).toBe("v1");
     expect(entry.descriptor.version.scheme).toBe("label");
+    expect(entry.descriptor.versioning.schemaVersion).toBe("1.0.0");
+    expect(entry.descriptor.versioning.contractVersion).toBe("1.0.0");
+    expect(entry.descriptor.versioning.schemaIntentContractVersion).toBe("1.0.0");
     expect(entry.descriptor.specialization).toBe("converter");
+    expect(entry.descriptor.schemaIntent.id).toBe("tabular");
     expect(entry.descriptor.configSchema.schemaId).toBe("dataset-a.schema");
     expect(entry.descriptor.discoverability.scope).toBe("default");
     expect(entry.descriptor.discoverability.defaultEntryPoint).toBeFalse();
@@ -126,11 +133,46 @@ describe("DataAssetRegistry", () => {
 
     const previewEntries = registry.list({ previewable: true });
     const ingestionEntries = registry.list({ specialization: DataAssetRegistrySpecializations.ingestion });
+    const runtimeUsableEntries = registry.list({ runtimeUsable: true });
 
     expect(previewEntries).toHaveLength(1);
     expect(previewEntries[0]?.descriptor.assetId).toBe("dataset-preview");
     expect(ingestionEntries).toHaveLength(1);
     expect(ingestionEntries[0]?.descriptor.assetId).toBe("dataset-ingest");
+    expect(registry.list({ schemaIntentId: "tabular" }).length).toBeGreaterThanOrEqual(2);
+    expect(runtimeUsableEntries).toHaveLength(2);
+  });
+
+  it("exposes runtime-operational dataset ownership and mutability metadata in registry descriptors", () => {
+    const registry = new DataAssetRegistry();
+    const entry = registry.register({
+      asset: new CanonicalDataAsset({
+        id: "dataset-runtime-ops",
+        name: "dataset-runtime-ops",
+        version: "1.0.0",
+        source: { type: "generated", workflowId: "wf-runtime-ops" },
+        location: { accessMethod: "virtual", location: "dataset://dataset-runtime-ops" },
+        outputShape: createCanonicalRecordsShape({ records: [] }),
+        runtime: {
+          usability: "runtime-operational",
+          instanceOwnership: {
+            owner: "system",
+            stateScope: "system-instance",
+          },
+          mutability: {
+            mode: "append-only",
+            writeBehavior: "system-only",
+          },
+          accessPatterns: ["scan-read", "append-write"],
+        },
+      }),
+    });
+
+    expect(entry.descriptor.capabilities.runtimeUsable).toBeTrue();
+    expect(entry.descriptor.runtime.usability).toBe("runtime-operational");
+    expect(entry.descriptor.runtime.instanceOwnership.stateScope).toBe("system-instance");
+    expect(entry.descriptor.runtime.mutability.mode).toBe("append-only");
+    expect(entry.descriptor.runtime.accessPatterns).toContain("append-write");
   });
 
   it("rejects duplicate registration keys and unsupported config overrides", () => {
@@ -164,5 +206,122 @@ describe("DataAssetRegistry", () => {
 
     const resolved = registry.resolveAsset({ assetId: "dataset-versioned" });
     expect(resolved?.version).toBe("1.10.0");
+  });
+
+  it("registers image metadata shapes under media schema intent", () => {
+    const registry = new DataAssetRegistry();
+    const asset = new CanonicalDataAsset({
+      id: "dataset-image-media",
+      name: "dataset-image-media",
+      source: { type: "generated", workflowId: "wf-image" },
+      location: { accessMethod: "virtual", location: "dataset://dataset-image-media" },
+      outputShape: createCanonicalImageMetadataRecordsShape({
+        items: [{
+          itemId: "item-1",
+          imageId: "asset:image:sample",
+          metadata: {
+            width: 512,
+            height: 512,
+            format: "png",
+          },
+          attributes: {
+            assetId: "asset:image:sample",
+          },
+        }],
+      }),
+    });
+
+    const entry = registry.register({ asset });
+    expect(entry.descriptor.schemaIntent.id).toBe("media");
+    expect(entry.descriptor.schemaIntent.validationIssues).toEqual([]);
+    expect(entry.descriptor.versioning.schemaVersion).toBe("1.0.0");
+    expect(entry.descriptor.inspectability.previewModes).toContain("dimensions-format-tags");
+    expect(registry.list({ schemaIntentId: "media" })).toHaveLength(1);
+  });
+
+  it("loads media datasets through the standard resolve flow with shared inspection/version metadata", () => {
+    const registry = new DataAssetRegistry();
+    const createLoadableMediaAsset = (tag: string) => new CanonicalDataAsset({
+      id: "dataset-media-loadable",
+      name: "dataset-media-loadable",
+      version: "1.0.0",
+      source: { type: "generated", workflowId: "wf-media-load" },
+      location: { accessMethod: "virtual", location: "dataset://dataset-media-loadable" },
+      outputShape: createCanonicalImageMetadataRecordsShape({
+        items: [{
+          itemId: "item-1",
+          attributes: {
+            assetRef: {
+              assetId: "asset:image:loadable",
+            },
+            width: 300,
+            height: 200,
+            format: "png",
+            tags: ["sample"],
+          },
+        }],
+      }),
+      config: {
+        tag,
+      },
+      versionMetadata: {
+        schemaVersion: "1.0.0",
+        contractVersion: "1.0.0",
+        revision: 2,
+        publishedVersionId: "1.0.0",
+      },
+    });
+
+    registry.register({
+      asset: createLoadableMediaAsset("sample"),
+      assetFactory: (config) => createLoadableMediaAsset(String(config.tag ?? "sample")),
+    });
+
+    const loaded = registry.resolveAsset({
+      assetId: "dataset-media-loadable",
+      versionId: "1.0.0",
+      configOverride: {
+        tag: "override",
+      },
+    });
+    expect(loaded).toBeDefined();
+    expect(loaded?.inspect().outputShapeKind).toBe("image-metadata-records");
+    expect(loaded?.inspect().revision).toBe(2);
+    expect(loaded?.inspect().metadata.versioning).toEqual({
+      datasetVersionId: "1.0.0",
+      schemaVersion: "1.0.0",
+      contractVersion: "1.0.0",
+      revision: 2,
+      publishedVersionId: "1.0.0",
+    });
+    expect(loaded?.config.values.tag).toBe("override");
+  });
+
+  it("rejects invalid records when explicitly registered as media schema intent", () => {
+    const registry = new DataAssetRegistry();
+    const asset = new CanonicalDataAsset({
+      id: "dataset-media-invalid",
+      name: "dataset-media-invalid",
+      source: { type: "generated", workflowId: "wf-invalid-image" },
+      location: { accessMethod: "virtual", location: "dataset://dataset-media-invalid" },
+      outputShape: createCanonicalRecordsShape({
+        records: [{
+          recordId: "img-1",
+          fields: {
+            assetRef: {
+              assetId: "asset:image:sample",
+            },
+            width: -1,
+            height: 256,
+            format: "png",
+          },
+        }],
+      }),
+    });
+
+    expect(() => registry.register({
+      asset,
+      schemaIntentId: "media",
+    })).toThrow("schema intent 'media' validation failed");
   });
 });

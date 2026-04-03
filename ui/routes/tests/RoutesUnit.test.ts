@@ -94,5 +94,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.configProfileStudio");
     expect(source).toContain("path: ROUTE_PATHS.context");
     expect(source).toContain("path: ROUTE_PATHS.workflowContextWorkbench");
+    expect(source).toContain("LegacyWorkflowEditorRedirectPage");
+    expect(source).not.toContain("WorkflowEditorPage");
   });
 });

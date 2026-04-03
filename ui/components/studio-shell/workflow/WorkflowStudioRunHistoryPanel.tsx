@@ -388,7 +388,7 @@ export default function WorkflowStudioRunHistoryPanel({
       workflowStatus: routeWorkflowStatus,
     } as const)
     : undefined;
-  const workflowEditorPath = buildWorkflowStudioRunHistoryPath({
+  const workflowStudioPath = buildWorkflowStudioRunHistoryPath({
     workflowId: runRouteOptions?.workflowId,
     workflowStatus: runRouteOptions?.workflowStatus,
     basePath: ROUTE_PATHS.workflowStudio,
@@ -599,7 +599,7 @@ export default function WorkflowStudioRunHistoryPanel({
             Durable run summaries, step-by-step inspection, and structured failure diagnostics.
           </p>
           <p className="ui-text-secondary ui-text-small ui-workflow-run-history__subtitle">
-            <Link className="ui-link" to={workflowEditorPath}>Workflow editor</Link> {" / "}
+            <Link className="ui-link" to={workflowStudioPath}>Workflow studio</Link> {" / "}
             <Link className="ui-link" to={runHistoryPath}>Run history</Link>
             {selectedRunId ? (
               <>
@@ -611,8 +611,8 @@ export default function WorkflowStudioRunHistoryPanel({
         </div>
         <div className="ui-row ui-row--wrap ui-workflow-run-history__actions">
           {isRunHistoryRoute ? (
-            <Link className="ui-button ui-button--ghost ui-button--sm" to={workflowEditorPath}>
-              Back to workflow editor
+            <Link className="ui-button ui-button--ghost ui-button--sm" to={workflowStudioPath}>
+              Back to workflow studio
             </Link>
           ) : (
             <Link className="ui-button ui-button--ghost ui-button--sm" to={runHistoryPath}>

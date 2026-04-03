@@ -129,4 +129,43 @@ describe("DataAssetFactory", () => {
     expect(asset.toCanonicalDataShape().kind).toBe("records");
     expect(asset.source.executionId).toBe("exec-factory-1");
   });
+
+  it("creates media dataset assets from image metadata converter results through shared factory flow", () => {
+    const converter = new DataConverterCore();
+    const conversionResult = converter.convert({
+      operation: "image-metadata-to-records",
+      imageId: "asset:image:converted",
+      metadata: {
+        assetRef: {
+          assetId: "asset:image:converted",
+        },
+        width: 320,
+        height: 240,
+        format: "png",
+        tags: ["sample"],
+      },
+      sourceAssetId: "source-image-asset",
+      sourceVersionId: "1.0.0",
+    });
+
+    expect(conversionResult.ok).toBeTrue();
+    if (!conversionResult.ok) {
+      throw new Error("Expected successful image conversion.");
+    }
+
+    const factory = new DataAssetFactory();
+    const asset = factory.createFromConverterResult({
+      assetId: "dataset-image-factory",
+      name: "Image Dataset",
+      version: "1.0.0",
+    }, conversionResult);
+
+    expect(asset.toCanonicalDataShape().kind).toBe("image-metadata-records");
+    const preview = factory.createPreviewFromConverterResult(conversionResult, { maxItems: 1 });
+    expect(preview.kind).toBe("image-metadata-records");
+    if (preview.kind !== "image-metadata-records") {
+      throw new Error("Expected image preview.");
+    }
+    expect(preview.items[0]?.imageReference).toBe("asset:image:converted");
+  });
 });

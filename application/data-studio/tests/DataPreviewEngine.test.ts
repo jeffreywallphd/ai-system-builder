@@ -72,7 +72,27 @@ describe("DataPreviewEngine", () => {
     expect(textPreview.items[0]?.text.endsWith("...")).toBe(true);
 
     const imageShape = createCanonicalImageMetadataRecordsShape({
-      items: [{ itemId: "img-1", label: "logo", confidence: 0.94 }],
+      items: [{
+        itemId: "img-1",
+        imageId: "asset:image:logo",
+        attributes: {
+          assetRef: {
+            assetId: "asset:image:logo",
+          },
+          width: 640,
+          height: 480,
+          format: "png",
+          tags: ["logo", "brand"],
+          annotations: {
+            caption: "Brand logo",
+            labels: ["approved"],
+          },
+          derived: {
+            orientation: "landscape",
+            aspectRatio: 1.333333,
+          },
+        },
+      }],
     });
 
     const imagePreview = createEngine().buildFromCanonicalShape(imageShape);
@@ -81,7 +101,117 @@ describe("DataPreviewEngine", () => {
       throw new Error("expected image metadata preview");
     }
 
-    expect(imagePreview.items[0]?.label).toBe("logo");
+    expect(imagePreview.items[0]?.imageReference).toBe("asset:image:logo");
+    expect(imagePreview.items[0]?.selectionId).toBe("img-1");
+    expect(imagePreview.items[0]?.width).toBe(640);
+    expect(imagePreview.items[0]?.height).toBe(480);
+    expect(imagePreview.items[0]?.format).toBe("png");
+    expect(imagePreview.items[0]?.tags).toEqual(["logo", "brand"]);
+    expect(imagePreview.items[0]?.annotations).toEqual({
+      caption: "Brand logo",
+      labels: ["approved"],
+    });
+  });
+
+  it("builds resilient image previews for partial and malformed records", () => {
+    const imageShape = createCanonicalImageMetadataRecordsShape({
+      items: [{
+        itemId: "img-partial",
+        imageId: "fallback-image-id",
+        attributes: {
+          width: 400,
+          format: "jpeg",
+        },
+      }, {
+        itemId: "img-malformed",
+        attributes: {
+          assetRef: {
+            assetId: "not-canonical-id",
+          },
+          width: 0,
+          height: 0,
+        },
+      }],
+    });
+
+    const preview = createEngine().buildFromCanonicalShape(imageShape, { maxItems: 2 });
+    expect(preview.kind).toBe("image-metadata-records");
+    if (preview.kind !== "image-metadata-records") {
+      throw new Error("expected image metadata preview");
+    }
+
+    expect(preview.summary.sampleCount).toBe(2);
+    expect(preview.items[0]?.imageReference).toBe("fallback-image-id");
+    expect(preview.items[0]?.height).toBeUndefined();
+    expect(preview.items[1]?.issues.length).toBeGreaterThan(0);
+    expect(preview.diagnostics.warningCount).toBeGreaterThan(0);
+  });
+
+  it("applies bounded sampling to image metadata previews", () => {
+    const shape = createCanonicalImageMetadataRecordsShape({
+      items: [
+        { itemId: "img-1", attributes: { width: 1, height: 1, format: "png" } },
+        { itemId: "img-2", attributes: { width: 1, height: 1, format: "png" } },
+      ],
+    });
+
+    const preview = createEngine().buildFromCanonicalShape(shape, { maxItems: 1 });
+    expect(preview.kind).toBe("image-metadata-records");
+    if (preview.kind !== "image-metadata-records") {
+      throw new Error("expected image metadata preview");
+    }
+    expect(preview.summary.totalCount).toBe(2);
+    expect(preview.summary.sampleCount).toBe(1);
+    expect(preview.summary.truncated).toBeTrue();
+    expect(preview.window.offset).toBe(0);
+    expect(preview.window.hasNextWindow).toBeTrue();
+  });
+
+  it("supports windowed image metadata previews", () => {
+    const shape = createCanonicalImageMetadataRecordsShape({
+      items: [
+        { itemId: "img-1", attributes: { width: 1, height: 1, format: "png" } },
+        { itemId: "img-2", attributes: { width: 2, height: 2, format: "jpeg" } },
+        { itemId: "img-3", attributes: { width: 3, height: 3, format: "webp" } },
+      ],
+    });
+
+    const preview = createEngine().buildFromCanonicalShape(shape, { maxItems: 1, windowOffset: 1 });
+    expect(preview.kind).toBe("image-metadata-records");
+    if (preview.kind !== "image-metadata-records") {
+      throw new Error("expected image metadata preview");
+    }
+
+    expect(preview.items).toHaveLength(1);
+    expect(preview.items[0]?.itemId).toBe("img-2");
+    expect(preview.window.offset).toBe(1);
+    expect(preview.window.limit).toBe(1);
+    expect(preview.window.hasPreviousWindow).toBeTrue();
+    expect(preview.window.hasNextWindow).toBeTrue();
+  });
+
+  it("maps local-file image references to thumbnail sources", () => {
+    const shape = createCanonicalImageMetadataRecordsShape({
+      items: [{
+        itemId: "img-thumb",
+        attributes: {
+          assetRef: {
+            kind: "local-file",
+            path: "C:\\images\\sample.png",
+          },
+          width: 50,
+          height: 50,
+          format: "png",
+        },
+      }],
+    });
+
+    const preview = createEngine().buildFromCanonicalShape(shape);
+    expect(preview.kind).toBe("image-metadata-records");
+    if (preview.kind !== "image-metadata-records") {
+      throw new Error("expected image metadata preview");
+    }
+    expect(preview.items[0]?.thumbnailSource).toBe("file:///C:/images/sample.png");
   });
 
   it("builds error preview from converter failures with diagnostics", () => {
@@ -123,4 +253,3 @@ describe("DataPreviewEngine", () => {
     expect(preview.kind).toBe("records");
   });
 });
-
