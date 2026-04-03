@@ -1342,3 +1342,12 @@ Not implemented in this slice:
   - deterministic `seed` (defaulted to a fixed integer).
 - Validation now enforces bounded ranges and allowed option sets for generation controls, and rejects empty model selections.
 - Preview summaries now include selected/default model configuration and concise generation behavior details, keeping schema assets inspectable and previewable without introducing UI-specific logic.
+
+## AI Loom image manipulation update: image + FaceID property controls (stories 3.5-3.6)
+
+- `ComfyImageManipulationPropertySchema` now includes first-class image controls for `width`, `height`, and image-to-image `denoiseStrength`, with safe runnable defaults and bounded validation suitable for Comfy runtime mapping.
+- Width/height are represented as bounded discrete pixel-grid values (`multipleOf: 64`) to stay compatible with current runtime/model constraints while remaining future-extensible through schema metadata.
+- Output result-count authoring remains explicit and validated (`1..4`) so single and multi-result generation are both contract-supported.
+- FaceID now has an explicit optional contract group (`enabled`, `referenceBindings`, `weight`, `startStepFraction`, `endStepFraction`) with schema-driven runtime mapping metadata and non-technical user-facing labels/descriptions.
+- FaceID reference bindings use dataset-native logical references (`datasetBindingId`, `datasetAssetId`) and reject raw file paths, preserving system-managed storage architecture boundaries.
+- FaceID step-window consistency is validated (`startStepFraction <= endStepFraction`) and preview output now summarizes whether identity guidance is enabled plus selected/default configuration.

@@ -13,7 +13,7 @@ import {
 describe("ComfyImageManipulationPropertySchema", () => {
   it("defines a versioned and inspectable property schema asset", () => {
     expect(ComfyImageManipulationPropertySchema.id).toBe("property-schema:image-manipulation");
-    expect(ComfyImageManipulationPropertySchema.version).toBe("1.1.0");
+    expect(ComfyImageManipulationPropertySchema.version).toBe("1.2.0");
     expect(ComfyImageManipulationPropertySchema.capabilities.composable).toBeTrue();
     expect(ComfyImageManipulationPropertySchema.capabilities.inspectable).toBeTrue();
     expect(ComfyImageManipulationPropertySchema.capabilities.previewable).toBeTrue();
@@ -21,6 +21,7 @@ describe("ComfyImageManipulationPropertySchema", () => {
       "prompts",
       "models",
       "generation",
+      "faceId",
       "output",
     ]);
   });
@@ -36,6 +37,16 @@ describe("ComfyImageManipulationPropertySchema", () => {
     expect(config.generation.sampler).toBe("euler");
     expect(config.generation.scheduler).toBe("normal");
     expect(config.generation.seed).toBe(1337);
+    expect(config.generation.width).toBe(1024);
+    expect(config.generation.height).toBe(1024);
+    expect(config.generation.denoiseStrength).toBe(0.6);
+    expect(config.faceId.enabled).toBeFalse();
+    expect(config.faceId.referenceBindings[0]).toEqual({
+      datasetBindingId: "faceid-reference",
+      datasetAssetId: "asset:dataset:image-faceid-reference",
+    });
+    expect(config.faceId.startStepFraction).toBe(0);
+    expect(config.faceId.endStepFraction).toBe(1);
     expect(config.output.resultCount).toBe(1);
 
     const issues = validateComfyImageManipulationConfig({});
@@ -66,6 +77,9 @@ describe("ComfyImageManipulationPropertySchema", () => {
       },
       generation: {
         variationStrength: 0.4,
+        width: 1024,
+        height: 768,
+        denoiseStrength: 0.55,
         steps: 20,
         cfg: 6,
         sampler: "dpmpp_2m",
@@ -97,6 +111,11 @@ describe("ComfyImageManipulationPropertySchema", () => {
     expect(preview.summary.sampler).toBe("euler");
     expect(preview.summary.scheduler).toBe("normal");
     expect(preview.summary.seed).toBe(1337);
+    expect(preview.summary.width).toBe(1024);
+    expect(preview.summary.height).toBe(1024);
+    expect(preview.summary.denoiseStrength).toBe(0.6);
+    expect(preview.summary.faceIdEnabled).toBeFalse();
+    expect(preview.summary.faceIdSummary).toBe("disabled");
   });
 
   it("maps prompt fields to desired and avoided conditioning surfaces", () => {
@@ -113,8 +132,10 @@ describe("ComfyImageManipulationPropertySchema", () => {
     const checkpointModel = modelsGroup?.entries.find((entry) => entry.id === "checkpointModel");
     const faceIdModel = modelsGroup?.entries.find((entry) => entry.id === "faceIdModel");
     const generationGroup = ComfyImageManipulationPropertySchema.fields.find((group) => group.groupId === "generation");
+    const faceIdGroup = ComfyImageManipulationPropertySchema.fields.find((group) => group.groupId === "faceId");
     const sampler = generationGroup?.entries.find((entry) => entry.id === "sampler");
     const scheduler = generationGroup?.entries.find((entry) => entry.id === "scheduler");
+    const referenceBindings = faceIdGroup?.entries.find((entry) => entry.id === "referenceBindings");
 
     expect(checkpointModel?.metadata).toEqual(expect.objectContaining({
       role: "checkpoint",
@@ -127,11 +148,19 @@ describe("ComfyImageManipulationPropertySchema", () => {
     }));
     expect(sampler?.validation).toEqual(expect.objectContaining({ options: expect.arrayContaining(["euler", "dpmpp_2m"]) }));
     expect(scheduler?.validation).toEqual(expect.objectContaining({ options: expect.arrayContaining(["normal", "karras"]) }));
+    expect(referenceBindings?.metadata).toEqual(expect.objectContaining({
+      runtimeBinding: "comfy.faceid.references",
+      referenceKind: "dataset-binding",
+      supportsMultiple: true,
+    }));
   });
 
   it("validates generation ranges and selection values", () => {
     const issues = validateComfyImageManipulationConfig({
       generation: {
+        width: 1000,
+        height: 65,
+        denoiseStrength: 2,
         steps: 0,
         cfg: 40,
         sampler: "unsupported",
@@ -146,6 +175,9 @@ describe("ComfyImageManipulationPropertySchema", () => {
     });
 
     expect(issues.some((issue) => issue.path === "generation.steps")).toBeTrue();
+    expect(issues.some((issue) => issue.path === "generation.width")).toBeTrue();
+    expect(issues.some((issue) => issue.path === "generation.height")).toBeTrue();
+    expect(issues.some((issue) => issue.path === "generation.denoiseStrength")).toBeTrue();
     expect(issues.some((issue) => issue.path === "generation.cfg")).toBeTrue();
     expect(issues.some((issue) => issue.path === "generation.sampler")).toBeTrue();
     expect(issues.some((issue) => issue.path === "generation.scheduler")).toBeTrue();
@@ -153,5 +185,42 @@ describe("ComfyImageManipulationPropertySchema", () => {
     expect(issues.some((issue) => issue.path === "models.checkpointModel")).toBeTrue();
     expect(issues.some((issue) => issue.path === "models.vaeModel")).toBeTrue();
     expect(issues.some((issue) => issue.path === "models.faceIdModel")).toBeTrue();
+  });
+
+  it("validates output count and FaceID logical consistency", () => {
+    const issues = validateComfyImageManipulationConfig({
+      output: {
+        resultCount: 0,
+      },
+      faceId: {
+        enabled: true,
+        referenceBindings: [{ datasetBindingId: "faceid-reference", datasetAssetId: "/tmp/face.png" }],
+        startStepFraction: 0.8,
+        endStepFraction: 0.2,
+      },
+    });
+
+    expect(issues.some((issue) => issue.path === "output.resultCount")).toBeTrue();
+    expect(issues.some((issue) => issue.path === "faceId.referenceBindings.0.datasetAssetId")).toBeTrue();
+    expect(issues.some((issue) => issue.path === "faceId.endStepFraction")).toBeTrue();
+  });
+
+  it("summarizes enabled FaceID guidance in preview output", () => {
+    const preview = createComfyImageManipulationConfigPreview({
+      faceId: {
+        enabled: true,
+        referenceBindings: [
+          { datasetBindingId: "faceid-reference", datasetAssetId: "asset:dataset:image-faceid-reference" },
+          { datasetBindingId: "faceid-reference", datasetAssetId: "asset:dataset:image-faceid-reference:v2" },
+        ],
+        weight: 1.1,
+        startStepFraction: 0.1,
+        endStepFraction: 0.9,
+      },
+    });
+
+    expect(preview.summary.faceIdEnabled).toBeTrue();
+    expect(preview.summary.faceIdSummary).toContain("enabled (2 references");
+    expect(preview.summary.faceIdSummary).toContain("range=0.1-0.9");
   });
 });
