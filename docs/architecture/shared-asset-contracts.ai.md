@@ -1325,3 +1325,16 @@
   - FaceID optional subworkflow composition metadata/validation in the base graph,
   - FaceID toggle + non-FaceID structural path behavior,
   - FaceID dataset-binding/control mapping exposure and inspectability in workflow-template and mapping assets.
+
+## AI Loom image manipulation update: output dataset-instance storage binding + workflow-template execution metadata (stories 4.9-4.10)
+
+- Workflow-template output bindings now support logical dataset/storage-instance target references directly in composition (`targetDatasetInstanceRef`, `targetStorageInstanceRef`, `targetStorageBindingId`) so workflow-facing contracts remain path-free and runtime-chainable.
+- Composition validation now rejects filesystem-style path values for these fields and enforces `storage-instance://` URI form for storage-instance references.
+- The default image-manipulation workflow template now binds output through logical dataset/storage references (not raw path contracts), aligning with shareable storage-instance architecture and later output retrieval/chaining flows.
+- Workflow-template definitions now include structured inspectable `executionMetadata` with:
+  - runtime backend/profile requirements,
+  - runtime dependency/capability requirements,
+  - workflow mode/capability posture,
+  - FaceID dependency/reference requirements,
+  - adapter/output handling hints for downstream runtime integration.
+- Template preview and instance contracts now expose these output-binding references and execution metadata so adapter/runtime layers can consume them without parsing free-form metadata.

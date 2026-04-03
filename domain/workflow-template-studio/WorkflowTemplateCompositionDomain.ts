@@ -81,6 +81,9 @@ const outputBindingSchema = z.object({
   workflowOutputId: z.string().trim().min(1),
   targetDatasetAssetId: z.string().trim().min(1).optional(),
   targetDatasetVersionId: z.string().trim().min(1).optional(),
+  targetDatasetInstanceRef: z.string().trim().min(1).optional(),
+  targetStorageInstanceRef: z.string().trim().min(1).optional(),
+  targetStorageBindingId: z.string().trim().min(1).optional(),
 });
 
 const parameterMappingSchema = z.object({
@@ -108,6 +111,20 @@ export const WorkflowTemplateCompositionSchema = z.object({
 
 export type WorkflowTemplateComposition = z.infer<typeof WorkflowTemplateCompositionSchema>;
 
+function looksLikeRawPath(value: string): boolean {
+  return value.startsWith("/")
+    || value.startsWith("./")
+    || value.startsWith("../")
+    || /^[A-Za-z]:[\\/]/.test(value)
+    || value.includes("\\");
+}
+
+function assertLogicalReference(value: string, label: string): void {
+  if (looksLikeRawPath(value)) {
+    throw new Error(`${label} must be a logical reference, not a raw filesystem path.`);
+  }
+}
+
 function dedupe(values: ReadonlyArray<string>): ReadonlyArray<string> {
   return Object.freeze([...new Set(values)]);
 }
@@ -134,6 +151,18 @@ export function createWorkflowTemplateComposition(input: unknown): WorkflowTempl
   for (const binding of parsed.outputBindings) {
     if (!interfaceIds.has(binding.workflowAssetId)) {
       throw new Error(`Output binding '${binding.bindingId}' references unknown workflow interface '${binding.workflowAssetId}'.`);
+    }
+    if (binding.targetDatasetInstanceRef) {
+      assertLogicalReference(binding.targetDatasetInstanceRef, `Output binding '${binding.bindingId}' dataset instance reference`);
+    }
+    if (binding.targetStorageBindingId) {
+      assertLogicalReference(binding.targetStorageBindingId, `Output binding '${binding.bindingId}' storage binding reference`);
+    }
+    if (binding.targetStorageInstanceRef) {
+      assertLogicalReference(binding.targetStorageInstanceRef, `Output binding '${binding.bindingId}' storage instance reference`);
+      if (!binding.targetStorageInstanceRef.startsWith("storage-instance://")) {
+        throw new Error(`Output binding '${binding.bindingId}' storage instance reference must use storage-instance:// logical URI form.`);
+      }
     }
   }
   for (const mapping of parsed.parameterMappings) {

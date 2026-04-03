@@ -146,6 +146,9 @@ export const ImageManipulationWorkflowTemplate: WorkflowTemplateDefinition = Obj
         workflowAssetId: "asset:workflow:image-to-image",
         workflowOutputId: "images",
         targetDatasetAssetId: ImageManipulationOutputDatasetAssetId,
+        targetDatasetInstanceRef: "dataset-instance-ref:reference-image:output",
+        targetStorageInstanceRef: "storage-instance://storage-instance%3Aasset%3Asystem%3Areference-image-manipulation%3Aimage-runtime",
+        targetStorageBindingId: "output-images",
       }),
     ]),
     parameterMappings: Object.freeze([
@@ -199,6 +202,46 @@ export const ImageManipulationWorkflowTemplate: WorkflowTemplateDefinition = Obj
     Object.freeze({ role: "dataset", assetId: ImageManipulationFaceIdReferenceDatasetAssetId }),
     Object.freeze({ role: "config-profile", assetId: ComfyImageManipulationBaseGraphAssetId, versionId: ComfyImageManipulationBaseGraphVersionId }),
   ]),
+  executionMetadata: Object.freeze({
+    runtime: Object.freeze({
+      backendId: "runtime:comfyui",
+      runtimeProfile: "comfyui",
+      requiredCapabilities: Object.freeze([
+        "workflow-template-execution",
+        "dataset-instance-output-materialization",
+        "storage-instance-dataset-bindings",
+      ]),
+      requiredDependencies: Object.freeze([
+        "comfyui>=0.2",
+        "model:checkpoint",
+        "model:vae",
+      ]),
+    }),
+    capability: Object.freeze({
+      workflowMode: "image-to-image",
+      supportsFaceId: true,
+      supportsBatchExecution: false,
+    }),
+    faceId: Object.freeze({
+      referenceDatasetAssetId: ImageManipulationFaceIdReferenceDatasetAssetId,
+      referenceBindingParameterId: "faceIdReferenceBindings",
+      requiredWhenEnabled: true,
+      dependencyAssetIds: Object.freeze([
+        ImageManipulationFaceIdSubworkflowAssetId,
+        ImageManipulationFaceIdReferenceDatasetAssetId,
+      ]),
+    }),
+    hints: Object.freeze({
+      adapterHints: Object.freeze([
+        "comfy-base-graph-required",
+        "faceid-subworkflow-optional",
+      ]),
+      outputHandling: Object.freeze([
+        "bind-output-to-dataset-instance",
+        "resolve-output-via-storage-instance-binding",
+      ]),
+    }),
+  }),
   tags: Object.freeze(["default", "image-manipulation", "img2img", "comfyui"]),
   metadata: Object.freeze({
     category: "image-manipulation",

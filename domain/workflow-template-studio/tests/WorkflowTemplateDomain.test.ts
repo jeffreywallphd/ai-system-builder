@@ -41,6 +41,19 @@ describe("WorkflowTemplateDomain", () => {
       { role: "workflow-definition", assetId: "asset:workflow:cinematic", versionId: "asset:workflow:cinematic:v3" },
       { role: "model", assetId: "asset:model:sdxl", versionId: "asset:model:sdxl:v1" },
     ],
+    executionMetadata: {
+      runtime: {
+        backendId: "runtime:comfyui",
+        runtimeProfile: "comfyui",
+        requiredCapabilities: ["workflow-template-execution"],
+        requiredDependencies: ["comfyui>=0.2"],
+      },
+      capability: {
+        workflowMode: "text-to-image",
+        supportsFaceId: false,
+        supportsBatchExecution: false,
+      },
+    },
     tags: ["image", "starter", "cinematic", "starter"],
     metadata: { owner: "platform", tier: "starter" },
   } as const;
@@ -59,6 +72,7 @@ describe("WorkflowTemplateDomain", () => {
     expect(reloaded.outputExpectations[0]?.outputId).toBe("images");
     expect(reloaded.parameters?.[0]?.parameterId).toBe("steps");
     expect(reloaded.composition?.workflowInterfaces[0]?.workflowAssetId).toBe("asset:workflow:cinematic");
+    expect(reloaded.executionMetadata?.runtime.backendId).toBe("runtime:comfyui");
   });
 
   it("requires at least one workflow-definition reference", () => {
