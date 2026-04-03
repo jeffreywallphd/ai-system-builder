@@ -75,3 +75,29 @@ export function createStorageLogicalReference(instanceId: string, area: StorageB
   }
   return `storage-instance://${encodeURIComponent(normalizedInstanceId)}/${area}`;
 }
+
+export function parseStorageLogicalReference(reference: string): {
+  readonly instanceId: string;
+  readonly area?: StorageBindingArea;
+} {
+  const normalized = reference.trim();
+  if (!normalized.startsWith("storage-instance://")) {
+    throw new Error(`Storage reference '${reference}' must use the storage-instance:// scheme.`);
+  }
+  const withoutScheme = normalized.slice("storage-instance://".length);
+  const [encodedInstanceId, area] = withoutScheme.split("/");
+  if (!encodedInstanceId) {
+    throw new Error(`Storage reference '${reference}' is missing an instance id.`);
+  }
+  const instanceId = decodeURIComponent(encodedInstanceId);
+  if (!instanceId.trim()) {
+    throw new Error(`Storage reference '${reference}' is missing an instance id.`);
+  }
+  if (!area) {
+    return Object.freeze({ instanceId });
+  }
+  if (!StorageBindingAreaSchema.safeParse(area).success) {
+    throw new Error(`Storage reference '${reference}' has unsupported area '${area}'.`);
+  }
+  return Object.freeze({ instanceId, area });
+}

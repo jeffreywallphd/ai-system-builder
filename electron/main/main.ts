@@ -80,6 +80,8 @@ import { SqliteSystemRuntimeExecutionStore } from "../../infrastructure/filesyst
 import { SqliteExecutionAuditRepository } from "../../infrastructure/filesystem/system-runtime/SqliteExecutionAuditRepository";
 import { SqliteImageRunHistoryRepository } from "../../infrastructure/filesystem/system-runtime/SqliteImageRunHistoryRepository";
 import { LocalStorageInstanceProvisioner } from "../../infrastructure/filesystem/system-runtime/LocalStorageInstanceProvisioner";
+import { LocalSystemOutputArtifactStorage } from "../../infrastructure/filesystem/system-runtime/LocalSystemOutputArtifactStorage";
+import { LocalStorageInstanceLifecycleInfrastructure } from "../../infrastructure/filesystem/system-runtime/LocalStorageInstanceLifecycleInfrastructure";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -321,6 +323,12 @@ async function bootstrapDesktopRuntime(): Promise<void> {
       storageInstanceProvisioner: new LocalStorageInstanceProvisioner({
         storageRootDirectory: path.join(storagePaths.storageDirectory, "storage"),
       }),
+      workflowOutputArtifactStorage: new LocalSystemOutputArtifactStorage(
+        path.join(storagePaths.storageDirectory, "storage"),
+      ),
+      storageLifecycleInfrastructure: new LocalStorageInstanceLifecycleInfrastructure(
+        path.join(storagePaths.storageDirectory, "storage"),
+      ),
     },
   );
   const systemStudioBackendApi = new SystemStudioBackendApi(studioShellRepository);

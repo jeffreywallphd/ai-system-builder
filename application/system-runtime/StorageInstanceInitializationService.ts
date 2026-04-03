@@ -48,6 +48,8 @@ export interface StorageInstanceInitializationResult {
 export interface StorageInstanceMetadataRepository {
   getByInstanceId(instanceId: string): Promise<StorageInstanceMetadata | undefined> | StorageInstanceMetadata | undefined;
   save(metadata: StorageInstanceMetadata): Promise<void> | void;
+  list?(): Promise<ReadonlyArray<StorageInstanceMetadata>> | ReadonlyArray<StorageInstanceMetadata>;
+  deleteByInstanceId?(instanceId: string): Promise<boolean> | boolean;
 }
 
 export class InMemoryStorageInstanceMetadataRepository implements StorageInstanceMetadataRepository {
@@ -59,6 +61,14 @@ export class InMemoryStorageInstanceMetadataRepository implements StorageInstanc
 
   public save(metadata: StorageInstanceMetadata): void {
     this.byId.set(metadata.instanceId, metadata);
+  }
+
+  public list(): ReadonlyArray<StorageInstanceMetadata> {
+    return Object.freeze([...this.byId.values()]);
+  }
+
+  public deleteByInstanceId(instanceId: string): boolean {
+    return this.byId.delete(instanceId.trim());
   }
 }
 

@@ -6,6 +6,7 @@ import type {
   PersistWorkflowOutputArtifactResult,
   WorkflowOutputArtifactStorage,
 } from "../../../application/system-runtime/WorkflowOutputArtifactStorage";
+import { parseStorageLogicalReference } from "../../../application/system-runtime/StorageInstanceProvisioningContract";
 
 export class LocalSystemOutputArtifactStorage implements WorkflowOutputArtifactStorage {
   public constructor(private readonly rootDirectory: string) {}
@@ -15,13 +16,18 @@ export class LocalSystemOutputArtifactStorage implements WorkflowOutputArtifactS
       throw new Error("invalid-request:Workflow output artifact payload must be a non-empty Uint8Array.");
     }
 
+    const binding = parseStorageLogicalReference(request.datasetStorageBinding.bindingReference);
+    if (!binding.area) {
+      throw new Error("invalid-request:Storage binding reference must include a logical area.");
+    }
     const extension = this.normalizeExtension(request.extensionHint, request.mimeTypeHint);
     const role = request.role.trim();
     const baseName = this.normalizeFileName(request.fileNameHint) ?? `output-${request.assetIndex + 1}`;
     const targetDir = path.join(
       this.rootDirectory,
-      sanitizeSegment(request.systemId),
-      sanitizeSegment(request.datasetInstanceId),
+      sanitizeSegment(binding.instanceId),
+      sanitizeSegment(binding.area),
+      "runs",
       sanitizeSegment(request.workflowRunId),
       sanitizeSegment(request.materializationId),
     );
@@ -32,21 +38,25 @@ export class LocalSystemOutputArtifactStorage implements WorkflowOutputArtifactS
     fs.writeFileSync(absolutePath, request.payload);
 
     const relativePath = path.relative(this.rootDirectory, absolutePath).split(path.sep).join("/");
-    const storageReference = `system-output://${relativePath}`;
+    const storageReference = `${request.datasetStorageBinding.bindingReference}/runs/${encodeURIComponent(request.workflowRunId)}/${encodeURIComponent(request.materializationId)}/${collision.fileName}`;
     const sha256 = crypto.createHash("sha256").update(request.payload).digest("hex");
     const identitySeed = `${sha256}:${relativePath}`;
     const stableId = `generated-output:${request.systemId}:${request.datasetInstanceId}:${crypto.createHash("sha1").update(identitySeed).digest("hex").slice(0, 24)}`;
 
     return Object.freeze({
       storageReference,
-      storageProvider: "system-owned-filesystem-output-store",
+      storageProvider: "storage-instance-filesystem-output-store",
       assetRef: Object.freeze({
         kind: "generated-output",
         stableId,
         outputId: storageReference,
         path: absolutePath,
-        sourceSystem: "system-owned-output-storage",
+        sourceSystem: "storage-instance-output-storage",
         sourceContext: Object.freeze({
+          storageInstanceId: request.datasetStorageBinding.storageInstanceId,
+          storageBindingId: request.datasetStorageBinding.bindingId,
+          storageBindingArea: request.datasetStorageBinding.bindingArea,
+          datasetInstanceId: request.datasetInstanceId,
           materializationId: request.materializationId,
           workflowRunId: request.workflowRunId,
           role: request.role,

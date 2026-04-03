@@ -94,13 +94,20 @@ import {
   StorageInstanceInitializationService,
   type StorageInstanceMetadataRepository,
 } from "../../../application/system-runtime/StorageInstanceInitializationService";
+import {
+  StorageInstanceLifecycleService,
+  type StorageInstanceLifecycleInfrastructure,
+} from "../../../application/system-runtime/StorageInstanceLifecycleService";
 import type { StorageAttachmentOwnerKind, StorageInstanceMetadata } from "../../../application/system-runtime/StorageInstanceMetadataModel";
 import type { DatasetInstanceAssetCatalog, DatasetInstanceAssetDefinition } from "../../../application/system-runtime/DatasetInstanceAssetCatalog";
 import { ZodMediaDatasetValidator } from "../../../application/dataset-studio/adapters/validation/MediaDatasetValidator";
 import { DatasetSchemaIntentIds } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import { createDefaultMediaAdapterBundle } from "../../../application/dataset-studio/adapters/media/MediaAdapterFactory";
 import { WorkflowOutputMaterializationService } from "../../../application/system-runtime/WorkflowOutputMaterializationService";
-import { InMemoryWorkflowOutputArtifactStorage } from "../../../application/system-runtime/WorkflowOutputArtifactStorage";
+import {
+  InMemoryWorkflowOutputArtifactStorage,
+  type WorkflowOutputArtifactStorage,
+} from "../../../application/system-runtime/WorkflowOutputArtifactStorage";
 import { InMemoryWorkflowOutputProvenanceRepository } from "../../../application/system-runtime/WorkflowOutputProvenanceRepository";
 import { OutputGalleryDatasetIntegrationService } from "../../../application/system-runtime/OutputGalleryDatasetIntegrationService";
 import type { OutputGalleryListing } from "../../../application/system-runtime/OutputGalleryDataContract";
@@ -268,6 +275,17 @@ export interface InitializeReferenceImageStorageRequest {
   readonly embeddedSubsystemId?: string;
   readonly storageInstanceId?: string;
   readonly attachToStorageInstanceId?: string;
+}
+
+export interface ManageReferenceImageStorageLifecycleRequest {
+  readonly systemId: string;
+  readonly storageInstanceId: string;
+  readonly operation: "initialize" | "reset" | "archive" | "cleanup";
+}
+
+export interface DeleteReferenceImageStorageRequest {
+  readonly systemId: string;
+  readonly storageInstanceId: string;
 }
 
 class StaticDatasetInstanceAssetCatalog implements DatasetInstanceAssetCatalog {
@@ -657,6 +675,7 @@ export class StudioShellBackendApi {
   private readonly referenceImageOutputGallery: OutputGalleryDatasetIntegrationService;
   private readonly referenceImageRunHistory: ImageRunHistoryService;
   private readonly storageInitialization: StorageInstanceInitializationService;
+  private readonly storageLifecycle: StorageInstanceLifecycleService;
   private readonly comfyMaterializationMapper = new ComfyExecutionResultMaterializationMapper();
   private readonly now: () => Date;
 
@@ -669,6 +688,8 @@ export class StudioShellBackendApi {
     options?: {
       readonly storageInstanceProvisioner?: StorageInstanceProvisioningContract;
       readonly storageInstanceMetadataRepository?: StorageInstanceMetadataRepository;
+      readonly workflowOutputArtifactStorage?: WorkflowOutputArtifactStorage;
+      readonly storageLifecycleInfrastructure?: StorageInstanceLifecycleInfrastructure;
     },
   ) {
     this.now = now;
@@ -696,9 +717,10 @@ export class StudioShellBackendApi {
         imageMetadataExtractor: createDefaultMediaAdapterBundle().metadataExtractor,
       },
     );
+    const storageMetadataRepository = options?.storageInstanceMetadataRepository ?? new InMemoryStorageInstanceMetadataRepository();
     this.referenceImageOutputMaterialization = new WorkflowOutputMaterializationService(
       this.referenceImageDatasets,
-      new InMemoryWorkflowOutputArtifactStorage(),
+      options?.workflowOutputArtifactStorage ?? new InMemoryWorkflowOutputArtifactStorage(),
       new InMemoryWorkflowOutputProvenanceRepository(),
     );
     this.referenceImageOutputGallery = new OutputGalleryDatasetIntegrationService(this.referenceImageDatasets);
@@ -709,7 +731,12 @@ export class StudioShellBackendApi {
     );
     this.storageInitialization = new StorageInstanceInitializationService(
       options?.storageInstanceProvisioner ?? new DeterministicStorageInstanceProvisioner(),
-      options?.storageInstanceMetadataRepository ?? new InMemoryStorageInstanceMetadataRepository(),
+      storageMetadataRepository,
+      this.now,
+    );
+    this.storageLifecycle = new StorageInstanceLifecycleService(
+      storageMetadataRepository,
+      options?.storageLifecycleInfrastructure,
       this.now,
     );
     this.workflowStudioService = new WorkflowStudioApplicationService(
@@ -1121,11 +1148,14 @@ export class StudioShellBackendApi {
       if (!inputDataset) {
         throw new StudioShellInvalidRequestError("Reference image input dataset is unavailable.");
       }
+      if (!inputDataset.storageBinding) {
+        throw new StudioShellInvalidRequestError("Reference image input dataset is missing a storage binding.");
+      }
 
       const ingested = await this.referenceImageDatasets.ingestImageRecordIntoInstance({
         systemId: runtimeSystemId,
         instanceId: inputDataset.instanceId,
-        storageReference: `upload://${runtimeSystemId}/${Date.now()}-${fileName}`,
+        storageReference: `${inputDataset.storageBinding.bindingReference}/uploads/${Date.now()}-${encodeURIComponent(fileName)}`,
         metadata: {
           ingestionSource: "reference-image-ui-upload",
           uploadedFileName: fileName,
@@ -2497,6 +2527,36 @@ export class StudioShellBackendApi {
       return Object.freeze({
         storage: initialized.metadata,
       });
+    });
+  }
+
+  public async manageReferenceImageStorageLifecycle(
+    request: ManageReferenceImageStorageLifecycleRequest,
+  ): Promise<StudioShellApiResponse<{ readonly storage: StorageInstanceMetadata }>> {
+    return this.wrap(async () => {
+      const systemId = request.systemId.trim();
+      await this.assertReferenceImageSystemOwnership(systemId);
+      const instanceId = request.storageInstanceId.trim();
+      const operation = request.operation;
+      const storage = operation === "initialize"
+        ? await this.storageLifecycle.initialize(instanceId)
+        : operation === "reset"
+          ? await this.storageLifecycle.reset(instanceId)
+          : operation === "archive"
+            ? await this.storageLifecycle.archive(instanceId)
+            : await this.storageLifecycle.cleanup(instanceId);
+      return Object.freeze({ storage });
+    });
+  }
+
+  public async deleteReferenceImageStorage(
+    request: DeleteReferenceImageStorageRequest,
+  ): Promise<StudioShellApiResponse<{ readonly instanceId: string; readonly deleted: boolean }>> {
+    return this.wrap(async () => {
+      const systemId = request.systemId.trim();
+      await this.assertReferenceImageSystemOwnership(systemId);
+      const deleted = await this.storageLifecycle.safeDelete(request.storageInstanceId.trim());
+      return Object.freeze(deleted);
     });
   }
 
