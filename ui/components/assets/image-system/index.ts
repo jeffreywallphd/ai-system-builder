@@ -8,6 +8,7 @@ export * from "./BrowserImageUploadIngestionAdapter";
 export * from "./ImageUploadPanel";
 export * from "./ImageViewer";
 export * from "./ImagePreviewPanel";
+export * from "./ImageStatusNotice";
 export * from "./ImageParameterMappers";
 export * from "./ImageParameterForm";
 export * from "./ImageOutputGallery";

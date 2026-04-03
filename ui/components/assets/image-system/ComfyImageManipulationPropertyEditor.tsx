@@ -8,15 +8,29 @@ import {
 type ComfySchemaGroup = (typeof ComfyImageManipulationPropertySchema.fields)[number];
 type ComfySchemaField = ComfySchemaGroup["entries"][number];
 
-const advancedGenerationFieldIds = new Set(["cfg", "sampler", "scheduler", "seed"]);
-const faceReferencePrimaryFieldIds = new Set(["enabled", "referenceBindings", "weight"]);
-
 const sectionLabels = Object.freeze({
   instructions: "Main editing instructions",
   imageSettings: "Image and result settings",
-  faceReference: "Face reference controls",
-  advanced: "Advanced settings",
+  faceReference: "Face reference controls (optional)",
+  advanced: "Advanced controls (optional)",
+  advancedModels: "Model choices",
+  advancedGeneration: "Generation tuning",
+  advancedIdentity: "Identity timing and model controls",
 });
+
+function getProgressiveDisclosure(field: ComfySchemaField): string | undefined {
+  const metadata = field.metadata as Record<string, unknown> | undefined;
+  return typeof metadata?.progressiveDisclosure === "string"
+    ? metadata.progressiveDisclosure
+    : undefined;
+}
+
+function isAdvancedField(groupId: ComfySchemaGroup["groupId"], field: ComfySchemaField): boolean {
+  if (groupId === "models") {
+    return true;
+  }
+  return getProgressiveDisclosure(field) === "advanced";
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -135,18 +149,20 @@ export function ComfyImageManipulationPropertyEditor({
   const fieldIssues = useMemo(() => collectFieldIssues(issues), [issues]);
 
   const instructionFields = promptsGroup?.entries ?? Object.freeze([]);
+  const generationFields = generationGroup?.entries ?? Object.freeze([]);
   const imageResultFields = Object.freeze([
-    ...(generationGroup?.entries.filter((entry) => !advancedGenerationFieldIds.has(entry.id)) ?? []),
+    ...generationFields.filter((entry) => !isAdvancedField("generation", entry)),
     ...(outputGroup?.entries ?? []),
   ]);
-  const faceReferenceFields = Object.freeze(
-    faceIdGroup?.entries.filter((entry) => faceReferencePrimaryFieldIds.has(entry.id)) ?? [],
-  );
-  const advancedFields = Object.freeze([
-    ...(modelsGroup?.entries ?? []),
-    ...(generationGroup?.entries.filter((entry) => advancedGenerationFieldIds.has(entry.id)) ?? []),
-    ...(faceIdGroup?.entries.filter((entry) => !faceReferencePrimaryFieldIds.has(entry.id)) ?? []),
-  ]);
+  const faceIdFields = faceIdGroup?.entries ?? Object.freeze([]);
+  const faceReferenceFields = Object.freeze(faceIdFields.filter((entry) => !isAdvancedField("faceId", entry)));
+
+  const advancedModelFields = Object.freeze((modelsGroup?.entries ?? []).filter((entry) => isAdvancedField("models", entry)));
+  const advancedGenerationFields = Object.freeze(generationFields.filter((entry) => isAdvancedField("generation", entry)));
+  const advancedIdentityFields = Object.freeze(faceIdFields.filter((entry) => isAdvancedField("faceId", entry)));
+  const hasAdvancedFields = advancedModelFields.length > 0
+    || advancedGenerationFields.length > 0
+    || advancedIdentityFields.length > 0;
 
   const applyFieldValue = (field: ComfySchemaField, nextValue: unknown): void => {
     const candidate = setValueAtPath(value as unknown as Record<string, unknown>, field.path, nextValue);
@@ -356,12 +372,29 @@ export function ComfyImageManipulationPropertyEditor({
         <h4 className="ui-text-small">{sectionLabels.faceReference}</h4>
         {faceReferenceFields.map((field) => renderField(field))}
       </section>
-      <details className="ui-stack ui-stack--xs">
-        <summary className="ui-text-small ui-text-secondary">{sectionLabels.advanced}</summary>
-        <div className="ui-stack ui-stack--xs">
-          {advancedFields.map((field) => renderField(field))}
-        </div>
-      </details>
+      {hasAdvancedFields ? (
+        <details className="ui-stack ui-stack--xs">
+          <summary className="ui-text-small ui-text-secondary">{sectionLabels.advanced}</summary>
+          {advancedModelFields.length > 0 ? (
+            <section className="ui-stack ui-stack--2xs">
+              <h4 className="ui-text-small">{sectionLabels.advancedModels}</h4>
+              {advancedModelFields.map((field) => renderField(field))}
+            </section>
+          ) : null}
+          {advancedGenerationFields.length > 0 ? (
+            <section className="ui-stack ui-stack--2xs">
+              <h4 className="ui-text-small">{sectionLabels.advancedGeneration}</h4>
+              {advancedGenerationFields.map((field) => renderField(field))}
+            </section>
+          ) : null}
+          {advancedIdentityFields.length > 0 ? (
+            <section className="ui-stack ui-stack--2xs">
+              <h4 className="ui-text-small">{sectionLabels.advancedIdentity}</h4>
+              {advancedIdentityFields.map((field) => renderField(field))}
+            </section>
+          ) : null}
+        </details>
+      ) : null}
     </section>
   );
 }

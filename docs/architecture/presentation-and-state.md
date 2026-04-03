@@ -887,3 +887,19 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - optional FaceID/reference dataset (`reference-image-dataset`)
 - Preview selection is now explicit and context-aware (`source` / `output` / `reference`) and updates from runtime page selection state without exposing filesystem paths or storage internals.
 - Empty/loading/unavailable/error states are now explicit in both preview and gallery surfaces, keeping runtime UX user-facing while preserving storage-instance/dataset-instance boundaries.
+
+## AI Loom image manipulation update: runtime state UX + advanced disclosure polish (stories 7.7-7.8)
+
+- Runtime editor state handling now uses one reusable status surface component (`ImageStatusNotice`) across page-level and panel-level UX for loading, empty, warning, success, and failure states.
+- `ImageManipulationRuntimeEditorPanel` now renders explicit user-facing state handling for:
+  - initial runtime hydration/loading,
+  - dataset/image collection loading failures,
+  - no-source-photo and no-selection empty states,
+  - run-readiness validation summaries that explain why run is blocked,
+  - execution status and failure messaging with diagnostics kept in collapsed advanced details.
+- Dataset/image retrieval errors are surfaced with plain-language product copy in default UI; technical diagnostics remain in separate advanced disclosure areas where already supported.
+- `ImagePreviewPanel` and `ImageGallerySlider` now share consistent state rendering language/patterns through the reusable status component instead of one-off inline messages.
+- Advanced settings disclosure in `ComfyImageManipulationPropertyEditor` remains schema-driven:
+  - advanced-field placement is derived from schema metadata/grouping (including model controls and explicitly tagged advanced fields),
+  - advanced controls are collapsed near the bottom by default with user-facing section labels (`Model choices`, `Generation tuning`, `Identity timing and model controls`),
+  - primary beginner-facing controls remain prominent in top sections.

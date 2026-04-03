@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 import type { ImageRenderOptions, ImageUiViewModel } from "./ImageUiContracts";
 import { ImageRenderFrame } from "./ImageRenderFrame";
+import { ImageStatusNotice } from "./ImageStatusNotice";
 
 export interface ImageGallerySliderProps {
   readonly title?: string;
@@ -37,16 +38,23 @@ export function ImageGallerySlider({
 }: ImageGallerySliderProps): JSX.Element {
   if (loading) {
     return (
-      <section className={["ui-image-surface", "ui-image-surface--status", className ?? ""].filter(Boolean).join(" ")}>
-        {title}: Loading images...
+      <section className={["ui-image-surface", className ?? ""].filter(Boolean).join(" ")}>
+        <ImageStatusNotice
+          title={`${title} is loading`}
+          message="Getting images ready."
+        />
       </section>
     );
   }
 
   if (errorMessage) {
     return (
-      <section className={["ui-image-surface", "ui-image-surface--status", "ui-text-danger", className ?? ""].filter(Boolean).join(" ")}>
-        {errorMessage}
+      <section className={["ui-image-surface", className ?? ""].filter(Boolean).join(" ")}>
+        <ImageStatusNotice
+          title={`${title} unavailable`}
+          message={errorMessage}
+          tone="danger"
+        />
       </section>
     );
   }
@@ -63,7 +71,10 @@ export function ImageGallerySlider({
         </span>
       </header>
       {items.length === 0 ? (
-        <p className="ui-text-small ui-text-secondary">{emptyMessage}</p>
+        <ImageStatusNotice
+          title={`No images in ${title.toLowerCase()}`}
+          message={emptyMessage}
+        />
       ) : (
         <div className="ui-image-gallery-slider__track" role="listbox" aria-label={title}>
           {items.map((item, index) => {
