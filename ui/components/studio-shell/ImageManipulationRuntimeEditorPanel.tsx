@@ -28,6 +28,20 @@ import {
   type ReferenceImageExecutionFlowIssue,
   type ReferenceImageExecutionFlowStep,
 } from "../../runtime/ReferenceImageExecutionFlowService";
+import {
+  createIdleImageManipulationRunLifecycleState,
+  mapExecutionFlowSnapshotToRunLifecycleState,
+  type ImageManipulationRunLifecycleSnapshot,
+} from "./image-manipulation/ImageManipulationRunLifecycleState";
+import {
+  createInitialImageManipulationSelectionState,
+  getSelectionRecordIdForRole,
+  reconcileImageManipulationSelection,
+  setActivePreviewRole,
+  setRoleSelection,
+  type ImageManipulationSelectionRole,
+  type ImageManipulationSelectionState,
+} from "./image-manipulation/ImageManipulationSelectionState";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
   acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
@@ -41,12 +55,19 @@ const uploadPolicy: FileIngestionPolicy = Object.freeze({
   }),
 });
 
-type PreviewSelectionContext = "source" | "output" | "reference";
-
-const previewContextLabels: Record<PreviewSelectionContext, string> = Object.freeze({
+const previewContextLabels: Record<ImageManipulationSelectionRole, string> = Object.freeze({
   source: "Source photo",
   output: "Created image",
   reference: "Face reference photo",
+});
+
+const runStateLabels: Record<ImageManipulationRunLifecycleSnapshot["state"], string> = Object.freeze({
+  idle: "Ready",
+  validating: "Checking settings",
+  preparing: "Preparing",
+  running: "Creating",
+  success: "Finished",
+  failure: "Needs attention",
 });
 
 function toFriendlyTimestamp(value: string | undefined): string | undefined {
@@ -60,7 +81,7 @@ function toFriendlyTimestamp(value: string | undefined): string | undefined {
   return timestamp.toLocaleString();
 }
 
-function mapItemsToDisplayViewModels(items: ReadonlyArray<OutputGalleryItem>, context: PreviewSelectionContext): ReadonlyArray<ImageUiViewModel> {
+function mapItemsToDisplayViewModels(items: ReadonlyArray<OutputGalleryItem>, context: ImageManipulationSelectionRole): ReadonlyArray<ImageUiViewModel> {
   const singularLabel = context === "source"
     ? "Source"
     : context === "reference"
@@ -93,6 +114,10 @@ function resolveSelectedItem(
   return items[0];
 }
 
+function toRecordIds(items: ReadonlyArray<OutputGalleryItem>): ReadonlyArray<string> {
+  return Object.freeze(items.map((item) => item.image.recordId));
+}
+
 async function encodeFileBase64(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
   let binary = "";
@@ -107,6 +132,19 @@ export interface ImageManipulationRuntimeEditorPanelProps {
   readonly context: StudioShellExtensionContext;
 }
 
+interface ImageCollections {
+  readonly sources: ReadonlyArray<OutputGalleryItem>;
+  readonly outputs: ReadonlyArray<OutputGalleryItem>;
+  readonly references: ReadonlyArray<OutputGalleryItem>;
+}
+
+interface LoadCollectionsOptions {
+  readonly preferredSourceRecordId?: string;
+  readonly preferredOutputRecordId?: string;
+  readonly preferredReferenceRecordId?: string;
+  readonly preferLatestOutput?: boolean;
+}
+
 export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulationRuntimeEditorPanelProps): JSX.Element {
   const [presetId, setPresetId] = useState(ComfyImageManipulationPropertySchema.defaultPresetId);
   const [config, setConfig] = useState<ComfyImageManipulationConfig>(() => createComfyImageManipulationDefaultConfig());
@@ -117,21 +155,14 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
   const executionFlow = useMemo(() => new ReferenceImageExecutionFlowService(), []);
   const requestIdRef = useRef(0);
 
-  const [selectedRecordId, setSelectedRecordId] = useState<string | undefined>();
-  const [selectedAssetId, setSelectedAssetId] = useState<string | undefined>();
+  const [selection, setSelection] = useState<ImageManipulationSelectionState>(() => createInitialImageManipulationSelectionState());
   const [datasetInstanceId, setDatasetInstanceId] = useState<string | undefined>();
-
-  const [activeSelectionContext, setActiveSelectionContext] = useState<PreviewSelectionContext>("output");
-  const [activeSourceId, setActiveSourceId] = useState<string | undefined>();
-  const [activeResultId, setActiveResultId] = useState<string | undefined>();
-  const [activeReferenceId, setActiveReferenceId] = useState<string | undefined>();
 
   const [outputItems, setOutputItems] = useState<ReadonlyArray<OutputGalleryItem>>([]);
   const [sourceItems, setSourceItems] = useState<ReadonlyArray<OutputGalleryItem>>([]);
   const [referenceItems, setReferenceItems] = useState<ReadonlyArray<OutputGalleryItem>>([]);
 
   const [isUploading, setIsUploading] = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
   const [isLoadingOutputs, setIsLoadingOutputs] = useState(false);
   const [isLoadingSources, setIsLoadingSources] = useState(false);
   const [isLoadingReferences, setIsLoadingReferences] = useState(false);
@@ -140,6 +171,7 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
   const [referenceLoadError, setReferenceLoadError] = useState<string | undefined>();
 
   const [statusMessage, setStatusMessage] = useState<string | undefined>();
+  const [runLifecycle, setRunLifecycle] = useState<ImageManipulationRunLifecycleSnapshot>(() => createIdleImageManipulationRunLifecycleState());
   const [integrityIssues, setIntegrityIssues] = useState<ReadonlyArray<CrossStudioIntegrityIssue>>([]);
   const [flowSteps, setFlowSteps] = useState<ReadonlyArray<ReferenceImageExecutionFlowStep>>([]);
   const [flowIssues, setFlowIssues] = useState<ReadonlyArray<ReferenceImageExecutionFlowIssue>>([]);
@@ -160,58 +192,70 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
   );
 
   const selectedSourceItem = useMemo(
-    () => resolveSelectedItem(sourceItems, activeSourceId ?? selectedRecordId),
-    [sourceItems, activeSourceId, selectedRecordId],
+    () => resolveSelectedItem(sourceItems, selection.sourceRecordId),
+    [sourceItems, selection.sourceRecordId],
   );
   const selectedOutputItem = useMemo(
-    () => resolveSelectedItem(outputItems, activeResultId),
-    [outputItems, activeResultId],
+    () => resolveSelectedItem(outputItems, selection.outputRecordId),
+    [outputItems, selection.outputRecordId],
   );
   const selectedReferenceItem = useMemo(
-    () => resolveSelectedItem(referenceItems, activeReferenceId),
-    [referenceItems, activeReferenceId],
+    () => resolveSelectedItem(referenceItems, selection.referenceRecordId),
+    [referenceItems, selection.referenceRecordId],
   );
 
+  useEffect(() => {
+    if (selectedSourceItem?.dataset.instanceId && selectedSourceItem.dataset.instanceId !== datasetInstanceId) {
+      setDatasetInstanceId(selectedSourceItem.dataset.instanceId);
+    }
+  }, [selectedSourceItem?.dataset.instanceId, datasetInstanceId]);
+
+  const selectedSourceRecordId = selectedSourceItem?.image.recordId;
+  const selectedSourceAssetId = selectedSourceItem?.image.imageReference
+    ?? selectedSourceItem?.image.thumbnailReference
+    ?? selectedSourceItem?.image.recordId;
+  const selectedSourceDatasetInstanceId = selectedSourceItem?.dataset.instanceId ?? datasetInstanceId;
+
   const selectedPreviewViewModel = useMemo(() => {
-    if (activeSelectionContext === "source") {
+    if (selection.activePreviewRole === "source") {
       return selectedSourceItem ? mapItemsToDisplayViewModels([selectedSourceItem], "source")[0] : undefined;
     }
-    if (activeSelectionContext === "reference") {
+    if (selection.activePreviewRole === "reference") {
       return selectedReferenceItem ? mapItemsToDisplayViewModels([selectedReferenceItem], "reference")[0] : undefined;
     }
     return selectedOutputItem ? mapItemsToDisplayViewModels([selectedOutputItem], "output")[0] : undefined;
-  }, [activeSelectionContext, selectedSourceItem, selectedReferenceItem, selectedOutputItem]);
+  }, [selection.activePreviewRole, selectedSourceItem, selectedReferenceItem, selectedOutputItem]);
 
-  const previewLoading = activeSelectionContext === "source"
+  const previewLoading = selection.activePreviewRole === "source"
     ? isLoadingSources
-    : activeSelectionContext === "reference"
+    : selection.activePreviewRole === "reference"
       ? isLoadingReferences
       : isLoadingOutputs;
 
-  const previewErrorMessage = activeSelectionContext === "source"
+  const previewErrorMessage = selection.activePreviewRole === "source"
     ? sourceLoadError
-    : activeSelectionContext === "reference"
+    : selection.activePreviewRole === "reference"
       ? referenceLoadError
       : outputLoadError;
 
   const activeGallery = useMemo(() => {
-    if (activeSelectionContext === "source") {
+    if (selection.activePreviewRole === "source") {
       return {
         title: "Source photos",
         subtitle: "Images you've uploaded for editing",
         items: sourceViewModels,
-        selectedId: activeSourceId ?? selectedSourceItem?.image.recordId,
+        selectedId: getSelectionRecordIdForRole(selection, "source") ?? selectedSourceItem?.image.recordId,
         loading: isLoadingSources,
         errorMessage: sourceLoadError,
         emptyMessage: "Upload a photo to get started.",
       } as const;
     }
-    if (activeSelectionContext === "reference") {
+    if (selection.activePreviewRole === "reference") {
       return {
         title: "Face reference photos",
         subtitle: "Optional reference images for identity guidance",
         items: referenceViewModels,
-        selectedId: activeReferenceId ?? selectedReferenceItem?.image.recordId,
+        selectedId: getSelectionRecordIdForRole(selection, "reference") ?? selectedReferenceItem?.image.recordId,
         loading: isLoadingReferences,
         errorMessage: referenceLoadError,
         emptyMessage: "No face reference photos are available yet.",
@@ -221,19 +265,16 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
       title: "Created images",
       subtitle: "Recent results from this editor",
       items: outputViewModels,
-      selectedId: activeResultId ?? selectedOutputItem?.image.recordId,
+      selectedId: getSelectionRecordIdForRole(selection, "output") ?? selectedOutputItem?.image.recordId,
       loading: isLoadingOutputs,
       errorMessage: outputLoadError,
       emptyMessage: "Create an image to see results here.",
     } as const;
   }, [
-    activeSelectionContext,
+    selection,
     sourceViewModels,
     outputViewModels,
     referenceViewModels,
-    activeSourceId,
-    activeResultId,
-    activeReferenceId,
     selectedSourceItem,
     selectedOutputItem,
     selectedReferenceItem,
@@ -280,12 +321,17 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
     }).finally(() => setLoading(false));
   };
 
-  const loadCollections = (): Promise<void> => {
+  const loadCollections = (options: LoadCollectionsOptions = {}): Promise<ImageCollections> => {
     if (!draft?.draftId) {
       setSourceItems(Object.freeze([]));
       setOutputItems(Object.freeze([]));
       setReferenceItems(Object.freeze([]));
-      return Promise.resolve();
+      setSelection(createInitialImageManipulationSelectionState());
+      return Promise.resolve(Object.freeze({
+        sources: Object.freeze([]),
+        outputs: Object.freeze([]),
+        references: Object.freeze([]),
+      }));
     }
 
     const requestId = requestIdRef.current + 1;
@@ -297,26 +343,42 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
       loadCollection("reference-image-dataset", setIsLoadingReferences, setReferenceLoadError),
     ]).then(([nextSources, nextOutputs, nextReferences]) => {
       if (requestId !== requestIdRef.current) {
-        return;
+        return Object.freeze({
+          sources: nextSources,
+          outputs: nextOutputs,
+          references: nextReferences,
+        });
       }
 
       setSourceItems(nextSources);
       setOutputItems(nextOutputs);
       setReferenceItems(nextReferences);
 
-      const nextSource = resolveSelectedItem(nextSources, activeSourceId ?? selectedRecordId);
-      const nextOutput = resolveSelectedItem(nextOutputs, activeResultId);
-      const nextReference = resolveSelectedItem(nextReferences, activeReferenceId);
+      setSelection((current) => {
+        const reconciled = reconcileImageManipulationSelection(current, {
+          sourceRecordIds: toRecordIds(nextSources),
+          outputRecordIds: toRecordIds(nextOutputs),
+          referenceRecordIds: toRecordIds(nextReferences),
+          preferredSourceRecordId: options.preferredSourceRecordId,
+          preferredOutputRecordId: options.preferLatestOutput
+            ? nextOutputs[0]?.image.recordId
+            : options.preferredOutputRecordId,
+          preferredReferenceRecordId: options.preferredReferenceRecordId,
+        });
 
-      if (nextSource) {
-        setActiveSourceId(nextSource.image.recordId);
-      }
-      if (nextOutput) {
-        setActiveResultId(nextOutput.image.recordId);
-      }
-      if (nextReference) {
-        setActiveReferenceId(nextReference.image.recordId);
-      }
+        const nextSource = resolveSelectedItem(nextSources, reconciled.sourceRecordId);
+        if (nextSource?.dataset.instanceId) {
+          setDatasetInstanceId(nextSource.dataset.instanceId);
+        }
+
+        return reconciled;
+      });
+
+      return Object.freeze({
+        sources: nextSources,
+        outputs: nextOutputs,
+        references: nextReferences,
+      });
     });
   };
 
@@ -332,6 +394,19 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
     );
   }
 
+  const isRunInProgress = runLifecycle.state === "validating"
+    || runLifecycle.state === "preparing"
+    || runLifecycle.state === "running";
+  const runDisabled = !context.operations.startSystemExecution
+    || !selectedSourceRecordId
+    || !selectedSourceAssetId
+    || !selectedSourceDatasetInstanceId
+    || !config.prompts.positivePrompt.trim()
+    || validationIssues.length > 0
+    || isRunInProgress;
+
+  const currentMessage = runLifecycle.message ?? statusMessage;
+
   return (
     <section className="ui-image-editor-page ui-stack ui-stack--sm">
       <div className="ui-image-editor-page__layout">
@@ -343,11 +418,11 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
             ingestionAdapter={uploadAdapter}
             targetContext={{
               system: { systemAssetId: draft.assetId },
-              dataset: datasetInstanceId
+              dataset: selectedSourceDatasetInstanceId
                 ? {
                   datasetAssetId: "asset:dataset:image-reference-input",
                   datasetVersionId: "v1",
-                  systemDatasetInstanceId: datasetInstanceId,
+                  systemDatasetInstanceId: selectedSourceDatasetInstanceId,
                 }
                 : undefined,
             }}
@@ -370,16 +445,18 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
                 .then((response) => {
                   if (!response.ok || !response.data) {
                     setStatusMessage(response.error?.message ?? "Could not upload this photo.");
-                    return;
+                    return undefined;
                   }
-                  setSelectedRecordId(response.data.recordId);
-                  setSelectedAssetId(response.data.image.assetId);
                   setDatasetInstanceId(response.data.datasetInstanceId);
-                  setActiveSourceId(response.data.recordId);
-                  setActiveSelectionContext("source");
+                  setSelection((current) => setRoleSelection(current, {
+                    role: "source",
+                    recordId: response.data.recordId,
+                    syncPreviewRole: true,
+                  }));
                   setStatusMessage("Photo ready.");
+                  return response.data.recordId;
                 })
-                .then(() => loadCollections())
+                .then((preferredSourceRecordId) => loadCollections({ preferredSourceRecordId }))
                 .finally(() => setIsUploading(false));
             }}
           />
@@ -387,7 +464,7 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
             value={config}
             presetId={presetId}
             issues={validationIssues}
-            disabled={context.isBusy || isRunning}
+            disabled={context.isBusy || isRunInProgress}
             onChange={(next) => {
               try {
                 setConfig(resolveComfyImageManipulationConfig(next, { presetId }));
@@ -400,6 +477,60 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
               setConfig(createComfyImageManipulationDefaultConfig({ presetId: nextPresetId }));
             }}
           />
+          <section className="ui-image-surface ui-stack ui-stack--xs">
+            <header className="ui-image-surface__header">
+              <h3 className="ui-image-surface__title">Selected photos</h3>
+            </header>
+            <label className="ui-form-field">
+              <span className="ui-form-field__label">Source photo</span>
+              <select
+                className="ui-input"
+                value={selection.sourceRecordId ?? ""}
+                disabled={sourceItems.length < 1}
+                onChange={(event) => {
+                  const next = event.currentTarget.value || undefined;
+                  setSelection((current) => setRoleSelection(current, {
+                    role: "source",
+                    recordId: next,
+                    syncPreviewRole: true,
+                  }));
+                }}
+              >
+                {sourceItems.length < 1 ? <option value="">No source photo yet</option> : null}
+                {sourceItems.map((item, index) => (
+                  <option key={item.image.recordId} value={item.image.recordId}>
+                    Source {index + 1}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ui-form-field">
+              <span className="ui-form-field__label">Face reference photo</span>
+              <select
+                className="ui-input"
+                value={selection.referenceRecordId ?? ""}
+                disabled={referenceItems.length < 1}
+                onChange={(event) => {
+                  const nextReferenceRecordId = event.currentTarget.value || undefined;
+                  setSelection((current) => setRoleSelection(current, {
+                    role: "reference",
+                    recordId: nextReferenceRecordId,
+                    syncPreviewRole: true,
+                  }));
+                }}
+              >
+                <option value="">None</option>
+                {referenceItems.map((item, index) => (
+                  <option key={item.image.recordId} value={item.image.recordId}>
+                    Reference {index + 1}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="ui-text-small ui-text-secondary">
+              These selections stay linked to system-managed image collections.
+            </p>
+          </section>
           <section className="ui-image-surface ui-stack ui-stack--sm">
             <header className="ui-image-surface__header">
               <h3 className="ui-image-surface__title">Create image</h3>
@@ -407,50 +538,73 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
             <button
               type="button"
               className="ui-button ui-button--primary"
-              disabled={
-                !context.operations.startSystemExecution
-                || !selectedRecordId
-                || !selectedAssetId
-                || !datasetInstanceId
-                || !config.prompts.positivePrompt.trim()
-                || validationIssues.length > 0
-                || isRunning
-              }
+              disabled={runDisabled}
               onClick={() => {
-                if (!context.operations.startSystemExecution || !selectedRecordId || !selectedAssetId || !datasetInstanceId) {
+                if (!context.operations.startSystemExecution || !selectedSourceRecordId || !selectedSourceAssetId || !selectedSourceDatasetInstanceId) {
                   return;
                 }
-                setIsRunning(true);
+                setRunLifecycle(Object.freeze({ state: "validating", message: "Checking your setup" }));
                 setIntegrityIssues([]);
-                const runtimeContext = createSystemContextContract({
-                  selectedImages: [Object.freeze({
-                    selectionId: selectedRecordId,
-                    imageId: selectedRecordId,
+                setFlowSteps([]);
+                setFlowIssues([]);
+
+                const selectedImages = [Object.freeze({
+                  selectionId: selectedSourceRecordId,
+                  imageId: selectedSourceRecordId,
+                  assetRef: Object.freeze({
+                    assetId: selectedSourceAssetId,
+                    recordId: selectedSourceRecordId,
+                  }),
+                  metadata: Object.freeze({ role: "source" }),
+                })];
+                if (selectedReferenceItem) {
+                  selectedImages.push(Object.freeze({
+                    selectionId: selectedReferenceItem.image.recordId,
+                    imageId: selectedReferenceItem.image.recordId,
                     assetRef: Object.freeze({
-                      assetId: selectedAssetId,
-                      recordId: selectedRecordId,
+                      assetId: selectedReferenceItem.image.imageReference
+                        ?? selectedReferenceItem.image.thumbnailReference
+                        ?? selectedReferenceItem.image.recordId,
+                      recordId: selectedReferenceItem.image.recordId,
                     }),
-                  })],
+                    metadata: Object.freeze({ role: "reference" }),
+                  }));
+                }
+
+                const datasetRefs = [Object.freeze({
+                  referenceId: "active-input",
+                  instanceId: selectedSourceDatasetInstanceId,
+                  datasetAssetId: "asset:dataset:image-reference-input",
+                  role: "active-input",
+                  systemAssetId: draft.assetId,
+                }), Object.freeze({
+                  referenceId: "system-output",
+                  instanceId: "dataset-instance:reference-image:output",
+                  datasetAssetId: "asset:dataset:image-reference-output",
+                  role: "system-owned-output",
+                  systemAssetId: draft.assetId,
+                })];
+                if (selectedReferenceItem) {
+                  datasetRefs.push(Object.freeze({
+                    referenceId: "face-reference",
+                    instanceId: selectedReferenceItem.dataset.instanceId,
+                    datasetAssetId: selectedReferenceItem.dataset.datasetAssetId,
+                    role: "reference-input",
+                    systemAssetId: draft.assetId,
+                  }));
+                }
+
+                const runtimeContext = createSystemContextContract({
+                  selectedImages,
                   parameters: Object.freeze({
                     editInstruction: config.prompts.positivePrompt,
                     variationStrength: config.generation.variationStrength,
                     resultCount: config.output.resultCount,
                     imageConfig: config,
                     presetId,
+                    selectedReferenceRecordId: selectedReferenceItem?.image.recordId,
                   }),
-                  datasets: [Object.freeze({
-                    referenceId: "active-input",
-                    instanceId: datasetInstanceId,
-                    datasetAssetId: "asset:dataset:image-reference-input",
-                    role: "active-input",
-                    systemAssetId: draft.assetId,
-                  }), Object.freeze({
-                    referenceId: "system-output",
-                    instanceId: "dataset-instance:reference-image:output",
-                    datasetAssetId: "asset:dataset:image-reference-output",
-                    role: "system-owned-output",
-                    systemAssetId: draft.assetId,
-                  })],
+                  datasets: datasetRefs,
                   runtime: Object.freeze({
                     runtimeSessionId: context.snapshot?.activeSessionId,
                     systemAssetId: draft.assetId,
@@ -466,11 +620,16 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
                 });
                 const integrity = validateReferenceImageCrossStudioContext(runtimeContext);
                 if (!integrity.valid) {
-                  setStatusMessage("Please check your image and settings.");
+                  setRunLifecycle(Object.freeze({
+                    state: "failure",
+                    message: "Please check your image and settings.",
+                  }));
                   setIntegrityIssues(integrity.blockingIssues);
-                  setIsRunning(false);
                   return;
                 }
+
+                setRunLifecycle(Object.freeze({ state: "preparing", message: "Preparing" }));
+
                 void executionFlow.run({
                   startExecution: async () => {
                     const response = await context.operations.startSystemExecution?.(request);
@@ -494,9 +653,13 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
                     studioId: context.studioId,
                     draftId: draft.draftId,
                     executionId,
-                    sourceRecordId: selectedRecordId,
-                    sourceAssetId: selectedAssetId,
-                    parameterSnapshot: Object.freeze({ presetId, imageConfig: config }),
+                    sourceRecordId: selectedSourceRecordId,
+                    sourceAssetId: selectedSourceAssetId,
+                    parameterSnapshot: Object.freeze({
+                      presetId,
+                      imageConfig: config,
+                      selectedReferenceRecordId: selectedReferenceItem?.image.recordId,
+                    }),
                     runtimeContext,
                     workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
                     workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
@@ -504,26 +667,28 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
                     runtimeResult,
                   }),
                   refreshViews: async () => {
-                    await loadCollections();
-                    setActiveSelectionContext("output");
+                    await loadCollections({ preferLatestOutput: true });
+                    setSelection((current) => setActivePreviewRole(current, "output"));
                   },
                   onSnapshot: (snapshot) => {
                     setFlowSteps(snapshot.steps);
                     setFlowIssues(snapshot.issues);
-                    setStatusMessage(
-                      snapshot.overallStatus === "completed"
-                        ? "Done. Your result is ready."
-                        : snapshot.overallStatus === "failed"
-                          ? "Run failed. Check advanced details."
-                          : snapshot.steps[snapshot.steps.length - 1]?.userLabel,
-                    );
+                    setRunLifecycle(mapExecutionFlowSnapshotToRunLifecycleState(snapshot));
                   },
-                }).finally(() => setIsRunning(false));
+                }).catch(() => {
+                  setRunLifecycle(Object.freeze({
+                    state: "failure",
+                    message: "Run failed. Check advanced details.",
+                  }));
+                });
               }}
             >
-              {isRunning ? "Creating..." : "Create image"}
+              {isRunInProgress ? "Creating..." : "Create image"}
             </button>
-            {statusMessage ? <p className="ui-text-small ui-text-secondary">{statusMessage}</p> : null}
+            <p className="ui-text-small ui-text-secondary">
+              Status: {runStateLabels[runLifecycle.state]}
+            </p>
+            {currentMessage ? <p className="ui-text-small ui-text-secondary">{currentMessage}</p> : null}
             <details>
               <summary className="ui-text-small ui-text-secondary">Advanced details</summary>
               {flowSteps.map((step) => (
@@ -548,7 +713,7 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
           <ImagePreviewPanel
             className="ui-image-editor-page__preview-panel"
             title="Image preview"
-            subtitle={previewContextLabels[activeSelectionContext]}
+            subtitle={previewContextLabels[selection.activePreviewRole]}
             image={selectedPreviewViewModel}
             loading={previewLoading}
             errorMessage={previewErrorMessage}
@@ -563,27 +728,27 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
               <button
                 type="button"
                 role="tab"
-                aria-selected={activeSelectionContext === "output"}
-                className={`ui-button ui-button--sm ${activeSelectionContext === "output" ? "ui-button--primary" : "ui-button--ghost"}`}
-                onClick={() => setActiveSelectionContext("output")}
+                aria-selected={selection.activePreviewRole === "output"}
+                className={`ui-button ui-button--sm ${selection.activePreviewRole === "output" ? "ui-button--primary" : "ui-button--ghost"}`}
+                onClick={() => setSelection((current) => setActivePreviewRole(current, "output"))}
               >
                 Results ({outputItems.length})
               </button>
               <button
                 type="button"
                 role="tab"
-                aria-selected={activeSelectionContext === "source"}
-                className={`ui-button ui-button--sm ${activeSelectionContext === "source" ? "ui-button--primary" : "ui-button--ghost"}`}
-                onClick={() => setActiveSelectionContext("source")}
+                aria-selected={selection.activePreviewRole === "source"}
+                className={`ui-button ui-button--sm ${selection.activePreviewRole === "source" ? "ui-button--primary" : "ui-button--ghost"}`}
+                onClick={() => setSelection((current) => setActivePreviewRole(current, "source"))}
               >
                 Source ({sourceItems.length})
               </button>
               <button
                 type="button"
                 role="tab"
-                aria-selected={activeSelectionContext === "reference"}
-                className={`ui-button ui-button--sm ${activeSelectionContext === "reference" ? "ui-button--primary" : "ui-button--ghost"}`}
-                onClick={() => setActiveSelectionContext("reference")}
+                aria-selected={selection.activePreviewRole === "reference"}
+                className={`ui-button ui-button--sm ${selection.activePreviewRole === "reference" ? "ui-button--primary" : "ui-button--ghost"}`}
+                onClick={() => setSelection((current) => setActivePreviewRole(current, "reference"))}
               >
                 Face reference ({referenceItems.length})
               </button>
@@ -598,15 +763,11 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
               errorMessage={activeGallery.errorMessage}
               emptyMessage={activeGallery.emptyMessage}
               onImageSelected={(imageId) => {
-                if (activeSelectionContext === "source") {
-                  setActiveSourceId(imageId);
-                  return;
-                }
-                if (activeSelectionContext === "reference") {
-                  setActiveReferenceId(imageId);
-                  return;
-                }
-                setActiveResultId(imageId);
+                setSelection((current) => setRoleSelection(current, {
+                  role: current.activePreviewRole,
+                  recordId: imageId,
+                  syncPreviewRole: true,
+                }));
               }}
             />
           </section>
