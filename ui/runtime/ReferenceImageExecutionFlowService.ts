@@ -152,6 +152,16 @@ export class ReferenceImageExecutionFlowService {
     upsertStep(ReferenceImageExecutionStepIds.persistence, "running");
     publish("running");
     const persisted = await request.persistOutputs(request.persistenceRequestFactory({ executionId, runtimeResult }));
+    const appendPersistenceDiagnostics = (codePrefix: string, userFallback: string) => {
+      for (const diagnostic of persisted.data?.diagnostics ?? []) {
+        issues.push(Object.freeze({
+          stepId: ReferenceImageExecutionStepIds.persistence,
+          code: `${codePrefix}:${diagnostic.code}`,
+          userMessage: diagnostic.userMessage || persisted.data?.userMessage || userFallback,
+          technicalMessage: diagnostic.technicalMessage,
+        }));
+      }
+    };
     if (!persisted.ok || !persisted.data) {
       upsertStep(ReferenceImageExecutionStepIds.persistence, "failed", "We couldn’t save this result.");
       issues.push(Object.freeze({
@@ -163,39 +173,54 @@ export class ReferenceImageExecutionFlowService {
     } else if (persisted.data.executionOutcome === "partial-failure" || persisted.data.status === "partial") {
       persistedItemCount = persisted.data.persistedRecordIds.length;
       batchItemCount = Math.max(batchItemCount, persisted.data.persistedRecordIds.length);
-      upsertStep(ReferenceImageExecutionStepIds.persistence, "partially-completed", "Some results were saved.");
+      upsertStep(
+        ReferenceImageExecutionStepIds.persistence,
+        "partially-completed",
+        persisted.data.userMessage || "Some results were saved.",
+      );
       for (const message of persisted.data.failureMessages) {
         issues.push(Object.freeze({
           stepId: ReferenceImageExecutionStepIds.persistence,
           code: "save-partial",
-          userMessage: "Some results could not be saved.",
+          userMessage: persisted.data.userMessage || "Some results could not be saved.",
           technicalMessage: message,
         }));
       }
+      appendPersistenceDiagnostics("save-partial", "Some results could not be saved.");
     } else if (persisted.data.executionOutcome === "non-recoverable-failure") {
       persistedItemCount = persisted.data.persistedRecordIds.length;
       batchItemCount = Math.max(batchItemCount, persisted.data.persistedRecordIds.length);
-      upsertStep(ReferenceImageExecutionStepIds.persistence, "failed", "Something went wrong while creating this image.");
+      upsertStep(
+        ReferenceImageExecutionStepIds.persistence,
+        "failed",
+        persisted.data.userMessage || "Something went wrong while creating this image.",
+      );
       for (const message of persisted.data.failureMessages) {
         issues.push(Object.freeze({
           stepId: ReferenceImageExecutionStepIds.persistence,
           code: "save-non-recoverable",
-          userMessage: "Something went wrong while creating this image.",
+          userMessage: persisted.data.userMessage || "Something went wrong while creating this image.",
           technicalMessage: message,
         }));
       }
+      appendPersistenceDiagnostics("save-non-recoverable", "Something went wrong while creating this image.");
     } else if (persisted.data.executionOutcome === "recoverable-failure" || persisted.data.status === "failed") {
       persistedItemCount = persisted.data.persistedRecordIds.length;
       batchItemCount = Math.max(batchItemCount, persisted.data.persistedRecordIds.length);
-      upsertStep(ReferenceImageExecutionStepIds.persistence, "failed", "Something went wrong while creating this image.");
+      upsertStep(
+        ReferenceImageExecutionStepIds.persistence,
+        "failed",
+        persisted.data.userMessage || "Something went wrong while creating this image.",
+      );
       for (const message of persisted.data.failureMessages) {
         issues.push(Object.freeze({
           stepId: ReferenceImageExecutionStepIds.persistence,
           code: "save-rejected",
-          userMessage: "Something went wrong while creating this image.",
+          userMessage: persisted.data.userMessage || "Something went wrong while creating this image.",
           technicalMessage: message,
         }));
       }
+      appendPersistenceDiagnostics("save-rejected", "Something went wrong while creating this image.");
     } else {
       persistedItemCount = persisted.data.persistedRecordIds.length;
       batchItemCount = Math.max(batchItemCount, persisted.data.persistedRecordIds.length);
@@ -261,6 +286,7 @@ export function createReferenceImageOutputPersistenceRequest(input: {
       ? {
         output: input.runtimeResult.output,
         status: input.runtimeResult.status,
+        diagnostics: input.runtimeResult.diagnostics,
       }
       : undefined,
   });

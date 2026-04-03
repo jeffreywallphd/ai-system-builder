@@ -74,6 +74,8 @@ describe("Reference image output persistence flow", () => {
     expect(persisted.data?.datasetInstanceId).toBe("dataset-instance:reference-image:output");
     expect(persisted.data?.persistedRecordIds.length).toBe(1);
     expect(persisted.data?.status).toBe("materialized");
+    expect(persisted.data?.userMessage).toBe("Done. Your new image version is ready.");
+    expect(persisted.data?.diagnostics).toEqual([]);
     expect(persisted.data?.executionOutcome).toBe("success");
     expect(persisted.data?.persistenceBlocked).toBeFalse();
 
@@ -270,6 +272,12 @@ it("blocks persistence when upstream execution status is failed", async () => {
     },
     runtimeResult: {
       status: "failed",
+      diagnostics: [{
+        source: "runtime-error",
+        severity: "error",
+        code: "missing-model",
+        message: "Missing checkpoint model for this runtime profile.",
+      }],
       output: {
         payload: {
           nodeResults: {
@@ -293,6 +301,7 @@ it("blocks persistence when upstream execution status is failed", async () => {
   expect(persisted.ok).toBeTrue();
   expect(persisted.data?.status).toBe("failed");
   expect(persisted.data?.persistedRecordIds).toEqual([]);
+  expect(persisted.data?.diagnostics[0]?.stage).toBe("model-dependency-availability-failure");
   expect(persisted.data?.executionOutcome).toBe("non-recoverable-failure");
   expect(persisted.data?.persistenceBlocked).toBeTrue();
 });

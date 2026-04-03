@@ -238,7 +238,36 @@ export interface PersistReferenceImageOutputsRequest {
   readonly runtimeResult?: {
     readonly output?: unknown;
     readonly status?: string;
+    readonly diagnostics?: ReadonlyArray<{
+      readonly source?: string;
+      readonly severity?: "info" | "warning" | "error";
+      readonly code?: string;
+      readonly message?: string;
+      readonly nodeId?: string;
+      readonly at?: string;
+    }>;
   };
+}
+
+export const PersistReferenceImageOutputDiagnosticStages = Object.freeze({
+  requestConstruction: "request-construction-failure",
+  runtimeConfigurationResolution: "runtime-configuration-resolution-failure",
+  executionSubmission: "execution-submission-failure",
+  pollingLifecycle: "polling-lifecycle-failure",
+  modelDependencyAvailability: "model-dependency-availability-failure",
+  outputMaterialization: "output-materialization-failure",
+});
+
+export type PersistReferenceImageOutputDiagnosticStage =
+  typeof PersistReferenceImageOutputDiagnosticStages[keyof typeof PersistReferenceImageOutputDiagnosticStages];
+
+export interface PersistReferenceImageOutputDiagnostic {
+  readonly stage: PersistReferenceImageOutputDiagnosticStage;
+  readonly code: string;
+  readonly userMessage: string;
+  readonly technicalMessage?: string;
+  readonly retryable: boolean;
+  readonly details?: Readonly<Record<string, unknown>>;
 }
 
 export interface PersistReferenceImageOutputsReadModel {
@@ -248,7 +277,9 @@ export interface PersistReferenceImageOutputsReadModel {
   readonly materializationId: string;
   readonly persistedRecordIds: ReadonlyArray<string>;
   readonly status: "materialized" | "partial" | "failed" | "pending";
+  readonly userMessage: string;
   readonly failureMessages: ReadonlyArray<string>;
+  readonly diagnostics: ReadonlyArray<PersistReferenceImageOutputDiagnostic>;
   readonly executionOutcome: "success" | "partial-failure" | "recoverable-failure" | "non-recoverable-failure";
   readonly persistenceBlocked: boolean;
 }
@@ -1277,7 +1308,19 @@ export class StudioShellBackendApi {
           materializationId: `mat:${executionId}`,
           persistedRecordIds: Object.freeze([]),
           status: "failed",
+          userMessage: failureMessage,
           failureMessages: Object.freeze([failureMessage]),
+          diagnostics: Object.freeze([
+            this.createReferenceImagePersistenceDiagnostic({
+              stage: this.classifyExecutionFailureStage(request.runtimeResult?.diagnostics),
+              code: runtimeExecutionStatus === "cancelled" ? "execution-cancelled" : "execution-failed",
+              userMessage: failureMessage,
+              technicalMessage: request.runtimeResult?.diagnostics?.[0]?.message
+                ?? `Runtime execution reported '${runtimeExecutionStatus}'.`,
+              retryable: runtimeExecutionStatus !== "cancelled",
+              details: this.createRuntimeDiagnosticDetail(request.runtimeResult?.diagnostics),
+            }),
+          ]),
           executionOutcome: "non-recoverable-failure" as const,
           persistenceBlocked: true,
         });
@@ -1325,7 +1368,18 @@ export class StudioShellBackendApi {
           materializationId: `mat:${executionId}`,
           persistedRecordIds: Object.freeze([]),
           status: "failed",
+          userMessage: "No generated images were available to save from this run.",
           failureMessages: Object.freeze(["No generated images were available to save from this run."]),
+          diagnostics: Object.freeze([
+            this.createReferenceImagePersistenceDiagnostic({
+              stage: PersistReferenceImageOutputDiagnosticStages.pollingLifecycle,
+              code: "runtime-result-missing-comfy-output",
+              userMessage: "No generated images were available to save from this run.",
+              technicalMessage: "Runtime result did not include a Comfy-compatible execution output payload.",
+              retryable: true,
+              details: this.createRuntimeDiagnosticDetail(request.runtimeResult?.diagnostics),
+            }),
+          ]),
           executionOutcome: "recoverable-failure" as const,
           persistenceBlocked: true,
         });
@@ -1374,35 +1428,83 @@ export class StudioShellBackendApi {
             materializationId: `mat:${executionId}`,
             persistedRecordIds: Object.freeze([]),
             status: "failed" as const,
+            userMessage: "Please choose an image and check your settings, then try again.",
             failureMessages,
+            diagnostics: Object.freeze(integrity.blockingIssues.map((issue) => this.createReferenceImagePersistenceDiagnostic({
+              stage: PersistReferenceImageOutputDiagnosticStages.runtimeConfigurationResolution,
+              code: issue.code,
+              userMessage: issue.userMessage,
+              technicalMessage: issue.technicalMessage,
+              retryable: true,
+              details: Object.freeze({
+                severity: issue.severity,
+              }),
+            }))),
             executionOutcome: "recoverable-failure" as const,
             persistenceBlocked: true,
           });
         }
       }
 
-      const mapped = this.comfyMaterializationMapper.map({
-        workflowRun: {
-          runId: executionId,
-          workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
-          workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
-        },
-        result: comfyResult,
-        parameterSnapshot: request.parameterSnapshot,
-        sourceImageRef: request.sourceAssetId?.trim()
-          ? Object.freeze({
-            kind: "generated-output" as const,
-            stableId: request.sourceAssetId.trim(),
-            outputId: request.sourceAssetId.trim(),
-          })
-          : undefined,
-        materializationId: `mat:${executionId}`,
-      });
-      const materialized = await this.referenceImageOutputMaterialization.materialize({
-        systemId: runtimeSystemId,
-        datasetInstanceId: outputDataset.instanceId,
-        payload: mapped,
-      });
+      let materialized: Awaited<ReturnType<WorkflowOutputMaterializationService["materialize"]>>;
+      try {
+        const mapped = this.comfyMaterializationMapper.map({
+          workflowRun: {
+            runId: executionId,
+            workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+            workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+          },
+          result: comfyResult,
+          parameterSnapshot: request.parameterSnapshot,
+          sourceImageRef: request.sourceAssetId?.trim()
+            ? Object.freeze({
+              kind: "generated-output" as const,
+              stableId: request.sourceAssetId.trim(),
+              outputId: request.sourceAssetId.trim(),
+            })
+            : undefined,
+          materializationId: `mat:${executionId}`,
+        });
+        materialized = await this.referenceImageOutputMaterialization.materialize({
+          systemId: runtimeSystemId,
+          datasetInstanceId: outputDataset.instanceId,
+          payload: mapped,
+        });
+      } catch (error) {
+        const technicalMessage = error instanceof Error ? error.message : "Unknown output materialization error.";
+        const stage = technicalMessage.includes("invalid-request")
+          ? PersistReferenceImageOutputDiagnosticStages.requestConstruction
+          : PersistReferenceImageOutputDiagnosticStages.outputMaterialization;
+        const userMessage = stage === PersistReferenceImageOutputDiagnosticStages.requestConstruction
+          ? "Please check your image settings and try again."
+          : "Something went wrong while saving this image.";
+        return Object.freeze({
+          systemId: runtimeSystemId,
+          datasetInstanceId: outputDataset.instanceId,
+          executionId,
+          materializationId: `mat:${executionId}`,
+          persistedRecordIds: Object.freeze([]),
+          status: "failed" as const,
+          userMessage,
+          failureMessages: Object.freeze([technicalMessage]),
+          diagnostics: Object.freeze([
+            this.createReferenceImagePersistenceDiagnostic({
+              stage,
+              code: stage === PersistReferenceImageOutputDiagnosticStages.requestConstruction
+                ? "materialization-request-invalid"
+                : "output-materialization-failed",
+              userMessage,
+              technicalMessage,
+              retryable: stage !== PersistReferenceImageOutputDiagnosticStages.requestConstruction,
+              details: Object.freeze({
+                executionId,
+              }),
+            }),
+          ]),
+          executionOutcome: "recoverable-failure" as const,
+          persistenceBlocked: true,
+        });
+      }
       this.referenceImageRunHistory.recordRun({
         runId: executionId,
         workflowExecutionId: executionId,
@@ -1469,7 +1571,26 @@ export class StudioShellBackendApi {
         materializationId: materialized.materializationId,
         persistedRecordIds: Object.freeze(materialized.records.map((record) => record.recordId)),
         status: materialized.status,
+        userMessage: materialized.status === "materialized"
+          ? "Done. Your new image version is ready."
+          : materialized.status === "partial"
+            ? "Finished with warnings. Some versions could not be saved."
+            : materialized.status === "pending"
+              ? "Saving is still in progress."
+              : "Something went wrong while creating this image.",
         failureMessages: Object.freeze(materialized.failures.map((failure) => failure.message)),
+        diagnostics: Object.freeze(materialized.failures.map((failure) => this.createReferenceImagePersistenceDiagnostic({
+          stage: PersistReferenceImageOutputDiagnosticStages.outputMaterialization,
+          code: failure.code,
+          userMessage: failure.code === "invalid-request"
+            ? "Please check your image settings and try again."
+            : "Some generated outputs could not be saved.",
+          technicalMessage: failure.message,
+          retryable: failure.retriable,
+          details: Object.freeze({
+            assetIndex: failure.assetIndex,
+          }),
+        }))),
         executionOutcome: this.classifyReferenceImageExecutionOutcome(materialized.status),
         persistenceBlocked: materialized.status === "failed",
       });
@@ -2713,6 +2834,70 @@ export class StudioShellBackendApi {
       return "recoverable-failure";
     }
     return "recoverable-failure";
+  }
+
+  private createReferenceImagePersistenceDiagnostic(
+    input: PersistReferenceImageOutputDiagnostic,
+  ): PersistReferenceImageOutputDiagnostic {
+    return Object.freeze({
+      stage: input.stage,
+      code: input.code.trim(),
+      userMessage: input.userMessage.trim(),
+      technicalMessage: input.technicalMessage?.trim(),
+      retryable: input.retryable,
+      details: input.details ? Object.freeze({ ...input.details }) : undefined,
+    });
+  }
+
+  private classifyExecutionFailureStage(
+    diagnostics?: ReadonlyArray<{
+      readonly source?: string;
+      readonly severity?: "info" | "warning" | "error";
+      readonly code?: string;
+      readonly message?: string;
+      readonly nodeId?: string;
+      readonly at?: string;
+    }>,
+  ): PersistReferenceImageOutputDiagnosticStage {
+    const firstMessage = diagnostics?.[0]?.message?.toLowerCase() ?? "";
+    const firstCode = diagnostics?.[0]?.code?.toLowerCase() ?? "";
+    const merged = `${firstCode} ${firstMessage}`;
+    if (
+      merged.includes("model")
+      || merged.includes("checkpoint")
+      || merged.includes("vae")
+      || merged.includes("dependency")
+      || merged.includes("missing-node")
+      || merged.includes("missing node")
+    ) {
+      return PersistReferenceImageOutputDiagnosticStages.modelDependencyAvailability;
+    }
+    return PersistReferenceImageOutputDiagnosticStages.executionSubmission;
+  }
+
+  private createRuntimeDiagnosticDetail(
+    diagnostics?: ReadonlyArray<{
+      readonly source?: string;
+      readonly severity?: "info" | "warning" | "error";
+      readonly code?: string;
+      readonly message?: string;
+      readonly nodeId?: string;
+      readonly at?: string;
+    }>,
+  ): Readonly<Record<string, unknown>> | undefined {
+    if (!diagnostics || diagnostics.length === 0) {
+      return undefined;
+    }
+    return Object.freeze({
+      runtimeDiagnostics: Object.freeze(diagnostics.map((entry) => Object.freeze({
+        source: entry.source,
+        severity: entry.severity,
+        code: entry.code,
+        message: entry.message,
+        nodeId: entry.nodeId,
+        at: entry.at,
+      }))),
+    });
   }
 
   private tryReadComfyResult(
