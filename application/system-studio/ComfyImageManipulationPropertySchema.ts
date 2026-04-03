@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const ComfyImageManipulationPropertySchemaId = "property-schema:image-manipulation";
-export const ComfyImageManipulationPropertySchemaVersion = "1.3.0";
+export const ComfyImageManipulationPropertySchemaVersion = "1.4.0";
 
 export const ComfyConditioningMapping = Object.freeze({
   positivePrompt: "desired-features",
@@ -55,6 +55,8 @@ const comfySchedulerOptions = Object.freeze(["normal", "karras", "exponential", 
 type ComfySamplerOption = (typeof comfySamplerOptions)[number];
 type ComfySchedulerOption = (typeof comfySchedulerOptions)[number];
 
+export const ComfyImageManipulationPresetProfileVersion = "1.0.0";
+
 export interface ComfyImageManipulationConfig {
   readonly prompts: {
     readonly positivePrompt: string;
@@ -99,6 +101,16 @@ export interface ComfyImageManipulationConfigValidationIssue {
   readonly message: string;
 }
 
+export interface ComfyImageManipulationPresetProfile {
+  readonly presetId: string;
+  readonly version: typeof ComfyImageManipulationPresetProfileVersion;
+  readonly name: string;
+  readonly description: string;
+  readonly defaultTemplatePreset: boolean;
+  readonly overrides: Partial<ComfyImageManipulationConfig>;
+  readonly previewSummary: string;
+}
+
 export interface ComfyImageManipulationPropertySchemaDefinition {
   readonly id: typeof ComfyImageManipulationPropertySchemaId;
   readonly version: typeof ComfyImageManipulationPropertySchemaVersion;
@@ -126,6 +138,8 @@ export interface ComfyImageManipulationPropertySchemaDefinition {
     }>;
   }>;
   readonly defaultConfig: ComfyImageManipulationConfig;
+  readonly defaultPresetId: string;
+  readonly presetProfiles: ReadonlyArray<ComfyImageManipulationPresetProfile>;
 }
 
 const ComfyImageManipulationConfigSchema = z.object({
@@ -199,6 +213,171 @@ const ComfyImageManipulationConfigSchema = z.object({
   }
 });
 
+const ComfyImageManipulationPresetOverrideSchema = z.object({
+  prompts: z.object({
+    positivePrompt: z.string().trim().min(1).optional(),
+    negativePrompt: z.string().trim().optional(),
+  }).optional(),
+  models: z.object({
+    checkpointModel: z.string().trim().min(1).optional(),
+    vaeModel: z.string().trim().min(1).optional(),
+    faceIdModel: z.string().trim().min(1).optional(),
+  }).optional(),
+  generation: z.object({
+    width: z.number().int().min(256).max(2048).multipleOf(64).optional(),
+    height: z.number().int().min(256).max(2048).multipleOf(64).optional(),
+    denoiseStrength: z.number().min(0).max(1).optional(),
+    variationStrength: z.number().min(0).max(1).optional(),
+    steps: z.number().int().min(1).max(200).optional(),
+    cfg: z.number().min(1).max(30).optional(),
+    sampler: z.enum(comfySamplerOptions).optional(),
+    scheduler: z.enum(comfySchedulerOptions).optional(),
+    seed: z.number().int().min(0).max(2147483647).optional(),
+  }).optional(),
+  faceId: z.object({
+    enabled: z.boolean().optional(),
+    referenceBindings: z.array(
+      z.object({
+        datasetBindingId: z.string().trim().regex(/^[a-z0-9-]+$/),
+        datasetAssetId: z.string().trim().startsWith("asset:dataset:"),
+      }),
+    ).max(8).optional(),
+    weight: z.number().min(0).max(2).optional(),
+    startStepFraction: z.number().min(0).max(1).optional(),
+    endStepFraction: z.number().min(0).max(1).optional(),
+  }).optional(),
+  output: z.object({
+    resultCount: z.number().int().min(1).max(4).optional(),
+    outputTarget: z.enum(["history", "download"]).optional(),
+  }).optional(),
+}).strict();
+
+function applyConfigOverrides(
+  base: ComfyImageManipulationConfig,
+  overrides: Partial<ComfyImageManipulationConfig>,
+): ComfyImageManipulationConfig {
+  return {
+    prompts: {
+      ...base.prompts,
+      ...overrides.prompts,
+    },
+    models: {
+      ...base.models,
+      ...overrides.models,
+    },
+    generation: {
+      ...base.generation,
+      ...overrides.generation,
+    },
+    faceId: {
+      ...base.faceId,
+      ...overrides.faceId,
+      referenceBindings: overrides.faceId?.referenceBindings ?? base.faceId.referenceBindings,
+    },
+    output: {
+      ...base.output,
+      ...overrides.output,
+    },
+  };
+}
+
+const ComfyImageManipulationPresetProfiles: ReadonlyArray<ComfyImageManipulationPresetProfile> = Object.freeze([
+  Object.freeze({
+    presetId: "balanced-default",
+    version: ComfyImageManipulationPresetProfileVersion,
+    name: "Balanced",
+    description: "A reliable everyday preset with a good mix of quality and speed.",
+    defaultTemplatePreset: true,
+    overrides: Object.freeze({}),
+    previewSummary: "Balanced quality and speed with dependable defaults.",
+  }),
+  Object.freeze({
+    presetId: "faster-light",
+    version: ComfyImageManipulationPresetProfileVersion,
+    name: "Quick Draft",
+    description: "Faster output for early exploration and idea checks.",
+    defaultTemplatePreset: false,
+    overrides: Object.freeze({
+      generation: Object.freeze({
+        width: 896,
+        height: 896,
+        denoiseStrength: 0.55,
+        variationStrength: 0.5,
+        steps: 20,
+      }),
+    }),
+    previewSummary: "Lower step count and smaller canvas for faster iterations.",
+  }),
+  Object.freeze({
+    presetId: "higher-quality",
+    version: ComfyImageManipulationPresetProfileVersion,
+    name: "High Detail",
+    description: "Prioritizes image quality and detail with a slower render profile.",
+    defaultTemplatePreset: false,
+    overrides: Object.freeze({
+      generation: Object.freeze({
+        width: 1152,
+        height: 1152,
+        denoiseStrength: 0.5,
+        variationStrength: 0.65,
+        steps: 45,
+        cfg: 8,
+        sampler: "dpmpp_2m",
+        scheduler: "karras",
+      }),
+    }),
+    previewSummary: "More rendering steps and stronger detail settings for premium quality.",
+  }),
+  Object.freeze({
+    presetId: "identity-focused",
+    version: ComfyImageManipulationPresetProfileVersion,
+    name: "Keep Face Match",
+    description: "Turns on identity guidance to keep the same person consistent across edits.",
+    defaultTemplatePreset: false,
+    overrides: Object.freeze({
+      faceId: Object.freeze({
+        enabled: true,
+        weight: 1,
+        startStepFraction: 0,
+        endStepFraction: 1,
+      }),
+      generation: Object.freeze({
+        denoiseStrength: 0.5,
+        variationStrength: 0.45,
+      }),
+    }),
+    previewSummary: "Enables identity guidance with a full-step face consistency window.",
+  }),
+]);
+
+const ComfyImageManipulationPresetById = new Map(
+  ComfyImageManipulationPresetProfiles.map((preset) => [preset.presetId, preset] as const),
+);
+
+function resolveDefaultPresetId(): string {
+  const defaults = ComfyImageManipulationPresetProfiles.filter((preset) => preset.defaultTemplatePreset);
+  if (defaults.length !== 1) {
+    throw new Error("Comfy image manipulation presets must define exactly one default template preset.");
+  }
+  return defaults[0].presetId;
+}
+
+const ComfyImageManipulationDefaultPresetId = resolveDefaultPresetId();
+
+function assertPresetProfilesAreValid(): void {
+  for (const preset of ComfyImageManipulationPresetProfiles) {
+    const parsed = ComfyImageManipulationPresetOverrideSchema.safeParse(preset.overrides);
+    if (!parsed.success) {
+      throw new Error(`Invalid preset overrides for '${preset.presetId}'.`);
+    }
+    ComfyImageManipulationConfigSchema.parse(applyConfigOverrides(createComfyImageManipulationBaseDefaultConfig(), parsed.data));
+  }
+}
+
+function createComfyImageManipulationBaseDefaultConfig(): ComfyImageManipulationConfig {
+  return ComfyImageManipulationConfigSchema.parse({});
+}
+
 function normalizeInput(input: unknown): Record<string, unknown> {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return {};
@@ -216,6 +395,8 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
     serializable: true,
     versioned: true,
   }),
+  defaultPresetId: ComfyImageManipulationDefaultPresetId,
+  presetProfiles: ComfyImageManipulationPresetProfiles,
   fields: Object.freeze([
     Object.freeze({
       groupId: "prompts",
@@ -536,22 +717,42 @@ export const ComfyImageManipulationPropertySchema: ComfyImageManipulationPropert
     }),
   ]),
   defaultConfig: Object.freeze({
-    prompts: Object.freeze({ ...promptDefaults }),
-    models: Object.freeze({ ...modelDefaults }),
-    generation: Object.freeze({ ...generationDefaults }),
-    faceId: Object.freeze({
-      enabled: faceIdDefaults.enabled,
-      referenceBindings: faceIdDefaults.referenceBindings.map((entry) => Object.freeze({ ...entry })),
-      weight: faceIdDefaults.weight,
-      startStepFraction: faceIdDefaults.startStepFraction,
-      endStepFraction: faceIdDefaults.endStepFraction,
-    }),
-    output: Object.freeze({ ...outputDefaults }),
+    ...createComfyImageManipulationBaseDefaultConfig(),
   }),
 });
 
-export function createComfyImageManipulationDefaultConfig(): ComfyImageManipulationConfig {
-  return ComfyImageManipulationConfigSchema.parse({});
+assertPresetProfilesAreValid();
+
+export function resolveComfyImageManipulationPresetProfile(presetId: string): ComfyImageManipulationPresetProfile {
+  const preset = ComfyImageManipulationPresetById.get(presetId);
+  if (!preset) {
+    throw new Error(`Unknown Comfy image manipulation preset '${presetId}'.`);
+  }
+  return preset;
+}
+
+export function resolveComfyImageManipulationPresetOverrides(presetId?: string): Partial<ComfyImageManipulationConfig> {
+  const resolvedPresetId = presetId ?? ComfyImageManipulationDefaultPresetId;
+  return resolveComfyImageManipulationPresetProfile(resolvedPresetId).overrides;
+}
+
+export function validateComfyImageManipulationPresetOverrides(input: unknown): ReadonlyArray<ComfyImageManipulationConfigValidationIssue> {
+  const parsed = ComfyImageManipulationPresetOverrideSchema.safeParse(normalizeInput(input));
+  if (parsed.success) {
+    return Object.freeze([]);
+  }
+
+  return Object.freeze(parsed.error.issues.map((issue) => Object.freeze({
+    scope: "field" as const,
+    code: "invalid-preset-override",
+    path: issue.path.join("."),
+    message: issue.message,
+  })));
+}
+
+export function createComfyImageManipulationDefaultConfig(options?: { readonly presetId?: string }): ComfyImageManipulationConfig {
+  const presetOverrides = resolveComfyImageManipulationPresetOverrides(options?.presetId);
+  return ComfyImageManipulationConfigSchema.parse(applyConfigOverrides(createComfyImageManipulationBaseDefaultConfig(), presetOverrides));
 }
 
 export function validateComfyImageManipulationConfig(input: unknown): ReadonlyArray<ComfyImageManipulationConfigValidationIssue> {
@@ -573,8 +774,13 @@ export function validateComfyImageManipulationConfig(input: unknown): ReadonlyAr
   }));
 }
 
-export function resolveComfyImageManipulationConfig(input: unknown): ComfyImageManipulationConfig {
-  return ComfyImageManipulationConfigSchema.parse(normalizeInput(input));
+export function resolveComfyImageManipulationConfig(
+  input: unknown,
+  options?: { readonly presetId?: string },
+): ComfyImageManipulationConfig {
+  const presetOverrides = resolveComfyImageManipulationPresetOverrides(options?.presetId);
+  const merged = applyConfigOverrides(createComfyImageManipulationBaseDefaultConfig(), presetOverrides);
+  return ComfyImageManipulationConfigSchema.parse(applyConfigOverrides(merged, normalizeInput(input) as Partial<ComfyImageManipulationConfig>));
 }
 
 export function serializeComfyImageManipulationConfig(input: unknown): string {
@@ -606,6 +812,8 @@ export interface ComfyImageManipulationConfigPreview {
     readonly outputTarget: "history" | "download";
     readonly faceIdEnabled: boolean;
     readonly faceIdSummary: string;
+    readonly presetId: string;
+    readonly presetName: string;
   };
 }
 
@@ -613,8 +821,13 @@ function truncate(text: string, maxLength: number): string {
   return text.length <= maxLength ? text : `${text.slice(0, maxLength).trimEnd()}…`;
 }
 
-export function createComfyImageManipulationConfigPreview(input: unknown): ComfyImageManipulationConfigPreview {
-  const resolved = resolveComfyImageManipulationConfig(input);
+export function createComfyImageManipulationConfigPreview(
+  input: unknown,
+  options?: { readonly presetId?: string },
+): ComfyImageManipulationConfigPreview {
+  const resolvedPresetId = options?.presetId ?? ComfyImageManipulationDefaultPresetId;
+  const preset = resolveComfyImageManipulationPresetProfile(resolvedPresetId);
+  const resolved = resolveComfyImageManipulationConfig(input, options);
   return Object.freeze({
     schemaId: ComfyImageManipulationPropertySchema.id,
     schemaVersion: ComfyImageManipulationPropertySchema.version,
@@ -636,6 +849,8 @@ export function createComfyImageManipulationConfigPreview(input: unknown): Comfy
       faceIdSummary: resolved.faceId.enabled
         ? `on (${resolved.faceId.referenceBindings.length} reference${resolved.faceId.referenceBindings.length === 1 ? "" : "s"}, influence=${resolved.faceId.weight}, timing=${resolved.faceId.startStepFraction}-${resolved.faceId.endStepFraction})`
         : "disabled",
+      presetId: preset.presetId,
+      presetName: preset.name,
     }),
   });
 }

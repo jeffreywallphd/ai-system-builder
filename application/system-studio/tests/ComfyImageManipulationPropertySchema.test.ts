@@ -5,18 +5,28 @@ import {
   createComfyImageManipulationConfigPreview,
   createComfyImageManipulationDefaultConfig,
   deserializeComfyImageManipulationConfig,
+  resolveComfyImageManipulationPresetOverrides,
+  resolveComfyImageManipulationPresetProfile,
   resolveComfyImageManipulationConfig,
   serializeComfyImageManipulationConfig,
   validateComfyImageManipulationConfig,
+  validateComfyImageManipulationPresetOverrides,
 } from "../ComfyImageManipulationPropertySchema";
 
 describe("ComfyImageManipulationPropertySchema", () => {
   it("defines a versioned and inspectable property schema asset", () => {
     expect(ComfyImageManipulationPropertySchema.id).toBe("property-schema:image-manipulation");
-    expect(ComfyImageManipulationPropertySchema.version).toBe("1.3.0");
+    expect(ComfyImageManipulationPropertySchema.version).toBe("1.4.0");
     expect(ComfyImageManipulationPropertySchema.capabilities.composable).toBeTrue();
     expect(ComfyImageManipulationPropertySchema.capabilities.inspectable).toBeTrue();
     expect(ComfyImageManipulationPropertySchema.capabilities.previewable).toBeTrue();
+    expect(ComfyImageManipulationPropertySchema.defaultPresetId).toBe("balanced-default");
+    expect(ComfyImageManipulationPropertySchema.presetProfiles.map((preset) => preset.presetId)).toEqual([
+      "balanced-default",
+      "faster-light",
+      "higher-quality",
+      "identity-focused",
+    ]);
     expect(ComfyImageManipulationPropertySchema.fields.map((group) => group.groupId)).toEqual([
       "prompts",
       "models",
@@ -51,6 +61,31 @@ describe("ComfyImageManipulationPropertySchema", () => {
 
     const issues = validateComfyImageManipulationConfig({});
     expect(issues).toEqual([]);
+  });
+
+  it("applies preset overrides against base defaults without duplicating the full config", () => {
+    const quickDraft = createComfyImageManipulationDefaultConfig({ presetId: "faster-light" });
+    const highDetail = createComfyImageManipulationDefaultConfig({ presetId: "higher-quality" });
+    const identity = createComfyImageManipulationDefaultConfig({ presetId: "identity-focused" });
+    const quickOverrides = resolveComfyImageManipulationPresetOverrides("faster-light");
+
+    expect(quickOverrides.prompts).toBeUndefined();
+    expect(quickDraft.generation.steps).toBe(20);
+    expect(quickDraft.generation.width).toBe(896);
+    expect(highDetail.generation.scheduler).toBe("karras");
+    expect(highDetail.generation.sampler).toBe("dpmpp_2m");
+    expect(identity.faceId.enabled).toBeTrue();
+    expect(identity.faceId.referenceBindings.length).toBeGreaterThan(0);
+  });
+
+  it("exposes inspectable preset metadata for downstream UI display", () => {
+    const preset = resolveComfyImageManipulationPresetProfile("higher-quality");
+
+    expect(preset.version).toBe("1.0.0");
+    expect(preset.name).toBe("High Detail");
+    expect(preset.description.length).toBeGreaterThan(0);
+    expect(preset.previewSummary.length).toBeGreaterThan(0);
+    expect(preset.defaultTemplatePreset).toBeFalse();
   });
 
   it("enforces non-empty positive prompt and accepts optional negative prompt", () => {
@@ -117,6 +152,15 @@ describe("ComfyImageManipulationPropertySchema", () => {
     expect(preview.summary.denoiseStrength).toBe(0.6);
     expect(preview.summary.faceIdEnabled).toBeFalse();
     expect(preview.summary.faceIdSummary).toBe("disabled");
+    expect(preview.summary.presetId).toBe("balanced-default");
+    expect(preview.summary.presetName).toBe("Balanced");
+  });
+
+  it("uses preset metadata in preview output for pre-run inspection", () => {
+    const preview = createComfyImageManipulationConfigPreview({}, { presetId: "faster-light" });
+    expect(preview.summary.presetId).toBe("faster-light");
+    expect(preview.summary.presetName).toBe("Quick Draft");
+    expect(preview.summary.width).toBe(896);
   });
 
   it("maps prompt fields to desired and avoided conditioning surfaces", () => {
@@ -208,6 +252,19 @@ describe("ComfyImageManipulationPropertySchema", () => {
     expect(issues.some((issue) => issue.path === "faceId.endStepFraction")).toBeTrue();
   });
 
+  it("rejects invalid preset override payloads and keeps storage references dataset-based", () => {
+    const issues = validateComfyImageManipulationPresetOverrides({
+      generation: { width: 1000, sampler: "unsupported" },
+      faceId: {
+        referenceBindings: [{ datasetBindingId: "faceid-reference", datasetAssetId: "/tmp/local/path.png" }],
+      },
+    });
+
+    expect(issues.some((issue) => issue.path === "generation.width")).toBeTrue();
+    expect(issues.some((issue) => issue.path === "generation.sampler")).toBeTrue();
+    expect(issues.some((issue) => issue.path === "faceId.referenceBindings.0.datasetAssetId")).toBeTrue();
+  });
+
   it("enforces cross-field rules for result destination and FaceID references", () => {
     const issues = validateComfyImageManipulationConfig({
       output: {
@@ -241,5 +298,32 @@ describe("ComfyImageManipulationPropertySchema", () => {
     expect(preview.summary.faceIdEnabled).toBeTrue();
     expect(preview.summary.faceIdSummary).toContain("on (2 references");
     expect(preview.summary.faceIdSummary).toContain("timing=0.1-0.9");
+  });
+
+  it("supports preset-aware resolution merged with user overrides and validation", () => {
+    const resolved = resolveComfyImageManipulationConfig(
+      {
+        generation: { steps: 32 },
+        output: { resultCount: 2, outputTarget: "history" },
+      },
+      { presetId: "higher-quality" },
+    );
+
+    expect(resolved.generation.width).toBe(1152);
+    expect(resolved.generation.steps).toBe(32);
+    expect(resolved.output.resultCount).toBe(2);
+    expect(() => resolveComfyImageManipulationConfig({}, { presetId: "unknown-preset" })).toThrow();
+  });
+
+  it("keeps default template configuration executable after preset support", () => {
+    const resolved = resolveComfyImageManipulationConfig({});
+    const issues = validateComfyImageManipulationConfig(resolved);
+
+    expect(issues).toEqual([]);
+    expect(resolved.faceId.enabled).toBeFalse();
+
+    const faceEnabled = resolveComfyImageManipulationConfig({}, { presetId: "identity-focused" });
+    expect(faceEnabled.faceId.enabled).toBeTrue();
+    expect(validateComfyImageManipulationConfig(faceEnabled)).toEqual([]);
   });
 });

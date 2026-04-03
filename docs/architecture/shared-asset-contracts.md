@@ -1363,3 +1363,12 @@ Not implemented in this slice:
   - FaceID reference requirements only when FaceID is enabled.
 - User-facing schema labels/descriptions were refined for non-technical readability while preserving inspectable runtime mapping metadata for advanced controls (for example, exposing user-friendly labels with technical metadata retained for CFG/seed/sampler/scheduler mappings).
 - Preview summaries now reflect resolved default state and user-friendly wording (including identity-guidance summary phrasing) rather than raw partial input.
+
+## AI Loom image manipulation update: preset profiles + schema validation coverage (stories 3.9-3.10)
+
+- `ComfyImageManipulationPropertySchema` now includes versioned, inspectable preset profiles (`presetProfiles`) with a required default preset id (`defaultPresetId`) so template/runtime consumers can resolve a runnable profile deterministically.
+- Preset profiles are authored as **override-only** payloads against base runnable defaults (balanced default, quick draft, high detail, keep face match) to keep contracts composable and future-friendly without duplicating the full schema config.
+- Preset resolution is first-class through `createComfyImageManipulationDefaultConfig({ presetId })` and `resolveComfyImageManipulationConfig(input, { presetId })`, preserving zero-input template execution while allowing optional user overrides.
+- Preset override payloads now have dedicated validation (`validateComfyImageManipulationPresetOverrides`) and runtime registration checks that enforce schema constraints, dataset-reference storage contracts, and cross-field correctness after merge.
+- Preview output now includes resolved preset identity metadata (`presetId`, `presetName`) for downstream schema-driven UIs while avoiding layout-specific behavior in the schema contract.
+- Automated tests in `application/system-studio/tests/ComfyImageManipulationPropertySchema.test.ts` now cover preset registration/resolution, override correctness, negative-path preset validation, and default template runnability with FaceID both enabled and disabled.
