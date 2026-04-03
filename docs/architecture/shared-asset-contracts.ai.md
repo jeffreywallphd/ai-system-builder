@@ -1338,3 +1338,18 @@
   - FaceID dependency/reference requirements,
   - adapter/output handling hints for downstream runtime integration.
 - Template preview and instance contracts now expose these output-binding references and execution metadata so adapter/runtime layers can consume them without parsing free-form metadata.
+
+## AI Loom image manipulation update: workflow-template default executable configuration hardening (story 4.11)
+
+- The default image-manipulation workflow template now publishes execution-critical defaults as first-class workflow-template metadata and parameter defaults (prompt, generation controls, checkpoint, VAE, output count, and FaceID defaults) so runtime launch readiness is inspectable without relying on implicit UI state.
+- FaceID defaults remain explicitly non-blocking for the default path (`faceIdEnabled=false` with logical reference bindings preconfigured) while still composing into both base workflow and FaceID subworkflow parameter mappings.
+- Model defaults continue to align with runtime assumptions through system-managed fallback ids (`system-default`) for checkpoint/VAE resolution in the runnable default path.
+
+## AI Loom image manipulation update: Epic 4 mapping/readiness regression coverage (story 4.12)
+
+- Added an Epic-4-scope integration test (`application/workflow-template-studio/tests/ImageManipulationWorkflowTemplateEpic4.integration.test.ts`) that validates:
+  - schema/default parameter readiness through template validation + instantiation,
+  - workflow/dataset binding correctness through readiness + asset-graph checks,
+  - prompt/model/VAE and FaceID mapping presence on instantiated workflow parameter bindings,
+  - non-FaceID default path runnability with output/storage binding readiness,
+  - execution metadata presence for runtime backend/capability assertions.

@@ -40,6 +40,9 @@ describe("ImageManipulationWorkflowTemplate", () => {
 
     expect(ImageManipulationWorkflowTemplate.metadata.baseGraphAssetId).toBe(ComfyImageManipulationBaseGraphAssetId);
     expect(ImageManipulationWorkflowTemplate.metadata.defaultExecutable).toBe("true");
+    expect(ImageManipulationWorkflowTemplate.metadata.defaultCheckpointModel).toBe("system-default");
+    expect(ImageManipulationWorkflowTemplate.metadata.defaultVaeModel).toBe("system-default");
+    expect(ImageManipulationWorkflowTemplate.metadata.defaultFaceIdEnabled).toBe("false");
   });
 
   it("publishes inspectable execution metadata for runtime/backends and FaceID dependencies", () => {
@@ -104,6 +107,17 @@ describe("ImageManipulationWorkflowTemplate", () => {
 
     const primaryInterface = interfaceByAssetId.get("asset:workflow:image-to-image");
     expect(primaryInterface?.inputIds).toEqual(["sourceImage", "instruction"]);
+
+    const primaryFaceIdMappings = (ImageManipulationWorkflowTemplate.composition?.parameterMappings ?? [])
+      .filter((entry) => entry.workflowAssetId === "asset:workflow:image-to-image" && entry.parameterId.startsWith("faceId"))
+      .map((entry) => entry.workflowParameterId);
+    expect(primaryFaceIdMappings).toEqual([
+      "faceIdEnabled",
+      "faceIdReferenceBindings",
+      "faceIdWeight",
+      "faceIdStartStepFraction",
+      "faceIdEndStepFraction",
+    ]);
   });
 
   it("binds FaceID dataset references through logical controls instead of raw paths", () => {
