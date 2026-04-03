@@ -169,10 +169,28 @@ describe("StudioShellBackendApi", () => {
     const embedded = await api.initializeReferenceImageStorage({
       systemId: "asset:system:reference-image-manipulation",
       ownerKind: "embedded-subsystem",
+      embeddedSubsystemId: "enhance",
       attachToStorageInstanceId: "storage-instance:shared-reference-runtime",
     });
     expect(embedded.ok).toBeTrue();
     expect(embedded.data?.storage.attachments.map((entry) => entry.ownerKind)).toEqual(["system", "embedded-subsystem"]);
+    expect(embedded.data?.storage.attachments.map((entry) => entry.ownerId)).toEqual([
+      "asset:system:reference-image-manipulation",
+      "asset:system:reference-image-manipulation::subsystem:enhance",
+    ]);
+    expect(provisioner.calls).toEqual(["storage-instance:shared-reference-runtime"]);
+
+    const siblingSystem = await api.initializeReferenceImageStorage({
+      systemId: "system:studio:sibling-system",
+      ownerKind: "system",
+      attachToStorageInstanceId: "storage-instance:shared-reference-runtime",
+    });
+    expect(siblingSystem.ok).toBeTrue();
+    expect(siblingSystem.data?.storage.attachments.map((entry) => entry.ownerId)).toEqual([
+      "asset:system:reference-image-manipulation",
+      "asset:system:reference-image-manipulation::subsystem:enhance",
+      "system:studio:sibling-system",
+    ]);
     expect(provisioner.calls).toEqual(["storage-instance:shared-reference-runtime"]);
   });
 

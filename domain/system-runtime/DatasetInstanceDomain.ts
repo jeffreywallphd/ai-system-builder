@@ -51,6 +51,14 @@ export interface DatasetInstanceLifecycleMetadata {
   readonly cleanupStatus?: DatasetInstanceCleanupStatus;
 }
 
+export interface DatasetInstanceStorageBinding {
+  readonly storageInstanceId: string;
+  readonly storageInstanceRef: string;
+  readonly bindingArea: "input" | "output" | "intermediate";
+  readonly bindingId: string;
+  readonly bindingReference: string;
+}
+
 export interface DatasetInstance {
   readonly instanceId: string;
   readonly systemId: string;
@@ -60,6 +68,7 @@ export interface DatasetInstance {
   readonly purpose?: string;
   readonly lifecycleStatus: DatasetInstanceLifecycleStatus;
   readonly runtimeStatus: DatasetInstanceRuntimeStatus;
+  readonly storageBinding?: DatasetInstanceStorageBinding;
   readonly seedMetadata?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly lifecycleMetadata?: DatasetInstanceLifecycleMetadata;
   readonly createdAt: string;
@@ -71,6 +80,7 @@ export interface DatasetInstancePatch {
   readonly purpose?: string | null;
   readonly lifecycleStatus?: DatasetInstanceLifecycleStatus;
   readonly runtimeStatus?: DatasetInstanceRuntimeStatus;
+  readonly storageBinding?: DatasetInstanceStorageBinding | null;
   readonly seedMetadata?: Readonly<Record<string, CanonicalRecordValue>> | null;
   readonly lifecycleMetadata?: DatasetInstanceLifecycleMetadata | null;
   readonly updatedAt?: string;
@@ -103,6 +113,41 @@ function normalizeSeedMetadata(
     return undefined;
   }
   return Object.freeze(Object.fromEntries(entries));
+}
+
+function normalizeStorageBinding(value?: DatasetInstanceStorageBinding): DatasetInstanceStorageBinding | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const storageInstanceId = normalizeRequired(value.storageInstanceId, "Dataset instance storage binding storageInstanceId");
+  const storageInstanceRef = normalizeRequired(value.storageInstanceRef, "Dataset instance storage binding storageInstanceRef");
+  const bindingId = normalizeRequired(value.bindingId, "Dataset instance storage binding bindingId");
+  const bindingReference = normalizeRequired(value.bindingReference, "Dataset instance storage binding bindingReference");
+  const bindingArea = value.bindingArea;
+  if (bindingArea !== "input" && bindingArea !== "output" && bindingArea !== "intermediate") {
+    throw new Error(`Dataset instance storage binding area '${String(bindingArea)}' is not supported.`);
+  }
+  const forbiddenPathToken = (candidate: string): boolean =>
+    candidate.includes("/")
+    || candidate.includes("\\")
+    || candidate.toLowerCase().includes("path")
+    || candidate.toLowerCase().includes("directory")
+    || candidate.toLowerCase().includes("filesystem");
+  if (forbiddenPathToken(storageInstanceId) || forbiddenPathToken(bindingId)) {
+    throw new Error("Dataset instance storage bindings must use storage-instance identities and logical binding ids, not path-like values.");
+  }
+  if (!storageInstanceRef.startsWith("storage-instance://") || !bindingReference.startsWith("storage-instance://")) {
+    throw new Error("Dataset instance storage bindings must use storage-instance:// logical references.");
+  }
+
+  return Object.freeze({
+    storageInstanceId,
+    storageInstanceRef,
+    bindingArea,
+    bindingId,
+    bindingReference,
+  });
 }
 
 function normalizeTimestamp(value: string | undefined, label: string): string {
@@ -214,6 +259,7 @@ export function createDatasetInstance(input: {
   readonly purpose?: string;
   readonly lifecycleStatus?: DatasetInstanceLifecycleStatus;
   readonly runtimeStatus?: DatasetInstanceRuntimeStatus;
+  readonly storageBinding?: DatasetInstanceStorageBinding;
   readonly seedMetadata?: Readonly<Record<string, CanonicalRecordValue>>;
   readonly lifecycleMetadata?: DatasetInstanceLifecycleMetadata;
   readonly createdAt?: string;
@@ -234,6 +280,7 @@ export function createDatasetInstance(input: {
     purpose: normalizeOptional(input.purpose),
     lifecycleStatus: normalizeLifecycleStatus(input.lifecycleStatus ?? DatasetInstanceLifecycleStatuses.provisioning),
     runtimeStatus: normalizeRuntimeStatus(input.runtimeStatus ?? DatasetInstanceRuntimeStatuses.idle),
+    storageBinding: normalizeStorageBinding(input.storageBinding),
     seedMetadata: normalizeSeedMetadata(input.seedMetadata),
     lifecycleMetadata: normalizeLifecycleMetadata(input.lifecycleMetadata),
     createdAt,
@@ -324,6 +371,9 @@ export function patchDatasetInstance(input: {
       : patch.purpose ?? input.instance.purpose,
     lifecycleStatus: patch.lifecycleStatus ?? input.instance.lifecycleStatus,
     runtimeStatus: patch.runtimeStatus ?? input.instance.runtimeStatus,
+    storageBinding: patch.storageBinding === null
+      ? undefined
+      : patch.storageBinding ?? input.instance.storageBinding,
     seedMetadata: patch.seedMetadata === null
       ? undefined
       : patch.seedMetadata ?? input.instance.seedMetadata,

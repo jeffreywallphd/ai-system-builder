@@ -65,6 +65,40 @@ describe("StorageInstanceInitializationService", () => {
     expect(attached.metadata.attachments.map((entry) => entry.ownerId)).toEqual(["system:root", "system:root::subsystem:enhance"]);
   });
 
+  it("supports sharing one storage instance across multiple top-level systems without duplicate provisioning", async () => {
+    const repository = new InMemoryStorageInstanceMetadataRepository();
+    const service = new StorageInstanceInitializationService(
+      new DeterministicStorageInstanceProvisioner(),
+      repository,
+      () => new Date("2026-04-03T00:00:00.000Z"),
+    );
+
+    const first = await service.initialize({
+      strategy: "provision",
+      instanceId: "storage-instance:shared:multi-system",
+      owner: {
+        ownerKind: "system",
+        ownerId: "system:a",
+        role: "runtime-io",
+      },
+      requestedBindings: ["input", "output", "intermediate"],
+    });
+    const second = await service.initialize({
+      strategy: "attach",
+      attachInstanceId: "storage-instance:shared:multi-system",
+      owner: {
+        ownerKind: "system",
+        ownerId: "system:b",
+        role: "runtime-io",
+      },
+      requestedBindings: ["input", "output"],
+    });
+
+    expect(first.provisioned).toBeTrue();
+    expect(second.provisioned).toBeFalse();
+    expect(second.metadata.attachments.map((entry) => entry.ownerId)).toEqual(["system:a", "system:b"]);
+  });
+
   it("rejects initialization payloads that try to configure storage directories", async () => {
     const service = new StorageInstanceInitializationService(
       new DeterministicStorageInstanceProvisioner(),

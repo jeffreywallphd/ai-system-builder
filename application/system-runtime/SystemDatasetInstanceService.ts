@@ -64,6 +64,7 @@ export interface CreateSystemDatasetInstanceRequest {
   readonly purpose?: string;
   readonly lifecycleStatus?: DatasetInstance["lifecycleStatus"];
   readonly runtimeStatus?: DatasetInstance["runtimeStatus"];
+  readonly storageBinding?: DatasetInstance["storageBinding"];
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
   readonly lifecycleMetadata?: DatasetInstance["lifecycleMetadata"];
 }
@@ -77,6 +78,7 @@ export interface EnsureRoleDatasetInstanceRequest {
   readonly purpose?: string;
   readonly requiredSchemaIntentId?: string;
   readonly requiredOutputShapeKind?: string;
+  readonly storageBinding?: DatasetInstance["storageBinding"];
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
   readonly lifecycleMetadata?: DatasetInstance["lifecycleMetadata"];
 }
@@ -86,6 +88,7 @@ export interface EnsureInputImageStoreInstanceRequest {
   readonly systemId: string;
   readonly datasetAssetId: string;
   readonly datasetAssetVersionId?: string;
+  readonly storageBinding?: DatasetInstance["storageBinding"];
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
 }
 
@@ -94,6 +97,7 @@ export interface EnsureOutputImageStoreInstanceRequest {
   readonly systemId: string;
   readonly datasetAssetId: string;
   readonly datasetAssetVersionId?: string;
+  readonly storageBinding?: DatasetInstance["storageBinding"];
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
 }
 
@@ -104,6 +108,7 @@ export interface EnsureWorkflowOutputTargetInstanceRequest {
   readonly datasetAssetId: string;
   readonly datasetAssetVersionId?: string;
   readonly purpose?: string;
+  readonly storageBinding?: DatasetInstance["storageBinding"];
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
 }
 
@@ -115,6 +120,7 @@ export interface EnsureIntermediateStoreInstanceRequest {
   readonly purpose?: string;
   readonly requiredSchemaIntentId?: string;
   readonly requiredOutputShapeKind?: string;
+  readonly storageBinding?: DatasetInstance["storageBinding"];
   readonly seedMetadata?: DatasetInstance["seedMetadata"];
   readonly lifecycleMetadata?: DatasetInstance["lifecycleMetadata"];
 }
@@ -326,6 +332,7 @@ export class SystemDatasetInstanceService {
   }
 
   public async createDatasetInstance(request: CreateSystemDatasetInstanceRequest): Promise<DatasetInstance> {
+    this.assertNoPathConfiguration(request);
     await this.assertSystemExists(request.systemId);
     await this.assertAssetLinked({
       datasetAssetId: request.datasetAssetId,
@@ -341,6 +348,7 @@ export class SystemDatasetInstanceService {
       purpose: request.purpose,
       lifecycleStatus: request.lifecycleStatus ?? DatasetInstanceLifecycleStatuses.ready,
       runtimeStatus: request.runtimeStatus ?? DatasetInstanceRuntimeStatuses.idle,
+      storageBinding: request.storageBinding,
       seedMetadata: request.seedMetadata,
       lifecycleMetadata: request.lifecycleMetadata,
     });
@@ -515,6 +523,7 @@ export class SystemDatasetInstanceService {
   }
 
   public async ensureRoleDatasetInstance(request: EnsureRoleDatasetInstanceRequest): Promise<DatasetInstance> {
+    this.assertNoPathConfiguration(request);
     await this.assertSystemExists(request.systemId);
     const asset = await this.assertAssetLinked({
       datasetAssetId: request.datasetAssetId,
@@ -543,6 +552,11 @@ export class SystemDatasetInstanceService {
           `conflict:System '${request.systemId}' already has a '${request.role}' dataset instance for purpose '${request.purpose ?? ""}' with different asset linkage.`,
         );
       }
+      if (!this.areStorageBindingsEquivalent(existing.storageBinding, request.storageBinding)) {
+        throw new Error(
+          `conflict:System '${request.systemId}' already has a '${request.role}' dataset instance for purpose '${request.purpose ?? ""}' with different storage binding linkage.`,
+        );
+      }
       return existing;
     }
 
@@ -553,6 +567,7 @@ export class SystemDatasetInstanceService {
       datasetAssetVersionId: request.datasetAssetVersionId,
       role: request.role,
       purpose: request.purpose,
+      storageBinding: request.storageBinding,
       seedMetadata: request.seedMetadata,
       lifecycleStatus: DatasetInstanceLifecycleStatuses.ready,
       runtimeStatus: DatasetInstanceRuntimeStatuses.idle,
@@ -570,6 +585,7 @@ export class SystemDatasetInstanceService {
       purpose: "incoming-images",
       requiredSchemaIntentId: DatasetSchemaIntentIds.media,
       requiredOutputShapeKind: "image-metadata-records",
+      storageBinding: request.storageBinding,
       seedMetadata: request.seedMetadata,
     });
   }
@@ -581,6 +597,7 @@ export class SystemDatasetInstanceService {
       systemId: request.systemId,
       datasetAssetId: request.datasetAssetId,
       datasetAssetVersionId: request.datasetAssetVersionId,
+      storageBinding: request.storageBinding,
       seedMetadata: request.seedMetadata,
     });
   }
@@ -604,6 +621,7 @@ export class SystemDatasetInstanceService {
       }),
       requiredSchemaIntentId: DatasetSchemaIntentIds.media,
       requiredOutputShapeKind: "image-metadata-records",
+      storageBinding: request.storageBinding,
       seedMetadata: request.seedMetadata,
     });
   }
@@ -620,6 +638,7 @@ export class SystemDatasetInstanceService {
       purpose: normalizeOptional(request.purpose) ?? "workflow-intermediate-images",
       requiredSchemaIntentId: request.requiredSchemaIntentId,
       requiredOutputShapeKind: request.requiredOutputShapeKind,
+      storageBinding: request.storageBinding,
       seedMetadata: request.seedMetadata,
       lifecycleMetadata: request.lifecycleMetadata,
     });
@@ -1586,6 +1605,54 @@ export class SystemDatasetInstanceService {
 
   private createImageRecordId(instanceId: string): string {
     return `${instanceId}:image-record:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  private areStorageBindingsEquivalent(
+    existing?: DatasetInstance["storageBinding"],
+    requested?: DatasetInstance["storageBinding"],
+  ): boolean {
+    if (!existing && !requested) {
+      return true;
+    }
+    if (!existing || !requested) {
+      return false;
+    }
+    return existing.storageInstanceId === requested.storageInstanceId
+      && existing.storageInstanceRef === requested.storageInstanceRef
+      && existing.bindingArea === requested.bindingArea
+      && existing.bindingId === requested.bindingId
+      && existing.bindingReference === requested.bindingReference;
+  }
+
+  private assertNoPathConfiguration(input: unknown): void {
+    const root = this.toOptionalRecord(input);
+    if (!root) {
+      return;
+    }
+    if (this.hasForbiddenPathField(root)) {
+      throw new Error("invalid-request:Dataset instance storage configuration must use storage-instance references instead of raw filesystem paths.");
+    }
+  }
+
+  private hasForbiddenPathField(node: Readonly<Record<string, unknown>>): boolean {
+    for (const [key, value] of Object.entries(node)) {
+      const normalized = key.toLowerCase();
+      if (normalized.includes("path") || normalized.includes("directory") || normalized.includes("filesystem")) {
+        return true;
+      }
+      const nested = this.toOptionalRecord(value);
+      if (nested && this.hasForbiddenPathField(nested)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private toOptionalRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return undefined;
+    }
+    return value as Readonly<Record<string, unknown>>;
   }
 
   private async requireOwnedDatasetInstance(input: {

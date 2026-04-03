@@ -470,6 +470,24 @@
   - application orchestrates provisioning + attach metadata,
   - infrastructure provisioners own filesystem details and path materialization.
 
+## AI Loom Image System vertical-slice update: dataset storage bindings + shared attachment reuse (stories 2.5-2.6)
+
+- Dataset-instance contracts now carry explicit storage-instance logical binding references (`DatasetInstance.storageBinding`) with:
+  - storage instance identity/reference (`storageInstanceId`, `storageInstanceRef`),
+  - logical area (`input|output|intermediate`),
+  - logical binding identity/reference (`bindingId`, `bindingReference`).
+- `SystemDatasetInstanceService` ensure/create flows now accept and persist those storage bindings, and guard against:
+  - path-like dataset storage configuration fields in request payloads,
+  - conflicting role/purpose ensures that attempt to rebind an existing dataset instance to a different storage binding.
+- `ReferenceImageSystemTemplate` dataset-instance definitions now declare intended storage binding areas so dataset contracts remain inspectable/composable at template level.
+- `StudioShellBackendApi` now wires storage initialization metadata directly into dataset-instance ensure requests:
+  - dataset ensure resolves through `storage-instance metadata -> logical area binding -> dataset instance storageBinding`,
+  - no user-facing raw filesystem path configuration is introduced.
+- Shared attachment semantics are now explicit for subsystem reuse:
+  - `initializeReferenceImageStorage` supports deterministic embedded subsystem owner identity (`{systemId}::subsystem:{embeddedSubsystemId}`) when owner kind is `embedded-subsystem`,
+  - attach semantics continue to reuse existing provisioned instances without duplicate provisioning across multiple top-level systems and embedded subsystems.
+- Filesystem path resolution remains infrastructure-owned; application/domain layers exchange only logical storage-instance references.
+
 ## AI Loom Image System vertical-slice update: system-owned binary output storage + provenance persistence (stories 2.3.5-2.3.6)
 
 - Workflow output materialization now supports explicit binary artifact persistence through an internal storage seam (`application/system-runtime/WorkflowOutputArtifactStorage.ts`) rather than executor-specific paths.

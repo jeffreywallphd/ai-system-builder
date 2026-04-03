@@ -264,6 +264,8 @@ export interface InitializeReferenceImageStorageRequest {
   readonly systemId: string;
   readonly ownerKind?: StorageAttachmentOwnerKind;
   readonly ownerRole?: string;
+  readonly ownerId?: string;
+  readonly embeddedSubsystemId?: string;
   readonly storageInstanceId?: string;
   readonly attachToStorageInstanceId?: string;
 }
@@ -2431,12 +2433,23 @@ export class StudioShellBackendApi {
   }
 
   private async ensureReferenceImageDatasetInstances(systemId: string) {
-    await this.initializeReferenceImageStorage({
+    const storage = await this.initializeReferenceImageStorage({
       systemId,
       ownerKind: "system",
       ownerRole: "reference-image-runtime",
     });
-    const requests = buildReferenceImageDatasetInstanceRequests(systemId);
+    const storageMetadata = storage.data?.storage;
+    const storageBindingByArea = storageMetadata
+      ? Object.freeze(Object.fromEntries(storageMetadata.bindings.map((binding) => [binding.area, Object.freeze({
+        storageInstanceId: storageMetadata.instanceId,
+        storageInstanceRef: storageMetadata.storageInstanceRef,
+        bindingId: binding.bindingId,
+        bindingReference: binding.reference,
+      })])))
+      : undefined;
+    const requests = buildReferenceImageDatasetInstanceRequests(systemId, {
+      storageBindingByArea,
+    });
     const ensured: Array<Awaited<ReturnType<SystemDatasetInstanceService["ensureRoleDatasetInstance"]>>> = [];
     for (const request of requests) {
       ensured.push(await this.referenceImageDatasets.ensureRoleDatasetInstance(request as EnsureRoleDatasetInstanceRequest));
@@ -2453,6 +2466,12 @@ export class StudioShellBackendApi {
       await this.assertReferenceImageSystemOwnership(systemId);
       const ownerKind = request.ownerKind ?? "system";
       const ownerRole = request.ownerRole?.trim() || "reference-image-runtime";
+      const ownerId = this.resolveStorageOwnerId({
+        ownerKind,
+        ownerId: request.ownerId,
+        systemId,
+        embeddedSubsystemId: request.embeddedSubsystemId,
+      });
       const sharedAttachment = request.attachToStorageInstanceId?.trim();
       const explicitInstanceId = request.storageInstanceId?.trim() || `storage-instance:${systemId}:image-runtime`;
       const initialized = await this.storageInitialization.initialize({
@@ -2461,7 +2480,7 @@ export class StudioShellBackendApi {
         attachInstanceId: sharedAttachment,
         owner: {
           ownerKind,
-          ownerId: systemId,
+          ownerId,
           role: ownerRole,
         },
         requestedBindings: ["input", "output", "intermediate"],
@@ -2479,6 +2498,28 @@ export class StudioShellBackendApi {
         storage: initialized.metadata,
       });
     });
+  }
+
+  private resolveStorageOwnerId(input: {
+    readonly ownerKind: StorageAttachmentOwnerKind;
+    readonly ownerId?: string;
+    readonly systemId: string;
+    readonly embeddedSubsystemId?: string;
+  }): string {
+    const explicitOwnerId = input.ownerId?.trim();
+    if (explicitOwnerId) {
+      return explicitOwnerId;
+    }
+    if (input.ownerKind === "embedded-subsystem") {
+      const subsystemId = input.embeddedSubsystemId?.trim();
+      if (!subsystemId) {
+        throw new StudioShellInvalidRequestError(
+          "embeddedSubsystemId is required when ownerKind is 'embedded-subsystem' unless ownerId is provided.",
+        );
+      }
+      return `${input.systemId}::subsystem:${subsystemId}`;
+    }
+    return input.systemId;
   }
 
   private assertNoStoragePathConfiguration(input: unknown): void {
