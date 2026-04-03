@@ -179,3 +179,10 @@ The most natural next architectural steps are:
 - Runtime/bootstrap composition is split between the Electron host and the renderer composition; the long-term architecture would benefit from a clearer statement of what must be host-owned versus renderer-owned.
 
 Direction 3 trust updates now also use local-first persistence seams for MCP governance: tool credential records prefer the desktop secure-storage bridge (Electron `safeStorage`) and fall back to encrypted local storage when unavailable; execution-policy audit decisions remain local-storage-backed, and ordinary installed-tool/read-model paths continue to avoid returning raw secret values.
+
+## AI Loom image manipulation update: runtime launch window contract and host flow (stories 8.1-8.2)
+
+- Desktop Studio Shell bridge now includes a dedicated runtime-window launch IPC seam (`ai-loom-desktop-studio-shell:runtime-window:launch`) that accepts only validated runtime launch contracts.
+- Launch payloads are normalized and versioned through one shared contract (`SystemRuntimeWindowLaunchContract`) before reaching host window creation.
+- Electron main now reuses existing window bootstrap mechanics to open a separate runtime-focused window and passes only contract-defined launch data to renderer query transport (`runtimeWindowLaunch`).
+- Runtime window reuse is bounded through contract window intent (`reuseWindowKey`) rather than ad hoc global state.

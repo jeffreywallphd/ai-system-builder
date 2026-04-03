@@ -56,3 +56,10 @@ The preload bridge uses synchronous IPC and exposes storage/workflow/model-file 
 
 ## TODO
 - When discussing security or performance, mention the sync IPC tradeoff explicitly.
+
+## AI Loom image manipulation update: runtime launch window contract and host flow (stories 8.1-8.2)
+
+- Desktop Studio Shell bridge now includes a dedicated runtime-window launch IPC seam (`ai-loom-desktop-studio-shell:runtime-window:launch`) that accepts only validated runtime launch contracts.
+- Launch payloads are normalized and versioned through one shared contract (`SystemRuntimeWindowLaunchContract`) before reaching host window creation.
+- Electron main now reuses existing window bootstrap mechanics to open a separate runtime-focused window and passes only contract-defined launch data to renderer query transport (`runtimeWindowLaunch`).
+- Runtime window reuse is bounded through contract window intent (`reuseWindowKey`) rather than ad hoc global state.

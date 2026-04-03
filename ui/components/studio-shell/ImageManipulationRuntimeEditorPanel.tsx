@@ -43,6 +43,7 @@ import {
   type ImageManipulationSelectionRole,
   type ImageManipulationSelectionState,
 } from "./image-manipulation/ImageManipulationSelectionState";
+import type { SystemRuntimeWindowLaunchContract } from "../../../application/system-runtime/SystemRuntimeWindowLaunchContract";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
   acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
@@ -119,6 +120,13 @@ function toRecordIds(items: ReadonlyArray<OutputGalleryItem>): ReadonlyArray<str
   return Object.freeze(items.map((item) => item.image.recordId));
 }
 
+function toSelectionRole(value: string | undefined): ImageManipulationSelectionRole | undefined {
+  if (value === "source" || value === "output" || value === "reference") {
+    return value;
+  }
+  return undefined;
+}
+
 async function encodeFileBase64(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
   let binary = "";
@@ -131,6 +139,7 @@ async function encodeFileBase64(file: File): Promise<string> {
 
 export interface ImageManipulationRuntimeEditorPanelProps {
   readonly context: StudioShellExtensionContext;
+  readonly runtimeLaunch?: SystemRuntimeWindowLaunchContract;
 }
 
 interface ImageCollections {
@@ -190,9 +199,10 @@ function toFriendlyValidationMessage(path: string): string {
   return "Review your settings before running.";
 }
 
-export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulationRuntimeEditorPanelProps): JSX.Element {
-  const [presetId, setPresetId] = useState(ComfyImageManipulationPropertySchema.defaultPresetId);
-  const [config, setConfig] = useState<ComfyImageManipulationConfig>(() => createComfyImageManipulationDefaultConfig());
+export function ImageManipulationRuntimeEditorPanel({ context, runtimeLaunch }: ImageManipulationRuntimeEditorPanelProps): JSX.Element {
+  const initialPresetId = runtimeLaunch?.initialSelection.presetId ?? ComfyImageManipulationPropertySchema.defaultPresetId;
+  const [presetId, setPresetId] = useState(initialPresetId);
+  const [config, setConfig] = useState<ComfyImageManipulationConfig>(() => createComfyImageManipulationDefaultConfig({ presetId: initialPresetId }));
   const draft = context.snapshot?.draft;
   const isTemplateDraft = draft?.assetId === ReferenceImageSystemTemplate.systemAsset.assetId;
   const studioShell = useMemo(() => new StudioShellService(), []);
@@ -424,19 +434,26 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
           sourceRecordIds: toRecordIds(nextSources),
           outputRecordIds: toRecordIds(nextOutputs),
           referenceRecordIds: toRecordIds(nextReferences),
-          preferredSourceRecordId: options.preferredSourceRecordId,
+          preferredSourceRecordId: options.preferredSourceRecordId
+            ?? runtimeLaunch?.initialSelection.selectedRecordIds["input-image-dataset"],
           preferredOutputRecordId: options.preferLatestOutput
             ? nextOutputs[0]?.image.recordId
-            : options.preferredOutputRecordId,
-          preferredReferenceRecordId: options.preferredReferenceRecordId,
+            : (options.preferredOutputRecordId
+              ?? runtimeLaunch?.initialSelection.selectedRecordIds["output-image-dataset"]),
+          preferredReferenceRecordId: options.preferredReferenceRecordId
+            ?? runtimeLaunch?.initialSelection.selectedRecordIds["reference-image-dataset"],
         });
+        const desiredPreviewRole = toSelectionRole(runtimeLaunch?.initialSelection.activePreviewRole);
+        const withPreviewRole = desiredPreviewRole
+          ? setActivePreviewRole(reconciled, desiredPreviewRole)
+          : reconciled;
 
-        const nextSource = resolveSelectedItem(nextSources, reconciled.sourceRecordId);
+        const nextSource = resolveSelectedItem(nextSources, withPreviewRole.sourceRecordId);
         if (nextSource?.dataset.instanceId) {
           setDatasetInstanceId(nextSource.dataset.instanceId);
         }
 
-        return reconciled;
+        return withPreviewRole;
       });
 
       return Object.freeze({

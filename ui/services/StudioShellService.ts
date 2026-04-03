@@ -51,6 +51,10 @@ import type {
   RuntimeExecutionResultReadModel,
 } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import type {
+  LaunchSystemRuntimeWindowReadModel,
+  LaunchSystemRuntimeWindowRequest,
+} from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
+import type {
   AddSystemChildComponentRequest,
   ListSystemChildComponentsRequest,
   RemoveSystemChildComponentRequest,
@@ -329,5 +333,12 @@ export class StudioShellService {
   ): Promise<StudioShellApiResponse<ChainReferenceImageDatasetItemReadModel>> {
     const raw = await this.requireBridge().chainReferenceImageDatasetItemToInput(JSON.stringify(request));
     return JSON.parse(raw) as StudioShellApiResponse<ChainReferenceImageDatasetItemReadModel>;
+  }
+
+  public async launchRuntimeWindow(
+    request: LaunchSystemRuntimeWindowRequest,
+  ): Promise<SystemRuntimeApiResponse<LaunchSystemRuntimeWindowReadModel>> {
+    const raw = await this.requireBridge().launchRuntimeWindow(JSON.stringify(request));
+    return JSON.parse(raw) as SystemRuntimeApiResponse<LaunchSystemRuntimeWindowReadModel>;
   }
 }

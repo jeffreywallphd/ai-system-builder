@@ -82,6 +82,11 @@ import { SqliteImageRunHistoryRepository } from "../../infrastructure/filesystem
 import { LocalStorageInstanceProvisioner } from "../../infrastructure/filesystem/system-runtime/LocalStorageInstanceProvisioner";
 import { LocalSystemOutputArtifactStorage } from "../../infrastructure/filesystem/system-runtime/LocalSystemOutputArtifactStorage";
 import { LocalStorageInstanceLifecycleInfrastructure } from "../../infrastructure/filesystem/system-runtime/LocalStorageInstanceLifecycleInfrastructure";
+import {
+  parseSystemRuntimeWindowLaunchContract,
+  SystemRuntimeWindowLaunchQueryParam,
+  type LaunchSystemRuntimeWindowReadModel,
+} from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -107,6 +112,19 @@ let serviceSupervisor: DesktopServiceSupervisor | undefined;
 let studioShellRepository: SqliteStudioShellRepository | undefined;
 let workflowPersistenceRepository: SqliteWorkflowPersistenceRepository | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
+const runtimeWindowByReuseKey = new Map<string, BrowserWindow>();
+
+function createRendererSearch(params: Record<string, string | undefined>): string | undefined {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (!value) {
+      continue;
+    }
+    search.set(key, value);
+  }
+  const serialized = search.toString();
+  return serialized ? `?${serialized}` : undefined;
+}
 
 function toFileEntry(filePath: string) {
   const stats = fs.statSync(filePath);
@@ -190,13 +208,96 @@ async function createMainWindow(): Promise<void> {
   mainWindow = window;
   window.once("ready-to-show", () => window.show());
 
+  await loadRendererRoot(window);
+}
+
+async function loadRendererRoot(window: BrowserWindow, search?: string): Promise<void> {
   const runtimeConfig = bootstrapContext?.runtimeConfig;
   if (runtimeConfig?.rendererDeliveryMode === RendererDeliveryModes.packagedAssets) {
-    await window.loadFile(path.join(__dirname, "../../dist/index.html"));
+    await window.loadFile(path.join(__dirname, "../../dist/index.html"), {
+      search,
+    });
   } else {
-    await window.loadURL(rendererDevUrl);
-    window.webContents.openDevTools({ mode: "detach" });
+    const url = new URL(rendererDevUrl);
+    url.pathname = "/";
+    if (search) {
+      url.search = search.startsWith("?") ? search.slice(1) : search;
+    }
+    await window.loadURL(url.toString());
+    if (window === mainWindow) {
+      window.webContents.openDevTools({ mode: "detach" });
+    }
   }
+}
+
+async function launchRuntimeWindowFromContract(
+  launchContractJson: string,
+): Promise<LaunchSystemRuntimeWindowReadModel> {
+  const contract = parseSystemRuntimeWindowLaunchContract(launchContractJson);
+  if (!contract) {
+    throw new Error("invalid-request:Runtime window launch contract is missing or invalid.");
+  }
+
+  const reuseWindowKey = contract.windowIntent.reuseWindowKey?.trim();
+  if (reuseWindowKey) {
+    const existing = runtimeWindowByReuseKey.get(reuseWindowKey);
+    if (existing && !existing.isDestroyed()) {
+      const search = createRendererSearch({
+        [SystemRuntimeWindowLaunchQueryParam]: launchContractJson,
+      });
+      await loadRendererRoot(existing, search);
+      if (contract.windowIntent.focus === "foreground") {
+        existing.focus();
+      }
+      return Object.freeze({
+        launchId: contract.launchId,
+        launchedAt: new Date().toISOString(),
+        targetKind: contract.launchTarget.targetKind,
+        systemAssetId: contract.launchTarget.systemAssetId,
+        pageBindingId: contract.launchTarget.pageBindingId,
+        routePath: "/",
+      });
+    }
+  }
+
+  const runtimeWindow = new BrowserWindow({
+    width: contract.windowIntent.dimensions?.width ?? 1440,
+    height: contract.windowIntent.dimensions?.height ?? 960,
+    show: false,
+    backgroundColor: "#111827",
+    title: contract.windowIntent.titleHint ?? "AI Loom Runtime",
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, "../preload.mjs"),
+    },
+  });
+
+  runtimeWindow.once("ready-to-show", () => runtimeWindow.show());
+  const search = createRendererSearch({
+    [SystemRuntimeWindowLaunchQueryParam]: launchContractJson,
+  });
+  await loadRendererRoot(runtimeWindow, search);
+
+  if (contract.windowIntent.focus === "foreground") {
+    runtimeWindow.focus();
+  }
+
+  if (reuseWindowKey) {
+    runtimeWindowByReuseKey.set(reuseWindowKey, runtimeWindow);
+    runtimeWindow.on("closed", () => {
+      runtimeWindowByReuseKey.delete(reuseWindowKey);
+    });
+  }
+
+  return Object.freeze({
+    launchId: contract.launchId,
+    launchedAt: new Date().toISOString(),
+    targetKind: contract.launchTarget.targetKind,
+    systemAssetId: contract.launchTarget.systemAssetId,
+    pageBindingId: contract.launchTarget.pageBindingId,
+    routePath: "/",
+  });
 }
 
 async function bootstrapDesktopRuntime(): Promise<void> {
@@ -635,6 +736,30 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:chain-to-input", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["chainReferenceImageDatasetItemToInput"]>[0];
     return JSON.stringify(await studioShellBackendApi.chainReferenceImageDatasetItemToInput(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:runtime-window:launch", async (_event, requestJson: string) => {
+    try {
+      const request = JSON.parse(requestJson) as { readonly launchContract?: unknown };
+      if (!request.launchContract) {
+        throw new Error("invalid-request:launchContract is required.");
+      }
+      const launchContractJson = JSON.stringify(request.launchContract);
+      const launched = await launchRuntimeWindowFromContract(launchContractJson);
+      return JSON.stringify({
+        ok: true,
+        data: launched,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Runtime window launch failed.";
+      const isInvalid = message.startsWith("invalid-request:");
+      return JSON.stringify({
+        ok: false,
+        error: {
+          code: isInvalid ? "invalid-request" : "internal",
+          message: isInvalid ? message.slice("invalid-request:".length) : message,
+        },
+      });
+    }
   });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
     event.returnValue = fs.existsSync(targetPath);

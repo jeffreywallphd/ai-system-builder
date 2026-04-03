@@ -913,3 +913,9 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - page-asset registry/renderer resolution assertions,
   - runtime editor default-state assertions (property editor defaults, preview/gallery empty-ready states, run-action gating cues),
   - run lifecycle transition assertions through the reusable execution-flow service.
+
+## AI Loom image manipulation update: runtime window shell rendering flow (stories 8.1-8.2)
+
+- App layout now supports a contract-driven runtime-window host mode when `runtimeWindowLaunch` is present in query params.
+- Runtime window rendering resolves a normalized launch contract and routes to registered runtime page assets (initially the image manipulation page binding) without reopening full Studio Shell authoring chrome.
+- System runtime panel launch UX now composes launch requests through the shared resolver and sends them via desktop bridge operation (`launchRuntimeWindow`) instead of directly constructing host/window details in UI components.

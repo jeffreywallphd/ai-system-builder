@@ -16,6 +16,8 @@ import ContextNavigationBar from "../components/navigation/ContextNavigationBar"
 import CommandPalette from "../components/navigation/CommandPalette";
 import { GlobalCommandTrigger } from "../routes/CommandPalette";
 import GuidedOnboardingFlowSurface from "../components/navigation/GuidedOnboardingFlow";
+import { SystemRuntimeWindowLaunchQueryParam } from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
+import SystemRuntimeWindowHost from "../components/studio-shell/SystemRuntimeWindowHost";
 
 const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   isExpanded: false,
@@ -154,6 +156,14 @@ export default function AppLayout(): JSX.Element {
   const isWideWorkspace =
     location.pathname.startsWith("/workflows/") ||
     location.pathname === "/workflows";
+  const isRuntimeWindowLaunch = useMemo(
+    () => new URLSearchParams(location.search).has(SystemRuntimeWindowLaunchQueryParam),
+    [location.search],
+  );
+
+  if (isRuntimeWindowLaunch) {
+    return <SystemRuntimeWindowHost />;
+  }
 
   return (
     <div className="ui-app ui-surface-app">

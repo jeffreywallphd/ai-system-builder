@@ -232,6 +232,15 @@ function installBridge(
     chainReferenceImageDatasetItemToInput(requestJson: string) {
       return api.chainReferenceImageDatasetItemToInput(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
+    launchRuntimeWindow(_requestJson: string) {
+      return Promise.resolve(JSON.stringify({
+        ok: false,
+        error: {
+          code: "unsupported",
+          message: "runtime-window-launch-not-configured",
+        },
+      }));
+    },
   };
 
   (globalThis as { window?: Window }).window = {

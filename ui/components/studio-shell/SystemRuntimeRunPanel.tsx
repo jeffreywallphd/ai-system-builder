@@ -7,6 +7,8 @@ import { UxRuntimeService } from "../../runtime/UxRuntimeService";
 import SystemRuntimeInterfacePreview from "./system/SystemRuntimeInterfacePreview";
 import { workflowStudioSurfaceAssetDefinition } from "../../studio-shell/studio-assets/StudioSurfaceAssetDefinitions";
 import { imageManipulationEditorPageAssetDefinition } from "../../studio-shell/studio-assets/ImageManipulationEditorPageAsset";
+import { createImageManipulationRuntimeWindowLaunchRequest } from "../../../application/system-runtime/SystemRuntimeWindowLaunchResolver";
+import { ImageManipulationSystemTemplate } from "../../../application/system-studio/ImageManipulationSystemTemplate";
 
 interface SystemRuntimeRunPanelProps {
   readonly context: StudioShellExtensionContext;
@@ -53,6 +55,13 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
     return draft.lifecycleStatus === AssetDraftLifecycleStatuses.validated
       || draft.lifecycleStatus === AssetDraftLifecycleStatuses.published;
   }, [draft]);
+  const canLaunchRuntimeWindow = useMemo(() => {
+    return Boolean(
+      draft?.draftId
+      && draft.assetId === ImageManipulationSystemTemplate.systemAsset.assetId
+      && context.operations.launchRuntimeWindow,
+    );
+  }, [context.operations.launchRuntimeWindow, draft?.assetId, draft?.draftId]);
 
   const isTerminal = status?.status === "succeeded" || status?.status === "failed" || status?.status === "cancelled";
 
@@ -158,6 +167,32 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
           />
           Auto-refresh every 2s (while running)
         </label>
+        <button
+          className="ui-button ui-button--ghost"
+          disabled={!canLaunchRuntimeWindow || isRunning}
+          onClick={() => {
+            if (!draft?.draftId || !context.operations.launchRuntimeWindow) {
+              return;
+            }
+            const responsePromise = context.operations.launchRuntimeWindow(
+              createImageManipulationRuntimeWindowLaunchRequest({
+                studioId: context.studioId,
+                draftId: draft.draftId,
+                sessionId: context.snapshot?.activeSessionId,
+                systemAssetId: draft.assetId,
+              }),
+            );
+            void responsePromise.then((response) => {
+              if (!response.ok || !response.data) {
+                setMessage(response.error?.message ?? "Could not open the runtime window.");
+                return;
+              }
+              setMessage(`Opened runtime window '${response.data.launchId}'.`);
+            });
+          }}
+        >
+          Open Runtime Window
+        </button>
       </div>
       {latestExecutionId ? (
         <div className="ui-stack ui-stack--2xs">

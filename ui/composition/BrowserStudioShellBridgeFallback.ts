@@ -67,6 +67,13 @@ export function resolveBrowserStudioShellBridgeFallback(): DesktopStudioShellBri
     getReferenceImageDatasetItem: (requestJson) => studioApi.getReferenceImageDatasetItem(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     listReferenceImageRunHistory: (requestJson) => studioApi.listReferenceImageRunHistory(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     chainReferenceImageDatasetItemToInput: (requestJson) => studioApi.chainReferenceImageDatasetItemToInput(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    launchRuntimeWindow: async () => JSON.stringify({
+      ok: false,
+      error: {
+        code: "unsupported",
+        message: "Runtime window launch is only available in the desktop host.",
+      },
+    }),
   });
 
   return fallbackBridge;

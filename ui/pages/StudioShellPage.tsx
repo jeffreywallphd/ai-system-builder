@@ -1419,6 +1419,7 @@ export default function StudioShellPage({
       setDraftContent: (nextContent) => {
         updateContent(nextContent);
       },
+      launchRuntimeWindow: async (request) => service.launchRuntimeWindow(request),
       startSystemExecution: async (request) => service.startSystemExecution(request),
       getSystemExecutionStatus: async (executionId) => service.getSystemExecutionStatus(executionId),
       getSystemExecutionTrace: async (request) => service.getSystemExecutionTrace(request),

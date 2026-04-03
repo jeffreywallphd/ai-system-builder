@@ -271,6 +271,9 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     chainReferenceImageDatasetItemToInput(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:reference-image:chain-to-input", requestJson) as Promise<string>;
     },
+    launchRuntimeWindow(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:runtime-window:launch", requestJson) as Promise<string>;
+    },
   },
   registry: {
     listAssets(limit?: number) {
