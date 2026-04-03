@@ -12,6 +12,10 @@ import {
 import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "../../domain/taxonomy/CompositionTaxonomy";
 import { DatasetInstanceRoles, type DatasetInstanceRole } from "../../domain/system-runtime/DatasetInstanceDomain";
 import type { EnsureRoleDatasetInstanceRequest } from "../system-runtime/SystemDatasetInstanceService";
+import {
+  ImageManipulationInputDatasetAssetId,
+  ImageManipulationOutputDatasetAssetId,
+} from "../dataset-studio/ImageManipulationDatasetAssets";
 import { CoreImageStarterWorkflowTemplates } from "../workflow-template-studio/CoreImageStarterWorkflowTemplates";
 
 export const ReferenceImageSystemTemplateId = "template:system:reference-image-manipulation";
@@ -163,7 +167,7 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
     components: [
       {
         componentKind: "atomic",
-        assetId: "asset:dataset:image-reference-input",
+        assetId: ImageManipulationInputDatasetAssetId,
         alias: "input-image-dataset-asset",
         taxonomy: {
           structuralKind: TaxonomyStructuralKinds.atomic,
@@ -173,7 +177,7 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
       },
       {
         componentKind: "atomic",
-        assetId: "asset:dataset:image-reference-output",
+        assetId: ImageManipulationOutputDatasetAssetId,
         alias: "output-image-dataset-asset",
         taxonomy: {
           structuralKind: TaxonomyStructuralKinds.atomic,
@@ -230,7 +234,7 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
       instanceId: "dataset-instance:reference-image:input",
       role: DatasetInstanceRoles.inputStore,
       purpose: "incoming-images",
-      datasetAssetId: "asset:dataset:image-reference-input",
+      datasetAssetId: ImageManipulationInputDatasetAssetId,
       requiredSchemaIntentId: DatasetSchemaIntentIds.media,
       requiredOutputShapeKind: "image-metadata-records",
       runtimeOwner: "system-runtime",
@@ -240,7 +244,7 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
       instanceId: "dataset-instance:reference-image:output",
       role: DatasetInstanceRoles.outputStore,
       purpose: "workflow-output-images",
-      datasetAssetId: "asset:dataset:image-reference-output",
+      datasetAssetId: ImageManipulationOutputDatasetAssetId,
       requiredSchemaIntentId: DatasetSchemaIntentIds.media,
       requiredOutputShapeKind: "image-metadata-records",
       runtimeOwner: "system-runtime",

@@ -5,12 +5,15 @@ import {
   type DataAssetRegistryEntry,
 } from "./DataAssetRegistry";
 import { registerDataStudioSampleAssets } from "./DataStudioSampleAssets";
+import { registerImageManipulationDatasetAssets } from "./ImageManipulationDatasetAssets";
 
 let cachedRegistry: DataAssetRegistry | undefined;
 
 export function getDataStudioAssetRegistry(): DataAssetRegistry {
   if (!cachedRegistry) {
-    cachedRegistry = registerDataStudioSampleAssets().registry;
+    const sample = registerDataStudioSampleAssets();
+    registerImageManipulationDatasetAssets(sample.registry);
+    cachedRegistry = sample.registry;
   }
   return cachedRegistry;
 }

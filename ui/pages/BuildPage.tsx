@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { BuildEntryService, BuildIntents, type BuildIntent } from "../routes/BuildEntry";
 import { PersistedWorkflowEntryService, type PersistedWorkflowEntry } from "../routes/PersistedWorkflowEntryService";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
-import { ReferenceImageSystemTemplate } from "../../application/system-studio/ReferenceImageSystemTemplate";
+import { ImageManipulationSystemTemplate } from "../../application/system-studio/ImageManipulationSystemTemplate";
 
 export interface BuildTemplateCard {
   readonly id: string;
@@ -16,11 +16,11 @@ export interface BuildTemplateCard {
 
 const buildTemplateCards: ReadonlyArray<BuildTemplateCard> = Object.freeze([
   Object.freeze({
-    id: ReferenceImageSystemTemplate.templateId,
+    id: ImageManipulationSystemTemplate.templateId,
     title: "Reference Image Manipulation System",
     description: "Compose a system asset with runtime-owned input/output image dataset instances and explicit workflow/UI boundaries.",
     difficulty: "Intermediate",
-    actionPath: `${ROUTE_PATHS.systemStudio}?buildTemplateId=${encodeURIComponent(ReferenceImageSystemTemplate.templateId)}`,
+    actionPath: `${ROUTE_PATHS.systemStudio}?buildTemplateId=${encodeURIComponent(ImageManipulationSystemTemplate.templateId)}`,
     actionLabel: "Open in System Studio",
   }),
   Object.freeze({
