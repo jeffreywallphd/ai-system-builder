@@ -33,11 +33,11 @@ class InMemoryFileStorage implements IFileStorage {
   async move(): Promise<void> {}
 }
 
-function createAsset(id: string): IAsset {
+function createAsset(id: string, kind: IAsset["kind"] = "workflow-definition"): IAsset {
   return new Asset({
     id,
     name: id,
-    kind: "workflow-definition",
+    kind,
     status: "available",
     source: new AssetSourceInfo({ type: "generated", provider: "test" }),
     location: new AssetLocation({ accessMethod: "memory", location: id }),
@@ -56,16 +56,18 @@ describe("WorkflowTemplateStarterKitService", () => {
     ]) {
       await catalog.save(createAsset(workflowId));
     }
+    await catalog.save(createAsset("asset:dataset:image-reference-output", "dataset"));
 
     const templateAssets = new WorkflowTemplateAssetService(catalog, new InMemoryFileStorage(), "/templates");
     const service = new WorkflowTemplateStarterKitService(templateAssets);
     const created = await service.provisionCoreImageStarterTemplates();
 
-    expect(created).toHaveLength(4);
+    expect(created).toHaveLength(5);
     expect(created.every((entry) => entry.kind === "workflow-template")).toBeTrue();
 
     const listed = await templateAssets.listTemplates();
     expect(listed.map((entry) => entry.name)).toEqual([
+      "Image manipulation default",
       "Image to image starter",
       "Restyle starter",
       "Enhance/upscale starter",
