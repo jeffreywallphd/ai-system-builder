@@ -1405,3 +1405,21 @@ Not implemented in this slice:
   - VAE selection binds to an explicit `VAELoader.vae_name` node used by both VAE encode/decode stages.
 - The base graph now includes a first-class `VAELoader` node and routes VAE encode/decode through that node, enabling non-embedded VAE execution paths without introducing special-case runtime loaders.
 - Coverage was expanded across base-graph, property-mapping, and workflow-template tests to validate prompt, checkpoint, VAE, and default-readiness binding behavior.
+
+## AI Loom image manipulation update: optional FaceID subworkflow composition + dataset/control bindings (stories 4.7-4.8)
+
+- FaceID is now modeled as an explicit **optional composed subworkflow path** rather than an implicit runtime special case:
+  - `ComfyImageManipulationBaseGraph` now carries versioned `subworkflows` metadata with a concrete `faceid-conditioning` entry that references the existing extension anchor and declares toggle + control/data paths.
+  - The base img2img path remains executable by default with FaceID disabled (`defaultEnabled: false`) so non-FaceID execution stays clean and valid.
+- The image-manipulation workflow template now composes an explicit FaceID workflow interface (`asset:workflow:image-to-image:faceid-conditioning`) and maps FaceID controls as inspectable template parameters:
+  - `faceIdEnabled`
+  - `faceIdReferenceBindings` (logical dataset references, not filesystem paths)
+  - `faceIdWeight`
+  - `faceIdStartStepFraction`
+  - `faceIdEndStepFraction`
+- FaceID reference dataset wiring now uses logical dataset references and system-context mapping to `referenceBindings`, aligned with shared storage-instance/dataset-instance contracts.
+- Comfy property mapping now includes explicit FaceID extension bindings for enable/reference/weight/start/end controls and emits inspectable `subworkflowBindings`, creating a clean adapter seam for FaceID-enabled vs non-FaceID execution branches.
+- Tests now cover:
+  - FaceID optional subworkflow composition metadata and validation in the base graph,
+  - FaceID toggle path and non-FaceID structural validity,
+  - FaceID dataset/control mapping and inspectability in workflow-template and mapping assets.

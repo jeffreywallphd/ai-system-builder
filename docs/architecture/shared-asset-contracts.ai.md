@@ -1307,3 +1307,21 @@
   - VAE -> `VAELoader.vae_name`
 - The base graph now includes an explicit `VAELoader` node and routes both encode/decode VAE dependencies through that node, enabling non-embedded VAE paths without adding runtime special-case loaders.
 - Tests now cover prompt, checkpoint, VAE, and default-readiness binding behavior across base-graph, mapping-asset, and workflow-template seams.
+
+## AI Loom image manipulation update: optional FaceID subworkflow composition + dataset/control bindings (stories 4.7-4.8)
+
+- FaceID is now modeled as an explicit **optional composed subworkflow path** instead of a hidden special case:
+  - `ComfyImageManipulationBaseGraph` now includes versioned `subworkflows` metadata with a concrete `faceid-conditioning` entry that points to the existing extension anchor and declares toggle + control/data paths.
+  - The base img2img path remains first-class and executable when FaceID is disabled (`defaultEnabled: false`), preserving non-FaceID execution as a clean default path.
+- The image-manipulation workflow template now composes an explicit FaceID workflow interface (`asset:workflow:image-to-image:faceid-conditioning`) and maps FaceID controls as inspectable template parameters:
+  - `faceIdEnabled`
+  - `faceIdReferenceBindings` (logical dataset references, not paths)
+  - `faceIdWeight`
+  - `faceIdStartStepFraction`
+  - `faceIdEndStepFraction`
+- FaceID dataset binding is now wired through logical dataset reference controls and system-context mapping to `referenceBindings`, aligned with storage-instance/dataset-instance runtime architecture boundaries.
+- Comfy property mapping now includes explicit FaceID extension bindings for enable/reference/weight/start/end controls and emits inspectable `subworkflowBindings` so future adapter logic can branch cleanly between FaceID and non-FaceID execution paths.
+- Added/updated tests cover:
+  - FaceID optional subworkflow composition metadata/validation in the base graph,
+  - FaceID toggle + non-FaceID structural path behavior,
+  - FaceID dataset-binding/control mapping exposure and inspectability in workflow-template and mapping assets.
