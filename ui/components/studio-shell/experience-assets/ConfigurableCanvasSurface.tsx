@@ -327,6 +327,7 @@ function ConfigurableCanvasEditingSurface({
       type: "node.position.change",
       nodeId: state.nodeId,
       position: Object.freeze({ x, y }),
+      phase: "transient",
     });
   };
 
@@ -367,6 +368,7 @@ function ConfigurableCanvasEditingSurface({
       type: "node.resize.change",
       nodeId: state.nodeId,
       frame: nextFrame,
+      phase: "transient",
     });
   };
 
@@ -410,64 +412,68 @@ function ConfigurableCanvasEditingSurface({
         return;
       }
       const coordinates = resolvePointerCoordinates(event);
-      if (coordinateMode === "normalized" && snapModel?.timing?.onRelease) {
-        if (interactionState.mode === "move" && interactionState.hasCrossedMoveThreshold) {
-          const frameRect = frameRef.current?.getBoundingClientRect();
-          const frameWidth = frameRect?.width ?? 0;
-          const frameHeight = frameRect?.height ?? 0;
-          const deltaX = coordinates.x - interactionState.startClientX;
-          const deltaY = coordinates.y - interactionState.startClientY;
-          const rawFrame = Object.freeze({
-            x: toFrameCoordinate(interactionState.nodeStartX + deltaX, frameWidth),
-            y: toFrameCoordinate(interactionState.nodeStartY + deltaY, frameHeight),
-            width: interactionState.nodeStartWidth,
-            height: interactionState.nodeStartHeight,
-          });
-          const snappedFrame = resolveReleaseSnappedFrame({
+      if (interactionState.mode === "move" && interactionState.hasCrossedMoveThreshold) {
+        const frameRect = frameRef.current?.getBoundingClientRect();
+        const frameWidth = frameRect?.width ?? 0;
+        const frameHeight = frameRect?.height ?? 0;
+        const deltaX = coordinates.x - interactionState.startClientX;
+        const deltaY = coordinates.y - interactionState.startClientY;
+        const rawFrame = Object.freeze({
+          x: toFrameCoordinate(interactionState.nodeStartX + deltaX, frameWidth),
+          y: toFrameCoordinate(interactionState.nodeStartY + deltaY, frameHeight),
+          width: interactionState.nodeStartWidth,
+          height: interactionState.nodeStartHeight,
+        });
+        const releaseFrame = (coordinateMode === "normalized" && snapModel?.timing?.onRelease)
+          ? resolveReleaseSnappedFrame({
             frame: rawFrame,
             snapModel,
-          });
-          onEditingEvent?.({
-            type: "node.position.change",
-            nodeId: interactionState.nodeId,
-            position: Object.freeze({
-              x: snappedFrame.x,
-              y: snappedFrame.y,
-            }),
-          });
-        }
-        if (interactionState.mode === "resize") {
-          const deltaX = coordinates.x - interactionState.startClientX;
-          const deltaY = coordinates.y - interactionState.startClientY;
-          const frame = mapResizeFrame({
-            id: interactionState.nodeId,
-            title: "",
-            x: interactionState.nodeStartX,
-            y: interactionState.nodeStartY,
-            width: interactionState.nodeStartWidth,
-            height: interactionState.nodeStartHeight,
-            minWidth: 48,
-            minHeight: 48,
-          }, deltaX, deltaY, interactionState.resizeHandle ?? "se");
-          const frameRect = frameRef.current?.getBoundingClientRect();
-          const frameWidth = frameRect?.width ?? 0;
-          const frameHeight = frameRect?.height ?? 0;
-          const rawFrame = Object.freeze({
-            x: toFrameCoordinate(frame.x, frameWidth),
-            y: toFrameCoordinate(frame.y, frameHeight),
-            width: toFrameSizeCoordinate(frame.width, frameWidth),
-            height: toFrameSizeCoordinate(frame.height, frameHeight),
-          });
-          const snappedFrame = resolveReleaseSnappedFrame({
+          })
+          : rawFrame;
+        onEditingEvent?.({
+          type: "node.position.change",
+          nodeId: interactionState.nodeId,
+          position: Object.freeze({
+            x: releaseFrame.x,
+            y: releaseFrame.y,
+          }),
+          phase: "commit",
+        });
+      }
+      if (interactionState.mode === "resize") {
+        const deltaX = coordinates.x - interactionState.startClientX;
+        const deltaY = coordinates.y - interactionState.startClientY;
+        const frame = mapResizeFrame({
+          id: interactionState.nodeId,
+          title: "",
+          x: interactionState.nodeStartX,
+          y: interactionState.nodeStartY,
+          width: interactionState.nodeStartWidth,
+          height: interactionState.nodeStartHeight,
+          minWidth: 48,
+          minHeight: 48,
+        }, deltaX, deltaY, interactionState.resizeHandle ?? "se");
+        const frameRect = frameRef.current?.getBoundingClientRect();
+        const frameWidth = frameRect?.width ?? 0;
+        const frameHeight = frameRect?.height ?? 0;
+        const rawFrame = Object.freeze({
+          x: toFrameCoordinate(frame.x, frameWidth),
+          y: toFrameCoordinate(frame.y, frameHeight),
+          width: toFrameSizeCoordinate(frame.width, frameWidth),
+          height: toFrameSizeCoordinate(frame.height, frameHeight),
+        });
+        const releaseFrame = (coordinateMode === "normalized" && snapModel?.timing?.onRelease)
+          ? resolveReleaseSnappedFrame({
             frame: rawFrame,
             snapModel,
-          });
-          onEditingEvent?.({
-            type: "node.resize.change",
-            nodeId: interactionState.nodeId,
-            frame: snappedFrame,
-          });
-        }
+          })
+          : rawFrame;
+        onEditingEvent?.({
+          type: "node.resize.change",
+          nodeId: interactionState.nodeId,
+          frame: releaseFrame,
+          phase: "commit",
+        });
       }
       setInteractionState(undefined);
     };

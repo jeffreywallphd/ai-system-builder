@@ -164,6 +164,7 @@ export type CanvasSurfaceEditingEvent =
       readonly x: number;
       readonly y: number;
     };
+    readonly phase?: "transient" | "commit";
   }
   | {
     readonly type: "node.resize.change";
@@ -174,6 +175,7 @@ export type CanvasSurfaceEditingEvent =
       readonly width: number;
       readonly height: number;
     };
+    readonly phase?: "transient" | "commit";
   }
   | {
     readonly type: "canvas.command";
