@@ -6,6 +6,7 @@ import { ExecutionResultPanel } from "./runtime/ExecutionResultPanel";
 import { UxRuntimeService } from "../../runtime/UxRuntimeService";
 import SystemRuntimeInterfacePreview from "./system/SystemRuntimeInterfacePreview";
 import { workflowStudioSurfaceAssetDefinition } from "../../studio-shell/studio-assets/StudioSurfaceAssetDefinitions";
+import { imageManipulationEditorPageAssetDefinition } from "../../studio-shell/studio-assets/ImageManipulationEditorPageAsset";
 
 interface SystemRuntimeRunPanelProps {
   readonly context: StudioShellExtensionContext;
@@ -33,6 +34,12 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
           : Object.freeze(["loom-wizard"]),
         embeddedVariant: panel.content?.embeddedVariant === "behavior-automation" ? "behavior-automation" : undefined,
         workflowModeContext: undefined,
+        extensionContext,
+      }),
+    }),
+    [imageManipulationEditorPageAssetDefinition.contract.identity.studioType]: Object.freeze({
+      asset: imageManipulationEditorPageAssetDefinition,
+      resolveInput: ({ extensionContext }: { readonly extensionContext: StudioShellExtensionContext }) => Object.freeze({
         extensionContext,
       }),
     }),
