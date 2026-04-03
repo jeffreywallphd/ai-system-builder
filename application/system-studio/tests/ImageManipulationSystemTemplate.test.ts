@@ -5,6 +5,10 @@ import {
   ImageManipulationSystemTemplate,
   ImageManipulationSystemTemplateId,
 } from "../ImageManipulationSystemTemplate";
+import {
+  ImageManipulationRuntimeTargets,
+  validateImageManipulationSystemTemplate,
+} from "../ImageManipulationSystemTemplateValidation";
 
 describe("ImageManipulationSystemTemplate", () => {
   it("exposes a concrete system template contract with composition extension points", () => {
@@ -28,6 +32,13 @@ describe("ImageManipulationSystemTemplate", () => {
     expect(ImageManipulationSystemTemplate.compositionBindings.propertySchemaBindingId).toBe("property-schema:image-manipulation");
     expect(ImageManipulationSystemTemplate.compositionBindings.pageBindingId).toBe("system-page:image-manipulation");
     expect(ImageManipulationSystemTemplate.compositionBindings.runtimeBindingId).toBe("runtime:image-manipulation");
+
+    expect(ImageManipulationSystemTemplate.systemAsset.executionMetadata?.runtime?.environment).toBe(
+      ImageManipulationRuntimeTargets.runtimeEnvironment,
+    );
+    expect(ImageManipulationSystemTemplate.systemAsset.executionMetadata?.orchestration?.mode).toBe(
+      ImageManipulationRuntimeTargets.orchestrationMode,
+    );
   });
 
   it("builds runtime dataset requests for system-managed dataset provisioning", () => {
@@ -48,5 +59,36 @@ describe("ImageManipulationSystemTemplate", () => {
 
     expect(requests).toHaveLength(3);
     expect(requests.map((entry) => entry.datasetAssetId)).toContain("asset:dataset:image-faceid-reference");
+  });
+
+  it("passes structural validation for required datasets, workflow, and runtime metadata", () => {
+    const validation = validateImageManipulationSystemTemplate(ImageManipulationSystemTemplate);
+
+    expect(validation.status).toBe("valid");
+    expect(validation.errors).toHaveLength(0);
+    expect(validation.metadata?.validatedTemplateId).toBe(ImageManipulationSystemTemplateId);
+  });
+
+  it("reports inspectable validation errors when required runtime metadata is missing", () => {
+    const invalid = {
+      ...ImageManipulationSystemTemplate,
+      systemAsset: {
+        ...ImageManipulationSystemTemplate.systemAsset,
+        executionMetadata: {
+          ...ImageManipulationSystemTemplate.systemAsset.executionMetadata,
+          runtime: {
+            ...ImageManipulationSystemTemplate.systemAsset.executionMetadata?.runtime,
+            environment: "",
+            requirements: [],
+          },
+        },
+      },
+    };
+
+    const validation = validateImageManipulationSystemTemplate(invalid);
+
+    expect(validation.status).toBe("invalid");
+    expect(validation.errors.map((entry) => entry.code)).toContain("runtime-environment-invalid");
+    expect(validation.errors.map((entry) => entry.code)).toContain("runtime-capability-missing");
   });
 });

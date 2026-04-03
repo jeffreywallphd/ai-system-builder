@@ -17,12 +17,15 @@ describe("ReferenceImageSystemTemplate", () => {
     expect(ReferenceImageSystemTemplate.systemAsset.components.map((entry) => entry.alias)).toEqual([
       "input-image-dataset-asset",
       "output-image-dataset-asset",
+      "reference-image-dataset-asset",
       "reference-workflow",
       "reference-ui",
     ]);
     expect(ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId).toBe(ReferenceImagePrimaryWorkflowTemplateAssetId);
     expect(ReferenceImageSystemTemplate.primaryWorkflowAsset.datasetBindings.workflowInputId).toBe("sourceImage");
     expect(ReferenceImageSystemTemplate.primaryWorkflowAsset.datasetBindings.workflowOutputId).toBe("images");
+    expect(ReferenceImageSystemTemplate.systemAsset.executionMetadata?.runtime?.environment).toBe("comfyui");
+    expect(ReferenceImageSystemTemplate.systemAsset.executionMetadata?.orchestration?.mode).toBe("workflow-template-driven");
     expect(ReferenceImageSystemTemplate.systemAsset.executionMetadata?.workflowContextMapping?.mappings.length).toBeGreaterThan(0);
   });
 

@@ -1143,3 +1143,10 @@
 - Build-to-System-Studio handoff carries `buildTemplateId` and resolves seeded draft defaults (asset id, metadata, dependencies, serialized composition content), so first save uses the canonical system asset id through the existing studio-shell `createDraft` path.
 - Seeded system draft content composes existing image input/output/optional FaceID dataset assets and binds the primary workflow template component (`asset:workflow-template:image-to-image:starter`) via standard system `components` + `bindings`.
 - This keeps system-level workflow binding explicit for downstream schema/runtime work without introducing execution-adapter shortcuts in this slice.
+
+## AI Loom image manipulation update: Comfy runtime execution metadata + system template structural validation (stories 1.7-1.8)
+
+- `ReferenceImageSystemTemplate` now declares explicit runtime execution intent metadata on the canonical `systemAsset.executionMetadata` seam (ComfyUI runtime environment, workflow-template-driven orchestration mode, and required runtime capability/hint descriptors).
+- This remains declarative metadata only (no runtime process start, install management, health polling, or execution adapter behavior is introduced in this slice).
+- Added reusable image-system template validation in `application/system-studio/ImageManipulationSystemTemplateValidation.ts` returning inspectable `AssetValidationResult` contracts.
+- Validation enforces required system identity metadata, required input/output dataset bindings, optional FaceID dataset semantics, required primary workflow template binding, and required Comfy runtime execution metadata/capabilities.
