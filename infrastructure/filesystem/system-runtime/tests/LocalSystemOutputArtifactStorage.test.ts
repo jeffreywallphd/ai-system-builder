@@ -12,6 +12,13 @@ describe("LocalSystemOutputArtifactStorage", () => {
       const requestBase = {
         systemId: "system:image",
         datasetInstanceId: "instance:outputs",
+        datasetStorageBinding: {
+          storageInstanceId: "storage-instance:shared-runtime",
+          storageInstanceRef: "storage-instance://storage-instance%3Ashared-runtime",
+          bindingId: "storage-binding:storage-instance:shared-runtime:output",
+          bindingReference: "storage-instance://storage-instance%3Ashared-runtime/output",
+          bindingArea: "output" as const,
+        },
         workflowRunId: "run:1",
         materializationId: "mat:1",
         role: "primary" as const,
@@ -24,10 +31,10 @@ describe("LocalSystemOutputArtifactStorage", () => {
       const first = await storage.persist({ ...requestBase, assetIndex: 0 });
       const second = await storage.persist({ ...requestBase, assetIndex: 1 });
 
-      expect(first.storageProvider).toBe("system-owned-filesystem-output-store");
+      expect(first.storageProvider).toBe("storage-instance-filesystem-output-store");
       expect(first.metadata.fileName).toBe("hero-final-primary.png");
       expect(second.metadata.fileName).toBe("hero-final-primary-1.png");
-      expect(first.storageReference.startsWith("system-output://")).toBe(true);
+      expect(first.storageReference.startsWith("storage-instance://storage-instance%3Ashared-runtime/output/runs/run%3A1/mat%3A1/")).toBe(true);
       expect(first.assetRef.stableId).not.toBe(second.assetRef.stableId);
       expect(first.metadata.sha256).toBe(second.metadata.sha256);
     } finally {

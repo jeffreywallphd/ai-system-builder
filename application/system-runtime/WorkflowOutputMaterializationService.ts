@@ -4,6 +4,7 @@ import type {
   DatasetInstanceImageGeneration,
   DatasetInstanceImageRecord,
 } from "../../domain/system-runtime/DatasetInstanceRecordDomain";
+import type { DatasetInstance } from "../../domain/system-runtime/DatasetInstanceDomain";
 import type { SystemDatasetInstanceService } from "./SystemDatasetInstanceService";
 import type { WorkflowOutputArtifactStorage } from "./WorkflowOutputArtifactStorage";
 import type { WorkflowOutputProvenanceRepository } from "./WorkflowOutputProvenanceRepository";
@@ -43,6 +44,10 @@ export class WorkflowOutputMaterializationService {
     request: MaterializeWorkflowOutputsRequest,
   ): Promise<MaterializeWorkflowOutputsResult> {
     const payload = validateWorkflowOutputMaterializationPayload(request.payload);
+    const datasetInstance = this.datasetInstances.loadDatasetInstance({
+      systemId: request.systemId,
+      instanceId: request.datasetInstanceId,
+    });
     const records: DatasetInstanceImageRecord[] = [];
     const failures: MaterializeWorkflowOutputsResult["failures"] = [];
 
@@ -66,6 +71,7 @@ export class WorkflowOutputMaterializationService {
           assetIndex,
           systemId: request.systemId,
           datasetInstanceId: request.datasetInstanceId,
+          datasetStorageBinding: datasetInstance.storageBinding,
         });
         const image = this.buildImageRecordShape({ payload, assetIndex, generation, persistedArtifact });
         const metadata = this.readMetadataRecord({
@@ -99,6 +105,12 @@ export class WorkflowOutputMaterializationService {
               storagePatch: {
                 reference: persistedArtifact?.storageReference
                   ?? this.resolveStorageReference(producedAsset.assetRef)
+                  ?? this.resolveStorageReferenceFromBinding({
+                    bindingReference: datasetInstance.storageBinding?.bindingReference,
+                    workflowRunId: payload.workflowRun.runId,
+                    materializationId: payload.materializationId,
+                    assetIndex,
+                  })
                   ?? null,
                 provider: persistedArtifact?.storageProvider ?? producedAsset.assetRef.kind ?? "generated-output",
               },
@@ -117,7 +129,14 @@ export class WorkflowOutputMaterializationService {
             instanceId: request.datasetInstanceId,
             recordId: deterministicRecordId,
             record: image,
-            storageReference: persistedArtifact?.storageReference ?? this.resolveStorageReference(producedAsset.assetRef),
+            storageReference: persistedArtifact?.storageReference
+              ?? this.resolveStorageReference(producedAsset.assetRef)
+              ?? this.resolveStorageReferenceFromBinding({
+                bindingReference: datasetInstance.storageBinding?.bindingReference,
+                workflowRunId: payload.workflowRun.runId,
+                materializationId: payload.materializationId,
+                assetIndex,
+              }),
             storageProvider: persistedArtifact?.storageProvider ?? producedAsset.assetRef.kind ?? "generated-output",
             metadata,
             provenance: this.createProvenance(payload, assetIndex),
@@ -258,6 +277,7 @@ export class WorkflowOutputMaterializationService {
     readonly assetIndex: number;
     readonly systemId: string;
     readonly datasetInstanceId: string;
+    readonly datasetStorageBinding?: DatasetInstance["storageBinding"];
   }) {
     if (!this.artifactStorage) {
       return undefined;
@@ -276,6 +296,7 @@ export class WorkflowOutputMaterializationService {
       return await this.artifactStorage.persist({
         systemId: input.systemId,
         datasetInstanceId: input.datasetInstanceId,
+        datasetStorageBinding: this.resolveStorageBinding(input.datasetStorageBinding),
         workflowRunId: input.payload.workflowRun.runId,
         materializationId: input.payload.materializationId,
         assetIndex: input.assetIndex,
@@ -289,6 +310,28 @@ export class WorkflowOutputMaterializationService {
       const message = error instanceof Error ? error.message : "failed to persist artifact";
       throw new Error(`artifact-persist-failed:${message}`);
     }
+  }
+
+  private resolveStorageBinding(
+    binding: DatasetInstance["storageBinding"] | undefined,
+  ): NonNullable<DatasetInstance["storageBinding"]> {
+    if (!binding) {
+      throw new Error("artifact-persist-failed:Dataset instance is missing a storage binding.");
+    }
+    return binding;
+  }
+
+  private resolveStorageReferenceFromBinding(input: {
+    readonly bindingReference?: string;
+    readonly workflowRunId: string;
+    readonly materializationId: string;
+    readonly assetIndex: number;
+  }): string | undefined {
+    const bindingReference = input.bindingReference?.trim();
+    if (!bindingReference) {
+      return undefined;
+    }
+    return `${bindingReference}/runs/${encodeURIComponent(input.workflowRunId)}/${encodeURIComponent(input.materializationId)}/${input.assetIndex}`;
   }
 
   private persistProvenanceRecord(input: {

@@ -488,6 +488,27 @@ Not implemented in this slice:
   - attach semantics continue to reuse existing provisioned instances without duplicate provisioning across multiple top-level systems and embedded subsystems.
 - Filesystem path resolution remains infrastructure-owned; application/domain layers exchange only logical storage-instance references.
 
+## AI Loom Image System vertical-slice update: ingestion/retrieval binding resolution + storage lifecycle operations (stories 2.7-2.8)
+
+- Ingestion and retrieval paths now resolve through storage-instance bindings end-to-end rather than path-like or system-owned output URI assumptions:
+  - reference-image upload ingestion now writes dataset record storage references from the dataset instance logical binding (`storage-instance://.../input/uploads/...`) in `StudioShellBackendApi`.
+  - workflow output artifact persistence now requires the target dataset instance storage binding in `WorkflowOutputArtifactStorage` requests.
+  - output materialization uses dataset-instance binding resolution as the canonical fallback reference path (`storage-instance://.../output/runs/...`) when persisted artifacts or executor refs do not provide one.
+- Raw filesystem path materialization remains infrastructure-only:
+  - `LocalSystemOutputArtifactStorage` now maps logical binding references into deterministic local directories under `/storage/{instanceId}/{area}/...` and no longer depends on system-owned directory identity.
+  - shared helper parsing for `storage-instance://` references lives in `StorageInstanceProvisioningContract` so infrastructure adapters do not replicate reference parsing semantics.
+- Added explicit storage-instance lifecycle orchestration in `StorageInstanceLifecycleService` with practical vertical-slice operations:
+  - `initialize`, `reset`, `archive`, `cleanup`, `detach`, and `safeDelete`.
+  - safe deletion is blocked when shared attachments are still present and requires archived lifecycle state before deletion.
+  - lifecycle state/timestamps are persisted in storage metadata, preserving inspectability.
+- Added local filesystem lifecycle infrastructure support (`LocalStorageInstanceLifecycleInfrastructure`) for directory-level lifecycle behavior:
+  - initialize/verify binding directories,
+  - reset (clear + recreate bound directories),
+  - cleanup (bounded intermediate-area cleanup),
+  - archive (move instance root under archive namespace),
+  - delete (remove instance root).
+- `StudioShellBackendApi` now exposes storage lifecycle operations (`manageReferenceImageStorageLifecycle`, `deleteReferenceImageStorage`) aligned with storage-instance semantics instead of system-exclusive ownership assumptions.
+
 ## AI Loom Image System vertical-slice update: system-owned binary output storage + provenance persistence (stories 2.3.5-2.3.6)
 
 - Workflow output materialization now supports explicit binary artifact persistence through an internal storage seam (`application/system-runtime/WorkflowOutputArtifactStorage.ts`) rather than executor-specific paths.

@@ -40,6 +40,14 @@ class AllowSystemValidator implements SystemDatasetOwnershipValidator {
   }
 }
 
+const outputStorageBinding = Object.freeze({
+  storageInstanceId: "storage-instance:test-runtime",
+  storageInstanceRef: "storage-instance://storage-instance%3Atest-runtime",
+  bindingId: "storage-binding:storage-instance:test-runtime:output",
+  bindingReference: "storage-instance://storage-instance%3Atest-runtime/output",
+  bindingArea: "output" as const,
+});
+
 describe("WorkflowOutputMaterializationService", () => {
   it("validates payloads and persists normalized generated image records into a system-owned dataset instance", async () => {
     const repository = new InMemoryDatasetInstanceRepository();
@@ -54,6 +62,7 @@ describe("WorkflowOutputMaterializationService", () => {
       systemId: "system:image",
       datasetAssetId: "asset:dataset:outputs",
       datasetAssetVersionId: "v1",
+      storageBinding: outputStorageBinding,
     });
 
     const service = new WorkflowOutputMaterializationService(datasetInstances);
@@ -144,6 +153,7 @@ describe("WorkflowOutputMaterializationService", () => {
       systemId: "system:image",
       datasetAssetId: "asset:dataset:outputs",
       datasetAssetVersionId: "v1",
+      storageBinding: outputStorageBinding,
     });
 
     const artifactStorage = new InMemoryWorkflowOutputArtifactStorage();
@@ -198,8 +208,8 @@ describe("WorkflowOutputMaterializationService", () => {
     });
 
     const record = result.records[0];
-    expect(record?.storage?.provider).toBe("in-memory-system-output-store");
-    expect(record?.image.assetRef.stableId.startsWith("generated-output:system-output://")).toBe(true);
+    expect(record?.storage?.provider).toBe("in-memory-storage-instance-output-store");
+    expect(record?.image.assetRef.stableId.startsWith("generated-output:storage-instance://")).toBe(true);
 
     const provenance = provenanceRepository.listByWorkflowRunId("run:binary:1");
     expect(provenance).toHaveLength(1);
@@ -228,6 +238,7 @@ describe("WorkflowOutputMaterializationService", () => {
       systemId: "system:image",
       datasetAssetId: "asset:dataset:outputs",
       datasetAssetVersionId: "v1",
+      storageBinding: outputStorageBinding,
     });
 
     const service = new WorkflowOutputMaterializationService(datasetInstances);
@@ -265,6 +276,7 @@ describe("WorkflowOutputMaterializationService", () => {
       systemId: "system:image",
       datasetAssetId: "asset:dataset:outputs",
       datasetAssetVersionId: "v1",
+      storageBinding: outputStorageBinding,
     });
 
     const service = new WorkflowOutputMaterializationService(datasetInstances);
@@ -316,6 +328,7 @@ describe("WorkflowOutputMaterializationService", () => {
       systemId: "system:image",
       datasetAssetId: "asset:dataset:outputs",
       datasetAssetVersionId: "v1",
+      storageBinding: outputStorageBinding,
     });
 
     class FlakyArtifactStorage implements WorkflowOutputArtifactStorage {
@@ -327,12 +340,12 @@ describe("WorkflowOutputMaterializationService", () => {
           throw new Error("simulated-artifact-write-failure");
         }
         return Object.freeze({
-          storageReference: `system-output://${request.materializationId}/${request.assetIndex}`,
+          storageReference: `${request.datasetStorageBinding.bindingReference}/runs/${request.materializationId}/${request.assetIndex}`,
           storageProvider: "flaky-memory-store",
           assetRef: Object.freeze({
             kind: "generated-output",
-            stableId: `generated-output:system-output://${request.materializationId}/${request.assetIndex}`,
-            outputId: `system-output://${request.materializationId}/${request.assetIndex}`,
+            stableId: `generated-output:${request.datasetStorageBinding.bindingReference}/runs/${request.materializationId}/${request.assetIndex}`,
+            outputId: `${request.datasetStorageBinding.bindingReference}/runs/${request.materializationId}/${request.assetIndex}`,
             path: `output-${request.assetIndex}.png`,
             sourceSystem: "flaky-test",
             sourceContext: Object.freeze({ role: request.role }),

@@ -1,9 +1,11 @@
 import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+import type { DatasetInstance } from "../../domain/system-runtime/DatasetInstanceDomain";
 import type { WorkflowOutputMaterializationPayload } from "./WorkflowOutputMaterializationContract";
 
 export interface PersistWorkflowOutputArtifactRequest {
   readonly systemId: string;
   readonly datasetInstanceId: string;
+  readonly datasetStorageBinding: NonNullable<DatasetInstance["storageBinding"]>;
   readonly workflowRunId: string;
   readonly materializationId: string;
   readonly assetIndex: number;
@@ -38,18 +40,20 @@ export class InMemoryWorkflowOutputArtifactStorage implements WorkflowOutputArti
   private readonly storage = new Map<string, Uint8Array>();
 
   public async persist(request: PersistWorkflowOutputArtifactRequest): Promise<PersistWorkflowOutputArtifactResult> {
-    const storageReference = `system-output://${request.systemId}/${request.datasetInstanceId}/${request.materializationId}/${request.assetIndex}`;
+    const storageReference = `${request.datasetStorageBinding.bindingReference}/runs/${encodeURIComponent(request.workflowRunId)}/${encodeURIComponent(request.materializationId)}/${request.assetIndex}`;
     this.storage.set(storageReference, request.payload);
     return Object.freeze({
       storageReference,
-      storageProvider: "in-memory-system-output-store",
+      storageProvider: "in-memory-storage-instance-output-store",
       assetRef: Object.freeze({
         kind: "generated-output",
         stableId: `generated-output:${storageReference}`,
         outputId: storageReference,
         path: storageReference,
-        sourceSystem: "in-memory-workflow-output-store",
+        sourceSystem: "in-memory-storage-instance-output-store",
         sourceContext: Object.freeze({
+          storageInstanceId: request.datasetStorageBinding.storageInstanceId,
+          storageBindingId: request.datasetStorageBinding.bindingId,
           role: request.role,
           workflowRunId: request.workflowRunId,
         }),
