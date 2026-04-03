@@ -6,6 +6,13 @@ import {
   ImageManipulationSystemTemplateId,
 } from "../ImageManipulationSystemTemplate";
 import {
+  ImageManipulationFaceIdReferenceDatasetAssetId,
+  ImageManipulationInputDatasetAssetId,
+  ImageManipulationOutputDatasetAssetId,
+} from "../../dataset-studio/ImageManipulationDatasetAssets";
+import { getDataStudioAssetRegistry } from "../../dataset-studio/DataStudioAssetRegistryCatalog";
+import { CoreImageStarterWorkflowTemplates } from "../../workflow-template-studio/CoreImageStarterWorkflowTemplates";
+import {
   ImageManipulationRuntimeTargets,
   validateImageManipulationSystemTemplate,
 } from "../ImageManipulationSystemTemplateValidation";
@@ -69,6 +76,33 @@ describe("ImageManipulationSystemTemplate", () => {
     expect(validation.metadata?.validatedTemplateId).toBe(ImageManipulationSystemTemplateId);
   });
 
+  it("resolves composed datasets and workflow through the shared registries used by the platform", () => {
+    const registry = getDataStudioAssetRegistry();
+    const inputBinding = ImageManipulationSystemTemplate.datasetInstances.find((entry) => (
+      entry.bindingId === ImageManipulationSystemTemplate.compositionBindings.inputDatasetBindingId
+    ));
+    const outputBinding = ImageManipulationSystemTemplate.datasetInstances.find((entry) => (
+      entry.bindingId === ImageManipulationSystemTemplate.compositionBindings.outputDatasetBindingId
+    ));
+    const optionalReferenceBinding = ImageManipulationSystemTemplate.datasetInstances.find((entry) => (
+      entry.bindingId === ImageManipulationSystemTemplate.compositionBindings.optionalReferenceDatasetBindingId
+    ));
+
+    expect(inputBinding?.datasetAssetId).toBe(ImageManipulationInputDatasetAssetId);
+    expect(outputBinding?.datasetAssetId).toBe(ImageManipulationOutputDatasetAssetId);
+    expect(optionalReferenceBinding?.datasetAssetId).toBe(ImageManipulationFaceIdReferenceDatasetAssetId);
+
+    expect(registry.get({ assetId: inputBinding?.datasetAssetId ?? "" })).toBeDefined();
+    expect(registry.get({ assetId: outputBinding?.datasetAssetId ?? "" })).toBeDefined();
+    expect(registry.get({ assetId: optionalReferenceBinding?.datasetAssetId ?? "" })).toBeDefined();
+
+    const workflowTemplate = CoreImageStarterWorkflowTemplates.find((template) => (
+      template.templateId === ImageManipulationSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId
+    ));
+    expect(workflowTemplate?.templateId).toBe(ImageManipulationPrimaryWorkflowTemplateAssetId);
+    expect(workflowTemplate?.versionId).toBe(ImageManipulationSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId);
+  });
+
   it("reports inspectable validation errors when required runtime metadata is missing", () => {
     const invalid = {
       ...ImageManipulationSystemTemplate,
@@ -90,5 +124,49 @@ describe("ImageManipulationSystemTemplate", () => {
     expect(validation.status).toBe("invalid");
     expect(validation.errors.map((entry) => entry.code)).toContain("runtime-environment-invalid");
     expect(validation.errors.map((entry) => entry.code)).toContain("runtime-capability-missing");
+  });
+
+  it("fails validation when required output dataset binding is missing", () => {
+    const invalid = {
+      ...ImageManipulationSystemTemplate,
+      datasetInstances: ImageManipulationSystemTemplate.datasetInstances.filter((entry) => (
+        entry.bindingId !== ImageManipulationSystemTemplate.compositionBindings.outputDatasetBindingId
+      )),
+    };
+
+    const validation = validateImageManipulationSystemTemplate(invalid);
+
+    expect(validation.status).toBe("invalid");
+    expect(validation.errors.map((entry) => entry.code)).toContain("output-dataset-binding-missing");
+  });
+
+  it("fails validation when required workflow binding is missing or invalid", () => {
+    const invalid = {
+      ...ImageManipulationSystemTemplate,
+      primaryWorkflowAsset: {
+        ...ImageManipulationSystemTemplate.primaryWorkflowAsset,
+        workflowTemplateAssetId: "",
+      },
+    };
+
+    const validation = validateImageManipulationSystemTemplate(invalid);
+
+    expect(validation.status).toBe("invalid");
+    expect(validation.errors.map((entry) => entry.code)).toContain("workflow-template-binding-invalid");
+  });
+
+  it("fails validation when execution runtime metadata is removed", () => {
+    const invalid = {
+      ...ImageManipulationSystemTemplate,
+      systemAsset: {
+        ...ImageManipulationSystemTemplate.systemAsset,
+        executionMetadata: undefined,
+      },
+    };
+
+    const validation = validateImageManipulationSystemTemplate(invalid);
+
+    expect(validation.status).toBe("invalid");
+    expect(validation.errors.map((entry) => entry.code)).toContain("execution-metadata-missing");
   });
 });

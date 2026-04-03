@@ -17,6 +17,18 @@ describe("SystemBuildTemplateCatalog", () => {
     ))).toBeTrue();
   });
 
+  it("does not shadow the image manipulation template with duplicate template or system asset ids", () => {
+    const sameTemplateId = SystemBuildTemplateCatalog.filter((entry) => (
+      entry.templateId === ImageManipulationSystemTemplate.templateId
+    ));
+    const sameSystemAssetId = SystemBuildTemplateCatalog.filter((entry) => (
+      entry.draftSeed.assetId === ImageManipulationSystemTemplate.systemAsset.assetId
+    ));
+
+    expect(sameTemplateId).toHaveLength(1);
+    expect(sameSystemAssetId).toHaveLength(1);
+  });
+
   it("seeds system studio defaults with workflow and dataset composition content", () => {
     const entry = SystemBuildTemplateCatalog[0];
     const parsed = JSON.parse(entry?.draftSeed.contentTemplate ?? "{}") as {
@@ -33,5 +45,11 @@ describe("SystemBuildTemplateCatalog", () => {
       ImageManipulationSystemTemplate.datasetInstances[0]?.datasetAssetId,
     );
     expect(parsed.systemSpec?.bindings?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it("returns undefined for unregistered template ids in the Build flow lookup path", () => {
+    expect(resolveSystemBuildTemplate("template:system:not-registered")).toBeUndefined();
+    expect(resolveSystemBuildTemplate("   ")).toBeUndefined();
+    expect(resolveSystemBuildTemplate(undefined)).toBeUndefined();
   });
 });
