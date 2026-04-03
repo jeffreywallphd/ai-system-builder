@@ -19,10 +19,14 @@ import {
   ImageManipulationOutputDatasetAssetId,
 } from "../dataset-studio/ImageManipulationDatasetAssets";
 import { CoreImageStarterWorkflowTemplates } from "../workflow-template-studio/CoreImageStarterWorkflowTemplates";
+import {
+  ImageManipulationWorkflowTemplateAssetId,
+  ImageManipulationWorkflowTemplateVersionId,
+} from "../workflow-template-studio/ImageManipulationWorkflowTemplate";
 
 export const ReferenceImageSystemTemplateId = "template:system:reference-image-manipulation";
-export const ReferenceImagePrimaryWorkflowTemplateAssetId = "asset:workflow-template:image-to-image:starter";
-export const ReferenceImagePrimaryWorkflowTemplateVersionId = "asset:workflow-template:image-to-image:starter:v1";
+export const ReferenceImagePrimaryWorkflowTemplateAssetId = ImageManipulationWorkflowTemplateAssetId;
+export const ReferenceImagePrimaryWorkflowTemplateVersionId = ImageManipulationWorkflowTemplateVersionId;
 
 const ReferenceImagePrimaryWorkflowTemplate = CoreImageStarterWorkflowTemplates.find((template) => (
   template.templateId === ReferenceImagePrimaryWorkflowTemplateAssetId

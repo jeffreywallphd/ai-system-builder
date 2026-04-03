@@ -1,10 +1,12 @@
 import type { WorkflowTemplateDefinition } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
+import { ImageManipulationWorkflowTemplate } from "./ImageManipulationWorkflowTemplate";
 
 function createCoreTemplate(input: WorkflowTemplateDefinition): WorkflowTemplateDefinition {
   return Object.freeze(input);
 }
 
 export const CoreImageStarterWorkflowTemplates: ReadonlyArray<WorkflowTemplateDefinition> = Object.freeze([
+  ImageManipulationWorkflowTemplate,
   createCoreTemplate({
     templateId: "asset:workflow-template:image-to-image:starter",
     versionId: "asset:workflow-template:image-to-image:starter:v1",

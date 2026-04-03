@@ -1372,3 +1372,14 @@ Not implemented in this slice:
 - Preset override payloads now have dedicated validation (`validateComfyImageManipulationPresetOverrides`) and runtime registration checks that enforce schema constraints, dataset-reference storage contracts, and cross-field correctness after merge.
 - Preview output now includes resolved preset identity metadata (`presetId`, `presetName`) for downstream schema-driven UIs while avoiding layout-specific behavior in the schema contract.
 - Automated tests in `application/system-studio/tests/ComfyImageManipulationPropertySchema.test.ts` now cover preset registration/resolution, override correctness, negative-path preset validation, and default template runnability with FaceID both enabled and disabled.
+
+## AI Loom image manipulation update: concrete workflow template asset + Comfy base graph foundation (stories 4.1-4.2)
+
+- Added a first-class `ImageManipulationWorkflowTemplate` (`application/workflow-template-studio/ImageManipulationWorkflowTemplate.ts`) and registered it in `CoreImageStarterWorkflowTemplates` so it is versioned, inspectable, previewable, and composable through existing workflow-template asset seams.
+- The template is composed from existing lower-level contracts/assets (workflow-definition contract surface, dataset assets, property schema defaults, and output binding contracts) rather than introducing a new image-specific template pipeline.
+- Added a concrete Comfy img2img base graph contract/resource (`application/system-studio/ComfyImageManipulationBaseGraph.ts`) with:
+  - positive + negative prompt conditioning nodes,
+  - source-image latent encode/decode flow,
+  - bounded FaceID extension anchors for future composition,
+  - parse/serialize helpers for later mapper/adapter integration.
+- The reference image system template now points to this concrete image-manipulation workflow template asset by default, preserving out-of-box executable template behavior in the current vertical slice.
