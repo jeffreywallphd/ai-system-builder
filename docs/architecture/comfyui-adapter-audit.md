@@ -258,3 +258,18 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
 - Added focused hardening coverage:
   - `application/system-runtime/tests/RuntimeCapabilityBindingFlow.integration.test.ts` (precedence, provider translation, persistence reload, missing model, provider mismatch, unsupported provider mapping contracts),
   - `application/system-runtime/tests/SystemRuntimeApplicationService.test.ts` (execution handoff + run/output metadata propagation of resolved runtime-capability trace).
+
+## Story 5.1 + 5.2 update
+- Added a concrete image-manipulation execution adapter contract at
+  `application/system-studio/ComfyImageManipulationExecutionAdapterContract.ts`.
+  - Covers request/graph build input, execution submission payload, progress polling snapshot, normalized success/failure outputs, and output materialization hook bindings.
+  - Keeps versioning + inspectability explicit (`contractVersion`, graph/template/version metadata, extension-binding inspection payloads).
+  - Stays asset-aligned by carrying logical dataset/storage binding references and workflow-template output materialization bindings.
+- Added a concrete request/graph builder at
+  `application/system-studio/ComfyImageManipulationGraphRequestBuilder.ts`.
+  - Transforms default image manipulation workflow-template context (resolved config + dataset runtime handles + runtime metadata + base graph) into a runnable Comfy `prompt` graph.
+  - Resolves logical source-image dataset references through the existing dataset-binding asset contract.
+  - Reuses the existing property-mapping asset for deterministic property-to-node mapping and extension readiness (including FaceID hooks) without adding a parallel mapping model.
+  - Produces inspectable submission output for debugging and runtime handoff.
+- Added focused tests in
+  `application/system-studio/tests/ComfyImageManipulationGraphRequestBuilder.test.ts` for default runnable graph output, logical-reference safety (no path leakage), and version-contract enforcement.
