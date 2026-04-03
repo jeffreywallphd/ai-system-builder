@@ -256,6 +256,15 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     listReferenceImageOutputs(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:reference-image:list-outputs", requestJson) as Promise<string>;
     },
+    getReferenceImageOutput(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:reference-image:get-output", requestJson) as Promise<string>;
+    },
+    listReferenceImageDatasetItems(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:reference-image:list-dataset-items", requestJson) as Promise<string>;
+    },
+    getReferenceImageDatasetItem(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:reference-image:get-dataset-item", requestJson) as Promise<string>;
+    },
     listReferenceImageRunHistory(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:reference-image:list-run-history", requestJson) as Promise<string>;
     },
