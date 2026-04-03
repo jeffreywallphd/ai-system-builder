@@ -2,6 +2,10 @@ import { useMemo, useRef, useState } from "react";
 import type { CanvasSurfaceEditingEvent } from "../../../studio-shell/experience-assets/ConfigurableCanvasSurfaceContracts";
 import type { StudioShellValidationIssue } from "../../../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import {
+  StudioShellValidationIssueCodes,
+  StudioShellValidationSections,
+} from "../../../../application/studio-shell/StudioShellValidation";
+import {
   ExperienceSurfaceAssetIds,
   resolveExperienceAssetModesFromRegistrations,
   type ExperienceSurfaceAssetId,
@@ -21,6 +25,10 @@ import {
 } from "../../../studio-shell/system/SystemCanvasExperienceAdapter";
 import { defaultPanelSlotId, type PanelAssetContract } from "../../../studio-shell/experience-assets/PanelAssetContracts";
 import { resolveCenteredNormalizedPlacement } from "../../../studio-shell/system/SystemCanvasPlacement";
+import {
+  areViewportSectionsOverlapping,
+  normalizeViewportSectionBounds,
+} from "../../../studio-shell/system/SystemPageLayoutInterpretation";
 import ConfigurableCanvasSurface from "../experience-assets/ConfigurableCanvasSurface";
 import { SystemPageSetupEditor } from "./SystemPageSetupEditor";
 import { SystemSettingsEditor } from "./SystemSettingsEditor";
@@ -30,6 +38,7 @@ import {
   createStudioIntentEvent,
   type StudioEmbeddedEvent,
 } from "../../../studio-shell/studio-assets/StudioEmbeddedEventContracts";
+import type { PanelAssetLayoutBounds } from "../../../studio-shell/experience-assets/PanelAssetContracts";
 
 interface SystemStudioDraftAuthoringBoundaryProps {
   readonly content: string;
@@ -57,6 +66,8 @@ export function SystemStudioDraftAuthoringBoundary({
   const [selectedWizardPageId, setSelectedWizardPageId] = useState<string>("pages");
   const [selectedLayoutNodeId, setSelectedLayoutNodeId] = useState<string | undefined>(undefined);
   const [selectedPageId, setSelectedPageId] = useState<string>("page-1");
+  const [canvasInteractionIssues, setCanvasInteractionIssues] = useState<ReadonlyArray<StudioShellValidationIssue>>([]);
+  const interactionStartBoundsRef = useRef<Map<string, PanelAssetLayoutBounds>>(new Map());
   const supportedModes = useMemo(
     () => resolveExperienceAssetModesFromRegistrations({ assetIds: experienceAssetIds }),
     [experienceAssetIds],
@@ -153,11 +164,54 @@ export function SystemStudioDraftAuthoringBoundary({
     if (!pages.some((page) => page.pageId === resolvedSelectedPageId)) {
       setSelectedPageId(pages[0]?.pageId ?? "page-1");
       setSelectedLayoutNodeId(undefined);
+      setCanvasInteractionIssues([]);
+      interactionStartBoundsRef.current.clear();
     }
   };
 
   const selectedPagePanels = document.canvasAuthoring.pageLayouts.find((layout) => layout.pageId === resolvedSelectedPageId)?.panels ?? [];
   const selectedPage = document.systemSpec.pages.find((page) => page.pageId === resolvedSelectedPageId);
+
+  const buildPageLayoutValidationIssues = (
+    panels: ReadonlyArray<PanelAssetContract>,
+  ): ReadonlyArray<StudioShellValidationIssue> => {
+    const issues: StudioShellValidationIssue[] = [];
+    const byNodeId = panels.map((panel) => Object.freeze({
+      nodeId: panel.sourceLayoutNodeId ?? panel.panelId,
+      title: panel.title,
+      bounds: normalizeViewportSectionBounds(panel.layoutBounds),
+    }));
+
+    for (let index = 0; index < byNodeId.length; index += 1) {
+      const source = byNodeId[index];
+      if (!source) {
+        continue;
+      }
+      for (let nextIndex = index + 1; nextIndex < byNodeId.length; nextIndex += 1) {
+        const target = byNodeId[nextIndex];
+        if (!target) {
+          continue;
+        }
+        if (!areViewportSectionsOverlapping({ a: source.bounds, b: target.bounds })) {
+          continue;
+        }
+        issues.push({
+          code: StudioShellValidationIssueCodes.lifecycleNotPublishReady,
+          section: StudioShellValidationSections.lifecycle,
+          severity: "error",
+          path: `systemSpec.canvasAuthoring.pageLayouts.${resolvedSelectedPageId}.${source.nodeId}`,
+          message: `Sections "${source.title}" and "${target.title}" are overlapping. Move one section to open space.`,
+        });
+      }
+    }
+    return Object.freeze(issues);
+  };
+
+  const localLayoutValidationIssues = buildPageLayoutValidationIssues(selectedPagePanels);
+
+  const clearNodeInteractionIssue = (nodeId: string): void => {
+    setCanvasInteractionIssues((current) => current.filter((issue) => !(issue.path ?? "").includes(nodeId)));
+  };
 
   const handleCanvasEditingEvent = (event: CanvasSurfaceEditingEvent): void => {
     if (event.type === "selection.change") {
@@ -174,15 +228,54 @@ export function SystemStudioDraftAuthoringBoundary({
 
     if (event.type === "node.position.change") {
       const latestPanels = resolveSelectedPagePanelsFromLatest();
+      const currentPanel = latestPanels.find((panel) => (panel.sourceLayoutNodeId ?? panel.panelId) === event.nodeId);
+      if (!currentPanel) {
+        return;
+      }
+      if (event.phase !== "commit" && !interactionStartBoundsRef.current.has(event.nodeId)) {
+        interactionStartBoundsRef.current.set(event.nodeId, currentPanel.layoutBounds);
+      }
+      const nextBounds = normalizePanelLayoutBounds({
+        ...currentPanel.layoutBounds,
+        x: event.position.x,
+        y: event.position.y,
+      });
+      if (event.phase === "commit") {
+        const overlaps = latestPanels.some((panel) => (
+          (panel.sourceLayoutNodeId ?? panel.panelId) !== event.nodeId
+          && areViewportSectionsOverlapping({ a: panel.layoutBounds, b: nextBounds })
+        ));
+        if (overlaps) {
+          const resetBounds = interactionStartBoundsRef.current.get(event.nodeId) ?? currentPanel.layoutBounds;
+          persistPanelsForSelectedPage(latestPanels.map((panel) => (
+            (panel.sourceLayoutNodeId ?? panel.panelId) === event.nodeId
+              ? Object.freeze({
+                ...panel,
+                layoutBounds: normalizePanelLayoutBounds(resetBounds),
+              })
+              : panel
+          )));
+          setCanvasInteractionIssues((issues) => Object.freeze([
+            ...issues.filter((issue) => !(issue.path ?? "").includes(event.nodeId)),
+            {
+              code: StudioShellValidationIssueCodes.lifecycleNotPublishReady,
+              section: StudioShellValidationSections.lifecycle,
+              severity: "error",
+              path: `systemSpec.canvasAuthoring.pageLayouts.${resolvedSelectedPageId}.${event.nodeId}`,
+              message: "That section still overlaps another section after placement. Move it to an open area.",
+            },
+          ]));
+          interactionStartBoundsRef.current.delete(event.nodeId);
+          return;
+        }
+        interactionStartBoundsRef.current.delete(event.nodeId);
+        clearNodeInteractionIssue(event.nodeId);
+      }
       persistPanelsForSelectedPage(latestPanels.map((panel) => (
         (panel.sourceLayoutNodeId ?? panel.panelId) === event.nodeId
           ? Object.freeze({
             ...panel,
-            layoutBounds: normalizePanelLayoutBounds({
-              ...panel.layoutBounds,
-              x: event.position.x,
-              y: event.position.y,
-            }),
+            layoutBounds: nextBounds,
           })
           : panel
       )));
@@ -191,16 +284,55 @@ export function SystemStudioDraftAuthoringBoundary({
 
     if (event.type === "node.resize.change") {
       const latestPanels = resolveSelectedPagePanelsFromLatest();
+      const currentPanel = latestPanels.find((panel) => (panel.sourceLayoutNodeId ?? panel.panelId) === event.nodeId);
+      if (!currentPanel) {
+        return;
+      }
+      if (event.phase !== "commit" && !interactionStartBoundsRef.current.has(event.nodeId)) {
+        interactionStartBoundsRef.current.set(event.nodeId, currentPanel.layoutBounds);
+      }
+      const nextBounds = normalizePanelLayoutBounds({
+        x: event.frame.x,
+        y: event.frame.y,
+        width: event.frame.width,
+        height: event.frame.height,
+      });
+      if (event.phase === "commit") {
+        const overlaps = latestPanels.some((panel) => (
+          (panel.sourceLayoutNodeId ?? panel.panelId) !== event.nodeId
+          && areViewportSectionsOverlapping({ a: panel.layoutBounds, b: nextBounds })
+        ));
+        if (overlaps) {
+          const resetBounds = interactionStartBoundsRef.current.get(event.nodeId) ?? currentPanel.layoutBounds;
+          persistPanelsForSelectedPage(latestPanels.map((panel) => (
+            (panel.sourceLayoutNodeId ?? panel.panelId) === event.nodeId
+              ? Object.freeze({
+                ...panel,
+                layoutBounds: normalizePanelLayoutBounds(resetBounds),
+              })
+              : panel
+          )));
+          setCanvasInteractionIssues((issues) => Object.freeze([
+            ...issues.filter((issue) => !(issue.path ?? "").includes(event.nodeId)),
+            {
+              code: StudioShellValidationIssueCodes.lifecycleNotPublishReady,
+              section: StudioShellValidationSections.lifecycle,
+              severity: "error",
+              path: `systemSpec.canvasAuthoring.pageLayouts.${resolvedSelectedPageId}.${event.nodeId}`,
+              message: "That section still overlaps another section after resizing. Resize it to fit open space.",
+            },
+          ]));
+          interactionStartBoundsRef.current.delete(event.nodeId);
+          return;
+        }
+        interactionStartBoundsRef.current.delete(event.nodeId);
+        clearNodeInteractionIssue(event.nodeId);
+      }
       persistPanelsForSelectedPage(latestPanels.map((panel) => (
         (panel.sourceLayoutNodeId ?? panel.panelId) === event.nodeId
           ? Object.freeze({
             ...panel,
-            layoutBounds: normalizePanelLayoutBounds({
-              x: event.frame.x,
-              y: event.frame.y,
-              width: event.frame.width,
-              height: event.frame.height,
-            }),
+            layoutBounds: nextBounds,
           })
           : panel
       )));
@@ -223,12 +355,14 @@ export function SystemStudioDraftAuthoringBoundary({
         }),
       });
       persistPanelsForSelectedPage(Object.freeze([...latestPanels, panel]));
+      setCanvasInteractionIssues([]);
       setSelectedLayoutNodeId(panel.sourceLayoutNodeId ?? panel.panelId);
       return;
     }
 
     if (event.type === "canvas.command" && event.commandId === "fit-layout") {
       persistPanelsForSelectedPage([]);
+      setCanvasInteractionIssues([]);
       setSelectedLayoutNodeId(undefined);
       return;
     }
@@ -253,6 +387,7 @@ export function SystemStudioDraftAuthoringBoundary({
         sourceLayoutNodeId: panelId,
       });
       persistPanelsForSelectedPage(Object.freeze([...latestPanels, panel]));
+      setCanvasInteractionIssues([]);
       setSelectedLayoutNodeId(panel.sourceLayoutNodeId ?? panel.panelId);
       return;
     }
@@ -313,12 +448,18 @@ export function SystemStudioDraftAuthoringBoundary({
     () => createSystemCanvasExperienceDefinition({
       content,
       extensionContext,
-      validationIssues,
+      validationIssues: Object.freeze([
+        ...validationIssues,
+        ...localLayoutValidationIssues,
+        ...canvasInteractionIssues,
+      ]),
       selectedLayoutNodeId,
       selectedPageId: resolvedSelectedPageId,
       onSelectPage: (pageId) => {
         setSelectedPageId(pageId);
         setSelectedLayoutNodeId(undefined);
+        setCanvasInteractionIssues([]);
+        interactionStartBoundsRef.current.clear();
       },
       onCanvasEditingEvent: handleCanvasEditingEvent,
       onPanelCompositionChange: ({ panelId, panel: nextPanel }) => {
@@ -328,7 +469,16 @@ export function SystemStudioDraftAuthoringBoundary({
         });
       },
     }),
-    [content, extensionContext, selectedLayoutNodeId, resolvedSelectedPageId, selectedPagePanels, validationIssues],
+    [
+      content,
+      extensionContext,
+      selectedLayoutNodeId,
+      resolvedSelectedPageId,
+      selectedPagePanels,
+      validationIssues,
+      localLayoutValidationIssues,
+      canvasInteractionIssues,
+    ],
   );
 
   const wizardPages = Object.freeze([

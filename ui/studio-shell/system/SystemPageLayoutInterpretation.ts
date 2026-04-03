@@ -20,6 +20,8 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+const overlapTolerance = 1e-6;
+
 export function normalizeViewportSectionBounds(bounds: PanelAssetLayoutBounds): PanelAssetLayoutBounds {
   const width = Math.max(0, Math.min(1, clamp01(bounds.width)));
   const height = Math.max(0, Math.min(1, clamp01(bounds.height)));
@@ -45,4 +47,19 @@ export function mapViewportSectionBoundsToStyle(input: {
     width: `max(${interpretation.sectionMinSizeVar}, calc(${widthPercent}% - ${interpretation.sectionGapVar}))`,
     height: `max(${interpretation.sectionMinSizeVar}, calc(${heightPercent}% - ${interpretation.sectionGapVar}))`,
   });
+}
+
+export function areViewportSectionsOverlapping(input: {
+  readonly a: PanelAssetLayoutBounds;
+  readonly b: PanelAssetLayoutBounds;
+}): boolean {
+  const a = normalizeViewportSectionBounds(input.a);
+  const b = normalizeViewportSectionBounds(input.b);
+  const separated = (
+    (a.x + a.width) <= (b.x + overlapTolerance)
+    || (b.x + b.width) <= (a.x + overlapTolerance)
+    || (a.y + a.height) <= (b.y + overlapTolerance)
+    || (b.y + b.height) <= (a.y + overlapTolerance)
+  );
+  return !separated;
 }
