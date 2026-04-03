@@ -33,6 +33,21 @@ const faceIdExtensionAnchorSchema = z.object({
   }),
 });
 
+const faceIdSubworkflowSchema = z.object({
+  subworkflowId: z.literal("faceid-conditioning"),
+  kind: z.literal("optional-conditioning-composition"),
+  enabledByConfigPath: z.literal("faceId.enabled"),
+  datasetReferencePath: z.literal("faceId.referenceBindings"),
+  controlPaths: z.object({
+    weight: z.literal("faceId.weight"),
+    startStepFraction: z.literal("faceId.startStepFraction"),
+    endStepFraction: z.literal("faceId.endStepFraction"),
+  }),
+  anchorId: z.literal("faceid-conditioning"),
+  defaultEnabled: z.boolean(),
+  notes: z.string().trim().min(1),
+});
+
 export const ComfyImageManipulationBaseGraphSchema = z.object({
   assetId: z.literal(ComfyImageManipulationBaseGraphAssetId),
   versionId: z.literal(ComfyImageManipulationBaseGraphVersionId),
@@ -42,6 +57,7 @@ export const ComfyImageManipulationBaseGraphSchema = z.object({
   nodes: z.array(comfyWorkflowNodeSchema).min(1),
   outputNodeIds: z.array(z.string().trim().min(1)).min(1),
   extensionAnchors: z.array(faceIdExtensionAnchorSchema),
+  subworkflows: z.array(faceIdSubworkflowSchema).default([]),
 });
 
 export type ComfyImageManipulationBaseGraph = z.infer<typeof ComfyImageManipulationBaseGraphSchema>;
@@ -162,6 +178,22 @@ export const ComfyImageManipulationBaseGraph: ComfyImageManipulationBaseGraph = 
       }),
     }),
   ]),
+  subworkflows: Object.freeze([
+    Object.freeze({
+      subworkflowId: "faceid-conditioning",
+      kind: "optional-conditioning-composition",
+      enabledByConfigPath: "faceId.enabled",
+      datasetReferencePath: "faceId.referenceBindings",
+      controlPaths: Object.freeze({
+        weight: "faceId.weight",
+        startStepFraction: "faceId.startStepFraction",
+        endStepFraction: "faceId.endStepFraction",
+      }),
+      anchorId: "faceid-conditioning",
+      defaultEnabled: false,
+      notes: "Optional FaceID conditioning composes into the graph through the faceid-conditioning anchor and keeps the base img2img path executable when disabled.",
+    }),
+  ]),
 });
 
 export function createComfyImageManipulationBaseGraph(input: unknown): ComfyImageManipulationBaseGraph {
@@ -188,6 +220,12 @@ export function createComfyImageManipulationBaseGraph(input: unknown): ComfyImag
       throw new Error(`FaceID extension anchor references unknown sampler node '${anchor.injectionPoints.samplerNodeId}'.`);
     }
   }
+  const anchorIds = new Set(parsed.extensionAnchors.map((entry) => entry.anchorId));
+  for (const subworkflow of parsed.subworkflows) {
+    if (!anchorIds.has(subworkflow.anchorId)) {
+      throw new Error(`Comfy image manipulation subworkflow '${subworkflow.subworkflowId}' references unknown anchor '${subworkflow.anchorId}'.`);
+    }
+  }
 
   return Object.freeze({
     ...parsed,
@@ -199,6 +237,10 @@ export function createComfyImageManipulationBaseGraph(input: unknown): ComfyImag
     extensionAnchors: Object.freeze(parsed.extensionAnchors.map((anchor) => Object.freeze({
       ...anchor,
       injectionPoints: Object.freeze({ ...anchor.injectionPoints }),
+    }))),
+    subworkflows: Object.freeze(parsed.subworkflows.map((subworkflow) => Object.freeze({
+      ...subworkflow,
+      controlPaths: Object.freeze({ ...subworkflow.controlPaths }),
     }))),
   });
 }

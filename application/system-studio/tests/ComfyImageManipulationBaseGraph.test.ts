@@ -31,6 +31,13 @@ describe("ComfyImageManipulationBaseGraph", () => {
 
     expect(parsed.extensionAnchors[0]?.anchorId).toBe("faceid-conditioning");
     expect(parsed.extensionAnchors[0]?.injectionPoints.samplerNodeId).toBe("6");
+    expect(parsed.subworkflows[0]).toEqual(expect.objectContaining({
+      subworkflowId: "faceid-conditioning",
+      kind: "optional-conditioning-composition",
+      enabledByConfigPath: "faceId.enabled",
+      datasetReferencePath: "faceId.referenceBindings",
+      defaultEnabled: false,
+    }));
   });
 
   it("rejects invalid output node references", () => {
@@ -38,5 +45,12 @@ describe("ComfyImageManipulationBaseGraph", () => {
       ...ComfyImageManipulationBaseGraph,
       outputNodeIds: ["does-not-exist"],
     })).toThrow();
+  });
+
+  it("rejects FaceID subworkflow anchors that do not exist in the extension anchor list", () => {
+    expect(() => createComfyImageManipulationBaseGraph({
+      ...ComfyImageManipulationBaseGraph,
+      extensionAnchors: [],
+    })).toThrow(/unknown anchor/);
   });
 });

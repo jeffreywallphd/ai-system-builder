@@ -20,6 +20,7 @@ const BindingGroups = Object.freeze({
   generation: "generation-controls",
   models: "model-controls",
   image: "image-controls",
+  faceId: "faceid-controls",
 } as const);
 
 type BindingGroup = typeof BindingGroups[keyof typeof BindingGroups];
@@ -28,6 +29,7 @@ const BindingGroupValues = [
   BindingGroups.generation,
   BindingGroups.models,
   BindingGroups.image,
+  BindingGroups.faceId,
 ] as const;
 
 const bindingSchema = z.object({
@@ -64,8 +66,10 @@ export interface ComfyImageManipulationPropertyMappingAsset {
     readonly supportsGenerationBindings: true;
     readonly supportsModelBindings: true;
     readonly supportsImageBindings: true;
+    readonly supportsFaceIdBindings: true;
     readonly faceIdExtensionReady: true;
     readonly advancedSettingsExtensionReady: true;
+    readonly faceIdCompositionBindingId: "faceid-conditioning";
   };
   readonly bindings: ReadonlyArray<ComfyImageManipulationPropertyBinding>;
 }
@@ -91,8 +95,10 @@ export const ComfyImageManipulationPropertyMappingAsset: ComfyImageManipulationP
     supportsGenerationBindings: true,
     supportsModelBindings: true,
     supportsImageBindings: true,
+    supportsFaceIdBindings: true,
     faceIdExtensionReady: true,
     advancedSettingsExtensionReady: true,
+    faceIdCompositionBindingId: "faceid-conditioning",
   }),
   bindings: Object.freeze([
     Object.freeze({ bindingId: "binding.prompt.positive", group: BindingGroups.prompts, schemaPath: "prompts.positivePrompt", graphNodeId: "4", graphInputName: "text" }),
@@ -127,7 +133,7 @@ export const ComfyImageManipulationPropertyMappingAsset: ComfyImageManipulationP
     }),
     Object.freeze({
       bindingId: "binding.faceid.enabled-extension",
-      group: BindingGroups.models,
+      group: BindingGroups.faceId,
       schemaPath: "faceId.enabled",
       graphNodeId: "6",
       graphInputName: "faceid_enabled",
@@ -135,12 +141,65 @@ export const ComfyImageManipulationPropertyMappingAsset: ComfyImageManipulationP
       extensionHook: true,
       notes: "Reserved for optional FaceID conditioning composition.",
     }),
+    Object.freeze({
+      bindingId: "binding.faceid.references-extension",
+      group: BindingGroups.faceId,
+      schemaPath: "faceId.referenceBindings",
+      graphNodeId: "faceid-conditioning",
+      graphInputName: "references",
+      required: false,
+      extensionHook: true,
+      notes: "Logical FaceID dataset reference bindings for optional FaceID conditioning composition.",
+    }),
+    Object.freeze({
+      bindingId: "binding.faceid.weight-extension",
+      group: BindingGroups.faceId,
+      schemaPath: "faceId.weight",
+      graphNodeId: "faceid-conditioning",
+      graphInputName: "weight",
+      required: false,
+      extensionHook: true,
+      notes: "FaceID conditioning weight control binding.",
+    }),
+    Object.freeze({
+      bindingId: "binding.faceid.start-step-extension",
+      group: BindingGroups.faceId,
+      schemaPath: "faceId.startStepFraction",
+      graphNodeId: "faceid-conditioning",
+      graphInputName: "start_step_fraction",
+      required: false,
+      extensionHook: true,
+      notes: "FaceID conditioning start-timing control binding.",
+    }),
+    Object.freeze({
+      bindingId: "binding.faceid.end-step-extension",
+      group: BindingGroups.faceId,
+      schemaPath: "faceId.endStepFraction",
+      graphNodeId: "faceid-conditioning",
+      graphInputName: "end_step_fraction",
+      required: false,
+      extensionHook: true,
+      notes: "FaceID conditioning end-timing control binding.",
+    }),
   ]),
 });
+
+export interface FaceIdSubworkflowBinding {
+  readonly subworkflowId: "faceid-conditioning";
+  readonly enabled: boolean;
+  readonly referenceBindings: ReadonlyArray<{
+    readonly datasetBindingId: string;
+    readonly datasetAssetId: string;
+  }>;
+  readonly weight: number;
+  readonly startStepFraction: number;
+  readonly endStepFraction: number;
+}
 
 export interface ResolveComfyImageManipulationGraphBindingsResult {
   readonly graphBindings: Readonly<Record<string, unknown>>;
   readonly extensionBindings: ReadonlyArray<Readonly<Record<string, unknown>>>;
+  readonly subworkflowBindings: ReadonlyArray<FaceIdSubworkflowBinding>;
 }
 
 function readConfigPath(config: Readonly<Record<string, unknown>>, path: string): unknown {
@@ -184,8 +243,21 @@ export function resolveComfyImageManipulationGraphBindings(
     graphBindings[`${binding.graphNodeId}.${binding.graphInputName}`] = value;
   }
 
+  const faceIdSubworkflowBinding: FaceIdSubworkflowBinding = Object.freeze({
+    subworkflowId: "faceid-conditioning",
+    enabled: Boolean(readConfigPath(resolvedConfig, "faceId.enabled")),
+    referenceBindings: Object.freeze((readConfigPath(resolvedConfig, "faceId.referenceBindings") as ReadonlyArray<{
+      readonly datasetBindingId: string;
+      readonly datasetAssetId: string;
+    }> | undefined) ?? []),
+    weight: Number(readConfigPath(resolvedConfig, "faceId.weight") ?? 0.8),
+    startStepFraction: Number(readConfigPath(resolvedConfig, "faceId.startStepFraction") ?? 0),
+    endStepFraction: Number(readConfigPath(resolvedConfig, "faceId.endStepFraction") ?? 1),
+  });
+
   return Object.freeze({
     graphBindings: Object.freeze(graphBindings),
     extensionBindings: Object.freeze(extensionBindings),
+    subworkflowBindings: Object.freeze([faceIdSubworkflowBinding]),
   });
 }

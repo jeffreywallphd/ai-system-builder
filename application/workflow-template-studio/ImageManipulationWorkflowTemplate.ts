@@ -13,6 +13,8 @@ import {
 
 export const ImageManipulationWorkflowTemplateAssetId = "asset:workflow-template:image-manipulation:default";
 export const ImageManipulationWorkflowTemplateVersionId = "asset:workflow-template:image-manipulation:default:v1";
+export const ImageManipulationFaceIdSubworkflowAssetId = "asset:workflow:image-to-image:faceid-conditioning";
+export const ImageManipulationFaceIdSubworkflowVersionId = "asset:workflow:image-to-image:faceid-conditioning:v1";
 
 const defaultConfig = createComfyImageManipulationDefaultConfig();
 
@@ -57,6 +59,10 @@ export const ImageManipulationWorkflowTemplate: WorkflowTemplateDefinition = Obj
     Object.freeze({ parameterId: "checkpointModel", value: defaultConfig.models.checkpointModel }),
     Object.freeze({ parameterId: "vaeModel", value: defaultConfig.models.vaeModel }),
     Object.freeze({ parameterId: "faceIdEnabled", value: defaultConfig.faceId.enabled }),
+    Object.freeze({ parameterId: "faceIdReferenceBindings", value: defaultConfig.faceId.referenceBindings }),
+    Object.freeze({ parameterId: "faceIdWeight", value: defaultConfig.faceId.weight }),
+    Object.freeze({ parameterId: "faceIdStartStepFraction", value: defaultConfig.faceId.startStepFraction }),
+    Object.freeze({ parameterId: "faceIdEndStepFraction", value: defaultConfig.faceId.endStepFraction }),
   ]),
   parameters: Object.freeze([
     Object.freeze({ parameterId: "positivePrompt", name: "Describe what to create", type: "string", required: true, defaultValue: defaultConfig.prompts.positivePrompt }),
@@ -71,6 +77,10 @@ export const ImageManipulationWorkflowTemplate: WorkflowTemplateDefinition = Obj
     Object.freeze({ parameterId: "checkpointModel", name: "Checkpoint model", type: "string", required: true, defaultValue: defaultConfig.models.checkpointModel }),
     Object.freeze({ parameterId: "vaeModel", name: "VAE model", type: "string", required: true, defaultValue: defaultConfig.models.vaeModel }),
     Object.freeze({ parameterId: "faceIdEnabled", name: "Enable FaceID", type: "boolean", required: true, defaultValue: defaultConfig.faceId.enabled }),
+    Object.freeze({ parameterId: "faceIdReferenceBindings", name: "FaceID references", type: "json", required: true, defaultValue: defaultConfig.faceId.referenceBindings }),
+    Object.freeze({ parameterId: "faceIdWeight", name: "FaceID influence", type: "number", required: true, defaultValue: defaultConfig.faceId.weight, validation: { min: 0, max: 2 } }),
+    Object.freeze({ parameterId: "faceIdStartStepFraction", name: "FaceID start timing", type: "number", required: true, defaultValue: defaultConfig.faceId.startStepFraction, validation: { min: 0, max: 1 } }),
+    Object.freeze({ parameterId: "faceIdEndStepFraction", name: "FaceID end timing", type: "number", required: true, defaultValue: defaultConfig.faceId.endStepFraction, validation: { min: 0, max: 1 } }),
   ]),
   composition: Object.freeze({
     contractVersion: "1.0.0",
@@ -93,6 +103,23 @@ export const ImageManipulationWorkflowTemplate: WorkflowTemplateDefinition = Obj
           "checkpointModel",
           "vaeModel",
           "faceIdEnabled",
+          "faceIdReferenceBindings",
+          "faceIdWeight",
+          "faceIdStartStepFraction",
+          "faceIdEndStepFraction",
+        ],
+      }),
+      Object.freeze({
+        workflowAssetId: ImageManipulationFaceIdSubworkflowAssetId,
+        workflowAssetVersionId: ImageManipulationFaceIdSubworkflowVersionId,
+        inputIds: [],
+        outputIds: [],
+        parameterIds: [
+          "faceIdEnabled",
+          "referenceBindings",
+          "weight",
+          "startStepFraction",
+          "endStepFraction",
         ],
       }),
     ]),
@@ -134,6 +161,11 @@ export const ImageManipulationWorkflowTemplate: WorkflowTemplateDefinition = Obj
       Object.freeze({ parameterId: "checkpointModel", workflowAssetId: "asset:workflow:image-to-image", workflowParameterId: "checkpointModel" }),
       Object.freeze({ parameterId: "vaeModel", workflowAssetId: "asset:workflow:image-to-image", workflowParameterId: "vaeModel" }),
       Object.freeze({ parameterId: "faceIdEnabled", workflowAssetId: "asset:workflow:image-to-image", workflowParameterId: "faceIdEnabled" }),
+      Object.freeze({ parameterId: "faceIdEnabled", workflowAssetId: ImageManipulationFaceIdSubworkflowAssetId, workflowParameterId: "faceIdEnabled" }),
+      Object.freeze({ parameterId: "faceIdReferenceBindings", workflowAssetId: ImageManipulationFaceIdSubworkflowAssetId, workflowParameterId: "referenceBindings" }),
+      Object.freeze({ parameterId: "faceIdWeight", workflowAssetId: ImageManipulationFaceIdSubworkflowAssetId, workflowParameterId: "weight" }),
+      Object.freeze({ parameterId: "faceIdStartStepFraction", workflowAssetId: ImageManipulationFaceIdSubworkflowAssetId, workflowParameterId: "startStepFraction" }),
+      Object.freeze({ parameterId: "faceIdEndStepFraction", workflowAssetId: ImageManipulationFaceIdSubworkflowAssetId, workflowParameterId: "endStepFraction" }),
     ]),
     systemContextMappings: Object.freeze([
       Object.freeze({
@@ -153,14 +185,15 @@ export const ImageManipulationWorkflowTemplate: WorkflowTemplateDefinition = Obj
       Object.freeze({
         mappingId: "image-manipulation.context.faceid-references",
         contextKey: "faceIdReferenceDataset",
-        workflowAssetId: "asset:workflow:image-to-image",
+        workflowAssetId: ImageManipulationFaceIdSubworkflowAssetId,
         targetKind: "workflow-parameter",
-        targetId: "faceIdEnabled",
+        targetId: "referenceBindings",
       }),
     ]),
   }),
   workflowAssets: Object.freeze([
     Object.freeze({ role: "workflow-definition", assetId: "asset:workflow:image-to-image", versionId: "asset:workflow:image-to-image:v1" }),
+    Object.freeze({ role: "workflow-definition", assetId: ImageManipulationFaceIdSubworkflowAssetId, versionId: ImageManipulationFaceIdSubworkflowVersionId }),
     Object.freeze({ role: "dataset", assetId: ImageManipulationInputDatasetAssetId }),
     Object.freeze({ role: "dataset", assetId: ImageManipulationOutputDatasetAssetId }),
     Object.freeze({ role: "dataset", assetId: ImageManipulationFaceIdReferenceDatasetAssetId }),
@@ -176,6 +209,7 @@ export const ImageManipulationWorkflowTemplate: WorkflowTemplateDefinition = Obj
     baseGraphVersionId: ComfyImageManipulationBaseGraphVersionId,
     baseGraphContractVersion: ComfyImageManipulationBaseGraphContractVersion,
     supportsFaceIdExtension: "true",
+    faceIdCompositionMode: "optional-subworkflow",
     inspectPreviewMode: "comparison",
     defaultExecutable: "true",
   }),
