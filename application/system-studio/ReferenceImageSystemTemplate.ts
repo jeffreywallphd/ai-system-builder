@@ -237,6 +237,22 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
       },
     ],
     executionMetadata: {
+      runtime: {
+        environment: "comfyui",
+        requirements: [
+          "comfyui-api",
+          "workflow-template-execution",
+          "image-generation",
+          "dataset-runtime-handles",
+        ],
+      },
+      orchestration: {
+        mode: "workflow-template-driven",
+        hints: [
+          "external-runtime-adapter",
+          "version-pinned-workflow-template",
+        ],
+      },
       workflowContextMapping: ReferenceImageSystemWorkflowContextMapping,
     },
   }),
