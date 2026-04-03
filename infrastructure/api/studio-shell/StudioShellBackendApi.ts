@@ -308,7 +308,7 @@ export interface GetReferenceImageOutputRequest {
 export interface ListReferenceImageDatasetItemsRequest {
   readonly studioId: string;
   readonly draftId?: string;
-  readonly datasetBindingId: Exclude<ReferenceImageDatasetBindingId, "input-image-dataset">;
+  readonly datasetBindingId: ReferenceImageDatasetBindingId;
   readonly limit?: number;
   readonly offset?: number;
 }
@@ -316,7 +316,7 @@ export interface ListReferenceImageDatasetItemsRequest {
 export interface GetReferenceImageDatasetItemRequest {
   readonly studioId: string;
   readonly draftId?: string;
-  readonly datasetBindingId: Exclude<ReferenceImageDatasetBindingId, "input-image-dataset">;
+  readonly datasetBindingId: ReferenceImageDatasetBindingId;
   readonly recordId: string;
 }
 
@@ -1818,7 +1818,7 @@ export class StudioShellBackendApi {
   private async listReferenceImageDatasetItemsInternal(request: {
     readonly studioId: string;
     readonly draftId?: string;
-    readonly datasetBindingId: Exclude<ReferenceImageDatasetBindingId, "input-image-dataset">;
+    readonly datasetBindingId: ReferenceImageDatasetBindingId;
     readonly limit?: number;
     readonly offset?: number;
   }): Promise<OutputGalleryListing> {
@@ -1839,7 +1839,7 @@ export class StudioShellBackendApi {
     request: {
       readonly studioId: string;
       readonly draftId?: string;
-      readonly datasetBindingId: Exclude<ReferenceImageDatasetBindingId, "input-image-dataset">;
+      readonly datasetBindingId: ReferenceImageDatasetBindingId;
       readonly recordId: string;
     },
   ): Promise<OutputGalleryItem> {

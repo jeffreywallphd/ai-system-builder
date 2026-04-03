@@ -616,6 +616,18 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listReferenceImageOutputs"]>[0];
     return JSON.stringify(await studioShellBackendApi.listReferenceImageOutputs(request));
   });
+  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:get-output", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["getReferenceImageOutput"]>[0];
+    return JSON.stringify(await studioShellBackendApi.getReferenceImageOutput(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:list-dataset-items", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listReferenceImageDatasetItems"]>[0];
+    return JSON.stringify(await studioShellBackendApi.listReferenceImageDatasetItems(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:get-dataset-item", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["getReferenceImageDatasetItem"]>[0];
+    return JSON.stringify(await studioShellBackendApi.getReferenceImageDatasetItem(request));
+  });
   ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:list-run-history", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listReferenceImageRunHistory"]>[0];
     return JSON.stringify(await studioShellBackendApi.listReferenceImageRunHistory(request));

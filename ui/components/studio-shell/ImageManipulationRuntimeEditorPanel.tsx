@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ComfyImageManipulationPropertySchema,
   createComfyImageManipulationDefaultConfig,
@@ -9,13 +9,15 @@ import {
 import { ReferenceImageSystemTemplate } from "../../../application/system-studio/ReferenceImageSystemTemplate";
 import { validateReferenceImageCrossStudioContext, type CrossStudioIntegrityIssue } from "../../../application/system-studio/ReferenceImageCrossStudioIntegrity";
 import type { OutputGalleryItem } from "../../../application/system-runtime/OutputGalleryDataContract";
+import type { ReferenceImageDatasetBindingId } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import { createSystemContextContract } from "../../../domain/system-studio/SystemContextContract";
 import type { FileIngestionPolicy } from "../../../domain/ingestion/interfaces/IFileIngestion";
 import { createBrowserImageUploadIngestionAdapter } from "../assets/image-system/BrowserImageUploadIngestionAdapter";
 import { ImageUploadPanel } from "../assets/image-system/ImageUploadPanel";
-import { ImageRenderFrame } from "../assets/image-system/ImageRenderFrame";
-import { ImageViewer } from "../assets/image-system/ImageViewer";
+import { ImageGallerySlider } from "../assets/image-system/ImageGallerySlider";
+import { ImagePreviewPanel } from "../assets/image-system/ImagePreviewPanel";
 import { mapOutputGalleryItemToImageViewModel } from "../assets/image-system/ImageOutputGalleryDataAdapter";
+import type { ImageUiViewModel } from "../assets/image-system/ImageUiContracts";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { StudioShellService } from "../../services/StudioShellService";
 import ComfyImageManipulationPropertyEditor from "../assets/image-system/ComfyImageManipulationPropertyEditor";
@@ -39,6 +41,58 @@ const uploadPolicy: FileIngestionPolicy = Object.freeze({
   }),
 });
 
+type PreviewSelectionContext = "source" | "output" | "reference";
+
+const previewContextLabels: Record<PreviewSelectionContext, string> = Object.freeze({
+  source: "Source photo",
+  output: "Created image",
+  reference: "Face reference photo",
+});
+
+function toFriendlyTimestamp(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) {
+    return undefined;
+  }
+  return timestamp.toLocaleString();
+}
+
+function mapItemsToDisplayViewModels(items: ReadonlyArray<OutputGalleryItem>, context: PreviewSelectionContext): ReadonlyArray<ImageUiViewModel> {
+  const singularLabel = context === "source"
+    ? "Source"
+    : context === "reference"
+      ? "Reference"
+      : "Result";
+
+  return Object.freeze(items.map((item, index) => {
+    const mapped = mapOutputGalleryItemToImageViewModel(item);
+    return Object.freeze({
+      ...mapped,
+      title: `${singularLabel} ${index + 1}`,
+      subtitle: toFriendlyTimestamp(item.timestamps.updatedAt),
+    });
+  }));
+}
+
+function resolveSelectedItem(
+  items: ReadonlyArray<OutputGalleryItem>,
+  selectedRecordId?: string,
+): OutputGalleryItem | undefined {
+  if (items.length < 1) {
+    return undefined;
+  }
+  if (selectedRecordId) {
+    const matched = items.find((item) => item.image.recordId === selectedRecordId);
+    if (matched) {
+      return matched;
+    }
+  }
+  return items[0];
+}
+
 async function encodeFileBase64(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
   let binary = "";
@@ -61,50 +115,213 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
   const studioShell = useMemo(() => new StudioShellService(), []);
   const uploadAdapter = useMemo(() => createBrowserImageUploadIngestionAdapter({ policy: uploadPolicy }), []);
   const executionFlow = useMemo(() => new ReferenceImageExecutionFlowService(), []);
+  const requestIdRef = useRef(0);
+
   const [selectedRecordId, setSelectedRecordId] = useState<string | undefined>();
   const [selectedAssetId, setSelectedAssetId] = useState<string | undefined>();
   const [datasetInstanceId, setDatasetInstanceId] = useState<string | undefined>();
+
+  const [activeSelectionContext, setActiveSelectionContext] = useState<PreviewSelectionContext>("output");
+  const [activeSourceId, setActiveSourceId] = useState<string | undefined>();
   const [activeResultId, setActiveResultId] = useState<string | undefined>();
-  const [items, setItems] = useState<ReadonlyArray<OutputGalleryItem>>([]);
+  const [activeReferenceId, setActiveReferenceId] = useState<string | undefined>();
+
+  const [outputItems, setOutputItems] = useState<ReadonlyArray<OutputGalleryItem>>([]);
+  const [sourceItems, setSourceItems] = useState<ReadonlyArray<OutputGalleryItem>>([]);
+  const [referenceItems, setReferenceItems] = useState<ReadonlyArray<OutputGalleryItem>>([]);
+
   const [isUploading, setIsUploading] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
-  const [isLoadingResults, setIsLoadingResults] = useState(false);
+  const [isLoadingOutputs, setIsLoadingOutputs] = useState(false);
+  const [isLoadingSources, setIsLoadingSources] = useState(false);
+  const [isLoadingReferences, setIsLoadingReferences] = useState(false);
+  const [outputLoadError, setOutputLoadError] = useState<string | undefined>();
+  const [sourceLoadError, setSourceLoadError] = useState<string | undefined>();
+  const [referenceLoadError, setReferenceLoadError] = useState<string | undefined>();
+
   const [statusMessage, setStatusMessage] = useState<string | undefined>();
   const [integrityIssues, setIntegrityIssues] = useState<ReadonlyArray<CrossStudioIntegrityIssue>>([]);
   const [flowSteps, setFlowSteps] = useState<ReadonlyArray<ReferenceImageExecutionFlowStep>>([]);
   const [flowIssues, setFlowIssues] = useState<ReadonlyArray<ReferenceImageExecutionFlowIssue>>([]);
+
   const validationIssues = useMemo(() => validateComfyImageManipulationConfig(config), [config]);
-  const viewModels = useMemo(() => items.map((item) => mapOutputGalleryItemToImageViewModel(item)), [items]);
-  const selectedItem = useMemo(() => items.find((item) => item.image.recordId === activeResultId) ?? items[0], [items, activeResultId]);
-  const selectedViewModel = useMemo(
-    () => selectedItem ? mapOutputGalleryItemToImageViewModel(selectedItem) : undefined,
-    [selectedItem],
+
+  const sourceViewModels = useMemo(
+    () => mapItemsToDisplayViewModels(sourceItems, "source"),
+    [sourceItems],
+  );
+  const outputViewModels = useMemo(
+    () => mapItemsToDisplayViewModels(outputItems, "output"),
+    [outputItems],
+  );
+  const referenceViewModels = useMemo(
+    () => mapItemsToDisplayViewModels(referenceItems, "reference"),
+    [referenceItems],
   );
 
-  const loadResults = (): Promise<ReadonlyArray<OutputGalleryItem>> => {
+  const selectedSourceItem = useMemo(
+    () => resolveSelectedItem(sourceItems, activeSourceId ?? selectedRecordId),
+    [sourceItems, activeSourceId, selectedRecordId],
+  );
+  const selectedOutputItem = useMemo(
+    () => resolveSelectedItem(outputItems, activeResultId),
+    [outputItems, activeResultId],
+  );
+  const selectedReferenceItem = useMemo(
+    () => resolveSelectedItem(referenceItems, activeReferenceId),
+    [referenceItems, activeReferenceId],
+  );
+
+  const selectedPreviewViewModel = useMemo(() => {
+    if (activeSelectionContext === "source") {
+      return selectedSourceItem ? mapItemsToDisplayViewModels([selectedSourceItem], "source")[0] : undefined;
+    }
+    if (activeSelectionContext === "reference") {
+      return selectedReferenceItem ? mapItemsToDisplayViewModels([selectedReferenceItem], "reference")[0] : undefined;
+    }
+    return selectedOutputItem ? mapItemsToDisplayViewModels([selectedOutputItem], "output")[0] : undefined;
+  }, [activeSelectionContext, selectedSourceItem, selectedReferenceItem, selectedOutputItem]);
+
+  const previewLoading = activeSelectionContext === "source"
+    ? isLoadingSources
+    : activeSelectionContext === "reference"
+      ? isLoadingReferences
+      : isLoadingOutputs;
+
+  const previewErrorMessage = activeSelectionContext === "source"
+    ? sourceLoadError
+    : activeSelectionContext === "reference"
+      ? referenceLoadError
+      : outputLoadError;
+
+  const activeGallery = useMemo(() => {
+    if (activeSelectionContext === "source") {
+      return {
+        title: "Source photos",
+        subtitle: "Images you've uploaded for editing",
+        items: sourceViewModels,
+        selectedId: activeSourceId ?? selectedSourceItem?.image.recordId,
+        loading: isLoadingSources,
+        errorMessage: sourceLoadError,
+        emptyMessage: "Upload a photo to get started.",
+      } as const;
+    }
+    if (activeSelectionContext === "reference") {
+      return {
+        title: "Face reference photos",
+        subtitle: "Optional reference images for identity guidance",
+        items: referenceViewModels,
+        selectedId: activeReferenceId ?? selectedReferenceItem?.image.recordId,
+        loading: isLoadingReferences,
+        errorMessage: referenceLoadError,
+        emptyMessage: "No face reference photos are available yet.",
+      } as const;
+    }
+    return {
+      title: "Created images",
+      subtitle: "Recent results from this editor",
+      items: outputViewModels,
+      selectedId: activeResultId ?? selectedOutputItem?.image.recordId,
+      loading: isLoadingOutputs,
+      errorMessage: outputLoadError,
+      emptyMessage: "Create an image to see results here.",
+    } as const;
+  }, [
+    activeSelectionContext,
+    sourceViewModels,
+    outputViewModels,
+    referenceViewModels,
+    activeSourceId,
+    activeResultId,
+    activeReferenceId,
+    selectedSourceItem,
+    selectedOutputItem,
+    selectedReferenceItem,
+    isLoadingSources,
+    isLoadingReferences,
+    isLoadingOutputs,
+    sourceLoadError,
+    referenceLoadError,
+    outputLoadError,
+  ]);
+
+  const loadCollection = (
+    datasetBindingId: ReferenceImageDatasetBindingId,
+    setLoading: (value: boolean) => void,
+    setError: (value: string | undefined) => void,
+  ): Promise<ReadonlyArray<OutputGalleryItem>> => {
     if (!draft?.draftId) {
       return Promise.resolve(Object.freeze([]));
     }
-    setIsLoadingResults(true);
-    return studioShell.listReferenceImageOutputs({
-      studioId: context.studioId,
-      draftId: draft.draftId,
-      limit: 24,
-      offset: 0,
-    }).then((response) => {
+    setLoading(true);
+    setError(undefined);
+
+    const request = datasetBindingId === "output-image-dataset"
+      ? studioShell.listReferenceImageOutputs({
+        studioId: context.studioId,
+        draftId: draft.draftId,
+        limit: 24,
+        offset: 0,
+      })
+      : studioShell.listReferenceImageDatasetItems({
+        studioId: context.studioId,
+        draftId: draft.draftId,
+        datasetBindingId,
+        limit: 24,
+        offset: 0,
+      });
+
+    return request.then((response) => {
       if (!response.ok || !response.data) {
+        setError(response.error?.message ?? "Couldn't load images right now.");
         return Object.freeze([]);
       }
-      setItems(response.data.items);
-      if (!activeResultId && response.data.items[0]) {
-        setActiveResultId(response.data.items[0].image.recordId);
-      }
       return response.data.items;
-    }).finally(() => setIsLoadingResults(false));
+    }).finally(() => setLoading(false));
+  };
+
+  const loadCollections = (): Promise<void> => {
+    if (!draft?.draftId) {
+      setSourceItems(Object.freeze([]));
+      setOutputItems(Object.freeze([]));
+      setReferenceItems(Object.freeze([]));
+      return Promise.resolve();
+    }
+
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+
+    return Promise.all([
+      loadCollection("input-image-dataset", setIsLoadingSources, setSourceLoadError),
+      loadCollection("output-image-dataset", setIsLoadingOutputs, setOutputLoadError),
+      loadCollection("reference-image-dataset", setIsLoadingReferences, setReferenceLoadError),
+    ]).then(([nextSources, nextOutputs, nextReferences]) => {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setSourceItems(nextSources);
+      setOutputItems(nextOutputs);
+      setReferenceItems(nextReferences);
+
+      const nextSource = resolveSelectedItem(nextSources, activeSourceId ?? selectedRecordId);
+      const nextOutput = resolveSelectedItem(nextOutputs, activeResultId);
+      const nextReference = resolveSelectedItem(nextReferences, activeReferenceId);
+
+      if (nextSource) {
+        setActiveSourceId(nextSource.image.recordId);
+      }
+      if (nextOutput) {
+        setActiveResultId(nextOutput.image.recordId);
+      }
+      if (nextReference) {
+        setActiveReferenceId(nextReference.image.recordId);
+      }
+    });
   };
 
   useEffect(() => {
-    void loadResults();
+    void loadCollections();
   }, [draft?.draftId]);
 
   if (!isTemplateDraft || !draft) {
@@ -158,9 +375,11 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
                   setSelectedRecordId(response.data.recordId);
                   setSelectedAssetId(response.data.image.assetId);
                   setDatasetInstanceId(response.data.datasetInstanceId);
+                  setActiveSourceId(response.data.recordId);
+                  setActiveSelectionContext("source");
                   setStatusMessage("Photo ready.");
                 })
-                .then(() => loadResults())
+                .then(() => loadCollections())
                 .finally(() => setIsUploading(false));
             }}
           />
@@ -285,7 +504,8 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
                     runtimeResult,
                   }),
                   refreshViews: async () => {
-                    await loadResults();
+                    await loadCollections();
+                    setActiveSelectionContext("output");
                   },
                   onSnapshot: (snapshot) => {
                     setFlowSteps(snapshot.steps);
@@ -325,66 +545,70 @@ export function ImageManipulationRuntimeEditorPanel({ context }: ImageManipulati
           </section>
         </aside>
         <div className="ui-image-editor-page__right-column ui-stack ui-stack--sm">
-          <section className="ui-image-surface ui-image-editor-page__preview-panel">
-            <header className="ui-image-surface__header">
-              <h3 className="ui-image-surface__title">Preview</h3>
-            </header>
-            {selectedViewModel ? (
-              <ImageViewer
-                image={selectedViewModel}
-                renderOptions={{
-                  fitMode: "contain",
-                  zoomCapability: "buttons",
-                  placeholderBehavior: "show-placeholder",
-                  lazyLoad: false,
-                  allowSelectionHighlight: true,
-                }}
-                selection={{
-                  mode: "single",
-                  selectedIds: [selectedViewModel.imageId],
-                  focusedId: selectedViewModel.imageId,
-                }}
-                showMetadata
-              />
-            ) : (
-              <p className="ui-text-small ui-text-secondary">Your newest image will appear here.</p>
-            )}
-          </section>
+          <ImagePreviewPanel
+            className="ui-image-editor-page__preview-panel"
+            title="Image preview"
+            subtitle={previewContextLabels[activeSelectionContext]}
+            image={selectedPreviewViewModel}
+            loading={previewLoading}
+            errorMessage={previewErrorMessage}
+            emptyMessage="Select a source, result, or face reference image to preview it here."
+            unavailableMessage="This image is currently unavailable."
+          />
           <section className="ui-image-surface ui-image-editor-page__gallery-panel">
-            <header className="ui-image-surface__header">
-              <h3 className="ui-image-surface__title">Results gallery</h3>
+            <header className="ui-image-surface__header ui-image-editor-page__gallery-header">
+              <h3 className="ui-image-surface__title">Image browser</h3>
             </header>
-            {isLoadingResults ? <p className="ui-text-small ui-text-secondary">Loading results...</p> : null}
-            {!isLoadingResults && viewModels.length === 0 ? (
-              <p className="ui-text-small ui-text-secondary">No results yet. Create an image to populate the gallery.</p>
-            ) : null}
-            <div className="ui-image-editor-page__gallery-slider">
-              {viewModels.map((item) => {
-                const selected = (activeResultId ?? viewModels[0]?.imageId) === item.imageId;
-                return (
-                  <button
-                    type="button"
-                    key={item.imageId}
-                    className={`ui-image-editor-page__gallery-item ${selected ? "ui-image-editor-page__gallery-item--active" : ""}`}
-                    onClick={() => setActiveResultId(item.imageId)}
-                  >
-                    <ImageRenderFrame
-                      image={item}
-                      selected={selected}
-                      className="ui-image-editor-page__gallery-frame"
-                      renderOptions={{
-                        fitMode: "cover",
-                        zoomCapability: "disabled",
-                        placeholderBehavior: "show-placeholder",
-                        lazyLoad: true,
-                        allowSelectionHighlight: true,
-                      }}
-                    />
-                    <span className="ui-text-small ui-text-secondary">{item.imageId}</span>
-                  </button>
-                );
-              })}
+            <div className="ui-image-editor-page__gallery-contexts" role="tablist" aria-label="Image collections">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeSelectionContext === "output"}
+                className={`ui-button ui-button--sm ${activeSelectionContext === "output" ? "ui-button--primary" : "ui-button--ghost"}`}
+                onClick={() => setActiveSelectionContext("output")}
+              >
+                Results ({outputItems.length})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeSelectionContext === "source"}
+                className={`ui-button ui-button--sm ${activeSelectionContext === "source" ? "ui-button--primary" : "ui-button--ghost"}`}
+                onClick={() => setActiveSelectionContext("source")}
+              >
+                Source ({sourceItems.length})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeSelectionContext === "reference"}
+                className={`ui-button ui-button--sm ${activeSelectionContext === "reference" ? "ui-button--primary" : "ui-button--ghost"}`}
+                onClick={() => setActiveSelectionContext("reference")}
+              >
+                Face reference ({referenceItems.length})
+              </button>
             </div>
+            <ImageGallerySlider
+              className="ui-image-editor-page__gallery-slider-panel"
+              title={activeGallery.title}
+              subtitle={activeGallery.subtitle}
+              items={activeGallery.items}
+              selectedImageId={activeGallery.selectedId}
+              loading={activeGallery.loading}
+              errorMessage={activeGallery.errorMessage}
+              emptyMessage={activeGallery.emptyMessage}
+              onImageSelected={(imageId) => {
+                if (activeSelectionContext === "source") {
+                  setActiveSourceId(imageId);
+                  return;
+                }
+                if (activeSelectionContext === "reference") {
+                  setActiveReferenceId(imageId);
+                  return;
+                }
+                setActiveResultId(imageId);
+              }}
+            />
           </section>
         </div>
       </div>

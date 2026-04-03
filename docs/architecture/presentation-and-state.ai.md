@@ -745,3 +745,15 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - right top: image preview,
   - right bottom: horizontal results gallery strip.
 - Settings are rendered from the existing Comfy image manipulation property schema (`ComfyImageManipulationPropertySchema`) through a reusable editor component (`ui/components/assets/image-system/ComfyImageManipulationPropertyEditor.tsx`) with grouped non-technical sections and collapsed advanced controls.
+
+## AI Loom image manipulation update: primary preview + gallery slider runtime panels (stories 7.3-7.4)
+
+- The runtime editor now uses reusable image-system primitives for right-side runtime browsing:
+  - `ui/components/assets/image-system/ImagePreviewPanel.tsx`
+  - `ui/components/assets/image-system/ImageGallerySlider.tsx`
+- `ImageManipulationRuntimeEditorPanel` now loads dataset-bound image collections for:
+  - source input dataset (`input-image-dataset`)
+  - generated output dataset (`output-image-dataset`)
+  - optional FaceID/reference dataset (`reference-image-dataset`)
+- Preview selection is now explicit and context-aware (`source` / `output` / `reference`) and updates from runtime page selection state without exposing filesystem paths or storage internals.
+- Empty/loading/unavailable/error states are now explicit in both preview and gallery surfaces, keeping runtime UX user-facing while preserving storage-instance/dataset-instance boundaries.

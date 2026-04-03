@@ -34,11 +34,14 @@ import type {
   ChainReferenceImageDatasetItemRequest,
   ListReferenceImageRunHistoryRequest,
   ListReferenceImageOutputsRequest,
+  GetReferenceImageOutputRequest,
+  ListReferenceImageDatasetItemsRequest,
+  GetReferenceImageDatasetItemRequest,
   PersistReferenceImageOutputsReadModel,
   PersistReferenceImageOutputsRequest,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import type { ImageRunHistoryListing } from "../../application/system-runtime/ImageRunHistoryDataContract";
-import type { OutputGalleryListing } from "../../application/system-runtime/OutputGalleryDataContract";
+import type { OutputGalleryItem, OutputGalleryListing } from "../../application/system-runtime/OutputGalleryDataContract";
 import type {
   StartSystemRuntimeExecutionRequest,
   StartSystemRuntimeExecutionResponse,
@@ -291,6 +294,27 @@ export class StudioShellService {
   ): Promise<StudioShellApiResponse<OutputGalleryListing>> {
     const raw = await this.requireBridge().listReferenceImageOutputs(JSON.stringify(request));
     return JSON.parse(raw) as StudioShellApiResponse<OutputGalleryListing>;
+  }
+
+  public async getReferenceImageOutput(
+    request: GetReferenceImageOutputRequest,
+  ): Promise<StudioShellApiResponse<OutputGalleryItem>> {
+    const raw = await this.requireBridge().getReferenceImageOutput(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<OutputGalleryItem>;
+  }
+
+  public async listReferenceImageDatasetItems(
+    request: ListReferenceImageDatasetItemsRequest,
+  ): Promise<StudioShellApiResponse<OutputGalleryListing>> {
+    const raw = await this.requireBridge().listReferenceImageDatasetItems(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<OutputGalleryListing>;
+  }
+
+  public async getReferenceImageDatasetItem(
+    request: GetReferenceImageDatasetItemRequest,
+  ): Promise<StudioShellApiResponse<OutputGalleryItem>> {
+    const raw = await this.requireBridge().getReferenceImageDatasetItem(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<OutputGalleryItem>;
   }
 
   public async listReferenceImageRunHistory(

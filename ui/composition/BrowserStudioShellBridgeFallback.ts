@@ -62,6 +62,9 @@ export function resolveBrowserStudioShellBridgeFallback(): DesktopStudioShellBri
     ingestReferenceImageUpload: (requestJson) => studioApi.ingestReferenceImageUpload(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     persistReferenceImageOutputs: (requestJson) => studioApi.persistReferenceImageOutputs(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     listReferenceImageOutputs: (requestJson) => studioApi.listReferenceImageOutputs(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    getReferenceImageOutput: (requestJson) => studioApi.getReferenceImageOutput(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    listReferenceImageDatasetItems: (requestJson) => studioApi.listReferenceImageDatasetItems(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    getReferenceImageDatasetItem: (requestJson) => studioApi.getReferenceImageDatasetItem(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     listReferenceImageRunHistory: (requestJson) => studioApi.listReferenceImageRunHistory(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     chainReferenceImageDatasetItemToInput: (requestJson) => studioApi.chainReferenceImageDatasetItemToInput(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
   });

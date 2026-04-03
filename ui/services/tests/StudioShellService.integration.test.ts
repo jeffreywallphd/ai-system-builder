@@ -217,6 +217,15 @@ function installBridge(
     listReferenceImageOutputs(requestJson: string) {
       return api.listReferenceImageOutputs(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
+    getReferenceImageOutput(requestJson: string) {
+      return api.getReferenceImageOutput(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    listReferenceImageDatasetItems(requestJson: string) {
+      return api.listReferenceImageDatasetItems(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    getReferenceImageDatasetItem(requestJson: string) {
+      return api.getReferenceImageDatasetItem(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
     listReferenceImageRunHistory(requestJson: string) {
       return api.listReferenceImageRunHistory(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
