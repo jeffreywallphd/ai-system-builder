@@ -45,6 +45,7 @@ export const ImageManipulationWorkflowTemplate: WorkflowTemplateDefinition = Obj
     }),
   ]),
   parameterDefaults: Object.freeze([
+    Object.freeze({ parameterId: "positivePrompt", value: defaultConfig.prompts.positivePrompt }),
     Object.freeze({ parameterId: "negativePrompt", value: defaultConfig.prompts.negativePrompt }),
     Object.freeze({ parameterId: "steps", value: defaultConfig.generation.steps }),
     Object.freeze({ parameterId: "cfg", value: defaultConfig.generation.cfg }),
@@ -58,6 +59,7 @@ export const ImageManipulationWorkflowTemplate: WorkflowTemplateDefinition = Obj
     Object.freeze({ parameterId: "faceIdEnabled", value: defaultConfig.faceId.enabled }),
   ]),
   parameters: Object.freeze([
+    Object.freeze({ parameterId: "positivePrompt", name: "Describe what to create", type: "string", required: true, defaultValue: defaultConfig.prompts.positivePrompt }),
     Object.freeze({ parameterId: "negativePrompt", name: "Avoid in output", type: "string", required: true, defaultValue: defaultConfig.prompts.negativePrompt }),
     Object.freeze({ parameterId: "steps", name: "Steps", type: "integer", required: true, defaultValue: defaultConfig.generation.steps, validation: { min: 1, max: 200 } }),
     Object.freeze({ parameterId: "cfg", name: "Guidance", type: "number", required: true, defaultValue: defaultConfig.generation.cfg, validation: { min: 1, max: 30 } }),
@@ -79,6 +81,7 @@ export const ImageManipulationWorkflowTemplate: WorkflowTemplateDefinition = Obj
         inputIds: ["sourceImage", "instruction"],
         outputIds: ["images"],
         parameterIds: [
+          "positivePrompt",
           "negativePrompt",
           "steps",
           "cfg",
@@ -119,6 +122,7 @@ export const ImageManipulationWorkflowTemplate: WorkflowTemplateDefinition = Obj
       }),
     ]),
     parameterMappings: Object.freeze([
+      Object.freeze({ parameterId: "positivePrompt", workflowAssetId: "asset:workflow:image-to-image", workflowParameterId: "positivePrompt" }),
       Object.freeze({ parameterId: "negativePrompt", workflowAssetId: "asset:workflow:image-to-image", workflowParameterId: "negativePrompt" }),
       Object.freeze({ parameterId: "steps", workflowAssetId: "asset:workflow:image-to-image", workflowParameterId: "steps" }),
       Object.freeze({ parameterId: "cfg", workflowAssetId: "asset:workflow:image-to-image", workflowParameterId: "cfg" }),
@@ -132,6 +136,13 @@ export const ImageManipulationWorkflowTemplate: WorkflowTemplateDefinition = Obj
       Object.freeze({ parameterId: "faceIdEnabled", workflowAssetId: "asset:workflow:image-to-image", workflowParameterId: "faceIdEnabled" }),
     ]),
     systemContextMappings: Object.freeze([
+      Object.freeze({
+        mappingId: "image-manipulation.context.positive-prompt-parameter",
+        contextKey: "editInstruction",
+        workflowAssetId: "asset:workflow:image-to-image",
+        targetKind: "workflow-parameter",
+        targetId: "positivePrompt",
+      }),
       Object.freeze({
         mappingId: "image-manipulation.context.positive-prompt",
         contextKey: "editInstruction",

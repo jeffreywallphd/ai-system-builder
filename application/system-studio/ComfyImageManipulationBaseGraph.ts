@@ -76,7 +76,7 @@ export const ComfyImageManipulationBaseGraph: ComfyImageManipulationBaseGraph = 
       classType: "VAEEncode",
       inputs: Object.freeze({
         pixels: ["2", 0],
-        vae: ["1", 2],
+        vae: ["9", 0],
       }),
       title: "Encode source image",
       purpose: "Convert source image to latent space for img2img sampling.",
@@ -124,10 +124,19 @@ export const ComfyImageManipulationBaseGraph: ComfyImageManipulationBaseGraph = 
       classType: "VAEDecode",
       inputs: Object.freeze({
         samples: ["6", 0],
-        vae: ["1", 2],
+        vae: ["9", 0],
       }),
       title: "Decode edited latent",
       purpose: "Decode sampled latent to image space.",
+    }),
+    Object.freeze({
+      nodeId: "9",
+      classType: "VAELoader",
+      inputs: Object.freeze({
+        vae_name: "{{models.vaeModel}}",
+      }),
+      title: "Load VAE",
+      purpose: "Resolve explicit VAE selection for non-embedded and runtime-selected detail models.",
     }),
     Object.freeze({
       nodeId: "8",

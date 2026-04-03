@@ -1297,3 +1297,13 @@
   - `application/system-studio/tests/ComfyImageManipulationDatasetBindingAsset.test.ts`
   - `application/system-studio/tests/ImageManipulationSystemTemplate.test.ts`
   - `application/system-studio/tests/ReferenceImageSystemTemplate.test.ts`
+
+## AI Loom image manipulation update: prompt conditioning + model/VAE workflow bindings (stories 4.5-4.6)
+
+- Prompt conditioning bindings now map both schema prompt fields directly into concrete Comfy conditioning nodes (`4.text` positive, `5.text` negative) through the versioned property-mapping asset contract, keeping schema -> mapping -> graph linkage inspectable.
+- The default image manipulation workflow template now includes explicit positive/negative prompt parameter defaults and parameter mappings so template execution remains runnable out of the box while still allowing context-driven prompt overrides.
+- Model bindings now map checkpoint and VAE selection into concrete graph/runtime inputs:
+  - checkpoint -> `CheckpointLoaderSimple.ckpt_name`
+  - VAE -> `VAELoader.vae_name`
+- The base graph now includes an explicit `VAELoader` node and routes both encode/decode VAE dependencies through that node, enabling non-embedded VAE paths without adding runtime special-case loaders.
+- Tests now cover prompt, checkpoint, VAE, and default-readiness binding behavior across base-graph, mapping-asset, and workflow-template seams.
