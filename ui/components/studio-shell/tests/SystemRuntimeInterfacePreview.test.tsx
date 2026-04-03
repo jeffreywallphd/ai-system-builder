@@ -1,8 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import type { StudioAssetDefinition } from "../../../studio-shell/studio-assets/StudioAssetContracts";
 import { renderToStaticMarkup } from "react-dom/server";
+import { ImageManipulationSystemTemplate } from "../../../../application/system-studio/ImageManipulationSystemTemplate";
+import { ReferenceImageSystemTemplate } from "../../../../application/system-studio/ReferenceImageSystemTemplate";
+import { resolveSystemBuildTemplate } from "../../../../application/system-studio/SystemBuildTemplateCatalog";
 import SystemRuntimeInterfacePreview from "../system/SystemRuntimeInterfacePreview";
 import { StudioAssetRenderModes, StudioUiAssetKinds } from "../../../studio-shell/studio-assets/StudioAssetContracts";
+import { imageManipulationEditorPageAssetDefinition } from "../../../studio-shell/studio-assets/ImageManipulationEditorPageAsset";
 
 describe("SystemRuntimeInterfacePreview", () => {
   it("renders authored page layout panels and empty-state pages from draft content", () => {
@@ -156,4 +160,55 @@ describe("SystemRuntimeInterfacePreview", () => {
     expect(html).toContain('data-testid="system-runtime-interface-panel-notice-alerts-invalid-configuration"');
   });
 
+  it("renders the default image editor page from the build template seed", () => {
+    const template = resolveSystemBuildTemplate(ImageManipulationSystemTemplate.templateId);
+    const html = renderToStaticMarkup(
+      <SystemRuntimeInterfacePreview
+        content={template?.draftSeed.contentTemplate ?? ""}
+        extensionContext={{
+          studioId: "system-studio",
+          snapshot: {
+            studioId: "system-studio",
+            studioName: "System Studio",
+            activeSessionId: "session-image-default",
+            sessionStatus: "active",
+            draft: {
+              draftId: "draft-image-default",
+              assetId: ReferenceImageSystemTemplate.systemAsset.assetId,
+              content: template?.draftSeed.contentTemplate ?? "",
+              revision: 1,
+              lifecycleStatus: "draft",
+              metadata: {
+                title: "Image Manipulation System",
+                tags: ["system"],
+              },
+              dependencies: [],
+              publishedVersionIds: [],
+              createdAt: "2026-04-03T00:00:00.000Z",
+              updatedAt: "2026-04-03T00:00:00.000Z",
+            },
+            versions: [],
+            validationIssues: [],
+          },
+          validationIssues: [],
+          handoffContext: {},
+          isBusy: false,
+          operations: {},
+        }}
+        studioAssetHosts={{
+          [ImageManipulationSystemTemplate.compositionBindings.pageBindingId]: {
+            asset: imageManipulationEditorPageAssetDefinition,
+            resolveInput: ({ extensionContext }) => ({
+              extensionContext,
+            }),
+          },
+        }}
+      />,
+    );
+
+    expect(html).toContain("Image edit workspace");
+    expect(html).toContain("Image preview");
+    expect(html).toContain("Image browser");
+    expect(html).toContain("Create image");
+  });
 });

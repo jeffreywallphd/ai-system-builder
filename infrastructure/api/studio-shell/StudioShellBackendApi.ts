@@ -2907,7 +2907,9 @@ export class StudioShellBackendApi {
       return;
     }
     const runtimeSystemId = this.resolveReferenceRuntimeSystemId(draft);
-    await this.ensureReferenceImageDatasetInstances(runtimeSystemId);
+    await this.ensureReferenceImageDatasetInstances(runtimeSystemId, {
+      includeOptionalReferenceDatasets: true,
+    });
   }
 
   public async initializeReferenceImageStorage(

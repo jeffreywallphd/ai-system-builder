@@ -903,3 +903,13 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - advanced-field placement is derived from schema metadata/grouping (including model controls and explicitly tagged advanced fields),
   - advanced controls are collapsed near the bottom by default with user-facing section labels (`Model choices`, `Generation tuning`, `Identity timing and model controls`),
   - primary beginner-facing controls remain prominent in top sections.
+
+## AI Loom image manipulation update: runtime-ready default initialization + UI coverage hardening (stories 7.9-7.10)
+
+- Reference-image template draft creation now provisions all runtime image-editor dataset bindings by default (`input-image-dataset`, `output-image-dataset`, `reference-image-dataset`) through existing storage-instance/dataset-instance seams, so first-load runtime reads no longer depend on user-triggered setup.
+- The image editor runtime page asset (`system-page:image-manipulation`) is now part of the default studio-asset registry path, keeping page-asset lookup/renderer resolution aligned with shared registry contracts instead of panel-local wiring only.
+- UI/runtime coverage now includes:
+  - default image-editor runtime composition from seeded build-template content,
+  - page-asset registry/renderer resolution assertions,
+  - runtime editor default-state assertions (property editor defaults, preview/gallery empty-ready states, run-action gating cues),
+  - run lifecycle transition assertions through the reusable execution-flow service.

@@ -8,7 +8,7 @@ import { createSystemContextContract } from "../../../domain/system-studio/Syste
 describe("ReferenceImageExecutionFlowService", () => {
   it("emits plain-language step status across trigger, execution, save, and refresh", async () => {
     const service = new ReferenceImageExecutionFlowService();
-    const snapshots: ReadonlyArray<unknown>[] = [];
+    const snapshots: string[] = [];
     const performanceReports: ReadonlyArray<unknown>[] = [];
 
     const final = await service.run({
@@ -55,7 +55,7 @@ describe("ReferenceImageExecutionFlowService", () => {
       }),
       refreshViews: async () => {},
       onSnapshot: (snapshot) => {
-        snapshots.push([snapshot]);
+        snapshots.push(`${snapshot.overallStatus}:${snapshot.steps.map((step) => `${step.stepId}:${step.status}`).join("|")}`);
       },
       onPerformanceReport: (report) => {
         performanceReports.push([report]);
@@ -68,6 +68,8 @@ describe("ReferenceImageExecutionFlowService", () => {
     expect(final.steps.some((step) => step.userLabel === "Saving")).toBeTrue();
     expect(final.steps.some((step) => step.userLabel === "Finished")).toBeTrue();
     expect(snapshots.length).toBeGreaterThan(0);
+    expect(snapshots.some((entry) => entry.startsWith("running:"))).toBeTrue();
+    expect(snapshots[snapshots.length - 1]?.startsWith("completed:")).toBeTrue();
     expect(performanceReports.length).toBe(1);
   });
 

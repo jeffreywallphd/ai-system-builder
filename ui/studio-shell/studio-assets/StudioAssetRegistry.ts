@@ -11,6 +11,7 @@ import { defaultComposedStudioUiContracts } from "./StudioUiComposedAssetContrac
 import {
   studioSurfaceAssetDefinitions,
 } from "./StudioSurfaceAssetDefinitions";
+import { imageManipulationEditorPageAssetDefinition } from "./ImageManipulationEditorPageAsset";
 import type { StudioEmbeddedEvent } from "./StudioEmbeddedEventContracts";
 import {
   deserializeStudioAssetCompositionDocument,
@@ -383,6 +384,11 @@ export function createDefaultStudioAssetRegistry(): StudioAssetRegistry {
   registry.registerMany(defaultComposedStudioUiContracts.map((contract) => registrationFromContract(contract)));
   registry.registerMany(
     studioSurfaceAssetDefinitions
+      .map((definition) => definition as StudioAssetDefinition<unknown, StudioEmbeddedEvent>)
+      .map((definition) => registrationFromDefinition(definition)),
+  );
+  registry.registerMany(
+    [imageManipulationEditorPageAssetDefinition]
       .map((definition) => definition as StudioAssetDefinition<unknown, StudioEmbeddedEvent>)
       .map((definition) => registrationFromDefinition(definition)),
   );

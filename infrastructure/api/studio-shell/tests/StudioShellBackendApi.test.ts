@@ -270,6 +270,48 @@ describe("StudioShellBackendApi", () => {
     expect(provisioner.calls).toEqual(["storage-instance:asset:system:reference-image-manipulation:image-runtime"]);
   });
 
+  it("provisions all image-editor dataset bindings at draft creation without extra setup", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    const initialized = await api.initializeStudio("studio-system", "System Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+    const created = await api.createDraft({
+      studioId: "studio-system",
+      sessionId,
+      assetId: "asset:system:reference-image-manipulation",
+      content: JSON.stringify({ systemSpec: {} }),
+      metadata: {
+        title: "Reference image",
+        tags: ["system"],
+        taxonomy: {
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "deterministic",
+        },
+      },
+    });
+
+    expect(created.ok).toBeTrue();
+    const runtimeSystemId = `system:studio:${created.data!.draft!.draftId}`;
+    const datasetInstances = (api as unknown as {
+      readonly referenceImageDatasets: {
+        readonly listSystemDatasetInstances: (systemId: string) => ReadonlyArray<{
+          readonly seedMetadata?: Readonly<Record<string, unknown>>;
+        }>;
+      };
+    }).referenceImageDatasets.listSystemDatasetInstances(runtimeSystemId);
+
+    const bindingIds = datasetInstances
+      .map((instance) => instance.seedMetadata?.datasetBindingId)
+      .filter((value): value is string => typeof value === "string")
+      .sort();
+
+    expect(bindingIds).toEqual([
+      "input-image-dataset",
+      "output-image-dataset",
+      "reference-image-dataset",
+    ]);
+  });
+
   it("ignores caller-provided upload path hints and ingests through dataset storage bindings", async () => {
     const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
     const initialized = await api.initializeStudio("studio-system", "System Studio");
