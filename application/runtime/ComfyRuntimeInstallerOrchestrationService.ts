@@ -24,6 +24,10 @@ import {
   createComfyRuntimeInstallerPersistedState,
 } from "./ComfyRuntimeInstallerStateContract";
 import { type ComfyRuntimeLifecycleResult } from "./ComfyRuntimeLifecycleContract";
+import {
+  createComfyRuntimeSystemDiagnosticsFromOrchestration,
+  type ComfyRuntimeSystemDiagnostics,
+} from "./ComfyRuntimeSystemDiagnostics";
 
 export const ComfyRuntimeOrchestrationStates = Object.freeze({
   ready: "ready",
@@ -142,6 +146,7 @@ export interface ComfyRuntimeInstallerOrchestrationResult {
   }>;
   readonly phases: ReadonlyArray<ComfyRuntimeOrchestrationPhaseResult>;
   readonly issues: ReadonlyArray<ComfyRuntimeOrchestrationIssue>;
+  readonly systemDiagnostics: ComfyRuntimeSystemDiagnostics;
   readonly persistedState?: Readonly<{
     readonly loaded: boolean;
     readonly statePath?: string;
@@ -462,7 +467,7 @@ export class ComfyRuntimeInstallerOrchestrationService {
       await this.stateStore.save(persistedState);
     }
 
-    return Object.freeze({
+    const baseResult = Object.freeze({
       state,
       runtimeAsset: installerRequests.runtimeAsset,
       resolvedTargets: Object.freeze({
@@ -485,6 +490,11 @@ export class ComfyRuntimeInstallerOrchestrationService {
       phases: Object.freeze(phases),
       issues: Object.freeze(issues),
       persistedState: persistedStateInfo,
+    });
+
+    return Object.freeze({
+      ...baseResult,
+      systemDiagnostics: createComfyRuntimeSystemDiagnosticsFromOrchestration(baseResult),
     });
   }
 

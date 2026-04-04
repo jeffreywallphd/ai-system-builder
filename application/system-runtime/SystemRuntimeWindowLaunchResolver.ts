@@ -1,4 +1,5 @@
 import { ImageManipulationSystemTemplate } from "../system-studio/ImageManipulationSystemTemplate";
+import type { ComfyRuntimeSystemDiagnostics } from "../runtime/ComfyRuntimeSystemDiagnostics";
 import {
   type LaunchSystemRuntimeWindowRequest,
   createSystemRuntimeWindowLaunchContract,
@@ -64,6 +65,7 @@ export interface CreateImageManipulationRuntimeWindowLaunchRequest {
   readonly targetKind?: "standalone-system" | "embedded-subsystem";
   readonly subsystemId?: string;
   readonly runtimeContextPayload?: Readonly<Record<string, unknown>>;
+  readonly runtimeDiagnostics?: ComfyRuntimeSystemDiagnostics;
   readonly initialSelection?: {
     readonly selectedDatasetBindingId?: string;
     readonly activePreviewRole?: string;
@@ -98,7 +100,12 @@ export function createImageManipulationRuntimeWindowLaunchContract(
         workflowTemplateVersionId: ImageManipulationSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
       },
     },
-    runtimeContextPayload: input.runtimeContextPayload ?? {},
+    runtimeContextPayload: {
+      ...(input.runtimeContextPayload ?? {}),
+      ...(input.runtimeDiagnostics
+        ? { runtimeDiagnostics: input.runtimeDiagnostics }
+        : {}),
+    },
     datasetBindings: [
       {
         bindingId: "input-image-dataset",

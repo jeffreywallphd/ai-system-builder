@@ -10,6 +10,7 @@ import {
 } from "../ReferenceImageSystemTemplate";
 import { ComfyRuntimeInstallationAssetId } from "../../runtime/ComfyRuntimeInstallationAsset";
 import { ComfyRuntimeWorkflowProfiles } from "../../runtime/ComfyRuntimeRequirements";
+import { ComfyRuntimeSystemDiagnosticsVersion } from "../../runtime/ComfyRuntimeSystemDiagnostics";
 
 describe("ReferenceImageSystemTemplate", () => {
   it("defines a bounded reference-image system composition with explicit IO contracts", () => {
@@ -35,6 +36,9 @@ describe("ReferenceImageSystemTemplate", () => {
     expect(ReferenceImageSystemTemplate.runtimeInstallationAsset.assetId).toBe(ComfyRuntimeInstallationAssetId);
     expect(ReferenceImageSystemTemplate.runtimeInstallationAsset.defaultWorkflowProfile).toBe(
       ComfyRuntimeWorkflowProfiles.imageManipulationDefault,
+    );
+    expect(ReferenceImageSystemTemplate.runtimeInstallationAsset.diagnosticsContractVersion).toBe(
+      ComfyRuntimeSystemDiagnosticsVersion,
     );
     expect(ReferenceImageSystemTemplate.runtimeInstallationAsset.supportedWorkflowProfiles).toContain(
       ComfyRuntimeWorkflowProfiles.imageManipulationFaceId,
