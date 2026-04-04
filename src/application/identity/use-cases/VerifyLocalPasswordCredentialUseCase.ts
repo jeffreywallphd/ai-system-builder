@@ -1,4 +1,4 @@
-import { AuthProviderKinds } from "../../../domain/identity/IdentityDomain";
+import { AuthProviderCategories, AuthProviderStatuses, type AuthProvider } from "../../../domain/identity/IdentityDomain";
 import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
@@ -8,8 +8,10 @@ import {
   type IdentityOperationResult,
 } from "../../../../application/contracts/IdentityApplicationContracts";
 import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
-import type { ILocalPasswordCredentialService } from "../../../../application/identity/ports/ILocalPasswordCredentialService";
+import type { IIdentityCredentialAuthenticator } from "../../../../application/identity/ports/IIdentityCredentialAuthenticator";
+import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
+import { providerSupportsAuthenticator } from "../../../../application/identity/services/IdentityProviderCatalog";
 
 export type VerifyLocalPasswordCredentialErrorCode =
   | typeof IdentityErrorCodes.invalidCredentials
@@ -31,9 +33,10 @@ export interface VerifyLocalPasswordCredentialResult {
 }
 
 interface VerifyLocalPasswordCredentialDependencies {
+  readonly lookupRepository: IIdentityLookupRepository;
   readonly credentialMaterialRepository: ICredentialMaterialRepository;
   readonly identityPolicyService: IdentityPolicyService;
-  readonly passwordCredentialService: ILocalPasswordCredentialService;
+  readonly credentialAuthenticator: IIdentityCredentialAuthenticator;
 }
 
 export class VerifyLocalPasswordCredentialUseCase {
@@ -46,8 +49,13 @@ export class VerifyLocalPasswordCredentialUseCase {
     if (!providerIdResult.ok) {
       return providerIdResult;
     }
+    const providerResult = await this.resolveLocalProvider(providerIdResult.value);
+    if (!providerResult.ok) {
+      return providerResult;
+    }
+
     const normalizedCandidateResult = this.requireSecretCandidate(
-      this.dependencies.passwordCredentialService.normalizePassword(input.candidate),
+      this.dependencies.credentialAuthenticator.normalizeCandidate(input.candidate),
       "candidate",
     );
     if (!normalizedCandidateResult.ok) {
@@ -55,9 +63,9 @@ export class VerifyLocalPasswordCredentialUseCase {
     }
 
     const normalizedProviderReference = this.dependencies.identityPolicyService.normalizeProviderReference({
-      providerId: providerIdResult.value,
+      providerId: providerResult.value.id,
       providerSubject: input.providerSubject,
-      providerKind: AuthProviderKinds.localPassword,
+      providerKind: providerResult.value.kind,
     });
     if (!normalizedProviderReference.valid || !normalizedProviderReference.value) {
       return this.failure(
@@ -77,15 +85,20 @@ export class VerifyLocalPasswordCredentialUseCase {
       return this.invalidCredentialsFailure();
     }
 
-    const isValid = await this.dependencies.passwordCredentialService.verifyPassword(
-      normalizedCandidateResult.value,
-      {
-        hashAlgorithm: credentialMaterial.hashAlgorithm,
-        hashValue: credentialMaterial.hashValue,
-        salt: credentialMaterial.salt,
-        pepperVersion: credentialMaterial.pepperVersion,
-      },
-    );
+    const verifyCandidate = this.dependencies.credentialAuthenticator.verifyCandidate;
+    if (!verifyCandidate || !this.dependencies.credentialAuthenticator.capabilities.canVerifyCredentialMaterial) {
+      return this.failure(
+        IdentityErrorCodes.invalidRequest,
+        `Authenticator '${this.dependencies.credentialAuthenticator.kind}' cannot verify credential material.`,
+      );
+    }
+
+    const isValid = await verifyCandidate.call(this.dependencies.credentialAuthenticator, normalizedCandidateResult.value, {
+      hashAlgorithm: credentialMaterial.hashAlgorithm,
+      hashValue: credentialMaterial.hashValue,
+      salt: credentialMaterial.salt,
+      pepperVersion: credentialMaterial.pepperVersion,
+    });
     if (!isValid) {
       return this.invalidCredentialsFailure();
     }
@@ -104,6 +117,41 @@ export class VerifyLocalPasswordCredentialUseCase {
       IdentityErrorCodes.invalidCredentials,
       "Invalid credentials.",
     );
+  }
+
+  private async resolveLocalProvider(
+    providerId: string,
+  ): Promise<IdentityOperationResult<AuthProvider, VerifyLocalPasswordCredentialErrorCode>> {
+    const provider = await this.dependencies.lookupRepository.findAuthProviderById(providerId);
+    if (!provider) {
+      return this.failure(
+        IdentityErrorCodes.unsupportedProvider,
+        `Verification provider '${providerId}' is not configured.`,
+      );
+    }
+
+    if (provider.category !== AuthProviderCategories.local) {
+      return this.failure(
+        IdentityErrorCodes.unsupportedProvider,
+        `Verification provider '${providerId}' is not a local provider.`,
+      );
+    }
+
+    if (!providerSupportsAuthenticator(provider, this.dependencies.credentialAuthenticator.kind)) {
+      return this.failure(
+        IdentityErrorCodes.unsupportedProvider,
+        `Verification provider '${providerId}' does not support authenticator '${this.dependencies.credentialAuthenticator.kind}'.`,
+      );
+    }
+
+    if (provider.status !== AuthProviderStatuses.active) {
+      return this.failure(
+        IdentityErrorCodes.unsupportedProvider,
+        `Verification provider '${providerId}' is not active.`,
+      );
+    }
+
+    return identitySuccess(provider);
   }
 
   private requireNonEmpty(

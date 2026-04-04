@@ -23,6 +23,9 @@
 - `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
 - `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`
 - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
+- `application/identity/ports/IIdentityCredentialAuthenticator.ts`
+- `application/identity/services/IdentityProviderCatalog.ts`
+- `application/identity/services/LocalPasswordIdentityAuthenticator.ts`
 - `application/identity/ports/ILocalPasswordCredentialService.ts`
 - `infrastructure/security/identity/ScryptLocalPasswordCredentialService.ts`
 
@@ -35,25 +38,27 @@
 ## Provider extension seam
 
 - Provider model already supports `local-password`, `oidc`, `oauth2`, `saml`, `passkey`, `custom`.
+- Application provider descriptors include local capability metadata for authenticator support and credential expectations.
+- Application authenticator contracts include extensible authenticator kinds (`password`, `passkey`) without requiring passkey implementation now.
 - Identity links are provider-subject based, so external provider integration can reuse current contracts.
 - Local-password specific normalization is isolated in policy logic, not hardcoded through the whole stack.
 
 ## Local registration seam
 
 - `RegisterLocalAccountUseCase` runs full local registration orchestration in the application layer.
-- It validates/normalizes profile + provider subject, checks deterministic uniqueness conflicts, enforces credential policy, hashes password candidates through `ILocalPasswordCredentialService`, and persists identity + credential material.
+- It validates/normalizes profile + provider subject, checks deterministic uniqueness conflicts, enforces credential policy, validates provider/authenticator compatibility, hashes password candidates through `IIdentityCredentialAuthenticator`, and persists identity + credential material.
 - It depends only on identity application ports plus `IdentityPolicyService`, with structured operation results for duplicate/policy/provider/state failures.
 
 ## Local verification seam
 
 - `VerifyLocalPasswordCredentialUseCase` provides local password verification for login/auth flows.
-- It normalizes local provider references, resolves active credential material, and verifies candidates through `ILocalPasswordCredentialService`.
+- It resolves provider capability metadata, normalizes local provider references, resolves active credential material, and verifies candidates through `IIdentityCredentialAuthenticator`.
 - Missing credential material and password mismatches map to the same invalid-credentials failure contract.
 
 ## Local login seam
 
 - `LoginLocalAccountUseCase` provides the transport-agnostic local login flow for local-password identities.
-- It normalizes provider references, validates local provider-path compatibility, resolves the linked identity, enforces account/provider-link credential-state checks, and verifies credential candidates against active credential material.
+- It normalizes provider references, validates local provider-path compatibility via provider capability metadata, resolves the linked identity, enforces account/provider-link credential-state checks, and verifies credential candidates via the authenticator contract against active credential material.
 - It returns authenticated-principal result fields intended for subsequent session issuance and device-trust checks.
 - It emits structured failures for unknown identity, invalid credentials, inactive or disabled account state, and unsupported auth paths.
 

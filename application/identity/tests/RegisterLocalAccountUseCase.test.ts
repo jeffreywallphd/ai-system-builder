@@ -33,6 +33,7 @@ import type { IIdentityLookupRepository } from "../ports/IIdentityLookupReposito
 import type { IIdentityPersistenceRepository } from "../ports/IIdentityPersistenceRepository";
 import type { ILocalPasswordCredentialService } from "../ports/ILocalPasswordCredentialService";
 import { IdentityPolicyService } from "../services/IdentityPolicyService";
+import { LocalPasswordIdentityAuthenticator } from "../services/LocalPasswordIdentityAuthenticator";
 import { RegisterLocalAccountUseCase } from "../../../src/application/identity/use-cases/RegisterLocalAccountUseCase";
 
 class InMemoryIdentityRegistrationAdapter
@@ -207,7 +208,7 @@ function createUseCase(
     persistenceRepository: adapter,
     credentialMaterialRepository: adapter,
     identityPolicyService: new IdentityPolicyService(adapter),
-    passwordCredentialService,
+    credentialAuthenticator: new LocalPasswordIdentityAuthenticator(passwordCredentialService),
     idGenerator: adapter,
     clock: adapter,
   });

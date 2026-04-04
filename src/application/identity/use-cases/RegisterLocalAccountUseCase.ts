@@ -1,6 +1,5 @@
 import {
   AuthProviderCategories,
-  AuthProviderKinds,
   AuthProviderStatuses,
   UserIdentityStatuses,
   createLocalCredentialState,
@@ -23,8 +22,9 @@ import type { IIdentityClock } from "../../../../application/identity/ports/IIde
 import type { IIdentityIdGenerator } from "../../../../application/identity/ports/IIdentityIdGenerator";
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
-import type { ILocalPasswordCredentialService } from "../../../../application/identity/ports/ILocalPasswordCredentialService";
+import type { IIdentityCredentialAuthenticator } from "../../../../application/identity/ports/IIdentityCredentialAuthenticator";
 import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
+import { providerSupportsAuthenticator } from "../../../../application/identity/services/IdentityProviderCatalog";
 
 export type RegisterLocalAccountErrorCode =
   | typeof IdentityErrorCodes.duplicateIdentity
@@ -62,7 +62,7 @@ interface RegisterLocalAccountDependencies {
   readonly persistenceRepository: IIdentityPersistenceRepository;
   readonly credentialMaterialRepository: ICredentialMaterialRepository;
   readonly identityPolicyService: IdentityPolicyService;
-  readonly passwordCredentialService: ILocalPasswordCredentialService;
+  readonly credentialAuthenticator: IIdentityCredentialAuthenticator;
   readonly idGenerator: IIdentityIdGenerator;
   readonly clock: IIdentityClock;
 }
@@ -95,7 +95,7 @@ export class RegisterLocalAccountUseCase {
     }
 
     const credentialCandidateResult = this.requireSecretCandidate(
-      this.dependencies.passwordCredentialService.normalizePassword(input.credential.candidate),
+      this.dependencies.credentialAuthenticator.normalizeCandidate(input.credential.candidate),
       "credential.candidate",
     );
     if (!credentialCandidateResult.ok) {
@@ -104,6 +104,10 @@ export class RegisterLocalAccountUseCase {
 
     const providerId = providerIdResult.value;
     const credentialPolicyId = credentialPolicyIdResult.value;
+    const providerResult = await this.resolveLocalProvider(providerId);
+    if (!providerResult.ok) {
+      return providerResult;
+    }
 
     const normalizedProfile = this.dependencies.identityPolicyService.normalizeRegistrationInput({
       username: input.username,
@@ -126,7 +130,7 @@ export class RegisterLocalAccountUseCase {
     const normalizedProviderReference = this.dependencies.identityPolicyService.normalizeProviderReference({
       providerId,
       providerSubject: input.providerSubject ?? normalizedProfile.value.username,
-      providerKind: AuthProviderKinds.localPassword,
+      providerKind: providerResult.value.kind,
     });
     if (!normalizedProviderReference.valid || !normalizedProviderReference.value) {
       return this.failure(
@@ -141,11 +145,6 @@ export class RegisterLocalAccountUseCase {
       );
     }
 
-    const providerResult = await this.resolveLocalProvider(providerId);
-    if (!providerResult.ok) {
-      return providerResult;
-    }
-
     const credentialPolicyResult = await this.resolveCredentialPolicy(credentialPolicyId);
     if (!credentialPolicyResult.ok) {
       return credentialPolicyResult;
@@ -158,7 +157,7 @@ export class RegisterLocalAccountUseCase {
       providerReference: {
         providerId,
         providerSubject: normalizedProviderReference.value.providerSubject,
-        providerKind: AuthProviderKinds.localPassword,
+        providerKind: providerResult.value.kind,
       },
     });
     if (!uniqueness.outcome.ok) {
@@ -187,7 +186,16 @@ export class RegisterLocalAccountUseCase {
     const userIdentityId = this.dependencies.idGenerator.nextId(IdentityIdNamespaces.userIdentity);
     const credentialMaterialId = this.dependencies.idGenerator.nextId(IdentityIdNamespaces.credentialMaterial);
     const providerSubject = normalizedProviderReference.value.providerSubject;
-    const hashedCredentialMaterial = await this.dependencies.passwordCredentialService.hashPassword(
+    const issueCredentialMaterial = this.dependencies.credentialAuthenticator.issueCredentialMaterial;
+    if (!issueCredentialMaterial || !this.dependencies.credentialAuthenticator.capabilities.canIssueCredentialMaterial) {
+      return this.failure(
+        IdentityErrorCodes.invalidState,
+        `Authenticator '${this.dependencies.credentialAuthenticator.kind}' cannot issue credential material.`,
+      );
+    }
+
+    const hashedCredentialMaterial = await issueCredentialMaterial.call(
+      this.dependencies.credentialAuthenticator,
       credentialCandidateResult.value,
     );
     const hashAlgorithm = this.normalizeOptional(hashedCredentialMaterial.hashAlgorithm);
@@ -254,13 +262,17 @@ export class RegisterLocalAccountUseCase {
       );
     }
 
-    if (
-      provider.kind !== AuthProviderKinds.localPassword
-      || provider.category !== AuthProviderCategories.local
-    ) {
+    if (provider.category !== AuthProviderCategories.local) {
       return this.failure(
         IdentityErrorCodes.unsupportedProvider,
-        `Registration provider '${providerId}' is not a local password provider.`,
+        `Registration provider '${providerId}' is not a local provider.`,
+      );
+    }
+
+    if (!providerSupportsAuthenticator(provider, this.dependencies.credentialAuthenticator.kind)) {
+      return this.failure(
+        IdentityErrorCodes.unsupportedProvider,
+        `Registration provider '${providerId}' does not support authenticator '${this.dependencies.credentialAuthenticator.kind}'.`,
       );
     }
 
