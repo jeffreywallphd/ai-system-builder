@@ -75,3 +75,8 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 - Added `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts` as a concrete infrastructure adapter implementing identity repository ports without moving identity rules out of the domain/application layers.
 - Added explicit persistence mapper boundaries in `src/infrastructure/persistence/identity/IdentityPersistenceMapper.ts` so SQL row contracts remain infrastructure-only and domain/application models stay persistence-agnostic.
 - Added `src/infrastructure/persistence/sqlite/SqliteCompat.ts` and `src/infrastructure/persistence/identity/SqliteIdentityPersistenceMigrations.ts` to keep database opening/migration mechanics isolated to infrastructure.
+
+## Direction 6 boundary note: Identity policy and validation services (story 1.1.5)
+- Pure identity validation and normalization policy now lives in `src/domain/identity/IdentityPolicy.ts` (username/email/profile normalization, provider-subject normalization, credential-policy evaluation, and status-transition evaluation) so rule logic is reusable outside transport/UI handlers.
+- Application orchestration for identity conflicts now lives in `application/identity/services/IdentityPolicyService.ts`, where repository-backed uniqueness checks are centralized behind `IIdentityLookupRepository` instead of being duplicated across registration/login entry points.
+- Structured issue/conflict outputs are now machine-friendly and deterministic (`issues` + ordered `username/email/provider-subject` conflicts), which keeps outer layers thin and transport-agnostic.

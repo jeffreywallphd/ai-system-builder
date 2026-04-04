@@ -1744,3 +1744,15 @@ Explicitly later than this scope:
 - Added `src`-layer schema migrations in `src/infrastructure/persistence/identity/SqliteIdentityPersistenceMigrations.ts` and local SQLite compatibility seam in `src/infrastructure/persistence/sqlite/SqliteCompat.ts` to keep the new persistence slice infrastructure-contained.
 - Added explicit mapper boundaries in `src/infrastructure/persistence/identity/IdentityPersistenceMapper.ts` so domain/application contracts are translated independently from SQL operations and raw row shapes are not exposed to upper layers.
 - Added mapper and adapter tests in `src/infrastructure/persistence/identity/tests/*` covering mapping behavior, migration application, and CRUD/query flows for user identities, provider links, credential material, and sessions.
+
+## Direction 6 note: Identity policy and validation services (story 1.1.5)
+- Added a pure identity policy seam in `src/domain/identity/IdentityPolicy.ts` for deterministic normalization and reusable lifecycle validation:
+  - username/email/profile normalization,
+  - provider-subject normalization with provider-oriented behavior (local-password subjects normalize case; external subjects preserve case),
+  - credential candidate policy evaluation mapped to structured issues,
+  - user status-transition evaluation mapped to structured issues.
+- Added an application-layer reusable service in `application/identity/services/IdentityPolicyService.ts` to orchestrate:
+  - normalization reuse for registration/lookup inputs,
+  - repository-backed uniqueness checks for username/email/provider-subject seams,
+  - deterministic conflict ordering with machine-readable conflict records.
+- Added focused tests in `src/domain/identity/tests/IdentityPolicy.test.ts` and `application/identity/tests/IdentityPolicyService.test.ts` to cover normalization determinism, conflict detection, credential-policy evaluation, and status-transition validation behavior.

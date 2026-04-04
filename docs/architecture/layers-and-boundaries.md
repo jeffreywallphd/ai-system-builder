@@ -220,3 +220,9 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - Added `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts` as a concrete infrastructure adapter implementing identity repository ports while keeping domain/application identity semantics unchanged.
 - Added explicit infrastructure mapping boundaries in `src/infrastructure/persistence/identity/IdentityPersistenceMapper.ts` so raw SQL row shapes do not leak above the infrastructure layer.
 - Added `src`-layer SQLite compatibility + migration seams in `src/infrastructure/persistence/sqlite/SqliteCompat.ts` and `src/infrastructure/persistence/identity/SqliteIdentityPersistenceMigrations.ts`.
+
+## Direction 6 boundary note: Identity policy and validation services (story 1.1.5)
+
+- Pure identity validation and normalization policy now lives in `src/domain/identity/IdentityPolicy.ts` (username/email/profile normalization, provider-subject normalization, credential-policy evaluation, and status-transition evaluation) so rule logic is reusable outside transport/UI handlers.
+- Application orchestration for identity conflicts now lives in `application/identity/services/IdentityPolicyService.ts`, where repository-backed uniqueness checks are centralized behind `IIdentityLookupRepository` instead of being duplicated across registration/login entry points.
+- Structured issue/conflict outputs are now machine-friendly and deterministic (`issues` + ordered `username/email/provider-subject` conflicts), which keeps outer layers thin and transport-agnostic.
