@@ -96,3 +96,12 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 - `RegisterLocalAccountUseCase` now consumes password candidates and persists only derived hash material produced by that port.
 - Added `VerifyLocalPasswordCredentialUseCase` as a reusable login verification seam over active credential-material lookup plus password verification through the same port.
 - Added infrastructure security implementation `infrastructure/security/identity/ScryptLocalPasswordCredentialService.ts` using scrypt-based password derivation and timing-safe verification.
+
+## Direction 6 boundary note: Authoritative identity server endpoints (story 1.2.6)
+- Added a thin infrastructure API adapter (`infrastructure/api/identity/IdentityAuthBackendApi.ts`) that maps inner identity results to stable public API error codes.
+- Added authoritative HTTP transport handlers in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts` for registration/login (`POST /api/v1/identity/register`, `POST /api/v1/identity/login`).
+- Boundary posture is preserved:
+  - request validation is transport-only (`zod`);
+  - registration/login business rules remain in application use cases;
+  - host wiring is outer-layer only (`hosts/server/IdentityServerHost.ts`).
+- Transport logging now redacts credential-sensitive fields before emission, so credential material does not leak through infrastructure logs.

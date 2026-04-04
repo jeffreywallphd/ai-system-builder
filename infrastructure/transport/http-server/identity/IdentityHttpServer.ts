@@ -1,0 +1,384 @@
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { randomUUID } from "node:crypto";
+import { URL } from "node:url";
+import { z } from "zod";
+import type { IdentityAuthBackendApi } from "../../../api/identity/IdentityAuthBackendApi";
+import {
+  IdentityAuthApiErrorCodes,
+  type IdentityAuthApiResponse,
+  type LoginLocalIdentityApiRequest,
+  type RegisterLocalIdentityApiRequest,
+} from "../../../api/identity/sdk/PublicIdentityAuthApiContract";
+
+const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
+
+const RegisterRequestSchema: z.ZodType<RegisterLocalIdentityApiRequest> = z.object({
+  username: z.string().min(1),
+  email: z.string().email().optional(),
+  displayName: z.string().min(1).optional(),
+  providerId: z.string().min(1).optional(),
+  providerSubject: z.string().min(1).optional(),
+  credentialPolicyId: z.string().min(1).optional(),
+  credential: z.object({
+    candidate: z.string().min(1),
+  }).strict(),
+}).strict();
+
+const LoginRequestSchema: z.ZodType<LoginLocalIdentityApiRequest> = z.object({
+  providerId: z.string().min(1).optional(),
+  providerSubject: z.string().min(1),
+  credential: z.object({
+    candidate: z.string().min(1),
+  }).strict(),
+}).strict();
+
+export interface IdentityHttpServerLogEvent {
+  readonly event: string;
+  readonly requestId: string;
+  readonly method?: string;
+  readonly path?: string;
+  readonly statusCode?: number;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
+export interface IdentityHttpServerLogger {
+  info(event: IdentityHttpServerLogEvent): void;
+  warn(event: IdentityHttpServerLogEvent): void;
+  error(event: IdentityHttpServerLogEvent): void;
+}
+
+export interface IdentityHttpServerOptions {
+  readonly backendApi: IdentityAuthBackendApi;
+  readonly logger?: IdentityHttpServerLogger;
+  readonly maxBodyBytes?: number;
+}
+
+export function createIdentityHttpServer(options: IdentityHttpServerOptions): Server {
+  const logger = options.logger ?? new ConsoleIdentityHttpServerLogger();
+  const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+
+  return createServer(async (request, response) => {
+    const requestId = randomUUID();
+    const path = new URL(request.url ?? "/", "http://localhost").pathname;
+    logger.info(Object.freeze({
+      event: "identity-http.request.received",
+      requestId,
+      method: request.method,
+      path,
+    }));
+
+    try {
+      if (request.method !== "POST") {
+        writeJson(response, 404, {
+          ok: false,
+          error: {
+            code: IdentityAuthApiErrorCodes.invalidRequest,
+            message: "Route not found.",
+          },
+        });
+        logger.warn(Object.freeze({
+          event: "identity-http.request.not-found",
+          requestId,
+          method: request.method,
+          path,
+          statusCode: 404,
+        }));
+        return;
+      }
+
+      if (path === "/api/v1/identity/register") {
+        await handleRegister(request, response, requestId, options.backendApi, logger, maxBodyBytes);
+        return;
+      }
+      if (path === "/api/v1/identity/login") {
+        await handleLogin(request, response, requestId, options.backendApi, logger, maxBodyBytes);
+        return;
+      }
+
+      writeJson(response, 404, {
+        ok: false,
+        error: {
+          code: IdentityAuthApiErrorCodes.invalidRequest,
+          message: "Route not found.",
+        },
+      });
+      logger.warn(Object.freeze({
+        event: "identity-http.request.not-found",
+        requestId,
+        method: request.method,
+        path,
+        statusCode: 404,
+      }));
+    } catch (error) {
+      writeJson(response, 500, {
+        ok: false,
+        error: {
+          code: IdentityAuthApiErrorCodes.internal,
+          message: "Unexpected identity HTTP transport failure.",
+        },
+      });
+      logger.error(Object.freeze({
+        event: "identity-http.request.unhandled-error",
+        requestId,
+        method: request.method,
+        path,
+        statusCode: 500,
+        details: {
+          error: normalizeError(error),
+        },
+      }));
+    }
+  });
+}
+
+async function handleRegister(
+  request: IncomingMessage,
+  response: ServerResponse,
+  requestId: string,
+  backendApi: IdentityAuthBackendApi,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<void> {
+  const parsedRequest = await parseAndValidateRequest(
+    request,
+    RegisterRequestSchema,
+    requestId,
+    logger,
+    maxBodyBytes,
+  );
+  if (!parsedRequest.ok) {
+    writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+    return;
+  }
+
+  const apiResponse = await backendApi.registerLocalAccount(parsedRequest.data);
+  const statusCode = mapStatusCode(apiResponse);
+  writeJson(response, statusCode, apiResponse);
+  logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+}
+
+async function handleLogin(
+  request: IncomingMessage,
+  response: ServerResponse,
+  requestId: string,
+  backendApi: IdentityAuthBackendApi,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<void> {
+  const parsedRequest = await parseAndValidateRequest(
+    request,
+    LoginRequestSchema,
+    requestId,
+    logger,
+    maxBodyBytes,
+  );
+  if (!parsedRequest.ok) {
+    writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+    return;
+  }
+
+  const apiResponse = await backendApi.loginLocalAccount(parsedRequest.data);
+  const statusCode = mapStatusCode(apiResponse);
+  writeJson(response, statusCode, apiResponse);
+  logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+}
+
+async function parseAndValidateRequest<T>(
+  request: IncomingMessage,
+  schema: z.ZodType<T>,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: T }
+  | { readonly ok: false; readonly statusCode: number; readonly body: IdentityAuthApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = Object.freeze({
+      ok: false,
+      error: {
+        code: IdentityAuthApiErrorCodes.invalidRequest,
+        message: parsedBody.error,
+      },
+    });
+    logger.warn(Object.freeze({
+      event: "identity-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  const validation = schema.safeParse(parsedBody.value);
+  if (!validation.success) {
+    const body = Object.freeze({
+      ok: false,
+      error: {
+        code: IdentityAuthApiErrorCodes.invalidRequest,
+        message: "Request validation failed.",
+        validationErrors: Object.freeze(validation.error.issues.map((issue) => Object.freeze({
+          path: issue.path.join("."),
+          code: issue.code,
+          message: issue.message,
+        }))),
+      },
+    });
+    logger.warn(Object.freeze({
+      event: "identity-http.request.validation-failed",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+      details: {
+        request: redactSensitiveFields(parsedBody.value),
+        issues: body.error.validationErrors,
+      },
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  return { ok: true, data: validation.data };
+}
+
+async function parseJsonBody(
+  request: IncomingMessage,
+  maxBodyBytes: number,
+): Promise<{ readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: string }> {
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+
+  for await (const chunk of request) {
+    const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += bufferChunk.length;
+    if (totalBytes > maxBodyBytes) {
+      return {
+        ok: false,
+        error: `Request body exceeds limit of ${maxBodyBytes} bytes.`,
+      };
+    }
+    chunks.push(bufferChunk);
+  }
+
+  if (chunks.length === 0) {
+    return { ok: false, error: "Request body is required." };
+  }
+
+  try {
+    return { ok: true, value: JSON.parse(Buffer.concat(chunks).toString("utf8")) };
+  } catch {
+    return { ok: false, error: "Request body must be valid JSON." };
+  }
+}
+
+function mapStatusCode(response: IdentityAuthApiResponse<unknown>): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error?.code) {
+    case IdentityAuthApiErrorCodes.invalidRequest:
+      return 400;
+    case IdentityAuthApiErrorCodes.conflict:
+      return 409;
+    case IdentityAuthApiErrorCodes.authenticationFailed:
+      return 401;
+    case IdentityAuthApiErrorCodes.accountInactive:
+      return 403;
+    case IdentityAuthApiErrorCodes.unsupportedProvider:
+      return 422;
+    default:
+      return 500;
+  }
+}
+
+function logResponse<TRequest extends Record<string, unknown>>(
+  logger: IdentityHttpServerLogger,
+  requestId: string,
+  request: IncomingMessage,
+  statusCode: number,
+  requestPayload: TRequest,
+  responsePayload: IdentityAuthApiResponse<unknown>,
+): void {
+  const event = Object.freeze({
+    event: "identity-http.request.completed",
+    requestId,
+    method: request.method,
+    path: request.url,
+    statusCode,
+    details: {
+      request: redactSensitiveFields(requestPayload),
+      response: redactSensitiveFields(responsePayload),
+    },
+  });
+
+  if (statusCode >= 500) {
+    logger.error(event);
+    return;
+  }
+  if (statusCode >= 400) {
+    logger.warn(event);
+    return;
+  }
+
+  logger.info(event);
+}
+
+function redactSensitiveFields(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return Object.freeze(value.map((entry) => redactSensitiveFields(entry)));
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const output: Record<string, unknown> = {};
+  for (const [key, nestedValue] of Object.entries(value)) {
+    const normalizedKey = key.toLowerCase();
+    if (
+      normalizedKey === "candidate"
+      || normalizedKey === "credential"
+      || normalizedKey === "hashvalue"
+      || normalizedKey === "salt"
+      || normalizedKey === "pepperversion"
+      || normalizedKey === "authorization"
+      || normalizedKey === "bearertoken"
+    ) {
+      output[key] = "[REDACTED]";
+      continue;
+    }
+    output[key] = redactSensitiveFields(nestedValue);
+  }
+
+  return Object.freeze(output);
+}
+
+function normalizeError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Unknown error";
+}
+
+function writeJson(response: ServerResponse, statusCode: number, payload: unknown): void {
+  response.statusCode = statusCode;
+  response.setHeader("content-type", "application/json; charset=utf-8");
+  response.end(JSON.stringify(payload));
+}
+
+class ConsoleIdentityHttpServerLogger implements IdentityHttpServerLogger {
+  public info(event: IdentityHttpServerLogEvent): void {
+    console.info(JSON.stringify(event));
+  }
+
+  public warn(event: IdentityHttpServerLogEvent): void {
+    console.warn(JSON.stringify(event));
+  }
+
+  public error(event: IdentityHttpServerLogEvent): void {
+    console.error(JSON.stringify(event));
+  }
+}
