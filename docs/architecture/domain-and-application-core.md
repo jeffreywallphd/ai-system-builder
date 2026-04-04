@@ -1758,3 +1758,10 @@ This slice intentionally keeps identity/credential/session concerns separate so 
   - `IIdentityIdGenerator` for stable ID generation boundaries.
 - Shared identity contract types now live in `application/contracts/IdentityApplicationContracts.ts` so identity use cases share query/material/session DTO contracts without binding to storage or transport concerns.
 - Contract-level tests for these seams now live in `application/identity/tests/IdentityPortsContracts.test.ts`.
+
+## Direction 6 note: Identity persistence schema and migration foundation (story 1.1.3)
+- Added a production SQLite identity persistence adapter in `infrastructure/filesystem/identity/SqliteIdentityRepository.ts` implementing lookup, persistence, credential-material, and session repository contracts from `application/identity/ports/*`.
+- Added explicit migration definitions in `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts` with version tracking and durable tables for auth providers, user identities, provider links, credential policies, credential material records, and sessions.
+- Added integrity constraints and indexes for identity-critical invariants: unique username/email, unique provider subject linkage, single active primary provider per user, single active credential material per provider-subject, enum status checks, and foreign-key references.
+- Kept credential secret material out general profile rows by isolating hash/salt/pepper fields in `identity_credential_material_records`.
+- Added repository integration tests in `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts` for migration application, contract round-trip behavior, and constraint enforcement.

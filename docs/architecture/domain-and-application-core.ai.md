@@ -1731,3 +1731,10 @@ Explicitly later than this scope:
 - Added explicit infrastructure seams for deterministic orchestration in identity use cases (`IIdentityClock`, `IIdentityIdGenerator`).
 - Added shared identity contract DTO/types in `application/contracts/IdentityApplicationContracts.ts` so registration/login/credential-update/session-issuance flows share stable request/query record shapes without framework coupling.
 - Added contract-focused tests in `application/identity/tests/IdentityPortsContracts.test.ts` to keep boundaries compile-verified and infrastructure-independent.
+
+## Direction 6 note: Identity persistence schema and migration foundation (story 1.1.3)
+- Added a production SQLite identity persistence adapter in `infrastructure/filesystem/identity/SqliteIdentityRepository.ts` implementing lookup, persistence, credential-material, and session repository contracts from `application/identity/ports/*`.
+- Added explicit migration definitions in `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts` with version tracking and durable tables for auth providers, user identities, provider links, credential policies, credential material records, and sessions.
+- Added integrity constraints and indexes for identity-critical invariants: unique username/email, unique provider subject linkage, single active primary provider per user, single active credential material per provider-subject, enum status checks, and foreign-key references.
+- Kept credential secret material out general profile rows by isolating hash/salt/pepper fields in `identity_credential_material_records`.
+- Added repository integration tests in `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts` for migration application, contract round-trip behavior, and constraint enforcement.
