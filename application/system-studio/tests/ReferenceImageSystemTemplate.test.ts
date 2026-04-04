@@ -9,6 +9,7 @@ import {
   ReferenceImageSystemWorkflowContextMapping,
 } from "../ReferenceImageSystemTemplate";
 import { ComfyRuntimeInstallationAssetId } from "../../runtime/ComfyRuntimeInstallationAsset";
+import { ComfyRuntimeWorkflowProfiles } from "../../runtime/ComfyRuntimeRequirements";
 
 describe("ReferenceImageSystemTemplate", () => {
   it("defines a bounded reference-image system composition with explicit IO contracts", () => {
@@ -32,6 +33,12 @@ describe("ReferenceImageSystemTemplate", () => {
       "asset:config-profile:comfy-image-manipulation-property-mapping",
     );
     expect(ReferenceImageSystemTemplate.runtimeInstallationAsset.assetId).toBe(ComfyRuntimeInstallationAssetId);
+    expect(ReferenceImageSystemTemplate.runtimeInstallationAsset.defaultWorkflowProfile).toBe(
+      ComfyRuntimeWorkflowProfiles.imageManipulationDefault,
+    );
+    expect(ReferenceImageSystemTemplate.runtimeInstallationAsset.supportedWorkflowProfiles).toContain(
+      ComfyRuntimeWorkflowProfiles.imageManipulationFaceId,
+    );
     expect(ReferenceImageSystemTemplate.systemAsset.executionMetadata?.runtime?.environment).toBe("comfyui");
     expect(ReferenceImageSystemTemplate.systemAsset.executionMetadata?.orchestration?.mode).toBe("workflow-template-driven");
     expect(ReferenceImageSystemTemplate.systemAsset.executionMetadata?.workflowContextMapping?.mappings.length).toBeGreaterThan(0);

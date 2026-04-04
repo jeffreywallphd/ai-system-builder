@@ -39,6 +39,8 @@ describe("createComfyRuntimeInstallerOrchestrationService", () => {
 
       expect(result.phases.find((entry) => entry.phase === "environment")?.status).toBe("completed");
       expect(result.phases.find((entry) => entry.phase === "dependencies")?.status).toBe("completed");
+      expect(result.phases.find((entry) => entry.phase === "custom-nodes")?.status).not.toBe("not-implemented");
+      expect(result.phases.find((entry) => entry.phase === "model-validation")?.status).not.toBe("not-implemented");
       expect(result.issues.some((entry) => entry.code === "environment-preparation-not-implemented")).toBeFalse();
       expect(result.issues.some((entry) => entry.code === "dependency-install-not-implemented")).toBeFalse();
     } finally {

@@ -16,6 +16,7 @@ import {
   type ImageManipulationSystemTemplateDefinition,
 } from "./ImageManipulationSystemTemplate";
 import { ComfyRuntimeInstallationAssetId } from "../runtime/ComfyRuntimeInstallationAsset";
+import { ComfyRuntimeWorkflowProfiles } from "../runtime/ComfyRuntimeRequirements";
 import { ComfyImageManipulationDatasetBindingAssetId } from "./ComfyImageManipulationDatasetBindingAsset";
 import { ComfyImageManipulationPropertyMappingAssetId } from "./ComfyImageManipulationPropertyMappingAsset";
 
@@ -237,6 +238,29 @@ export function validateImageManipulationSystemTemplate(
         actual: template.runtimeInstallationAsset.assetId,
       },
     }));
+  }
+  if (template.runtimeInstallationAsset.defaultWorkflowProfile !== ComfyRuntimeWorkflowProfiles.imageManipulationDefault) {
+    errors.push(createIssue({
+      code: "runtime-installation-default-workflow-profile-invalid",
+      message: "Image manipulation template must declare the default Comfy runtime workflow profile.",
+      assetId,
+      layer: "compatibility",
+      path: "runtimeInstallationAsset.defaultWorkflowProfile",
+    }));
+  }
+  for (const requiredProfile of [
+    ComfyRuntimeWorkflowProfiles.imageManipulationDefault,
+    ComfyRuntimeWorkflowProfiles.imageManipulationFaceId,
+  ]) {
+    if (!template.runtimeInstallationAsset.supportedWorkflowProfiles.includes(requiredProfile)) {
+      errors.push(createIssue({
+        code: "runtime-installation-supported-workflow-profile-missing",
+        message: `Image manipulation runtime installation asset metadata must support workflow profile '${requiredProfile}'.`,
+        assetId,
+        layer: "compatibility",
+        path: "runtimeInstallationAsset.supportedWorkflowProfiles",
+      }));
+    }
   }
 
   const executionMetadata = template.systemAsset.executionMetadata;

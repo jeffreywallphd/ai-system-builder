@@ -14,6 +14,11 @@ import {
   type ComfyRuntimeInstallationAsset,
   type ResolveComfyRuntimeInstallerRequestInput,
 } from "./ComfyRuntimeInstallationAsset";
+import {
+  ComfyRuntimeWorkflowProfiles,
+  resolveComfyRuntimeWorkflowProfile,
+  type ComfyRuntimeWorkflowProfile,
+} from "./ComfyRuntimeRequirements";
 
 export const ComfyRuntimeOrchestrationStates = Object.freeze({
   ready: "ready",
@@ -57,6 +62,7 @@ export interface ComfyRuntimeOrchestrationContext {
   readonly installDirectory: string;
   readonly runtimeWorkingDirectory: string;
   readonly runtimeEndpoint: string;
+  readonly workflowProfile: ComfyRuntimeWorkflowProfile;
 }
 
 export interface IComfyRuntimeEnvironmentPreparationHook {
@@ -97,6 +103,7 @@ export interface ComfyRuntimeInstallerOrchestrationRequest {
   readonly expectedRevision?: string;
   readonly updateMode?: "install-only" | "install-or-update";
   readonly includeRepositoryDiagnostics?: boolean;
+  readonly workflowProfile?: ComfyRuntimeWorkflowProfile;
 }
 
 export interface ComfyRuntimeInstallerOrchestrationResult {
@@ -108,6 +115,7 @@ export interface ComfyRuntimeInstallerOrchestrationResult {
     readonly runtimeWorkingDirectory: string;
     readonly runtimeEndpoint: string;
     readonly installLocationKey: string;
+    readonly workflowProfile: ComfyRuntimeWorkflowProfile;
   }>;
   readonly repository: Readonly<{
     readonly operation: "installed" | "updated" | "already-installed" | "already-current" | "failed" | "skipped";
@@ -218,12 +226,16 @@ export class ComfyRuntimeInstallerOrchestrationService {
       installDirectory,
     });
     const runtimeEndpoint = `http://${installerRequests.runtimeAsset.runtimeStart.defaultHost}:${installerRequests.runtimeAsset.runtimeStart.defaultPort}`;
+    const workflowProfile = resolveComfyRuntimeWorkflowProfile(
+      request.workflowProfile ?? ComfyRuntimeWorkflowProfiles.imageManipulationDefault,
+    );
 
     const context: ComfyRuntimeOrchestrationContext = Object.freeze({
       runtimeAsset: installerRequests.runtimeAsset,
       installDirectory,
       runtimeWorkingDirectory,
       runtimeEndpoint,
+      workflowProfile,
     });
 
     phases.push(this.createRepositoryPhase({
@@ -285,6 +297,7 @@ export class ComfyRuntimeInstallerOrchestrationService {
         runtimeWorkingDirectory: path.resolve(runtimeWorkingDirectory),
         runtimeEndpoint,
         installLocationKey: statusAfter.installLocation.installLocationKey,
+        workflowProfile,
       }),
       repository: Object.freeze({
         operation: repositoryOperation,

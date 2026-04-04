@@ -228,6 +228,18 @@ Direction 3 trust updates now also use local-first persistence seams for MCP gov
   - supports safe re-entry by inspecting existing repository state before install/update actions,
   - returns normalized orchestration status, per-phase outcomes, and actionable diagnostics, including explicit `not-implemented` phase reporting for later story seams.
 - Image-manipulation system template composition now carries an explicit default runtime-installation asset reference through `ReferenceImageSystemTemplate` / `ImageManipulationSystemTemplate` with validation coverage.
+
+## AI Loom image manipulation update: custom node install + runtime asset validation (stories 9.7-9.8)
+
+- Comfy runtime installation metadata now declares structured custom-node requirements and runtime asset requirements (`checkpoint`, `vae`, `faceid-model`) in `application/runtime/ComfyRuntimeInstallationAsset.ts`.
+- Custom-node install/update is now implemented as a dedicated Comfy orchestration hook (`infrastructure/runtime/ComfyRuntimeCustomNodeInstallationHooks.ts`) that composes the shared runtime repository installer contract for deterministic `custom_nodes` installs with install/update/recovery/diagnostics normalization.
+- Runtime model/asset validation is now implemented as a dedicated Comfy orchestration hook (`infrastructure/runtime/ComfyRuntimeAssetValidationHook.ts`) driven by requirement metadata, with explicit normalized statuses:
+  - `present-valid`
+  - `missing-required`
+  - `missing-optional`
+  - `incompatible`
+  - `unknown-unverifiable`
+- Runtime installer composition now wires these hooks by default (`infrastructure/runtime/ComfyRuntimeInstallerComposition.ts`), so orchestration phase output carries inspectable custom-node and model-validation metadata for installer diagnostics and runtime launch/readiness consumers.
 - Added focused tests:
   - `application/runtime/tests/ComfyRuntimeInstallationAsset.test.ts`
   - `application/runtime/tests/ComfyRuntimeInstallerOrchestrationService.test.ts`

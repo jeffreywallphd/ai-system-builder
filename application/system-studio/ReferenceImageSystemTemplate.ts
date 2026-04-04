@@ -28,6 +28,10 @@ import {
   ComfyRuntimeInstallationAssetId,
   ComfyRuntimeInstallationAssetVersionId,
 } from "../runtime/ComfyRuntimeInstallationAsset";
+import {
+  ComfyRuntimeWorkflowProfiles,
+  type ComfyRuntimeWorkflowProfile,
+} from "../runtime/ComfyRuntimeRequirements";
 import { ComfyImageManipulationDatasetBindingAssetId } from "./ComfyImageManipulationDatasetBindingAsset";
 import { ComfyImageManipulationPropertyMappingAssetId } from "./ComfyImageManipulationPropertyMappingAsset";
 
@@ -161,6 +165,8 @@ export interface ReferenceImageSystemTemplateDefinition {
     readonly assetId: typeof ComfyRuntimeInstallationAssetId;
     readonly versionId: typeof ComfyRuntimeInstallationAssetVersionId;
     readonly contractVersion: typeof ComfyRuntimeInstallationAssetContractVersion;
+    readonly defaultWorkflowProfile: typeof ComfyRuntimeWorkflowProfiles.imageManipulationDefault;
+    readonly supportedWorkflowProfiles: ReadonlyArray<ComfyRuntimeWorkflowProfile>;
   };
   readonly uiBindingBoundary: {
     readonly componentAlias: string;
@@ -337,6 +343,11 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
     assetId: ComfyRuntimeInstallationAssetId,
     versionId: ComfyRuntimeInstallationAssetVersionId,
     contractVersion: ComfyRuntimeInstallationAssetContractVersion,
+    defaultWorkflowProfile: ComfyRuntimeWorkflowProfiles.imageManipulationDefault,
+    supportedWorkflowProfiles: Object.freeze([
+      ComfyRuntimeWorkflowProfiles.imageManipulationDefault,
+      ComfyRuntimeWorkflowProfiles.imageManipulationFaceId,
+    ]),
   }),
   uiBindingBoundary: Object.freeze({
     componentAlias: "reference-ui",

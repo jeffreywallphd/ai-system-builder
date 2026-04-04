@@ -17,6 +17,8 @@ describe("ComfyRuntimeInstallationAsset", () => {
     expect(ComfyRuntimeInstallationAsset.source.repositoryUri).toContain("github.com/comfyanonymous/ComfyUI");
     expect(ComfyRuntimeInstallationAsset.requiredCapabilities).toContain("comfyui-api");
     expect(ComfyRuntimeInstallationAsset.validation.requiredRepositoryPaths).toContain("requirements.txt");
+    expect(ComfyRuntimeInstallationAsset.customNodeRequirements.length).toBeGreaterThan(0);
+    expect(ComfyRuntimeInstallationAsset.runtimeAssetRequirements.length).toBeGreaterThan(0);
   });
 
   it("resolves deterministic repository installer requests from provisioned root directory", () => {

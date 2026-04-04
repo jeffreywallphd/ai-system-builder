@@ -136,6 +136,61 @@ describe("ComfyRuntimeInstallerOrchestrationService", () => {
     expect(result.resolvedTargets.runtimeEndpoint).toBe("http://127.0.0.1:8188");
     expect(result.repository.statusAfter.installed?.source.requestedRevision).toBe("release-1");
   });
+
+  it("surfaces structured model-validation output through orchestration phase metadata", async () => {
+    const installer = new FakeRuntimeRepositoryInstaller(RuntimeRepositoryInstallationStates.installed);
+    const service = new ComfyRuntimeInstallerOrchestrationService(installer, {
+      environmentPreparationHook: {
+        prepare: async () => ({ status: "completed", message: "ok" }),
+      },
+      dependencyInstallationHook: {
+        installDependencies: async () => ({ status: "completed", message: "ok" }),
+      },
+      customNodeInstallationHook: {
+        installCustomNodes: async () => ({ status: "completed", message: "ok" }),
+      },
+      modelValidationHook: {
+        validateModels: async () => ({
+          status: "failed",
+          message: "Model validation failed.",
+          issues: [{
+            code: "missing-required",
+            severity: "error",
+            message: "Required checkpoint missing.",
+            phase: "model-validation",
+          }],
+          metadata: {
+            modelValidation: {
+              summary: {
+                total: 1,
+                presentValid: 0,
+                missingRequired: 1,
+                missingOptional: 0,
+                incompatible: 0,
+                unknownUnverifiable: 0,
+              },
+            },
+          },
+        }),
+      },
+      runtimeValidationHook: {
+        validateRuntime: async () => ({ status: "skipped", message: "runtime skipped" }),
+      },
+      now: () => new Date("2026-04-03T20:00:00.000Z"),
+    });
+
+    const result = await service.orchestrate({
+      targetRootDirectory: "/runtime/repositories",
+      workflowProfile: "image-manipulation-default",
+    });
+
+    expect(result.state).toBe(ComfyRuntimeOrchestrationStates.failed);
+    const modelPhase = result.phases.find((entry) => entry.phase === "model-validation");
+    expect(modelPhase?.status).toBe("failed");
+    expect((modelPhase?.metadata as { modelValidation?: { summary?: { missingRequired: number } } } | undefined)
+      ?.modelValidation?.summary?.missingRequired).toBe(1);
+    expect(result.issues.some((entry) => entry.code === "missing-required")).toBeTrue();
+  });
 });
 
 class FakeRuntimeRepositoryInstaller implements IRuntimeRepositoryInstallerContract {
