@@ -1530,3 +1530,35 @@ Not implemented in this slice:
   - runtime execution metadata,
   - inspectable runtime-state defaults for generation controls, prompt defaults/placeholders, and model references.
 - Seeded image-manipulation drafts are smoke-tested as demo-ready defaults that can run through standard provisioning/runtime setup without manual storage path configuration.
+
+## AI Loom image manipulation update: runnable-template contract formalization + regression suite hardening (stories 10.9-10.10)
+
+- Runnable-template contract is now documented as a composition contract, not a UI convenience check:
+  - `system` template composition is considered runnable only when canonical completeness validation returns valid status and execution-readiness assumptions hold for default runtime profile and dependencies.
+  - "Runnable by default" means no extra user configuration beyond normal runtime/install flow.
+- Epic 10 completeness rules are now explicitly framed as non-optional gates:
+  - system asset references and runtime metadata must be structurally valid,
+  - page asset wiring must expose required execution/preview bindings,
+  - workflow template must preserve required interface/parameter/output/runtime metadata contracts,
+  - property schema defaults must satisfy required execution fields,
+  - dataset/storage bindings must remain logical and resolvable.
+- Shared storage instance direction is now explicit and architecture-aligned:
+  - storage instances are provisioned by platform/runtime flows,
+  - storage instances are reusable resources and can be shared across systems/subsystems,
+  - workflow/page/runtime contracts use logical dataset/storage references rather than raw paths,
+  - conceptual storage layout is `/storage/{instanceId}/{input|output|reference}`,
+  - `/systems/{systemId}` remains reserved for system files/metadata and is not the runtime storage ownership contract.
+- Contract relationship map for this vertical slice:
+  - `system asset`: composes workflow/page/runtime contract envelope and dependency identities,
+  - `page asset`: carries runtime interaction boundary (run request, preview/gallery consumes/emits),
+  - `workflow template`: carries workflow parameter/input/output mappings, execution metadata, and logical output targets,
+  - `property schema`: defines required user-facing and execution-facing defaulted fields,
+  - `dataset/storage bindings`: connect system/workflow output/input flows to logical instances and shareable storage,
+  - `runtime execution metadata`: declares environment/capability/dependency posture for adapter selection/readiness,
+  - `readiness validation`: enforces model/runtime/custom-node prerequisites before execution path is treated as runnable.
+- Regression suite hardening (story 10.10) now adds contract-level checks that fail meaningfully when any critical runnable binding regresses, including:
+  - missing page/workflow/schema/runtime bindings,
+  - storage regressions to raw/system-owned path assumptions,
+  - runtime materialization/storage-reference shape regressions,
+  - required model/runtime readiness regressions,
+  - seeded default template contract regressions.
