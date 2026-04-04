@@ -11,7 +11,6 @@ import { ReferenceImageSystemTemplate } from "../../../application/system-studio
 import { validateReferenceImageCrossStudioContext, type CrossStudioIntegrityIssue } from "../../../application/system-studio/ReferenceImageCrossStudioIntegrity";
 import type { OutputGalleryItem } from "../../../application/system-runtime/OutputGalleryDataContract";
 import type { ReferenceImageDatasetBindingId } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
-import { createSystemContextContract } from "../../../domain/system-studio/SystemContextContract";
 import type { FileIngestionPolicy } from "../../../domain/ingestion/interfaces/IFileIngestion";
 import { createBrowserImageUploadIngestionAdapter } from "../assets/image-system/BrowserImageUploadIngestionAdapter";
 import { ImageUploadPanel } from "../assets/image-system/ImageUploadPanel";
@@ -23,13 +22,19 @@ import type { ImageUiViewModel } from "../assets/image-system/ImageUiContracts";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { StudioShellService } from "../../services/StudioShellService";
 import ComfyImageManipulationPropertyEditor from "../assets/image-system/ComfyImageManipulationPropertyEditor";
-import { buildReferenceImageStartRequest } from "./ReferenceImageExperiencePanel";
 import {
   ReferenceImageExecutionFlowService,
   createReferenceImageOutputPersistenceRequest,
   type ReferenceImageExecutionFlowIssue,
   type ReferenceImageExecutionFlowStep,
 } from "../../runtime/ReferenceImageExecutionFlowService";
+import { mapImageManipulationRuntimeStateToExecutionRequest } from "../../runtime/ImageManipulationRuntimeExecutionRequestMapper";
+import {
+  RuntimeWindowSessionPersistenceVersion,
+  SystemRuntimeWindowSessionPersistenceService,
+  type RuntimeWindowSessionSelectionState,
+  type RuntimeWindowSessionScope,
+} from "../../runtime/SystemRuntimeWindowSessionPersistenceService";
 import {
   createIdleImageManipulationRunLifecycleState,
   mapExecutionFlowSnapshotToRunLifecycleState,
@@ -132,6 +137,32 @@ function toSelectionRole(value: string | undefined): ImageManipulationSelectionR
   return undefined;
 }
 
+function mergeHydratedSelectionWithPersistedSession(input: {
+  readonly hydratedSelection: {
+    readonly selectedDatasetBindingId?: string;
+    readonly activePreviewRole: ImageManipulationSelectionRole;
+    readonly selectedRecordIds: Readonly<Record<string, string>>;
+    readonly gallerySelectionRecordIds: ReadonlyArray<string>;
+  };
+  readonly persistedSelection?: RuntimeWindowSessionSelectionState;
+}) {
+  if (!input.persistedSelection) {
+    return input.hydratedSelection;
+  }
+  return Object.freeze({
+    selectedDatasetBindingId: input.persistedSelection.selectedDatasetBindingId
+      ?? input.hydratedSelection.selectedDatasetBindingId,
+    activePreviewRole: input.persistedSelection.activePreviewRole,
+    selectedRecordIds: Object.freeze({
+      ...input.hydratedSelection.selectedRecordIds,
+      ...input.persistedSelection.selectedRecordIds,
+    }),
+    gallerySelectionRecordIds: input.persistedSelection.gallerySelectionRecordIds.length > 0
+      ? input.persistedSelection.gallerySelectionRecordIds
+      : input.hydratedSelection.gallerySelectionRecordIds,
+  });
+}
+
 async function encodeFileBase64(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
   let binary = "";
@@ -220,14 +251,6 @@ export function ImageManipulationRuntimeEditorPanel({
   runtimeLaunch,
   hydratedRuntime,
 }: ImageManipulationRuntimeEditorPanelProps): JSX.Element {
-  const initialPresetId = hydratedRuntime?.propertySchema.presetId
-    ?? runtimeLaunch?.initialSelection.presetId
-    ?? ComfyImageManipulationPropertySchema.defaultPresetId;
-  const [presetId, setPresetId] = useState(initialPresetId);
-  const [config, setConfig] = useState<ComfyImageManipulationConfig>(() => (
-    hydratedRuntime?.propertySchema.defaults
-    ?? createComfyImageManipulationDefaultConfig({ presetId: initialPresetId })
-  ));
   const draft = context.snapshot?.draft;
   const isImageRuntimeTarget = (hydratedRuntime?.resolvedPage.pageBindingId ?? runtimeLaunch?.launchTarget.pageBindingId)
     === ImageManipulationSystemTemplate.compositionBindings.pageBindingId;
@@ -235,23 +258,65 @@ export function ImageManipulationRuntimeEditorPanel({
   const uploadAdapter = useMemo(() => createBrowserImageUploadIngestionAdapter({ policy: uploadPolicy }), []);
   const executionFlow = useMemo(() => new ReferenceImageExecutionFlowService(), []);
   const datasetBindingService = useMemo(() => new ImageManipulationRuntimeDatasetBindingService(), []);
+  const sessionPersistence = useMemo(() => new SystemRuntimeWindowSessionPersistenceService(), []);
   const requestIdRef = useRef(0);
 
   const roleBindings = useMemo(
     () => datasetBindingService.resolveRoleBindings(hydratedRuntime?.datasetBindings ?? emptyHydratedDatasetBindings),
     [datasetBindingService, hydratedRuntime?.datasetBindings],
   );
-  const hydratedSelection = useMemo(() => {
-    if (hydratedRuntime) {
-      return hydratedRuntime.initialSelection;
+  const sessionScope = useMemo<RuntimeWindowSessionScope | undefined>(() => {
+    if (!runtimeLaunch) {
+      return undefined;
     }
-    return Object.freeze({
-      selectedDatasetBindingId: runtimeLaunch?.initialSelection.selectedDatasetBindingId ?? roleBindings.outputBindingId,
-      activePreviewRole: toSelectionRole(runtimeLaunch?.initialSelection.activePreviewRole) ?? "output",
-      selectedRecordIds: Object.freeze({ ...(runtimeLaunch?.initialSelection.selectedRecordIds ?? {}) }),
-      gallerySelectionRecordIds: Object.freeze([]),
+    return sessionPersistence.resolveScope({
+      launch: runtimeLaunch,
+      hydratedRuntime,
+      draftId: draft?.draftId,
     });
-  }, [hydratedRuntime, runtimeLaunch?.initialSelection.activePreviewRole, runtimeLaunch?.initialSelection.selectedDatasetBindingId, runtimeLaunch?.initialSelection.selectedRecordIds, roleBindings.outputBindingId]);
+  }, [draft?.draftId, hydratedRuntime, runtimeLaunch, sessionPersistence]);
+  const persistedSession = useMemo(
+    () => (sessionScope ? sessionPersistence.load(sessionScope) : undefined),
+    [sessionPersistence, sessionScope],
+  );
+  const initialPresetId = persistedSession?.property.presetId
+    ?? hydratedRuntime?.propertySchema.presetId
+    ?? runtimeLaunch?.initialSelection.presetId
+    ?? ComfyImageManipulationPropertySchema.defaultPresetId;
+  const [presetId, setPresetId] = useState(initialPresetId);
+  const [config, setConfig] = useState<ComfyImageManipulationConfig>(() => {
+    if (persistedSession?.property.config) {
+      return resolveComfyImageManipulationConfig(persistedSession.property.config, {
+        presetId: persistedSession.property.presetId,
+      });
+    }
+    return hydratedRuntime?.propertySchema.defaults
+      ?? createComfyImageManipulationDefaultConfig({ presetId: initialPresetId });
+  });
+  const hydratedSelection = useMemo(() => {
+    const baseSelection = (() => {
+      if (hydratedRuntime) {
+        return hydratedRuntime.initialSelection;
+      }
+      return Object.freeze({
+        selectedDatasetBindingId: runtimeLaunch?.initialSelection.selectedDatasetBindingId ?? roleBindings.outputBindingId,
+        activePreviewRole: toSelectionRole(runtimeLaunch?.initialSelection.activePreviewRole) ?? "output",
+        selectedRecordIds: Object.freeze({ ...(runtimeLaunch?.initialSelection.selectedRecordIds ?? {}) }),
+        gallerySelectionRecordIds: Object.freeze([]),
+      });
+    })();
+    return mergeHydratedSelectionWithPersistedSession({
+      hydratedSelection: baseSelection,
+      persistedSelection: persistedSession?.selection,
+    });
+  }, [
+    hydratedRuntime,
+    persistedSession?.selection,
+    roleBindings.outputBindingId,
+    runtimeLaunch?.initialSelection.activePreviewRole,
+    runtimeLaunch?.initialSelection.selectedDatasetBindingId,
+    runtimeLaunch?.initialSelection.selectedRecordIds,
+  ]);
   const [selection, setSelection] = useState<ImageManipulationSelectionState>(() => (
     datasetBindingService.createSelectionStateFromHydration({
       roleBindings,
@@ -259,8 +324,18 @@ export function ImageManipulationRuntimeEditorPanel({
     })
   ));
   const [selectionSnapshot, setSelectionSnapshot] = useState<ImageManipulationSelectionSnapshot>(() => (
-    datasetBindingService.createEmptySelectionSnapshot(roleBindings)
+    persistedSession?.selection
+      ? Object.freeze({
+        selectedDatasetBindingId: persistedSession.selection.selectedDatasetBindingId,
+        activePreviewRole: persistedSession.selection.activePreviewRole,
+        selectedRecordIds: Object.freeze({ ...persistedSession.selection.selectedRecordIds }),
+        gallerySelectionRecordIds: Object.freeze([...persistedSession.selection.gallerySelectionRecordIds]),
+      })
+      : datasetBindingService.createEmptySelectionSnapshot(roleBindings)
   ));
+  const [isRunAdvancedDetailsOpen, setIsRunAdvancedDetailsOpen] = useState(
+    persistedSession?.panelState.runAdvancedDetailsOpen === true,
+  );
   const [datasetInstanceId, setDatasetInstanceId] = useState<string | undefined>();
 
   const [outputItems, setOutputItems] = useState<ReadonlyArray<OutputGalleryItem>>([]);
@@ -287,8 +362,31 @@ export function ImageManipulationRuntimeEditorPanel({
       roleBindings,
       hydratedSelection,
     }));
-    setSelectionSnapshot(datasetBindingService.createEmptySelectionSnapshot(roleBindings));
-  }, [datasetBindingService, hydratedSelection, roleBindings]);
+    setSelectionSnapshot(
+      persistedSession?.selection
+        ? Object.freeze({
+          selectedDatasetBindingId: persistedSession.selection.selectedDatasetBindingId,
+          activePreviewRole: persistedSession.selection.activePreviewRole,
+          selectedRecordIds: Object.freeze({ ...persistedSession.selection.selectedRecordIds }),
+          gallerySelectionRecordIds: Object.freeze([...persistedSession.selection.gallerySelectionRecordIds]),
+        })
+        : datasetBindingService.createEmptySelectionSnapshot(roleBindings),
+    );
+    setIsRunAdvancedDetailsOpen(persistedSession?.panelState.runAdvancedDetailsOpen === true);
+  }, [datasetBindingService, hydratedSelection, persistedSession?.panelState.runAdvancedDetailsOpen, persistedSession?.selection, roleBindings]);
+
+  useEffect(() => {
+    setPresetId(initialPresetId);
+    setConfig(() => {
+      if (persistedSession?.property.config) {
+        return resolveComfyImageManipulationConfig(persistedSession.property.config, {
+          presetId: persistedSession.property.presetId,
+        });
+      }
+      return hydratedRuntime?.propertySchema.defaults
+        ?? createComfyImageManipulationDefaultConfig({ presetId: initialPresetId });
+    });
+  }, [hydratedRuntime?.propertySchema.defaults, initialPresetId, persistedSession?.property.config, persistedSession?.property.presetId]);
 
   const validationIssues = useMemo(() => validateComfyImageManipulationConfig(config), [config]);
   const validationSummaryMessage = useMemo(() => {
@@ -347,10 +445,6 @@ export function ImageManipulationRuntimeEditorPanel({
     [hydratedRuntime?.datasetBindings],
   );
   const sourceDatasetBinding = datasetBindingsById.get(roleBindings.sourceBindingId);
-  const outputDatasetBinding = datasetBindingsById.get(roleBindings.outputBindingId);
-  const referenceDatasetBinding = roleBindings.referenceBindingId
-    ? datasetBindingsById.get(roleBindings.referenceBindingId)
-    : undefined;
   const runtimeSystemAssetId = hydratedRuntime?.resolvedSystemAsset.assetId ?? draft?.assetId;
   const runtimeWorkflowAssetId = hydratedRuntime?.resolvedWorkflowTemplate.workflowTemplateAssetId
     ?? ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId;
@@ -572,6 +666,56 @@ export function ImageManipulationRuntimeEditorPanel({
     setSelectionSnapshot(reconciled.serializedSelection);
   }, [datasetBindingService, draft?.draftId, hydratedSelection, outputItems, referenceItems, roleBindings, selection, sourceItems]);
 
+  useEffect(() => {
+    if (!runtimeLaunch || !sessionScope) {
+      return;
+    }
+    sessionPersistence.save(Object.freeze({
+      schemaVersion: RuntimeWindowSessionPersistenceVersion,
+      scope: sessionScope,
+      launch: Object.freeze({
+        launchId: runtimeLaunch.launchId,
+        runtimeSessionId: context.snapshot?.activeSessionId,
+        restoredFromLaunchId: persistedSession?.launch.launchId,
+      }),
+      resolvedPage: Object.freeze({
+        systemAssetId: hydratedRuntime?.resolvedSystemAsset.assetId ?? runtimeLaunch.launchTarget.systemAssetId,
+        pageBindingId: hydratedRuntime?.resolvedPage.pageBindingId ?? runtimeLaunch.launchTarget.pageBindingId,
+        pageId: hydratedRuntime?.resolvedPage.pageId,
+        pageTitle: hydratedRuntime?.resolvedPage.pageTitle,
+        workflowTemplateAssetId: hydratedRuntime?.resolvedWorkflowTemplate.workflowTemplateAssetId,
+        workflowTemplateVersionId: hydratedRuntime?.resolvedWorkflowTemplate.workflowTemplateVersionId,
+        datasetBindingIds: Object.freeze((hydratedRuntime?.datasetBindings ?? []).map((entry) => entry.bindingId)),
+      }),
+      property: Object.freeze({
+        presetId,
+        config,
+      }),
+      selection: selectionSnapshot,
+      panelState: Object.freeze({
+        runAdvancedDetailsOpen: isRunAdvancedDetailsOpen,
+      }),
+      updatedAt: new Date().toISOString(),
+    }));
+  }, [
+    config,
+    context.snapshot?.activeSessionId,
+    hydratedRuntime?.datasetBindings,
+    hydratedRuntime?.resolvedPage.pageBindingId,
+    hydratedRuntime?.resolvedPage.pageId,
+    hydratedRuntime?.resolvedPage.pageTitle,
+    hydratedRuntime?.resolvedSystemAsset.assetId,
+    hydratedRuntime?.resolvedWorkflowTemplate.workflowTemplateAssetId,
+    hydratedRuntime?.resolvedWorkflowTemplate.workflowTemplateVersionId,
+    isRunAdvancedDetailsOpen,
+    persistedSession?.launch.launchId,
+    presetId,
+    runtimeLaunch,
+    selectionSnapshot,
+    sessionPersistence,
+    sessionScope,
+  ]);
+
   if (!isImageRuntimeTarget || !draft) {
     return (
       <ImageStatusNotice
@@ -786,92 +930,43 @@ export function ImageManipulationRuntimeEditorPanel({
               className="ui-button ui-button--primary"
               disabled={runDisabled}
               onClick={() => {
-                if (!context.operations.startSystemExecution || !selectedSourceRecordId || !selectedSourceAssetId || !selectedSourceDatasetInstanceId) {
+                if (!context.operations.startSystemExecution) {
                   return;
                 }
                 setRunLifecycle(Object.freeze({ state: "validating", message: "Checking your setup" }));
                 setIntegrityIssues([]);
                 setFlowSteps([]);
                 setFlowIssues([]);
-
-                const selectedImages = [Object.freeze({
-                  selectionId: selectedSourceRecordId,
-                  imageId: selectedSourceRecordId,
-                  assetRef: Object.freeze({
-                    assetId: selectedSourceAssetId,
-                    recordId: selectedSourceRecordId,
-                  }),
-                  metadata: Object.freeze({ role: "source" }),
-                })];
-                if (selectedReferenceItem) {
-                  selectedImages.push(Object.freeze({
-                    selectionId: selectedReferenceItem.image.recordId,
-                    imageId: selectedReferenceItem.image.recordId,
-                    assetRef: Object.freeze({
-                      assetId: selectedReferenceItem.image.imageReference
-                        ?? selectedReferenceItem.image.thumbnailReference
-                        ?? selectedReferenceItem.image.recordId,
-                      recordId: selectedReferenceItem.image.recordId,
-                    }),
-                    metadata: Object.freeze({ role: "reference" }),
-                  }));
-                }
-
-                const datasetRefs = [Object.freeze({
-                  referenceId: "active-input",
-                  instanceId: selectedSourceDatasetInstanceId,
-                  datasetAssetId: sourceDatasetBinding?.datasetAssetId
-                    ?? selectedSourceItem?.dataset.datasetAssetId
-                    ?? "asset:dataset:image-reference-input",
-                  role: "active-input",
-                  systemAssetId: runtimeSystemAssetId ?? draft.assetId,
-                }), Object.freeze({
-                  referenceId: "system-output",
-                  instanceId: outputDatasetBinding?.datasetInstanceId
-                    ?? selectedOutputItem?.dataset.instanceId
-                    ?? "dataset-instance:reference-image:output",
-                  datasetAssetId: outputDatasetBinding?.datasetAssetId
-                    ?? selectedOutputItem?.dataset.datasetAssetId
-                    ?? "asset:dataset:image-reference-output",
-                  role: "system-owned-output",
-                  systemAssetId: runtimeSystemAssetId ?? draft.assetId,
-                })];
-                if (selectedReferenceItem) {
-                  datasetRefs.push(Object.freeze({
-                    referenceId: "face-reference",
-                    instanceId: selectedReferenceItem.dataset.instanceId,
-                    datasetAssetId: referenceDatasetBinding?.datasetAssetId
-                      ?? selectedReferenceItem.dataset.datasetAssetId,
-                    role: "reference-input",
-                    systemAssetId: runtimeSystemAssetId ?? draft.assetId,
-                  }));
-                }
-
-                const runtimeContext = createSystemContextContract({
-                  selectedImages,
-                  parameters: Object.freeze({
-                    editInstruction: config.prompts.positivePrompt,
-                    variationStrength: config.generation.variationStrength,
-                    resultCount: config.output.resultCount,
-                    imageConfig: config,
-                    presetId,
-                    selectedReferenceRecordId: selectedReferenceItem?.image.recordId,
-                  }),
-                  datasets: datasetRefs,
-                  runtime: Object.freeze({
-                    runtimeSessionId: context.snapshot?.activeSessionId,
-                    systemAssetId: runtimeSystemAssetId ?? draft.assetId,
-                    workflowAssetId: runtimeWorkflowAssetId,
-                    sourceStudio: "system-studio",
-                  }),
-                });
-                const request = buildReferenceImageStartRequest({
+                const mapped = mapImageManipulationRuntimeStateToExecutionRequest({
                   studioId: context.studioId,
                   draftId: draft.draftId,
+                  runtimeSessionId: context.snapshot?.activeSessionId,
                   systemAssetId: runtimeSystemAssetId ?? draft.assetId,
-                  runtimeContext,
+                  workflowAssetId: runtimeWorkflowAssetId,
+                  workflowAssetVersionId: runtimeWorkflowAssetVersionId,
+                  presetId,
+                  config,
+                  roleBindings,
+                  datasetBindingsById,
+                  selectedSource: selectedSourceItem,
+                  selectedOutput: selectedOutputItem,
+                  selectedReference: selectedReferenceItem,
+                  selectionSnapshot,
                 });
-                const integrity = validateReferenceImageCrossStudioContext(runtimeContext);
+                if (!mapped.ok) {
+                  setRunLifecycle(Object.freeze({
+                    state: "failure",
+                    message: mapped.userMessage,
+                  }));
+                  setFlowIssues(Object.freeze([Object.freeze({
+                    stepId: "trigger",
+                    code: mapped.code,
+                    userMessage: mapped.userMessage,
+                    technicalMessage: mapped.technicalMessage,
+                  })]));
+                  return;
+                }
+                const integrity = validateReferenceImageCrossStudioContext(mapped.runtimeContext);
                 if (!integrity.valid) {
                   setRunLifecycle(Object.freeze({
                     state: "failure",
@@ -885,7 +980,7 @@ export function ImageManipulationRuntimeEditorPanel({
 
                 void executionFlow.run({
                   startExecution: async () => {
-                    const response = await context.operations.startSystemExecution?.(request);
+                    const response = await context.operations.startSystemExecution?.(mapped.startRequest);
                     return response && response.ok && response.data
                       ? { ok: true, executionId: response.data.executionId }
                       : { ok: false, errorMessage: response?.error?.message ?? "Could not start processing." };
@@ -906,15 +1001,15 @@ export function ImageManipulationRuntimeEditorPanel({
                     studioId: context.studioId,
                     draftId: draft.draftId,
                     executionId,
-                    sourceRecordId: selectedSourceRecordId,
-                    sourceAssetId: selectedSourceAssetId,
+                    sourceRecordId: mapped.sourceRecordId,
+                    sourceAssetId: mapped.sourceAssetId,
                     parameterSnapshot: Object.freeze({
                       presetId,
-                      imageConfig: config,
+                      imageConfig: mapped.resolvedConfig,
                       selectedReferenceRecordId: selectedReferenceItem?.image.recordId,
                       selectionSnapshot,
                     }),
-                    runtimeContext,
+                    runtimeContext: mapped.runtimeContext,
                     workflowAssetId: runtimeWorkflowAssetId,
                     workflowAssetVersionId: runtimeWorkflowAssetVersionId,
                     systemAssetId: runtimeSystemAssetId ?? draft.assetId,
@@ -951,7 +1046,12 @@ export function ImageManipulationRuntimeEditorPanel({
               message={runStatusMessage}
               tone={resolveRunStatusTone(runLifecycle.state)}
             />
-            <details>
+            <details
+              open={isRunAdvancedDetailsOpen}
+              onToggle={(event) => {
+                setIsRunAdvancedDetailsOpen(event.currentTarget.open);
+              }}
+            >
               <summary className="ui-text-small ui-text-secondary">Advanced details</summary>
               {flowSteps.map((step) => (
                 <p key={step.stepId} className="ui-text-small ui-text-secondary">

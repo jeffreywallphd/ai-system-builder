@@ -470,3 +470,11 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
   - lifecycle dataset operations are scoped to the requesting system bindings and do not assume exclusive storage ownership.
 - Validation hardening now includes explicit backend rejection coverage for user-supplied storage path configuration in reference-image storage initialization flows.
 - End-to-end coverage now includes shared-storage lifecycle scope/isolation and inspectability checks while preserving default template runnability without extra user setup.
+
+## AI Loom image manipulation runtime-window execution + restore update (stories 8.5-8.6)
+
+- Standalone runtime-window run actions now prepare backend execution requests from hydrated runtime selections/config through a dedicated mapper seam (`ui/runtime/ImageManipulationRuntimeExecutionRequestMapper.ts`) instead of page-local ad hoc request construction.
+- Mapping remains on existing execution orchestration contracts: runtime UI state -> `buildReferenceImageStartRequest` -> `startSystemExecution` backend path -> normalized result/persistence -> dataset refresh.
+- Dataset/storage references in runtime context now remain logical and inspectable (binding ids, dataset ids, storage-instance references/areas, sharing scope metadata) with no UI-facing filesystem path contracts.
+- FaceID-enabled runs now require an explicit selected reference image at preflight mapping time, while default non-FaceID template behavior remains runnable without extra setup.
+- Runtime-window session override state now has a dedicated persistence model (`ui/runtime/SystemRuntimeWindowSessionPersistenceService.ts`) so restored runs layer serialized runtime overrides on top of hydrated launch defaults for clean reopen/restore continuation.
