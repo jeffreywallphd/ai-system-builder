@@ -195,6 +195,28 @@ This keeps password verification logic in an application port + infrastructure a
 - returns authenticated-principal payload fields for downstream session issuance and device-trust composition
 - returns structured operation failures for unknown identity, invalid credentials, inactive/disabled account state, unsupported auth path, and invalid/misaligned requests
 
+## Authoritative Server API Surface
+
+Local identity registration/login is now exposed through an authoritative HTTP transport surface:
+
+- `POST /api/v1/identity/register`
+- `POST /api/v1/identity/login`
+
+Primary transport files:
+
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `infrastructure/api/identity/IdentityAuthBackendApi.ts`
+- `infrastructure/api/identity/sdk/PublicIdentityAuthApiContract.ts`
+- `hosts/server/IdentityServerHost.ts`
+
+Transport behavior:
+
+- request payloads are validated at the HTTP boundary with strict schemas
+- application-layer identity errors are translated to stable public API error codes
+- structured logs redact sensitive credential fields before serialization
+
+Detailed request/response examples and status/error mappings are documented in `docs/architecture/identity-server-api.md`.
+
 ## Local Credential Change Use Case
 
 `ChangeLocalPasswordCredentialUseCase.execute(...)` provides authenticated credential rotation for local-password identities:
@@ -274,6 +296,8 @@ Key tests for this foundation:
 - `application/identity/tests/IdentityAuthenticatorAndProviderCatalog.test.ts`
 - `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`
 - `infrastructure/security/identity/tests/ScryptLocalPasswordCredentialService.test.ts`
+- `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `src/infrastructure/persistence/identity/tests/IdentityPersistenceMapper.test.ts`
 - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
 

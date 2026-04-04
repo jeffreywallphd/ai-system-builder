@@ -247,3 +247,15 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - Registration (`src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`) now accepts password candidates and persists only hashed credential material generated through that port.
 - Local credential verification (`src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`) now resolves active credential material and verifies candidates through the same port with generic invalid-credential failure contracts.
 - Infrastructure security implementation now lives in `infrastructure/security/identity/ScryptLocalPasswordCredentialService.ts`, keeping secret derivation/verification details at the outer layer and preserving the provider-oriented seam for future passkey/external-provider methods.
+
+## Direction 6 boundary note: Authoritative identity server endpoints (story 1.2.6)
+
+- Added a dedicated infrastructure API adapter for local identity auth (`infrastructure/api/identity/IdentityAuthBackendApi.ts`) that translates inner identity results to stable public API error contracts.
+- Added authoritative HTTP transport handlers in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts` for:
+  - `POST /api/v1/identity/register`
+  - `POST /api/v1/identity/login`
+- HTTP transport stays thin:
+  - request schema validation at the boundary (`zod`),
+  - deterministic status/error mapping from backend API contracts,
+  - no domain/application rule duplication in transport.
+- Server host wiring now lives at outer layer in `hosts/server/IdentityServerHost.ts`, composing persistence/security/use-case dependencies without moving identity rules out of application/domain.

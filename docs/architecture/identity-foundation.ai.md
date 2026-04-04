@@ -21,6 +21,9 @@
 - `src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`
 - `src/application/identity/use-cases/LoginLocalAccountUseCase.ts`
 - `src/application/identity/use-cases/ChangeLocalPasswordCredentialUseCase.ts`
+- `infrastructure/api/identity/IdentityAuthBackendApi.ts`
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `hosts/server/IdentityServerHost.ts`
 - `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
 - `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`
 - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
@@ -64,6 +67,15 @@
 - It returns authenticated-principal result fields intended for subsequent session issuance and device-trust checks.
 - It emits structured failures for unknown identity, invalid credentials, inactive or disabled account state, and unsupported auth paths.
 
+## Authoritative server API seam
+
+- Registration and login are now exposed on authoritative HTTP endpoints:
+  - `POST /api/v1/identity/register`
+  - `POST /api/v1/identity/login`
+- HTTP transport validates requests at the boundary (strict schemas), maps inner identity failures to stable public API error codes, and returns bounded response envelopes.
+- HTTP logging now redacts credential material (`credential`/`candidate` and related secret fields) before structured log emission.
+- Detailed public API contract/examples are in `docs/architecture/identity-server-api.md`.
+
 ## Local credential change seam
 
 - `ChangeLocalPasswordCredentialUseCase` provides the production credential-change orchestration for authenticated local accounts.
@@ -87,4 +99,5 @@
 ## Read next
 
 - Full architecture note: `docs/architecture/identity-foundation.md`
+- Server endpoint contract note: `docs/architecture/identity-server-api.md`
 
