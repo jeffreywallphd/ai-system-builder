@@ -5,6 +5,80 @@ import { SystemBuildTemplateCatalog } from "../../../../application/system-studi
 import { ReferenceImageSystemTemplate } from "../../../../application/system-studio/ReferenceImageSystemTemplate";
 
 describe("Image manipulation default template runnable smoke", () => {
+  it("creates a demo-ready seeded system draft that can run output persistence without manual storage setup", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    const templateEntry = SystemBuildTemplateCatalog[0]!;
+
+    const initialized = await api.initializeStudio("studio-system", "System Studio");
+    const created = await api.createDraft({
+      studioId: "studio-system",
+      sessionId: initialized.data!.activeSessionId!,
+      assetId: templateEntry.draftSeed.assetId,
+      content: templateEntry.draftSeed.contentTemplate,
+      metadata: {
+        title: templateEntry.draftSeed.metadataPatch.title ?? "Image Manipulation System",
+        summary: templateEntry.draftSeed.metadataPatch.summary,
+        tags: templateEntry.draftSeed.metadataPatch.tags ?? ["system", "image-manipulation"],
+        taxonomy: templateEntry.draftSeed.metadataPatch.taxonomy!,
+        provenance: templateEntry.draftSeed.metadataPatch.provenance,
+      },
+      dependencies: templateEntry.draftSeed.dependencies,
+    });
+    expect(created.ok).toBeTrue();
+
+    const draftId = created.data!.draft!.draftId;
+    const inputUpload = await api.ingestReferenceImageUpload({
+      studioId: "studio-system",
+      draftId,
+      fileName: "seed-demo.png",
+      mimeType: "image/png",
+      payloadBase64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z2YcAAAAASUVORK5CYII=",
+    });
+    expect(inputUpload.ok).toBeTrue();
+
+    const persisted = await api.persistReferenceImageOutputs({
+      studioId: "studio-system",
+      draftId,
+      executionId: "run:smoke:seeded-defaults",
+      sourceRecordId: inputUpload.data?.recordId,
+      sourceAssetId: inputUpload.data?.image.assetId,
+      parameterSnapshot: {
+        editInstruction: "Enhance contrast with subtle highlights",
+        variationStrength: 0.5,
+        resultCount: 1,
+      },
+      runtimeResult: {
+        status: "completed",
+        output: {
+          payload: {
+            nodeResults: {
+              workflow: {
+                result: {
+                  executionId: "run:smoke:seeded-defaults",
+                  status: "completed",
+                  outputs: [Object.freeze({
+                    nodeId: "save_image",
+                    kind: "image",
+                    reference: "memory://seeded-smoke-1.png",
+                    metadata: Object.freeze({
+                      filename: "seeded-smoke-1.png",
+                      format: "png",
+                      width: 1024,
+                      height: 1024,
+                    }),
+                  })],
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(persisted.ok).toBeTrue();
+    expect(persisted.data?.status).toBe("materialized");
+    expect(persisted.data?.persistedRecordIds).toHaveLength(1);
+  });
+
   it("materializes and runs the default template through storage, dataset, execution, and output retrieval contracts", async () => {
     const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
     const templateEntry = SystemBuildTemplateCatalog[0]!;

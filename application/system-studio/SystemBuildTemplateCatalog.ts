@@ -1,6 +1,8 @@
 import type { AssetDraftDependencyReference, AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
+import { serializeSystemSerializationDocument } from "../../domain/system-studio/SystemSerializationContract";
 import { TaxonomyBehaviorKinds, TaxonomySemanticRoles } from "../../domain/taxonomy/CompositionTaxonomy";
 import { ImageManipulationSystemTemplate } from "./ImageManipulationSystemTemplate";
+import { createComfyImageManipulationDefaultConfig } from "./ComfyImageManipulationPropertySchema";
 import {
   assertImageManipulationTemplateRunnableDefaults,
   type ImageManipulationTemplateCompletenessValidationResult,
@@ -45,80 +47,140 @@ function deduplicateDependencies(
 }
 
 function buildImageManipulationSystemContentTemplate(): string {
-  return JSON.stringify(
-    {
-      systemSpec: {
-        semanticRole: TaxonomySemanticRoles.system,
-        components: ImageManipulationSystemTemplate.systemAsset.components,
-        nestedSystems: ImageManipulationSystemTemplate.systemAsset.nestedSystems ?? [],
-        dependencies: [],
-        bindings: ImageManipulationSystemTemplate.systemAsset.bindings,
-        inputs: ImageManipulationSystemTemplate.systemAsset.inputs,
-        outputs: ImageManipulationSystemTemplate.systemAsset.outputs,
-        parameters: ImageManipulationSystemTemplate.systemAsset.parameters,
-        settings: {
-          systemName: "Image Manipulation System",
-          systemDescription: "Edit a source image with natural-language instructions and save generated image outputs.",
-          defaultLandingPageId: "page-1",
-          navigation: { mode: "top" },
-          theme: {},
-          runtimeBehavior: {
-            confirmBeforeExit: false,
-            showHelpTips: true,
-            rememberLastPage: true,
-          },
+  const defaultConfig = createComfyImageManipulationDefaultConfig();
+  const rootEnvelope = {
+    systemSpec: {
+      semanticRole: TaxonomySemanticRoles.system,
+      components: ImageManipulationSystemTemplate.systemAsset.components,
+      nestedSystems: ImageManipulationSystemTemplate.systemAsset.nestedSystems ?? [],
+      dependencies: [],
+      bindings: ImageManipulationSystemTemplate.systemAsset.bindings,
+      inputs: ImageManipulationSystemTemplate.systemAsset.inputs,
+      outputs: ImageManipulationSystemTemplate.systemAsset.outputs,
+      parameters: ImageManipulationSystemTemplate.systemAsset.parameters,
+      executionMetadata: ImageManipulationSystemTemplate.systemAsset.executionMetadata,
+      settings: {
+        systemName: "Image Manipulation System",
+        systemDescription: "Edit a source image with natural-language instructions and save generated image outputs.",
+        defaultLandingPageId: "page-1",
+        navigation: { mode: "top" },
+        theme: {},
+        runtimeBehavior: {
+          confirmBeforeExit: false,
+          showHelpTips: true,
+          rememberLastPage: true,
         },
-        pages: [
-          {
-            pageId: "page-1",
-            title: "Image edit workspace",
-            description: "Select a source image, describe changes, and review generated results.",
-            layout: {
-              layoutKind: "workspace",
-              defaultRegionId: "workspace",
-              regionIds: ["workspace"],
-            },
-            navigation: {
-              route: "/",
-              title: "Image workspace",
-              supportsDeepLinking: false,
-              requiresRuntimeSession: false,
-            },
-          },
-        ],
-        canvasAuthoring: {
-          designFrame: {
-            mode: "bounded-frame",
-            ratio: { width: 16, height: 9 },
-            dimensions: { width: 1600, height: 900 },
-            boundedArea: { padding: 20 },
-          },
-          pageLayouts: [{
-            pageId: "page-1",
-            panels: [{
-              panelId: "image-editor-page",
-              assetId: "ui-composed:panel",
-              panelType: "composed-panel",
-              pageId: "page-1",
-              regionId: "workspace",
-              title: "Image editor",
-              description: "Adjust settings, preview results, and browse recent image versions.",
-              layoutBounds: { x: 0.02, y: 0.02, width: 0.96, height: 0.96 },
-              contentSlots: [{ slotId: "panel-content", label: "Editor content" }],
-              content: {
-                kind: "embedded-studio",
-                studioAssetId: ImageManipulationSystemTemplate.compositionBindings.pageBindingId,
-              },
-              sourceLayoutNodeId: "image-editor-page",
-            }],
-          }],
-        },
-        notes: "This template composes reusable datasets, workflow execution, and a ready-to-run image editor page.",
       },
+      pages: [
+        {
+          pageId: "page-1",
+          title: "Image edit workspace",
+          description: "Select a source image, describe changes, and review generated results.",
+          layout: {
+            layoutKind: "workspace",
+            defaultRegionId: "workspace",
+            regionIds: ["workspace"],
+          },
+          navigation: {
+            route: "/",
+            title: "Image workspace",
+            supportsDeepLinking: false,
+            requiresRuntimeSession: false,
+          },
+        },
+      ],
+      canvasAuthoring: {
+        designFrame: {
+          mode: "bounded-frame",
+          ratio: { width: 16, height: 9 },
+          dimensions: { width: 1600, height: 900 },
+          boundedArea: { padding: 20 },
+        },
+        pageLayouts: [{
+          pageId: "page-1",
+          panels: [{
+            panelId: "image-editor-page",
+            assetId: "ui-composed:panel",
+            panelType: "composed-panel",
+            pageId: "page-1",
+            regionId: "workspace",
+            title: "Image editor",
+            description: "Adjust settings, preview results, and browse recent image versions.",
+            layoutBounds: { x: 0.02, y: 0.02, width: 0.96, height: 0.96 },
+            contentSlots: [{ slotId: "panel-content", label: "Editor content" }],
+            content: {
+              kind: "embedded-studio",
+              studioAssetId: ImageManipulationSystemTemplate.compositionBindings.pageBindingId,
+            },
+            sourceLayoutNodeId: "image-editor-page",
+          }],
+        }],
+      },
+      notes: "This template composes reusable datasets, workflow execution, and a ready-to-run image editor page.",
     },
-    null,
-    2,
-  );
+  };
+
+  return serializeSystemSerializationDocument({
+    existingContent: JSON.stringify(rootEnvelope, null, 2),
+    dependencies: imageManipulationSeedDependencies,
+    systemSpec: {
+      components: ImageManipulationSystemTemplate.systemAsset.components,
+      nestedSystems: ImageManipulationSystemTemplate.systemAsset.nestedSystems ?? [],
+      inputs: ImageManipulationSystemTemplate.systemAsset.inputs,
+      outputs: ImageManipulationSystemTemplate.systemAsset.outputs,
+      parameters: ImageManipulationSystemTemplate.systemAsset.parameters,
+      bindings: ImageManipulationSystemTemplate.systemAsset.bindings,
+      executionMetadata: ImageManipulationSystemTemplate.systemAsset.executionMetadata,
+    },
+    runtimeDatasetInstances: ImageManipulationSystemTemplate.datasetInstances.map((entry) => Object.freeze({
+      instanceId: entry.instanceId,
+      datasetAssetId: entry.datasetAssetId,
+      datasetVersionId: entry.datasetAssetVersionId,
+      role: entry.role,
+    })),
+    runtimeWorkflowBindings: Object.freeze([
+      Object.freeze({
+        bindingId: ImageManipulationSystemTemplate.primaryWorkflowAsset.bindingId,
+        componentAlias: ImageManipulationSystemTemplate.primaryWorkflowAsset.componentAlias,
+        workflowAssetId: ImageManipulationSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+        workflowVersionId: ImageManipulationSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+        pinMode: "version" as const,
+      }),
+    ]),
+    runtimeState: Object.freeze({
+      templateId: ImageManipulationSystemTemplate.templateId,
+      runtimeBindingId: ImageManipulationSystemTemplate.compositionBindings.runtimeBindingId,
+      runtimeInstallationBindingId: ImageManipulationSystemTemplate.compositionBindings.runtimeInstallationBindingId,
+      propertySchemaBindingId: ImageManipulationSystemTemplate.compositionBindings.propertySchemaBindingId,
+      propertyMappingBindingId: ImageManipulationSystemTemplate.compositionBindings.propertyMappingBindingId,
+      inputDatasetWorkflowBindingId: ImageManipulationSystemTemplate.compositionBindings.inputDatasetWorkflowBindingId,
+      outputDatasetBindingId: ImageManipulationSystemTemplate.compositionBindings.outputDatasetBindingId,
+      inputDatasetBindingId: ImageManipulationSystemTemplate.compositionBindings.inputDatasetBindingId,
+      referenceDatasetBindingId: ImageManipulationSystemTemplate.compositionBindings.optionalReferenceDatasetBindingId,
+      workflowTemplateBindingId: ImageManipulationSystemTemplate.compositionBindings.workflowTemplateBindingId,
+      workflowTemplateAssetId: ImageManipulationSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+      workflowTemplateVersionId: ImageManipulationSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+      defaultGenerationSettings: Object.freeze({
+        steps: defaultConfig.generation.steps,
+        cfg: defaultConfig.generation.cfg,
+        denoiseStrength: defaultConfig.generation.denoiseStrength,
+        sampler: defaultConfig.generation.sampler,
+        scheduler: defaultConfig.generation.scheduler,
+        seed: defaultConfig.generation.seed,
+        resultCount: defaultConfig.output.resultCount,
+      }),
+      defaultPrompts: Object.freeze({
+        positivePrompt: defaultConfig.prompts.positivePrompt,
+        negativePrompt: defaultConfig.prompts.negativePrompt,
+      }),
+      defaultModelRefs: Object.freeze({
+        checkpointModel: defaultConfig.models.checkpointModel,
+        vaeModel: defaultConfig.models.vaeModel,
+        faceIdModel: defaultConfig.models.faceIdModel,
+      }),
+      defaultConfig,
+    }),
+  });
 }
 
 const imageManipulationSeedDependencies = deduplicateDependencies([

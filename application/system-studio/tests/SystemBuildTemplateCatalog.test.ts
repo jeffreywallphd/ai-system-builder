@@ -36,6 +36,27 @@ describe("SystemBuildTemplateCatalog", () => {
       readonly systemSpec?: {
         readonly components?: ReadonlyArray<{ readonly assetId: string }>;
         readonly bindings?: ReadonlyArray<{ readonly bindingId: string }>;
+        readonly executionMetadata?: {
+          readonly runtime?: { readonly environment?: string };
+          readonly orchestration?: { readonly mode?: string };
+        };
+        readonly serialization?: {
+          readonly runtime?: {
+            readonly datasetInstances?: ReadonlyArray<{
+              readonly instanceId?: string;
+              readonly datasetAssetId?: string;
+            }>;
+            readonly workflowBindings?: ReadonlyArray<{
+              readonly bindingId?: string;
+              readonly workflowAssetId?: string;
+            }>;
+            readonly state?: {
+              readonly defaultGenerationSettings?: { readonly resultCount?: number };
+              readonly defaultPrompts?: { readonly positivePrompt?: string };
+              readonly defaultModelRefs?: { readonly checkpointModel?: string; readonly vaeModel?: string };
+            };
+          };
+        };
         readonly canvasAuthoring?: {
           readonly pageLayouts?: ReadonlyArray<{
             readonly panels?: ReadonlyArray<{
@@ -56,6 +77,20 @@ describe("SystemBuildTemplateCatalog", () => {
       ImageManipulationSystemTemplate.datasetInstances[0]?.datasetAssetId,
     );
     expect(parsed.systemSpec?.bindings?.length ?? 0).toBeGreaterThan(0);
+    expect(parsed.systemSpec?.executionMetadata?.runtime?.environment).toBe("comfyui");
+    expect(parsed.systemSpec?.executionMetadata?.orchestration?.mode).toBe("workflow-template-driven");
+    expect(parsed.systemSpec?.serialization?.runtime?.workflowBindings?.some((entry) => (
+      entry.bindingId === ImageManipulationSystemTemplate.primaryWorkflowAsset.bindingId
+      && entry.workflowAssetId === ImageManipulationSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId
+    ))).toBeTrue();
+    expect(parsed.systemSpec?.serialization?.runtime?.datasetInstances?.some((entry) => (
+      entry.instanceId === ImageManipulationSystemTemplate.datasetInstances[0]?.instanceId
+      && entry.datasetAssetId === ImageManipulationSystemTemplate.datasetInstances[0]?.datasetAssetId
+    ))).toBeTrue();
+    expect(parsed.systemSpec?.serialization?.runtime?.state?.defaultGenerationSettings?.resultCount).toBe(1);
+    expect(parsed.systemSpec?.serialization?.runtime?.state?.defaultPrompts?.positivePrompt?.length ?? 0).toBeGreaterThan(0);
+    expect(parsed.systemSpec?.serialization?.runtime?.state?.defaultModelRefs?.checkpointModel?.length ?? 0).toBeGreaterThan(0);
+    expect(parsed.systemSpec?.serialization?.runtime?.state?.defaultModelRefs?.vaeModel?.length ?? 0).toBeGreaterThan(0);
     expect(parsed.systemSpec?.canvasAuthoring?.pageLayouts?.[0]?.panels?.[0]?.content?.kind).toBe("embedded-studio");
     expect(parsed.systemSpec?.canvasAuthoring?.pageLayouts?.[0]?.panels?.[0]?.content?.studioAssetId).toBe(
       ImageManipulationSystemTemplate.compositionBindings.pageBindingId,

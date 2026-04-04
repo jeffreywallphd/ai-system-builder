@@ -3475,6 +3475,36 @@ export class StudioShellBackendApi {
     }
 
     const message = error instanceof Error ? error.message : "Unexpected backend error.";
+    if (message.startsWith("not-found:")) {
+      return Object.freeze({
+        code: "not-found",
+        message: message.slice("not-found:".length),
+      });
+    }
+    if (message.startsWith("invalid-request:")) {
+      return Object.freeze({
+        code: "invalid-request",
+        message: message.slice("invalid-request:".length),
+      });
+    }
+    if (message.startsWith("conflict:")) {
+      return Object.freeze({
+        code: "conflict",
+        message: message.slice("conflict:".length),
+      });
+    }
+    if (message.startsWith("validation-failed:")) {
+      return Object.freeze({
+        code: "validation-failed",
+        message: message.slice("validation-failed:".length),
+      });
+    }
+    if (message.startsWith("persistence-failed:")) {
+      return Object.freeze({
+        code: "persistence-failed",
+        message: message.slice("persistence-failed:".length),
+      });
+    }
     return Object.freeze({
       code: "internal",
       message,

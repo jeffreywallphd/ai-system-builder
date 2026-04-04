@@ -1513,3 +1513,20 @@ Not implemented in this slice:
 - Contract fields are explicitly bounded to logical references and runtime bindings: launch target identity, system/template resolution inputs, runtime context payload, dataset/storage bindings, initial selection state, launch mode/window intent, and expected launch-result metadata.
 - Storage semantics remain non-exclusive by contract: bindings can declare shared ownership scope and use storage-instance logical references without raw filesystem paths.
 - Added a reusable resolver/mapper seam (`SystemRuntimeWindowLaunchResolver`) so callers can compose small inspectable launch requests while preserving default runnable behavior for image-manipulation templates.
+
+## AI Loom image manipulation update: failure-path integration coverage + demo-ready seed defaults (stories 10.7-10.8)
+
+- Added failure-path integration coverage over real image-manipulation validation/execution flows for:
+  - missing shared-storage binding references,
+  - invalid workflow/property/runtime wiring mappings,
+  - unavailable Comfy runtime endpoint readiness,
+  - missing required model dependency readiness,
+  - invalid runnable default configuration,
+  - output retrieval failure normalization in output-gallery data flow.
+- Failure assertions now verify normalized structured output contracts (machine-readable codes, severity, stage/category, human-readable message, and debugging metadata where available) and confirm that critical failures keep the system non-runnable.
+- The Build template seed now serializes canonical system runtime contract defaults at seed time:
+  - runtime dataset-instance references,
+  - runtime workflow binding references,
+  - runtime execution metadata,
+  - inspectable runtime-state defaults for generation controls, prompt defaults/placeholders, and model references.
+- Seeded image-manipulation drafts are smoke-tested as demo-ready defaults that can run through standard provisioning/runtime setup without manual storage path configuration.
