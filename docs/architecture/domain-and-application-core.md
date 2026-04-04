@@ -1765,3 +1765,9 @@ This slice intentionally keeps identity/credential/session concerns separate so 
 - Added integrity constraints and indexes for identity-critical invariants: unique username/email, unique provider subject linkage, single active primary provider per user, single active credential material per provider-subject, enum status checks, and foreign-key references.
 - Kept credential secret material out general profile rows by isolating hash/salt/pepper fields in `identity_credential_material_records`.
 - Added repository integration tests in `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts` for migration application, contract round-trip behavior, and constraint enforcement.
+
+## Direction 6 note: Identity persistence adapters in src layer (story 1.1.4)
+- Added a `src`-layer identity persistence adapter in `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts` implementing lookup, persistence, credential-material, and session repository contracts.
+- Added `src`-layer schema migrations in `src/infrastructure/persistence/identity/SqliteIdentityPersistenceMigrations.ts` and local SQLite compatibility seam in `src/infrastructure/persistence/sqlite/SqliteCompat.ts` to keep the new persistence slice infrastructure-contained.
+- Added explicit mapper boundaries in `src/infrastructure/persistence/identity/IdentityPersistenceMapper.ts` so domain/application contracts are translated independently from SQL operations and raw row shapes are not exposed to upper layers.
+- Added mapper and adapter tests in `src/infrastructure/persistence/identity/tests/*` covering mapping behavior, migration application, and CRUD/query flows for user identities, provider links, credential material, and sessions.

@@ -214,3 +214,9 @@ If a change needs data from the outside world, prefer adding or using an **appli
   - `IIdentitySessionRepository`.
 - Application orchestration dependencies for time and ID generation are now explicit seams (`IIdentityClock`, `IIdentityIdGenerator`) rather than implicit runtime calls.
 - Shared identity DTO/query contracts now live in `application/contracts/IdentityApplicationContracts.ts` so registration/login/credential-update/session-issuance use cases can share stable payload shapes without coupling to persistence or framework choices.
+
+## Direction 6 boundary note: Identity persistence adapters in src layer (story 1.1.4)
+
+- Added `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts` as a concrete infrastructure adapter implementing identity repository ports while keeping domain/application identity semantics unchanged.
+- Added explicit infrastructure mapping boundaries in `src/infrastructure/persistence/identity/IdentityPersistenceMapper.ts` so raw SQL row shapes do not leak above the infrastructure layer.
+- Added `src`-layer SQLite compatibility + migration seams in `src/infrastructure/persistence/sqlite/SqliteCompat.ts` and `src/infrastructure/persistence/identity/SqliteIdentityPersistenceMigrations.ts`.
