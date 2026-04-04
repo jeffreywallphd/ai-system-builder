@@ -41,6 +41,10 @@ Use this file as the shortest reliable orientation before reading the human arch
 - `infrastructure/interpreted/execution/InterpretedWorkflowExecutionStrategy.ts`
 - `ui/composition/createUiDependencies.ts`
 - `electron/main/main.ts`
+- `src/domain/identity/IdentityDomain.ts`
+- `application/contracts/IdentityApplicationContracts.ts`
+- `application/identity/services/IdentityBootstrapService.ts`
+- `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).

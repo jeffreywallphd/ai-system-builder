@@ -1807,3 +1807,14 @@ This slice intentionally keeps identity/credential/session concerns separate so 
   - `application/identity/tests/IdentityPortsContracts.test.ts`,
   - `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`,
   - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`.
+
+## Direction 6 note: Identity architecture and implementation conventions documentation (story 1.1.8)
+
+- Added a dedicated production architecture note at `docs/architecture/identity-foundation.md` with a companion summary in `docs/architecture/identity-foundation.ai.md`.
+- The note captures:
+  - domain concepts/invariants for provider, account, credential, and session lifecycle,
+  - application contracts and bootstrap orchestration seams,
+  - SQLite persistence schema/constraints and adapter boundaries,
+  - extension path for future external providers,
+  - separation between local identity lifecycle and non-identity trust layers (device/runtime/tool trust).
+- Architecture index docs now link to this note so identity foundation guidance is discoverable with the rest of the architecture set.

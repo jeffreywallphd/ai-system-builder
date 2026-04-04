@@ -1780,3 +1780,10 @@ Explicitly later than this scope:
   - `application/identity/tests/IdentityPortsContracts.test.ts`,
   - `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`,
   - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`.
+
+## Direction 6 note: Identity architecture and implementation conventions documentation (story 1.1.8)
+- Added dedicated identity architecture docs:
+  - `docs/architecture/identity-foundation.md` (full production note),
+  - `docs/architecture/identity-foundation.ai.md` (companion quick-reference).
+- Captures implemented domain concepts, persistence schema, port/adapter seams, bootstrap assumptions, and provider extension path.
+- Explicitly documents that local identity is separate from device/runtime/tool trust layers.

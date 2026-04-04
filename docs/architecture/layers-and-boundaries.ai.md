@@ -86,3 +86,7 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 - Bootstrap gating now uses `IIdentityLookupRepository.countUserIdentities()` so "can initialize" policy is application-level and storage-agnostic.
 - Bootstrap orchestration remains at the application layer over existing identity ports (lookup/persistence/credential-material/clock/id-generation), while SQLite adapters implement the new counting capability at infrastructure boundaries.
 - This keeps bootstrap policy deterministic and testable without leaking infrastructure or UI concerns inward.
+
+## Direction 6 boundary note: Identity architecture documentation (story 1.1.8)
+- Added dedicated identity architecture docs in `docs/architecture/identity-foundation.md` and `docs/architecture/identity-foundation.ai.md`.
+- Documents exact boundary ownership for identity contracts/adapters and keeps trust concerns separated from identity lifecycle contracts.
