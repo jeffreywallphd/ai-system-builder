@@ -60,6 +60,7 @@ Primary files:
 - `application/identity/ports/IIdentityIdGenerator.ts`
 - `application/identity/services/IdentityPolicyService.ts`
 - `application/identity/services/IdentityBootstrapService.ts`
+- `src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`
 
 Application responsibilities:
 
@@ -149,6 +150,19 @@ This keeps failure mapping deterministic across domain/application/infrastructur
 
 The service does not generate a password or perform hashing; it consumes already-generated credential material and persists it.
 
+## Local Registration Use Case
+
+`RegisterLocalAccountUseCase.execute(...)` provides the reusable application-layer registration flow for local-password identities:
+
+- normalizes profile and provider-subject inputs through `IdentityPolicyService`
+- requires configured active local-password provider and credential policy dependencies
+- enforces username/email/provider-subject uniqueness through lookup ports
+- enforces credential candidate policy before persistence
+- persists `UserIdentity` and active credential material using application ports only
+- returns typed operation results for success and structured failure paths
+
+The use case intentionally consumes caller-supplied credential hash material (`hashAlgorithm`, `hashValue`, optional salt/pepper metadata) so hashing strategy remains an outer-layer concern.
+
 ## Extension Seams for Future Providers
 
 The model is provider-oriented, not local-password hardcoded:
@@ -195,6 +209,7 @@ Key tests for this foundation:
 - `application/identity/tests/IdentityPortsContracts.test.ts`
 - `application/identity/tests/IdentityPolicyService.test.ts`
 - `application/identity/tests/IdentityBootstrapService.test.ts`
+- `application/identity/tests/RegisterLocalAccountUseCase.test.ts`
 - `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`
 - `src/infrastructure/persistence/identity/tests/IdentityPersistenceMapper.test.ts`
 - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
