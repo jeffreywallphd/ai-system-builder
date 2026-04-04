@@ -216,3 +216,18 @@ Direction 3 trust updates now also use local-first persistence seams for MCP gov
 - Added focused coverage:
   - `application/runtime/tests/RuntimeRepositoryInstallerContract.test.ts`
   - `infrastructure/runtime/tests/GitRuntimeRepositoryInstaller.test.ts`
+
+## AI Loom image manipulation update: Comfy runtime installation asset + installer orchestration (stories 9.3-9.4)
+
+- Added a first-class Comfy runtime installation asset contract in `application/runtime/ComfyRuntimeInstallationAsset.ts`:
+  - versioned, inspectable runtime-installation metadata (source/revision pinning/install target/runtime start/health/capabilities/requirements),
+  - deterministic provisioned-root request resolution through existing runtime repository installer contracts,
+  - path-free install target intent (`targetRootKey`, deterministic location strategy) suitable for shared runtime provisioning.
+- Added `application/runtime/ComfyRuntimeInstallerOrchestrationService.ts`:
+  - composes existing repository installer mechanics with explicit phase hooks for environment prep, dependency install, custom nodes, model validation, and runtime start/health validation,
+  - supports safe re-entry by inspecting existing repository state before install/update actions,
+  - returns normalized orchestration status, per-phase outcomes, and actionable diagnostics, including explicit `not-implemented` phase reporting for later story seams.
+- Image-manipulation system template composition now carries an explicit default runtime-installation asset reference through `ReferenceImageSystemTemplate` / `ImageManipulationSystemTemplate` with validation coverage.
+- Added focused tests:
+  - `application/runtime/tests/ComfyRuntimeInstallationAsset.test.ts`
+  - `application/runtime/tests/ComfyRuntimeInstallerOrchestrationService.test.ts`

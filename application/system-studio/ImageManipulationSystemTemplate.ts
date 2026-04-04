@@ -24,6 +24,7 @@ export interface ImageManipulationSystemTemplateDefinition {
   readonly datasetInstances: typeof ReferenceImageSystemTemplate.datasetInstances;
   readonly workflowBindingBoundary: typeof ReferenceImageSystemTemplate.workflowBindingBoundary;
   readonly primaryWorkflowAsset: typeof ReferenceImageSystemTemplate.primaryWorkflowAsset;
+  readonly runtimeInstallationAsset: typeof ReferenceImageSystemTemplate.runtimeInstallationAsset;
   readonly uiBindingBoundary: typeof ReferenceImageSystemTemplate.uiBindingBoundary;
   readonly compositionBindings: {
     readonly inputDatasetBindingId: "input-image-dataset";
@@ -35,6 +36,7 @@ export interface ImageManipulationSystemTemplateDefinition {
     readonly inputDatasetWorkflowBindingId: typeof ComfyImageManipulationDatasetBindingAssetId;
     readonly pageBindingId: "system-page:image-manipulation";
     readonly runtimeBindingId: "runtime:image-manipulation";
+    readonly runtimeInstallationBindingId: "runtime-installation:comfyui";
   };
 }
 
@@ -50,6 +52,7 @@ export const ImageManipulationSystemTemplate: ImageManipulationSystemTemplateDef
     inputDatasetWorkflowBindingId: ComfyImageManipulationDatasetBindingAssetId,
     pageBindingId: "system-page:image-manipulation",
     runtimeBindingId: "runtime:image-manipulation",
+    runtimeInstallationBindingId: "runtime-installation:comfyui",
   }),
 });
 
