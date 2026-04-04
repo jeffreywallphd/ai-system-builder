@@ -19,6 +19,7 @@
 - `application/identity/services/IdentityBootstrapService.ts`
 - `src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`
 - `src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`
+- `src/application/identity/use-cases/LoginLocalAccountUseCase.ts`
 - `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
 - `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`
 - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
@@ -48,6 +49,13 @@
 - `VerifyLocalPasswordCredentialUseCase` provides local password verification for login/auth flows.
 - It normalizes local provider references, resolves active credential material, and verifies candidates through `ILocalPasswordCredentialService`.
 - Missing credential material and password mismatches map to the same invalid-credentials failure contract.
+
+## Local login seam
+
+- `LoginLocalAccountUseCase` provides the transport-agnostic local login flow for local-password identities.
+- It normalizes provider references, validates local provider-path compatibility, resolves the linked identity, enforces account/provider-link credential-state checks, and verifies credential candidates against active credential material.
+- It returns authenticated-principal result fields intended for subsequent session issuance and device-trust checks.
+- It emits structured failures for unknown identity, invalid credentials, inactive or disabled account state, and unsupported auth paths.
 
 ## Boundary clarity: identity vs trust
 
