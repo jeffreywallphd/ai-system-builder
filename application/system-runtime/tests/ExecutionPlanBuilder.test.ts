@@ -243,4 +243,44 @@ describe("ExecutionPlanBuilder", () => {
     expect(result.status).toBe("invalid");
     expect(result.errors[0]).toContain("version-pinned components");
   });
+
+  it("allows unpinned dataset and tool-chain components when contracts are taxonomy-resolvable", async () => {
+    const root = createSystem({
+      assetId: "system:template-runtime",
+      versionId: "system:template-runtime:v1",
+      components: [
+        {
+          componentKind: "atomic",
+          alias: "input-image-dataset-asset",
+          assetId: "asset:dataset:image-reference-input",
+          taxonomy: { structuralKind: "atomic", semanticRole: "dataset", behaviorKind: "none" },
+        },
+        {
+          componentKind: "composite",
+          alias: "reference-ui",
+          assetId: "asset:tool-chain:reference-image-ui",
+          taxonomy: { structuralKind: "composite", semanticRole: "tool-chain", behaviorKind: "deterministic" },
+        },
+      ],
+    });
+    const runtimeContract = await mapSystemContractToRuntimeExecutionContract({
+      root,
+      contract: await resolver.resolveSystemContract({
+        root,
+        resolveSystem: async () => undefined,
+        resolveChildContract: async (component) => component.taxonomy
+          ? resolver.resolveContractForTaxonomy(component.taxonomy)
+          : undefined,
+      }),
+      resolveChildContract: async (component) => component.taxonomy
+        ? resolver.resolveContractForTaxonomy(component.taxonomy)
+        : undefined,
+    });
+    const deps = await resolveSystemRuntimeDependencies({ root, resolveSystem: async () => undefined });
+    const behavior = behaviorAlignment.resolveSystemRuntimeBehavior("system", "deterministic");
+
+    const result = new ExecutionPlanBuilder().build({ root, runtimeContract, dependencyResolution: deps, behavior });
+    expect(result.status).toBe("built");
+    expect(result.errors).toHaveLength(0);
+  });
 });
