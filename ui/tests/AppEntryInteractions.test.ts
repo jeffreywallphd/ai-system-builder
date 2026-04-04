@@ -10,11 +10,14 @@ describe("ui app entry interactions", () => {
     expect(appSource).toContain(
       'import { AppProviders } from "./composition/AppProviders"'
     );
+    expect(appSource).toContain("IdentityAuthSessionStore");
+    expect(appSource).toContain("onAuthenticated={handleAuthenticated}");
+    expect(appSource).toContain("if (!authenticated)");
     expect(appSource).toContain("<AppProviders config={config}>");
-    expect(appSource).toContain("<AppRouter isAuthenticated={isAuthenticated} />");
+    expect(appSource).toContain("isAuthenticated={authenticated}");
     expect(mainSource).toContain('import App from "./App"');
     expect(mainSource).toContain('import "./styles/app.css"');
-    expect(mainSource).toContain("<App isAuthenticated={true} />");
+    expect(mainSource).toContain("<App />");
   });
 
   it("provides root html shell for mounting", () => {

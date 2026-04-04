@@ -12,6 +12,17 @@ The renderer uses manual composition plus class-based stores/services; it is not
 - Execution-status presenter: `ui/presenters/WorkflowExecutionPresenter.ts`
 - Durable history/detail projection surface: `ui/services/ExecutionHistoryService.ts`, `ui/components/execution/ExecutionHistoryPanel.tsx`, `ui/components/execution/ExecutionRunDetailPanel.tsx`
 
+## Identity UI slice
+- `ui/App.tsx` now gates authenticated provider startup: auth routes render without `AppProviders`; authenticated routes mount the full dependency graph.
+- Minimal production auth routes live in:
+  - `ui/pages/LoginPage.tsx`
+  - `ui/pages/RegisterPage.tsx`
+- Identity renderer seams follow `shared` / `desktop` / `web` splits:
+  - `ui/shared/identity/*`
+  - `ui/desktop/identity/*`
+  - `ui/web/identity/*`
+  - `ui/services/IdentityAuthService.ts`
+
 ## Key wording
 Describe stores as "page-facing state managers" and UI services as "presentation-facing adapters over application use cases and repositories."
 

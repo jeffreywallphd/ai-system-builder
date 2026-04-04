@@ -9,9 +9,19 @@ The renderer is a React application whose pages and components depend on a manua
 ## Top-level structure
 
 ### React shell
-- `ui/App.tsx` wraps the router with `AppProviders`.
+- `ui/App.tsx` now gates authenticated renderer startup: unauthenticated routes render without `AppProviders`, and authenticated sessions mount the full provider/bootstrap graph.
 - `ui/routes/AppRouter.tsx` defines the route tree for the main product areas.
 - `ui/layout/AppLayout.tsx` provides shared layout/chrome.
+
+### Identity entry surface
+- Minimal production identity UI now lives in route-driven pages:
+  - `ui/pages/LoginPage.tsx`
+  - `ui/pages/RegisterPage.tsx`
+- Identity transport and environment seams are split by renderer convention:
+  - shared transport/session/validation: `ui/shared/identity/*`
+  - desktop endpoint resolution: `ui/desktop/identity/*`
+  - web/thin-client endpoint resolution: `ui/web/identity/*`
+  - UI service adapter: `ui/services/IdentityAuthService.ts`
 
 ### Dependency provider
 `ui/composition/AppProviders.tsx` creates the full UI dependency graph with `createUiDependencies()` and performs startup work such as:

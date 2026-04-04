@@ -82,6 +82,7 @@ import { SqliteImageRunHistoryRepository } from "../../infrastructure/filesystem
 import { LocalStorageInstanceProvisioner } from "../../infrastructure/filesystem/system-runtime/LocalStorageInstanceProvisioner";
 import { LocalSystemOutputArtifactStorage } from "../../infrastructure/filesystem/system-runtime/LocalSystemOutputArtifactStorage";
 import { LocalStorageInstanceLifecycleInfrastructure } from "../../infrastructure/filesystem/system-runtime/LocalStorageInstanceLifecycleInfrastructure";
+import { startIdentityServerHost, type IdentityServerHost } from "../../hosts/server/IdentityServerHost";
 import {
   parseSystemRuntimeWindowLaunchContract,
   SystemRuntimeWindowLaunchQueryParam,
@@ -109,6 +110,7 @@ let canonicalProjectionSink: InMemoryAssetLineageGraphProjectionSink | undefined
 let agentRepository: SqliteAgentRepository | undefined;
 let agentSessionRepository: SqliteAgentExecutionSessionRepository | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
+let identityServerHost: IdentityServerHost | undefined;
 let studioShellRepository: SqliteStudioShellRepository | undefined;
 let workflowPersistenceRepository: SqliteWorkflowPersistenceRepository | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
@@ -325,7 +327,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   });
   await serviceSupervisor.start();
 
-  const runtimeConfig = isPackaged
+  const baseRuntimeConfig = isPackaged
     ? AppRuntimeConfig.forDesktopProduction({
         storage: storagePaths,
         pythonRuntime,
@@ -338,6 +340,13 @@ async function bootstrapDesktopRuntime(): Promise<void> {
         serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
         serviceSupervisorPort: 8790,
       });
+  identityServerHost = await startIdentityServerHost({
+    databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
+  });
+  const runtimeConfig = AppRuntimeConfig.fromValues({
+    ...baseRuntimeConfig.toValues(),
+    identityApiBaseUrl: `http://127.0.0.1:${identityServerHost.port}`,
+  });
 
   bootstrapContext = Object.freeze({
     runtimeConfig: runtimeConfig.toValues(),
@@ -1067,6 +1076,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", async () => {
+  await identityServerHost?.close();
   await serviceSupervisor?.stop();
   storageDatabase?.dispose();
   executionRunRepository?.dispose();
