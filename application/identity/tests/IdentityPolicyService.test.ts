@@ -120,6 +120,12 @@ describe("IdentityPolicyService", () => {
       "provider-subject-conflict",
     ]);
     expect(result.normalized?.providerReference?.providerSubject).toBe("alice@example.com");
+    expect(result.outcome).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: "identity-duplicate",
+      }),
+    });
   });
 
   it("ignores conflicts for the excluded identity id", async () => {
@@ -151,6 +157,7 @@ describe("IdentityPolicyService", () => {
     expect(result.valid).toBe(true);
     expect(result.available).toBe(true);
     expect(result.conflicts).toEqual([]);
+    expect(result.outcome.ok).toBe(true);
   });
 
   it("exposes structured credential policy and status transition evaluations", () => {
@@ -179,5 +186,25 @@ describe("IdentityPolicyService", () => {
     const invalidTransition = service.evaluateStatusTransition(user, UserIdentityStatuses.pendingActivation);
     expect(invalidTransition.valid).toBe(false);
     expect(invalidTransition.issues[0]?.code).toBe("status-transition-disallowed");
+  });
+
+  it("returns structured policy-violation outcomes for invalid uniqueness input", async () => {
+    const service = new IdentityPolicyService(new InMemoryIdentityLookupRepository());
+    const result = await service.checkAccountUniqueness({
+      username: " ",
+      providerReference: {
+        providerId: " ",
+        providerSubject: " ",
+      },
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.available).toBe(false);
+    expect(result.outcome).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: "identity-policy-violation",
+      }),
+    });
   });
 });

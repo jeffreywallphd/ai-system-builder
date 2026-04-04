@@ -68,3 +68,68 @@ export const IdentityIdNamespaces = Object.freeze({
 
 export type IdentityIdNamespace =
   typeof IdentityIdNamespaces[keyof typeof IdentityIdNamespaces];
+
+export const IdentityErrorCodes = Object.freeze({
+  duplicateIdentity: "identity-duplicate",
+  invalidCredentials: "identity-invalid-credentials",
+  inactiveAccount: "identity-inactive-account",
+  policyViolation: "identity-policy-violation",
+  unsupportedProvider: "identity-unsupported-provider",
+  invalidSessionState: "identity-invalid-session-state",
+  invalidRequest: "identity-invalid-request",
+  invalidState: "identity-invalid-state",
+  notFound: "identity-not-found",
+});
+
+export type IdentityErrorCode = typeof IdentityErrorCodes[keyof typeof IdentityErrorCodes];
+
+export const IdentityErrorBoundaries = Object.freeze({
+  domain: "domain",
+  application: "application",
+  infrastructure: "infrastructure",
+});
+
+export type IdentityErrorBoundary =
+  typeof IdentityErrorBoundaries[keyof typeof IdentityErrorBoundaries];
+
+export interface IdentityOperationError<TCode extends IdentityErrorCode = IdentityErrorCode> {
+  readonly code: TCode;
+  readonly message: string;
+  readonly boundary: IdentityErrorBoundary;
+  readonly retryable: boolean;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
+export interface IdentityOperationSuccess<TValue> {
+  readonly ok: true;
+  readonly value: TValue;
+}
+
+export interface IdentityOperationFailure<TCode extends IdentityErrorCode = IdentityErrorCode> {
+  readonly ok: false;
+  readonly error: IdentityOperationError<TCode>;
+}
+
+export type IdentityOperationResult<TValue, TCode extends IdentityErrorCode = IdentityErrorCode> =
+  | IdentityOperationSuccess<TValue>
+  | IdentityOperationFailure<TCode>;
+
+export interface IdentityMutationOutcome {
+  readonly changed: boolean;
+}
+
+export function identitySuccess<TValue>(value: TValue): IdentityOperationSuccess<TValue> {
+  return Object.freeze({
+    ok: true,
+    value,
+  });
+}
+
+export function identityFailure<TCode extends IdentityErrorCode>(
+  error: IdentityOperationError<TCode>,
+): IdentityOperationFailure<TCode> {
+  return Object.freeze({
+    ok: false,
+    error,
+  });
+}

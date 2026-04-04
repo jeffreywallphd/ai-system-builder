@@ -11,11 +11,16 @@ import {
   revokeSession,
 } from "../../../src/domain/identity/IdentityDomain";
 import {
+  IdentityErrorCodes,
   IdentityCredentialMaterialStatuses,
   IdentityIdNamespaces,
   IdentityPrincipalLookupKinds,
+  identityFailure,
+  identitySuccess,
   type IdentityCredentialHistoryQuery,
   type IdentityCredentialMaterialRecord,
+  type IdentityMutationOutcome,
+  type IdentityOperationResult,
   type IdentityPrincipalLookup,
   type IdentityProviderSubjectReference,
   type IdentitySessionListQuery,
@@ -142,10 +147,18 @@ class InMemoryIdentityPortAdapter
     return record;
   }
 
-  async markCredentialMaterialSuperseded(recordId: string, supersededAt: string) {
+  async markCredentialMaterialSuperseded(
+    recordId: string,
+    supersededAt: string,
+  ): Promise<IdentityOperationResult<IdentityMutationOutcome, typeof IdentityErrorCodes.invalidRequest>> {
     const record = this.credentialMaterial.get(recordId.trim());
     if (!record) {
-      return false;
+      return identityFailure({
+        code: IdentityErrorCodes.invalidRequest,
+        message: "Credential material record was not found.",
+        boundary: "infrastructure",
+        retryable: false,
+      });
     }
 
     this.credentialMaterial.set(record.id, {
@@ -154,7 +167,7 @@ class InMemoryIdentityPortAdapter
       supersededAt,
       updatedAt: supersededAt,
     });
-    return true;
+    return identitySuccess({ changed: true });
   }
 
   async saveSession(session: ReturnType<typeof createSession>) {
@@ -192,8 +205,21 @@ class InMemoryIdentityPortAdapter
     return limit ? sessions.slice(0, limit) : sessions;
   }
 
-  async removeSession(sessionId: string) {
-    return this.sessions.delete(sessionId.trim());
+  async removeSession(
+    sessionId: string,
+  ): Promise<IdentityOperationResult<IdentityMutationOutcome, typeof IdentityErrorCodes.invalidSessionState>> {
+    const normalizedSessionId = sessionId.trim();
+    if (!normalizedSessionId) {
+      return identityFailure({
+        code: IdentityErrorCodes.invalidSessionState,
+        message: "Session id is required.",
+        boundary: "infrastructure",
+        retryable: false,
+      });
+    }
+    return identitySuccess({
+      changed: this.sessions.delete(normalizedSessionId),
+    });
   }
 }
 
@@ -263,7 +289,10 @@ describe("identity application ports contracts", () => {
     expect(activeCredential?.id).toBe(recordId);
 
     const superseded = await adapter.markCredentialMaterialSuperseded(recordId, "2026-04-04T13:00:00.000Z");
-    expect(superseded).toBe(true);
+    expect(superseded.ok).toBe(true);
+    if (superseded.ok) {
+      expect(superseded.value.changed).toBe(true);
+    }
     expect((await adapter.getActiveCredentialMaterial({
       providerId: "provider:local-password",
       providerSubject: "alice-local",
@@ -299,6 +328,14 @@ describe("identity application ports contracts", () => {
     });
     expect(list.map((session) => session.id)).toEqual([activeSession.id]);
     expect(revokedSession.status).toBe(IdentitySessionStatuses.revoked);
+
+    const invalidRemoval = await adapter.removeSession("   ");
+    expect(invalidRemoval).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: "identity-invalid-session-state",
+      }),
+    });
   });
 
   it("provides deterministic id and clock seams for use-case orchestration", () => {
