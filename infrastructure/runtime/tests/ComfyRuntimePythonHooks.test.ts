@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import os from "node:os";
 import path from "node:path";
 import { ComfyRuntimeInstallationAsset } from "../../../application/runtime/ComfyRuntimeInstallationAsset";
+import { ComfyRuntimeWorkflowProfiles } from "../../../application/runtime/ComfyRuntimeRequirements";
 import type { ComfyRuntimeOrchestrationContext } from "../../../application/runtime/ComfyRuntimeInstallerOrchestrationService";
 import {
   ComfyRuntimePythonHooks,
@@ -181,6 +182,11 @@ function createContext(root: string): ComfyRuntimeOrchestrationContext {
     installDirectory,
     runtimeWorkingDirectory: installDirectory,
     runtimeEndpoint: "http://127.0.0.1:8188",
+    runtimeHost: "127.0.0.1",
+    runtimePort: 8188,
+    runtimeEnvironment: Object.freeze({}),
+    runtimeStartupTimeoutMs: 120000,
+    workflowProfile: ComfyRuntimeWorkflowProfiles.imageManipulationDefault,
   });
 }
 

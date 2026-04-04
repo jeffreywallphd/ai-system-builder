@@ -137,3 +137,21 @@ The preload bridge uses synchronous IPC and exposes storage/workflow/model-file 
 - Added focused tests:
   - `infrastructure/runtime/tests/ComfyRuntimePythonHooks.test.ts`
   - `infrastructure/runtime/tests/ComfyRuntimeInstallerComposition.test.ts`
+
+## AI Loom image manipulation update: Comfy runtime lifecycle + installer state recovery (stories 9.9-9.10)
+
+- Runtime lifecycle/process management now has a dedicated infrastructure hook (`infrastructure/runtime/ComfyRuntimeLifecycleHooks.ts`) wired into installer orchestration as the runtime-validation phase.
+  - supports `start`, `stop`, `restart`, `inspect`, and validation-driven launch readiness checks;
+  - resolves runtime launch command from the provisioned Comfy virtual environment (`<installDirectory>/.venv/.../python`) first;
+  - injects runtime host/port/environment configuration from orchestration context;
+  - validates readiness/liveness endpoint URLs and polls for health with explicit timeout outcomes;
+  - distinguishes normalized lifecycle states (`starting`, `healthy`, `unhealthy`, `stopped`, `unknown`, `timed-out`) with inspectable diagnostics metadata.
+- Installer/runtime state persistence now uses a reusable contract seam (`application/runtime/ComfyRuntimeInstallerStateContract.ts`) with a filesystem-backed implementation (`infrastructure/runtime/FileComfyRuntimeInstallerStateStore.ts`).
+  - persisted state now records phase status by step, repository/runtime revision metadata, runtime launch/health metadata, timestamps, and structured issues;
+  - orchestration now loads persisted state, reconciles observed repository/runtime conditions, and emits explicit mismatch diagnostics instead of silently trusting stale metadata;
+  - resume behavior is idempotent for completed setup phases (`environment`, `dependencies`, `custom-nodes`) when persisted state still matches observed conditions, while stale/mismatched state triggers full recovery execution.
+- Runtime installer composition now wires lifecycle + state-store hooks by default (`infrastructure/runtime/ComfyRuntimeInstallerComposition.ts`) so image-manipulation runtime provisioning flows are recovery-ready without exposing user-managed install/runtime paths.
+- Added focused tests:
+  - `infrastructure/runtime/tests/ComfyRuntimeLifecycleHooks.test.ts`
+  - `infrastructure/runtime/tests/FileComfyRuntimeInstallerStateStore.test.ts`
+  - `application/runtime/tests/ComfyRuntimeInstallerOrchestrationService.test.ts` (resume/reconciliation additions)
