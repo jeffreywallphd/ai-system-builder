@@ -63,6 +63,7 @@ Primary files:
 - `application/identity/services/IdentityBootstrapService.ts`
 - `src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`
 - `src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`
+- `src/application/identity/use-cases/LoginLocalAccountUseCase.ts`
 
 Application responsibilities:
 
@@ -177,6 +178,17 @@ The use case intentionally keeps hashing behind `ILocalPasswordCredentialService
 
 This keeps password verification logic in an application port + infrastructure adapter seam that can coexist with future passkey or external-provider sign-in flows.
 
+## Local Login Use Case
+
+`LoginLocalAccountUseCase.execute(...)` provides the transport-agnostic local login orchestration for AI Loom accounts:
+
+- normalizes local provider-subject references through `IdentityPolicyService`
+- validates local provider path compatibility (`local-password`, `local`, active)
+- resolves the linked local identity and enforces account/provider-link credential-state rules
+- verifies credential candidates against active credential material records
+- returns authenticated-principal payload fields for downstream session issuance and device-trust composition
+- returns structured operation failures for unknown identity, invalid credentials, inactive/disabled account state, unsupported auth path, and invalid/misaligned requests
+
 ## Extension Seams for Future Providers
 
 The model is provider-oriented, not local-password hardcoded:
@@ -225,6 +237,7 @@ Key tests for this foundation:
 - `application/identity/tests/IdentityBootstrapService.test.ts`
 - `application/identity/tests/RegisterLocalAccountUseCase.test.ts`
 - `application/identity/tests/VerifyLocalPasswordCredentialUseCase.test.ts`
+- `application/identity/tests/LoginLocalAccountUseCase.test.ts`
 - `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`
 - `infrastructure/security/identity/tests/ScryptLocalPasswordCredentialService.test.ts`
 - `src/infrastructure/persistence/identity/tests/IdentityPersistenceMapper.test.ts`
