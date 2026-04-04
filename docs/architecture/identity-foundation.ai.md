@@ -20,10 +20,12 @@
 - `src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`
 - `src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`
 - `src/application/identity/use-cases/LoginLocalAccountUseCase.ts`
+- `src/application/identity/use-cases/ChangeLocalPasswordCredentialUseCase.ts`
 - `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
 - `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`
 - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
 - `application/identity/ports/IIdentityCredentialAuthenticator.ts`
+- `application/identity/ports/IIdentityCredentialResetVerifier.ts`
 - `application/identity/services/IdentityProviderCatalog.ts`
 - `application/identity/services/LocalPasswordIdentityAuthenticator.ts`
 - `application/identity/ports/ILocalPasswordCredentialService.ts`
@@ -61,6 +63,20 @@
 - It normalizes provider references, validates local provider-path compatibility via provider capability metadata, resolves the linked identity, enforces account/provider-link credential-state checks, and verifies credential candidates via the authenticator contract against active credential material.
 - It returns authenticated-principal result fields intended for subsequent session issuance and device-trust checks.
 - It emits structured failures for unknown identity, invalid credentials, inactive or disabled account state, and unsupported auth paths.
+
+## Local credential change seam
+
+- `ChangeLocalPasswordCredentialUseCase` provides the production credential-change orchestration for authenticated local accounts.
+- Default mode (`current-credential`) verifies the prior credential material before allowing replacement.
+- Replacement candidates are validated against policy constraints before mutation, including min-password-age and password-history reuse checks from `CredentialPolicy`.
+- Replacement secrets are re-hashed through `IIdentityCredentialAuthenticator`, active credential material is rotated by superseding the prior active record, and provider-link credential state is refreshed with new `passwordChangedAt`.
+- The flow returns deterministic typed failures across invalid credential, policy, account state, and provider/state alignment paths.
+
+## Reset-ready verification seam
+
+- Credential change verification is mode-based: `current-credential` (implemented) and `reset-assertion` (extension seam).
+- `reset-assertion` is delegated to `application/identity/ports/IIdentityCredentialResetVerifier.ts`, which is intentionally token/workflow agnostic so reset-token and administrator-assisted flows can plug in later without changing the credential-change core.
+- If no reset verifier is configured, reset mode fails deterministically with `identity-invalid-request`.
 
 ## Boundary clarity: identity vs trust
 
