@@ -1,4 +1,11 @@
 import { describe, expect, it } from "bun:test";
+import {
+  AuthProviderCategories,
+  AuthProviderKinds,
+  AuthProviderStatuses,
+  createAuthProvider,
+  type AuthProvider,
+} from "../../../src/domain/identity/IdentityDomain";
 import type {
   IdentityCredentialHistoryQuery,
   IdentityCredentialMaterialRecord,
@@ -17,10 +24,12 @@ import type { ICredentialMaterialRepository } from "../ports/ICredentialMaterial
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
 import type { ILocalPasswordCredentialService, LocalPasswordCredentialMaterial } from "../ports/ILocalPasswordCredentialService";
 import { IdentityPolicyService } from "../services/IdentityPolicyService";
+import { LocalPasswordIdentityAuthenticator } from "../services/LocalPasswordIdentityAuthenticator";
 import { VerifyLocalPasswordCredentialUseCase } from "../../../src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase";
 
 class InMemoryCredentialAdapter implements ICredentialMaterialRepository, IIdentityLookupRepository {
   private readonly credentialMaterial = new Map<string, IdentityCredentialMaterialRecord>();
+  private readonly providers = new Map<string, AuthProvider>();
 
   public async countUserIdentities(): Promise<number> {
     return 0;
@@ -38,8 +47,8 @@ class InMemoryCredentialAdapter implements ICredentialMaterialRepository, IIdent
     return undefined;
   }
 
-  public async findAuthProviderById(_providerId: string): Promise<undefined> {
-    return undefined;
+  public async findAuthProviderById(providerId: string): Promise<AuthProvider | undefined> {
+    return this.providers.get(providerId.trim());
   }
 
   public async findCredentialPolicyById(_policyId: string): Promise<undefined> {
@@ -73,6 +82,10 @@ class InMemoryCredentialAdapter implements ICredentialMaterialRepository, IIdent
   public async saveCredentialMaterial(record: IdentityCredentialMaterialRecord): Promise<IdentityCredentialMaterialRecord> {
     this.credentialMaterial.set(record.id, record);
     return record;
+  }
+
+  public async saveProvider(provider: AuthProvider): Promise<void> {
+    this.providers.set(provider.id, provider);
   }
 
   public async markCredentialMaterialSuperseded(
@@ -121,15 +134,23 @@ function createUseCase(
   passwordCredentialService: ILocalPasswordCredentialService = new StubLocalPasswordCredentialService(),
 ): VerifyLocalPasswordCredentialUseCase {
   return new VerifyLocalPasswordCredentialUseCase({
+    lookupRepository: adapter,
     credentialMaterialRepository: adapter,
     identityPolicyService: new IdentityPolicyService(adapter),
-    passwordCredentialService,
+    credentialAuthenticator: new LocalPasswordIdentityAuthenticator(passwordCredentialService),
   });
 }
 
 describe("VerifyLocalPasswordCredentialUseCase", () => {
   it("verifies a valid local password credential against active material", async () => {
     const adapter = new InMemoryCredentialAdapter();
+    await adapter.saveProvider(createAuthProvider({
+      id: "provider:local-password",
+      kind: AuthProviderKinds.localPassword,
+      category: AuthProviderCategories.local,
+      displayName: "Local Password",
+      status: AuthProviderStatuses.active,
+    }));
     await adapter.saveCredentialMaterial({
       id: "credential:1",
       userIdentityId: "user:1",
@@ -161,6 +182,13 @@ describe("VerifyLocalPasswordCredentialUseCase", () => {
 
   it("returns invalid-credentials for wrong password candidate", async () => {
     const adapter = new InMemoryCredentialAdapter();
+    await adapter.saveProvider(createAuthProvider({
+      id: "provider:local-password",
+      kind: AuthProviderKinds.localPassword,
+      category: AuthProviderCategories.local,
+      displayName: "Local Password",
+      status: AuthProviderStatuses.active,
+    }));
     await adapter.saveCredentialMaterial({
       id: "credential:1",
       userIdentityId: "user:1",

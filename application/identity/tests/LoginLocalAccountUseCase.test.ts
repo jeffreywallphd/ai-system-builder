@@ -34,6 +34,7 @@ import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
 import type { ILocalPasswordCredentialService, LocalPasswordCredentialMaterial } from "../ports/ILocalPasswordCredentialService";
 import { IdentityPolicyService } from "../services/IdentityPolicyService";
+import { LocalPasswordIdentityAuthenticator } from "../services/LocalPasswordIdentityAuthenticator";
 import { LoginLocalAccountUseCase } from "../../../src/application/identity/use-cases/LoginLocalAccountUseCase";
 
 class InMemoryLoginAdapter implements IIdentityLookupRepository, ICredentialMaterialRepository, IIdentityClock {
@@ -175,7 +176,7 @@ function createUseCase(
     lookupRepository: adapter,
     credentialMaterialRepository: adapter,
     identityPolicyService: new IdentityPolicyService(adapter),
-    passwordCredentialService,
+    credentialAuthenticator: new LocalPasswordIdentityAuthenticator(passwordCredentialService),
     clock: adapter,
   });
 }
@@ -249,7 +250,7 @@ describe("LoginLocalAccountUseCase", () => {
       providerId: "provider:local-password",
       providerSubject: "valid.user",
       credentialMaterialId: "credential:1",
-      authPath: "local-password",
+      authPath: "password",
       authenticatedAt: "2026-04-04T13:00:00.000Z",
     });
   });

@@ -58,8 +58,11 @@ Primary files:
 - `application/identity/ports/IIdentitySessionRepository.ts`
 - `application/identity/ports/IIdentityClock.ts`
 - `application/identity/ports/IIdentityIdGenerator.ts`
+- `application/identity/ports/IIdentityCredentialAuthenticator.ts`
 - `application/identity/ports/ILocalPasswordCredentialService.ts`
 - `application/identity/services/IdentityPolicyService.ts`
+- `application/identity/services/IdentityProviderCatalog.ts`
+- `application/identity/services/LocalPasswordIdentityAuthenticator.ts`
 - `application/identity/services/IdentityBootstrapService.ts`
 - `src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`
 - `src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`
@@ -158,22 +161,23 @@ The service does not generate a password or perform hashing; it consumes already
 `RegisterLocalAccountUseCase.execute(...)` provides the reusable application-layer registration flow for local-password identities:
 
 - normalizes profile and provider-subject inputs through `IdentityPolicyService`
-- requires configured active local-password provider and credential policy dependencies
+- resolves provider descriptors/capabilities and requires a local provider that supports the selected authenticator
 - enforces username/email/provider-subject uniqueness through lookup ports
 - enforces credential candidate policy before persistence
-- normalizes and hashes password candidates through `ILocalPasswordCredentialService`
+- normalizes and hashes password candidates through `IIdentityCredentialAuthenticator` (`LocalPasswordIdentityAuthenticator` wraps `ILocalPasswordCredentialService`)
 - persists `UserIdentity` and active credential material using application ports only
 - returns typed operation results for success and structured failure paths
 
-The use case intentionally keeps hashing behind `ILocalPasswordCredentialService` so secret-handling stays in infrastructure/security code while persistence still stores only hash material (`hashAlgorithm`, `hashValue`, optional salt/pepper metadata).
+The use case intentionally keeps hashing behind the authenticator contract so secret-handling stays in infrastructure/security code while persistence still stores only hash material (`hashAlgorithm`, `hashValue`, optional salt/pepper metadata).
 
 ## Local Credential Verification Use Case
 
 `VerifyLocalPasswordCredentialUseCase.execute(...)` provides the password-verification seam used by login/auth flows:
 
+- validates provider/authenticator compatibility through `IdentityProviderCatalog`
 - normalizes local provider-subject references through `IdentityPolicyService`
 - resolves active credential material from `ICredentialMaterialRepository`
-- verifies candidate passwords via `ILocalPasswordCredentialService`
+- verifies candidate passwords via `IIdentityCredentialAuthenticator`
 - returns generic invalid-credential failures on missing or mismatched secrets
 
 This keeps password verification logic in an application port + infrastructure adapter seam that can coexist with future passkey or external-provider sign-in flows.
@@ -183,9 +187,9 @@ This keeps password verification logic in an application port + infrastructure a
 `LoginLocalAccountUseCase.execute(...)` provides the transport-agnostic local login orchestration for AI Loom accounts:
 
 - normalizes local provider-subject references through `IdentityPolicyService`
-- validates local provider path compatibility (`local-password`, `local`, active)
+- validates local provider path compatibility through provider capability metadata (`local`, `active`, supports selected authenticator)
 - resolves the linked local identity and enforces account/provider-link credential-state rules
-- verifies credential candidates against active credential material records
+- verifies credential candidates against active credential material records via the authenticator contract
 - returns authenticated-principal payload fields for downstream session issuance and device-trust composition
 - returns structured operation failures for unknown identity, invalid credentials, inactive/disabled account state, unsupported auth path, and invalid/misaligned requests
 
@@ -194,6 +198,8 @@ This keeps password verification logic in an application port + infrastructure a
 The model is provider-oriented, not local-password hardcoded:
 
 - provider categories and kinds already include external options (`oidc`, `oauth2`, `saml`, `passkey`, `custom`)
+- application provider descriptors now expose local capability metadata (supported authenticators, credential-policy/material expectations, usernameless sign-in readiness)
+- application authenticator enums now include both `password` and `passkey`
 - `UserIdentity` links to provider subjects rather than assuming username-only login
 - lookup contracts support principal and provider-subject paths
 - credential material records are keyed by provider/subject and support history/supersede
@@ -238,6 +244,7 @@ Key tests for this foundation:
 - `application/identity/tests/RegisterLocalAccountUseCase.test.ts`
 - `application/identity/tests/VerifyLocalPasswordCredentialUseCase.test.ts`
 - `application/identity/tests/LoginLocalAccountUseCase.test.ts`
+- `application/identity/tests/IdentityAuthenticatorAndProviderCatalog.test.ts`
 - `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`
 - `infrastructure/security/identity/tests/ScryptLocalPasswordCredentialService.test.ts`
 - `src/infrastructure/persistence/identity/tests/IdentityPersistenceMapper.test.ts`
