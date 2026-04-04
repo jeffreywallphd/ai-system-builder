@@ -70,3 +70,8 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 - Lookup, persistence, credential-material, and session contracts are split into dedicated interfaces so use cases depend on capability seams instead of implementation detail.
 - Time and ID generation are explicit application seams (`IIdentityClock`, `IIdentityIdGenerator`) instead of implicit `Date`/UUID calls.
 - Shared DTO/query contracts in `application/contracts/IdentityApplicationContracts.ts` keep port payloads stable and framework-independent.
+
+## Direction 6 boundary note: Identity persistence adapters in src layer (story 1.1.4)
+- Added `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts` as a concrete infrastructure adapter implementing identity repository ports without moving identity rules out of the domain/application layers.
+- Added explicit persistence mapper boundaries in `src/infrastructure/persistence/identity/IdentityPersistenceMapper.ts` so SQL row contracts remain infrastructure-only and domain/application models stay persistence-agnostic.
+- Added `src/infrastructure/persistence/sqlite/SqliteCompat.ts` and `src/infrastructure/persistence/identity/SqliteIdentityPersistenceMigrations.ts` to keep database opening/migration mechanics isolated to infrastructure.
