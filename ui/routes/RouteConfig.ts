@@ -13,6 +13,8 @@ export interface AppRouteDefinition {
 
 export const ROUTE_PATHS = Object.freeze({
   home: "/",
+  login: "/auth/login",
+  register: "/auth/register",
   build: "/build",
   buildAutomate: "/build/automate",
   explore: "/explore",
@@ -61,6 +63,18 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     path: ROUTE_PATHS.home,
     title: "Home",
     showInNavigation: true,
+  }),
+  Object.freeze({
+    key: "login",
+    path: ROUTE_PATHS.login,
+    title: "Sign in",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "register",
+    path: ROUTE_PATHS.register,
+    title: "Create account",
+    showInNavigation: false,
   }),
   Object.freeze({
     key: "build",

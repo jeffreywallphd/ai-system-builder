@@ -13,6 +13,13 @@ Implemented transport and host composition:
 - `infrastructure/api/identity/IdentityAuthBackendApi.ts`
 - `hosts/server/IdentityServerHost.ts`
 
+UI entry points now consume this same HTTP surface through renderer identity adapters:
+
+- shared transport client: `ui/shared/identity/IdentityAuthClient.ts`
+- desktop endpoint resolver: `ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`
+- web/thin-client endpoint resolver: `ui/web/identity/resolveWebIdentityApiBaseUrl.ts`
+- UI-facing service: `ui/services/IdentityAuthService.ts`
+
 ## Request contracts
 
 ### Register request
@@ -126,3 +133,4 @@ The transport tests verify that raw credential candidates do not appear in log o
 
 - `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `ui/shared/identity/tests/IdentityAuthClient.test.ts`

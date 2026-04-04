@@ -32,6 +32,7 @@ export interface AppRuntimeConfigValues {
   readonly isProductionMode: boolean;
   readonly devSyncBaseUrl?: string;
   readonly devSyncToken?: string;
+  readonly identityApiBaseUrl?: string;
   readonly modelInstallDirectory: string;
   readonly serviceSupervisorBaseUrl?: string;
   readonly serviceSupervisorPort?: number;
@@ -63,6 +64,7 @@ export class AppRuntimeConfig {
   public readonly isProductionMode: boolean;
   public readonly devSyncBaseUrl?: string;
   public readonly devSyncToken?: string;
+  public readonly identityApiBaseUrl?: string;
   public readonly modelInstallDirectory: string;
   public readonly serviceSupervisorBaseUrl?: string;
   public readonly serviceSupervisorPort?: number;
@@ -86,6 +88,7 @@ export class AppRuntimeConfig {
     this.isProductionMode = values.isProductionMode;
     this.devSyncBaseUrl = values.devSyncBaseUrl?.trim() || undefined;
     this.devSyncToken = values.devSyncToken?.trim() || undefined;
+    this.identityApiBaseUrl = values.identityApiBaseUrl?.trim() || undefined;
     this.modelInstallDirectory = values.modelInstallDirectory.trim();
     this.serviceSupervisorBaseUrl = values.serviceSupervisorBaseUrl?.trim() || undefined;
     this.serviceSupervisorPort = values.serviceSupervisorPort;
@@ -123,6 +126,7 @@ export class AppRuntimeConfig {
       isProductionMode: this.isProductionMode,
       devSyncBaseUrl: this.devSyncBaseUrl,
       devSyncToken: this.devSyncToken,
+      identityApiBaseUrl: this.identityApiBaseUrl,
       modelInstallDirectory: this.modelInstallDirectory,
       serviceSupervisorBaseUrl: this.serviceSupervisorBaseUrl,
       serviceSupervisorPort: this.serviceSupervisorPort,
@@ -168,6 +172,7 @@ export class AppRuntimeConfig {
       isProductionMode: values.isProductionMode ?? profile.lifecycleStage === "production",
       devSyncBaseUrl: values.devSyncBaseUrl,
       devSyncToken: values.devSyncToken,
+      identityApiBaseUrl: values.identityApiBaseUrl,
       modelInstallDirectory: values.modelInstallDirectory,
       serviceSupervisorBaseUrl: values.serviceSupervisorBaseUrl,
       serviceSupervisorPort: values.serviceSupervisorPort,
@@ -189,6 +194,8 @@ export class AppRuntimeConfig {
     const modelInstallDirectory =
       AppRuntimeConfig.readEnvVariable("VITE_MODEL_INSTALL_DIRECTORY") ||
       "dev/models";
+    const identityApiBaseUrl =
+      AppRuntimeConfig.readEnvVariable("VITE_IDENTITY_API_BASE_URL");
 
     return new AppRuntimeConfig(AppRuntimeConfig.createValues(runtimeMode, {
       workflowRepositoryMode: profile.supportsLocalWorkspaceFilesystem ? "filesystem-indexed" : "browser-storage",
@@ -199,6 +206,7 @@ export class AppRuntimeConfig {
       seedStarterNode: true,
       devSyncBaseUrl,
       devSyncToken,
+      identityApiBaseUrl,
       modelInstallDirectory,
       workflowStorageDirectory: "dev/workflow-data/workflows",
       workflowIndexDatabasePath: profile.supportsLocalWorkspaceFilesystem
@@ -215,6 +223,7 @@ export class AppRuntimeConfig {
       uiSettingsPersistenceMode: "local-storage",
       installedModelCatalogMode: "browser-local-storage",
       seedStarterNode: true,
+      identityApiBaseUrl: undefined,
       modelInstallDirectory: options.storage.modelsDirectory,
       serviceSupervisorBaseUrl: options.serviceSupervisorBaseUrl,
       serviceSupervisorPort: options.serviceSupervisorPort,
@@ -233,6 +242,7 @@ export class AppRuntimeConfig {
       uiSettingsPersistenceMode: "desktop-sqlite",
       installedModelCatalogMode: "desktop-sqlite",
       seedStarterNode: false,
+      identityApiBaseUrl: undefined,
       modelInstallDirectory: options.storage.modelsDirectory,
       serviceSupervisorBaseUrl: options.serviceSupervisorBaseUrl,
       serviceSupervisorPort: options.serviceSupervisorPort,

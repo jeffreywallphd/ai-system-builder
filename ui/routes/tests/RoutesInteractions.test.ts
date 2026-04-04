@@ -7,15 +7,19 @@ describe("ui/routes interactions", () => {
 
     expect(appRouterSource).toContain('import ProtectedRoute from "./ProtectedRoute"');
     expect(appRouterSource).toContain('import { ROUTE_PATHS } from "./RouteConfig"');
-    expect(appRouterSource).toContain("redirectTo={ROUTE_PATHS.home}");
+    expect(appRouterSource).toContain("redirectTo={ROUTE_PATHS.login}");
+    expect(appRouterSource).toContain('import LoginPage from "../pages/LoginPage"');
+    expect(appRouterSource).toContain('import RegisterPage from "../pages/RegisterPage"');
   });
 
   it("keeps navigation and 404 route interactions intact", () => {
     const appRouterSource = readSource("ui/routes/AppRouter.tsx");
 
     expect(appRouterSource).toContain("element: <NotFoundPage />");
-    expect(appRouterSource).toContain("element: <Navigate to={ROUTE_PATHS.home} replace />");
+    expect(appRouterSource).toContain("to={isAuthenticated ? ROUTE_PATHS.home : ROUTE_PATHS.login}");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.build, element: <BuildPage />");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.login");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.register");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.buildAutomate, element: <BuildAutomatePage />");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.workflowConversation");
     expect(appRouterSource).toContain("<BuildPage />");

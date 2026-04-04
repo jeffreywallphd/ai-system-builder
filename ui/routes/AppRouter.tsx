@@ -31,23 +31,41 @@ import BuildAutomatePage from "../pages/BuildAutomatePage";
 import RegistryPage from "../pages/RegistryPage";
 import AssetDetailPage from "../pages/AssetDetailPage";
 import RunPage from "../pages/RunPage";
+import LoginPage from "../pages/LoginPage";
+import RegisterPage from "../pages/RegisterPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
+import type { LoginLocalIdentityApiResponse } from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 
 export interface AppRouterProps {
   readonly isAuthenticated?: boolean;
+  readonly onAuthenticated?: (session: LoginLocalIdentityApiResponse) => void;
 }
 
 export default function AppRouter({
   isAuthenticated = true,
+  onAuthenticated,
 }: AppRouterProps): JSX.Element {
+  const handleAuthenticated = onAuthenticated ?? (() => undefined);
   const routes = useMemo<ReadonlyArray<RouteObject>>(
     () => [
+      {
+        path: ROUTE_PATHS.login,
+        element: isAuthenticated
+          ? <Navigate to={ROUTE_PATHS.home} replace />
+          : <LoginPage onAuthenticated={handleAuthenticated} />,
+      },
+      {
+        path: ROUTE_PATHS.register,
+        element: isAuthenticated
+          ? <Navigate to={ROUTE_PATHS.home} replace />
+          : <RegisterPage />,
+      },
       {
         element: (
           <ProtectedRoute
             isAllowed={isAuthenticated}
-            redirectTo={ROUTE_PATHS.home}
+            redirectTo={ROUTE_PATHS.login}
           >
             <AppLayout />
           </ProtectedRoute>
@@ -103,11 +121,11 @@ export default function AppRouter({
       },
       {
         path: "/index.html",
-        element: <Navigate to={ROUTE_PATHS.home} replace />,
+        element: <Navigate to={isAuthenticated ? ROUTE_PATHS.home : ROUTE_PATHS.login} replace />,
       },
       { path: ROUTE_PATHS.notFound, element: <NotFoundPage /> },
     ],
-    [isAuthenticated]
+    [handleAuthenticated, isAuthenticated]
   );
   const router = useMemo(() => createBrowserRouter([...routes]), [routes]);
 

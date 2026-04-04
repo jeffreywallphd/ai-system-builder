@@ -16,6 +16,13 @@
 - `infrastructure/api/identity/sdk/PublicIdentityAuthApiContract.ts`
 - `hosts/server/IdentityServerHost.ts`
 
+Renderer client surface now uses the same endpoint contract:
+
+- `ui/shared/identity/IdentityAuthClient.ts`
+- `ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`
+- `ui/web/identity/resolveWebIdentityApiBaseUrl.ts`
+- `ui/services/IdentityAuthService.ts`
+
 ## Public error contract
 
 Public error codes are intentionally bounded:
@@ -44,3 +51,4 @@ HTTP transport logging redacts sensitive fields (`credential`, `candidate`, `has
 
 - `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `ui/shared/identity/tests/IdentityAuthClient.test.ts`

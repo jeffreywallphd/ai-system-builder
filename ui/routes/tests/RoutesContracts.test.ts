@@ -16,6 +16,8 @@ describe("ui/routes contract adherence", () => {
     const source = readSource("ui/routes/RouteConfig.ts");
 
     expect(source).toContain('home: "/"');
+    expect(source).toContain('login: "/auth/login"');
+    expect(source).toContain('register: "/auth/register"');
     expect(source).toContain('build: "/build"');
     expect(source).toContain('buildAutomate: "/build/automate"');
     expect(source).toContain('explore: "/explore"');

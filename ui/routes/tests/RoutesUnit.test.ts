@@ -6,6 +6,8 @@ describe("ui/routes unit coverage", () => {
     const source = readSource("ui/routes/RouteConfig.ts");
 
     expect(source).toContain('export const ROUTE_PATHS = Object.freeze({');
+    expect(source).toContain('login: "/auth/login"');
+    expect(source).toContain('register: "/auth/register"');
     expect(source).toContain('build: "/build"');
     expect(source).toContain('explore: "/explore"');
     expect(source).toContain('run: "/run"');
@@ -13,6 +15,8 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('workflowContextWorkbench: "/workflows/:workflowId/context-workbench"');
     expect(source).toContain("export const APP_ROUTES");
     expect(source).toContain('key: "build"');
+    expect(source).toContain('key: "login"');
+    expect(source).toContain('key: "register"');
     expect(source).toContain('key: "explore"');
     expect(source).toContain('key: "run"');
     expect(source).toContain('key: "workflow-editor"');
@@ -68,6 +72,8 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("<RouterProvider router={router} />");
     expect(source).toContain("<ProtectedRoute");
     expect(source).toContain("path: ROUTE_PATHS.build");
+    expect(source).toContain("path: ROUTE_PATHS.login");
+    expect(source).toContain("path: ROUTE_PATHS.register");
     expect(source).toContain("path: ROUTE_PATHS.explore");
     expect(source).toContain("path: ROUTE_PATHS.run");
     expect(source).toContain("path: ROUTE_PATHS.notFound");
