@@ -64,3 +64,9 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 - The model keeps identity lifecycle, credential lifecycle/policy, and session lifecycle as explicit separate concerns.
 - Provider contracts remain extensible (`local` + `external` categories and provider-kind descriptors) so local accounts are supported now without blocking future external identity integration.
 - No infrastructure/transport details were added to the identity domain seam.
+
+## Direction 6 boundary note: Identity application ports foundation (story 1.1.2)
+- Application-layer identity boundaries now live in `application/identity/ports/`.
+- Lookup, persistence, credential-material, and session contracts are split into dedicated interfaces so use cases depend on capability seams instead of implementation detail.
+- Time and ID generation are explicit application seams (`IIdentityClock`, `IIdentityIdGenerator`) instead of implicit `Date`/UUID calls.
+- Shared DTO/query contracts in `application/contracts/IdentityApplicationContracts.ts` keep port payloads stable and framework-independent.

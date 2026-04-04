@@ -204,3 +204,13 @@ If a change needs data from the outside world, prefer adding or using an **appli
   - session lifecycle (`Session`, issuance/rotation/revocation/expiry transitions).
 - Provider semantics are intentionally provider-oriented (`AuthProvider` categories/kinds for local and external providers), so local-password support is first-class without hard-coding a local-only model that blocks future SSO/OIDC/SAML seams.
 - The slice remains domain-pure: no transport, storage, hashing, or host/runtime dependencies were introduced in the identity model.
+
+## Direction 6 update: Identity application ports foundation (story 1.1.2)
+
+- Identity application boundaries are now explicit in `application/identity/ports/`:
+  - `IIdentityLookupRepository`,
+  - `IIdentityPersistenceRepository`,
+  - `ICredentialMaterialRepository`,
+  - `IIdentitySessionRepository`.
+- Application orchestration dependencies for time and ID generation are now explicit seams (`IIdentityClock`, `IIdentityIdGenerator`) rather than implicit runtime calls.
+- Shared identity DTO/query contracts now live in `application/contracts/IdentityApplicationContracts.ts` so registration/login/credential-update/session-issuance use cases can share stable payload shapes without coupling to persistence or framework choices.

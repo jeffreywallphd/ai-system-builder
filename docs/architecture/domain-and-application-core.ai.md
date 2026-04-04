@@ -1725,3 +1725,9 @@ Explicitly later than this scope:
 - Explicitly split identity (`UserIdentity`), credential (`CredentialPolicy`/`CredentialState`), and session (`Session`) lifecycle contracts.
 - Provider semantics are extensible (`AuthProvider` with local/external categories + provider kinds) so local-password support does not block future external identity integration.
 - Domain slice is pure and infrastructure-agnostic.
+
+## Direction 6 note: Identity application contracts foundation (story 1.1.2)
+- Added identity application-layer ports in `application/identity/ports/*` for identity lookup, identity persistence, credential-material persistence, and session persistence.
+- Added explicit infrastructure seams for deterministic orchestration in identity use cases (`IIdentityClock`, `IIdentityIdGenerator`).
+- Added shared identity contract DTO/types in `application/contracts/IdentityApplicationContracts.ts` so registration/login/credential-update/session-issuance flows share stable request/query record shapes without framework coupling.
+- Added contract-focused tests in `application/identity/tests/IdentityPortsContracts.test.ts` to keep boundaries compile-verified and infrastructure-independent.
