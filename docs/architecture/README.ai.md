@@ -115,3 +115,27 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Template completeness validation now includes runtime-dependency-readiness checks for both default execution profiles, so partially configured defaults fail catalog runnable validation instead of passing until runtime.
 - Added vertical-slice smoke coverage through `StudioShellBackendApi` that materializes the default template from catalog seed, provisions shared storage/dataset bindings, persists a run result, and verifies output-gallery/run-history retrieval contracts end-to-end.
 
+## AI Loom image manipulation update: runnable-template contract docs + regression hardening (stories 10.9-10.10)
+
+- Runnable template contract is now explicit: a system template is runnable only when completeness validation is valid, execution-readiness checks are valid for default execution path assumptions, and seeded build-template content resolves the required page/workflow/runtime wiring with no manual post-seed edits.
+- Completeness/readiness rules for Epic 10 are documented as contract-level gates:
+  - system/page/workflow/property-schema/runtime assets are present and canonically bound,
+  - required runnable defaults are present for schema and workflow execution parameters,
+  - page/workflow/runtime wiring is consistent for run action, mapping, output dataset/storage, and preview/gallery contracts,
+  - runtime dependency readiness is satisfied for required model/custom-node/runtime assumptions.
+- Shared storage model is now documented as first-class direction:
+  - storage instances are provisioned by the platform/runtime flow, not user path configuration,
+  - storage instances are shareable across systems and embedded subsystems,
+  - workflows and UI bind via logical dataset/storage references (for example `dataset-instance-ref:*`, `storage-instance://*`) instead of raw filesystem paths,
+  - conceptual storage layout follows `/storage/{instanceId}/input|output|reference` while `/systems/{systemId}` remains system files/metadata territory.
+- The default image manipulation template remains a no-extra-setup vertical slice: after normal runtime/install flow, default seeded template execution can run end-to-end without additional user configuration of paths/storage bindings.
+- Asset relationship expectations are explicit and layered:
+  - system asset composes page asset + workflow template + runtime metadata contracts,
+  - page asset executes against property schema and workflow bindings,
+  - workflow template defines dataset/storage/output/runtime execution metadata contracts,
+  - dataset/storage bindings stay logical and shareable,
+  - readiness validation is the final gate before treating template defaults as runnable.
+- Regression coverage now protects these guarantees through contract-focused suites in:
+  - `application/system-studio/tests/ImageManipulationRunnableTemplateContract.regression.test.ts`,
+  - existing completeness/readiness/smoke/failure-path suites under `application/system-studio/tests/*` and `infrastructure/api/studio-shell/tests/*`.
+
