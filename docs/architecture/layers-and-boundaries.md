@@ -195,3 +195,12 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - Several convenience mutations still live in UI services instead of dedicated application use cases. If the goal is a stricter clean architecture, those write operations should gradually move inward.
 - The codebase would be easier to reason about if the manual renderer composition and the container-based infrastructure composition shared more of the same registration path or abstractions.
 - Phase 7 inner contracts now expose authored-agent operations as application use cases (launch/session-read/run-control/trigger-binding) over existing `AgentRunnerService` + `IAgentExecutionSessionRepository` seams; no parallel runtime path was introduced.
+
+## Direction 6 update: Identity domain foundation (story 1.1.1)
+
+- Local identity inner-layer contracts now live in `src/domain/identity/IdentityDomain.ts` and explicitly separate:
+  - identity lifecycle (`UserIdentity` + provider-link invariants),
+  - credential lifecycle/policy (`CredentialPolicy`, `CredentialState`, password-rule validation),
+  - session lifecycle (`Session`, issuance/rotation/revocation/expiry transitions).
+- Provider semantics are intentionally provider-oriented (`AuthProvider` categories/kinds for local and external providers), so local-password support is first-class without hard-coding a local-only model that blocks future SSO/OIDC/SAML seams.
+- The slice remains domain-pure: no transport, storage, hashing, or host/runtime dependencies were introduced in the identity model.

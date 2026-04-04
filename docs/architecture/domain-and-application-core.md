@@ -1735,3 +1735,13 @@ Explicitly later than this scope:
   - `datasetSpec` -> `datasetPipelineSpec`,
   - `datasetPipelineSpec.schema` -> `datasetPipelineSpec.schemas.input.inlineDefinition`.
 - Recoverable migrations now emit explicit parse issues so legacy/mixed drafts are visible to authors while remaining editable and serializable in current format.
+
+## Direction 6 update: Identity domain and persistence foundation (story 1.1.1)
+
+The inner layers now include a bounded identity core in `src/domain/identity/IdentityDomain.ts`:
+- provider-facing identity contracts (`AuthProvider`) with local and external provider categories/kinds,
+- user aggregate lifecycle semantics (`UserIdentity` + provider-link invariants),
+- credential policy/state contracts (`CredentialPolicy`, `CredentialState`) with deterministic password-policy validation and lockout/reset/compromise state transitions,
+- session issuance/lifecycle contracts (`Session`) with explicit rotate/revoke/expire transitions.
+
+This slice intentionally keeps identity/credential/session concerns separate so later authentication/session/device-trust flows can layer on stable contracts rather than ad hoc auth objects.

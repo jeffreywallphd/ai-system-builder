@@ -1719,3 +1719,9 @@ Explicitly later than this scope:
   - `datasetSpec` -> `datasetPipelineSpec`,
   - `datasetPipelineSpec.schema` -> `datasetPipelineSpec.schemas.input.inlineDefinition`.
 - Recoverable migrations now emit explicit parse issues so legacy/mixed drafts are visible to authors while remaining editable and serializable in current format.
+
+## Direction 6 note: Identity domain foundation (story 1.1.1)
+- Added `src/domain/identity/IdentityDomain.ts` as a new inner-layer identity seam.
+- Explicitly split identity (`UserIdentity`), credential (`CredentialPolicy`/`CredentialState`), and session (`Session`) lifecycle contracts.
+- Provider semantics are extensible (`AuthProvider` with local/external categories + provider kinds) so local-password support does not block future external identity integration.
+- Domain slice is pure and infrastructure-agnostic.
