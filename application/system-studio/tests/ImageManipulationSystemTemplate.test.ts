@@ -16,6 +16,7 @@ import {
   ImageManipulationRuntimeTargets,
   validateImageManipulationSystemTemplate,
 } from "../ImageManipulationSystemTemplateValidation";
+import { ComfyRuntimeWorkflowProfiles } from "../../runtime/ComfyRuntimeRequirements";
 
 describe("ImageManipulationSystemTemplate", () => {
   it("exposes a concrete system template contract with composition extension points", () => {
@@ -51,6 +52,12 @@ describe("ImageManipulationSystemTemplate", () => {
     );
     expect(ImageManipulationSystemTemplate.runtimeInstallationAsset.assetId).toBe(
       "asset:config-profile:comfyui-runtime-installation",
+    );
+    expect(ImageManipulationSystemTemplate.runtimeInstallationAsset.defaultWorkflowProfile).toBe(
+      ComfyRuntimeWorkflowProfiles.imageManipulationDefault,
+    );
+    expect(ImageManipulationSystemTemplate.runtimeInstallationAsset.supportedWorkflowProfiles).toContain(
+      ComfyRuntimeWorkflowProfiles.imageManipulationFaceId,
     );
 
     expect(ImageManipulationSystemTemplate.systemAsset.executionMetadata?.runtime?.environment).toBe(
@@ -181,6 +188,22 @@ describe("ImageManipulationSystemTemplate", () => {
 
     expect(validation.status).toBe("invalid");
     expect(validation.errors.map((entry) => entry.code)).toContain("runtime-installation-asset-invalid");
+  });
+
+  it("fails validation when runtime workflow profile metadata is invalid", () => {
+    const invalid = {
+      ...ImageManipulationSystemTemplate,
+      runtimeInstallationAsset: {
+        ...ImageManipulationSystemTemplate.runtimeInstallationAsset,
+        defaultWorkflowProfile: "image-manipulation-faceid" as unknown as typeof ImageManipulationSystemTemplate.runtimeInstallationAsset.defaultWorkflowProfile,
+        supportedWorkflowProfiles: ["image-manipulation-default"],
+      },
+    } as unknown as typeof ImageManipulationSystemTemplate;
+
+    const validation = validateImageManipulationSystemTemplate(invalid);
+    expect(validation.status).toBe("invalid");
+    expect(validation.errors.map((entry) => entry.code)).toContain("runtime-installation-default-workflow-profile-invalid");
+    expect(validation.errors.map((entry) => entry.code)).toContain("runtime-installation-supported-workflow-profile-missing");
   });
 
   it("fails validation when workflow mapping assets are replaced", () => {

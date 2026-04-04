@@ -13,6 +13,12 @@ import {
   type RuntimeRepositoryUpdateRequest,
   type RuntimeRepositoryValidationRequest,
 } from "./RuntimeRepositoryInstallerContract";
+import {
+  ComfyRuntimeAssetRequirementSchema,
+  ComfyRuntimeRequirementApplicability,
+  ComfyRuntimeWorkflowProfiles,
+  ComfyRuntimeCustomNodeRequirementSchema,
+} from "./ComfyRuntimeRequirements";
 
 const nonEmptyStringSchema = z.string().trim().min(1);
 
@@ -105,6 +111,8 @@ export const ComfyRuntimeInstallationAssetSchema = z.object({
   runtimeHealth: runtimeHealthSchema,
   requiredCapabilities: z.array(nonEmptyStringSchema).min(1),
   installRequirements: z.array(dependencyRequirementSchema).min(1),
+  customNodeRequirements: z.array(ComfyRuntimeCustomNodeRequirementSchema).default([]),
+  runtimeAssetRequirements: z.array(ComfyRuntimeAssetRequirementSchema).default([]),
   validation: validationSchema,
   diagnostics: diagnosticsSchema,
   metadata: z.record(z.string(), z.unknown()).default({}),
@@ -204,8 +212,8 @@ export const ComfyRuntimeInstallationAsset: ComfyRuntimeInstallationAsset = crea
       requirementId: "custom-node-root",
       category: "custom-node",
       requirementRef: "custom_nodes/",
-      required: false,
-      notes: "Reserved for optional custom-node installation phase.",
+      required: true,
+      notes: "ComfyUI custom node install root.",
     },
     {
       requirementId: "model-presence-validation",
@@ -213,6 +221,101 @@ export const ComfyRuntimeInstallationAsset: ComfyRuntimeInstallationAsset = crea
       requirementRef: "models/checkpoints",
       required: true,
       notes: "Bounded model-presence validation seam.",
+    },
+  ],
+  customNodeRequirements: [
+    {
+      requirementId: "comfyui-ipadapter-plus",
+      displayName: "ComfyUI IPAdapter Plus",
+      category: "custom-node",
+      applicability: ComfyRuntimeRequirementApplicability.faceIdOnly,
+      required: true,
+      repository: {
+        installerKind: RuntimeRepositoryInstallerKinds.git,
+        repositoryKind: RuntimeRepositoryInstallerKinds.git,
+        repositoryUri: "https://github.com/cubiq/ComfyUI_IPAdapter_plus.git",
+        requestedRevision: "main",
+        metadata: {
+          runtimeFeature: "faceid-conditioning",
+          sourceProvider: "github",
+        },
+      },
+      metadata: {
+        workflowProfile: ComfyRuntimeWorkflowProfiles.imageManipulationFaceId,
+      },
+    },
+    {
+      requirementId: "comfyui-instantid",
+      displayName: "ComfyUI InstantID",
+      category: "custom-node",
+      applicability: ComfyRuntimeRequirementApplicability.faceIdOnly,
+      required: true,
+      repository: {
+        installerKind: RuntimeRepositoryInstallerKinds.git,
+        repositoryKind: RuntimeRepositoryInstallerKinds.git,
+        repositoryUri: "https://github.com/cubiq/ComfyUI_InstantID.git",
+        requestedRevision: "main",
+        metadata: {
+          runtimeFeature: "faceid-conditioning",
+          sourceProvider: "github",
+        },
+      },
+      metadata: {
+        workflowProfile: ComfyRuntimeWorkflowProfiles.imageManipulationFaceId,
+      },
+    },
+  ],
+  runtimeAssetRequirements: [
+    {
+      requirementId: "checkpoint-default",
+      kind: "checkpoint",
+      displayName: "Checkpoint model",
+      applicability: ComfyRuntimeRequirementApplicability.always,
+      required: true,
+      directoryRelativePath: "models/checkpoints",
+      configuredModelName: "system-default",
+      candidateFileNames: [],
+      allowedExtensions: [".safetensors", ".ckpt"],
+      minimumFileCount: 1,
+      compatibilityCheck: "filename-or-any",
+      compatibilityCheckLimitations: "Selection-specific checkpoint architecture compatibility is not verified in this slice.",
+      metadata: {
+        workflowParameterId: "checkpointModel",
+      },
+    },
+    {
+      requirementId: "vae-default",
+      kind: "vae",
+      displayName: "VAE model",
+      applicability: ComfyRuntimeRequirementApplicability.always,
+      required: true,
+      directoryRelativePath: "models/vae",
+      configuredModelName: "system-default",
+      candidateFileNames: [],
+      allowedExtensions: [".safetensors", ".pt", ".ckpt"],
+      minimumFileCount: 1,
+      compatibilityCheck: "filename-or-any",
+      compatibilityCheckLimitations: "Runtime VAE compatibility against checkpoint latent space is not verified in this slice.",
+      metadata: {
+        workflowParameterId: "vaeModel",
+      },
+    },
+    {
+      requirementId: "faceid-model",
+      kind: "faceid-model",
+      displayName: "FaceID model",
+      applicability: ComfyRuntimeRequirementApplicability.faceIdOnly,
+      required: true,
+      directoryRelativePath: "models/insightface",
+      configuredModelName: "system-default",
+      candidateFileNames: [],
+      allowedExtensions: [".onnx", ".pth", ".pt", ".safetensors"],
+      minimumFileCount: 1,
+      compatibilityCheck: "extension-only",
+      compatibilityCheckLimitations: "Model architecture validation for FaceID runtime compatibility is not robustly implemented in this slice.",
+      metadata: {
+        workflowParameterId: "faceIdModel",
+      },
     },
   ],
   validation: {
@@ -225,8 +328,11 @@ export const ComfyRuntimeInstallationAsset: ComfyRuntimeInstallationAsset = crea
       "repository-install-failed",
       "environment-preparation-failed",
       "dependency-install-failed",
-      "custom-node-install-not-implemented",
-      "model-validation-not-implemented",
+      "custom-node-install-failed",
+      "custom-node-validation-failed",
+      "runtime-asset-missing",
+      "runtime-asset-extension-incompatible",
+      "compatibility-check-limited",
       "runtime-validation-not-implemented",
     ],
     includeRepositoryDiagnosticsByDefault: true,
@@ -258,6 +364,20 @@ export function createComfyRuntimeInstallationAsset(input: ComfyRuntimeInstallat
     runtimeHealth: Object.freeze({ ...parsed.runtimeHealth, expectedStatusCodes: Object.freeze([...parsed.runtimeHealth.expectedStatusCodes]) }),
     requiredCapabilities: Object.freeze([...parsed.requiredCapabilities]),
     installRequirements: Object.freeze(parsed.installRequirements.map((entry) => Object.freeze({ ...entry }))),
+    customNodeRequirements: Object.freeze(parsed.customNodeRequirements.map((entry) => Object.freeze({
+      ...entry,
+      repository: Object.freeze({
+        ...entry.repository,
+        metadata: Object.freeze({ ...entry.repository.metadata }),
+      }),
+      metadata: Object.freeze({ ...entry.metadata }),
+    }))),
+    runtimeAssetRequirements: Object.freeze(parsed.runtimeAssetRequirements.map((entry) => Object.freeze({
+      ...entry,
+      candidateFileNames: Object.freeze([...entry.candidateFileNames]),
+      allowedExtensions: Object.freeze([...entry.allowedExtensions]),
+      metadata: Object.freeze({ ...entry.metadata }),
+    }))),
     validation: Object.freeze({
       ...parsed.validation,
       requiredRepositoryPaths: Object.freeze([...parsed.validation.requiredRepositoryPaths]),
