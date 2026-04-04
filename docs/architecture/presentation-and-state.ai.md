@@ -804,3 +804,11 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Runtime-window execution request construction is now shared in a non-component seam (`ui/runtime/ReferenceImageExecutionRequestBuilder.ts`) so runtime panels do not own workflow-input mapping internals.
 - Runtime-window session overrides now persist through a dedicated persistence seam (`ui/runtime/SystemRuntimeWindowSessionPersistenceService.ts`) that stores serializable logical state only (property config/preset, selection snapshot, preview/gallery focus, advanced-panel disclosure, launch/session/page context references).
 - Runtime editor startup now layers persisted runtime-window overrides on top of hydrated defaults and continues to refresh output collections in-place after execution, so reopen/restore keeps in-progress context without raw-path leakage.
+
+## AI Loom image manipulation update: runtime-window reopen/restore orchestration + lifecycle tests (stories 8.7-8.8)
+
+- Runtime-window restore now runs through a single renderer orchestrator (`ui/runtime/SystemRuntimeWindowRestoreService.ts`) that composes launch payload, hydration, persisted session lookup, and stale-reference normalization.
+- Runtime host boot (`SystemRuntimeWindowHost`) now surfaces restore issues with explicit source tagging (`launch`, `hydration`, `session-restore`) while keeping runtime page rendering available when only non-fatal restore warnings occur.
+- Runtime window relaunch from System Runtime Run panel now prepares reopen-aware launch contracts through the same restore seam (`buildReopenRequest`), carrying forward prior runtime-session identity and persisted logical runtime state.
+- `ImageManipulationRuntimeEditorPanel` now accepts host-resolved restored session state, preserving existing session persistence behavior while avoiding a second restore path for reopen context.
+- Runtime lifecycle coverage is now explicit in `ui/runtime/tests/SystemRuntimeWindowLifecycle.test.ts`, including launch payload normalization, hydration default/binding readiness, restore success for reopened sessions, stale reference degradation, and invalid launch-query normalization.
