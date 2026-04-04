@@ -15,6 +15,7 @@ import {
   ImageManipulationPrimaryWorkflowTemplateAssetId,
   type ImageManipulationSystemTemplateDefinition,
 } from "./ImageManipulationSystemTemplate";
+import { ComfyRuntimeInstallationAssetId } from "../runtime/ComfyRuntimeInstallationAsset";
 import { ComfyImageManipulationDatasetBindingAssetId } from "./ComfyImageManipulationDatasetBindingAsset";
 import { ComfyImageManipulationPropertyMappingAssetId } from "./ComfyImageManipulationPropertyMappingAsset";
 
@@ -220,6 +221,20 @@ export function validateImageManipulationSystemTemplate(
       metadata: {
         expected: ComfyImageManipulationPropertyMappingAssetId,
         actual: template.primaryWorkflowAsset.datasetBindings.propertyMappingAssetId,
+      },
+    }));
+  }
+
+  if (template.runtimeInstallationAsset.assetId !== ComfyRuntimeInstallationAssetId) {
+    errors.push(createIssue({
+      code: "runtime-installation-asset-invalid",
+      message: "Image manipulation template must reference the canonical Comfy runtime installation asset.",
+      assetId,
+      layer: "referential",
+      path: "runtimeInstallationAsset.assetId",
+      metadata: {
+        expected: ComfyRuntimeInstallationAssetId,
+        actual: template.runtimeInstallationAsset.assetId,
       },
     }));
   }

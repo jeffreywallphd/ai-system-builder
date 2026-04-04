@@ -41,12 +41,16 @@ describe("ImageManipulationSystemTemplate", () => {
     expect(ImageManipulationSystemTemplate.compositionBindings.inputDatasetWorkflowBindingId).toBe("asset:config-profile:comfy-image-manipulation-dataset-binding");
     expect(ImageManipulationSystemTemplate.compositionBindings.pageBindingId).toBe("system-page:image-manipulation");
     expect(ImageManipulationSystemTemplate.compositionBindings.runtimeBindingId).toBe("runtime:image-manipulation");
+    expect(ImageManipulationSystemTemplate.compositionBindings.runtimeInstallationBindingId).toBe("runtime-installation:comfyui");
 
     expect(ImageManipulationSystemTemplate.primaryWorkflowAsset.datasetBindings.inputDatasetBindingAssetId).toBe(
       "asset:config-profile:comfy-image-manipulation-dataset-binding",
     );
     expect(ImageManipulationSystemTemplate.primaryWorkflowAsset.datasetBindings.propertyMappingAssetId).toBe(
       "asset:config-profile:comfy-image-manipulation-property-mapping",
+    );
+    expect(ImageManipulationSystemTemplate.runtimeInstallationAsset.assetId).toBe(
+      "asset:config-profile:comfyui-runtime-installation",
     );
 
     expect(ImageManipulationSystemTemplate.systemAsset.executionMetadata?.runtime?.environment).toBe(
@@ -162,6 +166,21 @@ describe("ImageManipulationSystemTemplate", () => {
 
     expect(validation.status).toBe("invalid");
     expect(validation.errors.map((entry) => entry.code)).toContain("workflow-template-binding-invalid");
+  });
+
+  it("fails validation when runtime installation asset reference is replaced", () => {
+    const invalid = {
+      ...ImageManipulationSystemTemplate,
+      runtimeInstallationAsset: {
+        ...ImageManipulationSystemTemplate.runtimeInstallationAsset,
+        assetId: "asset:config-profile:other-runtime-installation",
+      },
+    };
+
+    const validation = validateImageManipulationSystemTemplate(invalid);
+
+    expect(validation.status).toBe("invalid");
+    expect(validation.errors.map((entry) => entry.code)).toContain("runtime-installation-asset-invalid");
   });
 
   it("fails validation when workflow mapping assets are replaced", () => {
