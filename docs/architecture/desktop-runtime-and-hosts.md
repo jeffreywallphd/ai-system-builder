@@ -200,3 +200,19 @@ Direction 3 trust updates now also use local-first persistence seams for MCP gov
 - Restored state is layered over hydrated defaults so runtime windows remain runnable without manual reconfiguration while still recovering prior property/selection/panel working context.
 - Persisted stale references now degrade safely: unresolved binding references are filtered and reported as normalized restore warnings (`runtime-window.restore.*`) rather than crashing runtime-window startup.
 - Lifecycle coverage now includes launch payload normalization, hydration/run-default initialization, restore success on reopen, stale-reference degradation, and invalid launch-query normalization (`ui/runtime/tests/SystemRuntimeWindowLifecycle.test.ts`).
+
+## AI Loom image manipulation update: runtime repository installer contracts + git installer (stories 9.1-9.2)
+
+- Added a reusable runtime repository installer contract seam in `application/runtime/RuntimeRepositoryInstallerContract.ts`:
+  - generic install/update/status/validate/diagnostics request and result contracts,
+  - repository-source metadata and installed-repository metadata,
+  - deterministic install-location key generation for provisioned system-managed runtime locations,
+  - normalized operation error and issue contracts.
+- Added a concrete Git-backed installer in `infrastructure/runtime/GitRuntimeRepositoryInstaller.ts`:
+  - deterministic target location resolution under provisioned roots,
+  - clone/install and fetch/update flows with revision capture,
+  - safe re-entry behavior for partial/interrupted installs,
+  - status inspection, validation, and diagnostics on the shared contract surface.
+- Added focused coverage:
+  - `application/runtime/tests/RuntimeRepositoryInstallerContract.test.ts`
+  - `infrastructure/runtime/tests/GitRuntimeRepositoryInstaller.test.ts`
