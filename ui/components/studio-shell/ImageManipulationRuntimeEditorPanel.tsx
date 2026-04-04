@@ -6,6 +6,7 @@ import {
   validateComfyImageManipulationConfig,
   type ComfyImageManipulationConfig,
 } from "../../../application/system-studio/ComfyImageManipulationPropertySchema";
+import { ImageManipulationSystemTemplate } from "../../../application/system-studio/ImageManipulationSystemTemplate";
 import { ReferenceImageSystemTemplate } from "../../../application/system-studio/ReferenceImageSystemTemplate";
 import { validateReferenceImageCrossStudioContext, type CrossStudioIntegrityIssue } from "../../../application/system-studio/ReferenceImageCrossStudioIntegrity";
 import type { OutputGalleryItem } from "../../../application/system-runtime/OutputGalleryDataContract";
@@ -35,15 +36,21 @@ import {
   type ImageManipulationRunLifecycleSnapshot,
 } from "./image-manipulation/ImageManipulationRunLifecycleState";
 import {
-  createInitialImageManipulationSelectionState,
   getSelectionRecordIdForRole,
-  reconcileImageManipulationSelection,
   setActivePreviewRole,
   setRoleSelection,
   type ImageManipulationSelectionRole,
   type ImageManipulationSelectionState,
 } from "./image-manipulation/ImageManipulationSelectionState";
 import type { SystemRuntimeWindowLaunchContract } from "../../../application/system-runtime/SystemRuntimeWindowLaunchContract";
+import type {
+  HydratedRuntimeDatasetBinding,
+  SystemRuntimeHydratedState,
+} from "../../runtime/SystemRuntimeWindowHydrationService";
+import {
+  ImageManipulationRuntimeDatasetBindingService,
+  type ImageManipulationSelectionSnapshot,
+} from "../../runtime/ImageManipulationRuntimeDatasetBindingService";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
   acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
@@ -71,6 +78,8 @@ const runStateLabels: Record<ImageManipulationRunLifecycleSnapshot["state"], str
   success: "Finished",
   failure: "Needs attention",
 });
+
+const emptyHydratedDatasetBindings: ReadonlyArray<HydratedRuntimeDatasetBinding> = Object.freeze([]);
 
 function toFriendlyTimestamp(value: string | undefined): string | undefined {
   if (!value) {
@@ -116,10 +125,6 @@ function resolveSelectedItem(
   return items[0];
 }
 
-function toRecordIds(items: ReadonlyArray<OutputGalleryItem>): ReadonlyArray<string> {
-  return Object.freeze(items.map((item) => item.image.recordId));
-}
-
 function toSelectionRole(value: string | undefined): ImageManipulationSelectionRole | undefined {
   if (value === "source" || value === "output" || value === "reference") {
     return value;
@@ -140,6 +145,7 @@ async function encodeFileBase64(file: File): Promise<string> {
 export interface ImageManipulationRuntimeEditorPanelProps {
   readonly context: StudioShellExtensionContext;
   readonly runtimeLaunch?: SystemRuntimeWindowLaunchContract;
+  readonly hydratedRuntime?: SystemRuntimeHydratedState;
 }
 
 interface ImageCollections {
@@ -164,6 +170,16 @@ function getCollectionLoadErrorMessage(datasetBindingId: ReferenceImageDatasetBi
     return "We couldn't load your face reference photos right now.";
   }
   return "We couldn't load your created images right now.";
+}
+
+function toReferenceImageDatasetBindingId(
+  bindingId: string | undefined,
+): ReferenceImageDatasetBindingId | undefined {
+  return bindingId === "input-image-dataset"
+    || bindingId === "output-image-dataset"
+    || bindingId === "reference-image-dataset"
+    ? bindingId
+    : undefined;
 }
 
 function resolveRunStatusTone(state: ImageManipulationRunLifecycleSnapshot["state"]): "neutral" | "warning" | "danger" | "success" {
@@ -199,18 +215,52 @@ function toFriendlyValidationMessage(path: string): string {
   return "Review your settings before running.";
 }
 
-export function ImageManipulationRuntimeEditorPanel({ context, runtimeLaunch }: ImageManipulationRuntimeEditorPanelProps): JSX.Element {
-  const initialPresetId = runtimeLaunch?.initialSelection.presetId ?? ComfyImageManipulationPropertySchema.defaultPresetId;
+export function ImageManipulationRuntimeEditorPanel({
+  context,
+  runtimeLaunch,
+  hydratedRuntime,
+}: ImageManipulationRuntimeEditorPanelProps): JSX.Element {
+  const initialPresetId = hydratedRuntime?.propertySchema.presetId
+    ?? runtimeLaunch?.initialSelection.presetId
+    ?? ComfyImageManipulationPropertySchema.defaultPresetId;
   const [presetId, setPresetId] = useState(initialPresetId);
-  const [config, setConfig] = useState<ComfyImageManipulationConfig>(() => createComfyImageManipulationDefaultConfig({ presetId: initialPresetId }));
+  const [config, setConfig] = useState<ComfyImageManipulationConfig>(() => (
+    hydratedRuntime?.propertySchema.defaults
+    ?? createComfyImageManipulationDefaultConfig({ presetId: initialPresetId })
+  ));
   const draft = context.snapshot?.draft;
-  const isTemplateDraft = draft?.assetId === ReferenceImageSystemTemplate.systemAsset.assetId;
+  const isImageRuntimeTarget = (hydratedRuntime?.resolvedPage.pageBindingId ?? runtimeLaunch?.launchTarget.pageBindingId)
+    === ImageManipulationSystemTemplate.compositionBindings.pageBindingId;
   const studioShell = useMemo(() => new StudioShellService(), []);
   const uploadAdapter = useMemo(() => createBrowserImageUploadIngestionAdapter({ policy: uploadPolicy }), []);
   const executionFlow = useMemo(() => new ReferenceImageExecutionFlowService(), []);
+  const datasetBindingService = useMemo(() => new ImageManipulationRuntimeDatasetBindingService(), []);
   const requestIdRef = useRef(0);
 
-  const [selection, setSelection] = useState<ImageManipulationSelectionState>(() => createInitialImageManipulationSelectionState());
+  const roleBindings = useMemo(
+    () => datasetBindingService.resolveRoleBindings(hydratedRuntime?.datasetBindings ?? emptyHydratedDatasetBindings),
+    [datasetBindingService, hydratedRuntime?.datasetBindings],
+  );
+  const hydratedSelection = useMemo(() => {
+    if (hydratedRuntime) {
+      return hydratedRuntime.initialSelection;
+    }
+    return Object.freeze({
+      selectedDatasetBindingId: runtimeLaunch?.initialSelection.selectedDatasetBindingId ?? roleBindings.outputBindingId,
+      activePreviewRole: toSelectionRole(runtimeLaunch?.initialSelection.activePreviewRole) ?? "output",
+      selectedRecordIds: Object.freeze({ ...(runtimeLaunch?.initialSelection.selectedRecordIds ?? {}) }),
+      gallerySelectionRecordIds: Object.freeze([]),
+    });
+  }, [hydratedRuntime, runtimeLaunch?.initialSelection.activePreviewRole, runtimeLaunch?.initialSelection.selectedDatasetBindingId, runtimeLaunch?.initialSelection.selectedRecordIds, roleBindings.outputBindingId]);
+  const [selection, setSelection] = useState<ImageManipulationSelectionState>(() => (
+    datasetBindingService.createSelectionStateFromHydration({
+      roleBindings,
+      hydratedSelection,
+    })
+  ));
+  const [selectionSnapshot, setSelectionSnapshot] = useState<ImageManipulationSelectionSnapshot>(() => (
+    datasetBindingService.createEmptySelectionSnapshot(roleBindings)
+  ));
   const [datasetInstanceId, setDatasetInstanceId] = useState<string | undefined>();
 
   const [outputItems, setOutputItems] = useState<ReadonlyArray<OutputGalleryItem>>([]);
@@ -231,6 +281,14 @@ export function ImageManipulationRuntimeEditorPanel({ context, runtimeLaunch }: 
   const [integrityIssues, setIntegrityIssues] = useState<ReadonlyArray<CrossStudioIntegrityIssue>>([]);
   const [flowSteps, setFlowSteps] = useState<ReadonlyArray<ReferenceImageExecutionFlowStep>>([]);
   const [flowIssues, setFlowIssues] = useState<ReadonlyArray<ReferenceImageExecutionFlowIssue>>([]);
+
+  useEffect(() => {
+    setSelection(datasetBindingService.createSelectionStateFromHydration({
+      roleBindings,
+      hydratedSelection,
+    }));
+    setSelectionSnapshot(datasetBindingService.createEmptySelectionSnapshot(roleBindings));
+  }, [datasetBindingService, hydratedSelection, roleBindings]);
 
   const validationIssues = useMemo(() => validateComfyImageManipulationConfig(config), [config]);
   const validationSummaryMessage = useMemo(() => {
@@ -284,6 +342,20 @@ export function ImageManipulationRuntimeEditorPanel({ context, runtimeLaunch }: 
     ?? selectedSourceItem?.image.thumbnailReference
     ?? selectedSourceItem?.image.recordId;
   const selectedSourceDatasetInstanceId = selectedSourceItem?.dataset.instanceId ?? datasetInstanceId;
+  const datasetBindingsById = useMemo(
+    () => new Map((hydratedRuntime?.datasetBindings ?? []).map((entry) => [entry.bindingId, entry] as const)),
+    [hydratedRuntime?.datasetBindings],
+  );
+  const sourceDatasetBinding = datasetBindingsById.get(roleBindings.sourceBindingId);
+  const outputDatasetBinding = datasetBindingsById.get(roleBindings.outputBindingId);
+  const referenceDatasetBinding = roleBindings.referenceBindingId
+    ? datasetBindingsById.get(roleBindings.referenceBindingId)
+    : undefined;
+  const runtimeSystemAssetId = hydratedRuntime?.resolvedSystemAsset.assetId ?? draft?.assetId;
+  const runtimeWorkflowAssetId = hydratedRuntime?.resolvedWorkflowTemplate.workflowTemplateAssetId
+    ?? ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId;
+  const runtimeWorkflowAssetVersionId = hydratedRuntime?.resolvedWorkflowTemplate.workflowTemplateVersionId
+    ?? ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId;
 
   const selectedPreviewViewModel = useMemo(() => {
     if (selection.activePreviewRole === "source") {
@@ -358,11 +430,11 @@ export function ImageManipulationRuntimeEditorPanel({ context, runtimeLaunch }: 
   ]);
 
   const loadCollection = (
-    datasetBindingId: ReferenceImageDatasetBindingId,
+    datasetBindingId: ReferenceImageDatasetBindingId | undefined,
     setLoading: (value: boolean) => void,
     setError: (value: string | undefined) => void,
   ): Promise<ReadonlyArray<OutputGalleryItem>> => {
-    if (!draft?.draftId) {
+    if (!datasetBindingId || !draft?.draftId) {
       return Promise.resolve(Object.freeze([]));
     }
     setLoading(true);
@@ -397,7 +469,11 @@ export function ImageManipulationRuntimeEditorPanel({ context, runtimeLaunch }: 
       setSourceItems(Object.freeze([]));
       setOutputItems(Object.freeze([]));
       setReferenceItems(Object.freeze([]));
-      setSelection(createInitialImageManipulationSelectionState());
+      setSelection(datasetBindingService.createSelectionStateFromHydration({
+        roleBindings,
+        hydratedSelection,
+      }));
+      setSelectionSnapshot(datasetBindingService.createEmptySelectionSnapshot(roleBindings));
       setIsHydrating(false);
       return Promise.resolve(Object.freeze({
         sources: Object.freeze([]),
@@ -413,9 +489,9 @@ export function ImageManipulationRuntimeEditorPanel({ context, runtimeLaunch }: 
     requestIdRef.current = requestId;
 
     return Promise.all([
-      loadCollection("input-image-dataset", setIsLoadingSources, setSourceLoadError),
-      loadCollection("output-image-dataset", setIsLoadingOutputs, setOutputLoadError),
-      loadCollection("reference-image-dataset", setIsLoadingReferences, setReferenceLoadError),
+      loadCollection(toReferenceImageDatasetBindingId(roleBindings.sourceBindingId), setIsLoadingSources, setSourceLoadError),
+      loadCollection(toReferenceImageDatasetBindingId(roleBindings.outputBindingId), setIsLoadingOutputs, setOutputLoadError),
+      loadCollection(toReferenceImageDatasetBindingId(roleBindings.referenceBindingId), setIsLoadingReferences, setReferenceLoadError),
     ]).then(([nextSources, nextOutputs, nextReferences]) => {
       if (requestId !== requestIdRef.current) {
         return Object.freeze({
@@ -430,23 +506,29 @@ export function ImageManipulationRuntimeEditorPanel({ context, runtimeLaunch }: 
       setReferenceItems(nextReferences);
 
       setSelection((current) => {
-        const reconciled = reconcileImageManipulationSelection(current, {
-          sourceRecordIds: toRecordIds(nextSources),
-          outputRecordIds: toRecordIds(nextOutputs),
-          referenceRecordIds: toRecordIds(nextReferences),
-          preferredSourceRecordId: options.preferredSourceRecordId
-            ?? runtimeLaunch?.initialSelection.selectedRecordIds["input-image-dataset"],
-          preferredOutputRecordId: options.preferLatestOutput
-            ? nextOutputs[0]?.image.recordId
-            : (options.preferredOutputRecordId
-              ?? runtimeLaunch?.initialSelection.selectedRecordIds["output-image-dataset"]),
-          preferredReferenceRecordId: options.preferredReferenceRecordId
-            ?? runtimeLaunch?.initialSelection.selectedRecordIds["reference-image-dataset"],
+        const reconciled = datasetBindingService.reconcileSelection({
+          current,
+          roleBindings,
+          hydratedSelection: Object.freeze({
+            ...hydratedSelection,
+            selectedRecordIds: Object.freeze({
+              ...hydratedSelection.selectedRecordIds,
+              ...(options.preferredSourceRecordId ? { [roleBindings.sourceBindingId]: options.preferredSourceRecordId } : {}),
+              ...(options.preferredOutputRecordId ? { [roleBindings.outputBindingId]: options.preferredOutputRecordId } : {}),
+              ...(options.preferredReferenceRecordId && roleBindings.referenceBindingId
+                ? { [roleBindings.referenceBindingId]: options.preferredReferenceRecordId }
+                : {}),
+            }),
+          }),
+          collections: {
+            sourceItems: nextSources,
+            outputItems: nextOutputs,
+            referenceItems: nextReferences,
+          },
+          preferLatestOutput: options.preferLatestOutput,
         });
-        const desiredPreviewRole = toSelectionRole(runtimeLaunch?.initialSelection.activePreviewRole);
-        const withPreviewRole = desiredPreviewRole
-          ? setActivePreviewRole(reconciled, desiredPreviewRole)
-          : reconciled;
+        const withPreviewRole = reconciled.selection;
+        setSelectionSnapshot(reconciled.serializedSelection);
 
         const nextSource = resolveSelectedItem(nextSources, withPreviewRole.sourceRecordId);
         if (nextSource?.dataset.instanceId) {
@@ -470,13 +552,31 @@ export function ImageManipulationRuntimeEditorPanel({ context, runtimeLaunch }: 
 
   useEffect(() => {
     void loadCollections({ hydration: true });
-  }, [draft?.draftId]);
+  }, [draft?.draftId, roleBindings.sourceBindingId, roleBindings.outputBindingId, roleBindings.referenceBindingId]);
 
-  if (!isTemplateDraft || !draft) {
+  useEffect(() => {
+    if (!draft?.draftId) {
+      setSelectionSnapshot(datasetBindingService.createEmptySelectionSnapshot(roleBindings));
+      return;
+    }
+    const reconciled = datasetBindingService.reconcileSelection({
+      current: selection,
+      roleBindings,
+      hydratedSelection,
+      collections: {
+        sourceItems,
+        outputItems,
+        referenceItems,
+      },
+    });
+    setSelectionSnapshot(reconciled.serializedSelection);
+  }, [datasetBindingService, draft?.draftId, hydratedSelection, outputItems, referenceItems, roleBindings, selection, sourceItems]);
+
+  if (!isImageRuntimeTarget || !draft) {
     return (
       <ImageStatusNotice
         title="Image editor unavailable"
-        message="This editor appears when the image manipulation template is open."
+        message="This runtime page is unavailable for the current launch context."
       />
     );
   }
@@ -518,8 +618,10 @@ export function ImageManipulationRuntimeEditorPanel({ context, runtimeLaunch }: 
               system: { systemAssetId: draft.assetId },
               dataset: selectedSourceDatasetInstanceId
                 ? {
-                  datasetAssetId: "asset:dataset:image-reference-input",
-                  datasetVersionId: "v1",
+                  datasetAssetId: sourceDatasetBinding?.datasetAssetId
+                    ?? "asset:dataset:image-reference-input",
+                  datasetVersionId: sourceDatasetBinding?.datasetAssetVersionId
+                    ?? "v1",
                   systemDatasetInstanceId: selectedSourceDatasetInstanceId,
                 }
                 : undefined,
@@ -718,23 +820,30 @@ export function ImageManipulationRuntimeEditorPanel({ context, runtimeLaunch }: 
                 const datasetRefs = [Object.freeze({
                   referenceId: "active-input",
                   instanceId: selectedSourceDatasetInstanceId,
-                  datasetAssetId: "asset:dataset:image-reference-input",
+                  datasetAssetId: sourceDatasetBinding?.datasetAssetId
+                    ?? selectedSourceItem?.dataset.datasetAssetId
+                    ?? "asset:dataset:image-reference-input",
                   role: "active-input",
-                  systemAssetId: draft.assetId,
+                  systemAssetId: runtimeSystemAssetId ?? draft.assetId,
                 }), Object.freeze({
                   referenceId: "system-output",
-                  instanceId: "dataset-instance:reference-image:output",
-                  datasetAssetId: "asset:dataset:image-reference-output",
+                  instanceId: outputDatasetBinding?.datasetInstanceId
+                    ?? selectedOutputItem?.dataset.instanceId
+                    ?? "dataset-instance:reference-image:output",
+                  datasetAssetId: outputDatasetBinding?.datasetAssetId
+                    ?? selectedOutputItem?.dataset.datasetAssetId
+                    ?? "asset:dataset:image-reference-output",
                   role: "system-owned-output",
-                  systemAssetId: draft.assetId,
+                  systemAssetId: runtimeSystemAssetId ?? draft.assetId,
                 })];
                 if (selectedReferenceItem) {
                   datasetRefs.push(Object.freeze({
                     referenceId: "face-reference",
                     instanceId: selectedReferenceItem.dataset.instanceId,
-                    datasetAssetId: selectedReferenceItem.dataset.datasetAssetId,
+                    datasetAssetId: referenceDatasetBinding?.datasetAssetId
+                      ?? selectedReferenceItem.dataset.datasetAssetId,
                     role: "reference-input",
-                    systemAssetId: draft.assetId,
+                    systemAssetId: runtimeSystemAssetId ?? draft.assetId,
                   }));
                 }
 
@@ -751,15 +860,15 @@ export function ImageManipulationRuntimeEditorPanel({ context, runtimeLaunch }: 
                   datasets: datasetRefs,
                   runtime: Object.freeze({
                     runtimeSessionId: context.snapshot?.activeSessionId,
-                    systemAssetId: draft.assetId,
-                    workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+                    systemAssetId: runtimeSystemAssetId ?? draft.assetId,
+                    workflowAssetId: runtimeWorkflowAssetId,
                     sourceStudio: "system-studio",
                   }),
                 });
                 const request = buildReferenceImageStartRequest({
                   studioId: context.studioId,
                   draftId: draft.draftId,
-                  systemAssetId: draft.assetId,
+                  systemAssetId: runtimeSystemAssetId ?? draft.assetId,
                   runtimeContext,
                 });
                 const integrity = validateReferenceImageCrossStudioContext(runtimeContext);
@@ -803,11 +912,12 @@ export function ImageManipulationRuntimeEditorPanel({ context, runtimeLaunch }: 
                       presetId,
                       imageConfig: config,
                       selectedReferenceRecordId: selectedReferenceItem?.image.recordId,
+                      selectionSnapshot,
                     }),
                     runtimeContext,
-                    workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
-                    workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
-                    systemAssetId: draft.assetId,
+                    workflowAssetId: runtimeWorkflowAssetId,
+                    workflowAssetVersionId: runtimeWorkflowAssetVersionId,
+                    systemAssetId: runtimeSystemAssetId ?? draft.assetId,
                     runtimeResult,
                   }),
                   refreshViews: async () => {

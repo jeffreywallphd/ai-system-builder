@@ -18,7 +18,7 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
       />,
     );
 
-    expect(html).toContain("image manipulation template");
+    expect(html).toContain("runtime page is unavailable");
   });
 
   it("renders the editor layout with preview and gallery regions for template drafts", () => {

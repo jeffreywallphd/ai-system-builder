@@ -186,3 +186,9 @@ Direction 3 trust updates now also use local-first persistence seams for MCP gov
 - Launch payloads are normalized and versioned through one shared contract (`SystemRuntimeWindowLaunchContract`) before reaching host window creation.
 - Electron main now reuses existing window bootstrap mechanics to open a separate runtime-focused window and passes only contract-defined launch data to renderer query transport (`runtimeWindowLaunch`).
 - Runtime window reuse is bounded through contract window intent (`reuseWindowKey`) rather than ad hoc global state.
+
+## AI Loom image manipulation update: runtime hydration and binding posture (stories 8.3-8.4)
+
+- Runtime-window host rendering now composes a dedicated hydration stage in renderer runtime seams (`SystemRuntimeWindowHydrationService`) after launch-contract parsing and snapshot loading, keeping host transport thin while moving launch-state normalization into one inspectable UI-runtime service.
+- Hydrated runtime state now stays contract-driven and storage-safe: dataset/storage identity is carried as logical refs/instance ids from launch + serialization context and not converted into renderer-facing filesystem paths.
+- Runtime startup now surfaces normalized hydration issues (warning/error) for invalid/missing launch dependencies instead of silent failure, while still allowing bounded fallback hydration from launch defaults when snapshot data is unavailable.
