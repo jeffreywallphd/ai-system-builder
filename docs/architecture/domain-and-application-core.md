@@ -1745,3 +1745,16 @@ The inner layers now include a bounded identity core in `src/domain/identity/Ide
 - session issuance/lifecycle contracts (`Session`) with explicit rotate/revoke/expire transitions.
 
 This slice intentionally keeps identity/credential/session concerns separate so later authentication/session/device-trust flows can layer on stable contracts rather than ad hoc auth objects.
+
+## Direction 6 update: Identity application contracts foundation (story 1.1.2)
+
+- Identity application ports now live in `application/identity/ports/` for:
+  - identity lookup (`IIdentityLookupRepository`),
+  - identity persistence (`IIdentityPersistenceRepository`),
+  - credential-material persistence (`ICredentialMaterialRepository`),
+  - session persistence (`IIdentitySessionRepository`).
+- Deterministic orchestration seams now include:
+  - `IIdentityClock` for time source control,
+  - `IIdentityIdGenerator` for stable ID generation boundaries.
+- Shared identity contract types now live in `application/contracts/IdentityApplicationContracts.ts` so identity use cases share query/material/session DTO contracts without binding to storage or transport concerns.
+- Contract-level tests for these seams now live in `application/identity/tests/IdentityPortsContracts.test.ts`.
