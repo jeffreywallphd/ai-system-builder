@@ -8,7 +8,12 @@ import {
   ComfyRuntimeCustomNodeInstallationHooks,
   type ComfyRuntimeCustomNodeInstallationHooksOptions,
 } from "./ComfyRuntimeCustomNodeInstallationHooks";
+import { ComfyRuntimeLifecycleHooks, type ComfyRuntimeLifecycleHooksOptions } from "./ComfyRuntimeLifecycleHooks";
 import { ComfyRuntimePythonHooks, type ComfyRuntimePythonHooksOptions } from "./ComfyRuntimePythonHooks";
+import {
+  FileComfyRuntimeInstallerStateStore,
+  type FileComfyRuntimeInstallerStateStoreOptions,
+} from "./FileComfyRuntimeInstallerStateStore";
 
 export interface ComfyRuntimeInstallerCompositionOptions {
   readonly orchestration?: Omit<
@@ -18,6 +23,8 @@ export interface ComfyRuntimeInstallerCompositionOptions {
   readonly pythonHooks?: ComfyRuntimePythonHooksOptions;
   readonly customNodeHooks?: ComfyRuntimeCustomNodeInstallationHooksOptions;
   readonly assetValidationHook?: ComfyRuntimeAssetValidationHookOptions;
+  readonly lifecycleHooks?: ComfyRuntimeLifecycleHooksOptions;
+  readonly stateStore?: FileComfyRuntimeInstallerStateStoreOptions;
 }
 
 export function createComfyRuntimeInstallerOrchestrationService(
@@ -36,6 +43,13 @@ export function createComfyRuntimeInstallerOrchestrationService(
     ...options.assetValidationHook,
     now: options.orchestration?.now ?? options.assetValidationHook?.now,
   });
+  const lifecycleHooks = new ComfyRuntimeLifecycleHooks({
+    ...options.lifecycleHooks,
+    now: options.orchestration?.now ?? options.lifecycleHooks?.now,
+  });
+  const stateStore = new FileComfyRuntimeInstallerStateStore({
+    ...options.stateStore,
+  });
 
   return new ComfyRuntimeInstallerOrchestrationService(repositoryInstaller, {
     ...options.orchestration,
@@ -43,5 +57,7 @@ export function createComfyRuntimeInstallerOrchestrationService(
     dependencyInstallationHook: pythonHooks,
     customNodeInstallationHook: customNodeHooks,
     modelValidationHook: assetValidationHook,
+    runtimeValidationHook: lifecycleHooks,
+    stateStore,
   });
 }

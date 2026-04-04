@@ -23,6 +23,10 @@ import {
   ComfyRuntimeOrchestrationPhaseStatuses,
   ComfyRuntimeOrchestrationStates,
 } from "../ComfyRuntimeInstallerOrchestrationService";
+import type {
+  ComfyRuntimeInstallerPersistedState,
+  IComfyRuntimeInstallerStateStore,
+} from "../ComfyRuntimeInstallerStateContract";
 
 describe("ComfyRuntimeInstallerOrchestrationService", () => {
   it("installs repository and reports partial when later phases are not implemented", async () => {
@@ -191,6 +195,114 @@ describe("ComfyRuntimeInstallerOrchestrationService", () => {
       ?.modelValidation?.summary?.missingRequired).toBe(1);
     expect(result.issues.some((entry) => entry.code === "missing-required")).toBeTrue();
   });
+
+  it("skips completed setup phases during resume when persisted state indicates completion", async () => {
+    const installer = new FakeRuntimeRepositoryInstaller(RuntimeRepositoryInstallationStates.installed);
+    const stateStore = new MemoryStateStore({
+      schemaVersion: 1,
+      runtimeDependencyId: "runtime:comfyui",
+      runtimeAssetId: "asset:config-profile:comfyui-runtime-installation",
+      runtimeAssetVersionId: "asset:config-profile:comfyui-runtime-installation:v1",
+      installLocationKey: "runtime-comfyui-install",
+      installDirectory: "/runtime/repositories/runtime-comfyui-install",
+      runtimeWorkingDirectory: "/runtime/repositories/runtime-comfyui-install",
+      runtimeEndpoint: "http://127.0.0.1:8188",
+      repositoryState: "installed",
+      orchestrationState: "partial",
+      phases: {
+        environment: {
+          status: "completed",
+          updatedAt: "2026-04-03T10:00:00.000Z",
+          message: "done",
+          metadata: {},
+          issues: [],
+        },
+        dependencies: {
+          status: "completed",
+          updatedAt: "2026-04-03T10:00:00.000Z",
+          message: "done",
+          metadata: {},
+          issues: [],
+        },
+      },
+      issues: [],
+      diagnostics: {
+        statePath: "/runtime/repositories/runtime-comfyui-install/.ai-loom-comfy-installer-state.json",
+      },
+      startedAt: "2026-04-03T10:00:00.000Z",
+      updatedAt: "2026-04-03T10:00:00.000Z",
+    });
+    const service = new ComfyRuntimeInstallerOrchestrationService(installer, {
+      stateStore,
+      customNodeInstallationHook: {
+        installCustomNodes: async () => ({ status: "completed", message: "ok" }),
+      },
+      modelValidationHook: {
+        validateModels: async () => ({ status: "completed", message: "ok" }),
+      },
+      runtimeValidationHook: {
+        validateRuntime: async () => ({ status: "completed", message: "ok" }),
+      },
+      now: () => new Date("2026-04-03T20:00:00.000Z"),
+    });
+
+    const result = await service.orchestrate({
+      targetRootDirectory: "/runtime/repositories",
+      recoveryMode: "resume",
+    });
+
+    expect(result.phases.find((entry) => entry.phase === "environment")?.status).toBe("skipped");
+    expect(result.phases.find((entry) => entry.phase === "dependencies")?.status).toBe("skipped");
+    expect(result.persistedState?.reconciliation).toBe("match");
+  });
+
+  it("reconciles stale persisted state and forces recovery execution", async () => {
+    const installer = new FakeRuntimeRepositoryInstaller(RuntimeRepositoryInstallationStates.notInstalled);
+    const stateStore = new MemoryStateStore({
+      schemaVersion: 1,
+      runtimeDependencyId: "runtime:comfyui",
+      runtimeAssetId: "asset:config-profile:comfyui-runtime-installation",
+      runtimeAssetVersionId: "asset:config-profile:comfyui-runtime-installation:v1",
+      installLocationKey: "runtime-comfyui-install",
+      installDirectory: "/runtime/repositories/runtime-comfyui-install",
+      runtimeWorkingDirectory: "/runtime/repositories/runtime-comfyui-install",
+      runtimeEndpoint: "http://127.0.0.1:8188",
+      repositoryState: "installed",
+      orchestrationState: "ready",
+      phases: {},
+      issues: [],
+      diagnostics: {},
+      startedAt: "2026-04-03T10:00:00.000Z",
+      updatedAt: "2026-04-03T10:00:00.000Z",
+    });
+    const service = new ComfyRuntimeInstallerOrchestrationService(installer, {
+      stateStore,
+      environmentPreparationHook: {
+        prepare: async () => ({ status: "completed", message: "ok" }),
+      },
+      dependencyInstallationHook: {
+        installDependencies: async () => ({ status: "completed", message: "ok" }),
+      },
+      customNodeInstallationHook: {
+        installCustomNodes: async () => ({ status: "completed", message: "ok" }),
+      },
+      modelValidationHook: {
+        validateModels: async () => ({ status: "completed", message: "ok" }),
+      },
+      runtimeValidationHook: {
+        validateRuntime: async () => ({ status: "completed", message: "ok" }),
+      },
+      now: () => new Date("2026-04-03T20:00:00.000Z"),
+    });
+
+    const result = await service.orchestrate({
+      targetRootDirectory: "/runtime/repositories",
+      recoveryMode: "resume",
+    });
+
+    expect(result.persistedState?.reconciliation).toBe("mismatch");
+    expect(result.issues.some((entry) => entry.code === "installer-state-reconciliation-mismatch")).toBeTrue();
+  });
 });
 
 class FakeRuntimeRepositoryInstaller implements IRuntimeRepositoryInstallerContract {
@@ -310,5 +422,26 @@ class FakeRuntimeRepositoryInstaller implements IRuntimeRepositoryInstallerContr
       }),
       targetRootDirectory: this.installLocation.targetRootDirectory,
     });
+  }
+}
+
+class MemoryStateStore implements IComfyRuntimeInstallerStateStore {
+  public constructor(private state?: ComfyRuntimeInstallerPersistedState) {}
+
+  public async load(_input: { readonly installDirectory: string }): Promise<{ state?: ComfyRuntimeInstallerPersistedState; diagnostics: ReadonlyArray<{
+    code: string;
+    severity: "error" | "warning";
+    message: string;
+    phase: string;
+    metadata?: Readonly<Record<string, unknown>>;
+  }> }> {
+    return Object.freeze({
+      state: this.state,
+      diagnostics: Object.freeze([]),
+    });
+  }
+
+  public async save(state: ComfyRuntimeInstallerPersistedState): Promise<void> {
+    this.state = state;
   }
 }

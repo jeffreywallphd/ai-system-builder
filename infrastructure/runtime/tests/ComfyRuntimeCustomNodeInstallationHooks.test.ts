@@ -195,6 +195,10 @@ function createContext(workflowProfile: (typeof ComfyRuntimeWorkflowProfiles)[ke
     installDirectory: "/runtime/comfyui",
     runtimeWorkingDirectory: "/runtime/comfyui",
     runtimeEndpoint: "http://127.0.0.1:8188",
+    runtimeHost: "127.0.0.1",
+    runtimePort: 8188,
+    runtimeEnvironment: Object.freeze({}),
+    runtimeStartupTimeoutMs: 120000,
     workflowProfile,
   });
 }

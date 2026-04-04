@@ -19,6 +19,11 @@ import {
   resolveComfyRuntimeWorkflowProfile,
   type ComfyRuntimeWorkflowProfile,
 } from "./ComfyRuntimeRequirements";
+import {
+  type IComfyRuntimeInstallerStateStore,
+  createComfyRuntimeInstallerPersistedState,
+} from "./ComfyRuntimeInstallerStateContract";
+import { type ComfyRuntimeLifecycleResult } from "./ComfyRuntimeLifecycleContract";
 
 export const ComfyRuntimeOrchestrationStates = Object.freeze({
   ready: "ready",
@@ -62,6 +67,10 @@ export interface ComfyRuntimeOrchestrationContext {
   readonly installDirectory: string;
   readonly runtimeWorkingDirectory: string;
   readonly runtimeEndpoint: string;
+  readonly runtimeHost: string;
+  readonly runtimePort: number;
+  readonly runtimeEnvironment: Readonly<Record<string, string>>;
+  readonly runtimeStartupTimeoutMs: number;
   readonly workflowProfile: ComfyRuntimeWorkflowProfile;
 }
 
@@ -104,6 +113,11 @@ export interface ComfyRuntimeInstallerOrchestrationRequest {
   readonly updateMode?: "install-only" | "install-or-update";
   readonly includeRepositoryDiagnostics?: boolean;
   readonly workflowProfile?: ComfyRuntimeWorkflowProfile;
+  readonly runtimeHostOverride?: string;
+  readonly runtimePortOverride?: number;
+  readonly runtimeEnvironment?: Readonly<Record<string, string>>;
+  readonly runtimeStartupTimeoutMs?: number;
+  readonly recoveryMode?: "resume" | "repair" | "revalidate";
 }
 
 export interface ComfyRuntimeInstallerOrchestrationResult {
@@ -128,6 +142,12 @@ export interface ComfyRuntimeInstallerOrchestrationResult {
   }>;
   readonly phases: ReadonlyArray<ComfyRuntimeOrchestrationPhaseResult>;
   readonly issues: ReadonlyArray<ComfyRuntimeOrchestrationIssue>;
+  readonly persistedState?: Readonly<{
+    readonly loaded: boolean;
+    readonly statePath?: string;
+    readonly recovered: boolean;
+    readonly reconciliation: "match" | "mismatch" | "none";
+  }>;
 }
 
 export interface ComfyRuntimeInstallerOrchestrationServiceOptions {
@@ -136,6 +156,7 @@ export interface ComfyRuntimeInstallerOrchestrationServiceOptions {
   readonly customNodeInstallationHook?: IComfyRuntimeCustomNodeInstallationHook;
   readonly modelValidationHook?: IComfyRuntimeModelValidationHook;
   readonly runtimeValidationHook?: IComfyRuntimeStartStopValidationHook;
+  readonly stateStore?: IComfyRuntimeInstallerStateStore;
   readonly now?: () => Date;
 }
 
@@ -145,6 +166,7 @@ export class ComfyRuntimeInstallerOrchestrationService {
   private readonly customNodeInstallationHook?: IComfyRuntimeCustomNodeInstallationHook;
   private readonly modelValidationHook?: IComfyRuntimeModelValidationHook;
   private readonly runtimeValidationHook?: IComfyRuntimeStartStopValidationHook;
+  private readonly stateStore?: IComfyRuntimeInstallerStateStore;
   private readonly now: () => Date;
 
   public constructor(
@@ -156,6 +178,7 @@ export class ComfyRuntimeInstallerOrchestrationService {
     this.customNodeInstallationHook = options.customNodeInstallationHook;
     this.modelValidationHook = options.modelValidationHook;
     this.runtimeValidationHook = options.runtimeValidationHook;
+    this.stateStore = options.stateStore;
     this.now = options.now ?? (() => new Date());
   }
 
@@ -178,6 +201,7 @@ export class ComfyRuntimeInstallerOrchestrationService {
     let repositoryOperation: ComfyRuntimeInstallerOrchestrationResult["repository"]["operation"] = "skipped";
     const issues: ComfyRuntimeOrchestrationIssue[] = [];
     const phases: ComfyRuntimeOrchestrationPhaseResult[] = [];
+    const startedAt = this.now().toISOString();
 
     if (
       statusBefore.state === RuntimeRepositoryInstallationStates.notInstalled
@@ -225,7 +249,19 @@ export class ComfyRuntimeInstallerOrchestrationService {
       runtimeAsset: installerRequests.runtimeAsset,
       installDirectory,
     });
-    const runtimeEndpoint = `http://${installerRequests.runtimeAsset.runtimeStart.defaultHost}:${installerRequests.runtimeAsset.runtimeStart.defaultPort}`;
+    const runtimeHost = request.runtimeHostOverride?.trim() || installerRequests.runtimeAsset.runtimeStart.defaultHost;
+    const runtimePort = Number.isInteger(request.runtimePortOverride) && (request.runtimePortOverride ?? 0) > 0
+      ? Number(request.runtimePortOverride)
+      : installerRequests.runtimeAsset.runtimeStart.defaultPort;
+    const runtimeEndpoint = `http://${runtimeHost}:${runtimePort}`;
+    const runtimeEnvironment = Object.freeze({
+      ...(request.runtimeEnvironment ?? {}),
+      COMFYUI_HOST: runtimeHost,
+      COMFYUI_PORT: `${runtimePort}`,
+    });
+    const runtimeStartupTimeoutMs = Number.isInteger(request.runtimeStartupTimeoutMs) && (request.runtimeStartupTimeoutMs ?? 0) > 0
+      ? Number(request.runtimeStartupTimeoutMs)
+      : installerRequests.runtimeAsset.runtimeHealth.startupTimeoutMs;
     const workflowProfile = resolveComfyRuntimeWorkflowProfile(
       request.workflowProfile ?? ComfyRuntimeWorkflowProfiles.imageManipulationDefault,
     );
@@ -235,8 +271,97 @@ export class ComfyRuntimeInstallerOrchestrationService {
       installDirectory,
       runtimeWorkingDirectory,
       runtimeEndpoint,
+      runtimeHost,
+      runtimePort,
+      runtimeEnvironment,
+      runtimeStartupTimeoutMs,
       workflowProfile,
     });
+
+    let persistedStateInfo: ComfyRuntimeInstallerOrchestrationResult["persistedState"] | undefined;
+    const phasePlan = new Set<ComfyRuntimeOrchestrationPhaseResult["phase"]>([
+      "environment",
+      "dependencies",
+      "custom-nodes",
+      "model-validation",
+      "runtime-validation",
+    ]);
+    if (this.stateStore) {
+      const persisted = await this.stateStore.load({ installDirectory });
+      for (const diagnostic of persisted.diagnostics) {
+        issues.push({
+          code: diagnostic.code,
+          severity: diagnostic.severity,
+          message: diagnostic.message,
+          phase: diagnostic.phase,
+          metadata: diagnostic.metadata,
+        });
+      }
+      const previous = persisted.state;
+      if (previous) {
+        const repositoryMismatch = previous.repositoryState !== statusBefore.state;
+        const revisionBefore = statusBefore.installed?.resolvedRevision;
+        const revisionMismatch = Boolean(previous.repositoryRevision && revisionBefore && previous.repositoryRevision !== revisionBefore);
+        const recoveryMode = request.recoveryMode ?? "resume";
+        if (repositoryMismatch || revisionMismatch) {
+          issues.push(issue(
+            "installer-state-reconciliation-mismatch",
+            "warning",
+            "Persisted installer state differs from observed runtime repository state.",
+            "repository",
+            {
+              persistedRepositoryState: previous.repositoryState,
+              observedRepositoryState: statusBefore.state,
+              persistedRevision: previous.repositoryRevision,
+              observedRevision: revisionBefore,
+            },
+          ));
+          phasePlan.clear();
+          phasePlan.add("environment");
+          phasePlan.add("dependencies");
+          phasePlan.add("custom-nodes");
+          phasePlan.add("model-validation");
+          phasePlan.add("runtime-validation");
+          persistedStateInfo = Object.freeze({
+            loaded: true,
+            statePath: previous.diagnostics.statePath as string | undefined,
+            recovered: true,
+            reconciliation: "mismatch",
+          });
+        } else {
+          const completedPhases = new Set(Object.entries(previous.phases)
+            .filter(([, phase]) => phase.status === "completed")
+            .map(([name]) => name));
+          if (recoveryMode === "resume") {
+            for (const phase of ["environment", "dependencies", "custom-nodes"] as const) {
+              if (completedPhases.has(phase)) {
+                phasePlan.delete(phase);
+              }
+            }
+          } else if (recoveryMode === "revalidate") {
+            for (const phase of ["environment", "dependencies", "custom-nodes"] as const) {
+              if (completedPhases.has(phase)) {
+                phasePlan.delete(phase);
+              }
+            }
+            phasePlan.add("model-validation");
+            phasePlan.add("runtime-validation");
+          }
+          persistedStateInfo = Object.freeze({
+            loaded: true,
+            statePath: previous.diagnostics.statePath as string | undefined,
+            recovered: recoveryMode !== "repair",
+            reconciliation: "match",
+          });
+        }
+      } else {
+        persistedStateInfo = Object.freeze({
+          loaded: false,
+          recovered: false,
+          reconciliation: "none",
+        });
+      }
+    }
 
     phases.push(this.createRepositoryPhase({
       operation: repositoryOperation,
@@ -248,21 +373,41 @@ export class ComfyRuntimeInstallerOrchestrationService {
 
     const repositoryHealthy = !issues.some((entry) => entry.phase === "repository" && entry.severity === "error");
     if (repositoryHealthy) {
-      phases.push(await this.executeHookPhase("environment", this.environmentPreparationHook
-        ? () => this.environmentPreparationHook!.prepare(context)
-        : undefined, "environment-preparation-not-implemented"));
-      phases.push(await this.executeHookPhase("dependencies", this.dependencyInstallationHook
-        ? () => this.dependencyInstallationHook!.installDependencies(context)
-        : undefined, "dependency-install-not-implemented"));
-      phases.push(await this.executeHookPhase("custom-nodes", this.customNodeInstallationHook
-        ? () => this.customNodeInstallationHook!.installCustomNodes(context)
-        : undefined, "custom-node-install-not-implemented"));
-      phases.push(await this.executeHookPhase("model-validation", this.modelValidationHook
-        ? () => this.modelValidationHook!.validateModels(context)
-        : undefined, "model-validation-not-implemented"));
-      phases.push(await this.executeHookPhase("runtime-validation", this.runtimeValidationHook
-        ? () => this.runtimeValidationHook!.validateRuntime(context)
-        : undefined, "runtime-validation-not-implemented"));
+      phases.push(await this.executeHookPhase("environment", phasePlan.has("environment")
+        ? this.environmentPreparationHook
+          ? () => this.environmentPreparationHook!.prepare(context)
+          : undefined
+        : undefined, "environment-preparation-not-implemented", !phasePlan.has("environment")
+        ? "Skipped because persisted installer state indicates this phase already completed."
+        : undefined));
+      phases.push(await this.executeHookPhase("dependencies", phasePlan.has("dependencies")
+        ? this.dependencyInstallationHook
+          ? () => this.dependencyInstallationHook!.installDependencies(context)
+          : undefined
+        : undefined, "dependency-install-not-implemented", !phasePlan.has("dependencies")
+        ? "Skipped because persisted installer state indicates this phase already completed."
+        : undefined));
+      phases.push(await this.executeHookPhase("custom-nodes", phasePlan.has("custom-nodes")
+        ? this.customNodeInstallationHook
+          ? () => this.customNodeInstallationHook!.installCustomNodes(context)
+          : undefined
+        : undefined, "custom-node-install-not-implemented", !phasePlan.has("custom-nodes")
+        ? "Skipped because persisted installer state indicates this phase already completed."
+        : undefined));
+      phases.push(await this.executeHookPhase("model-validation", phasePlan.has("model-validation")
+        ? this.modelValidationHook
+          ? () => this.modelValidationHook!.validateModels(context)
+          : undefined
+        : undefined, "model-validation-not-implemented", !phasePlan.has("model-validation")
+        ? "Skipped because persisted installer state indicates this phase already completed."
+        : undefined));
+      phases.push(await this.executeHookPhase("runtime-validation", phasePlan.has("runtime-validation")
+        ? this.runtimeValidationHook
+          ? () => this.runtimeValidationHook!.validateRuntime(context)
+          : undefined
+        : undefined, "runtime-validation-not-implemented", !phasePlan.has("runtime-validation")
+        ? "Skipped because persisted installer state indicates this phase already completed."
+        : undefined));
     } else {
       phases.push(this.createSkippedPhase("environment", "Skipped because repository phase failed."));
       phases.push(this.createSkippedPhase("dependencies", "Skipped because repository phase failed."));
@@ -288,6 +433,35 @@ export class ComfyRuntimeInstallerOrchestrationService {
         ? ComfyRuntimeOrchestrationStates.partial
         : ComfyRuntimeOrchestrationStates.ready;
 
+    const latestLifecycle = phases
+      .find((entry) => entry.phase === "runtime-validation")
+      ?.metadata?.runtimeLifecycle as ComfyRuntimeLifecycleResult | undefined;
+
+    if (this.stateStore) {
+      const persistedState = createComfyRuntimeInstallerPersistedState({
+        runtimeDependencyId: installerRequests.runtimeAsset.runtimeDependencyId,
+        runtimeAssetId: installerRequests.runtimeAsset.assetId,
+        runtimeAssetVersionId: installerRequests.runtimeAsset.versionId,
+        installLocationKey: statusAfter.installLocation.installLocationKey,
+        installDirectory,
+        runtimeWorkingDirectory: path.resolve(runtimeWorkingDirectory),
+        runtimeEndpoint,
+        repositoryState: statusAfter.state,
+        repositoryRevision: statusAfter.installed?.resolvedRevision,
+        orchestrationState: state,
+        phases,
+        lastLifecycle: latestLifecycle,
+        issues,
+        diagnostics: {
+          statePath: path.join(installDirectory, ".ai-loom-comfy-installer-state.json"),
+        },
+        startedAt,
+        updatedAt: this.now().toISOString(),
+        completedAt: this.now().toISOString(),
+      });
+      await this.stateStore.save(persistedState);
+    }
+
     return Object.freeze({
       state,
       runtimeAsset: installerRequests.runtimeAsset,
@@ -310,6 +484,7 @@ export class ComfyRuntimeInstallerOrchestrationService {
       }),
       phases: Object.freeze(phases),
       issues: Object.freeze(issues),
+      persistedState: persistedStateInfo,
     });
   }
 
@@ -345,9 +520,20 @@ export class ComfyRuntimeInstallerOrchestrationService {
     phase: ComfyRuntimeOrchestrationPhaseResult["phase"],
     runHook: (() => Promise<ComfyRuntimeOrchestrationPhaseHookResult>) | undefined,
     missingImplementationCode: string,
+    skippedMessage?: string,
   ): Promise<ComfyRuntimeOrchestrationPhaseResult> {
     const startedAt = this.now().toISOString();
     if (!runHook) {
+      if (skippedMessage) {
+        return Object.freeze({
+          phase,
+          status: ComfyRuntimeOrchestrationPhaseStatuses.skipped,
+          message: skippedMessage,
+          startedAt,
+          finishedAt: this.now().toISOString(),
+          issues: Object.freeze([]),
+        });
+      }
       return Object.freeze({
         phase,
         status: ComfyRuntimeOrchestrationPhaseStatuses.notImplemented,
