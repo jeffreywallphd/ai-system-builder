@@ -108,3 +108,20 @@ The preload bridge uses synchronous IPC and exposes storage/workflow/model-file 
 - Added focused tests:
   - `application/runtime/tests/ComfyRuntimeInstallationAsset.test.ts`
   - `application/runtime/tests/ComfyRuntimeInstallerOrchestrationService.test.ts`
+
+## AI Loom image manipulation update: Comfy Python environment + dependency install hooks (stories 9.5-9.6)
+
+- Added a reusable Python provisioning/dependency state contract in `application/runtime/PythonRuntimeProvisioningContract.ts`:
+  - normalized detection/provisioning/dependency statuses and issue/error/remediation diagnostics,
+  - structured command diagnostics for inspectable subprocess history,
+  - persisted dependency install snapshot schema (`started`/`completed`/`failed`/`skipped`) with last-step and remediation metadata.
+- Added concrete Comfy runtime environment/dependency phase hooks in `infrastructure/runtime/ComfyRuntimePythonHooks.ts`:
+  - Python interpreter detection with requirement parsing (`python>=x.y`) and incompatible/missing diagnostics,
+  - deterministic venv location provisioning (`<installDirectory>/.venv`) with safe staged create/promote and partial-environment recovery,
+  - pip integrity/bootstrap checks (`import pip`, `ensurepip --upgrade`, `pip --version`) before dependency install,
+  - repeatable requirements installation with persisted install-state metadata at `.ai-loom-comfy-python-dependencies.json`,
+  - explicit missing-requirements, pip-bootstrap, install-failure, and partial-retry diagnostics/remediation hints.
+- Added orchestration composition helper `infrastructure/runtime/ComfyRuntimeInstallerComposition.ts` that wires these hooks into `ComfyRuntimeInstallerOrchestrationService` as the default environment/dependency phase implementation seam.
+- Added focused tests:
+  - `infrastructure/runtime/tests/ComfyRuntimePythonHooks.test.ts`
+  - `infrastructure/runtime/tests/ComfyRuntimeInstallerComposition.test.ts`
