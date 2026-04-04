@@ -86,4 +86,93 @@ describe("ImageManipulationSystemCompletenessValidationService", () => {
     expect(result.issues.map((entry) => entry.code)).toContain("workflow-required-default-parameter-missing");
     expect(result.categories[ImageManipulationTemplateValidationCategories.runnableDefaults].errors).toBeGreaterThan(0);
   });
+
+  it("fails story 10.3 wiring when runtime page run action binding is missing", () => {
+    const result = validateImageManipulationTemplateCompleteness({
+      template: {
+        ...ImageManipulationSystemTemplate,
+        uiBindingBoundary: {
+          ...ImageManipulationSystemTemplate.uiBindingBoundary,
+          emits: ImageManipulationSystemTemplate.uiBindingBoundary.emits.filter((eventId) => eventId !== "runRequested"),
+        },
+      },
+    });
+
+    expect(result.status).toBe("invalid");
+    expect(result.issues.map((entry) => entry.code)).toContain("page-execution-action-binding-missing");
+    expect(result.categories[ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring].errors).toBeGreaterThan(0);
+  });
+
+  it("fails story 10.3 wiring when execution schema field is not mapped into workflow parameter overrides", () => {
+    const result = validateImageManipulationTemplateCompleteness({
+      workflowTemplate: {
+        ...ImageManipulationWorkflowTemplate,
+        composition: {
+          ...ImageManipulationWorkflowTemplate.composition!,
+          parameterMappings: ImageManipulationWorkflowTemplate.composition!.parameterMappings.filter((entry) => (
+            entry.parameterId !== "positivePrompt"
+          )),
+        },
+      },
+    });
+
+    expect(result.status).toBe("invalid");
+    expect(result.issues.map((entry) => entry.code)).toContain("schema-field-workflow-mapping-missing");
+    expect(result.categories[ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring].errors).toBeGreaterThan(0);
+  });
+
+  it("fails story 10.3 wiring when output dataset target is not aligned with preview/gallery dataset binding", () => {
+    const result = validateImageManipulationTemplateCompleteness({
+      workflowTemplate: {
+        ...ImageManipulationWorkflowTemplate,
+        composition: {
+          ...ImageManipulationWorkflowTemplate.composition!,
+          outputBindings: ImageManipulationWorkflowTemplate.composition!.outputBindings.map((binding) => ({
+            ...binding,
+            targetDatasetAssetId: "asset:dataset:not-output",
+          })),
+        },
+      },
+    });
+
+    expect(result.status).toBe("invalid");
+    expect(result.issues.map((entry) => entry.code)).toContain("execution-output-target-dataset-mismatch");
+    expect(result.categories[ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring].errors).toBeGreaterThan(0);
+  });
+
+  it("fails story 10.4 compatibility when workflow output storage reference shape is incomplete", () => {
+    const result = validateImageManipulationTemplateCompleteness({
+      workflowTemplate: {
+        ...ImageManipulationWorkflowTemplate,
+        composition: {
+          ...ImageManipulationWorkflowTemplate.composition!,
+          outputBindings: ImageManipulationWorkflowTemplate.composition!.outputBindings.map((binding) => ({
+            ...binding,
+            targetStorageInstanceRef: "",
+          })),
+        },
+      },
+    });
+
+    expect(result.status).toBe("invalid");
+    expect(result.issues.map((entry) => entry.code)).toContain("storage-reference-shape-incomplete");
+    expect(result.categories[ImageManipulationTemplateValidationCategories.sharedStorageCompatibility].errors).toBeGreaterThan(0);
+  });
+
+  it("fails story 10.4 compatibility when dataset binding assumes a systems path", () => {
+    const result = validateImageManipulationTemplateCompleteness({
+      template: {
+        ...ImageManipulationSystemTemplate,
+        datasetInstances: ImageManipulationSystemTemplate.datasetInstances.map((entry) => (
+          entry.bindingId === "output-image-dataset"
+            ? { ...entry, instanceId: "/systems/system-a/output" }
+            : entry
+        )),
+      },
+    });
+
+    expect(result.status).toBe("invalid");
+    expect(result.issues.map((entry) => entry.code)).toContain("dataset-binding-system-path-assumption-forbidden");
+    expect(result.categories[ImageManipulationTemplateValidationCategories.sharedStorageCompatibility].errors).toBeGreaterThan(0);
+  });
 });
