@@ -127,6 +127,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For UI composition and state flow, read [`presentation-and-state.md`](./presentation-and-state.md).
 - For cross-studio asset selection contracts and capability rules, read [`asset-selector-framework.md`](./asset-selector-framework.md).
 - For canonical studio launch/return handoff contracts, read [`studio-handoff-contract.md`](./studio-handoff-contract.md).
+- For local identity domain, contracts, persistence, and provider-extension seams, read [`identity-foundation.md`](./identity-foundation.md).
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).

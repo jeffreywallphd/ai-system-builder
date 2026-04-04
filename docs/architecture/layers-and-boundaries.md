@@ -233,3 +233,10 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - Bootstrap eligibility is enforced via an explicit application-port seam (`IIdentityLookupRepository.countUserIdentities()`), keeping bootstrap gating policy in application while storage detail remains in infrastructure adapters.
 - Provider/policy/user/material bootstrap orchestration stays application-owned and uses existing identity ports (`lookup`, `persistence`, `credential material`, `clock`, `id generation`) without introducing UI or transport coupling.
 - Infrastructure adapters (`src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`, `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`) now implement identity counting for deterministic first-run gating.
+
+## Direction 6 boundary note: Identity architecture documentation (story 1.1.8)
+
+- Added `docs/architecture/identity-foundation.md` and `docs/architecture/identity-foundation.ai.md` as the canonical architecture note pair for the identity foundation.
+- The note documents concrete boundary ownership for identity domain/application/infrastructure seams and makes the trust split explicit:
+  - local identity lifecycle remains in identity domain/application contracts,
+  - device/runtime/tool trust remains in separate trust modules and is not embedded in identity entities.
