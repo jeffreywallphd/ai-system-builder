@@ -54,6 +54,7 @@ import {
   SerializedAssetReferenceResolutionIssueCodes,
   SerializedAssetReferenceResolutionService,
 } from "./SerializedAssetReferenceResolutionService";
+import { requiresPinnedRuntimeComponentVersion } from "./RuntimeComponentVersionPinningPolicy";
 
 export interface StartSystemRuntimeExecutionRequest {
   readonly studioId?: string;
@@ -1157,7 +1158,10 @@ export class SystemRuntimeApplicationService {
     }
 
     const unresolvedChildren = input.root.components
-      .filter((component) => !component.versionId)
+      .filter((component) => requiresPinnedRuntimeComponentVersion({
+        component,
+        hasResolvedContract: Boolean(component.taxonomy && this.contractResolver.resolveContractForTaxonomy(component.taxonomy)),
+      }))
       .map((component) => component.alias ?? component.assetId);
     if (unresolvedChildren.length > 0) {
       throw new Error(`invalid-request:Execution requires pinned component versions. Missing version for: ${unresolvedChildren.join(", ")}.`);

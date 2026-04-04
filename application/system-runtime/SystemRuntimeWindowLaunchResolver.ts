@@ -15,6 +15,14 @@ function createLaunchId(seed: {
   return `runtime-window:${base}`;
 }
 
+function resolveTemplateDatasetBinding(bindingId: "input-image-dataset" | "output-image-dataset" | "reference-image-dataset") {
+  const resolved = ImageManipulationSystemTemplate.datasetInstances.find((entry) => entry.bindingId === bindingId);
+  if (!resolved) {
+    throw new Error(`Image manipulation template is missing dataset binding '${bindingId}'.`);
+  }
+  return resolved;
+}
+
 export interface ResolveSystemRuntimeWindowLaunchInput {
   readonly launchId?: string;
   readonly createdAt?: Date;
@@ -79,6 +87,10 @@ export interface CreateImageManipulationRuntimeWindowLaunchRequest {
 export function createImageManipulationRuntimeWindowLaunchContract(
   input: CreateImageManipulationRuntimeWindowLaunchRequest,
 ): SystemRuntimeWindowLaunchContract {
+  const inputDatasetBinding = resolveTemplateDatasetBinding("input-image-dataset");
+  const outputDatasetBinding = resolveTemplateDatasetBinding("output-image-dataset");
+  const referenceDatasetBinding = resolveTemplateDatasetBinding("reference-image-dataset");
+
   return resolveSystemRuntimeWindowLaunchContract({
     launchTarget: {
       targetKind: input.targetKind ?? "standalone-system",
@@ -110,7 +122,8 @@ export function createImageManipulationRuntimeWindowLaunchContract(
       {
         bindingId: "input-image-dataset",
         datasetBindingId: "input-image-dataset",
-        datasetAssetId: ImageManipulationSystemTemplate.datasetInstances.input.datasetAssetId,
+        datasetAssetId: inputDatasetBinding.datasetAssetId,
+        datasetAssetVersionId: inputDatasetBinding.datasetAssetVersionId,
         sharingScope: "shared",
         metadata: {
           role: "input",
@@ -119,7 +132,8 @@ export function createImageManipulationRuntimeWindowLaunchContract(
       {
         bindingId: "output-image-dataset",
         datasetBindingId: "output-image-dataset",
-        datasetAssetId: ImageManipulationSystemTemplate.datasetInstances.output.datasetAssetId,
+        datasetAssetId: outputDatasetBinding.datasetAssetId,
+        datasetAssetVersionId: outputDatasetBinding.datasetAssetVersionId,
         sharingScope: "shared",
         metadata: {
           role: "output",
@@ -128,7 +142,8 @@ export function createImageManipulationRuntimeWindowLaunchContract(
       {
         bindingId: "reference-image-dataset",
         datasetBindingId: "reference-image-dataset",
-        datasetAssetId: ImageManipulationSystemTemplate.datasetInstances.reference.datasetAssetId,
+        datasetAssetId: referenceDatasetBinding.datasetAssetId,
+        datasetAssetVersionId: referenceDatasetBinding.datasetAssetVersionId,
         sharingScope: "shared",
         metadata: {
           role: "reference",

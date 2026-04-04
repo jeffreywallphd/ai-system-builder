@@ -26,6 +26,9 @@ describe("SystemRuntimeWindowLaunchResolver", () => {
       "reference-image-dataset",
     ]);
     expect(contract.datasetBindings.every((entry) => entry.sharingScope === "shared")).toBeTrue();
+    expect(contract.datasetBindings.map((entry) => entry.datasetAssetId)).toEqual(
+      ImageManipulationSystemTemplate.datasetInstances.map((entry) => entry.datasetAssetId),
+    );
     expect(contract.initialSelection.selectedDatasetBindingId).toBe("input-image-dataset");
     expect(contract.windowIntent.reuseWindowKey).toBe("system-studio:system-page:image-manipulation");
   });

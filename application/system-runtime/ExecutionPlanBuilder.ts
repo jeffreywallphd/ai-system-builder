@@ -9,6 +9,7 @@ import type { RuntimeExecutionContract } from "./RuntimeExecutionContractMapping
 import type { RuntimeEnvironmentSelectionRequest } from "./RuntimeEnvironmentSelector";
 import { RuntimeEnvironmentSelector, type IRuntimeEnvironmentSelector } from "./RuntimeEnvironmentSelector";
 import type { RuntimeEnvironment, RuntimeEnvironmentKind } from "../../domain/system-runtime/RuntimeEnvironmentDomain";
+import { requiresPinnedRuntimeComponentVersion } from "./RuntimeComponentVersionPinningPolicy";
 
 export interface ExecutionPlanNode {
   readonly nodeId: string;
@@ -197,9 +198,24 @@ export class ExecutionPlanBuilder {
       nodeVersionIds[rootNodeId] = input.root.versionId;
     }
 
-    const unresolvedVersionNodes = baseNodes
-      .filter((node) => node.nodeType === "component" && !node.versionId)
-      .map((node) => node.alias ?? node.assetId);
+    const runtimeContractByAlias = new Map<string, RuntimeExecutionContract["childInterfaces"][number]>();
+    for (const childInterface of input.runtimeContract.childInterfaces) {
+      if (childInterface.alias) {
+        runtimeContractByAlias.set(childInterface.alias, childInterface);
+      }
+    }
+
+    const unresolvedVersionNodes = input.root.components
+      .filter((component) => {
+        const componentRuntimeContract = component.alias
+          ? runtimeContractByAlias.get(component.alias)
+          : undefined;
+        return requiresPinnedRuntimeComponentVersion({
+          component,
+          hasResolvedContract: Boolean(componentRuntimeContract?.contractVersion),
+        });
+      })
+      .map((component) => component.alias ?? component.assetId);
     if (unresolvedVersionNodes.length > 0) {
       return Object.freeze({
         status: "invalid",

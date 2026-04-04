@@ -984,6 +984,13 @@
   - unpinned workflow bindings are surfaced as typed issues (`unresolved-workflow-version`) in studio load flows,
   - runtime execution load rejects unresolved pinned workflow bindings via typed serialized-reference failures.
 
+## Direction 5 extension update: runtime component version pinning parity (story 5.3.6x)
+
+- Runtime execution version-pinning checks now follow the same policy used by System Studio publish enforcement:
+  - workflow/workflow-template/system/app-template children must stay explicitly version-pinned,
+  - taxonomy-resolvable dataset/tool-chain children can execute without explicit version ids because shared contracts are derivable from taxonomy.
+- Runtime window launch dataset bindings now resolve by template binding id (not index/property assumptions), preventing undefined dataset asset references when composing image-manipulation launch contracts.
+
 ## Direction 5 extension update: dataset asset reuse vs dataset instance duplication (story 5.3.7)
 
 - Runtime persistence now exposes an explicit duplication mode seam in `SystemDatasetInstancePersistenceService.duplicateSystemDatasetInstances(...)`:
