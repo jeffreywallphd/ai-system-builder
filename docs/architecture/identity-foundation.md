@@ -59,6 +59,7 @@ Primary files:
 - `application/identity/ports/IIdentityClock.ts`
 - `application/identity/ports/IIdentityIdGenerator.ts`
 - `application/identity/ports/IIdentityCredentialAuthenticator.ts`
+- `application/identity/ports/IIdentityCredentialResetVerifier.ts`
 - `application/identity/ports/ILocalPasswordCredentialService.ts`
 - `application/identity/services/IdentityPolicyService.ts`
 - `application/identity/services/IdentityProviderCatalog.ts`
@@ -67,6 +68,7 @@ Primary files:
 - `src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`
 - `src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`
 - `src/application/identity/use-cases/LoginLocalAccountUseCase.ts`
+- `src/application/identity/use-cases/ChangeLocalPasswordCredentialUseCase.ts`
 
 Application responsibilities:
 
@@ -193,6 +195,30 @@ This keeps password verification logic in an application port + infrastructure a
 - returns authenticated-principal payload fields for downstream session issuance and device-trust composition
 - returns structured operation failures for unknown identity, invalid credentials, inactive/disabled account state, unsupported auth path, and invalid/misaligned requests
 
+## Local Credential Change Use Case
+
+`ChangeLocalPasswordCredentialUseCase.execute(...)` provides authenticated credential rotation for local-password identities:
+
+- resolves authenticated account context from `userIdentityId` and enforces local provider-link account/credential-state eligibility
+- requires old-credential verification in the default `current-credential` path
+- enforces replacement credential policy rules before mutation, including minimum password age and recent credential-history reuse constraints from `CredentialPolicy`
+- re-hashes replacement credentials through the authenticator contract and persists a new active credential-material record
+- supersedes prior active credential material and updates provider-link credential state (`passwordChangedAt`, reset failure posture)
+- returns structured operation failures for invalid credentials, policy violations, unsupported providers, inactive/invalid account state, and invalid requests
+
+This keeps credential mutation in application-layer orchestration while preserving secret-handling boundaries in the infrastructure authenticator implementation.
+
+## Reset-Ready Credential Verification Seam
+
+Credential change now supports verification modes:
+
+- `current-credential` (implemented now): verifies the current credential material before rotation
+- `reset-assertion` (extension seam): delegated to `IIdentityCredentialResetVerifier`
+
+The reset verifier contract (`application/identity/ports/IIdentityCredentialResetVerifier.ts`) is intentionally transport/token agnostic and allows future reset-token or administrator-assisted reset workflows to authorize credential replacement without adding speculative token issuance systems in this slice.
+
+If `reset-assertion` is requested without a configured verifier, the use case deterministically fails with `identity-invalid-request`.
+
 ## Extension Seams for Future Providers
 
 The model is provider-oriented, not local-password hardcoded:
@@ -244,6 +270,7 @@ Key tests for this foundation:
 - `application/identity/tests/RegisterLocalAccountUseCase.test.ts`
 - `application/identity/tests/VerifyLocalPasswordCredentialUseCase.test.ts`
 - `application/identity/tests/LoginLocalAccountUseCase.test.ts`
+- `application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
 - `application/identity/tests/IdentityAuthenticatorAndProviderCatalog.test.ts`
 - `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`
 - `infrastructure/security/identity/tests/ScryptLocalPasswordCredentialService.test.ts`
