@@ -6,7 +6,7 @@ import type {
   TaxonomySemanticRole,
   TaxonomyStructuralKind,
 } from "../../domain/taxonomy/CompositionTaxonomy";
-import { TaxonomyStructuralKinds } from "../../domain/taxonomy/CompositionTaxonomy";
+import { TaxonomySemanticRoles, TaxonomyStructuralKinds } from "../../domain/taxonomy/CompositionTaxonomy";
 import { StudioShellInvalidRequestError } from "./StudioShellApplicationErrors";
 import {
   buildNestedSystemReferences,
@@ -14,6 +14,7 @@ import {
   type SystemBindingEndpoint,
   type SystemComponentReference,
   SystemBindingEndpointScopes,
+  SystemComponentKinds,
   type SystemCompositionReference,
 } from "../../domain/system-studio/SystemAssetDomain";
 
@@ -76,6 +77,35 @@ interface SystemBindingEndpointValidation {
   readonly valueType?: string;
 }
 
+function requiresPinnedComponentVersion(input: {
+  readonly component: SystemComponentReference;
+  readonly resolvedContract?: AssetDraft["metadata"]["contract"];
+}): boolean {
+  if (input.component.versionId) {
+    return false;
+  }
+
+  if (input.component.componentKind === SystemComponentKinds.system) {
+    return true;
+  }
+
+  const semanticRole = input.component.taxonomy?.semanticRole;
+  if (
+    semanticRole === TaxonomySemanticRoles.workflow
+    || semanticRole === TaxonomySemanticRoles.workflowTemplate
+    || semanticRole === TaxonomySemanticRoles.system
+    || semanticRole === TaxonomySemanticRoles.appTemplate
+  ) {
+    return true;
+  }
+
+  if (!semanticRole) {
+    return true;
+  }
+
+  return !input.resolvedContract;
+}
+
 function sameContractShape(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
@@ -100,11 +130,15 @@ export function evaluateStudioDraftConsistency(input: {
   issues.push(...validateTaxonomyForExpectation(taxonomy, expectation));
 
   if (!draft.metadata.contract) {
-    issues.push({
-      code: StudioAssetEnforcementIssueCodes.contractMissing,
-      message: `Draft '${draft.id}' in '${expectation.studioType}' is missing contract metadata.`,
-    });
-    return Object.freeze(issues);
+    const allowMissingSystemContract = expectation.structuralKind === TaxonomyStructuralKinds.system
+      && (expectation.requireDerivableContract ?? false) === false;
+    if (!allowMissingSystemContract) {
+      issues.push({
+        code: StudioAssetEnforcementIssueCodes.contractMissing,
+        message: `Draft '${draft.id}' in '${expectation.studioType}' is missing contract metadata.`,
+      });
+      return Object.freeze(issues);
+    }
   }
 
   const expectedContract = contractResolver.resolveContractForTaxonomy(taxonomy);
@@ -119,7 +153,7 @@ export function evaluateStudioDraftConsistency(input: {
     return Object.freeze(issues);
   }
 
-  if (expectedContract && !sameContractShape(expectedContract, draft.metadata.contract)) {
+  if (expectedContract && draft.metadata.contract && !sameContractShape(expectedContract, draft.metadata.contract)) {
     issues.push({
       code: StudioAssetEnforcementIssueCodes.contractMismatch,
       message: `Draft '${draft.id}' contract does not match the shared taxonomy-driven contract projection.`,
@@ -325,16 +359,15 @@ export async function evaluateSystemStudioDraftConsistency(input: {
     if (!component.alias) {
       continue;
     }
-    if (!component.versionId) {
+    const resolvedContract = input.resolveChildContract
+      ? await input.resolveChildContract(component)
+      : (component.taxonomy ? input.contractResolver.resolveContractForTaxonomy(component.taxonomy) : undefined);
+    if (requiresPinnedComponentVersion({ component, resolvedContract })) {
       issues.push({
         code: StudioAssetEnforcementIssueCodes.systemChildVersionUnpinned,
         message: `System draft '${input.draft.id}' child '${component.assetId}' must be pinned to a version.`,
       });
     }
-
-    const resolvedContract = input.resolveChildContract
-      ? await input.resolveChildContract(component)
-      : (component.taxonomy ? input.contractResolver.resolveContractForTaxonomy(component.taxonomy) : undefined);
     if (!resolvedContract) {
       issues.push({
         code: StudioAssetEnforcementIssueCodes.systemChildReferenceMissing,

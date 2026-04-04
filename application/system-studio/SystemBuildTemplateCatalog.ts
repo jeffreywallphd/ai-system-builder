@@ -1,6 +1,7 @@
 import type { AssetDraftDependencyReference, AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
 import { serializeSystemSerializationDocument } from "../../domain/system-studio/SystemSerializationContract";
 import { TaxonomyBehaviorKinds, TaxonomySemanticRoles } from "../../domain/taxonomy/CompositionTaxonomy";
+import { CompositionAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import { ImageManipulationSystemTemplate } from "./ImageManipulationSystemTemplate";
 import { createComfyImageManipulationDefaultConfig } from "./ComfyImageManipulationPropertySchema";
 import {
@@ -29,6 +30,8 @@ export interface SystemBuildTemplateEntry {
   readonly draftSeed: SystemBuildTemplateDraftSeed;
   readonly completenessValidation: ImageManipulationTemplateCompletenessValidationResult;
 }
+
+const contractResolver = new CompositionAssetContractResolver();
 
 function deduplicateDependencies(
   entries: ReadonlyArray<AssetDraftDependencyReference>,
@@ -203,6 +206,11 @@ const imageManipulationSeed: SystemBuildTemplateDraftSeed = Object.freeze({
     summary: "Edit images with instructions while preserving reusable dataset/workflow composition.",
     tags: Object.freeze(["system", "image", "image-manipulation", "starter-template"]),
     taxonomy: Object.freeze({
+      structuralKind: "system",
+      semanticRole: TaxonomySemanticRoles.system,
+      behaviorKind: TaxonomyBehaviorKinds.deterministic,
+    }),
+    contract: contractResolver.resolveContractForTaxonomy({
       structuralKind: "system",
       semanticRole: TaxonomySemanticRoles.system,
       behaviorKind: TaxonomyBehaviorKinds.deterministic,

@@ -49,6 +49,8 @@ import {
   SystemDatasetInstancePersistenceService,
   type RestoreSystemDatasetInstancePersistenceIssue,
 } from "../system-runtime/SystemDatasetInstancePersistenceService";
+import { CoreImageStarterWorkflowTemplates } from "../workflow-template-studio/CoreImageStarterWorkflowTemplates";
+import { createWorkflowTemplateContractProjection } from "../workflow-template-studio/WorkflowTemplateContractProjection";
 
 export interface EnsureSystemStudioResult {
   readonly initialized: boolean;
@@ -328,6 +330,17 @@ function tryReadPublishedDraftEnvelope(version: AssetVersion): {
   const content = typeof payload.content === "string" ? payload.content : undefined;
 
   return Object.freeze({ metadata, dependencies, content });
+}
+
+function tryResolveCoreWorkflowTemplateContract(input: {
+  readonly assetId: string;
+  readonly versionId?: string;
+}): AssetContractDescriptor | undefined {
+  const template = CoreImageStarterWorkflowTemplates.find((entry) => (
+    entry.templateId === input.assetId
+    && (!input.versionId || entry.versionId === input.versionId)
+  ));
+  return template ? createWorkflowTemplateContractProjection(template) : undefined;
 }
 
 export class SystemStudioApplicationService {
@@ -1275,10 +1288,25 @@ export class SystemStudioApplicationService {
         if (envelope.metadata?.contract) {
           return createAssetContractDescriptor(envelope.metadata.contract);
         }
+        const projectedFromCoreTemplate = tryResolveCoreWorkflowTemplateContract({
+          assetId: component.assetId,
+          versionId: component.versionId,
+        });
+        if (projectedFromCoreTemplate) {
+          return projectedFromCoreTemplate;
+        }
         if (envelope.metadata?.taxonomy) {
           return this.contractResolver.resolveContractForTaxonomy(envelope.metadata.taxonomy);
         }
       }
+    }
+
+    const projectedFromCoreTemplate = tryResolveCoreWorkflowTemplateContract({
+      assetId: component.assetId,
+      versionId: component.versionId,
+    });
+    if (projectedFromCoreTemplate) {
+      return projectedFromCoreTemplate;
     }
 
     return component.taxonomy

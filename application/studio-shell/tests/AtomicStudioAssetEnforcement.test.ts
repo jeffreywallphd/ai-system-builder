@@ -391,6 +391,89 @@ describe("evaluateCompositeStudioDraftConsistency", () => {
 });
 
 describe("evaluateSystemStudioDraftConsistency", () => {
+  it("allows missing draft contract metadata for system-studio runtime validation", async () => {
+    const root = createSystemAsset({
+      assetId: "system:root",
+      versionId: "system:root:v1",
+      taxonomy: createSystemStudioTaxonomy(),
+    });
+    const draft = createAtomicDraft({
+      draftId: "draft-system-no-contract",
+      studioId: "studio-systems",
+      metadata: {
+        title: "System Draft",
+        tags: ["system"],
+        taxonomy: root.taxonomy,
+        provenance: { sourceType: "generated", sourceLabel: "system-studio" },
+      },
+    });
+
+    const issues = await evaluateSystemStudioDraftConsistency({
+      draft,
+      expectation: {
+        studioType: "system-studio",
+        semanticRole: "system",
+        allowedBehaviorKinds: ["deterministic", "conditional", "iterative", "autonomous"],
+      },
+      contractResolver: resolver,
+      systemAsset: root,
+      resolveSystem: async () => undefined,
+      resolveChildContract: async () => undefined,
+    });
+
+    expect(issues.map((issue) => issue.code)).not.toContain("contract-missing");
+  });
+
+  it("does not require pinned versions for taxonomy-resolvable dataset and tool-chain child components", async () => {
+    const root = createSystemAsset({
+      assetId: "system:root",
+      versionId: "system:root:v1",
+      components: [
+        {
+          componentKind: SystemComponentKinds.atomic,
+          assetId: "asset:dataset:image-reference-input",
+          alias: "input-dataset",
+          taxonomy: { structuralKind: "atomic", semanticRole: "dataset", behaviorKind: "none" },
+        },
+        {
+          componentKind: SystemComponentKinds.composite,
+          assetId: "asset:tool-chain:reference-image-ui",
+          alias: "reference-ui",
+          taxonomy: { structuralKind: "composite", semanticRole: "tool-chain", behaviorKind: "deterministic" },
+        },
+      ],
+      taxonomy: createSystemStudioTaxonomy(),
+    });
+    const draft = createAtomicDraft({
+      draftId: "draft-system-unpinned-exemptions",
+      studioId: "studio-systems",
+      metadata: {
+        title: "System Draft",
+        tags: ["system"],
+        taxonomy: root.taxonomy,
+        contract: resolver.resolveContractForTaxonomy(root.taxonomy),
+        provenance: { sourceType: "generated", sourceLabel: "system-studio" },
+      },
+    });
+
+    const issues = await evaluateSystemStudioDraftConsistency({
+      draft,
+      expectation: {
+        studioType: "system-studio",
+        semanticRole: "system",
+        allowedBehaviorKinds: ["deterministic", "conditional", "iterative", "autonomous"],
+      },
+      contractResolver: resolver,
+      systemAsset: root,
+      resolveSystem: async () => undefined,
+      resolveChildContract: async (component) => component.taxonomy
+        ? resolver.resolveContractForTaxonomy(component.taxonomy)
+        : undefined,
+    });
+
+    expect(issues.map((issue) => issue.code)).not.toContain("system-child-version-unpinned");
+  });
+
   it("accepts valid bounded recursive system drafts for publish enforcement", async () => {
     const child = createSystemAsset({
       assetId: "system:child",
