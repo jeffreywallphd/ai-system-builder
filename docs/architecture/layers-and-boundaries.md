@@ -226,3 +226,10 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - Pure identity validation and normalization policy now lives in `src/domain/identity/IdentityPolicy.ts` (username/email/profile normalization, provider-subject normalization, credential-policy evaluation, and status-transition evaluation) so rule logic is reusable outside transport/UI handlers.
 - Application orchestration for identity conflicts now lives in `application/identity/services/IdentityPolicyService.ts`, where repository-backed uniqueness checks are centralized behind `IIdentityLookupRepository` instead of being duplicated across registration/login entry points.
 - Structured issue/conflict outputs are now machine-friendly and deterministic (`issues` + ordered `username/email/provider-subject` conflicts), which keeps outer layers thin and transport-agnostic.
+
+## Direction 6 boundary note: Seed-safe admin bootstrap initialization (story 1.1.6)
+
+- First-run admin initialization now lives in a dedicated application service (`application/identity/services/IdentityBootstrapService.ts`) rather than being folded into generic registration logic.
+- Bootstrap eligibility is enforced via an explicit application-port seam (`IIdentityLookupRepository.countUserIdentities()`), keeping bootstrap gating policy in application while storage detail remains in infrastructure adapters.
+- Provider/policy/user/material bootstrap orchestration stays application-owned and uses existing identity ports (`lookup`, `persistence`, `credential material`, `clock`, `id generation`) without introducing UI or transport coupling.
+- Infrastructure adapters (`src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`, `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`) now implement identity counting for deterministic first-run gating.

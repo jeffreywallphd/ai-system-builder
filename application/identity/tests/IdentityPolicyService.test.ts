@@ -20,6 +20,10 @@ class InMemoryIdentityLookupRepository implements IIdentityLookupRepository {
     return this.users.get(userIdentityId.trim());
   }
 
+  public async countUserIdentities() {
+    return this.users.size;
+  }
+
   public async findUserIdentityByPrincipal(lookup: IdentityPrincipalLookup) {
     const normalized = lookup.value.trim().toLowerCase();
     for (const user of this.users.values()) {

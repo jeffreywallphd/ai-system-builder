@@ -205,6 +205,14 @@ export class SqliteIdentityPersistenceAdapter
     return row ? this.hydrateUserIdentity(row) : undefined;
   }
 
+  public async countUserIdentities(): Promise<number> {
+    const row = this.getDatabase().prepare(
+      "SELECT COUNT(*) AS total FROM identity_user_identities",
+    ).get() as { total?: number } | undefined;
+
+    return typeof row?.total === "number" ? row.total : 0;
+  }
+
   public async findUserIdentityByPrincipal(lookup: IdentityPrincipalLookup): Promise<UserIdentity | undefined> {
     const normalizedValue = normalizeLookup(lookup.value)?.toLowerCase();
     if (!normalizedValue) {

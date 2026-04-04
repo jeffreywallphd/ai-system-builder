@@ -114,6 +114,7 @@ describe("SqliteIdentityRepository", () => {
     }));
 
     expect((await repository.findUserIdentityById(user.id))?.id).toBe(user.id);
+    expect(await repository.countUserIdentities()).toBe(1);
     expect((await repository.findUserIdentityByPrincipal({
       kind: IdentityPrincipalLookupKinds.username,
       value: "alice",

@@ -117,6 +117,7 @@ describe("SqliteIdentityPersistenceAdapter", () => {
     }));
 
     expect((await adapter.findUserIdentityById(user.id))?.id).toBe(user.id);
+    expect(await adapter.countUserIdentities()).toBe(1);
     expect((await adapter.findUserIdentityByPrincipal({
       kind: IdentityPrincipalLookupKinds.username,
       value: "alice",
