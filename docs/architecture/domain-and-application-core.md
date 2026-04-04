@@ -1783,3 +1783,10 @@ This slice intentionally keeps identity/credential/session concerns separate so 
   - repository-backed uniqueness checks for username/email/provider-subject seams,
   - deterministic conflict ordering with machine-readable conflict records.
 - Added focused tests in `src/domain/identity/tests/IdentityPolicy.test.ts` and `application/identity/tests/IdentityPolicyService.test.ts` to cover normalization determinism, conflict detection, credential-policy evaluation, and status-transition validation behavior.
+
+## Direction 6 note: Seed-safe admin bootstrap initialization (story 1.1.6)
+- Added a dedicated initialization seam in `application/identity/services/IdentityBootstrapService.ts` for first-run local admin bootstrap, explicitly separate from general registration flows.
+- Bootstrap eligibility now uses repository-backed identity-state detection (`IIdentityLookupRepository.countUserIdentities()`), so initialization is only allowed while no identities exist.
+- Bootstrap flow now safely provisions or validates local provider/policy dependencies, creates the first active local identity, and persists explicit credential material records with caller-supplied hash metadata (no default password path).
+- Repeat bootstrap attempts are deterministically blocked once identity state exists, and bootstrap now fails fast on invalid provider state, invalid profile/provider normalization input, or missing credential hash material.
+- Added focused coverage for first-run success and misuse-blocking behavior in `application/identity/tests/IdentityBootstrapService.test.ts`, and adapter coverage for identity counting in SQLite adapter tests.

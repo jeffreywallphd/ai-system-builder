@@ -70,6 +70,10 @@ class InMemoryIdentityPortAdapter
     return this.users.get(userIdentityId.trim());
   }
 
+  async countUserIdentities() {
+    return this.users.size;
+  }
+
   async findUserIdentityByPrincipal(lookup: IdentityPrincipalLookup) {
     const normalizedValue = lookup.value.trim().toLowerCase();
     for (const user of this.users.values()) {
@@ -224,6 +228,7 @@ describe("identity application ports contracts", () => {
       kind: IdentityPrincipalLookupKinds.username,
       value: "alice",
     }))?.id).toBe(user.id);
+    expect(await adapter.countUserIdentities()).toBe(1);
 
     expect((await adapter.findUserIdentityByPrincipal({
       kind: IdentityPrincipalLookupKinds.email,

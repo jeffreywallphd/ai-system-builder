@@ -9,6 +9,7 @@ import type {
 } from "../../contracts/IdentityApplicationContracts";
 
 export interface IIdentityLookupRepository {
+  countUserIdentities(): Promise<number>;
   findUserIdentityById(userIdentityId: string): Promise<UserIdentity | undefined>;
   findUserIdentityByPrincipal(lookup: IdentityPrincipalLookup): Promise<UserIdentity | undefined>;
   findUserIdentityByProviderSubject(reference: IdentityProviderSubjectReference): Promise<UserIdentity | undefined>;
