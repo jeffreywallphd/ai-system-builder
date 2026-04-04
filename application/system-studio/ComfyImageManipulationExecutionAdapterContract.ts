@@ -17,6 +17,8 @@ import type {
   ComfyRuntimeEnvironmentResolutionInput,
 } from "./ComfyImageManipulationRuntimeResolution";
 import type { RuntimeCapabilityBindingContract } from "../system-runtime/RuntimeCapabilityBindingContract";
+import type { ComfyRuntimeSystemDiagnostics } from "../runtime/ComfyRuntimeSystemDiagnostics";
+import type { ComfyRuntimeInstallationAsset } from "../runtime/ComfyRuntimeInstallationAsset";
 
 export const ComfyImageManipulationExecutionContractVersion = "1.0.0";
 
@@ -54,6 +56,8 @@ export interface ComfyImageManipulationGraphBuildRequest {
   readonly runtimeMetadata: ComfyImageManipulationExecutionRuntimeMetadata;
   readonly runtimeEnvironment?: ComfyRuntimeEnvironmentResolutionInput;
   readonly runtimeCapabilityBinding?: RuntimeCapabilityBindingContract;
+  readonly runtimeDiagnostics?: ComfyRuntimeSystemDiagnostics;
+  readonly runtimeInstallationAsset?: ComfyRuntimeInstallationAsset;
 }
 
 export interface ComfyImageManipulationMaterializationBinding {
