@@ -29,6 +29,9 @@ import {
   ComfyImageManipulationPropertyMappingAsset,
   ComfyImageManipulationPropertyMappingAssetId,
 } from "./ComfyImageManipulationPropertyMappingAsset";
+import { ComfyImageManipulationExecutionContractVersion } from "./ComfyImageManipulationExecutionAdapterContract";
+import { validateComfyImageManipulationExecutionReadiness } from "./ComfyImageManipulationExecutionValidation";
+import { ComfyImageManipulationBaseGraph } from "./ComfyImageManipulationBaseGraph";
 
 export const ImageManipulationRuntimeTargets = Object.freeze({
   runtimeEnvironment: "comfyui",
@@ -55,6 +58,7 @@ export const ImageManipulationTemplateValidationCategories = Object.freeze({
   storageBindings: "storage-bindings",
   executionAdapter: "execution-adapter",
   runnableDefaults: "runnable-defaults",
+  runtimeDependencyReadiness: "runtime-dependency-readiness",
   pageWorkflowRuntimeWiring: "page-workflow-runtime-wiring",
   sharedStorageCompatibility: "shared-storage-compatibility",
 } as const);
@@ -178,6 +182,7 @@ function mapCategoryToLayer(category: ImageManipulationTemplateValidationCategor
     category === ImageManipulationTemplateValidationCategories.runtimeMetadata
     || category === ImageManipulationTemplateValidationCategories.executionAdapter
     || category === ImageManipulationTemplateValidationCategories.runnableDefaults
+    || category === ImageManipulationTemplateValidationCategories.runtimeDependencyReadiness
     || category === ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring
     || category === ImageManipulationTemplateValidationCategories.sharedStorageCompatibility
   ) {
@@ -518,6 +523,72 @@ function validateSharedStorageCompatibility(input: {
         severity: "error",
         message: "Cross-system provisioning produced incompatible shared storage references.",
         path: "buildImageManipulationDatasetInstanceRequests.storageBindings",
+      }));
+    }
+  }
+}
+
+function validateRuntimeDependencyReadinessProfiles(input: {
+  readonly workflowTemplate: WorkflowTemplateDefinition;
+  readonly issues: ImageManipulationTemplateValidationIssue[];
+}): void {
+  const baseConfig = createComfyImageManipulationDefaultConfig();
+  const profileChecks = Object.freeze([
+    Object.freeze({
+      profileId: "default-non-faceid",
+      config: baseConfig,
+    }),
+    Object.freeze({
+      profileId: "default-faceid-capable",
+      config: {
+        ...baseConfig,
+        faceId: {
+          ...baseConfig.faceId,
+          enabled: true,
+        },
+      },
+    }),
+  ]);
+
+  for (const profile of profileChecks) {
+    const readiness = validateComfyImageManipulationExecutionReadiness({
+      contractVersion: ComfyImageManipulationExecutionContractVersion,
+      workflowTemplate: input.workflowTemplate,
+      baseGraph: ComfyImageManipulationBaseGraph,
+      resolvedConfig: profile.config,
+      datasetHandles: [Object.freeze({
+        kind: "dataset-instance",
+        referenceId: "input-image-dataset",
+        instanceId: "dataset-instance-ref:image-manipulation:input",
+        storageInstanceRef: "storage-instance://storage-instance%3Aimage-manipulation%3Aruntime",
+      })],
+      runtimeMetadata: Object.freeze({
+        executionId: `completeness:${profile.profileId}`,
+      }),
+      runtimeEnvironment: Object.freeze({
+        apiBaseUrl: "http://127.0.0.1:8188",
+      }),
+    });
+
+    for (const issue of readiness.issues) {
+      if (issue.severity === "warning" && issue.stage !== "runtime-dependency-readiness") {
+        continue;
+      }
+      if (
+        issue.stage !== "model-dependency-availability"
+        && issue.stage !== "runtime-dependency-readiness"
+      ) {
+        continue;
+      }
+      input.issues.push(createIssue({
+        category: ImageManipulationTemplateValidationCategories.runtimeDependencyReadiness,
+        code: `execution-readiness:${profile.profileId}:${issue.code}`,
+        severity: issue.severity,
+        message: issue.message,
+        path: `workflowTemplate.executionMetadata.runtime.requiredDependencies`,
+        metadata: issue.details
+          ? { profileId: profile.profileId, stage: issue.stage, ...issue.details }
+          : { profileId: profile.profileId, stage: issue.stage },
       }));
     }
   }
@@ -1194,6 +1265,10 @@ export function validateImageManipulationTemplateCompleteness(
   });
   validateSharedStorageCompatibility({
     template,
+    workflowTemplate,
+    issues,
+  });
+  validateRuntimeDependencyReadinessProfiles({
     workflowTemplate,
     issues,
   });

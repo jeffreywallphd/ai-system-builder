@@ -19,6 +19,7 @@ describe("ImageManipulationSystemCompletenessValidationService", () => {
     expect(result.runnable).toBeTrue();
     expect(result.issues).toHaveLength(0);
     expect(result.categories[ImageManipulationTemplateValidationCategories.runnableDefaults].errors).toBe(0);
+    expect(result.categories[ImageManipulationTemplateValidationCategories.runtimeDependencyReadiness].errors).toBe(0);
     expect(result.assetValidation.status).toBe("valid");
   });
 

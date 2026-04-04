@@ -1,4 +1,14 @@
 import type { ComfyAdapterErrorCode } from "../execution/comfyui/ComfyAdapterContract";
+import {
+  ComfyRuntimeAssetValidationStatuses,
+  ComfyRuntimeWorkflowProfiles,
+  resolveComfyRuntimeAssetRequirementsForProfile,
+  resolveComfyRuntimeCustomNodeRequirementsForProfile,
+  type ComfyRuntimeAssetRequirement,
+  type ComfyRuntimeAssetValidationEntry,
+} from "../runtime/ComfyRuntimeRequirements";
+import { ComfyRuntimeInstallationAsset } from "../runtime/ComfyRuntimeInstallationAsset";
+import type { ComfyRuntimeSystemDiagnostics } from "../runtime/ComfyRuntimeSystemDiagnostics";
 import type {
   ComfyImageManipulationExecutionFailure,
   ComfyImageManipulationGraphBuildRequest,
@@ -30,13 +40,21 @@ type ComfyExecutionReadinessValidationStage =
   | "dataset-storage-binding-resolution"
   | "runtime-configuration-resolution"
   | "model-dependency-availability"
+  | "runtime-dependency-readiness"
   | "output-materialization-prerequisites";
+
+type ComfyDependencyIssueClassification =
+  | "required-missing-dependency"
+  | "optional-missing-dependency"
+  | "incompatible-dependency"
+  | "unresolved-dependency-reference";
 
 export interface ComfyExecutionReadinessIssue {
   readonly severity: "error" | "warning";
   readonly stage: ComfyExecutionReadinessValidationStage;
   readonly code: string;
   readonly message: string;
+  readonly classification?: ComfyDependencyIssueClassification;
   readonly details?: Readonly<Record<string, unknown>>;
 }
 
@@ -59,6 +77,26 @@ export interface ComfyImageManipulationExecutionReadinessResult {
   readonly materializationBindings: ReadonlyArray<ComfyImageManipulationMaterializationBinding>;
 }
 
+interface ParsedRuntimeDependencyDiagnostics {
+  readonly modelEntriesByRequirementId: ReadonlyMap<string, ComfyRuntimeAssetValidationEntry>;
+  readonly customNodeEntriesByRequirementId: ReadonlyMap<string, {
+    readonly requirementId: string;
+    readonly status: string;
+  }>;
+  readonly modelPhaseIssues: ReadonlyArray<{
+    readonly code: string;
+    readonly severity: "error" | "warning";
+    readonly message: string;
+    readonly metadata?: Readonly<Record<string, unknown>>;
+  }>;
+  readonly customNodePhaseIssues: ReadonlyArray<{
+    readonly code: string;
+    readonly severity: "error" | "warning";
+    readonly message: string;
+    readonly metadata?: Readonly<Record<string, unknown>>;
+  }>;
+}
+
 function createIssue(input: ComfyExecutionReadinessIssue): ComfyExecutionReadinessIssue {
   return Object.freeze(input);
 }
@@ -76,6 +114,26 @@ function appendErrors(
       message,
     }));
   }
+}
+
+function appendDependencyIssue(
+  target: ComfyExecutionReadinessIssue[],
+  input: {
+    readonly code: string;
+    readonly message: string;
+    readonly classification: ComfyDependencyIssueClassification;
+    readonly severity: "error" | "warning";
+    readonly details?: Readonly<Record<string, unknown>>;
+  },
+): void {
+  target.push(createIssue({
+    severity: input.severity,
+    stage: "runtime-dependency-readiness",
+    code: input.code,
+    message: input.message,
+    classification: input.classification,
+    details: input.details,
+  }));
 }
 
 function parseRequiredDependencyModelKinds(
@@ -108,6 +166,339 @@ function resolveMaterializationBindings(
       targetStorageBindingId: binding.targetStorageBindingId,
     }))
     .filter((entry) => entry.targetDatasetAssetId.trim().length > 0));
+}
+
+function parseRuntimeDependencyDiagnostics(
+  diagnostics: ComfyRuntimeSystemDiagnostics | undefined,
+): ParsedRuntimeDependencyDiagnostics {
+  if (!diagnostics) {
+    return Object.freeze({
+      modelEntriesByRequirementId: new Map(),
+      customNodeEntriesByRequirementId: new Map(),
+      modelPhaseIssues: Object.freeze([]),
+      customNodePhaseIssues: Object.freeze([]),
+    });
+  }
+
+  const modelEntries = new Map<string, ComfyRuntimeAssetValidationEntry>();
+  const customNodeEntries = new Map<string, { readonly requirementId: string; readonly status: string }>();
+  const modelPhaseIssues: ParsedRuntimeDependencyDiagnostics["modelPhaseIssues"] = [];
+  const customNodePhaseIssues: ParsedRuntimeDependencyDiagnostics["customNodePhaseIssues"] = [];
+
+  const modelPhase = diagnostics.phaseDiagnostics.find((entry) => entry.phase === "model-validation");
+  const modelResult = modelPhase?.metadata?.modelValidation as
+    | { readonly result?: { readonly entries?: ReadonlyArray<ComfyRuntimeAssetValidationEntry> } }
+    | undefined;
+  for (const entry of modelResult?.result?.entries ?? []) {
+    if (entry?.requirementId) {
+      modelEntries.set(entry.requirementId, entry);
+    }
+  }
+
+  const customNodePhase = diagnostics.phaseDiagnostics.find((entry) => entry.phase === "custom-nodes");
+  const customNodeInstall = customNodePhase?.metadata?.customNodeInstall as
+    | { readonly entries?: ReadonlyArray<{ readonly requirementId?: string; readonly status?: string }> }
+    | undefined;
+  for (const entry of customNodeInstall?.entries ?? []) {
+    const requirementId = entry.requirementId?.trim();
+    if (!requirementId) continue;
+    customNodeEntries.set(requirementId, Object.freeze({
+      requirementId,
+      status: entry.status?.trim() ?? "unknown",
+    }));
+  }
+
+  for (const issue of diagnostics.failures) {
+    if (issue.phase === "model-validation") {
+      modelPhaseIssues.push(Object.freeze({
+        code: issue.code,
+        severity: issue.severity,
+        message: issue.message,
+        metadata: issue.metadata,
+      }));
+    } else if (issue.phase === "custom-nodes") {
+      customNodePhaseIssues.push(Object.freeze({
+        code: issue.code,
+        severity: issue.severity,
+        message: issue.message,
+        metadata: issue.metadata,
+      }));
+    }
+  }
+
+  return Object.freeze({
+    modelEntriesByRequirementId: modelEntries,
+    customNodeEntriesByRequirementId: customNodeEntries,
+    modelPhaseIssues: Object.freeze(modelPhaseIssues),
+    customNodePhaseIssues: Object.freeze(customNodePhaseIssues),
+  });
+}
+
+function isReferenceResolvableFromEntry(reference: string, entry: ComfyRuntimeAssetValidationEntry): boolean {
+  const normalized = reference.trim().toLowerCase();
+  if (!normalized || normalized === "system-default") return true;
+  const resolved = entry.resolvedFileName?.trim().toLowerCase();
+  if (resolved && (resolved === normalized || resolved.startsWith(`${normalized}.`))) {
+    return true;
+  }
+  return false;
+}
+
+function validateRuntimeDependencyReadiness(input: {
+  readonly request: ComfyImageManipulationGraphBuildRequest;
+  readonly executionPath: "non-faceid" | "faceid";
+  readonly requiredModelKinds: ReadonlySet<"checkpoint" | "vae" | "faceid">;
+  readonly issues: ComfyExecutionReadinessIssue[];
+  readonly checkpointModelRef?: string;
+  readonly vaeModelRef?: string;
+  readonly faceIdModelRef?: string;
+}): void {
+  const runtimeInstallationAsset = input.request.runtimeInstallationAsset ?? ComfyRuntimeInstallationAsset;
+  const workflowProfile = input.executionPath === "faceid"
+    ? ComfyRuntimeWorkflowProfiles.imageManipulationFaceId
+    : ComfyRuntimeWorkflowProfiles.imageManipulationDefault;
+  const hasRuntimeDiagnostics = Boolean(input.request.runtimeDiagnostics);
+  const dependencyDiagnostics = parseRuntimeDependencyDiagnostics(input.request.runtimeDiagnostics);
+
+  const requiredAssetRequirements = resolveComfyRuntimeAssetRequirementsForProfile({
+    requirements: runtimeInstallationAsset.runtimeAssetRequirements,
+    workflowProfile,
+  });
+  const requiredCustomNodeRequirements = resolveComfyRuntimeCustomNodeRequirementsForProfile({
+    requirements: runtimeInstallationAsset.customNodeRequirements,
+    workflowProfile,
+  });
+
+  validateExpectedRuntimeModelRequirement({
+    expectedKind: "checkpoint",
+    configuredModelRef: input.checkpointModelRef,
+    requiredModelKinds: input.requiredModelKinds,
+    requirements: requiredAssetRequirements,
+    dependencyDiagnostics,
+    hasRuntimeDiagnostics,
+    executionPath: input.executionPath,
+    issues: input.issues,
+  });
+  validateExpectedRuntimeModelRequirement({
+    expectedKind: "vae",
+    configuredModelRef: input.vaeModelRef,
+    requiredModelKinds: input.requiredModelKinds,
+    requirements: requiredAssetRequirements,
+    dependencyDiagnostics,
+    hasRuntimeDiagnostics,
+    executionPath: input.executionPath,
+    issues: input.issues,
+  });
+  if (input.executionPath === "faceid") {
+    validateExpectedRuntimeModelRequirement({
+      expectedKind: "faceid-model",
+      configuredModelRef: input.faceIdModelRef,
+      requiredModelKinds: new Set(["faceid"]),
+      requirements: requiredAssetRequirements,
+      dependencyDiagnostics,
+      hasRuntimeDiagnostics,
+      executionPath: input.executionPath,
+      issues: input.issues,
+    });
+  }
+
+  for (const requirement of requiredCustomNodeRequirements) {
+    if (!requirement.required) {
+      continue;
+    }
+    if (!hasRuntimeDiagnostics) {
+      continue;
+    }
+    const installed = dependencyDiagnostics.customNodeEntriesByRequirementId.get(requirement.requirementId);
+    if (!installed) {
+      appendDependencyIssue(input.issues, {
+        code: "custom-node-dependency-unresolved",
+        message: `Custom-node dependency '${requirement.displayName}' does not have a resolvable runtime validation entry.`,
+        classification: "unresolved-dependency-reference",
+        severity: "error",
+        details: Object.freeze({
+          requirementId: requirement.requirementId,
+          executionPath: input.executionPath,
+        }),
+      });
+      continue;
+    }
+    if (installed.status === "failed") {
+      appendDependencyIssue(input.issues, {
+        code: "custom-node-dependency-incompatible",
+        message: `Custom-node dependency '${requirement.displayName}' is installed but not compatible enough for execution.`,
+        classification: "incompatible-dependency",
+        severity: "error",
+        details: Object.freeze({
+          requirementId: requirement.requirementId,
+          status: installed.status,
+          executionPath: input.executionPath,
+        }),
+      });
+    }
+  }
+
+  if (!hasRuntimeDiagnostics) {
+    return;
+  }
+
+  for (const issue of dependencyDiagnostics.modelPhaseIssues) {
+    if (issue.code === "runtime-asset-directory-missing" || issue.code === "runtime-asset-missing") {
+      appendDependencyIssue(input.issues, {
+        code: "runtime-model-dependency-missing",
+        message: issue.message,
+        classification: "required-missing-dependency",
+        severity: issue.severity,
+        details: issue.metadata,
+      });
+    } else if (issue.code.includes("incompatible")) {
+      appendDependencyIssue(input.issues, {
+        code: "runtime-model-dependency-incompatible",
+        message: issue.message,
+        classification: "incompatible-dependency",
+        severity: issue.severity,
+        details: issue.metadata,
+      });
+    }
+  }
+
+  for (const issue of dependencyDiagnostics.customNodePhaseIssues) {
+    if (issue.code.includes("install-failed")) {
+      appendDependencyIssue(input.issues, {
+        code: "custom-node-dependency-required-missing",
+        message: issue.message,
+        classification: "required-missing-dependency",
+        severity: issue.severity,
+        details: issue.metadata,
+      });
+    } else if (issue.code.includes("validation-failed")) {
+      appendDependencyIssue(input.issues, {
+        code: "custom-node-dependency-incompatible",
+        message: issue.message,
+        classification: "incompatible-dependency",
+        severity: issue.severity,
+        details: issue.metadata,
+      });
+    }
+  }
+}
+
+function validateExpectedRuntimeModelRequirement(input: {
+  readonly expectedKind: "checkpoint" | "vae" | "faceid-model";
+  readonly configuredModelRef?: string;
+  readonly requiredModelKinds: ReadonlySet<"checkpoint" | "vae" | "faceid">;
+  readonly requirements: ReadonlyArray<ComfyRuntimeAssetRequirement>;
+  readonly dependencyDiagnostics: ParsedRuntimeDependencyDiagnostics;
+  readonly hasRuntimeDiagnostics: boolean;
+  readonly executionPath: "non-faceid" | "faceid";
+  readonly issues: ComfyExecutionReadinessIssue[];
+}): void {
+  const isRequiredByWorkflow = input.expectedKind === "faceid-model"
+    ? input.requiredModelKinds.has("faceid")
+    : input.requiredModelKinds.has(input.expectedKind);
+  if (!isRequiredByWorkflow) {
+    return;
+  }
+
+  const matchingRequirement = input.requirements.find((entry) => entry.kind === input.expectedKind);
+  if (!matchingRequirement) {
+    appendDependencyIssue(input.issues, {
+      code: "runtime-model-requirement-unresolved",
+      message: `Workflow dependency '${input.expectedKind}' could not be resolved to an installer/runtime requirement.`,
+      classification: "unresolved-dependency-reference",
+      severity: "error",
+      details: Object.freeze({
+        expectedKind: input.expectedKind,
+        executionPath: input.executionPath,
+      }),
+    });
+    return;
+  }
+
+  const validationEntry = input.dependencyDiagnostics.modelEntriesByRequirementId.get(matchingRequirement.requirementId);
+  if (!input.hasRuntimeDiagnostics) {
+    return;
+  }
+  if (!validationEntry) {
+    appendDependencyIssue(input.issues, {
+      code: "runtime-model-validation-entry-unresolved",
+      message: `Runtime model requirement '${matchingRequirement.displayName}' did not produce a resolvable validation entry.`,
+      classification: "unresolved-dependency-reference",
+      severity: "error",
+      details: Object.freeze({
+        requirementId: matchingRequirement.requirementId,
+        executionPath: input.executionPath,
+      }),
+    });
+    return;
+  }
+
+  if (
+    validationEntry.status === ComfyRuntimeAssetValidationStatuses.missingRequired
+    || (validationEntry.status === ComfyRuntimeAssetValidationStatuses.missingOptional && matchingRequirement.required)
+  ) {
+    appendDependencyIssue(input.issues, {
+      code: "runtime-model-required-missing",
+      message: `Required model dependency '${matchingRequirement.displayName}' is missing.`,
+      classification: "required-missing-dependency",
+      severity: "error",
+      details: Object.freeze({
+        requirementId: matchingRequirement.requirementId,
+        requirementKind: matchingRequirement.kind,
+        executionPath: input.executionPath,
+      }),
+    });
+    return;
+  }
+
+  if (validationEntry.status === ComfyRuntimeAssetValidationStatuses.missingOptional && !matchingRequirement.required) {
+    appendDependencyIssue(input.issues, {
+      code: "runtime-model-optional-missing",
+      message: `Optional model dependency '${matchingRequirement.displayName}' is missing.`,
+      classification: "optional-missing-dependency",
+      severity: "warning",
+      details: Object.freeze({
+        requirementId: matchingRequirement.requirementId,
+        requirementKind: matchingRequirement.kind,
+        executionPath: input.executionPath,
+      }),
+    });
+    return;
+  }
+
+  if (validationEntry.status === ComfyRuntimeAssetValidationStatuses.incompatible) {
+    appendDependencyIssue(input.issues, {
+      code: "runtime-model-incompatible",
+      message: `Model dependency '${matchingRequirement.displayName}' is incompatible with runtime requirements.`,
+      classification: "incompatible-dependency",
+      severity: "error",
+      details: Object.freeze({
+        requirementId: matchingRequirement.requirementId,
+        requirementKind: matchingRequirement.kind,
+        executionPath: input.executionPath,
+      }),
+    });
+    return;
+  }
+
+  const configuredModelRef = input.configuredModelRef?.trim();
+  if (!configuredModelRef || configuredModelRef === "system-default") {
+    return;
+  }
+  if (!isReferenceResolvableFromEntry(configuredModelRef, validationEntry)) {
+    appendDependencyIssue(input.issues, {
+      code: "runtime-model-reference-unresolved",
+      message: `Configured model reference '${configuredModelRef}' is not resolvable by runtime dependency validation.`,
+      classification: "unresolved-dependency-reference",
+      severity: "error",
+      details: Object.freeze({
+        configuredModelRef,
+        requirementId: matchingRequirement.requirementId,
+        resolvedFileName: validationEntry.resolvedFileName,
+        executionPath: input.executionPath,
+      }),
+    });
+  }
 }
 
 export function validateComfyImageManipulationExecutionReadiness(
@@ -228,9 +619,9 @@ export function validateComfyImageManipulationExecutionReadiness(
     }));
   }
 
-  const requiredModelKinds = parseRequiredDependencyModelKinds(
+  const requiredModelKinds = new Set(parseRequiredDependencyModelKinds(
     request.workflowTemplate.executionMetadata?.runtime.requiredDependencies ?? [],
-  );
+  ));
   const models = request.resolvedConfig.models;
   if (requiredModelKinds.has("checkpoint") && !models.checkpointModel.trim()) {
     issues.push(createIssue({
@@ -250,6 +641,7 @@ export function validateComfyImageManipulationExecutionReadiness(
   }
 
   if (executionPath === "faceid") {
+    requiredModelKinds.add("faceid");
     if (!faceIdBinding?.enabled) {
       issues.push(createIssue({
         severity: "error",
@@ -288,6 +680,16 @@ export function validateComfyImageManipulationExecutionReadiness(
       }),
     }));
   }
+
+  validateRuntimeDependencyReadiness({
+    request,
+    executionPath,
+    requiredModelKinds,
+    issues,
+    checkpointModelRef: models.checkpointModel,
+    vaeModelRef: models.vaeModel,
+    faceIdModelRef: request.resolvedConfig.models.faceIdModel,
+  });
 
   const ready = issues.every((issue) => issue.severity !== "error");
   return Object.freeze({
