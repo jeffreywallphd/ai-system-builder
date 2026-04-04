@@ -15,6 +15,7 @@ describe("SystemBuildTemplateCatalog", () => {
     expect(entry?.draftSeed.dependencies.some((dependency) => (
       dependency.assetId === ImageManipulationSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId
     ))).toBeTrue();
+    expect(entry?.completenessValidation.runnable).toBeTrue();
   });
 
   it("does not shadow the image manipulation template with duplicate template or system asset ids", () => {

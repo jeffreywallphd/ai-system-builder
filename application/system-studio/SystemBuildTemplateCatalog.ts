@@ -1,6 +1,10 @@
 import type { AssetDraftDependencyReference, AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
 import { TaxonomyBehaviorKinds, TaxonomySemanticRoles } from "../../domain/taxonomy/CompositionTaxonomy";
 import { ImageManipulationSystemTemplate } from "./ImageManipulationSystemTemplate";
+import {
+  assertImageManipulationTemplateRunnableDefaults,
+  type ImageManipulationTemplateCompletenessValidationResult,
+} from "./ImageManipulationSystemCompletenessValidationService";
 
 export interface SystemBuildTemplateDraftSeed {
   readonly assetId: string;
@@ -21,6 +25,7 @@ export interface SystemBuildTemplateEntry {
     readonly actionLabel?: string;
   };
   readonly draftSeed: SystemBuildTemplateDraftSeed;
+  readonly completenessValidation: ImageManipulationTemplateCompletenessValidationResult;
 }
 
 function deduplicateDependencies(
@@ -121,6 +126,12 @@ const imageManipulationSeedDependencies = deduplicateDependencies([
     Object.freeze({ assetId: component.assetId, versionId: component.versionId })),
 ]);
 
+const imageManipulationSeedContentTemplate = buildImageManipulationSystemContentTemplate();
+const imageManipulationCompletenessValidation = assertImageManipulationTemplateRunnableDefaults({
+  template: ImageManipulationSystemTemplate,
+  buildTemplateContent: imageManipulationSeedContentTemplate,
+});
+
 const imageManipulationSeed: SystemBuildTemplateDraftSeed = Object.freeze({
   assetId: ImageManipulationSystemTemplate.systemAsset.assetId,
   title: "Image Manipulation System",
@@ -137,7 +148,7 @@ const imageManipulationSeed: SystemBuildTemplateDraftSeed = Object.freeze({
     provenance: Object.freeze({ sourceLabel: "build-template:image-manipulation" }),
   }),
   dependencies: imageManipulationSeedDependencies,
-  contentTemplate: buildImageManipulationSystemContentTemplate(),
+  contentTemplate: imageManipulationSeedContentTemplate,
 });
 
 export const SystemBuildTemplateCatalog: ReadonlyArray<SystemBuildTemplateEntry> = Object.freeze([
@@ -151,6 +162,7 @@ export const SystemBuildTemplateCatalog: ReadonlyArray<SystemBuildTemplateEntry>
       actionLabel: "Open in System Studio",
     }),
     draftSeed: imageManipulationSeed,
+    completenessValidation: imageManipulationCompletenessValidation,
   }),
 ]);
 
