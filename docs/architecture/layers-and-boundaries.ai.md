@@ -58,3 +58,9 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 ## TODO
 - When summarizing purity/impurity, say "clean-architecture-style with pragmatic UI-layer convenience logic," not "strict clean architecture."
 - Phase 7 inner contracts now expose authored-agent operations as application use cases (launch/session-read/run-control/trigger-binding) over existing `AgentRunnerService` + `IAgentExecutionSessionRepository` seams; no parallel runtime path was introduced.
+
+## Direction 6 boundary note: Identity domain foundation (story 1.1.1)
+- New inner-layer identity contracts live in `src/domain/identity/IdentityDomain.ts`.
+- The model keeps identity lifecycle, credential lifecycle/policy, and session lifecycle as explicit separate concerns.
+- Provider contracts remain extensible (`local` + `external` categories and provider-kind descriptors) so local accounts are supported now without blocking future external identity integration.
+- No infrastructure/transport details were added to the identity domain seam.
