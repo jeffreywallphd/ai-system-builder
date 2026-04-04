@@ -240,3 +240,10 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - The note documents concrete boundary ownership for identity domain/application/infrastructure seams and makes the trust split explicit:
   - local identity lifecycle remains in identity domain/application contracts,
   - device/runtime/tool trust remains in separate trust modules and is not embedded in identity entities.
+
+## Direction 6 boundary note: Secure local password credential handling (story 1.2.2)
+
+- Local password secret handling now uses an explicit application seam (`application/identity/ports/ILocalPasswordCredentialService.ts`) so hashing/verification mechanics stay out of registration and login orchestration.
+- Registration (`src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`) now accepts password candidates and persists only hashed credential material generated through that port.
+- Local credential verification (`src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`) now resolves active credential material and verifies candidates through the same port with generic invalid-credential failure contracts.
+- Infrastructure security implementation now lives in `infrastructure/security/identity/ScryptLocalPasswordCredentialService.ts`, keeping secret derivation/verification details at the outer layer and preserving the provider-oriented seam for future passkey/external-provider methods.

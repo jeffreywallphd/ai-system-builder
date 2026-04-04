@@ -18,9 +18,12 @@
 - `application/identity/services/IdentityPolicyService.ts`
 - `application/identity/services/IdentityBootstrapService.ts`
 - `src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`
+- `src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`
 - `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
 - `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`
 - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
+- `application/identity/ports/ILocalPasswordCredentialService.ts`
+- `infrastructure/security/identity/ScryptLocalPasswordCredentialService.ts`
 
 ## Persistence shape
 
@@ -37,8 +40,14 @@
 ## Local registration seam
 
 - `RegisterLocalAccountUseCase` runs full local registration orchestration in the application layer.
-- It validates/normalizes profile + provider subject, checks deterministic uniqueness conflicts, enforces credential policy, and persists identity + credential material.
+- It validates/normalizes profile + provider subject, checks deterministic uniqueness conflicts, enforces credential policy, hashes password candidates through `ILocalPasswordCredentialService`, and persists identity + credential material.
 - It depends only on identity application ports plus `IdentityPolicyService`, with structured operation results for duplicate/policy/provider/state failures.
+
+## Local verification seam
+
+- `VerifyLocalPasswordCredentialUseCase` provides local password verification for login/auth flows.
+- It normalizes local provider references, resolves active credential material, and verifies candidates through `ILocalPasswordCredentialService`.
+- Missing credential material and password mismatches map to the same invalid-credentials failure contract.
 
 ## Boundary clarity: identity vs trust
 

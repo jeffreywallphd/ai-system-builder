@@ -90,3 +90,9 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 ## Direction 6 boundary note: Identity architecture documentation (story 1.1.8)
 - Added dedicated identity architecture docs in `docs/architecture/identity-foundation.md` and `docs/architecture/identity-foundation.ai.md`.
 - Documents exact boundary ownership for identity contracts/adapters and keeps trust concerns separated from identity lifecycle contracts.
+
+## Direction 6 boundary note: Secure local password credential handling (story 1.2.2)
+- Added an explicit local-password credential port (`application/identity/ports/ILocalPasswordCredentialService.ts`) so secret hashing/verification logic remains outside application registration/login orchestration.
+- `RegisterLocalAccountUseCase` now consumes password candidates and persists only derived hash material produced by that port.
+- Added `VerifyLocalPasswordCredentialUseCase` as a reusable login verification seam over active credential-material lookup plus password verification through the same port.
+- Added infrastructure security implementation `infrastructure/security/identity/ScryptLocalPasswordCredentialService.ts` using scrypt-based password derivation and timing-safe verification.
