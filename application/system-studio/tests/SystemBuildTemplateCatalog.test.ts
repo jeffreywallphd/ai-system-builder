@@ -15,7 +15,7 @@ describe("SystemBuildTemplateCatalog", () => {
     expect(entry?.draftSeed.dependencies.some((dependency) => (
       dependency.assetId === ImageManipulationSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId
     ))).toBeTrue();
-    expect(entry?.draftSeed.metadataPatch.contract).toBeDefined();
+    expect(entry?.draftSeed.metadataPatch.contract).toBeUndefined();
     expect(entry?.completenessValidation.runnable).toBeTrue();
   });
 
