@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildReferenceImageStartRequest } from "../ReferenceImageExperiencePanel";
+import { buildReferenceImageStartRequest } from "../../../runtime/ReferenceImageExecutionRequestBuilder";
 import { createSystemContextContract } from "../../../../domain/system-studio/SystemContextContract";
 
 describe("ReferenceImageExperiencePanel", () => {

@@ -796,3 +796,11 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Hydration now surfaces resolved system/workflow/page references, property-schema defaults, execution metadata, dataset/storage logical references, and normalized selection defaults, with explicit warning/error issue projection for inspectability.
 - Dataset and selection initialization now uses a dedicated binding seam (`ui/runtime/ImageManipulationRuntimeDatasetBindingService.ts`) so input/output/reference role bindings and selection reconciliation are serializable and persistence-ready.
 - `ImageManipulationRuntimeEditorPanel` now consumes hydrated runtime references for dataset/workflow/system context and keeps runtime-window behavior compatible with shared storage-instance and embedded-subsystem launch contracts without UI-facing raw path leakage.
+
+## AI Loom image manipulation update: runtime-window backend run wiring + session persistence (stories 8.5-8.6)
+
+- Runtime-window run mapping now routes through an explicit mapper seam (`ui/runtime/ImageManipulationRuntimeExecutionRequestMapper.ts`) so the UI submits resolved config/selection + logical dataset/storage references on the same backend execution start path (`startSystemExecution`) and shared output persistence/refresh flow.
+- Run-request preparation now enforces normalized preflight failures for missing required runtime selections (source dataset/input image and FaceID reference when enabled) before backend launch, while preserving default-template runnability with no extra setup.
+- Runtime-window execution request construction is now shared in a non-component seam (`ui/runtime/ReferenceImageExecutionRequestBuilder.ts`) so runtime panels do not own workflow-input mapping internals.
+- Runtime-window session overrides now persist through a dedicated persistence seam (`ui/runtime/SystemRuntimeWindowSessionPersistenceService.ts`) that stores serializable logical state only (property config/preset, selection snapshot, preview/gallery focus, advanced-panel disclosure, launch/session/page context references).
+- Runtime editor startup now layers persisted runtime-window overrides on top of hydrated defaults and continues to refresh output collections in-place after execution, so reopen/restore keeps in-progress context without raw-path leakage.
