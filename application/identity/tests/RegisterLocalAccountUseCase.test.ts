@@ -31,6 +31,7 @@ import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../ports/IIdentityPersistenceRepository";
+import type { ILocalPasswordCredentialService } from "../ports/ILocalPasswordCredentialService";
 import { IdentityPolicyService } from "../services/IdentityPolicyService";
 import { RegisterLocalAccountUseCase } from "../../../src/application/identity/use-cases/RegisterLocalAccountUseCase";
 
@@ -165,12 +166,48 @@ class InMemoryIdentityRegistrationAdapter
   }
 }
 
-function createUseCase(adapter: InMemoryIdentityRegistrationAdapter): RegisterLocalAccountUseCase {
+class StubPasswordCredentialService implements ILocalPasswordCredentialService {
+  public lastNormalizedCandidate?: string;
+  public lastHashedCandidate?: string;
+  public readonly hashAlgorithm = "scrypt";
+
+  public normalizePassword(candidate: string): string {
+    this.lastNormalizedCandidate = candidate.normalize("NFKC");
+    return this.lastNormalizedCandidate;
+  }
+
+  public async hashPassword(candidate: string) {
+    this.lastHashedCandidate = candidate;
+    return Object.freeze({
+      hashAlgorithm: this.hashAlgorithm,
+      hashValue: `hashed:${candidate.length}`,
+      salt: "salt:stub",
+    });
+  }
+
+  public async verifyPassword(
+    _candidate: string,
+    _material: {
+      readonly hashAlgorithm: string;
+      readonly hashValue: string;
+      readonly salt?: string;
+      readonly pepperVersion?: string;
+    },
+  ): Promise<boolean> {
+    return true;
+  }
+}
+
+function createUseCase(
+  adapter: InMemoryIdentityRegistrationAdapter,
+  passwordCredentialService: ILocalPasswordCredentialService = new StubPasswordCredentialService(),
+): RegisterLocalAccountUseCase {
   return new RegisterLocalAccountUseCase({
     lookupRepository: adapter,
     persistenceRepository: adapter,
     credentialMaterialRepository: adapter,
     identityPolicyService: new IdentityPolicyService(adapter),
+    passwordCredentialService,
     idGenerator: adapter,
     clock: adapter,
   });
@@ -195,7 +232,8 @@ describe("RegisterLocalAccountUseCase", () => {
   it("registers a valid local account and persists identity plus credential material", async () => {
     const adapter = new InMemoryIdentityRegistrationAdapter();
     await seedLocalProviderAndPolicy(adapter);
-    const useCase = createUseCase(adapter);
+    const passwordCredentialService = new StubPasswordCredentialService();
+    const useCase = createUseCase(adapter, passwordCredentialService);
 
     const result = await useCase.execute({
       username: "  New.User  ",
@@ -203,8 +241,6 @@ describe("RegisterLocalAccountUseCase", () => {
       displayName: " New User ",
       credential: {
         candidate: "Str0ng!Passphrase",
-        hashAlgorithm: "argon2id",
-        hashValue: "argon2id$v=19$m=65536,t=3,p=4$seed$registeredhash",
       },
     });
 
@@ -228,8 +264,11 @@ describe("RegisterLocalAccountUseCase", () => {
       providerId: result.value.providerId,
       providerSubject: result.value.providerSubject,
     });
-    expect(credential?.hashAlgorithm).toBe("argon2id");
-    expect(credential?.hashValue).toBe("argon2id$v=19$m=65536,t=3,p=4$seed$registeredhash");
+    expect(credential?.hashAlgorithm).toBe("scrypt");
+    expect(credential?.hashValue).toBe("hashed:17");
+    expect(credential?.hashValue).not.toBe("Str0ng!Passphrase");
+    expect(passwordCredentialService.lastNormalizedCandidate).toBe("Str0ng!Passphrase");
+    expect(passwordCredentialService.lastHashedCandidate).toBe("Str0ng!Passphrase");
   });
 
   it("rejects invalid registration profile input with structured policy error", async () => {
@@ -241,8 +280,6 @@ describe("RegisterLocalAccountUseCase", () => {
       username: "   ",
       credential: {
         candidate: "Str0ng!Passphrase",
-        hashAlgorithm: "argon2id",
-        hashValue: "hash",
       },
     });
 
@@ -278,8 +315,6 @@ describe("RegisterLocalAccountUseCase", () => {
       email: "existing@example.com",
       credential: {
         candidate: "Str0ng!Passphrase",
-        hashAlgorithm: "argon2id",
-        hashValue: "hash",
       },
     });
 
@@ -301,8 +336,6 @@ describe("RegisterLocalAccountUseCase", () => {
       username: "valid.user",
       credential: {
         candidate: "weak",
-        hashAlgorithm: "argon2id",
-        hashValue: "hash",
       },
     });
 
@@ -333,8 +366,6 @@ describe("RegisterLocalAccountUseCase", () => {
       username: "valid.user",
       credential: {
         candidate: "Str0ng!Passphrase",
-        hashAlgorithm: "argon2id",
-        hashValue: "hash",
       },
     });
 
@@ -346,7 +377,7 @@ describe("RegisterLocalAccountUseCase", () => {
     });
   });
 
-  it("rejects missing credential hash material with invalid-credentials error", async () => {
+  it("rejects missing credential candidate with invalid-credentials error", async () => {
     const adapter = new InMemoryIdentityRegistrationAdapter();
     await seedLocalProviderAndPolicy(adapter);
     const useCase = createUseCase(adapter);
@@ -354,9 +385,7 @@ describe("RegisterLocalAccountUseCase", () => {
     const result = await useCase.execute({
       username: "valid.user",
       credential: {
-        candidate: "Str0ng!Passphrase",
-        hashAlgorithm: "   ",
-        hashValue: "   ",
+        candidate: "   ",
       },
     });
 

@@ -58,9 +58,11 @@ Primary files:
 - `application/identity/ports/IIdentitySessionRepository.ts`
 - `application/identity/ports/IIdentityClock.ts`
 - `application/identity/ports/IIdentityIdGenerator.ts`
+- `application/identity/ports/ILocalPasswordCredentialService.ts`
 - `application/identity/services/IdentityPolicyService.ts`
 - `application/identity/services/IdentityBootstrapService.ts`
 - `src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`
+- `src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`
 
 Application responsibilities:
 
@@ -158,10 +160,22 @@ The service does not generate a password or perform hashing; it consumes already
 - requires configured active local-password provider and credential policy dependencies
 - enforces username/email/provider-subject uniqueness through lookup ports
 - enforces credential candidate policy before persistence
+- normalizes and hashes password candidates through `ILocalPasswordCredentialService`
 - persists `UserIdentity` and active credential material using application ports only
 - returns typed operation results for success and structured failure paths
 
-The use case intentionally consumes caller-supplied credential hash material (`hashAlgorithm`, `hashValue`, optional salt/pepper metadata) so hashing strategy remains an outer-layer concern.
+The use case intentionally keeps hashing behind `ILocalPasswordCredentialService` so secret-handling stays in infrastructure/security code while persistence still stores only hash material (`hashAlgorithm`, `hashValue`, optional salt/pepper metadata).
+
+## Local Credential Verification Use Case
+
+`VerifyLocalPasswordCredentialUseCase.execute(...)` provides the password-verification seam used by login/auth flows:
+
+- normalizes local provider-subject references through `IdentityPolicyService`
+- resolves active credential material from `ICredentialMaterialRepository`
+- verifies candidate passwords via `ILocalPasswordCredentialService`
+- returns generic invalid-credential failures on missing or mismatched secrets
+
+This keeps password verification logic in an application port + infrastructure adapter seam that can coexist with future passkey or external-provider sign-in flows.
 
 ## Extension Seams for Future Providers
 
@@ -210,7 +224,9 @@ Key tests for this foundation:
 - `application/identity/tests/IdentityPolicyService.test.ts`
 - `application/identity/tests/IdentityBootstrapService.test.ts`
 - `application/identity/tests/RegisterLocalAccountUseCase.test.ts`
+- `application/identity/tests/VerifyLocalPasswordCredentialUseCase.test.ts`
 - `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`
+- `infrastructure/security/identity/tests/ScryptLocalPasswordCredentialService.test.ts`
 - `src/infrastructure/persistence/identity/tests/IdentityPersistenceMapper.test.ts`
 - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
 

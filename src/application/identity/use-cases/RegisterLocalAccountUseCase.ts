@@ -23,6 +23,7 @@ import type { IIdentityClock } from "../../../../application/identity/ports/IIde
 import type { IIdentityIdGenerator } from "../../../../application/identity/ports/IIdentityIdGenerator";
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
+import type { ILocalPasswordCredentialService } from "../../../../application/identity/ports/ILocalPasswordCredentialService";
 import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
 
 export type RegisterLocalAccountErrorCode =
@@ -35,10 +36,6 @@ export type RegisterLocalAccountErrorCode =
 
 export interface RegisterLocalAccountCredentialInput {
   readonly candidate: string;
-  readonly hashAlgorithm: string;
-  readonly hashValue: string;
-  readonly salt?: string;
-  readonly pepperVersion?: string;
 }
 
 export interface RegisterLocalAccountInput {
@@ -65,6 +62,7 @@ interface RegisterLocalAccountDependencies {
   readonly persistenceRepository: IIdentityPersistenceRepository;
   readonly credentialMaterialRepository: ICredentialMaterialRepository;
   readonly identityPolicyService: IdentityPolicyService;
+  readonly passwordCredentialService: ILocalPasswordCredentialService;
   readonly idGenerator: IIdentityIdGenerator;
   readonly clock: IIdentityClock;
 }
@@ -96,22 +94,12 @@ export class RegisterLocalAccountUseCase {
       return credentialPolicyIdResult;
     }
 
-    const hashAlgorithmResult = this.requireNonEmpty(
-      input.credential.hashAlgorithm,
-      "credential.hashAlgorithm",
-      IdentityErrorCodes.invalidCredentials,
+    const credentialCandidateResult = this.requireSecretCandidate(
+      this.dependencies.passwordCredentialService.normalizePassword(input.credential.candidate),
+      "credential.candidate",
     );
-    if (!hashAlgorithmResult.ok) {
-      return hashAlgorithmResult;
-    }
-
-    const hashValueResult = this.requireNonEmpty(
-      input.credential.hashValue,
-      "credential.hashValue",
-      IdentityErrorCodes.invalidCredentials,
-    );
-    if (!hashValueResult.ok) {
-      return hashValueResult;
+    if (!credentialCandidateResult.ok) {
+      return credentialCandidateResult;
     }
 
     const providerId = providerIdResult.value;
@@ -179,7 +167,7 @@ export class RegisterLocalAccountUseCase {
 
     const credentialValidation = this.dependencies.identityPolicyService.evaluateCredentialCandidate(
       credentialPolicyResult.value,
-      input.credential.candidate,
+      credentialCandidateResult.value,
     );
     if (!credentialValidation.valid) {
       return this.failure(
@@ -199,6 +187,17 @@ export class RegisterLocalAccountUseCase {
     const userIdentityId = this.dependencies.idGenerator.nextId(IdentityIdNamespaces.userIdentity);
     const credentialMaterialId = this.dependencies.idGenerator.nextId(IdentityIdNamespaces.credentialMaterial);
     const providerSubject = normalizedProviderReference.value.providerSubject;
+    const hashedCredentialMaterial = await this.dependencies.passwordCredentialService.hashPassword(
+      credentialCandidateResult.value,
+    );
+    const hashAlgorithm = this.normalizeOptional(hashedCredentialMaterial.hashAlgorithm);
+    const hashValue = this.normalizeOptional(hashedCredentialMaterial.hashValue);
+    if (!hashAlgorithm || !hashValue) {
+      return this.failure(
+        IdentityErrorCodes.invalidState,
+        "Password credential service returned invalid hash material.",
+      );
+    }
 
     const userIdentity = createUserIdentity({
       id: userIdentityId,
@@ -225,10 +224,10 @@ export class RegisterLocalAccountUseCase {
       userIdentityId,
       providerId: providerResult.value.id,
       providerSubject,
-      hashAlgorithm: hashAlgorithmResult.value,
-      hashValue: hashValueResult.value,
-      salt: this.normalizeOptional(input.credential.salt),
-      pepperVersion: this.normalizeOptional(input.credential.pepperVersion),
+      hashAlgorithm,
+      hashValue,
+      salt: this.normalizeOptional(hashedCredentialMaterial.salt),
+      pepperVersion: this.normalizeOptional(hashedCredentialMaterial.pepperVersion),
       status: IdentityCredentialMaterialStatuses.active,
       createdAt: nowIso,
       updatedAt: nowIso,
@@ -305,6 +304,17 @@ export class RegisterLocalAccountUseCase {
   private normalizeOptional(value?: string): string | undefined {
     const normalized = value?.trim();
     return normalized ? normalized : undefined;
+  }
+
+  private requireSecretCandidate(
+    value: string,
+    field: string,
+  ): IdentityOperationResult<string, RegisterLocalAccountErrorCode> {
+    if (value.length === 0) {
+      return this.failure(IdentityErrorCodes.invalidCredentials, `${field} is required.`);
+    }
+
+    return identitySuccess(value);
   }
 
   private withIssueDetails(prefix: string, issues: ReadonlyArray<string>): string {
