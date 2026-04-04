@@ -1,6 +1,7 @@
 import { serializeWorkflowTemplateDefinition, createWorkflowTemplateAssetMetadata, WorkflowTemplateStudioIdentity } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
 import { AssetDraftLifecycleStatuses } from "../../domain/studio-shell/StudioShellDomain";
 import { CoreImageStarterWorkflowTemplates } from "../../application/workflow-template-studio/CoreImageStarterWorkflowTemplates";
+import { createWorkflowTemplateContractProjection } from "../../application/workflow-template-studio/WorkflowTemplateContractProjection";
 import type { RegistryService } from "./RegistryService";
 import type { StudioShellService } from "./StudioShellService";
 
@@ -37,6 +38,7 @@ export class WorkflowTemplateBootstrapService {
           summary: template.summary,
           tags: template.tags,
           behaviorKind: "deterministic",
+          contract: createWorkflowTemplateContractProjection(template),
         }),
         dependencies: template.workflowAssets.map((entry) => Object.freeze({
           assetId: entry.assetId,

@@ -10,6 +10,10 @@ import { CompositionAssetContractResolver } from "../../contracts/CompositionAss
 import { SystemDatasetInstancePersistenceService } from "../../system-runtime/SystemDatasetInstancePersistenceService";
 import { createDatasetInstance } from "../../../domain/system-runtime/DatasetInstanceDomain";
 import { createDatasetInstanceImageRecord } from "../../../domain/system-runtime/DatasetInstanceRecordDomain";
+import {
+  ImageManipulationWorkflowTemplateAssetId,
+  ImageManipulationWorkflowTemplateVersionId,
+} from "../../workflow-template-studio/ImageManipulationWorkflowTemplate";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -60,6 +64,51 @@ function createPublishedVersion(input: {
 }
 
 describe("SystemStudioApplicationService", () => {
+  it("resolves core workflow-template component contracts during validation when persisted version metadata lacks a contract", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-root"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new SystemStudioApplicationService(studioShell, repository);
+
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createSystemDraft({
+      sessionId: ensure.session.id,
+      draftId: "draft-root",
+      title: "System Root",
+      content: JSON.stringify({
+        systemSpec: {
+          components: [
+            {
+              componentKind: "composite",
+              alias: "reference-workflow",
+              assetId: ImageManipulationWorkflowTemplateAssetId,
+              versionId: ImageManipulationWorkflowTemplateVersionId,
+              taxonomy: { structuralKind: "composite", semanticRole: "workflow-template", behaviorKind: "deterministic" },
+            },
+          ],
+          inputs: [{ inputId: "sourceImage", valueType: "image-reference", required: true }],
+          outputs: [{ outputId: "editedImages", valueType: "image-metadata-records" }],
+          bindings: [
+            {
+              bindingId: "bind:system-source-to-workflow",
+              source: { scope: "system-input", endpointId: "sourceImage" },
+              target: { scope: "component-input", componentAlias: "reference-workflow", endpointId: "sourceImage" },
+            },
+            {
+              bindingId: "bind:workflow-output-to-system",
+              source: { scope: "component-output", componentAlias: "reference-workflow", endpointId: "images" },
+              target: { scope: "system-output", endpointId: "editedImages" },
+            },
+          ],
+        },
+      }),
+      dependencies: [{ assetId: ImageManipulationWorkflowTemplateAssetId, versionId: ImageManipulationWorkflowTemplateVersionId }],
+    });
+
+    const validation = await service.validateSystemDraft({ draftId: created.draft.id });
+    expect(validation.issues.map((entry) => entry.code)).not.toContain("system-binding-endpoint-not-found");
+  });
+
   it("reuses shared initialize/create/validate/publish flow for system assets with atomic/composite children", async () => {
     const repository = new InMemoryStudioShellRepository();
     await repository.saveAssetVersion(createPublishedVersion({
