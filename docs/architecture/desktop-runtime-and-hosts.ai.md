@@ -77,3 +77,19 @@ The preload bridge uses synchronous IPC and exposes storage/workflow/model-file 
 - Restore merges persisted session overrides on top of hydrated template defaults so runtime windows reopen in a usable context while remaining runnable from defaults when persisted state is missing.
 - Persisted stale/missing binding references are normalized to bounded warning issues (`runtime-window.restore.*`) and stripped from restored selection state, preventing runtime-window crashes.
 - Runtime window lifecycle tests now cover launch normalization, hydration defaults/binding establishment, restore overlay on reopen, stale-reference degradation, and invalid launch-input normalization (`ui/runtime/tests/SystemRuntimeWindowLifecycle.test.ts`).
+
+## AI Loom image manipulation update: runtime repository installer contracts + git installer (stories 9.1-9.2)
+
+- Added a reusable runtime repository installer contract seam at `application/runtime/RuntimeRepositoryInstallerContract.ts`:
+  - install/update/status/validate/diagnostics contracts,
+  - repository source metadata + installed repository metadata,
+  - deterministic install-location key generation for provisioned runtime roots,
+  - normalized operation error/issue contracts.
+- Added `infrastructure/runtime/GitRuntimeRepositoryInstaller.ts` as the concrete Git-backed installer:
+  - deterministic location resolution,
+  - clone/install + fetch/update with revision capture,
+  - safe partial-install recovery for re-entry after interruption,
+  - shared-contract status/validation/diagnostics operations.
+- Added focused tests:
+  - `application/runtime/tests/RuntimeRepositoryInstallerContract.test.ts`
+  - `infrastructure/runtime/tests/GitRuntimeRepositoryInstaller.test.ts`
