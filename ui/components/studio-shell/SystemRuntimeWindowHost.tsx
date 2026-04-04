@@ -7,35 +7,39 @@ import {
   type SystemRuntimeWindowLaunchContract,
 } from "../../../application/system-runtime/SystemRuntimeWindowLaunchContract";
 import {
-  SystemRuntimeWindowHydrationService,
-  type SystemRuntimeHydratedState,
-} from "../../runtime/SystemRuntimeWindowHydrationService";
+  type RuntimeWindowRestoreIssue,
+  SystemRuntimeWindowRestoreService,
+} from "../../runtime/SystemRuntimeWindowRestoreService";
+import type { SystemRuntimeHydratedState } from "../../runtime/SystemRuntimeWindowHydrationService";
 import ImageManipulationRuntimeEditorPanel from "./ImageManipulationRuntimeEditorPanel";
 import { imageManipulationEditorPageAssetDefinition } from "../../studio-shell/studio-assets/ImageManipulationEditorPageAsset";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { StudioShellService } from "../../services/StudioShellService";
+import type { RuntimeWindowSessionState } from "../../runtime/SystemRuntimeWindowSessionPersistenceService";
 
 interface RuntimePageRendererEntry {
   readonly render: (
     context: StudioShellExtensionContext,
     launch: SystemRuntimeWindowLaunchContract,
     hydratedRuntime?: SystemRuntimeHydratedState,
+    restoredSession?: RuntimeWindowSessionState,
   ) => JSX.Element;
 }
 
 const runtimePageRenderers: Readonly<Record<string, RuntimePageRendererEntry>> = Object.freeze({
   [imageManipulationEditorPageAssetDefinition.contract.identity.studioType]: Object.freeze({
-    render: (context, launch, hydratedRuntime) => (
+    render: (context, launch, hydratedRuntime, restoredSession) => (
       <ImageManipulationRuntimeEditorPanel
         context={context}
         runtimeLaunch={launch}
         hydratedRuntime={hydratedRuntime}
+        restoredSession={restoredSession}
       />
     ),
   }),
 });
 
-function parseLaunchContractFromSearch(search: string): {
+export function parseLaunchContractFromSearch(search: string): {
   readonly launchContract?: SystemRuntimeWindowLaunchContract;
   readonly issue?: string;
 } {
@@ -59,7 +63,7 @@ function parseLaunchContractFromSearch(search: string): {
 export default function SystemRuntimeWindowHost(): JSX.Element {
   const location = useLocation();
   const service = useMemo(() => new StudioShellService(), []);
-  const hydrationService = useMemo(() => new SystemRuntimeWindowHydrationService(), []);
+  const restoreService = useMemo(() => new SystemRuntimeWindowRestoreService(), []);
   const parsedLaunch = useMemo(
     () => parseLaunchContractFromSearch(location.search),
     [location.search],
@@ -67,7 +71,8 @@ export default function SystemRuntimeWindowHost(): JSX.Element {
   const launchContract = parsedLaunch.launchContract;
   const [snapshot, setSnapshot] = useState<StudioShellSnapshotReadModel | undefined>();
   const [hydratedRuntime, setHydratedRuntime] = useState<SystemRuntimeHydratedState | undefined>();
-  const [hydrationIssues, setHydrationIssues] = useState<ReadonlyArray<{ readonly code: string; readonly message: string; readonly severity: "warning" | "error"; readonly path?: string }>>([]);
+  const [restoredSession, setRestoredSession] = useState<RuntimeWindowSessionState | undefined>();
+  const [restoreIssues, setRestoreIssues] = useState<ReadonlyArray<RuntimeWindowRestoreIssue>>([]);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
@@ -77,28 +82,31 @@ export default function SystemRuntimeWindowHost(): JSX.Element {
     }
     const response = await service.loadSnapshot(launchContract.resolution.studioId);
     if (!response.ok) {
-      const hydration = hydrationService.hydrate({ launchContract });
-      setHydratedRuntime(hydration.state);
-      setHydrationIssues(hydration.issues);
+      const restore = restoreService.restore({ launchContract });
+      setHydratedRuntime(restore.state);
+      setRestoredSession(restore.persistedSession);
+      setRestoreIssues(restore.issues);
       setError(response.error?.message
-        ?? hydration.issues.find((issue) => issue.severity === "error")?.message
+        ?? restore.issues.find((issue) => issue.severity === "error")?.message
         ?? "Unable to load runtime window studio state.");
       return;
     }
     setSnapshot(response.data);
-    const hydration = hydrationService.hydrate({
+    const restore = restoreService.restore({
       launchContract,
       snapshot: response.data,
     });
-    setHydratedRuntime(hydration.state);
-    setHydrationIssues(hydration.issues);
-    setError(hydration.issues.find((issue) => issue.severity === "error")?.message);
+    setHydratedRuntime(restore.state);
+    setRestoredSession(restore.persistedSession);
+    setRestoreIssues(restore.issues);
+    setError(restore.issues.find((issue) => issue.severity === "error")?.message);
   };
 
   useEffect(() => {
     if (!launchContract) {
       setHydratedRuntime(undefined);
-      setHydrationIssues([]);
+      setRestoredSession(undefined);
+      setRestoreIssues([]);
       setError(
         parsedLaunch.issue === "runtime-window.launch-contract.query-missing"
           ? "Runtime launch data is missing."
@@ -172,27 +180,27 @@ export default function SystemRuntimeWindowHost(): JSX.Element {
           Launch {launchContract.launchId} | target {launchContract.launchTarget.targetKind}
         </span>
       </div>
-      {hydrationIssues.length > 0 ? (
+      {restoreIssues.length > 0 ? (
         <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
-          <strong>Runtime hydration</strong>
-          {hydrationIssues.map((issue) => (
-            <span key={`${issue.code}:${issue.path ?? ""}`} className="ui-text-small ui-text-secondary">
-              [{issue.severity}] {issue.message}
+          <strong>Runtime restore</strong>
+          {restoreIssues.map((issue) => (
+            <span key={`${issue.source}:${issue.code}:${issue.path ?? ""}`} className="ui-text-small ui-text-secondary">
+              [{issue.severity}] [{issue.source}] {issue.message}
             </span>
           ))}
           <details>
-            <summary className="ui-text-small ui-text-secondary">Hydration details</summary>
+            <summary className="ui-text-small ui-text-secondary">Restore details</summary>
             <pre className="ui-text-small">{JSON.stringify({
               launchId: launchContract.launchId,
               resolvedSystemAssetId: hydratedRuntime?.resolvedSystemAsset.assetId,
               resolvedPageBindingId: hydratedRuntime?.resolvedPage.pageBindingId,
               datasetBindingIds: hydratedRuntime?.datasetBindings.map((entry) => entry.bindingId),
-              issueCodes: hydrationIssues.map((issue) => issue.code),
+              issueCodes: restoreIssues.map((issue) => issue.code),
             }, null, 2)}</pre>
           </details>
         </div>
       ) : null}
-      {renderer.render(extensionContext, launchContract, hydratedRuntime)}
+      {renderer.render(extensionContext, launchContract, hydratedRuntime, restoredSession)}
     </section>
   );
 }

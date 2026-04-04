@@ -9,6 +9,7 @@ import { workflowStudioSurfaceAssetDefinition } from "../../studio-shell/studio-
 import { imageManipulationEditorPageAssetDefinition } from "../../studio-shell/studio-assets/ImageManipulationEditorPageAsset";
 import { createImageManipulationRuntimeWindowLaunchRequest } from "../../../application/system-runtime/SystemRuntimeWindowLaunchResolver";
 import { ImageManipulationSystemTemplate } from "../../../application/system-studio/ImageManipulationSystemTemplate";
+import { SystemRuntimeWindowRestoreService } from "../../runtime/SystemRuntimeWindowRestoreService";
 
 interface SystemRuntimeRunPanelProps {
   readonly context: StudioShellExtensionContext;
@@ -21,6 +22,7 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
   const [trace, setTrace] = useState<Awaited<ReturnType<NonNullable<StudioShellExtensionContext["operations"]["getSystemExecutionTrace"]>>>["data"]>();
   const [result, setResult] = useState<Awaited<ReturnType<NonNullable<StudioShellExtensionContext["operations"]["getSystemExecutionResult"]>>>["data"]>();
   const uxRuntimeService = useMemo(() => new UxRuntimeService(), []);
+  const runtimeWindowRestoreService = useMemo(() => new SystemRuntimeWindowRestoreService(), []);
   const [isRunning, setIsRunning] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
@@ -174,14 +176,14 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
             if (!draft?.draftId || !context.operations.launchRuntimeWindow) {
               return;
             }
-            const responsePromise = context.operations.launchRuntimeWindow(
-              createImageManipulationRuntimeWindowLaunchRequest({
+            const launchRequest = createImageManipulationRuntimeWindowLaunchRequest({
                 studioId: context.studioId,
                 draftId: draft.draftId,
                 sessionId: context.snapshot?.activeSessionId,
                 systemAssetId: draft.assetId,
-              }),
-            );
+              });
+            const reopenAwareRequest = runtimeWindowRestoreService.buildReopenRequest(launchRequest);
+            const responsePromise = context.operations.launchRuntimeWindow(reopenAwareRequest);
             void responsePromise.then((response) => {
               if (!response.ok || !response.data) {
                 setMessage(response.error?.message ?? "Could not open the runtime window.");

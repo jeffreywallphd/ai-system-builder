@@ -192,3 +192,11 @@ Direction 3 trust updates now also use local-first persistence seams for MCP gov
 - Runtime-window host rendering now composes a dedicated hydration stage in renderer runtime seams (`SystemRuntimeWindowHydrationService`) after launch-contract parsing and snapshot loading, keeping host transport thin while moving launch-state normalization into one inspectable UI-runtime service.
 - Hydrated runtime state now stays contract-driven and storage-safe: dataset/storage identity is carried as logical refs/instance ids from launch + serialization context and not converted into renderer-facing filesystem paths.
 - Runtime startup now surfaces normalized hydration issues (warning/error) for invalid/missing launch dependencies instead of silent failure, while still allowing bounded fallback hydration from launch defaults when snapshot data is unavailable.
+
+## AI Loom image manipulation update: runtime reopen and restore lifecycle hardening (stories 8.7-8.8)
+
+- Runtime-window relaunch now reuses persisted runtime-session context through a single reopen preparation seam (`SystemRuntimeWindowRestoreService.buildReopenRequest`) that augments normalized launch contracts with prior session id and persisted runtime-safe state overlays.
+- Runtime-window host restore now composes launch resolution, hydration, persisted-session lookup, and stale-reference handling in one orchestrator (`ui/runtime/SystemRuntimeWindowRestoreService.ts`) instead of introducing a parallel restore stack.
+- Restored state is layered over hydrated defaults so runtime windows remain runnable without manual reconfiguration while still recovering prior property/selection/panel working context.
+- Persisted stale references now degrade safely: unresolved binding references are filtered and reported as normalized restore warnings (`runtime-window.restore.*`) rather than crashing runtime-window startup.
+- Lifecycle coverage now includes launch payload normalization, hydration/run-default initialization, restore success on reopen, stale-reference degradation, and invalid launch-query normalization (`ui/runtime/tests/SystemRuntimeWindowLifecycle.test.ts`).

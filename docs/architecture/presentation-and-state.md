@@ -934,3 +934,11 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Runtime-window execution request construction is now shared in a non-component seam (`ui/runtime/ReferenceImageExecutionRequestBuilder.ts`) so runtime panels do not own workflow-input mapping internals.
 - Runtime-window session overrides now persist through a dedicated persistence seam (`ui/runtime/SystemRuntimeWindowSessionPersistenceService.ts`) that stores serializable logical state only (property config/preset, selection snapshot, preview/gallery focus, advanced-panel disclosure, launch/session/page context references).
 - Runtime editor startup now layers persisted runtime-window overrides on top of hydrated defaults and continues to refresh output collections in-place after execution, so reopen/restore keeps in-progress context without raw-path leakage.
+
+## AI Loom image manipulation update: runtime-window reopen/restore orchestration + lifecycle tests (stories 8.7-8.8)
+
+- Runtime-window restore now uses a single orchestrator (`ui/runtime/SystemRuntimeWindowRestoreService.ts`) that composes launch contract input, hydration, persisted-session lookup, and stale-reference normalization.
+- Runtime host boot (`SystemRuntimeWindowHost`) now surfaces restore issues with explicit source tags (`launch`, `hydration`, `session-restore`) while preserving non-fatal startup continuity.
+- Runtime-window relaunch from System Runtime Run panel now routes through reopen-aware launch preparation (`buildReopenRequest`) so existing runtime session identity and persisted logical runtime state are carried forward on relaunch.
+- `ImageManipulationRuntimeEditorPanel` now accepts host-resolved restored session context while keeping the established session persistence seam for ongoing updates.
+- Runtime lifecycle tests now cover launch payload normalization, hydration defaults + dataset/storage binding establishment, reopen restore success, stale-reference degradation, and invalid launch-query normalization (`ui/runtime/tests/SystemRuntimeWindowLifecycle.test.ts`).

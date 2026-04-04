@@ -34,6 +34,7 @@ import {
   SystemRuntimeWindowSessionPersistenceService,
   type RuntimeWindowSessionSelectionState,
   type RuntimeWindowSessionScope,
+  type RuntimeWindowSessionState,
 } from "../../runtime/SystemRuntimeWindowSessionPersistenceService";
 import {
   createIdleImageManipulationRunLifecycleState,
@@ -177,6 +178,7 @@ export interface ImageManipulationRuntimeEditorPanelProps {
   readonly context: StudioShellExtensionContext;
   readonly runtimeLaunch?: SystemRuntimeWindowLaunchContract;
   readonly hydratedRuntime?: SystemRuntimeHydratedState;
+  readonly restoredSession?: RuntimeWindowSessionState;
 }
 
 interface ImageCollections {
@@ -250,6 +252,7 @@ export function ImageManipulationRuntimeEditorPanel({
   context,
   runtimeLaunch,
   hydratedRuntime,
+  restoredSession,
 }: ImageManipulationRuntimeEditorPanelProps): JSX.Element {
   const draft = context.snapshot?.draft;
   const isImageRuntimeTarget = (hydratedRuntime?.resolvedPage.pageBindingId ?? runtimeLaunch?.launchTarget.pageBindingId)
@@ -276,8 +279,8 @@ export function ImageManipulationRuntimeEditorPanel({
     });
   }, [draft?.draftId, hydratedRuntime, runtimeLaunch, sessionPersistence]);
   const persistedSession = useMemo(
-    () => (sessionScope ? sessionPersistence.load(sessionScope) : undefined),
-    [sessionPersistence, sessionScope],
+    () => restoredSession ?? (sessionScope ? sessionPersistence.load(sessionScope) : undefined),
+    [restoredSession, sessionPersistence, sessionScope],
   );
   const initialPresetId = persistedSession?.property.presetId
     ?? hydratedRuntime?.propertySchema.presetId

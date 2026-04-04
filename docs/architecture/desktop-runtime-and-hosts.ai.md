@@ -69,3 +69,11 @@ The preload bridge uses synchronous IPC and exposes storage/workflow/model-file 
 - Runtime-window renderer flow now includes a dedicated hydration seam (`ui/runtime/SystemRuntimeWindowHydrationService.ts`) layered after launch-contract parsing/snapshot read; host IPC remains thin and contract transport stays unchanged.
 - Hydrated runtime state stays logical-reference-first (dataset instance ids, storage instance refs, binding ids) and avoids UI-facing raw path exposure.
 - Hydration now emits normalized warning/error issues for incomplete or invalid launch/snapshot inputs, with bounded fallback hydration from launch/template defaults.
+
+## AI Loom image manipulation update: runtime reopen + restore lifecycle hardening (stories 8.7-8.8)
+
+- Runtime-window launch reopen now composes persisted logical runtime session state into launch contracts before host handoff (`SystemRuntimeWindowRestoreService.buildReopenRequest`), including runtime session id carry-forward and persisted runtime-state overlays (property, selection, panel state).
+- Runtime-window host startup now uses one restore orchestrator seam (`ui/runtime/SystemRuntimeWindowRestoreService.ts`) that composes launch-contract parsing, hydration, persisted-session lookup, and stale-reference normalization instead of parallel restore paths.
+- Restore merges persisted session overrides on top of hydrated template defaults so runtime windows reopen in a usable context while remaining runnable from defaults when persisted state is missing.
+- Persisted stale/missing binding references are normalized to bounded warning issues (`runtime-window.restore.*`) and stripped from restored selection state, preventing runtime-window crashes.
+- Runtime window lifecycle tests now cover launch normalization, hydration defaults/binding establishment, restore overlay on reopen, stale-reference degradation, and invalid launch-input normalization (`ui/runtime/tests/SystemRuntimeWindowLifecycle.test.ts`).
