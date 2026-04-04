@@ -25,7 +25,10 @@ import { ComfyRuntimeInstallationAssetId } from "../runtime/ComfyRuntimeInstalla
 import { ComfyRuntimeWorkflowProfiles } from "../runtime/ComfyRuntimeRequirements";
 import { ComfyRuntimeSystemDiagnosticsVersion } from "../runtime/ComfyRuntimeSystemDiagnostics";
 import { ComfyImageManipulationDatasetBindingAssetId } from "./ComfyImageManipulationDatasetBindingAsset";
-import { ComfyImageManipulationPropertyMappingAssetId } from "./ComfyImageManipulationPropertyMappingAsset";
+import {
+  ComfyImageManipulationPropertyMappingAsset,
+  ComfyImageManipulationPropertyMappingAssetId,
+} from "./ComfyImageManipulationPropertyMappingAsset";
 
 export const ImageManipulationRuntimeTargets = Object.freeze({
   runtimeEnvironment: "comfyui",
@@ -52,6 +55,8 @@ export const ImageManipulationTemplateValidationCategories = Object.freeze({
   storageBindings: "storage-bindings",
   executionAdapter: "execution-adapter",
   runnableDefaults: "runnable-defaults",
+  pageWorkflowRuntimeWiring: "page-workflow-runtime-wiring",
+  sharedStorageCompatibility: "shared-storage-compatibility",
 } as const);
 
 export type ImageManipulationTemplateValidationCategory =
@@ -111,6 +116,21 @@ const requiredWorkflowDefaultParameters = Object.freeze([
 const requiredTemplateEmits = Object.freeze(["sourceImageSelected", "runRequested"]);
 const requiredExecutionAdapterHints = Object.freeze(["comfy-base-graph-required"]);
 const requiredOutputHandlingHints = Object.freeze(["resolve-output-via-storage-instance-binding"]);
+const requiredPageRuntimeConsumes = Object.freeze(["editedImages"]);
+const requiredExecutionSchemaFieldToWorkflowParameter = Object.freeze({
+  "prompts.positivePrompt": "positivePrompt",
+  "generation.steps": "steps",
+  "generation.cfg": "cfg",
+  "generation.denoiseStrength": "denoiseStrength",
+  "generation.sampler": "sampler",
+  "generation.scheduler": "scheduler",
+  "generation.seed": "seed",
+  "output.resultCount": "resultCount",
+  "models.checkpointModel": "checkpointModel",
+  "models.vaeModel": "vaeModel",
+  "faceId.enabled": "faceIdEnabled",
+  "faceId.referenceBindings": "faceIdReferenceBindings",
+} as const);
 
 function looksLikeRawPath(value: string): boolean {
   const normalized = value.trim();
@@ -158,6 +178,8 @@ function mapCategoryToLayer(category: ImageManipulationTemplateValidationCategor
     category === ImageManipulationTemplateValidationCategories.runtimeMetadata
     || category === ImageManipulationTemplateValidationCategories.executionAdapter
     || category === ImageManipulationTemplateValidationCategories.runnableDefaults
+    || category === ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring
+    || category === ImageManipulationTemplateValidationCategories.sharedStorageCompatibility
   ) {
     return AssetValidationLayers.compatibility;
   }
@@ -184,6 +206,320 @@ function parseBuildTemplateContent(content: string): Readonly<Record<string, unk
     return parsed as Readonly<Record<string, unknown>>;
   } catch {
     return undefined;
+  }
+}
+
+function validatePageWorkflowRuntimeWiring(input: {
+  readonly template: ImageManipulationSystemTemplateDefinition;
+  readonly workflowTemplate: WorkflowTemplateDefinition;
+  readonly propertySchema: ComfyImageManipulationPropertySchemaDefinition;
+  readonly requiredOutputDataset?: ImageManipulationSystemTemplateDefinition["datasetInstances"][number];
+  readonly optionalReferenceDataset?: ImageManipulationSystemTemplateDefinition["datasetInstances"][number];
+  readonly issues: ImageManipulationTemplateValidationIssue[];
+}): void {
+  if (!input.template.uiBindingBoundary.emits.includes("runRequested")) {
+    input.issues.push(createIssue({
+      category: ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring,
+      code: "page-execution-action-binding-missing",
+      severity: "error",
+      message: "Runtime page must expose a runRequested action binding for execution.",
+      path: "uiBindingBoundary.emits",
+    }));
+  }
+  if (!input.template.compositionBindings.runtimeBindingId.startsWith("runtime:")) {
+    input.issues.push(createIssue({
+      category: ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring,
+      code: "page-runtime-binding-invalid",
+      severity: "error",
+      message: "Runtime binding id must use runtime:* logical identity form.",
+      path: "compositionBindings.runtimeBindingId",
+    }));
+  }
+
+  const fieldByPath = new Map<string, { readonly id: string; readonly required: boolean }>();
+  for (const group of input.propertySchema.fields) {
+    for (const entry of group.entries) {
+      if (fieldByPath.has(entry.path)) {
+        input.issues.push(createIssue({
+          category: ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring,
+          code: "property-schema-field-path-duplicate",
+          severity: "error",
+          message: `Property schema path '${entry.path}' is duplicated.`,
+          path: `propertySchema.fields.${group.groupId}.${entry.id}`,
+        }));
+        continue;
+      }
+      fieldByPath.set(entry.path, { id: entry.id, required: entry.required });
+    }
+  }
+
+  const mappingBySchemaPath = new Set(ComfyImageManipulationPropertyMappingAsset.bindings.map((entry) => entry.schemaPath));
+  const workflowParameterMappings = new Set(
+    input.workflowTemplate.composition?.parameterMappings.map((entry) => entry.parameterId) ?? [],
+  );
+  for (const [schemaPath, parameterId] of Object.entries(requiredExecutionSchemaFieldToWorkflowParameter)) {
+    if (!fieldByPath.has(schemaPath)) {
+      input.issues.push(createIssue({
+        category: ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring,
+        code: "property-editor-field-schema-missing",
+        severity: "error",
+        message: `Execution field '${schemaPath}' is expected by the editor/runtime contract but is not defined in property schema.`,
+        path: `propertySchema.fields.${schemaPath}`,
+      }));
+    }
+    if (!mappingBySchemaPath.has(schemaPath)) {
+      input.issues.push(createIssue({
+        category: ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring,
+        code: "schema-field-property-mapping-missing",
+        severity: "error",
+        message: `Schema field '${schemaPath}' is not mapped into workflow graph overrides.`,
+        path: `propertyMapping.bindings.${schemaPath}`,
+      }));
+    }
+    if (!workflowParameterMappings.has(parameterId)) {
+      input.issues.push(createIssue({
+        category: ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring,
+        code: "schema-field-workflow-mapping-missing",
+        severity: "error",
+        message: `Schema-backed execution field '${schemaPath}' is not mapped to workflow parameter '${parameterId}'.`,
+        path: "workflowTemplate.composition.parameterMappings",
+        metadata: { schemaPath, parameterId },
+      }));
+    }
+  }
+
+  const outputBinding = input.workflowTemplate.composition?.outputBindings.find((entry) => (
+    entry.workflowOutputId === input.template.primaryWorkflowAsset.datasetBindings.workflowOutputId
+  ));
+  if (!outputBinding) {
+    input.issues.push(createIssue({
+      category: ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring,
+      code: "execution-output-binding-missing",
+      severity: "error",
+      message: "Execution output binding required by runtime gallery/preview flow is missing.",
+      path: "workflowTemplate.composition.outputBindings",
+    }));
+  } else {
+    if (input.requiredOutputDataset && outputBinding.targetDatasetAssetId !== input.requiredOutputDataset.datasetAssetId) {
+      input.issues.push(createIssue({
+        category: ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring,
+        code: "execution-output-target-dataset-mismatch",
+        severity: "error",
+        message: "Execution output target dataset is not aligned with the template output dataset binding.",
+        path: `workflowTemplate.composition.outputBindings.${outputBinding.bindingId}.targetDatasetAssetId`,
+        metadata: {
+          expected: input.requiredOutputDataset.datasetAssetId,
+          actual: outputBinding.targetDatasetAssetId,
+        },
+      }));
+    }
+    if (!outputBinding.targetStorageBindingId?.trim()) {
+      input.issues.push(createIssue({
+        category: ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring,
+        code: "execution-output-storage-binding-missing",
+        severity: "error",
+        message: "Execution output binding must declare a storage binding id for preview/gallery retrieval.",
+        path: `workflowTemplate.composition.outputBindings.${outputBinding.bindingId}.targetStorageBindingId`,
+      }));
+    }
+  }
+
+  for (const requiredConsume of requiredPageRuntimeConsumes) {
+    if (!input.template.uiBindingBoundary.consumes.includes(requiredConsume)) {
+      input.issues.push(createIssue({
+        category: ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring,
+        code: "preview-gallery-consume-binding-missing",
+        severity: "error",
+        message: `Runtime page is missing required consume binding '${requiredConsume}' for preview/gallery flow.`,
+        path: "uiBindingBoundary.consumes",
+      }));
+    }
+  }
+  if (
+    input.template.primaryWorkflowAsset.datasetBindings.outputDatasetInstanceBindingId
+    !== input.template.compositionBindings.outputDatasetBindingId
+  ) {
+    input.issues.push(createIssue({
+      category: ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring,
+      code: "preview-gallery-output-dataset-binding-mismatch",
+      severity: "error",
+      message: "Output dataset binding used by workflow execution does not match page preview/gallery binding.",
+      path: "primaryWorkflowAsset.datasetBindings.outputDatasetInstanceBindingId",
+    }));
+  }
+  if (
+    !input.template.workflowBindingBoundary.outputIds.includes(
+      input.template.primaryWorkflowAsset.datasetBindings.workflowOutputId,
+    )
+  ) {
+    input.issues.push(createIssue({
+      category: ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring,
+      code: "workflow-output-boundary-unresolved",
+      severity: "error",
+      message: "Workflow output used for execution is not exposed in workflow binding boundary.",
+      path: "workflowBindingBoundary.outputIds",
+    }));
+  }
+  if (input.requiredOutputDataset && input.requiredOutputDataset.storageBindingArea !== "output") {
+    input.issues.push(createIssue({
+      category: ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring,
+      code: "preview-gallery-output-storage-area-invalid",
+      severity: "error",
+      message: "Output dataset binding must route through the 'output' storage area for gallery retrieval.",
+      path: `datasetInstances.${input.requiredOutputDataset.bindingId}.storageBindingArea`,
+    }));
+  }
+  if (input.optionalReferenceDataset && input.optionalReferenceDataset.role !== DatasetInstanceRoles.inputStore) {
+    input.issues.push(createIssue({
+      category: ImageManipulationTemplateValidationCategories.pageWorkflowRuntimeWiring,
+      code: "selection-reference-dataset-role-invalid",
+      severity: "error",
+      message: "Reference selection dataset must use input-store role for runtime selection flow.",
+      path: `datasetInstances.${input.optionalReferenceDataset.bindingId}.role`,
+    }));
+  }
+}
+
+function validateSharedStorageCompatibility(input: {
+  readonly template: ImageManipulationSystemTemplateDefinition;
+  readonly workflowTemplate: WorkflowTemplateDefinition;
+  readonly issues: ImageManipulationTemplateValidationIssue[];
+}): void {
+  for (const datasetBinding of input.template.datasetInstances) {
+    if (looksLikeRawPath(datasetBinding.instanceId)) {
+      input.issues.push(createIssue({
+        category: ImageManipulationTemplateValidationCategories.sharedStorageCompatibility,
+        code: "dataset-binding-filesystem-path-forbidden",
+        severity: "error",
+        message: `Dataset binding '${datasetBinding.bindingId}' must use logical dataset instance identity, not raw filesystem paths.`,
+        path: `datasetInstances.${datasetBinding.bindingId}.instanceId`,
+      }));
+    }
+    const normalizedInstanceId = datasetBinding.instanceId.toLowerCase();
+    if (normalizedInstanceId.includes("/systems/") || normalizedInstanceId.includes("\\systems\\")) {
+      input.issues.push(createIssue({
+        category: ImageManipulationTemplateValidationCategories.sharedStorageCompatibility,
+        code: "dataset-binding-system-path-assumption-forbidden",
+        severity: "error",
+        message: `Dataset binding '${datasetBinding.bindingId}' assumes system-owned filesystem layout.`,
+        path: `datasetInstances.${datasetBinding.bindingId}.instanceId`,
+      }));
+    }
+  }
+
+  const outputBindings = input.workflowTemplate.composition?.outputBindings ?? [];
+  for (const outputBinding of outputBindings) {
+    if (!outputBinding.targetStorageInstanceRef?.trim()) {
+      input.issues.push(createIssue({
+        category: ImageManipulationTemplateValidationCategories.sharedStorageCompatibility,
+        code: "storage-reference-shape-incomplete",
+        severity: "error",
+        message: `Workflow output binding '${outputBinding.bindingId}' must declare a logical storage-instance reference.`,
+        path: `workflowTemplate.composition.outputBindings.${outputBinding.bindingId}.targetStorageInstanceRef`,
+      }));
+      continue;
+    }
+    if (looksLikeRawPath(outputBinding.targetStorageInstanceRef)) {
+      input.issues.push(createIssue({
+        category: ImageManipulationTemplateValidationCategories.sharedStorageCompatibility,
+        code: "workflow-output-storage-path-forbidden",
+        severity: "error",
+        message: `Workflow output binding '${outputBinding.bindingId}' cannot use raw storage paths.`,
+        path: `workflowTemplate.composition.outputBindings.${outputBinding.bindingId}.targetStorageInstanceRef`,
+      }));
+      continue;
+    }
+    try {
+      const parsed = parseStorageLogicalReference(outputBinding.targetStorageInstanceRef);
+      const normalizedInstanceId = parsed.instanceId.toLowerCase();
+      if (normalizedInstanceId.includes("/systems/") || normalizedInstanceId.includes("\\systems\\")) {
+        input.issues.push(createIssue({
+          category: ImageManipulationTemplateValidationCategories.sharedStorageCompatibility,
+          code: "workflow-output-system-owned-storage-assumption-forbidden",
+          severity: "error",
+          message: `Workflow output binding '${outputBinding.bindingId}' cannot assume /systems/* storage ownership.`,
+          path: `workflowTemplate.composition.outputBindings.${outputBinding.bindingId}.targetStorageInstanceRef`,
+        }));
+      }
+    } catch (error) {
+      input.issues.push(createIssue({
+        category: ImageManipulationTemplateValidationCategories.sharedStorageCompatibility,
+        code: "storage-reference-shape-unresolvable",
+        severity: "error",
+        message: error instanceof Error ? error.message : "Storage reference must use storage-instance:// logical form.",
+        path: `workflowTemplate.composition.outputBindings.${outputBinding.bindingId}.targetStorageInstanceRef`,
+      }));
+    }
+  }
+
+  const sharedStorageInstanceId = "storage-instance:shared-image-runtime";
+  const sharedStorageInstanceRef = "storage-instance://storage-instance%3Ashared-image-runtime";
+  const storageBindingByArea = Object.freeze({
+    input: Object.freeze({
+      storageInstanceId: sharedStorageInstanceId,
+      storageInstanceRef: sharedStorageInstanceRef,
+      bindingId: "storage-binding:shared-image-runtime:input",
+      bindingReference: `${sharedStorageInstanceRef}/input`,
+    }),
+    output: Object.freeze({
+      storageInstanceId: sharedStorageInstanceId,
+      storageInstanceRef: sharedStorageInstanceRef,
+      bindingId: "storage-binding:shared-image-runtime:output",
+      bindingReference: `${sharedStorageInstanceRef}/output`,
+    }),
+    reference: Object.freeze({
+      storageInstanceId: sharedStorageInstanceId,
+      storageInstanceRef: sharedStorageInstanceRef,
+      bindingId: "storage-binding:shared-image-runtime:reference",
+      bindingReference: `${sharedStorageInstanceRef}/reference`,
+    }),
+  });
+  const primary = buildImageManipulationDatasetInstanceRequests("system:image-manipulation", {
+    includeOptionalReferenceDatasets: true,
+    storageBindingByArea,
+  });
+  const secondary = buildImageManipulationDatasetInstanceRequests("system:embedded:reference-image", {
+    includeOptionalReferenceDatasets: true,
+    storageBindingByArea,
+  });
+  if (primary.length !== secondary.length) {
+    input.issues.push(createIssue({
+      category: ImageManipulationTemplateValidationCategories.sharedStorageCompatibility,
+      code: "shared-storage-cross-system-resolution-incompatible",
+      severity: "error",
+      message: "Storage reference resolution must be stable across systems/subsystems using the same shared storage instance.",
+      path: "buildImageManipulationDatasetInstanceRequests",
+    }));
+    return;
+  }
+  for (let index = 0; index < primary.length; index += 1) {
+    const primaryBinding = primary[index];
+    const secondaryBinding = secondary[index];
+    const primaryStorageBinding = primaryBinding?.storageBindings?.[0];
+    const secondaryStorageBinding = secondaryBinding?.storageBindings?.[0];
+    if (!primaryStorageBinding || !secondaryStorageBinding) {
+      input.issues.push(createIssue({
+        category: ImageManipulationTemplateValidationCategories.sharedStorageCompatibility,
+        code: "storage-reference-shape-incomplete",
+        severity: "error",
+        message: "Provisioning request must include complete logical storage bindings.",
+        path: "buildImageManipulationDatasetInstanceRequests.storageBindings",
+      }));
+      continue;
+    }
+    if (
+      primaryStorageBinding.storageInstanceId !== secondaryStorageBinding.storageInstanceId
+      || primaryStorageBinding.storageInstanceRef !== secondaryStorageBinding.storageInstanceRef
+      || primaryStorageBinding.bindingReference !== secondaryStorageBinding.bindingReference
+    ) {
+      input.issues.push(createIssue({
+        category: ImageManipulationTemplateValidationCategories.sharedStorageCompatibility,
+        code: "shared-storage-cross-system-resolution-incompatible",
+        severity: "error",
+        message: "Cross-system provisioning produced incompatible shared storage references.",
+        path: "buildImageManipulationDatasetInstanceRequests.storageBindings",
+      }));
+    }
   }
 }
 
@@ -847,6 +1183,20 @@ export function validateImageManipulationTemplateCompleteness(
       }
     }
   }
+
+  validatePageWorkflowRuntimeWiring({
+    template,
+    workflowTemplate,
+    propertySchema,
+    requiredOutputDataset,
+    optionalReferenceDataset,
+    issues,
+  });
+  validateSharedStorageCompatibility({
+    template,
+    workflowTemplate,
+    issues,
+  });
 
   const status = issues.some((issue) => issue.severity === "error")
     ? AssetValidationStatuses.invalid
