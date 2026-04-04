@@ -13,16 +13,24 @@ import type {
   IdentityCredentialHistoryQuery,
   IdentityCredentialMaterialRecord,
   IdentityIdNamespace,
+  IdentityMutationOutcome,
+  IdentityOperationResult,
   IdentityPrincipalLookup,
   IdentityProviderSubjectReference,
 } from "../../contracts/IdentityApplicationContracts";
-import { IdentityCredentialMaterialStatuses, IdentityPrincipalLookupKinds } from "../../contracts/IdentityApplicationContracts";
+import {
+  IdentityCredentialMaterialStatuses,
+  IdentityErrorCodes,
+  IdentityPrincipalLookupKinds,
+  identityFailure,
+  identitySuccess,
+} from "../../contracts/IdentityApplicationContracts";
 import type { ICredentialMaterialRepository } from "../ports/ICredentialMaterialRepository";
 import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../ports/IIdentityPersistenceRepository";
-import { IdentityBootstrapBlockedError, IdentityBootstrapInvalidRequestError, IdentityBootstrapInvalidStateError, IdentityBootstrapService } from "../services/IdentityBootstrapService";
+import { IdentityBootstrapService } from "../services/IdentityBootstrapService";
 import { IdentityPolicyService } from "../services/IdentityPolicyService";
 
 class InMemoryIdentityBootstrapAdapter
@@ -129,10 +137,18 @@ class InMemoryIdentityBootstrapAdapter
     return record;
   }
 
-  public async markCredentialMaterialSuperseded(recordId: string, supersededAt: string): Promise<boolean> {
+  public async markCredentialMaterialSuperseded(
+    recordId: string,
+    supersededAt: string,
+  ): Promise<IdentityOperationResult<IdentityMutationOutcome, "identity-invalid-request">> {
     const record = this.credentialMaterial.get(recordId.trim());
     if (!record) {
-      return false;
+      return identityFailure({
+        code: IdentityErrorCodes.invalidRequest,
+        message: "Credential material record was not found.",
+        boundary: "infrastructure",
+        retryable: false,
+      });
     }
 
     this.credentialMaterial.set(record.id, {
@@ -141,7 +157,7 @@ class InMemoryIdentityBootstrapAdapter
       supersededAt,
       updatedAt: supersededAt,
     });
-    return true;
+    return identitySuccess({ changed: true });
   }
 }
 
@@ -171,19 +187,23 @@ describe("IdentityBootstrapService", () => {
       },
     });
 
-    expect(result.userIdentityId).toBe("user-identity:1");
-    expect(result.credentialMaterialId).toBe("credential-material:2");
-    expect(result.providerId).toBe("provider:local-password");
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("expected bootstrap success");
+    }
+    expect(result.value.userIdentityId).toBe("user-identity:1");
+    expect(result.value.credentialMaterialId).toBe("credential-material:2");
+    expect(result.value.providerId).toBe("provider:local-password");
 
-    const user = await adapter.findUserIdentityById(result.userIdentityId);
+    const user = await adapter.findUserIdentityById(result.value.userIdentityId);
     expect(user?.status).toBe("active");
     expect(user?.username).toBe("admin.user");
     expect(user?.linkedProviders).toHaveLength(1);
     expect(user?.linkedProviders[0]?.providerId).toBe("provider:local-password");
 
     const credential = await adapter.getActiveCredentialMaterial({
-      providerId: result.providerId,
-      providerSubject: result.providerSubject,
+      providerId: result.value.providerId,
+      providerSubject: result.value.providerSubject,
     });
     expect(credential?.hashAlgorithm).toBe("argon2id");
     expect(credential?.hashValue).toBe("argon2id$v=19$m=65536,t=3,p=4$seed$safehashvalue");
@@ -197,34 +217,47 @@ describe("IdentityBootstrapService", () => {
     const adapter = new InMemoryIdentityBootstrapAdapter();
     const service = createService(adapter);
 
-    await service.bootstrapFirstLocalAdmin({
+    const firstBootstrap = await service.bootstrapFirstLocalAdmin({
       username: "admin",
       credential: {
         hashAlgorithm: "argon2id",
         hashValue: "hash:value:one",
       },
     });
+    expect(firstBootstrap.ok).toBe(true);
 
-    await expect(service.bootstrapFirstLocalAdmin({
+    const secondBootstrap = await service.bootstrapFirstLocalAdmin({
       username: "admin-two",
       credential: {
         hashAlgorithm: "argon2id",
         hashValue: "hash:value:two",
       },
-    })).rejects.toBeInstanceOf(IdentityBootstrapBlockedError);
+    });
+    expect(secondBootstrap).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: "identity-duplicate",
+      }),
+    });
   });
 
   it("rejects bootstrap requests with missing credential material", async () => {
     const adapter = new InMemoryIdentityBootstrapAdapter();
     const service = createService(adapter);
 
-    await expect(service.bootstrapFirstLocalAdmin({
+    const bootstrap = await service.bootstrapFirstLocalAdmin({
       username: "admin",
       credential: {
         hashAlgorithm: "   ",
         hashValue: "   ",
       },
-    })).rejects.toBeInstanceOf(IdentityBootstrapInvalidRequestError);
+    });
+    expect(bootstrap).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: "identity-invalid-credentials",
+      }),
+    });
 
     expect(await adapter.countUserIdentities()).toBe(0);
   });
@@ -243,13 +276,20 @@ describe("IdentityBootstrapService", () => {
 
     const service = createService(adapter);
 
-    await expect(service.bootstrapFirstLocalAdmin({
+    const bootstrap = await service.bootstrapFirstLocalAdmin({
       username: "admin",
       credential: {
         hashAlgorithm: "argon2id",
         hashValue: "hash:value:one",
       },
-    })).rejects.toBeInstanceOf(IdentityBootstrapInvalidStateError);
+    });
+
+    expect(bootstrap).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: "identity-unsupported-provider",
+      }),
+    });
   });
 
   it("blocks bootstrap when identity state is pre-seeded", async () => {
@@ -276,12 +316,18 @@ describe("IdentityBootstrapService", () => {
     }));
 
     const service = createService(adapter);
-    await expect(service.bootstrapFirstLocalAdmin({
+    const bootstrap = await service.bootstrapFirstLocalAdmin({
       username: "new-admin",
       credential: {
         hashAlgorithm: "argon2id",
         hashValue: "hash:value:new",
       },
-    })).rejects.toBeInstanceOf(IdentityBootstrapBlockedError);
+    });
+    expect(bootstrap).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: "identity-duplicate",
+      }),
+    });
   });
 });

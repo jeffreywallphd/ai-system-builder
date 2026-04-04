@@ -7,9 +7,16 @@ import {
   createCredentialPolicy,
   createLocalCredentialState,
   createUserIdentity,
+  type AuthProvider,
 } from "../../../src/domain/identity/IdentityDomain";
 import {
   IdentityCredentialMaterialStatuses,
+  IdentityErrorBoundaries,
+  IdentityErrorCodes,
+  identityFailure,
+  identitySuccess,
+  type IdentityOperationError,
+  type IdentityOperationResult,
   IdentityIdNamespaces,
 } from "../../contracts/IdentityApplicationContracts";
 import type { ICredentialMaterialRepository } from "../ports/ICredentialMaterialRepository";
@@ -19,45 +26,13 @@ import type { IIdentityLookupRepository } from "../ports/IIdentityLookupReposito
 import type { IIdentityPersistenceRepository } from "../ports/IIdentityPersistenceRepository";
 import { IdentityPolicyService } from "./IdentityPolicyService";
 
-export const IdentityBootstrapErrorCodes = Object.freeze({
-  blocked: "identity-bootstrap-blocked",
-  invalidRequest: "identity-bootstrap-invalid-request",
-  invalidState: "identity-bootstrap-invalid-state",
-});
-
 export type IdentityBootstrapErrorCode =
-  typeof IdentityBootstrapErrorCodes[keyof typeof IdentityBootstrapErrorCodes];
-
-export class IdentityBootstrapError extends Error {
-  public readonly code: IdentityBootstrapErrorCode;
-
-  constructor(code: IdentityBootstrapErrorCode, message: string) {
-    super(message);
-    this.name = "IdentityBootstrapError";
-    this.code = code;
-  }
-}
-
-export class IdentityBootstrapBlockedError extends IdentityBootstrapError {
-  constructor(message = "Identity bootstrap is blocked because identity state already exists.") {
-    super(IdentityBootstrapErrorCodes.blocked, message);
-    this.name = "IdentityBootstrapBlockedError";
-  }
-}
-
-export class IdentityBootstrapInvalidRequestError extends IdentityBootstrapError {
-  constructor(message: string) {
-    super(IdentityBootstrapErrorCodes.invalidRequest, message);
-    this.name = "IdentityBootstrapInvalidRequestError";
-  }
-}
-
-export class IdentityBootstrapInvalidStateError extends IdentityBootstrapError {
-  constructor(message: string) {
-    super(IdentityBootstrapErrorCodes.invalidState, message);
-    this.name = "IdentityBootstrapInvalidStateError";
-  }
-}
+  | typeof IdentityErrorCodes.duplicateIdentity
+  | typeof IdentityErrorCodes.invalidCredentials
+  | typeof IdentityErrorCodes.policyViolation
+  | typeof IdentityErrorCodes.unsupportedProvider
+  | typeof IdentityErrorCodes.invalidRequest
+  | typeof IdentityErrorCodes.invalidState;
 
 export interface BootstrapCredentialMaterialInput {
   readonly hashAlgorithm: string;
@@ -117,24 +92,47 @@ export class IdentityBootstrapService {
     });
   }
 
-  public async bootstrapFirstLocalAdmin(input: BootstrapLocalAdminInput): Promise<IdentityBootstrapResult> {
+  public async bootstrapFirstLocalAdmin(
+    input: BootstrapLocalAdminInput,
+  ): Promise<IdentityOperationResult<IdentityBootstrapResult, IdentityBootstrapErrorCode>> {
     const status = await this.getBootstrapStatus();
     if (!status.canBootstrap) {
-      throw new IdentityBootstrapBlockedError();
+      return this.failure(
+        IdentityErrorCodes.duplicateIdentity,
+        "Identity bootstrap is blocked because identity state already exists.",
+        {
+          userIdentityCount: status.userIdentityCount,
+        },
+      );
     }
 
-    const providerId = this.requireNonEmpty(
+    const providerIdResult = this.requireNonEmpty(
       input.providerId ?? IdentityBootstrapDefaults.localProviderId,
       "providerId",
     );
-    const providerDisplayName = this.requireNonEmpty(
+    if (!providerIdResult.ok) {
+      return providerIdResult;
+    }
+
+    const providerDisplayNameResult = this.requireNonEmpty(
       input.providerDisplayName ?? IdentityBootstrapDefaults.localProviderDisplayName,
       "providerDisplayName",
     );
-    const credentialPolicyId = this.requireNonEmpty(
+    if (!providerDisplayNameResult.ok) {
+      return providerDisplayNameResult;
+    }
+
+    const credentialPolicyIdResult = this.requireNonEmpty(
       input.credentialPolicyId ?? IdentityBootstrapDefaults.localCredentialPolicyId,
       "credentialPolicyId",
     );
+    if (!credentialPolicyIdResult.ok) {
+      return credentialPolicyIdResult;
+    }
+
+    const providerId = providerIdResult.value;
+    const providerDisplayName = providerDisplayNameResult.value;
+    const credentialPolicyId = credentialPolicyIdResult.value;
 
     const normalizedProfile = this.dependencies.identityPolicyService.normalizeRegistrationInput({
       username: input.username,
@@ -142,7 +140,8 @@ export class IdentityBootstrapService {
       displayName: input.displayName,
     });
     if (!normalizedProfile.valid || !normalizedProfile.value) {
-      throw new IdentityBootstrapInvalidRequestError(
+      return this.failure(
+        IdentityErrorCodes.policyViolation,
         this.withIssueDetails("Bootstrap profile is invalid.", normalizedProfile.issues.map((issue) => issue.message)),
       );
     }
@@ -153,7 +152,8 @@ export class IdentityBootstrapService {
       providerKind: AuthProviderKinds.localPassword,
     });
     if (!normalizedProviderReference.valid || !normalizedProviderReference.value) {
-      throw new IdentityBootstrapInvalidRequestError(
+      return this.failure(
+        IdentityErrorCodes.unsupportedProvider,
         this.withIssueDetails(
           "Bootstrap provider reference is invalid.",
           normalizedProviderReference.issues.map((issue) => issue.message),
@@ -171,21 +171,39 @@ export class IdentityBootstrapService {
         providerKind: AuthProviderKinds.localPassword,
       },
     });
-    if (!uniqueness.valid) {
-      throw new IdentityBootstrapInvalidRequestError(
-        this.withIssueDetails("Bootstrap account uniqueness check failed.", uniqueness.issues.map((issue) => issue.message)),
-      );
-    }
-    if (!uniqueness.available) {
-      throw new IdentityBootstrapBlockedError("Identity bootstrap is blocked because identity uniqueness conflicts already exist.");
+    if (!uniqueness.outcome.ok) {
+      return uniqueness.outcome;
     }
 
-    const hashAlgorithm = this.requireNonEmpty(input.credential.hashAlgorithm, "credential.hashAlgorithm");
-    const hashValue = this.requireNonEmpty(input.credential.hashValue, "credential.hashValue");
+    const hashAlgorithmResult = this.requireNonEmpty(
+      input.credential.hashAlgorithm,
+      "credential.hashAlgorithm",
+      IdentityErrorCodes.invalidCredentials,
+    );
+    if (!hashAlgorithmResult.ok) {
+      return hashAlgorithmResult;
+    }
+    const hashAlgorithm = hashAlgorithmResult.value;
+
+    const hashValueResult = this.requireNonEmpty(
+      input.credential.hashValue,
+      "credential.hashValue",
+      IdentityErrorCodes.invalidCredentials,
+    );
+    if (!hashValueResult.ok) {
+      return hashValueResult;
+    }
+    const hashValue = hashValueResult.value;
+
     const salt = this.normalizeOptional(input.credential.salt);
     const pepperVersion = this.normalizeOptional(input.credential.pepperVersion);
 
-    const provider = await this.resolveBootstrapProvider(providerId, providerDisplayName);
+    const providerResult = await this.resolveBootstrapProvider(providerId, providerDisplayName);
+    if (!providerResult.ok) {
+      return providerResult;
+    }
+    const provider = providerResult.value;
+
     const credentialPolicy = await this.resolveCredentialPolicy(credentialPolicyId);
 
     const now = this.dependencies.clock.now();
@@ -228,36 +246,41 @@ export class IdentityBootstrapService {
       updatedAt: nowIso,
     });
 
-    return Object.freeze({
+    return identitySuccess(Object.freeze({
       userIdentityId,
       providerId: provider.id,
       providerSubject,
       credentialPolicyId: credentialPolicy.id,
       credentialMaterialId,
       bootstrappedAt: nowIso,
-    });
+    }));
   }
 
-  private async resolveBootstrapProvider(providerId: string, providerDisplayName: string) {
+  private async resolveBootstrapProvider(
+    providerId: string,
+    providerDisplayName: string,
+  ): Promise<IdentityOperationResult<AuthProvider, IdentityBootstrapErrorCode>> {
     const existingProvider = await this.dependencies.lookupRepository.findAuthProviderById(providerId);
     if (existingProvider) {
       if (
         existingProvider.kind !== AuthProviderKinds.localPassword
         || existingProvider.category !== AuthProviderCategories.local
       ) {
-        throw new IdentityBootstrapInvalidStateError(
+        return this.failure(
+          IdentityErrorCodes.unsupportedProvider,
           `Bootstrap provider '${providerId}' is not a local password provider.`,
         );
       }
       if (existingProvider.status !== AuthProviderStatuses.active) {
-        throw new IdentityBootstrapInvalidStateError(
+        return this.failure(
+          IdentityErrorCodes.invalidState,
           `Bootstrap provider '${providerId}' must be active.`,
         );
       }
-      return existingProvider;
+      return identitySuccess(existingProvider);
     }
 
-    return this.dependencies.persistenceRepository.saveAuthProvider(createAuthProvider({
+    const provider = await this.dependencies.persistenceRepository.saveAuthProvider(createAuthProvider({
       id: providerId,
       kind: AuthProviderKinds.localPassword,
       category: AuthProviderCategories.local,
@@ -266,6 +289,8 @@ export class IdentityBootstrapService {
       status: AuthProviderStatuses.active,
       now: this.dependencies.clock.now(),
     }));
+
+    return identitySuccess(provider);
   }
 
   private async resolveCredentialPolicy(policyId: string) {
@@ -286,16 +311,35 @@ export class IdentityBootstrapService {
     return `${prefix} ${issues.join(" ")}`;
   }
 
-  private requireNonEmpty(value: string, field: string): string {
+  private requireNonEmpty(
+    value: string,
+    field: string,
+    code: typeof IdentityErrorCodes.invalidRequest | typeof IdentityErrorCodes.invalidCredentials = IdentityErrorCodes.invalidRequest,
+  ): IdentityOperationResult<string, IdentityBootstrapErrorCode> {
     const normalized = value.trim();
     if (!normalized) {
-      throw new IdentityBootstrapInvalidRequestError(`${field} is required.`);
+      return this.failure(code, `${field} is required.`);
     }
-    return normalized;
+    return identitySuccess(normalized);
   }
 
   private normalizeOptional(value?: string): string | undefined {
     const normalized = value?.trim();
     return normalized ? normalized : undefined;
+  }
+
+  private failure<TValue, TCode extends IdentityBootstrapErrorCode>(
+    code: TCode,
+    message: string,
+    details?: Readonly<Record<string, unknown>>,
+  ): IdentityOperationResult<TValue, TCode> {
+    const error: IdentityOperationError<TCode> = Object.freeze({
+      code,
+      message,
+      boundary: IdentityErrorBoundaries.application,
+      retryable: false,
+      details,
+    });
+    return identityFailure(error);
   }
 }

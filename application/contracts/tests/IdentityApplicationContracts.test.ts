@@ -1,9 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import {
+  IdentityErrorBoundaries,
+  IdentityErrorCodes,
   IdentityCredentialMaterialStatuses,
   IdentityIdNamespaces,
   IdentityPrincipalLookupKinds,
+  identityFailure,
+  identitySuccess,
   type IdentityCredentialMaterialRecord,
+  type IdentityOperationResult,
   type IdentityPrincipalLookup,
   type IdentitySessionListQuery,
 } from "../IdentityApplicationContracts";
@@ -37,5 +42,33 @@ describe("identity application shared contracts", () => {
     expect(credentialRecord.status).toBe("active");
     expect(sessionQuery.includeStatuses?.[0]).toBe("active");
     expect(IdentityIdNamespaces.identitySession).toBe("identity-session");
+  });
+
+  it("exposes structured identity operation result and error taxonomy contracts", () => {
+    const success: IdentityOperationResult<{ readonly userIdentityId: string }> = identitySuccess({
+      userIdentityId: "user:1",
+    });
+    const failure: IdentityOperationResult<never> = identityFailure({
+      code: IdentityErrorCodes.invalidSessionState,
+      message: "Session token is not active.",
+      boundary: IdentityErrorBoundaries.application,
+      retryable: false,
+      details: Object.freeze({
+        sessionId: "session:1",
+      }),
+    });
+
+    expect(success).toEqual({
+      ok: true,
+      value: {
+        userIdentityId: "user:1",
+      },
+    });
+    expect(failure).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: "identity-invalid-session-state",
+      }),
+    });
   });
 });

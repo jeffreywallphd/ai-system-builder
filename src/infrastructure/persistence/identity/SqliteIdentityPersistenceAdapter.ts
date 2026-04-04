@@ -1,11 +1,20 @@
 import fs from "node:fs";
 import path from "node:path";
 import type {
+  IdentityErrorCode,
   IdentityCredentialHistoryQuery,
   IdentityCredentialMaterialRecord,
+  IdentityMutationOutcome,
+  IdentityOperationResult,
   IdentityPrincipalLookup,
   IdentityProviderSubjectReference,
   IdentitySessionListQuery,
+} from "../../../../application/contracts/IdentityApplicationContracts";
+import {
+  IdentityErrorBoundaries,
+  IdentityErrorCodes,
+  identityFailure,
+  identitySuccess,
 } from "../../../../application/contracts/IdentityApplicationContracts";
 import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
@@ -436,11 +445,17 @@ export class SqliteIdentityPersistenceAdapter
     return record;
   }
 
-  public async markCredentialMaterialSuperseded(recordId: string, supersededAt: string): Promise<boolean> {
+  public async markCredentialMaterialSuperseded(
+    recordId: string,
+    supersededAt: string,
+  ): Promise<IdentityOperationResult<IdentityMutationOutcome, typeof IdentityErrorCodes.invalidRequest>> {
     const normalizedRecordId = normalizeLookup(recordId);
     const normalizedSupersededAt = normalizeLookup(supersededAt);
     if (!normalizedRecordId || !normalizedSupersededAt) {
-      return false;
+      return this.failure(
+        IdentityErrorCodes.invalidRequest,
+        "Credential material supersede request requires non-empty record id and supersededAt timestamp.",
+      );
     }
 
     const result = this.getDatabase().prepare(`
@@ -451,7 +466,9 @@ export class SqliteIdentityPersistenceAdapter
       WHERE credential_material_id = ?
     `).run(normalizedSupersededAt, normalizedSupersededAt, normalizedRecordId);
 
-    return result.changes > 0;
+    return identitySuccess(Object.freeze({
+      changed: result.changes > 0,
+    }));
   }
 
   public async saveSession(session: Session): Promise<Session> {
@@ -570,17 +587,24 @@ export class SqliteIdentityPersistenceAdapter
     return Object.freeze(rows.map((row) => mapSessionRowToDomain(row)));
   }
 
-  public async removeSession(sessionId: string): Promise<boolean> {
+  public async removeSession(
+    sessionId: string,
+  ): Promise<IdentityOperationResult<IdentityMutationOutcome, typeof IdentityErrorCodes.invalidSessionState>> {
     const normalizedSessionId = normalizeLookup(sessionId);
     if (!normalizedSessionId) {
-      return false;
+      return this.failure(
+        IdentityErrorCodes.invalidSessionState,
+        "Session removal requires a non-empty session id.",
+      );
     }
 
     const result = this.getDatabase().prepare(
       "DELETE FROM identity_sessions WHERE session_id = ?",
     ).run(normalizedSessionId);
 
-    return result.changes > 0;
+    return identitySuccess(Object.freeze({
+      changed: result.changes > 0,
+    }));
   }
 
   public dispose(): void {
@@ -639,6 +663,20 @@ export class SqliteIdentityPersistenceAdapter
       .get() as { version?: number } | undefined;
 
     return typeof row?.version === "number" ? row.version : 0;
+  }
+
+  private failure<TCode extends IdentityErrorCode>(
+    code: TCode,
+    message: string,
+    details?: Readonly<Record<string, unknown>>,
+  ): IdentityOperationResult<IdentityMutationOutcome, TCode> {
+    return identityFailure({
+      code,
+      message,
+      boundary: IdentityErrorBoundaries.infrastructure,
+      retryable: false,
+      details,
+    });
   }
 
   private hydrateUserIdentity(row: UserIdentityRow): UserIdentity {

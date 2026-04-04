@@ -151,7 +151,11 @@ describe("SqliteIdentityPersistenceAdapter", () => {
       providerSubject: "alice-local",
     }))?.id).toBe("credential:1");
 
-    expect(await adapter.markCredentialMaterialSuperseded("credential:1", "2026-04-04T13:00:00.000Z")).toBeTrue();
+    const supersedeResult = await adapter.markCredentialMaterialSuperseded("credential:1", "2026-04-04T13:00:00.000Z");
+    expect(supersedeResult.ok).toBeTrue();
+    if (supersedeResult.ok) {
+      expect(supersedeResult.value.changed).toBeTrue();
+    }
     expect(await adapter.getActiveCredentialMaterial({
       providerId: provider.id,
       providerSubject: "alice-local",
@@ -190,7 +194,11 @@ describe("SqliteIdentityPersistenceAdapter", () => {
     });
     expect(activeOnly.map((session) => session.id)).toEqual(["session:active"]);
 
-    expect(await adapter.removeSession("session:revoked")).toBeTrue();
+    const removeResult = await adapter.removeSession("session:revoked");
+    expect(removeResult.ok).toBeTrue();
+    if (removeResult.ok) {
+      expect(removeResult.value.changed).toBeTrue();
+    }
     expect(await adapter.getSessionById("session:revoked")).toBeUndefined();
 
     adapter.dispose();

@@ -151,7 +151,11 @@ describe("SqliteIdentityRepository", () => {
       providerSubject: "alice-local",
     }))?.id).toBe(materialId);
 
-    expect(await repository.markCredentialMaterialSuperseded(materialId, "2026-04-04T13:00:00.000Z")).toBeTrue();
+    const supersedeResult = await repository.markCredentialMaterialSuperseded(materialId, "2026-04-04T13:00:00.000Z");
+    expect(supersedeResult.ok).toBeTrue();
+    if (supersedeResult.ok) {
+      expect(supersedeResult.value.changed).toBeTrue();
+    }
     expect(await repository.getActiveCredentialMaterial({
       providerId: provider.id,
       providerSubject: "alice-local",
@@ -193,7 +197,11 @@ describe("SqliteIdentityRepository", () => {
     });
     expect(activeOnly.map((session) => session.id)).toEqual(["session:active"]);
 
-    expect(await repository.removeSession("session:revoked")).toBeTrue();
+    const removeResult = await repository.removeSession("session:revoked");
+    expect(removeResult.ok).toBeTrue();
+    if (removeResult.ok) {
+      expect(removeResult.value.changed).toBeTrue();
+    }
     expect(await repository.getSessionById("session:revoked")).toBeUndefined();
 
     repository.dispose();

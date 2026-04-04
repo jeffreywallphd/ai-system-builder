@@ -14,7 +14,14 @@ import {
   type NormalizedIdentityProfile,
   type ProviderSubjectReference,
 } from "../../../src/domain/identity/IdentityPolicy";
-import { IdentityPrincipalLookupKinds } from "../../contracts/IdentityApplicationContracts";
+import {
+  IdentityErrorBoundaries,
+  IdentityErrorCodes,
+  IdentityPrincipalLookupKinds,
+  identityFailure,
+  identitySuccess,
+  type IdentityOperationResult,
+} from "../../contracts/IdentityApplicationContracts";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
 
 export interface IdentityAccountUniquenessConflict {
@@ -45,6 +52,16 @@ export interface IdentityAccountUniquenessResult {
   };
   readonly conflicts: ReadonlyArray<IdentityAccountUniquenessConflict>;
   readonly issues: ReadonlyArray<IdentityPolicyIssue>;
+  readonly outcome: IdentityOperationResult<
+    {
+      readonly normalized: {
+        readonly profile: NormalizedIdentityProfile;
+        readonly providerReference?: ProviderSubjectReference;
+      };
+      readonly conflicts: ReadonlyArray<IdentityAccountUniquenessConflict>;
+    },
+    typeof IdentityErrorCodes.duplicateIdentity | typeof IdentityErrorCodes.policyViolation
+  >;
 }
 
 export class IdentityPolicyService {
@@ -97,6 +114,18 @@ export class IdentityPolicyService {
         normalized: undefined,
         conflicts: Object.freeze([]),
         issues: Object.freeze(issues),
+        outcome: identityFailure({
+          code: IdentityErrorCodes.policyViolation,
+          message: this.withIssueDetails(
+            "Identity profile validation failed.",
+            issues.map((issue) => issue.message),
+          ),
+          boundary: IdentityErrorBoundaries.domain,
+          retryable: false,
+          details: Object.freeze({
+            issueCodes: issues.map((issue) => issue.code),
+          }),
+        }),
       });
     }
 
@@ -148,16 +177,46 @@ export class IdentityPolicyService {
       }
     }
 
+    const normalized = Object.freeze({
+      profile,
+      providerReference,
+    });
+
+    const outcome = conflicts.length === 0
+      ? identitySuccess(Object.freeze({
+        normalized,
+        conflicts: Object.freeze(conflicts),
+      }))
+      : identityFailure({
+        code: IdentityErrorCodes.duplicateIdentity,
+        message: "Identity uniqueness constraints failed.",
+        boundary: IdentityErrorBoundaries.application,
+        retryable: false,
+        details: Object.freeze({
+          conflicts: conflicts.map((entry) => ({
+            code: entry.code,
+            field: entry.field,
+            value: entry.value,
+            conflictingUserIdentityId: entry.conflictingUserIdentityId,
+          })),
+        }),
+      });
+
     return Object.freeze({
       valid: true,
       available: conflicts.length === 0,
-      normalized: Object.freeze({
-        profile,
-        providerReference,
-      }),
+      normalized,
       conflicts: Object.freeze(conflicts),
       issues: Object.freeze(issues),
+      outcome,
     });
+  }
+
+  private withIssueDetails(prefix: string, issues: ReadonlyArray<string>): string {
+    if (issues.length === 0) {
+      return prefix;
+    }
+    return `${prefix} ${issues.join(" ")}`;
   }
 }
 

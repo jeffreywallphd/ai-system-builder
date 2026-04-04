@@ -1790,3 +1790,20 @@ This slice intentionally keeps identity/credential/session concerns separate so 
 - Bootstrap flow now safely provisions or validates local provider/policy dependencies, creates the first active local identity, and persists explicit credential material records with caller-supplied hash metadata (no default password path).
 - Repeat bootstrap attempts are deterministically blocked once identity state exists, and bootstrap now fails fast on invalid provider state, invalid profile/provider normalization input, or missing credential hash material.
 - Added focused coverage for first-run success and misuse-blocking behavior in `application/identity/tests/IdentityBootstrapService.test.ts`, and adapter coverage for identity counting in SQLite adapter tests.
+
+## Direction 6 note: Identity error taxonomy and shared operation results (story 1.1.7)
+- Added a shared identity error taxonomy and operation-result contract in `application/contracts/IdentityApplicationContracts.ts`:
+  - canonical error codes for duplicate identity, invalid credentials, inactive account, policy violation, unsupported provider, invalid session state, invalid request/state, and not found;
+  - typed operation result envelopes (`ok` success/failure) and error boundary metadata for domain/application/infrastructure seams.
+- Updated identity application services to return structured result contracts instead of relying on thrown/string-matched errors:
+  - `IdentityBootstrapService.bootstrapFirstLocalAdmin(...)` now returns typed success/failure results with deterministic codes (`identity-duplicate`, `identity-invalid-credentials`, `identity-policy-violation`, `identity-unsupported-provider`, etc.).
+  - `IdentityPolicyService.checkAccountUniqueness(...)` now includes a structured `outcome` result contract for policy-violation and duplicate-identity outcomes.
+- Updated identity persistence adapters and ports to return structured mutation results for failure-prone operations:
+  - credential-material supersede and session removal now return typed operation results (including explicit invalid-request and invalid-session-state failures) across both filesystem and `src` SQLite identity adapters.
+- Added/updated tests to verify key taxonomy-aligned failure paths and shared result behavior in:
+  - `application/contracts/tests/IdentityApplicationContracts.test.ts`,
+  - `application/identity/tests/IdentityBootstrapService.test.ts`,
+  - `application/identity/tests/IdentityPolicyService.test.ts`,
+  - `application/identity/tests/IdentityPortsContracts.test.ts`,
+  - `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`,
+  - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`.
