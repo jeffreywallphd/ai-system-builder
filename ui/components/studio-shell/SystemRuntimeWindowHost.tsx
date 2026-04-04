@@ -195,6 +195,8 @@ export default function SystemRuntimeWindowHost(): JSX.Element {
               resolvedSystemAssetId: hydratedRuntime?.resolvedSystemAsset.assetId,
               resolvedPageBindingId: hydratedRuntime?.resolvedPage.pageBindingId,
               datasetBindingIds: hydratedRuntime?.datasetBindings.map((entry) => entry.bindingId),
+              runtimeReadiness: hydratedRuntime?.runtimeDiagnostics?.readiness.state,
+              runtimeNextActions: hydratedRuntime?.runtimeDiagnostics?.nextActions.map((entry) => entry.code),
               issueCodes: restoreIssues.map((issue) => issue.code),
             }, null, 2)}</pre>
           </details>

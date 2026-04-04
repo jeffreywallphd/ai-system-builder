@@ -17,6 +17,7 @@ import {
   validateImageManipulationSystemTemplate,
 } from "../ImageManipulationSystemTemplateValidation";
 import { ComfyRuntimeWorkflowProfiles } from "../../runtime/ComfyRuntimeRequirements";
+import { ComfyRuntimeSystemDiagnosticsVersion } from "../../runtime/ComfyRuntimeSystemDiagnostics";
 
 describe("ImageManipulationSystemTemplate", () => {
   it("exposes a concrete system template contract with composition extension points", () => {
@@ -55,6 +56,9 @@ describe("ImageManipulationSystemTemplate", () => {
     );
     expect(ImageManipulationSystemTemplate.runtimeInstallationAsset.defaultWorkflowProfile).toBe(
       ComfyRuntimeWorkflowProfiles.imageManipulationDefault,
+    );
+    expect(ImageManipulationSystemTemplate.runtimeInstallationAsset.diagnosticsContractVersion).toBe(
+      ComfyRuntimeSystemDiagnosticsVersion,
     );
     expect(ImageManipulationSystemTemplate.runtimeInstallationAsset.supportedWorkflowProfiles).toContain(
       ComfyRuntimeWorkflowProfiles.imageManipulationFaceId,
@@ -204,6 +208,23 @@ describe("ImageManipulationSystemTemplate", () => {
     expect(validation.status).toBe("invalid");
     expect(validation.errors.map((entry) => entry.code)).toContain("runtime-installation-default-workflow-profile-invalid");
     expect(validation.errors.map((entry) => entry.code)).toContain("runtime-installation-supported-workflow-profile-missing");
+  });
+
+  it("fails validation when runtime diagnostics contract metadata is invalid", () => {
+    const invalid = {
+      ...ImageManipulationSystemTemplate,
+      runtimeInstallationAsset: {
+        ...ImageManipulationSystemTemplate.runtimeInstallationAsset,
+        diagnosticsContractVersion: "invalid-contract-version",
+      },
+    } as unknown as typeof ImageManipulationSystemTemplate;
+
+    const validation = validateImageManipulationSystemTemplate(invalid);
+
+    expect(validation.status).toBe("invalid");
+    expect(validation.errors.map((entry) => entry.code)).toContain(
+      "runtime-installation-diagnostics-contract-version-invalid",
+    );
   });
 
   it("fails validation when workflow mapping assets are replaced", () => {

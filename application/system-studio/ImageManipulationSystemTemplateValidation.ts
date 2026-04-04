@@ -17,6 +17,7 @@ import {
 } from "./ImageManipulationSystemTemplate";
 import { ComfyRuntimeInstallationAssetId } from "../runtime/ComfyRuntimeInstallationAsset";
 import { ComfyRuntimeWorkflowProfiles } from "../runtime/ComfyRuntimeRequirements";
+import { ComfyRuntimeSystemDiagnosticsVersion } from "../runtime/ComfyRuntimeSystemDiagnostics";
 import { ComfyImageManipulationDatasetBindingAssetId } from "./ComfyImageManipulationDatasetBindingAsset";
 import { ComfyImageManipulationPropertyMappingAssetId } from "./ComfyImageManipulationPropertyMappingAsset";
 
@@ -246,6 +247,19 @@ export function validateImageManipulationSystemTemplate(
       assetId,
       layer: "compatibility",
       path: "runtimeInstallationAsset.defaultWorkflowProfile",
+    }));
+  }
+  if (template.runtimeInstallationAsset.diagnosticsContractVersion !== ComfyRuntimeSystemDiagnosticsVersion) {
+    errors.push(createIssue({
+      code: "runtime-installation-diagnostics-contract-version-invalid",
+      message: "Image manipulation template must expose the canonical Comfy runtime diagnostics contract version.",
+      assetId,
+      layer: "compatibility",
+      path: "runtimeInstallationAsset.diagnosticsContractVersion",
+      metadata: {
+        expected: ComfyRuntimeSystemDiagnosticsVersion,
+        actual: template.runtimeInstallationAsset.diagnosticsContractVersion,
+      },
     }));
   }
   for (const requiredProfile of [

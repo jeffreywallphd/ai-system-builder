@@ -4,6 +4,10 @@ import {
   type ComfyImageManipulationConfig,
 } from "../../application/system-studio/ComfyImageManipulationPropertySchema";
 import { ImageManipulationSystemTemplate } from "../../application/system-studio/ImageManipulationSystemTemplate";
+import {
+  readComfyRuntimeSystemDiagnostics,
+  type ComfyRuntimeSystemDiagnostics,
+} from "../../application/runtime/ComfyRuntimeSystemDiagnostics";
 import type { SystemRuntimeWindowLaunchContract } from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
 import { parseSystemSerializationDocument } from "../../domain/system-studio/SystemSerializationContract";
 import type { StudioShellSnapshotReadModel } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
@@ -65,6 +69,7 @@ export interface SystemRuntimeHydratedState {
     readonly defaults: ComfyImageManipulationConfig;
   };
   readonly executionMetadata?: Readonly<Record<string, unknown>>;
+  readonly runtimeDiagnostics?: ComfyRuntimeSystemDiagnostics;
   readonly datasetBindings: ReadonlyArray<HydratedRuntimeDatasetBinding>;
   readonly storageInstances: ReadonlyArray<{
     readonly storageInstanceId?: string;
@@ -361,6 +366,15 @@ export class SystemRuntimeWindowHydrationService {
     const presetId = launch.initialSelection.presetId ?? ComfyImageManipulationPropertySchema.defaultPresetId;
     const defaultConfig = createComfyImageManipulationDefaultConfig({ presetId });
     const runtimeStateFromLaunch = readRecord(launch.runtimeContextPayload.runtimeState);
+    const runtimeDiagnostics = readComfyRuntimeSystemDiagnostics(launch.runtimeContextPayload.runtimeDiagnostics);
+    if (!runtimeDiagnostics && launch.runtimeContextPayload.runtimeDiagnostics !== undefined) {
+      issues.push(createIssue(
+        "runtime-window.runtime-diagnostics.invalid",
+        "warning",
+        "Runtime diagnostics payload is present but invalid; hydration continued without diagnostics.",
+        "runtimeContextPayload.runtimeDiagnostics",
+      ));
+    }
     const mergedRuntimeState = runtimeStateFromLaunch ?? runtimeState;
     const initialSelection = resolveSelectionState({
       launch,
@@ -393,6 +407,7 @@ export class SystemRuntimeWindowHydrationService {
         defaults: defaultConfig,
       }),
       executionMetadata,
+      runtimeDiagnostics,
       datasetBindings,
       storageInstances: Object.freeze(datasetBindings.map((binding) => Object.freeze({
         storageInstanceId: binding.storageInstanceId,

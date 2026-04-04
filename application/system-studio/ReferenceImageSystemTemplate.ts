@@ -28,6 +28,7 @@ import {
   ComfyRuntimeInstallationAssetId,
   ComfyRuntimeInstallationAssetVersionId,
 } from "../runtime/ComfyRuntimeInstallationAsset";
+import { ComfyRuntimeSystemDiagnosticsVersion } from "../runtime/ComfyRuntimeSystemDiagnostics";
 import {
   ComfyRuntimeWorkflowProfiles,
   type ComfyRuntimeWorkflowProfile,
@@ -165,6 +166,7 @@ export interface ReferenceImageSystemTemplateDefinition {
     readonly assetId: typeof ComfyRuntimeInstallationAssetId;
     readonly versionId: typeof ComfyRuntimeInstallationAssetVersionId;
     readonly contractVersion: typeof ComfyRuntimeInstallationAssetContractVersion;
+    readonly diagnosticsContractVersion: typeof ComfyRuntimeSystemDiagnosticsVersion;
     readonly defaultWorkflowProfile: typeof ComfyRuntimeWorkflowProfiles.imageManipulationDefault;
     readonly supportedWorkflowProfiles: ReadonlyArray<ComfyRuntimeWorkflowProfile>;
   };
@@ -343,6 +345,7 @@ export const ReferenceImageSystemTemplate: ReferenceImageSystemTemplateDefinitio
     assetId: ComfyRuntimeInstallationAssetId,
     versionId: ComfyRuntimeInstallationAssetVersionId,
     contractVersion: ComfyRuntimeInstallationAssetContractVersion,
+    diagnosticsContractVersion: ComfyRuntimeSystemDiagnosticsVersion,
     defaultWorkflowProfile: ComfyRuntimeWorkflowProfiles.imageManipulationDefault,
     supportedWorkflowProfiles: Object.freeze([
       ComfyRuntimeWorkflowProfiles.imageManipulationDefault,

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { ImageManipulationSystemTemplate } from "../../../application/system-studio/ImageManipulationSystemTemplate";
+import {
+  ComfyRuntimeSystemDiagnosticsVersion,
+  ComfyRuntimeSystemReadinessStates,
+} from "../../../application/runtime/ComfyRuntimeSystemDiagnostics";
 import { createImageManipulationRuntimeWindowLaunchContract } from "../../../application/system-runtime/SystemRuntimeWindowLaunchResolver";
 import { SystemRuntimeWindowHydrationService } from "../SystemRuntimeWindowHydrationService";
 
@@ -167,6 +171,72 @@ describe("SystemRuntimeWindowHydrationService", () => {
     expect(result.state).toBeUndefined();
     expect(result.issues[0]?.code).toBe("runtime-window.launch-contract.missing");
     expect(result.issues[0]?.severity).toBe("error");
+  });
+
+  it("reads structured runtime diagnostics from launch payload and warns on invalid payloads", () => {
+    const service = new SystemRuntimeWindowHydrationService();
+    const launchContract = createImageManipulationRuntimeWindowLaunchContract({
+      studioId: "system-studio",
+      draftId: "draft-2",
+      systemAssetId: ImageManipulationSystemTemplate.systemAsset.assetId,
+      runtimeDiagnostics: {
+        diagnosticsVersion: ComfyRuntimeSystemDiagnosticsVersion,
+        generatedAt: "2026-04-03T12:00:00.000Z",
+        runtimeDependencyId: "runtime:comfyui",
+        runtimeAssetId: "asset:config-profile:comfyui-runtime-installation",
+        runtimeAssetVersionId: "asset:config-profile:comfyui-runtime-installation:v1",
+        workflowProfile: "image-manipulation-default",
+        orchestrationState: "partial",
+        readiness: {
+          state: ComfyRuntimeSystemReadinessStates.partiallyConfigured,
+          recoverable: true,
+          summary: "Runtime is partially configured.",
+          reasons: ["installer-reported-partial-state"],
+        },
+        repository: {
+          stateBefore: "installed",
+          stateAfter: "installed",
+          operation: "updated",
+          installLocationKey: "runtime-comfyui",
+          installDirectory: "/runtime/comfy",
+          validationValid: true,
+        },
+        phaseStatus: {
+          environment: "completed",
+        },
+        runtimeLifecycle: {
+          state: "healthy",
+        },
+        persistedStateRecovery: {
+          loaded: true,
+          recovered: false,
+          reconciliation: "match",
+        },
+        validationFailures: [],
+        nextActions: [],
+        failures: [],
+        phaseDiagnostics: [],
+      },
+    });
+
+    const hydrated = service.hydrate({ launchContract });
+    expect(hydrated.ok).toBeTrue();
+    expect(hydrated.state?.runtimeDiagnostics?.readiness.state).toBe(ComfyRuntimeSystemReadinessStates.partiallyConfigured);
+
+    const invalid = service.hydrate({
+      launchContract: {
+        ...launchContract,
+        runtimeContextPayload: {
+          ...launchContract.runtimeContextPayload,
+          runtimeDiagnostics: {
+            diagnosticsVersion: "invalid",
+          },
+        },
+      },
+    });
+    expect(invalid.ok).toBeTrue();
+    expect(invalid.state?.runtimeDiagnostics).toBeUndefined();
+    expect(invalid.issues.map((entry) => entry.code)).toContain("runtime-window.runtime-diagnostics.invalid");
   });
 });
 

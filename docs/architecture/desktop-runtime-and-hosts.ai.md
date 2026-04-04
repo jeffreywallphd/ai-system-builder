@@ -155,3 +155,21 @@ The preload bridge uses synchronous IPC and exposes storage/workflow/model-file 
   - `infrastructure/runtime/tests/ComfyRuntimeLifecycleHooks.test.ts`
   - `infrastructure/runtime/tests/FileComfyRuntimeInstallerStateStore.test.ts`
   - `application/runtime/tests/ComfyRuntimeInstallerOrchestrationService.test.ts` (resume/reconciliation additions)
+
+## AI Loom image manipulation update: installer diagnostics system exposure + coverage hardening (stories 9.11-9.12)
+
+- Added a reusable system-facing diagnostics projection seam at `application/runtime/ComfyRuntimeSystemDiagnostics.ts`.
+  - maps installer orchestration + persisted state into one structured diagnostics model (phase statuses, repository/revision state, runtime lifecycle health, persisted-state recovery, normalized failures, and next-action remediation guidance);
+  - includes bounded runtime readiness classification used by higher-level system/runtime consumers (`ready`, `partially-configured`, `unhealthy`, `missing-dependencies-or-assets`, `recoverable`).
+- Installer orchestration output now carries this projection directly as `systemDiagnostics` on `ComfyRuntimeInstallerOrchestrationResult` so callers do not need ad hoc parsing.
+- Runtime-window launch/hydration seams now accept and read this diagnostics contract through launch context payload:
+  - launch resolver can include diagnostics in `runtimeContextPayload.runtimeDiagnostics`,
+  - hydration validates/normalizes the payload and exposes it on hydrated runtime state for runtime-window/status consumers.
+- Image manipulation system template runtime metadata now pins the diagnostics contract version so system/template validation paths have an explicit diagnostics seam.
+- Added focused tests for diagnostics projection + wiring:
+  - `application/runtime/tests/ComfyRuntimeSystemDiagnostics.test.ts`
+  - `application/runtime/tests/ComfyRuntimeInstallerOrchestrationService.test.ts` (system diagnostics assertions)
+  - `application/system-runtime/tests/SystemRuntimeWindowLaunchResolver.test.ts`
+  - `ui/runtime/tests/SystemRuntimeWindowHydrationService.test.ts`
+  - `application/system-studio/tests/ImageManipulationSystemTemplate.test.ts`
+  - `application/system-studio/tests/ReferenceImageSystemTemplate.test.ts`

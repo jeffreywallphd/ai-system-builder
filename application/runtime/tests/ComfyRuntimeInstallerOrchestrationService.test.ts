@@ -23,6 +23,7 @@ import {
   ComfyRuntimeOrchestrationPhaseStatuses,
   ComfyRuntimeOrchestrationStates,
 } from "../ComfyRuntimeInstallerOrchestrationService";
+import { ComfyRuntimeSystemReadinessStates } from "../ComfyRuntimeSystemDiagnostics";
 import type {
   ComfyRuntimeInstallerPersistedState,
   IComfyRuntimeInstallerStateStore,
@@ -47,6 +48,8 @@ describe("ComfyRuntimeInstallerOrchestrationService", () => {
     expect(result.phases[0]?.status).toBe(ComfyRuntimeOrchestrationPhaseStatuses.completed);
     expect(result.phases.slice(1).every((entry) => entry.status === ComfyRuntimeOrchestrationPhaseStatuses.notImplemented)).toBeTrue();
     expect(result.issues.some((entry) => entry.code === "dependency-install-not-implemented")).toBeTrue();
+    expect(result.systemDiagnostics.readiness.state).toBe(ComfyRuntimeSystemReadinessStates.partiallyConfigured);
+    expect(result.systemDiagnostics.nextActions.map((entry) => entry.code)).toContain("dependencies-implementation-pending");
   });
 
   it("updates an existing install and reaches ready when hooks complete", async () => {
@@ -194,6 +197,8 @@ describe("ComfyRuntimeInstallerOrchestrationService", () => {
     expect((modelPhase?.metadata as { modelValidation?: { summary?: { missingRequired: number } } } | undefined)
       ?.modelValidation?.summary?.missingRequired).toBe(1);
     expect(result.issues.some((entry) => entry.code === "missing-required")).toBeTrue();
+    expect(result.systemDiagnostics.readiness.state).toBe(ComfyRuntimeSystemReadinessStates.missingDependenciesOrAssets);
+    expect(result.systemDiagnostics.nextActions.map((entry) => entry.code)).toContain("install-required-runtime-assets");
   });
 
   it("skips completed setup phases during resume when persisted state indicates completion", async () => {
