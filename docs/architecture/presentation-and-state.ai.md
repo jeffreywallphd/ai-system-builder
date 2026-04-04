@@ -789,3 +789,10 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - App layout now supports a contract-driven runtime-window host mode when `runtimeWindowLaunch` is present in query params.
 - Runtime window rendering resolves a normalized launch contract and routes to registered runtime page assets (initially the image manipulation page binding) without reopening full Studio Shell authoring chrome.
 - System runtime panel launch UX now composes launch requests through the shared resolver and sends them via desktop bridge operation (`launchRuntimeWindow`) instead of directly constructing host/window details in UI components.
+
+## AI Loom image manipulation update: runtime hydration + dataset/selection binding (stories 8.3-8.4)
+
+- Runtime window startup now goes through a dedicated hydration seam (`ui/runtime/SystemRuntimeWindowHydrationService.ts`) that composes launch contract + snapshot/draft serialization into one normalized runtime payload.
+- Hydration now surfaces resolved system/workflow/page references, property-schema defaults, execution metadata, dataset/storage logical references, and normalized selection defaults, with explicit warning/error issue projection for inspectability.
+- Dataset and selection initialization now uses a dedicated binding seam (`ui/runtime/ImageManipulationRuntimeDatasetBindingService.ts`) so input/output/reference role bindings and selection reconciliation are serializable and persistence-ready.
+- `ImageManipulationRuntimeEditorPanel` now consumes hydrated runtime references for dataset/workflow/system context and keeps runtime-window behavior compatible with shared storage-instance and embedded-subsystem launch contracts without UI-facing raw path leakage.

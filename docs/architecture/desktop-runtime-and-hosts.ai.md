@@ -63,3 +63,9 @@ The preload bridge uses synchronous IPC and exposes storage/workflow/model-file 
 - Launch payloads are normalized and versioned through one shared contract (`SystemRuntimeWindowLaunchContract`) before reaching host window creation.
 - Electron main now reuses existing window bootstrap mechanics to open a separate runtime-focused window and passes only contract-defined launch data to renderer query transport (`runtimeWindowLaunch`).
 - Runtime window reuse is bounded through contract window intent (`reuseWindowKey`) rather than ad hoc global state.
+
+## AI Loom image manipulation update: runtime hydration + binding posture (stories 8.3-8.4)
+
+- Runtime-window renderer flow now includes a dedicated hydration seam (`ui/runtime/SystemRuntimeWindowHydrationService.ts`) layered after launch-contract parsing/snapshot read; host IPC remains thin and contract transport stays unchanged.
+- Hydrated runtime state stays logical-reference-first (dataset instance ids, storage instance refs, binding ids) and avoids UI-facing raw path exposure.
+- Hydration now emits normalized warning/error issues for incomplete or invalid launch/snapshot inputs, with bounded fallback hydration from launch/template defaults.
