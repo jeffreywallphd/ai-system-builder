@@ -15,7 +15,9 @@ Story 4.1.5 defines application-layer authorization seams so policy evaluation o
 - `src/application/authorization/ports/IAuthorizationPolicyEventRecorder.ts`
 - `src/application/authorization/ports/AuthorizationPolicyEvaluationPorts.ts`
 - `src/application/authorization/use-cases/EvaluateAuthorizationPolicyUseCase.ts`
+- `src/application/authorization/use-cases/EffectivePermissionResolutionService.ts`
 - `src/application/authorization/tests/AuthorizationPolicyPortsContracts.test.ts`
+- `src/application/authorization/tests/EffectivePermissionResolutionService.test.ts`
 
 ## Contract summary
 
@@ -39,3 +41,8 @@ Story 4.1.5 defines application-layer authorization seams so policy evaluation o
 ## Consumer seam
 
 `EvaluateAuthorizationPolicyUseCase` is the example consumer that composes all ports, builds domain-safe contexts, delegates to `IAuthorizationPolicyEvaluator`, and returns typed decision results.
+
+## Current production evaluator baseline
+
+- `EffectivePermissionResolutionService` is the first concrete `IAuthorizationPolicyEvaluator` implementation (Story 4.2.2).
+- It also exposes a batch `resolvePermissions(...)` seam for UI capability checks, reusing the same precedence used for enforcement decisions.

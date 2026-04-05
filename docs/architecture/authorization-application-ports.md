@@ -13,7 +13,9 @@ This note documents Story 4.1.5 (Feature 4 / Epic 4.1): application-layer author
 - `src/application/authorization/ports/IAuthorizationPolicyEventRecorder.ts`
 - `src/application/authorization/ports/AuthorizationPolicyEvaluationPorts.ts`
 - `src/application/authorization/use-cases/EvaluateAuthorizationPolicyUseCase.ts`
+- `src/application/authorization/use-cases/EffectivePermissionResolutionService.ts`
 - `src/application/authorization/tests/AuthorizationPolicyPortsContracts.test.ts`
+- `src/application/authorization/tests/EffectivePermissionResolutionService.test.ts`
 
 ## Scope and intent
 
@@ -52,6 +54,11 @@ This note documents Story 4.1.5 (Feature 4 / Epic 4.1): application-layer author
 3. Materialize domain-safe `ActorContext` and `ResourcePolicyContext`.
 4. Delegate decisioning to `IAuthorizationPolicyEvaluator`.
 5. Emit a best-effort evaluation event through `IAuthorizationPolicyEventRecorder` when configured.
+
+## Current evaluator baseline (Story 4.2.2)
+
+- `EffectivePermissionResolutionService` is the concrete `IAuthorizationPolicyEvaluator` implementation for effective-permission resolution.
+- The service also exposes `resolvePermissions(...)` for batch capability checks in UI and thin-client surfaces, using the same precedence as enforcement decisions.
 
 ## Coverage
 
