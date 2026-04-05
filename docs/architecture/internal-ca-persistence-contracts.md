@@ -47,6 +47,11 @@ Not persisted in plaintext:
 - full PEM/key content
 - decrypted trust payloads
 
+Story 6.1.4 implementation note:
+
+- `storage_locator` entries may reference protected internal secret storage via `secret-store:<ID>` locators.
+- locator targets are resolved through protected storage adapters, not direct filesystem payload reads in application/host logic.
+
 ## Repository seam expectations
 
 - `ICertificateAuthorityRootPersistenceRepository`: create/read/update CA root metadata and rotation/status metadata

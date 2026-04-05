@@ -15,7 +15,6 @@ import type {
   SaveCertificateAuthorityRootPersistenceRecordInput,
   SaveTrustMaterialReferencePersistenceRecordInput,
   TrustMaterialReferenceLookupQuery,
-  TrustMaterialReferenceLookupQuery,
   TrustMaterialReferencePersistenceRecord,
   UpdateCertificateAuthorityRotationPolicyPersistenceRecordInput,
   UpdateCertificateAuthorityStatusPersistenceRecordInput,
@@ -31,6 +30,7 @@ class StubConfigurationProvider {
 
 class StubSecretService {
   private readonly refs = new Map<string, CertificateAuthoritySecretMetadata>();
+  private readonly failingRefs = new Set<string>();
 
   public setSecret(secretRef: string, exists: boolean): void {
     this.refs.set(secretRef, Object.freeze({
@@ -40,7 +40,15 @@ class StubSecretService {
     }));
   }
 
+  public setUnavailable(secretRef: string): void {
+    this.failingRefs.add(secretRef);
+  }
+
   public async getSecretMetadata(secretRef: string): Promise<CertificateAuthoritySecretMetadata> {
+    if (this.failingRefs.has(secretRef)) {
+      throw new Error("secret source unavailable");
+    }
+
     return this.refs.get(secretRef) ?? Object.freeze({
       secretRef,
       exists: false,
@@ -241,6 +249,43 @@ describe("ResolveCertificateAuthorityStartupStateUseCase", () => {
 
     const result = await useCase.execute();
     expect(result.state).toBe(CertificateAuthorityStartupStates.migrationRequired);
+  });
+
+  it("returns invalid when configured secret source is unavailable", async () => {
+    const repositories = new InMemoryCertificateAuthorityRepositories();
+    repositories.addAuthority(createAuthorityRecord(CertificateAuthorityStatuses.active));
+    repositories.addTrustMaterial(createTrustMaterial({
+      materialRef: "trust:ca:cert:v1",
+      kind: "certificate-pem",
+      storageLocator: "secret-store:internal-ca:root-cert",
+    }));
+    repositories.addTrustMaterial(createTrustMaterial({
+      materialRef: "trust:ca:key:v1",
+      kind: "private-key-encrypted-pem",
+      storageLocator: "secret-store:internal-ca:root-key",
+    }));
+    const secretService = new StubSecretService();
+    secretService.setUnavailable("secret-store:internal-ca:root-cert");
+
+    const useCase = new ResolveCertificateAuthorityStartupStateUseCase({
+      configurationProvider: new StubConfigurationProvider({
+        source: "test",
+        certificateAuthorityId: "ca:internal:root:v1",
+        rootCertificateMaterialRef: "trust:ca:cert:v1",
+        rootPrivateKeyMaterialRef: "trust:ca:key:v1",
+        rootCertificateSecretRef: "secret-store:internal-ca:root-cert",
+        rootPrivateKeySecretRef: "secret-store:internal-ca:root-key",
+      }),
+      secretService,
+      certificateAuthorityRepository: repositories,
+      trustMaterialRepository: repositories,
+    });
+
+    const result = await useCase.execute();
+    expect(result.state).toBe(CertificateAuthorityStartupStates.invalid);
+    expect(
+      result.diagnostics.some((diagnostic) => diagnostic.code === "authority-secret-source-unavailable"),
+    ).toBeTrue();
   });
 });
 

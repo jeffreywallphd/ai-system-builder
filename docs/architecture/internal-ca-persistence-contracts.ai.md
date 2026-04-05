@@ -45,6 +45,7 @@ Quick baseline for Story 6.1.2 (Feature 6 / Epic 6.1): persistence contracts and
 - Persist metadata and protected references only.
 - Avoid plaintext persistence for private keys and decrypted certificate/key payloads.
 - Treat `storage_locator` and related locator refs as pointers to protected stores (vault/object store/HSM-backed systems).
+- Story 6.1.4 concretely supports `secret-store:<ID>` locators for internal encrypted secret storage adapters.
 
 ## Adapter semantics
 

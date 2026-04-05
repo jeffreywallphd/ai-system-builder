@@ -60,6 +60,7 @@ import {
   EnvironmentCertificateAuthorityBootstrapConfigurationProvider,
   EnvironmentCertificateAuthoritySecretService,
 } from "../../src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter";
+import { createFileSystemProtectedSecretStoreFromEnvironment } from "../../src/infrastructure/security/secrets/FileSystemProtectedSecretStore";
 import { AuthorizationPolicyDecisionEvaluator } from "../../src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyMutationService } from "../../src/application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "../../src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
@@ -642,9 +643,12 @@ async function validateCertificateAuthorityStartup(
   certificateAuthorityRepository: SqliteCertificateAuthorityPersistenceAdapter,
   env: Readonly<Record<string, string | undefined>>,
 ): Promise<void> {
+  const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(env);
   const startupStateUseCase = new ResolveCertificateAuthorityStartupStateUseCase({
     configurationProvider: new EnvironmentCertificateAuthorityBootstrapConfigurationProvider(env),
-    secretService: new EnvironmentCertificateAuthoritySecretService(env),
+    secretService: new EnvironmentCertificateAuthoritySecretService(env, {
+      protectedSecretStore,
+    }),
     certificateAuthorityRepository,
     trustMaterialRepository: certificateAuthorityRepository,
   });
