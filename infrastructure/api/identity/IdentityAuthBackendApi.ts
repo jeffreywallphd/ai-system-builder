@@ -28,6 +28,31 @@ import type {
   RevokeIdentitySessionUseCase,
   RevokeIdentitySessionErrorCode,
 } from "../../../src/application/identity/use-cases/RevokeIdentitySessionUseCase";
+import type {
+  ListTrustedDevicesUseCase,
+  ListTrustedDevicesErrorCode,
+} from "../../../src/application/identity/use-cases/ListTrustedDevicesUseCase";
+import type {
+  GetTrustedDeviceUseCase,
+  GetTrustedDeviceErrorCode,
+} from "../../../src/application/identity/use-cases/GetTrustedDeviceUseCase";
+import type {
+  RevokeTrustedDeviceUseCase,
+  RevokeTrustedDeviceErrorCode,
+} from "../../../src/application/identity/use-cases/RevokeTrustedDeviceUseCase";
+import type {
+  UpdateTrustedDeviceDisplayNameUseCase,
+  UpdateTrustedDeviceDisplayNameErrorCode,
+} from "../../../src/application/identity/use-cases/UpdateTrustedDeviceDisplayNameUseCase";
+import type {
+  InitiateTrustedDevicePairingUseCase,
+  InitiateTrustedDevicePairingErrorCode,
+} from "../../../src/application/identity/use-cases/InitiateTrustedDevicePairingUseCase";
+import type {
+  ValidateTrustedDevicePairingUseCase,
+  ValidateTrustedDevicePairingErrorCode,
+} from "../../../src/application/identity/use-cases/ValidateTrustedDevicePairingUseCase";
+import type { CompleteTrustedDevicePairingUseCase } from "../../../src/application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
 import type { IdentitySessionAccessChannel } from "../../../src/domain/identity/IdentityDomain";
 import type {
   RegisterLocalAccountUseCase,
@@ -43,12 +68,22 @@ import {
   type GetIdentityAdminAccountStatusApiResponse,
   type ListIdentityAdminAccountsApiRequest,
   type ListIdentityAdminAccountsApiResponse,
+  type ListTrustedDevicesApiRequest,
+  type ListTrustedDevicesApiResponse,
   type LoginLocalIdentityApiRequest,
   type LoginLocalIdentityApiResponse,
   type LogoutAuthenticatedSessionApiRequest,
   type LogoutAuthenticatedSessionApiResponse,
+  type CompleteTrustedDevicePairingApiRequest,
+  type CompleteTrustedDevicePairingApiResponse,
+  type GetTrustedDeviceApiRequest,
+  type GetTrustedDeviceApiResponse,
+  type InitiateTrustedDevicePairingApiRequest,
+  type InitiateTrustedDevicePairingApiResponse,
   type RevokeIdentitySessionApiRequest,
   type RevokeIdentitySessionApiResponse,
+  type RevokeTrustedDeviceApiRequest,
+  type RevokeTrustedDeviceApiResponse,
   type SetIdentityAdminAccountStatusApiRequest,
   type SetIdentityAdminAccountStatusApiResponse,
   type ResolveAuthenticatedSessionApiRequest,
@@ -56,6 +91,10 @@ import {
   type IdentitySessionTrustInvalidationReason,
   type RegisterLocalIdentityApiRequest,
   type RegisterLocalIdentityApiResponse,
+  type UpdateTrustedDeviceDisplayNameApiRequest,
+  type UpdateTrustedDeviceDisplayNameApiResponse,
+  type ValidateTrustedDevicePairingApiRequest,
+  type ValidateTrustedDevicePairingApiResponse,
 } from "./sdk/PublicIdentityAuthApiContract";
 import { IdentityAuthObservability, type IdentityAuthObservabilityOptions } from "./IdentityAuthObservability";
 import { IdentityAuthenticatedSessionService } from "../../../application/identity/services/IdentityAuthenticatedSessionService";
@@ -66,14 +105,20 @@ import {
 } from "../../../application/identity/ports/IIdentitySessionTrustService";
 import {
   serializeChangeLocalPasswordCredentialResponse,
+  serializeCompleteTrustedDevicePairingResponse,
   serializeGetIdentityAdminAccountStatusResponse,
+  serializeInitiateTrustedDevicePairingResponse,
   serializeListIdentityAdminAccountsResponse,
+  serializeListTrustedDevicesResponse,
   serializeLoginLocalIdentityResponse,
   serializeLogoutAuthenticatedSessionResponse,
   serializeRegisterLocalIdentityResponse,
   serializeResolveAuthenticatedSessionResponse,
   serializeRevokeIdentitySessionResponse,
+  serializeTrustedDeviceResponse,
   serializeSetIdentityAdminAccountStatusResponse,
+  serializeUpdateTrustedDeviceDisplayNameResponse,
+  serializeValidateTrustedDevicePairingResponse,
 } from "./IdentityAuthResponseSerializers";
 
 interface IdentityAuthBackendApiDependencies {
@@ -85,6 +130,13 @@ interface IdentityAuthBackendApiDependencies {
   readonly listLocalIdentityAccountsUseCase: ListLocalIdentityAccountsUseCase;
   readonly getLocalIdentityAccountStatusUseCase: GetLocalIdentityAccountStatusUseCase;
   readonly setLocalIdentityAccountStatusUseCase: SetLocalIdentityAccountStatusUseCase;
+  readonly listTrustedDevicesUseCase: ListTrustedDevicesUseCase;
+  readonly getTrustedDeviceUseCase: GetTrustedDeviceUseCase;
+  readonly revokeTrustedDeviceUseCase: RevokeTrustedDeviceUseCase;
+  readonly updateTrustedDeviceDisplayNameUseCase: UpdateTrustedDeviceDisplayNameUseCase;
+  readonly initiateTrustedDevicePairingUseCase: InitiateTrustedDevicePairingUseCase;
+  readonly validateTrustedDevicePairingUseCase: ValidateTrustedDevicePairingUseCase;
+  readonly completeTrustedDevicePairingUseCase: CompleteTrustedDevicePairingUseCase;
   readonly identityLookupRepository: IIdentityLookupRepository;
   readonly authenticatedSessionService: IdentityAuthenticatedSessionService;
   readonly sessionTrustService?: IIdentitySessionTrustService;
@@ -633,6 +685,263 @@ export class IdentityAuthBackendApi {
     return response;
   }
 
+  public async listTrustedDevices(
+    request: ListTrustedDevicesApiRequest,
+  ): Promise<IdentityAuthApiResponse<ListTrustedDevicesApiResponse>> {
+    const result = await this.dependencies.listTrustedDevicesUseCase.execute({
+      userIdentityId: request.userIdentityId,
+      workspaceId: request.workspaceId,
+      includeStatuses: request.includeStatuses,
+      limit: request.limit,
+      offset: request.offset,
+    });
+    if (!result.ok) {
+      const response = Object.freeze({ ok: false, error: this.mapTrustedDeviceError(result.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "trusted-device.list",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
+    }
+
+    const response = Object.freeze({
+      ok: true,
+      data: serializeListTrustedDevicesResponse(result.value.devices),
+    });
+    await this.observability.recordApiOutcome({
+      flow: "trusted-device.list",
+      request,
+      response,
+    });
+    return response;
+  }
+
+  public async getTrustedDevice(
+    request: GetTrustedDeviceApiRequest,
+  ): Promise<IdentityAuthApiResponse<GetTrustedDeviceApiResponse>> {
+    const result = await this.dependencies.getTrustedDeviceUseCase.execute({
+      trustedDeviceId: request.trustedDeviceId,
+    });
+    if (!result.ok) {
+      const response = Object.freeze({ ok: false, error: this.mapTrustedDeviceError(result.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "trusted-device.get",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
+    }
+
+    const response = Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        trustedDevice: serializeTrustedDeviceResponse(result.value.trustedDevice),
+      }),
+    });
+    await this.observability.recordApiOutcome({
+      flow: "trusted-device.get",
+      request,
+      response,
+    });
+    return response;
+  }
+
+  public async revokeTrustedDevice(
+    request: RevokeTrustedDeviceApiRequest,
+  ): Promise<IdentityAuthApiResponse<RevokeTrustedDeviceApiResponse>> {
+    const result = await this.dependencies.revokeTrustedDeviceUseCase.execute({
+      trustedDeviceId: request.trustedDeviceId,
+      reason: request.reason,
+      revokedByUserIdentityId: request.revokedByUserIdentityId,
+      note: request.note,
+      revokedAt: request.revokedAt,
+    });
+    if (!result.ok) {
+      const response = Object.freeze({ ok: false, error: this.mapTrustedDeviceError(result.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "trusted-device.revoke",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
+    }
+
+    const response = Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        trustedDeviceId: request.trustedDeviceId,
+        revoked: result.value.changed,
+      }),
+    });
+    await this.observability.recordApiOutcome({
+      flow: "trusted-device.revoke",
+      request,
+      response,
+    });
+    return response;
+  }
+
+  public async updateTrustedDeviceDisplayName(
+    request: UpdateTrustedDeviceDisplayNameApiRequest,
+  ): Promise<IdentityAuthApiResponse<UpdateTrustedDeviceDisplayNameApiResponse>> {
+    const result = await this.dependencies.updateTrustedDeviceDisplayNameUseCase.execute({
+      trustedDeviceId: request.trustedDeviceId,
+      displayName: request.displayName,
+      updatedAt: request.updatedAt,
+    });
+    if (!result.ok) {
+      const response = Object.freeze({ ok: false, error: this.mapTrustedDeviceError(result.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "trusted-device.display-name.update",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
+    }
+
+    const response = Object.freeze({
+      ok: true,
+      data: serializeUpdateTrustedDeviceDisplayNameResponse(result.value.trustedDevice),
+    });
+    await this.observability.recordApiOutcome({
+      flow: "trusted-device.display-name.update",
+      request,
+      response,
+    });
+    return response;
+  }
+
+  public async initiateTrustedDevicePairing(
+    request: InitiateTrustedDevicePairingApiRequest,
+  ): Promise<IdentityAuthApiResponse<InitiateTrustedDevicePairingApiResponse>> {
+    const result = await this.dependencies.initiateTrustedDevicePairingUseCase.execute({
+      trustedDeviceId: request.trustedDeviceId,
+      userIdentityId: request.userIdentityId,
+      workspaceId: request.workspaceId,
+      artifactType: request.artifactType,
+      actorBinding: request.actorBinding,
+      issuance: request.issuance,
+      maxValidationAttempts: request.maxValidationAttempts,
+      expiresAt: request.expiresAt,
+    });
+    if (!result.ok) {
+      const response = Object.freeze({ ok: false, error: this.mapTrustedDeviceError(result.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "trusted-device.pairing.initiate",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
+    }
+
+    const response = Object.freeze({
+      ok: true,
+      data: serializeInitiateTrustedDevicePairingResponse(result.value),
+    });
+    await this.observability.recordApiOutcome({
+      flow: "trusted-device.pairing.initiate",
+      request,
+      response,
+    });
+    return response;
+  }
+
+  public async validateTrustedDevicePairing(
+    request: ValidateTrustedDevicePairingApiRequest,
+  ): Promise<IdentityAuthApiResponse<ValidateTrustedDevicePairingApiResponse>> {
+    const result = await this.dependencies.validateTrustedDevicePairingUseCase.execute({
+      pairingSessionId: request.pairingSessionId,
+      pairingTokenId: request.pairingTokenId,
+      trustedDeviceId: request.trustedDeviceId,
+      userIdentityId: request.userIdentityId,
+      workspaceId: request.workspaceId,
+      presentedToken: request.presentedToken,
+      attemptedAt: request.attemptedAt,
+    });
+    if (!result.ok) {
+      const response = Object.freeze({ ok: false, error: this.mapTrustedDeviceError(result.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "trusted-device.pairing.validate",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
+    }
+
+    const response = Object.freeze({
+      ok: true,
+      data: serializeValidateTrustedDevicePairingResponse(result.value),
+    });
+    await this.observability.recordApiOutcome({
+      flow: "trusted-device.pairing.validate",
+      request,
+      response,
+    });
+    return response;
+  }
+
+  public async completeTrustedDevicePairing(
+    request: CompleteTrustedDevicePairingApiRequest,
+  ): Promise<IdentityAuthApiResponse<CompleteTrustedDevicePairingApiResponse>> {
+    try {
+      const result = await this.dependencies.completeTrustedDevicePairingUseCase.execute({
+        pairingSessionId: request.pairingSessionId,
+        pairingTokenId: request.pairingTokenId,
+        trustedDeviceId: request.trustedDeviceId,
+        userIdentityId: request.userIdentityId,
+        workspaceId: request.workspaceId,
+        trustedDeviceRegistration: request.trustedDeviceRegistration
+          ? Object.freeze({
+              displayName: request.trustedDeviceRegistration.displayName,
+              fingerprint: Object.freeze({
+                algorithm: request.trustedDeviceRegistration.fingerprint.algorithm,
+                value: request.trustedDeviceRegistration.fingerprint.value,
+                capturedAt: request.trustedDeviceRegistration.fingerprint.capturedAt,
+              }),
+              pairingMethod: request.trustedDeviceRegistration.pairingMethod,
+              metadata: request.trustedDeviceRegistration.metadata,
+              registeredAt: request.trustedDeviceRegistration.registeredAt,
+            })
+          : undefined,
+        presentedToken: request.presentedToken,
+        completedAt: request.completedAt,
+        completedByUserIdentityId: request.completedByUserIdentityId,
+        trustMaterialRef: request.trustMaterialRef,
+        trustMaterialRegistration: request.trustMaterialRegistration,
+      });
+      const response = Object.freeze({
+        ok: true,
+        data: serializeCompleteTrustedDevicePairingResponse(result),
+      });
+      await this.observability.recordApiOutcome({
+        flow: "trusted-device.pairing.complete",
+        request,
+        response,
+      });
+      return response;
+    } catch (error) {
+      const errorCode = mapTrustedDeviceErrorCodeFromException(error);
+      const response = Object.freeze({
+        ok: false,
+        error: this.mapTrustedDeviceError(errorCode),
+      });
+      await this.observability.recordApiOutcome({
+        flow: "trusted-device.pairing.complete",
+        request,
+        response,
+        errorCode,
+      });
+      return response;
+    }
+  }
+
   private mapRegisterError(code: RegisterLocalAccountErrorCode): IdentityAuthApiError {
     switch (code) {
       case IdentityErrorCodes.duplicateIdentity:
@@ -838,6 +1147,39 @@ export class IdentityAuthBackendApi {
     }
   }
 
+  private mapTrustedDeviceError(
+    code:
+      | ListTrustedDevicesErrorCode
+      | GetTrustedDeviceErrorCode
+      | RevokeTrustedDeviceErrorCode
+      | UpdateTrustedDeviceDisplayNameErrorCode
+      | InitiateTrustedDevicePairingErrorCode
+      | ValidateTrustedDevicePairingErrorCode,
+  ): IdentityAuthApiError {
+    switch (code) {
+      case IdentityErrorCodes.invalidRequest:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.invalidRequest,
+          message: "The trusted device request is invalid.",
+        });
+      case IdentityErrorCodes.notFound:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.notFound,
+          message: "The requested trusted device or pairing artifact was not found.",
+        });
+      case IdentityErrorCodes.invalidState:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.conflict,
+          message: "The trusted device request conflicts with current device pairing state.",
+        });
+      default:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.internal,
+          message: "Unexpected trusted device API error.",
+        });
+    }
+  }
+
   private adminOperationsDisabledResponse<TResponse>(): IdentityAuthApiResponse<TResponse> {
     return Object.freeze({
       ok: false,
@@ -879,6 +1221,25 @@ function isIdentitySessionTrustInvalidationReason(value: unknown): value is Iden
     || value === "trusted-device-trust-lost"
     || value === "trusted-device-expired"
     || value === "trusted-device-mismatch";
+}
+
+function mapTrustedDeviceErrorCodeFromException(
+  error: unknown,
+):
+  | typeof IdentityErrorCodes.invalidRequest
+  | typeof IdentityErrorCodes.invalidState
+  | typeof IdentityErrorCodes.notFound {
+  if (!(error instanceof Error)) {
+    return IdentityErrorCodes.invalidRequest;
+  }
+  const message = error.message.trim().toLowerCase();
+  if (message.includes("not found")) {
+    return IdentityErrorCodes.notFound;
+  }
+  if (message.includes("invalid") || message.includes("already") || message.includes("conflict")) {
+    return IdentityErrorCodes.invalidState;
+  }
+  return IdentityErrorCodes.invalidRequest;
 }
 
 function normalizeAccessChannel(value?: "desktop" | "thin-client"): IdentitySessionAccessChannel {

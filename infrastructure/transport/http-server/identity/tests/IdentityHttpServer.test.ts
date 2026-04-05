@@ -800,4 +800,162 @@ describe("IdentityHttpServer", () => {
     });
     expect(disabledLoginResponse.status).toBe(403);
   });
+
+  it("supports trusted-device management and pairing endpoints with authenticated context", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl, harness } = await startServer(logger);
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "trusted.device.api.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+    const registerBody = await registerResponse.json();
+
+    const trustedDeviceId = "trusted-device:http-flow";
+    await harness.provisionTrustedDevice({
+      trustedDeviceId,
+      userIdentityId: registerBody.data.userIdentityId,
+      trustStatus: "pending-pairing",
+    });
+
+    const provisioned = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "trusted.device.api.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(provisioned.status).toBe(200);
+    const loginBody = await provisioned.json();
+
+    const initiateResponse = await fetch(`${baseUrl}/api/v1/identity/trusted-devices/pairing/initiate`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        trustedDeviceId,
+        userIdentityId: "malicious-override-ignored",
+        artifactType: "one-time-code",
+        actorBinding: {
+          scope: "same-user",
+          userIdentityId: registerBody.data.userIdentityId,
+        },
+        expiresAt: "2026-04-04T18:30:00.000Z",
+      }),
+    });
+    expect(initiateResponse.status).toBe(200);
+    const initiateBody = await initiateResponse.json();
+    expect(initiateBody.ok).toBe(true);
+
+    const validateResponse = await fetch(`${baseUrl}/api/v1/identity/trusted-devices/pairing/validate`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        pairingSessionId: initiateBody.data.pairingSession.pairingSessionId,
+        pairingTokenId: initiateBody.data.pairingToken.pairingTokenId,
+        trustedDeviceId,
+        userIdentityId: "malicious-override-ignored",
+        presentedToken: initiateBody.data.artifact.value,
+      }),
+    });
+    expect(validateResponse.status).toBe(200);
+    const validateBody = await validateResponse.json();
+    expect(validateBody.ok).toBe(true);
+    expect(validateBody.data.outcome).toBe("valid");
+
+    const completeResponse = await fetch(`${baseUrl}/api/v1/identity/trusted-devices/pairing/complete`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        pairingSessionId: initiateBody.data.pairingSession.pairingSessionId,
+        pairingTokenId: initiateBody.data.pairingToken.pairingTokenId,
+        trustedDeviceId,
+        userIdentityId: "malicious-override-ignored",
+        presentedToken: initiateBody.data.artifact.value,
+        trustMaterialRef: {
+          materialId: `material:${trustedDeviceId}`,
+          kind: "session-signing-key",
+          issuedAt: "2026-04-04T18:00:00.000Z",
+        },
+      }),
+    });
+    expect(completeResponse.status).toBe(200);
+    const completeBody = await completeResponse.json();
+    expect(completeBody.ok).toBe(true);
+    expect(completeBody.data.trustedDevice.trustStatus).toBe("trusted");
+
+    const listResponse = await fetch(`${baseUrl}/api/v1/identity/trusted-devices`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+    });
+    expect(listResponse.status).toBe(200);
+    const listBody = await listResponse.json();
+    expect(listBody.ok).toBe(true);
+    expect(listBody.data.devices.some((device: { trustedDeviceId: string }) => device.trustedDeviceId === trustedDeviceId)).toBeTrue();
+
+    const getResponse = await fetch(`${baseUrl}/api/v1/identity/trusted-devices/${encodeURIComponent(trustedDeviceId)}`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+    });
+    expect(getResponse.status).toBe(200);
+    const getBody = await getResponse.json();
+    expect(getBody.ok).toBe(true);
+    expect(getBody.data.trustedDevice.trustedDeviceId).toBe(trustedDeviceId);
+
+    const renameResponse = await fetch(`${baseUrl}/api/v1/identity/trusted-devices/${encodeURIComponent(trustedDeviceId)}/display-name`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        displayName: "HTTP Flow Device",
+      }),
+    });
+    expect(renameResponse.status).toBe(200);
+    const renameBody = await renameResponse.json();
+    expect(renameBody.ok).toBe(true);
+    expect(renameBody.data.trustedDevice.displayName).toBe("HTTP Flow Device");
+
+    const revokeResponse = await fetch(`${baseUrl}/api/v1/identity/trusted-devices/${encodeURIComponent(trustedDeviceId)}/revoke`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        reason: "user-request",
+      }),
+    });
+    expect(revokeResponse.status).toBe(200);
+    const revokeBody = await revokeResponse.json();
+    expect(revokeBody.ok).toBe(true);
+    expect(revokeBody.data.revoked).toBe(true);
+  });
 });

@@ -13,6 +13,13 @@ This module defines the transport-facing request/response contracts for local ac
 - `ListIdentityAdminAccountsApiRequest`
 - `GetIdentityAdminAccountStatusApiRequest`
 - `SetIdentityAdminAccountStatusApiRequest`
+- `ListTrustedDevicesApiRequest`
+- `GetTrustedDeviceApiRequest`
+- `RevokeTrustedDeviceApiRequest`
+- `UpdateTrustedDeviceDisplayNameApiRequest`
+- `InitiateTrustedDevicePairingApiRequest`
+- `ValidateTrustedDevicePairingApiRequest`
+- `CompleteTrustedDevicePairingApiRequest`
 
 `LoginLocalIdentityApiRequest.client` supports optional trusted-device context:
 
@@ -42,12 +49,30 @@ Login also supports optional server-side trust posture selection:
 - `ListIdentityAdminAccountsApiResponse`
 - `GetIdentityAdminAccountStatusApiResponse`
 - `SetIdentityAdminAccountStatusApiResponse`
+- `ListTrustedDevicesApiResponse`
+- `GetTrustedDeviceApiResponse`
+- `RevokeTrustedDeviceApiResponse`
+- `UpdateTrustedDeviceDisplayNameApiResponse`
+- `InitiateTrustedDevicePairingApiResponse`
+- `ValidateTrustedDevicePairingApiResponse`
+- `CompleteTrustedDevicePairingApiResponse`
 
 Session responses may include device-bound trust context (`deviceTrustContext`) plus legacy compatibility fields (`trustedDeviceBindingId`, `trustMarker`) when present.
 
 High-assurance route posture:
 - `POST /api/v1/identity/credential/change` requires trusted session assurance.
 - `GET|POST /api/v1/identity/admin/accounts*` routes require trusted session assurance.
+
+Trusted-device route posture:
+- `GET /api/v1/identity/trusted-devices`
+- `GET /api/v1/identity/trusted-devices/:trustedDeviceId`
+- `POST /api/v1/identity/trusted-devices/:trustedDeviceId/revoke`
+- `POST /api/v1/identity/trusted-devices/:trustedDeviceId/display-name`
+- `POST /api/v1/identity/trusted-devices/pairing/initiate`
+- `POST /api/v1/identity/trusted-devices/pairing/validate`
+- `POST /api/v1/identity/trusted-devices/pairing/complete`
+
+Trusted-device responses intentionally exclude raw fingerprint values, token hashes, and trust-material internals.
 
 ## Error envelope
 

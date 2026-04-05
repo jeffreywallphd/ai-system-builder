@@ -21,6 +21,8 @@ describe("IdentityAuthRedaction", () => {
           { providerSubject: "alice" },
           { presentedToken: "PAIR-SECRET-ALPHA" },
           { pinReference: "pin:alpha" },
+          { artifact: { type: "one-time-code", value: "PAIR-CODE-ALPHA" } },
+          { fingerprint: { algorithm: "sha256", value: "fingerprint-value-alpha" } },
         ],
       },
     };
@@ -34,6 +36,8 @@ describe("IdentityAuthRedaction", () => {
     expect(serialized.includes("marker:alpha")).toBeFalse();
     expect(serialized.includes("trusted-device:alpha")).toBeFalse();
     expect(serialized.includes("PAIR-SECRET-ALPHA")).toBeFalse();
+    expect(serialized.includes("PAIR-CODE-ALPHA")).toBeFalse();
+    expect(serialized.includes("fingerprint-value-alpha")).toBeFalse();
     expect(serialized.includes("pin:alpha")).toBeFalse();
     expect(serialized.includes("[REDACTED]")).toBeTrue();
   });
