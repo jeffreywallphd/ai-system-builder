@@ -33,6 +33,11 @@ This note documents Story 5.1.5 (Feature 5 / Epic 5.1): shared transport contrac
 - Heartbeats:
   - `NodeHeartbeatPayloadDto`
   - `NodeHeartbeatResponseDto`
+- Inventory views:
+  - `NodeInventorySummaryDto`
+  - `NodeInventoryDetailDto`
+  - `NodeInventoryListResponseDto`
+  - `NodeInventoryDetailResponseDto`
 - Node detail and enrollment detail views:
   - admin-visible DTOs (`NodeDetailDto`, `NodeEnrollmentDetailDto`)
   - internal DTOs (`NodeInternalDetailDto`, `NodeInternalEnrollmentDetailDto`)
@@ -51,6 +56,8 @@ Projection helpers enforce safe defaults:
 - `toNodeDetailDto(...)`
 - `toNodeEnrollmentDetailDto(...)`
 - `toNodePendingEnrollmentSummaryDto(...)`
+- `toNodeInventorySummaryDto(...)`
+- `toNodeInventoryDetailDto(...)`
 
 These helpers intentionally remove internal-only fields (for example certificate authority references, certificate thumbprints, revision metadata, and revocation actor identity) unless explicitly using internal DTO types.
 
@@ -63,6 +70,7 @@ These helpers intentionally remove internal-only fields (for example certificate
 - heartbeat payloads
 - capability profile serialization
 - admin-visible and internal detail payloads
+- admin inventory summary/detail payloads
 
 Validation behavior includes:
 
@@ -167,3 +175,29 @@ Server-side enforcement posture:
 - heartbeat route requires authenticated transport
 - unknown nodes return `not-found`
 - non-trusted nodes (including revoked nodes) are rejected by application trusted-state checks before persistence mutation
+
+## Story 5.3.4 trusted inventory list/detail transport
+
+Story 5.3.4 extends node-trust transport with full lifecycle inventory queries and per-node admin detail read models.
+
+Canonical artifacts:
+
+- `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+
+Added API operations:
+
+- `GET /api/v1/nodes/inventory`
+  - returns admin-safe inventory summaries across trusted + pending + rejected + revoked + offline operational states
+  - supports filters: `approvalStatus`, `operationalState`, `enrollmentStatus`, `presenceState`, `nodeType`, `capability`, `deploymentTag`, `lastSeenAfter`, `lastSeenBefore`, `limit`, `offset`
+- `GET /api/v1/nodes/inventory/:nodeId`
+  - returns one admin-safe inventory detail
+  - includes pending enrollment context when available
+
+Sensitive data posture:
+
+- inventory DTOs intentionally expose operational trust state, capability profile, and presence metadata needed by admin UIs
+- internal trust fields (for example revocation actor identity, certificate authority refs, certificate thumbprints, and persistence revision internals) remain excluded

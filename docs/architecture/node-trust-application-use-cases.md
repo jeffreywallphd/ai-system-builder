@@ -1,6 +1,6 @@
 # Node Trust Application Use Cases
 
-This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment, Story 5.2.3 (Feature 5 / Epic 5.2): admin review/approval decisions for pending node enrollment, and Story 5.2.4 (Feature 5 / Epic 5.2): enrollment detail retrieval transport orchestration support.
+This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment, Story 5.2.3 (Feature 5 / Epic 5.2): admin review/approval decisions for pending node enrollment, Story 5.2.4 (Feature 5 / Epic 5.2): enrollment detail retrieval transport orchestration support, and Story 5.3.4 (Feature 5 / Epic 5.3): admin inventory list/detail query read models across trust and presence states.
 
 ## Canonical files
 
@@ -17,6 +17,9 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `src/application/nodes/use-cases/RevokeNodeTrustUseCase.ts`
 - `src/application/nodes/use-cases/RecordNodeHeartbeatUseCase.ts`
 - `src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase.ts`
+- `src/application/nodes/use-cases/NodeInventoryReadModels.ts`
+- `src/application/nodes/use-cases/ListNodeInventoryUseCase.ts`
+- `src/application/nodes/use-cases/GetNodeInventoryDetailUseCase.ts`
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
 - `src/infrastructure/security/nodes/NodeBootstrapIdentityService.ts`
 - `src/infrastructure/security/nodes/tests/NodeBootstrapIdentityService.test.ts`
@@ -75,6 +78,15 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
   - authorizes trusted inventory queries
   - queries trusted-node-only inventory using persistence query presets and filters
   - supports capability-filtered trusted inventory queries using normalized capability profiles
+- `ListNodeInventoryUseCase`
+  - authorizes admin inventory queries for full trust lifecycle visibility (active, pending, rejected, revoked, offline)
+  - merges node identity records and pending enrollment requests into one inventory read model
+  - supports filters by approval status, capability, node type, deployment tag, and presence state
+  - preserves admin-safe output by returning operational summaries without internal certificate/revision internals
+- `GetNodeInventoryDetailUseCase`
+  - authorizes admin inventory detail reads for one `nodeId`
+  - resolves node operational detail from node identity records plus pending enrollment context when present
+  - supports pending-only detail retrieval for nodes that only exist as enrollment requests
 - `NodeBootstrapIdentityService`
   - generates durable local bootstrap identity for `compute` and `hybrid` nodes
   - persists one local bootstrap record and Ed25519 keypair in a secure node-local directory
@@ -132,6 +144,8 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - revocation flow with certificate-revocation hook
 - heartbeat recording with trusted-node-only guardrails and revoked-node rejection behavior
 - trusted inventory query filtering
+- full inventory query filtering across node + pending-enrollment read models
+- node inventory detail retrieval for pending-only and persisted node records
 
 `src/infrastructure/security/nodes/tests/NodeBootstrapIdentityService.test.ts` validates:
 

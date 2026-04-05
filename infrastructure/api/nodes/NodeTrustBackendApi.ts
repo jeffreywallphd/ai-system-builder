@@ -1,17 +1,27 @@
 import type {
   ApproveNodeEnrollmentUseCase,
+  GetNodeInventoryDetailUseCase,
   GetNodeEnrollmentDetailUseCase,
+  ListNodeInventoryUseCase,
   ListTrustedNodeInventoryUseCase,
   RecordNodeHeartbeatUseCase,
   RegisterNodeEnrollmentRequestUseCase,
   RejectNodeEnrollmentUseCase,
   ReviewPendingNodeEnrollmentUseCase,
 } from "../../src/application/nodes/use-cases";
+import type {
+  NodeInventoryDetailReadModel,
+  NodeInventorySummaryReadModel,
+} from "../../src/application/nodes/use-cases/NodeInventoryReadModels";
 import { NodeTrustUseCaseErrorCodes } from "../../src/application/nodes/use-cases/NodeTrustUseCaseShared";
 import {
+  toNodeInventoryDetailDto,
+  toNodeInventorySummaryDto,
   toNodeDetailDto,
   toNodeEnrollmentDetailDto,
   toNodePendingEnrollmentSummaryDto,
+  type NodeInternalInventoryDetailDto,
+  type NodeInternalInventorySummaryDto,
   type NodeInternalDetailDto,
   type NodeInternalEnrollmentDetailDto,
 } from "../../src/shared/contracts/nodes/NodeTrustApiContracts";
@@ -24,6 +34,10 @@ import {
   type ApproveNodeEnrollmentApiResponse,
   type GetNodeEnrollmentDetailApiRequest,
   type GetNodeEnrollmentDetailApiResponse,
+  type GetNodeInventoryDetailApiRequest,
+  type GetNodeInventoryDetailApiResponse,
+  type ListNodeInventoryApiRequest,
+  type ListNodeInventoryApiResponse,
   type ListTrustedNodeInventoryApiRequest,
   type ListTrustedNodeInventoryApiResponse,
   NodeTrustApiErrorCodes,
@@ -43,10 +57,12 @@ interface NodeTrustBackendApiDependencies {
   readonly registerNodeEnrollmentRequestUseCase: RegisterNodeEnrollmentRequestUseCase;
   readonly reviewPendingNodeEnrollmentUseCase: ReviewPendingNodeEnrollmentUseCase;
   readonly getNodeEnrollmentDetailUseCase: GetNodeEnrollmentDetailUseCase;
+  readonly getNodeInventoryDetailUseCase: GetNodeInventoryDetailUseCase;
   readonly approveNodeEnrollmentUseCase: ApproveNodeEnrollmentUseCase;
   readonly rejectNodeEnrollmentUseCase: RejectNodeEnrollmentUseCase;
   readonly recordNodeHeartbeatUseCase: RecordNodeHeartbeatUseCase;
   readonly listTrustedNodeInventoryUseCase: ListTrustedNodeInventoryUseCase;
+  readonly listNodeInventoryUseCase: ListNodeInventoryUseCase;
 }
 
 export class NodeTrustBackendApi {
@@ -281,6 +297,71 @@ export class NodeTrustBackendApi {
     });
   }
 
+  public async listNodeInventory(
+    request: ListNodeInventoryApiRequest,
+  ): Promise<NodeTrustApiResponse<ListNodeInventoryApiResponse>> {
+    const outcome = await this.dependencies.listNodeInventoryUseCase.execute({
+      actorUserIdentityId: request.actorUserIdentityId,
+      nodeTypes: request.nodeTypes,
+      approvalStatuses: request.approvalStatuses,
+      presenceStates: request.presenceStates,
+      operationalStates: request.operationalStates,
+      capabilityAnyOf: request.capabilityAnyOf,
+      deploymentTagAnyOf: request.deploymentTagAnyOf,
+      lastSeenAfter: request.lastSeenAfter,
+      lastSeenBefore: request.lastSeenBefore,
+      limit: request.limit,
+      offset: request.offset,
+    });
+
+    if (!outcome.ok) {
+      return Object.freeze({
+        ok: false,
+        error: this.mapUseCaseError(outcome.error.code, outcome.error.message),
+      });
+    }
+
+    const enrollmentStatuses = request.enrollmentStatuses;
+    const nodes = enrollmentStatuses && enrollmentStatuses.length > 0
+      ? outcome.value.nodes.filter((node) => {
+        if (!node.enrollmentStatus) {
+          return false;
+        }
+        return enrollmentStatuses.includes(node.enrollmentStatus);
+      })
+      : outcome.value.nodes;
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        nodes: Object.freeze(nodes.map((node) => toNodeInventorySummaryDto(this.toInternalInventorySummary(node)))),
+      }),
+    });
+  }
+
+  public async getNodeInventoryDetail(
+    request: GetNodeInventoryDetailApiRequest,
+  ): Promise<NodeTrustApiResponse<GetNodeInventoryDetailApiResponse>> {
+    const outcome = await this.dependencies.getNodeInventoryDetailUseCase.execute({
+      actorUserIdentityId: request.actorUserIdentityId,
+      nodeId: request.nodeId,
+    });
+
+    if (!outcome.ok) {
+      return Object.freeze({
+        ok: false,
+        error: this.mapUseCaseError(outcome.error.code, outcome.error.message),
+      });
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        node: toNodeInventoryDetailDto(this.toInternalInventoryDetail(outcome.value.node)),
+      }),
+    });
+  }
+
   private toInternalEnrollment(input: NodeEnrollmentRequestPersistenceRecord): NodeInternalEnrollmentDetailDto {
     return Object.freeze({
       requestId: input.requestId,
@@ -324,6 +405,54 @@ export class NodeTrustBackendApi {
       lastModifiedAt: input.lastModifiedAt,
       lastModifiedBy: input.lastModifiedBy,
       revision: input.revision,
+    });
+  }
+
+  private toInternalInventorySummary(
+    input: NodeInventorySummaryReadModel,
+  ): NodeInternalInventorySummaryDto {
+    return Object.freeze({
+      nodeId: input.nodeId,
+      nodeType: input.nodeType,
+      displayName: input.displayName,
+      approvalStatus: input.approvalStatus,
+      trustState: input.trustState,
+      enrollmentStatus: input.enrollmentStatus,
+      operationalState: input.operationalState,
+      presenceState: input.presenceState,
+      capabilityProfile: input.capabilityProfile,
+      deploymentTags: input.deploymentTags,
+      lastSeen: input.lastSeen,
+      certificateRef: input.certificateRef,
+      revocation: Object.freeze({
+        state: input.revocationState,
+        reason: input.revocationReason,
+        note: input.revocationNote,
+        revokedAt: input.revokedAt,
+      }),
+      enrolledAt: input.enrolledAt,
+      requestedAt: input.requestedAt,
+      approvedAt: input.approvedAt,
+      revokedAt: input.revokedAt,
+      pendingEnrollmentRequestId: input.pendingEnrollmentRequestId,
+    });
+  }
+
+  private toInternalInventoryDetail(
+    input: NodeInventoryDetailReadModel,
+  ): NodeInternalInventoryDetailDto {
+    return Object.freeze({
+      ...this.toInternalInventorySummary(input),
+      pendingEnrollment: input.pendingEnrollment
+        ? Object.freeze({
+          requestId: input.pendingEnrollment.requestId,
+          status: input.pendingEnrollment.status,
+          requestedAt: input.pendingEnrollment.requestedAt,
+          reviewedAt: input.pendingEnrollment.reviewedAt,
+          decisionNote: input.pendingEnrollment.decisionNote,
+          certificateRef: input.pendingEnrollment.certificateRef,
+        })
+        : undefined,
     });
   }
 

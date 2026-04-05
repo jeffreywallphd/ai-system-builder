@@ -1,4 +1,5 @@
 import type {
+  NodeEnrollmentRequestPersistenceLookupQuery,
   NodeEnrollmentRequestPersistenceRecord,
   NodeIdentityPersistenceLookupQuery,
   NodeIdentityPersistenceRecord,
@@ -40,5 +41,11 @@ export interface NodeTrustAuthorizationHook {
   assertCanQueryTrustedNodeInventory(input: {
     readonly actorUserIdentityId: string;
     readonly query: NodeIdentityPersistenceLookupQuery;
+  }): Promise<void>;
+  assertCanQueryNodeInventory?(input: {
+    readonly actorUserIdentityId: string;
+    readonly nodeQuery: NodeIdentityPersistenceLookupQuery;
+    readonly enrollmentQuery?: NodeEnrollmentRequestPersistenceLookupQuery;
+    readonly nodeId?: string;
   }): Promise<void>;
 }

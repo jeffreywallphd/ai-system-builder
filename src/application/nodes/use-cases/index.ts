@@ -8,3 +8,6 @@ export * from "./RejectNodeEnrollmentUseCase";
 export * from "./RevokeNodeTrustUseCase";
 export * from "./RecordNodeHeartbeatUseCase";
 export * from "./ListTrustedNodeInventoryUseCase";
+export * from "./NodeInventoryReadModels";
+export * from "./ListNodeInventoryUseCase";
+export * from "./GetNodeInventoryDetailUseCase";

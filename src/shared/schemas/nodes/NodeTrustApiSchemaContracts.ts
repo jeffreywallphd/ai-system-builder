@@ -90,6 +90,21 @@ const NodeHeartbeatStatusSchema = z.enum([
   NodeHeartbeatStatuses.offline,
 ]);
 
+const NodeInventoryOperationalStateSchema = z.enum([
+  "active",
+  "pending",
+  "rejected",
+  "revoked",
+  "offline",
+]);
+
+const NodeInventoryPresenceStateSchema = z.enum([
+  "online",
+  "degraded",
+  "offline",
+  "unknown",
+]);
+
 const NodeRoleCapabilitySchema = z.enum([
   NodeRoleCapabilities.ui,
   NodeRoleCapabilities.api,
@@ -374,6 +389,48 @@ export const NodeHeartbeatResponseDtoSchema = z.object({
   node: NodeDetailDtoSchema,
 }).strict();
 
+export const NodeInventoryPendingEnrollmentDtoSchema = z.object({
+  requestId: NodeTrustApiIdentifierSchema,
+  status: NodeEnrollmentRequestStatusSchema,
+  requestedAt: NodeTrustApiTimestampSchema,
+  reviewedAt: NodeTrustApiTimestampSchema.optional(),
+  decisionNote: z.string().trim().max(2000).optional(),
+  certificateRef: NodeTrustApiIdentifierSchema.optional(),
+}).strict();
+
+export const NodeInventorySummaryDtoSchema = z.object({
+  nodeId: NodeTrustApiIdentifierSchema,
+  nodeType: NodeTypeSchema,
+  displayName: z.string().trim().min(1).max(120),
+  approvalStatus: NodeApprovalStatusSchema,
+  trustState: NodeTrustStateSchema,
+  enrollmentStatus: NodeEnrollmentRequestStatusSchema.optional(),
+  operationalState: NodeInventoryOperationalStateSchema,
+  presenceState: NodeInventoryPresenceStateSchema,
+  capabilityProfile: NodeCapabilityProfileDtoSchema,
+  deploymentTags: z.array(NodeTrustApiIdentifierSchema).max(64),
+  lastSeen: NodeLastSeenDtoSchema.optional(),
+  certificateRef: NodeTrustApiIdentifierSchema.optional(),
+  revocation: NodeRevocationDtoSchema,
+  enrolledAt: NodeTrustApiTimestampSchema.optional(),
+  requestedAt: NodeTrustApiTimestampSchema.optional(),
+  approvedAt: NodeTrustApiTimestampSchema.optional(),
+  revokedAt: NodeTrustApiTimestampSchema.optional(),
+  pendingEnrollmentRequestId: NodeTrustApiIdentifierSchema.optional(),
+}).strict();
+
+export const NodeInventoryDetailDtoSchema = NodeInventorySummaryDtoSchema.extend({
+  pendingEnrollment: NodeInventoryPendingEnrollmentDtoSchema.optional(),
+}).strict();
+
+export const NodeInventoryListResponseDtoSchema = z.object({
+  nodes: z.array(NodeInventorySummaryDtoSchema),
+}).strict();
+
+export const NodeInventoryDetailResponseDtoSchema = z.object({
+  node: NodeInventoryDetailDtoSchema,
+}).strict();
+
 export type NodeCapabilityProfileDtoPayload = z.infer<typeof NodeCapabilityProfileDtoSchema>;
 export type NodeEnrollmentSubmissionRequestDtoPayload = z.infer<typeof NodeEnrollmentSubmissionRequestDtoSchema>;
 export type NodePendingEnrollmentSummaryDtoPayload = z.infer<typeof NodePendingEnrollmentSummaryDtoSchema>;
@@ -390,6 +447,11 @@ export type PendingEnrollmentListResponseDtoPayload = z.infer<typeof PendingEnro
 export type NodeEnrollmentDecisionResponseDtoPayload = z.infer<typeof NodeEnrollmentDecisionResponseDtoSchema>;
 export type NodeRevocationResponseDtoPayload = z.infer<typeof NodeRevocationResponseDtoSchema>;
 export type NodeHeartbeatResponseDtoPayload = z.infer<typeof NodeHeartbeatResponseDtoSchema>;
+export type NodeInventoryPendingEnrollmentDtoPayload = z.infer<typeof NodeInventoryPendingEnrollmentDtoSchema>;
+export type NodeInventorySummaryDtoPayload = z.infer<typeof NodeInventorySummaryDtoSchema>;
+export type NodeInventoryDetailDtoPayload = z.infer<typeof NodeInventoryDetailDtoSchema>;
+export type NodeInventoryListResponseDtoPayload = z.infer<typeof NodeInventoryListResponseDtoSchema>;
+export type NodeInventoryDetailResponseDtoPayload = z.infer<typeof NodeInventoryDetailResponseDtoSchema>;
 
 function formatZodPath(path: ReadonlyArray<string | number>): string {
   if (path.length === 0) {
@@ -553,6 +615,38 @@ export function parseNodeHeartbeatResponseDto(payload: unknown): NodeHeartbeatRe
   return parseNodeTrustApiSchema(
     "NodeHeartbeatResponseDto",
     NodeHeartbeatResponseDtoSchema,
+    payload,
+  );
+}
+
+export function parseNodeInventorySummaryDto(payload: unknown): NodeInventorySummaryDtoPayload {
+  return parseNodeTrustApiSchema(
+    "NodeInventorySummaryDto",
+    NodeInventorySummaryDtoSchema,
+    payload,
+  );
+}
+
+export function parseNodeInventoryDetailDto(payload: unknown): NodeInventoryDetailDtoPayload {
+  return parseNodeTrustApiSchema(
+    "NodeInventoryDetailDto",
+    NodeInventoryDetailDtoSchema,
+    payload,
+  );
+}
+
+export function parseNodeInventoryListResponseDto(payload: unknown): NodeInventoryListResponseDtoPayload {
+  return parseNodeTrustApiSchema(
+    "NodeInventoryListResponseDto",
+    NodeInventoryListResponseDtoSchema,
+    payload,
+  );
+}
+
+export function parseNodeInventoryDetailResponseDto(payload: unknown): NodeInventoryDetailResponseDtoPayload {
+  return parseNodeTrustApiSchema(
+    "NodeInventoryDetailResponseDto",
+    NodeInventoryDetailResponseDtoSchema,
     payload,
   );
 }

@@ -2,7 +2,7 @@
 
 ## Scope
 
-Story 5.3.1, Story 5.3.2, and Story 5.3.3 (Feature 5 / Epic 5.3): approved-node activation plus capability profile registration/validation and operational presence heartbeat ingestion.
+Story 5.3.1, Story 5.3.2, Story 5.3.3, and Story 5.3.4 (Feature 5 / Epic 5.3): approved-node activation plus capability profile registration/validation, operational presence heartbeat ingestion, and admin inventory list/detail query views.
 
 ## Canonical files
 
@@ -10,6 +10,9 @@ Story 5.3.1, Story 5.3.2, and Story 5.3.3 (Feature 5 / Epic 5.3): approved-node 
 - `src/application/nodes/use-cases/ActivateApprovedNodeUseCase.ts`
 - `src/application/nodes/use-cases/RecordNodeHeartbeatUseCase.ts`
 - `src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase.ts`
+- `src/application/nodes/use-cases/NodeInventoryReadModels.ts`
+- `src/application/nodes/use-cases/ListNodeInventoryUseCase.ts`
+- `src/application/nodes/use-cases/GetNodeInventoryDetailUseCase.ts`
 - `src/application/nodes/ports/NodeTrustAuthorizationPorts.ts`
 - `src/application/nodes/ports/NodeTrustAuditPorts.ts`
 - `src/domain/nodes/NodeTrustDomain.ts`
@@ -75,6 +78,11 @@ Story 5.3.1, Story 5.3.2, and Story 5.3.3 (Feature 5 / Epic 5.3): approved-node 
 - Admin visibility endpoint:
   - `GET /api/v1/nodes/trusted`
   - supports query filters: `nodeType`, `capability`, `deploymentTag`, `lastSeenAfter`, `lastSeenBefore`, `limit`, `offset`
+- Admin inventory endpoints:
+  - `GET /api/v1/nodes/inventory`
+  - `GET /api/v1/nodes/inventory/:nodeId`
+  - supports filters: `approvalStatus`, `operationalState`, `enrollmentStatus`, `presenceState`, `nodeType`, `capability`, `deploymentTag`, `lastSeenAfter`, `lastSeenBefore`, `limit`, `offset`
+  - operational categories: `active`, `pending`, `rejected`, `revoked`, `offline`
 - Persisted presence fields:
   - `lastSeen.lastSeenAt`
   - `lastSeen.heartbeatStatus`

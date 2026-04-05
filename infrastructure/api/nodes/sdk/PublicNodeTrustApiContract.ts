@@ -1,4 +1,10 @@
 import type {
+  NodeApprovalStatus,
+  NodeEnrollmentRequestStatus,
+  NodeInventoryDetailDto,
+  NodeInventoryPresenceState,
+  NodeInventorySummaryDto,
+  NodeInventoryOperationalState,
   ApproveNodeEnrollmentActionRequestDto,
   NodeDetailDto,
   NodeEnrollmentDecisionResponseDto,
@@ -99,4 +105,32 @@ export interface ListTrustedNodeInventoryApiRequest {
 
 export interface ListTrustedNodeInventoryApiResponse {
   readonly nodes: ReadonlyArray<NodeDetailDto>;
+}
+
+export interface ListNodeInventoryApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly nodeTypes?: ReadonlyArray<NodeType>;
+  readonly approvalStatuses?: ReadonlyArray<NodeApprovalStatus>;
+  readonly operationalStates?: ReadonlyArray<NodeInventoryOperationalState>;
+  readonly enrollmentStatuses?: ReadonlyArray<NodeEnrollmentRequestStatus>;
+  readonly presenceStates?: ReadonlyArray<NodeInventoryPresenceState>;
+  readonly capabilityAnyOf?: ReadonlyArray<NodeRoleCapability>;
+  readonly deploymentTagAnyOf?: ReadonlyArray<string>;
+  readonly lastSeenAfter?: string;
+  readonly lastSeenBefore?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface ListNodeInventoryApiResponse {
+  readonly nodes: ReadonlyArray<NodeInventorySummaryDto>;
+}
+
+export interface GetNodeInventoryDetailApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly nodeId: string;
+}
+
+export interface GetNodeInventoryDetailApiResponse {
+  readonly node: NodeInventoryDetailDto;
 }

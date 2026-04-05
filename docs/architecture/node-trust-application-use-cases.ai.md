@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Quick baseline for Story 5.1.4 node trust application orchestration seams, Story 5.2.1 node bootstrap identity generation, Story 5.2.3 admin review/approval decisions, and Story 5.2.4 enrollment detail retrieval support (Feature 5 / Epic 5.1 and Epic 5.2).
+Quick baseline for Story 5.1.4 node trust application orchestration seams, Story 5.2.1 node bootstrap identity generation, Story 5.2.3 admin review/approval decisions, Story 5.2.4 enrollment detail retrieval support, and Story 5.3.4 admin inventory list/detail queries (Feature 5 / Epic 5.1, 5.2, and 5.3).
 
 ## Canonical files
 
@@ -19,6 +19,9 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - `src/application/nodes/use-cases/RevokeNodeTrustUseCase.ts`
 - `src/application/nodes/use-cases/RecordNodeHeartbeatUseCase.ts`
 - `src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase.ts`
+- `src/application/nodes/use-cases/NodeInventoryReadModels.ts`
+- `src/application/nodes/use-cases/ListNodeInventoryUseCase.ts`
+- `src/application/nodes/use-cases/GetNodeInventoryDetailUseCase.ts`
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
 - `src/infrastructure/security/nodes/NodeBootstrapIdentityService.ts`
 - `src/infrastructure/security/nodes/tests/NodeBootstrapIdentityService.test.ts`
@@ -36,6 +39,8 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - record node heartbeat
 - query trusted node inventory
 - query trusted node inventory with normalized capability filtering
+- query full admin inventory with operational summary states (`active`, `pending`, `rejected`, `revoked`, `offline`)
+- resolve one admin inventory detail view by `nodeId`, including pending-only enrollment-backed entries
 - generate/recover node-local bootstrap identity + trust material
 - build enrollment submission payloads from persisted bootstrap material
 

@@ -18,6 +18,7 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
 - approval/rejection/revocation action requests
 - node heartbeat payload/response
 - node detail and enrollment detail views
+- node inventory summary/detail views
 - capability profile transport serialization
 
 ## Public vs internal boundary
@@ -30,9 +31,11 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
   - `NodeInternalDetailDto`
   - `NodeInternalEnrollmentDetailDto`
 - Safe projection helpers:
-  - `toNodeDetailDto(...)`
-  - `toNodeEnrollmentDetailDto(...)`
-  - `toNodePendingEnrollmentSummaryDto(...)`
+- `toNodeDetailDto(...)`
+- `toNodeEnrollmentDetailDto(...)`
+- `toNodePendingEnrollmentSummaryDto(...)`
+- `toNodeInventorySummaryDto(...)`
+- `toNodeInventoryDetailDto(...)`
 
 ## Validation posture
 
@@ -92,3 +95,16 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
   - binds `actorUserIdentityId` to authenticated session principal,
   - binds heartbeat `nodeId` from route parameters so client payload node-id spoofing is ignored,
   - relies on application use case enforcement that only trusted nodes can update `lastSeen`.
+
+## Story 5.3.4 additions
+
+- Expanded server adapter surface:
+  - `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+  - `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- Expanded HTTP routes in `IdentityHttpServer.ts`:
+  - `GET /api/v1/nodes/inventory`
+  - `GET /api/v1/nodes/inventory/:nodeId`
+- Inventory routes now:
+  - return admin-safe lifecycle summaries across `active`, `pending`, `rejected`, `revoked`, and `offline` states,
+  - support filters for approval status, operational state, enrollment status, presence state, node type, capability, deployment tags, and last-seen windows,
+  - provide pending-enrollment detail context when a node has not yet materialized into a trusted node identity record.

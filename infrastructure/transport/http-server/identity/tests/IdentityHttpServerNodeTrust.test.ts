@@ -8,7 +8,9 @@ import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/Te
 import { NodeTrustBackendApi } from "../../../../api/nodes/NodeTrustBackendApi";
 import { createIdentityHttpServer } from "../IdentityHttpServer";
 import { ApproveNodeEnrollmentUseCase } from "../../../../../src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase";
+import { GetNodeInventoryDetailUseCase } from "../../../../../src/application/nodes/use-cases/GetNodeInventoryDetailUseCase";
 import { GetNodeEnrollmentDetailUseCase } from "../../../../../src/application/nodes/use-cases/GetNodeEnrollmentDetailUseCase";
+import { ListNodeInventoryUseCase } from "../../../../../src/application/nodes/use-cases/ListNodeInventoryUseCase";
 import { ListTrustedNodeInventoryUseCase } from "../../../../../src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase";
 import { RecordNodeHeartbeatUseCase } from "../../../../../src/application/nodes/use-cases/RecordNodeHeartbeatUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../../../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
@@ -63,6 +65,10 @@ async function startServer(): Promise<{
     getNodeEnrollmentDetailUseCase: new GetNodeEnrollmentDetailUseCase({
       enrollmentRequestRepository: nodeTrustAdapter,
     }),
+    getNodeInventoryDetailUseCase: new GetNodeInventoryDetailUseCase({
+      nodeRepository: nodeTrustAdapter,
+      enrollmentRequestRepository: nodeTrustAdapter,
+    }),
     approveNodeEnrollmentUseCase: new ApproveNodeEnrollmentUseCase({
       enrollmentRequestRepository: nodeTrustAdapter,
       nodeRepository: nodeTrustAdapter,
@@ -76,6 +82,10 @@ async function startServer(): Promise<{
     }),
     listTrustedNodeInventoryUseCase: new ListTrustedNodeInventoryUseCase({
       nodeRepository: nodeTrustAdapter,
+    }),
+    listNodeInventoryUseCase: new ListNodeInventoryUseCase({
+      nodeRepository: nodeTrustAdapter,
+      enrollmentRequestRepository: nodeTrustAdapter,
     }),
   });
 
@@ -429,6 +439,96 @@ describe("IdentityHttpServer node trust routes", () => {
     const inventoryBody = await inventory.json();
     expect(inventoryBody.ok).toBe(true);
     expect(inventoryBody.data.nodes.some((node: { nodeId: string }) => node.nodeId === "node:trusted:hb-1")).toBeTrue();
+  });
+
+  it("returns admin inventory list/detail with operational and presence filters", async () => {
+    const { baseUrl, nodeTrustAdapter } = await startServer();
+    const admin = await registerAndLogin(baseUrl, "node.inventory.filter.admin");
+
+    await fetch(`${baseUrl}/api/v1/nodes/enrollments`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        actorUserIdentityId: "node:bootstrap:pending-http-1",
+        nodeId: "node:pending:http-1",
+        nodeType: NodeTypes.hybrid,
+        displayName: "Pending HTTP 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["inventory-http"],
+      }),
+    });
+
+    await nodeTrustAdapter.registerNode({
+      record: {
+        nodeId: "node:trusted:http-offline-1",
+        nodeType: NodeTypes.compute,
+        displayName: "HTTP Offline 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:http-offline-1:v1",
+        },
+        deploymentTags: ["inventory-http"],
+        lastSeen: {
+          lastSeenAt: "2026-04-05T18:06:00.000Z",
+          heartbeatStatus: NodeHeartbeatStatuses.offline,
+        },
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:00:00.000Z",
+        approvedAt: "2026-04-05T18:02:00.000Z",
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T18:06:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-http-offline-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const listResponse = await fetch(
+      `${baseUrl}/api/v1/nodes/inventory?deploymentTag=inventory-http&operationalState=pending&operationalState=offline`,
+      {
+        headers: {
+          authorization: `Bearer ${admin.sessionToken}`,
+        },
+      },
+    );
+
+    expect(listResponse.status).toBe(200);
+    const listBody = await listResponse.json();
+    expect(listBody.ok).toBe(true);
+    expect(listBody.data.nodes.some((node: { nodeId: string }) => node.nodeId === "node:pending:http-1")).toBeTrue();
+    expect(listBody.data.nodes.some((node: { nodeId: string; operationalState: string }) => (
+      node.nodeId === "node:trusted:http-offline-1" && node.operationalState === "offline"
+    ))).toBeTrue();
+
+    const detailResponse = await fetch(
+      `${baseUrl}/api/v1/nodes/inventory/${encodeURIComponent("node:pending:http-1")}`,
+      {
+        headers: {
+          authorization: `Bearer ${admin.sessionToken}`,
+        },
+      },
+    );
+    expect(detailResponse.status).toBe(200);
+    const detailBody = await detailResponse.json();
+    expect(detailBody.ok).toBe(true);
+    expect(detailBody.data.node.operationalState).toBe("pending");
+    expect(detailBody.data.node.pendingEnrollment.requestId).toBeDefined();
   });
 
   it("rejects heartbeat updates for unknown and revoked nodes", async () => {
