@@ -29,11 +29,13 @@ Implementation-truth baseline for workspace tenancy domain + persistence contrac
 - `src/application/workspaces/use-cases/WorkspaceAdministrationQueryService.ts`
 - `src/application/workspaces/use-cases/IssueWorkspaceInvitationUseCase.ts`
 - `src/application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase.ts`
+- `src/application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase.ts`
 - `src/application/workspaces/tests/CreateWorkspaceUseCase.test.ts`
 - `src/application/workspaces/tests/WorkspaceLifecycleUseCases.test.ts`
 - `src/application/workspaces/tests/WorkspaceMembershipAdministrationUseCases.test.ts`
 - `src/application/workspaces/tests/WorkspaceAdministrationQueryService.test.ts`
 - `src/application/workspaces/tests/WorkspaceInvitationLifecycleUseCase.test.ts`
+- `src/application/workspaces/tests/ResolveAuthenticatedWorkspaceOnboardingUseCase.test.ts`
 - `src/application/workspaces/tests/WorkspaceRepositoryPortsContracts.test.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceMigrations.ts`
 - `src/infrastructure/persistence/workspaces/WorkspacePersistenceMapper.ts`
@@ -266,4 +268,20 @@ Protected-resource composition pattern is canonical:
   - invited role projection creates missing active role assignments for the accepting actor,
   - suspended/removed membership conflicts are rejected with deterministic conflict outcomes.
 - Added focused coverage in `src/application/workspaces/tests/WorkspaceInvitationLifecycleUseCase.test.ts` for success + failure paths (accept, decline, cancel, expiry resolution, stale token replay rejection, identity/workspace compatibility guards).
+
+## Story 3.3.3 authenticated join and onboarding resolution flow
+
+- Added `ResolveAuthenticatedWorkspaceOnboardingUseCase` (`src/application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase.ts`) as the signed-in join orchestration entry point for invitation onboarding.
+- Authenticated join resolution now:
+  - requires explicit authenticated session context (`sessionId`, `userIdentityId`, `email`),
+  - supports optional session verification seam (`AuthenticatedWorkspaceOnboardingSessionVerifier`) for trusted-device and security posture checks,
+  - supports optional membership posture policy seam (`AuthenticatedWorkspaceOnboardingMembershipPolicy`) to resolve `active` vs `pending` onboarding outcomes without redesign.
+- Invitation acceptance bridge now captures onboarding completion state in persisted invitation metadata:
+  - `ResolveWorkspaceInvitationLifecycleUseCase` accepts `resolvedOnboardingMetadata` in the `accept` action path,
+  - metadata is merged and persisted atomically with invitation acceptance + membership/role projection through `withWorkspaceInvitationOnboardingMetadata(...)`.
+- Identity mismatch and invalid invite scenarios remain safely rejected through existing invitation-lifecycle compatibility and token-validation guards; authenticated onboarding maps lifecycle failures to dedicated onboarding-safe error codes (`invalidInvite`, `forbidden`, `conflict`, etc.).
+- Added coverage:
+  - `ResolveAuthenticatedWorkspaceOnboardingUseCase.test.ts` for authenticated session validation, policy-driven pending onboarding posture, and invalid-invite mapping.
+  - updated `WorkspaceInvitationLifecycleUseCase.test.ts` to assert onboarding-resolution metadata persistence on accept.
+  - updated `WorkspaceDomain.test.ts` for onboarding metadata merge helper behavior.
 

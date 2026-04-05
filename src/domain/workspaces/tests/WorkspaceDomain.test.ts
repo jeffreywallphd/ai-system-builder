@@ -22,6 +22,7 @@ import {
   transitionWorkspaceMembershipStatus,
   transitionWorkspaceStatus,
   updateWorkspaceDetails,
+  withWorkspaceInvitationOnboardingMetadata,
 } from "../WorkspaceDomain";
 import {
   WorkspaceOwnershipError,
@@ -263,5 +264,38 @@ describe("WorkspaceDomain", () => {
       invitationTokenHash: "not-a-hash",
       expiresAt: "2026-04-06T16:30:00.000Z",
     })).toThrow("invitationTokenHash");
+  });
+
+  it("merges onboarding metadata updates for invitation records", () => {
+    const invitation = createWorkspaceInvitation({
+      id: "invite-metadata",
+      workspaceId: "workspace-1",
+      invitedEmail: "member@example.com",
+      invitedByUserId: "user-owner",
+      invitedRoles: [WorkspaceRoles.member],
+      onboardingMetadata: {
+        source: "issuance",
+      },
+      createdAt: "2026-04-05T16:00:00.000Z",
+      expiresAt: "2026-04-05T17:00:00.000Z",
+    });
+
+    const updated = withWorkspaceInvitationOnboardingMetadata(invitation, {
+      onboardingMetadata: {
+        onboardingResolution: {
+          flow: "authenticated-join",
+        },
+      },
+      actorUserId: "user-member",
+      now: new Date("2026-04-05T16:05:00.000Z"),
+      merge: true,
+    });
+
+    expect(updated.onboardingMetadata?.source).toBe("issuance");
+    expect(updated.onboardingMetadata?.onboardingResolution).toEqual({
+      flow: "authenticated-join",
+    });
+    expect(updated.lastModifiedBy).toBe("user-member");
+    expect(updated.lastModifiedAt).toBe("2026-04-05T16:05:00.000Z");
   });
 });
