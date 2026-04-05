@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Quick baseline for Story 5.1.4 node trust application orchestration seams plus Story 5.2.1 node bootstrap identity generation (Feature 5 / Epic 5.1 and Epic 5.2).
+Quick baseline for Story 5.1.4 node trust application orchestration seams, Story 5.2.1 node bootstrap identity generation, and Story 5.2.3 admin review/approval decisions (Feature 5 / Epic 5.1 and Epic 5.2).
 
 ## Canonical files
 
@@ -25,8 +25,8 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams plus S
 
 - register enrollment request
 - review/list pending enrollment queue
-- approve node (including certificate hook seam)
-- reject node
+- approve node (admin-authorized, explicit lifecycle transitions, decision metadata, certificate hook seam)
+- reject node (admin-authorized, explicit lifecycle transitions, decision metadata)
 - revoke node trust (including certificate-revocation seam)
 - record node heartbeat
 - query trusted node inventory
@@ -47,3 +47,5 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams plus S
 - Authorization policy engines can plug in through `NodeTrustAuthorizationHook` without changing use-case signatures.
 - PKI/certificate services can plug in through `NodeTrustCertificateHook` without changing node approval/revocation orchestration.
 - Audit pipelines can plug in through `NodeTrustAuditSink` while preserving non-blocking application flow.
+- Enrollment approval/rejection metadata (`reviewedAt`, `reviewedByUserIdentityId`, `decisionNote`) remains in persistence contracts so admin decisions are auditable and durable.
+- Approval/rejection audit events include the persisted decision metadata for downstream audit consumers.

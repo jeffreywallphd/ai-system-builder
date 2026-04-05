@@ -50,6 +50,13 @@ class InMemoryNodeTrustRepository
   implements INodeTrustIdentityPersistenceRepository, INodeEnrollmentRequestPersistenceRepository {
   public readonly nodes = new Map<string, NodeIdentityPersistenceRecord>();
   public readonly enrollmentRequests = new Map<string, NodeEnrollmentRequestPersistenceRecord>();
+  public readonly enrollmentStatusTransitions: Array<{
+    readonly requestId: string;
+    readonly toStatus: typeof NodeEnrollmentRequestStatuses[keyof typeof NodeEnrollmentRequestStatuses];
+    readonly reviewedAt?: string;
+    readonly reviewedByUserIdentityId?: string;
+    readonly decisionNote?: string;
+  }> = [];
 
   async findNodeById(nodeId: string): Promise<NodeIdentityPersistenceRecord | undefined> {
     return this.nodes.get(nodeId);
@@ -248,6 +255,14 @@ class InMemoryNodeTrustRepository
       throw new Error("Enrollment request not found.");
     }
 
+    this.enrollmentStatusTransitions.push(Object.freeze({
+      requestId: input.requestId,
+      toStatus: input.toStatus,
+      reviewedAt: input.reviewedAt,
+      reviewedByUserIdentityId: input.reviewedByUserIdentityId,
+      decisionNote: input.decisionNote,
+    }));
+
     return this.saveEnrollmentRequest({
       record: {
         ...existing,
@@ -278,6 +293,34 @@ function createAllowAllAuthorizationHook(): NodeTrustAuthorizationHook {
     async assertCanRevokeNode(_input) {},
     async assertCanRecordHeartbeat(_input) {},
     async assertCanQueryTrustedNodeInventory(_input) {},
+  };
+}
+
+function createDenyingAuthorizationHook(input: {
+  readonly reviewPending?: boolean;
+  readonly approve?: boolean;
+  readonly reject?: boolean;
+}): NodeTrustAuthorizationHook {
+  return {
+    async assertCanRegisterEnrollmentRequest(_request) {},
+    async assertCanReviewPendingEnrollment(_request) {
+      if (input.reviewPending) {
+        throw new Error("admin role required to review pending enrollments");
+      }
+    },
+    async assertCanApproveNode(_request) {
+      if (input.approve) {
+        throw new Error("admin role required to approve enrollment requests");
+      }
+    },
+    async assertCanRejectNode(_request) {
+      if (input.reject) {
+        throw new Error("admin role required to reject enrollment requests");
+      }
+    },
+    async assertCanRevokeNode(_request) {},
+    async assertCanRecordHeartbeat(_request) {},
+    async assertCanQueryTrustedNodeInventory(_request) {},
   };
 }
 
@@ -392,9 +435,56 @@ describe("node trust application use-cases", () => {
     expect(result.value.enrollments[0]?.requestId).toBe("enroll-1");
   });
 
+  it("blocks unauthorized actors from reviewing pending enrollment queue", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.saveEnrollmentRequest({
+      record: {
+        requestId: "enroll-review-denied-1",
+        nodeId: "node-review-denied-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Review Denied Node",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["us-east-1"],
+        requestedAt: "2026-04-05T17:00:00.000Z",
+        status: NodeEnrollmentRequestStatuses.submitted,
+        createdAt: "2026-04-05T17:00:00.000Z",
+        createdBy: "node-review-denied-1",
+        lastModifiedAt: "2026-04-05T17:00:00.000Z",
+        lastModifiedBy: "node-review-denied-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-review-denied",
+        context: {
+          actorUserIdentityId: "node-review-denied-1",
+        },
+      },
+    });
+
+    const useCase = new ReviewPendingNodeEnrollmentUseCase({
+      enrollmentRequestRepository: repository,
+      authorizationHook: createDenyingAuthorizationHook({ reviewPending: true }),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "member-1",
+    });
+
+    expect(result.ok).toBeFalse();
+    if (!result.ok) {
+      expect(result.error.code).toBe(NodeTrustUseCaseErrorCodes.forbidden);
+      expect(result.error.message).toContain("admin role required");
+    }
+  });
+
   it("approves enrollment requests and provisions node trust with certificate hook", async () => {
     const repository = new InMemoryNodeTrustRepository();
     const certificateHook = new StubCertificateHook();
+    const audit = new RecordingAuditSink();
     await repository.saveEnrollmentRequest({
       record: {
         requestId: "enroll-approve-1",
@@ -428,7 +518,7 @@ describe("node trust application use-cases", () => {
       authorizationHook: createAllowAllAuthorizationHook(),
       certificateHook,
       clock: createFixedClock("2026-04-05T18:05:00.000Z"),
-      auditSink: new RecordingAuditSink(),
+      auditSink: audit,
     });
 
     const result = await useCase.execute({
@@ -443,14 +533,80 @@ describe("node trust application use-cases", () => {
     }
 
     expect(result.value.enrollmentRequest.status).toBe(NodeEnrollmentRequestStatuses.approved);
+    expect(result.value.enrollmentRequest.reviewedByUserIdentityId).toBe("admin-1");
+    expect(result.value.enrollmentRequest.reviewedAt).toBe("2026-04-05T18:05:00.000Z");
+    expect(result.value.enrollmentRequest.decisionNote).toBe("Validated compute profile.");
     expect(result.value.node.approvalStatus).toBe(NodeApprovalStatuses.approved);
     expect(result.value.node.trustState).toBe(NodeTrustStates.trusted);
     expect(result.value.node.certificate?.certificateRef).toBe("cert:node-hybrid-1:v1");
     expect(certificateHook.issuedForNodeIds).toEqual(["node-hybrid-1"]);
+    expect(repository.enrollmentStatusTransitions.map((entry) => entry.toStatus)).toEqual([
+      NodeEnrollmentRequestStatuses.underReview,
+      NodeEnrollmentRequestStatuses.approved,
+    ]);
+    const event = audit.events[audit.events.length - 1];
+    expect(event?.type).toBe(NodeTrustAuditEventTypes.nodeApproved);
+    expect(event?.details?.reviewedByUserIdentityId).toBe("admin-1");
+    expect(event?.details?.reviewedAt).toBe("2026-04-05T18:05:00.000Z");
+    expect(event?.details?.decisionNote).toBe("Validated compute profile.");
+  });
+
+  it("blocks unauthorized actors from approving enrollment requests", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.saveEnrollmentRequest({
+      record: {
+        requestId: "enroll-approve-denied-1",
+        nodeId: "node-approve-denied-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Approve Denied Node",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["us-west-2"],
+        requestedAt: "2026-04-05T18:00:00.000Z",
+        status: NodeEnrollmentRequestStatuses.submitted,
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "node-approve-denied-1",
+        lastModifiedAt: "2026-04-05T18:00:00.000Z",
+        lastModifiedBy: "node-approve-denied-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-approve-denied",
+        context: {
+          actorUserIdentityId: "node-approve-denied-1",
+        },
+      },
+    });
+
+    const useCase = new ApproveNodeEnrollmentUseCase({
+      enrollmentRequestRepository: repository,
+      nodeRepository: repository,
+      authorizationHook: createDenyingAuthorizationHook({ approve: true }),
+      clock: createFixedClock("2026-04-05T18:05:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "member-1",
+      requestId: "enroll-approve-denied-1",
+    });
+
+    expect(result.ok).toBeFalse();
+    if (!result.ok) {
+      expect(result.error.code).toBe(NodeTrustUseCaseErrorCodes.forbidden);
+      expect(result.error.message).toContain("admin role required");
+    }
+
+    const persistedEnrollment = await repository.findEnrollmentRequestById("enroll-approve-denied-1");
+    expect(persistedEnrollment?.status).toBe(NodeEnrollmentRequestStatuses.submitted);
+    expect(repository.nodes.size).toBe(0);
   });
 
   it("rejects enrollment requests and quarantines node records", async () => {
     const repository = new InMemoryNodeTrustRepository();
+    const audit = new RecordingAuditSink();
     await repository.saveEnrollmentRequest({
       record: {
         requestId: "enroll-reject-1",
@@ -483,7 +639,7 @@ describe("node trust application use-cases", () => {
       nodeRepository: repository,
       authorizationHook: createAllowAllAuthorizationHook(),
       clock: createFixedClock("2026-04-05T18:15:00.000Z"),
-      auditSink: new RecordingAuditSink(),
+      auditSink: audit,
     });
 
     const result = await useCase.execute({
@@ -498,8 +654,73 @@ describe("node trust application use-cases", () => {
     }
 
     expect(result.value.enrollmentRequest.status).toBe(NodeEnrollmentRequestStatuses.rejected);
+    expect(result.value.enrollmentRequest.reviewedByUserIdentityId).toBe("admin-1");
+    expect(result.value.enrollmentRequest.reviewedAt).toBe("2026-04-05T18:15:00.000Z");
+    expect(result.value.enrollmentRequest.decisionNote).toBe("Node inventory exceeded for region.");
     expect(result.value.node?.approvalStatus).toBe(NodeApprovalStatuses.rejected);
     expect(result.value.node?.trustState).toBe(NodeTrustStates.quarantined);
+    expect(repository.enrollmentStatusTransitions.map((entry) => entry.toStatus)).toEqual([
+      NodeEnrollmentRequestStatuses.underReview,
+      NodeEnrollmentRequestStatuses.rejected,
+    ]);
+    const event = audit.events[audit.events.length - 1];
+    expect(event?.type).toBe(NodeTrustAuditEventTypes.nodeRejected);
+    expect(event?.details?.reviewedByUserIdentityId).toBe("admin-1");
+    expect(event?.details?.reviewedAt).toBe("2026-04-05T18:15:00.000Z");
+    expect(event?.details?.decisionNote).toBe("Node inventory exceeded for region.");
+  });
+
+  it("blocks unauthorized actors from rejecting enrollment requests", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.saveEnrollmentRequest({
+      record: {
+        requestId: "enroll-reject-denied-1",
+        nodeId: "node-reject-denied-1",
+        nodeType: NodeTypes.edge,
+        displayName: "Reject Denied Node",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          supportsRemoteScheduling: false,
+        },
+        deploymentTags: ["edge"],
+        requestedAt: "2026-04-05T18:10:00.000Z",
+        status: NodeEnrollmentRequestStatuses.submitted,
+        createdAt: "2026-04-05T18:10:00.000Z",
+        createdBy: "node-reject-denied-1",
+        lastModifiedAt: "2026-04-05T18:10:00.000Z",
+        lastModifiedBy: "node-reject-denied-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-reject-denied",
+        context: {
+          actorUserIdentityId: "node-reject-denied-1",
+        },
+      },
+    });
+
+    const useCase = new RejectNodeEnrollmentUseCase({
+      enrollmentRequestRepository: repository,
+      nodeRepository: repository,
+      authorizationHook: createDenyingAuthorizationHook({ reject: true }),
+      clock: createFixedClock("2026-04-05T18:15:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "member-1",
+      requestId: "enroll-reject-denied-1",
+    });
+
+    expect(result.ok).toBeFalse();
+    if (!result.ok) {
+      expect(result.error.code).toBe(NodeTrustUseCaseErrorCodes.forbidden);
+      expect(result.error.message).toContain("admin role required");
+    }
+
+    const persistedEnrollment = await repository.findEnrollmentRequestById("enroll-reject-denied-1");
+    expect(persistedEnrollment?.status).toBe(NodeEnrollmentRequestStatuses.submitted);
+    expect(repository.nodes.size).toBe(0);
   });
 
   it("revokes trusted nodes and invokes certificate revocation hook", async () => {

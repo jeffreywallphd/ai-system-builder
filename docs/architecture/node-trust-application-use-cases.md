@@ -1,6 +1,6 @@
 # Node Trust Application Use Cases
 
-This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, plus Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment.
+This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment, and Story 5.2.3 (Feature 5 / Epic 5.2): admin review/approval decisions for pending node enrollment.
 
 ## Canonical files
 
@@ -37,11 +37,15 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `ApproveNodeEnrollmentUseCase`
   - authorizes approval action
   - transitions enrollment request lifecycle (`submitted -> under-review -> approved` as needed)
+  - persists decision metadata (`reviewedAt`, `reviewedByUserIdentityId`, `decisionNote`) on the enrollment request
+  - emits approval audit events that include persisted decision metadata
   - issues/accepts certificate via hook seam
   - upserts node approval/trust state using persistence ports
 - `RejectNodeEnrollmentUseCase`
   - authorizes rejection action
   - transitions enrollment request lifecycle (`submitted -> under-review -> rejected` as needed)
+  - persists decision metadata (`reviewedAt`, `reviewedByUserIdentityId`, `decisionNote`) on the enrollment request
+  - emits rejection audit events that include persisted decision metadata
   - upserts node as rejected/quarantined for explicit lifecycle traceability
 - `RevokeNodeTrustUseCase`
   - authorizes revocation action
@@ -76,9 +80,11 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `NodeTrustAuthorizationHook`
   - explicit per-use-case permission hooks for register/review/approve/reject/revoke/heartbeat/query operations
   - keeps policy engines and admin role checks out of use-case internals
+  - supports explicit admin-only enforcement for review/approval/rejection actions
 - `NodeTrustCertificateHook`
   - explicit certificate issuance and optional revocation hook
   - allows later PKI integration without changing use-case boundaries
+  - approval flow can trigger certificate issuance while keeping certificate concerns outside enrollment-decision state transitions
 - `NodeTrustAuditSink`
   - best-effort audit publication seam with typed event vocabulary
   - non-blocking by default for current slice
@@ -100,9 +106,9 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts` validates:
 
 - enrollment registration orchestration
-- pending review listing
-- approval flow including certificate hook and trust-state mutation
-- rejection flow and quarantine state mutation
+- pending review listing (including denied review authorization path)
+- approval flow including authorization gating, explicit lifecycle transition sequence, decision metadata persistence, certificate hook, and trust-state mutation
+- rejection flow including authorization gating, explicit lifecycle transition sequence, decision metadata persistence, and quarantine state mutation
 - revocation flow with certificate-revocation hook
 - heartbeat recording and revoked-node rejection behavior
 - trusted inventory query filtering
