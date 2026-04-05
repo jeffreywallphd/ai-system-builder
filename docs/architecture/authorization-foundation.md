@@ -23,6 +23,8 @@ This note documents Story 4.1.1 (Feature 4 / Epic 4.1): core authorization domai
 - `src/shared/contracts/authorization/AuthorizationPolicyContracts.ts`
 - `src/domain/authorization/AuthorizationPermissionCatalog.ts`
 - `src/domain/authorization/tests/AuthorizationPermissionCatalog.test.ts`
+- `src/domain/authorization/AuthorizationRoleDefinitions.ts`
+- `src/domain/authorization/tests/AuthorizationRoleDefinitions.test.ts`
 
 ## Core domain concepts
 
@@ -108,3 +110,9 @@ This note documents Story 4.1.1 (Feature 4 / Epic 4.1): core authorization domai
 Story 4.1.2 adds the canonical permission catalog and resource-action matrix for deterministic permission naming and reusable permission lookups.
 
 - Developer reference: `docs/architecture/authorization-permission-catalog.md`
+
+## Role-definition seam
+
+Story 4.1.3 adds the canonical workspace role-definition layer and role-to-permission baseline mappings for policy evaluation inputs.
+
+- Developer reference: `docs/architecture/authorization-role-reference.md`

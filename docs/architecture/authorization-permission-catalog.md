@@ -18,6 +18,10 @@ The permission catalog defines:
 
 This keeps policy evaluation, role mapping, explicit sharing, and future enforcement seams aligned to one stable contract.
 
+Role baseline mapping that consumes this catalog is documented in:
+
+- `docs/architecture/authorization-role-reference.md`
+
 ## Naming contract
 
 All catalog permissions follow this deterministic format:
