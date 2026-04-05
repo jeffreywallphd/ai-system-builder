@@ -72,6 +72,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Authorization persistence DTO/repository contracts and migration-ready mutation semantics: `docs/architecture/authorization-persistence-contracts.md`
 - Feature 4 / Epic 4.1 end-to-end implementation baseline for authorization, visibility, and sharing: `docs/architecture/authorization-feature-4-epic-4.1-baseline.md`
 - Feature 4 / Epic 4.2 effective-permission resolver baseline for deterministic policy decisions: `docs/architecture/authorization-feature-4-epic-4.2-policy-evaluation-engine-and-authorization-persistence.md`
+- Feature 4 / Epic 4.3 transport/runtime authorization enforcement adapters for reusable HTTP/WebSocket/IPC policy guards: `docs/architecture/authorization-feature-4-epic-4.3-protected-resource-enforcement-and-runtime-integration.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).
