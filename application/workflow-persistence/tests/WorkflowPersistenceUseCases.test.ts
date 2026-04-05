@@ -246,6 +246,47 @@ describe("Workflow persistence use cases", () => {
     expect(duplicated.revision.workflowRevision).toBe(1);
   });
 
+  it("derives canonical workspace ownership metadata during creation and duplication when workspace scope is provided", async () => {
+    const repository = new InMemoryWorkflowPersistenceRepository();
+    const create = new CreatePersistedWorkflowUseCase(repository, () => new Date("2026-03-30T10:00:00.000Z"));
+    const duplicate = new DuplicatePersistedWorkflowUseCase(repository, () => new Date("2026-03-30T10:10:00.000Z"));
+
+    const created = await create.execute({
+      id: "workflow:persistence:workspace-owned",
+      name: "Workspace Owned Workflow",
+      draft: createValidDraft(),
+      ownershipContext: {
+        ownerId: "user:workspace-owner",
+        tenantId: "workspace:alpha",
+      },
+      workspace: {
+        workspaceId: "workspace:alpha",
+        visibility: "team",
+      },
+    });
+
+    expect(created.ownershipContext?.workspaceId).toBe("workspace:alpha");
+    expect(created.ownershipContext?.tenantId).toBe("workspace:alpha");
+    expect(created.ownershipContext?.workspaceOwnership?.workspaceId).toBe("workspace:alpha");
+    expect(created.ownershipContext?.workspaceOwnership?.ownerUserId).toBe("user:workspace-owner");
+    expect(created.ownershipContext?.workspaceOwnership?.visibility).toBe("team");
+
+    const duplicated = await duplicate.execute({
+      sourceWorkflowId: created.id,
+      duplicatedWorkflowId: "workflow:persistence:workspace-owned:copy-explicit",
+      actorContext: {
+        actorUserId: "user:workspace-owner",
+      },
+      workspace: {
+        workspaceId: "workspace:alpha",
+      },
+    });
+
+    expect(duplicated.ownershipContext?.workspaceId).toBe("workspace:alpha");
+    expect(duplicated.ownershipContext?.workspaceOwnership?.workspaceId).toBe("workspace:alpha");
+    expect(duplicated.ownershipContext?.workspaceOwnership?.ownerUserId).toBe("user:workspace-owner");
+  });
+
   it("allocates stable duplicate ids when automatic copy ids are already taken", async () => {
     const repository = new InMemoryWorkflowPersistenceRepository();
     const create = new CreatePersistedWorkflowUseCase(repository, () => new Date("2026-03-30T10:00:00.000Z"));

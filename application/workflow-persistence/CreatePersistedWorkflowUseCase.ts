@@ -8,6 +8,11 @@ import type { IWorkflowPersistenceRepository } from "../ports/interfaces/IWorkfl
 import { WorkflowPersistenceConflictError, toWorkflowPersistenceFailureError } from "./WorkflowPersistenceErrors";
 import { assertWorkflowDraftValid, normalizeRequired } from "./WorkflowPersistenceValidation";
 import type { WorkflowDraft } from "../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  resolveWorkflowWorkspaceScoping,
+  type ProtectedResourceActorContext,
+  type WorkspaceScopingInput,
+} from "./WorkflowWorkspaceScoping";
 
 export interface CreatePersistedWorkflowRequest {
   readonly id: string;
@@ -16,6 +21,8 @@ export interface CreatePersistedWorkflowRequest {
   readonly metadata?: WorkflowEntityMetadata;
   readonly lifecycleState?: WorkflowLifecycleState;
   readonly ownershipContext?: WorkflowPersistenceOwnershipContext;
+  readonly actorContext?: ProtectedResourceActorContext;
+  readonly workspace?: WorkspaceScopingInput;
   readonly versionLabel?: string;
 }
 
@@ -35,15 +42,21 @@ export class CreatePersistedWorkflowUseCase {
       throw new WorkflowPersistenceConflictError(id);
     }
 
+    const now = this.now();
     const created = createPersistedWorkflowRecord({
       id,
       name,
       draft: request.draft,
       metadata: request.metadata,
       lifecycleState: request.lifecycleState,
-      ownershipContext: request.ownershipContext,
+      ownershipContext: resolveWorkflowWorkspaceScoping({
+        ownershipContext: request.ownershipContext,
+        actorContext: request.actorContext,
+        workspace: request.workspace,
+        now,
+      }),
       versionLabel: request.versionLabel,
-      now: this.now(),
+      now,
     });
     return this.tryRepository("create:write-record", () => this.repository.create(created));
   }

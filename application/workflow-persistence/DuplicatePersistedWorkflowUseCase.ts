@@ -11,12 +11,19 @@ import {
   toWorkflowPersistenceFailureError,
 } from "./WorkflowPersistenceErrors";
 import { normalizeRequired } from "./WorkflowPersistenceValidation";
+import {
+  resolveWorkflowWorkspaceScoping,
+  type ProtectedResourceActorContext,
+  type WorkspaceScopingInput,
+} from "./WorkflowWorkspaceScoping";
 
 export interface DuplicatePersistedWorkflowRequest {
   readonly sourceWorkflowId: string;
   readonly duplicatedWorkflowId?: string;
   readonly duplicatedWorkflowName?: string;
   readonly ownershipContext?: WorkflowPersistenceOwnershipContext;
+  readonly actorContext?: ProtectedResourceActorContext;
+  readonly workspace?: WorkspaceScopingInput;
   readonly versionLabel?: string;
 }
 
@@ -73,16 +80,22 @@ export class DuplicatePersistedWorkflowUseCase {
       throw new WorkflowPersistenceConflictError(duplicatedWorkflowId);
     }
 
+    const now = this.now();
     const duplicate = createPersistedWorkflowRecord({
       id: duplicatedWorkflowId,
       name: request.duplicatedWorkflowName?.trim() || `${source.name} Copy`,
       draft: source.definition.draft,
       metadata: source.metadata,
       lifecycleState: WorkflowLifecycleStates.draft,
-      ownershipContext: request.ownershipContext ?? source.ownershipContext,
+      ownershipContext: resolveWorkflowWorkspaceScoping({
+        ownershipContext: request.ownershipContext ?? source.ownershipContext,
+        actorContext: request.actorContext,
+        workspace: request.workspace,
+        now,
+      }),
       versionLabel: request.versionLabel,
       duplicatedFromWorkflowId: source.id,
-      now: this.now(),
+      now,
     });
 
     return this.tryRepository("duplicate:write-record", () => this.repository.duplicate(source.id, duplicate));
