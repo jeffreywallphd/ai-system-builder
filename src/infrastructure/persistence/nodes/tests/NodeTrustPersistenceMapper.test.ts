@@ -23,8 +23,8 @@ describe("NodeTrustPersistenceMapper", () => {
       node_type: NodeTypes.compute,
       display_name: "Compute 001",
       capability_enabled_json: JSON.stringify([
-        NodeRoleCapabilities.workflowExecution,
-        NodeRoleCapabilities.modelInference,
+        NodeRoleCapabilities.executor,
+        NodeRoleCapabilities.api,
       ]),
       capability_profile_version: "profile:v1",
       supports_remote_scheduling: 1,
@@ -58,8 +58,8 @@ describe("NodeTrustPersistenceMapper", () => {
 
     expect(record.nodeId).toBe("node:001");
     expect(record.capabilityProfile.enabledCapabilities).toEqual([
-      NodeRoleCapabilities.workflowExecution,
-      NodeRoleCapabilities.modelInference,
+      NodeRoleCapabilities.api,
+      NodeRoleCapabilities.executor,
     ]);
     expect(record.deploymentTags).toEqual(["us-east-1", "gpu"]);
     expect(record.certificate?.certificateRef).toBe("cert:node:001:v1");
@@ -77,7 +77,7 @@ describe("NodeTrustPersistenceMapper", () => {
       node_type: NodeTypes.hybrid,
       display_name: "Hybrid 001",
       capability_enabled_json: JSON.stringify([
-        NodeRoleCapabilities.workflowExecution,
+        NodeRoleCapabilities.executor,
       ]),
       capability_profile_version: null,
       supports_remote_scheduling: 1,
@@ -104,5 +104,50 @@ describe("NodeTrustPersistenceMapper", () => {
     expect(rowValues[11]).toBe(NodeEnrollmentRequestStatuses.submitted);
     expect(normalizeNodeTrustLookup("  node:001  ")).toBe("node:001");
     expect(normalizeNodeTrustLookup("   ")).toBeUndefined();
+  });
+
+  it("normalizes legacy persisted capability values to canonical capability profile values", () => {
+    const record = mapNodeIdentityRowToRecord({
+      node_id: "node:legacy-capability",
+      node_type: NodeTypes.compute,
+      display_name: "Legacy Capability Node",
+      capability_enabled_json: JSON.stringify([
+        "workflow-execution",
+        "model-inference",
+      ]),
+      capability_profile_version: null,
+      supports_remote_scheduling: 1,
+      max_concurrent_workloads: null,
+      approval_status: NodeApprovalStatuses.pending,
+      trust_state: NodeTrustStates.pendingApproval,
+      certificate_ref: null,
+      certificate_assigned_at: null,
+      certificate_expires_at: null,
+      certificate_authority_ref: null,
+      certificate_thumbprint: null,
+      deployment_tags_json: JSON.stringify([]),
+      last_seen_at: null,
+      heartbeat_status: null,
+      last_seen_observed_by: null,
+      revocation_state: NodeRevocationStates.active,
+      revocation_reason: null,
+      revocation_revoked_at: null,
+      revocation_revoked_by_user_identity_id: null,
+      revocation_note: null,
+      enrolled_at: "2026-04-05T12:00:00.000Z",
+      approved_at: null,
+      revoked_at: null,
+      enrollment_request_id: null,
+      created_at: "2026-04-05T12:00:00.000Z",
+      created_by: "system",
+      last_modified_at: "2026-04-05T12:10:00.000Z",
+      last_modified_by: "system",
+      revision: 1,
+    });
+
+    expect(record.capabilityProfile.enabledCapabilities).toEqual([
+      NodeRoleCapabilities.api,
+      NodeRoleCapabilities.executor,
+    ]);
   });
 });

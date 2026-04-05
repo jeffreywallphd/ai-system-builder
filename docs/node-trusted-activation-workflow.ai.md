@@ -2,7 +2,7 @@
 
 ## Scope
 
-Story 5.3.1 (Feature 5 / Epic 5.3): explicit approved-node activation into trusted operational state.
+Story 5.3.1 and Story 5.3.2 (Feature 5 / Epic 5.3): approved-node activation plus capability profile registration/validation.
 
 ## Canonical files
 
@@ -10,6 +10,9 @@ Story 5.3.1 (Feature 5 / Epic 5.3): explicit approved-node activation into trust
 - `src/application/nodes/use-cases/ActivateApprovedNodeUseCase.ts`
 - `src/application/nodes/ports/NodeTrustAuthorizationPorts.ts`
 - `src/application/nodes/ports/NodeTrustAuditPorts.ts`
+- `src/domain/nodes/NodeTrustDomain.ts`
+- `src/shared/schemas/nodes/NodeTrustApiSchemaContracts.ts`
+- `src/shared/schemas/nodes/NodeTrustPersistenceSchemaContracts.ts`
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
 
 ## Lifecycle semantics
@@ -31,6 +34,24 @@ Story 5.3.1 (Feature 5 / Epic 5.3): explicit approved-node activation into trust
 - Repeated activation calls are idempotent/safely guarded:
   - already trusted with equivalent trust metadata returns without additional mutation
   - conflicting certificate re-activation is rejected as conflict
+- Capability profiles are validated and normalized before persistence.
+- Existing nodes are updated to approved enrollment capability profiles during approval.
+
+## Capability profile rules
+
+- Canonical capability set:
+  - `ui`
+  - `api`
+  - `scheduler`
+  - `executor`
+  - `storage-access`
+  - `preview-worker`
+- Validation:
+  - `ui` requires `api`
+  - `scheduler` requires `api` + `executor`
+  - `preview-worker` requires `executor`
+  - `supportsRemoteScheduling=true` requires `executor`
+  - `maxConcurrentWorkloads` requires `executor`
 
 ## Observability
 

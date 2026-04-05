@@ -46,6 +46,8 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
   - emits approval audit events that include persisted decision metadata
   - issues/accepts certificate via hook seam
   - upserts node approval state and activation prerequisites (`trustState=pending-approval`) using persistence ports
+  - normalizes and validates approved enrollment capability profiles before persistence
+  - updates existing node records with approved enrollment capability profiles for stable capability registration
 - `ActivateApprovedNodeUseCase`
   - authorizes activation action
   - requires node approval before trust activation and blocks revoked/unapproved nodes
@@ -71,6 +73,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `ListTrustedNodeInventoryUseCase`
   - authorizes trusted inventory queries
   - queries trusted-node-only inventory using persistence query presets and filters
+  - supports capability-filtered trusted inventory queries using normalized capability profiles
 - `NodeBootstrapIdentityService`
   - generates durable local bootstrap identity for `compute` and `hybrid` nodes
   - persists one local bootstrap record and Ed25519 keypair in a secure node-local directory
@@ -122,6 +125,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - pending review listing (including denied review authorization path)
 - enrollment detail retrieval (including denied review authorization path)
 - approval flow including authorization gating, explicit lifecycle transition sequence, decision metadata persistence, certificate hook, and pending-activation trust-state staging
+- approval flow includes capability profile normalization/validation and existing-node capability profile updates
 - activation flow including approved-only guardrails, idempotent trusted-state transition, and activation audit publication
 - rejection flow including authorization gating, explicit lifecycle transition sequence, decision metadata persistence, and quarantine state mutation
 - revocation flow with certificate-revocation hook

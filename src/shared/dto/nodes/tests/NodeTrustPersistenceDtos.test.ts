@@ -11,7 +11,7 @@ import {
 
 describe("NodeTrustPersistenceDtos", () => {
   it("builds deterministic lookup keys for capability, deployment tag, and trust state indexes", () => {
-    expect(toNodeCapabilityLookupKey(NodeRoleCapabilities.workflowExecution)).toBe("capability:workflow-execution");
+    expect(toNodeCapabilityLookupKey(NodeRoleCapabilities.executor)).toBe("capability:executor");
     expect(toNodeDeploymentTagLookupKey("  US-EAST-1  ")).toBe("tag:us-east-1");
     expect(toNodeTrustStateLookupKey(NodeTrustStates.pendingApproval)).toBe("trust-state:pending-approval");
   });

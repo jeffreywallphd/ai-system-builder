@@ -31,7 +31,7 @@ describe("NodeTrustApiContracts", () => {
       approvalStatus: NodeApprovalStatuses.approved,
       trustState: NodeTrustStates.trusted,
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
         supportsRemoteScheduling: true,
       },
       deploymentTags: ["us-east-1"],
@@ -78,7 +78,7 @@ describe("NodeTrustApiContracts", () => {
       reviewedByUserIdentityId: "admin-1",
       decisionNote: "pending cert",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
         supportsRemoteScheduling: true,
       },
       deploymentTags: ["hybrid"],
@@ -104,7 +104,7 @@ describe("NodeTrustApiContracts", () => {
       status: NodeEnrollmentRequestStatuses.underReview,
       requestedAt: "2026-04-05T12:00:00.000Z",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
         supportsRemoteScheduling: false,
       },
       deploymentTags: ["gpu"],
@@ -130,7 +130,7 @@ describe("NodeTrustApiContracts", () => {
       status: NodeEnrollmentRequestStatuses.approved,
       requestedAt: "2026-04-05T12:00:00.000Z",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
         supportsRemoteScheduling: false,
       },
       deploymentTags: ["gpu"],
@@ -150,7 +150,7 @@ describe("NodeTrustApiContracts", () => {
       approvalStatus: NodeApprovalStatuses.rejected,
       trustState: NodeTrustStates.revoked,
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.modelInference],
+        enabledCapabilities: [NodeRoleCapabilities.api],
         supportsRemoteScheduling: false,
       },
       deploymentTags: ["isolated"],

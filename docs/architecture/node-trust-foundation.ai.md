@@ -38,6 +38,19 @@ Quick baseline for Feature 5 / Epic 5.1 node-trust inner-layer contracts.
   - `revokedAt` + revocation reason
 - Last-seen timestamps are normalized and cannot predate enrollment timestamps.
 - Capability profiles are modeled as explicit enabled-capability sets, not single-role assumptions.
+- Capability profiles use canonical capabilities:
+  - `ui`
+  - `api`
+  - `scheduler`
+  - `executor`
+  - `storage-access`
+  - `preview-worker`
+- Capability profile guardrails:
+  - `ui` requires `api`
+  - `scheduler` requires `api` + `executor`
+  - `preview-worker` requires `executor`
+  - `supportsRemoteScheduling=true` requires `executor`
+  - `maxConcurrentWorkloads` requires `executor`
 
 ## Tests in this slice
 

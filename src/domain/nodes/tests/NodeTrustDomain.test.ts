@@ -33,8 +33,8 @@ describe("NodeTrustDomain", () => {
   it("models capability-enabled nodes with explicit profile semantics", () => {
     const capabilityProfile = createNodeCapabilityProfile({
       enabledCapabilities: [
-        NodeRoleCapabilities.workflowExecution,
-        NodeRoleCapabilities.modelInference,
+        NodeRoleCapabilities.executor,
+        NodeRoleCapabilities.api,
       ],
       capabilityProfileVersion: "v1",
       maxConcurrentWorkloads: 4,
@@ -51,8 +51,8 @@ describe("NodeTrustDomain", () => {
     });
 
     expect(node.capabilityProfile.enabledCapabilities).toEqual([
-      NodeRoleCapabilities.workflowExecution,
-      NodeRoleCapabilities.modelInference,
+      NodeRoleCapabilities.api,
+      NodeRoleCapabilities.executor,
     ]);
     expect(node.deploymentTags).toEqual(["gpu", "east-us"]);
     expect(node.approvalStatus).toBe(NodeApprovalStatuses.pending);
@@ -66,8 +66,9 @@ describe("NodeTrustDomain", () => {
       displayName: "Hybrid Beta",
       capabilityProfile: createNodeCapabilityProfile({
         enabledCapabilities: [
-          NodeRoleCapabilities.workflowExecution,
-          NodeRoleCapabilities.schedulingParticipation,
+          NodeRoleCapabilities.api,
+          NodeRoleCapabilities.executor,
+          NodeRoleCapabilities.scheduler,
         ],
       }),
       trustState: NodeTrustStates.pendingApproval,
@@ -110,7 +111,7 @@ describe("NodeTrustDomain", () => {
       nodeType: NodeTypes.compute,
       displayName: "Compute Gamma",
       capabilityProfile: createNodeCapabilityProfile({
-        enabledCapabilities: [NodeRoleCapabilities.modelInference],
+        enabledCapabilities: [NodeRoleCapabilities.api],
       }),
       requestedAt: "2026-04-05T12:00:00.000Z",
     });
@@ -205,7 +206,7 @@ describe("NodeTrustDomain", () => {
       nodeType: NodeTypes.compute,
       displayName: "Compute Zeta",
       capabilityProfile: createNodeCapabilityProfile({
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
       }),
       createdAt: "2026-04-05T12:00:00.000Z",
       enrolledAt: "2026-04-05T12:00:00.000Z",
@@ -224,8 +225,25 @@ describe("NodeTrustDomain", () => {
     )).toThrow(NodeTrustLifecycleTransitionError);
 
     expect(() => setNodeCapabilityProfile(node, createNodeCapabilityProfile({
-      enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+      enabledCapabilities: [NodeRoleCapabilities.executor],
       maxConcurrentWorkloads: 0,
     }))).toThrow("positive integer");
+
+    expect(() => createNodeCapabilityProfile({
+      enabledCapabilities: [NodeRoleCapabilities.ui],
+    })).toThrow("must also include 'api'");
+
+    expect(() => createNodeCapabilityProfile({
+      enabledCapabilities: [NodeRoleCapabilities.scheduler, NodeRoleCapabilities.api],
+    })).toThrow("must also include 'executor'");
+
+    expect(() => createNodeCapabilityProfile({
+      enabledCapabilities: [NodeRoleCapabilities.previewWorker],
+    })).toThrow("must also include 'executor'");
+
+    expect(() => createNodeCapabilityProfile({
+      enabledCapabilities: [NodeRoleCapabilities.storageAccess],
+      supportsRemoteScheduling: true,
+    })).toThrow("supportsRemoteScheduling requires 'executor'");
   });
 });

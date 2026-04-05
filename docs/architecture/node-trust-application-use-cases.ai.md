@@ -29,11 +29,13 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - review/list pending enrollment queue
 - fetch a single enrollment detail for admin review workflows
 - approve node (admin-authorized, explicit lifecycle transitions, decision metadata, certificate hook seam)
+- approve node includes capability profile normalization/validation and existing-node capability-profile registration
 - activate approved node (idempotent trusted-state transition with capability and certificate/trust metadata continuity)
 - reject node (admin-authorized, explicit lifecycle transitions, decision metadata)
 - revoke node trust (including certificate-revocation seam)
 - record node heartbeat
 - query trusted node inventory
+- query trusted node inventory with normalized capability filtering
 - generate/recover node-local bootstrap identity + trust material
 - build enrollment submission payloads from persisted bootstrap material
 

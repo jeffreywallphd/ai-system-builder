@@ -44,6 +44,18 @@ Quick baseline for Story 5.1.2 and Story 5.1.3 node-trust persistence contracts 
   - `capabilityAnyOf`, `deploymentTagAnyOf`
   - deterministic lookup-key helpers for future indexes/materialized projections
 
+## Capability profile normalization
+
+- Canonical capability values:
+  - `ui`
+  - `api`
+  - `scheduler`
+  - `executor`
+  - `storage-access`
+  - `preview-worker`
+- Persistence-layer profile validation enforces required capability combinations and scheduling/concurrency guardrails from the domain model.
+- Legacy persisted capability values from earlier stories are normalized to canonical capability values during row mapping.
+
 ## Boundary notes
 
 - No infrastructure/SQL details are exposed in application/domain layers.

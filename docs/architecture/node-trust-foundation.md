@@ -63,6 +63,13 @@ Transition helpers:
 Key invariants enforced by domain constructors and transition operations:
 
 - capability profiles must include at least one enabled capability
+- capability profiles are normalized to canonical ordering for stable persistence/read behavior
+- capability profile combinations are validated:
+  - `ui` requires `api`
+  - `scheduler` requires `api` and `executor`
+  - `preview-worker` requires `executor`
+  - `supportsRemoteScheduling=true` requires `executor`
+  - `maxConcurrentWorkloads` requires `executor`
 - trusted nodes must be approved and include `certificateRef`
 - revoked nodes must include revocation metadata (`revokedAt`, reason) and `trustState=revoked`
 - non-revoked nodes cannot carry revocation metadata
@@ -89,6 +96,7 @@ Story coverage for this foundation is implemented in:
 Tests validate:
 
 - capability-enabled modeling and deduped deployment tags
+- capability profile combination and scheduling/concurrency guardrails
 - trust prerequisites (approval + certificate)
 - lifecycle transition guards for approval/trust/enrollment
 - last-seen metadata handling and revoked-node heartbeat blocking

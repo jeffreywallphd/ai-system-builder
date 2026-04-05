@@ -88,6 +88,18 @@ Contracts are shaped for high-frequency query paths:
   - `capabilityAnyOf`, `deploymentTagAnyOf`
   - deterministic key helpers for index projection/materialized views.
 
+## Capability profile normalization
+
+- Canonical capability values:
+  - `ui`
+  - `api`
+  - `scheduler`
+  - `executor`
+  - `storage-access`
+  - `preview-worker`
+- Persistence validation enforces capability-combination guardrails and scheduling/concurrency consistency.
+- Legacy persisted capability values from earlier stories are normalized to canonical capability values during row mapping.
+
 ## Schema validation contracts
 
 `NodeTrustPersistenceSchemaContracts.ts` adds zod-backed schema validation for persistence records and parse helpers:

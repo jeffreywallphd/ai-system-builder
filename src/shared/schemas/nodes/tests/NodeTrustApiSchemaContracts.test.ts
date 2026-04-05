@@ -29,8 +29,8 @@ describe("NodeTrustApiSchemaContracts", () => {
       displayName: "Compute Node 001",
       capabilityProfile: {
         enabledCapabilities: [
-          NodeRoleCapabilities.workflowExecution,
-          NodeRoleCapabilities.modelInference,
+          NodeRoleCapabilities.executor,
+          NodeRoleCapabilities.api,
         ],
         supportsRemoteScheduling: true,
       },
@@ -54,12 +54,36 @@ describe("NodeTrustApiSchemaContracts", () => {
       displayName: "Compute Node 001",
       capabilityProfile: {
         enabledCapabilities: [
-          NodeRoleCapabilities.workflowExecution,
-          NodeRoleCapabilities.workflowExecution,
+          NodeRoleCapabilities.executor,
+          NodeRoleCapabilities.executor,
         ],
         supportsRemoteScheduling: true,
       },
     })).toThrow("must not include duplicates");
+  });
+
+  it("rejects incomplete scheduler and ui capability combinations", () => {
+    expect(() => NodeEnrollmentSubmissionRequestDtoSchema.parse({
+      actorUserIdentityId: "user:node-operator-1",
+      nodeId: "node:compute-001",
+      nodeType: NodeTypes.compute,
+      displayName: "Compute Node 001",
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.scheduler, NodeRoleCapabilities.executor],
+        supportsRemoteScheduling: true,
+      },
+    })).toThrow("must also include 'api'");
+
+    expect(() => NodeEnrollmentSubmissionRequestDtoSchema.parse({
+      actorUserIdentityId: "user:node-operator-1",
+      nodeId: "node:compute-002",
+      nodeType: NodeTypes.compute,
+      displayName: "Compute Node 002",
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.ui],
+        supportsRemoteScheduling: false,
+      },
+    })).toThrow("must also include 'api'");
   });
 
   it("rejects bootstrap payloads that provide no bootstrap material", () => {
@@ -69,7 +93,7 @@ describe("NodeTrustApiSchemaContracts", () => {
       nodeType: NodeTypes.compute,
       displayName: "Compute Node 001",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
         supportsRemoteScheduling: true,
       },
       bootstrap: {},
@@ -83,7 +107,7 @@ describe("NodeTrustApiSchemaContracts", () => {
       nodeType: NodeTypes.compute,
       displayName: "Compute Node 1",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
         supportsRemoteScheduling: true,
       },
       bootstrap: {
@@ -105,7 +129,7 @@ describe("NodeTrustApiSchemaContracts", () => {
       nodeType: NodeTypes.compute,
       displayName: "Compute Node 1",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
         supportsRemoteScheduling: true,
       },
       bootstrap: {
@@ -122,7 +146,7 @@ describe("NodeTrustApiSchemaContracts", () => {
       approvalStatus: NodeApprovalStatuses.approved,
       trustState: NodeTrustStates.trusted,
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
         supportsRemoteScheduling: true,
       },
       deploymentTags: ["us-east-1"],
@@ -145,7 +169,7 @@ describe("NodeTrustApiSchemaContracts", () => {
       approvalStatus: NodeApprovalStatuses.rejected,
       trustState: NodeTrustStates.revoked,
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.modelInference],
+        enabledCapabilities: [NodeRoleCapabilities.api],
         supportsRemoteScheduling: false,
       },
       deploymentTags: ["isolated"],
@@ -184,7 +208,7 @@ describe("NodeTrustApiSchemaContracts", () => {
         approvalStatus: NodeApprovalStatuses.approved,
         trustState: NodeTrustStates.trusted,
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         deploymentTags: ["us-east-1"],
@@ -212,7 +236,7 @@ describe("NodeTrustApiSchemaContracts", () => {
       approvalStatus: NodeApprovalStatuses.rejected,
       trustState: NodeTrustStates.revoked,
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.modelInference],
+        enabledCapabilities: [NodeRoleCapabilities.api],
         supportsRemoteScheduling: false,
       },
       deploymentTags: ["isolated"],
@@ -238,7 +262,7 @@ describe("NodeTrustApiSchemaContracts", () => {
       approvalStatus: NodeApprovalStatuses.approved,
       trustState: NodeTrustStates.trusted,
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.modelInference],
+        enabledCapabilities: [NodeRoleCapabilities.api, NodeRoleCapabilities.executor],
         supportsRemoteScheduling: true,
       },
       deploymentTags: ["gpu"],
@@ -275,7 +299,7 @@ describe("NodeTrustApiSchemaContracts", () => {
         requestedAt: "2026-04-05T12:00:00.000Z",
         reviewedAt: "2026-04-05T12:05:00.000Z",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         deploymentTags: ["default"],
@@ -288,7 +312,7 @@ describe("NodeTrustApiSchemaContracts", () => {
         approvalStatus: NodeApprovalStatuses.approved,
         trustState: NodeTrustStates.trusted,
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         deploymentTags: ["default"],
@@ -316,7 +340,7 @@ describe("NodeTrustApiSchemaContracts", () => {
       requestedAt: "2026-04-05T12:00:00.000Z",
       status: NodeEnrollmentRequestStatuses.submitted,
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
         supportsRemoteScheduling: true,
       },
       deploymentTags: ["default"],

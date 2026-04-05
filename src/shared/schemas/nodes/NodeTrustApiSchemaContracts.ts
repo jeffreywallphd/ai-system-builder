@@ -6,8 +6,10 @@ import {
   NodeRevocationReasons,
   NodeRevocationStates,
   NodeRoleCapabilities,
+  NodeTrustDomainError,
   NodeTrustStates,
   NodeTypes,
+  createNodeCapabilityProfile,
 } from "../../../domain/nodes/NodeTrustDomain";
 
 export interface NodeTrustApiSchemaValidationIssue {
@@ -89,12 +91,12 @@ const NodeHeartbeatStatusSchema = z.enum([
 ]);
 
 const NodeRoleCapabilitySchema = z.enum([
-  NodeRoleCapabilities.workflowExecution,
-  NodeRoleCapabilities.modelInference,
-  NodeRoleCapabilities.modelTraining,
-  NodeRoleCapabilities.mcpToolExecution,
+  NodeRoleCapabilities.ui,
+  NodeRoleCapabilities.api,
+  NodeRoleCapabilities.scheduler,
+  NodeRoleCapabilities.executor,
   NodeRoleCapabilities.storageAccess,
-  NodeRoleCapabilities.schedulingParticipation,
+  NodeRoleCapabilities.previewWorker,
 ]);
 
 const NodeEnrollmentRequestStatusSchema = z.enum([
@@ -127,6 +129,18 @@ export const NodeCapabilityProfileDtoSchema = z.object({
       path: ["enabledCapabilities"],
       message: "Node capabilityProfile enabledCapabilities must not include duplicates.",
     });
+  }
+
+  try {
+    createNodeCapabilityProfile(value);
+  } catch (error) {
+    if (error instanceof NodeTrustDomainError) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["enabledCapabilities"],
+        message: error.message,
+      });
+    }
   }
 });
 
