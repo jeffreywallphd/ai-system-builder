@@ -12,6 +12,7 @@ import {
   parseCertificateAuthorityStatusIntrospectionView,
   parseCertificateDistributionEventPersistenceRecord,
   parseIssuedCertificateMetadataView,
+  parseRuntimeTrustMaterialPackageView,
   parseCertificateRevocationHistoryPersistenceRecord,
   parseCertificateStatusHistoryPersistenceRecord,
   IssuedCertificatePersistenceRecordSchema,
@@ -334,5 +335,30 @@ describe("CertificateAuthoritySchemaContracts", () => {
 
     expect(item.trust.status).toBe("active");
     expect(list.pagination.returned).toBe(1);
+  });
+
+  it("parses runtime trust material package views", () => {
+    const parsed = parseRuntimeTrustMaterialPackageView({
+      packageId: "runtime-trust-package:node:node:alpha:ca:internal:root:v1:AA11",
+      occurredAt: "2026-04-05T01:00:00.000Z",
+      certificateAuthorityId: "ca:internal:root:v1",
+      serialNumber: "AA11",
+      targetKind: "node",
+      targetReferenceId: "node:alpha",
+      workspaceId: "workspace:alpha",
+      leafCertificatePem: "-----BEGIN CERTIFICATE-----leaf-----END CERTIFICATE-----",
+      certificateChainPem: "-----BEGIN CERTIFICATE-----chain-----END CERTIFICATE-----",
+      trustBundlePem: "-----BEGIN CERTIFICATE-----bundle-----END CERTIFICATE-----",
+      protectedReferences: [{
+        materialRef: "trust:cert:node:alpha:v1",
+        kind: "certificate-pem",
+        accessRef: "secret-store:node-alpha-cert",
+        accessRefRedacted: "secret-stor...a-cert",
+        fingerprintSha256: "sha256:abc",
+      }],
+    });
+
+    expect(parsed.targetKind).toBe("node");
+    expect(parsed.protectedReferences).toHaveLength(1);
   });
 });

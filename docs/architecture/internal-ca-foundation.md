@@ -1,6 +1,7 @@
 # Internal CA Foundation
 
 This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, Story 6.2.1, Story 6.2.2, Story 6.2.3, Story 6.2.4, Story 6.2.5, Story 6.2.6, and Story 6.2.7 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, certificate subject-profile issuance policy enforcement, concrete issuance signing/material persistence execution, node-trust-backed approved-node issuance eligibility, explicit certificate revocation workflow plus revocation-status enforcement seams, reusable certificate trust evaluation helpers, certificate lifecycle audit recording seams, and issued-certificate metadata query/listing seams for admin/API consumers.
+This note now also documents Story 6.3.1 (Feature 6 / Epic 6.3): runtime trust-material export/distribution contracts that provide scoped trust bundles, certificate-chain material, and protected reference packages for authorized runtime consumers.
 
 ## Canonical artifacts
 
@@ -20,6 +21,7 @@ This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.
 - `src/application/security/ports/ICertificateRevocationStatusRegistry.ts`
 - `src/application/security/ports/CertificateLifecycleAuditPorts.ts`
 - `src/application/security/ports/CertificateQueryAuthorizationPorts.ts`
+- `src/application/security/ports/CertificateRuntimeTrustMaterialAuthorizationPort.ts`
 - `src/application/security/ports/CertificateAuthorityPorts.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
@@ -30,6 +32,7 @@ This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.
 - `src/application/security/use-cases/CertificateTrustEvaluationService.ts`
 - `src/application/security/use-cases/ListIssuedCertificateMetadataUseCase.ts`
 - `src/application/security/use-cases/GetIssuedCertificateMetadataUseCase.ts`
+- `src/application/security/use-cases/ResolveRuntimeTrustMaterialPackageUseCase.ts`
 - `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
 - `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
 - `src/application/security/tests/ResolveCertificateAuthorityStartupStateUseCase.test.ts`
@@ -41,16 +44,19 @@ This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.
 - `src/application/security/tests/CertificateTrustEvaluationService.test.ts`
 - `src/application/security/tests/CertificateLifecycleAuditPorts.test.ts`
 - `src/application/security/tests/IssuedCertificateMetadataQueryUseCases.test.ts`
+- `src/application/security/tests/ResolveRuntimeTrustMaterialPackageUseCase.test.ts`
 - `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
 - `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
 - `src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage.ts`
 - `src/infrastructure/security/ca/InternalCertificateAuthorityIssuer.ts`
+- `src/infrastructure/security/certificates/RuntimeTrustMaterialDistributionService.ts`
 - `src/infrastructure/security/tests/InternalCertificateAuthorityBootstrapEnvironmentAdapter.test.ts`
 - `src/infrastructure/security/secrets/tests/FileSystemProtectedSecretStore.test.ts`
 - `src/infrastructure/security/ca/tests/ProtectedCertificateAuthorityRootMaterialStorage.test.ts`
 - `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
+- `src/infrastructure/security/certificates/tests/RuntimeTrustMaterialDistributionService.test.ts`
 - `hosts/server/IdentityServerHost.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
@@ -178,6 +184,24 @@ Story 6.2.7 adds read-side certificate visibility workflows for internal admin/A
   - `trustMaterialRef`
   - trust-material storage locators and protected secret references
 - query responses return operational metadata only: serials, statuses, trust evaluation summary, subject metadata, validity, revocation metadata, and audit stamps.
+
+## Story 6.3.1 runtime trust material export/distribution contracts
+
+Story 6.3.1 adds explicit runtime-consumer trust retrieval contracts so server/node transport components can request scoped trust material without raw filesystem coupling:
+
+- `ITrustMaterialDistributionPort` now includes a runtime retrieval contract (`resolveRuntimeTrustMaterialPackage`) alongside publish semantics.
+- `ResolveRuntimeTrustMaterialPackageUseCase` provides the application entrypoint for:
+  - input normalization/validation,
+  - caller authorization via `CertificateRuntimeTrustMaterialAuthorizationHook`,
+  - not-found and forbidden outcomes for runtime consumers.
+- `RuntimeTrustMaterialDistributionService` (infrastructure) assembles runtime material packages from persistence + protected storage by:
+  - resolving target-scoped issued certificate and CA records,
+  - loading certificate/chain/bundle material through protected storage seams,
+  - returning only requested runtime outputs (leaf cert, chain, trust bundle, protected references),
+  - preventing subject-scope drift by requiring certificate target/reference alignment.
+- runtime package responses include sanitized metadata and optional protected references (`accessRef` + redacted view) for authorized runtime components.
+- private-key payloads are not exported through runtime package contracts.
+- successful runtime retrieval persists a distribution event (`published`) through lifecycle-event persistence for future operational visibility.
 
 ## Story 6.1.3 startup bootstrap behavior
 
