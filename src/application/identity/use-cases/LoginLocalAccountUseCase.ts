@@ -1,6 +1,4 @@
 import {
-  AuthProviderCategories,
-  AuthProviderStatuses,
   CredentialStatuses,
   UserIdentityStatuses,
   type AuthProvider,
@@ -20,7 +18,7 @@ import type { IIdentityClock } from "../../../../application/identity/ports/IIde
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityCredentialAuthenticator } from "../../../../application/identity/ports/IIdentityCredentialAuthenticator";
 import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
-import { providerSupportsAuthenticator } from "../../../../application/identity/services/IdentityProviderCatalog";
+import { validateIdentityProvider } from "../../../../application/identity/services/IdentityProviderCatalog";
 
 export type LoginLocalAccountErrorCode =
   | typeof IdentityErrorCodes.invalidCredentials
@@ -176,24 +174,16 @@ export class LoginLocalAccountUseCase {
       );
     }
 
-    if (provider.category !== AuthProviderCategories.local) {
+    const providerValidation = validateIdentityProvider(provider, {
+      expectedCategory: "local",
+      authenticatorKind: this.dependencies.credentialAuthenticator.kind,
+      requireCredentialPolicy: true,
+      requireCredentialMaterialRecords: true,
+    });
+    if (!providerValidation.ok) {
       return this.failure(
         IdentityErrorCodes.unsupportedProvider,
-        `Login provider '${providerId}' is not a local provider.`,
-      );
-    }
-
-    if (!providerSupportsAuthenticator(provider, this.dependencies.credentialAuthenticator.kind)) {
-      return this.failure(
-        IdentityErrorCodes.unsupportedProvider,
-        `Login provider '${providerId}' does not support authenticator '${this.dependencies.credentialAuthenticator.kind}'.`,
-      );
-    }
-
-    if (provider.status !== AuthProviderStatuses.active) {
-      return this.failure(
-        IdentityErrorCodes.unsupportedProvider,
-        `Login provider '${providerId}' is not active.`,
+        providerValidation.failure.message,
       );
     }
 

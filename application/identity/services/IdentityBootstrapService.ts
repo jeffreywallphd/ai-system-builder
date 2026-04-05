@@ -25,6 +25,8 @@ import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../ports/IIdentityPersistenceRepository";
 import { IdentityPolicyService } from "./IdentityPolicyService";
+import { IdentityAuthenticatorKinds } from "../ports/IIdentityCredentialAuthenticator";
+import { validateIdentityProvider } from "./IdentityProviderCatalog";
 
 export type IdentityBootstrapErrorCode =
   | typeof IdentityErrorCodes.duplicateIdentity
@@ -146,35 +148,6 @@ export class IdentityBootstrapService {
       );
     }
 
-    const normalizedProviderReference = this.dependencies.identityPolicyService.normalizeProviderReference({
-      providerId,
-      providerSubject: input.providerSubject ?? normalizedProfile.value.username,
-      providerKind: AuthProviderKinds.localPassword,
-    });
-    if (!normalizedProviderReference.valid || !normalizedProviderReference.value) {
-      return this.failure(
-        IdentityErrorCodes.unsupportedProvider,
-        this.withIssueDetails(
-          "Bootstrap provider reference is invalid.",
-          normalizedProviderReference.issues.map((issue) => issue.message),
-        ),
-      );
-    }
-
-    const uniqueness = await this.dependencies.identityPolicyService.checkAccountUniqueness({
-      username: normalizedProfile.value.username,
-      email: normalizedProfile.value.email,
-      displayName: normalizedProfile.value.displayName,
-      providerReference: {
-        providerId,
-        providerSubject: normalizedProviderReference.value.providerSubject,
-        providerKind: AuthProviderKinds.localPassword,
-      },
-    });
-    if (!uniqueness.outcome.ok) {
-      return uniqueness.outcome;
-    }
-
     const hashAlgorithmResult = this.requireNonEmpty(
       input.credential.hashAlgorithm,
       "credential.hashAlgorithm",
@@ -203,6 +176,35 @@ export class IdentityBootstrapService {
       return providerResult;
     }
     const provider = providerResult.value;
+
+    const normalizedProviderReference = this.dependencies.identityPolicyService.normalizeProviderReference({
+      providerId: provider.id,
+      providerSubject: input.providerSubject ?? normalizedProfile.value.username,
+      providerKind: provider.kind,
+    });
+    if (!normalizedProviderReference.valid || !normalizedProviderReference.value) {
+      return this.failure(
+        IdentityErrorCodes.unsupportedProvider,
+        this.withIssueDetails(
+          "Bootstrap provider reference is invalid.",
+          normalizedProviderReference.issues.map((issue) => issue.message),
+        ),
+      );
+    }
+
+    const uniqueness = await this.dependencies.identityPolicyService.checkAccountUniqueness({
+      username: normalizedProfile.value.username,
+      email: normalizedProfile.value.email,
+      displayName: normalizedProfile.value.displayName,
+      providerReference: {
+        providerId: provider.id,
+        providerSubject: normalizedProviderReference.value.providerSubject,
+        providerKind: provider.kind,
+      },
+    });
+    if (!uniqueness.outcome.ok) {
+      return uniqueness.outcome;
+    }
 
     const credentialPolicy = await this.resolveCredentialPolicy(credentialPolicyId);
 
@@ -262,19 +264,16 @@ export class IdentityBootstrapService {
   ): Promise<IdentityOperationResult<AuthProvider, IdentityBootstrapErrorCode>> {
     const existingProvider = await this.dependencies.lookupRepository.findAuthProviderById(providerId);
     if (existingProvider) {
-      if (
-        existingProvider.kind !== AuthProviderKinds.localPassword
-        || existingProvider.category !== AuthProviderCategories.local
-      ) {
+      const providerValidation = validateIdentityProvider(existingProvider, {
+        expectedCategory: "local",
+        authenticatorKind: IdentityAuthenticatorKinds.password,
+        requireCredentialPolicy: true,
+        requireCredentialMaterialRecords: true,
+      });
+      if (!providerValidation.ok) {
         return this.failure(
           IdentityErrorCodes.unsupportedProvider,
-          `Bootstrap provider '${providerId}' is not a local password provider.`,
-        );
-      }
-      if (existingProvider.status !== AuthProviderStatuses.active) {
-        return this.failure(
-          IdentityErrorCodes.invalidState,
-          `Bootstrap provider '${providerId}' must be active.`,
+          providerValidation.failure.message,
         );
       }
       return identitySuccess(existingProvider);

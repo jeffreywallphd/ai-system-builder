@@ -7,7 +7,11 @@ import {
 } from "../../../src/domain/identity/IdentityDomain";
 import { IdentityAuthenticatorKinds } from "../ports/IIdentityCredentialAuthenticator";
 import type { ILocalPasswordCredentialService, LocalPasswordCredentialMaterial } from "../ports/ILocalPasswordCredentialService";
-import { describeIdentityProvider, providerSupportsAuthenticator } from "../services/IdentityProviderCatalog";
+import {
+  describeIdentityProvider,
+  providerSupportsAuthenticator,
+  validateIdentityProvider,
+} from "../services/IdentityProviderCatalog";
 import { LocalPasswordIdentityAuthenticator } from "../services/LocalPasswordIdentityAuthenticator";
 
 class StubLocalPasswordCredentialService implements ILocalPasswordCredentialService {
@@ -48,10 +52,11 @@ describe("IdentityProviderCatalog", () => {
     const passwordDescriptor = describeIdentityProvider(localPasswordProvider);
     const passkeyDescriptor = describeIdentityProvider(passkeyProvider);
 
-    expect(passwordDescriptor?.localCapabilities?.supportedAuthenticators).toEqual(["password"]);
-    expect(passwordDescriptor?.localCapabilities?.supportsCredentialMaterialRecords).toBe(true);
-    expect(passkeyDescriptor?.localCapabilities?.supportedAuthenticators).toEqual(["passkey"]);
-    expect(passkeyDescriptor?.localCapabilities?.supportsUsernamelessSignIn).toBe(true);
+    expect(passwordDescriptor?.capabilities.supportedAuthenticators).toEqual(["password"]);
+    expect(passwordDescriptor?.credentialHandling.supportsCredentialMaterialRecords).toBe(true);
+    expect(passwordDescriptor?.identityLinkage.subjectModel).toBe("provider-subject");
+    expect(passkeyDescriptor?.capabilities.supportedAuthenticators).toEqual(["passkey"]);
+    expect(passkeyDescriptor?.capabilities.supportsUsernamelessSignIn).toBe(true);
   });
 
   it("checks provider-to-authenticator compatibility without hard-coding local-password", () => {
@@ -74,6 +79,44 @@ describe("IdentityProviderCatalog", () => {
     expect(providerSupportsAuthenticator(localPasswordProvider, IdentityAuthenticatorKinds.passkey)).toBe(false);
     expect(providerSupportsAuthenticator(passkeyProvider, IdentityAuthenticatorKinds.password)).toBe(false);
     expect(providerSupportsAuthenticator(passkeyProvider, IdentityAuthenticatorKinds.passkey)).toBe(true);
+  });
+
+  it("validates provider requirements for local credential-backed flows", () => {
+    const localPasswordProvider = createAuthProvider({
+      id: "provider:local-password",
+      kind: AuthProviderKinds.localPassword,
+      category: AuthProviderCategories.local,
+      displayName: "Local Password",
+      status: AuthProviderStatuses.active,
+    });
+    const externalProvider = createAuthProvider({
+      id: "provider:oidc",
+      kind: AuthProviderKinds.oidc,
+      category: AuthProviderCategories.external,
+      displayName: "OIDC",
+      status: AuthProviderStatuses.active,
+    });
+
+    const validLocal = validateIdentityProvider(localPasswordProvider, {
+      expectedCategory: AuthProviderCategories.local,
+      authenticatorKind: IdentityAuthenticatorKinds.password,
+      requireCredentialPolicy: true,
+      requireCredentialMaterialRecords: true,
+    });
+    const invalidExternal = validateIdentityProvider(externalProvider, {
+      expectedCategory: AuthProviderCategories.local,
+      authenticatorKind: IdentityAuthenticatorKinds.password,
+      requireCredentialPolicy: true,
+      requireCredentialMaterialRecords: true,
+    });
+
+    expect(validLocal.ok).toBe(true);
+    expect(invalidExternal).toEqual({
+      ok: false,
+      failure: expect.objectContaining({
+        code: "unexpected-category",
+      }),
+    });
   });
 });
 

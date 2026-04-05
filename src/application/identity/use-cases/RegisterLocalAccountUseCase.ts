@@ -1,6 +1,4 @@
 import {
-  AuthProviderCategories,
-  AuthProviderStatuses,
   UserIdentityStatuses,
   createLocalCredentialState,
   createUserIdentity,
@@ -24,7 +22,7 @@ import type { IIdentityLookupRepository } from "../../../../application/identity
 import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
 import type { IIdentityCredentialAuthenticator } from "../../../../application/identity/ports/IIdentityCredentialAuthenticator";
 import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
-import { providerSupportsAuthenticator } from "../../../../application/identity/services/IdentityProviderCatalog";
+import { validateIdentityProvider } from "../../../../application/identity/services/IdentityProviderCatalog";
 
 export type RegisterLocalAccountErrorCode =
   | typeof IdentityErrorCodes.duplicateIdentity
@@ -262,24 +260,16 @@ export class RegisterLocalAccountUseCase {
       );
     }
 
-    if (provider.category !== AuthProviderCategories.local) {
+    const providerValidation = validateIdentityProvider(provider, {
+      expectedCategory: "local",
+      authenticatorKind: this.dependencies.credentialAuthenticator.kind,
+      requireCredentialPolicy: true,
+      requireCredentialMaterialRecords: true,
+    });
+    if (!providerValidation.ok) {
       return this.failure(
         IdentityErrorCodes.unsupportedProvider,
-        `Registration provider '${providerId}' is not a local provider.`,
-      );
-    }
-
-    if (!providerSupportsAuthenticator(provider, this.dependencies.credentialAuthenticator.kind)) {
-      return this.failure(
-        IdentityErrorCodes.unsupportedProvider,
-        `Registration provider '${providerId}' does not support authenticator '${this.dependencies.credentialAuthenticator.kind}'.`,
-      );
-    }
-
-    if (provider.status !== AuthProviderStatuses.active) {
-      return this.failure(
-        IdentityErrorCodes.invalidState,
-        `Registration provider '${providerId}' must be active.`,
+        providerValidation.failure.message,
       );
     }
 
