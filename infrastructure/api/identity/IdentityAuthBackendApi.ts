@@ -74,18 +74,40 @@ interface IdentityAuthBackendApiDependencies {
   readonly identityLookupRepository: IIdentityLookupRepository;
   readonly authenticatedSessionService: IdentityAuthenticatedSessionService;
   readonly observability?: IdentityAuthObservabilityOptions;
+  readonly featurePolicies?: {
+    readonly allowLocalRegistration?: boolean;
+    readonly allowLocalAdministration?: boolean;
+  };
 }
 
 export class IdentityAuthBackendApi {
   private readonly observability: IdentityAuthObservability;
+  private readonly featurePolicies: {
+    readonly allowLocalRegistration: boolean;
+    readonly allowLocalAdministration: boolean;
+  };
 
   public constructor(private readonly dependencies: IdentityAuthBackendApiDependencies) {
     this.observability = new IdentityAuthObservability(dependencies.observability);
+    this.featurePolicies = Object.freeze({
+      allowLocalRegistration: dependencies.featurePolicies?.allowLocalRegistration ?? true,
+      allowLocalAdministration: dependencies.featurePolicies?.allowLocalAdministration ?? true,
+    });
   }
 
   public async registerLocalAccount(
     request: RegisterLocalIdentityApiRequest,
   ): Promise<IdentityAuthApiResponse<RegisterLocalIdentityApiResponse>> {
+    if (!this.featurePolicies.allowLocalRegistration) {
+      return Object.freeze({
+        ok: false,
+        error: {
+          code: IdentityAuthApiErrorCodes.forbidden,
+          message: "Local registration is disabled by identity policy configuration.",
+        },
+      });
+    }
+
     const result = await this.dependencies.registerLocalAccountUseCase.execute({
       username: request.username,
       email: request.email,
@@ -305,6 +327,10 @@ export class IdentityAuthBackendApi {
   public async listIdentityAdminAccounts(
     request: ListIdentityAdminAccountsApiRequest,
   ): Promise<IdentityAuthApiResponse<ListIdentityAdminAccountsApiResponse>> {
+    if (!this.featurePolicies.allowLocalAdministration) {
+      return this.adminOperationsDisabledResponse();
+    }
+
     const result = await this.dependencies.listLocalIdentityAccountsUseCase.execute(request);
     if (!result.ok) {
       const response = Object.freeze({ ok: false, error: this.mapAdminAccountError(result.error.code) });
@@ -334,6 +360,10 @@ export class IdentityAuthBackendApi {
   public async getIdentityAdminAccountStatus(
     request: GetIdentityAdminAccountStatusApiRequest,
   ): Promise<IdentityAuthApiResponse<GetIdentityAdminAccountStatusApiResponse>> {
+    if (!this.featurePolicies.allowLocalAdministration) {
+      return this.adminOperationsDisabledResponse();
+    }
+
     const result = await this.dependencies.getLocalIdentityAccountStatusUseCase.execute(request);
     if (!result.ok) {
       const response = Object.freeze({ ok: false, error: this.mapAdminAccountError(result.error.code) });
@@ -363,6 +393,10 @@ export class IdentityAuthBackendApi {
   public async setIdentityAdminAccountStatus(
     request: SetIdentityAdminAccountStatusApiRequest,
   ): Promise<IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>> {
+    if (!this.featurePolicies.allowLocalAdministration) {
+      return this.adminOperationsDisabledResponse();
+    }
+
     const result = await this.dependencies.setLocalIdentityAccountStatusUseCase.execute(request);
     if (!result.ok) {
       const response = Object.freeze({ ok: false, error: this.mapAdminAccountError(result.error.code) });
@@ -542,6 +576,16 @@ export class IdentityAuthBackendApi {
           message: "Unexpected identity administration error.",
         });
     }
+  }
+
+  private adminOperationsDisabledResponse<TResponse>(): IdentityAuthApiResponse<TResponse> {
+    return Object.freeze({
+      ok: false,
+      error: {
+        code: IdentityAuthApiErrorCodes.forbidden,
+        message: "Local identity administration is disabled by identity policy configuration.",
+      },
+    });
   }
 }
 

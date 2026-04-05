@@ -420,4 +420,57 @@ describe("IdentityAuthBackendApi", () => {
     expect(serializedErrors.includes("audit-sink.emit-failed")).toBeTrue();
     expect(serializedErrors.includes("StrongPass!2026")).toBeFalse();
   });
+
+  it("rejects local registration when disabled by configuration", async () => {
+    const harness = await createIdentityAuthTestHarness({
+      featurePolicies: {
+        allowLocalRegistration: false,
+      },
+    });
+
+    const response = await harness.backendApi.registerLocalAccount({
+      username: "disabled.registration.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+
+    expect(response.ok).toBeFalse();
+    expect(response.error?.code).toBe("forbidden");
+  });
+
+  it("rejects identity administration operations when disabled by configuration", async () => {
+    const harness = await createIdentityAuthTestHarness({
+      featurePolicies: {
+        allowLocalAdministration: false,
+      },
+    });
+
+    const list = await harness.backendApi.listIdentityAdminAccounts({
+      context: {
+        actorUserIdentityId: "user:admin",
+      },
+    });
+    expect(list.ok).toBeFalse();
+    expect(list.error?.code).toBe("forbidden");
+
+    const getStatus = await harness.backendApi.getIdentityAdminAccountStatus({
+      context: {
+        actorUserIdentityId: "user:admin",
+      },
+      userIdentityId: "user:missing",
+    });
+    expect(getStatus.ok).toBeFalse();
+    expect(getStatus.error?.code).toBe("forbidden");
+
+    const setStatus = await harness.backendApi.setIdentityAdminAccountStatus({
+      context: {
+        actorUserIdentityId: "user:admin",
+      },
+      userIdentityId: "user:missing",
+      action: "disable",
+    });
+    expect(setStatus.ok).toBeFalse();
+    expect(setStatus.error?.code).toBe("forbidden");
+  });
 });

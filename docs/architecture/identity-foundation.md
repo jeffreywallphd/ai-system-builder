@@ -567,6 +567,39 @@ Session lifecycle, issuance, validation guard behavior, revocation consistency, 
 
 Use that note as the authoritative session-subsystem baseline for future security/device-trust stories.
 
+## Provider and Account Policy Runtime Configuration (Story 1.4.6)
+
+Identity provider/account decisions are now configurable through explicit, validated host configuration instead of hard-coded startup assumptions.
+
+Primary config seam:
+
+- `infrastructure/config/IdentityProviderAccountPolicyConfig.ts`
+
+Host wiring:
+
+- `hosts/server/IdentityServerHost.ts` loads policy config from environment and applies it at identity startup:
+  - local provider enablement (`active` or `disabled`)
+  - startup bootstrap seeding of default local provider and credential policy
+  - local registration feature toggle
+  - local identity administration feature toggle
+
+Credential policy defaults:
+
+- local credential policy defaults are environment-driven using strongly typed fields
+- configured values are validated via domain policy construction (`createCredentialPolicy(...)`) before persistence
+- invalid/incoherent values fail fast with clear config errors
+
+Key environment variables include:
+
+- `IDENTITY_LOCAL_PROVIDER_ENABLED`
+- `IDENTITY_LOCAL_PROVIDER_ID`
+- `IDENTITY_LOCAL_PROVIDER_DISPLAY_NAME`
+- `IDENTITY_LOCAL_CREDENTIAL_POLICY_ID`
+- `IDENTITY_BOOTSTRAP_SEED_DEFAULTS`
+- `IDENTITY_ACCOUNT_ALLOW_LOCAL_REGISTRATION`
+- `IDENTITY_ACCOUNT_ALLOW_ADMINISTRATION`
+- `IDENTITY_LOCAL_CREDENTIAL_*` (credential defaults)
+
 ## Implemented Test Coverage
 
 Key tests for this foundation:
@@ -584,6 +617,7 @@ Key tests for this foundation:
 - `application/identity/tests/IdentitySessionLifecycleService.test.ts`
 - `application/identity/tests/IdentityAuthenticatedSessionService.test.ts`
 - `infrastructure/config/tests/IdentitySessionPolicyConfig.test.ts`
+- `infrastructure/config/tests/IdentityProviderAccountPolicyConfig.test.ts`
 - `application/identity/tests/LogoutIdentitySessionUseCase.test.ts`
 - `application/identity/tests/RevokeIdentitySessionUseCase.test.ts`
 - `application/identity/tests/IdentityAuthenticatorAndProviderCatalog.test.ts`
@@ -592,6 +626,7 @@ Key tests for this foundation:
 - `infrastructure/security/identity/tests/ScryptLocalPasswordCredentialService.test.ts`
 - `infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`
 - `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
+- `hosts/server/tests/IdentityServerHost.test.ts`
 - `infrastructure/api/identity/tests/IdentityAuthRedaction.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `ui/pages/tests/IdentityAdminPage.test.tsx`
