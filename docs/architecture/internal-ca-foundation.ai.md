@@ -9,6 +9,7 @@
 - Adds secure CA startup bootstrap validation seams (Story 6.1.3) for authoritative-host startup.
 - Adds protected secret storage/loading seams for CA root and signing assets (Story 6.1.4).
 - Adds first-time CA initialization orchestration with guarded idempotency and host invocation seam (Story 6.1.5).
+- Adds CA status/health introspection query seams for internal/admin consumers (Story 6.1.6).
 
 ## Main artifacts to cite
 
@@ -24,12 +25,14 @@
 - `src/application/security/ports/ICertificateAuthorityRootMaterialStorage.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
+- `src/application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
 - `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
 - `src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage.ts`
 - `hosts/server/IdentityServerHost.ts`
 - `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
+- `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
 - `src/shared/schemas/security/CertificateAuthoritySchemaContracts.ts`
@@ -80,6 +83,26 @@ Structured diagnostics emitted by the startup use case are designed for future o
   - `initializeCertificateAuthorityForFirstSetup` composes host infrastructure and invokes the application use case
   - host call path does not bypass application-layer orchestration
 
+## Story 6.1.6 CA status/health introspection behavior
+
+- `GetCertificateAuthorityStatusIntrospectionUseCase` provides a read-only, sanitized CA status view for internal/admin consumers.
+- It composes:
+  - startup validation output from `ResolveCertificateAuthorityStartupStateUseCase`
+  - CA metadata from persistence
+  - issued-certificate lifecycle counts
+  - trust-distribution failure indicators
+  - rotation checkpoint projections
+- State classification is explicit:
+  - `healthy`
+  - `uninitialized`
+  - `degraded`
+  - `blocked`
+- Returned data intentionally excludes:
+  - private key/certificate content
+  - trust-material storage locators
+  - secret reference identifiers and raw file paths
+- Shared DTO/schema contracts include the introspection response shape to stabilize downstream admin API/UI integration.
+
 ## Coverage in this slice
 
 - Domain invariants and lifecycle transitions: `src/domain/security/tests/CertificateAuthorityDomain.test.ts`
@@ -92,6 +115,7 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - protected-secret store coverage: `src/infrastructure/security/secrets/tests/FileSystemProtectedSecretStore.test.ts`
 - protected CA material save/load coverage: `src/infrastructure/security/ca/tests/ProtectedCertificateAuthorityRootMaterialStorage.test.ts`
 - first-time CA initialization coverage: `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
+- CA introspection state/health/sanitization coverage: `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
 - host initialization seam coverage: `hosts/server/tests/IdentityServerHost.test.ts`
 
 ## Follow-on note

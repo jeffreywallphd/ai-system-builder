@@ -1,6 +1,6 @@
 # Internal CA Foundation
 
-This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, and Story 6.1.5 (Feature 6 / Epic 6.1): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, and first-time CA initialization orchestration.
+This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, and Story 6.1.6 (Feature 6 / Epic 6.1): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, and CA status/introspection query services.
 
 ## Canonical artifacts
 
@@ -17,9 +17,11 @@ This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, and Story 6.1.5 (Feat
 - `src/application/security/ports/CertificateAuthorityPorts.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
+- `src/application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase.ts`
 - `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
 - `src/application/security/tests/ResolveCertificateAuthorityStartupStateUseCase.test.ts`
 - `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
+- `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
 - `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
@@ -140,6 +142,24 @@ Story 6.1.5 adds `InitializeCertificateAuthorityUseCase`, which is the applicati
 - host startup calls `assertCertificateAuthorityStartupSafe` before bringing the server online
 - diagnostics are structured for future operator/admin presentation surfaces
 
+## Story 6.1.6 CA status and introspection query services
+
+Story 6.1.6 adds a read-only CA introspection service for internal consumers and future admin surfaces:
+
+- `GetCertificateAuthorityStatusIntrospectionUseCase` returns sanitized CA state and health data without exposing private key/certificate payloads, raw secret locators, or filesystem paths
+- startup-state diagnostics are reused from `ResolveCertificateAuthorityStartupStateUseCase` to classify configuration/security blocking conditions
+- response state vocabulary is explicit and admin-surface friendly:
+  - `healthy`
+  - `uninitialized`
+  - `degraded`
+  - `blocked`
+- introspection view includes:
+  - authority metadata (`certificateAuthorityId`, display and lifecycle timestamps, CA status, validity window)
+  - certificate status counts and last issuance timestamp
+  - computed rotation checkpoint (`recommendedRotationAt`, `configuredNextRotationDueAt`, `daysUntilRecommendedRotation`)
+  - health flags for startup readiness, rotation pressure, expiring certificates, and trust-distribution failures
+- shared DTO and schema contracts now include explicit CA introspection response types for downstream transport/API integration
+
 ## Domain model summary
 
 `CertificateAuthorityDomain.ts` defines:
@@ -206,6 +226,7 @@ These seams let later stories implement bootstrapping, issuance, lookup, revocat
 - `CertificateAuthorityDtos.test.ts`: query preset and lookup-key helper behavior
 - `CertificateAuthoritySchemaContracts.test.ts`: valid payload parsing and invalid payload rejection for CA/certificate/trust-material records
 - `InitializeCertificateAuthorityUseCase.test.ts`: clean initialization path, conflict policy behavior, and metadata/material sync assertions
+- `GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`: healthy/uninitialized/degraded/blocked state mapping, contract parse validation, and sanitization assertions
 - `IdentityServerHost.test.ts`: host-level first-time initialization invocation seam coverage
 
 ## Related architecture note

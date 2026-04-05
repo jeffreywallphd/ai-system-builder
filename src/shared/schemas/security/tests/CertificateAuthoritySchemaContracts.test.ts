@@ -8,6 +8,7 @@ import {
 import {
   CertificateAuthorityRootPersistenceRecordSchema,
   CertificateAuthoritySchemaValidationError,
+  parseCertificateAuthorityStatusIntrospectionView,
   parseCertificateDistributionEventPersistenceRecord,
   parseCertificateRevocationHistoryPersistenceRecord,
   parseCertificateStatusHistoryPersistenceRecord,
@@ -222,5 +223,61 @@ describe("CertificateAuthoritySchemaContracts", () => {
       lastModifiedBy: "user:security-admin",
       revision: 1,
     })).toThrow(CertificateAuthoritySchemaValidationError);
+  });
+
+  it("parses sanitized certificate authority introspection views", () => {
+    const parsed = parseCertificateAuthorityStatusIntrospectionView({
+      asOf: "2026-09-01T00:00:00.000Z",
+      initialized: true,
+      active: true,
+      blocked: false,
+      state: "healthy",
+      certificateAuthorityId: "ca:internal:root:v1",
+      authority: {
+        certificateAuthorityId: "ca:internal:root:v1",
+        displayName: "AI Loom Internal Root",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        lastModifiedAt: "2026-01-01T00:00:00.000Z",
+        status: "active",
+        validityNotBefore: "2026-01-01T00:00:00.000Z",
+        validityNotAfter: "2028-01-01T00:00:00.000Z",
+        certificateCounts: {
+          total: 2,
+          issued: 1,
+          revoked: 1,
+          expired: 0,
+          superseded: 0,
+          activeAtAsOf: 1,
+        },
+        lastIssuedAt: "2026-08-20T00:00:00.000Z",
+        rotationCheckpoint: {
+          recommendedRotationAt: "2027-10-03T00:00:00.000Z",
+          configuredNextRotationDueAt: "2027-10-03T00:00:00.000Z",
+          daysUntilRecommendedRotation: 397,
+          isDue: false,
+          isOverdue: false,
+        },
+      },
+      diagnostics: [
+        {
+          code: "bootstrap-config-ready",
+          severity: "info",
+          message: "Bootstrap configuration is aligned with persistence.",
+        },
+      ],
+      healthFlags: {
+        startupHealthy: true,
+        configurationBlocked: false,
+        authorityActive: true,
+        rotationDueSoon: false,
+        rotationOverdue: false,
+        hasRevokedCertificates: true,
+        hasExpiringCertificates: false,
+        hasDistributionFailures: false,
+      },
+    });
+
+    expect(parsed.state).toBe("healthy");
+    expect(parsed.authority?.certificateCounts.total).toBe(2);
   });
 });
