@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Quick baseline for Story 5.1.4 node trust application orchestration seams, Story 5.2.1 node bootstrap identity generation, Story 5.2.3 admin review/approval decisions, Story 5.2.4 enrollment detail retrieval support, and Story 5.3.4 admin inventory list/detail queries (Feature 5 / Epic 5.1, 5.2, and 5.3).
+Quick baseline for Story 5.1.4 node trust application orchestration seams, Story 5.2.1 node bootstrap identity generation, Story 5.2.3 admin review/approval decisions, Story 5.2.4 enrollment detail retrieval support, Story 5.3.4 admin inventory list/detail queries, and Story 5.4.1 durable node revocation behavior (Feature 5 / Epic 5.1, 5.2, 5.3, and 5.4).
 
 ## Canonical files
 
@@ -35,7 +35,7 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - approve node includes capability profile normalization/validation and existing-node capability-profile registration
 - activate approved node (idempotent trusted-state transition with capability and certificate/trust metadata continuity)
 - reject node (admin-authorized, explicit lifecycle transitions, decision metadata)
-- revoke node trust (including certificate-revocation seam)
+- revoke node trust (including certificate-revocation seam, durable revocation metadata persistence, and safe repeat-revocation no-op handling)
 - record node heartbeat
 - query trusted node inventory
 - query trusted node inventory with normalized capability filtering

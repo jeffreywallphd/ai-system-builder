@@ -1,6 +1,6 @@
 # Node Trusted Activation Workflow
 
-This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, and Story 5.3.5 (Feature 5 / Epic 5.3): explicit activation of approved nodes into trusted operational state, capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, and authenticated admin UI inventory inspection surfaces.
+This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, and Story 5.4.1 (Feature 5 / Epic 5.3 and Epic 5.4): explicit activation of approved nodes into trusted operational state, capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, authenticated admin UI inventory inspection surfaces, and durable node revocation behavior.
 
 ## Purpose
 
@@ -57,6 +57,8 @@ This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, and Stor
 - Unapproved nodes cannot be activated.
 - Capability profiles are normalized and validated before registration/approval persistence.
 - Existing nodes approved via enrollment are updated to the approved enrollment capability profile.
+- Revocation is admin-authorized and durable. Revoked nodes keep persisted revocation metadata (`revokedAt`, `revokedByUserIdentityId`, optional `note`) and remain visible in inventory as `revoked`.
+- Repeated revocation requests against already-revoked nodes are safe no-op operations that preserve original revocation metadata.
 
 ## Capability registration rules
 
@@ -74,6 +76,7 @@ This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, and Stor
 
 - `node-approved`
 - `node-activated`
+- `node-revoked`
 - `node-heartbeat-recorded`
 
 ## Presence transport and stored data

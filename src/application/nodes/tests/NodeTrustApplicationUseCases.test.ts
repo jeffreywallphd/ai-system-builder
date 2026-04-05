@@ -306,6 +306,7 @@ function createDenyingAuthorizationHook(input: {
   readonly approve?: boolean;
   readonly activate?: boolean;
   readonly reject?: boolean;
+  readonly revoke?: boolean;
 }): NodeTrustAuthorizationHook {
   return {
     async assertCanRegisterEnrollmentRequest(_request) {},
@@ -324,7 +325,11 @@ function createDenyingAuthorizationHook(input: {
         throw new Error("admin role required to reject enrollment requests");
       }
     },
-    async assertCanRevokeNode(_request) {},
+    async assertCanRevokeNode(_request) {
+      if (input.revoke) {
+        throw new Error("admin role required to revoke trusted nodes");
+      }
+    },
     async assertCanRecordHeartbeat(_request) {},
     async assertCanActivateNode(_request) {
       if (input.activate) {
@@ -1283,7 +1288,154 @@ describe("node trust application use-cases", () => {
 
     expect(result.value.node.trustState).toBe(NodeTrustStates.revoked);
     expect(result.value.node.revocation.state).toBe(NodeRevocationStates.revoked);
+    expect(result.value.node.revocation.reason).toBe(NodeRevocationReasons.policyViolation);
+    expect(result.value.node.revocation.revokedByUserIdentityId).toBe("admin-1");
+    expect(result.value.node.revocation.note).toBe("Heartbeat outlier detected.");
     expect(certificateHook.revokedCertificateRefs).toEqual(["cert:node-compute-9:v1"]);
+  });
+
+  it("blocks unauthorized actors from revoking trusted nodes", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.registerNode({
+      record: {
+        nodeId: "node-revoke-denied-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Revoke Denied Node",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:node-revoke-denied-1:v1",
+        },
+        deploymentTags: ["us-east-2"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:20:00.000Z",
+        approvedAt: "2026-04-05T18:20:30.000Z",
+        createdAt: "2026-04-05T18:20:00.000Z",
+        createdBy: "system",
+        lastModifiedAt: "2026-04-05T18:20:00.000Z",
+        lastModifiedBy: "system",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-node-revoke-denied-1",
+        context: {
+          actorUserIdentityId: "system",
+        },
+      },
+    });
+
+    const useCase = new RevokeNodeTrustUseCase({
+      nodeRepository: repository,
+      authorizationHook: createDenyingAuthorizationHook({ revoke: true }),
+      clock: createFixedClock("2026-04-05T18:25:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "member-1",
+      nodeId: "node-revoke-denied-1",
+      reason: NodeRevocationReasons.operatorAction,
+    });
+
+    expect(result.ok).toBeFalse();
+    if (!result.ok) {
+      expect(result.error.code).toBe(NodeTrustUseCaseErrorCodes.forbidden);
+      expect(result.error.message).toContain("admin role required");
+    }
+
+    const persisted = await repository.findNodeById("node-revoke-denied-1");
+    expect(persisted?.trustState).toBe(NodeTrustStates.trusted);
+    expect(persisted?.revocation.state).toBe(NodeRevocationStates.active);
+  });
+
+  it("treats repeated revocation requests as safe no-op while preserving revocation metadata", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    const certificateHook = new StubCertificateHook();
+    const audit = new RecordingAuditSink();
+    await repository.registerNode({
+      record: {
+        nodeId: "node-revoke-idempotent-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Revoke Idempotent Node",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:node-revoke-idempotent-1:v1",
+        },
+        deploymentTags: ["us-west-1"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:20:00.000Z",
+        approvedAt: "2026-04-05T18:20:30.000Z",
+        createdAt: "2026-04-05T18:20:00.000Z",
+        createdBy: "system",
+        lastModifiedAt: "2026-04-05T18:20:00.000Z",
+        lastModifiedBy: "system",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-node-revoke-idempotent-1",
+        context: {
+          actorUserIdentityId: "system",
+        },
+      },
+    });
+
+    const firstUseCase = new RevokeNodeTrustUseCase({
+      nodeRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      certificateHook,
+      clock: createFixedClock("2026-04-05T18:25:00.000Z"),
+      auditSink: audit,
+    });
+
+    const first = await firstUseCase.execute({
+      actorUserIdentityId: "admin-1",
+      nodeId: "node-revoke-idempotent-1",
+      reason: NodeRevocationReasons.policyViolation,
+      note: "Initial revocation",
+    });
+    expect(first.ok).toBeTrue();
+    if (!first.ok) {
+      return;
+    }
+    expect(first.value.mutation.changed).toBeTrue();
+
+    const secondUseCase = new RevokeNodeTrustUseCase({
+      nodeRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      certificateHook,
+      clock: createFixedClock("2026-04-05T18:30:00.000Z"),
+      auditSink: audit,
+    });
+
+    const second = await secondUseCase.execute({
+      actorUserIdentityId: "admin-2",
+      nodeId: "node-revoke-idempotent-1",
+    });
+    expect(second.ok).toBeTrue();
+    if (!second.ok) {
+      return;
+    }
+
+    expect(second.value.node.trustState).toBe(NodeTrustStates.revoked);
+    expect(second.value.node.revocation.reason).toBe(NodeRevocationReasons.policyViolation);
+    expect(second.value.node.revocation.revokedByUserIdentityId).toBe("admin-1");
+    expect(second.value.node.revocation.note).toBe("Initial revocation");
+    expect(second.value.mutation.changed).toBeFalse();
+    expect(certificateHook.revokedCertificateRefs).toEqual(["cert:node-revoke-idempotent-1:v1"]);
+    expect(audit.events.filter((event) => event.type === NodeTrustAuditEventTypes.nodeRevoked)).toHaveLength(2);
   });
 
   it("records heartbeat for active nodes and rejects revoked-node heartbeat updates", async () => {

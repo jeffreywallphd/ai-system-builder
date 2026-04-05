@@ -1,6 +1,6 @@
 # Node Trust Application Use Cases
 
-This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment, Story 5.2.3 (Feature 5 / Epic 5.2): admin review/approval decisions for pending node enrollment, Story 5.2.4 (Feature 5 / Epic 5.2): enrollment detail retrieval transport orchestration support, and Story 5.3.4 (Feature 5 / Epic 5.3): admin inventory list/detail query read models across trust and presence states.
+This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment, Story 5.2.3 (Feature 5 / Epic 5.2): admin review/approval decisions for pending node enrollment, Story 5.2.4 (Feature 5 / Epic 5.2): enrollment detail retrieval transport orchestration support, Story 5.3.4 (Feature 5 / Epic 5.3): admin inventory list/detail query read models across trust and presence states, and Story 5.4.1 (Feature 5 / Epic 5.4): durable node revocation semantics and repeat-revocation safety.
 
 ## Canonical files
 
@@ -66,9 +66,12 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
   - upserts node as rejected/quarantined for explicit lifecycle traceability
 - `RevokeNodeTrustUseCase`
   - authorizes revocation action
+  - requires revocation reason when revoking non-revoked nodes
   - validates revocation semantics through domain helpers
-  - revokes node trust state and revocation envelope in persistence
+  - revokes node trust state and revocation envelope in persistence with durable metadata (`revokedAt`, `revokedByUserIdentityId`, optional `note`)
   - invokes optional certificate revocation hook before state mutation
+  - safely handles repeated revocation requests for already-revoked nodes without mutating previously persisted revocation metadata
+  - emits revocation audit events for both initial revocation and safe already-revoked retries (`alreadyRevoked` detail flag)
 - `RecordNodeHeartbeatUseCase`
   - authorizes heartbeat writes
   - enforces trusted-node precondition before heartbeat writes (`trustState=trusted`)
@@ -141,7 +144,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - approval flow includes capability profile normalization/validation and existing-node capability profile updates
 - activation flow including approved-only guardrails, idempotent trusted-state transition, and activation audit publication
 - rejection flow including authorization gating, explicit lifecycle transition sequence, decision metadata persistence, and quarantine state mutation
-- revocation flow with certificate-revocation hook
+- revocation flow with certificate-revocation hook, authorization denial coverage, durable revocation metadata assertions, and safe repeat-revocation idempotency behavior
 - heartbeat recording with trusted-node-only guardrails and revoked-node rejection behavior
 - trusted inventory query filtering
 - full inventory query filtering across node + pending-enrollment read models
