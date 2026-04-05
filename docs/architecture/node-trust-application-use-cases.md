@@ -1,6 +1,6 @@
 # Node Trust Application Use Cases
 
-This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment, and Story 5.2.3 (Feature 5 / Epic 5.2): admin review/approval decisions for pending node enrollment.
+This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment, Story 5.2.3 (Feature 5 / Epic 5.2): admin review/approval decisions for pending node enrollment, and Story 5.2.4 (Feature 5 / Epic 5.2): enrollment detail retrieval transport orchestration support.
 
 ## Canonical files
 
@@ -10,6 +10,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `src/application/nodes/ports/NodeTrustAuditPorts.ts`
 - `src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase.ts`
 - `src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase.ts`
+- `src/application/nodes/use-cases/GetNodeEnrollmentDetailUseCase.ts`
 - `src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase.ts`
 - `src/application/nodes/use-cases/RejectNodeEnrollmentUseCase.ts`
 - `src/application/nodes/use-cases/RevokeNodeTrustUseCase.ts`
@@ -34,6 +35,9 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `ReviewPendingNodeEnrollmentUseCase`
   - lists pending/under-review enrollment requests for administrative review
   - keeps review authorization as a dedicated seam
+- `GetNodeEnrollmentDetailUseCase`
+  - resolves one enrollment request by `requestId` for admin review surfaces
+  - reuses review authorization seam (`assertCanReviewPendingEnrollment`) to enforce server-side access
 - `ApproveNodeEnrollmentUseCase`
   - authorizes approval action
   - transitions enrollment request lifecycle (`submitted -> under-review -> approved` as needed)
@@ -107,6 +111,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 
 - enrollment registration orchestration
 - pending review listing (including denied review authorization path)
+- enrollment detail retrieval (including denied review authorization path)
 - approval flow including authorization gating, explicit lifecycle transition sequence, decision metadata persistence, certificate hook, and trust-state mutation
 - rejection flow including authorization gating, explicit lifecycle transition sequence, decision metadata persistence, and quarantine state mutation
 - revocation flow with certificate-revocation hook

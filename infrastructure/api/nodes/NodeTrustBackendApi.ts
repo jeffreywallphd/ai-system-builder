@@ -1,20 +1,34 @@
 import type {
+  ApproveNodeEnrollmentUseCase,
+  GetNodeEnrollmentDetailUseCase,
   RegisterNodeEnrollmentRequestUseCase,
+  RejectNodeEnrollmentUseCase,
   ReviewPendingNodeEnrollmentUseCase,
 } from "../../src/application/nodes/use-cases";
 import { NodeTrustUseCaseErrorCodes } from "../../src/application/nodes/use-cases/NodeTrustUseCaseShared";
 import {
+  toNodeDetailDto,
   toNodeEnrollmentDetailDto,
   toNodePendingEnrollmentSummaryDto,
+  type NodeInternalDetailDto,
   type NodeInternalEnrollmentDetailDto,
 } from "../../src/shared/contracts/nodes/NodeTrustApiContracts";
-import type { NodeEnrollmentRequestPersistenceRecord } from "../../src/shared/dto/nodes/NodeTrustPersistenceDtos";
+import type {
+  NodeEnrollmentRequestPersistenceRecord,
+  NodeIdentityPersistenceRecord,
+} from "../../src/shared/dto/nodes/NodeTrustPersistenceDtos";
 import {
+  type ApproveNodeEnrollmentApiRequest,
+  type ApproveNodeEnrollmentApiResponse,
+  type GetNodeEnrollmentDetailApiRequest,
+  type GetNodeEnrollmentDetailApiResponse,
   NodeTrustApiErrorCodes,
   type ListPendingNodeEnrollmentsApiRequest,
   type ListPendingNodeEnrollmentsApiResponse,
   type NodeTrustApiError,
   type NodeTrustApiResponse,
+  type RejectNodeEnrollmentApiRequest,
+  type RejectNodeEnrollmentApiResponse,
   type SubmitNodeEnrollmentApiRequest,
   type SubmitNodeEnrollmentApiResponse,
 } from "./sdk/PublicNodeTrustApiContract";
@@ -22,6 +36,9 @@ import {
 interface NodeTrustBackendApiDependencies {
   readonly registerNodeEnrollmentRequestUseCase: RegisterNodeEnrollmentRequestUseCase;
   readonly reviewPendingNodeEnrollmentUseCase: ReviewPendingNodeEnrollmentUseCase;
+  readonly getNodeEnrollmentDetailUseCase: GetNodeEnrollmentDetailUseCase;
+  readonly approveNodeEnrollmentUseCase: ApproveNodeEnrollmentUseCase;
+  readonly rejectNodeEnrollmentUseCase: RejectNodeEnrollmentUseCase;
 }
 
 export class NodeTrustBackendApi {
@@ -108,6 +125,98 @@ export class NodeTrustBackendApi {
     });
   }
 
+  public async getNodeEnrollmentDetail(
+    request: GetNodeEnrollmentDetailApiRequest,
+  ): Promise<NodeTrustApiResponse<GetNodeEnrollmentDetailApiResponse>> {
+    const outcome = await this.dependencies.getNodeEnrollmentDetailUseCase.execute({
+      actorUserIdentityId: request.actorUserIdentityId,
+      requestId: request.requestId,
+    });
+
+    if (!outcome.ok) {
+      return Object.freeze({
+        ok: false,
+        error: this.mapUseCaseError(outcome.error.code, outcome.error.message),
+      });
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        enrollment: toNodeEnrollmentDetailDto(this.toInternalEnrollment(outcome.value.enrollmentRequest)),
+      }),
+    });
+  }
+
+  public async approveNodeEnrollment(
+    request: ApproveNodeEnrollmentApiRequest,
+  ): Promise<NodeTrustApiResponse<ApproveNodeEnrollmentApiResponse>> {
+    const outcome = await this.dependencies.approveNodeEnrollmentUseCase.execute({
+      actorUserIdentityId: request.actorUserIdentityId,
+      requestId: request.requestId,
+      reviewedAt: request.reviewedAt,
+      decisionNote: request.decisionNote,
+      certificateRef: request.certificate?.certificateRef,
+      certificateAuthorityRef: request.certificate?.certificateAuthorityRef,
+      certificateThumbprint: request.certificate?.certificateThumbprint,
+      certificateExpiresAt: request.certificate?.certificateExpiresAt,
+      correlationId: request.correlationId,
+      metadata: request.metadata,
+    });
+
+    if (!outcome.ok) {
+      return Object.freeze({
+        ok: false,
+        error: this.mapUseCaseError(outcome.error.code, outcome.error.message),
+      });
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        enrollment: toNodeEnrollmentDetailDto(this.toInternalEnrollment(outcome.value.enrollmentRequest)),
+        node: toNodeDetailDto(this.toInternalNode(outcome.value.node)),
+      }),
+    });
+  }
+
+  public async rejectNodeEnrollment(
+    request: RejectNodeEnrollmentApiRequest,
+  ): Promise<NodeTrustApiResponse<RejectNodeEnrollmentApiResponse>> {
+    const outcome = await this.dependencies.rejectNodeEnrollmentUseCase.execute({
+      actorUserIdentityId: request.actorUserIdentityId,
+      requestId: request.requestId,
+      reviewedAt: request.reviewedAt,
+      decisionNote: request.decisionNote,
+      correlationId: request.correlationId,
+      metadata: request.metadata,
+    });
+
+    if (!outcome.ok) {
+      return Object.freeze({
+        ok: false,
+        error: this.mapUseCaseError(outcome.error.code, outcome.error.message),
+      });
+    }
+    if (!outcome.value.node) {
+      return Object.freeze({
+        ok: false,
+        error: Object.freeze({
+          code: NodeTrustApiErrorCodes.internal,
+          message: "Enrollment rejection completed without a node lifecycle record.",
+        }),
+      });
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        enrollment: toNodeEnrollmentDetailDto(this.toInternalEnrollment(outcome.value.enrollmentRequest)),
+        node: toNodeDetailDto(this.toInternalNode(outcome.value.node)),
+      }),
+    });
+  }
+
   private toInternalEnrollment(input: NodeEnrollmentRequestPersistenceRecord): NodeInternalEnrollmentDetailDto {
     return Object.freeze({
       requestId: input.requestId,
@@ -122,6 +231,30 @@ export class NodeTrustBackendApi {
       capabilityProfile: input.capabilityProfile,
       deploymentTags: input.deploymentTags,
       certificateRef: input.certificateRef,
+      createdAt: input.createdAt,
+      createdBy: input.createdBy,
+      lastModifiedAt: input.lastModifiedAt,
+      lastModifiedBy: input.lastModifiedBy,
+      revision: input.revision,
+    });
+  }
+
+  private toInternalNode(input: NodeIdentityPersistenceRecord): NodeInternalDetailDto {
+    return Object.freeze({
+      nodeId: input.nodeId,
+      nodeType: input.nodeType,
+      displayName: input.displayName,
+      approvalStatus: input.approvalStatus,
+      trustState: input.trustState,
+      capabilityProfile: input.capabilityProfile,
+      deploymentTags: input.deploymentTags,
+      certificate: input.certificate,
+      lastSeen: input.lastSeen,
+      revocation: input.revocation,
+      enrolledAt: input.enrolledAt,
+      approvedAt: input.approvedAt,
+      revokedAt: input.revokedAt,
+      enrollmentRequestId: input.enrollmentRequestId,
       createdAt: input.createdAt,
       createdBy: input.createdBy,
       lastModifiedAt: input.lastModifiedAt,
@@ -148,6 +281,7 @@ export class NodeTrustBackendApi {
           message,
         });
       case NodeTrustUseCaseErrorCodes.conflict:
+      case NodeTrustUseCaseErrorCodes.invalidState:
         return Object.freeze({
           code: NodeTrustApiErrorCodes.conflict,
           message,

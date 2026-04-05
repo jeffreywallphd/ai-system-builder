@@ -82,7 +82,10 @@ import { RemoveWorkspaceMemberUseCase } from "../../src/application/workspaces/u
 import { AssignWorkspaceRoleUseCase } from "../../src/application/workspaces/use-cases/AssignWorkspaceRoleUseCase";
 import { ReassignWorkspaceRoleUseCase } from "../../src/application/workspaces/use-cases/ReassignWorkspaceRoleUseCase";
 import { RevokeWorkspaceRoleUseCase } from "../../src/application/workspaces/use-cases/RevokeWorkspaceRoleUseCase";
+import { ApproveNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase";
+import { GetNodeEnrollmentDetailUseCase } from "../../src/application/nodes/use-cases/GetNodeEnrollmentDetailUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
+import { RejectNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
 import type { WorkspaceIdNamespace } from "../../src/shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
@@ -472,6 +475,17 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     reviewPendingNodeEnrollmentUseCase: new ReviewPendingNodeEnrollmentUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
+    }),
+    getNodeEnrollmentDetailUseCase: new GetNodeEnrollmentDetailUseCase({
+      enrollmentRequestRepository: nodeTrustRepository,
+    }),
+    approveNodeEnrollmentUseCase: new ApproveNodeEnrollmentUseCase({
+      enrollmentRequestRepository: nodeTrustRepository,
+      nodeRepository: nodeTrustRepository,
+    }),
+    rejectNodeEnrollmentUseCase: new RejectNodeEnrollmentUseCase({
+      enrollmentRequestRepository: nodeTrustRepository,
+      nodeRepository: nodeTrustRepository,
     }),
   });
 

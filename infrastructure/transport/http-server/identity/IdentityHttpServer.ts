@@ -55,15 +55,22 @@ import {
   type WorkspaceAdministrationApiResponse,
 } from "../../../api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 import {
+  type ApproveNodeEnrollmentApiRequest,
+  type GetNodeEnrollmentDetailApiRequest,
   NodeTrustApiErrorCodes,
   type NodeTrustApiResponse,
+  type RejectNodeEnrollmentApiRequest,
 } from "../../../api/nodes/sdk/PublicNodeTrustApiContract";
 import { redactSensitiveAuthPayload, redactSensitiveText } from "../../../api/identity/IdentityAuthRedaction";
 import { NodeEnrollmentRequestStatuses } from "../../../../src/domain/nodes/NodeTrustDomain";
 import {
+  parseApproveNodeEnrollmentActionRequestDto,
+  parseRejectNodeEnrollmentActionRequestDto,
   parseNodeEnrollmentSubmissionRequestDto,
   NodeTrustApiSchemaValidationError,
+  type ApproveNodeEnrollmentActionRequestDtoPayload,
   type NodeEnrollmentSubmissionRequestDtoPayload,
+  type RejectNodeEnrollmentActionRequestDtoPayload,
 } from "../../../../src/shared/schemas/nodes/NodeTrustApiSchemaContracts";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
@@ -1233,6 +1240,144 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
               actorUserIdentityId: context.principal.userIdentityId,
               query: Object.fromEntries(url.searchParams.entries()),
             }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.nodeTrustBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/nodes/enrollments/")
+        && !path.endsWith("/approve")
+        && !path.endsWith("/reject")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const enrollmentRequestId = decodePathTail(path, "/api/v1/nodes/enrollments/");
+            if (!enrollmentRequestId) {
+              const invalid = buildNodeTrustInvalidRequestResponse("requestId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const enrollmentDetailRequest: GetNodeEnrollmentDetailApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              requestId: enrollmentRequestId,
+            });
+            const apiResponse = await options.nodeTrustBackendApi.getNodeEnrollmentDetail(enrollmentDetailRequest);
+            const statusCode = mapNodeTrustStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, enrollmentDetailRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.nodeTrustBackendApi
+        && request.method === "POST"
+        && path.endsWith("/approve")
+        && path.startsWith("/api/v1/nodes/enrollments/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const enrollmentRequestId = decodePathTail(path, "/api/v1/nodes/enrollments/", "/approve");
+            if (!enrollmentRequestId) {
+              const invalid = buildNodeTrustInvalidRequestResponse("requestId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateApproveNodeEnrollmentRequest(
+              request,
+              context.principal.userIdentityId,
+              enrollmentRequestId,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const approveRequest: ApproveNodeEnrollmentApiRequest = Object.freeze({
+              actorUserIdentityId: parsedRequest.data.actorUserIdentityId,
+              requestId: parsedRequest.data.requestId,
+              reviewedAt: parsedRequest.data.reviewedAt,
+              decisionNote: parsedRequest.data.decisionNote,
+              certificate: parsedRequest.data.certificate,
+              correlationId: parsedRequest.data.correlationId,
+              metadata: parsedRequest.data.metadata,
+            });
+            const apiResponse = await options.nodeTrustBackendApi.approveNodeEnrollment(approveRequest);
+            const statusCode = mapNodeTrustStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, approveRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.nodeTrustBackendApi
+        && request.method === "POST"
+        && path.endsWith("/reject")
+        && path.startsWith("/api/v1/nodes/enrollments/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const enrollmentRequestId = decodePathTail(path, "/api/v1/nodes/enrollments/", "/reject");
+            if (!enrollmentRequestId) {
+              const invalid = buildNodeTrustInvalidRequestResponse("requestId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateRejectNodeEnrollmentRequest(
+              request,
+              context.principal.userIdentityId,
+              enrollmentRequestId,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const rejectRequest: RejectNodeEnrollmentApiRequest = Object.freeze({
+              actorUserIdentityId: parsedRequest.data.actorUserIdentityId,
+              requestId: parsedRequest.data.requestId,
+              reviewedAt: parsedRequest.data.reviewedAt,
+              decisionNote: parsedRequest.data.decisionNote,
+              correlationId: parsedRequest.data.correlationId,
+              metadata: parsedRequest.data.metadata,
+            });
+            const apiResponse = await options.nodeTrustBackendApi.rejectNodeEnrollment(rejectRequest);
+            const statusCode = mapNodeTrustStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, rejectRequest, apiResponse);
           },
         );
         return;
@@ -2809,6 +2954,130 @@ async function parseAndValidateNodeEnrollmentSubmissionRequest(
   try {
     const data = parseNodeEnrollmentSubmissionRequestDto(parsedBody.value);
     return { ok: true, data };
+  } catch (error) {
+    if (error instanceof NodeTrustApiSchemaValidationError) {
+      const body: NodeTrustApiResponse<never> = Object.freeze({
+        ok: false,
+        error: Object.freeze({
+          code: NodeTrustApiErrorCodes.invalidRequest,
+          message: "Request validation failed.",
+          validationErrors: Object.freeze(error.issues.map((issue) => Object.freeze({
+            path: issue.path,
+            code: issue.code,
+            message: issue.message,
+          }))),
+        }),
+      });
+      logger.warn(Object.freeze({
+        event: "node-trust-http.request.validation-failed",
+        requestId,
+        method: request.method,
+        path: request.url,
+        statusCode: 400,
+        details: {
+          request: redactSensitiveAuthPayload(parsedBody.value),
+          issues: body.error?.validationErrors,
+        },
+      }));
+      return { ok: false, statusCode: 400, body };
+    }
+
+    const body = buildNodeTrustInvalidRequestResponse("Request validation failed.");
+    logger.warn(Object.freeze({
+      event: "node-trust-http.request.validation-error",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+      details: {
+        request: redactSensitiveAuthPayload(parsedBody.value),
+      },
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+}
+
+async function parseAndValidateApproveNodeEnrollmentRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  enrollmentRequestId: string,
+  requestLogId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: ApproveNodeEnrollmentActionRequestDtoPayload }
+  | { readonly ok: false; readonly statusCode: number; readonly body: NodeTrustApiResponse<never> }
+> {
+  return parseAndValidateNodeTrustActionRequest(
+    request,
+    Object.freeze({
+      actorUserIdentityId,
+      requestId: enrollmentRequestId,
+    }),
+    requestLogId,
+    logger,
+    maxBodyBytes,
+    parseApproveNodeEnrollmentActionRequestDto,
+  );
+}
+
+async function parseAndValidateRejectNodeEnrollmentRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  enrollmentRequestId: string,
+  requestLogId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: RejectNodeEnrollmentActionRequestDtoPayload }
+  | { readonly ok: false; readonly statusCode: number; readonly body: NodeTrustApiResponse<never> }
+> {
+  return parseAndValidateNodeTrustActionRequest(
+    request,
+    Object.freeze({
+      actorUserIdentityId,
+      requestId: enrollmentRequestId,
+    }),
+    requestLogId,
+    logger,
+    maxBodyBytes,
+    parseRejectNodeEnrollmentActionRequestDto,
+  );
+}
+
+async function parseAndValidateNodeTrustActionRequest<T>(
+  request: IncomingMessage,
+  additions: Readonly<Record<string, unknown>>,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+  parser: (payload: unknown) => T,
+): Promise<
+  | { readonly ok: true; readonly data: T }
+  | { readonly ok: false; readonly statusCode: number; readonly body: NodeTrustApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildNodeTrustInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "node-trust-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  try {
+    const payload = Object.freeze({
+      ...parsedBody.value as Record<string, unknown>,
+      ...additions,
+    });
+    return {
+      ok: true,
+      data: parser(payload),
+    };
   } catch (error) {
     if (error instanceof NodeTrustApiSchemaValidationError) {
       const body: NodeTrustApiResponse<never> = Object.freeze({

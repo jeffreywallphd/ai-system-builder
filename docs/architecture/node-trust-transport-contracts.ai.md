@@ -64,3 +64,17 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
   - persist as pending enrollment records (not active nodes),
   - return stable invalid/duplicate failures,
   - expose pending summaries via admin-facing query flow.
+
+## Story 5.2.4 additions
+
+- Expanded server adapter surface:
+  - `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+  - `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- Expanded HTTP routes in `IdentityHttpServer.ts`:
+  - `GET /api/v1/nodes/enrollments/:requestId` (enrollment detail review)
+  - `POST /api/v1/nodes/enrollments/:requestId/approve` (approval action)
+  - `POST /api/v1/nodes/enrollments/:requestId/reject` (rejection action)
+- These admin routes now:
+  - validate approval/rejection payloads through shared node-trust schema parse helpers,
+  - bind actor identity to authenticated session principal in transport layer,
+  - return admin-safe decision payloads that exclude internal certificate authority/trust metadata fields.

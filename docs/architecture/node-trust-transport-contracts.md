@@ -103,3 +103,39 @@ Lifecycle behavior for this slice:
 - Duplicate pending requests for the same `nodeId` return stable `conflict` responses.
 - Pending-review queries call `ReviewPendingNodeEnrollmentUseCase` and project records into `NodePendingEnrollmentSummaryDto` for admin-facing review flows.
 - Bootstrap public trust material is captured via submission payload metadata and `trustMaterialRef` promotion to `certificateRef` when no explicit certificate reference is provided.
+
+## Story 5.2.4 enrollment review and approval transport APIs
+
+Story 5.2.4 extends the node-trust admin transport surface so trusted admin UIs can complete the initial review workflow end to end.
+
+Canonical artifacts:
+
+- `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+
+Added API operations:
+
+- `GET /api/v1/nodes/enrollments/:requestId`
+  - returns `GetNodeEnrollmentDetailApiResponse` with one admin-safe `NodeEnrollmentDetailDto`
+- `POST /api/v1/nodes/enrollments/:requestId/approve`
+  - validates approval payload with shared node-trust schema contracts
+  - executes `ApproveNodeEnrollmentUseCase`
+  - returns `NodeEnrollmentDecisionResponseDto` with admin-safe node projection
+- `POST /api/v1/nodes/enrollments/:requestId/reject`
+  - validates rejection payload with shared node-trust schema contracts
+  - executes `RejectNodeEnrollmentUseCase`
+  - returns `NodeEnrollmentDecisionResponseDto`
+
+Server-side enforcement posture:
+
+- all review/detail/decision routes require an authenticated session
+- actor identity is bound to `context.principal.userIdentityId` in HTTP handlers rather than client-supplied actor values
+- use-case authorization hooks remain the policy seam for admin permissions
+
+Sensitive data posture:
+
+- responses are shaped via `toNodeEnrollmentDetailDto(...)` and `toNodeDetailDto(...)`
+- certificate authority internals, certificate thumbprints, mutation metadata, and other internal trust material remain excluded from admin transport responses

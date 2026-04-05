@@ -1,6 +1,7 @@
 export * from "./NodeTrustUseCaseShared";
 export * from "./RegisterNodeEnrollmentRequestUseCase";
 export * from "./ReviewPendingNodeEnrollmentUseCase";
+export * from "./GetNodeEnrollmentDetailUseCase";
 export * from "./ApproveNodeEnrollmentUseCase";
 export * from "./RejectNodeEnrollmentUseCase";
 export * from "./RevokeNodeTrustUseCase";
