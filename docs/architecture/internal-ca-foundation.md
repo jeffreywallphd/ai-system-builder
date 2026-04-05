@@ -1,7 +1,7 @@
 # Internal CA Foundation
 
 This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, Story 6.2.1, Story 6.2.2, Story 6.2.3, Story 6.2.4, Story 6.2.5, Story 6.2.6, and Story 6.2.7 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, certificate subject-profile issuance policy enforcement, concrete issuance signing/material persistence execution, node-trust-backed approved-node issuance eligibility, explicit certificate revocation workflow plus revocation-status enforcement seams, reusable certificate trust evaluation helpers, certificate lifecycle audit recording seams, and issued-certificate metadata query/listing seams for admin/API consumers.
-This note now also documents Story 6.3.1, Story 6.3.2, and Story 6.3.3 (Feature 6 / Epic 6.3): runtime trust-material export/distribution contracts, centralized certificate renewal/rotation planning services that classify renewal urgency and operator attention conditions before expiry, and a certificate renewal/replacement workflow that issues successor certificates while keeping historical linkage explicit and auditable.
+This note now also documents Story 6.3.1, Story 6.3.2, Story 6.3.3, and Story 6.3.4 (Feature 6 / Epic 6.3): runtime trust-material export/distribution contracts, centralized certificate renewal/rotation planning services that classify renewal urgency and operator attention conditions before expiry, a certificate renewal/replacement workflow that issues successor certificates while keeping historical linkage explicit and auditable, and authoritative server host/runtime composition wiring that resolves managed server trust material through the CA/certificate service layer before transport startup.
 
 ## Canonical artifacts
 
@@ -65,6 +65,7 @@ This note now also documents Story 6.3.1, Story 6.3.2, and Story 6.3.3 (Feature 
 - `src/infrastructure/security/certificates/tests/RuntimeTrustMaterialDistributionService.test.ts`
 - `hosts/server/IdentityServerHost.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
 - `src/shared/dto/security/tests/CertificateAuthorityDtos.test.ts`
 - `src/shared/schemas/security/CertificateAuthoritySchemaContracts.ts`
@@ -257,6 +258,24 @@ Story 6.3.3 adds a concrete application workflow to renew or replace existing is
   - `certificate-renewal-started`
   - `certificate-renewal-succeeded`
   - `certificate-renewal-failed`
+
+## Story 6.3.4 authoritative server runtime wiring to managed CA/certificate services
+
+Story 6.3.4 wires the authoritative server host runtime to managed CA/certificate services so startup and transport do not bypass certificate-management seams:
+
+- `startIdentityServerHost` now supports managed server TLS bootstrap via explicit environment posture:
+  - `AI_LOOM_INTERNAL_CA_SERVER_MANAGED_TLS_ENABLED=true` enables managed TLS composition.
+  - server target scope is resolved through runtime trust-material services (`targetKind='server'`, default `server:authoritative`).
+- managed startup material is resolved through formal CA/certificate service seams:
+  - runtime package retrieval through `ResolveRuntimeTrustMaterialPackageUseCase` + `RuntimeTrustMaterialDistributionService`
+  - certificate trust-state enforcement through `ResolveCertificateRevocationStatusUseCase`
+  - protected key loading through `ProtectedCertificateAuthorityRootMaterialStorage`
+- startup is fail-closed when required managed materials are unsafe/unavailable:
+  - runtime trust package not found
+  - runtime package missing serial/leaf certificate
+  - resolved certificate trust state not usable (`revoked`, `expired`, etc.)
+  - configured private-key trust material missing or wrong trust-material kind
+- authoritative transport creation now accepts an injected server factory in `IdentityHttpServer` so host composition can switch from plain HTTP to HTTPS when managed TLS material is resolved.
 
 ## Story 6.1.3 startup bootstrap behavior
 
@@ -483,7 +502,7 @@ Story 6.2.1 and Story 6.2.2 add `IssueCertificateForSubjectUseCase` in the appli
 - `GetCertificateRenewalPlanningUseCase.test.ts`: renewal planning aggregation, tracked-state summaries, and not-found CA attention handling
 - `RenewIssuedCertificateUseCase.test.ts`: renewal/replacement execution coverage including supersession linkage, overlap-preserve mode, revoked-subject rejection, and invalid overlap input handling
 - `InternalCertificateAuthorityIssuer.test.ts`: concrete root generation + signing pipeline behavior and issuance prerequisite failure coverage
-- `IdentityServerHost.test.ts`: host-level first-time initialization invocation seam coverage
+- `IdentityServerHost.test.ts`: host-level first-time initialization invocation seam coverage plus managed TLS runtime trust startup fail-closed/success-path coverage
 
 ## Related architecture note
 

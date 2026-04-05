@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
+import { createServer as createHttpsServer } from "node:https";
 import {
   AuthProviderCategories,
   AuthProviderKinds,
@@ -69,6 +70,10 @@ import {
 import { createFileSystemProtectedSecretStoreFromEnvironment } from "../../src/infrastructure/security/secrets/FileSystemProtectedSecretStore";
 import type { ICertificateAuthorityIssuerPort } from "../../src/application/security/ports/ICertificateAuthorityIssuerPort";
 import { ProtectedCertificateAuthorityRootMaterialStorage } from "../../src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
+import { RuntimeTrustMaterialDistributionService } from "../../src/infrastructure/security/certificates/RuntimeTrustMaterialDistributionService";
+import { ResolveRuntimeTrustMaterialPackageUseCase } from "../../src/application/security/use-cases/ResolveRuntimeTrustMaterialPackageUseCase";
+import { ResolveCertificateRevocationStatusUseCase } from "../../src/application/security/use-cases/ResolveCertificateRevocationStatusUseCase";
+import { TrustMaterialKinds } from "../../src/domain/security/CertificateAuthorityDomain";
 import { AuthorizationPolicyDecisionEvaluator } from "../../src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyMutationService } from "../../src/application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "../../src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
@@ -114,6 +119,7 @@ import { ReviewPendingNodeEnrollmentUseCase } from "../../src/application/nodes/
 import type { WorkspaceIdNamespace } from "../../src/shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   createIdentityHttpServer,
+  type IdentityHttpServerFactory,
   type IdentityHttpServerLogger,
 } from "../../infrastructure/transport/http-server/identity/IdentityHttpServer";
 import type { IdentitySessionLifecyclePolicies } from "../../application/identity/services/IdentitySessionLifecycleService";
@@ -142,6 +148,22 @@ export interface InitializeCertificateAuthorityForFirstSetupOptions {
   readonly env?: Readonly<Record<string, string | undefined>>;
   readonly auditHook?: (event: CertificateAuthorityInitializationAuditEvent) => Promise<void> | void;
 }
+
+interface ManagedIdentityServerTlsRuntimeMaterial {
+  readonly certPem: string;
+  readonly keyPem: string;
+  readonly caPem?: string;
+}
+
+const MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS = Object.freeze({
+  enabled: "AI_LOOM_INTERNAL_CA_SERVER_MANAGED_TLS_ENABLED",
+  targetReferenceId: "AI_LOOM_INTERNAL_CA_SERVER_REFERENCE_ID",
+  actorUserIdentityId: "AI_LOOM_INTERNAL_CA_SERVER_TLS_ACTOR_USER_IDENTITY_ID",
+  workspaceId: "AI_LOOM_INTERNAL_CA_SERVER_TLS_WORKSPACE_ID",
+  certificateAuthorityId: "AI_LOOM_INTERNAL_CA_SERVER_TLS_CERTIFICATE_AUTHORITY_ID",
+  serialNumber: "AI_LOOM_INTERNAL_CA_SERVER_TLS_SERIAL_NUMBER",
+  privateKeyMaterialRef: "AI_LOOM_INTERNAL_CA_SERVER_TLS_PRIVATE_KEY_MATERIAL_REF",
+});
 
 interface IdentityDefaultConfigurationRepository {
   saveAuthProvider(provider: AuthProvider): Promise<AuthProvider>;
@@ -548,50 +570,57 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       auditSink: nodeTrustAuditRecorder,
     }),
   });
+  const managedTlsMaterial = await resolveManagedIdentityServerTlsRuntimeMaterial({
+    certificateAuthorityRepository,
+    env,
+  });
 
-    const server = createIdentityHttpServer({
-      backendApi,
-      nodeTrustBackendApi,
-      authorizationManagementBackendApi,
-      workspaceBackendApi,
-      workspaceAdministrationBackendApi,
-      logger: options.logger,
+  const server = createIdentityHttpServer({
+    backendApi,
+    nodeTrustBackendApi,
+    authorizationManagementBackendApi,
+    workspaceBackendApi,
+    workspaceAdministrationBackendApi,
+    logger: options.logger,
+    serverFactory: managedTlsMaterial
+      ? createManagedIdentityServerTlsFactory(managedTlsMaterial)
+      : undefined,
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(options.port ?? 0, options.host ?? "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
     });
+  });
 
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(options.port ?? 0, options.host ?? "127.0.0.1", () => {
-        server.off("error", reject);
+  const addressInfo = server.address() as AddressInfo;
+
+  return Object.freeze({
+    port: addressInfo.port,
+    address: `${addressInfo.address}:${addressInfo.port}`,
+    close: () => new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        repository.dispose();
+        trustedDeviceRepository.dispose();
+        workspaceRepository.dispose();
+        authorizationRepository.dispose();
+        nodeTrustRepository.dispose();
+        nodeTrustAuditRecorder.dispose();
+        certificateAuthorityRepository.dispose();
+        const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
+        if (typeof disposablePublisher.dispose === "function") {
+          disposablePublisher.dispose();
+        }
+        if (error) {
+          reject(error);
+          return;
+        }
         resolve();
       });
-    });
-
-    const addressInfo = server.address() as AddressInfo;
-
-    return Object.freeze({
-      port: addressInfo.port,
-      address: `${addressInfo.address}:${addressInfo.port}`,
-      close: () => new Promise<void>((resolve, reject) => {
-        server.close((error) => {
-          repository.dispose();
-          trustedDeviceRepository.dispose();
-          workspaceRepository.dispose();
-          authorizationRepository.dispose();
-          nodeTrustRepository.dispose();
-          nodeTrustAuditRecorder.dispose();
-          certificateAuthorityRepository.dispose();
-          const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
-          if (typeof disposablePublisher.dispose === "function") {
-            disposablePublisher.dispose();
-          }
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve();
-        });
-      }),
-    });
+    }),
+  });
   } catch (error) {
     repository.dispose();
     trustedDeviceRepository.dispose();
@@ -654,6 +683,25 @@ function parseOptionalCsvList(value: string | undefined): ReadonlyArray<string> 
   return entries.length > 0 ? Object.freeze(entries) : undefined;
 }
 
+function parseOptionalBoolean(value: string | undefined): boolean | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+  if (normalized === "true") {
+    return true;
+  }
+  if (normalized === "false") {
+    return false;
+  }
+  return undefined;
+}
+
+function normalizeOptional(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
 async function validateCertificateAuthorityStartup(
   certificateAuthorityRepository: SqliteCertificateAuthorityPersistenceAdapter,
   env: Readonly<Record<string, string | undefined>>,
@@ -670,6 +718,135 @@ async function validateCertificateAuthorityStartup(
 
   const startupState = await startupStateUseCase.execute();
   assertCertificateAuthorityStartupSafe(startupState);
+}
+
+function createManagedIdentityServerTlsFactory(
+  tlsMaterial: ManagedIdentityServerTlsRuntimeMaterial,
+): IdentityHttpServerFactory {
+  return (requestListener) => createHttpsServer({
+    cert: tlsMaterial.certPem,
+    key: tlsMaterial.keyPem,
+    ca: tlsMaterial.caPem,
+  }, requestListener);
+}
+
+async function resolveManagedIdentityServerTlsRuntimeMaterial(input: {
+  readonly certificateAuthorityRepository: SqliteCertificateAuthorityPersistenceAdapter;
+  readonly env: Readonly<Record<string, string | undefined>>;
+}): Promise<ManagedIdentityServerTlsRuntimeMaterial | undefined> {
+  const tlsEnabled = parseOptionalBoolean(input.env[MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS.enabled]) ?? false;
+  if (!tlsEnabled) {
+    return undefined;
+  }
+
+  const targetReferenceId = normalizeOptional(input.env[MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS.targetReferenceId])
+    ?? "server:authoritative";
+  if (!targetReferenceId.startsWith("server:")) {
+    throw new Error("Managed identity-server TLS requires AI_LOOM_INTERNAL_CA_SERVER_REFERENCE_ID to start with 'server:'.");
+  }
+
+  const privateKeyMaterialRef = normalizeOptional(input.env[MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS.privateKeyMaterialRef]);
+  if (!privateKeyMaterialRef) {
+    throw new Error("Managed identity-server TLS requires AI_LOOM_INTERNAL_CA_SERVER_TLS_PRIVATE_KEY_MATERIAL_REF.");
+  }
+
+  const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(input.env);
+  if (!protectedSecretStore) {
+    throw new Error("Managed identity-server TLS requires protected secret storage configuration.");
+  }
+
+  const certificateMaterialStorage = new ProtectedCertificateAuthorityRootMaterialStorage(protectedSecretStore);
+  const runtimeTrustMaterialDistributionService = new RuntimeTrustMaterialDistributionService({
+    certificateAuthorityRepository: input.certificateAuthorityRepository,
+    issuedCertificateRepository: input.certificateAuthorityRepository,
+    trustMaterialReferenceRepository: input.certificateAuthorityRepository,
+    certificateMaterialStorage,
+    certificateLifecycleEventRepository: input.certificateAuthorityRepository,
+  });
+  const resolveRuntimeTrustMaterialPackageUseCase = new ResolveRuntimeTrustMaterialPackageUseCase({
+    trustMaterialDistributionPort: runtimeTrustMaterialDistributionService,
+  });
+
+  const actorUserIdentityId = normalizeOptional(input.env[MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS.actorUserIdentityId])
+    ?? "system:identity-server-host";
+  const runtimeTrustPackage = await resolveRuntimeTrustMaterialPackageUseCase.execute({
+    operationKey: `identity-server-managed-tls-runtime-package:${targetReferenceId}:${Date.now()}`,
+    actorUserIdentityId,
+    targetKind: "server",
+    targetReferenceId,
+    workspaceId: normalizeOptional(input.env[MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS.workspaceId]),
+    certificateAuthorityId: normalizeOptional(input.env[MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS.certificateAuthorityId]),
+    serialNumber: normalizeOptional(input.env[MANAGED_IDENTITY_SERVER_TLS_ENV_KEYS.serialNumber]),
+    includeLeafCertificate: true,
+    includeCertificateChain: true,
+    includeTrustBundle: true,
+  });
+
+  if (!runtimeTrustPackage.ok) {
+    throw new Error(`Managed identity-server TLS startup failed: ${runtimeTrustPackage.error.message}`);
+  }
+
+  if (!runtimeTrustPackage.value.serialNumber) {
+    throw new Error("Managed identity-server TLS startup failed: server runtime trust package is missing serialNumber.");
+  }
+
+  const revocationStatusUseCase = new ResolveCertificateRevocationStatusUseCase({
+    issuedCertificateRepository: input.certificateAuthorityRepository,
+    certificateLifecycleEventRepository: input.certificateAuthorityRepository,
+  });
+  const revocationStatus = await revocationStatusUseCase.resolveCertificateRevocationStatus({
+    serialNumber: runtimeTrustPackage.value.serialNumber,
+  });
+  if (!revocationStatus.usable || revocationStatus.status !== "active") {
+    throw new Error(
+      `Managed identity-server TLS startup failed: server certificate '${runtimeTrustPackage.value.serialNumber}' is not usable (status='${revocationStatus.status}').`,
+    );
+  }
+
+  const privateKeyMaterial = await input.certificateAuthorityRepository.findTrustMaterialByRef(privateKeyMaterialRef);
+  if (!privateKeyMaterial) {
+    throw new Error(
+      `Managed identity-server TLS startup failed: private key trust material '${privateKeyMaterialRef}' was not found.`,
+    );
+  }
+
+  if (privateKeyMaterial.kind !== TrustMaterialKinds.privateKeyEncryptedPem) {
+    throw new Error(
+      `Managed identity-server TLS startup failed: private key trust material '${privateKeyMaterialRef}' must have kind '${TrustMaterialKinds.privateKeyEncryptedPem}'.`,
+    );
+  }
+
+  const loadedPrivateKey = await certificateMaterialStorage.loadRootMaterials({
+    certificateAuthorityId: runtimeTrustPackage.value.certificateAuthorityId,
+    reason: "identity-server-managed-tls-startup",
+    materials: [{
+      materialRef: privateKeyMaterial.materialRef,
+      kind: privateKeyMaterial.kind,
+      secretRef: privateKeyMaterial.storageLocator,
+    }],
+  });
+  const privateKeyPem = loadedPrivateKey[0]?.plaintextValue?.trim();
+  if (!privateKeyPem) {
+    throw new Error("Managed identity-server TLS startup failed: private key material is unavailable.");
+  }
+
+  const leafCertificatePem = runtimeTrustPackage.value.leafCertificatePem?.trim();
+  if (!leafCertificatePem) {
+    throw new Error("Managed identity-server TLS startup failed: leaf certificate material is unavailable.");
+  }
+
+  const certificateFragments = [
+    leafCertificatePem,
+    runtimeTrustPackage.value.certificateChainPem?.trim(),
+  ].filter((value): value is string => Boolean(value && value.length > 0));
+
+  return Object.freeze({
+    certPem: `${certificateFragments.join("\n")}\n`,
+    keyPem: `${privateKeyPem}\n`,
+    caPem: runtimeTrustPackage.value.trustBundlePem?.trim()
+      ? `${runtimeTrustPackage.value.trustBundlePem.trim()}\n`
+      : undefined,
+  });
 }
 
 export async function initializeCertificateAuthorityForFirstSetup(
