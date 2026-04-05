@@ -136,3 +136,25 @@ The use case is direction-aware (`inbound` / `outbound`) and scenario-aware so t
   - certificate chain parsing
   - session/device/node trust data loading
   - protocol-specific response mapping (HTTP status, WebSocket close codes, etc.)
+
+## Story 7.1.3 host bootstrap wiring
+
+Story 7.1.3 adds explicit host-level transport composition and environment-aware secure defaults in runtime composition roots.
+
+### Host secure transport composition artifacts
+
+- `infrastructure/config/HostSecureTransportConfig.ts`
+- `hosts/server/IdentityServerHost.ts`
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `electron/main/main.ts`
+- `ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`
+- `ui/web/identity/resolveWebIdentityApiBaseUrl.ts`
+- `infrastructure/runtime/browser-development/BrowserDevelopmentManagedRuntime.ts`
+
+### Runtime behavior updates
+
+- Hosts resolve one shared secure transport config (`HostSecureTransportConfig`) instead of ad hoc endpoint/tls toggles.
+- Identity server host now composes `ValidateTransportConnectionTrustUseCase` + `HttpTransportTrustValidationAdapter` in the composition root and injects that gate into `IdentityHttpServer`.
+- Authenticated HTTP routes now run inbound transport-trust validation through shared contracts, with explicit node-to-control-plane mapping for node runtime trust-material and heartbeat routes.
+- Non-loopback authoritative server startup fails closed unless HTTPS transport material is available.
+- Desktop/web/worker transport endpoint resolution now enforces secure endpoints, allowing insecure transport only for explicit loopback-safe host profiles.

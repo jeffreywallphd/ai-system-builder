@@ -30,6 +30,10 @@ import { IdentityAuthBackendApi } from "../../infrastructure/api/identity/Identi
 import { IdentitySessionPolicyConfig } from "../../infrastructure/config/IdentitySessionPolicyConfig";
 import { IdentitySessionTrustPolicyConfig } from "../../infrastructure/config/IdentitySessionTrustPolicyConfig";
 import { IdentityProviderAccountPolicyConfig } from "../../infrastructure/config/IdentityProviderAccountPolicyConfig";
+import {
+  HostSecureTransportKinds,
+  resolveHostSecureTransportConfig,
+} from "../../infrastructure/config/HostSecureTransportConfig";
 import { SqliteTrustedDeviceRepository } from "../../infrastructure/filesystem/identity/SqliteTrustedDeviceRepository";
 import { TrustedDeviceManagementService } from "../../application/identity/services/TrustedDeviceManagementService";
 import { TrustedDevicePairingService } from "../../application/identity/services/TrustedDevicePairingService";
@@ -68,12 +72,14 @@ import {
   EnvironmentCertificateAuthorityBootstrapConfigurationProvider,
   EnvironmentCertificateAuthoritySecretService,
 } from "../../src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter";
+import { ServerManagedTransportTrustStateResolver } from "../../src/infrastructure/security/ServerManagedTransportTrustStateResolver";
 import { createFileSystemProtectedSecretStoreFromEnvironment } from "../../src/infrastructure/security/secrets/FileSystemProtectedSecretStore";
 import type { ICertificateAuthorityIssuerPort } from "../../src/application/security/ports/ICertificateAuthorityIssuerPort";
 import { ProtectedCertificateAuthorityRootMaterialStorage } from "../../src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
 import { RuntimeTrustMaterialDistributionService } from "../../src/infrastructure/security/certificates/RuntimeTrustMaterialDistributionService";
 import { ResolveRuntimeTrustMaterialPackageUseCase } from "../../src/application/security/use-cases/ResolveRuntimeTrustMaterialPackageUseCase";
 import { ResolveCertificateRevocationStatusUseCase } from "../../src/application/security/use-cases/ResolveCertificateRevocationStatusUseCase";
+import { ValidateTransportConnectionTrustUseCase } from "../../src/application/security/use-cases/ValidateTransportConnectionTrustUseCase";
 import { GetCertificateAuthorityStatusIntrospectionUseCase } from "../../src/application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase";
 import { ListIssuedCertificateMetadataUseCase } from "../../src/application/security/use-cases/ListIssuedCertificateMetadataUseCase";
 import { GetIssuedCertificateMetadataUseCase } from "../../src/application/security/use-cases/GetIssuedCertificateMetadataUseCase";
@@ -125,7 +131,12 @@ import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "../../src/applic
 import { RevokeNodeTrustUseCase } from "../../src/application/nodes/use-cases/RevokeNodeTrustUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
 import { InternalCertificateAuthorityIssuer } from "../../src/infrastructure/security/ca/InternalCertificateAuthorityIssuer";
+import { HttpTransportTrustValidationAdapter } from "../../src/infrastructure/transport/TransportTrustValidationAdapters";
 import type { WorkspaceIdNamespace } from "../../src/shared/contracts/workspaces/WorkspaceRepositoryContracts";
+import {
+  evaluateTransportConnectionTrust,
+  resolveBaselineTransportSecurityPolicy,
+} from "../../src/domain/security/TransportSecurityDomain";
 import {
   createIdentityHttpServer,
   type IdentityHttpServerFactory,
@@ -133,6 +144,10 @@ import {
 } from "../../infrastructure/transport/http-server/identity/IdentityHttpServer";
 import type { IdentitySessionLifecyclePolicies } from "../../application/identity/services/IdentitySessionLifecycleService";
 import type { AuthProvider, CredentialPolicy } from "../../src/domain/identity/IdentityDomain";
+import type {
+  EvaluateTransportConnectionPolicyRequest,
+  ResolveTransportSecurityPolicyRequest,
+} from "../../src/application/security/ports/TransportSecurityPorts";
 
 export interface IdentityServerHostOptions {
   readonly databasePath: string;
@@ -205,6 +220,25 @@ class RandomWorkspaceIdGenerator
   }
 }
 
+class BaselineTransportSecurityPolicyResolver {
+  public async resolveTransportSecurityPolicy(request: ResolveTransportSecurityPolicyRequest) {
+    return Object.freeze({
+      policy: resolveBaselineTransportSecurityPolicy(request.scenario),
+      source: "baseline" as const,
+    });
+  }
+}
+
+class DomainTransportConnectionPolicyEvaluator {
+  public async evaluateTransportConnectionPolicy(request: EvaluateTransportConnectionPolicyRequest) {
+    return evaluateTransportConnectionTrust({
+      policy: request.policy,
+      context: request.context,
+      evaluatedAt: request.evaluatedAt,
+    });
+  }
+}
+
 export async function startIdentityServerHost(options: IdentityServerHostOptions): Promise<IdentityServerHost> {
   const repository = new SqliteIdentityRepository(path.resolve(options.databasePath));
   const trustedDeviceRepository = new SqliteTrustedDeviceRepository(path.resolve(options.databasePath));
@@ -214,6 +248,12 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const nodeTrustAuditRecorder = new SqliteNodeTrustAuditRecorder(path.resolve(options.databasePath));
   const certificateAuthorityRepository = new SqliteCertificateAuthorityPersistenceAdapter(path.resolve(options.databasePath));
   const env = options.env ?? process.env;
+  const hostAddress = options.host ?? "127.0.0.1";
+  const secureTransportConfig = resolveHostSecureTransportConfig({
+    hostKind: HostSecureTransportKinds.server,
+    hostAddress,
+    env,
+  });
   try {
     const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(env);
     const providerAccountPolicies = options.providerAccountPolicies
@@ -653,10 +693,31 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       auditSink: nodeTrustAuditRecorder,
     }),
   });
+  const transportTrustStateResolver = new ServerManagedTransportTrustStateResolver({
+    trustedDeviceManagementService: trustedDeviceManagementService,
+    nodeTrustIdentityRepository: nodeTrustRepository,
+    certificateRevocationStatusRegistry: new ResolveCertificateRevocationStatusUseCase({
+      issuedCertificateRepository: certificateAuthorityRepository,
+      certificateLifecycleEventRepository: certificateAuthorityRepository,
+    }),
+  });
+  const transportTrustValidator = new ValidateTransportConnectionTrustUseCase({
+    transportSecurityPolicyResolverPort: new BaselineTransportSecurityPolicyResolver(),
+    transportConnectionPolicyEvaluatorPort: new DomainTransportConnectionPolicyEvaluator(),
+    trustedDeviceStateResolverPort: transportTrustStateResolver,
+    nodeStateResolverPort: transportTrustStateResolver,
+    peerCertificateStateResolverPort: transportTrustStateResolver,
+  });
+  const httpTransportTrustValidator = new HttpTransportTrustValidationAdapter(transportTrustValidator);
   const managedTlsMaterial = await resolveManagedIdentityServerTlsRuntimeMaterial({
     certificateAuthorityRepository,
     env,
   });
+  if (secureTransportConfig.requireSecureHttp && !managedTlsMaterial) {
+    throw new Error(
+      "Identity server secure transport configuration requires HTTPS startup, but managed TLS material is unavailable.",
+    );
+  }
 
   const server = createIdentityHttpServer({
     backendApi,
@@ -669,11 +730,17 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     serverFactory: managedTlsMaterial
       ? createManagedIdentityServerTlsFactory(managedTlsMaterial)
       : undefined,
+    transportTrust: secureTransportConfig.enforceTransportTrustValidation
+      ? Object.freeze({
+        httpValidator: httpTransportTrustValidator,
+        allowInsecureLoopback: secureTransportConfig.allowInsecureLoopback,
+      })
+      : undefined,
   });
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    server.listen(options.port ?? 0, options.host ?? "127.0.0.1", () => {
+    server.listen(options.port ?? 0, hostAddress, () => {
       server.off("error", reject);
       resolve();
     });

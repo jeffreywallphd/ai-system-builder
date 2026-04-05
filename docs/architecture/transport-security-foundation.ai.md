@@ -83,3 +83,21 @@ User trust is not treated as node trust.
 - centralized trust-state resolution + validation scenarios
 - transport adapter mapping behavior for accepted vs denied trust decisions
 - shared DTO contract projection and validation guards
+
+## Story 7.1.3 host composition update
+
+Story 7.1.3 wires these transport contracts into runnable hosts through explicit composition-root config:
+
+- `infrastructure/config/HostSecureTransportConfig.ts` central host transport profile resolution (`server`, `desktop`, `hybrid`, `web`, `worker`) and secure endpoint assertions.
+- `hosts/server/IdentityServerHost.ts` composes:
+  - `ServerManagedTransportTrustStateResolver`
+  - `ValidateTransportConnectionTrustUseCase`
+  - `HttpTransportTrustValidationAdapter`
+  and injects the resulting gate into `IdentityHttpServer`.
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts` now supports optional inbound authenticated-route transport trust validation with scenario/peer mapping, including node-path specific `node-to-control-plane` mapping.
+- `electron/main/main.ts`, `ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`, `ui/web/identity/resolveWebIdentityApiBaseUrl.ts`, and `infrastructure/runtime/browser-development/BrowserDevelopmentManagedRuntime.ts` now consume shared host transport config for endpoint safety checks.
+
+Fail-closed additions:
+
+- non-loopback authoritative server startup now fails when HTTPS is required but managed TLS material is unavailable;
+- insecure remote HTTP/WS endpoints are rejected by default outside loopback-safe host profiles.

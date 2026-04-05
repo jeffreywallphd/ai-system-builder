@@ -4,6 +4,11 @@ import net from "node:net";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import {
+  HostSecureTransportKinds,
+  assertSecureTransportEndpoint,
+  resolveHostSecureTransportConfig,
+} from "../../config/HostSecureTransportConfig";
 
 const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const SUPERVISOR_ENTRYPOINT = path.resolve(REPOSITORY_ROOT, "infrastructure/runtime/service-supervisor.js");
@@ -333,9 +338,17 @@ export class BrowserDevelopmentManagedRuntime {
 }
 
 export function resolveBrowserDevelopmentManagedRuntimeFromEnvironment(): BrowserDevelopmentManagedRuntime {
+  const supervisorHost = process.env.SERVICE_SUPERVISOR_HOST || "127.0.0.1";
+  const supervisorPort = Number(process.env.SERVICE_SUPERVISOR_PORT || 8790);
+  const secureTransportConfig = resolveHostSecureTransportConfig({
+    hostKind: HostSecureTransportKinds.worker,
+    hostAddress: supervisorHost,
+  });
+  assertSecureTransportEndpoint(`http://${supervisorHost}:${supervisorPort}`, secureTransportConfig);
+
   return new BrowserDevelopmentManagedRuntime({
-    supervisorPort: Number(process.env.SERVICE_SUPERVISOR_PORT || 8790),
-    supervisorHost: process.env.SERVICE_SUPERVISOR_HOST || "127.0.0.1",
+    supervisorPort,
+    supervisorHost,
     pythonRuntimePort: Number(process.env.PYTHON_RUNTIME_PORT || 8100),
     autostartEnabled: process.env.AI_LOOM_SERVICE_SUPERVISOR_AUTOSTART !== "false",
   });

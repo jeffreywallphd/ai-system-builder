@@ -104,6 +104,18 @@ import {
   type RejectNodeEnrollmentActionRequestDtoPayload,
   type RevokeNodeTrustActionRequestDtoPayload,
 } from "../../../../src/shared/schemas/nodes/NodeTrustApiSchemaContracts";
+import type { ValidateTransportConnectionTrustRequest } from "../../../../src/application/security/ports/TransportTrustValidationPorts";
+import { TransportConnectionDirections } from "../../../../src/application/security/ports/TransportTrustValidationPorts";
+import {
+  TransportChannelTypes,
+  TransportConnectionActorTypes,
+  TransportPeerTypes,
+  TransportSecurityScenarios,
+  type TransportConnectionActorType,
+  type TransportPeerType,
+  type TransportSecurityScenario,
+} from "../../../../src/domain/security/TransportSecurityDomain";
+import type { HttpTransportTrustValidationResult } from "../../../../src/infrastructure/transport/TransportTrustValidationAdapters";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 
@@ -581,6 +593,14 @@ export interface IdentityHttpServerLogger {
   error(event: IdentityHttpServerLogEvent): void;
 }
 
+interface IdentityHttpServerTransportTrustOptions {
+  readonly httpValidator: {
+    validate(request: ValidateTransportConnectionTrustRequest): Promise<HttpTransportTrustValidationResult>;
+  };
+  readonly allowInsecureLoopback: boolean;
+  readonly defaultScenario?: TransportSecurityScenario;
+}
+
 export interface IdentityHttpServerOptions {
   readonly backendApi: IdentityAuthBackendApi;
   readonly certificateOperationsBackendApi?: CertificateOperationsBackendApi;
@@ -591,6 +611,7 @@ export interface IdentityHttpServerOptions {
   readonly logger?: IdentityHttpServerLogger;
   readonly maxBodyBytes?: number;
   readonly serverFactory?: IdentityHttpServerFactory;
+  readonly transportTrust?: IdentityHttpServerTransportTrustOptions;
 }
 
 export type IdentityHttpServerInstance = Server | HttpsServer;
@@ -637,6 +658,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const responseBody: IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse> = Object.freeze({
@@ -663,6 +685,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const apiResponse = await options.backendApi.logoutAuthenticatedSession({
@@ -682,6 +705,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const parsedRequest = await parseAndValidateRequest(
@@ -719,6 +743,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           {
             minimumAssuranceLevel: "authenticated-trusted",
           },
@@ -757,6 +782,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           {
             minimumAssuranceLevel: "authenticated-trusted",
           },
@@ -803,6 +829,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           {
             minimumAssuranceLevel: "authenticated-trusted",
           },
@@ -840,6 +867,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           {
             minimumAssuranceLevel: "authenticated-trusted",
           },
@@ -889,6 +917,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           {
             minimumAssuranceLevel: "authenticated-trusted",
           },
@@ -948,6 +977,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           {
             minimumAssuranceLevel: "authenticated-trusted",
           },
@@ -998,6 +1028,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
@@ -1038,6 +1069,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const trustedDeviceId = decodePathTail(path, "/api/v1/identity/trusted-devices/");
@@ -1077,6 +1109,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const trustedDeviceId = decodePathTail(path, "/api/v1/identity/trusted-devices/", "/revoke");
@@ -1140,6 +1173,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const trustedDeviceId = decodePathTail(path, "/api/v1/identity/trusted-devices/", "/display-name");
@@ -1196,6 +1230,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const parsedRequest = await parseAndValidateRequest(
@@ -1232,6 +1267,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const parsedRequest = await parseAndValidateRequest(
@@ -1268,6 +1304,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const parsedRequest = await parseAndValidateRequest(
@@ -1307,6 +1344,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           {
             minimumAssuranceLevel: "authenticated-trusted",
           },
@@ -1373,6 +1411,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           {
             minimumAssuranceLevel: "authenticated-trusted",
           },
@@ -1492,6 +1531,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           {
             minimumAssuranceLevel: "authenticated-trusted",
           },
@@ -1531,6 +1571,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           {
             minimumAssuranceLevel: "authenticated-trusted",
           },
@@ -1580,6 +1621,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           {
             minimumAssuranceLevel: "authenticated-trusted",
           },
@@ -1650,6 +1692,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
@@ -1690,6 +1733,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
@@ -1744,6 +1788,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
@@ -1844,6 +1889,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const nodeId = decodePathTail(path, "/api/v1/nodes/inventory/");
@@ -1880,6 +1926,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const nodeId = decodePathTail(path, "/api/v1/nodes/", "/revoke");
@@ -1927,15 +1974,22 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && path.startsWith("/api/v1/nodes/")
         && !path.startsWith("/api/v1/nodes/enrollments/")
       ) {
+        const runtimeTrustMaterialNodeId = decodePathTail(path, "/api/v1/nodes/", "/runtime-trust-material");
         await requireAuthenticatedSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
-          undefined,
+          options.transportTrust,
+          {
+            transportScenario: TransportSecurityScenarios.nodeToControlPlane,
+            transportActorType: TransportConnectionActorTypes.nodeIdentity,
+            transportRemotePeerType: TransportPeerTypes.nodeRuntime,
+            nodeId: runtimeTrustMaterialNodeId,
+          },
           async (context) => {
-            const nodeId = decodePathTail(path, "/api/v1/nodes/", "/runtime-trust-material");
+            const nodeId = runtimeTrustMaterialNodeId;
             if (!nodeId) {
               const invalid = buildNodeTrustInvalidRequestResponse("nodeId is required.");
               writeJson(response, 400, invalid);
@@ -2079,15 +2133,22 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && path.startsWith("/api/v1/nodes/")
         && !path.startsWith("/api/v1/nodes/enrollments/")
       ) {
+        const heartbeatNodeId = decodePathTail(path, "/api/v1/nodes/", "/heartbeat");
         await requireAuthenticatedSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
-          undefined,
+          options.transportTrust,
+          {
+            transportScenario: TransportSecurityScenarios.nodeToControlPlane,
+            transportActorType: TransportConnectionActorTypes.nodeIdentity,
+            transportRemotePeerType: TransportPeerTypes.nodeRuntime,
+            nodeId: heartbeatNodeId,
+          },
           async (context) => {
-            const nodeId = decodePathTail(path, "/api/v1/nodes/", "/heartbeat");
+            const nodeId = heartbeatNodeId;
             if (!nodeId) {
               const invalid = buildNodeTrustInvalidRequestResponse("nodeId is required.");
               writeJson(response, 400, invalid);
@@ -2150,6 +2211,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const enrollmentRequestId = decodePathTail(path, "/api/v1/nodes/enrollments/");
@@ -2184,6 +2246,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const enrollmentRequestId = decodePathTail(path, "/api/v1/nodes/enrollments/", "/approve");
@@ -2236,6 +2299,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const enrollmentRequestId = decodePathTail(path, "/api/v1/nodes/enrollments/", "/reject");
@@ -2288,6 +2352,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const resource = decodeAuthorizationResourcePath(path, "/visibility");
@@ -2341,6 +2406,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const resource = decodeAuthorizationResourcePath(path, "/sharing-grants");
@@ -2394,6 +2460,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const pathParams = decodeAuthorizationResourceAndGrantPath(path);
@@ -2451,6 +2518,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const parsedRequest = await parseAndValidateAuthorizationManagementRequest(
@@ -2501,6 +2569,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const resource = decodeAuthorizationResourcePath(path, "/access-state");
@@ -2561,6 +2630,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const workspaceId = decodeAuthorizationWorkspaceReportingPath(path);
@@ -2619,6 +2689,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
@@ -2654,6 +2725,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
@@ -2695,6 +2767,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/admin-view");
@@ -2734,6 +2807,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const workspaceId = decodePathTail(path, "/api/v1/workspaces/");
@@ -2785,6 +2859,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/lifecycle");
@@ -2836,6 +2911,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/members");
@@ -2883,6 +2959,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/members");
@@ -2935,6 +3012,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const pathParams = decodeWorkspaceUserScopedPath(path, "/members/", "/status");
@@ -2988,6 +3066,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const pathParams = decodeWorkspaceUserScopedPath(path, "/members/");
@@ -3027,6 +3106,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/invitations");
@@ -3077,6 +3157,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const pathParams = decodeWorkspaceEntityPath(path, "/invitations/");
@@ -3116,6 +3197,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/roles");
@@ -3164,6 +3246,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/roles/assign");
@@ -3215,6 +3298,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/roles/reassign");
@@ -3266,6 +3350,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/roles/revoke");
@@ -3317,6 +3402,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/invitations");
@@ -3373,6 +3459,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           requestId,
           options.backendApi,
           logger,
+          options.transportTrust,
           undefined,
           async (context) => {
             const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/onboarding/accept");
@@ -3503,8 +3590,13 @@ async function requireAuthenticatedSession(
   requestId: string,
   backendApi: IdentityAuthBackendApi,
   logger: IdentityHttpServerLogger,
+  transportTrust: IdentityHttpServerTransportTrustOptions | undefined,
   options: {
     readonly minimumAssuranceLevel?: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted";
+    readonly transportScenario?: TransportSecurityScenario;
+    readonly transportActorType?: TransportConnectionActorType;
+    readonly transportRemotePeerType?: TransportPeerType;
+    readonly nodeId?: string;
   } | undefined,
   onAuthenticated: (context: AuthenticatedRequestContext) => Promise<void>,
 ): Promise<void> {
@@ -3554,6 +3646,36 @@ async function requireAuthenticatedSession(
     return;
   }
 
+  if (transportTrust && !shouldBypassTransportTrustValidation(request, transportTrust)) {
+    const transportValidationRequest = buildTransportTrustValidationRequest({
+      request,
+      requestId,
+      resolvedSession: resolvedSession.data,
+      options,
+      defaultScenario: transportTrust.defaultScenario ?? TransportSecurityScenarios.thinClientToControlPlane,
+    });
+    const transportValidation = await transportTrust.httpValidator.validate(transportValidationRequest);
+    if (!transportValidation.ok) {
+      writeJson(response, transportValidation.statusCode, transportValidation.body);
+      logResponse(
+        logger,
+        requestId,
+        request,
+        transportValidation.statusCode,
+        Object.freeze({
+          connectionId: transportValidationRequest.connectionId,
+          scenario: transportValidationRequest.scenario,
+          channelType: transportValidationRequest.channelType,
+          actorType: transportValidationRequest.actorType,
+          localPeerType: transportValidationRequest.localPeerType,
+          remotePeerType: transportValidationRequest.remotePeerType,
+        }),
+        transportValidation.body,
+      );
+      return;
+    }
+  }
+
   await onAuthenticated(Object.freeze({
     principal: resolvedSession.data.principal,
     session: resolvedSession.data.session,
@@ -3589,6 +3711,86 @@ async function handleLogin(
   const statusCode = mapStatusCode(apiResponse);
   writeJson(response, statusCode, apiResponse);
   logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+}
+
+function shouldBypassTransportTrustValidation(
+  request: IncomingMessage,
+  transportTrust: IdentityHttpServerTransportTrustOptions,
+): boolean {
+  if (!transportTrust.allowInsecureLoopback) {
+    return false;
+  }
+
+  const socketLike = request.socket as { readonly encrypted?: boolean } | undefined;
+  if (socketLike?.encrypted) {
+    return false;
+  }
+
+  const hostHeader = request.headers.host;
+  const hostValue = Array.isArray(hostHeader) ? hostHeader[0] : hostHeader;
+  if (!hostValue) {
+    return false;
+  }
+  const host = hostValue.split(":")[0]?.trim().toLowerCase();
+  return host === "127.0.0.1" || host === "localhost" || host === "::1" || host === "[::1]";
+}
+
+function buildTransportTrustValidationRequest(input: {
+  readonly request: IncomingMessage;
+  readonly requestId: string;
+  readonly resolvedSession: ResolveAuthenticatedSessionApiResponse;
+  readonly options: {
+    readonly transportScenario?: TransportSecurityScenario;
+    readonly transportActorType?: TransportConnectionActorType;
+    readonly transportRemotePeerType?: TransportPeerType;
+    readonly nodeId?: string;
+  } | undefined;
+  readonly defaultScenario: TransportSecurityScenario;
+}): ValidateTransportConnectionTrustRequest {
+  const socketLike = input.request.socket as {
+    readonly encrypted?: boolean;
+    readonly authorized?: boolean;
+    getPeerCertificate?: () => { readonly serialNumber?: string } | undefined;
+  };
+  const encrypted = Boolean(socketLike?.encrypted);
+  const peerCertificate = socketLike?.getPeerCertificate?.();
+  const peerSerialNumber = normalizeOptionalString(peerCertificate?.serialNumber ?? null);
+  const certificatePresented = Boolean(peerSerialNumber);
+  const scenario = input.options?.transportScenario ?? input.defaultScenario;
+  const actorType = input.options?.transportActorType ?? TransportConnectionActorTypes.userSession;
+  const remotePeerType = input.options?.transportRemotePeerType
+    ?? (input.resolvedSession.session.accessChannel === "desktop"
+      ? TransportPeerTypes.desktopClient
+      : TransportPeerTypes.thinClient);
+
+  return Object.freeze({
+    connectionId: `identity-http:${input.requestId}`,
+    direction: TransportConnectionDirections.inbound,
+    scenario,
+    channelType: encrypted ? TransportChannelTypes.https : TransportChannelTypes.http,
+    actorType,
+    localPeerType: TransportPeerTypes.authoritativeServer,
+    remotePeerType,
+    encryptedTransportEstablished: encrypted,
+    mutualTlsEstablished: Boolean(encrypted && socketLike?.authorized && certificatePresented),
+    lanTrustAssumed: false,
+    userSessionEvidence: actorType === TransportConnectionActorTypes.userSession
+      ? Object.freeze({
+        userIdentityId: input.resolvedSession.principal.userIdentityId,
+        loginAuthenticated: true,
+        trustedDeviceId: input.resolvedSession.session.deviceTrustContext?.trustedDeviceId,
+      })
+      : undefined,
+    nodeEvidence: actorType === TransportConnectionActorTypes.nodeIdentity
+      ? Object.freeze({
+        nodeId: input.options?.nodeId ?? input.resolvedSession.principal.userIdentityId,
+      })
+      : undefined,
+    peerCertificateEvidence: Object.freeze({
+      certificatePresented,
+      serialNumber: peerSerialNumber,
+    }),
+  });
 }
 
 async function parseAndValidateRequest<T>(
@@ -4666,3 +4868,6 @@ class ConsoleIdentityHttpServerLogger implements IdentityHttpServerLogger {
     console.error(JSON.stringify(event));
   }
 }
+
+
+
