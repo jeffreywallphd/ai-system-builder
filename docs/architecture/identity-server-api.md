@@ -207,6 +207,7 @@ Session issuance notes:
 - Session lifecycle metadata persists in `identity_sessions`.
 - Token/signing material persists separately in `identity_session_token_material` as token hash metadata (raw token is not persisted).
 - Revocation and logout invalidate token material (`invalidated_at`) and mark session lifecycle state `revoked`, so protected session validation fails on the next request without additional eventual-consistency delay in this local persistence slice.
+- Session expiry behavior is policy-driven through environment-backed configuration (`IDENTITY_SESSION_*` variables for desktop/thin-client TTL, refresh, and optional inactivity timeout), so returned `sessionExpiresAt` values reflect configured policy instead of fixed constants.
 
 ## Stable error mapping
 

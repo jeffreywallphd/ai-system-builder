@@ -26,6 +26,7 @@ import type { IIdentitySessionRepository } from "../ports/IIdentitySessionReposi
 export interface IdentitySessionLifecyclePolicy {
   readonly ttlMinutes: number;
   readonly allowRefresh: boolean;
+  readonly inactivityTimeoutMinutes?: number;
 }
 
 export interface IdentitySessionLifecyclePolicies {
@@ -106,6 +107,42 @@ export class IdentitySessionLifecycleService {
     return this.policies;
   }
 
+  public getPolicyForAccessChannel(accessChannel: IdentitySessionAccessChannel): IdentitySessionLifecyclePolicy | undefined {
+    return this.resolvePolicy(accessChannel);
+  }
+
+  public calculateSessionAbsoluteExpiry(
+    issuedAt: Date,
+    accessChannel: IdentitySessionAccessChannel,
+  ): Date | undefined {
+    const policy = this.resolvePolicy(accessChannel);
+    if (!policy) {
+      return undefined;
+    }
+
+    return new Date(issuedAt.getTime() + (policy.ttlMinutes * 60_000));
+  }
+
+  public calculateSessionRollingExpiry(
+    issuedAt: Date,
+    accessChannel: IdentitySessionAccessChannel,
+    lastActivityAt?: Date,
+  ): Date | undefined {
+    const policy = this.resolvePolicy(accessChannel);
+    if (!policy) {
+      return undefined;
+    }
+
+    const absoluteExpiry = new Date(issuedAt.getTime() + (policy.ttlMinutes * 60_000));
+    const anchor = lastActivityAt ?? issuedAt;
+    if (!policy.inactivityTimeoutMinutes) {
+      return absoluteExpiry;
+    }
+
+    const inactivityExpiry = new Date(anchor.getTime() + (policy.inactivityTimeoutMinutes * 60_000));
+    return inactivityExpiry.getTime() < absoluteExpiry.getTime() ? inactivityExpiry : absoluteExpiry;
+  }
+
   public async issueSession(
     input: IssueIdentitySessionInput,
   ): Promise<IdentityOperationResult<IssueIdentitySessionResult, typeof IdentityErrorCodes.invalidRequest>> {
@@ -128,7 +165,13 @@ export class IdentitySessionLifecycleService {
     }
 
     const issuedAt = this.dependencies.clock.now();
-    const expiresAt = new Date(issuedAt.getTime() + (policy.ttlMinutes * 60_000));
+    const expiresAt = this.calculateSessionRollingExpiry(issuedAt, input.accessChannel, issuedAt);
+    if (!expiresAt) {
+      return this.failure(
+        IdentityErrorCodes.invalidRequest,
+        `Unsupported session access channel '${String(input.accessChannel)}'.`,
+      );
+    }
     const session = createSession({
       id: this.dependencies.idGenerator.nextId(IdentityIdNamespaces.identitySession),
       userIdentityId,
@@ -196,7 +239,7 @@ export class IdentitySessionLifecycleService {
       providerId: current.providerId,
       providerSubject: current.providerSubject,
       issuedAt: now,
-      expiresAt: new Date(now.getTime() + (policy.ttlMinutes * 60_000)),
+      expiresAt: this.calculateSessionRollingExpiry(now, accessChannel, now) ?? new Date(now.getTime() + (policy.ttlMinutes * 60_000)),
       client: current.client,
     });
     const rotated = rotateSession(current, refreshedSessionId, now);
@@ -297,6 +340,21 @@ function assertPoliciesAreValid(policies: IdentitySessionLifecyclePolicies): voi
     }
     if (!Number.isInteger(policy.ttlMinutes) || policy.ttlMinutes < 1) {
       throw new Error(`Identity session lifecycle policy for '${channel}' requires ttlMinutes >= 1.`);
+    }
+    if (typeof policy.allowRefresh !== "boolean") {
+      throw new Error(`Identity session lifecycle policy for '${channel}' requires boolean allowRefresh.`);
+    }
+    if (policy.inactivityTimeoutMinutes !== undefined) {
+      if (!Number.isInteger(policy.inactivityTimeoutMinutes) || policy.inactivityTimeoutMinutes < 1) {
+        throw new Error(
+          `Identity session lifecycle policy for '${channel}' requires inactivityTimeoutMinutes >= 1 when configured.`,
+        );
+      }
+      if (policy.inactivityTimeoutMinutes > policy.ttlMinutes) {
+        throw new Error(
+          `Identity session lifecycle policy for '${channel}' requires inactivityTimeoutMinutes <= ttlMinutes.`,
+        );
+      }
     }
   }
 }

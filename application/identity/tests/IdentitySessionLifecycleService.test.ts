@@ -235,4 +235,58 @@ describe("IdentitySessionLifecycleService", () => {
     expect((await adapter.getSessionById("session:expired-candidate"))?.status).toBe(IdentitySessionStatuses.expired);
     expect((await adapter.getSessionById("session:not-due"))?.status).toBe(IdentitySessionStatuses.active);
   });
+
+  it("supports optional inactivity timeout policy during issuance", async () => {
+    const adapter = new InMemorySessionLifecycleAdapter();
+    const service = new IdentitySessionLifecycleService({
+      sessionRepository: adapter,
+      clock: adapter,
+      idGenerator: adapter,
+      policies: {
+        desktop: {
+          ttlMinutes: 60,
+          allowRefresh: false,
+        },
+        thinClient: {
+          ttlMinutes: 60,
+          allowRefresh: true,
+          inactivityTimeoutMinutes: 15,
+        },
+      },
+    });
+
+    const issued = await service.issueSession({
+      userIdentityId: "user:1",
+      providerId: "provider:local-password",
+      providerSubject: "alice",
+      accessChannel: IdentitySessionAccessChannels.thinClient,
+    });
+
+    expect(issued.ok).toBeTrue();
+    if (!issued.ok) {
+      throw new Error("Expected issue success.");
+    }
+    expect(issued.value.session.expiresAt).toBe("2026-04-04T12:15:00.000Z");
+  });
+
+  it("rejects invalid inactivity timeout policies", () => {
+    const adapter = new InMemorySessionLifecycleAdapter();
+
+    expect(() => new IdentitySessionLifecycleService({
+      sessionRepository: adapter,
+      clock: adapter,
+      idGenerator: adapter,
+      policies: {
+        desktop: {
+          ttlMinutes: 60,
+          allowRefresh: false,
+          inactivityTimeoutMinutes: 120,
+        },
+        thinClient: {
+          ttlMinutes: 60,
+          allowRefresh: true,
+        },
+      },
+    })).toThrow("inactivityTimeoutMinutes <= ttlMinutes");
+  });
 });

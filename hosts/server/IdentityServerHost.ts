@@ -22,16 +22,20 @@ import { SqliteIdentityRepository } from "../../infrastructure/filesystem/identi
 import { ScryptLocalPasswordCredentialService } from "../../infrastructure/security/identity/ScryptLocalPasswordCredentialService";
 import { OpaqueIdentitySessionTokenService } from "../../infrastructure/security/identity/OpaqueIdentitySessionTokenService";
 import { IdentityAuthBackendApi } from "../../infrastructure/api/identity/IdentityAuthBackendApi";
+import { IdentitySessionPolicyConfig } from "../../infrastructure/config/IdentitySessionPolicyConfig";
 import {
   createIdentityHttpServer,
   type IdentityHttpServerLogger,
 } from "../../infrastructure/transport/http-server/identity/IdentityHttpServer";
+import type { IdentitySessionLifecyclePolicies } from "../../application/identity/services/IdentitySessionLifecycleService";
 
 export interface IdentityServerHostOptions {
   readonly databasePath: string;
   readonly port?: number;
   readonly host?: string;
   readonly logger?: IdentityHttpServerLogger;
+  readonly env?: Readonly<Record<string, string | undefined>>;
+  readonly sessionPolicies?: IdentitySessionLifecyclePolicies;
 }
 
 export interface IdentityServerHost {
@@ -60,10 +64,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const identityPolicyService = new IdentityPolicyService(repository);
   const clock = new SystemIdentityClock();
   const idGenerator = new RandomIdentityIdGenerator();
+  const sessionPolicies = options.sessionPolicies
+    ?? IdentitySessionPolicyConfig.fromEnv(options.env ?? process.env).policies;
   const sessionLifecycleService = new IdentitySessionLifecycleService({
     sessionRepository: repository,
     clock,
     idGenerator,
+    policies: sessionPolicies,
   });
   const authenticatedSessionService = new IdentityAuthenticatedSessionService({
     lifecycleService: sessionLifecycleService,
