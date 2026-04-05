@@ -146,6 +146,35 @@ Protected-resource composition pattern is canonical:
   - authorization denials and invalid lifecycle transitions,
   - idempotent lifecycle actions (`changed: false`) and protected-field preservation.
 
+## Story 3.2.3 membership add/remove/status administration flows
+
+- Added:
+  - `AddWorkspaceMemberUseCase` (`src/application/workspaces/use-cases/AddWorkspaceMemberUseCase.ts`)
+  - `ChangeWorkspaceMembershipStatusUseCase` (`src/application/workspaces/use-cases/ChangeWorkspaceMembershipStatusUseCase.ts`)
+  - `RemoveWorkspaceMemberUseCase` (`src/application/workspaces/use-cases/RemoveWorkspaceMemberUseCase.ts`)
+- Admin-protected policy is explicit for all membership mutations:
+  - actor must have active membership
+  - actor must hold `owner` or `admin` role
+- Add flow:
+  - supports initial `pending` or `active`,
+  - defaults role to `member`,
+  - rejects `owner` assignment in member-add path,
+  - returns deterministic conflict for duplicate membership creation.
+- Status/remove flow:
+  - uses domain lifecycle transition guards for membership statuses,
+  - removal revokes active target role assignments in same orchestration.
+- Continuity rule:
+  - operations that would leave no active admin-capable member (`owner`/`admin`) are rejected with actionable conflict messaging.
+- Metadata persistence for audit friendliness is preserved:
+  - membership mutation attribution (`createdBy`, `lastModifiedBy`, status timestamps),
+  - role revocation attribution (`revokedBy`, `revokedAt`).
+- Coverage added in `src/application/workspaces/tests/WorkspaceMembershipAdministrationUseCases.test.ts` for:
+  - add/remove/status happy paths,
+  - admin authorization failures,
+  - invalid transition handling,
+  - last-admin continuity edge cases,
+  - actionable add/status/remove result-code mappings.
+
 ## Story 3.1.4 verification additions
 
 - adapter integration tests now assert update round-trips for mutable tenancy aggregates.

@@ -213,3 +213,35 @@ Story 3.1.4 extends the adapter integration tests to validate:
   - permission-denied and invalid-transition edge cases,
   - idempotent lifecycle actions and protected-field behavior.
 
+## Story 3.2.3 membership add/remove/status administration flows
+
+- Added membership-focused use cases:
+  - `AddWorkspaceMemberUseCase` (`src/application/workspaces/use-cases/AddWorkspaceMemberUseCase.ts`)
+  - `ChangeWorkspaceMembershipStatusUseCase` (`src/application/workspaces/use-cases/ChangeWorkspaceMembershipStatusUseCase.ts`)
+  - `RemoveWorkspaceMemberUseCase` (`src/application/workspaces/use-cases/RemoveWorkspaceMemberUseCase.ts`)
+- Membership administration now enforces explicit admin authorization policy for protected operations:
+  - actor must have active workspace membership
+  - actor must have `owner` or `admin` role
+- Membership add flow behavior:
+  - supports initial status `pending` or `active`
+  - defaults to `member` role assignment when no explicit role set is provided
+  - rejects `owner` assignment in add flow (ownership transfer remains separate)
+  - rejects duplicate member creation with actionable conflict output
+- Membership status transition flow behavior:
+  - uses domain lifecycle transitions for `pending`/`active`/`suspended`/`removed`
+  - emits deterministic invalid-transition outcomes for unsupported paths
+  - removal transitions revoke all active role assignments for the target member in the same orchestration
+- Admin continuity guard is now enforced for status and removal flows:
+  - operations that would remove/suspend the last active admin-capable member (`owner` or `admin`) are blocked
+  - actionable conflict guidance is returned so callers can assign a replacement admin first
+- Actor/timestamp metadata is persisted through domain mutation fields:
+  - membership: `createdBy`, `lastModifiedBy`, `createdAt`, `updatedAt`, `joinedAt`, `removedAt`, `removedByUserId`
+  - role assignment revocation: `revokedBy`, `revokedAt`
+- New test coverage in `src/application/workspaces/tests/WorkspaceMembershipAdministrationUseCases.test.ts` validates:
+  - member add happy path and metadata attribution
+  - admin-only operation gating
+  - status change transitions and invalid transition handling
+  - remove flow role revocation behavior
+  - last-admin continuity edge-case enforcement
+  - actionable result-code mapping across add/status/remove failure paths
+
