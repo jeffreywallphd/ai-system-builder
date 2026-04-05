@@ -154,9 +154,42 @@ describe("IdentityHttpServer", () => {
     expect(failedLoginBody.error.code).toBe("authentication-failed");
   });
 
-  it("redacts credential material in transport logs", async () => {
+  it("redacts credential and token material in transport logs", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger);
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "redaction.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+
+    const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "redaction.user",
+        client: {
+          trustedDeviceBindingId: "trusted-device:redaction",
+          trustMarker: "marker:redaction",
+        },
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(loginResponse.status).toBe(200);
+    const loginBody = await loginResponse.json();
 
     await fetch(`${baseUrl}/api/v1/identity/login`, {
       method: "POST",
@@ -170,9 +203,18 @@ describe("IdentityHttpServer", () => {
         },
       }),
     });
+    await fetch(`${baseUrl}/api/v1/identity/session`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+    });
 
     const serializedEvents = JSON.stringify(logger.events);
     expect(serializedEvents.includes("LeakySecret!2026")).toBeFalse();
+    expect(serializedEvents.includes("trusted-device:redaction")).toBeFalse();
+    expect(serializedEvents.includes("marker:redaction")).toBeFalse();
+    expect(serializedEvents.includes(loginBody.data.sessionToken)).toBeFalse();
     expect(serializedEvents.includes("[REDACTED]")).toBeTrue();
   });
 

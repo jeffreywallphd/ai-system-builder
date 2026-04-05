@@ -1,6 +1,6 @@
-import { IdentityAuthApiErrorCodes, type LoginLocalIdentityApiResponse } from "../../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+import { IdentityAuthApiErrorCodes } from "../../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import type { IdentityAuthService } from "../../services/IdentityAuthService";
-import type { IdentityAuthSessionStore } from "./IdentityAuthSessionStore";
+import { toPersistedIdentitySession, type IdentityAuthPersistedSession, type IdentityAuthSessionStore } from "./IdentityAuthSessionStore";
 
 export const IdentitySessionBootstrapStatus = Object.freeze({
   authenticated: "authenticated",
@@ -17,7 +17,7 @@ export const IdentitySessionUnauthenticatedReason = Object.freeze({
 export type IdentitySessionBootstrapResult =
   | {
     readonly status: typeof IdentitySessionBootstrapStatus.authenticated;
-    readonly session: LoginLocalIdentityApiResponse;
+    readonly session: IdentityAuthPersistedSession;
   }
   | {
     readonly status: typeof IdentitySessionBootstrapStatus.unauthenticated;
@@ -80,21 +80,20 @@ export class IdentityAuthSessionCoordinator {
         });
       }
 
-      const hydratedSession = Object.freeze({
-        ...session,
+      const hydratedSession = toPersistedIdentitySession({
         userIdentityId: response.data.principal.userIdentityId,
         username: response.data.principal.username,
-        email: response.data.principal.email,
         displayName: response.data.principal.displayName,
         providerId: response.data.session.providerId,
         providerSubject: response.data.session.providerSubject,
+        authPath: "password",
+        authenticatedAt: response.data.session.issuedAt,
         sessionId: response.data.session.sessionId,
+        sessionToken: session.sessionToken,
+        sessionTokenType: session.sessionTokenType,
         sessionIssuedAt: response.data.session.issuedAt,
         sessionExpiresAt: response.data.session.expiresAt,
         sessionAccessChannel: response.data.session.accessChannel,
-        sessionDeviceId: response.data.session.deviceId,
-        sessionTrustedDeviceBindingId: response.data.session.trustedDeviceBindingId,
-        sessionTrustMarker: response.data.session.trustMarker,
       });
       this.sessionStore.saveSession(hydratedSession);
       return Object.freeze({

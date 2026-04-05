@@ -59,13 +59,30 @@ HTTP mapping:
 
 ## Redaction guarantee
 
-Auth observability is centralized in `infrastructure/api/identity/IdentityAuthObservability.ts`.
+Auth observability and redaction are centralized in:
+
+- `infrastructure/api/identity/IdentityAuthObservability.ts`
+- `infrastructure/api/identity/IdentityAuthRedaction.ts`
+- `infrastructure/api/identity/IdentityAuthResponseSerializers.ts`
 
 `IdentityAuthBackendApi` emits structured register/login completion events through this seam (success and failure), and the seam exposes `IdentityAuthAuditEventSink` for later audit-service integration.
 
 Administration API flows also emit structured observability/audit events (`admin-accounts-list`, `admin-account-get`, `admin-account-status-set`) through the same seam.
 
-Shared redaction (`redactSensitiveAuthPayload`) is reused by both backend and HTTP transport logging so sensitive fields never appear in logs. Redacted fields include credential/token material and identity-sensitive request fields (`username`, `providerSubject`, `email`).
+Shared redaction (`redactSensitiveAuthPayload`, `redactSensitiveText`) is reused by backend/audit/HTTP transport logging so sensitive fields and bearer-like token strings never appear in logs. Redacted fields include credential/token material and identity-sensitive request fields (`username`, `providerSubject`, `email`).
+
+API response payload construction is now explicitly serializer-based in `IdentityAuthResponseSerializers.ts`, which keeps response contracts allowlist-mapped and prevents accidental field leakage from future use-case output expansion.
+
+## UI state hardening (story 1.4.5)
+
+Renderer session persistence now stores a narrowed allowlist shape (`IdentityAuthPersistedSession`) in `ui/shared/identity/IdentityAuthSessionStore.ts` instead of persisting the full login response payload.
+
+Persisted session records now intentionally exclude:
+
+- `email`
+- `providerSubject`
+- trusted-device and trust-marker metadata
+- other client-context metadata not required for authenticated runtime continuity
 
 ## Session issuance contract update
 

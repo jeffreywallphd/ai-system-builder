@@ -358,6 +358,22 @@ Reliability posture:
 - lifecycle event publication is intentionally best effort
 - publisher failures are swallowed by design so registration/login/session/logout lifecycle behavior is not blocked by unavailable downstream audit/governance sinks
 
+## Sensitive-Data Redaction Hardening (Story 1.4.5)
+
+Identity redaction and safe handling behavior is now centralized and safe-by-default across transport, observability, and renderer session persistence.
+
+Implementation points:
+
+- `infrastructure/api/identity/IdentityAuthRedaction.ts` centralizes recursive payload redaction plus freeform text/token redaction rules used by identity observability and HTTP server transport logs.
+- `infrastructure/api/identity/IdentityAuthResponseSerializers.ts` centralizes explicit allowlist response serialization for identity backend API payloads.
+- `ui/shared/identity/IdentityAuthSessionStore.ts` persists a minimized session shape (`IdentityAuthPersistedSession`) so token continuity fields remain available while recovery-sensitive/trust-seam metadata is excluded from local storage by default.
+
+Coverage posture:
+
+- identity backend observability tests assert credential, token, and trust-metadata redaction
+- HTTP transport tests assert request/response log redaction for credential and bearer-session material
+- UI session-store/coordinator tests assert persisted session snapshots exclude non-required sensitive metadata
+
 ## Separation From Device Trust and Session Trust
 
 Identity in this foundation answers:
@@ -576,6 +592,7 @@ Key tests for this foundation:
 - `infrastructure/security/identity/tests/ScryptLocalPasswordCredentialService.test.ts`
 - `infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`
 - `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
+- `infrastructure/api/identity/tests/IdentityAuthRedaction.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `ui/pages/tests/IdentityAdminPage.test.tsx`
 - `src/infrastructure/persistence/identity/tests/IdentityPersistenceMapper.test.ts`

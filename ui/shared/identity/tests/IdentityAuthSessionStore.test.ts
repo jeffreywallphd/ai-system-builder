@@ -18,14 +18,21 @@ describe("IdentityAuthSessionStore", () => {
     store.saveSession({
       userIdentityId: "user-1",
       username: "alice",
+      displayName: "Alice",
       providerId: "provider:local-password",
-      providerSubject: "alice",
-      authPath: "password",
-      authenticatedAt: "2026-04-04T20:00:00.000Z",
+      sessionId: "identity-session:1",
+      sessionToken: "token-1",
+      sessionTokenType: "Bearer",
+      sessionIssuedAt: "2026-04-04T20:00:00.000Z",
+      sessionExpiresAt: "2026-04-05T20:00:00.000Z",
     });
 
     expect(store.hasSession()).toBeTrue();
     expect(store.getSession()?.username).toBe("alice");
+    const serialized = backing.values().next().value as string;
+    expect(serialized.includes("providerSubject")).toBeFalse();
+    expect(serialized.includes("sessionTrustMarker")).toBeFalse();
+    expect(serialized.includes("\"email\"")).toBeFalse();
 
     store.clearSession();
     expect(store.hasSession()).toBeFalse();
@@ -54,9 +61,6 @@ describe("IdentityAuthSessionStore", () => {
       userIdentityId: "user-2",
       username: "desktop-user",
       providerId: "provider:local-password",
-      providerSubject: "desktop-user",
-      authPath: "password",
-      authenticatedAt: "2026-04-04T20:00:00.000Z",
       sessionId: "identity-session:2",
       sessionToken: "token-2",
       sessionTokenType: "Bearer",
@@ -83,9 +87,6 @@ describe("IdentityAuthSessionStore", () => {
       userIdentityId: "user-3",
       username: "bob",
       providerId: "provider:local-password",
-      providerSubject: "bob",
-      authPath: "password",
-      authenticatedAt: "2026-04-04T20:00:00.000Z",
       sessionId: "identity-session:3",
       sessionToken: "token-3",
       sessionTokenType: "Bearer",

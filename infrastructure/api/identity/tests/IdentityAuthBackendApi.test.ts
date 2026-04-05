@@ -355,6 +355,17 @@ describe("IdentityAuthBackendApi", () => {
     });
 
     expect(failedLogin.ok).toBeFalse();
+    const successfulLogin = await harness.backendApi.loginLocalAccount({
+      providerSubject: "obs.user",
+      client: {
+        trustedDeviceBindingId: "trusted-device:redaction",
+        trustMarker: "marker:redaction",
+      },
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(successfulLogin.ok).toBeTrue();
 
     expect(logger.infoEvents.length).toBeGreaterThanOrEqual(1);
     expect(logger.warnEvents.length).toBeGreaterThanOrEqual(1);
@@ -366,17 +377,25 @@ describe("IdentityAuthBackendApi", () => {
     });
     expect(serializedLogs.includes("StrongPass!2026")).toBeFalse();
     expect(serializedLogs.includes("LeakySecret!2026")).toBeFalse();
+    expect(serializedLogs.includes("trusted-device:redaction")).toBeFalse();
+    expect(serializedLogs.includes("marker:redaction")).toBeFalse();
+    expect(successfulLogin.ok && serializedLogs.includes(successfulLogin.data?.sessionToken ?? "")).toBeFalse();
     expect(serializedLogs.includes("[REDACTED]")).toBeTrue();
 
-    expect(auditEventSink.events.length).toBe(2);
+    expect(auditEventSink.events.length).toBe(3);
     expect(auditEventSink.events[0]?.type).toBe("identity-auth.local.register");
     expect(auditEventSink.events[0]?.outcome).toBe("success");
     expect(auditEventSink.events[1]?.type).toBe("identity-auth.local.login");
     expect(auditEventSink.events[1]?.outcome).toBe("failure");
+    expect(auditEventSink.events[2]?.type).toBe("identity-auth.local.login");
+    expect(auditEventSink.events[2]?.outcome).toBe("success");
 
     const serializedAuditEvents = JSON.stringify(auditEventSink.events);
     expect(serializedAuditEvents.includes("StrongPass!2026")).toBeFalse();
     expect(serializedAuditEvents.includes("LeakySecret!2026")).toBeFalse();
+    expect(serializedAuditEvents.includes("trusted-device:redaction")).toBeFalse();
+    expect(serializedAuditEvents.includes("marker:redaction")).toBeFalse();
+    expect(successfulLogin.ok && serializedAuditEvents.includes(successfulLogin.data?.sessionToken ?? "")).toBeFalse();
     expect(serializedAuditEvents.includes("[REDACTED]")).toBeTrue();
   });
 

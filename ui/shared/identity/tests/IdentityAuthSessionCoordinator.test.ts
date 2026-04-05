@@ -75,7 +75,9 @@ describe("IdentityAuthSessionCoordinator", () => {
       expect(result.session.username).toBe("alice-updated");
       expect(result.session.sessionAccessChannel).toBe("desktop");
     }
-    expect(store.getSession()?.sessionTrustedDeviceBindingId).toBe("trusted-device:1");
+    const persisted = store.getSession();
+    expect(persisted?.sessionId).toBe("identity-session:1");
+    expect(JSON.stringify(persisted).includes("trusted-device:1")).toBeFalse();
   });
 
   it("clears invalid sessions when API returns authentication failure", async () => {

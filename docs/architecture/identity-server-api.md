@@ -357,13 +357,16 @@ Application identity failures are translated through `IdentityAuthBackendApi` in
 Authentication flow observability is centralized in:
 
 - `infrastructure/api/identity/IdentityAuthObservability.ts`
+- `infrastructure/api/identity/IdentityAuthRedaction.ts`
+- `infrastructure/api/identity/IdentityAuthResponseSerializers.ts`
 
 `IdentityAuthBackendApi` emits structured registration/login completion events through this seam for both success and failure outcomes. The observability seam includes:
 
-- recursive payload redaction (`redactSensitiveAuthPayload`) shared across backend and HTTP transport logs
+- centralized recursive payload and freeform-string redaction (`redactSensitiveAuthPayload`, `redactSensitiveText`) shared across backend and HTTP transport logs
 - structured flow events (`identity-auth.local-register.completed`, `identity-auth.local-login.completed`)
 - structured flow events now include administration flows (`identity-auth.admin-accounts-list.completed`, `identity-auth.admin-account-get.completed`, `identity-auth.admin-account-status-set.completed`)
 - `IdentityAuthAuditEventSink` hook interface for future audit/event-service integration without changing auth flow orchestration
+- safe-by-default response serialization in `IdentityAuthResponseSerializers.ts` so transport payloads are allowlist-mapped instead of use-case object pass-through
 
 Redacted keys include:
 
@@ -383,7 +386,15 @@ Redacted keys include:
 - `providerSubject`
 - `email`
 
-`IdentityHttpServer` continues to emit transport-level request lifecycle logs and now uses the same shared redaction utility for validation and response-path logging.
+`IdentityHttpServer` continues to emit transport-level request lifecycle logs and now uses the same shared redaction utility for validation, response-path logging, and unhandled error normalization.
+
+## UI session persistence hardening (Story 1.4.5)
+
+Renderer session persistence is intentionally minimized:
+
+- `ui/shared/identity/IdentityAuthSessionStore.ts` now persists a narrowed `IdentityAuthPersistedSession` allowlist instead of the full login/session payload.
+- persisted session records retain only fields required for authenticated runtime continuity (`userIdentityId`, `username`, `displayName`, `providerId`, session id/token/type/timing/channel).
+- recovery-sensitive and trust-seam metadata (`email`, `providerSubject`, trusted-device binding id, trust marker, client-device metadata) is not persisted to local session storage by default.
 
 ## Test coverage
 
