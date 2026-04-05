@@ -24,8 +24,10 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - `src/application/nodes/use-cases/ListNodeInventoryUseCase.ts`
 - `src/application/nodes/use-cases/GetNodeInventoryDetailUseCase.ts`
 - `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
+- `src/application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase.ts`
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
 - `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
+- `src/application/nodes/tests/ResolveApprovedNodeRuntimeTrustMaterialUseCase.test.ts`
 - `src/infrastructure/security/nodes/NodeBootstrapIdentityService.ts`
 - `src/infrastructure/security/nodes/tests/NodeBootstrapIdentityService.test.ts`
 - `src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder.ts`
@@ -51,6 +53,7 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - query trusted node inventory with normalized capability filtering
 - query full admin inventory with operational summary states (`active`, `pending`, `rejected`, `revoked`, `offline`)
 - resolve one admin inventory detail view by `nodeId`, including pending-only enrollment-backed entries
+- resolve managed runtime trust materials for approved/trusted node identities via node-scoped retrieval workflow
 - generate/recover node-local bootstrap identity + trust material
 - build enrollment submission payloads from persisted bootstrap material
 
@@ -68,6 +71,7 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - Authorization policy engines can plug in through `NodeTrustAuthorizationHook` without changing use-case signatures.
 - PKI/certificate services can plug in through `NodeTrustCertificateHook` without changing node approval/revocation orchestration.
 - Certificate issuance policy enforcement can consume node-trust lifecycle evidence through `ResolveApprovedNodeCertificateEligibilityUseCase` via the security-layer `INodeCertificateEligibilityPort` seam.
+- Node runtime trust material retrieval can consume managed CA/certificate package seams through `ResolveApprovedNodeRuntimeTrustMaterialUseCase` and `ResolveRuntimeTrustMaterialPackageUseCase` without bypassing node trust lifecycle checks.
 - Audit pipelines can plug in through `NodeTrustAuditSink` while preserving non-blocking application flow.
 - stale pending enrollment expiration emits `node-enrollment-expired` audit events.
 - Enrollment approval/rejection metadata (`reviewedAt`, `reviewedByUserIdentityId`, `decisionNote`) remains in persistence contracts so admin decisions are auditable and durable.

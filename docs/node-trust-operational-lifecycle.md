@@ -67,6 +67,19 @@ This operational guide consolidates Story 5.4.5 (Feature 5 / Epic 5.4): bootstra
 - Repeat revocation is safe and idempotent.
 - New hardening: reject decisions on stale enrollment for revoked nodes do not mutate node trust back out of `revoked`.
 
+## Managed trust material provisioning
+
+- Approved and activated nodes retrieve managed runtime trust material through:
+  - `GET /api/v1/nodes/{nodeId}/runtime-trust-material`
+  - authenticated session bound to the same `nodeId` principal.
+- Retrieval is fail-closed unless node trust lifecycle state is eligible (`approved`, `trusted`, non-revoked, and certificate-present).
+- Returned runtime package material includes only node-safe payloads:
+  - leaf certificate PEM,
+  - certificate chain PEM (optional),
+  - trust bundle PEM (optional).
+- Protected storage references are intentionally excluded from node-facing runtime retrieval responses.
+- Unapproved, revoked, missing, or principal-mismatched requests are rejected.
+
 ## Administrator responsibilities
 
 - Review pending enrollment queue regularly and resolve old entries.

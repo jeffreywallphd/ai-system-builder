@@ -114,6 +114,7 @@ import { ListTrustedNodeInventoryUseCase } from "../../src/application/nodes/use
 import { RecordNodeHeartbeatUseCase } from "../../src/application/nodes/use-cases/RecordNodeHeartbeatUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { RejectNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
+import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "../../src/application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase";
 import { RevokeNodeTrustUseCase } from "../../src/application/nodes/use-cases/RevokeNodeTrustUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
 import type { WorkspaceIdNamespace } from "../../src/shared/contracts/workspaces/WorkspaceRepositoryContracts";
@@ -206,6 +207,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const certificateAuthorityRepository = new SqliteCertificateAuthorityPersistenceAdapter(path.resolve(options.databasePath));
   const env = options.env ?? process.env;
   try {
+    const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(env);
     const providerAccountPolicies = options.providerAccountPolicies
       ?? IdentityProviderAccountPolicyConfig.fromEnv(env);
     await applyIdentityStartupConfiguration(repository, providerAccountPolicies);
@@ -526,6 +528,20 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     resourcePolicyMetadataPersistenceRepository: authorizationRepository,
     clock: workspaceClock,
   });
+  const runtimeTrustMaterialDistributionService = protectedSecretStore
+    ? new RuntimeTrustMaterialDistributionService({
+      certificateAuthorityRepository,
+      issuedCertificateRepository: certificateAuthorityRepository,
+      trustMaterialReferenceRepository: certificateAuthorityRepository,
+      certificateMaterialStorage: new ProtectedCertificateAuthorityRootMaterialStorage(protectedSecretStore),
+      certificateLifecycleEventRepository: certificateAuthorityRepository,
+    })
+    : undefined;
+  const resolveRuntimeTrustMaterialPackageUseCase = runtimeTrustMaterialDistributionService
+    ? new ResolveRuntimeTrustMaterialPackageUseCase({
+      trustMaterialDistributionPort: runtimeTrustMaterialDistributionService,
+    })
+    : undefined;
   const nodeTrustBackendApi = new NodeTrustBackendApi({
     registerNodeEnrollmentRequestUseCase: new RegisterNodeEnrollmentRequestUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
@@ -559,6 +575,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     recordNodeHeartbeatUseCase: new RecordNodeHeartbeatUseCase({
       nodeRepository: nodeTrustRepository,
       auditSink: nodeTrustAuditRecorder,
+    }),
+    resolveApprovedNodeRuntimeTrustMaterialUseCase: new ResolveApprovedNodeRuntimeTrustMaterialUseCase({
+      nodeRepository: nodeTrustRepository,
+      runtimeTrustMaterialResolver: resolveRuntimeTrustMaterialPackageUseCase,
     }),
     listTrustedNodeInventoryUseCase: new ListTrustedNodeInventoryUseCase({
       nodeRepository: nodeTrustRepository,

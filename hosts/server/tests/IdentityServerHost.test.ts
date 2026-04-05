@@ -6,6 +6,14 @@ import type { AuthProvider, CredentialPolicy } from "../../../src/domain/identit
 import { IdentityProviderAccountPolicyConfig } from "../../../infrastructure/config/IdentityProviderAccountPolicyConfig";
 import { SqliteWorkspacePersistenceAdapter } from "../../../src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import { SqliteNodeTrustAuditRecorder } from "../../../src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
+import { SqliteNodeTrustPersistenceAdapter } from "../../../src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
+import {
+  NodeApprovalStatuses,
+  NodeRevocationStates,
+  NodeRoleCapabilities,
+  NodeTrustStates,
+  NodeTypes,
+} from "../../../src/domain/nodes/NodeTrustDomain";
 import {
   WorkspaceMembershipStatuses,
   WorkspaceRoleAssignmentStatuses,
@@ -26,6 +34,11 @@ import { SqliteCertificateAuthorityPersistenceAdapter } from "../../../src/infra
 import { InternalCertificateAuthorityIssuer } from "../../../src/infrastructure/security/ca/InternalCertificateAuthorityIssuer";
 import { createFileSystemProtectedSecretStoreFromEnvironment } from "../../../src/infrastructure/security/secrets/FileSystemProtectedSecretStore";
 import { ProtectedCertificateAuthorityRootMaterialStorage } from "../../../src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
+import {
+  CertificateStatuses,
+  CertificateSubjectReferenceKinds,
+  CertificateUsageKinds,
+} from "../../../src/domain/security/CertificateAuthorityDomain";
 
 class InMemoryIdentityDefaultConfigurationRepository {
   public readonly providers = new Map<string, AuthProvider>();
@@ -502,6 +515,79 @@ describe("IdentityServerHost", () => {
     rmSync(tempDirectory, { recursive: true, force: true });
   });
 
+  it("wires approved node runtime trust retrieval through managed certificate services", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-node-runtime-trust-host-success-"));
+    const databasePath = join(tempDirectory, "node-runtime-trust-host-success.sqlite");
+    const managedTlsEnv = Object.freeze({
+      ...createManagedTlsEnvironment(tempDirectory),
+      AI_LOOM_INTERNAL_CA_SERVER_MANAGED_TLS_ENABLED: "false",
+    });
+    const nodeId = "node:host:runtime-1";
+    await seedManagedNodeRuntimeTrustMaterial({
+      databasePath,
+      env: managedTlsEnv,
+      nodeId,
+    });
+
+    const host = await startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+      env: managedTlsEnv,
+    });
+
+    try {
+      const registerNode = await fetch(`http://${host.address}/api/v1/identity/register`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          username: nodeId,
+          credential: {
+            candidate: "StrongPass!2026",
+          },
+        }),
+      });
+      expect(registerNode.status).toBe(200);
+
+      const loginNode = await fetch(`http://${host.address}/api/v1/identity/login`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          providerSubject: nodeId,
+          credential: {
+            candidate: "StrongPass!2026",
+          },
+        }),
+      });
+      expect(loginNode.status).toBe(200);
+      const loginNodeBody = await loginNode.json();
+
+      const runtimeTrustMaterial = await fetch(
+        `http://${host.address}/api/v1/nodes/${encodeURIComponent(nodeId)}/runtime-trust-material`,
+        {
+          headers: {
+            authorization: `Bearer ${loginNodeBody.data.sessionToken}`,
+          },
+        },
+      );
+      expect(runtimeTrustMaterial.status).toBe(200);
+      const runtimeTrustMaterialBody = await runtimeTrustMaterial.json();
+      expect(runtimeTrustMaterialBody.ok).toBe(true);
+      expect(runtimeTrustMaterialBody.data.runtimeTrustMaterial.targetKind).toBe("node");
+      expect(runtimeTrustMaterialBody.data.runtimeTrustMaterial.targetReferenceId).toBe(nodeId);
+      expect(runtimeTrustMaterialBody.data.runtimeTrustMaterial.leafCertificatePem).toContain("BEGIN CERTIFICATE");
+    } finally {
+      await host.close();
+      rmSync(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("initializes CA through host composition by invoking the application use case", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-ca-init-host-"));
     const databasePath = join(tempDirectory, "identity-ca-init-host.sqlite");
@@ -659,4 +745,165 @@ async function seedManagedTlsServerCertificate(input: {
     },
   });
   repository.dispose();
+}
+
+async function seedManagedNodeRuntimeTrustMaterial(input: {
+  readonly databasePath: string;
+  readonly env: Readonly<Record<string, string | undefined>>;
+  readonly nodeId: string;
+}): Promise<void> {
+  await seedManagedTlsServerCertificate({
+    databasePath: input.databasePath,
+    env: input.env,
+    certificateStatus: "issued",
+  });
+
+  const repository = new SqliteCertificateAuthorityPersistenceAdapter(input.databasePath);
+  const nodeRepository = new SqliteNodeTrustPersistenceAdapter(input.databasePath);
+  const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(input.env);
+  if (!protectedSecretStore) {
+    repository.dispose();
+    nodeRepository.dispose();
+    throw new Error("Node runtime trust test setup requires protected secret storage.");
+  }
+  const materialStorage = new ProtectedCertificateAuthorityRootMaterialStorage(protectedSecretStore);
+
+  const issuedAt = "2026-04-05T13:00:00.000Z";
+  const leafRef = `trust:cert:${input.nodeId}:v1`;
+  const chainRef = `trust:chain:${input.nodeId}:v1`;
+  const leafSecretRef = `secret-store:internal-ca:${encodeURIComponent(`${input.nodeId}:leaf`)}`;
+  const chainSecretRef = `secret-store:internal-ca:${encodeURIComponent(`${input.nodeId}:chain`)}`;
+
+  await materialStorage.persistRootMaterials({
+    certificateAuthorityId: "ca:internal:root:v1",
+    reason: "seed-node-runtime-trust-material",
+    materials: [{
+      materialRef: leafRef,
+      kind: "certificate-pem",
+      plaintextValue: "-----BEGIN CERTIFICATE-----node-leaf-----END CERTIFICATE-----\n",
+      secretRef: leafSecretRef,
+    }, {
+      materialRef: chainRef,
+      kind: "certificate-chain-pem",
+      plaintextValue: "-----BEGIN CERTIFICATE-----node-chain-----END CERTIFICATE-----\n",
+      secretRef: chainSecretRef,
+    }],
+  });
+
+  await repository.saveTrustMaterial({
+    mutation: {
+      operationKey: `seed-node-runtime-trust-leaf-ref:${Date.now()}`,
+      context: {
+        actorUserIdentityId: "user:admin",
+        occurredAt: issuedAt,
+      },
+    },
+    record: {
+      materialRef: leafRef,
+      kind: "certificate-pem",
+      storageLocator: leafSecretRef,
+      createdAt: issuedAt,
+      createdBy: "user:admin",
+      lastModifiedAt: issuedAt,
+      lastModifiedBy: "user:admin",
+      revision: 1,
+    },
+  });
+  await repository.saveTrustMaterial({
+    mutation: {
+      operationKey: `seed-node-runtime-trust-chain-ref:${Date.now()}`,
+      context: {
+        actorUserIdentityId: "user:admin",
+        occurredAt: issuedAt,
+      },
+    },
+    record: {
+      materialRef: chainRef,
+      kind: "certificate-chain-pem",
+      storageLocator: chainSecretRef,
+      createdAt: issuedAt,
+      createdBy: "user:admin",
+      lastModifiedAt: issuedAt,
+      lastModifiedBy: "user:admin",
+      revision: 1,
+    },
+  });
+
+  await repository.saveIssuedCertificate({
+    mutation: {
+      operationKey: `seed-node-runtime-issued-cert:${Date.now()}`,
+      context: {
+        actorUserIdentityId: "user:admin",
+        occurredAt: issuedAt,
+      },
+    },
+    record: {
+      certificateAuthorityId: "ca:internal:root:v1",
+      serialNumber: "CC33DD44",
+      status: CertificateStatuses.issued,
+      subject: {
+        commonName: `${input.nodeId}.ai-loom.internal`,
+        dnsNames: [`${input.nodeId}.ai-loom.internal`],
+        ipAddresses: [],
+        uriSanEntries: [`spiffe://ai-loom.internal/${input.nodeId}`],
+      },
+      subjectReference: {
+        kind: CertificateSubjectReferenceKinds.node,
+        referenceId: input.nodeId,
+      },
+      usages: [CertificateUsageKinds.clientAuth, CertificateUsageKinds.mutualTls],
+      validity: {
+        notBefore: "2026-04-05T12:30:00.000Z",
+        notAfter: "2027-04-05T12:30:00.000Z",
+      },
+      issuedAt,
+      certificateMaterialRef: leafRef,
+      certificateChainMaterialRef: chainRef,
+      trustMaterialRef: chainRef,
+      publicKeyAlgorithm: "rsa-4096",
+      publicKeyFingerprintSha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      createdAt: issuedAt,
+      createdBy: "user:admin",
+      lastModifiedAt: issuedAt,
+      lastModifiedBy: "user:admin",
+      revision: 1,
+    },
+  });
+
+  await nodeRepository.registerNode({
+    mutation: {
+      operationKey: `seed-node-runtime-node-record:${Date.now()}`,
+      context: {
+        actorUserIdentityId: "user:admin",
+      },
+    },
+    record: {
+      nodeId: input.nodeId,
+      nodeType: NodeTypes.compute,
+      displayName: "Runtime Host Node",
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.executor],
+        supportsRemoteScheduling: true,
+      },
+      approvalStatus: NodeApprovalStatuses.approved,
+      trustState: NodeTrustStates.trusted,
+      certificate: {
+        certificateRef: leafRef,
+      },
+      deploymentTags: ["runtime"],
+      revocation: {
+        state: NodeRevocationStates.active,
+      },
+      enrolledAt: issuedAt,
+      approvedAt: issuedAt,
+      createdAt: issuedAt,
+      createdBy: "user:admin",
+      lastModifiedAt: issuedAt,
+      lastModifiedBy: "user:admin",
+      revision: 0,
+    },
+  });
+
+  repository.dispose();
+  nodeRepository.dispose();
 }

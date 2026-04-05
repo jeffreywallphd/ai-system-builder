@@ -1,6 +1,7 @@
 # Node Trust Application Use Cases
 
 This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment, Story 5.2.3 (Feature 5 / Epic 5.2): admin review/approval decisions for pending node enrollment, Story 5.2.4 (Feature 5 / Epic 5.2): enrollment detail retrieval transport orchestration support, Story 5.3.4 (Feature 5 / Epic 5.3): admin inventory list/detail query read models across trust and presence states, Story 5.4.1 (Feature 5 / Epic 5.4): durable node revocation semantics and repeat-revocation safety, Story 5.4.2 (Feature 5 / Epic 5.4): node-authenticated trust enforcement for runtime operations, Story 5.4.3 (Feature 5 / Epic 5.4): node trust audit recording integration, and Story 6.2.3 (Feature 6 / Epic 6.2): approved-node certificate issuance eligibility integration with node trust state.
+This note now also documents Story 6.3.5 (Feature 6 / Epic 6.3): approved-node runtime trust material retrieval integration for managed trust package consumption.
 
 ## Canonical files
 
@@ -22,8 +23,10 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `src/application/nodes/use-cases/ListNodeInventoryUseCase.ts`
 - `src/application/nodes/use-cases/GetNodeInventoryDetailUseCase.ts`
 - `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
+- `src/application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase.ts`
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
 - `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
+- `src/application/nodes/tests/ResolveApprovedNodeRuntimeTrustMaterialUseCase.test.ts`
 - `src/infrastructure/security/nodes/NodeBootstrapIdentityService.ts`
 - `src/infrastructure/security/nodes/tests/NodeBootstrapIdentityService.test.ts`
 - `src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder.ts`
@@ -112,6 +115,12 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
   - requires coherent enrollment linkage (`node.enrollmentRequestId`) and approved enrollment status
   - validates capability-profile integrity and enrollment-to-node capability-profile consistency
   - blocks issuance for revoked, unapproved, malformed, or enrollment-incoherent node records
+- `ResolveApprovedNodeRuntimeTrustMaterialUseCase`
+  - provides node-scoped managed runtime trust material retrieval for approved/trusted node identities
+  - enforces actor/node identity binding (`actorUserIdentityId === nodeId`)
+  - enforces centralized node lifecycle trust eligibility (`approved`, `trusted`, non-revoked, certificate-present)
+  - delegates material packaging to `ResolveRuntimeTrustMaterialPackageUseCase` so node retrieval uses CA/certificate service seams
+  - rejects protected-reference export for node runtime retrieval requests
 
 ## Shared application contracts
 

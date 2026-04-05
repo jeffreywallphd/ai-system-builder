@@ -13,9 +13,11 @@ import type {
   NodeEnrollmentSubmissionResponseDto,
   NodeHeartbeatPayloadDto,
   NodeHeartbeatResponseDto,
+  NodeRuntimeTrustMaterialResponseDto,
   NodeRevocationResponseDto,
   NodePendingEnrollmentSummaryDto,
   RevokeNodeTrustActionRequestDto,
+  ResolveNodeRuntimeTrustMaterialRequestDto,
   RejectNodeEnrollmentActionRequestDto,
 } from "../../../../src/shared/contracts/nodes/NodeTrustApiContracts";
 import {
@@ -97,6 +99,10 @@ export type RevokeNodeTrustApiResponse = NodeRevocationResponseDto;
 export type RecordNodeHeartbeatApiRequest = NodeHeartbeatPayloadDto;
 
 export type RecordNodeHeartbeatApiResponse = NodeHeartbeatResponseDto;
+
+export type ResolveNodeRuntimeTrustMaterialApiRequest = ResolveNodeRuntimeTrustMaterialRequestDto;
+
+export type ResolveNodeRuntimeTrustMaterialApiResponse = NodeRuntimeTrustMaterialResponseDto;
 
 export interface ListTrustedNodeInventoryApiRequest {
   readonly actorUserIdentityId: string;

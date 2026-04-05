@@ -1,7 +1,7 @@
 # Internal CA Foundation
 
 This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, Story 6.2.1, Story 6.2.2, Story 6.2.3, Story 6.2.4, Story 6.2.5, Story 6.2.6, and Story 6.2.7 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, certificate subject-profile issuance policy enforcement, concrete issuance signing/material persistence execution, node-trust-backed approved-node issuance eligibility, explicit certificate revocation workflow plus revocation-status enforcement seams, reusable certificate trust evaluation helpers, certificate lifecycle audit recording seams, and issued-certificate metadata query/listing seams for admin/API consumers.
-This note now also documents Story 6.3.1, Story 6.3.2, Story 6.3.3, and Story 6.3.4 (Feature 6 / Epic 6.3): runtime trust-material export/distribution contracts, centralized certificate renewal/rotation planning services that classify renewal urgency and operator attention conditions before expiry, a certificate renewal/replacement workflow that issues successor certificates while keeping historical linkage explicit and auditable, and authoritative server host/runtime composition wiring that resolves managed server trust material through the CA/certificate service layer before transport startup.
+This note now also documents Story 6.3.1, Story 6.3.2, Story 6.3.3, Story 6.3.4, and Story 6.3.5 (Feature 6 / Epic 6.3): runtime trust-material export/distribution contracts, centralized certificate renewal/rotation planning services that classify renewal urgency and operator attention conditions before expiry, a certificate renewal/replacement workflow that issues successor certificates while keeping historical linkage explicit and auditable, authoritative server host/runtime composition wiring that resolves managed server trust material through the CA/certificate service layer before transport startup, and approved-node runtime retrieval wiring for managed trust package consumption.
 
 ## Canonical artifacts
 
@@ -37,6 +37,7 @@ This note now also documents Story 6.3.1, Story 6.3.2, Story 6.3.3, and Story 6.
 - `src/application/security/use-cases/GetCertificateRenewalPlanningUseCase.ts`
 - `src/application/security/use-cases/RenewIssuedCertificateUseCase.ts`
 - `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
+- `src/application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase.ts`
 - `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
 - `src/application/security/tests/ResolveCertificateAuthorityStartupStateUseCase.test.ts`
 - `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
@@ -52,6 +53,7 @@ This note now also documents Story 6.3.1, Story 6.3.2, Story 6.3.3, and Story 6.
 - `src/application/security/tests/GetCertificateRenewalPlanningUseCase.test.ts`
 - `src/application/security/tests/RenewIssuedCertificateUseCase.test.ts`
 - `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
+- `src/application/nodes/tests/ResolveApprovedNodeRuntimeTrustMaterialUseCase.test.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
 - `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
@@ -65,6 +67,8 @@ This note now also documents Story 6.3.1, Story 6.3.2, Story 6.3.3, and Story 6.
 - `src/infrastructure/security/certificates/tests/RuntimeTrustMaterialDistributionService.test.ts`
 - `hosts/server/IdentityServerHost.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
+- `infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
 - `src/shared/dto/security/tests/CertificateAuthorityDtos.test.ts`
@@ -276,6 +280,25 @@ Story 6.3.4 wires the authoritative server host runtime to managed CA/certificat
   - resolved certificate trust state not usable (`revoked`, `expired`, etc.)
   - configured private-key trust material missing or wrong trust-material kind
 - authoritative transport creation now accepts an injected server factory in `IdentityHttpServer` so host composition can switch from plain HTTP to HTTPS when managed TLS material is resolved.
+
+## Story 6.3.5 approved node runtime wiring to managed trust bundle retrieval
+
+Story 6.3.5 wires approved-node runtime trust retrieval through managed CA/certificate service seams:
+
+- `ResolveApprovedNodeRuntimeTrustMaterialUseCase` now composes:
+  - strict node-authenticated actor binding (`actorUserIdentityId === nodeId`),
+  - node lifecycle trust gating (`approved` + `trusted` + non-revoked + certificate-present),
+  - managed runtime trust package resolution through `ResolveRuntimeTrustMaterialPackageUseCase` (`targetKind='node'`).
+- protected-reference export is explicitly blocked for node runtime retrieval requests (`includeProtectedReferences=true` is rejected).
+- `NodeTrustBackendApi` now exposes `resolveNodeRuntimeTrustMaterial(...)` as the node-facing retrieval contract adapter.
+- `IdentityHttpServer` now exposes `GET /api/v1/nodes/{nodeId}/runtime-trust-material` with:
+  - authenticated node principal binding checks,
+  - explicit query option validation,
+  - fail-closed outcomes for unapproved/revoked/missing nodes and invalid retrieval input.
+- `startIdentityServerHost` now composes node runtime retrieval wiring by injecting:
+  - `RuntimeTrustMaterialDistributionService`,
+  - `ResolveRuntimeTrustMaterialPackageUseCase`,
+  - `ResolveApprovedNodeRuntimeTrustMaterialUseCase` into `NodeTrustBackendApi`.
 
 ## Story 6.1.3 startup bootstrap behavior
 

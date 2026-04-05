@@ -7,6 +7,7 @@ import type {
   RecordNodeHeartbeatUseCase,
   RegisterNodeEnrollmentRequestUseCase,
   RejectNodeEnrollmentUseCase,
+  ResolveApprovedNodeRuntimeTrustMaterialUseCase,
   RevokeNodeTrustUseCase,
   ReviewPendingNodeEnrollmentUseCase,
 } from "../../src/application/nodes/use-cases";
@@ -52,6 +53,8 @@ import {
   type RejectNodeEnrollmentApiResponse,
   type RevokeNodeTrustApiRequest,
   type RevokeNodeTrustApiResponse,
+  type ResolveNodeRuntimeTrustMaterialApiRequest,
+  type ResolveNodeRuntimeTrustMaterialApiResponse,
   type SubmitNodeEnrollmentApiRequest,
   type SubmitNodeEnrollmentApiResponse,
 } from "./sdk/PublicNodeTrustApiContract";
@@ -65,6 +68,7 @@ interface NodeTrustBackendApiDependencies {
   readonly rejectNodeEnrollmentUseCase: RejectNodeEnrollmentUseCase;
   readonly revokeNodeTrustUseCase: RevokeNodeTrustUseCase;
   readonly recordNodeHeartbeatUseCase: RecordNodeHeartbeatUseCase;
+  readonly resolveApprovedNodeRuntimeTrustMaterialUseCase?: ResolveApprovedNodeRuntimeTrustMaterialUseCase;
   readonly listTrustedNodeInventoryUseCase: ListTrustedNodeInventoryUseCase;
   readonly listNodeInventoryUseCase: ListNodeInventoryUseCase;
 }
@@ -296,6 +300,46 @@ export class NodeTrustBackendApi {
       ok: true,
       data: Object.freeze({
         node: toNodeDetailDto(this.toInternalNode(outcome.value.node)),
+      }),
+    });
+  }
+
+  public async resolveNodeRuntimeTrustMaterial(
+    request: ResolveNodeRuntimeTrustMaterialApiRequest,
+  ): Promise<NodeTrustApiResponse<ResolveNodeRuntimeTrustMaterialApiResponse>> {
+    if (!this.dependencies.resolveApprovedNodeRuntimeTrustMaterialUseCase) {
+      return Object.freeze({
+        ok: false,
+        error: Object.freeze({
+          code: NodeTrustApiErrorCodes.internal,
+          message: "Node runtime trust material retrieval is not configured for this runtime.",
+        }),
+      });
+    }
+
+    const outcome = await this.dependencies.resolveApprovedNodeRuntimeTrustMaterialUseCase.execute({
+      actorUserIdentityId: request.actorUserIdentityId,
+      nodeId: request.nodeId,
+      workspaceId: request.workspaceId,
+      certificateAuthorityId: request.certificateAuthorityId,
+      serialNumber: request.serialNumber,
+      includeLeafCertificate: request.includeLeafCertificate,
+      includeCertificateChain: request.includeCertificateChain,
+      includeTrustBundle: request.includeTrustBundle,
+      occurredAt: request.occurredAt,
+    });
+
+    if (!outcome.ok) {
+      return Object.freeze({
+        ok: false,
+        error: this.mapUseCaseError(outcome.error.code, outcome.error.message),
+      });
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        runtimeTrustMaterial: outcome.value.runtimeTrustMaterial,
       }),
     });
   }
