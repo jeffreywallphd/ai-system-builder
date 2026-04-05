@@ -53,6 +53,7 @@ export interface LoginLocalIdentityApiRequest {
   readonly providerId?: string;
   readonly providerSubject: string;
   readonly accessChannel?: "desktop" | "thin-client";
+  readonly sessionTrustRequirement?: "allow-untrusted" | "allow-pairing" | "require-trusted";
   readonly client?: {
     readonly userAgent?: string;
     readonly ipAddress?: string;

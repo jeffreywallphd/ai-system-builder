@@ -53,6 +53,7 @@ UI entry points now consume this same HTTP surface through renderer identity ada
   "providerId": "string (optional)",
   "providerSubject": "string",
   "accessChannel": "desktop | thin-client (optional, defaults to thin-client)",
+  "sessionTrustRequirement": "allow-untrusted | allow-pairing | require-trusted (optional)",
   "client": {
     "userAgent": "string (optional)",
     "ipAddress": "string (optional)",
@@ -362,6 +363,9 @@ Protected endpoint behavior:
 - On success, the guard passes authenticated principal/session context into downstream handlers.
 - Missing, invalid, expired, and revoked sessions are rejected consistently with `401` + `authentication-failed`.
 - Logout and session-revoke routes share the same bearer-token guard.
+- High-assurance routes require trusted session assurance and return `403` + `forbidden` when trust is insufficient:
+  - `POST /api/v1/identity/credential/change`
+  - `GET|POST /api/v1/identity/admin/accounts*`
 
 Session issuance notes:
 
@@ -370,7 +374,9 @@ Session issuance notes:
 - Token/signing material persists separately in `identity_session_token_material` as token hash metadata (raw token is not persisted).
 - Revocation and logout invalidate token material (`invalidated_at`) and mark session lifecycle state `revoked`, so protected session validation fails on the next request without additional eventual-consistency delay in this local persistence slice.
 - Session expiry behavior is policy-driven through environment-backed configuration (`IDENTITY_SESSION_*` variables for desktop/thin-client TTL, refresh, and optional inactivity timeout), so returned `sessionExpiresAt` values reflect configured policy instead of fixed constants.
-- Session context now includes trusted-device seam fields (`trustedDeviceBindingId`, `trustMarker`) for future trust policy composition; they are persisted and returned as context but not used as authorization decisions in this slice.
+- Session context includes trusted-device seam fields (`trustedDeviceBindingId`, `trustMarker`) and trust context (`deviceTrustContext`) derived from trusted-device repository state.
+- Login/session issuance now supports trust posture (`allow-untrusted`, `allow-pairing`, `require-trusted`) and can deny issuance when trusted requirements are not met.
+- Validation fails closed for bound sessions when trusted-device state is missing, revoked, expired, or mismatched.
 
 ## Stable error mapping
 

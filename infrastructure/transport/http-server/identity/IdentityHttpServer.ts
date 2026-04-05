@@ -40,6 +40,7 @@ const LoginRequestSchema: z.ZodType<LoginLocalIdentityApiRequest> = z.object({
   providerId: z.string().min(1).optional(),
   providerSubject: z.string().min(1),
   accessChannel: z.enum(["desktop", "thin-client"]).optional(),
+  sessionTrustRequirement: z.enum(["allow-untrusted", "allow-pairing", "require-trusted"]).optional(),
   client: z.object({
     userAgent: z.string().min(1).optional(),
     ipAddress: z.string().min(1).optional(),
@@ -148,6 +149,10 @@ interface AuthenticatedRequestContext {
   readonly principal: AuthenticatedIdentityPrincipalApiResponse;
   readonly session: ResolveAuthenticatedSessionApiResponse["session"];
   readonly sessionToken: string;
+  readonly sessionTrust: {
+    readonly assuranceLevel: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted";
+    readonly isTrusted: boolean;
+  };
 }
 
 export function createIdentityHttpServer(options: IdentityHttpServerOptions): Server {
@@ -180,6 +185,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
           requestId,
           options.backendApi,
           logger,
+          undefined,
           async (context) => {
             const responseBody: IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse> = Object.freeze({
               ok: true,
@@ -205,6 +211,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
           requestId,
           options.backendApi,
           logger,
+          undefined,
           async (context) => {
             const apiResponse = await options.backendApi.logoutAuthenticatedSession({
               sessionToken: context.sessionToken,
@@ -223,6 +230,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
           requestId,
           options.backendApi,
           logger,
+          undefined,
           async (context) => {
             const parsedRequest = await parseAndValidateRequest(
               request,
@@ -259,6 +267,9 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
           requestId,
           options.backendApi,
           logger,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
           async (context) => {
             const parsedRequest = await parseAndValidateRequest(
               request,
@@ -294,6 +305,9 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
           requestId,
           options.backendApi,
           logger,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
             const includeStatuses = url.searchParams.getAll("status");
@@ -337,6 +351,9 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
           requestId,
           options.backendApi,
           logger,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
           async (context) => {
             const userIdentityId = decodePathTail(path, "/api/v1/identity/admin/accounts/");
             if (!userIdentityId) {
@@ -371,6 +388,9 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
           requestId,
           options.backendApi,
           logger,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
           async (context) => {
             const userIdentityId = decodePathTail(path, "/api/v1/identity/admin/accounts/", "/status");
             if (!userIdentityId) {
@@ -478,6 +498,9 @@ async function requireAuthenticatedSession(
   requestId: string,
   backendApi: IdentityAuthBackendApi,
   logger: IdentityHttpServerLogger,
+  options: {
+    readonly minimumAssuranceLevel?: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted";
+  } | undefined,
   onAuthenticated: (context: AuthenticatedRequestContext) => Promise<void>,
 ): Promise<void> {
   const sessionToken = extractBearerToken(request.headers.authorization);
@@ -508,10 +531,32 @@ async function requireAuthenticatedSession(
     return;
   }
 
+  const sessionAssuranceLevel = normalizeSessionAssuranceLevel(resolvedSession.data.session.deviceTrustContext?.sessionAssuranceLevel);
+  if (options?.minimumAssuranceLevel && !isSessionAssuranceAllowed(sessionAssuranceLevel, options.minimumAssuranceLevel)) {
+    const forbidden: IdentityAuthApiResponse<never> = Object.freeze({
+      ok: false,
+      error: {
+        code: IdentityAuthApiErrorCodes.forbidden,
+        message: "Session trust level is insufficient for this route.",
+      },
+    });
+    writeJson(response, 403, forbidden);
+    logResponse(logger, requestId, request, 403, Object.freeze({
+      sessionToken,
+      sessionAssuranceLevel,
+      minimumAssuranceLevel: options.minimumAssuranceLevel,
+    }), forbidden);
+    return;
+  }
+
   await onAuthenticated(Object.freeze({
     principal: resolvedSession.data.principal,
     session: resolvedSession.data.session,
     sessionToken,
+    sessionTrust: Object.freeze({
+      assuranceLevel: sessionAssuranceLevel,
+      isTrusted: sessionAssuranceLevel === "authenticated-trusted",
+    }),
   }));
 }
 
@@ -792,6 +837,27 @@ function writeJson(response: ServerResponse, statusCode: number, payload: unknow
   response.statusCode = statusCode;
   response.setHeader("content-type", "application/json; charset=utf-8");
   response.end(JSON.stringify(payload));
+}
+
+function normalizeSessionAssuranceLevel(
+  value: ResolveAuthenticatedSessionApiResponse["session"]["deviceTrustContext"] extends { readonly sessionAssuranceLevel?: infer T } ? T : never,
+): "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted" {
+  if (value === "authenticated-trusted" || value === "authenticated-restricted") {
+    return value;
+  }
+  return "authenticated-untrusted";
+}
+
+function isSessionAssuranceAllowed(
+  actual: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted",
+  minimum: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted",
+): boolean {
+  const order = Object.freeze({
+    "authenticated-untrusted": 1,
+    "authenticated-restricted": 2,
+    "authenticated-trusted": 3,
+  });
+  return order[actual] >= order[minimum];
 }
 
 class ConsoleIdentityHttpServerLogger implements IdentityHttpServerLogger {

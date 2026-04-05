@@ -68,11 +68,14 @@ Environment variables:
 - `IDENTITY_SESSION_THIN_CLIENT_TTL_MINUTES`
 - `IDENTITY_SESSION_THIN_CLIENT_ALLOW_REFRESH`
 - `IDENTITY_SESSION_THIN_CLIENT_INACTIVITY_TIMEOUT_MINUTES`
+- `IDENTITY_SESSION_DESKTOP_TRUST_REQUIREMENT` (`allow-untrusted` | `allow-pairing` | `require-trusted`)
+- `IDENTITY_SESSION_THIN_CLIENT_TRUST_REQUIREMENT` (`allow-untrusted` | `allow-pairing` | `require-trusted`)
 
 Defaults:
 
 - desktop: 30 days, refresh disabled
 - thin-client: 12 hours, refresh enabled
+- trust defaults: desktop `allow-pairing`, thin-client `allow-untrusted`
 
 Validation rules:
 
@@ -97,6 +100,9 @@ Validation rules:
 - persistence now includes dedicated trust columns on `identity_sessions` (migration version `6`) for trusted device id, assurance level, trust-state snapshot, and invalidation reasons JSON.
 - login issuance and session-resolution contracts accept/return structured trust context while preserving legacy `trustedDeviceBindingId` / `trustMarker` fields for compatibility.
 - optional `IIdentitySessionTrustEvaluator` can deny sessions and return trust invalidation reasons for deterministic runtime failure context.
+- `TrustedDeviceSessionTrustService` is now wired by the runtime host and evaluates trusted-device bindings against repository state during session validation.
+- Validation now fails closed for bound sessions when trusted device state is missing, revoked, expired, or mismatched.
+- Login/session issuance now resolves trust from repository state (not client-asserted trust claims), supports request-level trust posture (`allow-untrusted`, `allow-pairing`, `require-trusted`), and can deny issuance when trust requirements are unmet.
 
 ## Primary tests
 
@@ -105,7 +111,9 @@ Validation rules:
 - `application/identity/tests/LogoutIdentitySessionUseCase.test.ts`
 - `application/identity/tests/RevokeIdentitySessionUseCase.test.ts`
 - `infrastructure/config/tests/IdentitySessionPolicyConfig.test.ts`
+- `infrastructure/config/tests/IdentitySessionTrustPolicyConfig.test.ts`
 - `infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`
 - `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `application/identity/tests/TrustedDeviceSessionTrustService.test.ts`
 

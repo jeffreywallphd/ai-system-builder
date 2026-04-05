@@ -27,7 +27,10 @@ import { ScryptLocalPasswordCredentialService } from "../../infrastructure/secur
 import { OpaqueIdentitySessionTokenService } from "../../infrastructure/security/identity/OpaqueIdentitySessionTokenService";
 import { IdentityAuthBackendApi } from "../../infrastructure/api/identity/IdentityAuthBackendApi";
 import { IdentitySessionPolicyConfig } from "../../infrastructure/config/IdentitySessionPolicyConfig";
+import { IdentitySessionTrustPolicyConfig } from "../../infrastructure/config/IdentitySessionTrustPolicyConfig";
 import { IdentityProviderAccountPolicyConfig } from "../../infrastructure/config/IdentityProviderAccountPolicyConfig";
+import { SqliteTrustedDeviceRepository } from "../../infrastructure/filesystem/identity/SqliteTrustedDeviceRepository";
+import { TrustedDeviceSessionTrustService } from "../../application/identity/services/TrustedDeviceSessionTrustService";
 import {
   createIdentityHttpServer,
   type IdentityHttpServerLogger,
@@ -71,6 +74,7 @@ class RandomIdentityIdGenerator implements IIdentityIdGenerator {
 
 export async function startIdentityServerHost(options: IdentityServerHostOptions): Promise<IdentityServerHost> {
   const repository = new SqliteIdentityRepository(path.resolve(options.databasePath));
+  const trustedDeviceRepository = new SqliteTrustedDeviceRepository(path.resolve(options.databasePath));
   const env = options.env ?? process.env;
   const providerAccountPolicies = options.providerAccountPolicies
     ?? IdentityProviderAccountPolicyConfig.fromEnv(env);
@@ -82,7 +86,12 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const idGenerator = new RandomIdentityIdGenerator();
   const sessionPolicies = options.sessionPolicies
     ?? IdentitySessionPolicyConfig.fromEnv(env).policies;
+  const sessionTrustPolicies = IdentitySessionTrustPolicyConfig.fromEnv(env).policies;
   const eventPublisher = options.eventPublisher;
+  const sessionTrustService = new TrustedDeviceSessionTrustService({
+    trustedDeviceRepository,
+    policies: sessionTrustPolicies,
+  });
   const sessionLifecycleService = new IdentitySessionLifecycleService({
     sessionRepository: repository,
     clock,
@@ -95,6 +104,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     tokenMaterialRepository: repository,
     tokenService: new OpaqueIdentitySessionTokenService(),
     clock,
+    sessionTrustEvaluator: sessionTrustService,
     eventPublisher,
   });
 
@@ -153,6 +163,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     identityLookupRepository: repository,
     authenticatedSessionService,
+    sessionTrustService,
     featurePolicies: {
       allowLocalRegistration: providerAccountPolicies.allowLocalRegistration,
       allowLocalAdministration: providerAccountPolicies.allowLocalAdministration,
@@ -180,6 +191,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     close: () => new Promise<void>((resolve, reject) => {
       server.close((error) => {
         repository.dispose();
+        trustedDeviceRepository.dispose();
         if (error) {
           reject(error);
           return;

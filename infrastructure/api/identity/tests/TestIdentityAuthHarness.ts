@@ -10,6 +10,17 @@ import {
   type UserIdentity,
 } from "../../../../src/domain/identity/IdentityDomain";
 import {
+  DeviceFingerprintAlgorithms,
+  DevicePairingMethods,
+  DeviceTrustMaterialKinds,
+  DeviceTrustStatuses,
+  createDeviceFingerprint,
+  createDeviceTrustMaterialRef,
+  createTrustedDevice,
+  revokeTrustedDevice,
+  type TrustedDevice,
+} from "../../../../src/domain/identity/TrustedDeviceDomain";
+import {
   IdentityCredentialMaterialStatuses,
   IdentityErrorCodes,
   IdentityPrincipalLookupKinds,
@@ -24,6 +35,9 @@ import {
   type IdentityProviderSubjectReference,
   type IdentitySessionListQuery,
   type IdentitySessionTokenMaterialRecord,
+  type TrustedDeviceListQuery,
+  type TrustedDeviceLookupByFingerprintQuery,
+  type TrustedDeviceRevocationRequest,
   type IdentityUserIdentityListQuery,
 } from "../../../../application/contracts/IdentityApplicationContracts";
 import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
@@ -34,6 +48,7 @@ import type { IIdentityPersistenceRepository } from "../../../../application/ide
 import type { IIdentitySessionRepository } from "../../../../application/identity/ports/IIdentitySessionRepository";
 import type { IIdentitySessionTokenMaterialRepository } from "../../../../application/identity/ports/IIdentitySessionTokenMaterialRepository";
 import type { IIdentitySessionTokenService } from "../../../../application/identity/ports/IIdentitySessionTokenService";
+import type { ITrustedDeviceRepository } from "../../../../application/identity/ports/ITrustedDeviceRepository";
 import type {
   ILocalPasswordCredentialService,
   LocalPasswordCredentialMaterial,
@@ -42,6 +57,7 @@ import { IdentityPolicyService } from "../../../../application/identity/services
 import { LocalPasswordIdentityAuthenticator } from "../../../../application/identity/services/LocalPasswordIdentityAuthenticator";
 import { IdentitySessionLifecycleService } from "../../../../application/identity/services/IdentitySessionLifecycleService";
 import { IdentityAuthenticatedSessionService } from "../../../../application/identity/services/IdentityAuthenticatedSessionService";
+import { TrustedDeviceSessionTrustService } from "../../../../application/identity/services/TrustedDeviceSessionTrustService";
 import { IdentityAuthBackendApi } from "../IdentityAuthBackendApi";
 import { RegisterLocalAccountUseCase } from "../../../../src/application/identity/use-cases/RegisterLocalAccountUseCase";
 import { LoginLocalAccountUseCase } from "../../../../src/application/identity/use-cases/LoginLocalAccountUseCase";
@@ -62,12 +78,14 @@ class InMemoryIdentityAdapter
     IIdentitySessionTokenMaterialRepository,
     IIdentityClock,
     IIdentityIdGenerator,
-    IIdentitySessionTokenService {
+    IIdentitySessionTokenService,
+    ITrustedDeviceRepository {
   private readonly users = new Map<string, UserIdentity>();
   private readonly providers = new Map<string, AuthProvider>();
   private readonly policies = new Map<string, CredentialPolicy>();
   private readonly credentialMaterial = new Map<string, IdentityCredentialMaterialRecord>();
   private readonly sessions = new Map<string, Session>();
+  private readonly trustedDevices = new Map<string, TrustedDevice>();
   private readonly sessionTokenMaterialBySessionId = new Map<string, IdentitySessionTokenMaterialRecord>();
   private readonly sessionTokenMaterialByHash = new Map<string, IdentitySessionTokenMaterialRecord>();
   private idCounter = 0;
@@ -291,6 +309,112 @@ class InMemoryIdentityAdapter
     this.sessionTokenMaterialByHash.set(record.tokenHash, updated);
     return updated;
   }
+
+  public async createTrustedDevice(device: TrustedDevice): Promise<TrustedDevice> {
+    this.trustedDevices.set(device.id, device);
+    return device;
+  }
+
+  public async getTrustedDeviceById(trustedDeviceId: string): Promise<TrustedDevice | undefined> {
+    return this.trustedDevices.get(trustedDeviceId.trim());
+  }
+
+  public async findTrustedDeviceByFingerprint(
+    query: TrustedDeviceLookupByFingerprintQuery,
+  ): Promise<TrustedDevice | undefined> {
+    return [...this.trustedDevices.values()].find((device) => (
+      device.userIdentityId === query.userIdentityId
+      && (device.workspaceId ?? undefined) === (query.workspaceId ?? undefined)
+      && device.fingerprint.algorithm === query.fingerprint.algorithm
+      && device.fingerprint.value === query.fingerprint.value
+    ));
+  }
+
+  public async listTrustedDevices(
+    query: TrustedDeviceListQuery,
+  ): Promise<ReadonlyArray<TrustedDevice>> {
+    const filtered = [...this.trustedDevices.values()]
+      .filter((device) => device.userIdentityId === query.userIdentityId)
+      .filter((device) => (query.workspaceId ? device.workspaceId === query.workspaceId : true))
+      .filter((device) => (
+        !query.includeStatuses || query.includeStatuses.length === 0 || query.includeStatuses.includes(device.trustStatus)
+      ))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    const offset = Number.isInteger(query.offset) && (query.offset ?? -1) >= 0 ? query.offset as number : 0;
+    const limit = Number.isInteger(query.limit) && (query.limit ?? 0) > 0 ? query.limit as number : filtered.length;
+    return Object.freeze(filtered.slice(offset, offset + limit));
+  }
+
+  public async updateTrustedDevice(device: TrustedDevice): Promise<TrustedDevice> {
+    this.trustedDevices.set(device.id, device);
+    return device;
+  }
+
+  public async revokeTrustedDevice(
+    request: TrustedDeviceRevocationRequest,
+  ): Promise<IdentityOperationResult<IdentityMutationOutcome, "invalid-request" | "invalid-state" | "not-found">> {
+    const trustedDevice = this.trustedDevices.get(request.trustedDeviceId.trim());
+    if (!trustedDevice) {
+      return identityFailure({
+        code: IdentityErrorCodes.notFound,
+        message: "Trusted device was not found.",
+        boundary: "infrastructure",
+        retryable: false,
+      });
+    }
+
+    if (trustedDevice.trustStatus === DeviceTrustStatuses.revoked) {
+      return identityFailure({
+        code: IdentityErrorCodes.invalidState,
+        message: "Trusted device is already revoked.",
+        boundary: "infrastructure",
+        retryable: false,
+      });
+    }
+
+    const revoked = revokeTrustedDevice(trustedDevice, {
+      reason: request.reason,
+      revokedAt: request.revokedAt,
+      revokedByUserIdentityId: request.revokedByUserIdentityId,
+      note: request.note,
+    });
+    this.trustedDevices.set(revoked.id, revoked);
+    return identitySuccess(Object.freeze({ changed: true }));
+  }
+
+  public async provisionTrustedDevice(input: {
+    readonly trustedDeviceId: string;
+    readonly userIdentityId: string;
+    readonly trustStatus?: TrustedDevice["trustStatus"];
+  }): Promise<TrustedDevice> {
+    const now = this.now();
+    const trustStatus = input.trustStatus ?? DeviceTrustStatuses.trusted;
+    const trustedDevice = createTrustedDevice({
+      id: input.trustedDeviceId,
+      userIdentityId: input.userIdentityId,
+      displayName: "Test Trusted Device",
+      fingerprint: createDeviceFingerprint({
+        algorithm: DeviceFingerprintAlgorithms.sha256,
+        value: `fingerprint:${input.trustedDeviceId}`,
+        capturedAt: now,
+      }),
+      pairingMethod: DevicePairingMethods.oneTimeCode,
+      trustStatus,
+      trustMaterialRef: trustStatus === DeviceTrustStatuses.trusted
+        ? createDeviceTrustMaterialRef({
+            materialId: `material:${input.trustedDeviceId}`,
+            kind: DeviceTrustMaterialKinds.sessionSigningKey,
+            issuedAt: now,
+            expiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+          })
+        : undefined,
+      registeredAt: new Date(now.getTime() - 60_000),
+      pairedAt: trustStatus === DeviceTrustStatuses.trusted ? now : undefined,
+      updatedAt: now,
+    });
+    this.trustedDevices.set(trustedDevice.id, trustedDevice);
+    return trustedDevice;
+  }
 }
 
 class StubPasswordCredentialService implements ILocalPasswordCredentialService {
@@ -313,6 +437,11 @@ class StubPasswordCredentialService implements ILocalPasswordCredentialService {
 export interface IdentityAuthTestHarness {
   readonly backendApi: IdentityAuthBackendApi;
   readonly adapter: InMemoryIdentityAdapter;
+  provisionTrustedDevice(input: {
+    readonly trustedDeviceId: string;
+    readonly userIdentityId: string;
+    readonly trustStatus?: TrustedDevice["trustStatus"];
+  }): Promise<TrustedDevice>;
 }
 
 export async function createIdentityAuthTestHarness(
@@ -344,12 +473,20 @@ export async function createIdentityAuthTestHarness(
     clock: adapter,
     idGenerator: adapter,
   });
+  const sessionTrustService = new TrustedDeviceSessionTrustService({
+    trustedDeviceRepository: adapter,
+    policies: {
+      desktop: "allow-pairing",
+      thinClient: "allow-untrusted",
+    },
+  });
   const authenticatedSessionService = new IdentityAuthenticatedSessionService({
     lifecycleService: sessionLifecycleService,
     sessionRepository: adapter,
     tokenMaterialRepository: adapter,
     tokenService: adapter,
     clock: adapter,
+    sessionTrustEvaluator: sessionTrustService,
   });
 
   const backendApi = new IdentityAuthBackendApi({
@@ -402,11 +539,16 @@ export async function createIdentityAuthTestHarness(
     }),
     identityLookupRepository: adapter,
     authenticatedSessionService,
+    sessionTrustService,
     observability: options.observability,
     featurePolicies: options.featurePolicies,
   });
 
-  return Object.freeze({ backendApi, adapter });
+  return Object.freeze({
+    backendApi,
+    adapter,
+    provisionTrustedDevice: async (input) => adapter.provisionTrustedDevice(input),
+  });
 }
 
 export { InMemoryIdentityAdapter };

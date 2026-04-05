@@ -59,6 +59,11 @@ import {
 import { IdentityAuthObservability, type IdentityAuthObservabilityOptions } from "./IdentityAuthObservability";
 import { IdentityAuthenticatedSessionService } from "../../../application/identity/services/IdentityAuthenticatedSessionService";
 import {
+  IdentitySessionTrustRequirements,
+  type IIdentitySessionTrustService,
+  type IdentitySessionTrustRequirement,
+} from "../../../application/identity/ports/IIdentitySessionTrustService";
+import {
   serializeChangeLocalPasswordCredentialResponse,
   serializeGetIdentityAdminAccountStatusResponse,
   serializeListIdentityAdminAccountsResponse,
@@ -81,6 +86,7 @@ interface IdentityAuthBackendApiDependencies {
   readonly setLocalIdentityAccountStatusUseCase: SetLocalIdentityAccountStatusUseCase;
   readonly identityLookupRepository: IIdentityLookupRepository;
   readonly authenticatedSessionService: IdentityAuthenticatedSessionService;
+  readonly sessionTrustService?: IIdentitySessionTrustService;
   readonly observability?: IdentityAuthObservabilityOptions;
   readonly featurePolicies?: {
     readonly allowLocalRegistration?: boolean;
@@ -160,6 +166,7 @@ export class IdentityAuthBackendApi {
   public async loginLocalAccount(
     request: LoginLocalIdentityApiRequest,
   ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
+    const accessChannel = normalizeAccessChannel(request.accessChannel);
     const result = await this.dependencies.loginLocalAccountUseCase.execute({
       providerId: request.providerId,
       providerSubject: request.providerSubject,
@@ -179,36 +186,48 @@ export class IdentityAuthBackendApi {
       return response;
     }
 
+    const issuanceTrust = await this.resolveSessionIssuanceTrust({
+      request,
+      userIdentityId: result.value.userIdentityId,
+      accessChannel,
+      evaluatedAt: result.value.authenticatedAt,
+    });
+    if (!issuanceTrust.ok) {
+      return issuanceTrust.response;
+    }
+
     const issueSessionResult = await this.dependencies.authenticatedSessionService.issueAuthenticatedSession({
       userIdentityId: result.value.userIdentityId,
       providerId: result.value.providerId,
       providerSubject: result.value.providerSubject,
-      accessChannel: normalizeAccessChannel(request.accessChannel),
-      client: request.client ? {
-        userAgent: request.client.userAgent,
-        ipAddress: request.client.ipAddress,
-        deviceId: request.client.deviceId,
-        deviceTrust: request.client.deviceTrustContext
-          ? Object.freeze({
-              trustedDeviceId: request.client.deviceTrustContext.trustedDeviceId,
-              issuedOnTrustedDevice: request.client.deviceTrustContext.issuedOnTrustedDevice,
-              sessionAssuranceLevel: request.client.deviceTrustContext.sessionAssuranceLevel,
-              snapshot: request.client.deviceTrustContext.trustStateSnapshot
-                ? Object.freeze({
-                    state: request.client.deviceTrustContext.trustStateSnapshot.state,
-                    evaluatedAt: request.client.deviceTrustContext.trustStateSnapshot.evaluatedAt,
-                  })
-                : undefined,
-              invalidationReasons: request.client.deviceTrustContext.invalidationReasons,
-              trustedDeviceBindingId: request.client.deviceTrustContext.trustedDeviceBindingId,
-              trustMarker: request.client.deviceTrustContext.trustMarker,
-            })
-          : undefined,
-        trustedDeviceBindingId: request.client.trustedDeviceBindingId,
-        trustMarker: request.client.trustMarker,
-      } : undefined,
+      accessChannel,
+      client: {
+        userAgent: request.client?.userAgent,
+        ipAddress: request.client?.ipAddress,
+        deviceId: request.client?.deviceId,
+        deviceTrust: issuanceTrust.sessionClientTrust?.deviceTrust,
+        trustedDeviceBindingId: issuanceTrust.sessionClientTrust?.trustedDeviceBindingId,
+        trustMarker: issuanceTrust.sessionClientTrust?.trustMarker,
+      },
     });
     if (!issueSessionResult.ok) {
+      if (issueSessionResult.error.code === IdentityErrorCodes.invalidSessionState) {
+        const response = Object.freeze({
+          ok: false,
+          error: {
+            code: IdentityAuthApiErrorCodes.authenticationFailed,
+            message: "Session trust requirements were not satisfied.",
+          },
+        });
+        await this.observability.recordApiOutcome({
+          flow: "local-login",
+          request,
+          response,
+          errorCode: issueSessionResult.error.code,
+        });
+        return response;
+      }
+
       const response = Object.freeze({
         ok: false,
         error: {
@@ -236,6 +255,117 @@ export class IdentityAuthBackendApi {
       response,
     });
     return response;
+  }
+
+  private async resolveSessionIssuanceTrust(input: {
+    readonly request: LoginLocalIdentityApiRequest;
+    readonly userIdentityId: string;
+    readonly accessChannel: IdentitySessionAccessChannel;
+    readonly evaluatedAt: string;
+  }): Promise<
+    | {
+      readonly ok: true;
+      readonly sessionClientTrust?: {
+        readonly deviceTrust?: {
+          readonly trustedDeviceId?: string;
+          readonly issuedOnTrustedDevice?: boolean;
+          readonly sessionAssuranceLevel?: "authenticated-untrusted" | "authenticated-trusted" | "authenticated-restricted";
+          readonly snapshot?: {
+            readonly state: "unknown" | "untrusted" | "trusted" | "pending-pairing" | "revoked" | "expired";
+            readonly evaluatedAt: string;
+          };
+          readonly invalidationReasons?: ReadonlyArray<"trusted-device-revoked" | "trusted-device-trust-lost" | "trusted-device-expired" | "trusted-device-mismatch">;
+          readonly trustedDeviceBindingId?: string;
+          readonly trustMarker?: string;
+        };
+        readonly trustedDeviceBindingId?: string;
+        readonly trustMarker?: string;
+      };
+    }
+    | {
+      readonly ok: false;
+      readonly response: IdentityAuthApiResponse<LoginLocalIdentityApiResponse>;
+    }
+  > {
+    if (!this.dependencies.sessionTrustService) {
+      return {
+        ok: true,
+        sessionClientTrust: input.request.client
+          ? Object.freeze({
+              deviceTrust: input.request.client.deviceTrustContext
+                ? Object.freeze({
+                    trustedDeviceId: input.request.client.deviceTrustContext.trustedDeviceId,
+                    issuedOnTrustedDevice: input.request.client.deviceTrustContext.issuedOnTrustedDevice,
+                    sessionAssuranceLevel: input.request.client.deviceTrustContext.sessionAssuranceLevel,
+                    snapshot: input.request.client.deviceTrustContext.trustStateSnapshot
+                      ? Object.freeze({
+                          state: input.request.client.deviceTrustContext.trustStateSnapshot.state,
+                          evaluatedAt: input.request.client.deviceTrustContext.trustStateSnapshot.evaluatedAt,
+                        })
+                      : undefined,
+                    invalidationReasons: input.request.client.deviceTrustContext.invalidationReasons,
+                    trustedDeviceBindingId: input.request.client.deviceTrustContext.trustedDeviceBindingId,
+                    trustMarker: input.request.client.deviceTrustContext.trustMarker,
+                  })
+                : undefined,
+              trustedDeviceBindingId: input.request.client.trustedDeviceBindingId,
+              trustMarker: input.request.client.trustMarker,
+            })
+          : undefined,
+      };
+    }
+
+    const issuanceTrust = await this.dependencies.sessionTrustService.resolveSessionIssuanceTrust({
+      userIdentityId: input.userIdentityId,
+      accessChannel: input.accessChannel,
+      requestedTrustRequirement: normalizeSessionTrustRequirement(input.request.sessionTrustRequirement),
+      client: input.request.client ? Object.freeze({
+        userAgent: input.request.client.userAgent,
+        ipAddress: input.request.client.ipAddress,
+        deviceId: input.request.client.deviceId,
+        deviceTrust: input.request.client.deviceTrustContext
+          ? Object.freeze({
+              trustedDeviceId: input.request.client.deviceTrustContext.trustedDeviceId,
+              issuedOnTrustedDevice: input.request.client.deviceTrustContext.issuedOnTrustedDevice,
+              sessionAssuranceLevel: input.request.client.deviceTrustContext.sessionAssuranceLevel,
+              snapshot: input.request.client.deviceTrustContext.trustStateSnapshot
+                ? Object.freeze({
+                    state: input.request.client.deviceTrustContext.trustStateSnapshot.state,
+                    evaluatedAt: input.request.client.deviceTrustContext.trustStateSnapshot.evaluatedAt,
+                  })
+                : undefined,
+              invalidationReasons: input.request.client.deviceTrustContext.invalidationReasons,
+              trustedDeviceBindingId: input.request.client.deviceTrustContext.trustedDeviceBindingId,
+              trustMarker: input.request.client.deviceTrustContext.trustMarker,
+            })
+          : undefined,
+        trustedDeviceBindingId: input.request.client.trustedDeviceBindingId,
+        trustMarker: input.request.client.trustMarker,
+      }) : undefined,
+      evaluatedAt: input.evaluatedAt,
+    });
+
+    if (!issuanceTrust.allowed) {
+      return {
+        ok: false,
+        response: Object.freeze({
+          ok: false,
+          error: {
+            code: IdentityAuthApiErrorCodes.authenticationFailed,
+            message: issuanceTrust.reason,
+          },
+        }),
+      };
+    }
+
+    return {
+      ok: true,
+      sessionClientTrust: Object.freeze({
+        deviceTrust: issuanceTrust.deviceTrustContext,
+        trustedDeviceBindingId: issuanceTrust.trustedDeviceBindingId,
+        trustMarker: issuanceTrust.trustMarker,
+      }),
+    };
   }
 
   public async changeLocalPasswordCredential(
@@ -709,4 +839,17 @@ export class IdentityAuthBackendApi {
 
 function normalizeAccessChannel(value?: "desktop" | "thin-client"): IdentitySessionAccessChannel {
   return value ?? "thin-client";
+}
+
+function normalizeSessionTrustRequirement(
+  value: LoginLocalIdentityApiRequest["sessionTrustRequirement"],
+): IdentitySessionTrustRequirement | undefined {
+  switch (value) {
+    case IdentitySessionTrustRequirements.allowUntrusted:
+    case IdentitySessionTrustRequirements.allowPairing:
+    case IdentitySessionTrustRequirements.requireTrusted:
+      return value;
+    default:
+      return undefined;
+  }
 }

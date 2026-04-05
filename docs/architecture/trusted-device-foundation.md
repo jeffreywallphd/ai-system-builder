@@ -10,6 +10,8 @@ Scope in the initial stories was intentionally inner-layer only:
 
 Story 2.1.3 extends this foundation with infrastructure persistence adapters and schema migrations. API routes and UI pairing flows remain out of scope here.
 
+Story 2.2.3 adds trusted-device-backed session issuance/validation enforcement using this foundation (`TrustedDeviceSessionTrustService`) so runtime session trust is bound to current trusted-device state.
+
 ## Implemented canonical artifacts
 
 ### Domain

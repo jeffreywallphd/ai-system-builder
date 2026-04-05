@@ -56,6 +56,13 @@ describe("IdentityAuthBackendApi", () => {
     expect(registered.data?.userIdentityId).toBeDefined();
     expect(registered.data?.providerId).toBe("provider:local-password");
     expect(registered.data?.providerSubject).toBe("valid.user");
+    if (!registered.data?.userIdentityId) {
+      throw new Error("Expected registered user id.");
+    }
+    await harness.provisionTrustedDevice({
+      trustedDeviceId: "trusted-device:alpha",
+      userIdentityId: registered.data.userIdentityId,
+    });
 
     const loggedIn = await harness.backendApi.loginLocalAccount({
       providerSubject: "valid.user",
@@ -129,6 +136,32 @@ describe("IdentityAuthBackendApi", () => {
     expect(missing.error?.code).toBe("authentication-failed");
   });
 
+  it("denies login when trusted-device issuance is required but trust binding is missing", async () => {
+    const harness = await createIdentityAuthTestHarness();
+
+    const register = await harness.backendApi.registerLocalAccount({
+      username: "trusted.required.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(register.ok).toBeTrue();
+
+    const denied = await harness.backendApi.loginLocalAccount({
+      providerSubject: "trusted.required.user",
+      sessionTrustRequirement: "require-trusted",
+      client: {
+        trustedDeviceBindingId: "trusted-device:missing",
+      },
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+
+    expect(denied.ok).toBeFalse();
+    expect(denied.error?.code).toBe("authentication-failed");
+  });
+
   it("resolves authenticated principal context and rejects expired or revoked sessions", async () => {
     const harness = await createIdentityAuthTestHarness();
 
@@ -139,6 +172,13 @@ describe("IdentityAuthBackendApi", () => {
       },
     });
     expect(register.ok).toBeTrue();
+    if (!register.ok || !register.data?.userIdentityId) {
+      throw new Error("Expected register payload.");
+    }
+    await harness.provisionTrustedDevice({
+      trustedDeviceId: "trusted-device:resolve",
+      userIdentityId: register.data.userIdentityId,
+    });
 
     const login = await harness.backendApi.loginLocalAccount({
       providerSubject: "session.validation.user",
@@ -212,6 +252,53 @@ describe("IdentityAuthBackendApi", () => {
     });
     expect(revoked.ok).toBeFalse();
     expect(revoked.error?.code).toBe("authentication-failed");
+  });
+
+  it("invalidates trusted-bound sessions when the trusted device is revoked", async () => {
+    const harness = await createIdentityAuthTestHarness();
+
+    const register = await harness.backendApi.registerLocalAccount({
+      username: "trusted.revoked.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(register.ok).toBeTrue();
+    if (!register.ok || !register.data?.userIdentityId) {
+      throw new Error("Expected register payload.");
+    }
+
+    await harness.provisionTrustedDevice({
+      trustedDeviceId: "trusted-device:revoked",
+      userIdentityId: register.data.userIdentityId,
+    });
+
+    const login = await harness.backendApi.loginLocalAccount({
+      providerSubject: "trusted.revoked.user",
+      sessionTrustRequirement: "require-trusted",
+      client: {
+        trustedDeviceBindingId: "trusted-device:revoked",
+      },
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(login.ok).toBeTrue();
+    if (!login.ok || !login.data) {
+      throw new Error("Expected login payload.");
+    }
+
+    const revokeResult = await harness.adapter.revokeTrustedDevice({
+      trustedDeviceId: "trusted-device:revoked",
+      reason: "admin-action",
+    });
+    expect(revokeResult.ok).toBeTrue();
+
+    const resolved = await harness.backendApi.resolveAuthenticatedSession({
+      sessionToken: login.data.sessionToken,
+    });
+    expect(resolved.ok).toBeFalse();
+    expect(resolved.error?.code).toBe("authentication-failed");
   });
 
   it("supports explicit logout and authenticated session revocation flows", async () => {
