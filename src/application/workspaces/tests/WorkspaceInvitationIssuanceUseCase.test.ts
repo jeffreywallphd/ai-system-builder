@@ -33,6 +33,7 @@ import {
   type WorkspaceInvitationTokenIssuer,
   type WorkspaceInvitationTokenReference,
 } from "../use-cases/IssueWorkspaceInvitationUseCase";
+import { WorkspaceAdministrationAuditEventTypes, type WorkspaceAdministrationAuditEvent } from "../use-cases/WorkspaceAdministrationAudit";
 
 class InMemoryWorkspaceInvitationIssuanceAdapter
   implements IWorkspaceInvitationRepository, IWorkspaceAuthorizationReadRepository, IWorkspaceTransactionManager {
@@ -205,6 +206,41 @@ function seedWorkspace(adapter: InMemoryWorkspaceInvitationIssuanceAdapter): Wor
 }
 
 describe("IssueWorkspaceInvitationUseCase", () => {
+  it("emits invitation issuance audit hooks after successful issuance", async () => {
+    const adapter = new InMemoryWorkspaceInvitationIssuanceAdapter();
+    const workspace = seedWorkspace(adapter);
+    const events: WorkspaceAdministrationAuditEvent[] = [];
+
+    const useCase = new IssueWorkspaceInvitationUseCase({
+      invitationRepository: adapter,
+      authorizationReadRepository: adapter,
+      transactionManager: adapter,
+      idGenerator: new SequenceInvitationIdGenerator(),
+      clock: new FixedInvitationClock("2026-04-05T12:00:00.000Z"),
+      tokenIssuer: new StubInvitationTokenIssuer({
+        token: "tok_live_audit",
+        tokenHash: "aa7f44c8c9c9b66a7ad6bd9d8674ef50d5d30f5d5fb8bf6f6f17ac53fb16d7e2",
+        tokenHint: "audit001",
+      }),
+      auditSink: {
+        async recordWorkspaceAdministrationEvent(event: WorkspaceAdministrationAuditEvent): Promise<void> {
+          events.push(event);
+        },
+      },
+    });
+
+    const result = await useCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:owner",
+      invitedEmail: "audit@example.com",
+      invitedRoles: [WorkspaceRoles.viewer],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.type).toBe(WorkspaceAdministrationAuditEventTypes.invitationIssued);
+  });
+
   it("issues invitation records for authorized actors with hashed token references", async () => {
     const adapter = new InMemoryWorkspaceInvitationIssuanceAdapter();
     const workspace = seedWorkspace(adapter);

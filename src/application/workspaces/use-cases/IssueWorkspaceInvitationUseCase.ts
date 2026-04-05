@@ -15,6 +15,11 @@ import {
   WorkspaceIdNamespaces,
   type WorkspaceIdNamespace,
 } from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
+import {
+  WorkspaceAdministrationAuditEventTypes,
+  publishWorkspaceAdministrationAuditEventBestEffort,
+  type WorkspaceAdministrationAuditSink,
+} from "./WorkspaceAdministrationAudit";
 
 export const WorkspaceInvitationIssuanceErrorCodes = Object.freeze({
   invalidRequest: "workspace-invitation-issue-invalid-request",
@@ -101,6 +106,7 @@ interface IssueWorkspaceInvitationUseCaseDependencies {
   readonly clock: WorkspaceInvitationIssuanceClock;
   readonly defaultInvitationTtlMs?: number;
   readonly maxInvitationTtlMs?: number;
+  readonly auditSink?: WorkspaceAdministrationAuditSink;
 }
 
 export class IssueWorkspaceInvitationUseCase {
@@ -271,6 +277,20 @@ export class IssueWorkspaceInvitationUseCase {
         `Workspace invitation issuance failed: ${error instanceof Error ? error.message : "unknown persistence failure."}`,
       );
     }
+
+    await publishWorkspaceAdministrationAuditEventBestEffort(this.dependencies.auditSink, {
+      type: WorkspaceAdministrationAuditEventTypes.invitationIssued,
+      workspaceId,
+      actorUserIdentityId,
+      occurredAt: nowIso,
+      details: Object.freeze({
+        invitationId: invitation.id,
+        invitedEmail: invitation.invitedEmail,
+        invitedRoles: invitation.invitedRoles,
+        expiresAt: invitation.expiresAt,
+        targetUserIdentityIdHint: invitation.targetUserIdentityIdHint,
+      }),
+    });
 
     return {
       ok: true,

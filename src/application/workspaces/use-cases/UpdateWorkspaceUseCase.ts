@@ -8,6 +8,11 @@ import {
   type Workspace,
 } from "../../../domain/workspaces/WorkspaceDomain";
 import type { WorkspaceVisibility } from "../../../shared/workspaces/WorkspaceOwnership";
+import {
+  WorkspaceAdministrationAuditEventTypes,
+  publishWorkspaceAdministrationAuditEventBestEffort,
+  type WorkspaceAdministrationAuditSink,
+} from "./WorkspaceAdministrationAudit";
 
 export const WorkspaceUpdateErrorCodes = Object.freeze({
   invalidRequest: "workspace-update-invalid-request",
@@ -56,6 +61,7 @@ interface UpdateWorkspaceUseCaseDependencies {
   readonly workspaceRepository: IWorkspaceRepository;
   readonly authorizationReadRepository: IWorkspaceAuthorizationReadRepository;
   readonly clock: WorkspaceUpdateClock;
+  readonly auditSink?: WorkspaceAdministrationAuditSink;
 }
 
 export class UpdateWorkspaceUseCase {
@@ -138,6 +144,18 @@ export class UpdateWorkspaceUseCase {
         `Workspace update failed: ${error instanceof Error ? error.message : "unknown persistence failure."}`,
       );
     }
+
+    await publishWorkspaceAdministrationAuditEventBestEffort(this.dependencies.auditSink, {
+      type: WorkspaceAdministrationAuditEventTypes.workspaceUpdated,
+      workspaceId,
+      actorUserIdentityId,
+      occurredAt: this.dependencies.clock.now().toISOString(),
+      details: Object.freeze({
+        displayNameChanged: updated.displayName !== snapshot.workspace.displayName,
+        descriptionChanged: updated.description !== snapshot.workspace.description,
+        visibilityChanged: updated.ownership.visibility !== snapshot.workspace.ownership.visibility,
+      }),
+    });
 
     return {
       ok: true,

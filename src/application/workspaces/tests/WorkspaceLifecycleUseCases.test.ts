@@ -29,6 +29,7 @@ import {
   WorkspaceUpdateErrorCodes,
   type WorkspaceUpdateClock,
 } from "../use-cases/UpdateWorkspaceUseCase";
+import { WorkspaceAdministrationAuditEventTypes, type WorkspaceAdministrationAuditEvent } from "../use-cases/WorkspaceAdministrationAudit";
 
 class InMemoryWorkspaceLifecycleAdapter
   implements IWorkspaceRepository, IWorkspaceAuthorizationReadRepository {
@@ -136,6 +137,63 @@ function seedWorkspaceWithMember(
 }
 
 describe("Workspace lifecycle use cases", () => {
+  it("emits workspace administration audit hooks for update and lifecycle transitions", async () => {
+    const adapter = new InMemoryWorkspaceLifecycleAdapter();
+    const workspace = createWorkspace({
+      id: "workspace:audit",
+      slug: "team-audit",
+      displayName: "Team Audit",
+      ownerUserId: "user:owner",
+      createdBy: "user:owner",
+      status: WorkspaceStatuses.active,
+      now: new Date("2026-04-05T11:00:00.000Z"),
+    });
+    seedWorkspaceWithMember(adapter, {
+      workspace,
+      userIdentityId: "user:owner",
+      role: WorkspaceRoles.owner,
+    });
+
+    const events: WorkspaceAdministrationAuditEvent[] = [];
+    const auditSink = {
+      async recordWorkspaceAdministrationEvent(event: WorkspaceAdministrationAuditEvent): Promise<void> {
+        events.push(event);
+      },
+    };
+
+    const updateUseCase = new UpdateWorkspaceUseCase({
+      workspaceRepository: adapter,
+      authorizationReadRepository: adapter,
+      clock: new FixedWorkspaceLifecycleClock("2026-04-05T13:00:00.000Z"),
+      auditSink,
+    });
+    const lifecycleUseCase = new TransitionWorkspaceLifecycleUseCase({
+      workspaceRepository: adapter,
+      authorizationReadRepository: adapter,
+      clock: new FixedWorkspaceLifecycleClock("2026-04-05T13:05:00.000Z"),
+      auditSink,
+    });
+
+    const updated = await updateUseCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:owner",
+      displayName: "Team Audit Updated",
+    });
+    expect(updated.ok).toBe(true);
+
+    const archived = await lifecycleUseCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:owner",
+      action: WorkspaceLifecycleActions.archive,
+    });
+    expect(archived.ok).toBe(true);
+
+    expect(events.map((event) => event.type)).toEqual([
+      WorkspaceAdministrationAuditEventTypes.workspaceUpdated,
+      WorkspaceAdministrationAuditEventTypes.workspaceLifecycleTransitioned,
+    ]);
+  });
+
   it("updates workspace metadata for active admins and preserves protected fields", async () => {
     const adapter = new InMemoryWorkspaceLifecycleAdapter();
     const workspace = createWorkspace({

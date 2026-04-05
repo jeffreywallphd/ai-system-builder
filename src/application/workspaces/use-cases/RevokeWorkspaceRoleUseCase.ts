@@ -16,6 +16,11 @@ import {
   type WorkspaceRoleAdministrationAuditContext,
   type WorkspaceRoleAdministrationClock,
 } from "./WorkspaceRoleAdministrationContext";
+import {
+  WorkspaceAdministrationAuditEventTypes,
+  publishWorkspaceAdministrationAuditEventBestEffort,
+  type WorkspaceAdministrationAuditSink,
+} from "./WorkspaceAdministrationAudit";
 
 export const WorkspaceRoleRevocationErrorCodes = Object.freeze({
   invalidRequest: "workspace-role-revocation-invalid-request",
@@ -64,6 +69,7 @@ interface RevokeWorkspaceRoleUseCaseDependencies {
   readonly authorizationReadRepository: IWorkspaceAuthorizationReadRepository;
   readonly transactionManager?: IWorkspaceTransactionManager;
   readonly clock: WorkspaceRoleAdministrationClock;
+  readonly auditSink?: WorkspaceAdministrationAuditSink;
 }
 
 export class RevokeWorkspaceRoleUseCase {
@@ -201,6 +207,19 @@ export class RevokeWorkspaceRoleUseCase {
         `Workspace role revocation failed: ${error instanceof Error ? error.message : "unknown persistence failure."}`,
       );
     }
+
+    await publishWorkspaceAdministrationAuditEventBestEffort(this.dependencies.auditSink, {
+      type: WorkspaceAdministrationAuditEventTypes.roleRevoked,
+      workspaceId,
+      actorUserIdentityId,
+      occurredAt: nowIso,
+      details: Object.freeze({
+        targetUserIdentityId,
+        role,
+        roleAssignmentId: revokedRoleAssignment.id,
+        audit,
+      }),
+    });
 
     return {
       ok: true,

@@ -15,6 +15,11 @@ import {
   type WorkspaceRole,
   type WorkspaceRoleAssignment,
 } from "../../../domain/workspaces/WorkspaceDomain";
+import {
+  WorkspaceAdministrationAuditEventTypes,
+  publishWorkspaceAdministrationAuditEventBestEffort,
+  type WorkspaceAdministrationAuditSink,
+} from "./WorkspaceAdministrationAudit";
 
 export const WorkspaceMembershipStatusChangeErrorCodes = Object.freeze({
   invalidRequest: "workspace-membership-status-invalid-request",
@@ -39,6 +44,7 @@ export interface ChangeWorkspaceMembershipStatusUseCaseInput {
   readonly actorUserIdentityId: string;
   readonly targetUserIdentityId: string;
   readonly status: WorkspaceMembershipStatus;
+  readonly mutationKind?: "status-change" | "remove";
 }
 
 export interface ChangeWorkspaceMembershipStatusUseCaseResult {
@@ -67,6 +73,7 @@ interface ChangeWorkspaceMembershipStatusUseCaseDependencies {
   readonly authorizationReadRepository: IWorkspaceAuthorizationReadRepository;
   readonly transactionManager?: IWorkspaceTransactionManager;
   readonly clock: WorkspaceMembershipStatusChangeClock;
+  readonly auditSink?: WorkspaceAdministrationAuditSink;
 }
 
 export class ChangeWorkspaceMembershipStatusUseCase {
@@ -249,6 +256,21 @@ export class ChangeWorkspaceMembershipStatusUseCase {
         `Membership status change failed: ${error instanceof Error ? error.message : "unknown persistence failure."}`,
       );
     }
+
+    await publishWorkspaceAdministrationAuditEventBestEffort(this.dependencies.auditSink, {
+      type: WorkspaceAdministrationAuditEventTypes.membershipStatusChanged,
+      workspaceId,
+      actorUserIdentityId,
+      occurredAt: nowIso,
+      details: Object.freeze({
+        mutationKind: input.mutationKind ?? "status-change",
+        targetUserIdentityId,
+        membershipId: updatedMembership.id,
+        previousStatus: membership.status,
+        status: updatedMembership.status,
+        revokedRoleAssignmentIds: Object.freeze(updatedRoleAssignments.map((assignment) => assignment.id)),
+      }),
+    });
 
     return {
       ok: true,

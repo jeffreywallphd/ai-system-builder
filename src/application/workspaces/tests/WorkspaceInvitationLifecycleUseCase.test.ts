@@ -41,6 +41,7 @@ import {
   type WorkspaceInvitationLifecycleClock,
   type WorkspaceInvitationLifecycleIdGenerator,
 } from "../use-cases/ResolveWorkspaceInvitationLifecycleUseCase";
+import { WorkspaceAdministrationAuditEventTypes, type WorkspaceAdministrationAuditEvent } from "../use-cases/WorkspaceAdministrationAudit";
 
 class InMemoryWorkspaceInvitationLifecycleAdapter
   implements
@@ -348,6 +349,44 @@ function seedPendingInvitation(
 }
 
 describe("ResolveWorkspaceInvitationLifecycleUseCase", () => {
+  it("emits invitation acceptance audit hooks on successful acceptance", async () => {
+    const adapter = new InMemoryWorkspaceInvitationLifecycleAdapter();
+    seedWorkspace(adapter);
+    seedPendingInvitation(adapter, {
+      token: "tok_accept_audit_123",
+      targetUserIdentityIdHint: "user:member",
+    });
+    const events: WorkspaceAdministrationAuditEvent[] = [];
+
+    const useCase = new ResolveWorkspaceInvitationLifecycleUseCase({
+      workspaceRepository: adapter,
+      invitationRepository: adapter,
+      membershipRepository: adapter,
+      roleAssignmentRepository: adapter,
+      authorizationReadRepository: adapter,
+      transactionManager: adapter,
+      idGenerator: new SequenceWorkspaceInvitationLifecycleIdGenerator(),
+      clock: new FixedWorkspaceInvitationLifecycleClock("2026-04-05T12:00:00.000Z"),
+      auditSink: {
+        async recordWorkspaceAdministrationEvent(event: WorkspaceAdministrationAuditEvent): Promise<void> {
+          events.push(event);
+        },
+      },
+    });
+
+    const result = await useCase.execute({
+      action: WorkspaceInvitationLifecycleActions.accept,
+      workspaceId: "workspace:alpha",
+      actorUserIdentityId: "user:member",
+      actorEmail: "member@example.com",
+      invitationToken: "tok_accept_audit_123",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.type).toBe(WorkspaceAdministrationAuditEventTypes.invitationAccepted);
+  });
+
   it("accepts a valid invitation token and creates an active membership with projected roles", async () => {
     const adapter = new InMemoryWorkspaceInvitationLifecycleAdapter();
     seedWorkspace(adapter);

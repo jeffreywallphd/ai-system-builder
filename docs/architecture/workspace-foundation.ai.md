@@ -27,6 +27,7 @@ Implementation-truth baseline for workspace tenancy domain + persistence contrac
 - `src/application/workspaces/use-cases/UpdateWorkspaceUseCase.ts`
 - `src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase.ts`
 - `src/application/workspaces/use-cases/WorkspaceAdministrationQueryService.ts`
+- `src/application/workspaces/use-cases/WorkspaceAdministrationAudit.ts`
 - `src/application/workspaces/use-cases/IssueWorkspaceInvitationUseCase.ts`
 - `src/application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase.ts`
 - `src/application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase.ts`
@@ -388,4 +389,27 @@ Protected-resource composition pattern is canonical:
 - Added coverage for workspace-scoped assignment and persistence round-trip:
   - `application/workflow-persistence/tests/WorkflowPersistenceUseCases.test.ts`
   - `application/workflow-persistence/tests/SqliteWorkflowPersistenceRepository.test.ts`
+
+## Story 3.4.5 workspace administration audit seams
+
+- Added a shared application-layer audit hook seam in:
+  - `src/application/workspaces/use-cases/WorkspaceAdministrationAudit.ts`
+- The seam is explicit and best-effort:
+  - `WorkspaceAdministrationAuditSink.recordWorkspaceAdministrationEvent(...)`
+  - `publishWorkspaceAdministrationAuditEventBestEffort(...)`
+- Workspace administration mutation use cases now emit post-write events for:
+  - workspace create/update/lifecycle,
+  - membership add/status/remove,
+  - role assign/reassign/revoke,
+  - invitation issue + acceptance.
+- Event emission is at application boundaries (not domain aggregates), so infrastructure can bind adapters (logs/queue/audit stream) later without changing domain invariants.
+- Focused tests now verify hook invocation across core flows:
+  - `src/application/workspaces/tests/CreateWorkspaceUseCase.test.ts`
+  - `src/application/workspaces/tests/WorkspaceLifecycleUseCases.test.ts`
+  - `src/application/workspaces/tests/WorkspaceMembershipAdministrationUseCases.test.ts`
+  - `src/application/workspaces/tests/WorkspaceInvitationIssuanceUseCase.test.ts`
+  - `src/application/workspaces/tests/WorkspaceInvitationLifecycleUseCase.test.ts`
+- See:
+  - `docs/architecture/workspace-administration-audit-hooks.md`
+  - `docs/workspace-administration-operations.md`
 

@@ -23,6 +23,7 @@ import {
   type WorkspaceCreationClock,
   type WorkspaceCreationIdGenerator,
 } from "../use-cases/CreateWorkspaceUseCase";
+import { WorkspaceAdministrationAuditEventTypes } from "../use-cases/WorkspaceAdministrationAudit";
 import type {
   WorkspaceIdNamespace,
   WorkspaceMembershipListQuery,
@@ -173,7 +174,7 @@ class StubWorkspaceCreationClock implements WorkspaceCreationClock {
 describe("CreateWorkspaceUseCase", () => {
   it("creates a workspace with active creator membership and owner role assignment", async () => {
     const adapter = new InMemoryWorkspaceInitializationAdapter();
-    let audited = false;
+    let auditedEventType: string | undefined;
     const useCase = new CreateWorkspaceUseCase({
       workspaceRepository: adapter,
       membershipRepository: adapter,
@@ -182,8 +183,8 @@ describe("CreateWorkspaceUseCase", () => {
       idGenerator: new StubWorkspaceCreationIdGenerator(),
       clock: new StubWorkspaceCreationClock(),
       auditSink: {
-        async recordWorkspaceCreated() {
-          audited = true;
+        async recordWorkspaceAdministrationEvent(event) {
+          auditedEventType = event.type;
         },
       } satisfies WorkspaceCreationAuditSink,
     });
@@ -209,7 +210,7 @@ describe("CreateWorkspaceUseCase", () => {
     expect(result.value.creatorMembership.status).toBe(WorkspaceMembershipStatuses.active);
     expect(result.value.creatorMembership.joinedAt).toBe("2026-04-05T16:00:00.000Z");
     expect(result.value.creatorRoleAssignment.role).toBe(WorkspaceRoles.owner);
-    expect(audited).toBe(true);
+    expect(auditedEventType).toBe(WorkspaceAdministrationAuditEventTypes.workspaceCreated);
 
     expect(adapter.workspaces.size).toBe(1);
     expect(adapter.memberships.size).toBe(1);
