@@ -132,6 +132,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For session lifecycle, policy, guard, revocation, and client integration behavior, read [`identity-session-architecture.md`](./identity-session-architecture.md).
 - For trusted-device domain lifecycle, trust-state transitions, and identity/workspace trust contracts, read [`trusted-device-foundation.md`](./trusted-device-foundation.md).
 - For node identity/trust lifecycle vocabulary, capability-profile contracts, and revocation/last-seen domain invariants, read [`node-trust-foundation.md`](./node-trust-foundation.md).
+- For node trust persistence DTO/repository/schema contracts and indexing-oriented query patterns, read [`node-trust-persistence-contracts.md`](./node-trust-persistence-contracts.md).
 - For workspace tenancy domain aggregates, membership/role/invitation invariants, and reusable ownership metadata patterns, read [`workspace-foundation.md`](./workspace-foundation.md).
 - For authorization domain contracts covering RBAC, visibility, sharing, actor/resource policy context, and policy-decision models, read [`authorization-foundation.md`](./authorization-foundation.md).
 - For canonical authorization permission naming, resource/action matrix definitions, and permission lookup usage, read [`authorization-permission-catalog.md`](./authorization-permission-catalog.md).
