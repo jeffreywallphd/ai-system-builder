@@ -237,6 +237,36 @@ Application enforcement guidance:
   now uses dedicated node mTLS transport validation when host transport trust enforcement is configured.
 - Node certificate identity binding is validated against trusted node records through application use-case boundaries rather than direct transport persistence access.
 
+## Story 7.3.2 secure node heartbeat and capability exchange channel contracts
+
+Story 7.3.2 extends node runtime transport contracts so recurring operational exchanges can carry heartbeat, capability profile synchronization, and deployment-tag synchronization over the same authenticated node channel.
+
+Canonical artifacts:
+
+- `src/shared/contracts/nodes/NodeTrustApiContracts.ts`
+- `src/shared/schemas/nodes/NodeTrustApiSchemaContracts.ts`
+- `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/application/nodes/use-cases/RecordNodeOperationalUpdateUseCase.ts`
+
+Added API operation:
+
+- `POST /api/v1/nodes/:nodeId/operational-update`
+  - request contract: `NodeOperationalUpdatePayloadDto`
+  - response contract: `NodeOperationalUpdateResponseDto`
+  - route is protected by `requireAuthenticatedNodeTransport(...)` (mTLS validation when transport trust is enforced)
+  - actor/node identity values are transport-bound from authenticated node context; payload-claimed identities are overridden
+  - optional capability profile + deployment tag fields allow trust-aware operational metadata sync without adding insecure side channels
+
+Operational metadata posture:
+
+- response `update` metadata includes:
+  - `transportAuthenticatedNodeId`
+  - `capabilityProfileSynchronized`
+  - `deploymentTagsSynchronized`
+- this metadata is intended for orchestration/scheduling services that need deterministic node capability and placement evidence from authenticated channels.
+
 ## Story 5.4.4 admin revocation and trust-state management transport/UI hooks
 
 Story 5.4.4 adds concrete admin-facing revocation transport and renderer wiring on top of node inventory/detail.

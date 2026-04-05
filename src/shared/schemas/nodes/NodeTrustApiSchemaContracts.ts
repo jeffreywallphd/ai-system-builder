@@ -305,6 +305,11 @@ export const NodeHeartbeatPayloadDtoSchema = z.object({
   metadata: NodeTransportMetadataSchema.optional(),
 }).strict();
 
+export const NodeOperationalUpdatePayloadDtoSchema = NodeHeartbeatPayloadDtoSchema.extend({
+  capabilityProfile: NodeCapabilityProfileDtoSchema.optional(),
+  deploymentTags: z.array(NodeTrustApiIdentifierSchema).max(64).optional(),
+}).strict();
+
 export const ResolveNodeRuntimeTrustMaterialRequestDtoSchema = z.object({
   actorUserIdentityId: NodeTrustApiIdentifierSchema,
   nodeId: NodeTrustApiIdentifierSchema,
@@ -404,6 +409,16 @@ export const NodeHeartbeatResponseDtoSchema = z.object({
   node: NodeDetailDtoSchema,
 }).strict();
 
+export const NodeOperationalUpdateResponseDtoSchema = z.object({
+  node: NodeDetailDtoSchema,
+  update: z.object({
+    heartbeatRecorded: z.literal(true),
+    capabilityProfileSynchronized: z.boolean(),
+    deploymentTagsSynchronized: z.boolean(),
+    transportAuthenticatedNodeId: NodeTrustApiIdentifierSchema,
+  }).strict(),
+}).strict();
+
 export const NodeRuntimeTrustMaterialResponseDtoSchema = z.object({
   runtimeTrustMaterial: RuntimeTrustMaterialPackageViewSchema,
 }).strict();
@@ -457,6 +472,7 @@ export type ApproveNodeEnrollmentActionRequestDtoPayload = z.infer<typeof Approv
 export type RejectNodeEnrollmentActionRequestDtoPayload = z.infer<typeof RejectNodeEnrollmentActionRequestDtoSchema>;
 export type RevokeNodeTrustActionRequestDtoPayload = z.infer<typeof RevokeNodeTrustActionRequestDtoSchema>;
 export type NodeHeartbeatPayloadDtoPayload = z.infer<typeof NodeHeartbeatPayloadDtoSchema>;
+export type NodeOperationalUpdatePayloadDtoPayload = z.infer<typeof NodeOperationalUpdatePayloadDtoSchema>;
 export type ResolveNodeRuntimeTrustMaterialRequestDtoPayload = z.infer<typeof ResolveNodeRuntimeTrustMaterialRequestDtoSchema>;
 export type NodeEnrollmentDetailDtoPayload = z.infer<typeof NodeEnrollmentDetailDtoSchema>;
 export type NodeInternalEnrollmentDetailDtoPayload = z.infer<typeof NodeInternalEnrollmentDetailDtoSchema>;
@@ -467,6 +483,7 @@ export type PendingEnrollmentListResponseDtoPayload = z.infer<typeof PendingEnro
 export type NodeEnrollmentDecisionResponseDtoPayload = z.infer<typeof NodeEnrollmentDecisionResponseDtoSchema>;
 export type NodeRevocationResponseDtoPayload = z.infer<typeof NodeRevocationResponseDtoSchema>;
 export type NodeHeartbeatResponseDtoPayload = z.infer<typeof NodeHeartbeatResponseDtoSchema>;
+export type NodeOperationalUpdateResponseDtoPayload = z.infer<typeof NodeOperationalUpdateResponseDtoSchema>;
 export type NodeRuntimeTrustMaterialResponseDtoPayload = z.infer<typeof NodeRuntimeTrustMaterialResponseDtoSchema>;
 export type NodeInventoryPendingEnrollmentDtoPayload = z.infer<typeof NodeInventoryPendingEnrollmentDtoSchema>;
 export type NodeInventorySummaryDtoPayload = z.infer<typeof NodeInventorySummaryDtoSchema>;
@@ -566,6 +583,14 @@ export function parseNodeHeartbeatPayloadDto(payload: unknown): NodeHeartbeatPay
   );
 }
 
+export function parseNodeOperationalUpdatePayloadDto(payload: unknown): NodeOperationalUpdatePayloadDtoPayload {
+  return parseNodeTrustApiSchema(
+    "NodeOperationalUpdatePayloadDto",
+    NodeOperationalUpdatePayloadDtoSchema,
+    payload,
+  );
+}
+
 export function parseResolveNodeRuntimeTrustMaterialRequestDto(
   payload: unknown,
 ): ResolveNodeRuntimeTrustMaterialRequestDtoPayload {
@@ -646,6 +671,14 @@ export function parseNodeHeartbeatResponseDto(payload: unknown): NodeHeartbeatRe
   return parseNodeTrustApiSchema(
     "NodeHeartbeatResponseDto",
     NodeHeartbeatResponseDtoSchema,
+    payload,
+  );
+}
+
+export function parseNodeOperationalUpdateResponseDto(payload: unknown): NodeOperationalUpdateResponseDtoPayload {
+  return parseNodeTrustApiSchema(
+    "NodeOperationalUpdateResponseDto",
+    NodeOperationalUpdateResponseDtoSchema,
     payload,
   );
 }

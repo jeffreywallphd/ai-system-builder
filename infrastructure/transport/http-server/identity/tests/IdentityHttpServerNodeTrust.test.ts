@@ -13,6 +13,7 @@ import { GetNodeEnrollmentDetailUseCase } from "../../../../../src/application/n
 import { ListNodeInventoryUseCase } from "../../../../../src/application/nodes/use-cases/ListNodeInventoryUseCase";
 import { ListTrustedNodeInventoryUseCase } from "../../../../../src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase";
 import { RecordNodeHeartbeatUseCase } from "../../../../../src/application/nodes/use-cases/RecordNodeHeartbeatUseCase";
+import { RecordNodeOperationalUpdateUseCase } from "../../../../../src/application/nodes/use-cases/RecordNodeOperationalUpdateUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../../../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { RejectNodeEnrollmentUseCase } from "../../../../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
 import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "../../../../../src/application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase";
@@ -91,6 +92,9 @@ async function startServer(): Promise<{
       nodeRepository: nodeTrustAdapter,
     }),
     recordNodeHeartbeatUseCase: new RecordNodeHeartbeatUseCase({
+      nodeRepository: nodeTrustAdapter,
+    }),
+    recordNodeOperationalUpdateUseCase: new RecordNodeOperationalUpdateUseCase({
       nodeRepository: nodeTrustAdapter,
     }),
     resolveApprovedNodeRuntimeTrustMaterialUseCase: new ResolveApprovedNodeRuntimeTrustMaterialUseCase({
@@ -553,6 +557,79 @@ describe("IdentityHttpServer node trust routes", () => {
     const inventoryBody = await inventory.json();
     expect(inventoryBody.ok).toBe(true);
     expect(inventoryBody.data.nodes.some((node: { nodeId: string }) => node.nodeId === "node:trusted:hb-1")).toBeTrue();
+  });
+
+  it("records node operational update and ignores spoofed payload identity fields", async () => {
+    const { baseUrl, nodeTrustAdapter } = await startServer();
+    const nodePrincipal = await registerAndLogin(baseUrl, "node:trusted:op-1");
+
+    await nodeTrustAdapter.registerNode({
+      record: {
+        nodeId: "node:trusted:op-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Trusted Operational Node 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:trusted:op-1:v1",
+        },
+        deploymentTags: ["edge-east"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:00:00.000Z",
+        approvedAt: "2026-04-05T18:01:00.000Z",
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T18:01:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-op-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const operationalUpdate = await fetch(
+      `${baseUrl}/api/v1/nodes/${encodeURIComponent("node:trusted:op-1")}/operational-update`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${nodePrincipal.sessionToken}`,
+        },
+        body: JSON.stringify({
+          actorUserIdentityId: "spoofed-actor",
+          nodeId: "spoofed-node",
+          heartbeatStatus: NodeHeartbeatStatuses.degraded,
+          seenAt: "2026-04-05T18:02:45.000Z",
+          observedBy: "node-agent-v2",
+          capabilityProfile: {
+            enabledCapabilities: [NodeRoleCapabilities.api, NodeRoleCapabilities.executor],
+            supportsRemoteScheduling: true,
+          },
+          deploymentTags: ["edge-west", "scheduler"],
+        }),
+      },
+    );
+    expect(operationalUpdate.status).toBe(200);
+    const operationalBody = await operationalUpdate.json();
+    expect(operationalBody.ok).toBe(true);
+    expect(operationalBody.data.node.nodeId).toBe("node:trusted:op-1");
+    expect(operationalBody.data.node.lastSeen.lastSeenAt).toBe("2026-04-05T18:02:45.000Z");
+    expect(operationalBody.data.node.capabilityProfile.enabledCapabilities).toEqual([
+      NodeRoleCapabilities.api,
+      NodeRoleCapabilities.executor,
+    ]);
+    expect(operationalBody.data.node.deploymentTags).toEqual(["edge-west", "scheduler"]);
+    expect(operationalBody.data.update.transportAuthenticatedNodeId).toBe("node:trusted:op-1");
   });
 
   it("rejects heartbeat updates when the authenticated principal is not bound to the nodeId", async () => {

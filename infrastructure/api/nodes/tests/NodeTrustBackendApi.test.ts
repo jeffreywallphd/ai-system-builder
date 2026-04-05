@@ -8,6 +8,7 @@ import { GetNodeEnrollmentDetailUseCase } from "../../../src/application/nodes/u
 import { ListNodeInventoryUseCase } from "../../../src/application/nodes/use-cases/ListNodeInventoryUseCase";
 import { ListTrustedNodeInventoryUseCase } from "../../../src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase";
 import { RecordNodeHeartbeatUseCase } from "../../../src/application/nodes/use-cases/RecordNodeHeartbeatUseCase";
+import { RecordNodeOperationalUpdateUseCase } from "../../../src/application/nodes/use-cases/RecordNodeOperationalUpdateUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { RejectNodeEnrollmentUseCase } from "../../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
 import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "../../../src/application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase";
@@ -92,6 +93,10 @@ function createHarness(): {
       auditSink: auditRecorder,
     }),
     recordNodeHeartbeatUseCase: new RecordNodeHeartbeatUseCase({
+      nodeRepository: adapter,
+      auditSink: auditRecorder,
+    }),
+    recordNodeOperationalUpdateUseCase: new RecordNodeOperationalUpdateUseCase({
       nodeRepository: adapter,
       auditSink: auditRecorder,
     }),
@@ -432,6 +437,71 @@ describe("NodeTrustBackendApi", () => {
     expect(inventory.data.nodes).toHaveLength(1);
     expect(inventory.data.nodes[0]?.nodeId).toBe("node:trusted:presence-1");
     expect(inventory.data.nodes[0]?.lastSeen?.observedBy).toBe("node-agent");
+  });
+
+  it("records secure operational updates and synchronizes capability profile and deployment tags", async () => {
+    const harness = createHarness();
+    await harness.adapter.registerNode({
+      record: {
+        nodeId: "node:trusted:operational-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Trusted Operational 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:operational-1:v1",
+        },
+        deploymentTags: ["edge-east"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T17:00:00.000Z",
+        approvedAt: "2026-04-05T17:05:00.000Z",
+        createdAt: "2026-04-05T17:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T17:05:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-operational-trusted-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const operationalUpdate = await harness.backendApi.recordNodeOperationalUpdate({
+      actorUserIdentityId: "node:trusted:operational-1",
+      nodeId: "node:trusted:operational-1",
+      heartbeatStatus: NodeHeartbeatStatuses.degraded,
+      seenAt: "2026-04-05T17:15:00.000Z",
+      observedBy: "node-agent-v2",
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.api, NodeRoleCapabilities.executor],
+        supportsRemoteScheduling: true,
+      },
+      deploymentTags: ["edge-west", "scheduler"],
+    });
+
+    expect(operationalUpdate.ok).toBeTrue();
+    if (!operationalUpdate.ok || !operationalUpdate.data) {
+      return;
+    }
+
+    expect(operationalUpdate.data.node.lastSeen?.lastSeenAt).toBe("2026-04-05T17:15:00.000Z");
+    expect(operationalUpdate.data.node.capabilityProfile.enabledCapabilities).toEqual([
+      NodeRoleCapabilities.api,
+      NodeRoleCapabilities.executor,
+    ]);
+    expect(operationalUpdate.data.node.deploymentTags).toEqual(["edge-west", "scheduler"]);
+    expect(operationalUpdate.data.update.transportAuthenticatedNodeId).toBe("node:trusted:operational-1");
+    expect(operationalUpdate.data.update.capabilityProfileSynchronized).toBeTrue();
+    expect(operationalUpdate.data.update.deploymentTagsSynchronized).toBeTrue();
   });
 
   it("returns managed runtime trust material for approved trusted node identities", async () => {

@@ -14,6 +14,7 @@ import {
   NodeInventoryPresenceStates,
   NodeTrustApiContractError,
   NodeTrustTransportScopes,
+  type NodeOperationalUpdateResponseDto,
   type NodeRuntimeTrustMaterialResponseDto,
   toNodeInventoryDetailDto,
   toNodeInventorySummaryDto,
@@ -261,5 +262,39 @@ describe("NodeTrustApiContracts", () => {
 
     expect(response.runtimeTrustMaterial.targetKind).toBe("node");
     expect(response.runtimeTrustMaterial.targetReferenceId).toBe("node:compute-1");
+  });
+
+  it("supports operational update response contracts for secure heartbeat/capability exchange", () => {
+    const response: NodeOperationalUpdateResponseDto = Object.freeze({
+      node: {
+        nodeId: "node:compute-10",
+        nodeType: NodeTypes.compute,
+        displayName: "Compute 10",
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["edge-west"],
+        certificate: {
+          certificateRef: "cert:node-10:v1",
+        },
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T12:00:00.000Z",
+        approvedAt: "2026-04-05T12:05:00.000Z",
+      },
+      update: {
+        heartbeatRecorded: true,
+        capabilityProfileSynchronized: true,
+        deploymentTagsSynchronized: false,
+        transportAuthenticatedNodeId: "node:compute-10",
+      },
+    });
+
+    expect(response.update.heartbeatRecorded).toBeTrue();
+    expect(response.update.transportAuthenticatedNodeId).toBe("node:compute-10");
   });
 });

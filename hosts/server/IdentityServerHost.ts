@@ -125,6 +125,7 @@ import { GetNodeEnrollmentDetailUseCase } from "../../src/application/nodes/use-
 import { ListNodeInventoryUseCase } from "../../src/application/nodes/use-cases/ListNodeInventoryUseCase";
 import { ListTrustedNodeInventoryUseCase } from "../../src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase";
 import { RecordNodeHeartbeatUseCase } from "../../src/application/nodes/use-cases/RecordNodeHeartbeatUseCase";
+import { RecordNodeOperationalUpdateUseCase } from "../../src/application/nodes/use-cases/RecordNodeOperationalUpdateUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { RejectNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
 import { ResolveApprovedNodeCertificateEligibilityUseCase } from "../../src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase";
@@ -681,6 +682,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       auditSink: nodeTrustAuditRecorder,
     }),
     recordNodeHeartbeatUseCase: new RecordNodeHeartbeatUseCase({
+      nodeRepository: nodeTrustRepository,
+      auditSink: nodeTrustAuditRecorder,
+    }),
+    recordNodeOperationalUpdateUseCase: new RecordNodeOperationalUpdateUseCase({
       nodeRepository: nodeTrustRepository,
       auditSink: nodeTrustAuditRecorder,
     }),

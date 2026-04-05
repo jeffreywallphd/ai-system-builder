@@ -13,6 +13,8 @@ import {
   NodeDetailDtoSchema,
   NodeEnrollmentSubmissionRequestDtoSchema,
   NodeHeartbeatPayloadDtoSchema,
+  NodeOperationalUpdatePayloadDtoSchema,
+  parseNodeOperationalUpdateResponseDto,
   parseNodeInventoryDetailResponseDto,
   parseNodeInventoryListResponseDto,
   parseNodeRuntimeTrustMaterialResponseDto,
@@ -291,6 +293,26 @@ describe("NodeTrustApiSchemaContracts", () => {
     })).toThrow();
   });
 
+  it("accepts operational update payloads with capability and deployment synchronization fields", () => {
+    const parsed = NodeOperationalUpdatePayloadDtoSchema.parse({
+      actorUserIdentityId: "node:hybrid-001",
+      nodeId: "node:hybrid-001",
+      heartbeatStatus: NodeHeartbeatStatuses.online,
+      seenAt: "2026-04-05T12:22:00.000Z",
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.api, NodeRoleCapabilities.executor],
+        supportsRemoteScheduling: true,
+      },
+      deploymentTags: ["edge-west", "scheduler"],
+    });
+
+    expect(parsed.capabilityProfile?.enabledCapabilities).toEqual([
+      NodeRoleCapabilities.api,
+      NodeRoleCapabilities.executor,
+    ]);
+    expect(parsed.deploymentTags).toEqual(["edge-west", "scheduler"]);
+  });
+
   it("parses decision response payloads for approve/reject transport boundaries", () => {
     const parsed = parseNodeEnrollmentDecisionResponseDto({
       enrollment: {
@@ -435,5 +457,39 @@ describe("NodeTrustApiSchemaContracts", () => {
 
     expect(parsed.runtimeTrustMaterial.targetKind).toBe("node");
     expect(parsed.runtimeTrustMaterial.targetReferenceId).toBe("node:compute-1");
+  });
+
+  it("parses operational update response payloads", () => {
+    const parsed = parseNodeOperationalUpdateResponseDto({
+      node: {
+        nodeId: "node:compute:009",
+        nodeType: NodeTypes.compute,
+        displayName: "Compute Node 009",
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["edge-west"],
+        certificate: {
+          certificateRef: "cert:node-9:v1",
+        },
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T12:00:00.000Z",
+        approvedAt: "2026-04-05T12:05:00.000Z",
+      },
+      update: {
+        heartbeatRecorded: true,
+        capabilityProfileSynchronized: true,
+        deploymentTagsSynchronized: true,
+        transportAuthenticatedNodeId: "node:compute:009",
+      },
+    });
+
+    expect(parsed.update.heartbeatRecorded).toBeTrue();
+    expect(parsed.update.transportAuthenticatedNodeId).toBe("node:compute:009");
   });
 });

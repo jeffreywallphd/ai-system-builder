@@ -73,6 +73,7 @@ import {
   NodeTrustApiErrorCodes,
   type NodeTrustApiResponse,
   type RecordNodeHeartbeatApiRequest,
+  type RecordNodeOperationalUpdateApiRequest,
   type RejectNodeEnrollmentApiRequest,
   type RevokeNodeTrustApiRequest,
 } from "../../../api/nodes/sdk/PublicNodeTrustApiContract";
@@ -100,6 +101,7 @@ import { CertificateTrustEvaluationStatuses } from "../../../../src/shared/dto/s
 import {
   parseApproveNodeEnrollmentActionRequestDto,
   parseNodeHeartbeatPayloadDto,
+  parseNodeOperationalUpdatePayloadDto,
   parseResolveNodeRuntimeTrustMaterialRequestDto,
   parseRevokeNodeTrustActionRequestDto,
   parseRejectNodeEnrollmentActionRequestDto,
@@ -107,6 +109,7 @@ import {
   NodeTrustApiSchemaValidationError,
   type ApproveNodeEnrollmentActionRequestDtoPayload,
   type NodeHeartbeatPayloadDtoPayload,
+  type NodeOperationalUpdatePayloadDtoPayload,
   type NodeEnrollmentSubmissionRequestDtoPayload,
   type RejectNodeEnrollmentActionRequestDtoPayload,
   type RevokeNodeTrustActionRequestDtoPayload,
@@ -2261,6 +2264,57 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapNodeTrustStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, heartbeatRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.nodeTrustBackendApi
+        && request.method === "POST"
+        && path.endsWith("/operational-update")
+        && path.startsWith("/api/v1/nodes/")
+        && !path.startsWith("/api/v1/nodes/enrollments/")
+      ) {
+        const operationalUpdateNodeId = decodePathTail(path, "/api/v1/nodes/", "/operational-update");
+        await requireAuthenticatedNodeTransport(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          options.nodeTrustBackendApi,
+          logger,
+          options.transportTrust,
+          operationalUpdateNodeId,
+          async (context) => {
+            const nodeId = context.nodeId;
+
+            const parsedRequest = await parseAndValidateNodeOperationalUpdateRequest(
+              request,
+              nodeId,
+              nodeId,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const operationalUpdateRequest: RecordNodeOperationalUpdateApiRequest = Object.freeze({
+              actorUserIdentityId: parsedRequest.data.actorUserIdentityId,
+              nodeId: parsedRequest.data.nodeId,
+              heartbeatStatus: parsedRequest.data.heartbeatStatus,
+              seenAt: parsedRequest.data.seenAt,
+              observedBy: parsedRequest.data.observedBy,
+              capabilityProfile: parsedRequest.data.capabilityProfile,
+              deploymentTags: parsedRequest.data.deploymentTags,
+              metadata: parsedRequest.data.metadata,
+            });
+            const apiResponse = await options.nodeTrustBackendApi.recordNodeOperationalUpdate(operationalUpdateRequest);
+            const statusCode = mapNodeTrustStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, operationalUpdateRequest, apiResponse);
           },
         );
         return;
@@ -4987,6 +5041,30 @@ async function parseAndValidateNodeHeartbeatRequest(
     logger,
     maxBodyBytes,
     parseNodeHeartbeatPayloadDto,
+  );
+}
+
+async function parseAndValidateNodeOperationalUpdateRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  nodeId: string,
+  requestLogId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: NodeOperationalUpdatePayloadDtoPayload }
+  | { readonly ok: false; readonly statusCode: number; readonly body: NodeTrustApiResponse<never> }
+> {
+  return parseAndValidateNodeTrustActionRequest(
+    request,
+    Object.freeze({
+      actorUserIdentityId,
+      nodeId,
+    }),
+    requestLogId,
+    logger,
+    maxBodyBytes,
+    parseNodeOperationalUpdatePayloadDto,
   );
 }
 

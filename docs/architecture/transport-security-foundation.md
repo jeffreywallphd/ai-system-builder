@@ -69,6 +69,19 @@ Story 7.3.1 adds a dedicated node-to-server HTTP transport adapter path for cert
 - `src/application/nodes/tests/ResolveNodeMutualTlsTransportIdentityUseCase.test.ts`
   - covers trusted match acceptance, revoked-node rejection, unknown-node rejection, and certificate mismatch rejection.
 
+## Story 7.3.2 secure node heartbeat and capability exchange channel contracts
+
+Story 7.3.2 extends the same authenticated node channel posture introduced in Story 7.3.1 to routine node operational exchanges:
+
+- `POST /api/v1/nodes/:nodeId/heartbeat`
+- `POST /api/v1/nodes/:nodeId/operational-update`
+
+Transport and identity posture:
+
+- both routes are guarded through `requireAuthenticatedNodeTransport(...)`;
+- when transport trust enforcement is enabled, both routes require node mTLS validation (`ValidateTransportConnectionTrustUseCase` + node certificate identity resolution);
+- transport-authenticated node identity remains authoritative, so payload-claimed node/actor identifiers are not trusted as identity sources.
+
 ## Domain vocabulary
 
 ### Scenarios
