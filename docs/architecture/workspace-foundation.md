@@ -27,7 +27,9 @@ Scope in stories 3.1.1 through 3.1.5:
 - `src/application/workspaces/ports/IWorkspaceRoleAssignmentRepository.ts`
 - `src/application/workspaces/ports/IWorkspaceInvitationRepository.ts`
 - `src/application/workspaces/ports/IWorkspaceAuthorizationReadRepository.ts`
+- `src/application/workspaces/ports/IWorkspaceTransactionManager.ts`
 - `src/application/workspaces/ports/WorkspaceRepositoryPorts.ts`
+- `src/application/workspaces/use-cases/CreateWorkspaceUseCase.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceMigrations.ts`
 - `src/infrastructure/persistence/workspaces/WorkspacePersistenceMapper.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter.ts`
@@ -158,6 +160,7 @@ Protected-resource composition is standardized through `withWorkspaceScopedOwner
 - `src/domain/workspaces/tests/WorkspaceDomain.test.ts`
 - `src/shared/workspaces/tests/WorkspaceOwnership.test.ts`
 - `src/application/workspaces/tests/WorkspaceRepositoryPortsContracts.test.ts`
+- `src/application/workspaces/tests/CreateWorkspaceUseCase.test.ts`
 - `src/infrastructure/persistence/workspaces/tests/WorkspacePersistenceMapper.test.ts`
 - `src/infrastructure/persistence/workspaces/tests/SqliteWorkspacePersistenceAdapter.test.ts`
 
@@ -166,4 +169,28 @@ Story 3.1.4 extends the adapter integration tests to validate:
 - update mutations persist correctly for workspace/membership/role-assignment/invitation records
 - stale updates are rejected when a newer persisted record already exists
 - SQL constraint failures are surfaced with repository-operation context
+
+## Story 3.2.1 workspace creation and initialization flow
+
+- Added `CreateWorkspaceUseCase` in `src/application/workspaces/use-cases/CreateWorkspaceUseCase.ts` as the canonical application entry point for workspace provisioning.
+- The use case defines explicit input/output DTOs and structured result/error contracts for predictable calling behavior.
+- Initialization orchestration now performs:
+  - workspace creation with lifecycle + ownership metadata attribution,
+  - creator active membership bootstrap,
+  - creator owner role-assignment bootstrap.
+- Duplicate handling is explicit:
+  - slug uniqueness checks run before writes,
+  - generated id collision checks run before writes,
+  - write-time uniqueness failures are mapped to deterministic duplicate outcomes.
+- Added optional extension seams in the use case for:
+  - authorization gating (`assertCanCreateWorkspace`),
+  - post-commit audit emission (`recordWorkspaceCreated`, best effort for now).
+- Added transaction seam `IWorkspaceTransactionManager` and wired SQLite adapter support:
+  - `SqliteWorkspacePersistenceAdapter.runInTransaction(...)` uses `BEGIN IMMEDIATE`, `COMMIT`, and rollback on error.
+  - This allows workspace + membership + role initialization writes to be persisted atomically.
+- Added test coverage for:
+  - successful workspace initialization path,
+  - invalid input and duplicate slug rejection,
+  - authorization denial path,
+  - transaction rollback on initialization failure (both in-memory use-case-level and SQLite adapter-level).
 
