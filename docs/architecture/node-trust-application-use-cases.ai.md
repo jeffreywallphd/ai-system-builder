@@ -14,6 +14,7 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - `src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase.ts`
 - `src/application/nodes/use-cases/GetNodeEnrollmentDetailUseCase.ts`
 - `src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase.ts`
+- `src/application/nodes/use-cases/ActivateApprovedNodeUseCase.ts`
 - `src/application/nodes/use-cases/RejectNodeEnrollmentUseCase.ts`
 - `src/application/nodes/use-cases/RevokeNodeTrustUseCase.ts`
 - `src/application/nodes/use-cases/RecordNodeHeartbeatUseCase.ts`
@@ -28,6 +29,7 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - review/list pending enrollment queue
 - fetch a single enrollment detail for admin review workflows
 - approve node (admin-authorized, explicit lifecycle transitions, decision metadata, certificate hook seam)
+- activate approved node (idempotent trusted-state transition with capability and certificate/trust metadata continuity)
 - reject node (admin-authorized, explicit lifecycle transitions, decision metadata)
 - revoke node trust (including certificate-revocation seam)
 - record node heartbeat
@@ -51,3 +53,4 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - Audit pipelines can plug in through `NodeTrustAuditSink` while preserving non-blocking application flow.
 - Enrollment approval/rejection metadata (`reviewedAt`, `reviewedByUserIdentityId`, `decisionNote`) remains in persistence contracts so admin decisions are auditable and durable.
 - Approval/rejection audit events include the persisted decision metadata for downstream audit consumers.
+- Activation is explicitly separate from heartbeat presence writes so approval/activation lifecycle transitions and liveness updates remain independently auditable.

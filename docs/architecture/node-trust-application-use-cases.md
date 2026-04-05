@@ -12,6 +12,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase.ts`
 - `src/application/nodes/use-cases/GetNodeEnrollmentDetailUseCase.ts`
 - `src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase.ts`
+- `src/application/nodes/use-cases/ActivateApprovedNodeUseCase.ts`
 - `src/application/nodes/use-cases/RejectNodeEnrollmentUseCase.ts`
 - `src/application/nodes/use-cases/RevokeNodeTrustUseCase.ts`
 - `src/application/nodes/use-cases/RecordNodeHeartbeatUseCase.ts`
@@ -44,7 +45,14 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
   - persists decision metadata (`reviewedAt`, `reviewedByUserIdentityId`, `decisionNote`) on the enrollment request
   - emits approval audit events that include persisted decision metadata
   - issues/accepts certificate via hook seam
-  - upserts node approval/trust state using persistence ports
+  - upserts node approval state and activation prerequisites (`trustState=pending-approval`) using persistence ports
+- `ActivateApprovedNodeUseCase`
+  - authorizes activation action
+  - requires node approval before trust activation and blocks revoked/unapproved nodes
+  - enforces certificate-backed trust prerequisites before transition to `trustState=trusted`
+  - preserves approved capability profile and certificate/trust metadata on activation
+  - is idempotent for repeated activation attempts
+  - emits activation audit events for trusted-state transitions
 - `RejectNodeEnrollmentUseCase`
   - authorizes rejection action
   - transitions enrollment request lifecycle (`submitted -> under-review -> rejected` as needed)
@@ -82,7 +90,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 ## Hook-port seams
 
 - `NodeTrustAuthorizationHook`
-  - explicit per-use-case permission hooks for register/review/approve/reject/revoke/heartbeat/query operations
+  - explicit per-use-case permission hooks for register/review/approve/activate/reject/revoke/heartbeat/query operations
   - keeps policy engines and admin role checks out of use-case internals
   - supports explicit admin-only enforcement for review/approval/rejection actions
 - `NodeTrustCertificateHook`
@@ -92,6 +100,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `NodeTrustAuditSink`
   - best-effort audit publication seam with typed event vocabulary
   - non-blocking by default for current slice
+  - activation audit events are distinct from heartbeat presence events
 
 ## Boundary posture
 
@@ -112,7 +121,8 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - enrollment registration orchestration
 - pending review listing (including denied review authorization path)
 - enrollment detail retrieval (including denied review authorization path)
-- approval flow including authorization gating, explicit lifecycle transition sequence, decision metadata persistence, certificate hook, and trust-state mutation
+- approval flow including authorization gating, explicit lifecycle transition sequence, decision metadata persistence, certificate hook, and pending-activation trust-state staging
+- activation flow including approved-only guardrails, idempotent trusted-state transition, and activation audit publication
 - rejection flow including authorization gating, explicit lifecycle transition sequence, decision metadata persistence, and quarantine state mutation
 - revocation flow with certificate-revocation hook
 - heartbeat recording and revoked-node rejection behavior

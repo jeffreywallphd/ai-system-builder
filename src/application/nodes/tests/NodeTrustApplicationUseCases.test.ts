@@ -41,6 +41,7 @@ import { RegisterNodeEnrollmentRequestUseCase } from "../use-cases/RegisterNodeE
 import { ReviewPendingNodeEnrollmentUseCase } from "../use-cases/ReviewPendingNodeEnrollmentUseCase";
 import { GetNodeEnrollmentDetailUseCase } from "../use-cases/GetNodeEnrollmentDetailUseCase";
 import { ApproveNodeEnrollmentUseCase } from "../use-cases/ApproveNodeEnrollmentUseCase";
+import { ActivateApprovedNodeUseCase } from "../use-cases/ActivateApprovedNodeUseCase";
 import { RejectNodeEnrollmentUseCase } from "../use-cases/RejectNodeEnrollmentUseCase";
 import { RevokeNodeTrustUseCase } from "../use-cases/RevokeNodeTrustUseCase";
 import { RecordNodeHeartbeatUseCase } from "../use-cases/RecordNodeHeartbeatUseCase";
@@ -293,6 +294,7 @@ function createAllowAllAuthorizationHook(): NodeTrustAuthorizationHook {
     async assertCanRejectNode(_input) {},
     async assertCanRevokeNode(_input) {},
     async assertCanRecordHeartbeat(_input) {},
+    async assertCanActivateNode(_input) {},
     async assertCanQueryTrustedNodeInventory(_input) {},
   };
 }
@@ -300,6 +302,7 @@ function createAllowAllAuthorizationHook(): NodeTrustAuthorizationHook {
 function createDenyingAuthorizationHook(input: {
   readonly reviewPending?: boolean;
   readonly approve?: boolean;
+  readonly activate?: boolean;
   readonly reject?: boolean;
 }): NodeTrustAuthorizationHook {
   return {
@@ -321,6 +324,11 @@ function createDenyingAuthorizationHook(input: {
     },
     async assertCanRevokeNode(_request) {},
     async assertCanRecordHeartbeat(_request) {},
+    async assertCanActivateNode(_request) {
+      if (input.activate) {
+        throw new Error("admin role required to activate approved nodes");
+      }
+    },
     async assertCanQueryTrustedNodeInventory(_request) {},
   };
 }
@@ -576,7 +584,7 @@ describe("node trust application use-cases", () => {
     }
   });
 
-  it("approves enrollment requests and provisions node trust with certificate hook", async () => {
+  it("approves enrollment requests and stages node activation prerequisites with certificate hook", async () => {
     const repository = new InMemoryNodeTrustRepository();
     const certificateHook = new StubCertificateHook();
     const audit = new RecordingAuditSink();
@@ -632,7 +640,7 @@ describe("node trust application use-cases", () => {
     expect(result.value.enrollmentRequest.reviewedAt).toBe("2026-04-05T18:05:00.000Z");
     expect(result.value.enrollmentRequest.decisionNote).toBe("Validated compute profile.");
     expect(result.value.node.approvalStatus).toBe(NodeApprovalStatuses.approved);
-    expect(result.value.node.trustState).toBe(NodeTrustStates.trusted);
+    expect(result.value.node.trustState).toBe(NodeTrustStates.pendingApproval);
     expect(result.value.node.certificate?.certificateRef).toBe("cert:node-hybrid-1:v1");
     expect(certificateHook.issuedForNodeIds).toEqual(["node-hybrid-1"]);
     expect(repository.enrollmentStatusTransitions.map((entry) => entry.toStatus)).toEqual([
@@ -697,6 +705,275 @@ describe("node trust application use-cases", () => {
     const persistedEnrollment = await repository.findEnrollmentRequestById("enroll-approve-denied-1");
     expect(persistedEnrollment?.status).toBe(NodeEnrollmentRequestStatuses.submitted);
     expect(repository.nodes.size).toBe(0);
+  });
+
+  it("transitions approved nodes to trusted state through explicit activation lifecycle", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    const certificateHook = new StubCertificateHook();
+    await repository.saveEnrollmentRequest({
+      record: {
+        requestId: "enroll-activate-lifecycle-1",
+        nodeId: "node-activate-lifecycle-1",
+        nodeType: NodeTypes.hybrid,
+        displayName: "Activation Lifecycle Node 1",
+        capabilityProfile: {
+          enabledCapabilities: [
+            NodeRoleCapabilities.workflowExecution,
+            NodeRoleCapabilities.modelInference,
+          ],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["hybrid"],
+        requestedAt: "2026-04-05T18:00:00.000Z",
+        status: NodeEnrollmentRequestStatuses.submitted,
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "node-activate-lifecycle-1",
+        lastModifiedAt: "2026-04-05T18:00:00.000Z",
+        lastModifiedBy: "node-activate-lifecycle-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-activate-lifecycle-1",
+        context: {
+          actorUserIdentityId: "node-activate-lifecycle-1",
+        },
+      },
+    });
+
+    const approveUseCase = new ApproveNodeEnrollmentUseCase({
+      enrollmentRequestRepository: repository,
+      nodeRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      certificateHook,
+      clock: createFixedClock("2026-04-05T18:05:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const approval = await approveUseCase.execute({
+      actorUserIdentityId: "admin-1",
+      requestId: "enroll-activate-lifecycle-1",
+    });
+
+    expect(approval.ok).toBeTrue();
+    if (!approval.ok) {
+      return;
+    }
+    expect(approval.value.node.approvalStatus).toBe(NodeApprovalStatuses.approved);
+    expect(approval.value.node.trustState).toBe(NodeTrustStates.pendingApproval);
+    expect(approval.value.node.certificate?.certificateRef).toBe("cert:node-activate-lifecycle-1:v1");
+
+    const activateUseCase = new ActivateApprovedNodeUseCase({
+      nodeRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      clock: createFixedClock("2026-04-05T18:06:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const activation = await activateUseCase.execute({
+      actorUserIdentityId: "admin-1",
+      nodeId: "node-activate-lifecycle-1",
+    });
+
+    expect(activation.ok).toBeTrue();
+    if (!activation.ok) {
+      return;
+    }
+    expect(activation.value.node.trustState).toBe(NodeTrustStates.trusted);
+    expect(activation.value.node.capabilityProfile.enabledCapabilities).toEqual([
+      NodeRoleCapabilities.workflowExecution,
+      NodeRoleCapabilities.modelInference,
+    ]);
+  });
+
+  it("activates approved nodes into trusted state while preserving capabilities and trust metadata", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    const audit = new RecordingAuditSink();
+    await repository.registerNode({
+      record: {
+        nodeId: "node-activate-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Activation Node 1",
+        capabilityProfile: {
+          enabledCapabilities: [
+            NodeRoleCapabilities.workflowExecution,
+            NodeRoleCapabilities.schedulingParticipation,
+          ],
+          supportsRemoteScheduling: true,
+          maxConcurrentWorkloads: 4,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.pendingApproval,
+        certificate: {
+          certificateRef: "cert:node-activate-1:v1",
+          certificateAssignedAt: "2026-04-05T18:10:00.000Z",
+          certificateAuthorityRef: "ca:loom",
+        },
+        deploymentTags: ["region-1"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:00:00.000Z",
+        approvedAt: "2026-04-05T18:05:00.000Z",
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "system",
+        lastModifiedAt: "2026-04-05T18:05:00.000Z",
+        lastModifiedBy: "admin-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-activate-node-1",
+        context: {
+          actorUserIdentityId: "system",
+        },
+      },
+    });
+
+    const useCase = new ActivateApprovedNodeUseCase({
+      nodeRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      clock: createFixedClock("2026-04-05T18:20:00.000Z"),
+      auditSink: audit,
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "admin-1",
+      nodeId: "node-activate-1",
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.node.approvalStatus).toBe(NodeApprovalStatuses.approved);
+    expect(result.value.node.trustState).toBe(NodeTrustStates.trusted);
+    expect(result.value.node.capabilityProfile.enabledCapabilities).toEqual([
+      NodeRoleCapabilities.workflowExecution,
+      NodeRoleCapabilities.schedulingParticipation,
+    ]);
+    expect(result.value.node.certificate?.certificateRef).toBe("cert:node-activate-1:v1");
+    expect(result.value.mutation.changed).toBeTrue();
+    expect(audit.events[audit.events.length - 1]?.type).toBe(NodeTrustAuditEventTypes.nodeActivated);
+  });
+
+  it("keeps approved-node activation idempotent for repeated activation attempts", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.registerNode({
+      record: {
+        nodeId: "node-activate-2",
+        nodeType: NodeTypes.compute,
+        displayName: "Activation Node 2",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.pendingApproval,
+        certificate: {
+          certificateRef: "cert:node-activate-2:v1",
+        },
+        deploymentTags: ["region-1"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:00:00.000Z",
+        approvedAt: "2026-04-05T18:05:00.000Z",
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "system",
+        lastModifiedAt: "2026-04-05T18:05:00.000Z",
+        lastModifiedBy: "admin-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-activate-node-2",
+        context: {
+          actorUserIdentityId: "system",
+        },
+      },
+    });
+
+    const useCase = new ActivateApprovedNodeUseCase({
+      nodeRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      clock: createFixedClock("2026-04-05T18:20:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const first = await useCase.execute({
+      actorUserIdentityId: "admin-1",
+      nodeId: "node-activate-2",
+    });
+    expect(first.ok).toBeTrue();
+    if (!first.ok) {
+      return;
+    }
+
+    const second = await useCase.execute({
+      actorUserIdentityId: "admin-1",
+      nodeId: "node-activate-2",
+    });
+
+    expect(second.ok).toBeTrue();
+    if (!second.ok) {
+      return;
+    }
+
+    expect(second.value.node.trustState).toBe(NodeTrustStates.trusted);
+    expect(second.value.node.certificate?.certificateRef).toBe("cert:node-activate-2:v1");
+    expect(second.value.mutation.changed).toBeFalse();
+  });
+
+  it("rejects activation attempts for unapproved nodes", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.registerNode({
+      record: {
+        nodeId: "node-activate-unapproved",
+        nodeType: NodeTypes.compute,
+        displayName: "Activation Node Unapproved",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.pending,
+        trustState: NodeTrustStates.pendingApproval,
+        certificate: {
+          certificateRef: "cert:node-activate-unapproved:v1",
+        },
+        deploymentTags: ["region-1"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:00:00.000Z",
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "system",
+        lastModifiedAt: "2026-04-05T18:05:00.000Z",
+        lastModifiedBy: "system",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-activate-node-unapproved",
+        context: {
+          actorUserIdentityId: "system",
+        },
+      },
+    });
+
+    const useCase = new ActivateApprovedNodeUseCase({
+      nodeRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "admin-1",
+      nodeId: "node-activate-unapproved",
+    });
+
+    expect(result.ok).toBeFalse();
+    if (!result.ok) {
+      expect(result.error.code).toBe(NodeTrustUseCaseErrorCodes.invalidState);
+      expect(result.error.message).toContain("cannot be activated before approval");
+    }
   });
 
   it("rejects enrollment requests and quarantines node records", async () => {
