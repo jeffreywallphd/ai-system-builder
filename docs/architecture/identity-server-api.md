@@ -278,3 +278,7 @@ Redacted keys include:
 - `infrastructure/api/identity/IdentityAuthObservability.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
+
+## Related docs
+
+- Session subsystem architecture and integration expectations: `docs/architecture/identity-session-architecture.md`

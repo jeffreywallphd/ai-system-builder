@@ -453,6 +453,14 @@ Implemented behavior:
 - login requests now include explicit access-channel context (`desktop` or `thin-client`) and user-agent client metadata
 - expired/revoked/invalid sessions are deterministically cleared and the UI returns to sign-in with explicit recovery messaging
 
+## Session Architecture Reference (Story 1.3.8)
+
+Session lifecycle, issuance, validation guard behavior, revocation consistency, policy configuration, client expectations, and trusted-device seams are documented in:
+
+- `docs/architecture/identity-session-architecture.md`
+
+Use that note as the authoritative session-subsystem baseline for future security/device-trust stories.
+
 ## Implemented Test Coverage
 
 Key tests for this foundation:
