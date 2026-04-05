@@ -1,8 +1,8 @@
 # Workspace Foundation
 
-This note documents the initial production workspace-tenancy foundation for Feature 3 / Epic 3.1.
+This note documents the production workspace-tenancy foundation for Feature 3 / Epic 3.1.
 
-Scope in stories 3.1.1 and 3.1.2 is intentionally inner-layer first:
+Scope in stories 3.1.1 through 3.1.3:
 
 - workspace aggregate and lifecycle invariants
 - workspace membership aggregate and lifecycle invariants
@@ -11,6 +11,7 @@ Scope in stories 3.1.1 and 3.1.2 is intentionally inner-layer first:
 - reusable workspace-scoped ownership metadata patterns for downstream protected resources
 - application-layer workspace repository port contracts for persistence and query seams
 - shared workspace contract DTOs for create/update/query/list/invitation/membership/role mutation operations
+- SQLite persistence schema, migrations, row mappers, and repository adapter for workspace tenancy data
 
 ## Canonical artifacts
 
@@ -23,6 +24,9 @@ Scope in stories 3.1.1 and 3.1.2 is intentionally inner-layer first:
 - `src/application/workspaces/ports/IWorkspaceInvitationRepository.ts`
 - `src/application/workspaces/ports/IWorkspaceAuthorizationReadRepository.ts`
 - `src/application/workspaces/ports/WorkspaceRepositoryPorts.ts`
+- `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceMigrations.ts`
+- `src/infrastructure/persistence/workspaces/WorkspacePersistenceMapper.ts`
+- `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter.ts`
 
 ## Core concepts and contracts
 
@@ -117,8 +121,30 @@ Domain helpers provide controlled updates for ownership transfer and visibility 
 - Terminology aligns with existing identity and trusted-device baselines (`userIdentityId`, workspace linkage, lifecycle transition maps, structured mutation attribution).
 - No infrastructure details (SQL rows, storage engine APIs, transport objects) leak into workspace application contracts.
 
+## SQLite persistence schema
+
+- Schema is migration-versioned via `workspace_repository_migrations`.
+- Core tenancy tables:
+  - `workspace_records`
+  - `workspace_memberships`
+  - `workspace_role_assignments`
+  - `workspace_invitations`
+- Referential integrity:
+  - memberships, role assignments, and invitations reference `workspace_records`.
+  - role assignments reference membership scope via `(workspace_id, user_identity_id)`.
+  - membership invitation linkage is constrained to same-workspace invitations.
+- Ambiguous ownership and duplicate-role prevention:
+  - single active owner per workspace (`workspace_role_assignments_single_active_owner_unique` partial unique index)
+  - no duplicate active `(workspace_id, user_identity_id, role)` bindings
+  - no duplicate membership row per `(workspace_id, user_identity_id)`
+  - no duplicate pending invitations for `(workspace_id, invited_email)`
+- Lifecycle-state constraints are represented as SQL `CHECK` clauses for membership, role-assignment, and invitation state/metadata coherence.
+- Query-supporting indexes cover owner/status, membership workspace/status, invitation pending/expires, and role-assignment workspace/user/role filters used by repository contracts.
+
 ## Tests in this slice
 
 - `src/domain/workspaces/tests/WorkspaceDomain.test.ts`
 - `src/application/workspaces/tests/WorkspaceRepositoryPortsContracts.test.ts`
+- `src/infrastructure/persistence/workspaces/tests/WorkspacePersistenceMapper.test.ts`
+- `src/infrastructure/persistence/workspaces/tests/SqliteWorkspacePersistenceAdapter.test.ts`
 
