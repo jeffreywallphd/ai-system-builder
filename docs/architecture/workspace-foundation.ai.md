@@ -28,10 +28,12 @@ Implementation-truth baseline for workspace tenancy domain + persistence contrac
 - `src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase.ts`
 - `src/application/workspaces/use-cases/WorkspaceAdministrationQueryService.ts`
 - `src/application/workspaces/use-cases/IssueWorkspaceInvitationUseCase.ts`
+- `src/application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase.ts`
 - `src/application/workspaces/tests/CreateWorkspaceUseCase.test.ts`
 - `src/application/workspaces/tests/WorkspaceLifecycleUseCases.test.ts`
 - `src/application/workspaces/tests/WorkspaceMembershipAdministrationUseCases.test.ts`
 - `src/application/workspaces/tests/WorkspaceAdministrationQueryService.test.ts`
+- `src/application/workspaces/tests/WorkspaceInvitationLifecycleUseCase.test.ts`
 - `src/application/workspaces/tests/WorkspaceRepositoryPortsContracts.test.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceMigrations.ts`
 - `src/infrastructure/persistence/workspaces/WorkspacePersistenceMapper.ts`
@@ -245,4 +247,23 @@ Protected-resource composition pattern is canonical:
   - optional `targetUserIdentityIdHint`,
   - optional `onboardingMetadata`.
 - Workspace invitation persistence now includes token-reference and onboarding metadata columns/indexes, plus pending lookup by token hash through `IWorkspaceInvitationRepository.findPendingInvitationByTokenHash(...)`.
+
+## Story 3.3.2 invitation acceptance/decline/invalidation + expiry handling
+
+- Added `ResolveWorkspaceInvitationLifecycleUseCase` (`src/application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase.ts`) with explicit lifecycle actions:
+  - `accept` (token-driven invitation acceptance + membership conversion),
+  - `decline` (token-driven invitation decline response),
+  - `cancel` (admin-protected pending invitation revocation path).
+- Acceptance policy now validates:
+  - actor identity compatibility with invite target (`invitedEmail` + optional `targetUserIdentityIdHint`),
+  - workspace lifecycle readiness (`active` required for membership conversion),
+  - invitation pending/expiry window before token use.
+- Expiry handling is now deterministic in application flow:
+  - pending invitations encountered after `expiresAt` are persisted as `expired`,
+  - replayed/stale/invalid token usage is rejected with a safe generic token failure posture.
+- Membership conversion behavior for accepted invitations now supports explicit onboarding outcomes:
+  - accepted invites can create/transition membership to `active` (default) or `pending`,
+  - invited role projection creates missing active role assignments for the accepting actor,
+  - suspended/removed membership conflicts are rejected with deterministic conflict outcomes.
+- Added focused coverage in `src/application/workspaces/tests/WorkspaceInvitationLifecycleUseCase.test.ts` for success + failure paths (accept, decline, cancel, expiry resolution, stale token replay rejection, identity/workspace compatibility guards).
 
