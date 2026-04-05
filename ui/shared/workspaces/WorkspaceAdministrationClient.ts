@@ -17,6 +17,7 @@ import type {
   WorkspaceAdministrationApiResponse,
 } from "../../../infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 import type {
+  AcceptWorkspaceInvitationOnboardingApiResponse,
   IssueWorkspaceInvitationApiResponse,
   WorkspaceInvitationApiResponse,
 } from "../../../infrastructure/api/workspaces/sdk/PublicWorkspaceInvitationApiContract";
@@ -129,6 +130,14 @@ export interface WorkspaceAdministrationClient {
     },
     sessionToken: string,
   ): Promise<WorkspaceInvitationApiResponse<IssueWorkspaceInvitationApiResponse>>;
+  acceptWorkspaceInvitationOnboarding(
+    request: {
+      readonly workspaceId: string;
+      readonly invitationToken: string;
+      readonly onboardingMetadata?: Readonly<Record<string, unknown>>;
+    },
+    sessionToken: string,
+  ): Promise<WorkspaceInvitationApiResponse<AcceptWorkspaceInvitationOnboardingApiResponse>>;
   cancelWorkspaceInvitation(
     request: {
       readonly workspaceId: string;
@@ -433,6 +442,24 @@ export class HttpWorkspaceAdministrationClient implements WorkspaceAdministratio
         expiresAt: request.expiresAt,
         expiresInMs: request.expiresInMs,
         targetUserIdentityIdHint: request.targetUserIdentityIdHint,
+        onboardingMetadata: request.onboardingMetadata,
+      }),
+      sessionToken,
+    );
+  }
+
+  public async acceptWorkspaceInvitationOnboarding(
+    request: {
+      readonly workspaceId: string;
+      readonly invitationToken: string;
+      readonly onboardingMetadata?: Readonly<Record<string, unknown>>;
+    },
+    sessionToken: string,
+  ): Promise<WorkspaceInvitationApiResponse<AcceptWorkspaceInvitationOnboardingApiResponse>> {
+    return this.post(
+      `/api/v1/workspaces/${encodeURIComponent(request.workspaceId)}/onboarding/accept`,
+      Object.freeze({
+        invitationToken: request.invitationToken,
         onboardingMetadata: request.onboardingMetadata,
       }),
       sessionToken,

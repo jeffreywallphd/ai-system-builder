@@ -60,6 +60,11 @@ export class WorkspaceAdministrationService {
     sessionToken,
   ) => this.client.issueWorkspaceInvitation(request, sessionToken);
 
+  public acceptWorkspaceInvitationOnboarding: WorkspaceAdministrationClient["acceptWorkspaceInvitationOnboarding"] = (
+    request,
+    sessionToken,
+  ) => this.client.acceptWorkspaceInvitationOnboarding(request, sessionToken);
+
   public cancelWorkspaceInvitation: WorkspaceAdministrationClient["cancelWorkspaceInvitation"] = (
     request,
     sessionToken,

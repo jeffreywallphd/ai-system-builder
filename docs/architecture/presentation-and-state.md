@@ -971,3 +971,16 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - `ui/routes/RouteConfig.ts`,
   - `ui/routes/AppRouter.tsx`,
   - `ui/pages/SettingsPage.tsx`.
+
+## Workspace thin-client administration UI update (story 3.4.3)
+
+- Added focused thin-client workspace surfaces for web/mobile contexts:
+  - `ui/pages/WorkspaceMembershipThinClientPage.tsx`
+  - `ui/pages/WorkspaceInvitationOnboardingPage.tsx`
+- Added web-specific route helper in `ui/web/workspaces/WorkspaceThinClientRoutes.ts` for invite acceptance link path composition.
+- Renderer integration remains thin and contract-driven over existing backend endpoints:
+  - workspace client/service seams in `ui/shared/workspaces/WorkspaceAdministrationClient.ts` and `ui/services/WorkspaceAdministrationService.ts` now include invitation onboarding acceptance.
+- Thin-client route coverage now includes:
+  - `ROUTE_PATHS.workspaceThinMembership` (`/settings/workspaces/thin`) for compact membership/invitation management,
+  - `ROUTE_PATHS.workspaceInvitationAccept` (`/workspaces/:workspaceId/invitations/:invitationToken/accept`) for invite acceptance onboarding.
+- Responsive surface behavior for these pages is implemented in shared app styles (`ui/styles/app.css`) using dedicated thin-page layout classes to keep operations usable on smaller screens.

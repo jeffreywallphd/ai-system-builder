@@ -79,33 +79,37 @@ describe("HttpWorkspaceAdministrationClient", () => {
       invitedRoles: ["member"],
       expiresInMs: 3600000,
     }, "token-11");
+    await client.acceptWorkspaceInvitationOnboarding({
+      workspaceId: "workspace:alpha",
+      invitationToken: "tok_join_123",
+    }, "token-12");
     await client.cancelWorkspaceInvitation({
       workspaceId: "workspace:alpha",
       invitationId: "invitation:1",
-    }, "token-12");
+    }, "token-13");
     await client.listWorkspaceRoleAssignments({
       workspaceId: "workspace:alpha",
       roles: ["admin", "member"],
       statuses: ["active"],
       limit: 20,
       offset: 0,
-    }, "token-13");
+    }, "token-14");
     await client.assignWorkspaceRole({
       workspaceId: "workspace:alpha",
       targetUserIdentityId: "user:beta",
       role: "admin",
-    }, "token-14");
+    }, "token-15");
     await client.reassignWorkspaceRole({
       workspaceId: "workspace:alpha",
       targetUserIdentityId: "user:beta",
       fromRole: "member",
       toRole: "viewer",
-    }, "token-15");
+    }, "token-16");
     await client.revokeWorkspaceRole({
       workspaceId: "workspace:alpha",
       targetUserIdentityId: "user:beta",
       role: "viewer",
-    }, "token-16");
+    }, "token-17");
 
     expect(requests.map((entry) => entry.method)).toEqual([
       "GET",
@@ -118,6 +122,7 @@ describe("HttpWorkspaceAdministrationClient", () => {
       "POST",
       "DELETE",
       "GET",
+      "POST",
       "POST",
       "DELETE",
       "GET",
@@ -137,6 +142,7 @@ describe("HttpWorkspaceAdministrationClient", () => {
       "http://127.0.0.1:8788/api/v1/workspaces/workspace%3Aalpha/members/user%3Abeta",
       "http://127.0.0.1:8788/api/v1/workspaces/workspace%3Aalpha/invitations?status=pending&activeOnly=true&limit=10&offset=5",
       "http://127.0.0.1:8788/api/v1/workspaces/workspace%3Aalpha/invitations",
+      "http://127.0.0.1:8788/api/v1/workspaces/workspace%3Aalpha/onboarding/accept",
       "http://127.0.0.1:8788/api/v1/workspaces/workspace%3Aalpha/invitations/invitation%3A1",
       "http://127.0.0.1:8788/api/v1/workspaces/workspace%3Aalpha/roles?role=admin&role=member&status=active&limit=20&offset=0",
       "http://127.0.0.1:8788/api/v1/workspaces/workspace%3Aalpha/roles/assign",
