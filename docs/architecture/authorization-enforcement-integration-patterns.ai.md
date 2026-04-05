@@ -99,3 +99,26 @@ Async flows (`startExecutionAsync`, `pollExecution`) must preserve delegated sco
 - `infrastructure/api/studio-shell/tests/ReferenceImageOutputAuthorization.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthorizationManagement.test.ts`
+
+## 9) Sharing management and reporting surfaces (Story 4.4.8 publication)
+
+Use these seams when adding new admin/user sharing capabilities:
+
+- backend API composition: `AuthorizationManagementBackendApi`
+- HTTP routing and request validation: `IdentityHttpServer` authorization management handlers
+- renderer service/client seams: `AuthorizationManagementService`, `HttpAuthorizationManagementClient`
+- desktop/thin-client route builders: `ui/web/authorization/AuthorizationSharingRoutes.ts`
+- shared management panel composition: `AuthorizationSharingManagementPanel`
+- reporting surface: `AuthorizationReportingPage`
+
+Required extension posture:
+
+- keep endpoint and error contracts stable (`invalid-request`, `forbidden`, `conflict`, etc.),
+- keep high-risk mutation confirmations server-enforced through metadata confirmation codes,
+- keep access review/reporting policy-gated in backend APIs,
+- update docs + tests together when adding resource-family support to sharing/reporting surfaces.
+
+Reference docs:
+
+- `docs/architecture/authorization-feature-4-final-baseline.md`
+- `docs/authorization-sharing-management-and-access-review.md`

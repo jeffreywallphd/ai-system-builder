@@ -143,6 +143,8 @@ The runtime is not a single path. The system currently supports multiple executi
 - For the Feature 4 / Epic 4.2 effective-permission resolution baseline and deterministic precedence model, read [`authorization-feature-4-epic-4.2-policy-evaluation-engine-and-authorization-persistence.md`](./authorization-feature-4-epic-4.2-policy-evaluation-engine-and-authorization-persistence.md).
 - For Feature 4 / Epic 4.3 transport/runtime enforcement adapters and consistent HTTP/WebSocket/IPC authorization mapping, read [`authorization-feature-4-epic-4.3-protected-resource-enforcement-and-runtime-integration.md`](./authorization-feature-4-epic-4.3-protected-resource-enforcement-and-runtime-integration.md).
 - For route/handler/resource-module/UI/async extension rules that keep enforcement centralized, read [`authorization-enforcement-integration-patterns.md`](./authorization-enforcement-integration-patterns.md).
+- For the consolidated Feature 4 production baseline and extension checklist, read [`authorization-feature-4-final-baseline.md`](./authorization-feature-4-final-baseline.md).
+- For admin/user sharing-management and access-review operations guidance, read [`../authorization-sharing-management-and-access-review.md`](../authorization-sharing-management-and-access-review.md).
 - For workspace administration audit hook seams and integration boundaries, read [`workspace-administration-audit-hooks.md`](./workspace-administration-audit-hooks.md).
 - For Feature 1 completion baseline and downstream dependency notes (trusted device, workspace membership, authorization), read [`identity-feature-1-final-baseline.md`](./identity-feature-1-final-baseline.md).
 
@@ -249,4 +251,5 @@ The runtime is not a single path. The system currently supports multiple executi
 - Regression coverage now protects these guarantees through contract-focused suites in:
   - `application/system-studio/tests/ImageManipulationRunnableTemplateContract.regression.test.ts`,
   - existing completeness/readiness/smoke/failure-path suites under `application/system-studio/tests/*` and `infrastructure/api/studio-shell/tests/*`.
+
 

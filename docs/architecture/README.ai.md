@@ -74,6 +74,8 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 4 / Epic 4.2 effective-permission resolver baseline for deterministic policy decisions: `docs/architecture/authorization-feature-4-epic-4.2-policy-evaluation-engine-and-authorization-persistence.md`
 - Feature 4 / Epic 4.3 transport/runtime authorization enforcement adapters for reusable HTTP/WebSocket/IPC policy guards: `docs/architecture/authorization-feature-4-epic-4.3-protected-resource-enforcement-and-runtime-integration.md`
 - Authorization extension playbook for new route/handler/resource/UI/async surfaces: `docs/architecture/authorization-enforcement-integration-patterns.md`
+- Feature 4 final production baseline and extension checklist: `docs/architecture/authorization-feature-4-final-baseline.md`
+- Admin/user sharing-management and access-review operations guide: `docs/authorization-sharing-management-and-access-review.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).
@@ -171,4 +173,5 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Regression coverage now protects these guarantees through contract-focused suites in:
   - `application/system-studio/tests/ImageManipulationRunnableTemplateContract.regression.test.ts`,
   - existing completeness/readiness/smoke/failure-path suites under `application/system-studio/tests/*` and `infrastructure/api/studio-shell/tests/*`.
+
 
