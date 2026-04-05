@@ -3,6 +3,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
+  acceptWorkspaceInvitation,
+  revokeWorkspaceRoleAssignment,
+  revokeWorkspaceInvitation,
+  transitionWorkspaceMembershipStatus,
+  updateWorkspaceDetails,
   WorkspaceInvitationStatuses,
   WorkspaceMembershipStatuses,
   WorkspaceRoleAssignmentStatuses,
@@ -178,6 +183,185 @@ describe("SqliteWorkspacePersistenceAdapter", () => {
     adapter.dispose();
   });
 
+  it("persists update mutations for workspace, membership, invitation, and role assignment records", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-workspace-updates-"));
+    createdRoots.push(root);
+    const adapter = new SqliteWorkspacePersistenceAdapter(path.join(root, "workspace.sqlite"));
+
+    const workspace = await adapter.saveWorkspace(createWorkspace({
+      id: "workspace:alpha",
+      slug: "team-alpha",
+      displayName: "Team Alpha",
+      ownerUserId: "user:owner",
+      createdBy: "user:owner",
+      status: WorkspaceStatuses.active,
+      now: new Date("2026-04-05T12:00:00.000Z"),
+    }));
+    const updatedWorkspace = updateWorkspaceDetails(workspace, {
+      displayName: "Team Alpha Updated",
+      description: "Workspace detail update",
+      actorUserId: "user:owner",
+      now: new Date("2026-04-05T12:30:00.000Z"),
+    });
+    await adapter.saveWorkspace(updatedWorkspace);
+
+    const memberMembership = await adapter.saveMembership(createWorkspaceMembership({
+      id: "membership:alpha-member",
+      workspaceId: workspace.id,
+      userIdentityId: "user:member",
+      status: WorkspaceMembershipStatuses.active,
+      joinedAt: "2026-04-05T12:00:00.000Z",
+      createdBy: "user:owner",
+      now: new Date("2026-04-05T12:00:00.000Z"),
+    }));
+    const suspendedMembership = transitionWorkspaceMembershipStatus(memberMembership, {
+      status: WorkspaceMembershipStatuses.suspended,
+      actorUserId: "user:owner",
+      now: new Date("2026-04-05T12:40:00.000Z"),
+    });
+    await adapter.saveMembership(suspendedMembership);
+
+    await adapter.saveMembership(createWorkspaceMembership({
+      id: "membership:alpha-owner",
+      workspaceId: workspace.id,
+      userIdentityId: "user:owner",
+      status: WorkspaceMembershipStatuses.active,
+      joinedAt: "2026-04-05T12:00:00.000Z",
+      createdBy: "user:owner",
+      now: new Date("2026-04-05T12:00:00.000Z"),
+    }));
+
+    const roleAssignment = await adapter.saveRoleAssignment(createWorkspaceRoleAssignment({
+      id: "role:alpha-member",
+      workspaceId: workspace.id,
+      userIdentityId: "user:member",
+      role: WorkspaceRoles.member,
+      status: WorkspaceRoleAssignmentStatuses.active,
+      assignedBy: "user:owner",
+      assignedAt: "2026-04-05T12:00:00.000Z",
+    }));
+    const revokedRoleAssignment = revokeWorkspaceRoleAssignment(roleAssignment, {
+      revokedBy: "user:owner",
+      now: new Date("2026-04-05T12:50:00.000Z"),
+      activeOwnerAssignmentCount: 1,
+    });
+    await adapter.saveRoleAssignment(revokedRoleAssignment);
+
+    const invitation = await adapter.saveInvitation(createWorkspaceInvitation({
+      id: "invite:alpha-member",
+      workspaceId: workspace.id,
+      invitedEmail: "member@example.com",
+      invitedByUserId: "user:owner",
+      invitedRoles: [WorkspaceRoles.member],
+      status: WorkspaceInvitationStatuses.pending,
+      createdAt: "2026-04-05T12:00:00.000Z",
+      expiresAt: "2026-04-06T12:00:00.000Z",
+      lastModifiedBy: "user:owner",
+      lastModifiedAt: "2026-04-05T12:00:00.000Z",
+    }));
+    const revokedInvitation = revokeWorkspaceInvitation(invitation, {
+      actorUserId: "user:owner",
+      now: new Date("2026-04-05T12:55:00.000Z"),
+    });
+    await adapter.saveInvitation(revokedInvitation);
+
+    const loadedWorkspace = await adapter.findWorkspaceById(workspace.id);
+    const loadedMembership = await adapter.findMembershipById(memberMembership.id);
+    const loadedRoleAssignment = await adapter.findRoleAssignmentById(roleAssignment.id);
+    const loadedInvitation = await adapter.findInvitationById(invitation.id);
+
+    expect(loadedWorkspace?.displayName).toBe("Team Alpha Updated");
+    expect(loadedWorkspace?.description).toBe("Workspace detail update");
+    expect(loadedMembership?.status).toBe(WorkspaceMembershipStatuses.suspended);
+    expect(loadedMembership?.suspendedAt).toBe("2026-04-05T12:40:00.000Z");
+    expect(loadedRoleAssignment?.status).toBe(WorkspaceRoleAssignmentStatuses.revoked);
+    expect(loadedRoleAssignment?.revokedAt).toBe("2026-04-05T12:50:00.000Z");
+    expect(loadedInvitation?.status).toBe(WorkspaceInvitationStatuses.revoked);
+    expect(loadedInvitation?.lastModifiedAt).toBe("2026-04-05T12:55:00.000Z");
+
+    adapter.dispose();
+  });
+
+  it("rejects stale updates for mutable workspace tenancy records", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-workspace-stale-write-"));
+    createdRoots.push(root);
+    const adapter = new SqliteWorkspacePersistenceAdapter(path.join(root, "workspace.sqlite"));
+
+    const workspace = await adapter.saveWorkspace(createWorkspace({
+      id: "workspace:alpha",
+      slug: "team-alpha",
+      displayName: "Team Alpha",
+      ownerUserId: "user:owner",
+      createdBy: "user:owner",
+      status: WorkspaceStatuses.active,
+      now: new Date("2026-04-05T12:00:00.000Z"),
+    }));
+    const workspaceNewer = updateWorkspaceDetails(workspace, {
+      displayName: "Team Alpha Newer",
+      actorUserId: "user:owner",
+      now: new Date("2026-04-05T12:30:00.000Z"),
+    });
+    await adapter.saveWorkspace(workspaceNewer);
+    await expect(adapter.saveWorkspace(workspace)).rejects.toThrow("persistence conflict while saving workspace");
+
+    const membership = await adapter.saveMembership(createWorkspaceMembership({
+      id: "membership:alpha-member",
+      workspaceId: workspace.id,
+      userIdentityId: "user:member",
+      status: WorkspaceMembershipStatuses.active,
+      joinedAt: "2026-04-05T12:00:00.000Z",
+      createdBy: "user:owner",
+      now: new Date("2026-04-05T12:00:00.000Z"),
+    }));
+    const membershipNewer = transitionWorkspaceMembershipStatus(membership, {
+      status: WorkspaceMembershipStatuses.suspended,
+      actorUserId: "user:owner",
+      now: new Date("2026-04-05T12:40:00.000Z"),
+    });
+    await adapter.saveMembership(membershipNewer);
+    await expect(adapter.saveMembership(membership)).rejects.toThrow("persistence conflict while saving membership");
+
+    const invitation = await adapter.saveInvitation(createWorkspaceInvitation({
+      id: "invite:alpha-member",
+      workspaceId: workspace.id,
+      invitedEmail: "member@example.com",
+      invitedByUserId: "user:owner",
+      invitedRoles: [WorkspaceRoles.member],
+      status: WorkspaceInvitationStatuses.pending,
+      createdAt: "2026-04-05T12:00:00.000Z",
+      expiresAt: "2026-04-06T12:00:00.000Z",
+      lastModifiedBy: "user:owner",
+      lastModifiedAt: "2026-04-05T12:00:00.000Z",
+    }));
+    const invitationNewer = acceptWorkspaceInvitation(invitation, {
+      acceptedByUserIdentityId: "user:member",
+      now: new Date("2026-04-05T12:45:00.000Z"),
+    });
+    await adapter.saveInvitation(invitationNewer);
+    await expect(adapter.saveInvitation(invitation)).rejects.toThrow("persistence conflict while saving invitation");
+
+    const roleAssignment = await adapter.saveRoleAssignment(createWorkspaceRoleAssignment({
+      id: "role:alpha-member",
+      workspaceId: workspace.id,
+      userIdentityId: "user:member",
+      role: WorkspaceRoles.member,
+      status: WorkspaceRoleAssignmentStatuses.active,
+      assignedBy: "user:owner",
+      assignedAt: "2026-04-05T12:00:00.000Z",
+    }));
+    const roleAssignmentNewer = revokeWorkspaceRoleAssignment(roleAssignment, {
+      revokedBy: "user:owner",
+      now: new Date("2026-04-05T12:50:00.000Z"),
+      activeOwnerAssignmentCount: 1,
+    });
+    await adapter.saveRoleAssignment(roleAssignmentNewer);
+    await expect(adapter.saveRoleAssignment(roleAssignment)).rejects.toThrow(
+      "persistence conflict while saving role assignment",
+    );
+
+    adapter.dispose();
+  });
+
   it("enforces uniqueness and ownership integrity constraints", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-src-workspace-constraints-"));
     createdRoots.push(root);
@@ -248,7 +432,7 @@ describe("SqliteWorkspacePersistenceAdapter", () => {
       expiresAt: "2026-04-06T13:00:00.000Z",
       lastModifiedBy: "user:owner",
       lastModifiedAt: "2026-04-05T13:00:00.000Z",
-    }))).rejects.toThrow();
+    }))).rejects.toThrow("Workspace persistence failed to save workspace invitation");
 
     await expect(adapter.saveRoleAssignment(createWorkspaceRoleAssignment({
       id: "role:alpha-owner-2",
@@ -258,7 +442,7 @@ describe("SqliteWorkspacePersistenceAdapter", () => {
       status: WorkspaceRoleAssignmentStatuses.active,
       assignedBy: "user:owner",
       assignedAt: "2026-04-05T13:00:00.000Z",
-    }))).rejects.toThrow();
+    }))).rejects.toThrow("Workspace persistence failed to save workspace role assignment");
 
     adapter.dispose();
   });

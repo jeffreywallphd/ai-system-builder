@@ -173,32 +173,45 @@ export class SqliteWorkspacePersistenceAdapter
   }
 
   public async saveWorkspace(workspace: Workspace): Promise<Workspace> {
-    this.getDatabase().prepare(`
-      INSERT INTO workspace_records (
-        workspace_id,
-        slug,
-        display_name,
-        description,
-        status,
-        owner_user_id,
-        visibility,
-        created_by,
-        last_modified_by,
-        created_at,
-        last_modified_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(workspace_id) DO UPDATE SET
-        slug = excluded.slug,
-        display_name = excluded.display_name,
-        description = excluded.description,
-        status = excluded.status,
-        owner_user_id = excluded.owner_user_id,
-        visibility = excluded.visibility,
-        created_by = excluded.created_by,
-        last_modified_by = excluded.last_modified_by,
-        created_at = excluded.created_at,
-        last_modified_at = excluded.last_modified_at
-    `).run(...mapWorkspaceToRowValues(workspace));
+    const result = this.executeMutation("save workspace", () => this.getDatabase().prepare(`
+        INSERT INTO workspace_records (
+          workspace_id,
+          slug,
+          display_name,
+          description,
+          status,
+          owner_user_id,
+          visibility,
+          created_by,
+          last_modified_by,
+          created_at,
+          last_modified_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(workspace_id) DO UPDATE SET
+          slug = excluded.slug,
+          display_name = excluded.display_name,
+          description = excluded.description,
+          status = excluded.status,
+          owner_user_id = excluded.owner_user_id,
+          visibility = excluded.visibility,
+          created_by = excluded.created_by,
+          last_modified_by = excluded.last_modified_by,
+          created_at = excluded.created_at,
+          last_modified_at = excluded.last_modified_at
+        WHERE excluded.last_modified_at >= workspace_records.last_modified_at
+      `).run(...mapWorkspaceToRowValues(workspace)));
+
+    if (result.changes === 0) {
+      const persisted = await this.findWorkspaceById(workspace.id);
+      if (
+        persisted &&
+        persisted.ownership.lastModifiedAt > workspace.ownership.lastModifiedAt
+      ) {
+        throw new Error(
+          `Workspace persistence conflict while saving workspace '${workspace.id}': a newer record already exists.`,
+        );
+      }
+    }
 
     return workspace;
   }
@@ -327,38 +340,48 @@ export class SqliteWorkspacePersistenceAdapter
   }
 
   public async saveMembership(membership: WorkspaceMembership): Promise<WorkspaceMembership> {
-    this.getDatabase().prepare(`
-      INSERT INTO workspace_memberships (
-        membership_id,
-        workspace_id,
-        user_identity_id,
-        status,
-        invited_by_user_id,
-        invitation_id,
-        joined_at,
-        suspended_at,
-        removed_at,
-        removed_by_user_id,
-        created_at,
-        updated_at,
-        created_by,
-        last_modified_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(membership_id) DO UPDATE SET
-        workspace_id = excluded.workspace_id,
-        user_identity_id = excluded.user_identity_id,
-        status = excluded.status,
-        invited_by_user_id = excluded.invited_by_user_id,
-        invitation_id = excluded.invitation_id,
-        joined_at = excluded.joined_at,
-        suspended_at = excluded.suspended_at,
-        removed_at = excluded.removed_at,
-        removed_by_user_id = excluded.removed_by_user_id,
-        created_at = excluded.created_at,
-        updated_at = excluded.updated_at,
-        created_by = excluded.created_by,
-        last_modified_by = excluded.last_modified_by
-    `).run(...mapWorkspaceMembershipToRowValues(membership));
+    const result = this.executeMutation("save workspace membership", () => this.getDatabase().prepare(`
+        INSERT INTO workspace_memberships (
+          membership_id,
+          workspace_id,
+          user_identity_id,
+          status,
+          invited_by_user_id,
+          invitation_id,
+          joined_at,
+          suspended_at,
+          removed_at,
+          removed_by_user_id,
+          created_at,
+          updated_at,
+          created_by,
+          last_modified_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(membership_id) DO UPDATE SET
+          workspace_id = excluded.workspace_id,
+          user_identity_id = excluded.user_identity_id,
+          status = excluded.status,
+          invited_by_user_id = excluded.invited_by_user_id,
+          invitation_id = excluded.invitation_id,
+          joined_at = excluded.joined_at,
+          suspended_at = excluded.suspended_at,
+          removed_at = excluded.removed_at,
+          removed_by_user_id = excluded.removed_by_user_id,
+          created_at = excluded.created_at,
+          updated_at = excluded.updated_at,
+          created_by = excluded.created_by,
+          last_modified_by = excluded.last_modified_by
+        WHERE excluded.updated_at >= workspace_memberships.updated_at
+      `).run(...mapWorkspaceMembershipToRowValues(membership)));
+
+    if (result.changes === 0) {
+      const persisted = await this.findMembershipById(membership.id);
+      if (persisted && persisted.updatedAt > membership.updatedAt) {
+        throw new Error(
+          `Workspace persistence conflict while saving membership '${membership.id}': a newer record already exists.`,
+        );
+      }
+    }
 
     return membership;
   }
@@ -458,28 +481,43 @@ export class SqliteWorkspacePersistenceAdapter
   }
 
   public async saveRoleAssignment(roleAssignment: WorkspaceRoleAssignment): Promise<WorkspaceRoleAssignment> {
-    this.getDatabase().prepare(`
-      INSERT INTO workspace_role_assignments (
-        role_assignment_id,
-        workspace_id,
-        user_identity_id,
-        role,
-        status,
-        assigned_at,
-        assigned_by,
-        revoked_at,
-        revoked_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(role_assignment_id) DO UPDATE SET
-        workspace_id = excluded.workspace_id,
-        user_identity_id = excluded.user_identity_id,
-        role = excluded.role,
-        status = excluded.status,
-        assigned_at = excluded.assigned_at,
-        assigned_by = excluded.assigned_by,
-        revoked_at = excluded.revoked_at,
-        revoked_by = excluded.revoked_by
-    `).run(...mapWorkspaceRoleAssignmentToRowValues(roleAssignment));
+    const result = this.executeMutation("save workspace role assignment", () => this.getDatabase().prepare(`
+        INSERT INTO workspace_role_assignments (
+          role_assignment_id,
+          workspace_id,
+          user_identity_id,
+          role,
+          status,
+          assigned_at,
+          assigned_by,
+          revoked_at,
+          revoked_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(role_assignment_id) DO UPDATE SET
+          workspace_id = excluded.workspace_id,
+          user_identity_id = excluded.user_identity_id,
+          role = excluded.role,
+          status = excluded.status,
+          assigned_at = excluded.assigned_at,
+          assigned_by = excluded.assigned_by,
+          revoked_at = excluded.revoked_at,
+          revoked_by = excluded.revoked_by
+        WHERE COALESCE(excluded.revoked_at, excluded.assigned_at)
+          >= COALESCE(workspace_role_assignments.revoked_at, workspace_role_assignments.assigned_at)
+      `).run(...mapWorkspaceRoleAssignmentToRowValues(roleAssignment)));
+
+    if (result.changes === 0) {
+      const persisted = await this.findRoleAssignmentById(roleAssignment.id);
+      if (
+        persisted &&
+        this.getRoleAssignmentMutationTimestamp(persisted)
+          > this.getRoleAssignmentMutationTimestamp(roleAssignment)
+      ) {
+        throw new Error(
+          `Workspace persistence conflict while saving role assignment '${roleAssignment.id}': a newer record already exists.`,
+        );
+      }
+    }
 
     return roleAssignment;
   }
@@ -613,34 +651,44 @@ export class SqliteWorkspacePersistenceAdapter
   }
 
   public async saveInvitation(invitation: WorkspaceInvitation): Promise<WorkspaceInvitation> {
-    this.getDatabase().prepare(`
-      INSERT INTO workspace_invitations (
-        invitation_id,
-        workspace_id,
-        invited_email,
-        invited_by_user_id,
-        invited_roles_json,
-        status,
-        created_at,
-        expires_at,
-        responded_at,
-        accepted_by_user_identity_id,
-        last_modified_by,
-        last_modified_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(invitation_id) DO UPDATE SET
-        workspace_id = excluded.workspace_id,
-        invited_email = excluded.invited_email,
-        invited_by_user_id = excluded.invited_by_user_id,
-        invited_roles_json = excluded.invited_roles_json,
-        status = excluded.status,
-        created_at = excluded.created_at,
-        expires_at = excluded.expires_at,
-        responded_at = excluded.responded_at,
-        accepted_by_user_identity_id = excluded.accepted_by_user_identity_id,
-        last_modified_by = excluded.last_modified_by,
-        last_modified_at = excluded.last_modified_at
-    `).run(...mapWorkspaceInvitationToRowValues(invitation));
+    const result = this.executeMutation("save workspace invitation", () => this.getDatabase().prepare(`
+        INSERT INTO workspace_invitations (
+          invitation_id,
+          workspace_id,
+          invited_email,
+          invited_by_user_id,
+          invited_roles_json,
+          status,
+          created_at,
+          expires_at,
+          responded_at,
+          accepted_by_user_identity_id,
+          last_modified_by,
+          last_modified_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(invitation_id) DO UPDATE SET
+          workspace_id = excluded.workspace_id,
+          invited_email = excluded.invited_email,
+          invited_by_user_id = excluded.invited_by_user_id,
+          invited_roles_json = excluded.invited_roles_json,
+          status = excluded.status,
+          created_at = excluded.created_at,
+          expires_at = excluded.expires_at,
+          responded_at = excluded.responded_at,
+          accepted_by_user_identity_id = excluded.accepted_by_user_identity_id,
+          last_modified_by = excluded.last_modified_by,
+          last_modified_at = excluded.last_modified_at
+        WHERE excluded.last_modified_at >= workspace_invitations.last_modified_at
+      `).run(...mapWorkspaceInvitationToRowValues(invitation)));
+
+    if (result.changes === 0) {
+      const persisted = await this.findInvitationById(invitation.id);
+      if (persisted && persisted.lastModifiedAt > invitation.lastModifiedAt) {
+        throw new Error(
+          `Workspace persistence conflict while saving invitation '${invitation.id}': a newer record already exists.`,
+        );
+      }
+    }
 
     return invitation;
   }
@@ -759,5 +807,25 @@ export class SqliteWorkspacePersistenceAdapter
       sql: "",
       params: Object.freeze([]),
     };
+  }
+
+  private executeMutation(
+    operation: string,
+    mutation: () => { readonly changes: number },
+  ): { readonly changes: number } {
+    try {
+      return mutation();
+    } catch (error) {
+      throw this.toPersistenceError(operation, error);
+    }
+  }
+
+  private toPersistenceError(operation: string, error: unknown): Error {
+    const details = error instanceof Error ? error.message : String(error);
+    return new Error(`Workspace persistence failed to ${operation}: ${details}`);
+  }
+
+  private getRoleAssignmentMutationTimestamp(roleAssignment: WorkspaceRoleAssignment): string {
+    return roleAssignment.revokedAt ?? roleAssignment.assignedAt;
   }
 }
