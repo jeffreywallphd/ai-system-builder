@@ -1,6 +1,6 @@
 # Internal CA Foundation
 
-This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, and Story 6.2.1 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, and certificate subject-profile issuance policy enforcement.
+This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, Story 6.2.1, and Story 6.2.2 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, certificate subject-profile issuance policy enforcement, and concrete issuance signing/material persistence execution.
 
 ## Canonical artifacts
 
@@ -30,9 +30,11 @@ This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
 - `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
 - `src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage.ts`
+- `src/infrastructure/security/ca/InternalCertificateAuthorityIssuer.ts`
 - `src/infrastructure/security/tests/InternalCertificateAuthorityBootstrapEnvironmentAdapter.test.ts`
 - `src/infrastructure/security/secrets/tests/FileSystemProtectedSecretStore.test.ts`
 - `src/infrastructure/security/ca/tests/ProtectedCertificateAuthorityRootMaterialStorage.test.ts`
+- `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - `hosts/server/IdentityServerHost.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
@@ -55,9 +57,20 @@ Implemented in this story:
 
 Out of scope in this story:
 
-- concrete crypto implementation for key generation, signing, and CRL generation
-- concrete persistence adapters or schema migrations
+- full CRL generation/distribution workflows and automated rotation orchestration
 - authoritative server transport handlers for CA operations
+
+## Story 6.2.2 certificate issuance signing pipeline
+
+Story 6.2.2 adds the concrete end-to-end certificate issuance execution path:
+
+- `InternalCertificateAuthorityIssuer` now provides a production signing adapter for:
+  - CA root keypair/certificate generation (`initializeInternalCertificateAuthority`)
+  - leaf certificate signing (`issueCertificateMaterial`) using persisted CA root key/cert material
+  - deterministic serial creation, validity clamping, certificate fingerprint outputs, and chain output
+- `IssueCertificateForSubjectUseCase` now persists protected issued certificate/chain artifacts plus trust-material metadata references in the issuance path before final issued-certificate metadata write.
+- issuance emits redacted structured audit events (`certificate-issuance-started|succeeded|failed`) without exposing secret refs or plaintext material.
+- issuance failure handling now includes best-effort compensating revocation when post-signing persistence fails, so failure is bounded and explicit.
 
 ## Story 6.1.3 startup bootstrap behavior
 
@@ -241,11 +254,12 @@ The application layer exposes explicit ports only:
 
 These seams let later stories implement bootstrapping, issuance, lookup, revocation, and rotation workflows without importing infrastructure into domain/application code.
 
-Story 6.2.1 adds `IssueCertificateForSubjectUseCase` in the application layer to:
+Story 6.2.1 and Story 6.2.2 add `IssueCertificateForSubjectUseCase` in the application layer to:
 
 - enforce profile policy before calling the issuer crypto port
 - gate node certificate issuance on approved, non-revoked node trust state
-- persist issued certificate metadata only after policy and trust prerequisites pass
+- persist issued certificate/chain protected artifacts and trust-material metadata references before final issued-certificate metadata write
+- issue bounded, redacted audit events for start/success/failure outcomes
 
 ## Shared contract summary
 
@@ -274,7 +288,8 @@ Story 6.2.1 adds `IssueCertificateForSubjectUseCase` in the application layer to
 - `InitializeCertificateAuthorityUseCase.test.ts`: clean initialization path, conflict policy behavior, and metadata/material sync assertions
 - `GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`: healthy/uninitialized/degraded/blocked state mapping, contract parse validation, and sanitization assertions
 - `CertificateIssuancePolicyDomain.test.ts`: profile catalog, SAN/CN/usages/validity policy guards, and server/service path-separation assertions
-- `IssueCertificateForSubjectUseCase.test.ts`: pre-issuance policy enforcement, approved-node trust prerequisites, and revoked/unapproved node rejection coverage
+- `IssueCertificateForSubjectUseCase.test.ts`: pre-issuance policy enforcement, approved-node trust prerequisites, issued material persistence, and post-signing failure compensation coverage
+- `InternalCertificateAuthorityIssuer.test.ts`: concrete root generation + signing pipeline behavior and issuance prerequisite failure coverage
 - `IdentityServerHost.test.ts`: host-level first-time initialization invocation seam coverage
 
 ## Related architecture note

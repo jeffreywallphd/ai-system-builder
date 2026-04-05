@@ -11,6 +11,7 @@
 - Adds first-time CA initialization orchestration with guarded idempotency and host invocation seam (Story 6.1.5).
 - Adds CA status/health introspection query seams for internal/admin consumers (Story 6.1.6).
 - Adds certificate subject profiles and pre-issuance policy enforcement seams (Story 6.2.1).
+- Adds concrete CA issuance signing + protected issued-material persistence seams (Story 6.2.2).
 
 ## Main artifacts to cite
 
@@ -33,10 +34,12 @@
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
 - `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
 - `src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage.ts`
+- `src/infrastructure/security/ca/InternalCertificateAuthorityIssuer.ts`
 - `hosts/server/IdentityServerHost.ts`
 - `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
 - `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
+- `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
 - `src/shared/schemas/security/CertificateAuthoritySchemaContracts.ts`
@@ -53,8 +56,9 @@
 ## Boundary expectations
 
 - Domain/application layers expose contracts and validation only.
-- No infrastructure signing, key storage, or transport handlers are implemented in this story.
-- Later stories should implement concrete bootstrap, issuance, revocation, rotation, and distribution behavior behind these ports.
+- Infrastructure signing + root-material loading is now implemented behind `ICertificateAuthorityIssuerPort`.
+- Issued certificate/chain material persistence remains behind protected storage + trust-material reference ports.
+- CRL generation/distribution and automated rotation execution are still follow-on behavior.
 - Host startup composes CA bootstrap checks through application use cases and adapters, not host-level raw secret/key handling.
 - Startup secret metadata checks support `env:` and `secret-store:` references.
 - Protected-store configuration is fail-closed when partially configured or unavailable.
@@ -131,6 +135,18 @@ Structured diagnostics emitted by the startup use case are designed for future o
   - typed profile exists now for forward compatibility
   - issuance is intentionally disabled until dedicated device trust flows are implemented.
 
+## Story 6.2.2 issuance signing + persistence behavior
+
+- `InternalCertificateAuthorityIssuer` provides concrete:
+  - root CA keypair/certificate generation for initialization
+  - leaf certificate signing using persisted CA root cert/key material
+  - serial generation, validity-window clamping, and certificate fingerprint outputs
+- `IssueCertificateForSubjectUseCase` now:
+  - persists issued certificate/chain artifacts through protected storage
+  - persists trust-material metadata references aligned to issued material refs
+  - emits redacted issuance audit events (`started`, `succeeded`, `failed`)
+  - attempts best-effort compensating certificate revocation when post-signing persistence fails
+
 ## Coverage in this slice
 
 - Domain invariants and lifecycle transitions: `src/domain/security/tests/CertificateAuthorityDomain.test.ts`
@@ -145,7 +161,8 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - protected CA material save/load coverage: `src/infrastructure/security/ca/tests/ProtectedCertificateAuthorityRootMaterialStorage.test.ts`
 - first-time CA initialization coverage: `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - CA introspection state/health/sanitization coverage: `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
-- issuance policy precondition coverage: `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
+- issuance policy + issued-material persistence/failure compensation coverage: `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
+- concrete issuer signing pipeline coverage: `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - host initialization seam coverage: `hosts/server/tests/IdentityServerHost.test.ts`
 
 ## Follow-on note
