@@ -36,6 +36,7 @@ export interface AuthorizationManagementClient {
       readonly resourceFamily: AuthorizationResourceFamily;
       readonly resourceType: string;
       readonly resourceId: string;
+      readonly inspectedActorUserIdentityId?: string;
       readonly asOf?: string;
       readonly includeDenied?: boolean;
       readonly includeRevokedSharingGrants?: boolean;
@@ -109,6 +110,7 @@ export class HttpAuthorizationManagementClient implements AuthorizationManagemen
       readonly resourceFamily: AuthorizationResourceFamily;
       readonly resourceType: string;
       readonly resourceId: string;
+      readonly inspectedActorUserIdentityId?: string;
       readonly asOf?: string;
       readonly includeDenied?: boolean;
       readonly includeRevokedSharingGrants?: boolean;
@@ -116,6 +118,9 @@ export class HttpAuthorizationManagementClient implements AuthorizationManagemen
     sessionToken: string,
   ): Promise<AuthorizationManagementApiResponse<AuthorizationAccessStateApiResponse>> {
     const query = new URLSearchParams();
+    if (request.inspectedActorUserIdentityId) {
+      query.set("inspectedActorUserIdentityId", request.inspectedActorUserIdentityId);
+    }
     if (request.asOf) {
       query.set("asOf", request.asOf);
     }

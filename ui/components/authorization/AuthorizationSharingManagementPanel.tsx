@@ -51,6 +51,7 @@ export default function AuthorizationSharingManagementPanel({
   const [resourceType, setResourceType] = useState(initialResource?.resourceType ?? "asset");
   const [resourceId, setResourceId] = useState(initialResource?.resourceId ?? "");
   const [workspaceId, setWorkspaceId] = useState(initialResource?.workspaceId ?? "");
+  const [inspectedActorUserIdentityId, setInspectedActorUserIdentityId] = useState("");
   const [includeDeniedPermissions, setIncludeDeniedPermissions] = useState(true);
   const [includeRevokedSharingGrants, setIncludeRevokedSharingGrants] = useState(false);
 
@@ -104,6 +105,7 @@ export default function AuthorizationSharingManagementPanel({
         resourceFamily: resolvedResource.resourceFamily,
         resourceType: resolvedResource.resourceType,
         resourceId: resolvedResource.resourceId,
+        inspectedActorUserIdentityId: inspectedActorUserIdentityId.trim() || undefined,
         includeDenied: includeDeniedPermissions,
         includeRevokedSharingGrants,
       }, sessionToken);
@@ -129,6 +131,7 @@ export default function AuthorizationSharingManagementPanel({
     authorizationService,
     includeDeniedPermissions,
     includeRevokedSharingGrants,
+    inspectedActorUserIdentityId,
     resolvedResource,
     sessionToken,
   ]);
@@ -320,6 +323,15 @@ export default function AuthorizationSharingManagementPanel({
                 <span className="ui-field__label">Resource id</span>
                 <input className="ui-input" value={resourceId} onChange={(event) => setResourceId(event.target.value)} />
               </label>
+              <label className="ui-field">
+                <span className="ui-field__label">Inspect actor user id (optional)</span>
+                <input
+                  className="ui-input"
+                  value={inspectedActorUserIdentityId}
+                  placeholder="user:jamie"
+                  onChange={(event) => setInspectedActorUserIdentityId(event.target.value)}
+                />
+              </label>
             </div>
           ) : (
             <dl className="ui-meta-grid">
@@ -334,6 +346,10 @@ export default function AuthorizationSharingManagementPanel({
               <div className="ui-meta-item">
                 <dt className="ui-meta-label">Resource id</dt>
                 <dd className="ui-meta-value">{resourceId}</dd>
+              </div>
+              <div className="ui-meta-item">
+                <dt className="ui-meta-label">Inspect actor user id</dt>
+                <dd className="ui-meta-value">{inspectedActorUserIdentityId.trim() || "Current session user"}</dd>
               </div>
             </dl>
           )}
@@ -540,6 +556,11 @@ export default function AuthorizationSharingManagementPanel({
           <h2 className="ui-card__title">Permission feedback</h2>
         </div>
         <div className="ui-card__body">
+          {accessState ? (
+            <p className="ui-text-secondary ui-text-small">
+              Inspecting actor <strong>{accessState.inspectedActorUserIdentityId}</strong> (requested by {accessState.inspectorActorUserIdentityId}).
+            </p>
+          ) : null}
           {permissionRows.length === 0 ? <p className="ui-text-secondary">Load access state to see permission decisions.</p> : (
             <div className="ui-table-wrapper">
               <table className="ui-table">
@@ -548,6 +569,7 @@ export default function AuthorizationSharingManagementPanel({
                     <th scope="col">Permission</th>
                     <th scope="col">Decision</th>
                     <th scope="col">Reason</th>
+                    <th scope="col">Contributions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -556,6 +578,7 @@ export default function AuthorizationSharingManagementPanel({
                       <td>{permission.permissionKey}</td>
                       <td>{permission.isAllowed ? "Allowed" : "Denied"}</td>
                       <td>{permission.reason || permission.denialReason || permission.reasonCode}</td>
+                      <td>{formatPermissionContributions(permission)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -666,4 +689,27 @@ function applyApiError(
   setErrorMessage(error?.message ?? "Authorization management request failed.");
   const validationMessages = (error?.validationErrors ?? Object.freeze([])).map((entry) => `${entry.path}: ${entry.message}`);
   setValidationMessages(Object.freeze(validationMessages));
+}
+
+function formatPermissionContributions(
+  permission: AuthorizationAccessStateApiResponse["permissions"][number],
+): string {
+  const contributions: string[] = [];
+  if (permission.explanation.ownershipContext.contributedToDecision) {
+    contributions.push("owner");
+  }
+  if (permission.explanation.roleBasedGrants.contributedToDecision) {
+    contributions.push("role");
+  }
+  if (permission.explanation.directPermissionGrants.contributedToDecision) {
+    contributions.push("direct grant");
+  }
+  if (permission.explanation.sharingBasedGrants.contributedToDecision) {
+    contributions.push("sharing");
+  }
+  if (permission.explanation.visibilityContribution.contributedToDecision) {
+    contributions.push(`visibility (${permission.explanation.visibilityContribution.contributionReasonCode ?? "rule"})`);
+  }
+
+  return contributions.length > 0 ? contributions.join(", ") : "none";
 }

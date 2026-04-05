@@ -160,9 +160,10 @@ export class AuthorizationManagementBackendApi {
       return authorization;
     }
 
+    const inspectedActorUserIdentityId = request.inspectedActorUserIdentityId?.trim() || request.actorUserIdentityId;
     const outcome = await this.dependencies.listEffectiveAccessUseCase.execute({
       actor: {
-        actorUserIdentityId: request.actorUserIdentityId,
+        actorUserIdentityId: inspectedActorUserIdentityId,
         activeWorkspaceId: undefined,
       },
       resource: request.resource,
@@ -184,6 +185,8 @@ export class AuthorizationManagementBackendApi {
     return Object.freeze({
       ok: true,
       data: Object.freeze({
+        inspectorActorUserIdentityId: request.actorUserIdentityId,
+        inspectedActorUserIdentityId,
         resource: request.resource,
         resourcePolicyMetadata: toMetadataApiRecord({
           ...outcome.value.resourcePolicyMetadata,
@@ -202,6 +205,7 @@ export class AuthorizationManagementBackendApi {
           matchedRoleAssignmentIds: entry.decision.matchedRoleAssignmentIds,
           matchedPermissionGrantIds: entry.decision.matchedPermissionGrantIds,
           matchedSharingGrantIds: entry.decision.matchedSharingGrantIds,
+          explanation: entry.explanation,
         }))),
       }),
     });

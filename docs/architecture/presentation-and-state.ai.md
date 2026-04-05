@@ -872,3 +872,10 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - `ui/pages/AuthorizationSharingThinClientPage.tsx` (`ROUTE_PATHS.authorizationSharingThin` => `/settings/sharing/thin`)
 - Added web route helpers in `ui/web/authorization/AuthorizationSharingRoutes.ts` for deep-linking sharing screens from other surfaces.
 - Integrated representative resource-surface sharing controls directly in `ui/pages/AssetDetailPage.tsx` for asset-family access management in-context.
+
+## Authorization access review inspection UI update (story 4.4.3)
+
+- `AuthorizationSharingManagementPanel` now supports inspecting effective access for a specified target actor user id (optional; defaults to current session actor).
+- Access-state response context now displays both inspector and inspected actor identities so admin/user reviewers can confirm whose permissions are being analyzed.
+- Permission feedback rows now render contribution summaries per permission decision (owner/role/direct-grant/sharing/visibility), using backend-provided redaction-safe explanation channels.
+- Renderer transport seam now propagates inspected actor context through `ui/shared/authorization/AuthorizationManagementClient.ts` query parameters (`inspectedActorUserIdentityId`).
