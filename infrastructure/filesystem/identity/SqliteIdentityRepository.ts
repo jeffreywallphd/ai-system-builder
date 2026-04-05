@@ -137,6 +137,12 @@ interface SessionRow {
   readonly client_user_agent: string | null;
   readonly client_ip_address: string | null;
   readonly client_device_id: string | null;
+  readonly client_trusted_device_id: string | null;
+  readonly client_issued_on_trusted_device: number | null;
+  readonly client_session_assurance_level: "authenticated-untrusted" | "authenticated-trusted" | "authenticated-restricted" | null;
+  readonly client_device_trust_state: "unknown" | "untrusted" | "trusted" | "pending-pairing" | "revoked" | "expired" | null;
+  readonly client_device_trust_evaluated_at: string | null;
+  readonly client_device_trust_invalidation_reasons_json: string | null;
   readonly client_trusted_device_binding_id: string | null;
   readonly client_trust_marker: string | null;
 }
@@ -720,13 +726,19 @@ export class SqliteIdentityRepository
           replaced_by_session_id,
           revocation_reason,
           revoked_at,
-        client_access_channel,
-        client_user_agent,
-        client_ip_address,
-        client_device_id,
-        client_trusted_device_binding_id,
-        client_trust_marker
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          client_access_channel,
+          client_user_agent,
+          client_ip_address,
+          client_device_id,
+          client_trusted_device_id,
+          client_issued_on_trusted_device,
+          client_session_assurance_level,
+          client_device_trust_state,
+          client_device_trust_evaluated_at,
+          client_device_trust_invalidation_reasons_json,
+          client_trusted_device_binding_id,
+          client_trust_marker
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(session_id) DO UPDATE SET
           user_identity_id = excluded.user_identity_id,
           provider_id = excluded.provider_id,
@@ -742,6 +754,12 @@ export class SqliteIdentityRepository
           client_user_agent = excluded.client_user_agent,
           client_ip_address = excluded.client_ip_address,
           client_device_id = excluded.client_device_id,
+          client_trusted_device_id = excluded.client_trusted_device_id,
+          client_issued_on_trusted_device = excluded.client_issued_on_trusted_device,
+          client_session_assurance_level = excluded.client_session_assurance_level,
+          client_device_trust_state = excluded.client_device_trust_state,
+          client_device_trust_evaluated_at = excluded.client_device_trust_evaluated_at,
+          client_device_trust_invalidation_reasons_json = excluded.client_device_trust_invalidation_reasons_json,
           client_trusted_device_binding_id = excluded.client_trusted_device_binding_id,
           client_trust_marker = excluded.client_trust_marker
       `)
@@ -761,6 +779,16 @@ export class SqliteIdentityRepository
         session.client?.userAgent ?? null,
         session.client?.ipAddress ?? null,
         session.client?.deviceId ?? null,
+        session.client?.deviceTrust?.trustedDeviceId ?? null,
+        typeof session.client?.deviceTrust?.issuedOnTrustedDevice === "boolean"
+          ? toBooleanInteger(session.client.deviceTrust.issuedOnTrustedDevice)
+          : null,
+        session.client?.deviceTrust?.sessionAssuranceLevel ?? null,
+        session.client?.deviceTrust?.snapshot?.state ?? null,
+        session.client?.deviceTrust?.snapshot?.evaluatedAt ?? null,
+        session.client?.deviceTrust
+          ? JSON.stringify(session.client.deviceTrust.invalidationReasons)
+          : null,
         session.client?.trustedDeviceBindingId ?? null,
         session.client?.trustMarker ?? null,
       );
@@ -792,6 +820,12 @@ export class SqliteIdentityRepository
           client_user_agent,
           client_ip_address,
           client_device_id,
+          client_trusted_device_id,
+          client_issued_on_trusted_device,
+          client_session_assurance_level,
+          client_device_trust_state,
+          client_device_trust_evaluated_at,
+          client_device_trust_invalidation_reasons_json,
           client_trusted_device_binding_id,
           client_trust_marker
         FROM identity_sessions
@@ -845,6 +879,12 @@ export class SqliteIdentityRepository
           client_user_agent,
           client_ip_address,
           client_device_id,
+          client_trusted_device_id,
+          client_issued_on_trusted_device,
+          client_session_assurance_level,
+          client_device_trust_state,
+          client_device_trust_evaluated_at,
+          client_device_trust_invalidation_reasons_json,
           client_trusted_device_binding_id,
           client_trust_marker
         FROM identity_sessions
@@ -1174,6 +1214,32 @@ function parseBlockedSubstrings(value: string): ReadonlyArray<string> {
   return Object.freeze(parsed.filter((entry): entry is string => typeof entry === "string"));
 }
 
+function parseSessionTrustInvalidationReasons(
+  value: string | null,
+): ReadonlyArray<"trusted-device-revoked" | "trusted-device-trust-lost" | "trusted-device-expired" | "trusted-device-mismatch"> {
+  if (!value) {
+    return Object.freeze([]);
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      return Object.freeze([]);
+    }
+
+    return Object.freeze(
+      parsed.filter((entry): entry is "trusted-device-revoked" | "trusted-device-trust-lost" | "trusted-device-expired" | "trusted-device-mismatch" => (
+        entry === "trusted-device-revoked"
+        || entry === "trusted-device-trust-lost"
+        || entry === "trusted-device-expired"
+        || entry === "trusted-device-mismatch"
+      )),
+    );
+  } catch {
+    return Object.freeze([]);
+  }
+}
+
 function hydrateCredentialMaterial(row: CredentialMaterialRow): IdentityCredentialMaterialRecord {
   return Object.freeze({
     id: row.credential_material_id,
@@ -1205,6 +1271,27 @@ function hydrateSession(row: SessionRow): Session {
       userAgent: row.client_user_agent ?? undefined,
       ipAddress: row.client_ip_address ?? undefined,
       deviceId: row.client_device_id ?? undefined,
+      deviceTrust: row.client_trusted_device_id
+        || row.client_issued_on_trusted_device !== null
+        || row.client_session_assurance_level
+        || row.client_device_trust_state
+        || row.client_device_trust_evaluated_at
+        || row.client_device_trust_invalidation_reasons_json
+        ? Object.freeze({
+            trustedDeviceId: row.client_trusted_device_id ?? undefined,
+            issuedOnTrustedDevice: row.client_issued_on_trusted_device === 1,
+            sessionAssuranceLevel: row.client_session_assurance_level ?? "authenticated-untrusted",
+            snapshot: Object.freeze({
+              state: row.client_device_trust_state ?? "unknown",
+              evaluatedAt: row.client_device_trust_evaluated_at ?? row.issued_at,
+            }),
+            invalidationReasons: parseSessionTrustInvalidationReasons(
+              row.client_device_trust_invalidation_reasons_json,
+            ),
+            trustedDeviceBindingId: row.client_trusted_device_binding_id ?? row.client_trusted_device_id ?? undefined,
+            trustMarker: row.client_trust_marker ?? undefined,
+          })
+        : undefined,
       trustedDeviceBindingId: row.client_trusted_device_binding_id ?? undefined,
       trustMarker: row.client_trust_marker ?? undefined,
     },

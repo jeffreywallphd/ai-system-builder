@@ -126,6 +126,16 @@ describe("IdentitySessionLifecycleService", () => {
       accessChannel: IdentitySessionAccessChannels.desktop,
       client: {
         deviceId: "desktop-device-1",
+        deviceTrust: {
+          trustedDeviceId: "trusted-device:desktop-device-1",
+          issuedOnTrustedDevice: true,
+          sessionAssuranceLevel: "authenticated-trusted",
+          snapshot: {
+            state: "trusted",
+            evaluatedAt: "2026-04-04T12:00:00.000Z",
+          },
+          invalidationReasons: [],
+        },
       },
     });
     expect(desktopResult.ok).toBeTrue();
@@ -134,6 +144,8 @@ describe("IdentitySessionLifecycleService", () => {
     }
     expect(desktopResult.value.session.expiresAt).toBe("2026-05-04T12:00:00.000Z");
     expect(desktopResult.value.policy.allowRefresh).toBeFalse();
+    expect(desktopResult.value.session.client?.deviceTrust?.trustedDeviceId).toBe("trusted-device:desktop-device-1");
+    expect(desktopResult.value.session.client?.deviceTrust?.sessionAssuranceLevel).toBe("authenticated-trusted");
   });
 
   it("refreshes active sessions when policy allows refresh and rotates the prior session", async () => {

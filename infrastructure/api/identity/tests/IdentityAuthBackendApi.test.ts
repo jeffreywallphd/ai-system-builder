@@ -61,6 +61,16 @@ describe("IdentityAuthBackendApi", () => {
       providerSubject: "valid.user",
       client: {
         deviceId: "device:alpha",
+        deviceTrustContext: {
+          trustedDeviceId: "trusted-device:alpha",
+          issuedOnTrustedDevice: true,
+          sessionAssuranceLevel: "authenticated-trusted",
+          trustStateSnapshot: {
+            state: "trusted",
+            evaluatedAt: "2026-04-04T18:00:00.000Z",
+          },
+          invalidationReasons: [],
+        },
         trustedDeviceBindingId: "trusted-device:alpha",
         trustMarker: "marker:alpha",
       },
@@ -78,6 +88,9 @@ describe("IdentityAuthBackendApi", () => {
     expect(loggedIn.data?.sessionTokenType).toBe("Bearer");
     expect(loggedIn.data?.sessionAccessChannel).toBe("thin-client");
     expect(loggedIn.data?.sessionDeviceId).toBe("device:alpha");
+    expect(loggedIn.data?.sessionDeviceTrustContext?.trustedDeviceId).toBe("trusted-device:alpha");
+    expect(loggedIn.data?.sessionDeviceTrustContext?.sessionAssuranceLevel).toBe("authenticated-trusted");
+    expect(loggedIn.data?.sessionDeviceTrustContext?.trustStateSnapshot?.state).toBe("trusted");
     expect(loggedIn.data?.sessionTrustedDeviceBindingId).toBe("trusted-device:alpha");
     expect(loggedIn.data?.sessionTrustMarker).toBe("marker:alpha");
   });
@@ -161,6 +174,8 @@ describe("IdentityAuthBackendApi", () => {
     expect(resolvedData.principal.username).toBe("session.validation.user");
     expect(resolvedData.session.sessionId).toBe(loginData.sessionId);
     expect(resolvedData.session.deviceId).toBe("device:resolve");
+    expect(resolvedData.session.deviceTrustContext?.trustedDeviceId).toBe("trusted-device:resolve");
+    expect(resolvedData.session.deviceTrustContext?.sessionAssuranceLevel).toBe("authenticated-trusted");
     expect(resolvedData.session.trustedDeviceBindingId).toBe("trusted-device:resolve");
     expect(resolvedData.session.trustMarker).toBe("marker:resolve");
 

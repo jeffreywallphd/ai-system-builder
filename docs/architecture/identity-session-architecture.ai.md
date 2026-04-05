@@ -86,12 +86,17 @@ Validation rules:
 - visibility return re-validates and clears stale/revoked sessions
 - desktop uses preload storage bridge when available; web uses local storage
 
-## Trusted-device seam
+## Session trust model
 
-- optional fields: `trustedDeviceBindingId`, `trustMarker`
-- persisted on sessions and returned in resolution payloads
-- optional `IIdentitySessionTrustEvaluator` can deny sessions
-- no default evaluator is composed in host wiring yet
+- sessions now carry structured device trust context (`deviceTrust`) in addition to legacy compatibility fields:
+  - `trustedDeviceId`
+  - `issuedOnTrustedDevice`
+  - `sessionAssuranceLevel`
+  - `snapshot` (`state`, `evaluatedAt`)
+  - `invalidationReasons` (`trusted-device-revoked`, `trusted-device-trust-lost`, `trusted-device-expired`, `trusted-device-mismatch`)
+- persistence now includes dedicated trust columns on `identity_sessions` (migration version `6`) for trusted device id, assurance level, trust-state snapshot, and invalidation reasons JSON.
+- login issuance and session-resolution contracts accept/return structured trust context while preserving legacy `trustedDeviceBindingId` / `trustMarker` fields for compatibility.
+- optional `IIdentitySessionTrustEvaluator` can deny sessions and return trust invalidation reasons for deterministic runtime failure context.
 
 ## Primary tests
 

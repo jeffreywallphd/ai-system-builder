@@ -57,12 +57,47 @@ export interface LoginLocalIdentityApiRequest {
     readonly userAgent?: string;
     readonly ipAddress?: string;
     readonly deviceId?: string;
+    readonly deviceTrustContext?: IdentitySessionDeviceTrustContext;
     readonly trustedDeviceBindingId?: string;
     readonly trustMarker?: string;
   };
   readonly credential: {
     readonly candidate: string;
   };
+}
+
+export type IdentitySessionAssuranceLevel =
+  | "authenticated-untrusted"
+  | "authenticated-trusted"
+  | "authenticated-restricted";
+
+export type IdentitySessionDeviceTrustState =
+  | "unknown"
+  | "untrusted"
+  | "trusted"
+  | "pending-pairing"
+  | "revoked"
+  | "expired";
+
+export type IdentitySessionTrustInvalidationReason =
+  | "trusted-device-revoked"
+  | "trusted-device-trust-lost"
+  | "trusted-device-expired"
+  | "trusted-device-mismatch";
+
+export interface IdentitySessionDeviceTrustSnapshot {
+  readonly state: IdentitySessionDeviceTrustState;
+  readonly evaluatedAt: string;
+}
+
+export interface IdentitySessionDeviceTrustContext {
+  readonly trustedDeviceId?: string;
+  readonly issuedOnTrustedDevice?: boolean;
+  readonly sessionAssuranceLevel?: IdentitySessionAssuranceLevel;
+  readonly trustStateSnapshot?: IdentitySessionDeviceTrustSnapshot;
+  readonly invalidationReasons?: ReadonlyArray<IdentitySessionTrustInvalidationReason>;
+  readonly trustedDeviceBindingId?: string;
+  readonly trustMarker?: string;
 }
 
 export interface LoginLocalIdentityApiResponse {
@@ -81,6 +116,7 @@ export interface LoginLocalIdentityApiResponse {
   readonly sessionExpiresAt: string;
   readonly sessionAccessChannel?: "desktop" | "thin-client";
   readonly sessionDeviceId?: string;
+  readonly sessionDeviceTrustContext?: IdentitySessionDeviceTrustContext;
   readonly sessionTrustedDeviceBindingId?: string;
   readonly sessionTrustMarker?: string;
 }
@@ -173,6 +209,7 @@ export interface ResolveAuthenticatedSessionApiResponse {
     readonly providerSubject: string;
     readonly accessChannel?: "desktop" | "thin-client";
     readonly deviceId?: string;
+    readonly deviceTrustContext?: IdentitySessionDeviceTrustContext;
     readonly trustedDeviceBindingId?: string;
     readonly trustMarker?: string;
     readonly issuedAt: string;

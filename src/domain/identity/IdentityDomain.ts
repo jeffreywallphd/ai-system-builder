@@ -157,11 +157,58 @@ export const IdentitySessionAccessChannels = Object.freeze({
 export type IdentitySessionAccessChannel =
   typeof IdentitySessionAccessChannels[keyof typeof IdentitySessionAccessChannels];
 
+export const SessionAssuranceLevels = Object.freeze({
+  authenticatedUntrusted: "authenticated-untrusted",
+  authenticatedTrusted: "authenticated-trusted",
+  authenticatedRestricted: "authenticated-restricted",
+});
+
+export type SessionAssuranceLevel =
+  typeof SessionAssuranceLevels[keyof typeof SessionAssuranceLevels];
+
+export const SessionDeviceTrustStates = Object.freeze({
+  unknown: "unknown",
+  untrusted: "untrusted",
+  trusted: "trusted",
+  pendingPairing: "pending-pairing",
+  revoked: "revoked",
+  expired: "expired",
+});
+
+export type SessionDeviceTrustState =
+  typeof SessionDeviceTrustStates[keyof typeof SessionDeviceTrustStates];
+
+export const SessionDeviceTrustInvalidationReasons = Object.freeze({
+  trustedDeviceRevoked: "trusted-device-revoked",
+  trustedDeviceTrustLost: "trusted-device-trust-lost",
+  trustedDeviceExpired: "trusted-device-expired",
+  trustedDeviceMismatch: "trusted-device-mismatch",
+});
+
+export type SessionDeviceTrustInvalidationReason =
+  typeof SessionDeviceTrustInvalidationReasons[keyof typeof SessionDeviceTrustInvalidationReasons];
+
+export interface SessionDeviceTrustStateSnapshot {
+  readonly state: SessionDeviceTrustState;
+  readonly evaluatedAt: string;
+}
+
+export interface SessionDeviceTrustContext {
+  readonly trustedDeviceId?: string;
+  readonly issuedOnTrustedDevice?: boolean;
+  readonly sessionAssuranceLevel?: SessionAssuranceLevel;
+  readonly snapshot?: SessionDeviceTrustStateSnapshot;
+  readonly invalidationReasons?: ReadonlyArray<SessionDeviceTrustInvalidationReason>;
+  readonly trustedDeviceBindingId?: string;
+  readonly trustMarker?: string;
+}
+
 export interface SessionClientContext {
   readonly accessChannel?: IdentitySessionAccessChannel;
   readonly userAgent?: string;
   readonly ipAddress?: string;
   readonly deviceId?: string;
+  readonly deviceTrust?: SessionDeviceTrustContext;
   readonly trustedDeviceBindingId?: string;
   readonly trustMarker?: string;
 }
@@ -386,6 +433,84 @@ function normalizeSessionRevocationReason(value: SessionRevocationReason): Sessi
     throw new IdentityDomainError(`Session revocation reason '${String(value)}' is invalid.`);
   }
   return value;
+}
+
+function normalizeSessionAssuranceLevel(value?: SessionAssuranceLevel): SessionAssuranceLevel {
+  if (!value) {
+    return SessionAssuranceLevels.authenticatedUntrusted;
+  }
+  if (!Object.values(SessionAssuranceLevels).includes(value)) {
+    throw new IdentityDomainError(`Session assurance level '${String(value)}' is invalid.`);
+  }
+  return value;
+}
+
+function normalizeSessionDeviceTrustState(value?: SessionDeviceTrustState): SessionDeviceTrustState {
+  if (!value) {
+    return SessionDeviceTrustStates.unknown;
+  }
+  if (!Object.values(SessionDeviceTrustStates).includes(value)) {
+    throw new IdentityDomainError(`Session device trust state '${String(value)}' is invalid.`);
+  }
+  return value;
+}
+
+function normalizeSessionDeviceTrustInvalidationReasons(
+  values?: ReadonlyArray<SessionDeviceTrustInvalidationReason>,
+): ReadonlyArray<SessionDeviceTrustInvalidationReason> {
+  const deduped = new Set<SessionDeviceTrustInvalidationReason>();
+  for (const value of values ?? []) {
+    if (!Object.values(SessionDeviceTrustInvalidationReasons).includes(value)) {
+      throw new IdentityDomainError(`Session device trust invalidation reason '${String(value)}' is invalid.`);
+    }
+    deduped.add(value);
+  }
+  return Object.freeze([...deduped.values()]);
+}
+
+function normalizeSessionDeviceTrustContext(
+  input: {
+    readonly deviceTrust?: SessionDeviceTrustContext;
+    readonly trustedDeviceBindingId?: string;
+    readonly trustMarker?: string;
+  },
+  issuedAt: Date,
+): SessionDeviceTrustContext | undefined {
+  const trustedDeviceBindingId = normalizeOptional(input.trustedDeviceBindingId);
+  const trustMarker = normalizeOptional(input.trustMarker);
+  const trustedDeviceId = normalizeOptional(input.deviceTrust?.trustedDeviceId) ?? trustedDeviceBindingId;
+  const snapshotState = normalizeSessionDeviceTrustState(input.deviceTrust?.snapshot?.state);
+  const snapshotEvaluatedAt = normalizeIsoTimestamp(
+    input.deviceTrust?.snapshot?.evaluatedAt ?? issuedAt,
+    "Session trust snapshot evaluatedAt",
+  );
+
+  const hasExplicitTrustContext = Boolean(input.deviceTrust);
+  const hasLegacyTrustContext = Boolean(trustedDeviceBindingId || trustMarker);
+  if (!hasExplicitTrustContext && !hasLegacyTrustContext) {
+    return undefined;
+  }
+
+  const issuedOnTrustedDevice = input.deviceTrust?.issuedOnTrustedDevice ?? Boolean(trustedDeviceId);
+  const assuranceLevel = normalizeSessionAssuranceLevel(
+    input.deviceTrust?.sessionAssuranceLevel
+      ?? (issuedOnTrustedDevice
+        ? SessionAssuranceLevels.authenticatedTrusted
+        : SessionAssuranceLevels.authenticatedUntrusted),
+  );
+
+  return Object.freeze({
+    trustedDeviceId,
+    issuedOnTrustedDevice,
+    sessionAssuranceLevel: assuranceLevel,
+    snapshot: Object.freeze({
+      state: snapshotState,
+      evaluatedAt: snapshotEvaluatedAt,
+    }),
+    invalidationReasons: normalizeSessionDeviceTrustInvalidationReasons(input.deviceTrust?.invalidationReasons),
+    trustedDeviceBindingId: trustedDeviceBindingId ?? trustedDeviceId,
+    trustMarker,
+  });
 }
 
 export function isSessionTransitionAllowed(from: IdentitySessionStatus, to: IdentitySessionStatus): boolean {
@@ -751,8 +876,19 @@ export function createSession(input: {
       userAgent: normalizeOptional(input.client.userAgent),
       ipAddress: normalizeOptional(input.client.ipAddress),
       deviceId: normalizeOptional(input.client.deviceId),
-      trustedDeviceBindingId: normalizeOptional(input.client.trustedDeviceBindingId),
-      trustMarker: normalizeOptional(input.client.trustMarker),
+      deviceTrust: normalizeSessionDeviceTrustContext(
+        {
+          deviceTrust: input.client.deviceTrust,
+          trustedDeviceBindingId: input.client.trustedDeviceBindingId,
+          trustMarker: input.client.trustMarker,
+        },
+        issuedAtDate,
+      ),
+      trustedDeviceBindingId: normalizeOptional(input.client.trustedDeviceBindingId)
+        ?? normalizeOptional(input.client.deviceTrust?.trustedDeviceBindingId)
+        ?? normalizeOptional(input.client.deviceTrust?.trustedDeviceId),
+      trustMarker: normalizeOptional(input.client.trustMarker)
+        ?? normalizeOptional(input.client.deviceTrust?.trustMarker),
     }) : undefined,
   });
 }

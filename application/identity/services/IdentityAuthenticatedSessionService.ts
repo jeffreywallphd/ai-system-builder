@@ -2,7 +2,11 @@ import {
   IdentitySessionAccessChannels,
   IdentitySessionStatuses,
   expireSession,
+  SessionAssuranceLevels,
+  SessionDeviceTrustStates,
   type IdentitySessionAccessChannel,
+  type SessionDeviceTrustContext,
+  type SessionDeviceTrustInvalidationReason,
   type Session,
   type SessionRevocationReason,
 } from "../../../src/domain/identity/IdentityDomain";
@@ -38,6 +42,7 @@ export interface IssueAuthenticatedSessionInput {
     readonly userAgent?: string;
     readonly ipAddress?: string;
     readonly deviceId?: string;
+    readonly deviceTrust?: SessionDeviceTrustContext;
     readonly trustedDeviceBindingId?: string;
     readonly trustMarker?: string;
   };
@@ -55,6 +60,7 @@ export interface ResolveAuthenticatedSessionByTokenInput {
 
 export interface ResolveAuthenticatedSessionByTokenResult {
   readonly session: Session;
+  readonly deviceTrustContext?: SessionDeviceTrustContext;
   readonly trustedDeviceBindingId?: string;
   readonly trustMarker?: string;
 }
@@ -197,10 +203,16 @@ export class IdentityAuthenticatedSessionService {
         })
       : undefined;
     if (trustEvaluation && !trustEvaluation.allowed) {
+      const failureDetails = trustEvaluation.invalidationReasons && trustEvaluation.invalidationReasons.length > 0
+        ? Object.freeze({
+            ...(trustEvaluation.details ?? {}),
+            sessionTrustInvalidationReasons: trustEvaluation.invalidationReasons,
+          })
+        : trustEvaluation.details;
       return this.failure(
         IdentityErrorCodes.invalidSessionState,
         "Session trust requirements were not satisfied.",
-        trustEvaluation.details,
+        failureDetails,
       );
     }
 
@@ -227,11 +239,26 @@ export class IdentityAuthenticatedSessionService {
 
     return identitySuccess(Object.freeze({
       session: resolvedSession,
+      deviceTrustContext: mergeDeviceTrustContext(
+        resolvedSession.client?.deviceTrust,
+        trustEvaluation?.allowed ? trustEvaluation.deviceTrustContext : undefined,
+        trustEvaluation?.allowed
+          ? Object.freeze({
+              trustedDeviceBindingId: trustEvaluation.trustedDeviceBindingId,
+              trustMarker: trustEvaluation.trustMarker,
+            })
+          : undefined,
+      ),
       trustedDeviceBindingId: trustEvaluation?.allowed
-        ? trustEvaluation.trustedDeviceBindingId ?? resolvedSession.client?.trustedDeviceBindingId
+        ? trustEvaluation.trustedDeviceBindingId
+          ?? trustEvaluation.deviceTrustContext?.trustedDeviceBindingId
+          ?? trustEvaluation.deviceTrustContext?.trustedDeviceId
+          ?? resolvedSession.client?.trustedDeviceBindingId
         : resolvedSession.client?.trustedDeviceBindingId,
       trustMarker: trustEvaluation?.allowed
-        ? trustEvaluation.trustMarker ?? resolvedSession.client?.trustMarker
+        ? trustEvaluation.trustMarker
+          ?? trustEvaluation.deviceTrustContext?.trustMarker
+          ?? resolvedSession.client?.trustMarker
         : resolvedSession.client?.trustMarker,
     }));
   }
@@ -324,4 +351,56 @@ function normalizeToken(value: string): string | undefined {
 function normalizeRequired(value: string): string | undefined {
   const normalized = value.trim();
   return normalized ? normalized : undefined;
+}
+
+function mergeDeviceTrustContext(
+  persisted?: SessionDeviceTrustContext,
+  evaluated?: SessionDeviceTrustContext,
+  legacyEvaluation?: {
+    readonly trustedDeviceBindingId?: string;
+    readonly trustMarker?: string;
+  },
+): SessionDeviceTrustContext | undefined {
+  if (!persisted && !evaluated) {
+    return undefined;
+  }
+
+  const fallbackAssurance = (
+    evaluated?.issuedOnTrustedDevice
+    ?? persisted?.issuedOnTrustedDevice
+    ?? Boolean(evaluated?.trustedDeviceId || persisted?.trustedDeviceId || legacyEvaluation?.trustedDeviceBindingId)
+  )
+    ? SessionAssuranceLevels.authenticatedTrusted
+    : SessionAssuranceLevels.authenticatedUntrusted;
+
+  const invalidationReasons = evaluated?.invalidationReasons
+    ?? persisted?.invalidationReasons
+    ?? Object.freeze([] as SessionDeviceTrustInvalidationReason[]);
+
+  return Object.freeze({
+    trustedDeviceId: evaluated?.trustedDeviceId
+      ?? persisted?.trustedDeviceId
+      ?? evaluated?.trustedDeviceBindingId
+      ?? persisted?.trustedDeviceBindingId
+      ?? legacyEvaluation?.trustedDeviceBindingId,
+    issuedOnTrustedDevice: evaluated?.issuedOnTrustedDevice
+      ?? persisted?.issuedOnTrustedDevice
+      ?? Boolean(evaluated?.trustedDeviceId || persisted?.trustedDeviceId || legacyEvaluation?.trustedDeviceBindingId),
+    sessionAssuranceLevel: evaluated?.sessionAssuranceLevel ?? persisted?.sessionAssuranceLevel ?? fallbackAssurance,
+    snapshot: Object.freeze({
+      state: evaluated?.snapshot?.state
+        ?? persisted?.snapshot?.state
+        ?? SessionDeviceTrustStates.unknown,
+      evaluatedAt: evaluated?.snapshot?.evaluatedAt
+        ?? persisted?.snapshot?.evaluatedAt
+        ?? "1970-01-01T00:00:00.000Z",
+    }),
+    invalidationReasons,
+    trustedDeviceBindingId: evaluated?.trustedDeviceBindingId
+      ?? persisted?.trustedDeviceBindingId
+      ?? legacyEvaluation?.trustedDeviceBindingId
+      ?? evaluated?.trustedDeviceId
+      ?? persisted?.trustedDeviceId,
+    trustMarker: evaluated?.trustMarker ?? persisted?.trustMarker ?? legacyEvaluation?.trustMarker,
+  });
 }

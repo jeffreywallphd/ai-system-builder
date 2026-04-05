@@ -1,4 +1,4 @@
-export const IDENTITY_PERSISTENCE_SCHEMA_VERSION = 5;
+export const IDENTITY_PERSISTENCE_SCHEMA_VERSION = 6;
 
 export const IDENTITY_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -289,5 +289,28 @@ export const IDENTITY_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, st
       ON identity_trusted_device_pairing_tokens(trusted_device_id, status, updated_at DESC);
     CREATE INDEX IF NOT EXISTS identity_trusted_device_pairing_tokens_user_workspace_idx
       ON identity_trusted_device_pairing_tokens(user_identity_id, workspace_id, issued_at DESC);
+  `],
+  [6, `
+    ALTER TABLE identity_sessions
+      ADD COLUMN client_trusted_device_id TEXT;
+
+    ALTER TABLE identity_sessions
+      ADD COLUMN client_issued_on_trusted_device INTEGER CHECK (client_issued_on_trusted_device IN (0, 1));
+
+    ALTER TABLE identity_sessions
+      ADD COLUMN client_session_assurance_level TEXT CHECK (
+        client_session_assurance_level IN ('authenticated-untrusted', 'authenticated-trusted', 'authenticated-restricted')
+      );
+
+    ALTER TABLE identity_sessions
+      ADD COLUMN client_device_trust_state TEXT CHECK (
+        client_device_trust_state IN ('unknown', 'untrusted', 'trusted', 'pending-pairing', 'revoked', 'expired')
+      );
+
+    ALTER TABLE identity_sessions
+      ADD COLUMN client_device_trust_evaluated_at TEXT;
+
+    ALTER TABLE identity_sessions
+      ADD COLUMN client_device_trust_invalidation_reasons_json TEXT;
   `],
 ]);

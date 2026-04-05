@@ -96,7 +96,7 @@ Session metadata table:
 - contains lifecycle and client context:
   - ids/principal linkage (`session_id`, `user_identity_id`, `provider_id`, `provider_subject`)
   - lifecycle fields (`status`, `issued_at`, `expires_at`, `rotated_at`, `replaced_by_session_id`, `revocation_reason`, `revoked_at`)
-  - context fields (`client_access_channel`, `client_user_agent`, `client_ip_address`, `client_device_id`, `client_trusted_device_binding_id`, `client_trust_marker`)
+  - context fields (`client_access_channel`, `client_user_agent`, `client_ip_address`, `client_device_id`, `client_trusted_device_id`, `client_issued_on_trusted_device`, `client_session_assurance_level`, `client_device_trust_state`, `client_device_trust_evaluated_at`, `client_device_trust_invalidation_reasons_json`, `client_trusted_device_binding_id`, `client_trust_marker`)
 
 Token material table:
 
@@ -221,18 +221,24 @@ Storage selection:
 - desktop: `window.aiLoomDesktop.storage` when present
 - thin-client/web: `window.localStorage`
 
-## Trusted-device linkage seam
+## Session trust model
 
-Current seam fields:
+Structured session trust fields:
 
-- login/session context fields: `trustedDeviceBindingId`, `trustMarker`
-- persisted in `identity_sessions` as `client_trusted_device_binding_id` and `client_trust_marker`
-- surfaced by session-resolution contracts and UI-hydrated session state
+- login/session context supports structured `deviceTrust`:
+  - `trustedDeviceId`
+  - `issuedOnTrustedDevice`
+  - `sessionAssuranceLevel`
+  - `snapshot` (`state`, `evaluatedAt`)
+  - `invalidationReasons` (`trusted-device-revoked`, `trusted-device-trust-lost`, `trusted-device-expired`, `trusted-device-mismatch`)
+- persisted in `identity_sessions` (schema version `6`) through dedicated trust columns listed above
+- surfaced by session-resolution contracts and UI-hydrated session state as structured trust context
+- legacy compatibility fields `trustedDeviceBindingId` and `trustMarker` remain present
 
 Evaluation seam:
 
 - `IIdentitySessionTrustEvaluator` can be injected into `IdentityAuthenticatedSessionService`
-- evaluator can deny runtime session validity with existing `identity-invalid-session-state` outcomes
+- evaluator can deny runtime session validity with existing `identity-invalid-session-state` outcomes and emit trust invalidation reasons
 
 Current behavior:
 

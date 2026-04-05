@@ -115,6 +115,12 @@ describe("IdentityPersistenceMapper", () => {
       client_user_agent: "agent",
       client_ip_address: "127.0.0.1",
       client_device_id: "device-1",
+      client_trusted_device_id: "trusted-device:alpha",
+      client_issued_on_trusted_device: 1,
+      client_session_assurance_level: "authenticated-trusted",
+      client_device_trust_state: "trusted",
+      client_device_trust_evaluated_at: "2026-04-04T12:00:00.000Z",
+      client_device_trust_invalidation_reasons_json: "[\"trusted-device-revoked\"]",
       client_trusted_device_binding_id: "trusted-device:alpha",
       client_trust_marker: "marker:alpha",
     };
@@ -125,6 +131,8 @@ describe("IdentityPersistenceMapper", () => {
     expect(mappedCredential.hashAlgorithm).toBe("argon2id");
     expect(mappedSession.status).toBe(IdentitySessionStatuses.revoked);
     expect(mappedSession.client?.accessChannel).toBe("thin-client");
+    expect(mappedSession.client?.deviceTrust?.trustedDeviceId).toBe("trusted-device:alpha");
+    expect(mappedSession.client?.deviceTrust?.sessionAssuranceLevel).toBe("authenticated-trusted");
     expect(mappedSession.client?.trustedDeviceBindingId).toBe("trusted-device:alpha");
     expect(mappedSession.client?.trustMarker).toBe("marker:alpha");
     expect(mappedSession.revocation?.reason).toBe("logout");

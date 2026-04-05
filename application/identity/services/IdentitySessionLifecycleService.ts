@@ -6,6 +6,7 @@ import {
   revokeSession,
   rotateSession,
   type IdentitySessionAccessChannel,
+  type SessionDeviceTrustContext,
   type Session,
   type SessionRevocationReason,
 } from "../../../src/domain/identity/IdentityDomain";
@@ -43,6 +44,7 @@ export interface IssueIdentitySessionInput {
     readonly userAgent?: string;
     readonly ipAddress?: string;
     readonly deviceId?: string;
+    readonly deviceTrust?: SessionDeviceTrustContext;
     readonly trustedDeviceBindingId?: string;
     readonly trustMarker?: string;
   };
@@ -186,6 +188,7 @@ export class IdentitySessionLifecycleService {
         userAgent: input.client?.userAgent,
         ipAddress: input.client?.ipAddress,
         deviceId: input.client?.deviceId,
+        deviceTrust: input.client?.deviceTrust,
         trustedDeviceBindingId: input.client?.trustedDeviceBindingId,
         trustMarker: input.client?.trustMarker,
       },

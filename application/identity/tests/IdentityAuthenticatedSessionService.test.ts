@@ -151,6 +151,16 @@ describe("IdentityAuthenticatedSessionService", () => {
       accessChannel: IdentitySessionAccessChannels.thinClient,
       client: {
         deviceId: "device:alpha",
+        deviceTrust: {
+          trustedDeviceId: "trusted-device:alpha",
+          issuedOnTrustedDevice: true,
+          sessionAssuranceLevel: "authenticated-trusted",
+          snapshot: {
+            state: "trusted",
+            evaluatedAt: "2026-04-04T12:00:00.000Z",
+          },
+          invalidationReasons: [],
+        },
         trustedDeviceBindingId: "trusted-device:alpha",
         trustMarker: "marker:alpha",
       },
@@ -165,6 +175,9 @@ describe("IdentityAuthenticatedSessionService", () => {
       throw new Error("Expected token lookup success.");
     }
     expect(resolved.value.session.client?.deviceId).toBe("device:alpha");
+    expect(resolved.value.deviceTrustContext?.trustedDeviceId).toBe("trusted-device:alpha");
+    expect(resolved.value.deviceTrustContext?.sessionAssuranceLevel).toBe("authenticated-trusted");
+    expect(resolved.value.deviceTrustContext?.snapshot.state).toBe("trusted");
     expect(resolved.value.trustedDeviceBindingId).toBe("trusted-device:alpha");
     expect(resolved.value.trustMarker).toBe("marker:alpha");
   });
@@ -459,6 +472,7 @@ describe("IdentityAuthenticatedSessionService", () => {
       evaluateSessionTrust: async () => Object.freeze({
         allowed: false as const,
         reason: "device not trusted",
+        invalidationReasons: Object.freeze(["trusted-device-trust-lost"] as const),
         details: Object.freeze({ policy: "future-device-trust" }),
       }),
     };
@@ -487,6 +501,9 @@ describe("IdentityAuthenticatedSessionService", () => {
       throw new Error("Expected trust evaluation to reject session.");
     }
     expect(resolved.error.code).toBe(IdentityErrorCodes.invalidSessionState);
-    expect(resolved.error.details).toEqual({ policy: "future-device-trust" });
+    expect(resolved.error.details).toEqual({
+      policy: "future-device-trust",
+      sessionTrustInvalidationReasons: ["trusted-device-trust-lost"],
+    });
   });
 });

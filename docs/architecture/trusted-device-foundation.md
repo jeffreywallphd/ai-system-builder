@@ -128,7 +128,7 @@ State invariants include:
 - optional `workspaceId` for workspace-aware trust scoping,
 - trust material reference and revocation metadata for future evaluator and admin workflows.
 
-This aligns with existing identity session trust seams (`trustedDeviceBindingId` / `trustMarker`) without coupling trusted-device domain logic to transport or persistence details.
+This aligns with the session trust model (`deviceTrust` context with trusted device id, assurance level, trust snapshot, and invalidation reasons) while preserving legacy compatibility seams (`trustedDeviceBindingId` / `trustMarker`) without coupling trusted-device domain logic to transport or persistence details.
 
 ## Boundary and dependency posture
 
@@ -144,8 +144,8 @@ Primary persistence artifacts:
 - `infrastructure/filesystem/identity/TrustedDevicePersistenceMapper.ts`
 - `src/infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter.ts`
 - `src/infrastructure/persistence/identity/TrustedDevicePersistenceMapper.ts`
-- `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts` (schema version 5)
-- `src/infrastructure/persistence/identity/SqliteIdentityPersistenceMigrations.ts` (schema version 5)
+- `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts` (schema version 6, with session trust context columns)
+- `src/infrastructure/persistence/identity/SqliteIdentityPersistenceMigrations.ts` (schema version 6, with session trust context columns)
 
 New SQLite tables:
 - `identity_trusted_devices`
