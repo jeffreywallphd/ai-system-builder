@@ -352,6 +352,10 @@ describe("IdentityHttpServer workspace administration routes", () => {
     expect(listBody.data.workspaces[0].workspaceId).toBe("workspace:alpha");
     expect(listBody.data.workspaces[0].membershipSummary.active).toBe(1);
     expect(listBody.data.workspaces[0].actorAccess.canAdministrate).toBe(true);
+    expect(listBody.data.workspaces[0].actorAccess.capabilities.canManageWorkspaceSettings).toBe(true);
+    expect(listBody.data.workspaces[0].actorAccess.capabilities.canManageMembers).toBe(true);
+    expect(listBody.data.workspaces[0].actorAccess.capabilities.canManageInvitations).toBe(true);
+    expect(listBody.data.workspaces[0].actorAccess.capabilities.canManageRoles).toBe(true);
 
     const viewResponse = await fetch(`${baseUrl}/api/v1/workspaces/workspace%3Aalpha/admin-view`, {
       headers: {
@@ -513,5 +517,18 @@ describe("IdentityHttpServer workspace administration routes", () => {
     const mutationBody = await mutationResponse.json();
     expect(mutationBody.ok).toBe(false);
     expect(mutationBody.error.code).toBe("forbidden");
+
+    const memberListResponse = await fetch(`${baseUrl}/api/v1/workspaces`, {
+      headers: {
+        authorization: `Bearer ${member.sessionToken}`,
+      },
+    });
+    expect(memberListResponse.status).toBe(200);
+    const memberListBody = await memberListResponse.json();
+    expect(memberListBody.ok).toBe(true);
+    expect(memberListBody.data.workspaces[0].actorAccess.capabilities.canManageWorkspaceSettings).toBe(false);
+    expect(memberListBody.data.workspaces[0].actorAccess.capabilities.canManageMembers).toBe(false);
+    expect(memberListBody.data.workspaces[0].actorAccess.capabilities.canManageInvitations).toBe(false);
+    expect(memberListBody.data.workspaces[0].actorAccess.capabilities.canManageRoles).toBe(false);
   });
 });

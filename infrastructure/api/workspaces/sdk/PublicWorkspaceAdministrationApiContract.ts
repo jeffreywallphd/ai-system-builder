@@ -78,6 +78,14 @@ export interface WorkspaceAdministrativeActorAccessSummaryApiRecord {
   readonly effectiveRoles: ReadonlyArray<WorkspaceRole>;
   readonly canAdministrate: boolean;
   readonly isWorkspaceOwner: boolean;
+  readonly capabilities: WorkspaceAdministrativeActorCapabilitiesApiRecord;
+}
+
+export interface WorkspaceAdministrativeActorCapabilitiesApiRecord {
+  readonly canManageWorkspaceSettings: boolean;
+  readonly canManageMembers: boolean;
+  readonly canManageInvitations: boolean;
+  readonly canManageRoles: boolean;
 }
 
 export interface WorkspaceAdminListItemApiRecord {

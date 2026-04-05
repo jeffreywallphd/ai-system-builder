@@ -90,6 +90,7 @@ import {
   type UpdateWorkspaceAdministrationApiRequest,
   type UpdateWorkspaceAdministrationApiResponse,
   type WorkspaceAdminListItemApiRecord,
+  type WorkspaceAdministrativeActorCapabilitiesApiRecord,
   type WorkspaceAdministrationApiError,
   type WorkspaceAdministrationApiResponse,
   type WorkspaceInvitationApiRecord,
@@ -123,6 +124,12 @@ interface WorkspaceAdministrationBackendApiDependencies {
   };
 }
 
+type WorkspaceAdministrativeActorAccessWithCapabilities =
+  WorkspaceAdministrativeActorAccessSummary
+  & Readonly<{
+    capabilities: WorkspaceAdministrativeActorCapabilitiesApiRecord;
+  }>;
+
 export class WorkspaceAdministrationBackendApi {
   private readonly clock: { now(): Date };
   private readonly workspaceAdministrationCapabilityResourceType: string;
@@ -152,10 +159,17 @@ export class WorkspaceAdministrationBackendApi {
       return this.failedFromQuery(outcome.error.code, outcome.error.message);
     }
 
+    const workspaces = await Promise.all(outcome.value.workspaces.map(async (workspace) => (
+      toWorkspaceAdminListItem({
+        ...workspace,
+        actorAccess: await this.withActorAccessCapabilities(workspace.id, request.actorUserIdentityId, workspace.actorAccess),
+      })
+    )));
+
     return Object.freeze({
       ok: true,
       data: Object.freeze({
-        workspaces: Object.freeze(outcome.value.workspaces.map((workspace) => toWorkspaceAdminListItem(workspace))),
+        workspaces: Object.freeze(workspaces),
         pagination: outcome.value.pagination,
       }),
     });
@@ -651,7 +665,7 @@ export class WorkspaceAdministrationBackendApi {
   private async getActorAccessSummary(
     workspaceId: string,
     actorUserIdentityId: string,
-  ): Promise<WorkspaceAdministrativeActorAccessSummary> {
+  ): Promise<WorkspaceAdministrativeActorAccessWithCapabilities> {
     const snapshot = await this.dependencies.authorizationReadRepository.getWorkspaceAuthorizationSnapshot({
       workspaceId,
       userIdentityId: actorUserIdentityId,
@@ -664,22 +678,26 @@ export class WorkspaceAdministrationBackendApi {
         .map((assignment) => assignment.role) ?? []),
     ]);
 
-    return Object.freeze({
+    const actorAccess = Object.freeze({
       membershipStatus: snapshot?.membership?.status,
       effectiveRoles,
       canAdministrate: effectiveRoles.includes(WorkspaceRoles.owner) || effectiveRoles.includes(WorkspaceRoles.admin),
       isWorkspaceOwner: effectiveRoles.includes(WorkspaceRoles.owner),
+      capabilities: Object.freeze({
+        canManageWorkspaceSettings: false,
+        canManageMembers: false,
+        canManageInvitations: false,
+        canManageRoles: false,
+      }),
     });
+
+    return this.withActorAccessCapabilities(workspaceId, actorUserIdentityId, actorAccess);
   }
 
   private async assertWorkspaceAdministrationMutationAuthorized(
     workspaceId: string,
     actorUserIdentityId: string,
   ): Promise<WorkspaceAdministrationApiResponse<never> | undefined> {
-    if (!this.dependencies.authorizationPolicyDecisionEvaluator) {
-      return undefined;
-    }
-
     const normalizedWorkspaceId = workspaceId.trim();
     if (!normalizedWorkspaceId) {
       return this.failed(WorkspaceAdministrationApiErrorCodes.invalidRequest, "workspaceId is required.");
@@ -695,26 +713,18 @@ export class WorkspaceAdministrationBackendApi {
       return this.failed(WorkspaceAdministrationApiErrorCodes.notFound, `Workspace '${normalizedWorkspaceId}' was not found.`);
     }
 
-    let decision: Awaited<ReturnType<IAuthorizationPolicyDecisionEvaluator["evaluateDecision"]>>;
+    let decision: Awaited<ReturnType<IAuthorizationPolicyDecisionEvaluator["evaluateDecision"]>> | undefined;
     try {
-      decision = await this.dependencies.authorizationPolicyDecisionEvaluator.evaluateDecision({
-        actor: Object.freeze({
-          actorUserIdentityId: normalizedActorUserIdentityId,
-          activeWorkspaceId: normalizedWorkspaceId,
-        }),
-        requiredPermissionKey: "system.manage",
-        target: Object.freeze({
-          kind: AuthorizationPolicyEvaluationTargetKinds.workspaceCapability,
-          workspaceId: normalizedWorkspaceId,
-          capabilityResourceType: this.workspaceAdministrationCapabilityResourceType,
-        }),
-        asOf: this.clock.now().toISOString(),
-      });
+      decision = await this.evaluateWorkspaceAdministrationManageDecision(normalizedWorkspaceId, normalizedActorUserIdentityId);
     } catch (error) {
       return this.failed(
         WorkspaceAdministrationApiErrorCodes.internal,
         error instanceof Error ? error.message : "Workspace administration authorization evaluation failed.",
       );
+    }
+
+    if (!decision) {
+      return undefined;
     }
 
     if (decision.decision.isAllowed) {
@@ -772,6 +782,53 @@ export class WorkspaceAdministrationBackendApi {
     }
     return this.failed(error.code, error.message);
   }
+
+  private async withActorAccessCapabilities(
+    workspaceId: string,
+    actorUserIdentityId: string,
+    actorAccess: WorkspaceAdministrativeActorAccessSummary,
+  ): Promise<WorkspaceAdministrativeActorAccessWithCapabilities> {
+    let canManage = actorAccess.canAdministrate;
+    try {
+      const decision = await this.evaluateWorkspaceAdministrationManageDecision(workspaceId, actorUserIdentityId);
+      canManage = decision?.decision.isAllowed ?? actorAccess.canAdministrate;
+    } catch {
+      canManage = actorAccess.canAdministrate;
+    }
+
+    return Object.freeze({
+      ...actorAccess,
+      capabilities: Object.freeze({
+        canManageWorkspaceSettings: canManage,
+        canManageMembers: canManage,
+        canManageInvitations: canManage,
+        canManageRoles: canManage,
+      }),
+    });
+  }
+
+  private async evaluateWorkspaceAdministrationManageDecision(
+    workspaceId: string,
+    actorUserIdentityId: string,
+  ): Promise<Awaited<ReturnType<IAuthorizationPolicyDecisionEvaluator["evaluateDecision"]>> | undefined> {
+    if (!this.dependencies.authorizationPolicyDecisionEvaluator) {
+      return undefined;
+    }
+
+    return this.dependencies.authorizationPolicyDecisionEvaluator.evaluateDecision({
+      actor: Object.freeze({
+        actorUserIdentityId,
+        activeWorkspaceId: workspaceId,
+      }),
+      requiredPermissionKey: "system.manage",
+      target: Object.freeze({
+        kind: AuthorizationPolicyEvaluationTargetKinds.workspaceCapability,
+        workspaceId,
+        capabilityResourceType: this.workspaceAdministrationCapabilityResourceType,
+      }),
+      asOf: this.clock.now().toISOString(),
+    });
+  }
 }
 
 function toWorkspaceAdminListItem(value: {
@@ -787,7 +844,7 @@ function toWorkspaceAdminListItem(value: {
   readonly membershipSummary: WorkspaceMembershipStatusSummary;
   readonly roleSummary: WorkspaceRoleSummary;
   readonly invitationSummary: WorkspaceInvitationStatusSummary;
-  readonly actorAccess: WorkspaceAdministrativeActorAccessSummary;
+  readonly actorAccess: WorkspaceAdministrativeActorAccessWithCapabilities;
 }): WorkspaceAdminListItemApiRecord {
   return Object.freeze({
     workspaceId: value.id,
