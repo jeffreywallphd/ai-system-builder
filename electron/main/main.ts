@@ -16,6 +16,11 @@ import {
 } from "../../infrastructure/execution/createExecutionInfrastructure";
 import { resolveDesktopPythonRuntime } from "../../infrastructure/desktop/DesktopPythonRuntimeResolver";
 import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
+import {
+  HostSecureTransportKinds,
+  assertSecureTransportEndpoint,
+  resolveHostSecureTransportConfig,
+} from "../../infrastructure/config/HostSecureTransportConfig";
 import { RendererDeliveryModes } from "../../domain/runtime/AppRuntimeProfile";
 import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
 import type { DesktopBootstrapContext } from "../shared/DesktopContracts";
@@ -343,9 +348,16 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   identityServerHost = await startIdentityServerHost({
     databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
   });
+  const identityApiBaseUrl = assertSecureTransportEndpoint(
+    `http://127.0.0.1:${identityServerHost.port}`,
+    resolveHostSecureTransportConfig({
+      hostKind: HostSecureTransportKinds.desktop,
+      hostAddress: "127.0.0.1",
+    }),
+  );
   const runtimeConfig = AppRuntimeConfig.fromValues({
     ...baseRuntimeConfig.toValues(),
-    identityApiBaseUrl: `http://127.0.0.1:${identityServerHost.port}`,
+    identityApiBaseUrl,
   });
 
   bootstrapContext = Object.freeze({
