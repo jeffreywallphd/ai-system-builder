@@ -10,10 +10,12 @@
 - Adds protected secret storage/loading seams for CA root and signing assets (Story 6.1.4).
 - Adds first-time CA initialization orchestration with guarded idempotency and host invocation seam (Story 6.1.5).
 - Adds CA status/health introspection query seams for internal/admin consumers (Story 6.1.6).
+- Adds certificate subject profiles and pre-issuance policy enforcement seams (Story 6.2.1).
 
 ## Main artifacts to cite
 
 - `src/domain/security/CertificateAuthorityDomain.ts`
+- `src/domain/security/CertificateIssuancePolicyDomain.ts`
 - `src/application/security/ports/ICertificateAuthorityRootPersistenceRepository.ts`
 - `src/application/security/ports/IIssuedCertificatePersistenceRepository.ts`
 - `src/application/security/ports/ITrustMaterialReferencePersistenceRepository.ts`
@@ -26,6 +28,7 @@
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
 - `src/application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase.ts`
+- `src/application/security/use-cases/IssueCertificateForSubjectUseCase.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
 - `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
@@ -33,6 +36,7 @@
 - `hosts/server/IdentityServerHost.ts`
 - `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
+- `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
 - `src/shared/schemas/security/CertificateAuthoritySchemaContracts.ts`
@@ -103,9 +107,34 @@ Structured diagnostics emitted by the startup use case are designed for future o
   - secret reference identifiers and raw file paths
 - Shared DTO/schema contracts include the introspection response shape to stabilize downstream admin API/UI integration.
 
+## Story 6.2.1 subject profile + issuance policy behavior
+
+- Adds explicit subject profile vocabulary in domain:
+  - `authoritative-server`
+  - `approved-node`
+  - `internal-service`
+  - `trusted-device` (reserved for future use; issuance disabled)
+- Profiles define:
+  - required subject-reference kind and reference-id prefix
+  - allowed/required usage combinations
+  - SAN/common-name policy expectations
+  - profile-specific validity-day ceilings
+- `IssueCertificateForSubjectUseCase` enforces policy before calling `ICertificateAuthorityIssuerPort.issueCertificateMaterial`.
+- Node issuance guardrail:
+  - subject reference must resolve to a persisted node
+  - node must be approved
+  - node must not be revoked
+  - node trust state must be eligible (`pending-approval` or `trusted`)
+- Server/service separation:
+  - both flow through service subject-reference kind but are separated by profile kind + strict reference-id prefix (`server:` vs `service:`).
+- Device trust posture:
+  - typed profile exists now for forward compatibility
+  - issuance is intentionally disabled until dedicated device trust flows are implemented.
+
 ## Coverage in this slice
 
 - Domain invariants and lifecycle transitions: `src/domain/security/tests/CertificateAuthorityDomain.test.ts`
+- Subject profile policy validation coverage: `src/domain/security/tests/CertificateIssuancePolicyDomain.test.ts`
 - Port contract assumptions: `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
 - Bootstrap startup state coverage: `src/application/security/tests/ResolveCertificateAuthorityStartupStateUseCase.test.ts`
 - Environment adapter coverage: `src/infrastructure/security/tests/InternalCertificateAuthorityBootstrapEnvironmentAdapter.test.ts`
@@ -116,6 +145,7 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - protected CA material save/load coverage: `src/infrastructure/security/ca/tests/ProtectedCertificateAuthorityRootMaterialStorage.test.ts`
 - first-time CA initialization coverage: `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - CA introspection state/health/sanitization coverage: `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
+- issuance policy precondition coverage: `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
 - host initialization seam coverage: `hosts/server/tests/IdentityServerHost.test.ts`
 
 ## Follow-on note

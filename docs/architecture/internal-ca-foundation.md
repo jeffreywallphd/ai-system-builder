@@ -1,11 +1,13 @@
 # Internal CA Foundation
 
-This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, and Story 6.1.6 (Feature 6 / Epic 6.1): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, and CA status/introspection query services.
+This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, and Story 6.2.1 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, and certificate subject-profile issuance policy enforcement.
 
 ## Canonical artifacts
 
 - `src/domain/security/CertificateAuthorityDomain.ts`
+- `src/domain/security/CertificateIssuancePolicyDomain.ts`
 - `src/domain/security/tests/CertificateAuthorityDomain.test.ts`
+- `src/domain/security/tests/CertificateIssuancePolicyDomain.test.ts`
 - `src/application/security/ports/ICertificateAuthorityRootPersistenceRepository.ts`
 - `src/application/security/ports/IIssuedCertificatePersistenceRepository.ts`
 - `src/application/security/ports/ITrustMaterialReferencePersistenceRepository.ts`
@@ -18,10 +20,12 @@ This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, and Stor
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
 - `src/application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase.ts`
+- `src/application/security/use-cases/IssueCertificateForSubjectUseCase.ts`
 - `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
 - `src/application/security/tests/ResolveCertificateAuthorityStartupStateUseCase.test.ts`
 - `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
+- `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
 - `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
@@ -160,6 +164,36 @@ Story 6.1.6 adds a read-only CA introspection service for internal consumers and
   - health flags for startup readiness, rotation pressure, expiring certificates, and trust-distribution failures
 - shared DTO and schema contracts now include explicit CA introspection response types for downstream transport/API integration
 
+## Story 6.2.1 certificate subject profiles and issuance policy rules
+
+Story 6.2.1 adds typed issuance-policy modeling and pre-issuance enforcement for internal CA certificate subjects.
+
+### Supported certificate subject classes
+
+- `authoritative-server`
+  - service subject reference with `server:` reference prefix
+  - DNS SAN required and common-name-to-DNS-SAN match required
+  - usages constrained to server/client/mTLS authentication semantics
+- `approved-node`
+  - node subject reference with `node:` reference prefix
+  - URI SAN required for identity binding
+  - usages constrained to node enrollment + mTLS/client pathways
+  - issuance requires approved node enrollment status and non-revoked node trust lifecycle state
+- `internal-service`
+  - service subject reference with `service:` reference prefix
+  - DNS SAN required and common-name-to-DNS-SAN match required
+  - usages constrained to service identity + transport auth semantics
+- `trusted-device` (reserved/future)
+  - explicit typed profile exists but issuance is disabled for now to avoid speculative device-flow overbuild
+
+### Issuance policy rationale
+
+- profile definitions are explicit, typed, and domain-owned to keep allowed subject classes stable and auditable
+- SAN/common-name rules are profile specific, preventing subject-shape drift across server/service/node trust surfaces
+- validity-day ceilings are profile specific so short-lived operational identities can be enforced without widening all issuance paths
+- node issuance is explicitly gated on node-trust approval and revocation state, preventing blind issuance to pending/revoked subjects
+- authoritative-server and internal-service issuance paths are separated by profile kind and reference-id policy, even though both use service subject-reference kind
+
 ## Domain model summary
 
 `CertificateAuthorityDomain.ts` defines:
@@ -184,6 +218,12 @@ Lifecycle helpers and guardrails include:
 - active-time evaluation helper (`isIssuedCertificateActiveAt`)
 - rotation-policy update operation (`updateCertificateAuthorityRotationPolicy`)
 
+`CertificateIssuancePolicyDomain.ts` defines:
+
+- subject profile vocabulary (`authoritative-server`, `approved-node`, `internal-service`, `trusted-device`)
+- profile policy definitions (reference-kind/prefix, SAN/CN rules, allowed/required usages, validity limits)
+- policy evaluation service (`evaluateCertificateIssuancePolicy`) used before certificate material issuance
+
 ## Application boundary summary
 
 The application layer exposes explicit ports only:
@@ -200,6 +240,12 @@ The application layer exposes explicit ports only:
   - `CertificateAuthorityCryptoPorts`
 
 These seams let later stories implement bootstrapping, issuance, lookup, revocation, and rotation workflows without importing infrastructure into domain/application code.
+
+Story 6.2.1 adds `IssueCertificateForSubjectUseCase` in the application layer to:
+
+- enforce profile policy before calling the issuer crypto port
+- gate node certificate issuance on approved, non-revoked node trust state
+- persist issued certificate metadata only after policy and trust prerequisites pass
 
 ## Shared contract summary
 
@@ -227,6 +273,8 @@ These seams let later stories implement bootstrapping, issuance, lookup, revocat
 - `CertificateAuthoritySchemaContracts.test.ts`: valid payload parsing and invalid payload rejection for CA/certificate/trust-material records
 - `InitializeCertificateAuthorityUseCase.test.ts`: clean initialization path, conflict policy behavior, and metadata/material sync assertions
 - `GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`: healthy/uninitialized/degraded/blocked state mapping, contract parse validation, and sanitization assertions
+- `CertificateIssuancePolicyDomain.test.ts`: profile catalog, SAN/CN/usages/validity policy guards, and server/service path-separation assertions
+- `IssueCertificateForSubjectUseCase.test.ts`: pre-issuance policy enforcement, approved-node trust prerequisites, and revoked/unapproved node rejection coverage
 - `IdentityServerHost.test.ts`: host-level first-time initialization invocation seam coverage
 
 ## Related architecture note
