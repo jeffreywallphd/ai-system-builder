@@ -54,6 +54,7 @@ export const ROUTE_PATHS = Object.freeze({
   embeddingIndexStudio: "/studio-shell/embedding-index",
   configProfileStudio: "/studio-shell/config-profile",
   settings: "/settings",
+  workspaceAdmin: "/settings/workspaces",
   identityAdmin: "/settings/identity-admin",
   trustedDevices: "/settings/trusted-devices",
   notFound: "*",
@@ -311,6 +312,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     path: ROUTE_PATHS.settings,
     title: "Settings",
     showInNavigation: true,
+  }),
+  Object.freeze({
+    key: "workspace-admin",
+    path: ROUTE_PATHS.workspaceAdmin,
+    title: "Workspace administration",
+    showInNavigation: false,
   }),
   Object.freeze({
     key: "identity-admin",

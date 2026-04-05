@@ -9,6 +9,7 @@ describe("ui/pages unit coverage", () => {
     const context = readSource("ui/pages/ContextPage.tsx");
     const assets = readSource("ui/pages/AssetsPage.tsx");
     const mcp = readSource("ui/pages/McpPage.tsx");
+    const workspaceAdmin = readSource("ui/pages/WorkspaceAdministrationPage.tsx");
     const notFound = readSource("ui/pages/NotFoundPage.tsx");
 
     expect(home).toContain("AI Loom Studio");
@@ -17,6 +18,7 @@ describe("ui/pages unit coverage", () => {
     expect(context).toContain("Context Engineering");
     expect(assets).toContain("Browse generated and stored workflow assets");
     expect(mcp).toContain("Create new local MCP servers");
+    expect(workspaceAdmin).toContain("Workspace administration");
     expect(notFound).toContain("Page Not Found");
   });
 });

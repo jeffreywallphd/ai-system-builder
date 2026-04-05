@@ -13,6 +13,7 @@ describe("ui/pages contract adherence", () => {
       "ui/pages/RegistryPage.tsx",
       "ui/pages/McpPage.tsx",
       "ui/pages/SettingsPage.tsx",
+      "ui/pages/WorkspaceAdministrationPage.tsx",
       "ui/pages/NotFoundPage.tsx",
     ];
 

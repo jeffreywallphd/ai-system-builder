@@ -333,3 +333,23 @@ Protected-resource composition pattern is canonical:
   - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
   - updated `hosts/server/tests/IdentityServerHost.test.ts`
 
+## Story 3.4.2 desktop workspace administration pages
+
+- Added renderer-side workspace administration client + service seams for real backend usage:
+  - `ui/shared/workspaces/WorkspaceAdministrationClient.ts`
+  - `ui/services/WorkspaceAdministrationService.ts`
+- Added a new authenticated desktop administration page at `ui/pages/WorkspaceAdministrationPage.tsx` with production flows for:
+  - workspace creation,
+  - workspace settings/lifecycle updates,
+  - membership add/status/remove,
+  - invitation issuance and cancellation,
+  - role assignment and revocation.
+- Added route wiring for the new desktop surface:
+  - `ROUTE_PATHS.workspaceAdmin` (`/settings/workspaces`) in `ui/routes/RouteConfig.ts`
+  - page route mapping in `ui/routes/AppRouter.tsx`
+  - entry link from `ui/pages/SettingsPage.tsx`.
+- Added renderer/client test coverage for critical behavior and contract usage:
+  - `ui/shared/workspaces/tests/WorkspaceAdministrationClient.test.ts`
+  - `ui/pages/tests/WorkspaceAdministrationPage.test.tsx`
+  - updated route/pages/services contract/interactions tests for new route/service/page integration.
+
