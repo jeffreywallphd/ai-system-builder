@@ -267,6 +267,27 @@ Operational metadata posture:
   - `deploymentTagsSynchronized`
 - this metadata is intended for orchestration/scheduling services that need deterministic node capability and placement evidence from authenticated channels.
 
+## Story 7.3.3 node-to-node policy seam (no broad mesh transport)
+
+Story 7.3.3 does not add a new public HTTP node-peer API surface. Instead it adds an explicit application/infrastructure seam that future node-peer channels must use:
+
+- `src/application/security/ports/NodePeerCommunicationPolicyPorts.ts`
+  - operation-class and capability-aware policy contract for node-peer transport.
+- `src/application/security/use-cases/AuthorizeNodePeerCommunicationUseCase.ts`
+  - policy-gated authorization path that composes shared transport trust validation and peer certificate identity checks.
+- `src/infrastructure/transport/StaticNodePeerCommunicationPolicyResolver.ts`
+  - default-deny policy resolver with explicit local/remote pair allow rules.
+- `src/infrastructure/transport/NodePeerCertificateIdentityResolver.ts`
+  - certificate serial/fingerprint binding + node approval/trust/revocation posture resolution.
+- `src/infrastructure/transport/NodePeerTransportValidationAdapter.ts`
+  - protocol-safe allow/deny mapping for node-peer transport boundaries.
+
+Constraints for this seam:
+
+- peer channels are disabled unless a policy rule explicitly enables an operation class;
+- peer trust is certificate identity + trust lifecycle based, never raw network/LAN location based;
+- capability exposure is explicit per approved operation class.
+
 ## Story 5.4.4 admin revocation and trust-state management transport/UI hooks
 
 Story 5.4.4 adds concrete admin-facing revocation transport and renderer wiring on top of node inventory/detail.

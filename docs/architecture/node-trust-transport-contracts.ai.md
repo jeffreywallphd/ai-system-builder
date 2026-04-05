@@ -152,6 +152,23 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
   - `deploymentTagsSynchronized`,
   for downstream orchestration/scheduling services.
 
+## Story 7.3.3 additions (node-peer seam, default deny)
+
+No public node-peer HTTP API is added in this slice. The story introduces an explicit application/infrastructure seam that future node-peer transport handlers must consume:
+
+- `src/application/security/ports/NodePeerCommunicationPolicyPorts.ts`
+- `src/application/security/use-cases/AuthorizeNodePeerCommunicationUseCase.ts`
+- `src/infrastructure/transport/StaticNodePeerCommunicationPolicyResolver.ts`
+- `src/infrastructure/transport/NodePeerCertificateIdentityResolver.ts`
+- `src/infrastructure/transport/NodePeerTransportValidationAdapter.ts`
+
+Behavior highlights:
+
+- node-peer channels are policy gated and disabled when no explicit rule exists;
+- operation class and capability exposure are explicit in policy contracts;
+- peer identity checks are certificate-bound and include approval/trust/revocation posture;
+- no uncontrolled peer mesh transport path is introduced.
+
 ## Story 5.4.4 additions
 
 - New admin revocation endpoint:

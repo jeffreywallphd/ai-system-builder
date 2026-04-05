@@ -68,13 +68,61 @@ Story 7.3.1 adds a dedicated node-to-server HTTP transport adapter path for cert
   - require node mTLS trust validation when transport trust enforcement is enabled;
   - keep transport-authenticated node identity authoritative over payload-claimed identities.
 
+## Story 7.3.3 policy-gated node-to-node secure communication seam
+
+Story 7.3.3 adds a dedicated node-peer channel seam so direct node-to-node communication is explicit, authenticated, and disabled by default unless policy rules allow a specific operation class.
+
+### Canonical files
+
+- `src/domain/security/TransportSecurityDomain.ts`
+- `src/application/security/ports/NodePeerCommunicationPolicyPorts.ts`
+- `src/application/security/use-cases/AuthorizeNodePeerCommunicationUseCase.ts`
+- `src/infrastructure/transport/StaticNodePeerCommunicationPolicyResolver.ts`
+- `src/infrastructure/transport/NodePeerCertificateIdentityResolver.ts`
+- `src/infrastructure/transport/NodePeerTransportValidationAdapter.ts`
+
+### Runtime behavior
+
+- Adds `node-to-node` baseline scenario (`transport-policy:node-peer:v1`) requiring:
+  - secure encrypted channel;
+  - mTLS;
+  - trusted node posture;
+  - trusted peer certificate posture.
+- Adds explicit application-layer node-peer policy + identity contracts:
+  - operation-class allow-list;
+  - capability exposure list;
+  - optional explicit remote-peer allow-list;
+  - certificate-bound peer identity + trust lifecycle result.
+- Adds `AuthorizeNodePeerCommunicationUseCase` that composes:
+  - policy gate,
+  - shared transport trust validation,
+  - peer certificate identity/approval/trust/revocation checks.
+- Adds production-oriented infrastructure seams:
+  - static explicit pair policy resolver (no matching rule => deny),
+  - node certificate identity resolver backed by node trust persistence,
+  - transport adapter mapping authorization outcomes to protocol-safe responses.
+
+### Initial constrained operation
+
+- operation class: `runtime-trust-material-replication`
+- capability: `runtime-trust-material:read`
+- broad peer mesh behavior is not introduced.
+
+### Test coverage
+
+- `src/application/security/tests/AuthorizeNodePeerCommunicationUseCase.test.ts`
+- `src/infrastructure/transport/tests/StaticNodePeerCommunicationPolicyResolver.test.ts`
+- `src/infrastructure/transport/tests/NodePeerCertificateIdentityResolver.test.ts`
+- `src/infrastructure/transport/tests/NodePeerTransportValidationAdapter.test.ts`
+
 ## Core contract model
 
 - Scenarios:
-  - `desktop-client-to-control-plane`
-  - `thin-client-to-control-plane`
-  - `node-to-control-plane`
-  - `service-to-service`
+- `desktop-client-to-control-plane`
+- `thin-client-to-control-plane`
+- `node-to-control-plane`
+- `node-to-node`
+- `service-to-service`
 - Channel vocabulary:
   - modeled: `http`, `https`, `ws`, `wss`, `tls`
   - secure set: `https`, `wss`, `tls`

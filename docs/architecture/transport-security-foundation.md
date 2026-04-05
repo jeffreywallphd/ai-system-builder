@@ -82,6 +82,48 @@ Transport and identity posture:
 - when transport trust enforcement is enabled, both routes require node mTLS validation (`ValidateTransportConnectionTrustUseCase` + node certificate identity resolution);
 - transport-authenticated node identity remains authoritative, so payload-claimed node/actor identifiers are not trusted as identity sources.
 
+## Story 7.3.3 policy-gated node-to-node secure communication seam
+
+Story 7.3.3 introduces the explicit node-peer transport seam so direct node-to-node communication is not ad hoc and is denied unless explicitly policy-enabled for a constrained operation class.
+
+### Runtime seam updates
+
+- `src/domain/security/TransportSecurityDomain.ts`
+  - adds `node-to-node` scenario baseline (`transport-policy:node-peer:v1`);
+  - requires secure channel, encrypted transport, mTLS, trusted node state, and peer certificate trust for node-peer transport validation.
+- `src/application/security/ports/NodePeerCommunicationPolicyPorts.ts`
+  - defines application policy + identity seams for node-peer channels:
+    - explicit operation classes;
+    - explicit peer capabilities;
+    - certificate-bound peer identity and trust posture result contract.
+- `src/application/security/use-cases/AuthorizeNodePeerCommunicationUseCase.ts`
+  - composes node-peer policy resolution, shared transport trust validation, and peer certificate identity checks;
+  - fail-closed posture:
+    - peer channels disabled by default,
+    - operation class must be explicitly allowed,
+    - optional explicit peer-node allow-list is enforced,
+    - certificate identity binding + approval/trust/revocation posture must satisfy policy.
+- `src/infrastructure/transport/StaticNodePeerCommunicationPolicyResolver.ts`
+  - production-oriented policy resolver implementation with explicit local/remote pair rules;
+  - no rules means default deny.
+- `src/infrastructure/transport/NodePeerCertificateIdentityResolver.ts`
+  - resolves peer node trust lifecycle and validates certificate serial/fingerprint binding against node records.
+- `src/infrastructure/transport/NodePeerTransportValidationAdapter.ts`
+  - maps node-peer authorization outcomes to protocol-safe transport results (`400`, `403`, `500`).
+
+### Initial constrained use case
+
+- Operation class: `runtime-trust-material-replication`
+- Capability exposure: `runtime-trust-material:read`
+- This does not create a broad mesh; channels remain explicit rule-based pairings.
+
+### Test coverage updates
+
+- `src/application/security/tests/AuthorizeNodePeerCommunicationUseCase.test.ts`
+- `src/infrastructure/transport/tests/StaticNodePeerCommunicationPolicyResolver.test.ts`
+- `src/infrastructure/transport/tests/NodePeerCertificateIdentityResolver.test.ts`
+- `src/infrastructure/transport/tests/NodePeerTransportValidationAdapter.test.ts`
+
 ## Domain vocabulary
 
 ### Scenarios
@@ -89,6 +131,7 @@ Transport and identity posture:
 - `desktop-client-to-control-plane`
 - `thin-client-to-control-plane`
 - `node-to-control-plane`
+- `node-to-node`
 - `service-to-service`
 
 ### Channel and peer vocabulary

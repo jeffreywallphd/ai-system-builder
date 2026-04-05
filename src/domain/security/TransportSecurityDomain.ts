@@ -2,6 +2,7 @@ export const TransportSecurityScenarios = Object.freeze({
   desktopClientToControlPlane: "desktop-client-to-control-plane",
   thinClientToControlPlane: "thin-client-to-control-plane",
   nodeToControlPlane: "node-to-control-plane",
+  nodeToNode: "node-to-node",
   serviceToService: "service-to-service",
 });
 
@@ -185,6 +186,25 @@ const TransportSecurityBaselinePolicies: Readonly<Record<TransportSecurityScenar
     ]),
     allowedRemotePeerTypes: Object.freeze([
       TransportPeerTypes.authoritativeServer,
+    ]),
+    requiredActorType: TransportConnectionActorTypes.nodeIdentity,
+    requireAuthenticatedUserSession: false,
+    requireTrustedDevice: false,
+    requireTrustedNode: true,
+    requirePeerCertificateTrust: true,
+    requireMutualTls: true,
+    allowInsecureFallback: false,
+  }),
+  [TransportSecurityScenarios.nodeToNode]: Object.freeze({
+    policyId: "transport-policy:node-peer:v1",
+    scenario: TransportSecurityScenarios.nodeToNode,
+    allowedChannelTypes: Object.freeze([
+      TransportChannelTypes.https,
+      TransportChannelTypes.wss,
+      TransportChannelTypes.tls,
+    ]),
+    allowedRemotePeerTypes: Object.freeze([
+      TransportPeerTypes.nodeRuntime,
     ]),
     requiredActorType: TransportConnectionActorTypes.nodeIdentity,
     requireAuthenticatedUserSession: false,
