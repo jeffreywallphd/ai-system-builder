@@ -2,22 +2,34 @@
 
 ## Purpose
 
-Story 4.2.2 adds the first production effective-permission resolver implementation for Feature 4. It deterministically combines role grants, ownership semantics, visibility rules, explicit sharing grants, and deny conditions.
+Stories 4.2.2-4.2.3 deliver the production policy-evaluation core for Feature 4:
+
+- `EffectivePermissionResolutionService` provides deterministic allow/deny precedence.
+- `AuthorizationPolicyDecisionEvaluator` composes actor grants + resource metadata and emits typed decisions for resource-instance and workspace-capability checks.
 
 ## Canonical files
 
 - `src/application/authorization/use-cases/EffectivePermissionResolutionService.ts`
+- `src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator.ts`
 - `src/application/authorization/tests/EffectivePermissionResolutionService.test.ts`
+- `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
 - `src/application/authorization/use-cases/EvaluateAuthorizationPolicyUseCase.ts`
 
 ## Stable interface
 
-`EffectivePermissionResolutionService` is reusable in two ways:
+`EffectivePermissionResolutionService` remains reusable in two ways:
 
 - policy-evaluator seam: implements `IAuthorizationPolicyEvaluator` for API enforcement paths.
 - capability seam: exposes `resolvePermissions(...)` for batch UI capability checks.
 
 Both paths consume the same actor/resource context contract and use identical precedence.
+
+Story 4.2.3 adds `AuthorizationPolicyDecisionEvaluator` as the caller-facing evaluator seam:
+
+- accepts actor + permission + target (`resource-instance` or `workspace-capability`),
+- loads role/grant state and resource metadata for resource-instance checks,
+- reuses effective-permission precedence for the final allow/deny decision,
+- returns typed decision envelopes with stable denial reasons and optional redaction-safe debug details.
 
 ## Deterministic precedence order
 
@@ -55,6 +67,9 @@ Matrix-style tests cover:
 - explicit deny precedence over owner and role
 - default deny
 - batch capability resolution interface behavior
+- resource policy metadata missing behavior with deterministic deny reason
+- workspace-capability checks that do not require a concrete resource id
+- optional debug payload shape for operational diagnostics
 
 ## Extension guidance
 
