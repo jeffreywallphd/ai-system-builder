@@ -13,14 +13,23 @@ import {
   IdentityCredentialMaterialStatuses,
   IdentityIdNamespaces,
   IdentityPrincipalLookupKinds,
+  PairingTokenValidationOutcomes,
   identityFailure,
   identitySuccess,
   type IdentityCredentialMaterialRecord,
   type IdentityOperationResult,
   type IdentityPrincipalLookup,
   type IdentitySessionListQuery,
+  type TrustedDevicePairingCompletionRequest,
+  type TrustedDevicePairingInitiationRequest,
+  type TrustedDevicePairingValidationResponse,
   type TrustedDeviceRecord,
 } from "../IdentityApplicationContracts";
+import {
+  PairingTokenActorScopes,
+  PairingTokenArtifactTypes,
+  PairingTokenStatuses,
+} from "../../../src/domain/identity/TrustedDevicePairingDomain";
 
 describe("identity application shared contracts", () => {
   it("exposes stable lookup, id namespace, and credential material contract types", () => {
@@ -102,5 +111,88 @@ describe("identity application shared contracts", () => {
         code: "identity-invalid-session-state",
       }),
     });
+  });
+
+  it("exposes trusted-device pairing initiation, validation, and completion contract shapes", () => {
+    const initiationRequest: TrustedDevicePairingInitiationRequest = {
+      trustedDeviceId: "trusted-device:pairing:1",
+      userIdentityId: "user:1",
+      workspaceId: "workspace:alpha",
+      artifactType: PairingTokenArtifactTypes.oneTimeCode,
+      actorBinding: {
+        scope: PairingTokenActorScopes.sameUser,
+        userIdentityId: "user:1",
+      },
+      issuance: {
+        issuedByUserIdentityId: "user:1",
+        channelHint: "cli",
+      },
+      maxValidationAttempts: 5,
+      expiresAt: "2026-04-04T12:15:00.000Z",
+    };
+
+    const validationResponse: TrustedDevicePairingValidationResponse = {
+      outcome: PairingTokenValidationOutcomes.valid,
+      attemptsRemaining: 4,
+      pairingSession: {
+        id: "pairing-session:1",
+        trustedDeviceId: "trusted-device:pairing:1",
+        userIdentityId: "user:1",
+        workspaceId: "workspace:alpha",
+        pairingTokenId: "pairing-token:1",
+        status: "validated",
+        initiatedAt: "2026-04-04T12:00:00.000Z",
+        validatedAt: "2026-04-04T12:01:00.000Z",
+        updatedAt: "2026-04-04T12:01:00.000Z",
+      },
+      pairingToken: {
+        id: "pairing-token:1",
+        pairingSessionId: "pairing-session:1",
+        trustedDeviceId: "trusted-device:pairing:1",
+        userIdentityId: "user:1",
+        workspaceId: "workspace:alpha",
+        artifactType: PairingTokenArtifactTypes.oneTimeCode,
+        tokenHash: "hash:pairing:1",
+        hashAlgorithm: "sha256",
+        actorBinding: {
+          scope: PairingTokenActorScopes.sameUser,
+          userIdentityId: "user:1",
+        },
+        issuance: {},
+        status: PairingTokenStatuses.issued,
+        issuedAt: "2026-04-04T12:00:00.000Z",
+        expiresAt: "2026-04-04T12:15:00.000Z",
+        failedValidationAttempts: 1,
+        maxValidationAttempts: 5,
+        lastValidationAttemptAt: "2026-04-04T12:01:00.000Z",
+        updatedAt: "2026-04-04T12:01:00.000Z",
+      },
+    };
+
+    const completionRequest: TrustedDevicePairingCompletionRequest = {
+      pairingSessionId: "pairing-session:1",
+      pairingTokenId: "pairing-token:1",
+      trustedDeviceId: "trusted-device:pairing:1",
+      userIdentityId: "user:1",
+      workspaceId: "workspace:alpha",
+      presentedToken: "123456",
+      completedAt: "2026-04-04T12:02:00.000Z",
+      completedByUserIdentityId: "user:1",
+      trustMaterialRef: createDeviceTrustMaterialRef({
+        materialId: "trust-material:pairing:1",
+        kind: DeviceTrustMaterialKinds.sessionSigningKey,
+      }),
+      trustMaterialRegistration: {
+        materialKind: DeviceTrustMaterialKinds.sessionSigningKey,
+        pinReference: "pin:reference:1",
+      },
+    };
+
+    expect(initiationRequest.actorBinding.scope).toBe("same-user");
+    expect(validationResponse.outcome).toBe("valid");
+    expect(validationResponse.pairingToken.status).toBe("issued");
+    expect(completionRequest.trustMaterialRegistration?.pinReference).toBe("pin:reference:1");
+    expect(IdentityIdNamespaces.trustedDevicePairingSession).toBe("trusted-device-pairing-session");
+    expect(IdentityIdNamespaces.trustedDevicePairingToken).toBe("trusted-device-pairing-token");
   });
 });

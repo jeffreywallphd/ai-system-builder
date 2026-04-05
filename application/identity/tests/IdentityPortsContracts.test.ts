@@ -26,10 +26,30 @@ import {
   type TrustedDevice,
 } from "../../../src/domain/identity/TrustedDeviceDomain";
 import {
+  PairingSessionStatuses,
+  PairingTokenActorScopes,
+  PairingTokenArtifactTypes,
+  PairingTokenInvalidationReasons,
+  PairingTokenStatuses,
+  completePairingSession,
+  consumePairingToken,
+  createPairingSession,
+  createPairingToken,
+  expirePairingSession,
+  expirePairingToken,
+  invalidatePairingSession,
+  invalidatePairingToken,
+  markPairingSessionValidated,
+  registerPairingTokenFailedAttempt,
+  type PairingSession,
+  type PairingToken,
+} from "../../../src/domain/identity/TrustedDevicePairingDomain";
+import {
   IdentityErrorCodes,
   IdentityCredentialMaterialStatuses,
   IdentityIdNamespaces,
   IdentityPrincipalLookupKinds,
+  PairingTokenValidationOutcomes,
   identityFailure,
   identitySuccess,
   type IdentityCredentialHistoryQuery,
@@ -42,6 +62,17 @@ import {
   type IdentityUserIdentityListQuery,
   type TrustedDeviceDisplayNameUpdate,
   type TrustedDeviceLastSeenUpdate,
+  type TrustedDevicePairingCompletionRequest,
+  type TrustedDevicePairingCompletionResponse,
+  type TrustedDevicePairingExpirationRequest,
+  type TrustedDevicePairingExpirationResult,
+  type TrustedDevicePairingInitiationRequest,
+  type TrustedDevicePairingInitiationResponse,
+  type TrustedDevicePairingInvalidationRequest,
+  type TrustedDevicePairingSessionRecord,
+  type TrustedDevicePairingTokenRecord,
+  type TrustedDevicePairingValidationRequest,
+  type TrustedDevicePairingValidationResponse,
   type TrustedDeviceListQuery,
   type TrustedDeviceLookupByFingerprintQuery,
   type TrustedDevicePairingRequest,
@@ -56,6 +87,8 @@ import type { IIdentityLookupRepository } from "../ports/IIdentityLookupReposito
 import type { IIdentityPersistenceRepository } from "../ports/IIdentityPersistenceRepository";
 import type { IIdentitySessionRepository } from "../ports/IIdentitySessionRepository";
 import type { ITrustedDeviceManagementService } from "../ports/ITrustedDeviceManagementService";
+import type { ITrustedDevicePairingRepository } from "../ports/ITrustedDevicePairingRepository";
+import type { ITrustedDevicePairingService } from "../ports/ITrustedDevicePairingService";
 import type { ITrustedDeviceRepository } from "../ports/ITrustedDeviceRepository";
 
 class InMemoryIdentityPortAdapter
@@ -65,6 +98,7 @@ class InMemoryIdentityPortAdapter
     ICredentialMaterialRepository,
     IIdentitySessionRepository,
     ITrustedDeviceRepository,
+    ITrustedDevicePairingRepository,
     IIdentityClock,
     IIdentityIdGenerator {
   private readonly users = new Map<string, ReturnType<typeof createUserIdentity>>();
@@ -73,6 +107,8 @@ class InMemoryIdentityPortAdapter
   private readonly credentialMaterial = new Map<string, IdentityCredentialMaterialRecord>();
   private readonly sessions = new Map<string, ReturnType<typeof createSession>>();
   private readonly trustedDevices = new Map<string, TrustedDevice>();
+  private readonly pairingSessions = new Map<string, PairingSession>();
+  private readonly pairingTokens = new Map<string, PairingToken>();
   private sequence = 0;
 
   now(): Date {
@@ -356,6 +392,156 @@ class InMemoryIdentityPortAdapter
     this.trustedDevices.set(revoked.id, revoked);
     return identitySuccess({ changed: true });
   }
+
+  async createPairingSession(session: TrustedDevicePairingSessionRecord) {
+    const domain = createPairingSession({
+      ...session,
+      completion: session.completedAt
+        ? {
+            completedAt: session.completedAt,
+            completedByUserIdentityId: session.completedByUserIdentityId,
+            trustMaterialRegistration: session.trustMaterialRegistration,
+          }
+        : undefined,
+      rejection: session.rejectionReason && session.rejectedAt
+        ? {
+            reason: session.rejectionReason,
+            rejectedAt: session.rejectedAt,
+            note: session.rejectionNote,
+          }
+        : undefined,
+    });
+    this.pairingSessions.set(domain.id, domain);
+    return mapPairingSessionRecord(domain);
+  }
+
+  async createPairingToken(token: TrustedDevicePairingTokenRecord) {
+    const domain = createPairingToken({
+      ...token,
+      attempts: {
+        failedValidationAttempts: token.failedValidationAttempts,
+        maxValidationAttempts: token.maxValidationAttempts,
+        lastValidationAttemptAt: token.lastValidationAttemptAt,
+      },
+      consumed: token.consumedAt
+        ? {
+            consumedAt: token.consumedAt,
+            consumedByUserIdentityId: token.consumedByUserIdentityId,
+          }
+        : undefined,
+      invalidation: token.invalidationReason && token.invalidatedAt
+        ? {
+            reason: token.invalidationReason,
+            invalidatedAt: token.invalidatedAt,
+            invalidatedByUserIdentityId: token.invalidatedByUserIdentityId,
+            note: token.invalidationNote,
+          }
+        : undefined,
+    });
+    this.pairingTokens.set(domain.id, domain);
+    return mapPairingTokenRecord(domain);
+  }
+
+  async getPairingSessionById(pairingSessionId: string) {
+    const session = this.pairingSessions.get(pairingSessionId.trim());
+    return session ? mapPairingSessionRecord(session) : undefined;
+  }
+
+  async getPairingTokenById(pairingTokenId: string) {
+    const token = this.pairingTokens.get(pairingTokenId.trim());
+    return token ? mapPairingTokenRecord(token) : undefined;
+  }
+
+  async getPairingTokenBySessionId(pairingSessionId: string) {
+    for (const token of this.pairingTokens.values()) {
+      if (token.pairingSessionId === pairingSessionId.trim()) {
+        return mapPairingTokenRecord(token);
+      }
+    }
+    return undefined;
+  }
+
+  async updatePairingSession(session: TrustedDevicePairingSessionRecord) {
+    const updated = await this.createPairingSession(session);
+    return updated;
+  }
+
+  async updatePairingToken(token: TrustedDevicePairingTokenRecord) {
+    const updated = await this.createPairingToken(token);
+    return updated;
+  }
+
+  async invalidatePairingArtifacts(
+    request: TrustedDevicePairingInvalidationRequest,
+  ): Promise<
+    IdentityOperationResult<
+      IdentityMutationOutcome,
+      | typeof IdentityErrorCodes.invalidRequest
+      | typeof IdentityErrorCodes.invalidState
+      | typeof IdentityErrorCodes.notFound
+    >
+  > {
+    if (!request.pairingSessionId && !request.pairingTokenId) {
+      return identityFailure({
+        code: IdentityErrorCodes.invalidRequest,
+        message: "Pairing session id or pairing token id is required.",
+        boundary: "infrastructure",
+        retryable: false,
+      });
+    }
+
+    let changed = false;
+    if (request.pairingTokenId) {
+      const pairingToken = this.pairingTokens.get(request.pairingTokenId);
+      if (!pairingToken) {
+        return identityFailure({
+          code: IdentityErrorCodes.notFound,
+          message: "Pairing token was not found.",
+          boundary: "infrastructure",
+          retryable: false,
+        });
+      }
+      if (pairingToken.status === PairingTokenStatuses.issued) {
+        const invalidated = invalidatePairingToken(pairingToken, {
+          reason: request.reason,
+          invalidatedByUserIdentityId: request.invalidatedByUserIdentityId,
+          note: request.note,
+          invalidatedAt: request.invalidatedAt ?? this.now().toISOString(),
+        });
+        this.pairingTokens.set(invalidated.id, invalidated);
+        changed = true;
+      }
+    }
+
+    if (request.pairingSessionId) {
+      const pairingSession = this.pairingSessions.get(request.pairingSessionId);
+      if (!pairingSession) {
+        return identityFailure({
+          code: IdentityErrorCodes.notFound,
+          message: "Pairing session was not found.",
+          boundary: "infrastructure",
+          retryable: false,
+        });
+      }
+      if (pairingSession.status === PairingSessionStatuses.completed) {
+        return identityFailure({
+          code: IdentityErrorCodes.invalidState,
+          message: "Completed pairing sessions cannot be invalidated.",
+          boundary: "infrastructure",
+          retryable: false,
+        });
+      }
+      const invalidatedSession = invalidatePairingSession(pairingSession, {
+        invalidatedAt: request.invalidatedAt ?? this.now().toISOString(),
+      });
+      this.pairingSessions.set(invalidatedSession.id, invalidatedSession);
+      changed = true;
+    }
+
+    return identitySuccess({
+      changed,
+    });
+  }
 }
 
 function mapTrustedDeviceRecord(device: TrustedDevice): TrustedDeviceRecord {
@@ -374,6 +560,56 @@ function mapTrustedDeviceRecord(device: TrustedDevice): TrustedDeviceRecord {
     metadata: device.metadata,
     revocation: device.revocation,
     updatedAt: device.updatedAt,
+  });
+}
+
+function mapPairingTokenRecord(token: PairingToken): TrustedDevicePairingTokenRecord {
+  return Object.freeze({
+    id: token.id,
+    pairingSessionId: token.pairingSessionId,
+    trustedDeviceId: token.trustedDeviceId,
+    userIdentityId: token.userIdentityId,
+    workspaceId: token.workspaceId,
+    artifactType: token.artifactType,
+    tokenHash: token.tokenHash,
+    hashAlgorithm: token.hashAlgorithm,
+    actorBinding: token.actorBinding,
+    issuance: token.issuance,
+    status: token.status,
+    issuedAt: token.issuedAt,
+    expiresAt: token.expiresAt,
+    failedValidationAttempts: token.attempts.failedValidationAttempts,
+    maxValidationAttempts: token.attempts.maxValidationAttempts,
+    lastValidationAttemptAt: token.attempts.lastValidationAttemptAt,
+    consumedAt: token.consumed?.consumedAt,
+    consumedByUserIdentityId: token.consumed?.consumedByUserIdentityId,
+    invalidationReason: token.invalidation?.reason,
+    invalidatedAt: token.invalidation?.invalidatedAt,
+    invalidatedByUserIdentityId: token.invalidation?.invalidatedByUserIdentityId,
+    invalidationNote: token.invalidation?.note,
+    updatedAt: token.updatedAt,
+  });
+}
+
+function mapPairingSessionRecord(session: PairingSession): TrustedDevicePairingSessionRecord {
+  return Object.freeze({
+    id: session.id,
+    trustedDeviceId: session.trustedDeviceId,
+    userIdentityId: session.userIdentityId,
+    workspaceId: session.workspaceId,
+    pairingTokenId: session.pairingTokenId,
+    status: session.status,
+    initiatedAt: session.initiatedAt,
+    validatedAt: session.validatedAt,
+    completedAt: session.completion?.completedAt,
+    completedByUserIdentityId: session.completion?.completedByUserIdentityId,
+    trustMaterialRegistration: session.completion?.trustMaterialRegistration,
+    rejectedAt: session.rejection?.rejectedAt,
+    rejectionReason: session.rejection?.reason,
+    rejectionNote: session.rejection?.note,
+    invalidatedAt: session.invalidatedAt,
+    expiredAt: session.expiredAt,
+    updatedAt: session.updatedAt,
   });
 }
 
@@ -461,6 +697,346 @@ class InMemoryTrustedDeviceManagementService implements ITrustedDeviceManagement
     >
   > {
     return this.repository.revokeTrustedDevice(request);
+  }
+}
+
+class InMemoryTrustedDevicePairingService implements ITrustedDevicePairingService {
+  constructor(
+    private readonly trustedDeviceRepository: ITrustedDeviceRepository,
+    private readonly pairingRepository: ITrustedDevicePairingRepository,
+    private readonly idGenerator: IIdentityIdGenerator,
+    private readonly clock: IIdentityClock,
+  ) {}
+
+  async initiatePairing(request: TrustedDevicePairingInitiationRequest): Promise<TrustedDevicePairingInitiationResponse> {
+    const now = this.clock.now().toISOString();
+    const pairingSessionId = this.idGenerator.nextId(IdentityIdNamespaces.trustedDevicePairingSession);
+    const pairingTokenId = this.idGenerator.nextId(IdentityIdNamespaces.trustedDevicePairingToken);
+    const token = createPairingToken({
+      id: pairingTokenId,
+      pairingSessionId,
+      trustedDeviceId: request.trustedDeviceId,
+      userIdentityId: request.userIdentityId,
+      workspaceId: request.workspaceId,
+      artifactType: request.artifactType,
+      tokenHash: `hash:${pairingTokenId}`,
+      actorBinding: request.actorBinding,
+      issuance: request.issuance,
+      attempts: {
+        maxValidationAttempts: request.maxValidationAttempts,
+      },
+      issuedAt: now,
+      expiresAt: request.expiresAt,
+    });
+    const session = createPairingSession({
+      id: pairingSessionId,
+      trustedDeviceId: request.trustedDeviceId,
+      userIdentityId: request.userIdentityId,
+      workspaceId: request.workspaceId,
+      pairingTokenId,
+      initiatedAt: now,
+    });
+
+    const persistedSession = await this.pairingRepository.createPairingSession(mapPairingSessionRecord(session));
+    const persistedToken = await this.pairingRepository.createPairingToken(mapPairingTokenRecord(token));
+
+    return Object.freeze({
+      pairingSession: persistedSession,
+      pairingToken: persistedToken,
+      artifact: {
+        type: request.artifactType,
+        value: `artifact:${pairingTokenId}`,
+        redactedHint: "******",
+      },
+    });
+  }
+
+  async validatePairingToken(request: TrustedDevicePairingValidationRequest): Promise<TrustedDevicePairingValidationResponse> {
+    const sessionRecord = await this.pairingRepository.getPairingSessionById(request.pairingSessionId);
+    if (!sessionRecord) {
+      throw new Error(`Pairing session '${request.pairingSessionId}' was not found.`);
+    }
+    const tokenRecord = request.pairingTokenId
+      ? await this.pairingRepository.getPairingTokenById(request.pairingTokenId)
+      : await this.pairingRepository.getPairingTokenBySessionId(request.pairingSessionId);
+    if (!tokenRecord) {
+      throw new Error("Pairing token was not found.");
+    }
+
+    let token = createPairingToken({
+      ...tokenRecord,
+      attempts: {
+        failedValidationAttempts: tokenRecord.failedValidationAttempts,
+        maxValidationAttempts: tokenRecord.maxValidationAttempts,
+        lastValidationAttemptAt: tokenRecord.lastValidationAttemptAt,
+      },
+      consumed: tokenRecord.consumedAt
+        ? {
+            consumedAt: tokenRecord.consumedAt,
+            consumedByUserIdentityId: tokenRecord.consumedByUserIdentityId,
+          }
+        : undefined,
+      invalidation: tokenRecord.invalidationReason && tokenRecord.invalidatedAt
+        ? {
+            reason: tokenRecord.invalidationReason,
+            invalidatedAt: tokenRecord.invalidatedAt,
+            invalidatedByUserIdentityId: tokenRecord.invalidatedByUserIdentityId,
+            note: tokenRecord.invalidationNote,
+          }
+        : undefined,
+    });
+    let session = createPairingSession({
+      ...sessionRecord,
+      completion: sessionRecord.completedAt
+        ? {
+            completedAt: sessionRecord.completedAt,
+            completedByUserIdentityId: sessionRecord.completedByUserIdentityId,
+            trustMaterialRegistration: sessionRecord.trustMaterialRegistration,
+          }
+        : undefined,
+      rejection: sessionRecord.rejectionReason && sessionRecord.rejectedAt
+        ? {
+            reason: sessionRecord.rejectionReason,
+            rejectedAt: sessionRecord.rejectedAt,
+            note: sessionRecord.rejectionNote,
+          }
+        : undefined,
+    });
+
+    if (token.status === PairingTokenStatuses.expired || new Date(token.expiresAt).getTime() <= this.clock.now().getTime()) {
+      if (token.status === PairingTokenStatuses.issued) {
+        token = expirePairingToken(token, this.clock.now());
+      }
+      session = expirePairingSession(session, this.clock.now());
+      const persistedToken = await this.pairingRepository.updatePairingToken(mapPairingTokenRecord(token));
+      const persistedSession = await this.pairingRepository.updatePairingSession(mapPairingSessionRecord(session));
+      return Object.freeze({
+        outcome: PairingTokenValidationOutcomes.expired,
+        pairingSession: persistedSession,
+        pairingToken: persistedToken,
+        attemptsRemaining: 0,
+      });
+    }
+
+    if (token.status === PairingTokenStatuses.consumed) {
+      session = rejectPairingSession(session, {
+        reason: "token-reused",
+        rejectedAt: this.clock.now().toISOString(),
+      });
+      const persistedSession = await this.pairingRepository.updatePairingSession(mapPairingSessionRecord(session));
+      return Object.freeze({
+        outcome: PairingTokenValidationOutcomes.reused,
+        pairingSession: persistedSession,
+        pairingToken: tokenRecord,
+        attemptsRemaining: 0,
+      });
+    }
+
+    if (token.status === PairingTokenStatuses.invalidated) {
+      return Object.freeze({
+        outcome: PairingTokenValidationOutcomes.invalidated,
+        pairingSession: sessionRecord,
+        pairingToken: tokenRecord,
+        attemptsRemaining: 0,
+      });
+    }
+
+    const expectedValue = `artifact:${token.id}`;
+    if (request.presentedToken !== expectedValue) {
+      token = registerPairingTokenFailedAttempt(token, {
+        attemptedAt: request.attemptedAt ?? this.clock.now().toISOString(),
+        invalidatedByUserIdentityId: request.userIdentityId,
+      });
+      let outcome = PairingTokenValidationOutcomes.invalid;
+      if (token.status === PairingTokenStatuses.invalidated) {
+        session = rejectPairingSession(session, {
+          reason: "invalid-token",
+          rejectedAt: this.clock.now().toISOString(),
+          note: "max attempts reached",
+        });
+        outcome = PairingTokenValidationOutcomes.attemptsExhausted;
+      }
+      const persistedToken = await this.pairingRepository.updatePairingToken(mapPairingTokenRecord(token));
+      const persistedSession = await this.pairingRepository.updatePairingSession(mapPairingSessionRecord(session));
+      return Object.freeze({
+        outcome,
+        pairingSession: persistedSession,
+        pairingToken: persistedToken,
+        attemptsRemaining: Math.max(
+          persistedToken.maxValidationAttempts - persistedToken.failedValidationAttempts,
+          0,
+        ),
+      });
+    }
+
+    session = markPairingSessionValidated(session, {
+      validatedAt: request.attemptedAt ?? this.clock.now().toISOString(),
+    });
+    const persistedSession = await this.pairingRepository.updatePairingSession(mapPairingSessionRecord(session));
+    const persistedToken = await this.pairingRepository.updatePairingToken(mapPairingTokenRecord(token));
+    return Object.freeze({
+      outcome: PairingTokenValidationOutcomes.valid,
+      pairingSession: persistedSession,
+      pairingToken: persistedToken,
+      attemptsRemaining: Math.max(token.attempts.maxValidationAttempts - token.attempts.failedValidationAttempts, 0),
+    });
+  }
+
+  async completePairing(request: TrustedDevicePairingCompletionRequest): Promise<TrustedDevicePairingCompletionResponse> {
+    const sessionRecord = await this.pairingRepository.getPairingSessionById(request.pairingSessionId);
+    const tokenRecord = await this.pairingRepository.getPairingTokenById(request.pairingTokenId);
+    const trustedDevice = await this.trustedDeviceRepository.getTrustedDeviceById(request.trustedDeviceId);
+    if (!sessionRecord || !tokenRecord || !trustedDevice) {
+      throw new Error("Pairing completion dependencies were not found.");
+    }
+
+    let token = createPairingToken({
+      ...tokenRecord,
+      attempts: {
+        failedValidationAttempts: tokenRecord.failedValidationAttempts,
+        maxValidationAttempts: tokenRecord.maxValidationAttempts,
+        lastValidationAttemptAt: tokenRecord.lastValidationAttemptAt,
+      },
+    });
+    let session = createPairingSession({
+      ...sessionRecord,
+      completion: sessionRecord.completedAt
+        ? {
+            completedAt: sessionRecord.completedAt,
+            completedByUserIdentityId: sessionRecord.completedByUserIdentityId,
+            trustMaterialRegistration: sessionRecord.trustMaterialRegistration,
+          }
+        : undefined,
+      rejection: sessionRecord.rejectionReason && sessionRecord.rejectedAt
+        ? {
+            reason: sessionRecord.rejectionReason,
+            rejectedAt: sessionRecord.rejectedAt,
+            note: sessionRecord.rejectionNote,
+          }
+        : undefined,
+    });
+
+    if (request.presentedToken !== `artifact:${token.id}`) {
+      token = invalidatePairingToken(token, {
+        reason: PairingTokenInvalidationReasons.invalidTokenPresented,
+        invalidatedByUserIdentityId: request.userIdentityId,
+        invalidatedAt: this.clock.now().toISOString(),
+      });
+      session = rejectPairingSession(session, {
+        reason: "invalid-token",
+        rejectedAt: this.clock.now().toISOString(),
+      });
+      await this.pairingRepository.updatePairingToken(mapPairingTokenRecord(token));
+      await this.pairingRepository.updatePairingSession(mapPairingSessionRecord(session));
+      throw new Error("Pairing token presented for completion is invalid.");
+    }
+
+    token = consumePairingToken(token, {
+      consumedAt: request.completedAt ?? this.clock.now().toISOString(),
+      consumedByUserIdentityId: request.completedByUserIdentityId ?? request.userIdentityId,
+    });
+    if (session.status !== PairingSessionStatuses.validated) {
+      session = markPairingSessionValidated(session, {
+        validatedAt: request.completedAt ?? this.clock.now().toISOString(),
+      });
+    }
+    session = completePairingSession(session, token, {
+      completedAt: request.completedAt ?? this.clock.now().toISOString(),
+      completedByUserIdentityId: request.completedByUserIdentityId ?? request.userIdentityId,
+      trustMaterialRegistration: request.trustMaterialRegistration,
+    });
+    const pairedDevice = pairTrustedDevice(trustedDevice, {
+      trustMaterialRef: request.trustMaterialRef ?? createDeviceTrustMaterialRef({
+        materialId: `trust-material:${trustedDevice.id}`,
+        kind: DeviceTrustMaterialKinds.sessionSigningKey,
+      }),
+      pairedAt: request.completedAt ?? this.clock.now().toISOString(),
+      now: this.clock.now(),
+    });
+
+    const persistedToken = await this.pairingRepository.updatePairingToken(mapPairingTokenRecord(token));
+    const persistedSession = await this.pairingRepository.updatePairingSession(mapPairingSessionRecord(session));
+    const persistedDevice = await this.trustedDeviceRepository.updateTrustedDevice(pairedDevice);
+
+    return Object.freeze({
+      pairingSession: persistedSession,
+      pairingToken: persistedToken,
+      trustedDevice: mapTrustedDeviceRecord(persistedDevice),
+    });
+  }
+
+  async expirePairingAttempts(request: TrustedDevicePairingExpirationRequest): Promise<TrustedDevicePairingExpirationResult> {
+    let expiredTokens = 0;
+    let expiredSessions = 0;
+    const expiresBeforeTime = new Date(request.expiresBefore).getTime();
+    if (request.pairingTokenId) {
+      const tokenRecord = await this.pairingRepository.getPairingTokenById(request.pairingTokenId);
+      if (tokenRecord) {
+        const token = createPairingToken({
+          ...tokenRecord,
+          attempts: {
+            failedValidationAttempts: tokenRecord.failedValidationAttempts,
+            maxValidationAttempts: tokenRecord.maxValidationAttempts,
+            lastValidationAttemptAt: tokenRecord.lastValidationAttemptAt,
+          },
+        });
+        if (
+          token.status === PairingTokenStatuses.issued &&
+          new Date(token.expiresAt).getTime() <= expiresBeforeTime
+        ) {
+          await this.pairingRepository.updatePairingToken(mapPairingTokenRecord(expirePairingToken(token, new Date(request.expiresBefore))));
+          expiredTokens += 1;
+        }
+      }
+    }
+
+    if (request.pairingSessionId) {
+      const sessionRecord = await this.pairingRepository.getPairingSessionById(request.pairingSessionId);
+      if (sessionRecord) {
+        const session = createPairingSession({
+          ...sessionRecord,
+          completion: sessionRecord.completedAt
+            ? {
+                completedAt: sessionRecord.completedAt,
+                completedByUserIdentityId: sessionRecord.completedByUserIdentityId,
+                trustMaterialRegistration: sessionRecord.trustMaterialRegistration,
+              }
+            : undefined,
+          rejection: sessionRecord.rejectionReason && sessionRecord.rejectedAt
+            ? {
+                reason: sessionRecord.rejectionReason,
+                rejectedAt: sessionRecord.rejectedAt,
+                note: sessionRecord.rejectionNote,
+              }
+            : undefined,
+        });
+        if (
+          (session.status === PairingSessionStatuses.initiated || session.status === PairingSessionStatuses.validated) &&
+          new Date(session.initiatedAt).getTime() <= expiresBeforeTime
+        ) {
+          await this.pairingRepository.updatePairingSession(mapPairingSessionRecord(expirePairingSession(session, new Date(request.expiresBefore))));
+          expiredSessions += 1;
+        }
+      }
+    }
+
+    return Object.freeze({
+      expiredSessions,
+      expiredTokens,
+    });
+  }
+
+  async invalidatePairing(
+    request: TrustedDevicePairingInvalidationRequest,
+  ): Promise<
+    IdentityOperationResult<
+      IdentityMutationOutcome,
+      | typeof IdentityErrorCodes.invalidRequest
+      | typeof IdentityErrorCodes.invalidState
+      | typeof IdentityErrorCodes.notFound
+    >
+  > {
+    return this.pairingRepository.invalidatePairingArtifacts(request);
   }
 }
 
@@ -667,6 +1243,134 @@ describe("identity application ports contracts", () => {
       error: expect.objectContaining({
         code: "identity-invalid-state",
       }),
+    });
+  });
+
+  it("supports trusted-device pairing initiation, validation, completion, expiration, and invalidation seams", async () => {
+    const adapter = new InMemoryIdentityPortAdapter();
+    const trustedDeviceService = new InMemoryTrustedDeviceManagementService(adapter, adapter, adapter);
+    const pairingService = new InMemoryTrustedDevicePairingService(adapter, adapter, adapter, adapter);
+
+    const registered = await trustedDeviceService.registerTrustedDevice({
+      userIdentityId: "user:pairing:1",
+      workspaceId: "workspace:pairing:1",
+      displayName: "Pairing Laptop",
+      fingerprint: createDeviceFingerprint({
+        algorithm: DeviceFingerprintAlgorithms.sha256,
+        value: "pairing-fingerprint-1",
+      }),
+      pairingMethod: DevicePairingMethods.oneTimeCode,
+      registeredAt: "2026-04-04T12:00:00.000Z",
+    });
+
+    const initiated = await pairingService.initiatePairing({
+      trustedDeviceId: registered.id,
+      userIdentityId: "user:pairing:1",
+      workspaceId: "workspace:pairing:1",
+      artifactType: PairingTokenArtifactTypes.oneTimeCode,
+      actorBinding: {
+        scope: PairingTokenActorScopes.sameUser,
+        userIdentityId: "user:pairing:1",
+      },
+      expiresAt: "2026-04-04T12:15:00.000Z",
+      maxValidationAttempts: 2,
+    });
+    expect(initiated.pairingSession.status).toBe(PairingSessionStatuses.initiated);
+    expect(initiated.pairingToken.status).toBe(PairingTokenStatuses.issued);
+
+    const invalidValidation = await pairingService.validatePairingToken({
+      pairingSessionId: initiated.pairingSession.id,
+      pairingTokenId: initiated.pairingToken.id,
+      trustedDeviceId: registered.id,
+      userIdentityId: "user:pairing:1",
+      presentedToken: "wrong-token",
+      attemptedAt: "2026-04-04T12:01:00.000Z",
+    });
+    expect(invalidValidation.outcome).toBe(PairingTokenValidationOutcomes.invalid);
+    expect(invalidValidation.pairingToken.failedValidationAttempts).toBe(1);
+
+    const validValidation = await pairingService.validatePairingToken({
+      pairingSessionId: initiated.pairingSession.id,
+      pairingTokenId: initiated.pairingToken.id,
+      trustedDeviceId: registered.id,
+      userIdentityId: "user:pairing:1",
+      presentedToken: initiated.artifact.value,
+      attemptedAt: "2026-04-04T12:01:30.000Z",
+    });
+    expect(validValidation.outcome).toBe(PairingTokenValidationOutcomes.valid);
+    expect(validValidation.pairingSession.status).toBe(PairingSessionStatuses.validated);
+
+    const completed = await pairingService.completePairing({
+      pairingSessionId: initiated.pairingSession.id,
+      pairingTokenId: initiated.pairingToken.id,
+      trustedDeviceId: registered.id,
+      userIdentityId: "user:pairing:1",
+      workspaceId: "workspace:pairing:1",
+      presentedToken: initiated.artifact.value,
+      completedAt: "2026-04-04T12:02:00.000Z",
+      completedByUserIdentityId: "user:pairing:1",
+      trustMaterialRegistration: {
+        materialKind: DeviceTrustMaterialKinds.sessionSigningKey,
+        pinReference: "pin:pairing:1",
+      },
+    });
+    expect(completed.pairingToken.status).toBe(PairingTokenStatuses.consumed);
+    expect(completed.pairingSession.status).toBe(PairingSessionStatuses.completed);
+    expect(completed.trustedDevice.trustStatus).toBe(DeviceTrustStatuses.trusted);
+
+    const reusedValidation = await pairingService.validatePairingToken({
+      pairingSessionId: initiated.pairingSession.id,
+      pairingTokenId: initiated.pairingToken.id,
+      trustedDeviceId: registered.id,
+      userIdentityId: "user:pairing:1",
+      presentedToken: initiated.artifact.value,
+      attemptedAt: "2026-04-04T12:02:30.000Z",
+    });
+    expect(reusedValidation.outcome).toBe(PairingTokenValidationOutcomes.reused);
+
+    const toExpire = await pairingService.initiatePairing({
+      trustedDeviceId: registered.id,
+      userIdentityId: "user:pairing:1",
+      workspaceId: "workspace:pairing:1",
+      artifactType: PairingTokenArtifactTypes.qrPayload,
+      actorBinding: {
+        scope: PairingTokenActorScopes.sessionBound,
+        sessionId: "session:pairing:1",
+      },
+      expiresAt: "2026-04-04T12:00:30.000Z",
+    });
+    const expired = await pairingService.expirePairingAttempts({
+      pairingSessionId: toExpire.pairingSession.id,
+      pairingTokenId: toExpire.pairingToken.id,
+      expiresBefore: "2026-04-04T12:02:00.000Z",
+    });
+    expect(expired).toEqual({
+      expiredSessions: 1,
+      expiredTokens: 1,
+    });
+
+    const toInvalidate = await pairingService.initiatePairing({
+      trustedDeviceId: registered.id,
+      userIdentityId: "user:pairing:1",
+      artifactType: PairingTokenArtifactTypes.oneTimeCode,
+      actorBinding: {
+        scope: PairingTokenActorScopes.workspaceAdmin,
+        userIdentityId: "admin:pairing:1",
+      },
+      expiresAt: "2026-04-04T12:15:00.000Z",
+    });
+    const invalidated = await pairingService.invalidatePairing({
+      pairingSessionId: toInvalidate.pairingSession.id,
+      pairingTokenId: toInvalidate.pairingToken.id,
+      reason: PairingTokenInvalidationReasons.manualCancel,
+      invalidatedByUserIdentityId: "admin:pairing:1",
+      invalidatedAt: "2026-04-04T12:03:00.000Z",
+    });
+    expect(invalidated).toEqual({
+      ok: true,
+      value: {
+        changed: true,
+      },
     });
   });
 

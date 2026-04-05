@@ -6,6 +6,7 @@ Scope in this story is intentionally inner-layer only:
 - domain model and lifecycle invariants,
 - application repository/service ports,
 - shared trusted-device contracts for downstream adapters and UI.
+- pairing token/session lifecycle contracts for explicit trusted-device enrollment.
 
 No storage adapter, API route, or UI workflow is introduced in this slice.
 
@@ -14,6 +15,7 @@ No storage adapter, API route, or UI workflow is introduced in this slice.
 ### Domain
 
 - `src/domain/identity/TrustedDeviceDomain.ts`
+- `src/domain/identity/TrustedDevicePairingDomain.ts`
 
 Canonical domain concepts:
 - `TrustedDevice` entity with explicit identity and workspace association.
@@ -38,18 +40,65 @@ Primary domain operations:
 - `updateTrustedDeviceDisplayName(...)`
 - `revokeTrustedDevice(...)`
 - `expireTrustedDevice(...)`
+- `createPairingSession(...)`
+- `createPairingToken(...)`
+- `registerPairingTokenFailedAttempt(...)`
+- `consumePairingToken(...)`
+- `expirePairingToken(...)`
+- `invalidatePairingToken(...)`
+- `markPairingSessionValidated(...)`
+- `completePairingSession(...)`
+- `rejectPairingSession(...)`
+- `expirePairingSession(...)`
+- `invalidatePairingSession(...)`
 
 ### Application contracts and ports
 
 - Shared contracts: `application/contracts/IdentityApplicationContracts.ts`
 - Repository port: `application/identity/ports/ITrustedDeviceRepository.ts`
 - Service port: `application/identity/ports/ITrustedDeviceManagementService.ts`
+- Pairing repository port: `application/identity/ports/ITrustedDevicePairingRepository.ts`
+- Pairing service port: `application/identity/ports/ITrustedDevicePairingService.ts`
 
 Trusted-device contract coverage now includes:
 - record projection type (`TrustedDeviceRecord`),
 - list/fingerprint query contracts,
 - lifecycle request contracts for register/pair/display-name update/last-seen update/revoke,
-- id namespace extension (`IdentityIdNamespaces.trustedDevice`).
+- pairing DTOs for initiation/validation/completion/expiration/invalidation flows,
+- pairing session/token record contracts with attempt counters and invalidation metadata,
+- id namespace extension:
+  - `IdentityIdNamespaces.trustedDevice`
+  - `IdentityIdNamespaces.trustedDevicePairingSession`
+  - `IdentityIdNamespaces.trustedDevicePairingToken`
+
+## Pairing token and session lifecycle model
+
+Pairing token status is explicit:
+- `issued`
+- `consumed`
+- `expired`
+- `invalidated`
+
+Pairing session status is explicit:
+- `initiated`
+- `validated`
+- `completed`
+- `expired`
+- `invalidated`
+- `rejected`
+
+Pairing lifecycle rules are modeled in-domain with explicit transition maps:
+- `PairingTokenLifecycleTransitions`
+- `PairingSessionLifecycleTransitions`
+
+Key invariants and posture:
+- pairing tokens are single-use; only `issued` tokens can be consumed.
+- pairing tokens are time-bounded; `expiresAt` is required and validated against `issuedAt`.
+- failed validation attempts are tracked with explicit counters and limit enforcement.
+- attempt-limit exhaustion can auto-invalidate tokens with structured reason metadata.
+- invalid/reused/expired token states map to explicit validation outcomes for deterministic use-case handling.
+- pairing session completion requires a consumed token linked to the same session.
+- completion supports optional pinned trust-material registration metadata (`materialKind`, `pinReference`, optional key fingerprint) so trust-material enrollment can be finalized in later stories without changing use-case contracts.
 
 ## Trusted-device lifecycle model
 
@@ -91,6 +140,7 @@ This aligns with existing identity session trust seams (`trustedDeviceBindingId`
 
 - Domain invariants + lifecycle transitions:
   - `src/domain/identity/tests/TrustedDeviceDomain.test.ts`
+  - `src/domain/identity/tests/TrustedDevicePairingDomain.test.ts`
 - Application contract and port compile/lifecycle coverage:
   - `application/contracts/tests/IdentityApplicationContracts.test.ts`
   - `application/identity/tests/IdentityPortsContracts.test.ts`
