@@ -7,6 +7,8 @@ Stories 4.2.2-4.2.3 deliver the production policy-evaluation core for Feature 4:
 - `EffectivePermissionResolutionService` provides deterministic allow/deny precedence.
 - `AuthorizationPolicyDecisionEvaluator` composes actor grants + resource metadata and emits typed authorization decisions for resource-instance and workspace-capability checks.
 
+Story 4.2.4 adds optional hot-path caching for authorization persistence reads used repeatedly by policy-evaluation and list screens.
+
 ## Canonical files
 
 - `src/application/authorization/use-cases/EffectivePermissionResolutionService.ts`
@@ -14,6 +16,8 @@ Stories 4.2.2-4.2.3 deliver the production policy-evaluation core for Feature 4:
 - `src/application/authorization/tests/EffectivePermissionResolutionService.test.ts`
 - `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
 - `src/application/authorization/use-cases/EvaluateAuthorizationPolicyUseCase.ts`
+- `src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter.ts`
+- `src/infrastructure/persistence/authorization/tests/SqliteAuthorizationPersistenceAdapter.test.ts`
 
 ## Stable interface
 
@@ -64,6 +68,25 @@ Matrix-style tests validate:
 - resource-metadata-missing deterministic deny reason (`resource-policy-metadata-not-found`)
 - workspace-capability checks without requiring a concrete resource instance
 - optional debug details for safe operational diagnostics (`counts` + `sourceKind` only)
+- cache-enabled memoization for role-assignment, sharing-grant, and resource-policy read hot paths
+- cache invalidation on role assignment, sharing grant, and resource visibility/policy mutations
+- cache-disabled behavior parity (optional cache usage)
+
+## Caching and invalidation (Story 4.2.4)
+
+- `SqliteAuthorizationPersistenceAdapter` now includes an optional in-memory cache (enabled by default) for:
+  - `listRoleAssignments(...)`
+  - `listSharingGrants(...)`
+  - `findResourcePolicyMetadata(...)`
+  - `listResourcePolicyMetadata(...)`
+- Cache keys include workspace/resource locators, actor/subject filters, lifecycle filters (`asOf`, include flags), and paging fields.
+- Invalidation is explicit and mutation-scoped:
+  - role-assignment mutations clear role-assignment list cache,
+  - sharing-grant mutations clear sharing-grant list cache,
+  - resource-policy mutations evict the direct resource metadata cache key and clear resource-policy list cache.
+- Cache capacity is bounded per store via `maxEntriesPerStore` to avoid unbounded memory growth.
+- Cache usage is optional with adapter options:
+  - `new SqliteAuthorizationPersistenceAdapter(path, { cache: { enabled: false } })`
 
 ## Extension guidance
 

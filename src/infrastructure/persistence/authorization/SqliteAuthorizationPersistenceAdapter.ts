@@ -42,6 +42,17 @@ import {
   AUTHORIZATION_PERSISTENCE_SCHEMA_VERSION,
 } from "./SqliteAuthorizationPersistenceMigrations";
 
+export interface SqliteAuthorizationPersistenceAdapterCacheOptions {
+  readonly enabled?: boolean;
+  readonly maxEntriesPerStore?: number;
+}
+
+export interface SqliteAuthorizationPersistenceAdapterOptions {
+  readonly cache?: SqliteAuthorizationPersistenceAdapterCacheOptions;
+}
+
+const DefaultCacheMaxEntriesPerStore = 512;
+
 export class SqliteAuthorizationPersistenceAdapter
   implements
     IAuthorizationRoleAssignmentPersistenceRepository,
@@ -49,8 +60,23 @@ export class SqliteAuthorizationPersistenceAdapter
     IAuthorizationResourcePolicyMetadataPersistenceRepository {
   private database?: SqliteCompatDatabase;
   private initialized = false;
+  private readonly cacheEnabled: boolean;
+  private readonly maxCacheEntriesPerStore: number;
+  private readonly roleAssignmentsListCache = new Map<string, ReadonlyArray<AuthorizationRoleAssignmentPersistenceRecord>>();
+  private readonly sharingGrantsListCache = new Map<string, ReadonlyArray<AuthorizationSharingGrantPersistenceRecord>>();
+  private readonly resourcePolicyFindCache = new Map<string, AuthorizationResourcePolicyMetadataPersistenceRecord | null>();
+  private readonly resourcePolicyListCache = new Map<string, ReadonlyArray<AuthorizationResourcePolicyMetadataPersistenceRecord>>();
 
-  public constructor(private readonly databasePath: string) {}
+  public constructor(
+    private readonly databasePath: string,
+    options?: SqliteAuthorizationPersistenceAdapterOptions,
+  ) {
+    this.cacheEnabled = options?.cache?.enabled ?? true;
+    const requestedMaxEntries = options?.cache?.maxEntriesPerStore;
+    this.maxCacheEntriesPerStore = Number.isInteger(requestedMaxEntries) && (requestedMaxEntries as number) > 0
+      ? requestedMaxEntries as number
+      : DefaultCacheMaxEntriesPerStore;
+  }
 
   public async findRoleAssignmentById(roleAssignmentId: string): Promise<AuthorizationRoleAssignmentPersistenceRecord | undefined> {
     const normalizedRoleAssignmentId = normalizeAuthorizationLookup(roleAssignmentId);
@@ -89,6 +115,12 @@ export class SqliteAuthorizationPersistenceAdapter
   public async listRoleAssignments(
     query: AuthorizationRoleAssignmentPersistenceLookupQuery,
   ): Promise<ReadonlyArray<AuthorizationRoleAssignmentPersistenceRecord>> {
+    const cacheKey = this.toRoleAssignmentListCacheKey(query);
+    const cached = this.readFromCache(this.roleAssignmentsListCache, cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const clauses: string[] = [];
     const params: unknown[] = [];
 
@@ -184,7 +216,9 @@ export class SqliteAuthorizationPersistenceAdapter
       ${paging.sql}
     `).all(...params, ...paging.params) as AuthorizationRoleAssignmentRow[];
 
-    return Object.freeze(rows.map((row) => mapRoleAssignmentRowToRecord(row)));
+    const result = Object.freeze(rows.map((row) => mapRoleAssignmentRowToRecord(row)));
+    this.writeToCache(this.roleAssignmentsListCache, cacheKey, result);
+    return result;
   }
 
   public async upsertRoleAssignment(
@@ -269,6 +303,8 @@ export class SqliteAuthorizationPersistenceAdapter
       );
     })();
 
+    this.invalidateRoleAssignmentCaches();
+
     return Object.freeze({
       record: persistedRecord as AuthorizationRoleAssignmentPersistenceRecord,
       changed: true,
@@ -335,6 +371,12 @@ export class SqliteAuthorizationPersistenceAdapter
   public async listSharingGrants(
     query: AuthorizationSharingGrantPersistenceLookupQuery,
   ): Promise<ReadonlyArray<AuthorizationSharingGrantPersistenceRecord>> {
+    const cacheKey = this.toSharingGrantListCacheKey(query);
+    const cached = this.readFromCache(this.sharingGrantsListCache, cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const clauses: string[] = [];
     const params: unknown[] = [];
 
@@ -423,7 +465,9 @@ export class SqliteAuthorizationPersistenceAdapter
       ${paging.sql}
     `).all(...params, ...paging.params) as AuthorizationSharingGrantRow[];
 
-    return Object.freeze(rows.map((row) => mapSharingGrantRowToRecord(row)));
+    const result = Object.freeze(rows.map((row) => mapSharingGrantRowToRecord(row)));
+    this.writeToCache(this.sharingGrantsListCache, cacheKey, result);
+    return result;
   }
 
   public async upsertSharingGrant(
@@ -513,6 +557,8 @@ export class SqliteAuthorizationPersistenceAdapter
       );
     })();
 
+    this.invalidateSharingGrantCaches();
+
     return Object.freeze({
       record: persistedRecord as AuthorizationSharingGrantPersistenceRecord,
       changed: true,
@@ -542,17 +588,32 @@ export class SqliteAuthorizationPersistenceAdapter
   public async findResourcePolicyMetadata(
     resource: AuthorizationPersistenceResourceLocator,
   ): Promise<AuthorizationResourcePolicyMetadataPersistenceRecord | undefined> {
+    const cacheKey = this.toResourcePolicyFindCacheKey(resource);
+    const cached = this.readFromCache(this.resourcePolicyFindCache, cacheKey);
+    if (cached !== undefined) {
+      return cached ?? undefined;
+    }
+
     const row = this.getResourcePolicyMetadataByResourceInternal(resource);
     if (!row || row.deleted_at) {
+      this.writeToCache(this.resourcePolicyFindCache, cacheKey, null);
       return undefined;
     }
 
-    return mapResourcePolicyMetadataRowToRecord(row);
+    const result = mapResourcePolicyMetadataRowToRecord(row);
+    this.writeToCache(this.resourcePolicyFindCache, cacheKey, result);
+    return result;
   }
 
   public async listResourcePolicyMetadata(
     query: AuthorizationResourcePolicyMetadataPersistenceLookupQuery,
   ): Promise<ReadonlyArray<AuthorizationResourcePolicyMetadataPersistenceRecord>> {
+    const cacheKey = this.toResourcePolicyListCacheKey(query);
+    const cached = this.readFromCache(this.resourcePolicyListCache, cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const clauses: string[] = [];
     const params: unknown[] = [];
 
@@ -623,7 +684,9 @@ export class SqliteAuthorizationPersistenceAdapter
       ${paging.sql}
     `).all(...params, ...paging.params) as AuthorizationResourcePolicyMetadataRow[];
 
-    return Object.freeze(rows.map((row) => mapResourcePolicyMetadataRowToRecord(row)));
+    const result = Object.freeze(rows.map((row) => mapResourcePolicyMetadataRowToRecord(row)));
+    this.writeToCache(this.resourcePolicyListCache, cacheKey, result);
+    return result;
   }
 
   public async upsertResourcePolicyMetadata(
@@ -708,6 +771,8 @@ export class SqliteAuthorizationPersistenceAdapter
       );
     })();
 
+    this.invalidateResourcePolicyCaches(input.record);
+
     return Object.freeze({
       record: persistedRecord as AuthorizationResourcePolicyMetadataPersistenceRecord,
       changed: true,
@@ -735,6 +800,7 @@ export class SqliteAuthorizationPersistenceAdapter
   }
 
   public dispose(): void {
+    this.clearCaches();
     this.database?.close();
     this.database = undefined;
     this.initialized = false;
@@ -1000,5 +1066,102 @@ export class SqliteAuthorizationPersistenceAdapter
   private toPersistenceError(operation: string, error: unknown): Error {
     const details = error instanceof Error ? error.message : String(error);
     return new Error(`Authorization persistence failed to ${operation}: ${details}`);
+  }
+
+  private readFromCache<T>(cache: Map<string, T>, key: string): T | undefined {
+    if (!this.cacheEnabled) {
+      return undefined;
+    }
+    return cache.get(key);
+  }
+
+  private writeToCache<T>(cache: Map<string, T>, key: string, value: T): void {
+    if (!this.cacheEnabled) {
+      return;
+    }
+
+    if (cache.has(key)) {
+      cache.delete(key);
+    }
+    cache.set(key, value);
+
+    if (cache.size > this.maxCacheEntriesPerStore) {
+      const oldestKey = cache.keys().next().value as string | undefined;
+      if (oldestKey) {
+        cache.delete(oldestKey);
+      }
+    }
+  }
+
+  private invalidateRoleAssignmentCaches(): void {
+    this.roleAssignmentsListCache.clear();
+  }
+
+  private invalidateSharingGrantCaches(): void {
+    this.sharingGrantsListCache.clear();
+  }
+
+  private invalidateResourcePolicyCaches(resource: AuthorizationPersistenceResourceLocator): void {
+    this.resourcePolicyFindCache.delete(this.toResourcePolicyFindCacheKey(resource));
+    this.resourcePolicyListCache.clear();
+  }
+
+  private clearCaches(): void {
+    this.roleAssignmentsListCache.clear();
+    this.sharingGrantsListCache.clear();
+    this.resourcePolicyFindCache.clear();
+    this.resourcePolicyListCache.clear();
+  }
+
+  private toRoleAssignmentListCacheKey(query: AuthorizationRoleAssignmentPersistenceLookupQuery): string {
+    const statuses = query.statuses ? [...query.statuses].sort().join(",") : "";
+    return [
+      query.workspaceId ?? "",
+      query.actorUserIdentityId ?? "",
+      query.roleKey ?? "",
+      query.scope ?? "",
+      query.resourceFamily ?? "",
+      query.resourceType ?? "",
+      query.resourceId ?? "",
+      statuses,
+      String(query.includeRevoked ?? false),
+      query.asOf ?? "",
+      query.limit?.toString() ?? "",
+      query.offset?.toString() ?? "",
+    ].join("|");
+  }
+
+  private toSharingGrantListCacheKey(query: AuthorizationSharingGrantPersistenceLookupQuery): string {
+    const resourceKey = query.resource ? toAuthorizationResourceLookupKey(query.resource) : "";
+    return [
+      resourceKey,
+      query.workspaceId ?? "",
+      query.subjectUserIdentityId ?? "",
+      query.subjectWorkspaceId ?? "",
+      query.subjectRoleKey ?? "",
+      String(query.includeRevoked ?? false),
+      String(query.includeExpired ?? false),
+      query.asOf ?? "",
+      query.limit?.toString() ?? "",
+      query.offset?.toString() ?? "",
+    ].join("|");
+  }
+
+  private toResourcePolicyFindCacheKey(resource: AuthorizationPersistenceResourceLocator): string {
+    return toAuthorizationResourceLookupKey(resource);
+  }
+
+  private toResourcePolicyListCacheKey(query: AuthorizationResourcePolicyMetadataPersistenceLookupQuery): string {
+    const resourceKey = query.resource ? toAuthorizationResourceLookupKey(query.resource) : "";
+    return [
+      resourceKey,
+      query.workspaceId ?? "",
+      query.ownerUserIdentityId ?? "",
+      query.visibility ?? "",
+      String(query.includeDeleted ?? false),
+      query.asOf ?? "",
+      query.limit?.toString() ?? "",
+      query.offset?.toString() ?? "",
+    ].join("|");
   }
 }
