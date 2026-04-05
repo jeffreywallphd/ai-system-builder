@@ -272,4 +272,88 @@ describe("IdentityServerHost", () => {
       rmSync(tempDirectory, { recursive: true, force: true });
     }
   });
+
+  it("exposes node enrollment submission and pending-review routes on the runtime host", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-node-host-test-"));
+    const databasePath = join(tempDirectory, "identity-node-host.sqlite");
+    const host = await startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+    });
+
+    try {
+      const submitResponse = await fetch(`http://${host.address}/api/v1/nodes/enrollments`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          actorUserIdentityId: "node:bootstrap:host-1",
+          nodeId: "node:host:1",
+          nodeType: "compute",
+          displayName: "Host Node 1",
+          capabilityProfile: {
+            enabledCapabilities: ["workflow-execution"],
+            supportsRemoteScheduling: true,
+          },
+          bootstrap: {
+            trustMaterialRef: "trust-material:host-node-1",
+            publicKeyAlgorithm: "ed25519",
+            publicKeyFingerprintSha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          },
+        }),
+      });
+      expect(submitResponse.status).toBe(200);
+      const submitBody = await submitResponse.json();
+      expect(submitBody.ok).toBe(true);
+      expect(submitBody.data.enrollment.status).toBe("submitted");
+
+      const registerAdmin = await fetch(`http://${host.address}/api/v1/identity/register`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          username: "node.host.admin",
+          credential: {
+            candidate: "StrongPass!2026",
+          },
+        }),
+      });
+      expect(registerAdmin.status).toBe(200);
+
+      const loginAdmin = await fetch(`http://${host.address}/api/v1/identity/login`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          providerSubject: "node.host.admin",
+          credential: {
+            candidate: "StrongPass!2026",
+          },
+        }),
+      });
+      expect(loginAdmin.status).toBe(200);
+      const loginAdminBody = await loginAdmin.json();
+
+      const pendingResponse = await fetch(`http://${host.address}/api/v1/nodes/enrollments/pending`, {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${loginAdminBody.data.sessionToken}`,
+        },
+      });
+      expect(pendingResponse.status).toBe(200);
+      const pendingBody = await pendingResponse.json();
+      expect(pendingBody.ok).toBe(true);
+      expect(pendingBody.data.enrollments).toHaveLength(1);
+      expect(pendingBody.data.enrollments[0].nodeId).toBe("node:host:1");
+    } finally {
+      await host.close();
+      rmSync(tempDirectory, { recursive: true, force: true });
+    }
+  });
 });

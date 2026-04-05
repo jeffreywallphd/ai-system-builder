@@ -44,10 +44,12 @@ import { SqliteIdentityLifecycleEventPublisher } from "../../infrastructure/file
 import { WorkspaceInvitationBackendApi } from "../../infrastructure/api/workspaces/WorkspaceInvitationBackendApi";
 import { WorkspaceAdministrationBackendApi } from "../../infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
 import { AuthorizationManagementBackendApi } from "../../infrastructure/api/authorization/AuthorizationManagementBackendApi";
+import { NodeTrustBackendApi } from "../../infrastructure/api/nodes/NodeTrustBackendApi";
 import { SqliteWorkspacePersistenceAdapter } from "../../src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import { WorkspaceAuthorizationPolicyReadAdapter } from "../../src/infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
 import { SqliteAuthorizationPersistenceAdapter } from "../../src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter";
 import { SqliteAuthorizationPolicyReadAdapter } from "../../src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter";
+import { SqliteNodeTrustPersistenceAdapter } from "../../src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
 import { AuthorizationPolicyDecisionEvaluator } from "../../src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyMutationService } from "../../src/application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "../../src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
@@ -80,6 +82,8 @@ import { RemoveWorkspaceMemberUseCase } from "../../src/application/workspaces/u
 import { AssignWorkspaceRoleUseCase } from "../../src/application/workspaces/use-cases/AssignWorkspaceRoleUseCase";
 import { ReassignWorkspaceRoleUseCase } from "../../src/application/workspaces/use-cases/ReassignWorkspaceRoleUseCase";
 import { RevokeWorkspaceRoleUseCase } from "../../src/application/workspaces/use-cases/RevokeWorkspaceRoleUseCase";
+import { RegisterNodeEnrollmentRequestUseCase } from "../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
+import { ReviewPendingNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
 import type { WorkspaceIdNamespace } from "../../src/shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   createIdentityHttpServer,
@@ -141,6 +145,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const trustedDeviceRepository = new SqliteTrustedDeviceRepository(path.resolve(options.databasePath));
   const workspaceRepository = new SqliteWorkspacePersistenceAdapter(path.resolve(options.databasePath));
   const authorizationRepository = new SqliteAuthorizationPersistenceAdapter(path.resolve(options.databasePath));
+  const nodeTrustRepository = new SqliteNodeTrustPersistenceAdapter(path.resolve(options.databasePath));
   const env = options.env ?? process.env;
   const providerAccountPolicies = options.providerAccountPolicies
     ?? IdentityProviderAccountPolicyConfig.fromEnv(env);
@@ -461,9 +466,18 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     resourcePolicyMetadataPersistenceRepository: authorizationRepository,
     clock: workspaceClock,
   });
+  const nodeTrustBackendApi = new NodeTrustBackendApi({
+    registerNodeEnrollmentRequestUseCase: new RegisterNodeEnrollmentRequestUseCase({
+      enrollmentRequestRepository: nodeTrustRepository,
+    }),
+    reviewPendingNodeEnrollmentUseCase: new ReviewPendingNodeEnrollmentUseCase({
+      enrollmentRequestRepository: nodeTrustRepository,
+    }),
+  });
 
   const server = createIdentityHttpServer({
     backendApi,
+    nodeTrustBackendApi,
     authorizationManagementBackendApi,
     workspaceBackendApi,
     workspaceAdministrationBackendApi,
@@ -489,6 +503,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
         trustedDeviceRepository.dispose();
         workspaceRepository.dispose();
         authorizationRepository.dispose();
+        nodeTrustRepository.dispose();
         const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
         if (typeof disposablePublisher.dispose === "function") {
           disposablePublisher.dispose();
