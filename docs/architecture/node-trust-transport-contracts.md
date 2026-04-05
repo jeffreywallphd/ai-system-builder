@@ -225,6 +225,18 @@ Application enforcement guidance:
 - This centralized gate enforces approved + activated (`trustState=trusted`) + non-revoked + certificate-present preconditions before node-scoped writes.
 - Future node-authenticated handlers (for example execution registration flows) should reuse this same helper to preserve consistent denial semantics and certificate-transport compatibility.
 
+## Story 7.3.1 node-to-server mutually authenticated transport adapter hooks
+
+- Node transport APIs now expose a certificate-authenticated resolution seam through:
+  - `ResolveNodeMutualTlsTransportIdentityApiRequest`
+  - `ResolveNodeMutualTlsTransportIdentityApiResponse`
+  - `NodeTrustBackendApi.resolveNodeMutualTlsTransportIdentity(...)`
+- Runtime transport posture for node channels:
+  - `GET /api/v1/nodes/:nodeId/runtime-trust-material`
+  - `POST /api/v1/nodes/:nodeId/heartbeat`
+  now uses dedicated node mTLS transport validation when host transport trust enforcement is configured.
+- Node certificate identity binding is validated against trusted node records through application use-case boundaries rather than direct transport persistence access.
+
 ## Story 5.4.4 admin revocation and trust-state management transport/UI hooks
 
 Story 5.4.4 adds concrete admin-facing revocation transport and renderer wiring on top of node inventory/detail.

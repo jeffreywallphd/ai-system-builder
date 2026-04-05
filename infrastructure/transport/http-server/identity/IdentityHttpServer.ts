@@ -139,6 +139,7 @@ import {
   evaluateThinClientWebSocketOriginPolicy,
   type ThinClientSessionChannelContextDto,
 } from "../../../../src/shared/contracts/security/ThinClientTransportContracts";
+import { validateNodeMutualTlsTransport } from "./NodeMutualTlsTransportAdapter";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 
@@ -665,6 +666,7 @@ interface InboundHttpTransportConnectionState {
   readonly mutualTlsEstablished: boolean;
   readonly peerCertificatePresented: boolean;
   readonly peerCertificateSerialNumber?: string;
+  readonly peerCertificateFingerprintSha256?: string;
   readonly localAddress?: string;
   readonly remoteAddress?: string;
   readonly host?: string;
@@ -685,6 +687,19 @@ interface AuthenticatedRequestContext {
       readonly accessChannel: "desktop" | "thin-client";
       readonly thinClient?: ThinClientSessionChannelContextDto;
     };
+    readonly trustValidation: {
+      readonly enforced: boolean;
+      readonly scenario: TransportSecurityScenario;
+      readonly actorType: TransportConnectionActorType;
+      readonly remotePeerType: TransportPeerType;
+    };
+  };
+}
+
+interface AuthenticatedNodeTransportContext {
+  readonly nodeId: string;
+  readonly transport: {
+    readonly connection: InboundHttpTransportConnectionState;
     readonly trustValidation: {
       readonly enforced: boolean;
       readonly scenario: TransportSecurityScenario;
@@ -2073,40 +2088,17 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && !path.startsWith("/api/v1/nodes/enrollments/")
       ) {
         const runtimeTrustMaterialNodeId = decodePathTail(path, "/api/v1/nodes/", "/runtime-trust-material");
-        await requireAuthenticatedSession(
+        await requireAuthenticatedNodeTransport(
           request,
           response,
           requestId,
           options.backendApi,
+          options.nodeTrustBackendApi,
           logger,
           options.transportTrust,
-          {
-            transportScenario: TransportSecurityScenarios.nodeToControlPlane,
-            transportActorType: TransportConnectionActorTypes.nodeIdentity,
-            transportRemotePeerType: TransportPeerTypes.nodeRuntime,
-            nodeId: runtimeTrustMaterialNodeId,
-          },
+          runtimeTrustMaterialNodeId,
           async (context) => {
-            const nodeId = runtimeTrustMaterialNodeId;
-            if (!nodeId) {
-              const invalid = buildNodeTrustInvalidRequestResponse("nodeId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-            if (!isAuthenticatedNodePrincipalForNode(context, nodeId)) {
-              const forbidden = buildNodeTrustForbiddenResponse(
-                `Authenticated session is not authorized to retrieve runtime trust material for node '${nodeId}'.`,
-              );
-              writeJson(response, 403, forbidden);
-              logResponse(logger, requestId, request, 403, Object.freeze({
-                nodeId,
-                principalUserIdentityId: context.principal.userIdentityId,
-                principalUsername: context.principal.username,
-                sessionProviderSubject: context.session.providerSubject,
-              }), forbidden);
-              return;
-            }
+            const nodeId = context.nodeId;
 
             const includeLeafCertificateInput = searchParams.get("includeLeafCertificate");
             const includeCertificateChainInput = searchParams.get("includeCertificateChain");
@@ -2232,40 +2224,17 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && !path.startsWith("/api/v1/nodes/enrollments/")
       ) {
         const heartbeatNodeId = decodePathTail(path, "/api/v1/nodes/", "/heartbeat");
-        await requireAuthenticatedSession(
+        await requireAuthenticatedNodeTransport(
           request,
           response,
           requestId,
           options.backendApi,
+          options.nodeTrustBackendApi,
           logger,
           options.transportTrust,
-          {
-            transportScenario: TransportSecurityScenarios.nodeToControlPlane,
-            transportActorType: TransportConnectionActorTypes.nodeIdentity,
-            transportRemotePeerType: TransportPeerTypes.nodeRuntime,
-            nodeId: heartbeatNodeId,
-          },
+          heartbeatNodeId,
           async (context) => {
-            const nodeId = heartbeatNodeId;
-            if (!nodeId) {
-              const invalid = buildNodeTrustInvalidRequestResponse("nodeId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-            if (!isAuthenticatedNodePrincipalForNode(context, nodeId)) {
-              const forbidden = buildNodeTrustForbiddenResponse(
-                `Authenticated session is not authorized to submit heartbeat for node '${nodeId}'.`,
-              );
-              writeJson(response, 403, forbidden);
-              logResponse(logger, requestId, request, 403, Object.freeze({
-                nodeId,
-                principalUserIdentityId: context.principal.userIdentityId,
-                principalUsername: context.principal.username,
-                sessionProviderSubject: context.session.providerSubject,
-              }), forbidden);
-              return;
-            }
+            const nodeId = context.nodeId;
 
             const parsedRequest = await parseAndValidateNodeHeartbeatRequest(
               request,
@@ -4049,6 +4018,99 @@ async function requireAuthenticatedSession(
   }));
 }
 
+async function requireAuthenticatedNodeTransport(
+  request: IncomingMessage,
+  response: ServerResponse,
+  requestId: string,
+  backendApi: IdentityAuthBackendApi,
+  nodeTrustBackendApi: NodeTrustBackendApi,
+  logger: IdentityHttpServerLogger,
+  transportTrust: IdentityHttpServerTransportTrustOptions | undefined,
+  nodeId: string | undefined,
+  onAuthenticated: (context: AuthenticatedNodeTransportContext) => Promise<void>,
+): Promise<void> {
+  if (!nodeId) {
+    const invalid = buildNodeTrustInvalidRequestResponse("nodeId is required.");
+    writeJson(response, 400, invalid);
+    logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+    return;
+  }
+
+  if (!transportTrust) {
+    await requireAuthenticatedSession(
+      request,
+      response,
+      requestId,
+      backendApi,
+      logger,
+      transportTrust,
+      {
+        transportScenario: TransportSecurityScenarios.nodeToControlPlane,
+        transportActorType: TransportConnectionActorTypes.nodeIdentity,
+        transportRemotePeerType: TransportPeerTypes.nodeRuntime,
+        nodeId,
+      },
+      async (context) => {
+        if (!isAuthenticatedNodePrincipalForNode(context, nodeId)) {
+          const forbidden = buildNodeTrustForbiddenResponse(
+            `Authenticated session is not authorized to establish node transport for '${nodeId}'.`,
+          );
+          writeJson(response, 403, forbidden);
+          logResponse(logger, requestId, request, 403, Object.freeze({
+            nodeId,
+            principalUserIdentityId: context.principal.userIdentityId,
+            principalUsername: context.principal.username,
+            sessionProviderSubject: context.session.providerSubject,
+          }), forbidden);
+          return;
+        }
+
+        await onAuthenticated(Object.freeze({
+          nodeId,
+          transport: Object.freeze({
+            connection: context.transport.connection,
+            trustValidation: context.transport.trustValidation,
+          }),
+        }));
+      },
+    );
+    return;
+  }
+
+  const transportState = resolveInboundHttpTransportConnectionState(request);
+  const mutualTlsValidation = await validateNodeMutualTlsTransport({
+    requestId,
+    nodeId,
+    transportState,
+    ports: Object.freeze({
+      trustValidator: transportTrust.httpValidator,
+      nodeIdentityResolver: nodeTrustBackendApi,
+    }),
+  });
+  if (!mutualTlsValidation.ok) {
+    writeJson(response, mutualTlsValidation.statusCode, mutualTlsValidation.body);
+    logResponse(logger, requestId, request, mutualTlsValidation.statusCode, Object.freeze({
+      nodeId,
+      transport: Object.freeze({
+        channelType: transportState.channelType,
+        encryptedTransportEstablished: transportState.encryptedTransportEstablished,
+        mutualTlsEstablished: transportState.mutualTlsEstablished,
+        peerCertificatePresented: transportState.peerCertificatePresented,
+        peerCertificateSerialNumber: transportState.peerCertificateSerialNumber,
+      }),
+    }), mutualTlsValidation.body);
+    return;
+  }
+
+  await onAuthenticated(Object.freeze({
+    nodeId: mutualTlsValidation.node.nodeId,
+    transport: Object.freeze({
+      connection: transportState,
+      trustValidation: mutualTlsValidation.trust,
+    }),
+  }));
+}
+
 async function handleLogin(
   request: IncomingMessage,
   response: ServerResponse,
@@ -4468,11 +4530,15 @@ function resolveInboundHttpTransportConnectionState(request: IncomingMessage): I
     readonly authorized?: boolean;
     readonly localAddress?: string;
     readonly remoteAddress?: string;
-    getPeerCertificate?: () => { readonly serialNumber?: string } | undefined;
+    getPeerCertificate?: () => {
+      readonly serialNumber?: string;
+      readonly fingerprint256?: string;
+    } | undefined;
   } | undefined;
   const encryptedTransportEstablished = Boolean(socketLike?.encrypted);
   const peerCertificate = socketLike?.getPeerCertificate?.();
   const peerCertificateSerialNumber = normalizeOptionalString(peerCertificate?.serialNumber ?? null);
+  const peerCertificateFingerprintSha256 = normalizeCertificateFingerprintSha256(peerCertificate?.fingerprint256);
   const peerCertificatePresented = Boolean(peerCertificateSerialNumber);
   const host = normalizeHostHeader(request.headers.host);
   const localAddress = normalizeOptionalString(socketLike?.localAddress ?? null);
@@ -4484,6 +4550,7 @@ function resolveInboundHttpTransportConnectionState(request: IncomingMessage): I
     mutualTlsEstablished: Boolean(encryptedTransportEstablished && socketLike?.authorized && peerCertificatePresented),
     peerCertificatePresented,
     peerCertificateSerialNumber,
+    peerCertificateFingerprintSha256,
     host,
     localAddress,
     remoteAddress,
@@ -4501,6 +4568,15 @@ function normalizeHostHeader(hostHeader: string | string[] | undefined): string 
   }
   const splitHost = normalized.split(":")[0]?.trim();
   return splitHost ? splitHost.toLowerCase() : undefined;
+}
+
+function normalizeCertificateFingerprintSha256(fingerprint: string | undefined): string | undefined {
+  const normalized = normalizeOptionalString(fingerprint ?? null);
+  if (!normalized) {
+    return undefined;
+  }
+  const compact = normalized.replace(/[^a-fA-F0-9]/g, "");
+  return compact ? compact.toUpperCase() : undefined;
 }
 
 function isLoopbackHostValue(value: string | undefined): boolean {

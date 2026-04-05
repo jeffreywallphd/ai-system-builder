@@ -117,6 +117,18 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
 - Node-authenticated write flows continue to bind actor/node fields at transport boundary (payload spoofed actor/node values are ignored).
 - Application layer now owns reusable trust-state enforcement through `enforceNodeAuthenticatedOperationTrust(...)`, keeping transport checks focused on authenticated identity binding and preserving compatibility with upcoming certificate-authenticated transport.
 
+## Story 7.3.1 additions
+
+- Node transport APIs now expose a certificate-authenticated resolution seam through:
+  - `ResolveNodeMutualTlsTransportIdentityApiRequest`
+  - `ResolveNodeMutualTlsTransportIdentityApiResponse`
+  - `NodeTrustBackendApi.resolveNodeMutualTlsTransportIdentity(...)`
+- Runtime transport posture for node channels:
+  - `GET /api/v1/nodes/:nodeId/runtime-trust-material`
+  - `POST /api/v1/nodes/:nodeId/heartbeat`
+  now uses dedicated node mTLS transport validation when host transport trust enforcement is configured.
+- Node certificate identity binding is validated against trusted node records through application use-case boundaries rather than direct transport persistence access.
+
 ## Story 5.4.4 additions
 
 - New admin revocation endpoint:

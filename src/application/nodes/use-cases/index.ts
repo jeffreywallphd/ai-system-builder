@@ -13,3 +13,4 @@ export * from "./ListNodeInventoryUseCase";
 export * from "./GetNodeInventoryDetailUseCase";
 export * from "./ResolveApprovedNodeCertificateEligibilityUseCase";
 export * from "./ResolveApprovedNodeRuntimeTrustMaterialUseCase";
+export * from "./ResolveNodeMutualTlsTransportIdentityUseCase";

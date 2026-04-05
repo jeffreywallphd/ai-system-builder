@@ -8,6 +8,7 @@ import type {
   RegisterNodeEnrollmentRequestUseCase,
   RejectNodeEnrollmentUseCase,
   ResolveApprovedNodeRuntimeTrustMaterialUseCase,
+  ResolveNodeMutualTlsTransportIdentityUseCase,
   RevokeNodeTrustUseCase,
   ReviewPendingNodeEnrollmentUseCase,
 } from "../../src/application/nodes/use-cases";
@@ -55,6 +56,8 @@ import {
   type RevokeNodeTrustApiResponse,
   type ResolveNodeRuntimeTrustMaterialApiRequest,
   type ResolveNodeRuntimeTrustMaterialApiResponse,
+  type ResolveNodeMutualTlsTransportIdentityApiRequest,
+  type ResolveNodeMutualTlsTransportIdentityApiResponse,
   type SubmitNodeEnrollmentApiRequest,
   type SubmitNodeEnrollmentApiResponse,
 } from "./sdk/PublicNodeTrustApiContract";
@@ -69,6 +72,7 @@ interface NodeTrustBackendApiDependencies {
   readonly revokeNodeTrustUseCase: RevokeNodeTrustUseCase;
   readonly recordNodeHeartbeatUseCase: RecordNodeHeartbeatUseCase;
   readonly resolveApprovedNodeRuntimeTrustMaterialUseCase?: ResolveApprovedNodeRuntimeTrustMaterialUseCase;
+  readonly resolveNodeMutualTlsTransportIdentityUseCase?: ResolveNodeMutualTlsTransportIdentityUseCase;
   readonly listTrustedNodeInventoryUseCase: ListTrustedNodeInventoryUseCase;
   readonly listNodeInventoryUseCase: ListNodeInventoryUseCase;
 }
@@ -340,6 +344,42 @@ export class NodeTrustBackendApi {
       ok: true,
       data: Object.freeze({
         runtimeTrustMaterial: outcome.value.runtimeTrustMaterial,
+      }),
+    });
+  }
+
+  public async resolveNodeMutualTlsTransportIdentity(
+    request: ResolveNodeMutualTlsTransportIdentityApiRequest,
+  ): Promise<NodeTrustApiResponse<ResolveNodeMutualTlsTransportIdentityApiResponse>> {
+    if (!this.dependencies.resolveNodeMutualTlsTransportIdentityUseCase) {
+      return Object.freeze({
+        ok: false,
+        error: Object.freeze({
+          code: NodeTrustApiErrorCodes.internal,
+          message: "Node mutual TLS transport identity resolution is not configured for this runtime.",
+        }),
+      });
+    }
+
+    const outcome = await this.dependencies.resolveNodeMutualTlsTransportIdentityUseCase.execute({
+      nodeId: request.nodeId,
+      certificateSerialNumber: request.certificateSerialNumber,
+      certificateFingerprintSha256: request.certificateFingerprintSha256,
+    });
+
+    if (!outcome.ok) {
+      return Object.freeze({
+        ok: false,
+        error: this.mapUseCaseError(outcome.error.code, outcome.error.message),
+      });
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        nodeId: outcome.value.nodeId,
+        certificateRef: outcome.value.certificateRef,
+        certificateThumbprint: outcome.value.certificateThumbprint,
       }),
     });
   }

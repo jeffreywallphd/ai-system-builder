@@ -104,6 +104,18 @@ export type ResolveNodeRuntimeTrustMaterialApiRequest = ResolveNodeRuntimeTrustM
 
 export type ResolveNodeRuntimeTrustMaterialApiResponse = NodeRuntimeTrustMaterialResponseDto;
 
+export interface ResolveNodeMutualTlsTransportIdentityApiRequest {
+  readonly nodeId: string;
+  readonly certificateSerialNumber?: string;
+  readonly certificateFingerprintSha256?: string;
+}
+
+export interface ResolveNodeMutualTlsTransportIdentityApiResponse {
+  readonly nodeId: string;
+  readonly certificateRef: string;
+  readonly certificateThumbprint?: string;
+}
+
 export interface ListTrustedNodeInventoryApiRequest {
   readonly actorUserIdentityId: string;
   readonly nodeTypes?: ReadonlyArray<NodeType>;

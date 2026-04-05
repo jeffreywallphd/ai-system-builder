@@ -28,6 +28,37 @@ Story 7.1.1 + 7.1.2 baseline for Feature 7 / Epic 7.1: secure transport domain/a
 - `src/infrastructure/transport/websocket/tests/SecureWebSocketChannelContext.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
 
+## Story 7.3.1 node-to-server mutually authenticated transport adapter
+
+Story 7.3.1 adds a dedicated node-to-server HTTP transport adapter path for certificate-authenticated channels so node runtime operations do not depend on user-session transport flows.
+
+### Runtime adapter updates
+
+- `infrastructure/transport/http-server/identity/NodeMutualTlsTransportAdapter.ts`
+  - centralizes node mTLS transport validation by composing:
+    - `HttpTransportTrustValidationAdapter` (policy + mTLS/certificate trust gate),
+    - node certificate identity resolution (`resolveNodeMutualTlsTransportIdentity(...)`) against trusted node records.
+  - returns protocol-safe accepted/rejected outcomes with explicit status mapping.
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - adds `requireAuthenticatedNodeTransport(...)` for node-only endpoints (`/runtime-trust-material`, `/heartbeat`);
+  - uses the node mTLS adapter whenever transport trust enforcement is configured;
+  - keeps a legacy authenticated-session fallback only when transport trust is not configured in runtime composition.
+- `src/application/nodes/use-cases/ResolveNodeMutualTlsTransportIdentityUseCase.ts`
+  - validates node lifecycle trust eligibility (`approved` + `trusted` + non-revoked + certificate-assigned),
+  - validates presented certificate serial/fingerprint against node certificate binding metadata.
+- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+  - adds `resolveNodeMutualTlsTransportIdentity(...)` as the application-facing seam consumed by the transport adapter.
+- `hosts/server/IdentityServerHost.ts`
+  - composes `ResolveNodeMutualTlsTransportIdentityUseCase` into `NodeTrustBackendApi`;
+  - configures managed TLS server startup with client certificate requests (`requestCert: true`) for mTLS-capable channels.
+
+### Test coverage updates
+
+- `infrastructure/transport/http-server/identity/tests/NodeMutualTlsTransportAdapter.test.ts`
+  - covers approved, revoked, and untrusted certificate channel outcomes.
+- `src/application/nodes/tests/ResolveNodeMutualTlsTransportIdentityUseCase.test.ts`
+  - covers trusted match acceptance, revoked-node rejection, unknown-node rejection, and certificate mismatch rejection.
+
 ## Core contract model
 
 - Scenarios:
