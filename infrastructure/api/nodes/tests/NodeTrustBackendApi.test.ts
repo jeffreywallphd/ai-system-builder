@@ -4,10 +4,19 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { ApproveNodeEnrollmentUseCase } from "../../../src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase";
 import { GetNodeEnrollmentDetailUseCase } from "../../../src/application/nodes/use-cases/GetNodeEnrollmentDetailUseCase";
+import { ListTrustedNodeInventoryUseCase } from "../../../src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase";
+import { RecordNodeHeartbeatUseCase } from "../../../src/application/nodes/use-cases/RecordNodeHeartbeatUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { RejectNodeEnrollmentUseCase } from "../../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
-import { NodeRoleCapabilities, NodeTypes } from "../../../src/domain/nodes/NodeTrustDomain";
+import {
+  NodeApprovalStatuses,
+  NodeHeartbeatStatuses,
+  NodeRevocationStates,
+  NodeRoleCapabilities,
+  NodeTrustStates,
+  NodeTypes,
+} from "../../../src/domain/nodes/NodeTrustDomain";
 import { SqliteNodeTrustPersistenceAdapter } from "../../../src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
 import { NodeTrustBackendApi } from "../NodeTrustBackendApi";
 
@@ -50,6 +59,12 @@ function createHarness(): {
     }),
     rejectNodeEnrollmentUseCase: new RejectNodeEnrollmentUseCase({
       enrollmentRequestRepository: adapter,
+      nodeRepository: adapter,
+    }),
+    recordNodeHeartbeatUseCase: new RecordNodeHeartbeatUseCase({
+      nodeRepository: adapter,
+    }),
+    listTrustedNodeInventoryUseCase: new ListTrustedNodeInventoryUseCase({
       nodeRepository: adapter,
     }),
   });
@@ -210,5 +225,122 @@ describe("NodeTrustBackendApi", () => {
     }
     expect(rejected.data.enrollment.status).toBe("rejected");
     expect(rejected.data.node.trustState).toBe("quarantined");
+  });
+
+  it("records heartbeat for trusted nodes and exposes last-seen in inventory queries", async () => {
+    const harness = createHarness();
+    await harness.adapter.registerNode({
+      record: {
+        nodeId: "node:trusted:presence-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Trusted Presence 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:presence-1:v1",
+        },
+        deploymentTags: ["presence"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T17:00:00.000Z",
+        approvedAt: "2026-04-05T17:05:00.000Z",
+        createdAt: "2026-04-05T17:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T17:05:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-presence-trusted",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const heartbeat = await harness.backendApi.recordNodeHeartbeat({
+      actorUserIdentityId: "node:trusted:presence-1",
+      nodeId: "node:trusted:presence-1",
+      heartbeatStatus: NodeHeartbeatStatuses.online,
+      seenAt: "2026-04-05T17:10:00.000Z",
+      observedBy: "node-agent",
+    });
+    expect(heartbeat.ok).toBeTrue();
+    if (!heartbeat.ok || !heartbeat.data) {
+      return;
+    }
+    expect(heartbeat.data.node.lastSeen?.lastSeenAt).toBe("2026-04-05T17:10:00.000Z");
+    expect(heartbeat.data.node.lastSeen?.heartbeatStatus).toBe(NodeHeartbeatStatuses.online);
+
+    const inventory = await harness.backendApi.listTrustedNodeInventory({
+      actorUserIdentityId: "admin:user:presence",
+      lastSeenAfter: "2026-04-05T17:09:00.000Z",
+    });
+    expect(inventory.ok).toBeTrue();
+    if (!inventory.ok || !inventory.data) {
+      return;
+    }
+    expect(inventory.data.nodes).toHaveLength(1);
+    expect(inventory.data.nodes[0]?.nodeId).toBe("node:trusted:presence-1");
+    expect(inventory.data.nodes[0]?.lastSeen?.observedBy).toBe("node-agent");
+  });
+
+  it("rejects heartbeat updates from unknown or non-trusted nodes", async () => {
+    const harness = createHarness();
+
+    const unknown = await harness.backendApi.recordNodeHeartbeat({
+      actorUserIdentityId: "node:missing",
+      nodeId: "node:missing",
+      heartbeatStatus: NodeHeartbeatStatuses.online,
+    });
+    expect(unknown.ok).toBeFalse();
+    if (!unknown.ok && unknown.error) {
+      expect(unknown.error.code).toBe("not-found");
+    }
+
+    await harness.adapter.registerNode({
+      record: {
+        nodeId: "node:pending:presence-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Pending Presence 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.pending,
+        trustState: NodeTrustStates.pendingApproval,
+        deploymentTags: ["presence"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T17:00:00.000Z",
+        createdAt: "2026-04-05T17:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T17:00:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-presence-pending",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const nonTrusted = await harness.backendApi.recordNodeHeartbeat({
+      actorUserIdentityId: "node:pending:presence-1",
+      nodeId: "node:pending:presence-1",
+      heartbeatStatus: NodeHeartbeatStatuses.online,
+    });
+    expect(nonTrusted.ok).toBeFalse();
+    if (!nonTrusted.ok && nonTrusted.error) {
+      expect(nonTrusted.error.code).toBe("conflict");
+    }
   });
 });

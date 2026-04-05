@@ -1,6 +1,6 @@
 # Node Trusted Activation Workflow
 
-This note documents Story 5.3.1 and Story 5.3.2 (Feature 5 / Epic 5.3): explicit activation of approved nodes into trusted operational state and capability profile registration/validation.
+This note documents Story 5.3.1, Story 5.3.2, and Story 5.3.3 (Feature 5 / Epic 5.3): explicit activation of approved nodes into trusted operational state, capability profile registration/validation, and operational presence heartbeat ingestion.
 
 ## Purpose
 
@@ -13,12 +13,17 @@ This note documents Story 5.3.1 and Story 5.3.2 (Feature 5 / Epic 5.3): explicit
 
 - `src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase.ts`
 - `src/application/nodes/use-cases/ActivateApprovedNodeUseCase.ts`
+- `src/application/nodes/use-cases/RecordNodeHeartbeatUseCase.ts`
+- `src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase.ts`
 - `src/application/nodes/ports/NodeTrustAuthorizationPorts.ts`
 - `src/application/nodes/ports/NodeTrustAuditPorts.ts`
 - `src/domain/nodes/NodeTrustDomain.ts`
 - `src/shared/schemas/nodes/NodeTrustApiSchemaContracts.ts`
 - `src/shared/schemas/nodes/NodeTrustPersistenceSchemaContracts.ts`
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
+- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 
 ## Lifecycle model
 
@@ -34,6 +39,7 @@ This note documents Story 5.3.1 and Story 5.3.2 (Feature 5 / Epic 5.3): explicit
   - preserves approved capability profile and trust metadata
 - Presence step:
   - heartbeat updates remain separate and do not activate trust
+  - heartbeat updates require `trustState=trusted`
 
 ## Idempotency and safety
 
@@ -60,6 +66,29 @@ This note documents Story 5.3.1 and Story 5.3.2 (Feature 5 / Epic 5.3): explicit
 - `node-approved`
 - `node-activated`
 - `node-heartbeat-recorded`
+
+## Presence transport and stored data
+
+- Node heartbeat endpoint:
+  - `POST /api/v1/nodes/:nodeId/heartbeat`
+  - requires authenticated transport
+  - binds actor identity to authenticated principal
+  - transport binds `actorUserIdentityId` and `nodeId` from authenticated principal + route parameters so client-supplied spoof values are ignored
+- Admin visibility endpoint:
+  - `GET /api/v1/nodes/trusted`
+  - query filters: `nodeType`, `capability`, `deploymentTag`, `lastSeenAfter`, `lastSeenBefore`, `limit`, `offset`
+- Persisted presence fields:
+  - `lastSeen.lastSeenAt`
+  - `lastSeen.heartbeatStatus`
+  - `lastSeen.observedBy` (optional)
+
+## Heartbeat cadence guidance
+
+- Recommended steady-state cadence: every 30 seconds.
+- Suggested freshness thresholds:
+  - mark degraded when no heartbeat is observed for more than 90 seconds,
+  - mark offline when no heartbeat is observed for more than 180 seconds.
+- This transport profile is intentionally compatible with future certificate-authenticated node transport by keeping heartbeat payloads and persistence fields unchanged.
 
 ## Test coverage
 

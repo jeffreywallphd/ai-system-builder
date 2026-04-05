@@ -78,3 +78,17 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
   - validate approval/rejection payloads through shared node-trust schema parse helpers,
   - bind actor identity to authenticated session principal in transport layer,
   - return admin-safe decision payloads that exclude internal certificate authority/trust metadata fields.
+
+## Story 5.3.3 additions
+
+- Expanded server adapter surface:
+  - `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+  - `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- Expanded HTTP routes in `IdentityHttpServer.ts`:
+  - `POST /api/v1/nodes/:nodeId/heartbeat` (trusted-node heartbeat ingestion)
+  - `GET /api/v1/nodes/trusted` (admin trusted-node inventory/presence query)
+- Heartbeat route behavior:
+  - validates payload via `parseNodeHeartbeatPayloadDto(...)`,
+  - binds `actorUserIdentityId` to authenticated session principal,
+  - binds heartbeat `nodeId` from route parameters so client payload node-id spoofing is ignored,
+  - relies on application use case enforcement that only trusted nodes can update `lastSeen`.

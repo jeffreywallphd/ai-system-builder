@@ -1,13 +1,20 @@
 import type {
   ApproveNodeEnrollmentActionRequestDto,
+  NodeDetailDto,
   NodeEnrollmentDecisionResponseDto,
   NodeEnrollmentDetailDto,
   NodeEnrollmentSubmissionRequestDto,
   NodeEnrollmentSubmissionResponseDto,
+  NodeHeartbeatPayloadDto,
+  NodeHeartbeatResponseDto,
   NodePendingEnrollmentSummaryDto,
   RejectNodeEnrollmentActionRequestDto,
 } from "../../../../src/shared/contracts/nodes/NodeTrustApiContracts";
-import { NodeEnrollmentRequestStatuses } from "../../../../src/domain/nodes/NodeTrustDomain";
+import {
+  NodeEnrollmentRequestStatuses,
+  type NodeRoleCapability,
+  type NodeType,
+} from "../../../../src/domain/nodes/NodeTrustDomain";
 
 export const NodeTrustApiErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -74,3 +81,22 @@ export type ApproveNodeEnrollmentApiResponse = NodeEnrollmentDecisionResponseDto
 export type RejectNodeEnrollmentApiRequest = RejectNodeEnrollmentActionRequestDto;
 
 export type RejectNodeEnrollmentApiResponse = NodeEnrollmentDecisionResponseDto;
+
+export type RecordNodeHeartbeatApiRequest = NodeHeartbeatPayloadDto;
+
+export type RecordNodeHeartbeatApiResponse = NodeHeartbeatResponseDto;
+
+export interface ListTrustedNodeInventoryApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly nodeTypes?: ReadonlyArray<NodeType>;
+  readonly capabilityAnyOf?: ReadonlyArray<NodeRoleCapability>;
+  readonly deploymentTagAnyOf?: ReadonlyArray<string>;
+  readonly lastSeenAfter?: string;
+  readonly lastSeenBefore?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface ListTrustedNodeInventoryApiResponse {
+  readonly nodes: ReadonlyArray<NodeDetailDto>;
+}

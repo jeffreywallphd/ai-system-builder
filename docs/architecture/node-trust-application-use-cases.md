@@ -68,6 +68,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
   - invokes optional certificate revocation hook before state mutation
 - `RecordNodeHeartbeatUseCase`
   - authorizes heartbeat writes
+  - enforces trusted-node precondition before heartbeat writes (`trustState=trusted`)
   - validates heartbeat update against domain rules (for example revoked nodes cannot update heartbeat)
   - persists last-seen metadata
 - `ListTrustedNodeInventoryUseCase`
@@ -129,7 +130,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - activation flow including approved-only guardrails, idempotent trusted-state transition, and activation audit publication
 - rejection flow including authorization gating, explicit lifecycle transition sequence, decision metadata persistence, and quarantine state mutation
 - revocation flow with certificate-revocation hook
-- heartbeat recording and revoked-node rejection behavior
+- heartbeat recording with trusted-node-only guardrails and revoked-node rejection behavior
 - trusted inventory query filtering
 
 `src/infrastructure/security/nodes/tests/NodeBootstrapIdentityService.test.ts` validates:

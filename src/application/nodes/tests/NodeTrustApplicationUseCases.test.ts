@@ -1364,7 +1364,7 @@ describe("node trust application use-cases", () => {
 
     expect(revokedHeartbeat.ok).toBeFalse();
     if (!revokedHeartbeat.ok) {
-      expect(revokedHeartbeat.error.code).toBe(NodeTrustUseCaseErrorCodes.invalidRequest);
+      expect(revokedHeartbeat.error.code).toBe(NodeTrustUseCaseErrorCodes.invalidState);
     }
   });
 

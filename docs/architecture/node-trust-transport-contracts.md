@@ -139,3 +139,31 @@ Sensitive data posture:
 
 - responses are shaped via `toNodeEnrollmentDetailDto(...)` and `toNodeDetailDto(...)`
 - certificate authority internals, certificate thumbprints, mutation metadata, and other internal trust material remain excluded from admin transport responses
+
+## Story 5.3.3 heartbeat ingestion and operational presence transport
+
+Story 5.3.3 extends node-trust transport so trusted nodes can publish liveness and admins can query current trusted presence.
+
+Canonical artifacts:
+
+- `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+
+Added API operations:
+
+- `POST /api/v1/nodes/:nodeId/heartbeat`
+  - validates heartbeat payload with `parseNodeHeartbeatPayloadDto(...)`
+  - binds `actorUserIdentityId` to authenticated session principal
+  - binds `nodeId` from route parameters so client payload spoof values are ignored
+  - records `lastSeenAt`, `heartbeatStatus`, and optional `observedBy`
+- `GET /api/v1/nodes/trusted`
+  - returns admin-safe trusted node inventory (`NodeDetailDto[]`)
+  - supports filters: `nodeType`, `capability`, `deploymentTag`, `lastSeenAfter`, `lastSeenBefore`, `limit`, `offset`
+
+Server-side enforcement posture:
+
+- heartbeat route requires authenticated transport
+- unknown nodes return `not-found`
+- non-trusted nodes (including revoked nodes) are rejected by application trusted-state checks before persistence mutation

@@ -1,4 +1,5 @@
 import {
+  NodeTrustStates,
   createNodeIdentity,
   recordNodeLastSeen,
   type NodeHeartbeatStatus,
@@ -80,6 +81,12 @@ export class RecordNodeHeartbeatUseCase {
     const node = await this.dependencies.nodeRepository.findNodeById(nodeId);
     if (!node) {
       return toNodeTrustFailure(NodeTrustUseCaseErrorCodes.notFound, `Node '${nodeId}' was not found.`);
+    }
+    if (node.trustState !== NodeTrustStates.trusted) {
+      return toNodeTrustFailure(
+        NodeTrustUseCaseErrorCodes.invalidState,
+        `Node '${nodeId}' is not trusted and cannot report heartbeat presence.`,
+      );
     }
 
     try {

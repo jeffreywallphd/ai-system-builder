@@ -9,10 +9,20 @@ import { NodeTrustBackendApi } from "../../../../api/nodes/NodeTrustBackendApi";
 import { createIdentityHttpServer } from "../IdentityHttpServer";
 import { ApproveNodeEnrollmentUseCase } from "../../../../../src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase";
 import { GetNodeEnrollmentDetailUseCase } from "../../../../../src/application/nodes/use-cases/GetNodeEnrollmentDetailUseCase";
+import { ListTrustedNodeInventoryUseCase } from "../../../../../src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase";
+import { RecordNodeHeartbeatUseCase } from "../../../../../src/application/nodes/use-cases/RecordNodeHeartbeatUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../../../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { RejectNodeEnrollmentUseCase } from "../../../../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../../../../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
-import { NodeRoleCapabilities, NodeTypes } from "../../../../../src/domain/nodes/NodeTrustDomain";
+import {
+  NodeApprovalStatuses,
+  NodeHeartbeatStatuses,
+  NodeRevocationReasons,
+  NodeRevocationStates,
+  NodeRoleCapabilities,
+  NodeTrustStates,
+  NodeTypes,
+} from "../../../../../src/domain/nodes/NodeTrustDomain";
 import { SqliteNodeTrustPersistenceAdapter } from "../../../../../src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
 
 const servers: Server[] = [];
@@ -59,6 +69,12 @@ async function startServer(): Promise<{
     }),
     rejectNodeEnrollmentUseCase: new RejectNodeEnrollmentUseCase({
       enrollmentRequestRepository: nodeTrustAdapter,
+      nodeRepository: nodeTrustAdapter,
+    }),
+    recordNodeHeartbeatUseCase: new RecordNodeHeartbeatUseCase({
+      nodeRepository: nodeTrustAdapter,
+    }),
+    listTrustedNodeInventoryUseCase: new ListTrustedNodeInventoryUseCase({
       nodeRepository: nodeTrustAdapter,
     }),
   });
@@ -324,5 +340,164 @@ describe("IdentityHttpServer node trust routes", () => {
     expect(rejectBody.ok).toBe(true);
     expect(rejectBody.data.enrollment.status).toBe("rejected");
     expect(rejectBody.data.node.trustState).toBe("quarantined");
+  });
+
+  it("records node heartbeat, updates lastSeen, and ignores spoofed payload actor/node fields", async () => {
+    const { baseUrl, nodeTrustAdapter } = await startServer();
+    const nodePrincipal = await registerAndLogin(baseUrl, "node:trusted:hb-1");
+    const admin = await registerAndLogin(baseUrl, "node.inventory.admin");
+
+    await nodeTrustAdapter.registerNode({
+      record: {
+        nodeId: "node:trusted:hb-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Trusted HB Node 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:trusted:hb-1:v1",
+        },
+        deploymentTags: ["presence"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:00:00.000Z",
+        approvedAt: "2026-04-05T18:01:00.000Z",
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T18:01:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-hb-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const unauthenticatedHeartbeat = await fetch(
+      `${baseUrl}/api/v1/nodes/${encodeURIComponent("node:trusted:hb-1")}/heartbeat`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          heartbeatStatus: NodeHeartbeatStatuses.online,
+        }),
+      },
+    );
+    expect(unauthenticatedHeartbeat.status).toBe(401);
+
+    const heartbeat = await fetch(
+      `${baseUrl}/api/v1/nodes/${encodeURIComponent("node:trusted:hb-1")}/heartbeat`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${nodePrincipal.sessionToken}`,
+        },
+        body: JSON.stringify({
+          actorUserIdentityId: "spoofed-actor",
+          nodeId: "spoofed-node",
+          heartbeatStatus: NodeHeartbeatStatuses.online,
+          seenAt: "2026-04-05T18:02:30.000Z",
+          observedBy: "node-agent-v1",
+        }),
+      },
+    );
+    expect(heartbeat.status).toBe(200);
+    const heartbeatBody = await heartbeat.json();
+    expect(heartbeatBody.ok).toBe(true);
+    expect(heartbeatBody.data.node.nodeId).toBe("node:trusted:hb-1");
+    expect(heartbeatBody.data.node.lastSeen.lastSeenAt).toBe("2026-04-05T18:02:30.000Z");
+    expect(heartbeatBody.data.node.lastSeen.observedBy).toBe("node-agent-v1");
+
+    const inventory = await fetch(
+      `${baseUrl}/api/v1/nodes/trusted?lastSeenAfter=2026-04-05T18:02:00.000Z&deploymentTag=presence`,
+      {
+        headers: {
+          authorization: `Bearer ${admin.sessionToken}`,
+        },
+      },
+    );
+    expect(inventory.status).toBe(200);
+    const inventoryBody = await inventory.json();
+    expect(inventoryBody.ok).toBe(true);
+    expect(inventoryBody.data.nodes.some((node: { nodeId: string }) => node.nodeId === "node:trusted:hb-1")).toBeTrue();
+  });
+
+  it("rejects heartbeat updates for unknown and revoked nodes", async () => {
+    const { baseUrl, nodeTrustAdapter } = await startServer();
+    const missingNodePrincipal = await registerAndLogin(baseUrl, "node:missing:hb-1");
+    const revokedNodePrincipal = await registerAndLogin(baseUrl, "node:revoked:hb-1");
+
+    await nodeTrustAdapter.registerNode({
+      record: {
+        nodeId: "node:revoked:hb-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Revoked HB Node",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.rejected,
+        trustState: NodeTrustStates.revoked,
+        deploymentTags: ["presence"],
+        revocation: {
+          state: NodeRevocationStates.revoked,
+          reason: NodeRevocationReasons.operatorAction,
+          revokedAt: "2026-04-05T18:05:00.000Z",
+          revokedByUserIdentityId: "admin-1",
+        },
+        enrolledAt: "2026-04-05T18:00:00.000Z",
+        revokedAt: "2026-04-05T18:05:00.000Z",
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T18:05:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-revoked-hb",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const unknownHeartbeat = await fetch(
+      `${baseUrl}/api/v1/nodes/${encodeURIComponent("node:missing:hb-1")}/heartbeat`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${missingNodePrincipal.sessionToken}`,
+        },
+        body: JSON.stringify({
+          heartbeatStatus: NodeHeartbeatStatuses.online,
+        }),
+      },
+    );
+    expect(unknownHeartbeat.status).toBe(404);
+
+    const revokedHeartbeat = await fetch(
+      `${baseUrl}/api/v1/nodes/${encodeURIComponent("node:revoked:hb-1")}/heartbeat`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${revokedNodePrincipal.sessionToken}`,
+        },
+        body: JSON.stringify({
+          heartbeatStatus: NodeHeartbeatStatuses.online,
+        }),
+      },
+    );
+    expect(revokedHeartbeat.status).toBe(409);
   });
 });

@@ -57,18 +57,26 @@ import {
 import {
   type ApproveNodeEnrollmentApiRequest,
   type GetNodeEnrollmentDetailApiRequest,
+  type ListTrustedNodeInventoryApiRequest,
   NodeTrustApiErrorCodes,
   type NodeTrustApiResponse,
+  type RecordNodeHeartbeatApiRequest,
   type RejectNodeEnrollmentApiRequest,
 } from "../../../api/nodes/sdk/PublicNodeTrustApiContract";
 import { redactSensitiveAuthPayload, redactSensitiveText } from "../../../api/identity/IdentityAuthRedaction";
-import { NodeEnrollmentRequestStatuses } from "../../../../src/domain/nodes/NodeTrustDomain";
+import {
+  NodeEnrollmentRequestStatuses,
+  NodeRoleCapabilities,
+  NodeTypes,
+} from "../../../../src/domain/nodes/NodeTrustDomain";
 import {
   parseApproveNodeEnrollmentActionRequestDto,
+  parseNodeHeartbeatPayloadDto,
   parseRejectNodeEnrollmentActionRequestDto,
   parseNodeEnrollmentSubmissionRequestDto,
   NodeTrustApiSchemaValidationError,
   type ApproveNodeEnrollmentActionRequestDtoPayload,
+  type NodeHeartbeatPayloadDtoPayload,
   type NodeEnrollmentSubmissionRequestDtoPayload,
   type RejectNodeEnrollmentActionRequestDtoPayload,
 } from "../../../../src/shared/schemas/nodes/NodeTrustApiSchemaContracts";
@@ -296,6 +304,19 @@ const WorkspaceLifecycleActionValues = z.enum(["archive", "reactivate", "suspend
 const NodePendingEnrollmentStatusValues = z.enum([
   NodeEnrollmentRequestStatuses.submitted,
   NodeEnrollmentRequestStatuses.underReview,
+]);
+const NodeTypeValues = z.enum([
+  NodeTypes.compute,
+  NodeTypes.hybrid,
+  NodeTypes.edge,
+]);
+const NodeCapabilityValues = z.enum([
+  NodeRoleCapabilities.ui,
+  NodeRoleCapabilities.api,
+  NodeRoleCapabilities.scheduler,
+  NodeRoleCapabilities.executor,
+  NodeRoleCapabilities.storageAccess,
+  NodeRoleCapabilities.previewWorker,
 ]);
 
 const IssueWorkspaceInvitationRequestSchema: z.ZodType<Pick<
@@ -1240,6 +1261,112 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
               actorUserIdentityId: context.principal.userIdentityId,
               query: Object.fromEntries(url.searchParams.entries()),
             }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.nodeTrustBackendApi
+        && request.method === "GET"
+        && path === "/api/v1/nodes/trusted"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const nodeTypes = url.searchParams.getAll("nodeType");
+            const nodeTypeValidation = z.array(NodeTypeValues).safeParse(nodeTypes);
+            if (!nodeTypeValidation.success) {
+              const validationError = buildNodeTrustQueryValidationError("nodeType", "nodeType values are invalid.");
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+
+            const capabilities = url.searchParams.getAll("capability");
+            const capabilityValidation = z.array(NodeCapabilityValues).safeParse(capabilities);
+            if (!capabilityValidation.success) {
+              const validationError = buildNodeTrustQueryValidationError("capability", "capability values are invalid.");
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+
+            const inventoryRequest: ListTrustedNodeInventoryApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              nodeTypes: nodeTypeValidation.data.length > 0 ? nodeTypeValidation.data : undefined,
+              capabilityAnyOf: capabilityValidation.data.length > 0 ? capabilityValidation.data : undefined,
+              deploymentTagAnyOf: url.searchParams.getAll("deploymentTag"),
+              lastSeenAfter: normalizeOptionalString(url.searchParams.get("lastSeenAfter")),
+              lastSeenBefore: normalizeOptionalString(url.searchParams.get("lastSeenBefore")),
+              limit: parseOptionalInteger(url.searchParams.get("limit")),
+              offset: parseOptionalInteger(url.searchParams.get("offset")),
+            });
+
+            const apiResponse = await options.nodeTrustBackendApi.listTrustedNodeInventory(inventoryRequest);
+            const statusCode = mapNodeTrustStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              query: Object.fromEntries(url.searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.nodeTrustBackendApi
+        && request.method === "POST"
+        && path.endsWith("/heartbeat")
+        && path.startsWith("/api/v1/nodes/")
+        && !path.startsWith("/api/v1/nodes/enrollments/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const nodeId = decodePathTail(path, "/api/v1/nodes/", "/heartbeat");
+            if (!nodeId) {
+              const invalid = buildNodeTrustInvalidRequestResponse("nodeId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateNodeHeartbeatRequest(
+              request,
+              context.principal.userIdentityId,
+              nodeId,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const heartbeatRequest: RecordNodeHeartbeatApiRequest = Object.freeze({
+              actorUserIdentityId: parsedRequest.data.actorUserIdentityId,
+              nodeId: parsedRequest.data.nodeId,
+              heartbeatStatus: parsedRequest.data.heartbeatStatus,
+              seenAt: parsedRequest.data.seenAt,
+              observedBy: parsedRequest.data.observedBy,
+              metadata: parsedRequest.data.metadata,
+            });
+            const apiResponse = await options.nodeTrustBackendApi.recordNodeHeartbeat(heartbeatRequest);
+            const statusCode = mapNodeTrustStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, heartbeatRequest, apiResponse);
           },
         );
         return;
@@ -3042,6 +3169,30 @@ async function parseAndValidateRejectNodeEnrollmentRequest(
     logger,
     maxBodyBytes,
     parseRejectNodeEnrollmentActionRequestDto,
+  );
+}
+
+async function parseAndValidateNodeHeartbeatRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  nodeId: string,
+  requestLogId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: NodeHeartbeatPayloadDtoPayload }
+  | { readonly ok: false; readonly statusCode: number; readonly body: NodeTrustApiResponse<never> }
+> {
+  return parseAndValidateNodeTrustActionRequest(
+    request,
+    Object.freeze({
+      actorUserIdentityId,
+      nodeId,
+    }),
+    requestLogId,
+    logger,
+    maxBodyBytes,
+    parseNodeHeartbeatPayloadDto,
   );
 }
 
