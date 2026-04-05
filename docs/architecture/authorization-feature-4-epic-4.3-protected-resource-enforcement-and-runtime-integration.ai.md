@@ -12,7 +12,9 @@ Story 4.3.1 introduces reusable transport-layer authorization enforcement adapte
 - `infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
 - `src/infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter.ts`
 - `infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
+- `infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
+- `ui/presenters/WorkspaceAdministrationCapabilitiesPresenter.ts`
 - `infrastructure/api/studio-shell/StudioShellBackendApi.ts`
 - `infrastructure/api/registry/RegistryBackendApi.ts`
 - `infrastructure/api/studio-shell/tests/ReferenceImageOutputAuthorization.test.ts`
@@ -128,3 +130,16 @@ Story 4.3.5 verification covers:
 - deterministic rule-based remove/mask redaction behavior,
 - workflow run detail partial redaction for workspace visibility role access,
 - runtime result/trace partial redaction for workspace visibility operational access.
+
+Story 4.3.6 integrates authorization-aware capability loading for UI affordances:
+
+- workspace administration API responses now include explicit actor capability flags (`canManageWorkspaceSettings`, `canManageMembers`, `canManageInvitations`, `canManageRoles`) under `actorAccess.capabilities`.
+- capability flags are derived from centralized policy evaluation (`system.manage` workspace-capability target) in `WorkspaceAdministrationBackendApi`, reusing the same permission gate used for protected mutation operations.
+- desktop/thin-client workspace administration surfaces consume these capability flags through a centralized presenter (`presentWorkspaceAdministrationCapabilities(...)`) rather than embedding permission literals directly in page components.
+- UI affordances (settings edits, membership updates, invitation actions, role actions) are shown/enabled from capability flags while server-side policy enforcement remains authoritative.
+
+Story 4.3.6 verification covers:
+
+- workspace admin HTTP responses returning capability flags for authorized and unauthorized actors,
+- centralized UI capability derivation/fallback behavior in presenter tests,
+- representative workspace admin/thin-client pages wired to centralized capability presentation instead of page-local permission literals.

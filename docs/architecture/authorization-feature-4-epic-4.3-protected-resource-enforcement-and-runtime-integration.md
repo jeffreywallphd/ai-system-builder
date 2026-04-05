@@ -10,7 +10,9 @@ Story 4.3.1 adds reusable transport authorization adapters so request handlers c
 - `infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
 - `src/infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter.ts`
 - `infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
+- `infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
+- `ui/presenters/WorkspaceAdministrationCapabilitiesPresenter.ts`
 - `infrastructure/api/studio-shell/StudioShellBackendApi.ts`
 - `infrastructure/api/registry/RegistryBackendApi.ts`
 - `infrastructure/api/studio-shell/tests/ReferenceImageOutputAuthorization.test.ts`
@@ -104,3 +106,16 @@ Story 4.3.5 test coverage validates:
 - deterministic remove/mask redaction path behavior,
 - workflow run detail partial redaction for workspace-visibility role-based callers,
 - runtime result/trace partial redaction for workspace-visibility operational callers.
+
+Story 4.3.6 integrates authorization-driven capability loading for UI affordances:
+
+- workspace administration API responses now expose explicit actor capability flags (`canManageWorkspaceSettings`, `canManageMembers`, `canManageInvitations`, `canManageRoles`) under `actorAccess.capabilities`.
+- capability flags are derived by centralized policy evaluation (`system.manage` workspace-capability target) inside `WorkspaceAdministrationBackendApi`, reusing the same permission gate used for mutation enforcement.
+- desktop and thin-client workspace administration pages now consume those flags through a centralized presenter (`presentWorkspaceAdministrationCapabilities(...)`) rather than embedding permission literals directly in page components.
+- UI controls for settings, memberships, invitations, and roles are capability-driven for UX guidance while server authorization remains the authoritative enforcement point.
+
+Story 4.3.6 test coverage validates:
+
+- HTTP workspace admin responses include expected capability flags for allowed and denied actors,
+- centralized UI capability derivation/fallback behavior via presenter tests,
+- representative workspace admin and thin-client page wiring to centralized capability presentation.

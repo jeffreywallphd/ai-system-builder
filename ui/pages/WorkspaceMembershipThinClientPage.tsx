@@ -6,6 +6,7 @@ import type {
   WorkspaceMembershipApiRecord,
 } from "../../infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
+import { presentWorkspaceAdministrationCapabilities } from "../presenters/WorkspaceAdministrationCapabilitiesPresenter";
 import { WorkspaceAdministrationService } from "../services/WorkspaceAdministrationService";
 import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
 import { buildWorkspaceInvitationAcceptPath } from "../web/workspaces/WorkspaceThinClientRoutes";
@@ -33,7 +34,7 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
   const [latestInvitationPath, setLatestInvitationPath] = useState<string>();
 
   const selectedWorkspace = workspaces.find((workspace) => workspace.workspaceId === selectedWorkspaceId);
-  const canAdministrate = selectedWorkspace?.actorAccess.canAdministrate ?? false;
+  const workspaceCapabilities = presentWorkspaceAdministrationCapabilities(selectedWorkspace);
 
   const refreshWorkspaceDetails = async (
     workspaceId: string,
@@ -44,7 +45,7 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
     }
 
     const workspace = workspaceList.find((entry) => entry.workspaceId === workspaceId);
-    if (!workspace?.actorAccess.canAdministrate) {
+    if (!presentWorkspaceAdministrationCapabilities(workspace).canAdministrate) {
       setMemberships(Object.freeze([]));
       setInvitations(Object.freeze([]));
       setMembershipDrafts(Object.freeze({}));
@@ -224,7 +225,7 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
             </div>
           ) : null}
 
-          {!canAdministrate && selectedWorkspace ? (
+          {!workspaceCapabilities.canAdministrate && selectedWorkspace ? (
             <p className="ui-text-secondary">
               You have read access only in this workspace. Member and invitation updates require owner/admin role access.
             </p>
@@ -251,7 +252,7 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
                   <select
                     className="ui-select ui-select--sm"
                     value={membershipDrafts[membership.userIdentityId] ?? membership.status}
-                    disabled={!selectedWorkspaceId || !canAdministrate || isMutating}
+                    disabled={!selectedWorkspaceId || !workspaceCapabilities.canManageMembers || isMutating}
                     onChange={(event) => {
                       const nextStatus = event.target.value as WorkspaceMembershipApiRecord["status"];
                       setMembershipDrafts((current) => Object.freeze({
@@ -265,7 +266,7 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
                   <button
                     type="button"
                     className="ui-button ui-button--secondary ui-button--sm"
-                    disabled={!selectedWorkspaceId || !canAdministrate || isMutating}
+                    disabled={!selectedWorkspaceId || !workspaceCapabilities.canManageMembers || isMutating}
                     onClick={() => {
                       if (!selectedWorkspaceId) {
                         return;
@@ -291,7 +292,7 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
                   <button
                     type="button"
                     className="ui-button ui-button--danger ui-button--sm"
-                    disabled={!selectedWorkspaceId || !canAdministrate || isMutating}
+                    disabled={!selectedWorkspaceId || !workspaceCapabilities.canManageMembers || isMutating}
                     onClick={() => {
                       if (!selectedWorkspaceId) {
                         return;
@@ -331,7 +332,7 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
                   type="email"
                   value={inviteEmail}
                   onChange={(event) => setInviteEmail(event.target.value)}
-                  disabled={!selectedWorkspaceId || !canAdministrate || isMutating}
+                  disabled={!selectedWorkspaceId || !workspaceCapabilities.canManageInvitations || isMutating}
                 />
               </label>
               <label className="ui-field">
@@ -340,7 +341,7 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
                   className="ui-select"
                   value={inviteRole}
                   onChange={(event) => setInviteRole(event.target.value as (typeof invitationRoleOptions)[number])}
-                  disabled={!selectedWorkspaceId || !canAdministrate || isMutating}
+                  disabled={!selectedWorkspaceId || !workspaceCapabilities.canManageInvitations || isMutating}
                 >
                   {invitationRoleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
                 </select>
@@ -348,7 +349,7 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
               <button
                 type="button"
                 className="ui-button ui-button--primary ui-button--sm"
-                disabled={!selectedWorkspaceId || !canAdministrate || isMutating}
+                disabled={!selectedWorkspaceId || !workspaceCapabilities.canManageInvitations || isMutating}
                 onClick={() => {
                   if (!selectedWorkspaceId) {
                     return;
@@ -396,7 +397,7 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
                   <button
                     type="button"
                     className="ui-button ui-button--danger ui-button--sm"
-                    disabled={!selectedWorkspaceId || !canAdministrate || isMutating || invitation.status !== "pending"}
+                    disabled={!selectedWorkspaceId || !workspaceCapabilities.canManageInvitations || isMutating || invitation.status !== "pending"}
                     onClick={() => {
                       if (!selectedWorkspaceId) {
                         return;
