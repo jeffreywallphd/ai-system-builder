@@ -12,6 +12,8 @@ import type {
   InitiateTrustedDevicePairingApiResponse,
   ListIdentityAdminAccountsApiRequest,
   ListIdentityAdminAccountsApiResponse,
+  ListIdentityAdminTrustedDevicesApiRequest,
+  ListIdentityAdminTrustedDevicesApiResponse,
   ListTrustedDevicesApiRequest,
   ListTrustedDevicesApiResponse,
   LoginLocalIdentityApiRequest,
@@ -20,6 +22,8 @@ import type {
   LogoutAuthenticatedSessionApiResponse,
   RevokeTrustedDeviceApiRequest,
   RevokeTrustedDeviceApiResponse,
+  RevokeIdentityAdminTrustedDeviceApiRequest,
+  RevokeIdentityAdminTrustedDeviceApiResponse,
   RevokeIdentitySessionApiRequest,
   RevokeIdentitySessionApiResponse,
   ResolveAuthenticatedSessionApiRequest,
@@ -94,6 +98,20 @@ export class IdentityAuthService {
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>> {
     return this.client.setIdentityAdminAccountStatus(request, sessionToken);
+  }
+
+  public listIdentityAdminTrustedDevices(
+    request: ListIdentityAdminTrustedDevicesApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminTrustedDevicesApiResponse>> {
+    return this.client.listIdentityAdminTrustedDevices(request, sessionToken);
+  }
+
+  public revokeIdentityAdminTrustedDevice(
+    request: RevokeIdentityAdminTrustedDeviceApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentityAdminTrustedDeviceApiResponse>> {
+    return this.client.revokeIdentityAdminTrustedDevice(request, sessionToken);
   }
 
   public changeLocalPasswordCredential(

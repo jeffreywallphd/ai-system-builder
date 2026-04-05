@@ -41,8 +41,9 @@ afterEach(async () => {
 
 async function startServer(
   logger: CapturingLogger,
+  harnessOptions: Parameters<typeof createIdentityAuthTestHarness>[0] = {},
 ): Promise<{ readonly baseUrl: string; readonly harness: Awaited<ReturnType<typeof createIdentityAuthTestHarness>> }> {
-  const harness = await createIdentityAuthTestHarness();
+  const harness = await createIdentityAuthTestHarness(harnessOptions);
   const server = createIdentityHttpServer({
     backendApi: harness.backendApi,
     logger,
@@ -665,6 +666,134 @@ describe("IdentityHttpServer", () => {
       },
     });
     expect(sessionAfterDisable.status).toBe(401);
+  });
+
+  it("enforces admin authorization for trusted-device oversight endpoints", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl, harness } = await startServer(logger, {
+      trustedDeviceAdministration: {
+        bootstrapAdminUserIdentityIds: ["user-identity:1"],
+      },
+    });
+
+    const adminRegisterResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "trusted.device.admin.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(adminRegisterResponse.status).toBe(200);
+    const adminRegisterBody = await adminRegisterResponse.json();
+    expect(adminRegisterBody.data.userIdentityId).toBe("user-identity:1");
+    await harness.provisionTrustedDevice({
+      trustedDeviceId: "trusted-device:admin-self",
+      userIdentityId: adminRegisterBody.data.userIdentityId,
+      trustStatus: "trusted",
+    });
+
+    const memberRegisterResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "trusted.device.member.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(memberRegisterResponse.status).toBe(200);
+    const memberRegisterBody = await memberRegisterResponse.json();
+    await harness.provisionTrustedDevice({
+      trustedDeviceId: "trusted-device:member-managed",
+      userIdentityId: memberRegisterBody.data.userIdentityId,
+      trustStatus: "trusted",
+    });
+
+    const memberLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "trusted.device.member.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(memberLoginResponse.status).toBe(200);
+    const memberLoginBody = await memberLoginResponse.json();
+
+    const forbiddenListResponse = await fetch(
+      `${baseUrl}/api/v1/identity/admin/trusted-devices?userIdentityId=${encodeURIComponent(adminRegisterBody.data.userIdentityId)}`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${memberLoginBody.data.sessionToken}`,
+        },
+      },
+    );
+    expect(forbiddenListResponse.status).toBe(403);
+    const forbiddenListBody = await forbiddenListResponse.json();
+    expect(forbiddenListBody.ok).toBe(false);
+    expect(forbiddenListBody.error.code).toBe("forbidden");
+
+    const adminLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "trusted.device.admin.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(adminLoginResponse.status).toBe(200);
+    const adminLoginBody = await adminLoginResponse.json();
+
+    const adminListResponse = await fetch(
+      `${baseUrl}/api/v1/identity/admin/trusted-devices?userIdentityId=${encodeURIComponent(memberRegisterBody.data.userIdentityId)}`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${adminLoginBody.data.sessionToken}`,
+        },
+      },
+    );
+    expect(adminListResponse.status).toBe(200);
+    const adminListBody = await adminListResponse.json();
+    expect(adminListBody.ok).toBe(true);
+    expect(adminListBody.data.devices.some((device: { trustedDeviceId: string }) => (
+      device.trustedDeviceId === "trusted-device:member-managed"
+    ))).toBeTrue();
+
+    const adminRevokeResponse = await fetch(
+      `${baseUrl}/api/v1/identity/admin/trusted-devices/${encodeURIComponent("trusted-device:member-managed")}/revoke`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${adminLoginBody.data.sessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          reason: "admin-action",
+        }),
+      },
+    );
+    expect(adminRevokeResponse.status).toBe(200);
+    const adminRevokeBody = await adminRevokeResponse.json();
+    expect(adminRevokeBody.ok).toBe(true);
+    expect(adminRevokeBody.data.revoked).toBe(true);
   });
 
   it("hardens the full local identity lifecycle journey across endpoints", async () => {

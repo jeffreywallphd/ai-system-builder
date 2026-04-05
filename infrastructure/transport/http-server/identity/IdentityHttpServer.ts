@@ -24,6 +24,8 @@ import {
   type InitiateTrustedDevicePairingApiResponse,
   type RevokeTrustedDeviceApiRequest,
   type RevokeTrustedDeviceApiResponse,
+  type RevokeIdentityAdminTrustedDeviceApiRequest,
+  type RevokeIdentityAdminTrustedDeviceApiResponse,
   type RevokeIdentitySessionApiRequest,
   type ResolveAuthenticatedSessionApiResponse,
   type RegisterLocalIdentityApiRequest,
@@ -157,6 +159,14 @@ const TrustedDeviceRevocationReasonValues = z.enum([
 
 const RevokeTrustedDeviceRequestSchema: z.ZodType<
   Pick<RevokeTrustedDeviceApiRequest, "reason" | "note" | "revokedAt">
+> = z.object({
+  reason: TrustedDeviceRevocationReasonValues,
+  note: z.string().min(1).max(1024).optional(),
+  revokedAt: z.string().datetime().optional(),
+}).strict();
+
+const RevokeIdentityAdminTrustedDeviceRequestSchema: z.ZodType<
+  Pick<RevokeIdentityAdminTrustedDeviceApiRequest, "reason" | "note" | "revokedAt">
 > = z.object({
   reason: TrustedDeviceRevocationReasonValues,
   note: z.string().min(1).max(1024).optional(),
@@ -540,6 +550,115 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
             logResponse(logger, requestId, request, statusCode, Object.freeze({
               context: buildAdminContext(context.principal.userIdentityId),
               userIdentityId,
+              ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (request.method === "GET" && path === "/api/v1/identity/admin/trusted-devices") {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const userIdentityId = normalizeOptionalString(url.searchParams.get("userIdentityId"));
+            if (!userIdentityId) {
+              const invalid = buildInvalidRequestResponse("userIdentityId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const workspaceId = normalizeOptionalString(url.searchParams.get("workspaceId"));
+            const includeStatuses = url.searchParams.getAll("status");
+            const limit = parseOptionalInteger(url.searchParams.get("limit"));
+            const offset = parseOptionalInteger(url.searchParams.get("offset"));
+            const statusValidation = z.array(TrustedDeviceStatusValues).safeParse(includeStatuses);
+            if (!statusValidation.success) {
+              const validationError = buildQueryValidationError("status", "status values are invalid.");
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.listIdentityAdminTrustedDevices({
+              context: buildAdminContext(context.principal.userIdentityId),
+              userIdentityId,
+              workspaceId,
+              includeStatuses: statusValidation.data,
+              limit,
+              offset,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              context: buildAdminContext(context.principal.userIdentityId),
+              userIdentityId,
+              workspaceId,
+              includeStatuses: statusValidation.data,
+              limit,
+              offset,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        request.method === "POST"
+        && path.endsWith("/revoke")
+        && path.startsWith("/api/v1/identity/admin/trusted-devices/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const trustedDeviceId = decodePathTail(path, "/api/v1/identity/admin/trusted-devices/", "/revoke");
+            if (!trustedDeviceId) {
+              const invalid = buildInvalidRequestResponse("trustedDeviceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateRequest(
+              request,
+              RevokeIdentityAdminTrustedDeviceRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.revokeIdentityAdminTrustedDevice({
+              context: buildAdminContext(context.principal.userIdentityId),
+              trustedDeviceId,
+              reason: parsedRequest.data.reason,
+              note: parsedRequest.data.note,
+              revokedAt: parsedRequest.data.revokedAt,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              context: buildAdminContext(context.principal.userIdentityId),
+              trustedDeviceId,
               ...parsedRequest.data,
             }), apiResponse);
           },

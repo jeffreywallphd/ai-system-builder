@@ -6,8 +6,10 @@ This document describes the user-facing trusted-device flows available in the re
 
 - Settings -> **Trusted devices**
 - Identity administration -> **Trusted devices**
+- Identity administration -> **Trusted device oversight**
 
 Route: `ui/routes/RouteConfig.ts` -> `ROUTE_PATHS.trustedDevices` (`/settings/trusted-devices`)
+Route: `ui/routes/RouteConfig.ts` -> `ROUTE_PATHS.identityAdmin` (`/settings/identity-admin`)
 
 ## Pairing workflow
 
@@ -47,6 +49,26 @@ The management table surfaces, per device:
 
 Revocation requires user confirmation and calls the authenticated trusted-device revoke API.
 
+## Admin trusted-device oversight workflow
+
+The identity administration page now includes a trusted-device oversight section:
+
+1. Select a local account.
+2. Optionally provide a workspace filter.
+3. Load trusted devices for that user/workspace scope.
+4. Revoke trust with the admin revoke action when policy requires.
+
+API paths used by admin oversight:
+
+- `GET /api/v1/identity/admin/trusted-devices?userIdentityId=<id>&workspaceId=<optional>&status=<optional>`
+- `POST /api/v1/identity/admin/trusted-devices/:trustedDeviceId/revoke`
+
+Authorization posture:
+
+- self-service trusted-device routes remain user-scoped.
+- admin oversight routes evaluate centralized administrative trusted-device authorization policy in the backend.
+- bootstrap admin identities can be configured through `IDENTITY_TRUSTED_DEVICE_ADMIN_USER_IDS`.
+
 ## API usage boundary
 
 The trusted-device page uses the shared renderer identity API seam:
@@ -60,3 +82,6 @@ No local-only trust shortcuts are used for pairing or revocation state transitio
 
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
 - `ui/pages/tests/TrustedDevicesPage.test.tsx`
+- `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `application/identity/tests/TrustedDeviceAdministrativeAuthorization.test.ts`

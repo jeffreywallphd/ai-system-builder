@@ -585,6 +585,10 @@ export async function createIdentityAuthTestHarness(
       readonly allowLocalRegistration?: boolean;
       readonly allowLocalAdministration?: boolean;
     };
+    readonly trustedDeviceAdministration?: {
+      readonly bootstrapAdminUserIdentityIds?: ReadonlyArray<string>;
+      readonly adminAssertions?: ReadonlyArray<string>;
+    };
   } = {},
 ): Promise<IdentityAuthTestHarness> {
   const adapter = new InMemoryIdentityAdapter();
@@ -704,6 +708,7 @@ export async function createIdentityAuthTestHarness(
     sessionTrustService,
     observability: options.observability,
     featurePolicies: options.featurePolicies,
+    trustedDeviceAdministration: options.trustedDeviceAdministration,
   });
 
   return Object.freeze({
