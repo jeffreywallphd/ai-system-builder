@@ -11,6 +11,7 @@ import { RecordNodeHeartbeatUseCase } from "../../../src/application/nodes/use-c
 import { RegisterNodeEnrollmentRequestUseCase } from "../../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { RejectNodeEnrollmentUseCase } from "../../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
 import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "../../../src/application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase";
+import { ResolveNodeMutualTlsTransportIdentityUseCase } from "../../../src/application/nodes/use-cases/ResolveNodeMutualTlsTransportIdentityUseCase";
 import { RevokeNodeTrustUseCase } from "../../../src/application/nodes/use-cases/RevokeNodeTrustUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
 import {
@@ -99,6 +100,9 @@ function createHarness(): {
       runtimeTrustMaterialResolver: new ResolveRuntimeTrustMaterialPackageUseCase({
         trustMaterialDistributionPort: new StubRuntimeTrustMaterialDistributionPort(),
       }),
+    }),
+    resolveNodeMutualTlsTransportIdentityUseCase: new ResolveNodeMutualTlsTransportIdentityUseCase({
+      nodeRepository: adapter,
     }),
     listTrustedNodeInventoryUseCase: new ListTrustedNodeInventoryUseCase({
       nodeRepository: adapter,
@@ -529,6 +533,73 @@ describe("NodeTrustBackendApi", () => {
       return;
     }
     expect(result.error.code).toBe("conflict");
+  });
+
+  it("resolves certificate-authenticated node transport identity for trusted nodes", async () => {
+    const harness = createHarness();
+    await harness.adapter.registerNode({
+      record: {
+        nodeId: "node:trusted:mtls-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Trusted mTLS 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "ABCD12",
+          certificateThumbprint: "A1:B2:C3:D4",
+        },
+        deploymentTags: ["runtime"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T17:00:00.000Z",
+        approvedAt: "2026-04-05T17:05:00.000Z",
+        createdAt: "2026-04-05T17:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T17:05:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-mtls-identity-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const approved = await harness.backendApi.resolveNodeMutualTlsTransportIdentity({
+      nodeId: "node:trusted:mtls-1",
+      certificateSerialNumber: "abcd12",
+      certificateFingerprintSha256: "a1b2c3d4",
+    });
+    expect(approved.ok).toBeTrue();
+    if (approved.ok) {
+      expect(approved.data?.nodeId).toBe("node:trusted:mtls-1");
+      expect(approved.data?.certificateRef).toBe("ABCD12");
+    }
+
+    const mismatch = await harness.backendApi.resolveNodeMutualTlsTransportIdentity({
+      nodeId: "node:trusted:mtls-1",
+      certificateSerialNumber: "ZZ9999",
+    });
+    expect(mismatch.ok).toBeFalse();
+    if (!mismatch.ok) {
+      expect(mismatch.error?.code).toBe("forbidden");
+    }
+
+    const unknown = await harness.backendApi.resolveNodeMutualTlsTransportIdentity({
+      nodeId: "node:missing:mtls-1",
+      certificateSerialNumber: "ABCD12",
+    });
+    expect(unknown.ok).toBeFalse();
+    if (!unknown.ok) {
+      expect(unknown.error?.code).toBe("not-found");
+    }
   });
 
   it("rejects heartbeat updates from unknown, pending, rejected, and revoked nodes", async () => {

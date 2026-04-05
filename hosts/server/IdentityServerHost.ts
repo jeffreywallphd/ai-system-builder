@@ -129,6 +129,7 @@ import { RegisterNodeEnrollmentRequestUseCase } from "../../src/application/node
 import { RejectNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
 import { ResolveApprovedNodeCertificateEligibilityUseCase } from "../../src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase";
 import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "../../src/application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase";
+import { ResolveNodeMutualTlsTransportIdentityUseCase } from "../../src/application/nodes/use-cases/ResolveNodeMutualTlsTransportIdentityUseCase";
 import { RevokeNodeTrustUseCase } from "../../src/application/nodes/use-cases/RevokeNodeTrustUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
 import { InternalCertificateAuthorityIssuer } from "../../src/infrastructure/security/ca/InternalCertificateAuthorityIssuer";
@@ -687,6 +688,9 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       nodeRepository: nodeTrustRepository,
       runtimeTrustMaterialResolver: resolveRuntimeTrustMaterialPackageUseCase,
     }),
+    resolveNodeMutualTlsTransportIdentityUseCase: new ResolveNodeMutualTlsTransportIdentityUseCase({
+      nodeRepository: nodeTrustRepository,
+    }),
     listTrustedNodeInventoryUseCase: new ListTrustedNodeInventoryUseCase({
       nodeRepository: nodeTrustRepository,
       auditSink: nodeTrustAuditRecorder,
@@ -927,6 +931,8 @@ function createManagedIdentityServerTlsFactory(
     cert: tlsMaterial.certPem,
     key: tlsMaterial.keyPem,
     ca: tlsMaterial.caPem,
+    requestCert: true,
+    rejectUnauthorized: false,
   }, requestListener);
 }
 
