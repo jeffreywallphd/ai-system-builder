@@ -42,10 +42,13 @@ Use this file as the shortest reliable orientation before reading the human arch
 - `ui/composition/createUiDependencies.ts`
 - `electron/main/main.ts`
 - `src/domain/identity/IdentityDomain.ts`
+- `src/domain/identity/TrustedDeviceDomain.ts`
 - `application/contracts/IdentityApplicationContracts.ts`
 - `application/identity/services/IdentityBootstrapService.ts`
 - `application/identity/services/IdentitySessionLifecycleService.ts`
 - `application/identity/services/IdentityAuthenticatedSessionService.ts`
+- `application/identity/ports/ITrustedDeviceRepository.ts`
+- `application/identity/ports/ITrustedDeviceManagementService.ts`
 - `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`
 - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `infrastructure/api/identity/IdentityAuthBackendApi.ts`
@@ -54,6 +57,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 
 - Detailed session subsystem architecture: `docs/architecture/identity-session-architecture.md`
 - Feature 1 downstream handoff baseline: `docs/architecture/identity-feature-1-final-baseline.md`
+- Trusted-device domain/contracts baseline: `docs/architecture/trusted-device-foundation.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).

@@ -130,6 +130,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For local identity domain, contracts, persistence, and provider-extension seams, read [`identity-foundation.md`](./identity-foundation.md).
 - For authoritative local identity registration/login server endpoints and transport contracts, read [`identity-server-api.md`](./identity-server-api.md).
 - For session lifecycle, policy, guard, revocation, and client integration behavior, read [`identity-session-architecture.md`](./identity-session-architecture.md).
+- For trusted-device domain lifecycle, trust-state transitions, and identity/workspace trust contracts, read [`trusted-device-foundation.md`](./trusted-device-foundation.md).
 - For Feature 1 completion baseline and downstream dependency notes (trusted device, workspace membership, authorization), read [`identity-feature-1-final-baseline.md`](./identity-feature-1-final-baseline.md).
 
 ## Direction 4 (Phase 1) foundation
