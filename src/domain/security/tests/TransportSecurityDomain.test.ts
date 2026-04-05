@@ -18,14 +18,18 @@ describe("TransportSecurityDomain", () => {
     const desktop = resolveBaselineTransportSecurityPolicy(TransportSecurityScenarios.desktopClientToControlPlane);
     const thinClient = resolveBaselineTransportSecurityPolicy(TransportSecurityScenarios.thinClientToControlPlane);
     const node = resolveBaselineTransportSecurityPolicy(TransportSecurityScenarios.nodeToControlPlane);
+    const peer = resolveBaselineTransportSecurityPolicy(TransportSecurityScenarios.nodeToNode);
 
-    expect(policies).toHaveLength(4);
+    expect(policies).toHaveLength(5);
     expect(desktop.requireAuthenticatedUserSession).toBeTrue();
     expect(desktop.requireTrustedDevice).toBeTrue();
     expect(thinClient.requireAuthenticatedUserSession).toBeTrue();
     expect(thinClient.requireTrustedDevice).toBeFalse();
     expect(node.requireTrustedNode).toBeTrue();
     expect(node.requireMutualTls).toBeTrue();
+    expect(peer.requireTrustedNode).toBeTrue();
+    expect(peer.requireMutualTls).toBeTrue();
+    expect(peer.allowedRemotePeerTypes).toContain(TransportPeerTypes.nodeRuntime);
   });
 
   it("rejects policies that allow insecure channels or fallback", () => {
