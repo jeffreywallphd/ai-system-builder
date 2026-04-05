@@ -206,6 +206,28 @@ describe("IdentityServerHost", () => {
       }));
       workspaceRepository.dispose();
 
+      const listWorkspacesResponse = await fetch(`http://${host.address}/api/v1/workspaces`, {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${ownerLoginBody.data.sessionToken}`,
+        },
+      });
+      expect(listWorkspacesResponse.status).toBe(200);
+      const listWorkspacesBody = await listWorkspacesResponse.json();
+      expect(listWorkspacesBody.ok).toBe(true);
+      expect(listWorkspacesBody.data.workspaces[0].workspaceId).toBe("workspace:alpha");
+
+      const workspaceAdminViewResponse = await fetch(`http://${host.address}/api/v1/workspaces/workspace%3Aalpha/admin-view`, {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${ownerLoginBody.data.sessionToken}`,
+        },
+      });
+      expect(workspaceAdminViewResponse.status).toBe(200);
+      const workspaceAdminViewBody = await workspaceAdminViewResponse.json();
+      expect(workspaceAdminViewBody.ok).toBe(true);
+      expect(workspaceAdminViewBody.data.workspace.workspaceId).toBe("workspace:alpha");
+
       const issueResponse = await fetch(`http://${host.address}/api/v1/workspaces/workspace%3Aalpha/invitations`, {
         method: "POST",
         headers: {
