@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { URL } from "node:url";
 import { z } from "zod";
 import type { IdentityAuthBackendApi } from "../../../api/identity/IdentityAuthBackendApi";
+import type { AuthorizationManagementBackendApi } from "../../../api/authorization/AuthorizationManagementBackendApi";
 import type { WorkspaceInvitationBackendApi } from "../../../api/workspaces/WorkspaceInvitationBackendApi";
 import type { WorkspaceAdministrationBackendApi } from "../../../api/workspaces/WorkspaceAdministrationBackendApi";
 import {
@@ -38,6 +39,10 @@ import {
   type ValidateTrustedDevicePairingApiRequest,
   type ValidateTrustedDevicePairingApiResponse,
 } from "../../../api/identity/sdk/PublicIdentityAuthApiContract";
+import {
+  AuthorizationManagementApiErrorCodes,
+  type AuthorizationManagementApiResponse,
+} from "../../../api/authorization/sdk/PublicAuthorizationManagementApiContract";
 import {
   WorkspaceInvitationApiErrorCodes,
   type AcceptWorkspaceInvitationOnboardingApiRequest,
@@ -350,6 +355,74 @@ const RevokeWorkspaceRoleRequestSchema = z.object({
   metadata: WorkspaceRoleAuditSchema.shape.metadata,
 }).strict();
 
+const AuthorizationResourceFamilyValues = z.enum([
+  "asset",
+  "system",
+  "workflow",
+  "template",
+  "run",
+  "queue",
+  "log",
+  "storage-instance",
+  "secret-metadata",
+  "artifact",
+]);
+const AuthorizationResourceVisibilityValues = z.enum(["private", "workspace", "shared", "published"]);
+const AuthorizationSharingPolicyModeValues = z.enum(["owner-only", "workspace-members", "explicit", "published"]);
+const AuthorizationSharingSubjectTargetSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("user"),
+    userId: z.string().min(1),
+  }).strict(),
+  z.object({
+    kind: z.literal("workspace-role"),
+    workspaceId: z.string().min(1),
+    roleKey: WorkspaceRoleValues,
+  }).strict(),
+  z.object({
+    kind: z.literal("workspace"),
+    workspaceId: z.string().min(1),
+  }).strict(),
+  z.object({
+    kind: z.literal("public"),
+  }).strict(),
+]);
+const AuthorizationSharingGrantMutationSchema = z.object({
+  id: z.string().min(1),
+  target: AuthorizationSharingSubjectTargetSchema,
+  permissionKeys: z.array(z.string().min(1)).min(1),
+}).strict();
+const AuthorizationUpdateVisibilityRequestSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+  visibility: AuthorizationResourceVisibilityValues,
+  sharingPolicyMode: AuthorizationSharingPolicyModeValues,
+  allowResharing: z.boolean().optional(),
+  sharingGrants: z.array(AuthorizationSharingGrantMutationSchema).optional(),
+  isPublishedCapable: z.boolean().optional(),
+  publishedAt: z.string().datetime().optional(),
+  expectedRevision: z.number().int().min(0).optional(),
+  reason: z.string().min(1).optional(),
+  correlationId: z.string().min(1).optional(),
+  metadata: z.record(z.unknown()).optional(),
+}).strict();
+const AuthorizationGrantSharingRequestSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+  visibility: AuthorizationResourceVisibilityValues.optional(),
+  grant: AuthorizationSharingGrantMutationSchema,
+  expectedRevision: z.number().int().min(0).optional(),
+  reason: z.string().min(1).optional(),
+  correlationId: z.string().min(1).optional(),
+  metadata: z.record(z.unknown()).optional(),
+}).strict();
+const AuthorizationRevokeSharingRequestSchema = z.object({
+  workspaceId: z.string().min(1).optional(),
+  visibility: AuthorizationResourceVisibilityValues.optional(),
+  expectedRevision: z.number().int().min(0).optional(),
+  reason: z.string().min(1).optional(),
+  correlationId: z.string().min(1).optional(),
+  metadata: z.record(z.unknown()).optional(),
+}).strict();
+
 export interface IdentityHttpServerLogEvent {
   readonly event: string;
   readonly requestId: string;
@@ -367,6 +440,7 @@ export interface IdentityHttpServerLogger {
 
 export interface IdentityHttpServerOptions {
   readonly backendApi: IdentityAuthBackendApi;
+  readonly authorizationManagementBackendApi?: AuthorizationManagementBackendApi;
   readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
   readonly workspaceAdministrationBackendApi?: WorkspaceAdministrationBackendApi;
   readonly logger?: IdentityHttpServerLogger;
@@ -1067,6 +1141,229 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
             logResponse(logger, requestId, request, statusCode, Object.freeze({
               ...parsedRequest.data,
               userIdentityId: context.principal.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.authorizationManagementBackendApi
+        && request.method === "PATCH"
+        && path.endsWith("/visibility")
+        && path.startsWith("/api/v1/authorization/resources/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const resource = decodeAuthorizationResourcePath(path, "/visibility");
+            if (!resource) {
+              const invalid = buildAuthorizationManagementInvalidRequestResponse(
+                "resourceFamily, resourceType, and resourceId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateAuthorizationManagementRequest(
+              request,
+              AuthorizationUpdateVisibilityRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.authorizationManagementBackendApi.updateVisibility({
+              actorUserIdentityId: context.principal.userIdentityId,
+              resource,
+              ...parsedRequest.data,
+            });
+            const statusCode = mapAuthorizationManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              resource,
+              ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.authorizationManagementBackendApi
+        && request.method === "POST"
+        && path.endsWith("/sharing-grants")
+        && path.startsWith("/api/v1/authorization/resources/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const resource = decodeAuthorizationResourcePath(path, "/sharing-grants");
+            if (!resource) {
+              const invalid = buildAuthorizationManagementInvalidRequestResponse(
+                "resourceFamily, resourceType, and resourceId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateAuthorizationManagementRequest(
+              request,
+              AuthorizationGrantSharingRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.authorizationManagementBackendApi.grantSharingAccess({
+              actorUserIdentityId: context.principal.userIdentityId,
+              resource,
+              ...parsedRequest.data,
+            });
+            const statusCode = mapAuthorizationManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              resource,
+              ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.authorizationManagementBackendApi
+        && request.method === "DELETE"
+        && path.includes("/sharing-grants/")
+        && path.startsWith("/api/v1/authorization/resources/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const pathParams = decodeAuthorizationResourceAndGrantPath(path);
+            if (!pathParams) {
+              const invalid = buildAuthorizationManagementInvalidRequestResponse(
+                "resourceFamily, resourceType, resourceId, and grantId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateAuthorizationManagementRequest(
+              request,
+              AuthorizationRevokeSharingRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+              {
+                allowEmptyBody: true,
+              },
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.authorizationManagementBackendApi.revokeSharingAccess({
+              actorUserIdentityId: context.principal.userIdentityId,
+              resource: pathParams.resource,
+              grantId: pathParams.grantId,
+              ...parsedRequest.data,
+            });
+            const statusCode = mapAuthorizationManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              resource: pathParams.resource,
+              grantId: pathParams.grantId,
+              ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.authorizationManagementBackendApi
+        && request.method === "GET"
+        && path.endsWith("/access-state")
+        && path.startsWith("/api/v1/authorization/resources/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const resource = decodeAuthorizationResourcePath(path, "/access-state");
+            if (!resource) {
+              const invalid = buildAuthorizationManagementInvalidRequestResponse(
+                "resourceFamily, resourceType, and resourceId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const includeDenied = parseOptionalBoolean(url.searchParams.get("includeDenied"));
+            const includeRevokedSharingGrants = parseOptionalBoolean(url.searchParams.get("includeRevokedSharingGrants"));
+            const asOf = normalizeOptionalString(url.searchParams.get("asOf"));
+
+            if (asOf && !z.string().datetime({ offset: true }).safeParse(asOf).success) {
+              const invalid = buildAuthorizationManagementInvalidRequestResponse("asOf must be a valid ISO-8601 timestamp.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                actorUserIdentityId: context.principal.userIdentityId,
+                resource,
+                asOf,
+              }), invalid);
+              return;
+            }
+
+            const apiResponse = await options.authorizationManagementBackendApi.readAccessState({
+              actorUserIdentityId: context.principal.userIdentityId,
+              resource,
+              asOf,
+              includeDenied,
+              includeRevokedSharingGrants,
+            });
+            const statusCode = mapAuthorizationManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              resource,
+              query: Object.fromEntries(url.searchParams.entries()),
             }), apiResponse);
           },
         );
@@ -2224,6 +2521,69 @@ async function parseAndValidateWorkspaceAdministrationRequest<T>(
   return { ok: true, data: validation.data };
 }
 
+async function parseAndValidateAuthorizationManagementRequest<T>(
+  request: IncomingMessage,
+  schema: z.ZodType<T>,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+  options?: {
+    readonly allowEmptyBody?: boolean;
+  },
+): Promise<
+  | { readonly ok: true; readonly data: T }
+  | { readonly ok: false; readonly statusCode: number; readonly body: AuthorizationManagementApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    if (options?.allowEmptyBody && parsedBody.error === "Request body is required.") {
+      const validation = schema.safeParse({});
+      if (validation.success) {
+        return { ok: true, data: validation.data };
+      }
+    }
+    const body = buildAuthorizationManagementInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "authorization-management-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  const validation = schema.safeParse(parsedBody.value);
+  if (!validation.success) {
+    const body: AuthorizationManagementApiResponse<never> = Object.freeze({
+      ok: false,
+      error: {
+        code: AuthorizationManagementApiErrorCodes.invalidRequest,
+        message: "Request validation failed.",
+        validationErrors: Object.freeze(validation.error.issues.map((issue) => Object.freeze({
+          path: issue.path.join("."),
+          code: issue.code,
+          message: issue.message,
+        }))),
+      },
+    });
+    logger.warn(Object.freeze({
+      event: "authorization-management-http.request.validation-failed",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+      details: {
+        request: redactSensitiveAuthPayload(parsedBody.value),
+        issues: body.error?.validationErrors,
+      },
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  return { ok: true, data: validation.data };
+}
+
 async function parseJsonBody(
   request: IncomingMessage,
   maxBodyBytes: number,
@@ -2320,6 +2680,27 @@ function mapWorkspaceAdministrationStatusCode(response: WorkspaceAdministrationA
       return 409;
     case WorkspaceAdministrationApiErrorCodes.invalidTransition:
       return 422;
+    default:
+      return 500;
+  }
+}
+
+function mapAuthorizationManagementStatusCode(response: AuthorizationManagementApiResponse<unknown>): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error?.code) {
+    case AuthorizationManagementApiErrorCodes.invalidRequest:
+      return 400;
+    case AuthorizationManagementApiErrorCodes.authenticationFailed:
+      return 401;
+    case AuthorizationManagementApiErrorCodes.forbidden:
+      return 403;
+    case AuthorizationManagementApiErrorCodes.notFound:
+      return 404;
+    case AuthorizationManagementApiErrorCodes.conflict:
+      return 409;
     default:
       return 500;
   }
@@ -2440,6 +2821,71 @@ function decodeWorkspaceUserScopedPath(
   });
 }
 
+function decodeAuthorizationResourcePath(
+  path: string,
+  suffix: "/visibility" | "/sharing-grants" | "/access-state",
+): { readonly resourceFamily: z.infer<typeof AuthorizationResourceFamilyValues>; readonly resourceType: string; readonly resourceId: string } | undefined {
+  const prefix = "/api/v1/authorization/resources/";
+  if (!path.startsWith(prefix) || !path.endsWith(suffix)) {
+    return undefined;
+  }
+
+  const raw = path.slice(prefix.length, path.length - suffix.length);
+  const [resourceFamilyRaw, resourceTypeRaw, resourceIdRaw] = raw.split("/");
+  const resourceFamily = decodeURIComponent(resourceFamilyRaw ?? "").trim();
+  const resourceType = decodeURIComponent(resourceTypeRaw ?? "").trim();
+  const resourceId = decodeURIComponent(resourceIdRaw ?? "").trim();
+
+  if (!resourceFamily || !resourceType || !resourceId) {
+    return undefined;
+  }
+
+  const familyValidation = AuthorizationResourceFamilyValues.safeParse(resourceFamily);
+  if (!familyValidation.success) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    resourceFamily: familyValidation.data,
+    resourceType,
+    resourceId,
+  });
+}
+
+function decodeAuthorizationResourceAndGrantPath(
+  path: string,
+): {
+  readonly resource: { readonly resourceFamily: z.infer<typeof AuthorizationResourceFamilyValues>; readonly resourceType: string; readonly resourceId: string };
+  readonly grantId: string;
+} | undefined {
+  const prefix = "/api/v1/authorization/resources/";
+  const marker = "/sharing-grants/";
+  if (!path.startsWith(prefix) || !path.includes(marker)) {
+    return undefined;
+  }
+
+  const markerIndex = path.indexOf(marker, prefix.length);
+  if (markerIndex < 0) {
+    return undefined;
+  }
+
+  const resourcePath = path.slice(0, markerIndex + marker.length - "/".length);
+  const resource = decodeAuthorizationResourcePath(resourcePath, "/sharing-grants");
+  if (!resource) {
+    return undefined;
+  }
+
+  const grantId = decodeURIComponent(path.slice(markerIndex + marker.length)).trim();
+  if (!grantId) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    resource,
+    grantId,
+  });
+}
+
 function buildInvalidRequestResponse(message: string): IdentityAuthApiResponse<never> {
   return Object.freeze({
     ok: false,
@@ -2465,6 +2911,16 @@ function buildWorkspaceAdministrationInvalidRequestResponse(message: string): Wo
     ok: false,
     error: {
       code: WorkspaceAdministrationApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
+function buildAuthorizationManagementInvalidRequestResponse(message: string): AuthorizationManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: AuthorizationManagementApiErrorCodes.invalidRequest,
       message,
     },
   });

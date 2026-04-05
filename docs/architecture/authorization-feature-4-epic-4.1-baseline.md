@@ -18,7 +18,6 @@ What is intentionally not in this epic:
 
 - no production infrastructure adapter implementing `IAuthorizationPolicyEvaluator`
 - no runtime-wide enforcement wiring across every protected feature path yet
-- no finalized admin API transport endpoints for authorization management operations yet
 
 ## Canonical implementation files
 

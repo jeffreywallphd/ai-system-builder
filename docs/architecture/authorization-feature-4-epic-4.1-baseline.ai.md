@@ -28,7 +28,6 @@ Implementation-truth handoff for the authorization foundation delivered in Epic 
 
 - No production policy evaluator adapter implementation yet (`IAuthorizationPolicyEvaluator` is a seam).
 - No full runtime-wide enforcement wiring for all protected features yet.
-- No finalized authorization admin transport APIs yet.
 
 ## Permission-check flow baseline
 

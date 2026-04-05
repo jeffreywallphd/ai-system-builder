@@ -15,7 +15,9 @@ Goal: prevent bypasses and keep all policy checks centralized.
 - `infrastructure/api/system-runtime/SystemRuntimeBackendApi.ts`
 - `infrastructure/api/system-runtime/RuntimeRequestRouter.ts`
 - `infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
+- `infrastructure/api/authorization/AuthorizationManagementBackendApi.ts`
 - `src/application/authorization/use-cases/AuthorizationResponseRedaction.ts`
+- `src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter.ts`
 - `ui/presenters/WorkspaceAdministrationCapabilitiesPresenter.ts`
 
 ## Required enforcement patterns
@@ -96,3 +98,4 @@ Async flows (`startExecutionAsync`, `pollExecution`) must preserve delegated sco
 - `infrastructure/api/system-runtime/tests/SystemRuntimeOperationalAuthorization.test.ts`
 - `infrastructure/api/studio-shell/tests/ReferenceImageOutputAuthorization.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthorizationManagement.test.ts`
