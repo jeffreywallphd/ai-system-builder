@@ -28,6 +28,9 @@ Legacy compatibility fields remain available:
 - `trustedDeviceBindingId`
 - `trustMarker`
 
+Login also supports optional server-side trust posture selection:
+- `sessionTrustRequirement`: `allow-untrusted` | `allow-pairing` | `require-trusted`
+
 ## Success responses
 
 - `RegisterLocalIdentityApiResponse`
@@ -41,6 +44,10 @@ Legacy compatibility fields remain available:
 - `SetIdentityAdminAccountStatusApiResponse`
 
 Session responses may include device-bound trust context (`deviceTrustContext`) plus legacy compatibility fields (`trustedDeviceBindingId`, `trustMarker`) when present.
+
+High-assurance route posture:
+- `POST /api/v1/identity/credential/change` requires trusted session assurance.
+- `GET|POST /api/v1/identity/admin/accounts*` routes require trusted session assurance.
 
 ## Error envelope
 

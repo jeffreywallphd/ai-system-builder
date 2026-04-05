@@ -21,6 +21,9 @@ export interface IdentitySessionTrustEvaluationDenied {
   readonly reason: string;
   readonly invalidationReasons?: ReadonlyArray<SessionDeviceTrustInvalidationReason>;
   readonly details?: Readonly<Record<string, unknown>>;
+  readonly deviceTrustContext?: SessionDeviceTrustContext;
+  readonly trustedDeviceBindingId?: string;
+  readonly trustMarker?: string;
 }
 
 export type IdentitySessionTrustEvaluationResult =

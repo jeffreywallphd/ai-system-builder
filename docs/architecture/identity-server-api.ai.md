@@ -90,6 +90,7 @@ Persisted session records now intentionally exclude:
 
 - Login request now accepts optional session-context fields:
   - `accessChannel` (`desktop` or `thin-client`; default `thin-client`)
+  - `sessionTrustRequirement` (`allow-untrusted` | `allow-pairing` | `require-trusted`)
   - optional `client` context (`userAgent`, `ipAddress`, `deviceId`, `trustedDeviceBindingId`, `trustMarker`)
 - Login success now includes issued-session fields:
   - `sessionId`
@@ -102,6 +103,11 @@ Persisted session records now intentionally exclude:
 - Session metadata and token material are separated in persistence (`identity_sessions` vs `identity_session_token_material`).
 - Session expiry/refresh behavior is policy-configurable through environment-backed identity session policy settings (`IDENTITY_SESSION_*`) rather than hard-coded expiry constants.
 - Trusted-device seam metadata is context-only in this slice (persisted + returned) and not yet used for authorization decisions.
+- Trusted-device-aware issuance now resolves trust against persisted trusted-device state and can deny login issuance when `sessionTrustRequirement=require-trusted` is not satisfied.
+- Session validation now fails closed for bound sessions when trusted-device state is missing/revoked/expired/mismatched.
+- High-assurance routes now enforce trusted session assurance in middleware:
+  - `POST /api/v1/identity/credential/change`
+  - `GET|POST /api/v1/identity/admin/accounts*`
 
 ## Credential change contract update
 

@@ -187,6 +187,8 @@ Variables:
 - `IDENTITY_SESSION_THIN_CLIENT_TTL_MINUTES`
 - `IDENTITY_SESSION_THIN_CLIENT_ALLOW_REFRESH`
 - `IDENTITY_SESSION_THIN_CLIENT_INACTIVITY_TIMEOUT_MINUTES`
+- `IDENTITY_SESSION_DESKTOP_TRUST_REQUIREMENT` (`allow-untrusted` | `allow-pairing` | `require-trusted`)
+- `IDENTITY_SESSION_THIN_CLIENT_TRUST_REQUIREMENT` (`allow-untrusted` | `allow-pairing` | `require-trusted`)
 
 Validation constraints:
 
@@ -200,6 +202,7 @@ Default posture:
 - desktop: `ttlMinutes=43200` (30 days), `allowRefresh=false`
 - thin-client: `ttlMinutes=720` (12 hours), `allowRefresh=true`
 - inactivity timeout unset for both channels unless configured
+- trust requirement defaults: desktop=`allow-pairing`, thin-client=`allow-untrusted`
 
 ## Client integration expectations
 
@@ -242,8 +245,10 @@ Evaluation seam:
 
 Current behavior:
 
-- no default trust evaluator is wired by `IdentityServerHost`
-- trusted-device fields are context-carrying metadata only in this slice
+- `IdentityServerHost` now wires `TrustedDeviceSessionTrustService` as the default `IIdentitySessionTrustEvaluator`
+- bound sessions fail closed at validation when trusted-device state is missing, revoked, expired, or mismatched
+- login/session issuance resolves trust from repository state and supports trust posture selection (`allow-untrusted`, `allow-pairing`, `require-trusted`)
+- high-assurance HTTP routes (credential change and admin account routes) enforce trusted session assurance in middleware
 
 ## Sequence diagrams
 
@@ -307,8 +312,10 @@ Primary tests for this subsystem:
 - `application/identity/tests/LogoutIdentitySessionUseCase.test.ts`
 - `application/identity/tests/RevokeIdentitySessionUseCase.test.ts`
 - `infrastructure/config/tests/IdentitySessionPolicyConfig.test.ts`
+- `infrastructure/config/tests/IdentitySessionTrustPolicyConfig.test.ts`
 - `infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`
 - `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `application/identity/tests/TrustedDeviceSessionTrustService.test.ts`
 - `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`
 

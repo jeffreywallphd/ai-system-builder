@@ -433,9 +433,63 @@ describe("IdentityHttpServer", () => {
     expect(invalidAfterRevoke.status).toBe(401);
   });
 
-  it("supports bearer-authenticated local credential change", async () => {
+  it("rejects high-assurance routes for untrusted sessions", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger);
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "untrusted.high.assurance.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+
+    const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "untrusted.high.assurance.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(loginResponse.status).toBe(200);
+    const loginBody = await loginResponse.json();
+
+    const credentialChange = await fetch(`${baseUrl}/api/v1/identity/credential/change`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+      body: JSON.stringify({
+        newCredential: {
+          candidate: "StrongerPass!2027",
+        },
+        verification: {
+          currentCredential: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(credentialChange.status).toBe(403);
+    const credentialBody = await credentialChange.json();
+    expect(credentialBody.ok).toBe(false);
+    expect(credentialBody.error.code).toBe("forbidden");
+  });
+
+  it("supports bearer-authenticated local credential change", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl, harness } = await startServer(logger);
 
     const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
       method: "POST",
@@ -450,6 +504,11 @@ describe("IdentityHttpServer", () => {
       }),
     });
     expect(registerResponse.status).toBe(200);
+    const registerBody = await registerResponse.json();
+    await harness.provisionTrustedDevice({
+      trustedDeviceId: "trusted-device:credential-change",
+      userIdentityId: registerBody.data.userIdentityId,
+    });
 
     const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
       method: "POST",
@@ -458,6 +517,10 @@ describe("IdentityHttpServer", () => {
       },
       body: JSON.stringify({
         providerSubject: "credential.change.api.user",
+        sessionTrustRequirement: "require-trusted",
+        client: {
+          trustedDeviceBindingId: "trusted-device:credential-change",
+        },
         credential: {
           candidate: "StrongPass!2026",
         },
@@ -517,7 +580,7 @@ describe("IdentityHttpServer", () => {
 
   it("supports bearer-authenticated local account administration endpoints", async () => {
     const logger = new CapturingLogger();
-    const { baseUrl } = await startServer(logger);
+    const { baseUrl, harness } = await startServer(logger);
 
     const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
       method: "POST",
@@ -533,6 +596,10 @@ describe("IdentityHttpServer", () => {
     });
     expect(registerResponse.status).toBe(200);
     const registerBody = await registerResponse.json();
+    await harness.provisionTrustedDevice({
+      trustedDeviceId: "trusted-device:admin",
+      userIdentityId: registerBody.data.userIdentityId,
+    });
 
     const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
       method: "POST",
@@ -541,6 +608,10 @@ describe("IdentityHttpServer", () => {
       },
       body: JSON.stringify({
         providerSubject: "admin.api.user",
+        sessionTrustRequirement: "require-trusted",
+        client: {
+          trustedDeviceBindingId: "trusted-device:admin",
+        },
         credential: {
           candidate: "StrongPass!2026",
         },
@@ -598,7 +669,7 @@ describe("IdentityHttpServer", () => {
 
   it("hardens the full local identity lifecycle journey across endpoints", async () => {
     const logger = new CapturingLogger();
-    const { baseUrl } = await startServer(logger);
+    const { baseUrl, harness } = await startServer(logger);
 
     const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
       method: "POST",
@@ -613,12 +684,20 @@ describe("IdentityHttpServer", () => {
     });
     expect(registerResponse.status).toBe(200);
     const registerBody = await registerResponse.json();
+    await harness.provisionTrustedDevice({
+      trustedDeviceId: "trusted-device:lifecycle",
+      userIdentityId: registerBody.data.userIdentityId,
+    });
 
     const firstLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         providerSubject: "lifecycle.user",
+        sessionTrustRequirement: "require-trusted",
+        client: {
+          trustedDeviceBindingId: "trusted-device:lifecycle",
+        },
         credential: {
           candidate: "StrongPass!2026",
         },
@@ -677,6 +756,10 @@ describe("IdentityHttpServer", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         providerSubject: "lifecycle.user",
+        sessionTrustRequirement: "require-trusted",
+        client: {
+          trustedDeviceBindingId: "trusted-device:lifecycle",
+        },
         credential: {
           candidate: "StrongerPass!2027",
         },
