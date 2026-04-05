@@ -1,4 +1,5 @@
 import {
+  Session,
   AuthProviderCategories,
   AuthProviderKinds,
   AuthProviderStatuses,
@@ -21,18 +22,25 @@ import {
   type IdentityOperationResult,
   type IdentityPrincipalLookup,
   type IdentityProviderSubjectReference,
+  type IdentitySessionListQuery,
+  type IdentitySessionTokenMaterialRecord,
 } from "../../../../application/contracts/IdentityApplicationContracts";
 import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
 import type { IIdentityClock } from "../../../../application/identity/ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../../../../application/identity/ports/IIdentityIdGenerator";
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
+import type { IIdentitySessionRepository } from "../../../../application/identity/ports/IIdentitySessionRepository";
+import type { IIdentitySessionTokenMaterialRepository } from "../../../../application/identity/ports/IIdentitySessionTokenMaterialRepository";
+import type { IIdentitySessionTokenService } from "../../../../application/identity/ports/IIdentitySessionTokenService";
 import type {
   ILocalPasswordCredentialService,
   LocalPasswordCredentialMaterial,
 } from "../../../../application/identity/ports/ILocalPasswordCredentialService";
 import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
 import { LocalPasswordIdentityAuthenticator } from "../../../../application/identity/services/LocalPasswordIdentityAuthenticator";
+import { IdentitySessionLifecycleService } from "../../../../application/identity/services/IdentitySessionLifecycleService";
+import { IdentityAuthenticatedSessionService } from "../../../../application/identity/services/IdentityAuthenticatedSessionService";
 import { IdentityAuthBackendApi } from "../IdentityAuthBackendApi";
 import { RegisterLocalAccountUseCase } from "../../../../src/application/identity/use-cases/RegisterLocalAccountUseCase";
 import { LoginLocalAccountUseCase } from "../../../../src/application/identity/use-cases/LoginLocalAccountUseCase";
@@ -43,13 +51,20 @@ class InMemoryIdentityAdapter
     IIdentityLookupRepository,
     IIdentityPersistenceRepository,
     ICredentialMaterialRepository,
+    IIdentitySessionRepository,
+    IIdentitySessionTokenMaterialRepository,
     IIdentityClock,
-    IIdentityIdGenerator {
+    IIdentityIdGenerator,
+    IIdentitySessionTokenService {
   private readonly users = new Map<string, UserIdentity>();
   private readonly providers = new Map<string, AuthProvider>();
   private readonly policies = new Map<string, CredentialPolicy>();
   private readonly credentialMaterial = new Map<string, IdentityCredentialMaterialRecord>();
+  private readonly sessions = new Map<string, Session>();
+  private readonly sessionTokenMaterialBySessionId = new Map<string, IdentitySessionTokenMaterialRecord>();
+  private readonly sessionTokenMaterialByHash = new Map<string, IdentitySessionTokenMaterialRecord>();
   private idCounter = 0;
+  private tokenCounter = 0;
 
   public now(): Date {
     return new Date("2026-04-04T18:00:00.000Z");
@@ -58,6 +73,21 @@ class InMemoryIdentityAdapter
   public nextId(namespace: IdentityIdNamespace): string {
     this.idCounter += 1;
     return `${namespace}:${this.idCounter}`;
+  }
+
+  public issueToken(): ReturnType<IIdentitySessionTokenService["issueToken"]> {
+    this.tokenCounter += 1;
+    const token = `session-token-${this.tokenCounter}`;
+    return Object.freeze({
+      token,
+      tokenHash: this.hashToken(token),
+      hashAlgorithm: "sha256" as const,
+      tokenType: "opaque-bearer" as const,
+    });
+  }
+
+  public hashToken(token: string): string {
+    return `hash:${token.trim()}`;
   }
 
   public async countUserIdentities(): Promise<number> {
@@ -170,6 +200,64 @@ class InMemoryIdentityAdapter
 
     return identitySuccess(Object.freeze({ changed: true }));
   }
+
+  public async saveSession(session: Session): Promise<Session> {
+    this.sessions.set(session.id, session);
+    return session;
+  }
+
+  public async getSessionById(sessionId: string): Promise<Session | undefined> {
+    return this.sessions.get(sessionId.trim());
+  }
+
+  public async listSessionsByUserIdentityId(query: IdentitySessionListQuery): Promise<ReadonlyArray<Session>> {
+    return Object.freeze([...this.sessions.values()].filter((session) => session.userIdentityId === query.userIdentityId));
+  }
+
+  public async removeSession(
+    _sessionId: string,
+  ): Promise<IdentityOperationResult<IdentityMutationOutcome, typeof IdentityErrorCodes.invalidSessionState>> {
+    return identitySuccess(Object.freeze({ changed: false }));
+  }
+
+  public async saveSessionTokenMaterial(
+    record: IdentitySessionTokenMaterialRecord,
+  ): Promise<IdentitySessionTokenMaterialRecord> {
+    this.sessionTokenMaterialBySessionId.set(record.sessionId, record);
+    this.sessionTokenMaterialByHash.set(record.tokenHash, record);
+    return record;
+  }
+
+  public async getSessionTokenMaterialBySessionId(
+    sessionId: string,
+  ): Promise<IdentitySessionTokenMaterialRecord | undefined> {
+    return this.sessionTokenMaterialBySessionId.get(sessionId.trim());
+  }
+
+  public async getSessionTokenMaterialByTokenHash(
+    tokenHash: string,
+  ): Promise<IdentitySessionTokenMaterialRecord | undefined> {
+    return this.sessionTokenMaterialByHash.get(tokenHash.trim());
+  }
+
+  public async invalidateSessionTokenMaterial(
+    sessionId: string,
+    invalidatedAt: string,
+  ): Promise<IdentitySessionTokenMaterialRecord | undefined> {
+    const record = this.sessionTokenMaterialBySessionId.get(sessionId.trim());
+    if (!record) {
+      return undefined;
+    }
+
+    const updated = Object.freeze({
+      ...record,
+      invalidatedAt,
+      updatedAt: invalidatedAt,
+    });
+    this.sessionTokenMaterialBySessionId.set(record.sessionId, updated);
+    this.sessionTokenMaterialByHash.set(record.tokenHash, updated);
+    return updated;
+  }
 }
 
 class StubPasswordCredentialService implements ILocalPasswordCredentialService {
@@ -212,6 +300,18 @@ export async function createIdentityAuthTestHarness(
 
   const identityPolicyService = new IdentityPolicyService(adapter);
   const credentialAuthenticator = new LocalPasswordIdentityAuthenticator(new StubPasswordCredentialService());
+  const sessionLifecycleService = new IdentitySessionLifecycleService({
+    sessionRepository: adapter,
+    clock: adapter,
+    idGenerator: adapter,
+  });
+  const authenticatedSessionService = new IdentityAuthenticatedSessionService({
+    lifecycleService: sessionLifecycleService,
+    sessionRepository: adapter,
+    tokenMaterialRepository: adapter,
+    tokenService: adapter,
+    clock: adapter,
+  });
 
   const backendApi = new IdentityAuthBackendApi({
     registerLocalAccountUseCase: new RegisterLocalAccountUseCase({
@@ -230,6 +330,7 @@ export async function createIdentityAuthTestHarness(
       credentialAuthenticator,
       clock: adapter,
     }),
+    authenticatedSessionService,
     observability: options.observability,
   });
 

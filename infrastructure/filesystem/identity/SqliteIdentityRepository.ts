@@ -8,6 +8,7 @@ import type {
   IdentityOperationResult,
   IdentityPrincipalLookup,
   IdentitySessionListQuery,
+  IdentitySessionTokenMaterialRecord,
   IdentityProviderSubjectReference,
 } from "../../../application/contracts/IdentityApplicationContracts";
 import {
@@ -20,6 +21,7 @@ import type { ICredentialMaterialRepository } from "../../../application/identit
 import type { IIdentityLookupRepository } from "../../../application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../../../application/identity/ports/IIdentityPersistenceRepository";
 import type { IIdentitySessionRepository } from "../../../application/identity/ports/IIdentitySessionRepository";
+import type { IIdentitySessionTokenMaterialRepository } from "../../../application/identity/ports/IIdentitySessionTokenMaterialRepository";
 import {
   AuthProviderCategories,
   AuthProviderKinds,
@@ -136,12 +138,24 @@ interface SessionRow {
   readonly client_device_id: string | null;
 }
 
+interface SessionTokenMaterialRow {
+  readonly session_id: string;
+  readonly token_hash: string;
+  readonly hash_algorithm: "sha256";
+  readonly token_type: "opaque-bearer";
+  readonly created_at: string;
+  readonly updated_at: string;
+  readonly expires_at: string;
+  readonly invalidated_at: string | null;
+}
+
 export class SqliteIdentityRepository
   implements
     IIdentityLookupRepository,
     IIdentityPersistenceRepository,
     ICredentialMaterialRepository,
-    IIdentitySessionRepository {
+    IIdentitySessionRepository,
+    IIdentitySessionTokenMaterialRepository {
   private database?: SqliteCompatDatabase;
   private initialized = false;
 
@@ -797,6 +811,119 @@ export class SqliteIdentityRepository
     }));
   }
 
+  public async saveSessionTokenMaterial(
+    record: IdentitySessionTokenMaterialRecord,
+  ): Promise<IdentitySessionTokenMaterialRecord> {
+    this.getDatabase()
+      .prepare(`
+        INSERT INTO identity_session_token_material (
+          session_id,
+          token_hash,
+          hash_algorithm,
+          token_type,
+          created_at,
+          updated_at,
+          expires_at,
+          invalidated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(session_id) DO UPDATE SET
+          token_hash = excluded.token_hash,
+          hash_algorithm = excluded.hash_algorithm,
+          token_type = excluded.token_type,
+          created_at = excluded.created_at,
+          updated_at = excluded.updated_at,
+          expires_at = excluded.expires_at,
+          invalidated_at = excluded.invalidated_at
+      `)
+      .run(
+        record.sessionId,
+        record.tokenHash,
+        record.hashAlgorithm,
+        record.tokenType,
+        record.createdAt,
+        record.updatedAt,
+        record.expiresAt,
+        record.invalidatedAt ?? null,
+      );
+
+    return record;
+  }
+
+  public async getSessionTokenMaterialBySessionId(
+    sessionId: string,
+  ): Promise<IdentitySessionTokenMaterialRecord | undefined> {
+    const normalizedSessionId = normalizeLookup(sessionId);
+    if (!normalizedSessionId) {
+      return undefined;
+    }
+
+    const row = this.getDatabase()
+      .prepare(`
+        SELECT
+          session_id,
+          token_hash,
+          hash_algorithm,
+          token_type,
+          created_at,
+          updated_at,
+          expires_at,
+          invalidated_at
+        FROM identity_session_token_material
+        WHERE session_id = ?
+      `)
+      .get(normalizedSessionId) as SessionTokenMaterialRow | undefined;
+
+    return row ? hydrateSessionTokenMaterial(row) : undefined;
+  }
+
+  public async getSessionTokenMaterialByTokenHash(
+    tokenHash: string,
+  ): Promise<IdentitySessionTokenMaterialRecord | undefined> {
+    const normalizedTokenHash = normalizeLookup(tokenHash);
+    if (!normalizedTokenHash) {
+      return undefined;
+    }
+
+    const row = this.getDatabase()
+      .prepare(`
+        SELECT
+          session_id,
+          token_hash,
+          hash_algorithm,
+          token_type,
+          created_at,
+          updated_at,
+          expires_at,
+          invalidated_at
+        FROM identity_session_token_material
+        WHERE token_hash = ?
+      `)
+      .get(normalizedTokenHash) as SessionTokenMaterialRow | undefined;
+
+    return row ? hydrateSessionTokenMaterial(row) : undefined;
+  }
+
+  public async invalidateSessionTokenMaterial(
+    sessionId: string,
+    invalidatedAt: string,
+  ): Promise<IdentitySessionTokenMaterialRecord | undefined> {
+    const normalizedSessionId = normalizeLookup(sessionId);
+    const normalizedInvalidatedAt = normalizeLookup(invalidatedAt);
+    if (!normalizedSessionId || !normalizedInvalidatedAt) {
+      return undefined;
+    }
+
+    this.getDatabase()
+      .prepare(`
+        UPDATE identity_session_token_material
+        SET invalidated_at = ?, updated_at = ?
+        WHERE session_id = ?
+      `)
+      .run(normalizedInvalidatedAt, normalizedInvalidatedAt, normalizedSessionId);
+
+    return this.getSessionTokenMaterialBySessionId(normalizedSessionId);
+  }
+
   public dispose(): void {
     this.database?.close();
     this.database = undefined;
@@ -1025,6 +1152,19 @@ function hydrateSession(row: SessionRow): Session {
     rotatedAt: row.rotated_at ?? undefined,
     replacedBySessionId: row.replaced_by_session_id ?? undefined,
     revocation,
+  });
+}
+
+function hydrateSessionTokenMaterial(row: SessionTokenMaterialRow): IdentitySessionTokenMaterialRecord {
+  return Object.freeze({
+    sessionId: row.session_id,
+    tokenHash: row.token_hash,
+    hashAlgorithm: row.hash_algorithm,
+    tokenType: row.token_type,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    expiresAt: row.expires_at,
+    invalidatedAt: row.invalidated_at ?? undefined,
   });
 }
 

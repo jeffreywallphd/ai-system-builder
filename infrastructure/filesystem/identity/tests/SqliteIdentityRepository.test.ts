@@ -49,7 +49,7 @@ describe("SqliteIdentityRepository", () => {
     const db = openSqliteCompatDatabase(databasePath);
     const migrationVersion = db.prepare("SELECT MAX(version) AS version FROM identity_repository_migrations")
       .get() as { version?: number };
-    expect(migrationVersion.version).toBe(2);
+    expect(migrationVersion.version).toBe(3);
 
     const tableRows = db.prepare(`
       SELECT name
@@ -61,7 +61,8 @@ describe("SqliteIdentityRepository", () => {
           'identity_user_identities',
           'identity_user_provider_links',
           'identity_credential_material_records',
-          'identity_sessions'
+          'identity_sessions',
+          'identity_session_token_material'
         )
       ORDER BY name ASC
     `).all() as Array<{ name: string }>;
@@ -69,6 +70,7 @@ describe("SqliteIdentityRepository", () => {
       "identity_auth_providers",
       "identity_credential_material_records",
       "identity_credential_policies",
+      "identity_session_token_material",
       "identity_sessions",
       "identity_user_identities",
       "identity_user_provider_links",
@@ -193,6 +195,20 @@ describe("SqliteIdentityRepository", () => {
 
     expect((await repository.getSessionById(activeSession.id))?.status).toBe(IdentitySessionStatuses.active);
     expect((await repository.getSessionById(activeSession.id))?.client?.accessChannel).toBe("thin-client");
+    await repository.saveSessionTokenMaterial({
+      sessionId: activeSession.id,
+      tokenHash: "hash:session:active",
+      hashAlgorithm: "sha256",
+      tokenType: "opaque-bearer",
+      createdAt: "2026-04-04T12:00:00.000Z",
+      updatedAt: "2026-04-04T12:00:00.000Z",
+      expiresAt: "2026-04-04T16:00:00.000Z",
+    });
+    expect((await repository.getSessionTokenMaterialBySessionId(activeSession.id))?.tokenHash).toBe("hash:session:active");
+    expect((await repository.getSessionTokenMaterialByTokenHash("hash:session:active"))?.sessionId).toBe(activeSession.id);
+    const invalidatedToken = await repository.invalidateSessionTokenMaterial(activeSession.id, "2026-04-04T12:30:00.000Z");
+    expect(invalidatedToken?.invalidatedAt).toBe("2026-04-04T12:30:00.000Z");
+
     const activeOnly = await repository.listSessionsByUserIdentityId({
       userIdentityId: user.id,
       includeStatuses: [IdentitySessionStatuses.active],

@@ -50,6 +50,12 @@ export interface RegisterLocalIdentityApiResponse {
 export interface LoginLocalIdentityApiRequest {
   readonly providerId?: string;
   readonly providerSubject: string;
+  readonly accessChannel?: "desktop" | "thin-client";
+  readonly client?: {
+    readonly userAgent?: string;
+    readonly ipAddress?: string;
+    readonly deviceId?: string;
+  };
   readonly credential: {
     readonly candidate: string;
   };
@@ -64,4 +70,10 @@ export interface LoginLocalIdentityApiResponse {
   readonly providerSubject: string;
   readonly authPath: string;
   readonly authenticatedAt: string;
+  readonly sessionId: string;
+  readonly sessionToken: string;
+  readonly sessionTokenType: "Bearer";
+  readonly sessionIssuedAt: string;
+  readonly sessionExpiresAt: string;
+  readonly sessionAccessChannel?: "desktop" | "thin-client";
 }

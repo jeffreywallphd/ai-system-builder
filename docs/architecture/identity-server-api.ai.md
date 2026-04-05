@@ -5,6 +5,7 @@
 - Authoritative HTTP endpoints for local identity registration and login:
   - `POST /api/v1/identity/register`
   - `POST /api/v1/identity/login`
+- Login success now issues and persists authenticated sessions and returns bearer session credentials.
 - Transport validation at the boundary (`zod`) with stable failure envelopes.
 - Deterministic translation from inner identity errors to public API error codes.
 - Structured authentication observability with centralized redaction and audit-ready event hooks.
@@ -50,6 +51,20 @@ Auth observability is centralized in `infrastructure/api/identity/IdentityAuthOb
 `IdentityAuthBackendApi` emits structured register/login completion events through this seam (success and failure), and the seam exposes `IdentityAuthAuditEventSink` for later audit-service integration.
 
 Shared redaction (`redactSensitiveAuthPayload`) is reused by both backend and HTTP transport logging so sensitive fields never appear in logs. Redacted fields include credential/token material and identity-sensitive request fields (`username`, `providerSubject`, `email`).
+
+## Session issuance contract update
+
+- Login request now accepts optional session-context fields:
+  - `accessChannel` (`desktop` or `thin-client`; default `thin-client`)
+  - optional `client` context (`userAgent`, `ipAddress`, `deviceId`)
+- Login success now includes issued-session fields:
+  - `sessionId`
+  - `sessionToken`
+  - `sessionTokenType` (`Bearer`)
+  - `sessionIssuedAt`
+  - `sessionExpiresAt`
+  - `sessionAccessChannel`
+- Session metadata and token material are separated in persistence (`identity_sessions` vs `identity_session_token_material`).
 
 ## Tests
 
