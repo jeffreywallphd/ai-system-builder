@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Implementation-truth baseline for workspace tenancy domain contracts introduced in Feature 3 / Epic 3.1.
+Implementation-truth baseline for workspace tenancy domain + persistence contracts introduced in Feature 3 / Epic 3.1.
 
 ## Canonical files
 
@@ -17,6 +17,11 @@ Implementation-truth baseline for workspace tenancy domain contracts introduced 
 - `src/application/workspaces/ports/IWorkspaceAuthorizationReadRepository.ts`
 - `src/application/workspaces/ports/WorkspaceRepositoryPorts.ts`
 - `src/application/workspaces/tests/WorkspaceRepositoryPortsContracts.test.ts`
+- `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceMigrations.ts`
+- `src/infrastructure/persistence/workspaces/WorkspacePersistenceMapper.ts`
+- `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter.ts`
+- `src/infrastructure/persistence/workspaces/tests/WorkspacePersistenceMapper.test.ts`
+- `src/infrastructure/persistence/workspaces/tests/SqliteWorkspacePersistenceAdapter.test.ts`
 
 ## Aggregates and value contracts
 
@@ -73,4 +78,15 @@ Helpers support creation, visibility updates, and ownership transfer with invari
   - workspace invitation lookup/persistence + pending-by-email lookup,
   - workspace-scoped authorization read snapshot projection.
 - Shared workspace contract DTOs now define explicit create/update/query/list/mutation payloads and action attribution context for audit-friendly actor metadata.
+- Story 3.1.3 adds concrete SQLite persistence:
+  - migration-versioned schema (`workspace_repository_migrations`),
+  - tenancy tables (`workspace_records`, `workspace_memberships`, `workspace_role_assignments`, `workspace_invitations`),
+  - typed row/domain mappers,
+  - repository adapter implementing all workspace repository ports.
+- SQL constraints/indexes enforce core operational guarantees:
+  - single active owner role assignment per workspace,
+  - no duplicate active role binding per `(workspaceId, userIdentityId, role)`,
+  - no duplicate membership per workspace/user pair,
+  - no duplicate pending invitation per workspace/email,
+  - lifecycle metadata coherence via table-level `CHECK` constraints.
 
