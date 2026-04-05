@@ -9,6 +9,10 @@
 - Adds SQLite migrations/adapters for durable identity storage.
 - Standardizes typed identity operation results and error taxonomy.
 
+## Final handoff doc
+
+- `docs/architecture/identity-feature-1-final-baseline.md` is the downstream implementation baseline for trusted device, workspace membership, and authorization follow-on work.
+
 ## Main files to cite
 
 - `src/domain/identity/IdentityDomain.ts`
