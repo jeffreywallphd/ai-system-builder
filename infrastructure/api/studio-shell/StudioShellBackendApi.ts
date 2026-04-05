@@ -338,6 +338,13 @@ export interface ReferenceImageAccessAuthorizationContext {
   readonly asOf?: string;
 }
 
+export interface OperationalAccessAuthorizationContext {
+  readonly actorUserIdentityId: string;
+  readonly activeWorkspaceId?: string;
+  readonly authenticatedAt?: string;
+  readonly asOf?: string;
+}
+
 export interface ChainReferenceImageDatasetItemRequest {
   readonly studioId: string;
   readonly draftId?: string;
@@ -367,6 +374,7 @@ export interface ListReferenceImageRunHistoryRequest {
   readonly limit?: number;
   readonly offset?: number;
   readonly status?: ImageRunHistoryExecutionStatus;
+  readonly authorization?: OperationalAccessAuthorizationContext;
 }
 
 export interface InitializeReferenceImageStorageRequest {
@@ -699,6 +707,7 @@ export interface ListWorkflowStudioRunsRequest {
   readonly status?: WorkflowRunStatus;
   readonly triggerSource?: WorkflowRunTriggerSource;
   readonly limit?: number;
+  readonly authorization?: OperationalAccessAuthorizationContext;
 }
 
 export interface WorkflowRunRerunOverrides {
@@ -721,6 +730,7 @@ export interface StartWorkflowRunRerunRequest {
   readonly mode?: "as-is" | "edited";
   readonly rerunReason?: string;
   readonly overrides?: WorkflowRunRerunOverrides;
+  readonly authorization?: OperationalAccessAuthorizationContext;
 }
 
 export interface WorkflowRunRerunLaunchReadModel {
@@ -810,6 +820,8 @@ export class StudioShellBackendApi {
   private readonly now: () => Date;
   private readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
   private readonly referenceImageProtectedResourceType: string;
+  private readonly referenceImageRunProtectedResourceType: string;
+  private readonly workflowRunProtectedResourceType: string;
 
   constructor(
     private readonly repository: IStudioShellRepository,
@@ -824,6 +836,8 @@ export class StudioShellBackendApi {
       readonly storageLifecycleInfrastructure?: StorageInstanceLifecycleInfrastructure;
       readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
       readonly referenceImageProtectedResourceType?: string;
+      readonly referenceImageRunProtectedResourceType?: string;
+      readonly workflowRunProtectedResourceType?: string;
     },
   ) {
     this.now = now;
@@ -876,6 +890,10 @@ export class StudioShellBackendApi {
     this.authorizationDecisionEvaluator = options?.authorizationDecisionEvaluator;
     this.referenceImageProtectedResourceType = options?.referenceImageProtectedResourceType?.trim()
       || "reference-image-output";
+    this.referenceImageRunProtectedResourceType = options?.referenceImageRunProtectedResourceType?.trim()
+      || "reference-image-run";
+    this.workflowRunProtectedResourceType = options?.workflowRunProtectedResourceType?.trim()
+      || "workflow-run";
     this.workflowStudioService = new WorkflowStudioApplicationService(
       this.service,
       undefined,
@@ -1954,6 +1972,108 @@ export class StudioShellBackendApi {
     return `${systemId.trim()}::${datasetBindingId}`;
   }
 
+  private createReferenceImageRunProtectedResourceId(systemId: string, runId: string): string {
+    return `${systemId.trim()}::${runId.trim()}`;
+  }
+
+  private async filterReferenceImageRunHistoryAuthorized(
+    systemId: string,
+    runs: ReadonlyArray<ImageRunHistoryListing["runs"][number]>,
+    authorization?: OperationalAccessAuthorizationContext,
+  ): Promise<ReadonlyArray<ImageRunHistoryListing["runs"][number]>> {
+    if (!this.authorizationDecisionEvaluator) {
+      return Object.freeze([...runs]);
+    }
+    const allowed: Array<ImageRunHistoryListing["runs"][number]> = [];
+    for (const run of runs) {
+      if (await this.isOperationalResourceReadAllowed({
+        authorization,
+        requiredPermissionKey: "run.read",
+        resourceFamily: AuthorizationResourceFamilies.run,
+        resourceType: this.referenceImageRunProtectedResourceType,
+        resourceId: this.createReferenceImageRunProtectedResourceId(systemId, run.runId),
+      })) {
+        allowed.push(run);
+      }
+    }
+    return Object.freeze(allowed);
+  }
+
+  private async filterWorkflowRunsAuthorized(
+    runs: ReadonlyArray<WorkflowRunSummaryReadModel>,
+    authorization?: OperationalAccessAuthorizationContext,
+  ): Promise<ReadonlyArray<WorkflowRunSummaryReadModel>> {
+    if (!this.authorizationDecisionEvaluator) {
+      return Object.freeze([...runs]);
+    }
+    const allowed: WorkflowRunSummaryReadModel[] = [];
+    for (const run of runs) {
+      if (await this.isOperationalResourceReadAllowed({
+        authorization,
+        requiredPermissionKey: "run.read",
+        resourceFamily: AuthorizationResourceFamilies.run,
+        resourceType: this.workflowRunProtectedResourceType,
+        resourceId: run.runId,
+      })) {
+        allowed.push(run);
+      }
+    }
+    return Object.freeze(allowed);
+  }
+
+  private async assertWorkflowRunReadAuthorized(
+    runId: string,
+    authorization?: OperationalAccessAuthorizationContext,
+  ): Promise<void> {
+    if (!this.authorizationDecisionEvaluator) {
+      return;
+    }
+    const allowed = await this.isOperationalResourceReadAllowed({
+      authorization,
+      requiredPermissionKey: "run.read",
+      resourceFamily: AuthorizationResourceFamilies.run,
+      resourceType: this.workflowRunProtectedResourceType,
+      resourceId: runId,
+    });
+    if (!allowed) {
+      throw new Error(`not-found:Workflow run '${runId}' was not found.`);
+    }
+  }
+
+  private async isOperationalResourceReadAllowed(input: {
+    readonly authorization?: OperationalAccessAuthorizationContext;
+    readonly requiredPermissionKey: "run.read";
+    readonly resourceFamily: typeof AuthorizationResourceFamilies.run;
+    readonly resourceType: string;
+    readonly resourceId: string;
+  }): Promise<boolean> {
+    if (!this.authorizationDecisionEvaluator) {
+      return true;
+    }
+    const actorUserIdentityId = input.authorization?.actorUserIdentityId?.trim();
+    if (!actorUserIdentityId) {
+      return false;
+    }
+    const decision = await this.authorizationDecisionEvaluator.evaluateDecision({
+      actor: Object.freeze({
+        actorUserIdentityId,
+        activeWorkspaceId: input.authorization?.activeWorkspaceId?.trim() || undefined,
+        authenticatedAt: input.authorization?.authenticatedAt?.trim() || undefined,
+      }),
+      requiredPermissionKey: input.requiredPermissionKey,
+      target: Object.freeze({
+        kind: AuthorizationPolicyEvaluationTargetKinds.resourceInstance,
+        resource: Object.freeze({
+          resourceFamily: input.resourceFamily,
+          resourceType: input.resourceType,
+          resourceId: input.resourceId.trim(),
+        }),
+      }),
+      asOf: input.authorization?.asOf?.trim() || this.now().toISOString(),
+    });
+    return decision.decision.isAllowed;
+  }
+
   private async resolveReferenceImageDatasetForBinding(input: {
     readonly studioId: string;
     readonly draftId?: string;
@@ -2024,12 +2144,30 @@ export class StudioShellBackendApi {
         throw new StudioShellInvalidRequestError("Recent activity is only available for the reference image template.");
       }
       const runtimeSystemId = this.resolveReferenceRuntimeSystemId(draft);
-      return this.referenceImageRunHistory.listRuns({
+      const listing = this.referenceImageRunHistory.listRuns({
         systemId: runtimeSystemId,
         workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
         status: request.status,
         limit: request.limit,
         offset: request.offset,
+      });
+      const runs = await this.filterReferenceImageRunHistoryAuthorized(runtimeSystemId, listing.runs, request.authorization);
+      if (runs.length === listing.runs.length) {
+        return listing;
+      }
+      return Object.freeze({
+        ...listing,
+        summary: Object.freeze({
+          ...listing.summary,
+          totalRuns: runs.length,
+          returnedRuns: runs.length,
+          truncated: false,
+        }),
+        window: Object.freeze({
+          ...listing.window,
+          hasNextWindow: false,
+        }),
+        runs: Object.freeze(runs),
       });
     });
   }
@@ -2133,12 +2271,15 @@ export class StudioShellBackendApi {
         triggerSource: request.triggerSource,
         limit: request.limit,
       });
-      return Object.freeze(summaries.map((summary) => this.toWorkflowRunSummaryReadModel(summary)));
+      const readModels = summaries.map((summary) => this.toWorkflowRunSummaryReadModel(summary));
+      const filtered = await this.filterWorkflowRunsAuthorized(readModels, request.authorization);
+      return Object.freeze(filtered);
     });
   }
 
   public async getWorkflowRunDetail(
     runId: string,
+    authorization?: OperationalAccessAuthorizationContext,
   ): Promise<StudioShellApiResponse<WorkflowRunDetailReadModel>> {
     return this.wrap(async () => {
       if (!this.getWorkflowRunDetailUseCase) {
@@ -2149,6 +2290,7 @@ export class StudioShellBackendApi {
       if (!normalizedRunId) {
         throw new StudioShellInvalidRequestError("Workflow run id is required.");
       }
+      await this.assertWorkflowRunReadAuthorized(normalizedRunId, authorization);
 
       const detail = await this.getWorkflowRunDetailUseCase.execute(normalizedRunId);
       if (!detail) {
@@ -2177,6 +2319,7 @@ export class StudioShellBackendApi {
       if (!sourceRunId) {
         throw new StudioShellInvalidRequestError("sourceRunId is required.");
       }
+      await this.assertWorkflowRunReadAuthorized(sourceRunId, request.authorization);
 
       const sourceDetail = await this.getWorkflowRunDetailUseCase.execute(sourceRunId);
       if (!sourceDetail) {

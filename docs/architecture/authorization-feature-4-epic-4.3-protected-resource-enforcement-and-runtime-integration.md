@@ -15,6 +15,9 @@ Story 4.3.1 adds reusable transport authorization adapters so request handlers c
 - `infrastructure/api/registry/RegistryBackendApi.ts`
 - `infrastructure/api/studio-shell/tests/ReferenceImageOutputAuthorization.test.ts`
 - `infrastructure/api/registry/tests/RegistryBackendApiAuthorization.test.ts`
+- `infrastructure/api/studio-shell/tests/OperationalRunAuthorization.test.ts`
+- `infrastructure/api/system-runtime/SystemRuntimeBackendApi.ts`
+- `infrastructure/api/system-runtime/tests/SystemRuntimeOperationalAuthorization.test.ts`
 
 ## Enforcement model
 
@@ -70,3 +73,21 @@ Story 4.3.3 test coverage validates:
 - explicit sharing access,
 - denied callers receiving stable non-leaky not-found responses,
 - registry asset detail authorization-deny parity with missing-asset behavior.
+
+Story 4.3.4 enforces operational authorization on runs, queues, logs, and monitoring visibility:
+
+- `StudioShellBackendApi` now policy-gates workflow run reads (`run.read`) and reference-image run-history reads (`run.read`) with actor-aware context and per-item list filtering.
+- Workflow run list paths filter denied runs out of returned collections; per-run detail and rerun source lookups apply direct authorization checks before revealing run content.
+- Reference-image run-history lists apply run-level authorization filtering against runtime-system-scoped run resource ids.
+- `SystemRuntimeBackendApi` now enforces runtime operational policy checks:
+  - run visibility checks (`run.read`) on status/result/session/poll operational paths,
+  - queue visibility checks (`queue.read`) on recent execution queue listing,
+  - log visibility checks (`log.read`) on execution trace and execution audit-trail retrieval.
+- Runtime queue listing performs both top-level queue authorization and per-run filtering so partially visible queue pages do not leak denied run entries.
+
+Story 4.3.4 test coverage validates:
+
+- run access for owner, explicit-share collaborator, workspace admin, and denied actors,
+- reference-image run-history filtering parity across owner/collaborator/admin/denied scenarios,
+- runtime execution status/trace/audit authorization denies for unauthorized actors,
+- runtime queue listing filtering behavior when callers can view queue metadata but only a subset of runs.

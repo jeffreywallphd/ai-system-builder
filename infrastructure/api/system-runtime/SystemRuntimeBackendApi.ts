@@ -70,6 +70,9 @@ import {
   InMemoryExecutionAuditRepository,
   type ExecutionAuditRepository,
 } from "../../../application/system-runtime/ExecutionAuditRepository";
+import type { IAuthorizationPolicyDecisionEvaluator } from "../../../src/application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
+import { AuthorizationPolicyEvaluationTargetKinds } from "../../../src/application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import { AuthorizationResourceFamilies } from "../../../src/domain/authorization/AuthorizationPermissionCatalog";
 
 export type {
   RuntimeExecutionResultReadModel,
@@ -156,6 +159,14 @@ export interface ExecutionCallbackRegistrationRequest {
   readonly maxAttempts?: number;
 }
 
+export interface SystemRuntimeAuthorizationOptions {
+  readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+  readonly runProtectedResourceType?: string;
+  readonly queueProtectedResourceType?: string;
+  readonly logProtectedResourceType?: string;
+  readonly now?: () => Date;
+}
+
 export class SystemRuntimeBackendApi {
   private static readonly EXTERNAL_POLL_RESPONSE_CACHE_TTL_MS = 75;
   private static readonly EXTERNAL_STATUS_RESPONSE_CACHE_TTL_MS = 75;
@@ -185,6 +196,11 @@ export class SystemRuntimeBackendApi {
   }>();
   private readonly tenantIsolationPolicy = new TenantExecutionIsolationPolicy();
   private readonly auditTrailService: ExecutionAuditTrailService;
+  private readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+  private readonly runProtectedResourceType: string;
+  private readonly queueProtectedResourceType: string;
+  private readonly logProtectedResourceType: string;
+  private readonly now: () => Date;
 
   public constructor(
     repository: IStudioShellRepository,
@@ -196,9 +212,15 @@ export class SystemRuntimeBackendApi {
     private readonly callbackDispatcher: ExecutionCallbackDispatcher = new HttpExecutionCallbackDispatcher(),
     executionAuditRepository: ExecutionAuditRepository = new InMemoryExecutionAuditRepository(),
     private readonly runtimeRateLimitEvaluator = new RuntimeRateLimitEvaluator(),
+    authorizationOptions?: SystemRuntimeAuthorizationOptions,
   ) {
     this.service = new SystemRuntimeApplicationService(repository, executionStore);
     this.auditTrailService = new ExecutionAuditTrailService(executionAuditRepository);
+    this.authorizationDecisionEvaluator = authorizationOptions?.authorizationDecisionEvaluator;
+    this.runProtectedResourceType = authorizationOptions?.runProtectedResourceType?.trim() || "runtime-execution";
+    this.queueProtectedResourceType = authorizationOptions?.queueProtectedResourceType?.trim() || "runtime-queue";
+    this.logProtectedResourceType = authorizationOptions?.logProtectedResourceType?.trim() || "runtime-log";
+    this.now = authorizationOptions?.now ?? (() => new Date());
   }
 
   public async startExecution(request: StartSystemRuntimeExecutionRequest & {
@@ -535,9 +557,16 @@ export class SystemRuntimeBackendApi {
   ): Promise<SystemRuntimeApiResponse<RuntimeExecutionTraceReadModel>> {
     return this.wrap(async () => {
       await this.getExecutionStatusAuthorized(request.executionId, request.requestContext);
+      await this.assertOperationalResourceAuthorized({
+        requestContext: request.requestContext,
+        requiredPermissionKey: "log.read",
+        resourceFamily: AuthorizationResourceFamilies.log,
+        resourceType: this.logProtectedResourceType,
+        resourceId: request.executionId,
+      });
       return this.service.getExecutionTrace(request.executionId, {
-      eventLimit: request.eventLimit,
-      logLimit: request.logLimit,
+        eventLimit: request.eventLimit,
+        logLimit: request.logLimit,
       });
     });
   }
@@ -573,8 +602,38 @@ export class SystemRuntimeBackendApi {
     readonly assetId: string;
     readonly versionId?: string;
     readonly limit?: number;
+    readonly requestContext?: RuntimeApiRequestContext;
   }): Promise<SystemRuntimeApiResponse<ReadonlyArray<RuntimeExecutionSummaryReadModel>>> {
-    return this.wrap(async () => this.service.listRecentExecutionsForSystem(input));
+    return this.wrap(async () => {
+      await this.assertOperationalResourceAuthorized({
+        requestContext: input.requestContext,
+        requiredPermissionKey: "queue.read",
+        resourceFamily: AuthorizationResourceFamilies.queue,
+        resourceType: this.queueProtectedResourceType,
+        resourceId: this.createQueueResourceId(input.assetId, input.versionId),
+      });
+      const summaries = await this.service.listRecentExecutionsForSystem({
+        assetId: input.assetId,
+        versionId: input.versionId,
+        limit: input.limit,
+      });
+      if (!this.authorizationDecisionEvaluator) {
+        return summaries;
+      }
+      const filtered: RuntimeExecutionSummaryReadModel[] = [];
+      for (const summary of summaries) {
+        if (await this.isOperationalResourceAllowed({
+          requestContext: input.requestContext,
+          requiredPermissionKey: "run.read",
+          resourceFamily: AuthorizationResourceFamilies.run,
+          resourceType: this.runProtectedResourceType,
+          resourceId: summary.executionId,
+        })) {
+          filtered.push(summary);
+        }
+      }
+      return Object.freeze(filtered);
+    });
   }
 
   public async getExecutionAuditTrail(input: {
@@ -584,6 +643,13 @@ export class SystemRuntimeBackendApi {
   }): Promise<SystemRuntimeApiResponse<ReadonlyArray<ExecutionAuditRecord>>> {
     return this.wrap(async () => {
       await this.getExecutionStatusAuthorized(input.executionId, input.requestContext);
+      await this.assertOperationalResourceAuthorized({
+        requestContext: input.requestContext,
+        requiredPermissionKey: "log.read",
+        resourceFamily: AuthorizationResourceFamilies.log,
+        resourceType: this.logProtectedResourceType,
+        resourceId: input.executionId,
+      });
       return this.auditTrailService.listByExecutionId(input.executionId, input.limit);
     });
   }
@@ -606,7 +672,15 @@ export class SystemRuntimeBackendApi {
       if (!executionId) {
         throw new Error("invalid-request:executionId or sessionId is required.");
       }
-      const status = await this.getExecutionStatusAuthorized(executionId, input.requestContext).catch(() => undefined);
+      let status: RuntimeExecutionStatusReadModel | undefined;
+      try {
+        status = await this.getExecutionStatusAuthorized(executionId, input.requestContext);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (!message.startsWith("not-found:")) {
+          throw error;
+        }
+      }
       if (status) {
         this.emitExecutionUpdateFromSnapshot({
           executionId,
@@ -638,6 +712,13 @@ export class SystemRuntimeBackendApi {
         this.assertTenantIsolation({
           access: { caller, tenant: tenantContext },
           resourceTenantId: session?.context?.tenantId,
+        });
+        await this.assertOperationalResourceAuthorized({
+          requestContext: input.requestContext,
+          requiredPermissionKey: "run.read",
+          resourceFamily: AuthorizationResourceFamilies.run,
+          resourceType: this.runProtectedResourceType,
+          resourceId: executionId,
         });
         const response = Object.freeze({
           executionId,
@@ -678,6 +759,15 @@ export class SystemRuntimeBackendApi {
         access: { caller, tenant: tenantContext },
         resourceTenantId: session.context?.tenantId,
       });
+      for (const executionId of session.executionIds ?? []) {
+        await this.assertOperationalResourceAuthorized({
+          requestContext,
+          requiredPermissionKey: "run.read",
+          resourceFamily: AuthorizationResourceFamilies.run,
+          resourceType: this.runProtectedResourceType,
+          resourceId: executionId,
+        });
+      }
       return session;
     });
   }
@@ -1050,10 +1140,97 @@ export class SystemRuntimeBackendApi {
       access: { caller: callerContext, tenant: tenantContext },
       resourceTenantId: this.readExecutionTenantId(executionId),
     });
+    await this.assertOperationalResourceAuthorized({
+      requestContext,
+      requiredPermissionKey: "run.read",
+      resourceFamily: AuthorizationResourceFamilies.run,
+      resourceType: this.runProtectedResourceType,
+      resourceId: executionId,
+    });
     if (cacheKey) {
       this.rememberExternalStatusCache(cacheKey, status);
     }
     return status;
+  }
+
+  private createQueueResourceId(assetId: string, versionId?: string): string {
+    const normalizedAssetId = assetId.trim();
+    const normalizedVersionId = versionId?.trim();
+    return normalizedVersionId
+      ? `${normalizedAssetId}::${normalizedVersionId}`
+      : normalizedAssetId;
+  }
+
+  private async assertOperationalResourceAuthorized(input: {
+    readonly requestContext?: RuntimeApiRequestContext;
+    readonly requiredPermissionKey: "run.read" | "queue.read" | "log.read";
+    readonly resourceFamily:
+      | typeof AuthorizationResourceFamilies.run
+      | typeof AuthorizationResourceFamilies.queue
+      | typeof AuthorizationResourceFamilies.log;
+    readonly resourceType: string;
+    readonly resourceId: string;
+  }): Promise<void> {
+    if (!await this.isOperationalResourceAllowed(input)) {
+      throw new Error("forbidden:Runtime operational resource access is not authorized.");
+    }
+  }
+
+  private async isOperationalResourceAllowed(input: {
+    readonly requestContext?: RuntimeApiRequestContext;
+    readonly requiredPermissionKey: "run.read" | "queue.read" | "log.read";
+    readonly resourceFamily:
+      | typeof AuthorizationResourceFamilies.run
+      | typeof AuthorizationResourceFamilies.queue
+      | typeof AuthorizationResourceFamilies.log;
+    readonly resourceType: string;
+    readonly resourceId: string;
+  }): Promise<boolean> {
+    if (!this.authorizationDecisionEvaluator || input.requestContext?.trustedInternal) {
+      return true;
+    }
+    const callerContext = this.resolveCallerContext({ requestContext: input.requestContext });
+    const actorUserIdentityId = callerContext?.callerKind === "user"
+      ? callerContext.callerId?.trim()
+      : undefined;
+    const actorServiceId = callerContext?.callerKind && callerContext.callerKind !== "user"
+      ? callerContext.callerId?.trim()
+      : undefined;
+    if (!actorUserIdentityId && !actorServiceId) {
+      return false;
+    }
+    const metadata = callerContext?.metadata as {
+      readonly workspaceId?: unknown;
+      readonly activeWorkspaceId?: unknown;
+      readonly authenticatedAt?: unknown;
+    } | undefined;
+    const activeWorkspaceIdRaw = typeof metadata?.activeWorkspaceId === "string"
+      ? metadata.activeWorkspaceId
+      : typeof metadata?.workspaceId === "string"
+        ? metadata.workspaceId
+        : undefined;
+    const authenticatedAtRaw = typeof metadata?.authenticatedAt === "string"
+      ? metadata.authenticatedAt
+      : undefined;
+    const decision = await this.authorizationDecisionEvaluator.evaluateDecision({
+      actor: Object.freeze({
+        actorUserIdentityId,
+        actorServiceId,
+        activeWorkspaceId: activeWorkspaceIdRaw?.trim() || undefined,
+        authenticatedAt: authenticatedAtRaw?.trim() || undefined,
+      }),
+      requiredPermissionKey: input.requiredPermissionKey,
+      target: Object.freeze({
+        kind: AuthorizationPolicyEvaluationTargetKinds.resourceInstance,
+        resource: Object.freeze({
+          resourceFamily: input.resourceFamily,
+          resourceType: input.resourceType.trim(),
+          resourceId: input.resourceId.trim(),
+        }),
+      }),
+      asOf: this.now().toISOString(),
+    });
+    return decision.decision.isAllowed;
   }
 
   private resolveTenantContext(input: {
