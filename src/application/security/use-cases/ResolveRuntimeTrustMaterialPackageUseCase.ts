@@ -14,6 +14,7 @@ export const ResolveRuntimeTrustMaterialPackageErrorCodes = Object.freeze({
   invalidRequest: "resolve-runtime-trust-material-package-invalid-request",
   forbidden: "resolve-runtime-trust-material-package-forbidden",
   notFound: "resolve-runtime-trust-material-package-not-found",
+  internal: "resolve-runtime-trust-material-package-internal",
 });
 
 export type ResolveRuntimeTrustMaterialPackageErrorCode =
@@ -47,9 +48,46 @@ export interface ResolveRuntimeTrustMaterialPackageUseCaseInput {
   readonly occurredAt?: string;
 }
 
+export type ResolveRuntimeTrustMaterialPackageObservabilityEvent =
+  | {
+    readonly event: "runtime-trust-material-package-resolve-succeeded";
+    readonly occurredAt: string;
+    readonly operationKey: string;
+    readonly actorUserIdentityId: string;
+    readonly targetKind: CertificateDistributionTargetKind;
+    readonly targetReferenceId: string;
+    readonly workspaceId?: string;
+    readonly certificateAuthorityId?: string;
+    readonly serialNumber?: string;
+    readonly includeLeafCertificate: boolean;
+    readonly includeCertificateChain: boolean;
+    readonly includeTrustBundle: boolean;
+    readonly includeProtectedReferences: boolean;
+    readonly packageId: string;
+  }
+  | {
+    readonly event: "runtime-trust-material-package-resolve-failed";
+    readonly occurredAt: string;
+    readonly operationKey?: string;
+    readonly actorUserIdentityId?: string;
+    readonly targetKind?: CertificateDistributionTargetKind;
+    readonly targetReferenceId?: string;
+    readonly workspaceId?: string;
+    readonly certificateAuthorityId?: string;
+    readonly serialNumber?: string;
+    readonly includeLeafCertificate?: boolean;
+    readonly includeCertificateChain?: boolean;
+    readonly includeTrustBundle?: boolean;
+    readonly includeProtectedReferences?: boolean;
+    readonly code: ResolveRuntimeTrustMaterialPackageErrorCode;
+    readonly message: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  };
+
 interface ResolveRuntimeTrustMaterialPackageUseCaseDependencies {
   readonly trustMaterialDistributionPort: ITrustMaterialDistributionPort;
   readonly authorizationHook?: CertificateRuntimeTrustMaterialAuthorizationHook;
+  readonly observabilityHook?: (event: ResolveRuntimeTrustMaterialPackageObservabilityEvent) => Promise<void> | void;
 }
 
 export class ResolveRuntimeTrustMaterialPackageUseCase {
@@ -60,6 +98,23 @@ export class ResolveRuntimeTrustMaterialPackageUseCase {
   ): Promise<ResolveRuntimeTrustMaterialPackageOutcome> {
     const normalized = normalizeInput(input);
     if (!normalized.ok) {
+      await this.emitObservability({
+        event: "runtime-trust-material-package-resolve-failed",
+        occurredAt: new Date().toISOString(),
+        operationKey: normalizeOptional(input.operationKey),
+        actorUserIdentityId: normalizeOptional(input.actorUserIdentityId),
+        targetKind: input.targetKind,
+        targetReferenceId: normalizeOptional(input.targetReferenceId),
+        workspaceId: normalizeOptional(input.workspaceId),
+        certificateAuthorityId: normalizeOptional(input.certificateAuthorityId),
+        serialNumber: normalizeSerial(input.serialNumber),
+        includeLeafCertificate: input.includeLeafCertificate,
+        includeCertificateChain: input.includeCertificateChain,
+        includeTrustBundle: input.includeTrustBundle,
+        includeProtectedReferences: input.includeProtectedReferences,
+        code: normalized.error.code,
+        message: normalized.error.message,
+      });
       return normalized;
     }
 
@@ -82,24 +137,122 @@ export class ResolveRuntimeTrustMaterialPackageUseCase {
         });
       }
     } catch (error) {
-      return failure(
+      const outcome = failure(
         "forbidden",
-        error instanceof Error ? error.message : "Actor is not authorized to resolve runtime trust material.",
+        "Actor is not authorized to resolve runtime trust material package.",
       );
+      await this.emitObservability({
+        event: "runtime-trust-material-package-resolve-failed",
+        occurredAt: normalized.value.occurredAt,
+        operationKey: normalized.value.operationKey,
+        actorUserIdentityId: normalized.value.actorUserIdentityId,
+        targetKind: normalized.value.targetKind,
+        targetReferenceId: normalized.value.targetReferenceId,
+        workspaceId: normalized.value.workspaceId,
+        certificateAuthorityId: normalized.value.certificateAuthorityId,
+        serialNumber: normalized.value.serialNumber,
+        includeLeafCertificate: normalized.value.includeLeafCertificate,
+        includeCertificateChain: normalized.value.includeCertificateChain,
+        includeTrustBundle: normalized.value.includeTrustBundle,
+        includeProtectedReferences: normalized.value.includeProtectedReferences,
+        code: outcome.error.code,
+        message: outcome.error.message,
+        details: Object.freeze({
+          reason: toErrorSummary(error),
+        }),
+      });
+      return outcome;
     }
 
-    const value = await this.dependencies.trustMaterialDistributionPort.resolveRuntimeTrustMaterialPackage(normalized.value);
+    let value: ResolveRuntimeTrustMaterialPackageResult | undefined;
+    try {
+      value = await this.dependencies.trustMaterialDistributionPort.resolveRuntimeTrustMaterialPackage(normalized.value);
+    } catch (error) {
+      const outcome = failure(
+        "internal",
+        "Runtime trust material package resolution failed due to an internal error.",
+      );
+      await this.emitObservability({
+        event: "runtime-trust-material-package-resolve-failed",
+        occurredAt: normalized.value.occurredAt,
+        operationKey: normalized.value.operationKey,
+        actorUserIdentityId: normalized.value.actorUserIdentityId,
+        targetKind: normalized.value.targetKind,
+        targetReferenceId: normalized.value.targetReferenceId,
+        workspaceId: normalized.value.workspaceId,
+        certificateAuthorityId: normalized.value.certificateAuthorityId,
+        serialNumber: normalized.value.serialNumber,
+        includeLeafCertificate: normalized.value.includeLeafCertificate,
+        includeCertificateChain: normalized.value.includeCertificateChain,
+        includeTrustBundle: normalized.value.includeTrustBundle,
+        includeProtectedReferences: normalized.value.includeProtectedReferences,
+        code: outcome.error.code,
+        message: outcome.error.message,
+        details: Object.freeze({
+          reason: toErrorSummary(error),
+        }),
+      });
+      return outcome;
+    }
+
     if (!value) {
-      return failure(
+      const outcome = failure(
         "notFound",
         "No runtime trust material package was found for the requested target scope.",
       );
+      await this.emitObservability({
+        event: "runtime-trust-material-package-resolve-failed",
+        occurredAt: normalized.value.occurredAt,
+        operationKey: normalized.value.operationKey,
+        actorUserIdentityId: normalized.value.actorUserIdentityId,
+        targetKind: normalized.value.targetKind,
+        targetReferenceId: normalized.value.targetReferenceId,
+        workspaceId: normalized.value.workspaceId,
+        certificateAuthorityId: normalized.value.certificateAuthorityId,
+        serialNumber: normalized.value.serialNumber,
+        includeLeafCertificate: normalized.value.includeLeafCertificate,
+        includeCertificateChain: normalized.value.includeCertificateChain,
+        includeTrustBundle: normalized.value.includeTrustBundle,
+        includeProtectedReferences: normalized.value.includeProtectedReferences,
+        code: outcome.error.code,
+        message: outcome.error.message,
+      });
+      return outcome;
     }
+
+    await this.emitObservability({
+      event: "runtime-trust-material-package-resolve-succeeded",
+      occurredAt: normalized.value.occurredAt,
+      operationKey: normalized.value.operationKey,
+      actorUserIdentityId: normalized.value.actorUserIdentityId,
+      targetKind: normalized.value.targetKind,
+      targetReferenceId: normalized.value.targetReferenceId,
+      workspaceId: normalized.value.workspaceId,
+      certificateAuthorityId: normalized.value.certificateAuthorityId,
+      serialNumber: normalized.value.serialNumber,
+      includeLeafCertificate: normalized.value.includeLeafCertificate,
+      includeCertificateChain: normalized.value.includeCertificateChain,
+      includeTrustBundle: normalized.value.includeTrustBundle,
+      includeProtectedReferences: normalized.value.includeProtectedReferences,
+      packageId: value.packageId,
+    });
 
     return {
       ok: true,
       value,
     };
+  }
+
+  private async emitObservability(event: ResolveRuntimeTrustMaterialPackageObservabilityEvent): Promise<void> {
+    if (!this.dependencies.observabilityHook) {
+      return;
+    }
+
+    try {
+      await this.dependencies.observabilityHook(sanitizeObservabilityEvent(event));
+    } catch {
+      // Intentionally non-fatal.
+    }
   }
 }
 
@@ -217,7 +370,7 @@ function normalizeSerial(value?: string): string | undefined {
 }
 
 function failure(
-  code: "invalidRequest" | "forbidden" | "notFound",
+  code: "invalidRequest" | "forbidden" | "notFound" | "internal",
   message: string,
 ): ResolveRuntimeTrustMaterialPackageOutcome {
   return {
@@ -227,4 +380,110 @@ function failure(
       message,
     }),
   };
+}
+
+const SensitiveObservabilityDetailKeyPattern =
+  /(secret|token|password|credential|private[-_]?key|trust[-_]?material|certificate[-_]?material|chain[-_]?material|storage[-_]?locator|pem|csr|public[-_]?key|key[-_]?scope|access[-_]?ref|raw)/i;
+const SensitiveObservabilityValuePattern =
+  /(-----BEGIN [A-Z ]+-----|secret-store:|private[-_]?key|certificate[-_]?material|chain[-_]?material|trust[-_]?material)/i;
+const MaxObservabilityStringLength = 256;
+
+function sanitizeObservabilityEvent(
+  event: ResolveRuntimeTrustMaterialPackageObservabilityEvent,
+): ResolveRuntimeTrustMaterialPackageObservabilityEvent {
+  if (event.event === "runtime-trust-material-package-resolve-succeeded") {
+    return Object.freeze({
+      ...event,
+      actorUserIdentityId: normalizeObservabilityValue(event.actorUserIdentityId),
+      operationKey: normalizeObservabilityValue(event.operationKey),
+      targetReferenceId: normalizeObservabilityValue(event.targetReferenceId),
+      packageId: normalizeObservabilityValue(event.packageId),
+      workspaceId: normalizeObservabilityOptional(event.workspaceId),
+      certificateAuthorityId: normalizeObservabilityOptional(event.certificateAuthorityId),
+      serialNumber: normalizeObservabilityOptional(event.serialNumber),
+    });
+  }
+
+  return Object.freeze({
+    ...event,
+    actorUserIdentityId: normalizeObservabilityOptional(event.actorUserIdentityId),
+    operationKey: normalizeObservabilityOptional(event.operationKey),
+    targetReferenceId: normalizeObservabilityOptional(event.targetReferenceId),
+    workspaceId: normalizeObservabilityOptional(event.workspaceId),
+    certificateAuthorityId: normalizeObservabilityOptional(event.certificateAuthorityId),
+    serialNumber: normalizeObservabilityOptional(event.serialNumber),
+    details: sanitizeObservabilityDetails(event.details),
+  });
+}
+
+function sanitizeObservabilityDetails(
+  details: Readonly<Record<string, unknown>> | undefined,
+): Readonly<Record<string, unknown>> | undefined {
+  if (!details) {
+    return undefined;
+  }
+
+  const output: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(details)) {
+    if (SensitiveObservabilityDetailKeyPattern.test(key)) {
+      output[key] = "[REDACTED]";
+      continue;
+    }
+    output[key] = sanitizeObservabilityUnknown(value);
+  }
+  return Object.freeze(output);
+}
+
+function sanitizeObservabilityUnknown(value: unknown): unknown {
+  if (value === null || value === undefined) {
+    return value;
+  }
+  if (typeof value === "string") {
+    if (SensitiveObservabilityValuePattern.test(value)) {
+      return "[REDACTED]";
+    }
+    return value.length > MaxObservabilityStringLength
+      ? `${value.slice(0, MaxObservabilityStringLength)}...`
+      : value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return Object.freeze(value.slice(0, 20).map((entry) => sanitizeObservabilityUnknown(entry)));
+  }
+  if (typeof value === "object") {
+    const output: Record<string, unknown> = {};
+    for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+      if (SensitiveObservabilityDetailKeyPattern.test(key)) {
+        output[key] = "[REDACTED]";
+        continue;
+      }
+      output[key] = sanitizeObservabilityUnknown(nestedValue);
+    }
+    return Object.freeze(output);
+  }
+  return String(value);
+}
+
+function normalizeObservabilityValue(value: string): string {
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : "unknown";
+}
+
+function normalizeObservabilityOptional(value?: string): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function toErrorSummary(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return "unknown-error";
+  }
+  const name = normalizeObservabilityValue(error.name || "error");
+  const message = normalizeObservabilityOptional(error.message);
+  return message ? `${name}: ${message}` : name;
 }

@@ -9,11 +9,15 @@ import type {
   ResolveRuntimeTrustMaterialPackageInput,
   ResolveRuntimeTrustMaterialPackageResult,
 } from "../ports/ITrustMaterialDistributionPort";
-import { ResolveRuntimeTrustMaterialPackageUseCase } from "../use-cases/ResolveRuntimeTrustMaterialPackageUseCase";
+import {
+  ResolveRuntimeTrustMaterialPackageUseCase,
+  type ResolveRuntimeTrustMaterialPackageObservabilityEvent,
+} from "../use-cases/ResolveRuntimeTrustMaterialPackageUseCase";
 
 class StubTrustMaterialDistributionPort implements ITrustMaterialDistributionPort {
   public lastResolveInput?: ResolveRuntimeTrustMaterialPackageInput;
   public resolveResult?: ResolveRuntimeTrustMaterialPackageResult;
+  public throwOnResolve?: Error;
 
   public async publishTrustBundle(_input: PublishTrustBundleInput): Promise<PublishTrustBundleResult> {
     throw new Error("not implemented");
@@ -22,6 +26,9 @@ class StubTrustMaterialDistributionPort implements ITrustMaterialDistributionPor
   public async resolveRuntimeTrustMaterialPackage(
     input: ResolveRuntimeTrustMaterialPackageInput,
   ): Promise<ResolveRuntimeTrustMaterialPackageResult | undefined> {
+    if (this.throwOnResolve) {
+      throw this.throwOnResolve;
+    }
     this.lastResolveInput = input;
     return this.resolveResult;
   }
@@ -39,6 +46,14 @@ class StubAuthorizationHook implements CertificateRuntimeTrustMaterialAuthorizat
     if (this.deny) {
       throw new Error("forbidden-runtime-trust-material");
     }
+  }
+}
+
+class CapturingObservabilityHook {
+  public readonly events: ResolveRuntimeTrustMaterialPackageObservabilityEvent[] = [];
+
+  public async onEvent(event: ResolveRuntimeTrustMaterialPackageObservabilityEvent): Promise<void> {
+    this.events.push(event);
   }
 }
 
@@ -113,6 +128,7 @@ describe("ResolveRuntimeTrustMaterialPackageUseCase", () => {
       throw new Error("Expected forbidden result.");
     }
     expect(result.error.code).toBe("resolve-runtime-trust-material-package-forbidden");
+    expect(result.error.message).toBe("Actor is not authorized to resolve runtime trust material package.");
   });
 
   it("returns not-found when no scoped package exists", async () => {
@@ -153,5 +169,40 @@ describe("ResolveRuntimeTrustMaterialPackageUseCase", () => {
       throw new Error("Expected invalid request result.");
     }
     expect(result.error.code).toBe("resolve-runtime-trust-material-package-invalid-request");
+  });
+
+  it("returns internal for unexpected distribution failures and emits redacted observability metadata", async () => {
+    const distributionPort = new StubTrustMaterialDistributionPort();
+    distributionPort.throwOnResolve = new Error("pem=-----BEGIN PRIVATE KEY-----");
+    const observabilityHook = new CapturingObservabilityHook();
+
+    const useCase = new ResolveRuntimeTrustMaterialPackageUseCase({
+      trustMaterialDistributionPort: distributionPort,
+      observabilityHook: async (event) => observabilityHook.onEvent(event),
+    });
+
+    const result = await useCase.execute({
+      operationKey: "runtime-material-op-5",
+      actorUserIdentityId: "user:runtime-service",
+      targetKind: "node",
+      targetReferenceId: "node:alpha",
+      includeProtectedReferences: true,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected internal error result.");
+    }
+
+    expect(result.error.code).toBe("resolve-runtime-trust-material-package-internal");
+    expect(result.error.message).toBe("Runtime trust material package resolution failed due to an internal error.");
+
+    expect(observabilityHook.events).toHaveLength(1);
+    const event = observabilityHook.events[0];
+    expect(event.event).toBe("runtime-trust-material-package-resolve-failed");
+    if (event.event === "runtime-trust-material-package-resolve-failed") {
+      expect(event.code).toBe("resolve-runtime-trust-material-package-internal");
+      expect((event.details as Record<string, unknown>)?.reason).not.toContain("PRIVATE KEY");
+    }
   });
 });

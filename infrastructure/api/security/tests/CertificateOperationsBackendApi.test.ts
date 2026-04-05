@@ -180,6 +180,63 @@ describe("CertificateOperationsBackendApi", () => {
       expect(invalidResponse.error.code).toBe(CertificateOperationsApiErrorCodes.notFound);
     }
   });
+
+  it("redacts sensitive internal error text for CA status failures", async () => {
+    const backend = createBackend({
+      getCertificateAuthorityStatusIntrospectionUseCase: {
+        execute: async () => {
+          throw new Error("failed to load private key -----BEGIN PRIVATE KEY-----");
+        },
+      },
+    });
+
+    const response = await backend.getCertificateAuthorityStatus({
+      actorUserIdentityId: "user-identity:admin",
+    });
+
+    expect(response.ok).toBeFalse();
+    if (response.ok || !response.error) {
+      return;
+    }
+
+    expect(response.error.code).toBe(CertificateOperationsApiErrorCodes.internal);
+    expect(response.error.message).toBe("Failed to resolve certificate authority status.");
+    expect(response.error.message.includes("PRIVATE KEY")).toBeFalse();
+  });
+
+  it("redacts sensitive use-case error text from list responses", async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const backend = createBackend({
+      listIssuedCertificateMetadataUseCase: {
+        execute: async () => Object.freeze({
+          ok: false,
+          error: Object.freeze({
+            code: ListIssuedCertificateMetadataErrorCodes.forbidden,
+            message: "denied secret-store:internal-ca:root-key",
+          }),
+        }),
+      },
+      observabilityHook: async (event: unknown) => {
+        events.push(event as Record<string, unknown>);
+      },
+    });
+
+    const response = await backend.listIssuedCertificates({
+      actorUserIdentityId: "user-identity:admin",
+    });
+
+    expect(response.ok).toBeFalse();
+    if (response.ok || !response.error) {
+      return;
+    }
+
+    expect(response.error.code).toBe(CertificateOperationsApiErrorCodes.forbidden);
+    expect(response.error.message).toBe("Actor is not authorized to list issued certificates.");
+    expect(response.error.message.includes("secret-store")).toBeFalse();
+    expect(events).toHaveLength(1);
+    expect(events[0]?.event).toBe("certificate-operations.request.failed");
+    expect(events[0]?.message).toBe("Actor is not authorized to list issued certificates.");
+  });
 });
 
 function createBackend(overrides: Record<string, unknown>): CertificateOperationsBackendApi {
