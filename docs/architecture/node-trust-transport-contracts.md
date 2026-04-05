@@ -1,0 +1,84 @@
+# Node Trust Transport and IPC Contracts
+
+This note documents Story 5.1.5 (Feature 5 / Epic 5.1): shared transport contracts and schema validation boundaries for node enrollment and trust administration APIs/IPC.
+
+## Canonical artifacts
+
+- `src/shared/contracts/nodes/NodeTrustApiContracts.ts`
+- `src/shared/contracts/nodes/tests/NodeTrustApiContracts.test.ts`
+- `src/shared/schemas/nodes/NodeTrustApiSchemaContracts.ts`
+- `src/shared/schemas/nodes/tests/NodeTrustApiSchemaContracts.test.ts`
+
+## Scope and intent
+
+- Define one shared request/response DTO vocabulary for server, desktop IPC, hybrid host, thin-client, and worker-facing node-trust boundaries.
+- Keep transport validation centralized in one schema module so payload semantics do not diverge by adapter.
+- Explicitly separate admin-visible payloads from internal-only payload fields to prevent accidental data leakage.
+- Keep certificate/bootstrap integration future-ready using opaque bootstrap envelopes instead of certificate-provider internals.
+
+## Transport contracts covered
+
+- Enrollment submission:
+  - `NodeEnrollmentSubmissionRequestDto`
+  - `NodeEnrollmentSubmissionResponseDto`
+- Pending enrollments:
+  - `NodePendingEnrollmentSummaryDto`
+  - `PendingEnrollmentListResponseDto`
+- Approval/rejection/revocation actions:
+  - `ApproveNodeEnrollmentActionRequestDto`
+  - `RejectNodeEnrollmentActionRequestDto`
+  - `RevokeNodeTrustActionRequestDto`
+  - `NodeEnrollmentDecisionResponseDto`
+  - `NodeRevocationResponseDto`
+- Heartbeats:
+  - `NodeHeartbeatPayloadDto`
+  - `NodeHeartbeatResponseDto`
+- Node detail and enrollment detail views:
+  - admin-visible DTOs (`NodeDetailDto`, `NodeEnrollmentDetailDto`)
+  - internal DTOs (`NodeInternalDetailDto`, `NodeInternalEnrollmentDetailDto`)
+- Capability profile serialization:
+  - `NodeCapabilityProfileDto`
+
+## Public/internal boundary posture
+
+`NodeTrustApiContracts.ts` formalizes two transport scopes:
+
+- `admin`: default DTO shape for UI/admin APIs.
+- `internal`: richer internal shape that may include operator-only or infrastructure-only fields.
+
+Projection helpers enforce safe defaults:
+
+- `toNodeDetailDto(...)`
+- `toNodeEnrollmentDetailDto(...)`
+- `toNodePendingEnrollmentSummaryDto(...)`
+
+These helpers intentionally remove internal-only fields (for example certificate authority references, certificate thumbprints, revision metadata, and revocation actor identity) unless explicitly using internal DTO types.
+
+## Schema validation contracts
+
+`NodeTrustApiSchemaContracts.ts` adds zod-backed schemas and parse helpers for all public action payloads and view DTOs:
+
+- enrollment submission and pending enrollment summaries
+- approval/rejection/revocation action requests
+- heartbeat payloads
+- capability profile serialization
+- admin-visible and internal detail payloads
+
+Validation behavior includes:
+
+- strict object schemas at transport boundaries
+- trusted/revoked lifecycle coherence checks for node detail payloads
+- pending-summary status restrictions (`submitted`, `under-review` only)
+- bootstrap envelope minimum-content checks
+- typed schema validation failures via `NodeTrustApiSchemaValidationError`
+
+## Boundary guidance for adapters
+
+- HTTP/IPC handlers should parse inbound payloads with the `parse*` helpers before invoking application use cases.
+- Admin/UI response handlers should return admin DTOs by default (`NodeDetailDto`, `NodeEnrollmentDetailDto`), derived from internal records via projection helpers.
+- Internal-only fields should remain confined to operator service boundaries unless explicitly required.
+
+## Test coverage
+
+- `NodeTrustApiContracts.test.ts` validates admin/internal transport separation and projection behavior.
+- `NodeTrustApiSchemaContracts.test.ts` validates request/response schemas, invariants, strictness against internal field leakage, and typed validation errors.

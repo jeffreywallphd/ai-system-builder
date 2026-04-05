@@ -66,6 +66,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Node trust domain/contracts baseline: `docs/architecture/node-trust-foundation.md`
 - Node trust persistence DTO/repository/schema baseline: `docs/architecture/node-trust-persistence-contracts.md`
 - Node trust application orchestration/use-case baseline: `docs/architecture/node-trust-application-use-cases.md`
+- Node trust shared API/IPC DTO + schema validation baseline: `docs/architecture/node-trust-transport-contracts.md`
 - Workspace tenancy domain/contracts baseline: `docs/architecture/workspace-foundation.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
 - Authorization permission matrix and key catalog reference: `docs/architecture/authorization-permission-catalog.md`
