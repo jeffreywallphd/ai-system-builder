@@ -30,6 +30,8 @@ Scope in stories 3.1.1 through 3.1.5:
 - `src/application/workspaces/ports/IWorkspaceTransactionManager.ts`
 - `src/application/workspaces/ports/WorkspaceRepositoryPorts.ts`
 - `src/application/workspaces/use-cases/CreateWorkspaceUseCase.ts`
+- `src/application/workspaces/use-cases/UpdateWorkspaceUseCase.ts`
+- `src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceMigrations.ts`
 - `src/infrastructure/persistence/workspaces/WorkspacePersistenceMapper.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter.ts`
@@ -161,6 +163,7 @@ Protected-resource composition is standardized through `withWorkspaceScopedOwner
 - `src/shared/workspaces/tests/WorkspaceOwnership.test.ts`
 - `src/application/workspaces/tests/WorkspaceRepositoryPortsContracts.test.ts`
 - `src/application/workspaces/tests/CreateWorkspaceUseCase.test.ts`
+- `src/application/workspaces/tests/WorkspaceLifecycleUseCases.test.ts`
 - `src/infrastructure/persistence/workspaces/tests/WorkspacePersistenceMapper.test.ts`
 - `src/infrastructure/persistence/workspaces/tests/SqliteWorkspacePersistenceAdapter.test.ts`
 
@@ -193,4 +196,20 @@ Story 3.1.4 extends the adapter integration tests to validate:
   - invalid input and duplicate slug rejection,
   - authorization denial path,
   - transaction rollback on initialization failure (both in-memory use-case-level and SQLite adapter-level).
+
+## Story 3.2.2 workspace update/archive/reactivation lifecycle management
+
+- Added `UpdateWorkspaceUseCase` (`src/application/workspaces/use-cases/UpdateWorkspaceUseCase.ts`) to govern mutable workspace metadata updates:
+  - only `displayName`, `description`, and `visibility` are accepted in the update path,
+  - immutable/protected fields (`id`, `slug`, `ownerUserId`) are preserved by design,
+  - actor authorization is checked through `IWorkspaceAuthorizationReadRepository` snapshots, requiring active membership and either `owner` or `admin` role.
+- Added `TransitionWorkspaceLifecycleUseCase` (`src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase.ts`) to provide explicit lifecycle actions:
+  - `archive`, `reactivate`, `suspend`, `activate`,
+  - explicit role policy (`owner` required for archive/reactivate; `owner` or `admin` for suspend/activate),
+  - deterministic invalid-transition outcomes for unsupported status paths.
+- Domain lifecycle transitions now explicitly permit workspace reactivation (`archived -> active`) while preserving guarded invalid transitions through `transitionWorkspaceStatus(...)`.
+- New tests in `src/application/workspaces/tests/WorkspaceLifecycleUseCases.test.ts` and updated domain tests in `src/domain/workspaces/tests/WorkspaceDomain.test.ts` cover:
+  - happy-path metadata updates and archive/reactivation flows,
+  - permission-denied and invalid-transition edge cases,
+  - idempotent lifecycle actions and protected-field behavior.
 

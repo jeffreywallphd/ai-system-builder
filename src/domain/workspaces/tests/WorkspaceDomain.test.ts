@@ -3,6 +3,7 @@ import {
   WorkspaceDomainError,
   WorkspaceInvitationLifecycleTransitionError,
   WorkspaceInvitationStatuses,
+  WorkspaceLifecycleTransitionError,
   WorkspaceMembershipLifecycleTransitionError,
   WorkspaceMembershipStatuses,
   WorkspaceRoleAssignmentStatuses,
@@ -81,8 +82,21 @@ describe("WorkspaceDomain", () => {
       "user-owner",
       new Date("2026-04-05T12:10:00.000Z"),
     );
+    const reactivated = transitionWorkspaceStatus(
+      archived,
+      WorkspaceStatuses.active,
+      "user-owner",
+      new Date("2026-04-05T12:12:00.000Z"),
+    );
 
     expect(archived.status).toBe(WorkspaceStatuses.archived);
+    expect(reactivated.status).toBe(WorkspaceStatuses.active);
+    expect(() => transitionWorkspaceStatus(
+      archived,
+      WorkspaceStatuses.suspended,
+      "user-owner",
+      new Date("2026-04-05T12:13:00.000Z"),
+    )).toThrow(WorkspaceLifecycleTransitionError);
     expect(() => updateWorkspaceDetails(archived, {
       visibility: WorkspaceVisibilities.public,
       actorUserId: "user-owner",
