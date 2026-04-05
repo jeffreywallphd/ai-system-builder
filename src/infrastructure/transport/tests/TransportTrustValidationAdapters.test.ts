@@ -11,6 +11,15 @@ import {
   HttpTransportTrustValidationAdapter,
   WebSocketTransportTrustValidationAdapter,
 } from "../TransportTrustValidationAdapters";
+import type { TransportSecurityAuditEvent, TransportSecurityEventReporter } from "../../../application/security/ports/TransportSecurityAuditPorts";
+
+class CapturingTransportSecurityEventReporter implements TransportSecurityEventReporter {
+  public readonly events: TransportSecurityAuditEvent[] = [];
+
+  public async recordTransportSecurityEvent(event: TransportSecurityAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
 
 describe("TransportTrustValidationAdapters", () => {
   it("returns allow result for accepted trust decisions", async () => {
@@ -76,6 +85,45 @@ describe("TransportTrustValidationAdapters", () => {
       expect(result.statusCode).toBe(403);
       expect(result.body.error.code).toBe("forbidden");
     }
+  });
+
+  it("emits transport security events for HTTP and websocket denials", async () => {
+    const reporter = new CapturingTransportSecurityEventReporter();
+    const validator = {
+      async execute() {
+        const outcome = rejectedOutcome([TransportConnectionRejectionReasons.peerCertificateTrustRequired]);
+        if (!outcome.ok) {
+          return outcome;
+        }
+        return Object.freeze({
+          ...outcome,
+          value: Object.freeze({
+            ...outcome.value,
+            resolvedTrustState: Object.freeze({
+              ...outcome.value.resolvedTrustState,
+              peerCertificate: Object.freeze({
+                certificatePresented: true,
+                trustState: "revoked" as const,
+                resolution: "resolved" as const,
+                checkedAt: "2026-04-05T12:00:00.000Z",
+              }),
+            }),
+          }),
+        });
+      },
+    };
+
+    const http = new HttpTransportTrustValidationAdapter(validator, reporter);
+    const socket = new WebSocketTransportTrustValidationAdapter(validator, reporter);
+
+    await http.validate(createValidationRequest());
+    await socket.validate(createValidationRequest());
+
+    expect(reporter.events).toHaveLength(2);
+    expect(reporter.events[0]?.type).toBe("transport-certificate-mismatch-rejected");
+    expect(reporter.events[0]?.outcome).toBe("rejected");
+    expect(reporter.events[1]?.type).toBe("transport-websocket-upgrade-denied");
+    expect(reporter.events[1]?.outcome).toBe("rejected");
   });
 });
 

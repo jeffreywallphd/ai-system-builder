@@ -7,6 +7,10 @@ import type { ValidateTransportConnectionTrustRequest } from "../../application/
 import {
   TransportConnectionRejectionReasons,
 } from "../../domain/security/TransportSecurityDomain";
+import {
+  TransportSecurityAuditEventTypes,
+  type TransportSecurityEventReporter,
+} from "../../application/security/ports/TransportSecurityAuditPorts";
 
 export const TransportTrustValidationTransportErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -61,7 +65,10 @@ export type WebSocketTransportTrustValidationResult =
 type TransportTrustValidator = Pick<ValidateTransportConnectionTrustUseCase, "execute">;
 
 export class HttpTransportTrustValidationAdapter {
-  public constructor(private readonly validator: TransportTrustValidator) {}
+  public constructor(
+    private readonly validator: TransportTrustValidator,
+    private readonly securityEventReporter?: TransportSecurityEventReporter,
+  ) {}
 
   public async validate(
     request: ValidateTransportConnectionTrustRequest,
@@ -75,6 +82,47 @@ export class HttpTransportTrustValidationAdapter {
     }
 
     const denied = mapTrustValidationOutcomeToTransportError(outcome);
+    await this.securityEventReporter?.recordTransportSecurityEvent(Object.freeze({
+      type: classifyDeniedEventType(outcome),
+      outcome: "rejected",
+      occurredAt: resolveOccurredAt(outcome),
+      connectionId: request.connectionId,
+      scenario: request.scenario,
+      channelType: request.channelType,
+      actorType: request.actorType,
+      localPeerType: request.localPeerType,
+      remotePeerType: request.remotePeerType,
+      rejectionReasons: outcome.ok ? outcome.value.trustValidation.rejectionReasons : undefined,
+      trustSnapshot: outcome.ok
+        ? Object.freeze({
+            userSessionAuthenticated: outcome.value.resolvedTrustState.userSessionAuthenticated,
+            trustedDevice: outcome.value.resolvedTrustState.trustedDevice
+              ? Object.freeze({
+                  trustedDeviceId: outcome.value.resolvedTrustState.trustedDevice.trustedDeviceId,
+                  trustState: outcome.value.resolvedTrustState.trustedDevice.trustState,
+                })
+              : undefined,
+            trustedNode: outcome.value.resolvedTrustState.trustedNode
+              ? Object.freeze({
+                  nodeId: outcome.value.resolvedTrustState.trustedNode.nodeId,
+                  trustState: outcome.value.resolvedTrustState.trustedNode.trustState,
+                })
+              : undefined,
+            peerCertificate: outcome.value.resolvedTrustState.peerCertificate
+              ? Object.freeze({
+                  certificatePresented: outcome.value.resolvedTrustState.peerCertificate.certificatePresented,
+                  trustState: outcome.value.resolvedTrustState.peerCertificate.trustState,
+                })
+              : undefined,
+          })
+        : undefined,
+      details: Object.freeze({
+        direction: request.direction,
+        statusCode: denied.statusCode,
+        transportErrorCode: denied.error.code,
+      }),
+    }));
+
     return Object.freeze({
       ok: false,
       statusCode: denied.statusCode,
@@ -87,7 +135,10 @@ export class HttpTransportTrustValidationAdapter {
 }
 
 export class WebSocketTransportTrustValidationAdapter {
-  public constructor(private readonly validator: TransportTrustValidator) {}
+  public constructor(
+    private readonly validator: TransportTrustValidator,
+    private readonly securityEventReporter?: TransportSecurityEventReporter,
+  ) {}
 
   public async validate(
     request: ValidateTransportConnectionTrustRequest,
@@ -101,6 +152,47 @@ export class WebSocketTransportTrustValidationAdapter {
     }
 
     const denied = mapTrustValidationOutcomeToTransportError(outcome);
+    await this.securityEventReporter?.recordTransportSecurityEvent(Object.freeze({
+      type: TransportSecurityAuditEventTypes.websocketUpgradeDenied,
+      outcome: "rejected",
+      occurredAt: resolveOccurredAt(outcome),
+      connectionId: request.connectionId,
+      scenario: request.scenario,
+      channelType: request.channelType,
+      actorType: request.actorType,
+      localPeerType: request.localPeerType,
+      remotePeerType: request.remotePeerType,
+      rejectionReasons: outcome.ok ? outcome.value.trustValidation.rejectionReasons : undefined,
+      trustSnapshot: outcome.ok
+        ? Object.freeze({
+            userSessionAuthenticated: outcome.value.resolvedTrustState.userSessionAuthenticated,
+            trustedDevice: outcome.value.resolvedTrustState.trustedDevice
+              ? Object.freeze({
+                  trustedDeviceId: outcome.value.resolvedTrustState.trustedDevice.trustedDeviceId,
+                  trustState: outcome.value.resolvedTrustState.trustedDevice.trustState,
+                })
+              : undefined,
+            trustedNode: outcome.value.resolvedTrustState.trustedNode
+              ? Object.freeze({
+                  nodeId: outcome.value.resolvedTrustState.trustedNode.nodeId,
+                  trustState: outcome.value.resolvedTrustState.trustedNode.trustState,
+                })
+              : undefined,
+            peerCertificate: outcome.value.resolvedTrustState.peerCertificate
+              ? Object.freeze({
+                  certificatePresented: outcome.value.resolvedTrustState.peerCertificate.certificatePresented,
+                  trustState: outcome.value.resolvedTrustState.peerCertificate.trustState,
+                })
+              : undefined,
+          })
+        : undefined,
+      details: Object.freeze({
+        direction: request.direction,
+        closeCode: mapStatusCodeToWebSocketCloseCode(denied.statusCode),
+        transportErrorCode: denied.error.code,
+      }),
+    }));
+
     return Object.freeze({
       ok: false,
       closeCode: mapStatusCodeToWebSocketCloseCode(denied.statusCode),
@@ -197,5 +289,39 @@ function mapStatusCodeToWebSocketCloseCode(statusCode: number): number {
     return 4403;
   }
   return 1011;
+}
+
+function resolveOccurredAt(outcome: ValidateTransportConnectionTrustOutcome): string {
+  return outcome.ok ? outcome.value.trustValidation.evaluatedAt : new Date().toISOString();
+}
+
+function classifyDeniedEventType(outcome: ValidateTransportConnectionTrustOutcome) {
+  if (!outcome.ok) {
+    return TransportSecurityAuditEventTypes.transportConnectionRejected;
+  }
+
+  const rejectionReasons = outcome.value.trustValidation.rejectionReasons;
+  if (rejectionReasons.includes(TransportConnectionRejectionReasons.trustedDeviceRequired)) {
+    return TransportSecurityAuditEventTypes.untrustedDeviceRejected;
+  }
+  if (
+    rejectionReasons.includes(TransportConnectionRejectionReasons.trustedNodeRequired)
+    && outcome.value.resolvedTrustState.trustedNode?.trustState === "revoked"
+  ) {
+    return TransportSecurityAuditEventTypes.revokedNodeRejected;
+  }
+  if (
+    rejectionReasons.includes(TransportConnectionRejectionReasons.peerCertificateTrustRequired)
+    && outcome.value.resolvedTrustState.peerCertificate?.certificatePresented
+  ) {
+    return TransportSecurityAuditEventTypes.certificateMismatchRejected;
+  }
+  if (
+    rejectionReasons.includes(TransportConnectionRejectionReasons.remotePeerTypeNotAllowed)
+    || rejectionReasons.includes(TransportConnectionRejectionReasons.actorTypeMismatch)
+  ) {
+    return TransportSecurityAuditEventTypes.policyPeerRejected;
+  }
+  return TransportSecurityAuditEventTypes.transportConnectionRejected;
 }
 

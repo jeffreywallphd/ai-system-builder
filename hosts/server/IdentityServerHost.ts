@@ -73,6 +73,7 @@ import {
   EnvironmentCertificateAuthoritySecretService,
 } from "../../src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter";
 import { ServerManagedTransportTrustStateResolver } from "../../src/infrastructure/security/ServerManagedTransportTrustStateResolver";
+import { TransportSecurityObservabilityReporter } from "../../src/infrastructure/security/TransportSecurityObservabilityReporter";
 import { createFileSystemProtectedSecretStoreFromEnvironment } from "../../src/infrastructure/security/secrets/FileSystemProtectedSecretStore";
 import type { ICertificateAuthorityIssuerPort } from "../../src/application/security/ports/ICertificateAuthorityIssuerPort";
 import { ProtectedCertificateAuthorityRootMaterialStorage } from "../../src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
@@ -701,14 +702,46 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       certificateLifecycleEventRepository: certificateAuthorityRepository,
     }),
   });
+  const transportSecurityObservability = new TransportSecurityObservabilityReporter({
+    logger: {
+      info: (event) => options.logger?.info({
+        event: event.event,
+        requestId: event.details.connectionId,
+        details: Object.freeze({
+          level: event.level,
+          transport: event.details,
+        }),
+      }),
+      warn: (event) => options.logger?.warn({
+        event: event.event,
+        requestId: event.details.connectionId,
+        details: Object.freeze({
+          level: event.level,
+          transport: event.details,
+        }),
+      }),
+      error: (event) => options.logger?.error({
+        event: event.event,
+        requestId: event.details.connectionId,
+        details: Object.freeze({
+          level: event.level,
+          transport: event.details,
+        }),
+      }),
+    },
+  });
   const transportTrustValidator = new ValidateTransportConnectionTrustUseCase({
     transportSecurityPolicyResolverPort: new BaselineTransportSecurityPolicyResolver(),
     transportConnectionPolicyEvaluatorPort: new DomainTransportConnectionPolicyEvaluator(),
     trustedDeviceStateResolverPort: transportTrustStateResolver,
     nodeStateResolverPort: transportTrustStateResolver,
     peerCertificateStateResolverPort: transportTrustStateResolver,
+    transportConnectionPolicyAuditPort: transportSecurityObservability,
   });
-  const httpTransportTrustValidator = new HttpTransportTrustValidationAdapter(transportTrustValidator);
+  const httpTransportTrustValidator = new HttpTransportTrustValidationAdapter(
+    transportTrustValidator,
+    transportSecurityObservability,
+  );
   const managedTlsMaterial = await resolveManagedIdentityServerTlsRuntimeMaterial({
     certificateAuthorityRepository,
     env,

@@ -136,6 +136,8 @@ describe("EvaluateTransportConnectionPolicyUseCase", () => {
     expect(outcome.value.trustValidation.accepted).toBeTrue();
     expect(auditPort.events).toHaveLength(1);
     expect(auditPort.events[0]?.event).toBe("transport-connection-accepted");
+    expect(auditPort.events[0]?.resolvedTrustState?.trustedDevice?.trustState).toBe(AuthenticatedTrustStates.trusted);
+    expect(auditPort.events[0]?.resolvedTrustState?.peerCertificate?.certificatePresented).toBeTrue();
   });
 
   it("fails closed when override policy enables insecure fallback", async () => {

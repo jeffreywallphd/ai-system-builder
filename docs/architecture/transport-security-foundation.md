@@ -27,7 +27,11 @@ Story 7.1.2 adds centralized trust-state resolution and transport adapter mappin
 - `src/application/security/tests/ValidateTransportConnectionTrustUseCase.test.ts`
 - `src/shared/contracts/security/tests/TransportSecurityContracts.test.ts`
 - `src/infrastructure/security/ServerManagedTransportTrustStateResolver.ts`
+- `src/application/security/ports/TransportSecurityAuditPorts.ts`
+- `src/infrastructure/security/TransportSecurityObservabilityReporter.ts`
 - `src/infrastructure/security/tests/ServerManagedTransportTrustStateResolver.test.ts`
+- `src/application/security/tests/TransportSecurityAuditPorts.test.ts`
+- `src/infrastructure/security/tests/TransportSecurityObservabilityReporter.test.ts`
 - `src/infrastructure/transport/TransportTrustValidationAdapters.ts`
 - `src/infrastructure/transport/tests/TransportTrustValidationAdapters.test.ts`
 
@@ -158,3 +162,42 @@ Story 7.1.3 adds explicit host-level transport composition and environment-aware
 - Authenticated HTTP routes now run inbound transport-trust validation through shared contracts, with explicit node-to-control-plane mapping for node runtime trust-material and heartbeat routes.
 - Non-loopback authoritative server startup fails closed unless HTTPS transport material is available.
 - Desktop/web/worker transport endpoint resolution now enforces secure endpoints, allowing insecure transport only for explicit loopback-safe host profiles.
+
+## Story 7.1.4 audit and redacted logging integration
+
+Story 7.1.4 extends the transport trust path with explicit audit/log event modeling and redaction-safe emission:
+
+- `TransportSecurityAuditPorts` defines:
+  - transport security event taxonomy for accepted and rejected outcomes;
+  - best-effort audit sink integration;
+  - explicit redaction/sanitization rules for sensitive details.
+- `TransportSecurityObservabilityReporter` bridges:
+  - `ITransportConnectionPolicyAuditPort` decisions from policy evaluation;
+  - transport adapter denial events;
+  into one structured, redacted event stream for logs and optional audit sinks.
+- `TransportTrustValidationAdapters` now accept an optional security event reporter and emit denial events, including explicit websocket upgrade denial events.
+- `IdentityServerHost` composes the shared reporter into:
+  - `ValidateTransportConnectionTrustUseCase` (policy decision events),
+  - `HttpTransportTrustValidationAdapter` (transport-boundary denial events).
+
+### Event model highlights
+
+- Success events include generic connection acceptance and device-bound session channel establishment.
+- Rejection events include untrusted device, revoked node, certificate mismatch handling, websocket upgrade denial, policy-based peer rejection, and general transport rejection.
+- Policy decision events carry resolved trust snapshot metadata (user/device/node/certificate posture) so event classification remains centralized and adapter code does not re-implement trust rules.
+
+### Redaction baseline
+
+Transport audit/log sanitization explicitly redacts or masks:
+
+- path-bearing fields;
+- prompt-bearing fields;
+- tokens/secrets/password/credentials/session-bearing fields;
+- certificate/PEM/CSR/chain/raw trust-material fields.
+
+Freeform strings are also sanitized for:
+
+- bearer token patterns;
+- secret assignment fragments;
+- filesystem path fragments;
+- PEM block payloads.

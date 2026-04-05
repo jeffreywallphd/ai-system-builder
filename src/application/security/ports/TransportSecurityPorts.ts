@@ -4,6 +4,7 @@ import type {
   TransportSecurityPolicy,
   TransportSecurityScenario,
 } from "../../../domain/security/TransportSecurityDomain";
+import type { TransportSecurityResolvedTrustSnapshot } from "./TransportSecurityAuditPorts";
 
 export interface ResolveTransportSecurityPolicyRequest {
   readonly scenario: TransportSecurityScenario;
@@ -33,6 +34,7 @@ export interface TransportConnectionPolicyDecisionAuditEvent {
   readonly remotePeerType: TransportConnectionContext["remotePeerType"];
   readonly channelType: TransportConnectionContext["channelType"];
   readonly rejectionReasons: ReadonlyArray<string>;
+  readonly resolvedTrustState?: TransportSecurityResolvedTrustSnapshot;
   readonly occurredAt: string;
 }
 

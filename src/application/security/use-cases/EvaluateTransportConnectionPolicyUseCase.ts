@@ -113,6 +113,27 @@ export class EvaluateTransportConnectionPolicyUseCase {
         remotePeerType: context.remotePeerType,
         channelType: context.channelType,
         rejectionReasons: trustValidation.rejectionReasons,
+        resolvedTrustState: Object.freeze({
+          userSessionAuthenticated: Boolean(context.userSessionTrust?.loginAuthenticated),
+          trustedDevice: context.deviceTrust
+            ? Object.freeze({
+                trustedDeviceId: context.deviceTrust.trustedDeviceId,
+                trustState: context.deviceTrust.trustState,
+              })
+            : undefined,
+          trustedNode: context.nodeTrust
+            ? Object.freeze({
+                nodeId: context.nodeTrust.nodeId,
+                trustState: context.nodeTrust.trustState,
+              })
+            : undefined,
+          peerCertificate: context.peerCertificateTrust
+            ? Object.freeze({
+                certificatePresented: context.peerCertificateTrust.certificatePresented,
+                trustState: context.peerCertificateTrust.trustState,
+              })
+            : undefined,
+        }),
         occurredAt: trustValidation.evaluatedAt,
       });
     } catch {
