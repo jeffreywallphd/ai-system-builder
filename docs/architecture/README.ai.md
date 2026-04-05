@@ -45,6 +45,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - `src/domain/identity/TrustedDeviceDomain.ts`
 - `src/shared/workspaces/WorkspaceOwnership.ts`
 - `src/domain/workspaces/WorkspaceDomain.ts`
+- `src/domain/authorization/AuthorizationDomain.ts`
 - `application/contracts/IdentityApplicationContracts.ts`
 - `application/identity/services/IdentityBootstrapService.ts`
 - `application/identity/services/IdentitySessionLifecycleService.ts`
