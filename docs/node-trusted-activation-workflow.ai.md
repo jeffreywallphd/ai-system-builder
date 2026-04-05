@@ -2,7 +2,7 @@
 
 ## Scope
 
-Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, and Story 5.3.5 (Feature 5 / Epic 5.3): approved-node activation plus capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, and renderer-side admin inventory inspection UI.
+Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, and Story 5.4.1 (Feature 5 / Epic 5.3 and 5.4): approved-node activation plus capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, renderer-side admin inventory inspection UI, and durable revocation semantics.
 
 ## Canonical files
 
@@ -50,6 +50,10 @@ Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, and Story 5.3.5 (Feature 5 /
   - conflicting certificate re-activation is rejected as conflict
 - Capability profiles are validated and normalized before persistence.
 - Existing nodes are updated to approved enrollment capability profiles during approval.
+- Revocation is admin-authorized and durable:
+  - revocation metadata (`revokedAt`, `revokedByUserIdentityId`, optional `note`) is preserved in node identity persistence
+  - revoked nodes remain visible to admin inventory as `operationalState=revoked`
+  - repeated revocation requests for already-revoked nodes are safe no-op operations that preserve original metadata
 
 ## Capability profile rules
 
@@ -71,6 +75,7 @@ Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, and Story 5.3.5 (Feature 5 /
 
 - Approval emits `node-approved`.
 - Activation emits `node-activated`.
+- Revocation emits `node-revoked`.
 - Heartbeat emits `node-heartbeat-recorded`.
 
 ## Presence transport and storage

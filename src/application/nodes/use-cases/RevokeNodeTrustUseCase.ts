@@ -32,7 +32,7 @@ import {
 export interface RevokeNodeTrustUseCaseRequest {
   readonly actorUserIdentityId: string;
   readonly nodeId: string;
-  readonly reason: NodeRevocationReason;
+  readonly reason?: NodeRevocationReason;
   readonly note?: string;
   readonly revokedAt?: string;
   readonly expectedRevision?: number;
@@ -84,14 +84,28 @@ export class RevokeNodeTrustUseCase {
       return toNodeTrustFailure(NodeTrustUseCaseErrorCodes.notFound, `Node '${nodeId}' was not found.`);
     }
 
-    const revokedAt = normalizeOptional(request.revokedAt) ?? this.clock.now().toISOString();
+    const alreadyRevoked = node.trustState === NodeTrustStates.revoked || node.revocation.state === NodeRevocationStates.revoked;
+    const reason = request.reason ?? node.revocation.reason;
+    if (!alreadyRevoked && !reason) {
+      return toNodeTrustFailure(
+        NodeTrustUseCaseErrorCodes.invalidRequest,
+        "reason is required when revoking an active node.",
+      );
+    }
+    const requiredReason = reason as NodeRevocationReason;
+
+    const revokedAt = normalizeOptional(request.revokedAt)
+      ?? node.revocation.revokedAt
+      ?? node.revokedAt
+      ?? this.clock.now().toISOString();
+    const note = normalizeOptional(request.note) ?? node.revocation.note;
 
     const revocation = Object.freeze({
       state: NodeRevocationStates.revoked,
-      reason: request.reason,
+      reason,
       revokedAt,
-      revokedByUserIdentityId: actorUserIdentityId,
-      note: normalizeOptional(request.note),
+      revokedByUserIdentityId: node.revocation.revokedByUserIdentityId ?? actorUserIdentityId,
+      note,
     });
 
     try {
@@ -107,6 +121,36 @@ export class RevokeNodeTrustUseCase {
         NodeTrustUseCaseErrorCodes.forbidden,
         error instanceof Error ? error.message : "Actor is not authorized to revoke nodes.",
       );
+    }
+
+    if (alreadyRevoked) {
+      const mutation = Object.freeze({
+        record: node,
+        changed: false,
+        wasReplay: false,
+      });
+
+      await publishNodeTrustAuditEventBestEffort(this.dependencies.auditSink, {
+        type: NodeTrustAuditEventTypes.nodeRevoked,
+        actorUserIdentityId,
+        occurredAt: this.clock.now().toISOString(),
+        nodeId,
+        details: Object.freeze({
+          reason: node.revocation.reason,
+          revokedByUserIdentityId: node.revocation.revokedByUserIdentityId,
+          note: node.revocation.note,
+          revokedAt: node.revocation.revokedAt ?? node.revokedAt,
+          alreadyRevoked: true,
+        }),
+      });
+
+      return {
+        ok: true,
+        value: Object.freeze({
+          node,
+          mutation,
+        }),
+      };
     }
 
     try {
@@ -128,10 +172,10 @@ export class RevokeNodeTrustUseCase {
           updatedAt: node.lastModifiedAt,
         }),
         {
-          reason: request.reason,
+          reason: requiredReason,
           revokedAt,
           revokedByUserIdentityId: actorUserIdentityId,
-          note: request.note,
+          note,
         },
       );
     } catch (error) {
@@ -146,7 +190,7 @@ export class RevokeNodeTrustUseCase {
           nodeId: node.nodeId,
           certificateRef: node.certificate.certificateRef,
           revokedAt,
-          reason: request.reason,
+          reason: requiredReason,
         });
       } catch (error) {
         return toNodeTrustFailure(
@@ -166,7 +210,7 @@ export class RevokeNodeTrustUseCase {
         idGenerator: this.idGenerator,
         clock: this.clock,
         expectedRevision: request.expectedRevision,
-        reason: request.reason,
+        reason: requiredReason,
         correlationId: request.correlationId,
         metadata: request.metadata,
       }),
@@ -178,7 +222,11 @@ export class RevokeNodeTrustUseCase {
       occurredAt: revokedAt,
       nodeId,
       details: Object.freeze({
-        reason: request.reason,
+        reason: requiredReason,
+        revokedByUserIdentityId: actorUserIdentityId,
+        note,
+        revokedAt,
+        alreadyRevoked: false,
       }),
     });
 

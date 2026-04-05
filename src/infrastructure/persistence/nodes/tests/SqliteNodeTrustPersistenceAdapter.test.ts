@@ -206,6 +206,7 @@ describe("SqliteNodeTrustPersistenceAdapter", () => {
         reason: "policy-violation",
         revokedAt: "2026-04-05T12:30:00.000Z",
         revokedByUserIdentityId: "admin:1",
+        note: "Revoked from admin control plane.",
       },
       mutation: {
         operationKey: "op:node:001:revoke",
@@ -216,12 +217,18 @@ describe("SqliteNodeTrustPersistenceAdapter", () => {
       },
     });
     expect(revoked.record.trustState).toBe(NodeTrustStates.revoked);
+    expect(revoked.record.revocation.reason).toBe("policy-violation");
+    expect(revoked.record.revocation.revokedByUserIdentityId).toBe("admin:1");
+    expect(revoked.record.revocation.note).toBe("Revoked from admin control plane.");
+    expect(revoked.record.revokedAt).toBe("2026-04-05T12:30:00.000Z");
 
     const revokedNodes = await adapter.listNodes({
       trustStates: [NodeTrustStates.revoked],
       includeRevoked: true,
     });
     expect(revokedNodes).toHaveLength(1);
+    expect(revokedNodes[0]?.nodeId).toBe("node:compute:001");
+    expect(revokedNodes[0]?.revocation.note).toBe("Revoked from admin control plane.");
 
     const enrollmentSaved = await adapter.saveEnrollmentRequest({
       record: {

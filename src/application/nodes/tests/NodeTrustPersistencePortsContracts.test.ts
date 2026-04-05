@@ -582,6 +582,7 @@ describe("node trust persistence repository contract assumptions", () => {
         reason: "policy-violation",
         revokedAt: "2026-04-05T14:30:00.000Z",
         revokedByUserIdentityId: "admin-2",
+        note: "Trust disabled by admin review.",
       },
       mutation: {
         operationKey: "op-node-revoke-2",
@@ -603,6 +604,12 @@ describe("node trust persistence repository contract assumptions", () => {
 
     expect(revocationResult.record.trustState).toBe(NodeTrustStates.revoked);
     expect(revocationResult.record.revocation.state).toBe(NodeRevocationStates.revoked);
+    expect(revocationResult.record.revocation.reason).toBe("policy-violation");
+    expect(revocationResult.record.revocation.revokedByUserIdentityId).toBe("admin-2");
+    expect(revocationResult.record.revocation.note).toBe("Trust disabled by admin review.");
+    expect(revocationResult.record.revokedAt).toBe("2026-04-05T14:30:00.000Z");
+    expect(revokedNodes[0]?.nodeId).toBe("node-compute-002");
+    expect(revokedNodes[0]?.revocation.note).toBe("Trust disabled by admin review.");
     expect(revokedNodes).toHaveLength(1);
     expect(activeNodes).toHaveLength(0);
   });
