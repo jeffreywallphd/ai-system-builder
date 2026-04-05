@@ -10,6 +10,7 @@ The renderer is a React application whose pages and components depend on a manua
 
 ### React shell
 - `ui/App.tsx` now gates authenticated renderer startup: unauthenticated routes render without `AppProviders`, and authenticated sessions mount the full provider/bootstrap graph.
+- `ui/App.tsx` now runs authenticated bootstrap checks against real identity session validation before mounting authenticated providers, and re-validates on visibility return for expiry/revocation recovery.
 - `ui/routes/AppRouter.tsx` defines the route tree for the main product areas.
 - `ui/layout/AppLayout.tsx` provides shared layout/chrome.
 
@@ -22,6 +23,10 @@ The renderer is a React application whose pages and components depend on a manua
   - desktop endpoint resolution: `ui/desktop/identity/*`
   - web/thin-client endpoint resolution: `ui/web/identity/*`
   - UI service adapter: `ui/services/IdentityAuthService.ts`
+- Shared auth session-state seams now include:
+  - `ui/shared/identity/IdentityAuthSessionCoordinator.ts` for authenticated bootstrap and active-session refresh orchestration
+  - `ui/shared/identity/IdentityAuthSessionStore.ts` for platform-aware session persistence (desktop storage bridge when available, local storage fallback)
+  - `ui/shared/identity/IdentityAuthEnvironment.ts` for channel-aware login context (`desktop` vs `thin-client`)
 
 ### Dependency provider
 `ui/composition/AppProviders.tsx` creates the full UI dependency graph with `createUiDependencies()` and performs startup work such as:

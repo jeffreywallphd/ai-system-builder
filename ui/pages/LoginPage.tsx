@@ -3,13 +3,15 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { LoginLocalIdentityApiResponse } from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { IdentityAuthService } from "../services/IdentityAuthService";
+import { resolveIdentityAccessChannel, resolveIdentityClientContext } from "../shared/identity/IdentityAuthEnvironment";
 import { validateLoginForm } from "../shared/identity/IdentityAuthValidation";
 
 export interface LoginPageProps {
   readonly onAuthenticated: (session: LoginLocalIdentityApiResponse) => void;
+  readonly authNotice?: "session-expired" | "session-invalid";
 }
 
-export default function LoginPage({ onAuthenticated }: LoginPageProps): JSX.Element {
+export default function LoginPage({ onAuthenticated, authNotice }: LoginPageProps): JSX.Element {
   const authService = useMemo(() => new IdentityAuthService(), []);
   const navigate = useNavigate();
   const location = useLocation();
@@ -41,6 +43,8 @@ export default function LoginPage({ onAuthenticated }: LoginPageProps): JSX.Elem
       const response = await authService.loginLocalAccount({
         providerId: providerId.trim() || undefined,
         providerSubject: providerSubject.trim(),
+        accessChannel: resolveIdentityAccessChannel(),
+        client: resolveIdentityClientContext(),
         credential: { candidate: password },
       });
 
@@ -105,6 +109,12 @@ export default function LoginPage({ onAuthenticated }: LoginPageProps): JSX.Elem
           ) : null}
           {routeState?.registrationSuccess ? (
             <p className="ui-auth-page__success" role="status">Account registration succeeded. Sign in to continue.</p>
+          ) : null}
+          {authNotice === "session-expired" ? (
+            <p className="ui-auth-page__error" role="status">Your session expired. Sign in again to continue.</p>
+          ) : null}
+          {authNotice === "session-invalid" ? (
+            <p className="ui-auth-page__error" role="status">Your session was revoked or is no longer valid. Sign in again.</p>
           ) : null}
 
           <div className="ui-page__actions">

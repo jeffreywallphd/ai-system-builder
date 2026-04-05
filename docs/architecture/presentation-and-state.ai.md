@@ -14,6 +14,7 @@ The renderer uses manual composition plus class-based stores/services; it is not
 
 ## Identity UI slice
 - `ui/App.tsx` now gates authenticated provider startup: auth routes render without `AppProviders`; authenticated routes mount the full dependency graph.
+- Auth bootstrap now validates stored sessions through the identity session endpoint before mounting authenticated runtime state, and visibility return re-checks active sessions for expiry/revocation recovery.
 - Minimal production auth routes live in:
   - `ui/pages/LoginPage.tsx`
   - `ui/pages/RegisterPage.tsx`
@@ -22,6 +23,10 @@ The renderer uses manual composition plus class-based stores/services; it is not
   - `ui/desktop/identity/*`
   - `ui/web/identity/*`
   - `ui/services/IdentityAuthService.ts`
+- Shared client auth/session seams:
+  - `ui/shared/identity/IdentityAuthSessionCoordinator.ts` (bootstrap + refresh orchestration)
+  - `ui/shared/identity/IdentityAuthSessionStore.ts` (platform-aware persistence)
+  - `ui/shared/identity/IdentityAuthEnvironment.ts` (desktop vs thin-client channel context)
 
 ## Key wording
 Describe stores as "page-facing state managers" and UI services as "presentation-facing adapters over application use cases and repositories."

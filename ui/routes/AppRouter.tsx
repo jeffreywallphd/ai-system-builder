@@ -41,12 +41,14 @@ export interface AppRouterProps {
   readonly isAuthenticated?: boolean;
   readonly onAuthenticated?: (session: LoginLocalIdentityApiResponse) => void;
   readonly onLogout?: () => Promise<void> | void;
+  readonly authNotice?: "session-expired" | "session-invalid";
 }
 
 export default function AppRouter({
   isAuthenticated = true,
   onAuthenticated,
   onLogout,
+  authNotice,
 }: AppRouterProps): JSX.Element {
   const handleAuthenticated = onAuthenticated ?? (() => undefined);
   const handleLogout = onLogout ?? (() => undefined);
@@ -56,7 +58,7 @@ export default function AppRouter({
         path: ROUTE_PATHS.login,
         element: isAuthenticated
           ? <Navigate to={ROUTE_PATHS.home} replace />
-          : <LoginPage onAuthenticated={handleAuthenticated} />,
+          : <LoginPage onAuthenticated={handleAuthenticated} authNotice={authNotice} />,
       },
       {
         path: ROUTE_PATHS.register,
@@ -128,7 +130,7 @@ export default function AppRouter({
       },
       { path: ROUTE_PATHS.notFound, element: <NotFoundPage /> },
     ],
-    [handleAuthenticated, handleLogout, isAuthenticated]
+    [authNotice, handleAuthenticated, handleLogout, isAuthenticated]
   );
   const router = useMemo(() => createBrowserRouter([...routes]), [routes]);
 

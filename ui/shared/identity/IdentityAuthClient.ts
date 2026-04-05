@@ -5,6 +5,7 @@ import type {
   LogoutAuthenticatedSessionApiResponse,
   RevokeIdentitySessionApiRequest,
   RevokeIdentitySessionApiResponse,
+  ResolveAuthenticatedSessionApiResponse,
   RegisterLocalIdentityApiRequest,
   RegisterLocalIdentityApiResponse,
 } from "../../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
@@ -16,6 +17,9 @@ export interface IdentityAuthClient {
   loginLocalAccount(
     request: LoginLocalIdentityApiRequest,
   ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>>;
+  resolveAuthenticatedSession(
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>>;
   logoutAuthenticatedSession(
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<LogoutAuthenticatedSessionApiResponse>>;
@@ -43,6 +47,14 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     request: LoginLocalIdentityApiRequest,
   ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
     return this.post("/api/v1/identity/login", request);
+  }
+
+  public async resolveAuthenticatedSession(
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>> {
+    return this.get("/api/v1/identity/session", {
+      authorization: `Bearer ${sessionToken}`,
+    });
   }
 
   public async logoutAuthenticatedSession(
@@ -74,6 +86,19 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
         ...headers,
       },
       body: JSON.stringify(body),
+    });
+
+    const payload = await response.json() as IdentityAuthApiResponse<TResponse>;
+    return payload;
+  }
+
+  private async get<TResponse>(
+    path: string,
+    headers: Readonly<Record<string, string>> = {},
+  ): Promise<IdentityAuthApiResponse<TResponse>> {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: "GET",
+      headers,
     });
 
     const payload = await response.json() as IdentityAuthApiResponse<TResponse>;
