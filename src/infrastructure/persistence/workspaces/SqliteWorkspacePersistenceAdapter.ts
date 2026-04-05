@@ -5,6 +5,7 @@ import type { IWorkspaceInvitationRepository } from "../../../application/worksp
 import type { IWorkspaceMembershipRepository } from "../../../application/workspaces/ports/IWorkspaceMembershipRepository";
 import type { IWorkspaceRepository } from "../../../application/workspaces/ports/IWorkspaceRepository";
 import type { IWorkspaceRoleAssignmentRepository } from "../../../application/workspaces/ports/IWorkspaceRoleAssignmentRepository";
+import type { IWorkspaceTransactionManager } from "../../../application/workspaces/ports/IWorkspaceTransactionManager";
 import {
   WorkspaceRoleAssignmentStatuses,
   WorkspaceRoles,
@@ -52,7 +53,8 @@ export class SqliteWorkspacePersistenceAdapter
     IWorkspaceMembershipRepository,
     IWorkspaceRoleAssignmentRepository,
     IWorkspaceInvitationRepository,
-    IWorkspaceAuthorizationReadRepository {
+    IWorkspaceAuthorizationReadRepository,
+    IWorkspaceTransactionManager {
   private database?: SqliteCompatDatabase;
   private initialized = false;
 
@@ -718,6 +720,23 @@ export class SqliteWorkspacePersistenceAdapter
       effectiveRoles,
       isWorkspaceOwner: effectiveRoles.includes(WorkspaceRoles.owner),
     });
+  }
+
+  public async runInTransaction<TValue>(operation: () => Promise<TValue>): Promise<TValue> {
+    const database = this.getDatabase();
+    database.exec("BEGIN IMMEDIATE TRANSACTION");
+    try {
+      const value = await operation();
+      database.exec("COMMIT");
+      return value;
+    } catch (error) {
+      try {
+        database.exec("ROLLBACK");
+      } catch {
+        // Ignore rollback failures because the original error is more actionable.
+      }
+      throw error;
+    }
   }
 
   public dispose(): void {

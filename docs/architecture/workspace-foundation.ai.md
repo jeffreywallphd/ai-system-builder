@@ -15,7 +15,10 @@ Implementation-truth baseline for workspace tenancy domain + persistence contrac
 - `src/application/workspaces/ports/IWorkspaceRoleAssignmentRepository.ts`
 - `src/application/workspaces/ports/IWorkspaceInvitationRepository.ts`
 - `src/application/workspaces/ports/IWorkspaceAuthorizationReadRepository.ts`
+- `src/application/workspaces/ports/IWorkspaceTransactionManager.ts`
 - `src/application/workspaces/ports/WorkspaceRepositoryPorts.ts`
+- `src/application/workspaces/use-cases/CreateWorkspaceUseCase.ts`
+- `src/application/workspaces/tests/CreateWorkspaceUseCase.test.ts`
 - `src/application/workspaces/tests/WorkspaceRepositoryPortsContracts.test.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceMigrations.ts`
 - `src/infrastructure/persistence/workspaces/WorkspacePersistenceMapper.ts`
@@ -101,6 +104,25 @@ Protected-resource composition pattern is canonical:
   - no duplicate membership per workspace/user pair,
   - no duplicate pending invitation per workspace/email,
   - lifecycle metadata coherence via table-level `CHECK` constraints.
+
+## Story 3.2.1 workspace initialization use case
+
+- Added `CreateWorkspaceUseCase` in `src/application/workspaces/use-cases/CreateWorkspaceUseCase.ts` for production-safe workspace provisioning flow:
+  - validates creation input by reusing workspace domain invariants,
+  - enforces slug/id duplicate checks before write path,
+  - creates workspace + creator active membership + creator owner role assignment in one orchestration.
+- Initialization flow now supports a transaction seam via `IWorkspaceTransactionManager`, so the multi-record create path is atomic when the adapter provides transaction execution.
+- `SqliteWorkspacePersistenceAdapter` now implements `runInTransaction(...)` using explicit `BEGIN IMMEDIATE` / `COMMIT` / `ROLLBACK`.
+- Creator metadata attribution is deterministic on initialization records (`createdBy` / `lastModifiedBy` and assignment/join timestamps from one clock instant).
+- Creation flow has bounded extension hooks for:
+  - authorization gating (pre-write actor validation seam),
+  - best-effort audit event emission (post-commit seam for future durable audit integration).
+- New tests cover:
+  - successful workspace initialization with owner membership/role bootstrap,
+  - invalid input and duplicate slug handling,
+  - authorization hook denial behavior,
+  - atomic rollback on initialization failure,
+  - SQLite transaction rollback behavior.
 
 ## Story 3.1.4 verification additions
 

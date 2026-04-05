@@ -3,6 +3,7 @@ import type { IWorkspaceInvitationRepository } from "./IWorkspaceInvitationRepos
 import type { IWorkspaceMembershipRepository } from "./IWorkspaceMembershipRepository";
 import type { IWorkspaceRepository } from "./IWorkspaceRepository";
 import type { IWorkspaceRoleAssignmentRepository } from "./IWorkspaceRoleAssignmentRepository";
+import type { IWorkspaceTransactionManager } from "./IWorkspaceTransactionManager";
 
 export interface WorkspaceRepositoryPorts {
   readonly workspaceRepository: IWorkspaceRepository;
@@ -10,4 +11,5 @@ export interface WorkspaceRepositoryPorts {
   readonly roleAssignmentRepository: IWorkspaceRoleAssignmentRepository;
   readonly invitationRepository: IWorkspaceInvitationRepository;
   readonly authorizationReadRepository: IWorkspaceAuthorizationReadRepository;
+  readonly transactionManager?: IWorkspaceTransactionManager;
 }

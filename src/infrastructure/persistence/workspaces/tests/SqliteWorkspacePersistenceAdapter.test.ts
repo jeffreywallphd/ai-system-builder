@@ -446,4 +446,27 @@ describe("SqliteWorkspacePersistenceAdapter", () => {
 
     adapter.dispose();
   });
+
+  it("rolls back transaction-scoped workspace initialization mutations on failure", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-workspace-transaction-"));
+    createdRoots.push(root);
+    const adapter = new SqliteWorkspacePersistenceAdapter(path.join(root, "workspace.sqlite"));
+
+    await expect(adapter.runInTransaction(async () => {
+      await adapter.saveWorkspace(createWorkspace({
+        id: "workspace:atomic",
+        slug: "atomic-workspace",
+        displayName: "Atomic Workspace",
+        ownerUserId: "user:owner",
+        createdBy: "user:owner",
+        status: WorkspaceStatuses.active,
+        now: new Date("2026-04-05T17:00:00.000Z"),
+      }));
+      throw new Error("forced rollback");
+    })).rejects.toThrow("forced rollback");
+
+    expect(await adapter.findWorkspaceById("workspace:atomic")).toBeUndefined();
+
+    adapter.dispose();
+  });
 });
