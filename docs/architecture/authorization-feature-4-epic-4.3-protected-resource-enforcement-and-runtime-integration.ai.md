@@ -22,6 +22,8 @@ Story 4.3.1 introduces reusable transport-layer authorization enforcement adapte
 - `infrastructure/api/studio-shell/tests/OperationalRunAuthorization.test.ts`
 - `infrastructure/api/system-runtime/SystemRuntimeBackendApi.ts`
 - `infrastructure/api/system-runtime/tests/SystemRuntimeOperationalAuthorization.test.ts`
+- `infrastructure/api/system-runtime/RuntimeRequestRouter.ts`
+- `infrastructure/api/system-runtime/tests/RuntimeRequestRouter.test.ts`
 
 ## Transport enforcement model
 
@@ -143,3 +145,18 @@ Story 4.3.6 verification covers:
 - workspace admin HTTP responses returning capability flags for authorized and unauthorized actors,
 - centralized UI capability derivation/fallback behavior in presenter tests,
 - representative workspace admin/thin-client pages wired to centralized capability presentation instead of page-local permission literals.
+
+Story 4.3.7 protects background and asynchronous runtime execution paths with explicit authorization context semantics:
+
+- `SystemRuntimeBackendApi` trusted-internal requests now distinguish actor semantics through `trustedInternalAuthorization`:
+  - `propagate-caller` requires explicit delegated caller context and evaluates policy with that actor.
+  - `system-action` requires explicit `systemActionId` when authorization policy evaluation is active.
+- Trusted internal requests no longer implicitly bypass policy for delegated user/service callers; bypass is limited to explicit system actions.
+- `RuntimeRequestRouter` now emits explicit trusted-internal system-action semantics for studio-shell internal runtime routing.
+- Asynchronous/deferred runtime flows (`startExecutionAsync` + `pollExecution`) now preserve delegated actor scope when callers choose `propagate-caller`, preventing privileged server-side background processing from silently operating as an implicit superuser.
+
+Story 4.3.7 verification covers:
+
+- trusted internal delegated-caller requests still receiving `forbidden` when policy denies actor access,
+- trusted internal system-action bypass requiring explicit `systemActionId` when authorization is active,
+- async/deferred polling paths honoring delegated actor scope instead of implicit privileged bypass.

@@ -147,6 +147,10 @@ export interface RuntimeExecutionResultApiModel extends RuntimeExecutionResultRe
 
 export interface RuntimeApiRequestContext {
   readonly trustedInternal?: boolean;
+  readonly trustedInternalAuthorization?: {
+    readonly actorMode?: "propagate-caller" | "system-action";
+    readonly systemActionId?: string;
+  };
   readonly requireAuthentication?: boolean;
   readonly authentication?: RuntimeApiAuthenticationRequest;
   readonly accessContext?: ExecutionAccessContext;
@@ -903,9 +907,23 @@ export class SystemRuntimeBackendApi {
   }): ExecutionAccessContext | undefined {
     const runtimeContext = request.requestContext;
     if (runtimeContext?.trustedInternal) {
-      return request.accessContext ?? runtimeContext.accessContext ?? Object.freeze({
+      const explicitCallerContext = request.accessContext ?? runtimeContext.accessContext;
+      const trustedInternalAuthorization = runtimeContext.trustedInternalAuthorization;
+      const actorMode = trustedInternalAuthorization?.actorMode?.trim() || (explicitCallerContext ? "propagate-caller" : "system-action");
+      if (actorMode === "propagate-caller") {
+        if (!explicitCallerContext) {
+          throw new Error("invalid-request:Trusted internal request is missing delegated caller context.");
+        }
+        return explicitCallerContext;
+      }
+      const systemActionId = trustedInternalAuthorization?.systemActionId?.trim()
+        || (this.authorizationDecisionEvaluator ? "" : "studio-shell-internal");
+      if (!systemActionId) {
+        throw new Error("invalid-request:Trusted internal system actions must include a trustedInternalAuthorization.systemActionId.");
+      }
+      return Object.freeze({
         callerKind: "system",
-        callerId: "studio-shell-internal",
+        callerId: systemActionId,
         roles: Object.freeze(["trusted-internal"]),
       });
     }
@@ -1244,10 +1262,13 @@ export class SystemRuntimeBackendApi {
     readonly resourceType: string;
     readonly resourceId: string;
   }): Promise<AuthorizationResponseAccessLevel> {
-    if (!this.authorizationDecisionEvaluator || input.requestContext?.trustedInternal) {
+    if (!this.authorizationDecisionEvaluator) {
       return AuthorizationResponseAccessLevels.full;
     }
     const callerContext = this.resolveCallerContext({ requestContext: input.requestContext });
+    if (input.requestContext?.trustedInternal && callerContext?.callerKind === "system") {
+      return AuthorizationResponseAccessLevels.full;
+    }
     const actorUserIdentityId = callerContext?.callerKind === "user"
       ? callerContext.callerId?.trim()
       : undefined;

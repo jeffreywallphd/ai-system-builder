@@ -20,6 +20,8 @@ Story 4.3.1 adds reusable transport authorization adapters so request handlers c
 - `infrastructure/api/studio-shell/tests/OperationalRunAuthorization.test.ts`
 - `infrastructure/api/system-runtime/SystemRuntimeBackendApi.ts`
 - `infrastructure/api/system-runtime/tests/SystemRuntimeOperationalAuthorization.test.ts`
+- `infrastructure/api/system-runtime/RuntimeRequestRouter.ts`
+- `infrastructure/api/system-runtime/tests/RuntimeRequestRouter.test.ts`
 
 ## Enforcement model
 
@@ -119,3 +121,18 @@ Story 4.3.6 test coverage validates:
 - HTTP workspace admin responses include expected capability flags for allowed and denied actors,
 - centralized UI capability derivation/fallback behavior via presenter tests,
 - representative workspace admin and thin-client page wiring to centralized capability presentation.
+
+Story 4.3.7 secures background and asynchronous execution paths with explicit authorization context semantics:
+
+- `SystemRuntimeBackendApi` trusted-internal request handling now models explicit trusted internal actor semantics via `trustedInternalAuthorization`:
+  - `propagate-caller` requires delegated caller context and enforces policy as that caller.
+  - `system-action` requires explicit `systemActionId` when authorization policy evaluation is enabled.
+- Trusted internal delegated user/service callers no longer implicitly bypass policy checks; bypass behavior is explicitly constrained to declared system actions.
+- `RuntimeRequestRouter` now marks studio-shell internal runtime calls with explicit system-action semantics so internal automation is differentiated from user-delegated access.
+- Deferred runtime flows (`startExecutionAsync`, `pollExecution`) preserve actor scoping when using delegated context, preventing privileged background processing from acting on behalf of users without explicit policy context.
+
+Story 4.3.7 test coverage validates:
+
+- delegated trusted-internal callers still receiving `forbidden` when policy denies access,
+- explicit system-action requirement for trusted-internal bypass in authorization-enabled runtime contexts,
+- async/deferred polling paths preserving delegated actor scope.
