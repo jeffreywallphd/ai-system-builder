@@ -1,6 +1,6 @@
 # Internal CA Foundation
 
-This note documents Story 6.1.1 (Feature 6 / Epic 6.1): the internal certificate-authority domain language and application service boundaries for root CA lifecycle, certificate issuance/revocation, rotation metadata, and trust material references.
+This note documents Story 6.1.1 and Story 6.1.3 (Feature 6 / Epic 6.1): the internal certificate-authority domain language, application service boundaries, and secure startup bootstrap validation path for root CA lifecycle, certificate issuance/revocation, rotation metadata, trust material references, and host startup safety checks.
 
 ## Canonical artifacts
 
@@ -11,8 +11,16 @@ This note documents Story 6.1.1 (Feature 6 / Epic 6.1): the internal certificate
 - `src/application/security/ports/ITrustMaterialReferencePersistenceRepository.ts`
 - `src/application/security/ports/ICertificateAuthorityIssuerPort.ts`
 - `src/application/security/ports/ITrustMaterialDistributionPort.ts`
+- `src/application/security/ports/ICertificateAuthorityBootstrapConfigurationProvider.ts`
+- `src/application/security/ports/ICertificateAuthorityBootstrapSecretService.ts`
 - `src/application/security/ports/CertificateAuthorityPorts.ts`
+- `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
+- `src/application/security/tests/ResolveCertificateAuthorityStartupStateUseCase.test.ts`
+- `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
+- `src/infrastructure/security/tests/InternalCertificateAuthorityBootstrapEnvironmentAdapter.test.ts`
+- `hosts/server/IdentityServerHost.ts`
+- `hosts/server/tests/IdentityServerHost.test.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
 - `src/shared/dto/security/tests/CertificateAuthorityDtos.test.ts`
 - `src/shared/schemas/security/CertificateAuthoritySchemaContracts.ts`
@@ -36,6 +44,42 @@ Out of scope in this story:
 - concrete crypto implementation for key generation, signing, and CRL generation
 - concrete persistence adapters or schema migrations
 - authoritative server transport handlers for CA operations
+
+## Story 6.1.3 startup bootstrap behavior
+
+Startup validation now uses an application use case (`ResolveCertificateAuthorityStartupStateUseCase`) so the host composition layer does not read CA material directly.
+
+### Startup state model
+
+- `uninitialized`
+  - no persisted CA and no complete bootstrap material path is present
+  - safe to continue startup while later initialization workflows are pending
+- `initialized`
+  - active CA is present and bootstrap config, trust metadata, and secret references are all coherent
+- `invalid`
+  - partial bootstrap config, missing trust metadata, missing secret material, or mismatched references
+  - startup fails closed
+- `revoked`
+  - persisted CA status is compromised
+  - startup fails closed
+- `migration-required`
+  - retired CA or bootstrap configuration/persistence mismatch requiring operator migration action
+  - startup fails closed
+
+### Bootstrap config and secret source seam
+
+`InternalCertificateAuthorityBootstrapEnvironmentAdapter` provides production-oriented environment-backed adapters for:
+
+- approved config loading (`AI_LOOM_INTERNAL_CA_*` keys)
+- secret metadata checks via explicit `env:<VARIABLE_NAME>` references
+
+The secret service seam validates presence only and intentionally keeps raw key handling outside host composition.
+
+### Failure mode expectations
+
+- unsafe partial states fail closed with structured diagnostics from the use case
+- host startup calls `assertCertificateAuthorityStartupSafe` before bringing the server online
+- diagnostics are structured for future operator/admin presentation surfaces
 
 ## Domain model summary
 

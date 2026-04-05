@@ -51,6 +51,15 @@ import { SqliteAuthorizationPersistenceAdapter } from "../../src/infrastructure/
 import { SqliteAuthorizationPolicyReadAdapter } from "../../src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter";
 import { SqliteNodeTrustPersistenceAdapter } from "../../src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
 import { SqliteNodeTrustAuditRecorder } from "../../src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
+import { SqliteCertificateAuthorityPersistenceAdapter } from "../../src/infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
+import {
+  assertCertificateAuthorityStartupSafe,
+  ResolveCertificateAuthorityStartupStateUseCase,
+} from "../../src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase";
+import {
+  EnvironmentCertificateAuthorityBootstrapConfigurationProvider,
+  EnvironmentCertificateAuthoritySecretService,
+} from "../../src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter";
 import { AuthorizationPolicyDecisionEvaluator } from "../../src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyMutationService } from "../../src/application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "../../src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
@@ -156,40 +165,43 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const authorizationRepository = new SqliteAuthorizationPersistenceAdapter(path.resolve(options.databasePath));
   const nodeTrustRepository = new SqliteNodeTrustPersistenceAdapter(path.resolve(options.databasePath));
   const nodeTrustAuditRecorder = new SqliteNodeTrustAuditRecorder(path.resolve(options.databasePath));
+  const certificateAuthorityRepository = new SqliteCertificateAuthorityPersistenceAdapter(path.resolve(options.databasePath));
   const env = options.env ?? process.env;
-  const providerAccountPolicies = options.providerAccountPolicies
-    ?? IdentityProviderAccountPolicyConfig.fromEnv(env);
-  await applyIdentityStartupConfiguration(repository, providerAccountPolicies);
+  try {
+    const providerAccountPolicies = options.providerAccountPolicies
+      ?? IdentityProviderAccountPolicyConfig.fromEnv(env);
+    await applyIdentityStartupConfiguration(repository, providerAccountPolicies);
+    await validateCertificateAuthorityStartup(certificateAuthorityRepository, env);
 
-  const authenticator = new LocalPasswordIdentityAuthenticator(new ScryptLocalPasswordCredentialService());
-  const identityPolicyService = new IdentityPolicyService(repository);
-  const clock = new SystemIdentityClock();
-  const idGenerator = new RandomIdentityIdGenerator();
-  const sessionPolicies = options.sessionPolicies
-    ?? IdentitySessionPolicyConfig.fromEnv(env).policies;
-  const sessionTrustPolicies = IdentitySessionTrustPolicyConfig.fromEnv(env).policies;
-  const eventPublisher = options.eventPublisher ?? new SqliteIdentityLifecycleEventPublisher(path.resolve(options.databasePath));
-  const workspaceClock = new SystemWorkspaceClock();
-  const workspaceIdGenerator = new RandomWorkspaceIdGenerator();
-  const workspaceAuthorizationPolicyReadAdapter = new WorkspaceAuthorizationPolicyReadAdapter({
-    workspaceAuthorizationReadRepository: workspaceRepository,
-  });
-  const workspaceAdministrationAuthorizationDecisionEvaluator = new AuthorizationPolicyDecisionEvaluator({
-    roleGrantReadRepository: workspaceAuthorizationPolicyReadAdapter,
-    sharingGrantReadRepository: workspaceAuthorizationPolicyReadAdapter,
-    resourcePolicyMetadataReadRepository: workspaceAuthorizationPolicyReadAdapter,
-    clock: workspaceClock,
-  });
-  const authorizationPolicyReadAdapter = new SqliteAuthorizationPolicyReadAdapter({
-    authorizationPersistenceAdapter: authorizationRepository,
-  });
-  const authorizationDecisionEvaluator = new AuthorizationPolicyDecisionEvaluator({
-    roleGrantReadRepository: authorizationPolicyReadAdapter,
-    sharingGrantReadRepository: authorizationPolicyReadAdapter,
-    resourcePolicyMetadataReadRepository: authorizationPolicyReadAdapter,
-    clock: workspaceClock,
-  });
-  const authorizationMutationService = new AuthorizationPolicyMutationService({
+    const authenticator = new LocalPasswordIdentityAuthenticator(new ScryptLocalPasswordCredentialService());
+    const identityPolicyService = new IdentityPolicyService(repository);
+    const clock = new SystemIdentityClock();
+    const idGenerator = new RandomIdentityIdGenerator();
+    const sessionPolicies = options.sessionPolicies
+      ?? IdentitySessionPolicyConfig.fromEnv(env).policies;
+    const sessionTrustPolicies = IdentitySessionTrustPolicyConfig.fromEnv(env).policies;
+    const eventPublisher = options.eventPublisher ?? new SqliteIdentityLifecycleEventPublisher(path.resolve(options.databasePath));
+    const workspaceClock = new SystemWorkspaceClock();
+    const workspaceIdGenerator = new RandomWorkspaceIdGenerator();
+    const workspaceAuthorizationPolicyReadAdapter = new WorkspaceAuthorizationPolicyReadAdapter({
+      workspaceAuthorizationReadRepository: workspaceRepository,
+    });
+    const workspaceAdministrationAuthorizationDecisionEvaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: workspaceAuthorizationPolicyReadAdapter,
+      sharingGrantReadRepository: workspaceAuthorizationPolicyReadAdapter,
+      resourcePolicyMetadataReadRepository: workspaceAuthorizationPolicyReadAdapter,
+      clock: workspaceClock,
+    });
+    const authorizationPolicyReadAdapter = new SqliteAuthorizationPolicyReadAdapter({
+      authorizationPersistenceAdapter: authorizationRepository,
+    });
+    const authorizationDecisionEvaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: authorizationPolicyReadAdapter,
+      sharingGrantReadRepository: authorizationPolicyReadAdapter,
+      resourcePolicyMetadataReadRepository: authorizationPolicyReadAdapter,
+      clock: workspaceClock,
+    });
+    const authorizationMutationService = new AuthorizationPolicyMutationService({
     ports: {
       roleAssignmentPersistenceRepository: authorizationRepository,
       sharingGrantPersistenceRepository: authorizationRepository,
@@ -521,48 +533,59 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
   });
 
-  const server = createIdentityHttpServer({
-    backendApi,
-    nodeTrustBackendApi,
-    authorizationManagementBackendApi,
-    workspaceBackendApi,
-    workspaceAdministrationBackendApi,
-    logger: options.logger,
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(options.port ?? 0, options.host ?? "127.0.0.1", () => {
-      server.off("error", reject);
-      resolve();
+    const server = createIdentityHttpServer({
+      backendApi,
+      nodeTrustBackendApi,
+      authorizationManagementBackendApi,
+      workspaceBackendApi,
+      workspaceAdministrationBackendApi,
+      logger: options.logger,
     });
-  });
 
-  const addressInfo = server.address() as AddressInfo;
-
-  return Object.freeze({
-    port: addressInfo.port,
-    address: `${addressInfo.address}:${addressInfo.port}`,
-    close: () => new Promise<void>((resolve, reject) => {
-      server.close((error) => {
-        repository.dispose();
-        trustedDeviceRepository.dispose();
-        workspaceRepository.dispose();
-        authorizationRepository.dispose();
-        nodeTrustRepository.dispose();
-        nodeTrustAuditRecorder.dispose();
-        const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
-        if (typeof disposablePublisher.dispose === "function") {
-          disposablePublisher.dispose();
-        }
-        if (error) {
-          reject(error);
-          return;
-        }
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(options.port ?? 0, options.host ?? "127.0.0.1", () => {
+        server.off("error", reject);
         resolve();
       });
-    }),
-  });
+    });
+
+    const addressInfo = server.address() as AddressInfo;
+
+    return Object.freeze({
+      port: addressInfo.port,
+      address: `${addressInfo.address}:${addressInfo.port}`,
+      close: () => new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          repository.dispose();
+          trustedDeviceRepository.dispose();
+          workspaceRepository.dispose();
+          authorizationRepository.dispose();
+          nodeTrustRepository.dispose();
+          nodeTrustAuditRecorder.dispose();
+          certificateAuthorityRepository.dispose();
+          const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
+          if (typeof disposablePublisher.dispose === "function") {
+            disposablePublisher.dispose();
+          }
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      }),
+    });
+  } catch (error) {
+    repository.dispose();
+    trustedDeviceRepository.dispose();
+    workspaceRepository.dispose();
+    authorizationRepository.dispose();
+    nodeTrustRepository.dispose();
+    nodeTrustAuditRecorder.dispose();
+    certificateAuthorityRepository.dispose();
+    throw error;
+  }
 }
 
 export async function applyIdentityStartupConfiguration(
@@ -613,4 +636,19 @@ function parseOptionalCsvList(value: string | undefined): ReadonlyArray<string> 
     .filter(Boolean);
 
   return entries.length > 0 ? Object.freeze(entries) : undefined;
+}
+
+async function validateCertificateAuthorityStartup(
+  certificateAuthorityRepository: SqliteCertificateAuthorityPersistenceAdapter,
+  env: Readonly<Record<string, string | undefined>>,
+): Promise<void> {
+  const startupStateUseCase = new ResolveCertificateAuthorityStartupStateUseCase({
+    configurationProvider: new EnvironmentCertificateAuthorityBootstrapConfigurationProvider(env),
+    secretService: new EnvironmentCertificateAuthoritySecretService(env),
+    certificateAuthorityRepository,
+    trustMaterialRepository: certificateAuthorityRepository,
+  });
+
+  const startupState = await startupStateUseCase.execute();
+  assertCertificateAuthorityStartupSafe(startupState);
 }

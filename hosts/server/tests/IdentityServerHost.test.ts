@@ -363,4 +363,21 @@ describe("IdentityServerHost", () => {
       rmSync(tempDirectory, { recursive: true, force: true });
     }
   });
+
+  it("fails closed when internal CA bootstrap configuration is partially defined", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-ca-startup-invalid-"));
+    const databasePath = join(tempDirectory, "identity-ca-startup-invalid.sqlite");
+    await expect(startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+      env: {
+        AI_LOOM_INTERNAL_CA_ID: "ca:internal:root:v1",
+      },
+    })).rejects.toThrow("Internal CA startup validation failed");
+
+    rmSync(tempDirectory, { recursive: true, force: true });
+  });
 });
