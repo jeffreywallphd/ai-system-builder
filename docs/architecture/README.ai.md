@@ -68,6 +68,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Node trust application orchestration/use-case baseline: `docs/architecture/node-trust-application-use-cases.md`
 - Node trust shared API/IPC DTO + schema validation baseline: `docs/architecture/node-trust-transport-contracts.md`
 - Internal CA domain/contracts baseline for CA roots, issued certificates, rotation metadata, and trust material seams: `docs/architecture/internal-ca-foundation.md`
+- Transport security domain/application contract baseline for fail-closed HTTPS/WSS/TLS policy and trust validation seams: `docs/architecture/transport-security-foundation.md`
 - Node bootstrap identity/trust-material operations baseline: `docs/node-bootstrap-identity-operations.md`
 - Workspace tenancy domain/contracts baseline: `docs/architecture/workspace-foundation.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`

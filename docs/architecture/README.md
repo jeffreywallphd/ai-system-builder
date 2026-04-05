@@ -136,6 +136,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For node trust application-layer enrollment/approval/revocation/heartbeat/query orchestration seams and hook ports, read [`node-trust-application-use-cases.md`](./node-trust-application-use-cases.md).
 - For shared node-trust API/IPC request-response contracts, admin-vs-internal DTO boundaries, and schema validation adapters, read [`node-trust-transport-contracts.md`](./node-trust-transport-contracts.md).
 - For internal CA domain contracts, certificate lifecycle boundaries, and trust-material metadata seams, read [`internal-ca-foundation.md`](./internal-ca-foundation.md).
+- For transport security domain/application contracts, fail-closed channel policy semantics, and host adapter integration guidance, read [`transport-security-foundation.md`](./transport-security-foundation.md).
 - For node-local bootstrap identity/trust-material operations and enrollment payload bootstrap metadata, read [`../node-bootstrap-identity-operations.md`](../node-bootstrap-identity-operations.md).
 - For workspace tenancy domain aggregates, membership/role/invitation invariants, and reusable ownership metadata patterns, read [`workspace-foundation.md`](./workspace-foundation.md).
 - For authorization domain contracts covering RBAC, visibility, sharing, actor/resource policy context, and policy-decision models, read [`authorization-foundation.md`](./authorization-foundation.md).
