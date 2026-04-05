@@ -142,6 +142,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For the end-to-end Feature 4 / Epic 4.1 authorization implementation baseline and extension guidance, read [`authorization-feature-4-epic-4.1-baseline.md`](./authorization-feature-4-epic-4.1-baseline.md).
 - For the Feature 4 / Epic 4.2 effective-permission resolution baseline and deterministic precedence model, read [`authorization-feature-4-epic-4.2-policy-evaluation-engine-and-authorization-persistence.md`](./authorization-feature-4-epic-4.2-policy-evaluation-engine-and-authorization-persistence.md).
 - For Feature 4 / Epic 4.3 transport/runtime enforcement adapters and consistent HTTP/WebSocket/IPC authorization mapping, read [`authorization-feature-4-epic-4.3-protected-resource-enforcement-and-runtime-integration.md`](./authorization-feature-4-epic-4.3-protected-resource-enforcement-and-runtime-integration.md).
+- For route/handler/resource-module/UI/async extension rules that keep enforcement centralized, read [`authorization-enforcement-integration-patterns.md`](./authorization-enforcement-integration-patterns.md).
 - For workspace administration audit hook seams and integration boundaries, read [`workspace-administration-audit-hooks.md`](./workspace-administration-audit-hooks.md).
 - For Feature 1 completion baseline and downstream dependency notes (trusted device, workspace membership, authorization), read [`identity-feature-1-final-baseline.md`](./identity-feature-1-final-baseline.md).
 
