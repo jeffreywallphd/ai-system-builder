@@ -285,3 +285,22 @@ Protected-resource composition pattern is canonical:
   - updated `WorkspaceInvitationLifecycleUseCase.test.ts` to assert onboarding-resolution metadata persistence on accept.
   - updated `WorkspaceDomain.test.ts` for onboarding metadata merge helper behavior.
 
+## Story 3.3.4 invitation and onboarding API transport exposure
+
+- Added workspace invitation/onboarding public API contracts:
+  - `infrastructure/api/workspaces/sdk/PublicWorkspaceInvitationApiContract.ts`
+  - `infrastructure/api/workspaces/sdk/index.ts`
+- Added `WorkspaceInvitationBackendApi` (`infrastructure/api/workspaces/WorkspaceInvitationBackendApi.ts`) to map transport DTOs into workspace invitation issuance and authenticated onboarding use cases while exposing stable external error codes.
+- Extended authoritative HTTP server transport (`infrastructure/transport/http-server/identity/IdentityHttpServer.ts`) with authenticated workspace routes:
+  - `POST /api/v1/workspaces/:workspaceId/invitations`
+  - `POST /api/v1/workspaces/:workspaceId/onboarding/accept`
+- Route behavior is transport-safe and production-oriented:
+  - `zod` request validation at boundary,
+  - bearer-session authentication enforced via existing authenticated-session guard,
+  - workspace admin authorization enforced through existing invitation issuance use-case policy (`owner`/`admin` + active membership),
+  - stable external error envelope mapping (`invalid-request`, `forbidden`, `not-found`, `conflict`, `invalid-invite`, `internal`),
+  - invitation token hash and persistence internals are not exposed in response payloads.
+- Host composition now wires workspace invitation APIs in runtime server bootstrap (`hosts/server/IdentityServerHost.ts`) using existing SQLite workspace persistence and workspace use cases.
+- Added HTTP integration coverage for route behavior and contract shape in:
+  - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceInvitations.test.ts`
+

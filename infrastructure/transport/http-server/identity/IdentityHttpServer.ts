@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { URL } from "node:url";
 import { z } from "zod";
 import type { IdentityAuthBackendApi } from "../../../api/identity/IdentityAuthBackendApi";
+import type { WorkspaceInvitationBackendApi } from "../../../api/workspaces/WorkspaceInvitationBackendApi";
 import {
   ChangeLocalPasswordCredentialVerificationModes,
   IdentityAuthApiErrorCodes,
@@ -36,6 +37,12 @@ import {
   type ValidateTrustedDevicePairingApiRequest,
   type ValidateTrustedDevicePairingApiResponse,
 } from "../../../api/identity/sdk/PublicIdentityAuthApiContract";
+import {
+  WorkspaceInvitationApiErrorCodes,
+  type AcceptWorkspaceInvitationOnboardingApiRequest,
+  type IssueWorkspaceInvitationApiRequest,
+  type WorkspaceInvitationApiResponse,
+} from "../../../api/workspaces/sdk/PublicWorkspaceInvitationApiContract";
 import { redactSensitiveAuthPayload, redactSensitiveText } from "../../../api/identity/IdentityAuthRedaction";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
@@ -251,6 +258,28 @@ const CompleteTrustedDevicePairingRequestSchema: z.ZodType<CompleteTrustedDevice
   }).strict().optional(),
 }).strict();
 
+const WorkspaceRoleValues = z.enum(["owner", "admin", "member", "viewer"]);
+
+const IssueWorkspaceInvitationRequestSchema: z.ZodType<Pick<
+  IssueWorkspaceInvitationApiRequest,
+  "invitedEmail" | "invitedRoles" | "expiresAt" | "expiresInMs" | "targetUserIdentityIdHint" | "onboardingMetadata"
+>> = z.object({
+  invitedEmail: z.string().email(),
+  invitedRoles: z.array(WorkspaceRoleValues).min(1),
+  expiresAt: z.string().datetime().optional(),
+  expiresInMs: z.number().int().positive().optional(),
+  targetUserIdentityIdHint: z.string().min(1).optional(),
+  onboardingMetadata: z.record(z.unknown()).optional(),
+}).strict();
+
+const AcceptWorkspaceInvitationOnboardingRequestSchema: z.ZodType<Pick<
+  AcceptWorkspaceInvitationOnboardingApiRequest,
+  "invitationToken" | "onboardingMetadata"
+>> = z.object({
+  invitationToken: z.string().min(1),
+  onboardingMetadata: z.record(z.unknown()).optional(),
+}).strict();
+
 export interface IdentityHttpServerLogEvent {
   readonly event: string;
   readonly requestId: string;
@@ -268,6 +297,7 @@ export interface IdentityHttpServerLogger {
 
 export interface IdentityHttpServerOptions {
   readonly backendApi: IdentityAuthBackendApi;
+  readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
   readonly logger?: IdentityHttpServerLogger;
   readonly maxBodyBytes?: number;
 }
@@ -972,6 +1002,136 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
         return;
       }
 
+      if (
+        options.workspaceBackendApi
+        && request.method === "POST"
+        && path.endsWith("/invitations")
+        && path.startsWith("/api/v1/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/invitations");
+            if (!workspaceId) {
+              const invalid = buildWorkspaceInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateWorkspaceRequest(
+              request,
+              IssueWorkspaceInvitationRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.workspaceBackendApi.issueWorkspaceInvitation({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              invitedEmail: parsedRequest.data.invitedEmail,
+              invitedRoles: parsedRequest.data.invitedRoles,
+              expiresAt: parsedRequest.data.expiresAt,
+              expiresInMs: parsedRequest.data.expiresInMs,
+              targetUserIdentityIdHint: parsedRequest.data.targetUserIdentityIdHint,
+              onboardingMetadata: parsedRequest.data.onboardingMetadata,
+            });
+            const statusCode = mapWorkspaceStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceBackendApi
+        && request.method === "POST"
+        && path.endsWith("/onboarding/accept")
+        && path.startsWith("/api/v1/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/onboarding/accept");
+            if (!workspaceId) {
+              const invalid = buildWorkspaceInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const actorEmail = normalizeOptionalString(context.principal.email ?? null);
+            if (!actorEmail) {
+              const invalid = buildWorkspaceInvalidRequestResponse(
+                "Authenticated principal email is required for invitation onboarding acceptance.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({ workspaceId }), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateWorkspaceRequest(
+              request,
+              AcceptWorkspaceInvitationOnboardingRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.workspaceBackendApi.acceptWorkspaceInvitationOnboarding({
+              workspaceId,
+              invitationToken: parsedRequest.data.invitationToken,
+              onboardingMetadata: parsedRequest.data.onboardingMetadata,
+              session: Object.freeze({
+                sessionId: context.session.sessionId,
+                userIdentityId: context.principal.userIdentityId,
+                email: actorEmail,
+                assuranceLevel: context.session.deviceTrustContext?.sessionAssuranceLevel,
+                trustedDeviceId: context.session.deviceTrustContext?.trustedDeviceId,
+                externalIdentityProvider: context.session.providerId,
+                metadata: Object.freeze({
+                  accessChannel: context.session.accessChannel,
+                  deviceId: context.session.deviceId,
+                }),
+              }),
+            });
+            const statusCode = mapWorkspaceStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId,
+              invitationToken: parsedRequest.data.invitationToken,
+              sessionId: context.session.sessionId,
+              userIdentityId: context.principal.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
       writeJson(response, 404, {
         ok: false,
         error: {
@@ -1188,6 +1348,60 @@ async function parseAndValidateRequest<T>(
   return { ok: true, data: validation.data };
 }
 
+async function parseAndValidateWorkspaceRequest<T>(
+  request: IncomingMessage,
+  schema: z.ZodType<T>,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: T }
+  | { readonly ok: false; readonly statusCode: number; readonly body: WorkspaceInvitationApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildWorkspaceInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "workspace-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  const validation = schema.safeParse(parsedBody.value);
+  if (!validation.success) {
+    const body: WorkspaceInvitationApiResponse<never> = Object.freeze({
+      ok: false,
+      error: {
+        code: WorkspaceInvitationApiErrorCodes.invalidRequest,
+        message: "Request validation failed.",
+        validationErrors: Object.freeze(validation.error.issues.map((issue) => Object.freeze({
+          path: issue.path.join("."),
+          code: issue.code,
+          message: issue.message,
+        }))),
+      },
+    });
+    logger.warn(Object.freeze({
+      event: "workspace-http.request.validation-failed",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+      details: {
+        request: redactSensitiveAuthPayload(parsedBody.value),
+        issues: body.error?.validationErrors,
+      },
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  return { ok: true, data: validation.data };
+}
+
 async function parseJsonBody(
   request: IncomingMessage,
   maxBodyBytes: number,
@@ -1243,6 +1457,29 @@ function mapStatusCode(response: IdentityAuthApiResponse<unknown>): number {
   }
 }
 
+function mapWorkspaceStatusCode(response: WorkspaceInvitationApiResponse<unknown>): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error?.code) {
+    case WorkspaceInvitationApiErrorCodes.invalidRequest:
+      return 400;
+    case WorkspaceInvitationApiErrorCodes.authenticationFailed:
+      return 401;
+    case WorkspaceInvitationApiErrorCodes.forbidden:
+      return 403;
+    case WorkspaceInvitationApiErrorCodes.notFound:
+      return 404;
+    case WorkspaceInvitationApiErrorCodes.conflict:
+      return 409;
+    case WorkspaceInvitationApiErrorCodes.invalidInvite:
+      return 400;
+    default:
+      return 500;
+  }
+}
+
 function parseOptionalInteger(value: string | null): number | undefined {
   if (!value) {
     return undefined;
@@ -1287,6 +1524,16 @@ function buildInvalidRequestResponse(message: string): IdentityAuthApiResponse<n
     ok: false,
     error: {
       code: IdentityAuthApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
+function buildWorkspaceInvalidRequestResponse(message: string): WorkspaceInvitationApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: WorkspaceInvitationApiErrorCodes.invalidRequest,
       message,
     },
   });
@@ -1352,7 +1599,7 @@ function logResponse<TRequest extends Record<string, unknown>>(
   request: IncomingMessage,
   statusCode: number,
   requestPayload: TRequest,
-  responsePayload: IdentityAuthApiResponse<unknown>,
+  responsePayload: unknown,
 ): void {
   const event = Object.freeze({
     event: "identity-http.request.completed",
