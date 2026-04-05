@@ -55,6 +55,8 @@ export const ROUTE_PATHS = Object.freeze({
   configProfileStudio: "/studio-shell/config-profile",
   settings: "/settings",
   workspaceAdmin: "/settings/workspaces",
+  workspaceThinMembership: "/settings/workspaces/thin",
+  workspaceInvitationAccept: "/workspaces/:workspaceId/invitations/:invitationToken/accept",
   identityAdmin: "/settings/identity-admin",
   trustedDevices: "/settings/trusted-devices",
   notFound: "*",
@@ -317,6 +319,18 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "workspace-admin",
     path: ROUTE_PATHS.workspaceAdmin,
     title: "Workspace administration",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "workspace-thin-membership",
+    path: ROUTE_PATHS.workspaceThinMembership,
+    title: "Workspace memberships",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "workspace-invitation-accept",
+    path: ROUTE_PATHS.workspaceInvitationAccept,
+    title: "Workspace invitation onboarding",
     showInNavigation: false,
   }),
   Object.freeze({

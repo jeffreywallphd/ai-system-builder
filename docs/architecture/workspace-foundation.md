@@ -428,3 +428,23 @@ Story 3.1.4 extends the adapter integration tests to validate:
   - `ui/pages/tests/WorkspaceAdministrationPage.test.tsx`
   - updated route/pages/services contract/interactions tests for new route/service/page integration.
 
+## Story 3.4.3 thin-client workspace membership and invitation management views
+
+- Extended renderer workspace service/client seams to include thin-client onboarding acceptance over the existing production invitation backend contract:
+  - `ui/shared/workspaces/WorkspaceAdministrationClient.ts`
+  - `ui/services/WorkspaceAdministrationService.ts`
+- Added two focused thin-client surfaces aligned with smaller-screen operations:
+  - `ui/pages/WorkspaceMembershipThinClientPage.tsx` for membership review, invitation status review, invitation issuance, membership status updates, and invitation/member cancellation flows.
+  - `ui/pages/WorkspaceInvitationOnboardingPage.tsx` for authenticated invitation acceptance flow using the existing onboarding contract.
+- Added thin-client web route helper under `ui/web/workspaces/WorkspaceThinClientRoutes.ts` for invite acceptance link composition.
+- Thin-client route wiring now exposes focused workspace operations outside the full desktop administration page:
+  - `ROUTE_PATHS.workspaceThinMembership` (`/settings/workspaces/thin`)
+  - `ROUTE_PATHS.workspaceInvitationAccept` (`/workspaces/:workspaceId/invitations/:invitationToken/accept`)
+  - wired in `ui/routes/AppRouter.tsx` and discoverable from `ui/pages/SettingsPage.tsx`.
+- Responsive UI behavior is explicitly implemented through dedicated thin-client classes in `ui/styles/app.css` so membership and invitation operations remain usable on smaller surfaces.
+- Added renderer/client coverage updates for thin-client scope:
+  - `ui/shared/workspaces/tests/WorkspaceAdministrationClient.test.ts`
+  - `ui/pages/tests/WorkspaceMembershipThinClientPage.test.tsx`
+  - `ui/pages/tests/WorkspaceInvitationOnboardingPage.test.tsx`
+  - updated route/pages settings coverage tests for new thin-client routes and settings links.
+

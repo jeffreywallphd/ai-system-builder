@@ -61,6 +61,9 @@ export default function SettingsPage(): JSX.Element {
           <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.workspaceAdmin}>
             Workspace administration
           </Link>
+          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.workspaceThinMembership}>
+            Workspace memberships
+          </Link>
           <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.trustedDevices}>
             Trusted devices
           </Link>

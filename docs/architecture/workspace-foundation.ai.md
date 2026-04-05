@@ -353,3 +353,23 @@ Protected-resource composition pattern is canonical:
   - `ui/pages/tests/WorkspaceAdministrationPage.test.tsx`
   - updated route/pages/services contract/interactions tests for new route/service/page integration.
 
+## Story 3.4.3 thin-client workspace membership and invitation management views
+
+- Extended renderer workspace client/service seams to include invitation onboarding acceptance through the existing workspace onboarding backend contract:
+  - `ui/shared/workspaces/WorkspaceAdministrationClient.ts`
+  - `ui/services/WorkspaceAdministrationService.ts`
+- Added thin-client-focused workspace surfaces for web/mobile operations:
+  - `ui/pages/WorkspaceMembershipThinClientPage.tsx` for membership review, invitation status review, invitation issuance, and basic role-aware member/invitation management actions.
+  - `ui/pages/WorkspaceInvitationOnboardingPage.tsx` for authenticated invite acceptance (`/onboarding/accept`) using production data paths.
+- Added thin-client web route helper `ui/web/workspaces/WorkspaceThinClientRoutes.ts` for invite-acceptance link composition.
+- Added thin-client route wiring for focused operations outside the full desktop administration screen:
+  - `ROUTE_PATHS.workspaceThinMembership` (`/settings/workspaces/thin`)
+  - `ROUTE_PATHS.workspaceInvitationAccept` (`/workspaces/:workspaceId/invitations/:invitationToken/accept`)
+  - route integration in `ui/routes/RouteConfig.ts` and `ui/routes/AppRouter.tsx`, with settings entry-point link updates in `ui/pages/SettingsPage.tsx`.
+- Added responsive thin-client layout styles in `ui/styles/app.css` to keep membership and invitation flows usable on smaller screens.
+- Added/updated coverage for thin-client route/page/client behavior:
+  - `ui/shared/workspaces/tests/WorkspaceAdministrationClient.test.ts`
+  - `ui/pages/tests/WorkspaceMembershipThinClientPage.test.tsx`
+  - `ui/pages/tests/WorkspaceInvitationOnboardingPage.test.tsx`
+  - updated route/settings/pages interaction tests.
+
