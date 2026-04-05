@@ -6,6 +6,8 @@ import type {
   LogoutAuthenticatedSessionApiResponse,
   RevokeIdentitySessionApiRequest,
   RevokeIdentitySessionApiResponse,
+  ResolveAuthenticatedSessionApiRequest,
+  ResolveAuthenticatedSessionApiResponse,
   RegisterLocalIdentityApiRequest,
   RegisterLocalIdentityApiResponse,
 } from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
@@ -30,6 +32,12 @@ export class IdentityAuthService {
     request: LoginLocalIdentityApiRequest,
   ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
     return this.client.loginLocalAccount(request);
+  }
+
+  public resolveAuthenticatedSession(
+    request: ResolveAuthenticatedSessionApiRequest,
+  ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>> {
+    return this.client.resolveAuthenticatedSession(request.sessionToken);
   }
 
   public logoutAuthenticatedSession(

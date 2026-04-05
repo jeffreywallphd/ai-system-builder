@@ -428,6 +428,31 @@ Principal/session resolution seam:
 - `resolveAuthenticatedSession` responses can now include session `deviceId`, `trustedDeviceBindingId`, and `trustMarker`.
 - This allows later trusted-device policy work to enrich authenticated runtime context without refactoring core identity/session layers.
 
+## UI Session-State Exposure (Story 1.3.7)
+
+Renderer auth/session state now uses authenticated-session behavior as the source of truth instead of local placeholder assumptions.
+
+Primary renderer files:
+
+- `ui/App.tsx`
+- `ui/routes/AppRouter.tsx`
+- `ui/pages/LoginPage.tsx`
+- `ui/shared/identity/IdentityAuthSessionCoordinator.ts`
+- `ui/shared/identity/IdentityAuthSessionStore.ts`
+- `ui/shared/identity/IdentityAuthEnvironment.ts`
+- `ui/shared/identity/IdentityAuthClient.ts`
+- `ui/services/IdentityAuthService.ts`
+
+Implemented behavior:
+
+- authenticated bootstrap now validates stored session tokens against `GET /api/v1/identity/session` before mounting authenticated provider/runtime state
+- session validation is refreshed on visibility return to recover from server-side session revocation/expiry while the client is open
+- desktop and thin-client persistence now follows platform seams:
+  - desktop uses preload bridge storage when available (`window.aiLoomDesktop.storage`)
+  - thin-client/web uses browser local storage
+- login requests now include explicit access-channel context (`desktop` or `thin-client`) and user-agent client metadata
+- expired/revoked/invalid sessions are deterministically cleared and the UI returns to sign-in with explicit recovery messaging
+
 ## Implemented Test Coverage
 
 Key tests for this foundation:

@@ -7,35 +7,81 @@ export class IdentityAuthSessionStore {
     return this.getSession() !== undefined;
   }
 
+  public hasActiveSession(at: Date = new Date()): boolean {
+    const session = this.getSession();
+    if (!session) {
+      return false;
+    }
+    return !this.isSessionExpired(session, at);
+  }
+
   public getSession(): LoginLocalIdentityApiResponse | undefined {
-    if (typeof window === "undefined") {
+    const storage = resolveStorage();
+    if (!storage) {
       return undefined;
     }
 
-    const raw = window.localStorage.getItem(IdentitySessionStorageKey);
+    const raw = storage.getItem(IdentitySessionStorageKey);
     if (!raw) {
       return undefined;
     }
 
     try {
-      return JSON.parse(raw) as LoginLocalIdentityApiResponse;
+      const parsed = JSON.parse(raw) as LoginLocalIdentityApiResponse;
+      if (!parsed.sessionToken || !parsed.sessionExpiresAt) {
+        storage.removeItem(IdentitySessionStorageKey);
+        return undefined;
+      }
+      return parsed;
     } catch {
-      window.localStorage.removeItem(IdentitySessionStorageKey);
+      storage.removeItem(IdentitySessionStorageKey);
       return undefined;
     }
   }
 
   public saveSession(session: LoginLocalIdentityApiResponse): void {
-    if (typeof window === "undefined") {
+    const storage = resolveStorage();
+    if (!storage) {
       return;
     }
-    window.localStorage.setItem(IdentitySessionStorageKey, JSON.stringify(session));
+    storage.setItem(IdentitySessionStorageKey, JSON.stringify(session));
   }
 
   public clearSession(): void {
-    if (typeof window === "undefined") {
+    const storage = resolveStorage();
+    if (!storage) {
       return;
     }
-    window.localStorage.removeItem(IdentitySessionStorageKey);
+    storage.removeItem(IdentitySessionStorageKey);
   }
+
+  public isSessionExpired(
+    session: Pick<LoginLocalIdentityApiResponse, "sessionExpiresAt">,
+    at: Date = new Date(),
+  ): boolean {
+    const expiresAt = Date.parse(session.sessionExpiresAt);
+    if (!Number.isFinite(expiresAt)) {
+      return true;
+    }
+    return expiresAt <= at.getTime();
+  }
+}
+
+interface StorageLike {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+function resolveStorage(): StorageLike | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  const desktopStorage = window.aiLoomDesktop?.storage;
+  if (desktopStorage) {
+    return desktopStorage;
+  }
+
+  return window.localStorage;
 }

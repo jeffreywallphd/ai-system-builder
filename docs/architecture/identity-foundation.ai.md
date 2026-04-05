@@ -186,6 +186,16 @@
 - No trust evaluator is wired by default in this slice, so existing local-session behavior remains unchanged.
 - Authenticated-session resolution contracts now surface device/trust seam fields (`deviceId`, `trustedDeviceBindingId`, `trustMarker`) so later trusted-device policy work can compose on existing principal/session resolution flows.
 
+## Client session-state exposure (story 1.3.7)
+
+- Renderer auth state is now derived from real session validation (`GET /api/v1/identity/session`) rather than local presence-only assumptions.
+- `ui/App.tsx` performs authenticated bootstrap checks before mounting authenticated providers and refreshes session validity on visibility return.
+- Session persistence now follows platform conventions through a shared store seam:
+  - desktop prefers preload desktop storage bridge (`window.aiLoomDesktop.storage`)
+  - thin-client/web uses browser local storage
+- Login now sends channel-aware session context (`desktop` or `thin-client`) plus client user-agent metadata through shared environment helpers.
+- Expired or revoked sessions are cleared locally and routed back to sign-in with explicit recovery notices.
+
 ## Read next
 
 - Full architecture note: `docs/architecture/identity-foundation.md`
