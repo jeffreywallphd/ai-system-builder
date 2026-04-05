@@ -15,6 +15,7 @@ import ToolRunPage from "../pages/ToolRunPage";
 import SettingsPage from "../pages/SettingsPage";
 import AuthorizationSharingManagementPage from "../pages/AuthorizationSharingManagementPage";
 import AuthorizationSharingThinClientPage from "../pages/AuthorizationSharingThinClientPage";
+import AuthorizationReportingPage from "../pages/AuthorizationReportingPage";
 import WorkflowStudioPage from "../pages/WorkflowStudioPage";
 import ContextBundleStudioPage from "../pages/ContextBundleStudioPage";
 import DatasetPipelineStudioPage from "../pages/DatasetPipelineStudioPage";
@@ -135,6 +136,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.settings, element: <SettingsPage /> },
           { path: ROUTE_PATHS.authorizationSharing, element: <AuthorizationSharingManagementPage /> },
           { path: ROUTE_PATHS.authorizationSharingThin, element: <AuthorizationSharingThinClientPage /> },
+          { path: ROUTE_PATHS.authorizationReporting, element: <AuthorizationReportingPage /> },
           { path: ROUTE_PATHS.workspaceAdmin, element: <WorkspaceAdministrationPage /> },
           { path: ROUTE_PATHS.workspaceThinMembership, element: <WorkspaceMembershipThinClientPage /> },
           { path: ROUTE_PATHS.identityAdmin, element: <IdentityAdminPage /> },

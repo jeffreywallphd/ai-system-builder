@@ -21,6 +21,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('key: "run"');
     expect(source).toContain('key: "workflow-editor"');
     expect(source).toContain('key: "settings"');
+    expect(source).toContain('key: "authorization-reporting"');
     expect(source).toContain('key: "workspace-admin"');
     expect(source).toContain('key: "workspace-thin-membership"');
     expect(source).toContain('key: "workspace-invitation-accept"');
@@ -44,6 +45,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('embeddingIndexStudio: "/studio-shell/embedding-index"');
     expect(source).toContain('configProfileStudio: "/studio-shell/config-profile"');
     expect(source).toContain('workspaceAdmin: "/settings/workspaces"');
+    expect(source).toContain('authorizationReporting: "/settings/sharing/reporting"');
     expect(source).toContain('workspaceThinMembership: "/settings/workspaces/thin"');
     expect(source).toContain('workspaceInvitationAccept: "/workspaces/:workspaceId/invitations/:invitationToken/accept"');
     expect(source).toContain('identityAdmin: "/settings/identity-admin"');
@@ -87,6 +89,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.notFound");
     expect(source).toContain('path: "/index.html"');
     expect(source).toContain("path: ROUTE_PATHS.settings");
+    expect(source).toContain("path: ROUTE_PATHS.authorizationReporting");
     expect(source).toContain("path: ROUTE_PATHS.workspaceAdmin");
     expect(source).toContain("path: ROUTE_PATHS.workspaceThinMembership");
     expect(source).toContain("path: ROUTE_PATHS.workspaceInvitationAccept");

@@ -1126,6 +1126,21 @@ body {
   font-size: var(--font-size-sm);
 }
 
+.ui-authorization-reporting-page__field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-sm);
+}
+
+.ui-authorization-reporting-page__alert {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.ui-authorization-reporting-page__alert--error {
+  color: var(--color-danger);
+}
+
 .ui-select--sm {
   min-height: var(--control-height-sm);
 }

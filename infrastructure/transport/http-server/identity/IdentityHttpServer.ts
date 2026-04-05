@@ -1435,6 +1435,64 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
       }
 
       if (
+        options.authorizationManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/authorization/reporting/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const workspaceId = decodeAuthorizationWorkspaceReportingPath(path);
+            if (!workspaceId) {
+              const invalid = buildAuthorizationManagementInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const asOf = normalizeOptionalString(url.searchParams.get("asOf"));
+            const includeRevokedRoleAssignments = parseOptionalBoolean(url.searchParams.get("includeRevokedRoleAssignments"));
+            const includeRevokedSharingGrants = parseOptionalBoolean(url.searchParams.get("includeRevokedSharingGrants"));
+            const recentSharingMutationsLimit = parseOptionalInteger(url.searchParams.get("recentSharingMutationsLimit"));
+
+            if (asOf && !z.string().datetime({ offset: true }).safeParse(asOf).success) {
+              const invalid = buildAuthorizationManagementInvalidRequestResponse("asOf must be a valid ISO-8601 timestamp.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                actorUserIdentityId: context.principal.userIdentityId,
+                workspaceId,
+                asOf,
+              }), invalid);
+              return;
+            }
+
+            const apiResponse = await options.authorizationManagementBackendApi.readWorkspaceSharingReport({
+              actorUserIdentityId: context.principal.userIdentityId,
+              workspaceId,
+              asOf,
+              includeRevokedRoleAssignments,
+              includeRevokedSharingGrants,
+              recentSharingMutationsLimit,
+            });
+            const statusCode = mapAuthorizationManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              workspaceId,
+              query: Object.fromEntries(url.searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
         options.workspaceAdministrationBackendApi
         && request.method === "GET"
         && path === "/api/v1/workspaces"
@@ -2948,6 +3006,16 @@ function decodeAuthorizationResourceAndGrantPath(
     resource,
     grantId,
   });
+}
+
+function decodeAuthorizationWorkspaceReportingPath(path: string): string | undefined {
+  const prefix = "/api/v1/authorization/reporting/workspaces/";
+  if (!path.startsWith(prefix)) {
+    return undefined;
+  }
+
+  const workspaceId = decodeURIComponent(path.slice(prefix.length)).trim();
+  return workspaceId ? workspaceId : undefined;
 }
 
 function buildInvalidRequestResponse(message: string): IdentityAuthApiResponse<never> {

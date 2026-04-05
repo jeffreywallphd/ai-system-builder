@@ -279,3 +279,22 @@ Command gate examples:
   - transport/API mapping uses `conflict` for deterministic caller handling.
 - Workspace administrative continuity is a hard guardrail:
   - admin-role revocation is rejected when it would leave no active `owner|admin` role assignment in the workspace.
+
+## Authorization and sharing reporting read model (Story 4.4.6)
+
+- `AuthorizationManagementBackendApi` now includes a workspace-level reporting query:
+  - `readWorkspaceSharingReport(...)`
+  - returns role assignment posture, resource visibility distribution, unusual visibility/policy patterns, and recent sharing mutations.
+- Report reads are policy-protected through workspace capability authorization:
+  - callers must satisfy `system.manage` for the workspace capability target.
+- `IdentityHttpServer` now routes a read-only reporting endpoint:
+  - `GET /api/v1/authorization/reporting/workspaces/:workspaceId`
+  - optional query fields: `asOf`, `includeRevokedRoleAssignments`, `includeRevokedSharingGrants`, `recentSharingMutationsLimit`.
+- Reporting output is assembled from existing authorization persistence sources (no ad hoc DB inspection surfaces):
+  - workspace-scoped role assignments,
+  - workspace-scoped resource policy metadata,
+  - workspace-scoped sharing grants.
+- Unusual pattern detection currently flags:
+  - private resources with active sharing grants,
+  - owner-only policy resources with active sharing grants,
+  - published resources missing `publishedAt`.

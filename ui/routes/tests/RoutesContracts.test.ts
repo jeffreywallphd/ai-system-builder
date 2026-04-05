@@ -37,6 +37,7 @@ describe("ui/routes contract adherence", () => {
     expect(source).toContain('settings: "/settings"');
     expect(source).toContain('authorizationSharing: "/settings/sharing"');
     expect(source).toContain('authorizationSharingThin: "/settings/sharing/thin"');
+    expect(source).toContain('authorizationReporting: "/settings/sharing/reporting"');
     expect(source).toContain('workspaceAdmin: "/settings/workspaces"');
     expect(source).toContain('identityAdmin: "/settings/identity-admin"');
     expect(source).toContain('notFound: "*"');

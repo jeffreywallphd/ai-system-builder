@@ -232,6 +232,43 @@ describe("IdentityHttpServer authorization management routes", () => {
     expect(bulkBody.data.succeededResources).toBe(1);
     expect(bulkBody.data.failedResources).toBe(1);
   });
+
+  it("exposes workspace authorization reporting for authorized administrators", async () => {
+    const harness = await startServer();
+    const owner = await registerAndLogin(harness.baseUrl, "auth.mgmt.owner.report", "auth-owner-report@example.com");
+    await seedAuthorizationResource(harness.adapter, owner.userIdentityId, "user-viewer");
+
+    const reportResponse = await fetch(`${harness.baseUrl}/api/v1/authorization/reporting/workspaces/workspace-1?recentSharingMutationsLimit=10`, {
+      headers: {
+        authorization: `Bearer ${owner.sessionToken}`,
+      },
+    });
+
+    expect(reportResponse.status).toBe(200);
+    const body = await reportResponse.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.workspaceId).toBe("workspace-1");
+    expect(Array.isArray(body.data.roleAssignments)).toBe(true);
+    expect(body.data.resourceVisibilityDistribution.total).toBeGreaterThan(0);
+  });
+
+  it("forbids workspace authorization reporting for non-admin actors", async () => {
+    const harness = await startServer();
+    const owner = await registerAndLogin(harness.baseUrl, "auth.mgmt.owner.report.2", "auth-owner-report2@example.com");
+    const viewer = await registerAndLogin(harness.baseUrl, "auth.mgmt.viewer.report", "auth-viewer-report@example.com");
+    await seedAuthorizationResource(harness.adapter, owner.userIdentityId, viewer.userIdentityId);
+
+    const reportResponse = await fetch(`${harness.baseUrl}/api/v1/authorization/reporting/workspaces/workspace-1`, {
+      headers: {
+        authorization: `Bearer ${viewer.sessionToken}`,
+      },
+    });
+
+    expect(reportResponse.status).toBe(403);
+    const body = await reportResponse.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("forbidden");
+  });
 });
 
 async function startServer(): Promise<{
@@ -309,8 +346,12 @@ async function startServer(): Promise<{
       resourcePolicyMetadataReadRepository: readAdapter,
     }),
     decisionEvaluator,
+    roleAssignmentPersistenceRepository: adapter,
     sharingGrantPersistenceRepository: adapter,
     resourcePolicyMetadataPersistenceRepository: adapter,
+    clock: {
+      now: () => new Date("2026-04-05T12:00:00.000Z"),
+    },
   });
 
   const server = createIdentityHttpServer({

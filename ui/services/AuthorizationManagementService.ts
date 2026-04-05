@@ -16,6 +16,10 @@ export class AuthorizationManagementService {
     this.client.readAccessState(request, sessionToken)
   );
 
+  public readWorkspaceSharingReport: AuthorizationManagementClient["readWorkspaceSharingReport"] = (request, sessionToken) => (
+    this.client.readWorkspaceSharingReport(request, sessionToken)
+  );
+
   public updateVisibility: AuthorizationManagementClient["updateVisibility"] = (request, sessionToken) => (
     this.client.updateVisibility(request, sessionToken)
   );

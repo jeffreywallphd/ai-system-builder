@@ -6,6 +6,7 @@ import type { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "../../../
 import type { IAuthorizationPolicyDecisionEvaluator } from "../../../src/application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
 import type { IAuthorizationSharingGrantPersistenceRepository } from "../../../src/application/authorization/ports/IAuthorizationSharingGrantPersistenceRepository";
 import type { IAuthorizationResourcePolicyMetadataPersistenceRepository } from "../../../src/application/authorization/ports/IAuthorizationResourcePolicyMetadataPersistenceRepository";
+import type { IAuthorizationRoleAssignmentPersistenceRepository } from "../../../src/application/authorization/ports/IAuthorizationRoleAssignmentPersistenceRepository";
 import { AuthorizationPolicyEvaluationTargetKinds } from "../../../src/application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
 import { AuthorizationAdministrationErrorCodes } from "../../../src/application/authorization/use-cases/AuthorizationAdministrationUseCaseShared";
 import {
@@ -19,6 +20,8 @@ import {
   type AuthorizationResourcePolicyMetadataApiRecord,
   type AuthorizationSharingGrantApiRecord,
   type AuthorizationSharingTargetApiRecord,
+  type AuthorizationWorkspaceSharingReportApiRequest,
+  type AuthorizationWorkspaceSharingReportApiResponse,
   type GrantAuthorizationSharingAccessApiRequest,
   type GrantAuthorizationSharingAccessApiResponse,
   type RevokeAuthorizationSharingAccessApiRequest,
@@ -34,12 +37,22 @@ interface AuthorizationManagementBackendApiDependencies {
   readonly bulkGrantWorkspaceRoleAccessUseCase: BulkGrantAuthorizationWorkspaceRoleAccessUseCase;
   readonly listEffectiveAccessUseCase: ListAuthorizationEffectiveAccessUseCase;
   readonly decisionEvaluator: IAuthorizationPolicyDecisionEvaluator;
+  readonly roleAssignmentPersistenceRepository: IAuthorizationRoleAssignmentPersistenceRepository;
   readonly sharingGrantPersistenceRepository: IAuthorizationSharingGrantPersistenceRepository;
   readonly resourcePolicyMetadataPersistenceRepository: IAuthorizationResourcePolicyMetadataPersistenceRepository;
+  readonly clock?: {
+    now(): Date;
+  };
 }
 
 export class AuthorizationManagementBackendApi {
-  public constructor(private readonly dependencies: AuthorizationManagementBackendApiDependencies) {}
+  private readonly clock: { now(): Date };
+
+  public constructor(private readonly dependencies: AuthorizationManagementBackendApiDependencies) {
+    this.clock = dependencies.clock ?? {
+      now: () => new Date(),
+    };
+  }
 
   public async updateVisibility(
     request: UpdateAuthorizationVisibilityApiRequest,
@@ -269,6 +282,136 @@ export class AuthorizationManagementBackendApi {
     });
   }
 
+  public async readWorkspaceSharingReport(
+    request: AuthorizationWorkspaceSharingReportApiRequest,
+  ): Promise<AuthorizationManagementApiResponse<AuthorizationWorkspaceSharingReportApiResponse>> {
+    const workspaceId = request.workspaceId.trim();
+    if (!workspaceId) {
+      return this.failed(AuthorizationManagementApiErrorCodes.invalidRequest, "workspaceId is required.");
+    }
+
+    const asOf = request.asOf?.trim() || this.clock.now().toISOString();
+    const asOfTime = Date.parse(asOf);
+    if (!Number.isFinite(asOfTime)) {
+      return this.failed(AuthorizationManagementApiErrorCodes.invalidRequest, "asOf must be a valid ISO-8601 timestamp.");
+    }
+
+    const authorization = await this.assertWorkspaceReportReadAuthorized(request.actorUserIdentityId, workspaceId, asOf);
+    if (authorization) {
+      return authorization;
+    }
+
+    const includeRevokedRoleAssignments = request.includeRevokedRoleAssignments ?? true;
+    const includeRevokedSharingGrants = request.includeRevokedSharingGrants ?? true;
+    const recentSharingMutationsLimit = normalizeRecentLimit(request.recentSharingMutationsLimit);
+
+    const roleAssignments = await this.dependencies.roleAssignmentPersistenceRepository.listRoleAssignments({
+      workspaceId,
+      includeRevoked: includeRevokedRoleAssignments,
+      asOf,
+      limit: 1000,
+      offset: 0,
+    });
+    const resourcePolicyMetadata = await this.dependencies.resourcePolicyMetadataPersistenceRepository.listResourcePolicyMetadata({
+      workspaceId,
+      includeDeleted: false,
+      asOf,
+      limit: 2000,
+      offset: 0,
+    });
+    const sharingGrants = await this.dependencies.sharingGrantPersistenceRepository.listSharingGrants({
+      workspaceId,
+      includeRevoked: includeRevokedSharingGrants,
+      includeExpired: true,
+      asOf,
+      limit: 5000,
+      offset: 0,
+    });
+
+    const activeSharingGrantCountByResource = new Map<string, number>();
+    for (const grant of sharingGrants) {
+      if (!isActiveGrant(grant, asOfTime)) {
+        continue;
+      }
+      const key = toResourceKey(grant.resourceFamily, grant.resourceType, grant.resourceId);
+      activeSharingGrantCountByResource.set(key, (activeSharingGrantCountByResource.get(key) ?? 0) + 1);
+    }
+
+    const unusualVisibilityPatterns = resourcePolicyMetadata.flatMap((metadata) => {
+      const activeSharingGrantCount = activeSharingGrantCountByResource.get(
+        toResourceKey(metadata.resourceFamily, metadata.resourceType, metadata.resourceId),
+      ) ?? 0;
+      const reasonCodes: Array<
+        | "private-resource-with-active-sharing-grants"
+        | "owner-only-policy-with-active-sharing-grants"
+        | "published-visibility-without-published-at"
+      > = [];
+
+      if (metadata.visibility === "private" && activeSharingGrantCount > 0) {
+        reasonCodes.push("private-resource-with-active-sharing-grants");
+      }
+      if (metadata.sharingPolicyMode === "owner-only" && activeSharingGrantCount > 0) {
+        reasonCodes.push("owner-only-policy-with-active-sharing-grants");
+      }
+      if (metadata.visibility === "published" && !metadata.publishedAt) {
+        reasonCodes.push("published-visibility-without-published-at");
+      }
+
+      if (reasonCodes.length === 0) {
+        return [];
+      }
+
+      return [Object.freeze({
+        resource: Object.freeze({
+          resourceFamily: metadata.resourceFamily,
+          resourceType: metadata.resourceType,
+          resourceId: metadata.resourceId,
+        }),
+        workspaceId: metadata.workspaceId,
+        visibility: metadata.visibility,
+        sharingPolicyMode: metadata.sharingPolicyMode,
+        activeSharingGrantCount,
+        reasonCodes: Object.freeze(reasonCodes),
+      })];
+    });
+
+    const recentSharingMutations = sharingGrants
+      .map((grant) => toRecentSharingMutation(grant))
+      .sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt))
+      .slice(0, recentSharingMutationsLimit);
+
+    const visibilityDistribution = summarizeVisibility(resourcePolicyMetadata);
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        workspaceId,
+        asOf,
+        generatedAt: this.clock.now().toISOString(),
+        roleAssignments: Object.freeze([...roleAssignments]
+          .sort((left, right) => Date.parse(right.assignedAt) - Date.parse(left.assignedAt))
+          .map((assignment) => Object.freeze({
+            roleAssignmentId: assignment.id,
+            actorUserIdentityId: assignment.actorUserIdentityId,
+            roleKey: assignment.roleKey,
+            scope: assignment.scope,
+            status: assignment.status,
+            workspaceId: assignment.workspaceId,
+            resourceFamily: assignment.resourceFamily,
+            resourceType: assignment.resourceType,
+            resourceId: assignment.resourceId,
+            assignedAt: assignment.assignedAt,
+            assignedByUserIdentityId: assignment.assignedByUserIdentityId,
+            revokedAt: assignment.revokedAt,
+            revokedByUserIdentityId: assignment.revokedByUserIdentityId,
+          }))),
+        resourceVisibilityDistribution: visibilityDistribution,
+        unusualVisibilityPatterns: Object.freeze(unusualVisibilityPatterns),
+        recentSharingMutations: Object.freeze(recentSharingMutations),
+      }),
+    });
+  }
+
   private async assertAccessStateReadAuthorized(
     request: AuthorizationAccessStateApiRequest,
   ): Promise<AuthorizationManagementApiResponse<never> | undefined> {
@@ -294,6 +437,32 @@ export class AuthorizationManagementBackendApi {
     }
 
     return this.failed(AuthorizationManagementApiErrorCodes.forbidden, "Actor is not authorized to inspect access state.");
+  }
+
+  private async assertWorkspaceReportReadAuthorized(
+    actorUserIdentityId: string,
+    workspaceId: string,
+    asOf: string,
+  ): Promise<AuthorizationManagementApiResponse<never> | undefined> {
+    const decision = await this.dependencies.decisionEvaluator.evaluateDecision({
+      actor: {
+        actorUserIdentityId,
+        activeWorkspaceId: workspaceId,
+      },
+      requiredPermissionKey: "system.manage",
+      target: {
+        kind: AuthorizationPolicyEvaluationTargetKinds.workspaceCapability,
+        workspaceId,
+        capabilityResourceType: "authorization-administration",
+      },
+      asOf,
+    });
+
+    if (decision.decision.isAllowed) {
+      return undefined;
+    }
+
+    return this.failed(AuthorizationManagementApiErrorCodes.forbidden, "Actor is not authorized to inspect workspace authorization reporting.");
   }
 
   private failedFromAdministrationOutcome(
@@ -460,4 +629,114 @@ function toValidationErrors(
   });
 
   return parsed.length > 0 ? Object.freeze(parsed) : undefined;
+}
+
+function toResourceKey(resourceFamily: string, resourceType: string, resourceId: string): string {
+  return `${resourceFamily}:${resourceType}:${resourceId}`;
+}
+
+function isActiveGrant(
+  grant: {
+    readonly grantedAt: string;
+    readonly expiresAt?: string;
+    readonly revokedAt?: string;
+  },
+  asOfTime: number,
+): boolean {
+  const grantedAtTime = Date.parse(grant.grantedAt);
+  if (!Number.isFinite(grantedAtTime) || grantedAtTime > asOfTime) {
+    return false;
+  }
+
+  if (grant.revokedAt) {
+    const revokedAtTime = Date.parse(grant.revokedAt);
+    if (Number.isFinite(revokedAtTime) && revokedAtTime <= asOfTime) {
+      return false;
+    }
+  }
+
+  if (grant.expiresAt) {
+    const expiresAtTime = Date.parse(grant.expiresAt);
+    if (Number.isFinite(expiresAtTime) && expiresAtTime <= asOfTime) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function summarizeVisibility(
+  resourcePolicyMetadata: ReadonlyArray<{ readonly visibility: "private" | "workspace" | "shared" | "published" }>,
+): Readonly<{
+  private: number;
+  workspace: number;
+  shared: number;
+  published: number;
+  total: number;
+}> {
+  let privateCount = 0;
+  let workspaceCount = 0;
+  let sharedCount = 0;
+  let publishedCount = 0;
+
+  for (const metadata of resourcePolicyMetadata) {
+    if (metadata.visibility === "private") {
+      privateCount += 1;
+    } else if (metadata.visibility === "workspace") {
+      workspaceCount += 1;
+    } else if (metadata.visibility === "shared") {
+      sharedCount += 1;
+    } else {
+      publishedCount += 1;
+    }
+  }
+
+  return Object.freeze({
+    private: privateCount,
+    workspace: workspaceCount,
+    shared: sharedCount,
+    published: publishedCount,
+    total: resourcePolicyMetadata.length,
+  });
+}
+
+function toRecentSharingMutation(grant: {
+  readonly id: string;
+  readonly resourceFamily: string;
+  readonly resourceType: string;
+  readonly resourceId: string;
+  readonly subject: {
+    readonly kind: "user" | "workspace-role" | "workspace" | "public";
+    readonly userIdentityId?: string;
+    readonly workspaceId?: string;
+    readonly roleKey?: string;
+  };
+  readonly permissionKeys: ReadonlyArray<string>;
+  readonly grantedAt: string;
+  readonly grantedByUserIdentityId: string;
+  readonly revokedAt?: string;
+  readonly revokedByUserIdentityId?: string;
+}) {
+  const mutationType = grant.revokedAt ? "revoked" : "granted";
+  return Object.freeze({
+    grantId: grant.id,
+    mutationType,
+    occurredAt: grant.revokedAt ?? grant.grantedAt,
+    actorUserIdentityId: grant.revokedByUserIdentityId ?? grant.grantedByUserIdentityId,
+    resource: Object.freeze({
+      resourceFamily: grant.resourceFamily,
+      resourceType: grant.resourceType,
+      resourceId: grant.resourceId,
+    }),
+    target: toSharingTarget(grant.subject),
+    permissionKeys: grant.permissionKeys,
+  });
+}
+
+function normalizeRecentLimit(value: number | undefined): number {
+  if (!Number.isInteger(value)) {
+    return 25;
+  }
+
+  return Math.min(Math.max(value as number, 1), 100);
 }

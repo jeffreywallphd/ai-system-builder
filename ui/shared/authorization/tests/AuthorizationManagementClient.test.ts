@@ -31,6 +31,13 @@ describe("HttpAuthorizationManagementClient", () => {
       includeRevokedSharingGrants: false,
       asOf: "2026-04-05T12:00:00.000Z",
     }, "token-1");
+    await client.readWorkspaceSharingReport({
+      workspaceId: "workspace:1",
+      includeRevokedRoleAssignments: true,
+      includeRevokedSharingGrants: false,
+      recentSharingMutationsLimit: 20,
+      asOf: "2026-04-05T12:30:00.000Z",
+    }, "token-2");
     await client.updateVisibility({
       resourceFamily: "asset",
       resourceType: "asset",
@@ -40,7 +47,7 @@ describe("HttpAuthorizationManagementClient", () => {
       sharingPolicyMode: "explicit",
       allowResharing: false,
       expectedRevision: 4,
-    }, "token-2");
+    }, "token-3");
     await client.grantSharingAccess({
       resourceFamily: "asset",
       resourceType: "asset",
@@ -54,18 +61,19 @@ describe("HttpAuthorizationManagementClient", () => {
         },
         permissionKeys: ["asset.read"],
       },
-    }, "token-3");
+    }, "token-4");
     await client.revokeSharingAccess({
       resourceFamily: "asset",
       resourceType: "asset",
       resourceId: "asset:1",
       grantId: "grant:1",
       expectedRevision: 5,
-    }, "token-4");
+    }, "token-5");
 
-    expect(requests.map((entry) => entry.method)).toEqual(["GET", "PATCH", "POST", "DELETE"]);
+    expect(requests.map((entry) => entry.method)).toEqual(["GET", "GET", "PATCH", "POST", "DELETE"]);
     expect(requests.map((entry) => entry.url)).toEqual([
       "http://127.0.0.1:8788/api/v1/authorization/resources/asset/asset/asset%3A1/access-state?inspectedActorUserIdentityId=user%3Ainspected&asOf=2026-04-05T12%3A00%3A00.000Z&includeDenied=true&includeRevokedSharingGrants=false",
+      "http://127.0.0.1:8788/api/v1/authorization/reporting/workspaces/workspace%3A1?asOf=2026-04-05T12%3A30%3A00.000Z&includeRevokedRoleAssignments=true&includeRevokedSharingGrants=false&recentSharingMutationsLimit=20",
       "http://127.0.0.1:8788/api/v1/authorization/resources/asset/asset/asset%3A1/visibility",
       "http://127.0.0.1:8788/api/v1/authorization/resources/asset/asset/asset%3A1/sharing-grants",
       "http://127.0.0.1:8788/api/v1/authorization/resources/asset/asset/asset%3A1/sharing-grants/grant%3A1",
