@@ -1,107 +1,54 @@
-import { CertificateStatuses } from "../../../domain/security/CertificateAuthorityDomain";
 import type { ICertificateLifecycleEventPersistenceRepository } from "../ports/ICertificateLifecycleEventPersistenceRepository";
 import type { IIssuedCertificatePersistenceRepository } from "../ports/IIssuedCertificatePersistenceRepository";
 import {
-  CertificateRevocationRegistryStatuses,
   type ICertificateRevocationStatusRegistry,
   type ResolveCertificateRevocationStatusInput,
   type ResolveCertificateRevocationStatusResult,
 } from "../ports/ICertificateRevocationStatusRegistry";
+import { CertificateTrustEvaluationService, type CertificateTrustEvaluationClock } from "./CertificateTrustEvaluationService";
 
 export interface ResolveCertificateRevocationStatusUseCaseDependencies {
   readonly issuedCertificateRepository: IIssuedCertificatePersistenceRepository;
   readonly certificateLifecycleEventRepository: ICertificateLifecycleEventPersistenceRepository;
+  readonly clock?: CertificateTrustEvaluationClock;
 }
 
 export class ResolveCertificateRevocationStatusUseCase implements ICertificateRevocationStatusRegistry {
-  public constructor(private readonly dependencies: ResolveCertificateRevocationStatusUseCaseDependencies) {}
+  private readonly trustEvaluationService: CertificateTrustEvaluationService;
+
+  public constructor(private readonly dependencies: ResolveCertificateRevocationStatusUseCaseDependencies) {
+    this.trustEvaluationService = new CertificateTrustEvaluationService({
+      clock: dependencies.clock,
+    });
+  }
 
   public async resolveCertificateRevocationStatus(
     input: ResolveCertificateRevocationStatusInput,
   ): Promise<ResolveCertificateRevocationStatusResult> {
     const serialNumber = normalizeSerial(input.serialNumber);
-    const checkedAt = normalizeTimestamp(input.asOf);
 
     const certificate = await this.dependencies.issuedCertificateRepository.findIssuedCertificateBySerialNumber(serialNumber);
-    if (!certificate) {
-      return Object.freeze({
-        serialNumber,
-        status: CertificateRevocationRegistryStatuses.notFound,
-        revoked: false,
-        active: false,
-        expired: false,
-        checkedAt,
-      });
-    }
+    const trust = this.trustEvaluationService.evaluateIssuedCertificateTrust({
+      serialNumber,
+      certificate,
+      asOf: input.asOf,
+    });
 
-    if (certificate.status === CertificateStatuses.revoked) {
-      const revocation = certificate.revocation
-        ?? await this.resolveLatestRevocation(serialNumber);
-      return Object.freeze({
-        serialNumber,
-        certificateAuthorityId: certificate.certificateAuthorityId,
-        status: CertificateRevocationRegistryStatuses.revoked,
-        certificateStatus: certificate.status,
-        revoked: true,
-        active: false,
-        expired: false,
-        checkedAt,
-        revocation,
-      });
-    }
-
-    if (certificate.status === CertificateStatuses.superseded) {
-      return Object.freeze({
-        serialNumber,
-        certificateAuthorityId: certificate.certificateAuthorityId,
-        status: CertificateRevocationRegistryStatuses.superseded,
-        certificateStatus: certificate.status,
-        revoked: false,
-        active: false,
-        expired: false,
-        checkedAt,
-      });
-    }
-
-    const notBefore = Date.parse(certificate.validity.notBefore);
-    const notAfter = Date.parse(certificate.validity.notAfter);
-    const asOfMs = Date.parse(checkedAt);
-
-    if (certificate.status === CertificateStatuses.expired || asOfMs >= notAfter) {
-      return Object.freeze({
-        serialNumber,
-        certificateAuthorityId: certificate.certificateAuthorityId,
-        status: CertificateRevocationRegistryStatuses.expired,
-        certificateStatus: certificate.status,
-        revoked: false,
-        active: false,
-        expired: true,
-        checkedAt,
-      });
-    }
-
-    if (asOfMs < notBefore) {
-      return Object.freeze({
-        serialNumber,
-        certificateAuthorityId: certificate.certificateAuthorityId,
-        status: CertificateRevocationRegistryStatuses.notYetValid,
-        certificateStatus: certificate.status,
-        revoked: false,
-        active: false,
-        expired: false,
-        checkedAt,
-      });
-    }
+    const revocation = trust.status === "revoked"
+      ? certificate?.revocation ?? await this.resolveLatestRevocation(serialNumber)
+      : undefined;
 
     return Object.freeze({
       serialNumber,
-      certificateAuthorityId: certificate.certificateAuthorityId,
-      status: CertificateRevocationRegistryStatuses.active,
-      certificateStatus: certificate.status,
-      revoked: false,
-      active: true,
-      expired: false,
-      checkedAt,
+      certificateAuthorityId: trust.certificateAuthorityId,
+      status: trust.status,
+      certificateStatus: trust.certificateStatus,
+      revoked: trust.revoked,
+      active: trust.active,
+      expired: trust.expired,
+      usable: trust.usable,
+      checkedAt: trust.checkedAt,
+      revocation,
     });
   }
 
@@ -133,15 +80,3 @@ function normalizeSerial(serialNumber: string): string {
   return normalized;
 }
 
-function normalizeTimestamp(value?: string): string {
-  if (!value) {
-    return new Date().toISOString();
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    throw new Error("asOf must be a valid timestamp when provided.");
-  }
-
-  return parsed.toISOString();
-}

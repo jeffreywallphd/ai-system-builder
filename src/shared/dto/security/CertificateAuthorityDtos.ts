@@ -78,6 +78,51 @@ export interface CertificateRevocationPersistenceRecord {
   readonly note?: string;
 }
 
+export const CertificateTrustEvaluationStatuses = Object.freeze({
+  active: "active",
+  revoked: "revoked",
+  expired: "expired",
+  superseded: "superseded",
+  notYetValid: "not-yet-valid",
+  notFound: "not-found",
+  subjectInactive: "subject-inactive",
+  invalid: "invalid",
+});
+
+export type CertificateTrustEvaluationStatus =
+  typeof CertificateTrustEvaluationStatuses[keyof typeof CertificateTrustEvaluationStatuses];
+
+export const CertificateLinkedSubjectTrustStates = Object.freeze({
+  active: "active",
+  inactive: "inactive",
+  suspended: "suspended",
+  revoked: "revoked",
+});
+
+export type CertificateLinkedSubjectTrustState =
+  typeof CertificateLinkedSubjectTrustStates[keyof typeof CertificateLinkedSubjectTrustStates];
+
+export interface CertificateTrustEvaluationSubjectSnapshotDto {
+  readonly state: CertificateLinkedSubjectTrustState;
+  readonly referenceId?: string;
+  readonly reason?: string;
+}
+
+export interface CertificateTrustEvaluationViewDto {
+  readonly serialNumber: string;
+  readonly certificateAuthorityId?: string;
+  readonly status: CertificateTrustEvaluationStatus;
+  readonly certificateStatus?: CertificateStatus;
+  readonly revoked: boolean;
+  readonly active: boolean;
+  readonly expired: boolean;
+  readonly usable: boolean;
+  readonly checkedAt: string;
+  readonly linkedSubject?: CertificateTrustEvaluationSubjectSnapshotDto;
+  readonly diagnosticCode?: string;
+  readonly revocation?: CertificateRevocationPersistenceRecord;
+}
+
 export const CertificateDistributionTargetKinds = Object.freeze({
   node: "node",
   server: "server",

@@ -132,6 +132,7 @@ describe("ResolveCertificateRevocationStatusUseCase", () => {
     expect(result.status).toBe(CertificateRevocationRegistryStatuses.active);
     expect(result.active).toBe(true);
     expect(result.revoked).toBe(false);
+    expect(result.usable).toBe(true);
   });
 
   it("returns revoked with revocation metadata for revoked certificates", async () => {
@@ -170,6 +171,7 @@ describe("ResolveCertificateRevocationStatusUseCase", () => {
 
     expect(result.status).toBe(CertificateRevocationRegistryStatuses.revoked);
     expect(result.revoked).toBe(true);
+    expect(result.usable).toBe(false);
     expect(result.revocation?.reason).toBe(CertificateRevocationReasons.policyViolation);
   });
 
@@ -199,7 +201,35 @@ describe("ResolveCertificateRevocationStatusUseCase", () => {
 
     expect(expired.status).toBe(CertificateRevocationRegistryStatuses.expired);
     expect(expired.expired).toBe(true);
+    expect(expired.usable).toBe(false);
     expect(missing.status).toBe(CertificateRevocationRegistryStatuses.notFound);
+    expect(missing.usable).toBe(false);
+  });
+
+  it("uses injected clock when asOf is omitted", async () => {
+    const issuedCertificates = new InMemoryIssuedCertificateRepository();
+    const lifecycleEvents = new InMemoryLifecycleEventRepository();
+    issuedCertificates.recordsBySerial.set("FACE01", createIssuedRecord({
+      serialNumber: "FACE01",
+      status: CertificateStatuses.issued,
+      notBefore: "2026-04-05T12:00:00.000Z",
+      notAfter: "2026-05-01T12:00:00.000Z",
+    }));
+
+    const useCase = new ResolveCertificateRevocationStatusUseCase({
+      issuedCertificateRepository: issuedCertificates,
+      certificateLifecycleEventRepository: lifecycleEvents,
+      clock: {
+        now: () => new Date("2026-06-01T00:00:00.000Z"),
+      },
+    });
+
+    const result = await useCase.resolveCertificateRevocationStatus({
+      serialNumber: "FACE01",
+    });
+
+    expect(result.checkedAt).toBe("2026-06-01T00:00:00.000Z");
+    expect(result.status).toBe(CertificateRevocationRegistryStatuses.expired);
   });
 });
 

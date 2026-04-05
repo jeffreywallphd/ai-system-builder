@@ -1,17 +1,12 @@
 import type { CertificateStatus } from "../../../domain/security/CertificateAuthorityDomain";
-import type { CertificateRevocationPersistenceRecord } from "../../../shared/dto/security/CertificateAuthorityDtos";
+import {
+  CertificateTrustEvaluationStatuses,
+  type CertificateRevocationPersistenceRecord,
+  type CertificateTrustEvaluationStatus,
+} from "../../../shared/dto/security/CertificateAuthorityDtos";
 
-export const CertificateRevocationRegistryStatuses = Object.freeze({
-  active: "active",
-  revoked: "revoked",
-  expired: "expired",
-  superseded: "superseded",
-  notYetValid: "not-yet-valid",
-  notFound: "not-found",
-});
-
-export type CertificateRevocationRegistryStatus =
-  typeof CertificateRevocationRegistryStatuses[keyof typeof CertificateRevocationRegistryStatuses];
+export const CertificateRevocationRegistryStatuses = CertificateTrustEvaluationStatuses;
+export type CertificateRevocationRegistryStatus = CertificateTrustEvaluationStatus;
 
 export interface ResolveCertificateRevocationStatusInput {
   readonly serialNumber: string;
@@ -26,6 +21,7 @@ export interface ResolveCertificateRevocationStatusResult {
   readonly revoked: boolean;
   readonly active: boolean;
   readonly expired: boolean;
+  readonly usable: boolean;
   readonly checkedAt: string;
   readonly revocation?: CertificateRevocationPersistenceRecord;
 }
