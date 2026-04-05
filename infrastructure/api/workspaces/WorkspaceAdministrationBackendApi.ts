@@ -96,6 +96,8 @@ import {
   type WorkspaceMembershipApiRecord,
   type WorkspaceRoleAssignmentApiRecord,
 } from "./sdk/PublicWorkspaceAdministrationApiContract";
+import { AuthorizationPolicyEvaluationTargetKinds } from "../../src/application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import type { IAuthorizationPolicyDecisionEvaluator } from "../../src/application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
 
 interface WorkspaceAdministrationBackendApiDependencies {
   readonly workspaceQueryService: WorkspaceAdministrationQueryService;
@@ -114,6 +116,8 @@ interface WorkspaceAdministrationBackendApiDependencies {
   readonly reassignWorkspaceRoleUseCase: ReassignWorkspaceRoleUseCase;
   readonly revokeWorkspaceRoleUseCase: RevokeWorkspaceRoleUseCase;
   readonly resolveWorkspaceInvitationLifecycleUseCase: ResolveWorkspaceInvitationLifecycleUseCase;
+  readonly authorizationPolicyDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+  readonly workspaceAdministrationCapabilityResourceType?: string;
   readonly clock?: {
     now(): Date;
   };
@@ -121,11 +125,14 @@ interface WorkspaceAdministrationBackendApiDependencies {
 
 export class WorkspaceAdministrationBackendApi {
   private readonly clock: { now(): Date };
+  private readonly workspaceAdministrationCapabilityResourceType: string;
 
   public constructor(private readonly dependencies: WorkspaceAdministrationBackendApiDependencies) {
     this.clock = dependencies.clock ?? {
       now: () => new Date(),
     };
+    this.workspaceAdministrationCapabilityResourceType = dependencies.workspaceAdministrationCapabilityResourceType?.trim()
+      || "workspace-administration";
   }
 
   public async listWorkspaces(
@@ -341,6 +348,14 @@ export class WorkspaceAdministrationBackendApi {
   public async updateWorkspace(
     request: UpdateWorkspaceAdministrationApiRequest,
   ): Promise<WorkspaceAdministrationApiResponse<UpdateWorkspaceAdministrationApiResponse>> {
+    const authorizationFailure = await this.assertWorkspaceAdministrationMutationAuthorized(
+      request.workspaceId,
+      request.actorUserIdentityId,
+    );
+    if (authorizationFailure) {
+      return authorizationFailure;
+    }
+
     const outcome = await this.dependencies.updateWorkspaceUseCase.execute({
       workspaceId: request.workspaceId,
       actorUserIdentityId: request.actorUserIdentityId,
@@ -362,6 +377,14 @@ export class WorkspaceAdministrationBackendApi {
   public async transitionWorkspaceLifecycle(
     request: TransitionWorkspaceAdministrationLifecycleApiRequest,
   ): Promise<WorkspaceAdministrationApiResponse<TransitionWorkspaceAdministrationLifecycleApiResponse>> {
+    const authorizationFailure = await this.assertWorkspaceAdministrationMutationAuthorized(
+      request.workspaceId,
+      request.actorUserIdentityId,
+    );
+    if (authorizationFailure) {
+      return authorizationFailure;
+    }
+
     const outcome = await this.dependencies.transitionWorkspaceLifecycleUseCase.execute({
       workspaceId: request.workspaceId,
       actorUserIdentityId: request.actorUserIdentityId,
@@ -381,6 +404,14 @@ export class WorkspaceAdministrationBackendApi {
   public async addWorkspaceMember(
     request: AddWorkspaceAdministrationMemberApiRequest,
   ): Promise<WorkspaceAdministrationApiResponse<AddWorkspaceAdministrationMemberApiResponse>> {
+    const authorizationFailure = await this.assertWorkspaceAdministrationMutationAuthorized(
+      request.workspaceId,
+      request.actorUserIdentityId,
+    );
+    if (authorizationFailure) {
+      return authorizationFailure;
+    }
+
     const outcome = await this.dependencies.addWorkspaceMemberUseCase.execute({
       workspaceId: request.workspaceId,
       actorUserIdentityId: request.actorUserIdentityId,
@@ -405,6 +436,14 @@ export class WorkspaceAdministrationBackendApi {
   public async changeWorkspaceMembershipStatus(
     request: ChangeWorkspaceAdministrationMemberStatusApiRequest,
   ): Promise<WorkspaceAdministrationApiResponse<ChangeWorkspaceAdministrationMemberStatusApiResponse>> {
+    const authorizationFailure = await this.assertWorkspaceAdministrationMutationAuthorized(
+      request.workspaceId,
+      request.actorUserIdentityId,
+    );
+    if (authorizationFailure) {
+      return authorizationFailure;
+    }
+
     const outcome = await this.dependencies.changeWorkspaceMembershipStatusUseCase.execute({
       workspaceId: request.workspaceId,
       actorUserIdentityId: request.actorUserIdentityId,
@@ -429,6 +468,14 @@ export class WorkspaceAdministrationBackendApi {
   public async removeWorkspaceMember(
     request: RemoveWorkspaceAdministrationMemberApiRequest,
   ): Promise<WorkspaceAdministrationApiResponse<RemoveWorkspaceAdministrationMemberApiResponse>> {
+    const authorizationFailure = await this.assertWorkspaceAdministrationMutationAuthorized(
+      request.workspaceId,
+      request.actorUserIdentityId,
+    );
+    if (authorizationFailure) {
+      return authorizationFailure;
+    }
+
     const outcome = await this.dependencies.removeWorkspaceMemberUseCase.execute({
       workspaceId: request.workspaceId,
       actorUserIdentityId: request.actorUserIdentityId,
@@ -452,6 +499,14 @@ export class WorkspaceAdministrationBackendApi {
   public async assignWorkspaceRole(
     request: AssignWorkspaceAdministrationRoleApiRequest,
   ): Promise<WorkspaceAdministrationApiResponse<AssignWorkspaceAdministrationRoleApiResponse>> {
+    const authorizationFailure = await this.assertWorkspaceAdministrationMutationAuthorized(
+      request.workspaceId,
+      request.actorUserIdentityId,
+    );
+    if (authorizationFailure) {
+      return authorizationFailure;
+    }
+
     const outcome = await this.dependencies.assignWorkspaceRoleUseCase.execute({
       workspaceId: request.workspaceId,
       actorUserIdentityId: request.actorUserIdentityId,
@@ -476,6 +531,14 @@ export class WorkspaceAdministrationBackendApi {
   public async reassignWorkspaceRole(
     request: ReassignWorkspaceAdministrationRoleApiRequest,
   ): Promise<WorkspaceAdministrationApiResponse<ReassignWorkspaceAdministrationRoleApiResponse>> {
+    const authorizationFailure = await this.assertWorkspaceAdministrationMutationAuthorized(
+      request.workspaceId,
+      request.actorUserIdentityId,
+    );
+    if (authorizationFailure) {
+      return authorizationFailure;
+    }
+
     const outcome = await this.dependencies.reassignWorkspaceRoleUseCase.execute({
       workspaceId: request.workspaceId,
       actorUserIdentityId: request.actorUserIdentityId,
@@ -502,6 +565,14 @@ export class WorkspaceAdministrationBackendApi {
   public async revokeWorkspaceRole(
     request: RevokeWorkspaceAdministrationRoleApiRequest,
   ): Promise<WorkspaceAdministrationApiResponse<RevokeWorkspaceAdministrationRoleApiResponse>> {
+    const authorizationFailure = await this.assertWorkspaceAdministrationMutationAuthorized(
+      request.workspaceId,
+      request.actorUserIdentityId,
+    );
+    if (authorizationFailure) {
+      return authorizationFailure;
+    }
+
     const outcome = await this.dependencies.revokeWorkspaceRoleUseCase.execute({
       workspaceId: request.workspaceId,
       actorUserIdentityId: request.actorUserIdentityId,
@@ -526,6 +597,14 @@ export class WorkspaceAdministrationBackendApi {
   public async cancelWorkspaceInvitation(
     request: CancelWorkspaceAdministrationInvitationApiRequest,
   ): Promise<WorkspaceAdministrationApiResponse<CancelWorkspaceAdministrationInvitationApiResponse>> {
+    const authorizationFailure = await this.assertWorkspaceAdministrationMutationAuthorized(
+      request.workspaceId,
+      request.actorUserIdentityId,
+    );
+    if (authorizationFailure) {
+      return authorizationFailure;
+    }
+
     const outcome = await this.dependencies.resolveWorkspaceInvitationLifecycleUseCase.execute({
       action: WorkspaceInvitationLifecycleActions.cancel,
       workspaceId: request.workspaceId,
@@ -591,6 +670,61 @@ export class WorkspaceAdministrationBackendApi {
       canAdministrate: effectiveRoles.includes(WorkspaceRoles.owner) || effectiveRoles.includes(WorkspaceRoles.admin),
       isWorkspaceOwner: effectiveRoles.includes(WorkspaceRoles.owner),
     });
+  }
+
+  private async assertWorkspaceAdministrationMutationAuthorized(
+    workspaceId: string,
+    actorUserIdentityId: string,
+  ): Promise<WorkspaceAdministrationApiResponse<never> | undefined> {
+    if (!this.dependencies.authorizationPolicyDecisionEvaluator) {
+      return undefined;
+    }
+
+    const normalizedWorkspaceId = workspaceId.trim();
+    if (!normalizedWorkspaceId) {
+      return this.failed(WorkspaceAdministrationApiErrorCodes.invalidRequest, "workspaceId is required.");
+    }
+
+    const normalizedActorUserIdentityId = actorUserIdentityId.trim();
+    if (!normalizedActorUserIdentityId) {
+      return this.failed(WorkspaceAdministrationApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+    }
+
+    const workspace = await this.dependencies.workspaceRepository.findWorkspaceById(normalizedWorkspaceId);
+    if (!workspace) {
+      return this.failed(WorkspaceAdministrationApiErrorCodes.notFound, `Workspace '${normalizedWorkspaceId}' was not found.`);
+    }
+
+    let decision: Awaited<ReturnType<IAuthorizationPolicyDecisionEvaluator["evaluateDecision"]>>;
+    try {
+      decision = await this.dependencies.authorizationPolicyDecisionEvaluator.evaluateDecision({
+        actor: Object.freeze({
+          actorUserIdentityId: normalizedActorUserIdentityId,
+          activeWorkspaceId: normalizedWorkspaceId,
+        }),
+        requiredPermissionKey: "system.manage",
+        target: Object.freeze({
+          kind: AuthorizationPolicyEvaluationTargetKinds.workspaceCapability,
+          workspaceId: normalizedWorkspaceId,
+          capabilityResourceType: this.workspaceAdministrationCapabilityResourceType,
+        }),
+        asOf: this.clock.now().toISOString(),
+      });
+    } catch (error) {
+      return this.failed(
+        WorkspaceAdministrationApiErrorCodes.internal,
+        error instanceof Error ? error.message : "Workspace administration authorization evaluation failed.",
+      );
+    }
+
+    if (decision.decision.isAllowed) {
+      return undefined;
+    }
+
+    return this.failed(
+      WorkspaceAdministrationApiErrorCodes.forbidden,
+      decision.decision.reason,
+    );
   }
 
   private failedFromQuery(code: WorkspaceAdministrationQueryErrorCode, message: string): WorkspaceAdministrationApiResponse<never> {

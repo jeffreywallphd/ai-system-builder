@@ -44,6 +44,8 @@ import { SqliteIdentityLifecycleEventPublisher } from "../../infrastructure/file
 import { WorkspaceInvitationBackendApi } from "../../infrastructure/api/workspaces/WorkspaceInvitationBackendApi";
 import { WorkspaceAdministrationBackendApi } from "../../infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
 import { SqliteWorkspacePersistenceAdapter } from "../../src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
+import { WorkspaceAuthorizationPolicyReadAdapter } from "../../src/infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
+import { AuthorizationPolicyDecisionEvaluator } from "../../src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import {
   IssueWorkspaceInvitationUseCase,
   type WorkspaceInvitationIssuanceClock,
@@ -144,6 +146,15 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const eventPublisher = options.eventPublisher ?? new SqliteIdentityLifecycleEventPublisher(path.resolve(options.databasePath));
   const workspaceClock = new SystemWorkspaceClock();
   const workspaceIdGenerator = new RandomWorkspaceIdGenerator();
+  const workspaceAuthorizationPolicyReadAdapter = new WorkspaceAuthorizationPolicyReadAdapter({
+    workspaceAuthorizationReadRepository: workspaceRepository,
+  });
+  const workspaceAdministrationAuthorizationDecisionEvaluator = new AuthorizationPolicyDecisionEvaluator({
+    roleGrantReadRepository: workspaceAuthorizationPolicyReadAdapter,
+    sharingGrantReadRepository: workspaceAuthorizationPolicyReadAdapter,
+    resourcePolicyMetadataReadRepository: workspaceAuthorizationPolicyReadAdapter,
+    clock: workspaceClock,
+  });
   const sessionTrustService = new TrustedDeviceSessionTrustService({
     trustedDeviceRepository,
     policies: sessionTrustPolicies,
@@ -366,6 +377,8 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       clock: workspaceClock,
     }),
     resolveWorkspaceInvitationLifecycleUseCase: resolveWorkspaceInvitationLifecycleUseCase,
+    authorizationPolicyDecisionEvaluator: workspaceAdministrationAuthorizationDecisionEvaluator,
+    workspaceAdministrationCapabilityResourceType: "workspace-administration",
     clock: workspaceClock,
   });
 

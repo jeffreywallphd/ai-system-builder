@@ -46,6 +46,8 @@ import { RemoveWorkspaceMemberUseCase } from "../../../../../src/application/wor
 import { AssignWorkspaceRoleUseCase } from "../../../../../src/application/workspaces/use-cases/AssignWorkspaceRoleUseCase";
 import { ReassignWorkspaceRoleUseCase } from "../../../../../src/application/workspaces/use-cases/ReassignWorkspaceRoleUseCase";
 import { RevokeWorkspaceRoleUseCase } from "../../../../../src/application/workspaces/use-cases/RevokeWorkspaceRoleUseCase";
+import { AuthorizationPolicyDecisionEvaluator } from "../../../../../src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
+import { WorkspaceAuthorizationPolicyReadAdapter } from "../../../../../src/infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
 import { createIdentityHttpServer } from "../IdentityHttpServer";
 
 class FixedClock implements WorkspaceInvitationIssuanceClock, WorkspaceInvitationLifecycleClock, AuthenticatedWorkspaceOnboardingClock {
@@ -130,6 +132,9 @@ async function startServer() {
     }),
   });
 
+  const workspaceAuthorizationPolicyReadAdapter = new WorkspaceAuthorizationPolicyReadAdapter({
+    workspaceAuthorizationReadRepository: workspaceRepository,
+  });
   const workspaceAdministrationBackendApi = new WorkspaceAdministrationBackendApi({
     workspaceQueryService: new WorkspaceAdministrationQueryService({
       workspaceRepository,
@@ -208,6 +213,13 @@ async function startServer() {
       clock,
     }),
     resolveWorkspaceInvitationLifecycleUseCase: lifecycleUseCase,
+    authorizationPolicyDecisionEvaluator: new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: workspaceAuthorizationPolicyReadAdapter,
+      sharingGrantReadRepository: workspaceAuthorizationPolicyReadAdapter,
+      resourcePolicyMetadataReadRepository: workspaceAuthorizationPolicyReadAdapter,
+      clock,
+    }),
+    workspaceAdministrationCapabilityResourceType: "workspace-administration",
     clock,
   });
 
@@ -473,5 +485,33 @@ describe("IdentityHttpServer workspace administration routes", () => {
     expect(invalidCreateBody.ok).toBe(false);
     expect(invalidCreateBody.error.code).toBe("invalid-request");
     expect(Array.isArray(invalidCreateBody.error.validationErrors)).toBe(true);
+  });
+
+  it("denies workspace access mutations for non-admin members", async () => {
+    const { baseUrl, workspaceRepository } = await startServer();
+    const owner = await registerAndLogin(baseUrl, { username: "workspace.admin.owner.4", email: "admin-owner4@example.com" });
+    const member = await registerAndLogin(baseUrl, { username: "workspace.admin.member.4", email: "admin-member4@example.com" });
+    await seedWorkspaceAdmin(workspaceRepository, {
+      workspaceId: "workspace:alpha",
+      ownerUserIdentityId: owner.userIdentityId,
+      memberUserIdentityId: member.userIdentityId,
+    });
+
+    const mutationResponse = await fetch(`${baseUrl}/api/v1/workspaces/workspace%3Aalpha/roles/assign`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${member.sessionToken}`,
+      },
+      body: JSON.stringify({
+        targetUserIdentityId: owner.userIdentityId,
+        role: "viewer",
+        reason: "unauthorized attempt",
+      }),
+    });
+    expect(mutationResponse.status).toBe(403);
+    const mutationBody = await mutationResponse.json();
+    expect(mutationBody.ok).toBe(false);
+    expect(mutationBody.error.code).toBe("forbidden");
   });
 });

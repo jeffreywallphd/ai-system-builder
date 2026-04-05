@@ -9,6 +9,8 @@
 - Workspace administration mutations write via application use cases.
 - On successful writes, use cases emit best-effort audit events through `WorkspaceAdministrationAuditSink`.
 - Audit dispatch failure is intentionally non-blocking in this slice.
+- Story 4.3.2 adds centralized policy gating for workspace-sensitive mutations (`system.manage` workspace capability) before mutation use cases execute.
+- Self-service invitation onboarding remains outside this admin mutation gate.
 
 ## Event coverage
 
