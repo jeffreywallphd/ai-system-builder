@@ -16,6 +16,7 @@ import {
 } from "../../../domain/workspaces/WorkspaceDomain";
 import {
   WorkspaceVisibilities,
+  rehydrateWorkspaceOwnershipMetadata,
   type WorkspaceVisibility,
 } from "../../../shared/workspaces/WorkspaceOwnership";
 
@@ -84,7 +85,7 @@ export function mapWorkspaceRowToDomain(row: WorkspaceRow): Workspace {
     displayName: row.display_name,
     description: row.description ?? undefined,
     status: assertWorkspaceStatus(row.status),
-    ownership: Object.freeze({
+    ownership: rehydrateWorkspaceOwnershipMetadata({
       workspaceId: row.workspace_id,
       ownerUserId: row.owner_user_id,
       visibility: assertWorkspaceVisibility(row.visibility),
