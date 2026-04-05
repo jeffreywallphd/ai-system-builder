@@ -38,6 +38,7 @@ Scope in stories 3.1.1 through 3.1.5:
 - `src/application/workspaces/use-cases/RevokeWorkspaceRoleUseCase.ts`
 - `src/application/workspaces/use-cases/UpdateWorkspaceUseCase.ts`
 - `src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase.ts`
+- `src/application/workspaces/use-cases/WorkspaceAdministrationQueryService.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceMigrations.ts`
 - `src/infrastructure/persistence/workspaces/WorkspacePersistenceMapper.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter.ts`
@@ -170,6 +171,8 @@ Protected-resource composition is standardized through `withWorkspaceScopedOwner
 - `src/application/workspaces/tests/WorkspaceRepositoryPortsContracts.test.ts`
 - `src/application/workspaces/tests/CreateWorkspaceUseCase.test.ts`
 - `src/application/workspaces/tests/WorkspaceLifecycleUseCases.test.ts`
+- `src/application/workspaces/tests/WorkspaceMembershipAdministrationUseCases.test.ts`
+- `src/application/workspaces/tests/WorkspaceAdministrationQueryService.test.ts`
 - `src/infrastructure/persistence/workspaces/tests/WorkspacePersistenceMapper.test.ts`
 - `src/infrastructure/persistence/workspaces/tests/SqliteWorkspacePersistenceAdapter.test.ts`
 
@@ -273,4 +276,26 @@ Story 3.1.4 extends the adapter integration tests to validate:
   - duplicate and unauthorized role mutation denials
   - continuity-policy conflicts for last active admin-capable membership
   - owner-role mutation rejection in role-administration paths
+
+## Story 3.2.5 workspace membership query and listing services
+
+- Added `WorkspaceAdministrationQueryService` (`src/application/workspaces/use-cases/WorkspaceAdministrationQueryService.ts`) as the explicit workspace-administration read-path application service.
+- Query operations are explicit and stable for admin/operations interfaces:
+  - `listWorkspaces` (actor-scoped workspace listing with filter and pagination),
+  - `listWorkspaceMemberships`,
+  - `listWorkspaceInvitations`,
+  - `listWorkspaceRoleAssignments`.
+- Read responses are UI/API-oriented DTOs with summary data and no raw persistence-row exposure:
+  - workspace membership/role/invitation summary counts,
+  - per-member active role summaries and admin-capable flags,
+  - invitation active/expired indicators at query time,
+  - consistent pagination envelope (`limit`, `offset`, `returned`, `hasMore`).
+- Access-aware behavior assumptions are enforced in the application layer:
+  - workspace listing is scoped to workspaces where the actor has active membership visibility,
+  - membership/invitation/role listing requires active workspace membership and an `owner` or `admin` role.
+- Added `src/application/workspaces/tests/WorkspaceAdministrationQueryService.test.ts` coverage for:
+  - filtering and pagination behavior,
+  - DTO shape and summary-field behavior,
+  - forbidden access paths for non-admin actors,
+  - invalid-request handling for missing required identifiers.
 
