@@ -59,6 +59,11 @@ Primary domain operations:
 - Service port: `application/identity/ports/ITrustedDeviceManagementService.ts`
 - Pairing repository port: `application/identity/ports/ITrustedDevicePairingRepository.ts`
 - Pairing service port: `application/identity/ports/ITrustedDevicePairingService.ts`
+- Application implementations:
+  - `application/identity/services/TrustedDeviceManagementService.ts`
+  - `application/identity/services/TrustedDevicePairingService.ts`
+  - `application/identity/services/TrustedDeviceServiceMappers.ts`
+  - `src/application/identity/use-cases/CompleteTrustedDevicePairingUseCase.ts`
 
 Trusted-device contract coverage now includes:
 - record projection type (`TrustedDeviceRecord`),
@@ -99,6 +104,16 @@ Key invariants and posture:
 - invalid/reused/expired token states map to explicit validation outcomes for deterministic use-case handling.
 - pairing session completion requires a consumed token linked to the same session.
 - completion supports optional pinned trust-material registration metadata (`materialKind`, `pinReference`, optional key fingerprint) so trust-material enrollment can be finalized in later stories without changing use-case contracts.
+
+Story 2.2.2 runtime completion posture:
+- pairing completion is now implemented as production application orchestration (not only contract tests).
+- completion verifies session/token/device/user/workspace linkage before mutating state.
+- completion validates presented pairing artifacts by hash comparison (raw artifact values are not persisted).
+- expired, invalidated, or reused artifacts cannot transition a device to trusted.
+- invalid completion artifacts invalidate/reject the pairing flow deterministically.
+- successful completion consumes the pairing token, completes the pairing session, persists trust-material registration metadata, and persists the trusted device in `trusted` state with `trustMaterialRef`.
+- completion is idempotency-guarded for already completed sessions and fails closed on conflicting repeats.
+- completion request now supports optional `trustedDeviceRegistration` material to create pending trusted-device records before pairing where needed.
 
 ## Trusted-device lifecycle model
 
@@ -170,3 +185,7 @@ Persistence guarantees now covered:
   - `src/infrastructure/persistence/identity/tests/TrustedDevicePersistenceMapper.test.ts`
   - `src/infrastructure/persistence/identity/tests/SqliteTrustedDevicePersistenceAdapter.test.ts`
   - `infrastructure/filesystem/identity/tests/SqliteTrustedDeviceRepository.test.ts`
+- Application/service and completion integration coverage (Story 2.2.2):
+  - `application/identity/tests/TrustedDevicePairingService.test.ts`
+  - `application/identity/tests/CompleteTrustedDevicePairingUseCase.test.ts`
+  - `infrastructure/filesystem/identity/tests/TrustedDevicePairingCompletionIntegration.test.ts`

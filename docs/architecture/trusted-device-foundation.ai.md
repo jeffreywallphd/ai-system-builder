@@ -16,6 +16,10 @@ Session trust integration note:
 - `application/identity/ports/ITrustedDeviceManagementService.ts`
 - `application/identity/ports/ITrustedDevicePairingRepository.ts`
 - `application/identity/ports/ITrustedDevicePairingService.ts`
+- `application/identity/services/TrustedDeviceManagementService.ts`
+- `application/identity/services/TrustedDevicePairingService.ts`
+- `application/identity/services/TrustedDeviceServiceMappers.ts`
+- `src/application/identity/use-cases/CompleteTrustedDevicePairingUseCase.ts`
 - `infrastructure/filesystem/identity/SqliteTrustedDeviceRepository.ts`
 - `infrastructure/filesystem/identity/TrustedDevicePersistenceMapper.ts`
 - `src/infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter.ts`
@@ -77,6 +81,25 @@ Pairing service lifecycle contract (`ITrustedDevicePairingService`):
 - expire pairing attempts/tokens/sessions
 - invalidate pairing artifacts
 
+## Completion enforcement update (Story 2.2.2)
+
+- Pairing completion is now implemented as production application service orchestration in `TrustedDevicePairingService`.
+- Completion flow now:
+  - verifies token/session/device/user/workspace linkage before mutation,
+  - validates presented pairing artifact by hash comparison (raw token not persisted),
+  - rejects/invalidates invalid completion artifacts,
+  - expires issued artifacts that crossed `expiresAt` before completion,
+  - consumes token and marks session completed with trust-material registration metadata,
+  - pairs the trusted-device record with persisted trust material reference.
+- Completion is idempotency-guarded:
+  - repeated completion for an already completed session returns persisted state when token + trust material align,
+  - conflicting repeated completion requests fail closed.
+- Optional completion-time device registration seam:
+  - `TrustedDevicePairingCompletionRequest.trustedDeviceRegistration` allows creation of the pending trusted-device record when needed before pairing.
+- Sensitive pairing artifacts:
+  - service errors avoid echoing presented token values,
+  - auth redaction now includes `presentedToken` and `pinReference` keys for transport/log safety.
+
 ## Persistence update (Story 2.1.3)
 
 - SQLite migrations for trusted-device/session persistence now land in schema version `6` for both migration tracks:
@@ -106,3 +129,6 @@ Pairing service lifecycle contract (`ITrustedDevicePairingService`):
 - `src/infrastructure/persistence/identity/tests/TrustedDevicePersistenceMapper.test.ts`
 - `src/infrastructure/persistence/identity/tests/SqliteTrustedDevicePersistenceAdapter.test.ts`
 - `infrastructure/filesystem/identity/tests/SqliteTrustedDeviceRepository.test.ts`
+- `application/identity/tests/TrustedDevicePairingService.test.ts`
+- `application/identity/tests/CompleteTrustedDevicePairingUseCase.test.ts`
+- `infrastructure/filesystem/identity/tests/TrustedDevicePairingCompletionIntegration.test.ts`

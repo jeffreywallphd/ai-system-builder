@@ -293,6 +293,20 @@ export interface TrustedDevicePairingCompletionRequest {
   readonly trustedDeviceId: string;
   readonly userIdentityId: string;
   readonly workspaceId?: string;
+  readonly trustedDeviceRegistration?: Readonly<{
+    readonly displayName: string;
+    readonly fingerprint: DeviceFingerprint;
+    readonly pairingMethod: DevicePairingMethod;
+    readonly metadata?: Readonly<{
+      platform?: string;
+      osVersion?: string;
+      appVersion?: string;
+      deviceModel?: string;
+      locale?: string;
+      lastIpAddress?: string;
+    }>;
+    readonly registeredAt?: string;
+  }>;
   readonly presentedToken: string;
   readonly completedAt?: string;
   readonly completedByUserIdentityId?: string;

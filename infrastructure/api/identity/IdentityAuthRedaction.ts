@@ -16,6 +16,8 @@ const SENSITIVE_FIELD_KEYS = new Set([
   "newcredential",
   "pepperversion",
   "providersubject",
+  "presentedtoken",
+  "pinreference",
   "recoverycode",
   "recoverytoken",
   "salt",

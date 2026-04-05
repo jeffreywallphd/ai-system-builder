@@ -19,6 +19,8 @@ describe("IdentityAuthRedaction", () => {
           { trustMarker: "marker:alpha" },
           { trustedDeviceId: "trusted-device:alpha" },
           { providerSubject: "alice" },
+          { presentedToken: "PAIR-SECRET-ALPHA" },
+          { pinReference: "pin:alpha" },
         ],
       },
     };
@@ -31,6 +33,8 @@ describe("IdentityAuthRedaction", () => {
     expect(serialized.includes("NewSecret!2027")).toBeFalse();
     expect(serialized.includes("marker:alpha")).toBeFalse();
     expect(serialized.includes("trusted-device:alpha")).toBeFalse();
+    expect(serialized.includes("PAIR-SECRET-ALPHA")).toBeFalse();
+    expect(serialized.includes("pin:alpha")).toBeFalse();
     expect(serialized.includes("[REDACTED]")).toBeTrue();
   });
 
