@@ -19,6 +19,14 @@ This note documents Story 4.1.5 (Feature 4 / Epic 4.1): application-layer author
 - `src/application/authorization/use-cases/AuthorizedResourceQueryService.ts`
 - `src/application/authorization/use-cases/AuthorizationPolicyMutationService.ts`
 - `src/application/authorization/use-cases/AuthorizationAuditRedaction.ts`
+- `src/application/authorization/use-cases/AuthorizationAdministrationUseCaseShared.ts`
+- `src/application/authorization/use-cases/AssignAuthorizationRoleUseCase.ts`
+- `src/application/authorization/use-cases/RemoveAuthorizationRoleUseCase.ts`
+- `src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase.ts`
+- `src/application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase.ts`
+- `src/application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase.ts`
+- `src/application/authorization/use-cases/EvaluateAuthorizationPermissionUseCase.ts`
+- `src/application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase.ts`
 - `src/application/authorization/tests/AuthorizationPolicyPortsContracts.test.ts`
 - `src/application/authorization/tests/EffectivePermissionResolutionService.test.ts`
 - `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
@@ -83,6 +91,18 @@ This note documents Story 4.1.5 (Feature 4 / Epic 4.1): application-layer author
 - Decision events include actor/workspace/resource references, permission, outcome, reason code, and compact counts only.
 - Mutation events include actor/workspace/resource references and mutation semantics (`entityKind`, `mutationKind`, `operationKey`, `changed`, `wasReplay`).
 - Free-form mutation reason/metadata is redacted through `AuthorizationAuditRedaction.ts` before emission.
+
+## Administration command/query seams (Story 4.2.7)
+
+- Authorization administration now exposes first-class application use cases so controllers/pages can call stable commands/queries instead of embedding policy logic:
+  - role assignment commands (`AssignAuthorizationRoleUseCase`, `RemoveAuthorizationRoleUseCase`)
+  - sharing commands (`GrantAuthorizationSharingAccessUseCase`, `RevokeAuthorizationSharingAccessUseCase`)
+  - visibility command (`UpdateAuthorizationVisibilityUseCase`)
+  - permission query (`EvaluateAuthorizationPermissionUseCase`)
+  - effective-access query (`ListAuthorizationEffectiveAccessUseCase`)
+- Command/query payloads are validated with Epic 4.1 authorization schemas.
+- Administrative mutations enforce actor authorization through `IAuthorizationPolicyDecisionEvaluator` before persistence writes.
+- Mutation side effects remain centralized in `AuthorizationPolicyMutationService` to preserve audit-event emission behavior.
 
 ## Coverage
 

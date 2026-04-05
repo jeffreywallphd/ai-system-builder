@@ -10,6 +10,7 @@ Stories 4.2.2-4.2.3 deliver the production policy-evaluation core for Feature 4:
 Story 4.2.4 adds optional hot-path caching for authorization persistence reads used repeatedly by policy-evaluation and list screens.
 Story 4.2.5 adds reusable authorization-aware list/search query composition so workspace views only return resources visible to the requesting actor.
 Story 4.2.6 adds audit-friendly authorization event emission for mutation operations and deny-focused decision outcomes.
+Story 4.2.7 adds production application command/query use cases for authorization administration and permission/effective-access reads.
 
 ## Canonical files
 
@@ -21,8 +22,17 @@ Story 4.2.6 adds audit-friendly authorization event emission for mutation operat
 - `src/application/authorization/use-cases/AuthorizedResourceQueryService.ts`
 - `src/application/authorization/use-cases/AuthorizationPolicyMutationService.ts`
 - `src/application/authorization/use-cases/AuthorizationAuditRedaction.ts`
+- `src/application/authorization/use-cases/AuthorizationAdministrationUseCaseShared.ts`
+- `src/application/authorization/use-cases/AssignAuthorizationRoleUseCase.ts`
+- `src/application/authorization/use-cases/RemoveAuthorizationRoleUseCase.ts`
+- `src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase.ts`
+- `src/application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase.ts`
+- `src/application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase.ts`
+- `src/application/authorization/use-cases/EvaluateAuthorizationPermissionUseCase.ts`
+- `src/application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase.ts`
 - `src/application/authorization/tests/AuthorizedResourceQueryService.test.ts`
 - `src/application/authorization/tests/AuthorizationPolicyMutationService.test.ts`
+- `src/application/authorization/tests/AuthorizationAdministrationUseCases.test.ts`
 - `src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter.ts`
 - `src/infrastructure/persistence/authorization/tests/SqliteAuthorizationPersistenceAdapter.test.ts`
 
@@ -130,3 +140,20 @@ Integration example:
   - sharing grant upsert/revoke,
   - resource policy upsert/soft-delete.
 - Audit metadata redaction is centralized in `AuthorizationAuditRedaction.ts`, which masks sensitive keys (for example `token`, `password`, `credential`, `apiKey`) and truncates long free-form strings.
+
+## Authorization administration use cases (Story 4.2.7)
+
+- Application commands now provide direct use-case seams for:
+  - assign role,
+  - remove role,
+  - grant sharing access,
+  - revoke sharing access,
+  - update visibility (with sharing-grant reconciliation).
+- Query use cases now provide:
+  - permission evaluation (`EvaluateAuthorizationPermissionUseCase`),
+  - effective-access listing (`ListAuthorizationEffectiveAccessUseCase`).
+- All command/query boundaries validate payloads through Epic 4.1 schema parsers.
+- Mutation commands enforce actor authorization before persistence writes:
+  - workspace capability check (`system.manage`) for role administration,
+  - resource-level share/manage checks (`<resource-family>.share|manage`) for sharing and visibility operations.
+- Mutations remain coordinated through `AuthorizationPolicyMutationService`, preserving centralized repository + audit-event side effects.
