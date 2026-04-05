@@ -368,6 +368,41 @@ Current authorization posture:
 - session revoke enforces actor ownership of the target session in the application use case
 - system-driven revocation seams now exist in application services/use cases for future security/device-trust orchestration
 
+## Session Policy Configuration and Expiry Controls (Story 1.3.5)
+
+Session lifecycle policy is now configurable through standard environment-backed config seams rather than hard-coded runtime behavior:
+
+- `infrastructure/config/IdentitySessionPolicyConfig.ts`
+- `hosts/server/IdentityServerHost.ts` (policy loading + injection into `IdentitySessionLifecycleService`)
+
+Configurable per-channel policy controls:
+
+- absolute session duration (`ttlMinutes`)
+- refresh allowance (`allowRefresh`)
+- optional inactivity timeout (`inactivityTimeoutMinutes`)
+
+Environment variables:
+
+- `IDENTITY_SESSION_DESKTOP_TTL_MINUTES`
+- `IDENTITY_SESSION_DESKTOP_ALLOW_REFRESH`
+- `IDENTITY_SESSION_DESKTOP_INACTIVITY_TIMEOUT_MINUTES`
+- `IDENTITY_SESSION_THIN_CLIENT_TTL_MINUTES`
+- `IDENTITY_SESSION_THIN_CLIENT_ALLOW_REFRESH`
+- `IDENTITY_SESSION_THIN_CLIENT_INACTIVITY_TIMEOUT_MINUTES`
+
+Policy evaluation remains in application-layer identity services (not transport):
+
+- issuance and refresh use policy-derived expiry windows in `IdentitySessionLifecycleService`
+- token/session validation applies rolling inactivity expiry and absolute TTL caps in `IdentityAuthenticatedSessionService`
+- protected HTTP routes continue to consume these outcomes through backend APIs/guards without embedding policy logic
+
+Default policy posture remains explicit and secure by default:
+
+- desktop: `ttlMinutes=43200` (30 days), `allowRefresh=false`, inactivity timeout unset
+- thin-client: `ttlMinutes=720` (12 hours), `allowRefresh=true`, inactivity timeout unset
+
+When inactivity timeout is configured, validation updates session/token expiry on activity (bounded by absolute TTL), and inactive sessions are expired/rejected once the inactivity window elapses.
+
 ## Implemented Test Coverage
 
 Key tests for this foundation:
@@ -384,6 +419,7 @@ Key tests for this foundation:
 - `application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
 - `application/identity/tests/IdentitySessionLifecycleService.test.ts`
 - `application/identity/tests/IdentityAuthenticatedSessionService.test.ts`
+- `infrastructure/config/tests/IdentitySessionPolicyConfig.test.ts`
 - `application/identity/tests/LogoutIdentitySessionUseCase.test.ts`
 - `application/identity/tests/RevokeIdentitySessionUseCase.test.ts`
 - `application/identity/tests/IdentityAuthenticatorAndProviderCatalog.test.ts`

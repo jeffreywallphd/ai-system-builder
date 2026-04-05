@@ -150,6 +150,28 @@
   - `identity_session_token_material.invalidated_at` is set
 - Resulting consistency behavior is immediate for subsequent guard checks in local SQLite-backed runtime state: revoked sessions are rejected as `401` + `authentication-failed`.
 
+## Session policy configuration and expiry controls (story 1.3.5)
+
+- Session policy is now environment-configurable through `infrastructure/config/IdentitySessionPolicyConfig.ts` and injected by `hosts/server/IdentityServerHost.ts` into `IdentitySessionLifecycleService`.
+- Per-channel controls now include:
+  - absolute TTL (`ttlMinutes`)
+  - refresh allowance (`allowRefresh`)
+  - optional inactivity timeout (`inactivityTimeoutMinutes`)
+- Supported environment variables:
+  - `IDENTITY_SESSION_DESKTOP_TTL_MINUTES`
+  - `IDENTITY_SESSION_DESKTOP_ALLOW_REFRESH`
+  - `IDENTITY_SESSION_DESKTOP_INACTIVITY_TIMEOUT_MINUTES`
+  - `IDENTITY_SESSION_THIN_CLIENT_TTL_MINUTES`
+  - `IDENTITY_SESSION_THIN_CLIENT_ALLOW_REFRESH`
+  - `IDENTITY_SESSION_THIN_CLIENT_INACTIVITY_TIMEOUT_MINUTES`
+- Policy evaluation remains in application services:
+  - issuance/refresh in `IdentitySessionLifecycleService`
+  - validation-time rolling inactivity + absolute-cap expiry in `IdentityAuthenticatedSessionService`
+  - transport guard code consumes results only (no transport-level policy logic).
+- Default posture remains explicit:
+  - desktop: 30-day TTL, refresh disabled, inactivity timeout unset
+  - thin-client: 12-hour TTL, refresh enabled, inactivity timeout unset
+
 ## Read next
 
 - Full architecture note: `docs/architecture/identity-foundation.md`

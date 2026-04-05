@@ -70,6 +70,7 @@ Shared redaction (`redactSensitiveAuthPayload`) is reused by both backend and HT
   - `sessionExpiresAt`
   - `sessionAccessChannel`
 - Session metadata and token material are separated in persistence (`identity_sessions` vs `identity_session_token_material`).
+- Session expiry/refresh behavior is policy-configurable through environment-backed identity session policy settings (`IDENTITY_SESSION_*`) rather than hard-coded expiry constants.
 
 ## Logout and revocation contract update (story 1.3.4)
 

@@ -294,4 +294,101 @@ describe("IdentityAuthenticatedSessionService", () => {
     const resolved = await service.resolveAuthenticatedSessionByToken({ token: issued.value.token });
     expect(resolved.ok).toBeFalse();
   });
+
+  it("applies inactivity timeout as rolling expiry during token resolution", async () => {
+    const adapter = new InMemoryIdentitySessionAdapter();
+    const lifecycleService = new IdentitySessionLifecycleService({
+      sessionRepository: adapter,
+      clock: adapter,
+      idGenerator: adapter,
+      policies: {
+        desktop: {
+          ttlMinutes: 60,
+          allowRefresh: false,
+          inactivityTimeoutMinutes: 5,
+        },
+        thinClient: {
+          ttlMinutes: 60,
+          allowRefresh: true,
+          inactivityTimeoutMinutes: 5,
+        },
+      },
+    });
+    const service = new IdentityAuthenticatedSessionService({
+      lifecycleService,
+      sessionRepository: adapter,
+      tokenMaterialRepository: adapter,
+      tokenService: adapter,
+      clock: adapter,
+    });
+
+    const issued = await service.issueAuthenticatedSession({
+      userIdentityId: "user:1",
+      providerId: "provider:local-password",
+      providerSubject: "alice",
+      accessChannel: IdentitySessionAccessChannels.thinClient,
+    });
+    if (!issued.ok) {
+      throw new Error("Expected issue success.");
+    }
+
+    expect(issued.value.session.expiresAt).toBe("2026-04-04T12:05:00.000Z");
+
+    adapter.setNow("2026-04-04T12:03:00.000Z");
+    const resolved = await service.resolveAuthenticatedSessionByToken({ token: issued.value.token });
+    expect(resolved.ok).toBeTrue();
+    if (!resolved.ok) {
+      throw new Error("Expected resolve success.");
+    }
+    expect(resolved.value.session.expiresAt).toBe("2026-04-04T12:08:00.000Z");
+
+    const tokenMaterial = await adapter.getSessionTokenMaterialBySessionId(issued.value.session.id);
+    expect(tokenMaterial?.updatedAt).toBe("2026-04-04T12:03:00.000Z");
+    expect(tokenMaterial?.expiresAt).toBe("2026-04-04T12:08:00.000Z");
+  });
+
+  it("expires sessions when inactivity timeout window elapses without activity", async () => {
+    const adapter = new InMemoryIdentitySessionAdapter();
+    const lifecycleService = new IdentitySessionLifecycleService({
+      sessionRepository: adapter,
+      clock: adapter,
+      idGenerator: adapter,
+      policies: {
+        desktop: {
+          ttlMinutes: 60,
+          allowRefresh: false,
+          inactivityTimeoutMinutes: 5,
+        },
+        thinClient: {
+          ttlMinutes: 60,
+          allowRefresh: true,
+          inactivityTimeoutMinutes: 5,
+        },
+      },
+    });
+    const service = new IdentityAuthenticatedSessionService({
+      lifecycleService,
+      sessionRepository: adapter,
+      tokenMaterialRepository: adapter,
+      tokenService: adapter,
+      clock: adapter,
+    });
+
+    const issued = await service.issueAuthenticatedSession({
+      userIdentityId: "user:1",
+      providerId: "provider:local-password",
+      providerSubject: "alice",
+      accessChannel: IdentitySessionAccessChannels.thinClient,
+    });
+    if (!issued.ok) {
+      throw new Error("Expected issue success.");
+    }
+
+    adapter.setNow("2026-04-04T12:06:00.000Z");
+    const resolved = await service.resolveAuthenticatedSessionByToken({ token: issued.value.token });
+    expect(resolved.ok).toBeFalse();
+
+    const expired = await adapter.getSessionById(issued.value.session.id);
+    expect(expired?.status).toBe(IdentitySessionStatuses.expired);
+  });
 });

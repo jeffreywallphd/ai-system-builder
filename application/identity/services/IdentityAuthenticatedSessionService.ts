@@ -1,4 +1,5 @@
 import {
+  IdentitySessionAccessChannels,
   IdentitySessionStatuses,
   expireSession,
   type IdentitySessionAccessChannel,
@@ -155,7 +156,28 @@ export class IdentityAuthenticatedSessionService {
       return this.failure(IdentityErrorCodes.invalidSessionState, "Session is not active.");
     }
 
-    return identitySuccess(Object.freeze({ session }));
+    const policyAccessChannel = session.client?.accessChannel ?? IdentitySessionAccessChannels.thinClient;
+    const rolledExpiry = this.dependencies.lifecycleService.calculateSessionRollingExpiry(
+      new Date(session.issuedAt),
+      policyAccessChannel,
+      now,
+    );
+
+    let resolvedSession = session;
+    if (rolledExpiry && rolledExpiry.getTime() > new Date(session.expiresAt).getTime()) {
+      resolvedSession = await this.dependencies.sessionRepository.saveSession(Object.freeze({
+        ...session,
+        expiresAt: rolledExpiry.toISOString(),
+      }));
+    }
+
+    await this.dependencies.tokenMaterialRepository.saveSessionTokenMaterial(Object.freeze({
+      ...tokenMaterial,
+      updatedAt: now.toISOString(),
+      expiresAt: resolvedSession.expiresAt,
+    }));
+
+    return identitySuccess(Object.freeze({ session: resolvedSession }));
   }
 
   public async invalidateAuthenticatedSession(
