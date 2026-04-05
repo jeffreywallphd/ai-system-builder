@@ -213,3 +213,39 @@ Story 7.2.2 adds an upgrade gate for runtime websocket channels so accepted sock
   - purpose parsing and capability mapping;
   - channel-context construction with actor/transport metadata;
   - channel registry registration and release lifecycle.
+
+## Story 7.2.3 desktop trusted-device channel bootstrap + pinned trust handling
+
+Story 7.2.3 adds desktop-side transport bootstrap behavior so desktop client channels are bound to explicit trusted-device registration + pinned trust material instead of generic LAN assumptions.
+
+### Runtime additions
+
+- `electron/shared/DesktopContracts.ts`
+  - desktop bootstrap context now includes `identityTransportTrust` with:
+    - trust enforcement posture (`required` / `optional`);
+    - trusted-device registration binding metadata;
+    - pinned trust-material registration metadata.
+- `electron/main/main.ts`
+  - desktop host resolves `identityTransportTrust` from secure desktop storage/env-backed host config and injects it into preload bootstrap context.
+- `infrastructure/security/DesktopTrustedDeviceTransportBootstrap.ts`
+  - central desktop trust-bootstrap resolver + ports:
+    - bootstrap-context port (`IDesktopTrustedDeviceBootstrapPort`);
+    - clock port (`IDesktopTrustedDeviceBootstrapClockPort`);
+    - deterministic bootstrap state model (`ready` / `not-required` / `failed` with actionable reason codes).
+- `infrastructure/transport/http-client/DesktopTrustedDeviceIdentityAuthClient.ts`
+  - desktop-aware auth client wrapper that:
+    - blocks login when required trust bootstrap fails;
+    - injects trusted-device binding into desktop login requests and requires trusted session issuance;
+    - distinguishes credential success from trusted-device session assurance (fail-closes untrusted issued sessions).
+
+### Failure-state posture
+
+- Bootstrap failures are surfaced as structured trust-failure reasons in API error envelopes (`registration-missing`, `pinned-trust-material-missing`, `pinned-trust-material-expired`, `session-assurance-not-trusted`) without returning raw trust-material values.
+- Desktop login UX can show actionable remediation guidance while transport/bootstrap internals remain outside page/presentation composition.
+
+### Tests
+
+- `infrastructure/security/tests/DesktopTrustedDeviceTransportBootstrap.test.ts`
+  - covers required/optional bootstrap posture, missing registration, missing pin, expired pin, and ready-state resolution.
+- `infrastructure/transport/http-client/tests/DesktopTrustedDeviceIdentityAuthClient.test.ts`
+  - covers bootstrap-failure channel blocking, trust-context login injection, post-login trust-assurance gating, and non-required passthrough behavior.
