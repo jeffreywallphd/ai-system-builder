@@ -62,3 +62,4 @@ Defined in `src/shared/contracts/authorization/AuthorizationPolicyContracts.ts` 
 - Story 4.1.4 adds reusable protected-resource visibility/sharing contracts; see `docs/architecture/authorization-visibility-sharing-contracts.md`.
 - Story 4.1.5 adds application-layer authorization ports and policy-evaluation interfaces; see `docs/architecture/authorization-application-ports.md`.
 - Story 4.1.6 adds shared authorization payload schemas and boundary-validation parse helpers; see `docs/architecture/authorization-schema-validation-contracts.md`.
+- Story 4.1.7 adds migration-ready authorization persistence DTOs and repository-port seams for role assignments, sharing grants, and resource policy metadata; see `docs/architecture/authorization-persistence-contracts.md`.

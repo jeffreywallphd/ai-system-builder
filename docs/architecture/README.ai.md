@@ -69,6 +69,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Authorization protected-resource visibility + explicit-sharing contracts: `docs/architecture/authorization-visibility-sharing-contracts.md`
 - Authorization application-layer policy evaluation ports and adapter-boundary contracts: `docs/architecture/authorization-application-ports.md`
 - Authorization shared payload schema contracts and boundary-validation guidance: `docs/architecture/authorization-schema-validation-contracts.md`
+- Authorization persistence DTO/repository contracts and migration-ready mutation semantics: `docs/architecture/authorization-persistence-contracts.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).
