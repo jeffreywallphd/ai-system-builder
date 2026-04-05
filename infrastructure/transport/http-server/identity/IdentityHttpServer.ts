@@ -111,6 +111,7 @@ import {
   TransportConnectionActorTypes,
   TransportPeerTypes,
   TransportSecurityScenarios,
+  type TransportChannelType,
   type TransportConnectionActorType,
   type TransportPeerType,
   type TransportSecurityScenario,
@@ -601,6 +602,11 @@ interface IdentityHttpServerTransportTrustOptions {
   readonly defaultScenario?: TransportSecurityScenario;
 }
 
+interface IdentityHttpServerSecureTransportOptions {
+  readonly requireHttps: boolean;
+  readonly allowInsecureLoopback: boolean;
+}
+
 export interface IdentityHttpServerOptions {
   readonly backendApi: IdentityAuthBackendApi;
   readonly certificateOperationsBackendApi?: CertificateOperationsBackendApi;
@@ -611,11 +617,24 @@ export interface IdentityHttpServerOptions {
   readonly logger?: IdentityHttpServerLogger;
   readonly maxBodyBytes?: number;
   readonly serverFactory?: IdentityHttpServerFactory;
+  readonly secureTransport?: IdentityHttpServerSecureTransportOptions;
   readonly transportTrust?: IdentityHttpServerTransportTrustOptions;
 }
 
 export type IdentityHttpServerInstance = Server | HttpsServer;
 export type IdentityHttpServerFactory = (requestListener: RequestListener) => IdentityHttpServerInstance;
+
+interface InboundHttpTransportConnectionState {
+  readonly channelType: TransportChannelType;
+  readonly encryptedTransportEstablished: boolean;
+  readonly mutualTlsEstablished: boolean;
+  readonly peerCertificatePresented: boolean;
+  readonly peerCertificateSerialNumber?: string;
+  readonly localAddress?: string;
+  readonly remoteAddress?: string;
+  readonly host?: string;
+  readonly loopbackRequest: boolean;
+}
 
 interface AuthenticatedRequestContext {
   readonly principal: AuthenticatedIdentityPrincipalApiResponse;
@@ -624,6 +643,15 @@ interface AuthenticatedRequestContext {
   readonly sessionTrust: {
     readonly assuranceLevel: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted";
     readonly isTrusted: boolean;
+  };
+  readonly transport: {
+    readonly connection: InboundHttpTransportConnectionState;
+    readonly trustValidation: {
+      readonly enforced: boolean;
+      readonly scenario: TransportSecurityScenario;
+      readonly actorType: TransportConnectionActorType;
+      readonly remotePeerType: TransportPeerType;
+    };
   };
 }
 
@@ -635,6 +663,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
   return serverFactory(async (request, response) => {
     const requestId = randomUUID();
     const path = new URL(request.url ?? "/", "http://localhost").pathname;
+    const transportState = resolveInboundHttpTransportConnectionState(request);
     logger.info(Object.freeze({
       event: "identity-http.request.received",
       requestId,
@@ -643,6 +672,21 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
     }));
 
     try {
+      if (path.startsWith("/api/")) {
+        const secureTransportDecision = enforceApiSecureTransport({
+          request,
+          secureTransport: options.secureTransport,
+          transportState,
+        });
+        if (!secureTransportDecision.ok) {
+          writeJson(response, secureTransportDecision.statusCode, secureTransportDecision.body);
+          logResponse(logger, requestId, request, secureTransportDecision.statusCode, Object.freeze({
+            transport: transportState,
+          }), secureTransportDecision.body);
+          return;
+        }
+      }
+
       if (request.method === "POST" && path === "/api/v1/identity/register") {
         await handleRegister(request, response, requestId, options.backendApi, logger, maxBodyBytes);
         return;
@@ -673,6 +717,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               principal: context.principal,
               session: context.session,
               sessionToken: context.sessionToken,
+              transport: context.transport,
             }), responseBody);
           },
         );
@@ -3646,13 +3691,23 @@ async function requireAuthenticatedSession(
     return;
   }
 
-  if (transportTrust && !shouldBypassTransportTrustValidation(request, transportTrust)) {
+  const transportState = resolveInboundHttpTransportConnectionState(request);
+  const defaultScenario = transportTrust?.defaultScenario ?? TransportSecurityScenarios.thinClientToControlPlane;
+  const transportRouting = resolveTransportTrustRouting({
+    resolvedSession: resolvedSession.data,
+    options,
+    defaultScenario,
+  });
+  const bypassTransportTrustValidation = Boolean(
+    transportTrust && shouldBypassTransportTrustValidation(transportState, transportTrust),
+  );
+  if (transportTrust && !bypassTransportTrustValidation) {
     const transportValidationRequest = buildTransportTrustValidationRequest({
-      request,
+      transportState,
       requestId,
       resolvedSession: resolvedSession.data,
-      options,
-      defaultScenario: transportTrust.defaultScenario ?? TransportSecurityScenarios.thinClientToControlPlane,
+      routing: transportRouting,
+      nodeId: options?.nodeId,
     });
     const transportValidation = await transportTrust.httpValidator.validate(transportValidationRequest);
     if (!transportValidation.ok) {
@@ -3684,6 +3739,15 @@ async function requireAuthenticatedSession(
       assuranceLevel: sessionAssuranceLevel,
       isTrusted: sessionAssuranceLevel === "authenticated-trusted",
     }),
+    transport: Object.freeze({
+      connection: transportState,
+      trustValidation: Object.freeze({
+        enforced: Boolean(transportTrust && !bypassTransportTrustValidation),
+        scenario: transportRouting.scenario,
+        actorType: transportRouting.actorType,
+        remotePeerType: transportRouting.remotePeerType,
+      }),
+    }),
   }));
 }
 
@@ -3714,83 +3778,180 @@ async function handleLogin(
 }
 
 function shouldBypassTransportTrustValidation(
-  request: IncomingMessage,
+  transportState: InboundHttpTransportConnectionState,
   transportTrust: IdentityHttpServerTransportTrustOptions,
 ): boolean {
   if (!transportTrust.allowInsecureLoopback) {
     return false;
   }
-
-  const socketLike = request.socket as { readonly encrypted?: boolean } | undefined;
-  if (socketLike?.encrypted) {
+  if (transportState.encryptedTransportEstablished) {
     return false;
   }
-
-  const hostHeader = request.headers.host;
-  const hostValue = Array.isArray(hostHeader) ? hostHeader[0] : hostHeader;
-  if (!hostValue) {
-    return false;
-  }
-  const host = hostValue.split(":")[0]?.trim().toLowerCase();
-  return host === "127.0.0.1" || host === "localhost" || host === "::1" || host === "[::1]";
+  return transportState.loopbackRequest;
 }
 
 function buildTransportTrustValidationRequest(input: {
-  readonly request: IncomingMessage;
+  readonly transportState: InboundHttpTransportConnectionState;
   readonly requestId: string;
   readonly resolvedSession: ResolveAuthenticatedSessionApiResponse;
-  readonly options: {
-    readonly transportScenario?: TransportSecurityScenario;
-    readonly transportActorType?: TransportConnectionActorType;
-    readonly transportRemotePeerType?: TransportPeerType;
-    readonly nodeId?: string;
-  } | undefined;
-  readonly defaultScenario: TransportSecurityScenario;
-}): ValidateTransportConnectionTrustRequest {
-  const socketLike = input.request.socket as {
-    readonly encrypted?: boolean;
-    readonly authorized?: boolean;
-    getPeerCertificate?: () => { readonly serialNumber?: string } | undefined;
+  readonly routing: {
+    readonly scenario: TransportSecurityScenario;
+    readonly actorType: TransportConnectionActorType;
+    readonly remotePeerType: TransportPeerType;
   };
-  const encrypted = Boolean(socketLike?.encrypted);
-  const peerCertificate = socketLike?.getPeerCertificate?.();
-  const peerSerialNumber = normalizeOptionalString(peerCertificate?.serialNumber ?? null);
-  const certificatePresented = Boolean(peerSerialNumber);
-  const scenario = input.options?.transportScenario ?? input.defaultScenario;
-  const actorType = input.options?.transportActorType ?? TransportConnectionActorTypes.userSession;
-  const remotePeerType = input.options?.transportRemotePeerType
-    ?? (input.resolvedSession.session.accessChannel === "desktop"
-      ? TransportPeerTypes.desktopClient
-      : TransportPeerTypes.thinClient);
-
+  readonly nodeId?: string;
+}): ValidateTransportConnectionTrustRequest {
   return Object.freeze({
     connectionId: `identity-http:${input.requestId}`,
     direction: TransportConnectionDirections.inbound,
-    scenario,
-    channelType: encrypted ? TransportChannelTypes.https : TransportChannelTypes.http,
-    actorType,
+    scenario: input.routing.scenario,
+    channelType: input.transportState.channelType,
+    actorType: input.routing.actorType,
     localPeerType: TransportPeerTypes.authoritativeServer,
-    remotePeerType,
-    encryptedTransportEstablished: encrypted,
-    mutualTlsEstablished: Boolean(encrypted && socketLike?.authorized && certificatePresented),
+    remotePeerType: input.routing.remotePeerType,
+    encryptedTransportEstablished: input.transportState.encryptedTransportEstablished,
+    mutualTlsEstablished: input.transportState.mutualTlsEstablished,
     lanTrustAssumed: false,
-    userSessionEvidence: actorType === TransportConnectionActorTypes.userSession
+    userSessionEvidence: input.routing.actorType === TransportConnectionActorTypes.userSession
       ? Object.freeze({
         userIdentityId: input.resolvedSession.principal.userIdentityId,
         loginAuthenticated: true,
         trustedDeviceId: input.resolvedSession.session.deviceTrustContext?.trustedDeviceId,
       })
       : undefined,
-    nodeEvidence: actorType === TransportConnectionActorTypes.nodeIdentity
+    nodeEvidence: input.routing.actorType === TransportConnectionActorTypes.nodeIdentity
       ? Object.freeze({
-        nodeId: input.options?.nodeId ?? input.resolvedSession.principal.userIdentityId,
+        nodeId: input.nodeId ?? input.resolvedSession.principal.userIdentityId,
       })
       : undefined,
     peerCertificateEvidence: Object.freeze({
-      certificatePresented,
-      serialNumber: peerSerialNumber,
+      certificatePresented: input.transportState.peerCertificatePresented,
+      serialNumber: input.transportState.peerCertificateSerialNumber,
     }),
   });
+}
+
+function resolveTransportTrustRouting(input: {
+  readonly resolvedSession: ResolveAuthenticatedSessionApiResponse;
+  readonly options: {
+    readonly transportScenario?: TransportSecurityScenario;
+    readonly transportActorType?: TransportConnectionActorType;
+    readonly transportRemotePeerType?: TransportPeerType;
+  } | undefined;
+  readonly defaultScenario: TransportSecurityScenario;
+}): {
+  readonly scenario: TransportSecurityScenario;
+  readonly actorType: TransportConnectionActorType;
+  readonly remotePeerType: TransportPeerType;
+} {
+  const scenario = input.options?.transportScenario ?? input.defaultScenario;
+  const actorType = input.options?.transportActorType ?? TransportConnectionActorTypes.userSession;
+  const remotePeerType = input.options?.transportRemotePeerType
+    ?? (input.resolvedSession.session.accessChannel === "desktop"
+      ? TransportPeerTypes.desktopClient
+      : TransportPeerTypes.thinClient);
+  return Object.freeze({
+    scenario,
+    actorType,
+    remotePeerType,
+  });
+}
+
+function enforceApiSecureTransport(input: {
+  readonly request: IncomingMessage;
+  readonly secureTransport: IdentityHttpServerSecureTransportOptions | undefined;
+  readonly transportState: InboundHttpTransportConnectionState;
+}): {
+  readonly ok: true;
+} | {
+  readonly ok: false;
+  readonly statusCode: number;
+  readonly body: {
+    readonly ok: false;
+    readonly error: {
+      readonly code: "forbidden";
+      readonly message: string;
+    };
+  };
+} {
+  if (!input.secureTransport?.requireHttps) {
+    return Object.freeze({ ok: true });
+  }
+  if (input.transportState.encryptedTransportEstablished) {
+    return Object.freeze({ ok: true });
+  }
+  if (input.secureTransport.allowInsecureLoopback && input.transportState.loopbackRequest) {
+    return Object.freeze({ ok: true });
+  }
+
+  return Object.freeze({
+    ok: false,
+    statusCode: 403,
+    body: Object.freeze({
+      ok: false,
+      error: Object.freeze({
+        code: "forbidden" as const,
+        message: "Secure HTTPS transport is required for this API endpoint.",
+      }),
+    }),
+  });
+}
+
+function resolveInboundHttpTransportConnectionState(request: IncomingMessage): InboundHttpTransportConnectionState {
+  const socketLike = request.socket as {
+    readonly encrypted?: boolean;
+    readonly authorized?: boolean;
+    readonly localAddress?: string;
+    readonly remoteAddress?: string;
+    getPeerCertificate?: () => { readonly serialNumber?: string } | undefined;
+  } | undefined;
+  const encryptedTransportEstablished = Boolean(socketLike?.encrypted);
+  const peerCertificate = socketLike?.getPeerCertificate?.();
+  const peerCertificateSerialNumber = normalizeOptionalString(peerCertificate?.serialNumber ?? null);
+  const peerCertificatePresented = Boolean(peerCertificateSerialNumber);
+  const host = normalizeHostHeader(request.headers.host);
+  const localAddress = normalizeOptionalString(socketLike?.localAddress ?? null);
+  const remoteAddress = normalizeOptionalString(socketLike?.remoteAddress ?? null);
+
+  return Object.freeze({
+    channelType: encryptedTransportEstablished ? TransportChannelTypes.https : TransportChannelTypes.http,
+    encryptedTransportEstablished,
+    mutualTlsEstablished: Boolean(encryptedTransportEstablished && socketLike?.authorized && peerCertificatePresented),
+    peerCertificatePresented,
+    peerCertificateSerialNumber,
+    host,
+    localAddress,
+    remoteAddress,
+    loopbackRequest: isLoopbackHostValue(host)
+      || isLoopbackAddress(localAddress)
+      || isLoopbackAddress(remoteAddress),
+  });
+}
+
+function normalizeHostHeader(hostHeader: string | string[] | undefined): string | undefined {
+  const hostValue = Array.isArray(hostHeader) ? hostHeader[0] : hostHeader;
+  const normalized = normalizeOptionalString(hostValue ?? null);
+  if (!normalized) {
+    return undefined;
+  }
+  const splitHost = normalized.split(":")[0]?.trim();
+  return splitHost ? splitHost.toLowerCase() : undefined;
+}
+
+function isLoopbackHostValue(value: string | undefined): boolean {
+  return value === "127.0.0.1" || value === "localhost" || value === "::1" || value === "[::1]";
+}
+
+function isLoopbackAddress(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === "127.0.0.1"
+    || normalized === "::1"
+    || normalized === "::ffff:127.0.0.1"
+    || normalized === "::ffff:7f00:1";
 }
 
 async function parseAndValidateRequest<T>(

@@ -485,6 +485,24 @@ describe("IdentityServerHost", () => {
     rmSync(tempDirectory, { recursive: true, force: true });
   });
 
+  it("fails closed when secure transport policy disables loopback HTTP fallback", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-loopback-http-disabled-"));
+    const databasePath = join(tempDirectory, "identity-loopback-http-disabled.sqlite");
+
+    await expect(startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+      env: {
+        AI_LOOM_TRANSPORT_ALLOW_INSECURE_LOOPBACK: "false",
+      },
+    })).rejects.toThrow("requires HTTPS startup");
+
+    rmSync(tempDirectory, { recursive: true, force: true });
+  });
+
   it("fails closed when managed TLS resolves a revoked server certificate", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-managed-tls-revoked-"));
     const databasePath = join(tempDirectory, "identity-managed-tls-revoked.sqlite");

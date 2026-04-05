@@ -760,6 +760,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     workspaceBackendApi,
     workspaceAdministrationBackendApi,
     logger: options.logger,
+    secureTransport: Object.freeze({
+      requireHttps: secureTransportConfig.requireSecureHttp,
+      allowInsecureLoopback: secureTransportConfig.allowInsecureLoopback,
+    }),
     serverFactory: managedTlsMaterial
       ? createManagedIdentityServerTlsFactory(managedTlsMaterial)
       : undefined,
