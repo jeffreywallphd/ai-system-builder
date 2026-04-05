@@ -1,6 +1,6 @@
 # Transport Security Foundation
 
-This document describes the Story 7.1.1 transport security contract baseline for Feature 7 / Epic 7.1.
+This document describes the Story 7.1.1 and Story 7.1.2 transport security baseline for Feature 7 / Epic 7.1.
 
 ## Scope
 
@@ -11,17 +11,25 @@ The slice introduces shared domain and application contracts for secure runtime 
 - trusted node to control-plane
 - service-to-service control-plane channels
 
-It does not add host-specific HTTP/TLS adapter behavior yet. It defines the interfaces those adapters should consume.
+Story 7.1.1 defines policy and trust-evaluation contracts.
+Story 7.1.2 adds centralized trust-state resolution and transport adapter mapping so inbound/outbound connection checks can consume one validation path.
 
 ## Canonical artifacts
 
 - `src/domain/security/TransportSecurityDomain.ts`
 - `src/application/security/ports/TransportSecurityPorts.ts`
 - `src/application/security/use-cases/EvaluateTransportConnectionPolicyUseCase.ts`
+- `src/application/security/ports/TransportTrustValidationPorts.ts`
+- `src/application/security/use-cases/ValidateTransportConnectionTrustUseCase.ts`
 - `src/shared/contracts/security/TransportSecurityContracts.ts`
 - `src/domain/security/tests/TransportSecurityDomain.test.ts`
 - `src/application/security/tests/EvaluateTransportConnectionPolicyUseCase.test.ts`
+- `src/application/security/tests/ValidateTransportConnectionTrustUseCase.test.ts`
 - `src/shared/contracts/security/tests/TransportSecurityContracts.test.ts`
+- `src/infrastructure/security/ServerManagedTransportTrustStateResolver.ts`
+- `src/infrastructure/security/tests/ServerManagedTransportTrustStateResolver.test.ts`
+- `src/infrastructure/transport/TransportTrustValidationAdapters.ts`
+- `src/infrastructure/transport/tests/TransportTrustValidationAdapters.test.ts`
 
 ## Domain vocabulary
 
@@ -101,11 +109,22 @@ Rejection reasons include:
 
 This keeps host transport handlers thin and avoids duplicating trust rules in each host.
 
+Story 7.1.2 adds `ValidateTransportConnectionTrustUseCase` as the centralized trust-validation path that:
+
+- resolves trusted-device state from server-managed registration records
+- resolves node trust and revocation posture from node identity persistence
+- resolves peer certificate posture from certificate revocation/trust state
+- composes resolved trust evidence into one policy evaluation decision
+- returns structured failure reasons for audit/logging/safe transport responses
+
+The use case is direction-aware (`inbound` / `outbound`) and scenario-aware so the same path can be reused by multiple hosts and adapters without re-implementing trust checks.
+
 ## Adapter guidance
 
 - Parse and normalize inbound connection/auth evidence at transport boundaries.
-- Build `TransportConnectionContext` from host/runtime details.
-- Invoke `EvaluateTransportConnectionPolicyUseCase` before accepting HTTP/WebSocket/service channels.
+- Build transport trust validation requests from host/runtime details and invoke `ValidateTransportConnectionTrustUseCase`.
+- Use infrastructure trust-state resolvers to load trusted-device/node/certificate posture from server-managed stores.
+- Use transport adapter mappings (`HTTP` / `WebSocket`) to convert validation outcomes into protocol-safe responses without exposing sensitive trust internals.
 - Treat non-accepted decisions as authoritative rejection outcomes.
 - Do not add insecure fallback branches in adapter code paths.
 
