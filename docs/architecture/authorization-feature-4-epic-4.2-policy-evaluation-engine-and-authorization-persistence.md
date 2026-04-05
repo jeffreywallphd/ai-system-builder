@@ -223,3 +223,19 @@ Command gate examples:
 - `AssignAuthorizationRoleUseCase` -> requires workspace capability `system.manage`.
 - `GrantAuthorizationSharingAccessUseCase` -> requires `<resource-family>.share` and metadata/visibility consistency checks.
 - `UpdateAuthorizationVisibilityUseCase` -> requires `<resource-family>.manage`, validates ownership-scope constraints, then reconciles sharing grants to submitted target state.
+
+## Transport-facing sharing and visibility management (Story 4.4.1)
+
+- `AuthorizationManagementBackendApi` now exposes transport-ready operations for:
+  - visibility updates,
+  - explicit sharing grant upsert,
+  - explicit sharing grant revoke,
+  - effective access state inspection.
+- `IdentityHttpServer` now routes authorization management endpoints under `/api/v1/authorization/resources/:resourceFamily/:resourceType/:resourceId/...`.
+- Request payloads are validated at transport boundaries and again through Epic 4.1 shared schema parsing in command/query use cases.
+- Error mapping remains stable across handlers:
+  - `invalid-request` -> HTTP `400`
+  - `forbidden` -> HTTP `403`
+  - `not-found` -> HTTP `404`
+  - `conflict` -> HTTP `409`
+  - `internal` -> HTTP `500`

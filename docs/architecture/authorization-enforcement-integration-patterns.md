@@ -13,13 +13,16 @@ Use this file when adding any new read/write/download/operational capability tha
 - `infrastructure/api/system-runtime/SystemRuntimeBackendApi.ts`
 - `infrastructure/api/system-runtime/RuntimeRequestRouter.ts`
 - `infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
+- `infrastructure/api/authorization/AuthorizationManagementBackendApi.ts`
 - `src/application/authorization/use-cases/AuthorizationResponseRedaction.ts`
+- `src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter.ts`
 - `ui/presenters/WorkspaceAdministrationCapabilitiesPresenter.ts`
 - `infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
 - `infrastructure/api/studio-shell/tests/ReferenceImageOutputAuthorization.test.ts`
 - `infrastructure/api/studio-shell/tests/OperationalRunAuthorization.test.ts`
 - `infrastructure/api/system-runtime/tests/SystemRuntimeOperationalAuthorization.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthorizationManagement.test.ts`
 
 ## 1) Route and transport guard pattern
 

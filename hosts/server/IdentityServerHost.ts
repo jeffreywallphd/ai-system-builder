@@ -43,9 +43,17 @@ import { CompleteTrustedDevicePairingUseCase } from "../../src/application/ident
 import { SqliteIdentityLifecycleEventPublisher } from "../../infrastructure/filesystem/identity/SqliteIdentityLifecycleEventPublisher";
 import { WorkspaceInvitationBackendApi } from "../../infrastructure/api/workspaces/WorkspaceInvitationBackendApi";
 import { WorkspaceAdministrationBackendApi } from "../../infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
+import { AuthorizationManagementBackendApi } from "../../infrastructure/api/authorization/AuthorizationManagementBackendApi";
 import { SqliteWorkspacePersistenceAdapter } from "../../src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import { WorkspaceAuthorizationPolicyReadAdapter } from "../../src/infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
+import { SqliteAuthorizationPersistenceAdapter } from "../../src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter";
+import { SqliteAuthorizationPolicyReadAdapter } from "../../src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter";
 import { AuthorizationPolicyDecisionEvaluator } from "../../src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
+import { AuthorizationPolicyMutationService } from "../../src/application/authorization/use-cases/AuthorizationPolicyMutationService";
+import { GrantAuthorizationSharingAccessUseCase } from "../../src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
+import { RevokeAuthorizationSharingAccessUseCase } from "../../src/application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
+import { UpdateAuthorizationVisibilityUseCase } from "../../src/application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
+import { ListAuthorizationEffectiveAccessUseCase } from "../../src/application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
 import {
   IssueWorkspaceInvitationUseCase,
   type WorkspaceInvitationIssuanceClock,
@@ -131,6 +139,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const repository = new SqliteIdentityRepository(path.resolve(options.databasePath));
   const trustedDeviceRepository = new SqliteTrustedDeviceRepository(path.resolve(options.databasePath));
   const workspaceRepository = new SqliteWorkspacePersistenceAdapter(path.resolve(options.databasePath));
+  const authorizationRepository = new SqliteAuthorizationPersistenceAdapter(path.resolve(options.databasePath));
   const env = options.env ?? process.env;
   const providerAccountPolicies = options.providerAccountPolicies
     ?? IdentityProviderAccountPolicyConfig.fromEnv(env);
@@ -153,6 +162,23 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     roleGrantReadRepository: workspaceAuthorizationPolicyReadAdapter,
     sharingGrantReadRepository: workspaceAuthorizationPolicyReadAdapter,
     resourcePolicyMetadataReadRepository: workspaceAuthorizationPolicyReadAdapter,
+    clock: workspaceClock,
+  });
+  const authorizationPolicyReadAdapter = new SqliteAuthorizationPolicyReadAdapter({
+    authorizationPersistenceAdapter: authorizationRepository,
+  });
+  const authorizationDecisionEvaluator = new AuthorizationPolicyDecisionEvaluator({
+    roleGrantReadRepository: authorizationPolicyReadAdapter,
+    sharingGrantReadRepository: authorizationPolicyReadAdapter,
+    resourcePolicyMetadataReadRepository: authorizationPolicyReadAdapter,
+    clock: workspaceClock,
+  });
+  const authorizationMutationService = new AuthorizationPolicyMutationService({
+    ports: {
+      roleAssignmentPersistenceRepository: authorizationRepository,
+      sharingGrantPersistenceRepository: authorizationRepository,
+      resourcePolicyMetadataPersistenceRepository: authorizationRepository,
+    },
     clock: workspaceClock,
   });
   const sessionTrustService = new TrustedDeviceSessionTrustService({
@@ -381,9 +407,51 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     workspaceAdministrationCapabilityResourceType: "workspace-administration",
     clock: workspaceClock,
   });
+  const authorizationManagementBackendApi = new AuthorizationManagementBackendApi({
+    grantSharingAccessUseCase: new GrantAuthorizationSharingAccessUseCase({
+      mutationService: authorizationMutationService,
+      decisionEvaluator: authorizationDecisionEvaluator,
+      persistencePorts: {
+        roleAssignmentPersistenceRepository: authorizationRepository,
+        sharingGrantPersistenceRepository: authorizationRepository,
+        resourcePolicyMetadataPersistenceRepository: authorizationRepository,
+      },
+      clock: workspaceClock,
+    }),
+    revokeSharingAccessUseCase: new RevokeAuthorizationSharingAccessUseCase({
+      mutationService: authorizationMutationService,
+      decisionEvaluator: authorizationDecisionEvaluator,
+      persistencePorts: {
+        roleAssignmentPersistenceRepository: authorizationRepository,
+        sharingGrantPersistenceRepository: authorizationRepository,
+        resourcePolicyMetadataPersistenceRepository: authorizationRepository,
+      },
+      clock: workspaceClock,
+    }),
+    updateVisibilityUseCase: new UpdateAuthorizationVisibilityUseCase({
+      mutationService: authorizationMutationService,
+      decisionEvaluator: authorizationDecisionEvaluator,
+      persistencePorts: {
+        roleAssignmentPersistenceRepository: authorizationRepository,
+        sharingGrantPersistenceRepository: authorizationRepository,
+        resourcePolicyMetadataPersistenceRepository: authorizationRepository,
+      },
+      clock: workspaceClock,
+    }),
+    listEffectiveAccessUseCase: new ListAuthorizationEffectiveAccessUseCase({
+      decisionEvaluator: authorizationDecisionEvaluator,
+      roleGrantReadRepository: authorizationPolicyReadAdapter,
+      sharingGrantReadRepository: authorizationPolicyReadAdapter,
+      resourcePolicyMetadataReadRepository: authorizationPolicyReadAdapter,
+    }),
+    decisionEvaluator: authorizationDecisionEvaluator,
+    sharingGrantPersistenceRepository: authorizationRepository,
+    resourcePolicyMetadataPersistenceRepository: authorizationRepository,
+  });
 
   const server = createIdentityHttpServer({
     backendApi,
+    authorizationManagementBackendApi,
     workspaceBackendApi,
     workspaceAdministrationBackendApi,
     logger: options.logger,
@@ -407,6 +475,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
         repository.dispose();
         trustedDeviceRepository.dispose();
         workspaceRepository.dispose();
+        authorizationRepository.dispose();
         const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
         if (typeof disposablePublisher.dispose === "function") {
           disposablePublisher.dispose();
