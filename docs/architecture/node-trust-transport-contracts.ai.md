@@ -43,6 +43,7 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
   - pending-summary status restrictions,
   - capability dedupe,
   - bootstrap envelope minimum-content checks,
+  - bootstrap public trust-material metadata validation (reference + key fields),
   - rejection of internal-only fields in admin schemas.
 
 ## Adapter guidance

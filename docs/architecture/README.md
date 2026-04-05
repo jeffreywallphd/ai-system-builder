@@ -135,6 +135,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For node trust persistence DTO/repository/schema contracts and indexing-oriented query patterns, read [`node-trust-persistence-contracts.md`](./node-trust-persistence-contracts.md).
 - For node trust application-layer enrollment/approval/revocation/heartbeat/query orchestration seams and hook ports, read [`node-trust-application-use-cases.md`](./node-trust-application-use-cases.md).
 - For shared node-trust API/IPC request-response contracts, admin-vs-internal DTO boundaries, and schema validation adapters, read [`node-trust-transport-contracts.md`](./node-trust-transport-contracts.md).
+- For node-local bootstrap identity/trust-material operations and enrollment payload bootstrap metadata, read [`../node-bootstrap-identity-operations.md`](../node-bootstrap-identity-operations.md).
 - For workspace tenancy domain aggregates, membership/role/invitation invariants, and reusable ownership metadata patterns, read [`workspace-foundation.md`](./workspace-foundation.md).
 - For authorization domain contracts covering RBAC, visibility, sharing, actor/resource policy context, and policy-decision models, read [`authorization-foundation.md`](./authorization-foundation.md).
 - For canonical authorization permission naming, resource/action matrix definitions, and permission lookup usage, read [`authorization-permission-catalog.md`](./authorization-permission-catalog.md).

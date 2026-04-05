@@ -136,12 +136,30 @@ export const NodeCertificateBootstrapEnvelopeDtoSchema = z.object({
   attestationFormat: NodeTrustApiIdentifierSchema.optional(),
   attestationEvidence: z.string().trim().min(1).max(10000).optional(),
   requestedCertificateProfile: NodeTrustApiIdentifierSchema.optional(),
+  trustMaterialRef: NodeTrustApiIdentifierSchema.optional(),
+  publicKeyAlgorithm: NodeTrustApiIdentifierSchema.optional(),
+  publicKeyFingerprintSha256: z.string().trim().regex(/^[a-f0-9]{64}$/).optional(),
+  publicKeyPem: z.string().trim().min(1).max(10000).optional(),
 }).strict().superRefine((value, context) => {
-  if (!value.bootstrapTokenId && !value.attestationEvidence && !value.requestedCertificateProfile) {
+  if (
+    !value.bootstrapTokenId
+    && !value.attestationEvidence
+    && !value.requestedCertificateProfile
+    && !value.trustMaterialRef
+    && !value.publicKeyPem
+  ) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["bootstrapTokenId"],
       message: "Bootstrap envelope must include at least one bootstrap field.",
+    });
+  }
+
+  if (value.publicKeyPem && !value.trustMaterialRef) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["trustMaterialRef"],
+      message: "Bootstrap envelope publicKeyPem requires trustMaterialRef.",
     });
   }
 });
