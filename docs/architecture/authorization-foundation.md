@@ -148,3 +148,18 @@ Story 4.1.6 adds shared authorization payload schemas for boundary validation of
   - `src/shared/schemas/authorization/tests/AuthorizationSchemaContracts.test.ts`
 - Developer reference:
   - `docs/architecture/authorization-schema-validation-contracts.md`
+
+## Persistence contracts seam
+
+Story 4.1.7 adds migration-ready persistence DTOs and repository-port contracts for role assignments, sharing grants, and resource policy metadata.
+
+- Canonical contract files:
+  - `src/shared/dto/authorization/AuthorizationPersistenceDtos.ts`
+  - `src/application/authorization/ports/IAuthorizationRoleAssignmentPersistenceRepository.ts`
+  - `src/application/authorization/ports/IAuthorizationSharingGrantPersistenceRepository.ts`
+  - `src/application/authorization/ports/IAuthorizationResourcePolicyMetadataPersistenceRepository.ts`
+- Contract tests:
+  - `src/shared/dto/authorization/tests/AuthorizationPersistenceDtos.test.ts`
+  - `src/application/authorization/tests/AuthorizationPolicyPersistencePortsContracts.test.ts`
+- Developer reference:
+  - `docs/architecture/authorization-persistence-contracts.md`
