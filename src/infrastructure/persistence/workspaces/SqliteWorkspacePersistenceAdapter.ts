@@ -19,6 +19,7 @@ import type {
   WorkspaceAuthorizationSnapshot,
   WorkspaceAuthorizationSnapshotQuery,
   WorkspaceInvitationListQuery,
+  WorkspacePendingInvitationByTokenHashLookupQuery,
   WorkspaceMembershipListQuery,
   WorkspaceListQuery,
   WorkspacePendingInvitationLookupQuery,
@@ -537,6 +538,10 @@ export class SqliteWorkspacePersistenceAdapter
         invited_email,
         invited_by_user_id,
         invited_roles_json,
+        invitation_token_hash,
+        invitation_token_hint,
+        target_user_identity_id_hint,
+        onboarding_metadata_json,
         status,
         created_at,
         expires_at,
@@ -568,6 +573,10 @@ export class SqliteWorkspacePersistenceAdapter
         invited_email,
         invited_by_user_id,
         invited_roles_json,
+        invitation_token_hash,
+        invitation_token_hint,
+        target_user_identity_id_hint,
+        onboarding_metadata_json,
         status,
         created_at,
         expires_at,
@@ -583,6 +592,46 @@ export class SqliteWorkspacePersistenceAdapter
       ORDER BY created_at DESC
       LIMIT 1
     `).get(...(asOf ? [normalizedWorkspaceId, normalizedEmail, asOf] : [normalizedWorkspaceId, normalizedEmail])) as WorkspaceInvitationRow | undefined;
+
+    return row ? mapWorkspaceInvitationRowToDomain(row) : undefined;
+  }
+
+  public async findPendingInvitationByTokenHash(
+    query: WorkspacePendingInvitationByTokenHashLookupQuery,
+  ): Promise<WorkspaceInvitation | undefined> {
+    const normalizedWorkspaceId = normalizeLookup(query.workspaceId);
+    const normalizedTokenHash = normalizeLookup(query.invitationTokenHash)?.toLowerCase();
+    if (!normalizedWorkspaceId || !normalizedTokenHash) {
+      return undefined;
+    }
+
+    const asOf = normalizeLookup(query.asOf ?? "");
+    const row = this.getDatabase().prepare(`
+      SELECT
+        invitation_id,
+        workspace_id,
+        invited_email,
+        invited_by_user_id,
+        invited_roles_json,
+        invitation_token_hash,
+        invitation_token_hint,
+        target_user_identity_id_hint,
+        onboarding_metadata_json,
+        status,
+        created_at,
+        expires_at,
+        responded_at,
+        accepted_by_user_identity_id,
+        last_modified_by,
+        last_modified_at
+      FROM workspace_invitations
+      WHERE workspace_id = ?
+        AND invitation_token_hash = ?
+        AND status = 'pending'
+        ${asOf ? "AND expires_at > ?" : ""}
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(...(asOf ? [normalizedWorkspaceId, normalizedTokenHash, asOf] : [normalizedWorkspaceId, normalizedTokenHash])) as WorkspaceInvitationRow | undefined;
 
     return row ? mapWorkspaceInvitationRowToDomain(row) : undefined;
   }
@@ -636,6 +685,10 @@ export class SqliteWorkspacePersistenceAdapter
         invited_email,
         invited_by_user_id,
         invited_roles_json,
+        invitation_token_hash,
+        invitation_token_hint,
+        target_user_identity_id_hint,
+        onboarding_metadata_json,
         status,
         created_at,
         expires_at,
@@ -660,6 +713,10 @@ export class SqliteWorkspacePersistenceAdapter
           invited_email,
           invited_by_user_id,
           invited_roles_json,
+          invitation_token_hash,
+          invitation_token_hint,
+          target_user_identity_id_hint,
+          onboarding_metadata_json,
           status,
           created_at,
           expires_at,
@@ -673,6 +730,10 @@ export class SqliteWorkspacePersistenceAdapter
           invited_email = excluded.invited_email,
           invited_by_user_id = excluded.invited_by_user_id,
           invited_roles_json = excluded.invited_roles_json,
+          invitation_token_hash = excluded.invitation_token_hash,
+          invitation_token_hint = excluded.invitation_token_hint,
+          target_user_identity_id_hint = excluded.target_user_identity_id_hint,
+          onboarding_metadata_json = excluded.onboarding_metadata_json,
           status = excluded.status,
           created_at = excluded.created_at,
           expires_at = excluded.expires_at,

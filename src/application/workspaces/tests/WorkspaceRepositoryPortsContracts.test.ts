@@ -28,6 +28,7 @@ import {
   type WorkspaceInvitationListQuery,
   type WorkspaceListQuery,
   type WorkspaceMembershipListQuery,
+  type WorkspacePendingInvitationByTokenHashLookupQuery,
   type WorkspacePendingInvitationLookupQuery,
   type WorkspaceRoleAssignmentListQuery,
 } from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
@@ -181,6 +182,24 @@ class InMemoryWorkspacePortAdapter
     return undefined;
   }
 
+  async findPendingInvitationByTokenHash(
+    query: WorkspacePendingInvitationByTokenHashLookupQuery,
+  ): Promise<WorkspaceInvitation | undefined> {
+    const normalizedTokenHash = query.invitationTokenHash.trim().toLowerCase();
+    const asOf = query.asOf ? new Date(query.asOf).getTime() : undefined;
+    for (const invitation of this.invitations.values()) {
+      if (
+        invitation.workspaceId === query.workspaceId
+        && invitation.invitationTokenHash === normalizedTokenHash
+        && invitation.status === "pending"
+        && (asOf === undefined || new Date(invitation.expiresAt).getTime() > asOf)
+      ) {
+        return invitation;
+      }
+    }
+    return undefined;
+  }
+
   async listInvitations(query: WorkspaceInvitationListQuery): Promise<ReadonlyArray<WorkspaceInvitation>> {
     const expiresBefore = query.expiresBefore ? new Date(query.expiresBefore).getTime() : undefined;
     const expiresAfter = query.expiresAfter ? new Date(query.expiresAfter).getTime() : undefined;
@@ -317,6 +336,12 @@ describe("workspace repository ports and shared contracts", () => {
       invitedEmail: "member@example.com",
       invitedByUserId: "user-owner",
       invitedRoles: [WorkspaceRoles.member],
+      invitationTokenHash: "e6d2f98d676404b4f86530ad5f2666689fc26f98b84b9adcf656e9f7087fbbf2",
+      invitationTokenHint: "token101",
+      targetUserIdentityIdHint: "user-member",
+      onboardingMetadata: {
+        source: "workspace-port-test",
+      },
       expiresAt: "2026-04-06T12:00:00.000Z",
       action,
     };
@@ -326,6 +351,10 @@ describe("workspace repository ports and shared contracts", () => {
       invitedEmail: invitationInput.invitedEmail,
       invitedByUserId: invitationInput.invitedByUserId,
       invitedRoles: invitationInput.invitedRoles,
+      invitationTokenHash: invitationInput.invitationTokenHash,
+      invitationTokenHint: invitationInput.invitationTokenHint,
+      targetUserIdentityIdHint: invitationInput.targetUserIdentityIdHint,
+      onboardingMetadata: invitationInput.onboardingMetadata,
       expiresAt: invitationInput.expiresAt,
       createdAt: invitationInput.action.occurredAt,
       lastModifiedBy: invitationInput.action.actorUserIdentityId,
@@ -395,6 +424,8 @@ describe("workspace repository ports and shared contracts", () => {
       invitedEmail: "viewer@example.com",
       invitedByUserId: "user-owner",
       invitedRoles: [WorkspaceRoles.viewer],
+      invitationTokenHash: "f6f7aa5e95a64a949fdf77af4b56e4507ed20d5b0f651350a1479a4216f72ccb",
+      invitationTokenHint: "token102",
       createdAt: "2026-04-05T14:00:00.000Z",
       expiresAt: "2026-04-05T15:00:00.000Z",
       lastModifiedBy: "user-owner",
@@ -411,11 +442,17 @@ describe("workspace repository ports and shared contracts", () => {
       invitedEmail: "VIEWER@EXAMPLE.COM",
       asOf: "2026-04-05T14:30:00.000Z",
     });
+    const pendingByToken = await adapter.findPendingInvitationByTokenHash({
+      workspaceId: workspace.id,
+      invitationTokenHash: "f6f7aa5e95a64a949fdf77af4b56e4507ed20d5b0f651350a1479a4216f72ccb",
+      asOf: "2026-04-05T14:30:00.000Z",
+    });
 
     expect(snapshot?.workspace.id).toBe(workspace.id);
     expect(snapshot?.isWorkspaceOwner).toBe(true);
     expect(snapshot?.effectiveRoles).toEqual([WorkspaceRoles.owner]);
     expect(pendingInvitation?.id).toBe("invite-snapshot");
+    expect(pendingByToken?.id).toBe("invite-snapshot");
   });
 
   it("supports aggregate dependency wiring through workspace repository port bundle", async () => {

@@ -39,6 +39,7 @@ Scope in stories 3.1.1 through 3.1.5:
 - `src/application/workspaces/use-cases/UpdateWorkspaceUseCase.ts`
 - `src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase.ts`
 - `src/application/workspaces/use-cases/WorkspaceAdministrationQueryService.ts`
+- `src/application/workspaces/use-cases/IssueWorkspaceInvitationUseCase.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceMigrations.ts`
 - `src/infrastructure/persistence/workspaces/WorkspacePersistenceMapper.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter.ts`
@@ -110,6 +111,7 @@ Scope in stories 3.1.1 through 3.1.5:
 - Invitation expiry must be strictly after creation timestamp.
 - Invitations must include at least one role.
 - Invitations cannot directly assign `owner` role (ownership transfer is separate).
+- Invitation issuance persists secure token hash references; raw invitation tokens are never stored.
 - Accepted invitations require `acceptedByUserIdentityId` and `respondedAt`.
 - Invitation lifecycle transitions are explicit and transition-guarded.
 
@@ -298,4 +300,18 @@ Story 3.1.4 extends the adapter integration tests to validate:
   - DTO shape and summary-field behavior,
   - forbidden access paths for non-admin actors,
   - invalid-request handling for missing required identifiers.
+
+## Story 3.3.1 workspace invitation issuance and persistence
+
+- Added `IssueWorkspaceInvitationUseCase` (`src/application/workspaces/use-cases/IssueWorkspaceInvitationUseCase.ts`) for admin-protected invitation issuance.
+- Issuance policy now enforces:
+  - actor active workspace membership,
+  - actor role gate (`owner` or `admin`),
+  - duplicate pending invitation conflict handling by workspace/email,
+  - explicit expiration-policy bounds using default/max invitation TTL.
+- Invitation records now persist issuance metadata required for secure onboarding:
+  - `invitationTokenHash` and `invitationTokenHint` (hash persisted; raw token returned only during issuance),
+  - optional `targetUserIdentityIdHint`,
+  - optional `onboardingMetadata`.
+- Workspace invitation persistence now includes token/onboarding columns and repository lookup by pending token hash (`findPendingInvitationByTokenHash(...)`) to support secure join flow continuation stories.
 

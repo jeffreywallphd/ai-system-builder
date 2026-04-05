@@ -26,6 +26,7 @@ import type {
   WorkspaceInvitationListQuery,
   WorkspaceListQuery,
   WorkspaceMembershipListQuery,
+  WorkspacePendingInvitationByTokenHashLookupQuery,
   WorkspacePendingInvitationLookupQuery,
   WorkspaceRoleAssignmentListQuery,
 } from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
@@ -179,6 +180,27 @@ class InMemoryWorkspaceAdministrationQueryAdapter
       if (
         invitation.workspaceId === query.workspaceId
         && invitation.invitedEmail === normalizedEmail
+        && invitation.status === WorkspaceInvitationStatuses.pending
+        && (Number.isNaN(asOf) || expiresAt > asOf)
+      ) {
+        return invitation;
+      }
+    }
+
+    return undefined;
+  }
+
+  public async findPendingInvitationByTokenHash(
+    query: WorkspacePendingInvitationByTokenHashLookupQuery,
+  ): Promise<WorkspaceInvitation | undefined> {
+    const asOf = query.asOf ? new Date(query.asOf).getTime() : Number.NaN;
+    const normalizedHash = query.invitationTokenHash.trim().toLowerCase();
+
+    for (const invitation of this.invitations.values()) {
+      const expiresAt = new Date(invitation.expiresAt).getTime();
+      if (
+        invitation.workspaceId === query.workspaceId
+        && invitation.invitationTokenHash === normalizedHash
         && invitation.status === WorkspaceInvitationStatuses.pending
         && (Number.isNaN(asOf) || expiresAt > asOf)
       ) {
@@ -386,6 +408,8 @@ function seedWorkspaceAdministrationReadModel(
     invitedEmail: "pending@example.com",
     invitedByUserId: "user:owner",
     invitedRoles: [WorkspaceRoles.member],
+    invitationTokenHash: "0f4442f5fb6c2f7dd93c4a0f856f1f2f896d7eb2f75839505f1162a0a0225ea6",
+    invitationTokenHint: "token201",
     status: WorkspaceInvitationStatuses.pending,
     createdAt: "2026-04-05T10:20:00.000Z",
     expiresAt: "2026-04-05T13:00:00.000Z",
@@ -398,6 +422,8 @@ function seedWorkspaceAdministrationReadModel(
     invitedEmail: "expired@example.com",
     invitedByUserId: "user:owner",
     invitedRoles: [WorkspaceRoles.viewer],
+    invitationTokenHash: "14e9f78f131dcf8188506fc9f6ec19d665fb692e8ae549f4b58fbd636c123a13",
+    invitationTokenHint: "token202",
     status: WorkspaceInvitationStatuses.pending,
     createdAt: "2026-04-05T09:00:00.000Z",
     expiresAt: "2026-04-05T10:30:00.000Z",
@@ -410,6 +436,8 @@ function seedWorkspaceAdministrationReadModel(
     invitedEmail: "accepted@example.com",
     invitedByUserId: "user:owner",
     invitedRoles: [WorkspaceRoles.viewer],
+    invitationTokenHash: "4726d4f043f9f30d4fdb5f09a4ec3a2af1f6f28eb35e9307a37ef6f32d5ba2de",
+    invitationTokenHint: "token203",
     status: WorkspaceInvitationStatuses.accepted,
     createdAt: "2026-04-05T08:00:00.000Z",
     expiresAt: "2026-04-05T12:00:00.000Z",

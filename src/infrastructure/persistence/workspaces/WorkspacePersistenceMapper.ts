@@ -69,6 +69,10 @@ export interface WorkspaceInvitationRow {
   readonly invited_email: string;
   readonly invited_by_user_id: string;
   readonly invited_roles_json: string;
+  readonly invitation_token_hash: string | null;
+  readonly invitation_token_hint: string | null;
+  readonly target_user_identity_id_hint: string | null;
+  readonly onboarding_metadata_json: string | null;
   readonly status: WorkspaceInvitationStatus;
   readonly created_at: string;
   readonly expires_at: string;
@@ -137,6 +141,10 @@ export function mapWorkspaceInvitationRowToDomain(row: WorkspaceInvitationRow): 
     invitedEmail: row.invited_email,
     invitedByUserId: row.invited_by_user_id,
     invitedRoles: parseWorkspaceRolesJson(row.invited_roles_json),
+    invitationTokenHash: row.invitation_token_hash ?? undefined,
+    invitationTokenHint: row.invitation_token_hint ?? undefined,
+    targetUserIdentityIdHint: row.target_user_identity_id_hint ?? undefined,
+    onboardingMetadata: parseOnboardingMetadataJson(row.onboarding_metadata_json),
     status: assertWorkspaceInvitationStatus(row.status),
     createdAt: row.created_at,
     expiresAt: row.expires_at,
@@ -205,6 +213,10 @@ export function mapWorkspaceInvitationToRowValues(invitation: WorkspaceInvitatio
     invitation.invitedEmail,
     invitation.invitedByUserId,
     JSON.stringify(invitation.invitedRoles),
+    invitation.invitationTokenHash ?? null,
+    invitation.invitationTokenHint ?? null,
+    invitation.targetUserIdentityIdHint ?? null,
+    JSON.stringify(invitation.onboardingMetadata ?? {}),
     invitation.status,
     invitation.createdAt,
     invitation.expiresAt,
@@ -242,6 +254,26 @@ function parseWorkspaceRolesJson(value: string): ReadonlyArray<WorkspaceRole> {
     return Object.freeze([...new Set(roles)]);
   } catch {
     return Object.freeze([]);
+  }
+}
+
+function parseOnboardingMetadataJson(value: string | null): Readonly<Record<string, unknown>> | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return undefined;
+    }
+    const objectValue = parsed as Record<string, unknown>;
+    if (Object.keys(objectValue).length === 0) {
+      return undefined;
+    }
+    return Object.freeze({ ...objectValue });
+  } catch {
+    return undefined;
   }
 }
 

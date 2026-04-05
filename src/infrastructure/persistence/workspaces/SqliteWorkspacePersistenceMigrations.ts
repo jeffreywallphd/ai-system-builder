@@ -1,4 +1,4 @@
-export const WORKSPACE_PERSISTENCE_SCHEMA_VERSION = 1;
+export const WORKSPACE_PERSISTENCE_SCHEMA_VERSION = 2;
 
 export const WORKSPACE_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -166,5 +166,26 @@ export const WORKSPACE_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, s
     CREATE UNIQUE INDEX IF NOT EXISTS workspace_role_assignments_single_active_owner_unique
       ON workspace_role_assignments(workspace_id)
       WHERE status = 'active' AND role = 'owner';
+  `],
+  [2, `
+    ALTER TABLE workspace_invitations
+      ADD COLUMN invitation_token_hash TEXT;
+
+    ALTER TABLE workspace_invitations
+      ADD COLUMN invitation_token_hint TEXT;
+
+    ALTER TABLE workspace_invitations
+      ADD COLUMN target_user_identity_id_hint TEXT;
+
+    ALTER TABLE workspace_invitations
+      ADD COLUMN onboarding_metadata_json TEXT;
+
+    UPDATE workspace_invitations
+    SET onboarding_metadata_json = '{}'
+    WHERE onboarding_metadata_json IS NULL;
+
+    CREATE INDEX IF NOT EXISTS workspace_invitations_workspace_token_hash_idx
+      ON workspace_invitations(workspace_id, invitation_token_hash)
+      WHERE invitation_token_hash IS NOT NULL;
   `],
 ]);

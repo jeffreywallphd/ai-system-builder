@@ -57,7 +57,7 @@ describe("SqliteWorkspacePersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM workspace_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(1);
+    expect(versionRow.version).toBe(2);
 
     const tables = database.prepare(`
       SELECT name
@@ -105,6 +105,12 @@ describe("SqliteWorkspacePersistenceAdapter", () => {
       invitedEmail: "member@example.com",
       invitedByUserId: "user:owner",
       invitedRoles: [WorkspaceRoles.member],
+      invitationTokenHash: "91de59e34492520f46f523be1bbdfe64f36e95ffac7f3a96f2f893d3427f5dc9",
+      invitationTokenHint: "token001",
+      targetUserIdentityIdHint: "user:member",
+      onboardingMetadata: {
+        source: "persistence-test",
+      },
       status: WorkspaceInvitationStatuses.pending,
       createdAt: "2026-04-05T12:00:00.000Z",
       expiresAt: "2026-04-06T12:00:00.000Z",
@@ -169,7 +175,13 @@ describe("SqliteWorkspacePersistenceAdapter", () => {
       invitedEmail: "MEMBER@EXAMPLE.COM",
       asOf: "2026-04-05T13:00:00.000Z",
     });
+    const pendingInvitationByToken = await adapter.findPendingInvitationByTokenHash({
+      workspaceId: workspace.id,
+      invitationTokenHash: "91de59e34492520f46f523be1bbdfe64f36e95ffac7f3a96f2f893d3427f5dc9",
+      asOf: "2026-04-05T13:00:00.000Z",
+    });
     expect(pendingInvitation?.id).toBe(invitation.id);
+    expect(pendingInvitationByToken?.id).toBe(invitation.id);
 
     const snapshot = await adapter.getWorkspaceAuthorizationSnapshot({
       workspaceId: workspace.id,
@@ -253,6 +265,8 @@ describe("SqliteWorkspacePersistenceAdapter", () => {
       invitedEmail: "member@example.com",
       invitedByUserId: "user:owner",
       invitedRoles: [WorkspaceRoles.member],
+      invitationTokenHash: "5a4d59f979b9f04f97f9474d3f8fbc3f15a52dbf4f725c24f882f6c7558ec291",
+      invitationTokenHint: "token002",
       status: WorkspaceInvitationStatuses.pending,
       createdAt: "2026-04-05T12:00:00.000Z",
       expiresAt: "2026-04-06T12:00:00.000Z",
@@ -327,6 +341,8 @@ describe("SqliteWorkspacePersistenceAdapter", () => {
       invitedEmail: "member@example.com",
       invitedByUserId: "user:owner",
       invitedRoles: [WorkspaceRoles.member],
+      invitationTokenHash: "26cf18bc8e2ffd4f8f6f9a1fe1af4be61dc7bcf4f7b8f22a4f03e509d3f44df1",
+      invitationTokenHint: "token003",
       status: WorkspaceInvitationStatuses.pending,
       createdAt: "2026-04-05T12:00:00.000Z",
       expiresAt: "2026-04-06T12:00:00.000Z",
@@ -404,6 +420,8 @@ describe("SqliteWorkspacePersistenceAdapter", () => {
       invitedEmail: "member@example.com",
       invitedByUserId: "user:owner",
       invitedRoles: [WorkspaceRoles.member],
+      invitationTokenHash: "f8d5e0c6e7f37d3c8f5f2e905a8b9f95b81e7e8e65f3edf8ed03e233ef0f3c53",
+      invitationTokenHint: "token004",
       status: WorkspaceInvitationStatuses.pending,
       createdAt: "2026-04-05T12:00:00.000Z",
       expiresAt: "2026-04-06T12:00:00.000Z",
@@ -427,6 +445,8 @@ describe("SqliteWorkspacePersistenceAdapter", () => {
       invitedEmail: "MEMBER@EXAMPLE.COM",
       invitedByUserId: "user:owner",
       invitedRoles: [WorkspaceRoles.viewer],
+      invitationTokenHash: "4cc48845f6cbf271be9104f0f5a5f66ff611f894a9b81f3f2a450f8f35f88fe2",
+      invitationTokenHint: "token005",
       status: WorkspaceInvitationStatuses.pending,
       createdAt: "2026-04-05T13:00:00.000Z",
       expiresAt: "2026-04-06T13:00:00.000Z",

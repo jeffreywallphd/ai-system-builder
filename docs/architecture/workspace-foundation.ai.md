@@ -27,6 +27,7 @@ Implementation-truth baseline for workspace tenancy domain + persistence contrac
 - `src/application/workspaces/use-cases/UpdateWorkspaceUseCase.ts`
 - `src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase.ts`
 - `src/application/workspaces/use-cases/WorkspaceAdministrationQueryService.ts`
+- `src/application/workspaces/use-cases/IssueWorkspaceInvitationUseCase.ts`
 - `src/application/workspaces/tests/CreateWorkspaceUseCase.test.ts`
 - `src/application/workspaces/tests/WorkspaceLifecycleUseCases.test.ts`
 - `src/application/workspaces/tests/WorkspaceMembershipAdministrationUseCases.test.ts`
@@ -86,6 +87,7 @@ Protected-resource composition pattern is canonical:
 - active/suspended/removed memberships require correct state timestamps/actor fields
 - invitation expiry/order/email/role semantics are validated
 - invitation flows cannot assign `owner` role directly
+- invitation issuance persists secure token hash references (raw tokens are not stored)
 - role-assignment sets reject duplicate active role entries
 - each workspace must have exactly one active owner role assignment
 - revoking the last active owner role assignment is rejected
@@ -230,4 +232,17 @@ Protected-resource composition pattern is canonical:
 - stale update attempts are rejected once newer records are persisted.
 - constraint and mutation failures surface contextual repository operation messages.
 - ownership metadata standards now include dedicated shared tests at `src/shared/workspaces/tests/WorkspaceOwnership.test.ts`.
+
+## Story 3.3.1 workspace invitation issuance and persistence
+
+- Added `IssueWorkspaceInvitationUseCase` (`src/application/workspaces/use-cases/IssueWorkspaceInvitationUseCase.ts`) for admin-protected invitation issuance.
+- Issuance now enforces:
+  - actor active membership + `owner`/`admin` role,
+  - duplicate active pending invitation rejection by `(workspaceId, invitedEmail)`,
+  - explicit expiration policy bounds (`defaultInvitationTtlMs`, `maxInvitationTtlMs`, optional explicit `expiresAt`/`expiresInMs` input).
+- Invitation records now capture issuance metadata needed for join/onboarding flows:
+  - `invitationTokenHash` + `invitationTokenHint` (secure token reference persisted, plaintext token returned only at issue time),
+  - optional `targetUserIdentityIdHint`,
+  - optional `onboardingMetadata`.
+- Workspace invitation persistence now includes token-reference and onboarding metadata columns/indexes, plus pending lookup by token hash through `IWorkspaceInvitationRepository.findPendingInvitationByTokenHash(...)`.
 
