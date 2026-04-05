@@ -1,6 +1,10 @@
 import { IdentityErrorCodes } from "../../../application/contracts/IdentityApplicationContracts";
 import type { IIdentityLookupRepository } from "../../../application/identity/ports/IIdentityLookupRepository";
 import type {
+  ChangeLocalPasswordCredentialUseCase,
+  ChangeLocalPasswordCredentialErrorCode,
+} from "../../../src/application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
+import type {
   LoginLocalAccountUseCase,
   LoginLocalAccountErrorCode,
 } from "../../../src/application/identity/use-cases/LoginLocalAccountUseCase";
@@ -30,6 +34,8 @@ import type {
   RegisterLocalAccountErrorCode,
 } from "../../../src/application/identity/use-cases/RegisterLocalAccountUseCase";
 import {
+  type ChangeLocalPasswordCredentialApiRequest,
+  type ChangeLocalPasswordCredentialApiResponse,
   IdentityAuthApiErrorCodes,
   type IdentityAuthApiError,
   type IdentityAuthApiResponse,
@@ -53,6 +59,7 @@ import {
 import { IdentityAuthObservability, type IdentityAuthObservabilityOptions } from "./IdentityAuthObservability";
 import { IdentityAuthenticatedSessionService } from "../../../application/identity/services/IdentityAuthenticatedSessionService";
 import {
+  serializeChangeLocalPasswordCredentialResponse,
   serializeGetIdentityAdminAccountStatusResponse,
   serializeListIdentityAdminAccountsResponse,
   serializeLoginLocalIdentityResponse,
@@ -66,6 +73,7 @@ import {
 interface IdentityAuthBackendApiDependencies {
   readonly registerLocalAccountUseCase: RegisterLocalAccountUseCase;
   readonly loginLocalAccountUseCase: LoginLocalAccountUseCase;
+  readonly changeLocalPasswordCredentialUseCase: ChangeLocalPasswordCredentialUseCase;
   readonly logoutIdentitySessionUseCase: LogoutIdentitySessionUseCase;
   readonly revokeIdentitySessionUseCase: RevokeIdentitySessionUseCase;
   readonly listLocalIdentityAccountsUseCase: ListLocalIdentityAccountsUseCase;
@@ -202,6 +210,41 @@ export class IdentityAuthBackendApi {
 
     await this.observability.recordApiOutcome({
       flow: "local-login",
+      request,
+      response,
+    });
+    return response;
+  }
+
+  public async changeLocalPasswordCredential(
+    request: ChangeLocalPasswordCredentialApiRequest & { readonly userIdentityId: string },
+  ): Promise<IdentityAuthApiResponse<ChangeLocalPasswordCredentialApiResponse>> {
+    const result = await this.dependencies.changeLocalPasswordCredentialUseCase.execute({
+      userIdentityId: request.userIdentityId,
+      providerId: request.providerId,
+      providerSubject: request.providerSubject,
+      credentialPolicyId: request.credentialPolicyId,
+      newCredential: request.newCredential,
+      verification: request.verification,
+    });
+
+    if (!result.ok) {
+      const response = Object.freeze({ ok: false, error: this.mapChangeCredentialError(result.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "local-credential-change",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
+    }
+
+    const response = Object.freeze({
+      ok: true,
+      data: serializeChangeLocalPasswordCredentialResponse(result.value),
+    });
+    await this.observability.recordApiOutcome({
+      flow: "local-credential-change",
       request,
       response,
     });
@@ -485,6 +528,43 @@ export class IdentityAuthBackendApi {
         return Object.freeze({
           code: IdentityAuthApiErrorCodes.internal,
           message: "Unexpected identity login error.",
+        });
+    }
+  }
+
+  private mapChangeCredentialError(code: ChangeLocalPasswordCredentialErrorCode): IdentityAuthApiError {
+    switch (code) {
+      case IdentityErrorCodes.invalidCredentials:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.authenticationFailed,
+          message: "Invalid credentials.",
+        });
+      case IdentityErrorCodes.inactiveAccount:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.accountInactive,
+          message: "The account is not active for credential changes.",
+        });
+      case IdentityErrorCodes.unsupportedProvider:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.unsupportedProvider,
+          message: "The selected identity provider is not supported for credential change.",
+        });
+      case IdentityErrorCodes.policyViolation:
+      case IdentityErrorCodes.invalidRequest:
+      case IdentityErrorCodes.notFound:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.invalidRequest,
+          message: "The credential change request is invalid.",
+        });
+      case IdentityErrorCodes.invalidState:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.internal,
+          message: "Credential change is not currently available.",
+        });
+      default:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.internal,
+          message: "Unexpected credential change error.",
         });
     }
   }

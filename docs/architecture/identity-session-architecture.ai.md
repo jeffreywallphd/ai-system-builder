@@ -44,6 +44,7 @@ Service ownership:
 Guarded endpoints:
 
 - `GET /api/v1/identity/session`
+- `POST /api/v1/identity/credential/change`
 - `POST /api/v1/identity/logout`
 - `POST /api/v1/identity/session/revoke`
 - `GET /api/v1/identity/admin/accounts`

@@ -45,6 +45,7 @@ import { IdentityAuthenticatedSessionService } from "../../../../application/ide
 import { IdentityAuthBackendApi } from "../IdentityAuthBackendApi";
 import { RegisterLocalAccountUseCase } from "../../../../src/application/identity/use-cases/RegisterLocalAccountUseCase";
 import { LoginLocalAccountUseCase } from "../../../../src/application/identity/use-cases/LoginLocalAccountUseCase";
+import { ChangeLocalPasswordCredentialUseCase } from "../../../../src/application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
 import { LogoutIdentitySessionUseCase } from "../../../../src/application/identity/use-cases/LogoutIdentitySessionUseCase";
 import { RevokeIdentitySessionUseCase } from "../../../../src/application/identity/use-cases/RevokeIdentitySessionUseCase";
 import { ListLocalIdentityAccountsUseCase } from "../../../../src/application/identity/use-cases/ListLocalIdentityAccountsUseCase";
@@ -366,6 +367,15 @@ export async function createIdentityAuthTestHarness(
       credentialMaterialRepository: adapter,
       identityPolicyService,
       credentialAuthenticator,
+      clock: adapter,
+    }),
+    changeLocalPasswordCredentialUseCase: new ChangeLocalPasswordCredentialUseCase({
+      lookupRepository: adapter,
+      persistenceRepository: adapter,
+      credentialMaterialRepository: adapter,
+      identityPolicyService,
+      credentialAuthenticator,
+      idGenerator: adapter,
       clock: adapter,
     }),
     logoutIdentitySessionUseCase: new LogoutIdentitySessionUseCase({

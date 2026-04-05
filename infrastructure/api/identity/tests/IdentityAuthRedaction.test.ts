@@ -9,6 +9,12 @@ describe("IdentityAuthRedaction", () => {
         credential: {
           candidate: "StrongPass!2026",
         },
+        verification: {
+          currentCredential: "CurrentSecret!2026",
+        },
+        newCredential: {
+          candidate: "NewSecret!2027",
+        },
         metadata: [
           { trustMarker: "marker:alpha" },
           { providerSubject: "alice" },
@@ -20,6 +26,8 @@ describe("IdentityAuthRedaction", () => {
     const serialized = JSON.stringify(redacted);
     expect(serialized.includes("alice")).toBeFalse();
     expect(serialized.includes("StrongPass!2026")).toBeFalse();
+    expect(serialized.includes("CurrentSecret!2026")).toBeFalse();
+    expect(serialized.includes("NewSecret!2027")).toBeFalse();
     expect(serialized.includes("marker:alpha")).toBeFalse();
     expect(serialized.includes("[REDACTED]")).toBeTrue();
   });

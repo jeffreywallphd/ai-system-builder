@@ -6,6 +6,7 @@ export interface IdentityAuthObservabilityLogEvent {
   readonly flow:
     | "local-register"
     | "local-login"
+    | "local-credential-change"
     | "local-logout"
     | "session-revoke"
     | "admin-accounts-list"
@@ -27,6 +28,7 @@ export interface IdentityAuthAuditEvent {
   readonly type:
     | "identity-auth.local.register"
     | "identity-auth.local.login"
+    | "identity-auth.local.credential.change"
     | "identity-auth.local.logout"
     | "identity-auth.session.revoke"
     | "identity-auth.admin.accounts.list"
@@ -51,6 +53,7 @@ interface RecordApiOutcomeInput {
   readonly flow:
     | "local-register"
     | "local-login"
+    | "local-credential-change"
     | "local-logout"
     | "session-revoke"
     | "admin-accounts-list"
@@ -133,6 +136,8 @@ function toAuditType(flow: RecordApiOutcomeInput["flow"]): IdentityAuthAuditEven
       return "identity-auth.local.register";
     case "local-login":
       return "identity-auth.local.login";
+    case "local-credential-change":
+      return "identity-auth.local.credential.change";
     case "local-logout":
       return "identity-auth.local.logout";
     case "session-revoke":

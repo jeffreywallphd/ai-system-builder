@@ -115,6 +115,49 @@ export interface RevokeIdentitySessionApiResponse {
   readonly revocationReason: IdentitySessionRevocationReason;
 }
 
+export const ChangeLocalPasswordCredentialVerificationModes = Object.freeze({
+  currentCredential: "current-credential",
+  resetAssertion: "reset-assertion",
+} as const);
+
+export type ChangeLocalPasswordCredentialVerificationMode =
+  typeof ChangeLocalPasswordCredentialVerificationModes[keyof typeof ChangeLocalPasswordCredentialVerificationModes];
+
+export interface ChangeLocalPasswordCredentialCurrentCredentialVerificationApiRequest {
+  readonly mode?: typeof ChangeLocalPasswordCredentialVerificationModes.currentCredential;
+  readonly currentCredential: string;
+}
+
+export interface ChangeLocalPasswordCredentialResetAssertionVerificationApiRequest {
+  readonly mode: typeof ChangeLocalPasswordCredentialVerificationModes.resetAssertion;
+  readonly resetAssertion: string;
+}
+
+export type ChangeLocalPasswordCredentialVerificationApiRequest =
+  | ChangeLocalPasswordCredentialCurrentCredentialVerificationApiRequest
+  | ChangeLocalPasswordCredentialResetAssertionVerificationApiRequest;
+
+export interface ChangeLocalPasswordCredentialApiRequest {
+  readonly providerId?: string;
+  readonly providerSubject?: string;
+  readonly credentialPolicyId?: string;
+  readonly newCredential: {
+    readonly candidate: string;
+  };
+  readonly verification: ChangeLocalPasswordCredentialVerificationApiRequest;
+}
+
+export interface ChangeLocalPasswordCredentialApiResponse {
+  readonly userIdentityId: string;
+  readonly providerId: string;
+  readonly providerSubject: string;
+  readonly credentialPolicyId: string;
+  readonly supersededCredentialMaterialId: string;
+  readonly credentialMaterialId: string;
+  readonly changedAt: string;
+  readonly verificationMode: ChangeLocalPasswordCredentialVerificationMode;
+}
+
 export interface AuthenticatedIdentityPrincipalApiResponse {
   readonly userIdentityId: string;
   readonly username: string;

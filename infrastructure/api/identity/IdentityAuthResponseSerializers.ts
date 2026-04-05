@@ -1,4 +1,5 @@
 import type {
+  ChangeLocalPasswordCredentialApiResponse,
   GetIdentityAdminAccountStatusApiResponse,
   ListIdentityAdminAccountsApiResponse,
   LoginLocalIdentityApiResponse,
@@ -8,6 +9,7 @@ import type {
   RevokeIdentitySessionApiResponse,
   SetIdentityAdminAccountStatusApiResponse,
 } from "./sdk/PublicIdentityAuthApiContract";
+import type { ChangeLocalPasswordCredentialResult } from "../../../src/application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
 import type { LocalIdentityAccountSummary } from "../../../src/application/identity/use-cases/ListLocalIdentityAccountsUseCase";
 import type { SetLocalIdentityAccountStatusResult } from "../../../src/application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
 import type { IssueAuthenticatedSessionResult } from "../../../application/identity/services/IdentityAuthenticatedSessionService";
@@ -90,6 +92,21 @@ export function serializeRevokeIdentitySessionResponse(
     userIdentityId: value.userIdentityId,
     revokedAt: value.revokedAt,
     revocationReason: value.revocationReason,
+  });
+}
+
+export function serializeChangeLocalPasswordCredentialResponse(
+  value: ChangeLocalPasswordCredentialResult,
+): ChangeLocalPasswordCredentialApiResponse {
+  return Object.freeze({
+    userIdentityId: value.userIdentityId,
+    providerId: value.providerId,
+    providerSubject: value.providerSubject,
+    credentialPolicyId: value.credentialPolicyId,
+    supersededCredentialMaterialId: value.supersededCredentialMaterialId,
+    credentialMaterialId: value.credentialMaterialId,
+    changedAt: value.changedAt,
+    verificationMode: value.verificationMode,
   });
 }
 

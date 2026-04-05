@@ -166,8 +166,9 @@ Operational effect:
 ## Authoritative server API seam
 
 - Registration and login are now exposed on authoritative HTTP endpoints:
-  - `POST /api/v1/identity/register`
-  - `POST /api/v1/identity/login`
+- `POST /api/v1/identity/register`
+- `POST /api/v1/identity/login`
+- `POST /api/v1/identity/credential/change` (authenticated)
 - HTTP transport validates requests at the boundary (strict schemas), maps inner identity failures to stable public API error codes, and returns bounded response envelopes.
 - HTTP logging now redacts credential material (`credential`/`candidate` and related secret fields) before structured log emission.
 - Detailed public API contract/examples are in `docs/architecture/identity-server-api.md`.

@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { HttpIdentityAuthClient } from "../IdentityAuthClient";
 
 describe("HttpIdentityAuthClient", () => {
-  it("calls register/login/session/logout/revoke/admin identity API endpoints", async () => {
+  it("calls register/login/session/logout/revoke/credential/admin identity API endpoints", async () => {
     const requests: ReadonlyArray<{ method: string; url: string; body: string; authorization?: string }> = [];
     (globalThis as typeof globalThis & {
       fetch: (input: string, init?: RequestInit) => Promise<Response>;
@@ -32,6 +32,10 @@ describe("HttpIdentityAuthClient", () => {
     await client.resolveAuthenticatedSession("token-0");
     await client.logoutAuthenticatedSession("token-1");
     await client.revokeIdentitySession({ sessionId: "identity-session:1", reason: "security" }, "token-2");
+    await client.changeLocalPasswordCredential({
+      newCredential: { candidate: "password-2" },
+      verification: { currentCredential: "password-1" },
+    }, "token-2b");
     await client.listIdentityAdminAccounts({
       context: { actorUserIdentityId: "user-1" },
       includeStatuses: ["active", "suspended"],
@@ -56,6 +60,7 @@ describe("HttpIdentityAuthClient", () => {
       "GET",
       "POST",
       "POST",
+      "POST",
       "GET",
       "GET",
       "POST",
@@ -66,6 +71,7 @@ describe("HttpIdentityAuthClient", () => {
       "http://127.0.0.1:8788/api/v1/identity/session",
       "http://127.0.0.1:8788/api/v1/identity/logout",
       "http://127.0.0.1:8788/api/v1/identity/session/revoke",
+      "http://127.0.0.1:8788/api/v1/identity/credential/change",
       "http://127.0.0.1:8788/api/v1/identity/admin/accounts?status=active&status=suspended&limit=10&offset=20",
       "http://127.0.0.1:8788/api/v1/identity/admin/accounts/user-2?providerId=provider%3Alocal-password",
       "http://127.0.0.1:8788/api/v1/identity/admin/accounts/user-2/status",
@@ -73,8 +79,9 @@ describe("HttpIdentityAuthClient", () => {
     expect(requests[2]?.authorization).toBe("Bearer token-0");
     expect(requests[3]?.authorization).toBe("Bearer token-1");
     expect(requests[4]?.authorization).toBe("Bearer token-2");
-    expect(requests[5]?.authorization).toBe("Bearer token-3");
-    expect(requests[6]?.authorization).toBe("Bearer token-4");
-    expect(requests[7]?.authorization).toBe("Bearer token-5");
+    expect(requests[5]?.authorization).toBe("Bearer token-2b");
+    expect(requests[6]?.authorization).toBe("Bearer token-3");
+    expect(requests[7]?.authorization).toBe("Bearer token-4");
+    expect(requests[8]?.authorization).toBe("Bearer token-5");
   });
 });
