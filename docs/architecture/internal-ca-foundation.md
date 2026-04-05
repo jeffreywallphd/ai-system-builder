@@ -1,6 +1,6 @@
 # Internal CA Foundation
 
-This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, Story 6.2.1, Story 6.2.2, and Story 6.2.3 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, certificate subject-profile issuance policy enforcement, concrete issuance signing/material persistence execution, and node-trust-backed approved-node issuance eligibility.
+This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, Story 6.2.1, Story 6.2.2, Story 6.2.3, and Story 6.2.4 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, certificate subject-profile issuance policy enforcement, concrete issuance signing/material persistence execution, node-trust-backed approved-node issuance eligibility, and explicit certificate revocation workflow plus revocation-status enforcement seams.
 
 ## Canonical artifacts
 
@@ -17,17 +17,22 @@ This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.
 - `src/application/security/ports/ICertificateAuthorityBootstrapSecretService.ts`
 - `src/application/security/ports/ICertificateAuthorityRootMaterialStorage.ts`
 - `src/application/security/ports/INodeCertificateEligibilityPort.ts`
+- `src/application/security/ports/ICertificateRevocationStatusRegistry.ts`
 - `src/application/security/ports/CertificateAuthorityPorts.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
 - `src/application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase.ts`
 - `src/application/security/use-cases/IssueCertificateForSubjectUseCase.ts`
+- `src/application/security/use-cases/RevokeIssuedCertificateUseCase.ts`
+- `src/application/security/use-cases/ResolveCertificateRevocationStatusUseCase.ts`
 - `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
 - `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
 - `src/application/security/tests/ResolveCertificateAuthorityStartupStateUseCase.test.ts`
 - `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
 - `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
+- `src/application/security/tests/RevokeIssuedCertificateUseCase.test.ts`
+- `src/application/security/tests/ResolveCertificateRevocationStatusUseCase.test.ts`
 - `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
@@ -87,6 +92,19 @@ Story 6.2.3 aligns certificate issuance trust with node-trust lifecycle evidence
   - capability-profile integrity and enrollment-to-node capability-profile coherence.
 - `approved-node` issuance now fails closed when node trust data is missing, malformed, revoked, unapproved, or enrollment-incoherent.
 - issued certificate subject linkage remains durable through persisted `subjectReference` (`kind='node'`, `referenceId=<nodeId>`), with linkage eligibility derived from node-trust records.
+
+## Story 6.2.4 certificate revocation workflow and status enforcement
+
+Story 6.2.4 adds explicit certificate trust-withdrawal and status enforcement behavior:
+
+- `RevokeIssuedCertificateUseCase` provides the application command to revoke an issued certificate with:
+  - strict serial/actor/reason validation,
+  - explicit duplicate-revocation rejection,
+  - invalid-state rejection for non-issued certificate statuses,
+  - persisted revocation metadata (`reason`, `revokedAt`, `revokedByActorId`, `note`) through certificate persistence boundaries.
+- revocation history persistence is guaranteed via `ICertificateLifecycleEventPersistenceRepository` when revocation history is absent from a repository implementation.
+- `ResolveCertificateRevocationStatusUseCase` implements `ICertificateRevocationStatusRegistry` as the canonical revocation registry seam for downstream transport consumers.
+- revocation/status checks now return explicit trust status categories (`active`, `revoked`, `expired`, `superseded`, `not-yet-valid`, `not-found`) so callers can distinguish revoked certificates from expired and active certificates.
 
 ## Story 6.1.3 startup bootstrap behavior
 
@@ -268,7 +286,7 @@ The application layer exposes explicit ports only:
   - `CertificateAuthorityPersistencePorts`
   - `CertificateAuthorityCryptoPorts`
 
-These seams let later stories implement bootstrapping, issuance, lookup, revocation, and rotation workflows without importing infrastructure into domain/application code.
+These seams let CA workflows implement bootstrapping, issuance, lookup, revocation, and rotation without importing infrastructure into domain/application code.
 
 Story 6.2.1 and Story 6.2.2 add `IssueCertificateForSubjectUseCase` in the application layer to:
 
@@ -305,6 +323,8 @@ Story 6.2.1 and Story 6.2.2 add `IssueCertificateForSubjectUseCase` in the appli
 - `GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`: healthy/uninitialized/degraded/blocked state mapping, contract parse validation, and sanitization assertions
 - `CertificateIssuancePolicyDomain.test.ts`: profile catalog, SAN/CN/usages/validity policy guards, and server/service path-separation assertions
 - `IssueCertificateForSubjectUseCase.test.ts`: pre-issuance policy enforcement, approved-node trust prerequisites, issued material persistence, and post-signing failure compensation coverage
+- `RevokeIssuedCertificateUseCase.test.ts`: explicit admin revocation flow, duplicate revocation rejection, and invalid request handling
+- `ResolveCertificateRevocationStatusUseCase.test.ts`: revocation registry status resolution for active/revoked/expired/not-found cases
 - `InternalCertificateAuthorityIssuer.test.ts`: concrete root generation + signing pipeline behavior and issuance prerequisite failure coverage
 - `IdentityServerHost.test.ts`: host-level first-time initialization invocation seam coverage
 
