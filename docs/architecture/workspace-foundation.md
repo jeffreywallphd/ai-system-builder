@@ -40,6 +40,7 @@ Scope in stories 3.1.1 through 3.1.5:
 - `src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase.ts`
 - `src/application/workspaces/use-cases/WorkspaceAdministrationQueryService.ts`
 - `src/application/workspaces/use-cases/IssueWorkspaceInvitationUseCase.ts`
+- `src/application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceMigrations.ts`
 - `src/infrastructure/persistence/workspaces/WorkspacePersistenceMapper.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter.ts`
@@ -175,6 +176,7 @@ Protected-resource composition is standardized through `withWorkspaceScopedOwner
 - `src/application/workspaces/tests/WorkspaceLifecycleUseCases.test.ts`
 - `src/application/workspaces/tests/WorkspaceMembershipAdministrationUseCases.test.ts`
 - `src/application/workspaces/tests/WorkspaceAdministrationQueryService.test.ts`
+- `src/application/workspaces/tests/WorkspaceInvitationLifecycleUseCase.test.ts`
 - `src/infrastructure/persistence/workspaces/tests/WorkspacePersistenceMapper.test.ts`
 - `src/infrastructure/persistence/workspaces/tests/SqliteWorkspacePersistenceAdapter.test.ts`
 
@@ -314,4 +316,29 @@ Story 3.1.4 extends the adapter integration tests to validate:
   - optional `targetUserIdentityIdHint`,
   - optional `onboardingMetadata`.
 - Workspace invitation persistence now includes token/onboarding columns and repository lookup by pending token hash (`findPendingInvitationByTokenHash(...)`) to support secure join flow continuation stories.
+
+## Story 3.3.2 invitation acceptance, decline, invalidation, and expiry resolution
+
+- Added `ResolveWorkspaceInvitationLifecycleUseCase` (`src/application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase.ts`) to provide explicit invitation lifecycle mutation actions:
+  - `accept` (invite token -> invitation acceptance + membership projection),
+  - `decline` (invite token -> declined invitation response),
+  - `cancel` (admin-protected pending invitation invalidation/revocation).
+- Acceptance flow now enforces application-level invariants before membership conversion:
+  - actor identity compatibility with invitation target (`invitedEmail` and optional `targetUserIdentityIdHint`),
+  - workspace lifecycle compatibility (`active` only for join conversion),
+  - invitation pending-state and expiry validation before use.
+- Expiry resolution behavior is now explicit and deterministic:
+  - pending invitations encountered past `expiresAt` are transitioned to `expired`,
+  - stale/replayed/invalid token usage returns a safe generic token failure without revealing invite state.
+- Membership conversion behavior on acceptance now supports explicit onboarding posture:
+  - accepted invitations can materialize target membership as `active` (default) or `pending`,
+  - invited roles are projected as active role assignments when missing,
+  - existing suspended/removed membership conflicts are rejected with actionable conflict outcomes.
+- Added focused use-case tests in `src/application/workspaces/tests/WorkspaceInvitationLifecycleUseCase.test.ts` covering:
+  - acceptance happy path (membership + role projection),
+  - pending-membership acceptance mode,
+  - decline flow behavior,
+  - cancellation authorization and revocation behavior,
+  - expiry resolution and stale/reused token rejection,
+  - identity/workspace-state compatibility failures.
 

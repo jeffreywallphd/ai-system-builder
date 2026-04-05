@@ -724,7 +724,7 @@ export class SqliteWorkspacePersistenceAdapter
           accepted_by_user_identity_id,
           last_modified_by,
           last_modified_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(invitation_id) DO UPDATE SET
           workspace_id = excluded.workspace_id,
           invited_email = excluded.invited_email,
