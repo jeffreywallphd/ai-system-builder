@@ -18,9 +18,11 @@ Story 4.1.5 defines application-layer authorization seams so policy evaluation o
 - `src/application/authorization/use-cases/EvaluateAuthorizationPolicyUseCase.ts`
 - `src/application/authorization/use-cases/EffectivePermissionResolutionService.ts`
 - `src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator.ts`
+- `src/application/authorization/use-cases/AuthorizedResourceQueryService.ts`
 - `src/application/authorization/tests/AuthorizationPolicyPortsContracts.test.ts`
 - `src/application/authorization/tests/EffectivePermissionResolutionService.test.ts`
 - `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
+- `src/application/authorization/tests/AuthorizedResourceQueryService.test.ts`
 
 ## Contract summary
 
@@ -34,6 +36,7 @@ Story 4.1.5 defines application-layer authorization seams so policy evaluation o
 - Policy evaluator is a dedicated application interface (`IAuthorizationPolicyEvaluator`) so enforcement logic remains swappable.
 - Resource-scoped and workspace-capability decisions are also available through `IAuthorizationPolicyDecisionEvaluator`, which centralizes actor/action/target evaluation for runtime callers.
 - Event recording is optional and best-effort (`IAuthorizationPolicyEventRecorder`).
+- `IAuthorizationResourcePolicyMetadataReadRepository` also supports list metadata lookup for authorization-aware list/search composition.
 
 ## Expected adapter behavior
 
@@ -51,3 +54,4 @@ Story 4.1.5 defines application-layer authorization seams so policy evaluation o
 - `EffectivePermissionResolutionService` is the first concrete `IAuthorizationPolicyEvaluator` implementation (Story 4.2.2).
 - It also exposes a batch `resolvePermissions(...)` seam for UI capability checks, reusing the same precedence used for enforcement decisions.
 - `AuthorizationPolicyDecisionEvaluator` (Story 4.2.3) composes role/grant/resource metadata loading and `EffectivePermissionResolutionService` into one reusable decision seam that returns typed allow/deny results with stable denial reasons.
+- `AuthorizedResourceQueryService` (Story 4.2.5) composes metadata listing + per-resource decision evaluation into a reusable authorized list/search helper with workspace scope and owner/shared filters.

@@ -8,6 +8,7 @@ Stories 4.2.2-4.2.3 deliver the production policy-evaluation core for Feature 4:
 - `AuthorizationPolicyDecisionEvaluator` composes actor grants + resource metadata and emits typed authorization decisions for resource-instance and workspace-capability checks.
 
 Story 4.2.4 adds optional hot-path caching for authorization persistence reads used repeatedly by policy-evaluation and list screens.
+Story 4.2.5 adds reusable authorization-aware list/search query composition so workspace views only return resources visible to the requesting actor.
 
 ## Canonical files
 
@@ -16,6 +17,8 @@ Story 4.2.4 adds optional hot-path caching for authorization persistence reads u
 - `src/application/authorization/tests/EffectivePermissionResolutionService.test.ts`
 - `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
 - `src/application/authorization/use-cases/EvaluateAuthorizationPolicyUseCase.ts`
+- `src/application/authorization/use-cases/AuthorizedResourceQueryService.ts`
+- `src/application/authorization/tests/AuthorizedResourceQueryService.test.ts`
 - `src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter.ts`
 - `src/infrastructure/persistence/authorization/tests/SqliteAuthorizationPersistenceAdapter.test.ts`
 
@@ -87,6 +90,23 @@ Matrix-style tests validate:
 - Cache capacity is bounded per store via `maxEntriesPerStore` to avoid unbounded memory growth.
 - Cache usage is optional with adapter options:
   - `new SqliteAuthorizationPersistenceAdapter(path, { cache: { enabled: false } })`
+
+## Authorized list/search query pattern (Story 4.2.5)
+
+- `AuthorizedResourceQueryService` is the reusable application seam for list/search surfaces that must exclude unauthorized resources.
+- The service accepts actor context + workspace scope + required permission key and then:
+  - loads workspace-scoped metadata candidates via `IAuthorizationResourcePolicyMetadataReadRepository.listResourcePolicyMetadata(...)`,
+  - applies optional resource-family/resource-type/search filters,
+  - evaluates allow/deny per candidate through `IAuthorizationPolicyDecisionEvaluator`,
+  - supports owner/shared relation filters (`owner`, `shared`),
+  - returns deterministic paged results.
+- Resource modules should call this service first, then hydrate module-specific list rows only for authorized resource keys.
+
+Integration example:
+
+1. Run `listAuthorizedResources(...)` for workspace + permission (for example `asset.read`, `log.read`, `queue.read`).
+2. Use the returned `{ resourceFamily, resourceType, resourceId }` tuples to query the module read model.
+3. Preserve ordering/pagination from the authorized query result to keep deterministic UI behavior.
 
 ## Extension guidance
 

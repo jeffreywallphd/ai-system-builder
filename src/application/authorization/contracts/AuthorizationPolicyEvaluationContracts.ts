@@ -59,6 +59,17 @@ export interface AuthorizationResourcePolicyMetadataLookupQuery {
   readonly asOf?: string;
 }
 
+export interface AuthorizationResourcePolicyMetadataListQuery {
+  readonly workspaceId?: string;
+  readonly ownerUserIdentityId?: string;
+  readonly visibility?: ResourceVisibility;
+  readonly resourceFamily?: AuthorizationResourceFamily;
+  readonly resourceType?: string;
+  readonly asOf?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
 export interface AuthorizationResourcePolicyMetadata {
   readonly resourceFamily: AuthorizationResourceFamily;
   readonly resourceType: string;
