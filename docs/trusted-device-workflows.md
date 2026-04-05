@@ -78,6 +78,19 @@ The trusted-device page uses the shared renderer identity API seam:
 
 No local-only trust shortcuts are used for pairing or revocation state transitions.
 
+## Audit coverage
+
+Trusted-device lifecycle operations now emit identity lifecycle audit events through the identity publisher abstraction, including:
+
+- pairing initiation
+- pairing completion
+- pairing failure (`expired` / `invalid-token`)
+- trusted-device revocation
+- trust-status changes
+- session invalidation caused by trusted-device trust loss
+
+Audit payloads include actor/target linkage where available (`userIdentityId`, `trustedDeviceId`, pairing/session identifiers, and timestamps) and intentionally exclude raw pairing/token secrets.
+
 ## Tests
 
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`

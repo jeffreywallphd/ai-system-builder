@@ -38,6 +38,18 @@ Renderer user-facing flow for trusted-device pairing and management.
 - expired/invalid/reused/invalidated/attempts-exhausted outcomes are user-visible
 - unauthenticated or expired session state renders explicit sign-in guidance
 
+## Audit coverage
+
+- trusted-device lifecycle paths now emit identity lifecycle audit events through the shared publisher seam.
+- covered events:
+  - pairing initiated
+  - pairing completed
+  - pairing failed (`expired` / `invalid-token`)
+  - trusted-device revoked
+  - trust-status changed
+  - trust-loss session invalidation
+- audit payloads carry actor/target linkage and timestamps without storing raw pairing token secrets.
+
 ## Tests
 
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`

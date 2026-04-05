@@ -227,6 +227,23 @@ export class IdentityAuthenticatedSessionService {
         session.id,
         nowIso,
       );
+      await publishIdentityLifecycleEventBestEffort(
+        this.dependencies.eventPublisher,
+        createIdentityLifecycleEvent({
+          eventType: IdentityLifecycleEventTypes.sessionTrustInvalidated,
+          contractVersion: IdentityLifecycleEventContractVersions.v1,
+          occurredAt: nowIso,
+          payload: {
+            sessionId: session.id,
+            userIdentityId: session.userIdentityId,
+            trustedDeviceId: deniedTrustContext?.trustedDeviceId ?? session.client?.trustedDeviceBindingId,
+            revocationReason: SessionRevocationReasons.security,
+            invalidationReasons: trustEvaluation.invalidationReasons,
+            invalidatedAt: nowIso,
+            reason: trustEvaluation.reason,
+          },
+        }),
+      );
 
       const failureDetails = Object.freeze({
         ...(trustEvaluation.details ?? {}),

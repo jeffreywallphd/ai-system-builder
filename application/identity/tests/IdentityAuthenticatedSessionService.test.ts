@@ -463,6 +463,7 @@ describe("IdentityAuthenticatedSessionService", () => {
 
   it("supports optional trust-evaluation seam during token resolution", async () => {
     const adapter = new InMemoryIdentitySessionAdapter();
+    const events: IdentityLifecycleEvent[] = [];
     const lifecycleService = new IdentitySessionLifecycleService({
       sessionRepository: adapter,
       clock: adapter,
@@ -483,6 +484,11 @@ describe("IdentityAuthenticatedSessionService", () => {
       tokenService: adapter,
       clock: adapter,
       sessionTrustEvaluator: trustEvaluator,
+      eventPublisher: {
+        publish: async (event) => {
+          events.push(event);
+        },
+      },
     });
 
     const issued = await service.issueAuthenticatedSession({
@@ -524,5 +530,6 @@ describe("IdentityAuthenticatedSessionService", () => {
     }
     expect(secondResolve.error.code).toBe(IdentityErrorCodes.invalidSessionState);
     expect(secondResolve.error.message).toBe("Session token is invalidated.");
+    expect(events.some((event) => event.eventType === IdentityLifecycleEventTypes.sessionTrustInvalidated)).toBeTrue();
   });
 });

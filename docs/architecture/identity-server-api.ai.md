@@ -76,9 +76,16 @@ Auth observability and redaction are centralized in:
 - `infrastructure/api/identity/IdentityAuthRedaction.ts`
 - `infrastructure/api/identity/IdentityAuthResponseSerializers.ts`
 
-`IdentityAuthBackendApi` emits structured register/login completion events through this seam (success and failure), and the seam exposes `IdentityAuthAuditEventSink` for later audit-service integration.
+`IdentityAuthBackendApi` emits structured auth/admin/trusted-device API completion events through this seam (success and failure), and the seam exposes `IdentityAuthAuditEventSink` for audit-service integration.
 
 Administration API flows also emit structured observability/audit events (`admin-accounts-list`, `admin-account-get`, `admin-account-status-set`) through the same seam.
+
+Trusted-device API flows now also emit structured observability/audit event types:
+- self-service list/get/revoke/rename
+- pairing initiate/validate/complete
+- admin trusted-device list/revoke
+
+Trusted-device lifecycle governance auditing additionally uses the application lifecycle-event publisher seam and is now persisted by default in host composition via `SqliteIdentityLifecycleEventPublisher`.
 
 Shared redaction (`redactSensitiveAuthPayload`, `redactSensitiveText`) is reused by backend/audit/HTTP transport logging so sensitive fields and bearer-like token strings never appear in logs. Redacted fields include credential/token material and identity-sensitive request fields (`username`, `providerSubject`, `email`).
 

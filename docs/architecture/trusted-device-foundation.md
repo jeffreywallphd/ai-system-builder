@@ -192,3 +192,17 @@ Persistence guarantees now covered:
   - `application/identity/tests/TrustedDevicePairingService.test.ts`
   - `application/identity/tests/CompleteTrustedDevicePairingUseCase.test.ts`
   - `infrastructure/filesystem/identity/tests/TrustedDevicePairingCompletionIntegration.test.ts`
+
+## Audit coverage update (Story 2.3.4)
+
+- Trusted-device lifecycle operations now emit structured identity lifecycle audit events through the existing publisher abstraction (`IIdentityLifecycleEventPublisher`) with best-effort/non-blocking semantics.
+- Added lifecycle event types:
+  - `identity.trusted-device.pairing-initiated`
+  - `identity.trusted-device.pairing-completed`
+  - `identity.trusted-device.pairing-failed`
+  - `identity.trusted-device.revoked`
+  - `identity.trusted-device.trust-status-changed`
+- Pairing failure audit events are emitted for expiration and invalid-token paths where pairing validation/completion fails.
+- Event payloads identify actor and target context where available (for example user identity, trusted device id, pairing token/session ids, optional workspace, and timestamps).
+- Raw pairing secrets/artifact values are not emitted; audit payloads remain token-secret-safe.
+- `IdentityServerHost` now composes a default SQLite-backed lifecycle event publisher (`infrastructure/filesystem/identity/SqliteIdentityLifecycleEventPublisher.ts`) so trusted-device audit events are durably persisted without coupling trusted-device services to storage mechanics.

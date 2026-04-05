@@ -127,6 +127,15 @@
   - `SetLocalIdentityAccountStatusUseCase` (disable path): `identity.local-account.disabled`
   - `IdentityAuthenticatedSessionService.issueAuthenticatedSession(...)`: `identity.session.created`
   - `LogoutIdentitySessionUseCase`: `identity.session.logged-out`
+  - trusted-device services/session trust now also emit:
+    - `identity.trusted-device.pairing-initiated`
+    - `identity.trusted-device.pairing-completed`
+    - `identity.trusted-device.pairing-failed`
+    - `identity.trusted-device.revoked`
+    - `identity.trusted-device.trust-status-changed`
+    - `identity.session.trust-invalidated`
+
+Identity server host now composes a default SQLite lifecycle-event publisher (`SqliteIdentityLifecycleEventPublisher`) so lifecycle audit events persist by default while preserving the same `IIdentityLifecycleEventPublisher` abstraction boundary.
 
 ## Sensitive-data redaction hardening (story 1.4.5)
 

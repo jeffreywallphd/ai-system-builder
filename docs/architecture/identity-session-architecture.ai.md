@@ -103,6 +103,7 @@ Validation rules:
 - `TrustedDeviceSessionTrustService` is now wired by the runtime host and evaluates trusted-device bindings against repository state during session validation.
 - Validation now fails closed for bound sessions when trusted device state is missing, revoked, expired, or mismatched.
 - Trust-evaluation denial now performs lazy runtime invalidation: the active session is revoked (`security`) and bearer token material is invalidated immediately.
+- Trust-evaluation invalidation now emits a dedicated lifecycle audit event (`identity.session.trust-invalidated`) including session id, user identity, trusted-device linkage (when present), invalidation reasons, and invalidation timestamp.
 - Session validation failures caused by trust now surface a distinct trust-failure response path in API errors (`error.trustFailure.reason`, `error.trustFailure.invalidationReasons`) for user handling and observability.
 - Trusted-session trust markers are now material-aware; marker mismatch against current trusted-device material is treated as stale/mismatched trust and rejected.
 - Login/session issuance now resolves trust from repository state (not client-asserted trust claims), supports request-level trust posture (`allow-untrusted`, `allow-pairing`, `require-trusted`), and can deny issuance when trust requirements are unmet.

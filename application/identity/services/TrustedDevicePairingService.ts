@@ -20,9 +20,15 @@ import {
 } from "../../contracts/IdentityApplicationContracts";
 import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
+import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import type { ITrustedDevicePairingRepository } from "../ports/ITrustedDevicePairingRepository";
 import type { ITrustedDevicePairingService } from "../ports/ITrustedDevicePairingService";
 import type { ITrustedDeviceRepository } from "../ports/ITrustedDeviceRepository";
+import {
+  IdentityLifecycleEventContractVersions,
+  IdentityLifecycleEventTypes,
+  createIdentityLifecycleEvent,
+} from "../../contracts/IdentityLifecycleEventContracts";
 import {
   PairingSessionStatuses,
   PairingTokenActorScopes,
@@ -57,6 +63,7 @@ import {
   mapTokenRecordToDomain,
   mapTrustedDeviceRecord,
 } from "./TrustedDeviceServiceMappers";
+import { publishIdentityLifecycleEventBestEffort } from "./IdentityLifecycleEventPublishing";
 
 interface TrustedDevicePairingServiceDependencies {
   readonly trustedDeviceRepository: ITrustedDeviceRepository;
@@ -64,6 +71,7 @@ interface TrustedDevicePairingServiceDependencies {
   readonly idGenerator: IIdentityIdGenerator;
   readonly clock: IIdentityClock;
   readonly pairingTokenHasher?: (token: string) => string;
+  readonly eventPublisher?: IIdentityLifecycleEventPublisher;
 }
 
 export class TrustedDevicePairingService implements ITrustedDevicePairingService {
@@ -114,6 +122,26 @@ export class TrustedDevicePairingService implements ITrustedDevicePairingService
 
     const persistedSession = await this.dependencies.pairingRepository.createPairingSession(mapPairingSessionRecord(session));
     const persistedToken = await this.dependencies.pairingRepository.createPairingToken(mapPairingTokenRecord(token));
+    await publishIdentityLifecycleEventBestEffort(
+      this.dependencies.eventPublisher,
+      createIdentityLifecycleEvent({
+        eventType: IdentityLifecycleEventTypes.trustedDevicePairingInitiated,
+        contractVersion: IdentityLifecycleEventContractVersions.v1,
+        occurredAt: persistedToken.issuedAt,
+        payload: {
+          pairingSessionId: persistedSession.pairingSessionId,
+          pairingTokenId: persistedToken.pairingTokenId,
+          trustedDeviceId: persistedToken.trustedDeviceId,
+          userIdentityId: persistedToken.userIdentityId,
+          workspaceId: persistedToken.workspaceId,
+          actorScope: persistedToken.actorBinding.scope,
+          artifactType: persistedToken.artifactType,
+          issuedAt: persistedToken.issuedAt,
+          expiresAt: persistedToken.expiresAt,
+          issuedByUserIdentityId: persistedToken.issuance?.issuedByUserIdentityId,
+        },
+      }),
+    );
 
     return Object.freeze({
       pairingSession: persistedSession,
@@ -146,6 +174,16 @@ export class TrustedDevicePairingService implements ITrustedDevicePairingService
       const expiredSession = this.expireActiveSession(session);
       const persistedToken = await this.dependencies.pairingRepository.updatePairingToken(mapPairingTokenRecord(expiredToken));
       const persistedSession = await this.dependencies.pairingRepository.updatePairingSession(mapPairingSessionRecord(expiredSession));
+      await this.publishPairingFailureAudit({
+        pairingSessionId: persistedSession.pairingSessionId,
+        pairingTokenId: persistedToken.pairingTokenId,
+        trustedDeviceId: persistedToken.trustedDeviceId,
+        userIdentityId: persistedToken.userIdentityId,
+        workspaceId: persistedToken.workspaceId,
+        failureReason: "expired",
+        occurredAt: request.attemptedAt ?? this.dependencies.clock.now().toISOString(),
+        actorUserIdentityId: request.userIdentityId,
+      });
       return Object.freeze({
         outcome: PairingTokenValidationOutcomes.expired,
         pairingSession: persistedSession,
@@ -205,6 +243,18 @@ export class TrustedDevicePairingService implements ITrustedDevicePairingService
       const persistedSession = await this.dependencies.pairingRepository.updatePairingSession(
         mapPairingSessionRecord(nextSession),
       );
+      if (outcome === PairingTokenValidationOutcomes.invalid || outcome === PairingTokenValidationOutcomes.attemptsExhausted) {
+        await this.publishPairingFailureAudit({
+          pairingSessionId: persistedSession.pairingSessionId,
+          pairingTokenId: persistedToken.pairingTokenId,
+          trustedDeviceId: persistedToken.trustedDeviceId,
+          userIdentityId: persistedToken.userIdentityId,
+          workspaceId: persistedToken.workspaceId,
+          failureReason: "invalid-token",
+          occurredAt: request.attemptedAt ?? this.dependencies.clock.now().toISOString(),
+          actorUserIdentityId: request.userIdentityId,
+        });
+      }
       return Object.freeze({
         outcome,
         pairingSession: persistedSession,
@@ -257,8 +307,18 @@ export class TrustedDevicePairingService implements ITrustedDevicePairingService
         ? expirePairingToken(token, request.completedAt ? new Date(request.completedAt) : this.dependencies.clock.now())
         : token;
       const expiredSession = this.expireActiveSession(session);
-      await this.dependencies.pairingRepository.updatePairingToken(mapPairingTokenRecord(expiredToken));
-      await this.dependencies.pairingRepository.updatePairingSession(mapPairingSessionRecord(expiredSession));
+      const persistedToken = await this.dependencies.pairingRepository.updatePairingToken(mapPairingTokenRecord(expiredToken));
+      const persistedSession = await this.dependencies.pairingRepository.updatePairingSession(mapPairingSessionRecord(expiredSession));
+      await this.publishPairingFailureAudit({
+        pairingSessionId: persistedSession.pairingSessionId,
+        pairingTokenId: persistedToken.pairingTokenId,
+        trustedDeviceId: persistedToken.trustedDeviceId,
+        userIdentityId: persistedToken.userIdentityId,
+        workspaceId: persistedToken.workspaceId,
+        failureReason: "expired",
+        occurredAt: request.completedAt ?? this.dependencies.clock.now().toISOString(),
+        actorUserIdentityId: request.completedByUserIdentityId ?? request.userIdentityId,
+      });
       throw new Error("Pairing token is expired.");
     }
 
@@ -277,8 +337,18 @@ export class TrustedDevicePairingService implements ITrustedDevicePairingService
     if (!this.isPresentedTokenValid(token, request.presentedToken)) {
       const invalidatedToken = this.invalidateOnInvalidCompletionToken(token, request.userIdentityId);
       const rejectedSession = this.rejectInvalidToken(session);
-      await this.dependencies.pairingRepository.updatePairingToken(mapPairingTokenRecord(invalidatedToken));
-      await this.dependencies.pairingRepository.updatePairingSession(mapPairingSessionRecord(rejectedSession));
+      const persistedToken = await this.dependencies.pairingRepository.updatePairingToken(mapPairingTokenRecord(invalidatedToken));
+      const persistedSession = await this.dependencies.pairingRepository.updatePairingSession(mapPairingSessionRecord(rejectedSession));
+      await this.publishPairingFailureAudit({
+        pairingSessionId: persistedSession.pairingSessionId,
+        pairingTokenId: persistedToken.pairingTokenId,
+        trustedDeviceId: persistedToken.trustedDeviceId,
+        userIdentityId: persistedToken.userIdentityId,
+        workspaceId: persistedToken.workspaceId,
+        failureReason: "invalid-token",
+        occurredAt: request.completedAt ?? this.dependencies.clock.now().toISOString(),
+        actorUserIdentityId: request.completedByUserIdentityId ?? request.userIdentityId,
+      });
       throw new Error("Pairing token presented for completion is invalid.");
     }
 
@@ -315,6 +385,42 @@ export class TrustedDevicePairingService implements ITrustedDevicePairingService
       mapPairingSessionRecord(completedSession),
     );
     const persistedDevice = await this.dependencies.trustedDeviceRepository.updateTrustedDevice(pairedDevice);
+    await publishIdentityLifecycleEventBestEffort(
+      this.dependencies.eventPublisher,
+      createIdentityLifecycleEvent({
+        eventType: IdentityLifecycleEventTypes.trustedDevicePairingCompleted,
+        contractVersion: IdentityLifecycleEventContractVersions.v1,
+        occurredAt: persistedSession.completedAt ?? completionTime,
+        payload: {
+          pairingSessionId: persistedSession.pairingSessionId,
+          pairingTokenId: persistedToken.pairingTokenId,
+          trustedDeviceId: persistedDevice.id,
+          userIdentityId: persistedDevice.userIdentityId,
+          workspaceId: persistedDevice.workspaceId,
+          completedAt: persistedSession.completedAt ?? completionTime,
+          completedByUserIdentityId: persistedSession.completedByUserIdentityId,
+          trustMaterialKind: persistedDevice.trustMaterialRef?.kind,
+        },
+      }),
+    );
+    await publishIdentityLifecycleEventBestEffort(
+      this.dependencies.eventPublisher,
+      createIdentityLifecycleEvent({
+        eventType: IdentityLifecycleEventTypes.trustedDeviceTrustStatusChanged,
+        contractVersion: IdentityLifecycleEventContractVersions.v1,
+        occurredAt: persistedDevice.updatedAt,
+        payload: {
+          trustedDeviceId: persistedDevice.id,
+          userIdentityId: persistedDevice.userIdentityId,
+          workspaceId: persistedDevice.workspaceId,
+          previousStatus: trustedDevice.trustStatus,
+          nextStatus: persistedDevice.trustStatus,
+          changedAt: persistedDevice.updatedAt,
+          changedByUserIdentityId: request.completedByUserIdentityId ?? request.userIdentityId,
+          reason: "pairing-completed",
+        },
+      }),
+    );
 
     return Object.freeze({
       pairingSession: persistedSession,
@@ -530,6 +636,36 @@ export class TrustedDevicePairingService implements ITrustedDevicePairingService
       invalidatedByUserIdentityId: userIdentityId,
       note: "pairing token mismatch",
     });
+  }
+
+  private async publishPairingFailureAudit(input: {
+    readonly pairingSessionId: string;
+    readonly pairingTokenId: string;
+    readonly trustedDeviceId: string;
+    readonly userIdentityId: string;
+    readonly workspaceId?: string;
+    readonly failureReason: "expired" | "invalid-token";
+    readonly occurredAt: string;
+    readonly actorUserIdentityId?: string;
+  }): Promise<void> {
+    await publishIdentityLifecycleEventBestEffort(
+      this.dependencies.eventPublisher,
+      createIdentityLifecycleEvent({
+        eventType: IdentityLifecycleEventTypes.trustedDevicePairingFailed,
+        contractVersion: IdentityLifecycleEventContractVersions.v1,
+        occurredAt: input.occurredAt,
+        payload: {
+          pairingSessionId: input.pairingSessionId,
+          pairingTokenId: input.pairingTokenId,
+          trustedDeviceId: input.trustedDeviceId,
+          userIdentityId: input.userIdentityId,
+          workspaceId: input.workspaceId,
+          failureReason: input.failureReason,
+          occurredAt: input.occurredAt,
+          actorUserIdentityId: input.actorUserIdentityId,
+        },
+      }),
+    );
   }
 }
 

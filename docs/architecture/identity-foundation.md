@@ -358,11 +358,19 @@ Current emission points:
 - `SetLocalIdentityAccountStatusUseCase` (disable flow): `identity.local-account.disabled`
 - `IdentityAuthenticatedSessionService.issueAuthenticatedSession(...)`: `identity.session.created`
 - `LogoutIdentitySessionUseCase`: `identity.session.logged-out`
+- trusted-device/session-trust lifecycle services:
+  - `identity.trusted-device.pairing-initiated`
+  - `identity.trusted-device.pairing-completed`
+  - `identity.trusted-device.pairing-failed`
+  - `identity.trusted-device.revoked`
+  - `identity.trusted-device.trust-status-changed`
+  - `identity.session.trust-invalidated`
 
 Reliability posture:
 
 - lifecycle event publication is intentionally best effort
 - publisher failures are swallowed by design so registration/login/session/logout lifecycle behavior is not blocked by unavailable downstream audit/governance sinks
+- host runtime now composes a default SQLite-backed lifecycle event publisher (`infrastructure/filesystem/identity/SqliteIdentityLifecycleEventPublisher.ts`) so lifecycle audit records persist by default while preserving the publisher port abstraction
 
 ## Sensitive-Data Redaction Hardening (Story 1.4.5)
 
