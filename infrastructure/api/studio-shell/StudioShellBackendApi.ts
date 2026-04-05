@@ -129,6 +129,9 @@ import {
 import { ComfyExecutionResultMaterializationMapper } from "../../comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper";
 import type { SystemContextContract } from "../../../domain/system-studio/SystemContextContract";
 import type { DatasetInstance } from "../../../domain/system-runtime/DatasetInstanceDomain";
+import type { IAuthorizationPolicyDecisionEvaluator } from "../../../src/application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
+import { AuthorizationPolicyEvaluationTargetKinds } from "../../../src/application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import { AuthorizationResourceFamilies } from "../../../src/domain/authorization/AuthorizationPermissionCatalog";
 
 export interface StudioShellApiError {
   readonly code:
@@ -301,12 +304,14 @@ export interface ListReferenceImageOutputsRequest {
   readonly draftId?: string;
   readonly limit?: number;
   readonly offset?: number;
+  readonly authorization?: ReferenceImageAccessAuthorizationContext;
 }
 
 export interface GetReferenceImageOutputRequest {
   readonly studioId: string;
   readonly draftId?: string;
   readonly recordId: string;
+  readonly authorization?: ReferenceImageAccessAuthorizationContext;
 }
 
 export interface ListReferenceImageDatasetItemsRequest {
@@ -315,6 +320,7 @@ export interface ListReferenceImageDatasetItemsRequest {
   readonly datasetBindingId: ReferenceImageDatasetBindingId;
   readonly limit?: number;
   readonly offset?: number;
+  readonly authorization?: ReferenceImageAccessAuthorizationContext;
 }
 
 export interface GetReferenceImageDatasetItemRequest {
@@ -322,6 +328,14 @@ export interface GetReferenceImageDatasetItemRequest {
   readonly draftId?: string;
   readonly datasetBindingId: ReferenceImageDatasetBindingId;
   readonly recordId: string;
+  readonly authorization?: ReferenceImageAccessAuthorizationContext;
+}
+
+export interface ReferenceImageAccessAuthorizationContext {
+  readonly actorUserIdentityId: string;
+  readonly activeWorkspaceId?: string;
+  readonly authenticatedAt?: string;
+  readonly asOf?: string;
 }
 
 export interface ChainReferenceImageDatasetItemRequest {
@@ -794,6 +808,8 @@ export class StudioShellBackendApi {
   private readonly storageLifecycle: StorageInstanceLifecycleService;
   private readonly comfyMaterializationMapper = new ComfyExecutionResultMaterializationMapper();
   private readonly now: () => Date;
+  private readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+  private readonly referenceImageProtectedResourceType: string;
 
   constructor(
     private readonly repository: IStudioShellRepository,
@@ -806,6 +822,8 @@ export class StudioShellBackendApi {
       readonly storageInstanceMetadataRepository?: StorageInstanceMetadataRepository;
       readonly workflowOutputArtifactStorage?: WorkflowOutputArtifactStorage;
       readonly storageLifecycleInfrastructure?: StorageInstanceLifecycleInfrastructure;
+      readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+      readonly referenceImageProtectedResourceType?: string;
     },
   ) {
     this.now = now;
@@ -855,6 +873,9 @@ export class StudioShellBackendApi {
       options?.storageLifecycleInfrastructure,
       this.now,
     );
+    this.authorizationDecisionEvaluator = options?.authorizationDecisionEvaluator;
+    this.referenceImageProtectedResourceType = options?.referenceImageProtectedResourceType?.trim()
+      || "reference-image-output";
     this.workflowStudioService = new WorkflowStudioApplicationService(
       this.service,
       undefined,
@@ -1704,6 +1725,7 @@ export class StudioShellBackendApi {
         datasetBindingId: "output-image-dataset",
         limit: request.limit,
         offset: request.offset,
+        authorization: request.authorization,
       });
     });
   }
@@ -1717,6 +1739,7 @@ export class StudioShellBackendApi {
         draftId: request.draftId,
         datasetBindingId: "output-image-dataset",
         recordId: request.recordId,
+        authorization: request.authorization,
       });
     });
   }
@@ -1731,6 +1754,7 @@ export class StudioShellBackendApi {
         datasetBindingId: request.datasetBindingId,
         limit: request.limit,
         offset: request.offset,
+        authorization: request.authorization,
       });
     });
   }
@@ -1837,11 +1861,17 @@ export class StudioShellBackendApi {
     readonly datasetBindingId: ReferenceImageDatasetBindingId;
     readonly limit?: number;
     readonly offset?: number;
+    readonly authorization?: ReferenceImageAccessAuthorizationContext;
   }): Promise<OutputGalleryListing> {
     const dataset = await this.resolveReferenceImageDatasetForBinding({
       studioId: request.studioId,
       draftId: request.draftId,
       datasetBindingId: request.datasetBindingId,
+    });
+    await this.assertReferenceImageDatasetReadAuthorized({
+      systemId: dataset.systemId,
+      datasetBindingId: request.datasetBindingId,
+      authorization: request.authorization,
     });
     return this.referenceImageOutputGallery.listOutputGalleryItems({
       systemId: dataset.systemId,
@@ -1857,6 +1887,7 @@ export class StudioShellBackendApi {
       readonly draftId?: string;
       readonly datasetBindingId: ReferenceImageDatasetBindingId;
       readonly recordId: string;
+      readonly authorization?: ReferenceImageAccessAuthorizationContext;
     },
   ): Promise<OutputGalleryItem> {
     const dataset = await this.resolveReferenceImageDatasetForBinding({
@@ -1864,11 +1895,63 @@ export class StudioShellBackendApi {
       draftId: request.draftId,
       datasetBindingId: request.datasetBindingId,
     });
-    return this.referenceImageOutputGallery.getOutputGalleryItem({
+    await this.assertReferenceImageDatasetReadAuthorized({
       systemId: dataset.systemId,
-      datasetInstanceId: dataset.instanceId,
-      recordId: request.recordId,
+      datasetBindingId: request.datasetBindingId,
+      authorization: request.authorization,
     });
+    try {
+      return this.referenceImageOutputGallery.getOutputGalleryItem({
+        systemId: dataset.systemId,
+        datasetInstanceId: dataset.instanceId,
+        recordId: request.recordId,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("not-found:")) {
+        throw new Error("not-found:Requested reference image output was not found.");
+      }
+      throw error;
+    }
+  }
+
+  private async assertReferenceImageDatasetReadAuthorized(input: {
+    readonly systemId: string;
+    readonly datasetBindingId: ReferenceImageDatasetBindingId;
+    readonly authorization?: ReferenceImageAccessAuthorizationContext;
+  }): Promise<void> {
+    if (!this.authorizationDecisionEvaluator) {
+      return;
+    }
+    const actorUserIdentityId = input.authorization?.actorUserIdentityId?.trim();
+    if (!actorUserIdentityId) {
+      throw new Error("not-found:Requested reference image output was not found.");
+    }
+
+    const asOf = input.authorization?.asOf?.trim() || this.now().toISOString();
+    const decision = await this.authorizationDecisionEvaluator.evaluateDecision({
+      actor: Object.freeze({
+        actorUserIdentityId,
+        activeWorkspaceId: input.authorization?.activeWorkspaceId?.trim() || undefined,
+        authenticatedAt: input.authorization?.authenticatedAt?.trim() || undefined,
+      }),
+      requiredPermissionKey: "asset.read",
+      target: Object.freeze({
+        kind: AuthorizationPolicyEvaluationTargetKinds.resourceInstance,
+        resource: Object.freeze({
+          resourceFamily: AuthorizationResourceFamilies.asset,
+          resourceType: this.referenceImageProtectedResourceType,
+          resourceId: this.createReferenceImageProtectedResourceId(input.systemId, input.datasetBindingId),
+        }),
+      }),
+      asOf,
+    });
+    if (!decision.decision.isAllowed) {
+      throw new Error("not-found:Requested reference image output was not found.");
+    }
+  }
+
+  private createReferenceImageProtectedResourceId(systemId: string, datasetBindingId: ReferenceImageDatasetBindingId): string {
+    return `${systemId.trim()}::${datasetBindingId}`;
   }
 
   private async resolveReferenceImageDatasetForBinding(input: {

@@ -9,6 +9,9 @@ import {
   type ExploreSearchResult,
   type UnifiedExploreAssetLibrary,
 } from "../../../application/asset-registry/ExploreAssetQueryService";
+import type { IAuthorizationPolicyDecisionEvaluator } from "../../../src/application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
+import { AuthorizationPolicyEvaluationTargetKinds } from "../../../src/application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import { AuthorizationResourceFamilies } from "../../../src/domain/authorization/AuthorizationPermissionCatalog";
 
 export interface RegistryApiError {
   readonly code: "not-found" | "invalid-request" | "internal";
@@ -27,6 +30,13 @@ export interface RegistryDependencyEndpointQuery {
 }
 
 export interface RegistryAssetDetailQuery extends RegistryDependencyEndpointQuery {}
+
+export interface RegistryActorAuthorizationContext {
+  readonly actorUserIdentityId: string;
+  readonly activeWorkspaceId?: string;
+  readonly authenticatedAt?: string;
+  readonly asOf?: string;
+}
 
 export interface RegistryTraversalEndpointQuery extends RegistryDependencyEndpointQuery {
   readonly maxDepth?: number;
@@ -52,11 +62,19 @@ function normalizeTraversalOptions(query: RegistryTraversalEndpointQuery): Regis
 
 export class RegistryBackendApi {
   private readonly exploreAssetQueryService: ExploreAssetQueryService;
+  private readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+  private readonly assetProtectedResourceType: string;
+  private readonly now: () => Date;
 
   constructor(
     private readonly registryQueryService: CrossStudioRegistryQueryService,
     private readonly graphService: RegistryDependencyGraphService,
     listPersistedWorkflowsUseCase?: ListPersistedWorkflowsUseCase,
+    options?: {
+      readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+      readonly assetProtectedResourceType?: string;
+      readonly now?: () => Date;
+    },
   ) {
     this.exploreAssetQueryService = new ExploreAssetQueryService(
       this.registryQueryService,
@@ -66,6 +84,9 @@ export class RegistryBackendApi {
         }
         : undefined,
     );
+    this.authorizationDecisionEvaluator = options?.authorizationDecisionEvaluator;
+    this.assetProtectedResourceType = options?.assetProtectedResourceType?.trim() || "registry-asset";
+    this.now = options?.now ?? (() => new Date());
   }
 
   public async listAssets(limit?: number): Promise<RegistryApiResponse<ReadonlyArray<RegistryAsset>>> {
@@ -124,7 +145,10 @@ export class RegistryBackendApi {
     return this.wrap(() => this.exploreAssetQueryService.search(query));
   }
 
-  public async getAssetDetail(query: RegistryAssetDetailQuery): Promise<RegistryApiResponse<RegistryAsset>> {
+  public async getAssetDetail(
+    query: RegistryAssetDetailQuery,
+    actor?: RegistryActorAuthorizationContext,
+  ): Promise<RegistryApiResponse<RegistryAsset>> {
     return this.wrap(async () => {
       const versionId = query.versionId?.trim();
       if (versionId) {
@@ -132,6 +156,7 @@ export class RegistryBackendApi {
         if (!byVersion) {
           throw new Error("not-found:Asset or version was not found.");
         }
+        await this.assertAssetReadAuthorized(byVersion.assetId, actor);
         return byVersion;
       }
 
@@ -144,8 +169,40 @@ export class RegistryBackendApi {
       if (!asset) {
         throw new Error("not-found:Asset or version was not found.");
       }
+      await this.assertAssetReadAuthorized(asset.assetId, actor);
       return asset;
     });
+  }
+
+  private async assertAssetReadAuthorized(assetId: string, actor?: RegistryActorAuthorizationContext): Promise<void> {
+    if (!this.authorizationDecisionEvaluator) {
+      return;
+    }
+    const actorUserIdentityId = actor?.actorUserIdentityId?.trim();
+    if (!actorUserIdentityId) {
+      throw new Error("not-found:Asset or version was not found.");
+    }
+    const decision = await this.authorizationDecisionEvaluator.evaluateDecision({
+      actor: Object.freeze({
+        actorUserIdentityId,
+        activeWorkspaceId: actor?.activeWorkspaceId?.trim() || undefined,
+        authenticatedAt: actor?.authenticatedAt?.trim() || undefined,
+      }),
+      requiredPermissionKey: "asset.read",
+      target: Object.freeze({
+        kind: AuthorizationPolicyEvaluationTargetKinds.resourceInstance,
+        resource: Object.freeze({
+          resourceFamily: AuthorizationResourceFamilies.asset,
+          resourceType: this.assetProtectedResourceType,
+          resourceId: assetId.trim(),
+        }),
+      }),
+      asOf: actor?.asOf?.trim() || this.now().toISOString(),
+    });
+
+    if (!decision.decision.isAllowed) {
+      throw new Error("not-found:Asset or version was not found.");
+    }
   }
 
   public async getDependencies(query: RegistryDependencyEndpointQuery) {
