@@ -18,6 +18,7 @@ import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
 import type { IIdentitySessionRepository } from "../ports/IIdentitySessionRepository";
 import type { IIdentitySessionTokenMaterialRepository } from "../ports/IIdentitySessionTokenMaterialRepository";
+import type { IIdentitySessionTrustEvaluator } from "../ports/IIdentitySessionTrustEvaluator";
 import type {
   IdentitySessionTokenIssueResult,
   IIdentitySessionTokenService,
@@ -127,6 +128,46 @@ class InMemoryIdentitySessionAdapter
 }
 
 describe("IdentityAuthenticatedSessionService", () => {
+  it("carries optional trusted-device session context through issuance and resolution", async () => {
+    const adapter = new InMemoryIdentitySessionAdapter();
+    const lifecycleService = new IdentitySessionLifecycleService({
+      sessionRepository: adapter,
+      clock: adapter,
+      idGenerator: adapter,
+    });
+    const service = new IdentityAuthenticatedSessionService({
+      lifecycleService,
+      sessionRepository: adapter,
+      tokenMaterialRepository: adapter,
+      tokenService: adapter,
+      clock: adapter,
+    });
+
+    const issued = await service.issueAuthenticatedSession({
+      userIdentityId: "user:1",
+      providerId: "provider:local-password",
+      providerSubject: "alice",
+      accessChannel: IdentitySessionAccessChannels.thinClient,
+      client: {
+        deviceId: "device:alpha",
+        trustedDeviceBindingId: "trusted-device:alpha",
+        trustMarker: "marker:alpha",
+      },
+    });
+    if (!issued.ok) {
+      throw new Error("Expected session issue success.");
+    }
+
+    const resolved = await service.resolveAuthenticatedSessionByToken({ token: issued.value.token });
+    expect(resolved.ok).toBeTrue();
+    if (!resolved.ok) {
+      throw new Error("Expected token lookup success.");
+    }
+    expect(resolved.value.session.client?.deviceId).toBe("device:alpha");
+    expect(resolved.value.trustedDeviceBindingId).toBe("trusted-device:alpha");
+    expect(resolved.value.trustMarker).toBe("marker:alpha");
+  });
+
   it("issues persisted authenticated sessions and resolves active session by token", async () => {
     const adapter = new InMemoryIdentitySessionAdapter();
     const lifecycleService = new IdentitySessionLifecycleService({
@@ -390,5 +431,47 @@ describe("IdentityAuthenticatedSessionService", () => {
 
     const expired = await adapter.getSessionById(issued.value.session.id);
     expect(expired?.status).toBe(IdentitySessionStatuses.expired);
+  });
+
+  it("supports optional trust-evaluation seam during token resolution", async () => {
+    const adapter = new InMemoryIdentitySessionAdapter();
+    const lifecycleService = new IdentitySessionLifecycleService({
+      sessionRepository: adapter,
+      clock: adapter,
+      idGenerator: adapter,
+    });
+    const trustEvaluator: IIdentitySessionTrustEvaluator = {
+      evaluateSessionTrust: async () => Object.freeze({
+        allowed: false as const,
+        reason: "device not trusted",
+        details: Object.freeze({ policy: "future-device-trust" }),
+      }),
+    };
+    const service = new IdentityAuthenticatedSessionService({
+      lifecycleService,
+      sessionRepository: adapter,
+      tokenMaterialRepository: adapter,
+      tokenService: adapter,
+      clock: adapter,
+      sessionTrustEvaluator: trustEvaluator,
+    });
+
+    const issued = await service.issueAuthenticatedSession({
+      userIdentityId: "user:1",
+      providerId: "provider:local-password",
+      providerSubject: "alice",
+      accessChannel: IdentitySessionAccessChannels.thinClient,
+    });
+    if (!issued.ok) {
+      throw new Error("Expected issue success.");
+    }
+
+    const resolved = await service.resolveAuthenticatedSessionByToken({ token: issued.value.token });
+    expect(resolved.ok).toBeFalse();
+    if (resolved.ok) {
+      throw new Error("Expected trust evaluation to reject session.");
+    }
+    expect(resolved.error.code).toBe(IdentityErrorCodes.invalidSessionState);
+    expect(resolved.error.details).toEqual({ policy: "future-device-trust" });
   });
 });

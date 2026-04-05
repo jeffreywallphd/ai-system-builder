@@ -216,11 +216,15 @@ describe("IdentityDomain", () => {
       client: {
         accessChannel: "desktop",
         deviceId: "desktop-1",
+        trustedDeviceBindingId: "trusted-device:desktop-1",
+        trustMarker: "marker:desktop",
       },
     });
 
     const revoked = revokeSession(session, SessionRevocationReasons.admin, new Date("2026-04-04T18:05:00.000Z"));
     expect(session.client?.accessChannel).toBe("desktop");
+    expect(session.client?.trustedDeviceBindingId).toBe("trusted-device:desktop-1");
+    expect(session.client?.trustMarker).toBe("marker:desktop");
     expect(revoked.revocation?.reason).toBe("admin");
   });
 

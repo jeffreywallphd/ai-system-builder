@@ -159,6 +159,9 @@ export class IdentityAuthBackendApi {
         sessionIssuedAt: issueSessionResult.value.session.issuedAt,
         sessionExpiresAt: issueSessionResult.value.session.expiresAt,
         sessionAccessChannel: issueSessionResult.value.session.client?.accessChannel,
+        sessionDeviceId: issueSessionResult.value.session.client?.deviceId,
+        sessionTrustedDeviceBindingId: issueSessionResult.value.session.client?.trustedDeviceBindingId,
+        sessionTrustMarker: issueSessionResult.value.session.client?.trustMarker,
       }),
     });
 
@@ -210,6 +213,9 @@ export class IdentityAuthBackendApi {
           providerId: resolved.value.session.providerId,
           providerSubject: resolved.value.session.providerSubject,
           accessChannel: resolved.value.session.client?.accessChannel,
+          deviceId: resolved.value.session.client?.deviceId,
+          trustedDeviceBindingId: resolved.value.trustedDeviceBindingId,
+          trustMarker: resolved.value.trustMarker,
           issuedAt: resolved.value.session.issuedAt,
           expiresAt: resolved.value.session.expiresAt,
         }),

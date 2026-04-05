@@ -1,4 +1,4 @@
-export const IDENTITY_SCHEMA_VERSION = 3;
+export const IDENTITY_SCHEMA_VERSION = 4;
 
 export const IDENTITY_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -158,5 +158,12 @@ export const IDENTITY_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Obj
       ON identity_session_token_material(token_hash);
     CREATE INDEX IF NOT EXISTS identity_session_token_material_expiry_idx
       ON identity_session_token_material(expires_at ASC);
+  `],
+  [4, `
+    ALTER TABLE identity_sessions
+      ADD COLUMN client_trusted_device_binding_id TEXT;
+
+    ALTER TABLE identity_sessions
+      ADD COLUMN client_trust_marker TEXT;
   `],
 ]);

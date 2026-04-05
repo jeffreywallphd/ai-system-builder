@@ -19,6 +19,7 @@ import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentitySessionRepository } from "../ports/IIdentitySessionRepository";
 import type { IIdentitySessionTokenMaterialRepository } from "../ports/IIdentitySessionTokenMaterialRepository";
 import type { IIdentitySessionTokenService } from "../ports/IIdentitySessionTokenService";
+import type { IIdentitySessionTrustEvaluator } from "../ports/IIdentitySessionTrustEvaluator";
 import { IdentitySessionLifecycleService } from "./IdentitySessionLifecycleService";
 
 export interface IssueAuthenticatedSessionInput {
@@ -30,6 +31,8 @@ export interface IssueAuthenticatedSessionInput {
     readonly userAgent?: string;
     readonly ipAddress?: string;
     readonly deviceId?: string;
+    readonly trustedDeviceBindingId?: string;
+    readonly trustMarker?: string;
   };
 }
 
@@ -45,6 +48,8 @@ export interface ResolveAuthenticatedSessionByTokenInput {
 
 export interface ResolveAuthenticatedSessionByTokenResult {
   readonly session: Session;
+  readonly trustedDeviceBindingId?: string;
+  readonly trustMarker?: string;
 }
 
 export interface InvalidateAuthenticatedSessionInput {
@@ -71,6 +76,7 @@ interface IdentityAuthenticatedSessionServiceDependencies {
   readonly tokenMaterialRepository: IIdentitySessionTokenMaterialRepository;
   readonly tokenService: IIdentitySessionTokenService;
   readonly clock: IIdentityClock;
+  readonly sessionTrustEvaluator?: IIdentitySessionTrustEvaluator;
 }
 
 export class IdentityAuthenticatedSessionService {
@@ -156,6 +162,20 @@ export class IdentityAuthenticatedSessionService {
       return this.failure(IdentityErrorCodes.invalidSessionState, "Session is not active.");
     }
 
+    const trustEvaluation = this.dependencies.sessionTrustEvaluator
+      ? await this.dependencies.sessionTrustEvaluator.evaluateSessionTrust({
+          session,
+          evaluatedAt: now.toISOString(),
+        })
+      : undefined;
+    if (trustEvaluation && !trustEvaluation.allowed) {
+      return this.failure(
+        IdentityErrorCodes.invalidSessionState,
+        "Session trust requirements were not satisfied.",
+        trustEvaluation.details,
+      );
+    }
+
     const policyAccessChannel = session.client?.accessChannel ?? IdentitySessionAccessChannels.thinClient;
     const rolledExpiry = this.dependencies.lifecycleService.calculateSessionRollingExpiry(
       new Date(session.issuedAt),
@@ -177,7 +197,15 @@ export class IdentityAuthenticatedSessionService {
       expiresAt: resolvedSession.expiresAt,
     }));
 
-    return identitySuccess(Object.freeze({ session: resolvedSession }));
+    return identitySuccess(Object.freeze({
+      session: resolvedSession,
+      trustedDeviceBindingId: trustEvaluation?.allowed
+        ? trustEvaluation.trustedDeviceBindingId ?? resolvedSession.client?.trustedDeviceBindingId
+        : resolvedSession.client?.trustedDeviceBindingId,
+      trustMarker: trustEvaluation?.allowed
+        ? trustEvaluation.trustMarker ?? resolvedSession.client?.trustMarker
+        : resolvedSession.client?.trustMarker,
+    }));
   }
 
   public async invalidateAuthenticatedSession(

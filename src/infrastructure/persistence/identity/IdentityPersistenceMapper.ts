@@ -112,6 +112,8 @@ export interface SessionRow {
   readonly client_user_agent: string | null;
   readonly client_ip_address: string | null;
   readonly client_device_id: string | null;
+  readonly client_trusted_device_binding_id: string | null;
+  readonly client_trust_marker: string | null;
 }
 
 export interface SessionTokenMaterialRow {
@@ -238,6 +240,8 @@ export function mapSessionRowToDomain(row: SessionRow): Session {
       userAgent: row.client_user_agent ?? undefined,
       ipAddress: row.client_ip_address ?? undefined,
       deviceId: row.client_device_id ?? undefined,
+      trustedDeviceBindingId: row.client_trusted_device_binding_id ?? undefined,
+      trustMarker: row.client_trust_marker ?? undefined,
     },
   });
 
@@ -376,6 +380,8 @@ export function mapSessionToRowValues(session: Session): ReadonlyArray<unknown> 
     session.client?.userAgent ?? null,
     session.client?.ipAddress ?? null,
     session.client?.deviceId ?? null,
+    session.client?.trustedDeviceBindingId ?? null,
+    session.client?.trustMarker ?? null,
   ]);
 }
 

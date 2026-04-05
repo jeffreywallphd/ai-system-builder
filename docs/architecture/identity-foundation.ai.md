@@ -98,7 +98,7 @@
 
 ## Boundary clarity: identity vs trust
 
-- Identity session records carry lifecycle state and optional client context only (`accessChannel`, user agent, IP, device id).
+- Identity session records carry lifecycle state and optional client context only (`accessChannel`, `userAgent`, `ipAddress`, `deviceId`, `trustedDeviceBindingId`, `trustMarker`).
 - Device trust and runtime/tool trust remain separate concerns (for example MCP trust modules).
 - No identity invariant currently depends on device-attestation or runtime trust decisions.
 
@@ -171,6 +171,20 @@
 - Default posture remains explicit:
   - desktop: 30-day TTL, refresh disabled, inactivity timeout unset
   - thin-client: 12-hour TTL, refresh enabled, inactivity timeout unset
+
+## Trusted-device binding seams (story 1.3.6)
+
+- Session client context now includes optional trusted-device seam fields:
+  - `trustedDeviceBindingId`
+  - `trustMarker`
+- These are persisted in `identity_sessions` as:
+  - `client_trusted_device_binding_id`
+  - `client_trust_marker`
+- `IdentityAuthenticatedSessionService` now exposes an optional validation extension hook:
+  - `application/identity/ports/IIdentitySessionTrustEvaluator.ts`
+  - the evaluator can participate in bearer-token session validation and deny sessions with existing invalid-session-state outcomes
+- No trust evaluator is wired by default in this slice, so existing local-session behavior remains unchanged.
+- Authenticated-session resolution contracts now surface device/trust seam fields (`deviceId`, `trustedDeviceBindingId`, `trustMarker`) so later trusted-device policy work can compose on existing principal/session resolution flows.
 
 ## Read next
 

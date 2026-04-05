@@ -162,6 +162,8 @@ export interface SessionClientContext {
   readonly userAgent?: string;
   readonly ipAddress?: string;
   readonly deviceId?: string;
+  readonly trustedDeviceBindingId?: string;
+  readonly trustMarker?: string;
 }
 
 export const SessionRevocationReasons = Object.freeze({
@@ -749,6 +751,8 @@ export function createSession(input: {
       userAgent: normalizeOptional(input.client.userAgent),
       ipAddress: normalizeOptional(input.client.ipAddress),
       deviceId: normalizeOptional(input.client.deviceId),
+      trustedDeviceBindingId: normalizeOptional(input.client.trustedDeviceBindingId),
+      trustMarker: normalizeOptional(input.client.trustMarker),
     }) : undefined,
   });
 }

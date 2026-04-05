@@ -59,6 +59,11 @@ describe("IdentityAuthBackendApi", () => {
 
     const loggedIn = await harness.backendApi.loginLocalAccount({
       providerSubject: "valid.user",
+      client: {
+        deviceId: "device:alpha",
+        trustedDeviceBindingId: "trusted-device:alpha",
+        trustMarker: "marker:alpha",
+      },
       credential: {
         candidate: "StrongPass!2026",
       },
@@ -72,6 +77,9 @@ describe("IdentityAuthBackendApi", () => {
     expect(loggedIn.data?.sessionToken).toBeDefined();
     expect(loggedIn.data?.sessionTokenType).toBe("Bearer");
     expect(loggedIn.data?.sessionAccessChannel).toBe("thin-client");
+    expect(loggedIn.data?.sessionDeviceId).toBe("device:alpha");
+    expect(loggedIn.data?.sessionTrustedDeviceBindingId).toBe("trusted-device:alpha");
+    expect(loggedIn.data?.sessionTrustMarker).toBe("marker:alpha");
   });
 
   it("maps duplicate registration to conflict and invalid login to authentication-failed", async () => {
@@ -121,6 +129,11 @@ describe("IdentityAuthBackendApi", () => {
 
     const login = await harness.backendApi.loginLocalAccount({
       providerSubject: "session.validation.user",
+      client: {
+        deviceId: "device:resolve",
+        trustedDeviceBindingId: "trusted-device:resolve",
+        trustMarker: "marker:resolve",
+      },
       credential: {
         candidate: "StrongPass!2026",
       },
@@ -147,6 +160,9 @@ describe("IdentityAuthBackendApi", () => {
     }
     expect(resolvedData.principal.username).toBe("session.validation.user");
     expect(resolvedData.session.sessionId).toBe(loginData.sessionId);
+    expect(resolvedData.session.deviceId).toBe("device:resolve");
+    expect(resolvedData.session.trustedDeviceBindingId).toBe("trusted-device:resolve");
+    expect(resolvedData.session.trustMarker).toBe("marker:resolve");
 
     harness.adapter.setNow("2026-04-05T18:30:00.000Z");
     const expired = await harness.backendApi.resolveAuthenticatedSession({
