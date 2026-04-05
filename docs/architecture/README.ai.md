@@ -70,6 +70,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Authorization application-layer policy evaluation ports and adapter-boundary contracts: `docs/architecture/authorization-application-ports.md`
 - Authorization shared payload schema contracts and boundary-validation guidance: `docs/architecture/authorization-schema-validation-contracts.md`
 - Authorization persistence DTO/repository contracts and migration-ready mutation semantics: `docs/architecture/authorization-persistence-contracts.md`
+- Feature 4 / Epic 4.1 end-to-end implementation baseline for authorization, visibility, and sharing: `docs/architecture/authorization-feature-4-epic-4.1-baseline.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).

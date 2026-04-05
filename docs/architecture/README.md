@@ -139,6 +139,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For authorization application ports, policy evaluator seams, and adapter expectations for context loading/event recording, read [`authorization-application-ports.md`](./authorization-application-ports.md).
 - For shared authorization payload schemas, boundary validation contracts, and schema-vs-domain guidance, read [`authorization-schema-validation-contracts.md`](./authorization-schema-validation-contracts.md).
 - For authorization persistence DTO/repository contracts, idempotent mutation semantics, and migration-ready lifecycle fields, read [`authorization-persistence-contracts.md`](./authorization-persistence-contracts.md).
+- For the end-to-end Feature 4 / Epic 4.1 authorization implementation baseline and extension guidance, read [`authorization-feature-4-epic-4.1-baseline.md`](./authorization-feature-4-epic-4.1-baseline.md).
 - For workspace administration audit hook seams and integration boundaries, read [`workspace-administration-audit-hooks.md`](./workspace-administration-audit-hooks.md).
 - For Feature 1 completion baseline and downstream dependency notes (trusted device, workspace membership, authorization), read [`identity-feature-1-final-baseline.md`](./identity-feature-1-final-baseline.md).
 
