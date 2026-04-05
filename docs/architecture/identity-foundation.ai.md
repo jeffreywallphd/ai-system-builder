@@ -123,6 +123,17 @@
 - Raw token values are returned only at issuance time and are not persisted in session metadata rows.
 - Login API flow now issues a persisted session and returns session metadata + bearer token fields.
 
+## Authenticated-session validation guard model (story 1.3.3)
+
+- `IdentityHttpServer` now includes guard infrastructure for bearer-token protected routes.
+- Guard extraction/parsing of `Authorization` headers stays in transport code.
+- Session validation and principal resolution are delegated to `IdentityAuthBackendApi.resolveAuthenticatedSession(...)`, which composes:
+  - `IdentityAuthenticatedSessionService.resolveAuthenticatedSessionByToken(...)`
+  - `IIdentityLookupRepository.findUserIdentityById(...)`
+- Successful guard evaluation passes authenticated context (principal + session metadata) to downstream handlers.
+- Missing, invalid, expired, and revoked sessions are normalized to the same external failure posture (`401` + `authentication-failed`).
+- Current protected endpoint: `GET /api/v1/identity/session`.
+
 ## Read next
 
 - Full architecture note: `docs/architecture/identity-foundation.md`

@@ -88,6 +88,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       credentialAuthenticator: authenticator,
       clock,
     }),
+    identityLookupRepository: repository,
     authenticatedSessionService,
   });
 

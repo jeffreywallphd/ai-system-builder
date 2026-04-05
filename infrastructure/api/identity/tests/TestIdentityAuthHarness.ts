@@ -65,9 +65,14 @@ class InMemoryIdentityAdapter
   private readonly sessionTokenMaterialByHash = new Map<string, IdentitySessionTokenMaterialRecord>();
   private idCounter = 0;
   private tokenCounter = 0;
+  private current = new Date("2026-04-04T18:00:00.000Z");
 
   public now(): Date {
-    return new Date("2026-04-04T18:00:00.000Z");
+    return new Date(this.current.getTime());
+  }
+
+  public setNow(value: string): void {
+    this.current = new Date(value);
   }
 
   public nextId(namespace: IdentityIdNamespace): string {
@@ -330,6 +335,7 @@ export async function createIdentityAuthTestHarness(
       credentialAuthenticator,
       clock: adapter,
     }),
+    identityLookupRepository: adapter,
     authenticatedSessionService,
     observability: options.observability,
   });

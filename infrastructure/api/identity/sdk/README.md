@@ -6,11 +6,13 @@ This module defines the transport-facing request/response contracts for local ac
 
 - `RegisterLocalIdentityApiRequest`
 - `LoginLocalIdentityApiRequest`
+- `ResolveAuthenticatedSessionApiRequest`
 
 ## Success responses
 
 - `RegisterLocalIdentityApiResponse`
 - `LoginLocalIdentityApiResponse`
+- `ResolveAuthenticatedSessionApiResponse`
 
 ## Error envelope
 

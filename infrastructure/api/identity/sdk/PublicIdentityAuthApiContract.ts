@@ -77,3 +77,26 @@ export interface LoginLocalIdentityApiResponse {
   readonly sessionExpiresAt: string;
   readonly sessionAccessChannel?: "desktop" | "thin-client";
 }
+
+export interface ResolveAuthenticatedSessionApiRequest {
+  readonly sessionToken: string;
+}
+
+export interface AuthenticatedIdentityPrincipalApiResponse {
+  readonly userIdentityId: string;
+  readonly username: string;
+  readonly email?: string;
+  readonly displayName?: string;
+}
+
+export interface ResolveAuthenticatedSessionApiResponse {
+  readonly principal: AuthenticatedIdentityPrincipalApiResponse;
+  readonly session: {
+    readonly sessionId: string;
+    readonly providerId: string;
+    readonly providerSubject: string;
+    readonly accessChannel?: "desktop" | "thin-client";
+    readonly issuedAt: string;
+    readonly expiresAt: string;
+  };
+}
