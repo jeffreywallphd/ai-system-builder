@@ -1,4 +1,4 @@
-export const IDENTITY_SCHEMA_VERSION = 1;
+export const IDENTITY_SCHEMA_VERSION = 2;
 
 export const IDENTITY_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -136,5 +136,9 @@ export const IDENTITY_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Obj
       ON identity_sessions(provider_id, provider_subject, issued_at DESC);
     CREATE INDEX IF NOT EXISTS identity_sessions_status_expiry_idx
       ON identity_sessions(status, expires_at ASC);
+  `],
+  [2, `
+    ALTER TABLE identity_sessions
+      ADD COLUMN client_access_channel TEXT CHECK (client_access_channel IN ('desktop', 'thin-client'));
   `],
 ]);

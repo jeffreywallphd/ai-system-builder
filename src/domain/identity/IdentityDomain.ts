@@ -149,14 +149,33 @@ export const IdentitySessionStatuses = Object.freeze({
 
 export type IdentitySessionStatus = typeof IdentitySessionStatuses[keyof typeof IdentitySessionStatuses];
 
+export const IdentitySessionAccessChannels = Object.freeze({
+  desktop: "desktop",
+  thinClient: "thin-client",
+});
+
+export type IdentitySessionAccessChannel =
+  typeof IdentitySessionAccessChannels[keyof typeof IdentitySessionAccessChannels];
+
 export interface SessionClientContext {
+  readonly accessChannel?: IdentitySessionAccessChannel;
   readonly userAgent?: string;
   readonly ipAddress?: string;
   readonly deviceId?: string;
 }
 
+export const SessionRevocationReasons = Object.freeze({
+  logout: "logout",
+  security: "security",
+  rotation: "rotation",
+  admin: "admin",
+});
+
+export type SessionRevocationReason =
+  typeof SessionRevocationReasons[keyof typeof SessionRevocationReasons];
+
 export interface SessionRevocation {
-  readonly reason: "logout" | "security" | "rotation" | "admin";
+  readonly reason: SessionRevocationReason;
   readonly revokedAt: string;
 }
 
@@ -173,6 +192,19 @@ export interface Session {
   readonly revocation?: SessionRevocation;
   readonly client?: SessionClientContext;
 }
+
+export const IdentitySessionLifecycleTransitions: Readonly<
+  Record<IdentitySessionStatus, ReadonlyArray<IdentitySessionStatus>>
+> = Object.freeze({
+  [IdentitySessionStatuses.active]: Object.freeze([
+    IdentitySessionStatuses.rotated,
+    IdentitySessionStatuses.expired,
+    IdentitySessionStatuses.revoked,
+  ]),
+  [IdentitySessionStatuses.rotated]: Object.freeze([]),
+  [IdentitySessionStatuses.expired]: Object.freeze([]),
+  [IdentitySessionStatuses.revoked]: Object.freeze([]),
+});
 
 function normalizeRequired(value: string, field: string): string {
   const normalized = value.trim();
@@ -337,19 +369,33 @@ function normalizeSessionStatus(value?: IdentitySessionStatus): IdentitySessionS
   return status;
 }
 
-function assertSessionTransitionAllowed(from: IdentitySessionStatus, to: IdentitySessionStatus): void {
+function normalizeSessionAccessChannel(value?: IdentitySessionAccessChannel): IdentitySessionAccessChannel | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Object.values(IdentitySessionAccessChannels).includes(value)) {
+    throw new IdentityDomainError(`Session access channel '${String(value)}' is invalid.`);
+  }
+  return value;
+}
+
+function normalizeSessionRevocationReason(value: SessionRevocationReason): SessionRevocationReason {
+  if (!Object.values(SessionRevocationReasons).includes(value)) {
+    throw new IdentityDomainError(`Session revocation reason '${String(value)}' is invalid.`);
+  }
+  return value;
+}
+
+export function isSessionTransitionAllowed(from: IdentitySessionStatus, to: IdentitySessionStatus): boolean {
   if (from === to) {
-    return;
+    return true;
   }
 
-  const allowed: Readonly<Record<IdentitySessionStatus, ReadonlyArray<IdentitySessionStatus>>> = {
-    [IdentitySessionStatuses.active]: Object.freeze([IdentitySessionStatuses.rotated, IdentitySessionStatuses.expired, IdentitySessionStatuses.revoked]),
-    [IdentitySessionStatuses.rotated]: Object.freeze([]),
-    [IdentitySessionStatuses.expired]: Object.freeze([]),
-    [IdentitySessionStatuses.revoked]: Object.freeze([]),
-  };
+  return IdentitySessionLifecycleTransitions[from].includes(to);
+}
 
-  if (!allowed[from].includes(to)) {
+function assertSessionTransitionAllowed(from: IdentitySessionStatus, to: IdentitySessionStatus): void {
+  if (!isSessionTransitionAllowed(from, to)) {
     throw new SessionLifecycleTransitionError(from, to);
   }
 }
@@ -699,6 +745,7 @@ export function createSession(input: {
     replacedBySessionId: undefined,
     revocation: undefined,
     client: input.client ? Object.freeze({
+      accessChannel: normalizeSessionAccessChannel(input.client.accessChannel),
       userAgent: normalizeOptional(input.client.userAgent),
       ipAddress: normalizeOptional(input.client.ipAddress),
       deviceId: normalizeOptional(input.client.deviceId),
@@ -721,7 +768,7 @@ export function rotateSession(session: Session, replacementSessionId: string, no
 
 export function revokeSession(
   session: Session,
-  reason: SessionRevocation["reason"],
+  reason: SessionRevocationReason,
   now: Date = new Date(),
 ): Session {
   assertSessionTransitionAllowed(session.status, IdentitySessionStatuses.revoked);
@@ -729,7 +776,7 @@ export function revokeSession(
   return Object.freeze({
     ...session,
     status: IdentitySessionStatuses.revoked,
-    revocation: Object.freeze({ reason, revokedAt }),
+    revocation: Object.freeze({ reason: normalizeSessionRevocationReason(reason), revokedAt }),
   });
 }
 

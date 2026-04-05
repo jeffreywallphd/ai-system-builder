@@ -6,7 +6,9 @@ import {
   IdentityDomainError,
   IdentityLifecycleTransitionError,
   IdentitySessionStatuses,
+  IdentitySessionLifecycleTransitions,
   SessionLifecycleTransitionError,
+  SessionRevocationReasons,
   UserIdentityStatuses,
   clearCredentialFailures,
   createAuthProvider,
@@ -22,6 +24,7 @@ import {
   revokeSession,
   rotateSession,
   transitionUserIdentityStatus,
+  isSessionTransitionAllowed,
   validateCredentialCandidate,
   withUserIdentityProviderCredentialState,
 } from "../IdentityDomain";
@@ -189,6 +192,36 @@ describe("IdentityDomain", () => {
 
     expect(revoked.status).toBe(IdentitySessionStatuses.revoked);
     expect(revoked.revocation?.reason).toBe("security");
+  });
+
+  it("exposes explicit session lifecycle transition rules", () => {
+    expect(IdentitySessionLifecycleTransitions.active).toEqual([
+      IdentitySessionStatuses.rotated,
+      IdentitySessionStatuses.expired,
+      IdentitySessionStatuses.revoked,
+    ]);
+    expect(IdentitySessionLifecycleTransitions.rotated).toEqual([]);
+    expect(isSessionTransitionAllowed(IdentitySessionStatuses.active, IdentitySessionStatuses.revoked)).toBeTrue();
+    expect(isSessionTransitionAllowed(IdentitySessionStatuses.revoked, IdentitySessionStatuses.active)).toBeFalse();
+  });
+
+  it("captures access-channel context while keeping revocation reasons explicit", () => {
+    const session = createSession({
+      id: "session-desktop",
+      userIdentityId: "user-2",
+      providerId: "provider:local-password",
+      providerSubject: "user-2",
+      issuedAt: new Date("2026-04-04T18:00:00.000Z"),
+      expiresAt: new Date("2026-04-04T19:00:00.000Z"),
+      client: {
+        accessChannel: "desktop",
+        deviceId: "desktop-1",
+      },
+    });
+
+    const revoked = revokeSession(session, SessionRevocationReasons.admin, new Date("2026-04-04T18:05:00.000Z"));
+    expect(session.client?.accessChannel).toBe("desktop");
+    expect(revoked.revocation?.reason).toBe("admin");
   });
 
   it("only expires sessions after expiresAt", () => {

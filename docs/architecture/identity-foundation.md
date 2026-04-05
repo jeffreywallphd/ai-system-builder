@@ -28,6 +28,7 @@ Primary files:
 
 - `src/domain/identity/IdentityDomain.ts`
 - `src/domain/identity/IdentityPolicy.ts`
+- `application/identity/services/IdentitySessionLifecycleService.ts`
 
 Core concepts:
 
@@ -44,6 +45,7 @@ Key invariants enforced in domain code:
 - user lifecycle transitions are constrained (`pending-activation -> active`, etc.)
 - session lifecycle transitions are constrained (`active -> rotated|expired|revoked`)
 - session expiry must be later than issue time
+- session access channels are explicit (`desktop` and `thin-client`) for channel-specific policy handling
 - locked credentials require `lockoutUntil`
 - credential policy constraints are validated at creation and candidate evaluation
 
@@ -273,9 +275,34 @@ Identity does not currently represent device trust posture or runtime trust post
 
 Specifically:
 
-- `Session.client` fields (`userAgent`, `ipAddress`, `deviceId`) are informational context, not a trust decision model.
+- `Session.client` fields (`accessChannel`, `userAgent`, `ipAddress`, `deviceId`) are informational/session-context metadata, not a trust decision model.
 - MCP/runtime trust policy code lives in separate trust modules (for example `domain/mcp/McpToolTrust.ts`) and is not coupled into identity domain logic.
 - No identity rule depends on device-attestation state, runtime sandbox trust state, or tool trust decisions.
+
+## Session Lifecycle Policy Service (Story 1.3.1)
+
+Session lifecycle orchestration is now centralized in:
+
+- `application/identity/services/IdentitySessionLifecycleService.ts`
+
+This service defines and applies production session rules for:
+
+- session issuance (`issueSession`) with policy-derived TTL by channel
+- session refresh/rotation (`refreshSession`) when allowed by channel policy
+- explicit revocation (`revokeSession`) with structured revocation reasons
+- expiration sweeps (`expireDueSessions`) for active sessions past `expiresAt`
+
+Policy defaults are explicit and channel-oriented:
+
+- `desktop`: long-lived sessions, refresh disabled by default
+- `thin-client`: shorter TTL sessions, refresh enabled by default
+
+Domain lifecycle state transitions are exported and explicit via:
+
+- `IdentitySessionLifecycleTransitions`
+- `isSessionTransitionAllowed(...)`
+
+This keeps session semantics separate from login-attempt workflows and trusted-device posture, while still carrying optional device context for later trust-layer composition.
 
 This separation keeps local account lifecycle stable while enabling later device/session trust layers to compose on top instead of being embedded in core identity entities.
 
@@ -293,6 +320,7 @@ Key tests for this foundation:
 - `application/identity/tests/VerifyLocalPasswordCredentialUseCase.test.ts`
 - `application/identity/tests/LoginLocalAccountUseCase.test.ts`
 - `application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
+- `application/identity/tests/IdentitySessionLifecycleService.test.ts`
 - `application/identity/tests/IdentityAuthenticatorAndProviderCatalog.test.ts`
 - `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`
 - `infrastructure/security/identity/tests/ScryptLocalPasswordCredentialService.test.ts`

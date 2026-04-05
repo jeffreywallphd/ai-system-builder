@@ -485,10 +485,11 @@ export class SqliteIdentityPersistenceAdapter
         replaced_by_session_id,
         revocation_reason,
         revoked_at,
+        client_access_channel,
         client_user_agent,
         client_ip_address,
         client_device_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(session_id) DO UPDATE SET
         user_identity_id = excluded.user_identity_id,
         provider_id = excluded.provider_id,
@@ -500,6 +501,7 @@ export class SqliteIdentityPersistenceAdapter
         replaced_by_session_id = excluded.replaced_by_session_id,
         revocation_reason = excluded.revocation_reason,
         revoked_at = excluded.revoked_at,
+        client_access_channel = excluded.client_access_channel,
         client_user_agent = excluded.client_user_agent,
         client_ip_address = excluded.client_ip_address,
         client_device_id = excluded.client_device_id
@@ -527,6 +529,7 @@ export class SqliteIdentityPersistenceAdapter
         replaced_by_session_id,
         revocation_reason,
         revoked_at,
+        client_access_channel,
         client_user_agent,
         client_ip_address,
         client_device_id
@@ -575,6 +578,7 @@ export class SqliteIdentityPersistenceAdapter
         replaced_by_session_id,
         revocation_reason,
         revoked_at,
+        client_access_channel,
         client_user_agent,
         client_ip_address,
         client_device_id
