@@ -24,6 +24,7 @@ import {
   type IdentityProviderSubjectReference,
   type IdentitySessionListQuery,
   type IdentitySessionTokenMaterialRecord,
+  type IdentityUserIdentityListQuery,
 } from "../../../../application/contracts/IdentityApplicationContracts";
 import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
 import type { IIdentityClock } from "../../../../application/identity/ports/IIdentityClock";
@@ -46,6 +47,9 @@ import { RegisterLocalAccountUseCase } from "../../../../src/application/identit
 import { LoginLocalAccountUseCase } from "../../../../src/application/identity/use-cases/LoginLocalAccountUseCase";
 import { LogoutIdentitySessionUseCase } from "../../../../src/application/identity/use-cases/LogoutIdentitySessionUseCase";
 import { RevokeIdentitySessionUseCase } from "../../../../src/application/identity/use-cases/RevokeIdentitySessionUseCase";
+import { ListLocalIdentityAccountsUseCase } from "../../../../src/application/identity/use-cases/ListLocalIdentityAccountsUseCase";
+import { GetLocalIdentityAccountStatusUseCase } from "../../../../src/application/identity/use-cases/GetLocalIdentityAccountStatusUseCase";
+import { SetLocalIdentityAccountStatusUseCase } from "../../../../src/application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
 import type { IdentityAuthObservabilityOptions } from "../IdentityAuthObservability";
 
 class InMemoryIdentityAdapter
@@ -103,6 +107,27 @@ class InMemoryIdentityAdapter
 
   public async findUserIdentityById(userIdentityId: string): Promise<UserIdentity | undefined> {
     return this.users.get(userIdentityId.trim());
+  }
+
+  public async listUserIdentities(query: IdentityUserIdentityListQuery): Promise<ReadonlyArray<UserIdentity>> {
+    const filtered = [...this.users.values()]
+      .filter((user) => {
+        if (!query.providerId) {
+          return true;
+        }
+
+        return user.linkedProviders.some((link) => (
+          !link.unlinkedAt && link.providerId === query.providerId
+        ));
+      })
+      .filter((user) => (
+        !query.includeStatuses || query.includeStatuses.length === 0 || query.includeStatuses.includes(user.status)
+      ))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    const offset = Number.isInteger(query.offset) && (query.offset ?? -1) >= 0 ? (query.offset as number) : 0;
+    const limit = Number.isInteger(query.limit) && (query.limit ?? 0) > 0 ? (query.limit as number) : filtered.length;
+    return Object.freeze(filtered.slice(offset, offset + limit));
   }
 
   public async findUserIdentityByPrincipal(lookup: IdentityPrincipalLookup): Promise<UserIdentity | undefined> {
@@ -343,6 +368,21 @@ export async function createIdentityAuthTestHarness(
     revokeIdentitySessionUseCase: new RevokeIdentitySessionUseCase({
       sessionRepository: adapter,
       authenticatedSessionService,
+    }),
+    listLocalIdentityAccountsUseCase: new ListLocalIdentityAccountsUseCase({
+      lookupRepository: adapter,
+      sessionRepository: adapter,
+    }),
+    getLocalIdentityAccountStatusUseCase: new GetLocalIdentityAccountStatusUseCase({
+      lookupRepository: adapter,
+      sessionRepository: adapter,
+    }),
+    setLocalIdentityAccountStatusUseCase: new SetLocalIdentityAccountStatusUseCase({
+      lookupRepository: adapter,
+      persistenceRepository: adapter,
+      sessionRepository: adapter,
+      authenticatedSessionService,
+      clock: adapter,
     }),
     identityLookupRepository: adapter,
     authenticatedSessionService,

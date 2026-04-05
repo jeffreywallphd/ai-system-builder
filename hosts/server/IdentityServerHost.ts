@@ -18,6 +18,9 @@ import { RegisterLocalAccountUseCase } from "../../src/application/identity/use-
 import { LoginLocalAccountUseCase } from "../../src/application/identity/use-cases/LoginLocalAccountUseCase";
 import { LogoutIdentitySessionUseCase } from "../../src/application/identity/use-cases/LogoutIdentitySessionUseCase";
 import { RevokeIdentitySessionUseCase } from "../../src/application/identity/use-cases/RevokeIdentitySessionUseCase";
+import { ListLocalIdentityAccountsUseCase } from "../../src/application/identity/use-cases/ListLocalIdentityAccountsUseCase";
+import { GetLocalIdentityAccountStatusUseCase } from "../../src/application/identity/use-cases/GetLocalIdentityAccountStatusUseCase";
+import { SetLocalIdentityAccountStatusUseCase } from "../../src/application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
 import { SqliteIdentityRepository } from "../../infrastructure/filesystem/identity/SqliteIdentityRepository";
 import { ScryptLocalPasswordCredentialService } from "../../infrastructure/security/identity/ScryptLocalPasswordCredentialService";
 import { OpaqueIdentitySessionTokenService } from "../../infrastructure/security/identity/OpaqueIdentitySessionTokenService";
@@ -103,6 +106,21 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     revokeIdentitySessionUseCase: new RevokeIdentitySessionUseCase({
       sessionRepository: repository,
       authenticatedSessionService,
+    }),
+    listLocalIdentityAccountsUseCase: new ListLocalIdentityAccountsUseCase({
+      lookupRepository: repository,
+      sessionRepository: repository,
+    }),
+    getLocalIdentityAccountStatusUseCase: new GetLocalIdentityAccountStatusUseCase({
+      lookupRepository: repository,
+      sessionRepository: repository,
+    }),
+    setLocalIdentityAccountStatusUseCase: new SetLocalIdentityAccountStatusUseCase({
+      lookupRepository: repository,
+      persistenceRepository: repository,
+      sessionRepository: repository,
+      authenticatedSessionService,
+      clock,
     }),
     identityLookupRepository: repository,
     authenticatedSessionService,

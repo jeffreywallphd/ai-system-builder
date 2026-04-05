@@ -7,7 +7,11 @@ import {
 } from "../../../src/domain/identity/IdentityDomain";
 import { IdentityPolicyService } from "../services/IdentityPolicyService";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
-import type { IdentityPrincipalLookup, IdentityProviderSubjectReference } from "../../contracts/IdentityApplicationContracts";
+import type {
+  IdentityPrincipalLookup,
+  IdentityProviderSubjectReference,
+  IdentityUserIdentityListQuery,
+} from "../../contracts/IdentityApplicationContracts";
 
 class InMemoryIdentityLookupRepository implements IIdentityLookupRepository {
   private readonly users = new Map<string, ReturnType<typeof createUserIdentity>>();
@@ -22,6 +26,10 @@ class InMemoryIdentityLookupRepository implements IIdentityLookupRepository {
 
   public async countUserIdentities() {
     return this.users.size;
+  }
+
+  public async listUserIdentities(_query: IdentityUserIdentityListQuery) {
+    return Object.freeze([...this.users.values()]);
   }
 
   public async findUserIdentityByPrincipal(lookup: IdentityPrincipalLookup) {

@@ -46,12 +46,16 @@ Guarded endpoints:
 - `GET /api/v1/identity/session`
 - `POST /api/v1/identity/logout`
 - `POST /api/v1/identity/session/revoke`
+- `GET /api/v1/identity/admin/accounts`
+- `GET /api/v1/identity/admin/accounts/:userIdentityId`
+- `POST /api/v1/identity/admin/accounts/:userIdentityId/status`
 
 `IdentityHttpServer.requireAuthenticatedSession(...)`:
 
 - extracts bearer token
 - resolves principal/session via backend API
 - normalizes missing/invalid/expired/revoked to `401` + `authentication-failed`
+- account disablement now revokes all active sessions for the target account with `admin` reason in administration status-mutation flow
 
 ## Policy controls
 

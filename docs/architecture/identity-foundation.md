@@ -289,6 +289,27 @@ Current local-account flows now consume the same provider abstraction instead of
 
 This keeps local auth fully functional while making provider-path assumptions explicit and testable, so adding OIDC/Google/Microsoft/SAML-style providers can follow descriptor + adapter composition without changing identity ownership semantics (`UserIdentity` remains the authorization subject with provider-subject links).
 
+## Local Account Administration Use Cases (Story 1.4.2)
+
+Core local account administration flows are now implemented as explicit application use cases and authenticated server APIs:
+
+- `src/application/identity/use-cases/ListLocalIdentityAccountsUseCase.ts`
+- `src/application/identity/use-cases/GetLocalIdentityAccountStatusUseCase.ts`
+- `src/application/identity/use-cases/SetLocalIdentityAccountStatusUseCase.ts`
+
+Implemented administration capabilities in this slice:
+
+- list local identities with account/provider-link status and active-session counts
+- query a specific local identity account status payload for operations support
+- enable (`suspended|locked -> active`) or disable (`* -> suspended`) local accounts through application orchestration
+- revoke active sessions with `admin` revocation reason during account disablement so existing bearer tokens are invalid on next guarded request
+
+Authorization and audit readiness posture:
+
+- all administration use-case inputs require an explicit administrative action context (`actorUserIdentityId`, optional authorization/audit context metadata)
+- identity application logic does not perform role/permission policy decisions in this slice, keeping identity lifecycle concerns separate from future authorization policy engines
+- backend observability/audit flow taxonomy now includes administration flows for later audit sink integration
+
 ## Separation From Device Trust and Session Trust
 
 Identity in this foundation answers:
@@ -502,6 +523,7 @@ Key tests for this foundation:
 - `application/identity/tests/LogoutIdentitySessionUseCase.test.ts`
 - `application/identity/tests/RevokeIdentitySessionUseCase.test.ts`
 - `application/identity/tests/IdentityAuthenticatorAndProviderCatalog.test.ts`
+- `application/identity/tests/LocalIdentityAdministrationUseCases.test.ts`
 - `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`
 - `infrastructure/security/identity/tests/ScryptLocalPasswordCredentialService.test.ts`
 - `infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`

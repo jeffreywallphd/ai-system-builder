@@ -13,6 +13,7 @@ import type {
   IdentityOperationResult,
   IdentityPrincipalLookup,
   IdentityProviderSubjectReference,
+  IdentityUserIdentityListQuery,
 } from "../../contracts/IdentityApplicationContracts";
 import {
   IdentityCredentialMaterialStatuses,
@@ -37,6 +38,10 @@ class InMemoryCredentialAdapter implements ICredentialMaterialRepository, IIdent
 
   public async findUserIdentityById(_userIdentityId: string): Promise<undefined> {
     return undefined;
+  }
+
+  public async listUserIdentities(_query: IdentityUserIdentityListQuery): Promise<ReadonlyArray<never>> {
+    return Object.freeze([]);
   }
 
   public async findUserIdentityByPrincipal(_lookup: IdentityPrincipalLookup): Promise<undefined> {

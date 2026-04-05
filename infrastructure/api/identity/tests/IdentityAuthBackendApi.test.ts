@@ -261,6 +261,72 @@ describe("IdentityAuthBackendApi", () => {
     expect(postRevokeResolve.error?.code).toBe("authentication-failed");
   });
 
+  it("supports local account administration list/read/status-change flows", async () => {
+    const harness = await createIdentityAuthTestHarness();
+
+    const register = await harness.backendApi.registerLocalAccount({
+      username: "admin.managed.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(register.ok).toBeTrue();
+
+    const login = await harness.backendApi.loginLocalAccount({
+      providerSubject: "admin.managed.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(login.ok).toBeTrue();
+    if (!login.ok || !login.data) {
+      throw new Error("Expected login success.");
+    }
+
+    const list = await harness.backendApi.listIdentityAdminAccounts({
+      context: {
+        actorUserIdentityId: "user:admin",
+      },
+    });
+    expect(list.ok).toBeTrue();
+    expect(list.data?.accounts.some((account) => account.userIdentityId === register.data?.userIdentityId)).toBeTrue();
+
+    const getStatus = await harness.backendApi.getIdentityAdminAccountStatus({
+      context: {
+        actorUserIdentityId: "user:admin",
+      },
+      userIdentityId: register.data!.userIdentityId,
+    });
+    expect(getStatus.ok).toBeTrue();
+    expect(getStatus.data?.account.activeSessionCount).toBe(1);
+
+    const disable = await harness.backendApi.setIdentityAdminAccountStatus({
+      context: {
+        actorUserIdentityId: "user:admin",
+      },
+      userIdentityId: register.data!.userIdentityId,
+      action: "disable",
+    });
+    expect(disable.ok).toBeTrue();
+    expect(disable.data?.status).toBe("suspended");
+    expect(disable.data?.affectedSessionIds).toEqual([login.data.sessionId]);
+
+    const afterDisable = await harness.backendApi.loginLocalAccount({
+      providerSubject: "admin.managed.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(afterDisable.ok).toBeFalse();
+    expect(afterDisable.error?.code).toBe("account-inactive");
+
+    const resolveDisabledSession = await harness.backendApi.resolveAuthenticatedSession({
+      sessionToken: login.data.sessionToken,
+    });
+    expect(resolveDisabledSession.ok).toBeFalse();
+    expect(resolveDisabledSession.error?.code).toBe("authentication-failed");
+  });
+
   it("emits structured redacted observability events for register/login success and failure", async () => {
     const logger = new CapturingObservabilityLogger();
     const auditEventSink = new CapturingAuditEventSink();

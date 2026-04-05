@@ -24,6 +24,7 @@ import {
   type IdentityPrincipalLookup,
   type IdentityProviderSubjectReference,
   type IdentitySessionListQuery,
+  type IdentityUserIdentityListQuery,
 } from "../../contracts/IdentityApplicationContracts";
 import type { ICredentialMaterialRepository } from "../ports/ICredentialMaterialRepository";
 import type { IIdentityClock } from "../ports/IIdentityClock";
@@ -77,6 +78,17 @@ class InMemoryIdentityPortAdapter
 
   async countUserIdentities() {
     return this.users.size;
+  }
+
+  async listUserIdentities(query: IdentityUserIdentityListQuery) {
+    const filtered = [...this.users.values()]
+      .filter((user) => (
+        !query.providerId || user.linkedProviders.some((link) => !link.unlinkedAt && link.providerId === query.providerId)
+      ))
+      .filter((user) => (
+        !query.includeStatuses || query.includeStatuses.length === 0 || query.includeStatuses.includes(user.status)
+      ));
+    return Object.freeze(filtered);
   }
 
   async findUserIdentityByPrincipal(lookup: IdentityPrincipalLookup) {

@@ -374,4 +374,85 @@ describe("IdentityHttpServer", () => {
     });
     expect(invalidAfterRevoke.status).toBe(401);
   });
+
+  it("supports bearer-authenticated local account administration endpoints", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "admin.api.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+    const registerBody = await registerResponse.json();
+
+    const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "admin.api.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(loginResponse.status).toBe(200);
+    const loginBody = await loginResponse.json();
+
+    const listResponse = await fetch(`${baseUrl}/api/v1/identity/admin/accounts`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+    });
+    expect(listResponse.status).toBe(200);
+    const listBody = await listResponse.json();
+    expect(listBody.ok).toBe(true);
+    expect(listBody.data.accounts.some((account: { userIdentityId: string }) => account.userIdentityId === registerBody.data.userIdentityId)).toBeTrue();
+
+    const getResponse = await fetch(`${baseUrl}/api/v1/identity/admin/accounts/${encodeURIComponent(registerBody.data.userIdentityId)}`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+    });
+    expect(getResponse.status).toBe(200);
+    const getBody = await getResponse.json();
+    expect(getBody.ok).toBe(true);
+    expect(getBody.data.account.userIdentityId).toBe(registerBody.data.userIdentityId);
+
+    const disableResponse = await fetch(`${baseUrl}/api/v1/identity/admin/accounts/${encodeURIComponent(registerBody.data.userIdentityId)}/status`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+      body: JSON.stringify({
+        action: "disable",
+      }),
+    });
+    expect(disableResponse.status).toBe(200);
+    const disableBody = await disableResponse.json();
+    expect(disableBody.ok).toBe(true);
+    expect(disableBody.data.status).toBe("suspended");
+    expect(disableBody.data.affectedSessionIds).toEqual([loginBody.data.sessionId]);
+
+    const sessionAfterDisable = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+    });
+    expect(sessionAfterDisable.status).toBe(401);
+  });
 });

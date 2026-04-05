@@ -1,4 +1,5 @@
 import type { IdentitySessionStatus } from "../../src/domain/identity/IdentityDomain";
+import type { UserIdentityStatus } from "../../src/domain/identity/IdentityDomain";
 
 export const IdentityPrincipalLookupKinds = Object.freeze({
   username: "username",
@@ -56,6 +57,13 @@ export interface IdentitySessionListQuery {
   readonly expiresBefore?: string;
   readonly expiresAfter?: string;
   readonly limit?: number;
+}
+
+export interface IdentityUserIdentityListQuery {
+  readonly providerId?: string;
+  readonly includeStatuses?: ReadonlyArray<UserIdentityStatus>;
+  readonly limit?: number;
+  readonly offset?: number;
 }
 
 export interface IdentitySessionTokenMaterialRecord {

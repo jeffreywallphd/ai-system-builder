@@ -143,6 +143,7 @@ Bearer-token validation path (`resolveAuthenticatedSessionByToken`) enforces:
 
 - logout (`POST /api/v1/identity/logout`) revokes the currently authenticated session with reason `logout`
 - targeted revoke (`POST /api/v1/identity/session/revoke`) revokes a specific session id; actor ownership is enforced by use case when actor id is supplied
+- local account disablement (`POST /api/v1/identity/admin/accounts/:userIdentityId/status` with `action=disable`) revokes all active sessions for the target account with reason `admin`
 - revocation updates both persistence surfaces:
   - session status becomes `revoked` with revocation metadata
   - token material `invalidated_at` is set
