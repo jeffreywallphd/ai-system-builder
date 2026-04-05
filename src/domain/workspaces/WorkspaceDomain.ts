@@ -141,7 +141,7 @@ export const WorkspaceLifecycleTransitions: Readonly<Record<WorkspaceStatus, Rea
   [WorkspaceStatuses.provisioning]: Object.freeze([WorkspaceStatuses.active, WorkspaceStatuses.archived]),
   [WorkspaceStatuses.active]: Object.freeze([WorkspaceStatuses.suspended, WorkspaceStatuses.archived]),
   [WorkspaceStatuses.suspended]: Object.freeze([WorkspaceStatuses.active, WorkspaceStatuses.archived]),
-  [WorkspaceStatuses.archived]: Object.freeze([]),
+  [WorkspaceStatuses.archived]: Object.freeze([WorkspaceStatuses.active]),
 });
 
 export const WorkspaceMembershipLifecycleTransitions: Readonly<

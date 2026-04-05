@@ -18,7 +18,10 @@ Implementation-truth baseline for workspace tenancy domain + persistence contrac
 - `src/application/workspaces/ports/IWorkspaceTransactionManager.ts`
 - `src/application/workspaces/ports/WorkspaceRepositoryPorts.ts`
 - `src/application/workspaces/use-cases/CreateWorkspaceUseCase.ts`
+- `src/application/workspaces/use-cases/UpdateWorkspaceUseCase.ts`
+- `src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase.ts`
 - `src/application/workspaces/tests/CreateWorkspaceUseCase.test.ts`
+- `src/application/workspaces/tests/WorkspaceLifecycleUseCases.test.ts`
 - `src/application/workspaces/tests/WorkspaceRepositoryPortsContracts.test.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceMigrations.ts`
 - `src/infrastructure/persistence/workspaces/WorkspacePersistenceMapper.ts`
@@ -123,6 +126,25 @@ Protected-resource composition pattern is canonical:
   - authorization hook denial behavior,
   - atomic rollback on initialization failure,
   - SQLite transaction rollback behavior.
+
+## Story 3.2.2 workspace update/archive/reactivation lifecycle management
+
+- Added `UpdateWorkspaceUseCase` in `src/application/workspaces/use-cases/UpdateWorkspaceUseCase.ts` for production-safe workspace metadata changes:
+  - mutable fields are explicit (`displayName`, `description`, `visibility`),
+  - immutable/protected fields remain unchanged (workspace `id`, `slug`, ownership `ownerUserId`),
+  - actor permissions are validated through `IWorkspaceAuthorizationReadRepository` snapshots (active membership + `owner`/`admin` role).
+- Added `TransitionWorkspaceLifecycleUseCase` in `src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase.ts` with explicit lifecycle actions:
+  - `archive`, `reactivate`, `suspend`, `activate`,
+  - role-gated transitions (`owner` required for archive/reactivate; `owner` or `admin` for suspend/activate),
+  - invalid state transitions return deterministic invalid-transition outcomes.
+- Workspace domain lifecycle map now explicitly supports reactivation (`archived -> active`) while preserving guarded transition behavior for unsupported paths.
+- Lifecycle transitions are still domain-first:
+  - `transitionWorkspaceStatus(...)` remains the source-of-truth transition guard,
+  - archived visibility invariants are preserved (`archived` workspaces cannot be `public`).
+- New coverage in `WorkspaceLifecycleUseCases.test.ts` and `WorkspaceDomain.test.ts` validates:
+  - happy-path metadata updates and lifecycle archive/reactivation,
+  - authorization denials and invalid lifecycle transitions,
+  - idempotent lifecycle actions (`changed: false`) and protected-field preservation.
 
 ## Story 3.1.4 verification additions
 
