@@ -1,5 +1,13 @@
 import type { IdentitySessionStatus } from "../../src/domain/identity/IdentityDomain";
 import type { UserIdentityStatus } from "../../src/domain/identity/IdentityDomain";
+import type {
+  DeviceDisplayName,
+  DeviceFingerprint,
+  DevicePairingMethod,
+  DeviceRevocationReason,
+  DeviceTrustMaterialRef,
+  DeviceTrustStatus,
+} from "../../src/domain/identity/TrustedDeviceDomain";
 
 export const IdentityPrincipalLookupKinds = Object.freeze({
   username: "username",
@@ -77,12 +85,106 @@ export interface IdentitySessionTokenMaterialRecord {
   readonly invalidatedAt?: string;
 }
 
+export interface TrustedDeviceRecord {
+  readonly id: string;
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly displayName: DeviceDisplayName;
+  readonly fingerprint: DeviceFingerprint;
+  readonly pairingMethod: DevicePairingMethod;
+  readonly trustStatus: DeviceTrustStatus;
+  readonly trustMaterialRef?: DeviceTrustMaterialRef;
+  readonly registeredAt: string;
+  readonly pairedAt?: string;
+  readonly lastSeenAt?: string;
+  readonly metadata: Readonly<{
+    platform?: string;
+    osVersion?: string;
+    appVersion?: string;
+    deviceModel?: string;
+    locale?: string;
+    lastIpAddress?: string;
+  }>;
+  readonly revocation?: Readonly<{
+    reason: DeviceRevocationReason;
+    revokedAt: string;
+    revokedByUserIdentityId?: string;
+    note?: string;
+  }>;
+  readonly updatedAt: string;
+}
+
+export interface TrustedDeviceListQuery {
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly includeStatuses?: ReadonlyArray<DeviceTrustStatus>;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface TrustedDeviceLookupByFingerprintQuery {
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly fingerprint: DeviceFingerprint;
+}
+
+export interface TrustedDeviceRegistrationRequest {
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly displayName: string;
+  readonly fingerprint: DeviceFingerprint;
+  readonly pairingMethod: DevicePairingMethod;
+  readonly metadata?: Readonly<{
+    platform?: string;
+    osVersion?: string;
+    appVersion?: string;
+    deviceModel?: string;
+    locale?: string;
+    lastIpAddress?: string;
+  }>;
+  readonly registeredAt?: string;
+}
+
+export interface TrustedDevicePairingRequest {
+  readonly trustedDeviceId: string;
+  readonly trustMaterialRef: DeviceTrustMaterialRef;
+  readonly pairedAt?: string;
+}
+
+export interface TrustedDeviceDisplayNameUpdate {
+  readonly trustedDeviceId: string;
+  readonly displayName: string;
+  readonly updatedAt?: string;
+}
+
+export interface TrustedDeviceRevocationRequest {
+  readonly trustedDeviceId: string;
+  readonly reason: DeviceRevocationReason;
+  readonly revokedByUserIdentityId?: string;
+  readonly note?: string;
+  readonly revokedAt?: string;
+}
+
+export interface TrustedDeviceLastSeenUpdate {
+  readonly trustedDeviceId: string;
+  readonly seenAt: string;
+  readonly metadataPatch?: Readonly<{
+    platform?: string;
+    osVersion?: string;
+    appVersion?: string;
+    deviceModel?: string;
+    locale?: string;
+    lastIpAddress?: string;
+  }>;
+}
+
 export const IdentityIdNamespaces = Object.freeze({
   userIdentity: "user-identity",
   identitySession: "identity-session",
   provider: "provider",
   credentialPolicy: "credential-policy",
   credentialMaterial: "credential-material",
+  trustedDevice: "trusted-device",
 });
 
 export type IdentityIdNamespace =

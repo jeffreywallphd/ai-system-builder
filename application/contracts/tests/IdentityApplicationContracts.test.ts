@@ -1,5 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import {
+  DeviceFingerprintAlgorithms,
+  DevicePairingMethods,
+  DeviceTrustMaterialKinds,
+  DeviceTrustStatuses,
+  createDeviceFingerprint,
+  createDeviceTrustMaterialRef,
+} from "../../../src/domain/identity/TrustedDeviceDomain";
+import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
   IdentityCredentialMaterialStatuses,
@@ -11,6 +19,7 @@ import {
   type IdentityOperationResult,
   type IdentityPrincipalLookup,
   type IdentitySessionListQuery,
+  type TrustedDeviceRecord,
 } from "../IdentityApplicationContracts";
 
 describe("identity application shared contracts", () => {
@@ -38,10 +47,33 @@ describe("identity application shared contracts", () => {
       limit: 5,
     };
 
+    const trustedDeviceRecord: TrustedDeviceRecord = {
+      id: "trusted-device:1",
+      userIdentityId: "user:1",
+      workspaceId: "workspace:alpha",
+      displayName: { value: "Studio Laptop" },
+      fingerprint: createDeviceFingerprint({
+        algorithm: DeviceFingerprintAlgorithms.sha256,
+        value: "fingerprint:abc",
+      }),
+      pairingMethod: DevicePairingMethods.oneTimeCode,
+      trustStatus: DeviceTrustStatuses.trusted,
+      trustMaterialRef: createDeviceTrustMaterialRef({
+        materialId: "trust-material:1",
+        kind: DeviceTrustMaterialKinds.sessionSigningKey,
+      }),
+      registeredAt: "2026-04-04T12:00:00.000Z",
+      pairedAt: "2026-04-04T12:01:00.000Z",
+      metadata: {},
+      updatedAt: "2026-04-04T12:01:00.000Z",
+    };
+
     expect(principalLookup.kind).toBe("username");
     expect(credentialRecord.status).toBe("active");
     expect(sessionQuery.includeStatuses?.[0]).toBe("active");
+    expect(trustedDeviceRecord.trustStatus).toBe("trusted");
     expect(IdentityIdNamespaces.identitySession).toBe("identity-session");
+    expect(IdentityIdNamespaces.trustedDevice).toBe("trusted-device");
   });
 
   it("exposes structured identity operation result and error taxonomy contracts", () => {

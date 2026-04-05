@@ -11,6 +11,21 @@ import {
   revokeSession,
 } from "../../../src/domain/identity/IdentityDomain";
 import {
+  DeviceTrustStatuses,
+  DeviceFingerprintAlgorithms,
+  DevicePairingMethods,
+  DeviceRevocationReasons,
+  DeviceTrustMaterialKinds,
+  createDeviceFingerprint,
+  createDeviceTrustMaterialRef,
+  createTrustedDevice,
+  pairTrustedDevice,
+  revokeTrustedDevice,
+  touchTrustedDevice,
+  updateTrustedDeviceDisplayName,
+  type TrustedDevice,
+} from "../../../src/domain/identity/TrustedDeviceDomain";
+import {
   IdentityErrorCodes,
   IdentityCredentialMaterialStatuses,
   IdentityIdNamespaces,
@@ -25,6 +40,14 @@ import {
   type IdentityProviderSubjectReference,
   type IdentitySessionListQuery,
   type IdentityUserIdentityListQuery,
+  type TrustedDeviceDisplayNameUpdate,
+  type TrustedDeviceLastSeenUpdate,
+  type TrustedDeviceListQuery,
+  type TrustedDeviceLookupByFingerprintQuery,
+  type TrustedDevicePairingRequest,
+  type TrustedDeviceRecord,
+  type TrustedDeviceRegistrationRequest,
+  type TrustedDeviceRevocationRequest,
 } from "../../contracts/IdentityApplicationContracts";
 import type { ICredentialMaterialRepository } from "../ports/ICredentialMaterialRepository";
 import type { IIdentityClock } from "../ports/IIdentityClock";
@@ -32,6 +55,8 @@ import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../ports/IIdentityPersistenceRepository";
 import type { IIdentitySessionRepository } from "../ports/IIdentitySessionRepository";
+import type { ITrustedDeviceManagementService } from "../ports/ITrustedDeviceManagementService";
+import type { ITrustedDeviceRepository } from "../ports/ITrustedDeviceRepository";
 
 class InMemoryIdentityPortAdapter
   implements
@@ -39,6 +64,7 @@ class InMemoryIdentityPortAdapter
     IIdentityPersistenceRepository,
     ICredentialMaterialRepository,
     IIdentitySessionRepository,
+    ITrustedDeviceRepository,
     IIdentityClock,
     IIdentityIdGenerator {
   private readonly users = new Map<string, ReturnType<typeof createUserIdentity>>();
@@ -46,6 +72,7 @@ class InMemoryIdentityPortAdapter
   private readonly policies = new Map<string, ReturnType<typeof createCredentialPolicy>>();
   private readonly credentialMaterial = new Map<string, IdentityCredentialMaterialRecord>();
   private readonly sessions = new Map<string, ReturnType<typeof createSession>>();
+  private readonly trustedDevices = new Map<string, TrustedDevice>();
   private sequence = 0;
 
   now(): Date {
@@ -233,6 +260,208 @@ class InMemoryIdentityPortAdapter
       changed: this.sessions.delete(normalizedSessionId),
     });
   }
+
+  async createTrustedDevice(device: TrustedDevice) {
+    this.trustedDevices.set(device.id, device);
+    return device;
+  }
+
+  async getTrustedDeviceById(trustedDeviceId: string) {
+    return this.trustedDevices.get(trustedDeviceId.trim());
+  }
+
+  async findTrustedDeviceByFingerprint(query: TrustedDeviceLookupByFingerprintQuery) {
+    for (const trustedDevice of this.trustedDevices.values()) {
+      const workspaceMatches = query.workspaceId
+        ? trustedDevice.workspaceId === query.workspaceId
+        : true;
+      if (
+        trustedDevice.userIdentityId === query.userIdentityId &&
+        workspaceMatches &&
+        trustedDevice.fingerprint.algorithm === query.fingerprint.algorithm &&
+        trustedDevice.fingerprint.value === query.fingerprint.value
+      ) {
+        return trustedDevice;
+      }
+    }
+    return undefined;
+  }
+
+  async listTrustedDevices(query: TrustedDeviceListQuery) {
+    const devices = [...this.trustedDevices.values()]
+      .filter((trustedDevice) => trustedDevice.userIdentityId === query.userIdentityId)
+      .filter((trustedDevice) => !query.workspaceId || trustedDevice.workspaceId === query.workspaceId)
+      .filter((trustedDevice) => (
+        !query.includeStatuses ||
+        query.includeStatuses.length === 0 ||
+        query.includeStatuses.includes(trustedDevice.trustStatus)
+      ));
+
+    const offset = query.offset && query.offset > 0 ? query.offset : 0;
+    const limit = query.limit && query.limit > 0 ? query.limit : undefined;
+    const paged = offset > 0 ? devices.slice(offset) : devices;
+    return limit ? paged.slice(0, limit) : paged;
+  }
+
+  async updateTrustedDevice(device: TrustedDevice) {
+    this.trustedDevices.set(device.id, device);
+    return device;
+  }
+
+  async revokeTrustedDevice(
+    request: TrustedDeviceRevocationRequest,
+  ): Promise<
+    IdentityOperationResult<
+      IdentityMutationOutcome,
+      | typeof IdentityErrorCodes.invalidRequest
+      | typeof IdentityErrorCodes.invalidState
+      | typeof IdentityErrorCodes.notFound
+    >
+  > {
+    const trustedDeviceId = request.trustedDeviceId.trim();
+    if (!trustedDeviceId) {
+      return identityFailure({
+        code: IdentityErrorCodes.invalidRequest,
+        message: "Trusted device id is required.",
+        boundary: "infrastructure",
+        retryable: false,
+      });
+    }
+
+    const trustedDevice = this.trustedDevices.get(trustedDeviceId);
+    if (!trustedDevice) {
+      return identityFailure({
+        code: IdentityErrorCodes.notFound,
+        message: "Trusted device was not found.",
+        boundary: "infrastructure",
+        retryable: false,
+      });
+    }
+
+    if (trustedDevice.trustStatus === DeviceTrustStatuses.revoked) {
+      return identityFailure({
+        code: IdentityErrorCodes.invalidState,
+        message: "Trusted device is already revoked.",
+        boundary: "infrastructure",
+        retryable: false,
+      });
+    }
+
+    const revoked = revokeTrustedDevice(trustedDevice, {
+      reason: request.reason,
+      revokedAt: request.revokedAt ?? new Date().toISOString(),
+      revokedByUserIdentityId: request.revokedByUserIdentityId,
+      note: request.note,
+    });
+    this.trustedDevices.set(revoked.id, revoked);
+    return identitySuccess({ changed: true });
+  }
+}
+
+function mapTrustedDeviceRecord(device: TrustedDevice): TrustedDeviceRecord {
+  return Object.freeze({
+    id: device.id,
+    userIdentityId: device.userIdentityId,
+    workspaceId: device.workspaceId,
+    displayName: device.displayName,
+    fingerprint: device.fingerprint,
+    pairingMethod: device.pairingMethod,
+    trustStatus: device.trustStatus,
+    trustMaterialRef: device.trustMaterialRef,
+    registeredAt: device.registeredAt,
+    pairedAt: device.pairedAt,
+    lastSeenAt: device.lastSeenAt,
+    metadata: device.metadata,
+    revocation: device.revocation,
+    updatedAt: device.updatedAt,
+  });
+}
+
+class InMemoryTrustedDeviceManagementService implements ITrustedDeviceManagementService {
+  constructor(
+    private readonly repository: ITrustedDeviceRepository,
+    private readonly idGenerator: IIdentityIdGenerator,
+    private readonly clock: IIdentityClock,
+  ) {}
+
+  async registerTrustedDevice(request: TrustedDeviceRegistrationRequest): Promise<TrustedDeviceRecord> {
+    const trustedDevice = createTrustedDevice({
+      id: this.idGenerator.nextId(IdentityIdNamespaces.trustedDevice),
+      userIdentityId: request.userIdentityId,
+      workspaceId: request.workspaceId,
+      displayName: request.displayName,
+      fingerprint: request.fingerprint,
+      pairingMethod: request.pairingMethod,
+      registeredAt: request.registeredAt ?? this.clock.now(),
+      metadata: request.metadata,
+    });
+    const created = await this.repository.createTrustedDevice(trustedDevice);
+    return mapTrustedDeviceRecord(created);
+  }
+
+  async getTrustedDeviceById(trustedDeviceId: string): Promise<TrustedDeviceRecord | undefined> {
+    const trustedDevice = await this.repository.getTrustedDeviceById(trustedDeviceId);
+    return trustedDevice ? mapTrustedDeviceRecord(trustedDevice) : undefined;
+  }
+
+  async listTrustedDevices(query: TrustedDeviceListQuery): Promise<ReadonlyArray<TrustedDeviceRecord>> {
+    const devices = await this.repository.listTrustedDevices(query);
+    return Object.freeze(devices.map((trustedDevice) => mapTrustedDeviceRecord(trustedDevice)));
+  }
+
+  async pairTrustedDevice(request: TrustedDevicePairingRequest): Promise<TrustedDeviceRecord> {
+    const trustedDevice = await this.repository.getTrustedDeviceById(request.trustedDeviceId);
+    if (!trustedDevice) {
+      throw new Error(`Trusted device '${request.trustedDeviceId}' was not found.`);
+    }
+    const paired = pairTrustedDevice(trustedDevice, {
+      trustMaterialRef: request.trustMaterialRef,
+      pairedAt: request.pairedAt ?? this.clock.now(),
+      now: this.clock.now(),
+    });
+    const updated = await this.repository.updateTrustedDevice(paired);
+    return mapTrustedDeviceRecord(updated);
+  }
+
+  async updateTrustedDeviceDisplayName(request: TrustedDeviceDisplayNameUpdate): Promise<TrustedDeviceRecord> {
+    const trustedDevice = await this.repository.getTrustedDeviceById(request.trustedDeviceId);
+    if (!trustedDevice) {
+      throw new Error(`Trusted device '${request.trustedDeviceId}' was not found.`);
+    }
+    const updated = updateTrustedDeviceDisplayName(
+      trustedDevice,
+      request.displayName,
+      request.updatedAt ? new Date(request.updatedAt) : this.clock.now(),
+    );
+    const persisted = await this.repository.updateTrustedDevice(updated);
+    return mapTrustedDeviceRecord(persisted);
+  }
+
+  async recordTrustedDeviceLastSeen(request: TrustedDeviceLastSeenUpdate): Promise<TrustedDeviceRecord> {
+    const trustedDevice = await this.repository.getTrustedDeviceById(request.trustedDeviceId);
+    if (!trustedDevice) {
+      throw new Error(`Trusted device '${request.trustedDeviceId}' was not found.`);
+    }
+    const updated = touchTrustedDevice(trustedDevice, {
+      seenAt: request.seenAt,
+      metadataPatch: request.metadataPatch,
+    });
+    const persisted = await this.repository.updateTrustedDevice(updated);
+    return mapTrustedDeviceRecord(persisted);
+  }
+
+  async revokeTrustedDevice(
+    request: TrustedDeviceRevocationRequest,
+  ): Promise<
+    IdentityOperationResult<
+      IdentityMutationOutcome,
+      | typeof IdentityErrorCodes.invalidRequest
+      | typeof IdentityErrorCodes.invalidState
+      | typeof IdentityErrorCodes.notFound
+    >
+  > {
+    return this.repository.revokeTrustedDevice(request);
+  }
 }
 
 describe("identity application ports contracts", () => {
@@ -346,6 +575,97 @@ describe("identity application ports contracts", () => {
       ok: false,
       error: expect.objectContaining({
         code: "identity-invalid-session-state",
+      }),
+    });
+  });
+
+  it("supports trusted-device repository and service lifecycle actions", async () => {
+    const adapter = new InMemoryIdentityPortAdapter();
+    const service = new InMemoryTrustedDeviceManagementService(adapter, adapter, adapter);
+
+    const registered = await service.registerTrustedDevice({
+      userIdentityId: "user:trusted:1",
+      workspaceId: "workspace:trusted:1",
+      displayName: "Jeff Workstation",
+      fingerprint: createDeviceFingerprint({
+        algorithm: DeviceFingerprintAlgorithms.sha256,
+        value: "trusted-fingerprint-1",
+      }),
+      pairingMethod: DevicePairingMethods.oneTimeCode,
+      metadata: {
+        platform: "desktop",
+      },
+      registeredAt: "2026-04-04T12:00:00.000Z",
+    });
+    expect(registered.id).toBe("trusted-device:1");
+    expect(registered.trustStatus).toBe(DeviceTrustStatuses.pendingPairing);
+
+    const paired = await service.pairTrustedDevice({
+      trustedDeviceId: registered.id,
+      trustMaterialRef: createDeviceTrustMaterialRef({
+        materialId: "trust-material:trusted:1",
+        kind: DeviceTrustMaterialKinds.attestationKey,
+      }),
+      pairedAt: "2026-04-04T12:01:00.000Z",
+    });
+    expect(paired.trustStatus).toBe(DeviceTrustStatuses.trusted);
+
+    const renamed = await service.updateTrustedDeviceDisplayName({
+      trustedDeviceId: registered.id,
+      displayName: "Jeff Workstation Renamed",
+      updatedAt: "2026-04-04T12:01:30.000Z",
+    });
+    expect(renamed.displayName.value).toBe("Jeff Workstation Renamed");
+
+    const touched = await service.recordTrustedDeviceLastSeen({
+      trustedDeviceId: registered.id,
+      seenAt: "2026-04-04T12:02:00.000Z",
+      metadataPatch: {
+        appVersion: "0.1.0",
+      },
+    });
+    expect(touched.lastSeenAt).toBe("2026-04-04T12:02:00.000Z");
+    expect(touched.metadata.appVersion).toBe("0.1.0");
+
+    const byFingerprint = await adapter.findTrustedDeviceByFingerprint({
+      userIdentityId: "user:trusted:1",
+      workspaceId: "workspace:trusted:1",
+      fingerprint: createDeviceFingerprint({
+        algorithm: DeviceFingerprintAlgorithms.sha256,
+        value: "trusted-fingerprint-1",
+      }),
+    });
+    expect(byFingerprint?.id).toBe(registered.id);
+
+    const listed = await service.listTrustedDevices({
+      userIdentityId: "user:trusted:1",
+      includeStatuses: [DeviceTrustStatuses.trusted],
+      limit: 10,
+    });
+    expect(listed).toHaveLength(1);
+
+    const revoked = await service.revokeTrustedDevice({
+      trustedDeviceId: registered.id,
+      reason: DeviceRevocationReasons.suspectedCompromise,
+      revokedByUserIdentityId: "admin:1",
+      note: "Potential theft",
+      revokedAt: "2026-04-04T12:03:00.000Z",
+    });
+    expect(revoked).toEqual({
+      ok: true,
+      value: {
+        changed: true,
+      },
+    });
+
+    const revokedAgain = await service.revokeTrustedDevice({
+      trustedDeviceId: registered.id,
+      reason: DeviceRevocationReasons.adminAction,
+    });
+    expect(revokedAgain).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: "identity-invalid-state",
       }),
     });
   });
