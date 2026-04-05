@@ -5,7 +5,6 @@ import {
   AuthProviderCategories,
   AuthProviderKinds,
   createAuthProvider,
-  createCredentialPolicy,
 } from "../../src/domain/identity/IdentityDomain";
 import { IdentityIdNamespaces, type IdentityIdNamespace } from "../../application/contracts/IdentityApplicationContracts";
 import { IdentityPolicyService } from "../../application/identity/services/IdentityPolicyService";
@@ -27,11 +26,13 @@ import { ScryptLocalPasswordCredentialService } from "../../infrastructure/secur
 import { OpaqueIdentitySessionTokenService } from "../../infrastructure/security/identity/OpaqueIdentitySessionTokenService";
 import { IdentityAuthBackendApi } from "../../infrastructure/api/identity/IdentityAuthBackendApi";
 import { IdentitySessionPolicyConfig } from "../../infrastructure/config/IdentitySessionPolicyConfig";
+import { IdentityProviderAccountPolicyConfig } from "../../infrastructure/config/IdentityProviderAccountPolicyConfig";
 import {
   createIdentityHttpServer,
   type IdentityHttpServerLogger,
 } from "../../infrastructure/transport/http-server/identity/IdentityHttpServer";
 import type { IdentitySessionLifecyclePolicies } from "../../application/identity/services/IdentitySessionLifecycleService";
+import type { AuthProvider, CredentialPolicy } from "../../src/domain/identity/IdentityDomain";
 
 export interface IdentityServerHostOptions {
   readonly databasePath: string;
@@ -41,12 +42,18 @@ export interface IdentityServerHostOptions {
   readonly env?: Readonly<Record<string, string | undefined>>;
   readonly sessionPolicies?: IdentitySessionLifecyclePolicies;
   readonly eventPublisher?: IIdentityLifecycleEventPublisher;
+  readonly providerAccountPolicies?: IdentityProviderAccountPolicyConfig;
 }
 
 export interface IdentityServerHost {
   readonly port: number;
   readonly address: string;
   close(): Promise<void>;
+}
+
+interface IdentityDefaultConfigurationRepository {
+  saveAuthProvider(provider: AuthProvider): Promise<AuthProvider>;
+  saveCredentialPolicy(policy: CredentialPolicy): Promise<CredentialPolicy>;
 }
 
 class SystemIdentityClock implements IIdentityClock {
@@ -63,14 +70,17 @@ class RandomIdentityIdGenerator implements IIdentityIdGenerator {
 
 export async function startIdentityServerHost(options: IdentityServerHostOptions): Promise<IdentityServerHost> {
   const repository = new SqliteIdentityRepository(path.resolve(options.databasePath));
-  await ensureDefaultIdentityConfiguration(repository);
+  const env = options.env ?? process.env;
+  const providerAccountPolicies = options.providerAccountPolicies
+    ?? IdentityProviderAccountPolicyConfig.fromEnv(env);
+  await applyIdentityStartupConfiguration(repository, providerAccountPolicies);
 
   const authenticator = new LocalPasswordIdentityAuthenticator(new ScryptLocalPasswordCredentialService());
   const identityPolicyService = new IdentityPolicyService(repository);
   const clock = new SystemIdentityClock();
   const idGenerator = new RandomIdentityIdGenerator();
   const sessionPolicies = options.sessionPolicies
-    ?? IdentitySessionPolicyConfig.fromEnv(options.env ?? process.env).policies;
+    ?? IdentitySessionPolicyConfig.fromEnv(env).policies;
   const eventPublisher = options.eventPublisher;
   const sessionLifecycleService = new IdentitySessionLifecycleService({
     sessionRepository: repository,
@@ -132,6 +142,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     identityLookupRepository: repository,
     authenticatedSessionService,
+    featurePolicies: {
+      allowLocalRegistration: providerAccountPolicies.allowLocalRegistration,
+      allowLocalAdministration: providerAccountPolicies.allowLocalAdministration,
+    },
   });
 
   const server = createIdentityHttpServer({
@@ -165,17 +179,23 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   });
 }
 
-async function ensureDefaultIdentityConfiguration(repository: SqliteIdentityRepository): Promise<void> {
+export async function applyIdentityStartupConfiguration(
+  repository: IdentityDefaultConfigurationRepository,
+  policies: IdentityProviderAccountPolicyConfig,
+): Promise<void> {
+  if (!policies.bootstrapSeedDefaults) {
+    return;
+  }
+
   await repository.saveAuthProvider(createAuthProvider({
-    id: "provider:local-password",
+    id: policies.localProviderId,
     kind: AuthProviderKinds.localPassword,
     category: AuthProviderCategories.local,
-    displayName: "Local Password",
+    displayName: policies.localProviderDisplayName,
+    status: policies.localProviderStatus,
   }));
 
-  await repository.saveCredentialPolicy(createCredentialPolicy({
-    id: "policy:local-password",
-  }));
+  await repository.saveCredentialPolicy(policies.buildLocalCredentialPolicy());
 }
 
 function normalizeNamespace(namespace: IdentityIdNamespace): string {

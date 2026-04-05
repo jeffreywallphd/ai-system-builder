@@ -315,7 +315,13 @@ export interface IdentityAuthTestHarness {
 }
 
 export async function createIdentityAuthTestHarness(
-  options: { readonly observability?: IdentityAuthObservabilityOptions } = {},
+  options: {
+    readonly observability?: IdentityAuthObservabilityOptions;
+    readonly featurePolicies?: {
+      readonly allowLocalRegistration?: boolean;
+      readonly allowLocalAdministration?: boolean;
+    };
+  } = {},
 ): Promise<IdentityAuthTestHarness> {
   const adapter = new InMemoryIdentityAdapter();
 
@@ -387,6 +393,7 @@ export async function createIdentityAuthTestHarness(
     identityLookupRepository: adapter,
     authenticatedSessionService,
     observability: options.observability,
+    featurePolicies: options.featurePolicies,
   });
 
   return Object.freeze({ backendApi, adapter });

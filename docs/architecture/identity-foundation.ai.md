@@ -286,6 +286,18 @@ Operational effect:
 - Login now sends channel-aware session context (`desktop` or `thin-client`) plus client user-agent metadata through shared environment helpers.
 - Expired or revoked sessions are cleared locally and routed back to sign-in with explicit recovery notices.
 
+## Provider/account policy runtime configuration (story 1.4.6)
+
+- Provider/account policy configuration is now centralized in:
+  - `infrastructure/config/IdentityProviderAccountPolicyConfig.ts`
+- `hosts/server/IdentityServerHost.ts` now composes this config from environment and applies startup seeding/feature toggles:
+  - local provider status enablement (`active` vs `disabled`)
+  - startup bootstrap seeding for local provider + credential policy defaults
+  - local registration toggle
+  - identity administration toggle
+- local credential policy defaults are environment-driven and validated through domain policy construction (`createCredentialPolicy(...)`) before being persisted.
+- invalid or incoherent values fail fast with explicit configuration errors.
+
 ## Read next
 
 - Full architecture note: `docs/architecture/identity-foundation.md`
