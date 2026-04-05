@@ -57,6 +57,8 @@ import {
 import {
   type ApproveNodeEnrollmentApiRequest,
   type GetNodeEnrollmentDetailApiRequest,
+  type GetNodeInventoryDetailApiRequest,
+  type ListNodeInventoryApiRequest,
   type ListTrustedNodeInventoryApiRequest,
   NodeTrustApiErrorCodes,
   type NodeTrustApiResponse,
@@ -65,6 +67,7 @@ import {
 } from "../../../api/nodes/sdk/PublicNodeTrustApiContract";
 import { redactSensitiveAuthPayload, redactSensitiveText } from "../../../api/identity/IdentityAuthRedaction";
 import {
+  NodeApprovalStatuses,
   NodeEnrollmentRequestStatuses,
   NodeRoleCapabilities,
   NodeTypes,
@@ -305,10 +308,37 @@ const NodePendingEnrollmentStatusValues = z.enum([
   NodeEnrollmentRequestStatuses.submitted,
   NodeEnrollmentRequestStatuses.underReview,
 ]);
+const NodeEnrollmentRequestStatusValues = z.enum([
+  NodeEnrollmentRequestStatuses.submitted,
+  NodeEnrollmentRequestStatuses.underReview,
+  NodeEnrollmentRequestStatuses.approved,
+  NodeEnrollmentRequestStatuses.rejected,
+  NodeEnrollmentRequestStatuses.withdrawn,
+  NodeEnrollmentRequestStatuses.expired,
+]);
 const NodeTypeValues = z.enum([
   NodeTypes.compute,
   NodeTypes.hybrid,
   NodeTypes.edge,
+]);
+const NodeApprovalStatusValues = z.enum([
+  NodeApprovalStatuses.pending,
+  NodeApprovalStatuses.approved,
+  NodeApprovalStatuses.rejected,
+  NodeApprovalStatuses.suspended,
+]);
+const NodeInventoryOperationalStateValues = z.enum([
+  "active",
+  "pending",
+  "rejected",
+  "revoked",
+  "offline",
+]);
+const NodeInventoryPresenceStateValues = z.enum([
+  "online",
+  "degraded",
+  "offline",
+  "unknown",
 ]);
 const NodeCapabilityValues = z.enum([
   NodeRoleCapabilities.ui,
@@ -1315,6 +1345,139 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
               actorUserIdentityId: context.principal.userIdentityId,
               query: Object.fromEntries(url.searchParams.entries()),
             }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.nodeTrustBackendApi
+        && request.method === "GET"
+        && path === "/api/v1/nodes/inventory"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const nodeTypes = url.searchParams.getAll("nodeType");
+            const nodeTypeValidation = z.array(NodeTypeValues).safeParse(nodeTypes);
+            if (!nodeTypeValidation.success) {
+              const validationError = buildNodeTrustQueryValidationError("nodeType", "nodeType values are invalid.");
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+
+            const approvalStatuses = url.searchParams.getAll("approvalStatus");
+            const approvalStatusValidation = z.array(NodeApprovalStatusValues).safeParse(approvalStatuses);
+            if (!approvalStatusValidation.success) {
+              const validationError = buildNodeTrustQueryValidationError("approvalStatus", "approvalStatus values are invalid.");
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+
+            const operationalStates = url.searchParams.getAll("operationalState");
+            const operationalStateValidation = z.array(NodeInventoryOperationalStateValues).safeParse(operationalStates);
+            if (!operationalStateValidation.success) {
+              const validationError = buildNodeTrustQueryValidationError(
+                "operationalState",
+                "operationalState values are invalid.",
+              );
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+
+            const presenceStates = url.searchParams.getAll("presenceState");
+            const presenceStateValidation = z.array(NodeInventoryPresenceStateValues).safeParse(presenceStates);
+            if (!presenceStateValidation.success) {
+              const validationError = buildNodeTrustQueryValidationError("presenceState", "presenceState values are invalid.");
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+
+            const enrollmentStatuses = url.searchParams.getAll("enrollmentStatus");
+            const enrollmentStatusValidation = z.array(NodeEnrollmentRequestStatusValues).safeParse(enrollmentStatuses);
+            if (!enrollmentStatusValidation.success) {
+              const validationError = buildNodeTrustQueryValidationError(
+                "enrollmentStatus",
+                "enrollmentStatus values are invalid.",
+              );
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+
+            const capabilities = url.searchParams.getAll("capability");
+            const capabilityValidation = z.array(NodeCapabilityValues).safeParse(capabilities);
+            if (!capabilityValidation.success) {
+              const validationError = buildNodeTrustQueryValidationError("capability", "capability values are invalid.");
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+
+            const inventoryRequest: ListNodeInventoryApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              nodeTypes: nodeTypeValidation.data.length > 0 ? nodeTypeValidation.data : undefined,
+              approvalStatuses: approvalStatusValidation.data.length > 0 ? approvalStatusValidation.data : undefined,
+              operationalStates: operationalStateValidation.data.length > 0 ? operationalStateValidation.data : undefined,
+              enrollmentStatuses: enrollmentStatusValidation.data.length > 0 ? enrollmentStatusValidation.data : undefined,
+              presenceStates: presenceStateValidation.data.length > 0 ? presenceStateValidation.data : undefined,
+              capabilityAnyOf: capabilityValidation.data.length > 0 ? capabilityValidation.data : undefined,
+              deploymentTagAnyOf: url.searchParams.getAll("deploymentTag"),
+              lastSeenAfter: normalizeOptionalString(url.searchParams.get("lastSeenAfter")),
+              lastSeenBefore: normalizeOptionalString(url.searchParams.get("lastSeenBefore")),
+              limit: parseOptionalInteger(url.searchParams.get("limit")),
+              offset: parseOptionalInteger(url.searchParams.get("offset")),
+            });
+
+            const apiResponse = await options.nodeTrustBackendApi.listNodeInventory(inventoryRequest);
+            const statusCode = mapNodeTrustStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              query: Object.fromEntries(url.searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.nodeTrustBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/nodes/inventory/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const nodeId = decodePathTail(path, "/api/v1/nodes/inventory/");
+            if (!nodeId) {
+              const invalid = buildNodeTrustInvalidRequestResponse("nodeId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const inventoryDetailRequest: GetNodeInventoryDetailApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              nodeId,
+            });
+            const apiResponse = await options.nodeTrustBackendApi.getNodeInventoryDetail(inventoryDetailRequest);
+            const statusCode = mapNodeTrustStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, inventoryDetailRequest, apiResponse);
           },
         );
         return;

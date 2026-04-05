@@ -7,6 +7,8 @@ export const NodeTrustAuditEventTypes = Object.freeze({
   nodeRevoked: "node-revoked",
   heartbeatRecorded: "node-heartbeat-recorded",
   trustedInventoryQueried: "node-trusted-inventory-queried",
+  inventoryQueried: "node-inventory-queried",
+  inventoryDetailQueried: "node-inventory-detail-queried",
 });
 
 export type NodeTrustAuditEventType =

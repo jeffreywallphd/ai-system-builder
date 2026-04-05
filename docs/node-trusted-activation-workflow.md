@@ -1,6 +1,6 @@
 # Node Trusted Activation Workflow
 
-This note documents Story 5.3.1, Story 5.3.2, and Story 5.3.3 (Feature 5 / Epic 5.3): explicit activation of approved nodes into trusted operational state, capability profile registration/validation, and operational presence heartbeat ingestion.
+This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, and Story 5.3.4 (Feature 5 / Epic 5.3): explicit activation of approved nodes into trusted operational state, capability profile registration/validation, operational presence heartbeat ingestion, and admin inventory list/detail views across lifecycle states.
 
 ## Purpose
 
@@ -15,6 +15,9 @@ This note documents Story 5.3.1, Story 5.3.2, and Story 5.3.3 (Feature 5 / Epic 
 - `src/application/nodes/use-cases/ActivateApprovedNodeUseCase.ts`
 - `src/application/nodes/use-cases/RecordNodeHeartbeatUseCase.ts`
 - `src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase.ts`
+- `src/application/nodes/use-cases/NodeInventoryReadModels.ts`
+- `src/application/nodes/use-cases/ListNodeInventoryUseCase.ts`
+- `src/application/nodes/use-cases/GetNodeInventoryDetailUseCase.ts`
 - `src/application/nodes/ports/NodeTrustAuthorizationPorts.ts`
 - `src/application/nodes/ports/NodeTrustAuditPorts.ts`
 - `src/domain/nodes/NodeTrustDomain.ts`
@@ -22,6 +25,7 @@ This note documents Story 5.3.1, Story 5.3.2, and Story 5.3.3 (Feature 5 / Epic 
 - `src/shared/schemas/nodes/NodeTrustPersistenceSchemaContracts.ts`
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
 - `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
 - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 
@@ -77,10 +81,29 @@ This note documents Story 5.3.1, Story 5.3.2, and Story 5.3.3 (Feature 5 / Epic 
 - Admin visibility endpoint:
   - `GET /api/v1/nodes/trusted`
   - query filters: `nodeType`, `capability`, `deploymentTag`, `lastSeenAfter`, `lastSeenBefore`, `limit`, `offset`
+- Admin inventory endpoints:
+  - `GET /api/v1/nodes/inventory`
+  - `GET /api/v1/nodes/inventory/:nodeId`
+  - query filters: `approvalStatus`, `operationalState`, `enrollmentStatus`, `presenceState`, `nodeType`, `capability`, `deploymentTag`, `lastSeenAfter`, `lastSeenBefore`, `limit`, `offset`
+  - operational inventory categories: `active`, `pending`, `rejected`, `revoked`, `offline`
 - Persisted presence fields:
   - `lastSeen.lastSeenAt`
   - `lastSeen.heartbeatStatus`
   - `lastSeen.observedBy` (optional)
+
+## Inventory field guidance
+
+- `operationalState`
+  - `active`: approved + trusted node with non-offline heartbeat state
+  - `pending`: pending-approval/pending-enrollment lifecycle nodes and pending enrollment requests
+  - `rejected`: rejected/quarantined lifecycle nodes
+  - `revoked`: revoked trust lifecycle nodes
+  - `offline`: trusted nodes with heartbeat state `offline`
+- `presenceState`
+  - `online`, `degraded`, `offline` from last heartbeat snapshot
+  - `unknown` when no heartbeat snapshot exists yet
+- `pendingEnrollment`
+  - detail-only object that includes pending enrollment metadata when available (`requestId`, `status`, `requestedAt`, optional review note/timestamp)
 
 ## Heartbeat cadence guidance
 

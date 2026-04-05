@@ -13,6 +13,8 @@ import {
   NodeDetailDtoSchema,
   NodeEnrollmentSubmissionRequestDtoSchema,
   NodeHeartbeatPayloadDtoSchema,
+  parseNodeInventoryDetailResponseDto,
+  parseNodeInventoryListResponseDto,
   NodeTrustApiSchemaValidationError,
   parseNodeDetailDto,
   parseNodeEnrollmentDecisionResponseDto,
@@ -354,5 +356,63 @@ describe("NodeTrustApiSchemaContracts", () => {
       ...pending,
       status: NodeEnrollmentRequestStatuses.approved,
     })).toThrow(NodeTrustApiSchemaValidationError);
+  });
+
+  it("parses inventory list/detail response payloads for admin inventory routes", () => {
+    const list = parseNodeInventoryListResponseDto({
+      nodes: [{
+        nodeId: "node:inventory:1",
+        nodeType: NodeTypes.compute,
+        displayName: "Inventory 1",
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        operationalState: "offline",
+        presenceState: "offline",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["inventory"],
+        lastSeen: {
+          lastSeenAt: "2026-04-05T12:22:00.000Z",
+          heartbeatStatus: NodeHeartbeatStatuses.offline,
+        },
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T12:00:00.000Z",
+        approvedAt: "2026-04-05T12:05:00.000Z",
+      }],
+    });
+    expect(list.nodes[0]?.operationalState).toBe("offline");
+
+    const detail = parseNodeInventoryDetailResponseDto({
+      node: {
+        nodeId: "node:inventory:pending-1",
+        nodeType: NodeTypes.hybrid,
+        displayName: "Inventory Pending 1",
+        approvalStatus: NodeApprovalStatuses.pending,
+        trustState: NodeTrustStates.pendingEnrollment,
+        enrollmentStatus: NodeEnrollmentRequestStatuses.submitted,
+        operationalState: "pending",
+        presenceState: "unknown",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["inventory"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        requestedAt: "2026-04-05T12:22:00.000Z",
+        pendingEnrollmentRequestId: "enrollment:pending-1",
+        pendingEnrollment: {
+          requestId: "enrollment:pending-1",
+          status: NodeEnrollmentRequestStatuses.submitted,
+          requestedAt: "2026-04-05T12:22:00.000Z",
+        },
+      },
+    });
+    expect(detail.node.pendingEnrollment?.requestId).toBe("enrollment:pending-1");
   });
 });

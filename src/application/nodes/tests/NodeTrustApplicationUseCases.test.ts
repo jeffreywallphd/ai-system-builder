@@ -46,6 +46,8 @@ import { RejectNodeEnrollmentUseCase } from "../use-cases/RejectNodeEnrollmentUs
 import { RevokeNodeTrustUseCase } from "../use-cases/RevokeNodeTrustUseCase";
 import { RecordNodeHeartbeatUseCase } from "../use-cases/RecordNodeHeartbeatUseCase";
 import { ListTrustedNodeInventoryUseCase } from "../use-cases/ListTrustedNodeInventoryUseCase";
+import { GetNodeInventoryDetailUseCase } from "../use-cases/GetNodeInventoryDetailUseCase";
+import { ListNodeInventoryUseCase } from "../use-cases/ListNodeInventoryUseCase";
 import { NodeTrustUseCaseErrorCodes } from "../use-cases/NodeTrustUseCaseShared";
 
 class InMemoryNodeTrustRepository
@@ -1454,5 +1456,148 @@ describe("node trust application use-cases", () => {
     expect(result.value.nodes).toHaveLength(1);
     expect(result.value.nodes[0]?.nodeId).toBe("trusted-1");
     expect(audit.events[audit.events.length - 1]?.type).toBe(NodeTrustAuditEventTypes.trustedInventoryQueried);
+  });
+
+  it("lists admin inventory across pending and offline operational states", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    const audit = new RecordingAuditSink();
+
+    await repository.saveEnrollmentRequest({
+      record: {
+        requestId: "pending-inventory-1",
+        nodeId: "node:pending:inventory-1",
+        nodeType: NodeTypes.hybrid,
+        displayName: "Pending Inventory 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["inventory"],
+        requestedAt: "2026-04-05T18:45:00.000Z",
+        status: NodeEnrollmentRequestStatuses.submitted,
+        createdAt: "2026-04-05T18:45:00.000Z",
+        createdBy: "node:pending:inventory-1",
+        lastModifiedAt: "2026-04-05T18:45:00.000Z",
+        lastModifiedBy: "node:pending:inventory-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-pending-inventory-1",
+        context: {
+          actorUserIdentityId: "node:pending:inventory-1",
+        },
+      },
+    });
+
+    await repository.registerNode({
+      record: {
+        nodeId: "node:trusted:offline-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Trusted Offline 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:trusted:offline-1:v1",
+        },
+        deploymentTags: ["inventory"],
+        lastSeen: {
+          lastSeenAt: "2026-04-05T18:46:00.000Z",
+          heartbeatStatus: NodeHeartbeatStatuses.offline,
+        },
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:40:00.000Z",
+        approvedAt: "2026-04-05T18:41:00.000Z",
+        createdAt: "2026-04-05T18:40:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T18:46:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-trusted-offline-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const useCase = new ListNodeInventoryUseCase({
+      nodeRepository: repository,
+      enrollmentRequestRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      auditSink: audit,
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "admin-1",
+      deploymentTagAnyOf: ["inventory"],
+      operationalStates: ["pending", "offline"],
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.nodes).toHaveLength(2);
+    expect(result.value.nodes.some((node) => node.nodeId === "node:pending:inventory-1")).toBeTrue();
+    expect(result.value.nodes.some((node) => node.nodeId === "node:trusted:offline-1")).toBeTrue();
+    expect(audit.events[audit.events.length - 1]?.type).toBe(NodeTrustAuditEventTypes.inventoryQueried);
+  });
+
+  it("returns inventory detail for pending-only nodes", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.saveEnrollmentRequest({
+      record: {
+        requestId: "pending-detail-1",
+        nodeId: "node:pending:detail-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Pending Detail 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["inventory"],
+        requestedAt: "2026-04-05T18:55:00.000Z",
+        status: NodeEnrollmentRequestStatuses.underReview,
+        createdAt: "2026-04-05T18:55:00.000Z",
+        createdBy: "node:pending:detail-1",
+        lastModifiedAt: "2026-04-05T18:55:00.000Z",
+        lastModifiedBy: "admin-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-pending-detail-1",
+        context: {
+          actorUserIdentityId: "node:pending:detail-1",
+        },
+      },
+    });
+
+    const useCase = new GetNodeInventoryDetailUseCase({
+      nodeRepository: repository,
+      enrollmentRequestRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "admin-1",
+      nodeId: "node:pending:detail-1",
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.node.operationalState).toBe("pending");
+    expect(result.value.node.pendingEnrollment?.requestId).toBe("pending-detail-1");
+    expect(result.value.node.presenceState).toBe("unknown");
   });
 });

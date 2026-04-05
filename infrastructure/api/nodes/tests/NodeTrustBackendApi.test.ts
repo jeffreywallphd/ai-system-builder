@@ -3,7 +3,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { ApproveNodeEnrollmentUseCase } from "../../../src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase";
+import { GetNodeInventoryDetailUseCase } from "../../../src/application/nodes/use-cases/GetNodeInventoryDetailUseCase";
 import { GetNodeEnrollmentDetailUseCase } from "../../../src/application/nodes/use-cases/GetNodeEnrollmentDetailUseCase";
+import { ListNodeInventoryUseCase } from "../../../src/application/nodes/use-cases/ListNodeInventoryUseCase";
 import { ListTrustedNodeInventoryUseCase } from "../../../src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase";
 import { RecordNodeHeartbeatUseCase } from "../../../src/application/nodes/use-cases/RecordNodeHeartbeatUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
@@ -53,6 +55,10 @@ function createHarness(): {
     getNodeEnrollmentDetailUseCase: new GetNodeEnrollmentDetailUseCase({
       enrollmentRequestRepository: adapter,
     }),
+    getNodeInventoryDetailUseCase: new GetNodeInventoryDetailUseCase({
+      nodeRepository: adapter,
+      enrollmentRequestRepository: adapter,
+    }),
     approveNodeEnrollmentUseCase: new ApproveNodeEnrollmentUseCase({
       enrollmentRequestRepository: adapter,
       nodeRepository: adapter,
@@ -66,6 +72,10 @@ function createHarness(): {
     }),
     listTrustedNodeInventoryUseCase: new ListTrustedNodeInventoryUseCase({
       nodeRepository: adapter,
+    }),
+    listNodeInventoryUseCase: new ListNodeInventoryUseCase({
+      nodeRepository: adapter,
+      enrollmentRequestRepository: adapter,
     }),
   });
 
@@ -342,5 +352,87 @@ describe("NodeTrustBackendApi", () => {
     if (!nonTrusted.ok && nonTrusted.error) {
       expect(nonTrusted.error.code).toBe("conflict");
     }
+  });
+
+  it("lists admin inventory and returns node inventory detail including pending enrollment context", async () => {
+    const harness = createHarness();
+    await harness.backendApi.submitNodeEnrollment({
+      actorUserIdentityId: "node:bootstrap:pending-1",
+      nodeId: "node:pending:inventory-1",
+      nodeType: NodeTypes.hybrid,
+      displayName: "Pending Inventory 1",
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.executor],
+        supportsRemoteScheduling: true,
+      },
+      deploymentTags: ["inventory"],
+      requestedAt: "2026-04-05T17:30:00.000Z",
+    });
+
+    await harness.adapter.registerNode({
+      record: {
+        nodeId: "node:trusted:offline-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Trusted Offline 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:offline-1:v1",
+        },
+        deploymentTags: ["inventory"],
+        lastSeen: {
+          lastSeenAt: "2026-04-05T17:40:00.000Z",
+          heartbeatStatus: NodeHeartbeatStatuses.offline,
+        },
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T17:00:00.000Z",
+        approvedAt: "2026-04-05T17:10:00.000Z",
+        createdAt: "2026-04-05T17:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T17:40:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-inventory-offline-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const list = await harness.backendApi.listNodeInventory({
+      actorUserIdentityId: "admin:user:inventory",
+      deploymentTagAnyOf: ["inventory"],
+      operationalStates: ["pending", "offline"],
+    });
+
+    expect(list.ok).toBeTrue();
+    if (!list.ok || !list.data) {
+      return;
+    }
+
+    expect(list.data.nodes.some((node) => node.nodeId === "node:pending:inventory-1")).toBeTrue();
+    expect(list.data.nodes.some((node) => node.nodeId === "node:trusted:offline-1")).toBeTrue();
+    expect(list.data.nodes.find((node) => node.nodeId === "node:trusted:offline-1")?.operationalState).toBe("offline");
+
+    const pendingDetail = await harness.backendApi.getNodeInventoryDetail({
+      actorUserIdentityId: "admin:user:inventory",
+      nodeId: "node:pending:inventory-1",
+    });
+
+    expect(pendingDetail.ok).toBeTrue();
+    if (!pendingDetail.ok || !pendingDetail.data) {
+      return;
+    }
+
+    expect(pendingDetail.data.node.operationalState).toBe("pending");
+    expect(pendingDetail.data.node.pendingEnrollment?.requestId).toBeDefined();
   });
 });

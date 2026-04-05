@@ -10,8 +10,12 @@ import {
   NodeTypes,
 } from "../../../../domain/nodes/NodeTrustDomain";
 import {
+  NodeInventoryOperationalStates,
+  NodeInventoryPresenceStates,
   NodeTrustApiContractError,
   NodeTrustTransportScopes,
+  toNodeInventoryDetailDto,
+  toNodeInventorySummaryDto,
   toNodeDetailDto,
   toNodeEnrollmentDetailDto,
   toNodePendingEnrollmentSummaryDto,
@@ -172,5 +176,69 @@ describe("NodeTrustApiContracts", () => {
 
     expect(admin.revocation.reason).toBe(NodeRevocationReasons.policyViolation);
     expect((admin.revocation as unknown as { revokedByUserIdentityId?: string }).revokedByUserIdentityId).toBeUndefined();
+  });
+
+  it("projects internal inventory summary to admin-safe summary", () => {
+    const summary = toNodeInventorySummaryDto({
+      nodeId: "node:compute:inventory-1",
+      nodeType: NodeTypes.compute,
+      displayName: "Inventory 1",
+      approvalStatus: NodeApprovalStatuses.approved,
+      trustState: NodeTrustStates.trusted,
+      operationalState: NodeInventoryOperationalStates.active,
+      presenceState: NodeInventoryPresenceStates.online,
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.executor],
+        supportsRemoteScheduling: true,
+      },
+      deploymentTags: ["inventory"],
+      lastSeen: {
+        lastSeenAt: "2026-04-05T12:12:00.000Z",
+        heartbeatStatus: NodeHeartbeatStatuses.online,
+      },
+      certificateRef: "cert:inventory-1:v1",
+      revocation: {
+        state: NodeRevocationStates.active,
+        revokedByUserIdentityId: "admin-hidden",
+      },
+      enrolledAt: "2026-04-05T12:00:00.000Z",
+      approvedAt: "2026-04-05T12:05:00.000Z",
+    });
+
+    expect(summary.operationalState).toBe(NodeInventoryOperationalStates.active);
+    expect(summary.revocation.state).toBe(NodeRevocationStates.active);
+    expect((summary.revocation as unknown as { revokedByUserIdentityId?: string }).revokedByUserIdentityId).toBeUndefined();
+  });
+
+  it("projects internal inventory detail with pending enrollment metadata", () => {
+    const detail = toNodeInventoryDetailDto({
+      nodeId: "node:pending:inventory-2",
+      nodeType: NodeTypes.hybrid,
+      displayName: "Inventory 2",
+      approvalStatus: NodeApprovalStatuses.pending,
+      trustState: NodeTrustStates.pendingEnrollment,
+      enrollmentStatus: NodeEnrollmentRequestStatuses.submitted,
+      operationalState: NodeInventoryOperationalStates.pending,
+      presenceState: NodeInventoryPresenceStates.unknown,
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.executor],
+        supportsRemoteScheduling: true,
+      },
+      deploymentTags: ["inventory"],
+      certificateRef: "trust-material:inventory-2",
+      revocation: {
+        state: NodeRevocationStates.active,
+      },
+      requestedAt: "2026-04-05T12:10:00.000Z",
+      pendingEnrollmentRequestId: "enrollment:inventory-2",
+      pendingEnrollment: {
+        requestId: "enrollment:inventory-2",
+        status: NodeEnrollmentRequestStatuses.submitted,
+        requestedAt: "2026-04-05T12:10:00.000Z",
+      },
+    });
+
+    expect(detail.pendingEnrollment?.requestId).toBe("enrollment:inventory-2");
+    expect(detail.operationalState).toBe(NodeInventoryOperationalStates.pending);
   });
 });

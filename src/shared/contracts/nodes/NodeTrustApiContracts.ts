@@ -71,6 +71,27 @@ export interface NodeInternalRevocationDto extends NodeRevocationDto {
   readonly revokedByUserIdentityId?: string;
 }
 
+export const NodeInventoryOperationalStates = Object.freeze({
+  active: "active",
+  pending: "pending",
+  rejected: "rejected",
+  revoked: "revoked",
+  offline: "offline",
+});
+
+export type NodeInventoryOperationalState =
+  typeof NodeInventoryOperationalStates[keyof typeof NodeInventoryOperationalStates];
+
+export const NodeInventoryPresenceStates = Object.freeze({
+  online: "online",
+  degraded: "degraded",
+  offline: "offline",
+  unknown: "unknown",
+});
+
+export type NodeInventoryPresenceState =
+  typeof NodeInventoryPresenceStates[keyof typeof NodeInventoryPresenceStates];
+
 export interface NodeEnrollmentSubmissionRequestDto {
   readonly actorUserIdentityId: string;
   readonly nodeId: string;
@@ -185,6 +206,48 @@ export interface NodeInternalDetailDto extends NodeDetailDto {
   readonly revision: number;
 }
 
+export interface NodeInventorySummaryDto {
+  readonly nodeId: string;
+  readonly nodeType: NodeType;
+  readonly displayName: string;
+  readonly approvalStatus: NodeApprovalStatus;
+  readonly trustState: NodeTrustState;
+  readonly enrollmentStatus?: NodeEnrollmentRequestStatus;
+  readonly operationalState: NodeInventoryOperationalState;
+  readonly presenceState: NodeInventoryPresenceState;
+  readonly capabilityProfile: NodeCapabilityProfileDto;
+  readonly deploymentTags: ReadonlyArray<string>;
+  readonly lastSeen?: NodeLastSeenDto;
+  readonly certificateRef?: string;
+  readonly revocation: NodeRevocationDto;
+  readonly enrolledAt?: string;
+  readonly requestedAt?: string;
+  readonly approvedAt?: string;
+  readonly revokedAt?: string;
+  readonly pendingEnrollmentRequestId?: string;
+}
+
+export interface NodeInternalInventorySummaryDto extends NodeInventorySummaryDto {
+  readonly revocation: NodeInternalRevocationDto;
+}
+
+export interface NodeInventoryPendingEnrollmentDto {
+  readonly requestId: string;
+  readonly status: NodeEnrollmentRequestStatus;
+  readonly requestedAt: string;
+  readonly reviewedAt?: string;
+  readonly decisionNote?: string;
+  readonly certificateRef?: string;
+}
+
+export interface NodeInventoryDetailDto extends NodeInventorySummaryDto {
+  readonly pendingEnrollment?: NodeInventoryPendingEnrollmentDto;
+}
+
+export interface NodeInternalInventoryDetailDto extends NodeInternalInventorySummaryDto {
+  readonly pendingEnrollment?: NodeInventoryPendingEnrollmentDto;
+}
+
 export interface NodeEnrollmentSubmissionResponseDto {
   readonly enrollment: NodeEnrollmentDetailDto;
 }
@@ -204,6 +267,14 @@ export interface NodeRevocationResponseDto {
 
 export interface NodeHeartbeatResponseDto {
   readonly node: NodeDetailDto;
+}
+
+export interface NodeInventoryListResponseDto {
+  readonly nodes: ReadonlyArray<NodeInventorySummaryDto>;
+}
+
+export interface NodeInventoryDetailResponseDto {
+  readonly node: NodeInventoryDetailDto;
 }
 
 export function toNodeDetailDto(value: NodeInternalDetailDto): NodeDetailDto {
@@ -273,5 +344,49 @@ export function toNodePendingEnrollmentSummaryDto(
     capabilityProfile: value.capabilityProfile,
     deploymentTags: value.deploymentTags,
     hasBootstrapMaterial: Boolean(value.certificateRef),
+  });
+}
+
+export function toNodeInventorySummaryDto(value: NodeInternalInventorySummaryDto): NodeInventorySummaryDto {
+  return Object.freeze({
+    nodeId: value.nodeId,
+    nodeType: value.nodeType,
+    displayName: value.displayName,
+    approvalStatus: value.approvalStatus,
+    trustState: value.trustState,
+    enrollmentStatus: value.enrollmentStatus,
+    operationalState: value.operationalState,
+    presenceState: value.presenceState,
+    capabilityProfile: value.capabilityProfile,
+    deploymentTags: value.deploymentTags,
+    lastSeen: value.lastSeen,
+    certificateRef: value.certificateRef,
+    revocation: Object.freeze({
+      state: value.revocation.state,
+      reason: value.revocation.reason,
+      revokedAt: value.revocation.revokedAt,
+      note: value.revocation.note,
+    }),
+    enrolledAt: value.enrolledAt,
+    requestedAt: value.requestedAt,
+    approvedAt: value.approvedAt,
+    revokedAt: value.revokedAt,
+    pendingEnrollmentRequestId: value.pendingEnrollmentRequestId,
+  });
+}
+
+export function toNodeInventoryDetailDto(value: NodeInternalInventoryDetailDto): NodeInventoryDetailDto {
+  return Object.freeze({
+    ...toNodeInventorySummaryDto(value),
+    pendingEnrollment: value.pendingEnrollment
+      ? Object.freeze({
+        requestId: value.pendingEnrollment.requestId,
+        status: value.pendingEnrollment.status,
+        requestedAt: value.pendingEnrollment.requestedAt,
+        reviewedAt: value.pendingEnrollment.reviewedAt,
+        decisionNote: value.pendingEnrollment.decisionNote,
+        certificateRef: value.pendingEnrollment.certificateRef,
+      })
+      : undefined,
   });
 }
