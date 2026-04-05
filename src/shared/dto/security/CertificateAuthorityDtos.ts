@@ -302,6 +302,84 @@ export interface SaveCertificateDistributionEventPersistenceRecordInput {
   readonly mutation: CertificateAuthorityPersistenceMutationEnvelope;
 }
 
+export const CertificateAuthorityIntrospectionStates = Object.freeze({
+  healthy: "healthy",
+  uninitialized: "uninitialized",
+  degraded: "degraded",
+  blocked: "blocked",
+});
+
+export type CertificateAuthorityIntrospectionState =
+  typeof CertificateAuthorityIntrospectionStates[keyof typeof CertificateAuthorityIntrospectionStates];
+
+export const CertificateAuthorityIntrospectionDiagnosticSeverities = Object.freeze({
+  info: "info",
+  warning: "warning",
+  error: "error",
+});
+
+export type CertificateAuthorityIntrospectionDiagnosticSeverity =
+  typeof CertificateAuthorityIntrospectionDiagnosticSeverities[keyof typeof CertificateAuthorityIntrospectionDiagnosticSeverities];
+
+export interface CertificateAuthorityIntrospectionDiagnosticDto {
+  readonly code: string;
+  readonly severity: CertificateAuthorityIntrospectionDiagnosticSeverity;
+  readonly message: string;
+}
+
+export interface CertificateAuthorityCertificateCountSummaryDto {
+  readonly total: number;
+  readonly issued: number;
+  readonly revoked: number;
+  readonly expired: number;
+  readonly superseded: number;
+  readonly activeAtAsOf: number;
+}
+
+export interface CertificateAuthorityRotationCheckpointDto {
+  readonly recommendedRotationAt: string;
+  readonly configuredNextRotationDueAt?: string;
+  readonly daysUntilRecommendedRotation: number;
+  readonly isDue: boolean;
+  readonly isOverdue: boolean;
+}
+
+export interface CertificateAuthorityStatusHealthFlagsDto {
+  readonly startupHealthy: boolean;
+  readonly configurationBlocked: boolean;
+  readonly authorityActive: boolean;
+  readonly rotationDueSoon: boolean;
+  readonly rotationOverdue: boolean;
+  readonly hasRevokedCertificates: boolean;
+  readonly hasExpiringCertificates: boolean;
+  readonly hasDistributionFailures: boolean;
+}
+
+export interface CertificateAuthorityIntrospectionAuthorityDto {
+  readonly certificateAuthorityId: string;
+  readonly displayName: string;
+  readonly createdAt: string;
+  readonly lastModifiedAt: string;
+  readonly status: CertificateAuthorityStatus;
+  readonly validityNotBefore: string;
+  readonly validityNotAfter: string;
+  readonly certificateCounts: CertificateAuthorityCertificateCountSummaryDto;
+  readonly lastIssuedAt?: string;
+  readonly rotationCheckpoint: CertificateAuthorityRotationCheckpointDto;
+}
+
+export interface CertificateAuthorityStatusIntrospectionViewDto {
+  readonly asOf: string;
+  readonly initialized: boolean;
+  readonly active: boolean;
+  readonly blocked: boolean;
+  readonly state: CertificateAuthorityIntrospectionState;
+  readonly certificateAuthorityId?: string;
+  readonly authority?: CertificateAuthorityIntrospectionAuthorityDto;
+  readonly diagnostics: ReadonlyArray<CertificateAuthorityIntrospectionDiagnosticDto>;
+  readonly healthFlags: CertificateAuthorityStatusHealthFlagsDto;
+}
+
 export const CertificateAuthorityPersistenceQueryPresets = Object.freeze({
   activeStatuses: Object.freeze([CertificateAuthorityStatuses.active]),
   terminalStatuses: Object.freeze([

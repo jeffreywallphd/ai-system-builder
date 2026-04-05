@@ -5,6 +5,8 @@ import {
   CertificateSubjectReferenceKinds,
 } from "../../../../domain/security/CertificateAuthorityDomain";
 import {
+  CertificateAuthorityIntrospectionDiagnosticSeverities,
+  CertificateAuthorityIntrospectionStates,
   CertificateAuthorityPersistenceQueryPresets,
   CertificateDistributionTargetKinds,
   normalizeCertificateAuthorityMutationOperationKey,
@@ -46,5 +48,11 @@ describe("CertificateAuthorityDtos", () => {
     expect(() => normalizeCertificateAuthorityMutationOperationKey("   ")).toThrow(
       "operationKey is required",
     );
+  });
+
+  it("exposes introspection state and diagnostic severity vocabularies", () => {
+    expect(CertificateAuthorityIntrospectionStates.healthy).toBe("healthy");
+    expect(CertificateAuthorityIntrospectionStates.blocked).toBe("blocked");
+    expect(CertificateAuthorityIntrospectionDiagnosticSeverities.error).toBe("error");
   });
 });

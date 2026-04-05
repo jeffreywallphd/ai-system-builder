@@ -10,6 +10,8 @@ import {
   createCertificateValidityWindow,
 } from "../../../domain/security/CertificateAuthorityDomain";
 import {
+  CertificateAuthorityIntrospectionDiagnosticSeverities,
+  CertificateAuthorityIntrospectionStates,
   CertificateDistributionEventStatuses,
   CertificateDistributionTargetKinds,
 } from "../../dto/security/CertificateAuthorityDtos";
@@ -167,6 +169,19 @@ const CertificateDistributionEventStatusSchema = z.enum([
   CertificateDistributionEventStatuses.published,
   CertificateDistributionEventStatuses.failed,
   CertificateDistributionEventStatuses.acknowledged,
+]);
+
+const CertificateAuthorityIntrospectionStateSchema = z.enum([
+  CertificateAuthorityIntrospectionStates.healthy,
+  CertificateAuthorityIntrospectionStates.uninitialized,
+  CertificateAuthorityIntrospectionStates.degraded,
+  CertificateAuthorityIntrospectionStates.blocked,
+]);
+
+const CertificateAuthorityIntrospectionDiagnosticSeveritySchema = z.enum([
+  CertificateAuthorityIntrospectionDiagnosticSeverities.info,
+  CertificateAuthorityIntrospectionDiagnosticSeverities.warning,
+  CertificateAuthorityIntrospectionDiagnosticSeverities.error,
 ]);
 
 export const TrustMaterialReferencePersistenceRecordSchema = z.object({
@@ -339,6 +354,65 @@ export const CertificateDistributionEventPersistenceRecordSchema = z.object({
   }
 });
 
+export const CertificateAuthorityCertificateCountSummarySchema = z.object({
+  total: z.number().int().nonnegative(),
+  issued: z.number().int().nonnegative(),
+  revoked: z.number().int().nonnegative(),
+  expired: z.number().int().nonnegative(),
+  superseded: z.number().int().nonnegative(),
+  activeAtAsOf: z.number().int().nonnegative(),
+});
+
+export const CertificateAuthorityRotationCheckpointSchema = z.object({
+  recommendedRotationAt: CertificateAuthorityTimestampSchema,
+  configuredNextRotationDueAt: CertificateAuthorityTimestampSchema.optional(),
+  daysUntilRecommendedRotation: z.number().int(),
+  isDue: z.boolean(),
+  isOverdue: z.boolean(),
+});
+
+export const CertificateAuthorityStatusHealthFlagsSchema = z.object({
+  startupHealthy: z.boolean(),
+  configurationBlocked: z.boolean(),
+  authorityActive: z.boolean(),
+  rotationDueSoon: z.boolean(),
+  rotationOverdue: z.boolean(),
+  hasRevokedCertificates: z.boolean(),
+  hasExpiringCertificates: z.boolean(),
+  hasDistributionFailures: z.boolean(),
+});
+
+export const CertificateAuthorityIntrospectionDiagnosticSchema = z.object({
+  code: z.string().trim().min(1).max(255),
+  severity: CertificateAuthorityIntrospectionDiagnosticSeveritySchema,
+  message: z.string().trim().min(1).max(1024),
+});
+
+export const CertificateAuthorityIntrospectionAuthoritySchema = z.object({
+  certificateAuthorityId: CertificateAuthorityIdentifierSchema,
+  displayName: z.string().trim().min(1).max(255),
+  createdAt: CertificateAuthorityTimestampSchema,
+  lastModifiedAt: CertificateAuthorityTimestampSchema,
+  status: CertificateAuthorityStatusSchema,
+  validityNotBefore: CertificateAuthorityTimestampSchema,
+  validityNotAfter: CertificateAuthorityTimestampSchema,
+  certificateCounts: CertificateAuthorityCertificateCountSummarySchema,
+  lastIssuedAt: CertificateAuthorityTimestampSchema.optional(),
+  rotationCheckpoint: CertificateAuthorityRotationCheckpointSchema,
+});
+
+export const CertificateAuthorityStatusIntrospectionViewSchema = z.object({
+  asOf: CertificateAuthorityTimestampSchema,
+  initialized: z.boolean(),
+  active: z.boolean(),
+  blocked: z.boolean(),
+  state: CertificateAuthorityIntrospectionStateSchema,
+  certificateAuthorityId: CertificateAuthorityIdentifierSchema.optional(),
+  authority: CertificateAuthorityIntrospectionAuthoritySchema.optional(),
+  diagnostics: z.array(CertificateAuthorityIntrospectionDiagnosticSchema),
+  healthFlags: CertificateAuthorityStatusHealthFlagsSchema,
+});
+
 export type RotationPolicyMetadataPersistenceRecordPayload = z.infer<typeof RotationPolicyMetadataPersistenceRecordSchema>;
 export type CertificateValidityWindowPersistenceRecordPayload = z.infer<typeof CertificateValidityWindowPersistenceRecordSchema>;
 export type CertificateSubjectPersistenceRecordPayload = z.infer<typeof CertificateSubjectPersistenceRecordSchema>;
@@ -350,6 +424,7 @@ export type IssuedCertificatePersistenceRecordPayload = z.infer<typeof IssuedCer
 export type CertificateStatusHistoryPersistenceRecordPayload = z.infer<typeof CertificateStatusHistoryPersistenceRecordSchema>;
 export type CertificateRevocationHistoryPersistenceRecordPayload = z.infer<typeof CertificateRevocationHistoryPersistenceRecordSchema>;
 export type CertificateDistributionEventPersistenceRecordPayload = z.infer<typeof CertificateDistributionEventPersistenceRecordSchema>;
+export type CertificateAuthorityStatusIntrospectionViewPayload = z.infer<typeof CertificateAuthorityStatusIntrospectionViewSchema>;
 
 function formatZodPath(path: ReadonlyArray<string | number>): string {
   if (path.length === 0) {
@@ -439,6 +514,16 @@ export function parseCertificateDistributionEventPersistenceRecord(
   return parseCertificateAuthoritySchema(
     "CertificateDistributionEventPersistenceRecord",
     CertificateDistributionEventPersistenceRecordSchema,
+    payload,
+  );
+}
+
+export function parseCertificateAuthorityStatusIntrospectionView(
+  payload: unknown,
+): CertificateAuthorityStatusIntrospectionViewPayload {
+  return parseCertificateAuthoritySchema(
+    "CertificateAuthorityStatusIntrospectionView",
+    CertificateAuthorityStatusIntrospectionViewSchema,
     payload,
   );
 }
