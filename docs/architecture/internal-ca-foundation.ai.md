@@ -18,6 +18,7 @@
 - Adds certificate lifecycle audit recording seams for initialization/issuance/revocation decisions and outcomes (Story 6.2.6).
 - Adds issued-certificate metadata list/detail query seams for trusted admin/API consumers (Story 6.2.7).
 - Adds runtime trust-material export/distribution contracts for scoped runtime consumers (Story 6.3.1).
+- Adds certificate renewal eligibility and rotation planning services for pre-expiry operations readiness (Story 6.3.2).
 
 ## Main artifacts to cite
 
@@ -47,6 +48,8 @@
 - `src/application/security/use-cases/ListIssuedCertificateMetadataUseCase.ts`
 - `src/application/security/use-cases/GetIssuedCertificateMetadataUseCase.ts`
 - `src/application/security/use-cases/ResolveRuntimeTrustMaterialPackageUseCase.ts`
+- `src/application/security/use-cases/CertificateRenewalPlanningService.ts`
+- `src/application/security/use-cases/GetCertificateRenewalPlanningUseCase.ts`
 - `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
@@ -262,6 +265,37 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - private key plaintext is intentionally excluded from runtime package outputs.
 - retrieval success is tracked through persisted `certificate_distribution_events` (`published`) for operational follow-up.
 
+## Story 6.3.2 rotation planning + renewal eligibility behavior
+
+- `CertificateRenewalPlanningService` centralizes renewal-state evaluation logic for both CA and issued certificates.
+- issued-certificate renewal states are explicit and stable for downstream automation:
+  - `active`
+  - `renewal-soon`
+  - `renewal-required`
+  - `expired`
+- CA rotation-state evaluation uses:
+  - CA `validity.notAfter`
+  - `rotationPolicy.rotateBeforeExpiryDays` as required checkpoint baseline
+  - configurable lead days for `renewal-soon` posture ahead of required checkpoint
+- stale-state detection identifies certificate metadata drift when persisted status does not match validity-window reality (for example, issued-but-already-expired).
+- `GetCertificateRenewalPlanningUseCase` composes persistence reads + renewal policy rules and returns:
+  - normalized policy windows (`asOf`, issued renewal windows, CA lead window),
+  - CA renewal/rotation assessment,
+  - issued-certificate renewal assessments and aggregate counts,
+  - machine-readable operator attention items (without UI-coupled presentation logic).
+
+### Current policy defaults and assumptions
+
+- issued certificate defaults:
+  - renewal-soon window: 30 days before expiry
+  - renewal-required window: 7 days before expiry
+- CA defaults:
+  - renewal-required checkpoint: `rotationPolicy.rotateBeforeExpiryDays`
+  - renewal-soon checkpoint: required checkpoint + 30 lead days
+- `notAfter` boundary is exclusive for active validity; evaluation at `notAfter` yields `expired`.
+- non-renewable issued statuses (`revoked`, `superseded`) are excluded from tracked renewal counts by default.
+- attention outputs are code-first and automation-friendly so future jobs/controllers can trigger remediation without redesign.
+
 ## Coverage in this slice
 
 - Domain invariants and lifecycle transitions: `src/domain/security/tests/CertificateAuthorityDomain.test.ts`
@@ -281,6 +315,8 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - revocation registry status enforcement behavior: `src/application/security/tests/ResolveCertificateRevocationStatusUseCase.test.ts`
 - trust evaluation helper and boundary coverage: `src/application/security/tests/CertificateTrustEvaluationService.test.ts`
 - lifecycle audit sanitization behavior: `src/application/security/tests/CertificateLifecycleAuditPorts.test.ts`
+- renewal state classification and stale metadata detection coverage: `src/application/security/tests/CertificateRenewalPlanningService.test.ts`
+- renewal planning aggregation/attention coverage: `src/application/security/tests/GetCertificateRenewalPlanningUseCase.test.ts`
 - concrete issuer signing pipeline coverage: `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - host initialization seam coverage: `hosts/server/tests/IdentityServerHost.test.ts`
 

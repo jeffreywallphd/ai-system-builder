@@ -1,7 +1,7 @@
 # Internal CA Foundation
 
 This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, Story 6.2.1, Story 6.2.2, Story 6.2.3, Story 6.2.4, Story 6.2.5, Story 6.2.6, and Story 6.2.7 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, certificate subject-profile issuance policy enforcement, concrete issuance signing/material persistence execution, node-trust-backed approved-node issuance eligibility, explicit certificate revocation workflow plus revocation-status enforcement seams, reusable certificate trust evaluation helpers, certificate lifecycle audit recording seams, and issued-certificate metadata query/listing seams for admin/API consumers.
-This note now also documents Story 6.3.1 (Feature 6 / Epic 6.3): runtime trust-material export/distribution contracts that provide scoped trust bundles, certificate-chain material, and protected reference packages for authorized runtime consumers.
+This note now also documents Story 6.3.1 and Story 6.3.2 (Feature 6 / Epic 6.3): runtime trust-material export/distribution contracts plus centralized certificate renewal/rotation planning services that classify renewal urgency and operator attention conditions before expiry.
 
 ## Canonical artifacts
 
@@ -33,6 +33,8 @@ This note now also documents Story 6.3.1 (Feature 6 / Epic 6.3): runtime trust-m
 - `src/application/security/use-cases/ListIssuedCertificateMetadataUseCase.ts`
 - `src/application/security/use-cases/GetIssuedCertificateMetadataUseCase.ts`
 - `src/application/security/use-cases/ResolveRuntimeTrustMaterialPackageUseCase.ts`
+- `src/application/security/use-cases/CertificateRenewalPlanningService.ts`
+- `src/application/security/use-cases/GetCertificateRenewalPlanningUseCase.ts`
 - `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
 - `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
 - `src/application/security/tests/ResolveCertificateAuthorityStartupStateUseCase.test.ts`
@@ -45,6 +47,8 @@ This note now also documents Story 6.3.1 (Feature 6 / Epic 6.3): runtime trust-m
 - `src/application/security/tests/CertificateLifecycleAuditPorts.test.ts`
 - `src/application/security/tests/IssuedCertificateMetadataQueryUseCases.test.ts`
 - `src/application/security/tests/ResolveRuntimeTrustMaterialPackageUseCase.test.ts`
+- `src/application/security/tests/CertificateRenewalPlanningService.test.ts`
+- `src/application/security/tests/GetCertificateRenewalPlanningUseCase.test.ts`
 - `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
@@ -202,6 +206,32 @@ Story 6.3.1 adds explicit runtime-consumer trust retrieval contracts so server/n
 - runtime package responses include sanitized metadata and optional protected references (`accessRef` + redacted view) for authorized runtime components.
 - private-key payloads are not exported through runtime package contracts.
 - successful runtime retrieval persists a distribution event (`published`) through lifecycle-event persistence for future operational visibility.
+
+## Story 6.3.2 certificate rotation planning and renewal eligibility services
+
+Story 6.3.2 adds centralized renewal-planning seams so operations and future automation can reason about certificate lifecycle pressure consistently:
+
+- `CertificateRenewalPlanningService` provides deterministic, reusable rule evaluation for:
+  - issued certificate renewal states (`active`, `renewal-soon`, `renewal-required`, `expired`),
+  - certificate-authority rotation states using CA validity + configured `rotateBeforeExpiryDays` policy,
+  - stale lifecycle metadata detection when persisted certificate status is inconsistent with validity windows.
+- `GetCertificateRenewalPlanningUseCase` composes CA and issued-certificate persistence reads with renewal policy rules and returns:
+  - policy-normalized planning context (`asOf`, renewal windows),
+  - CA renewal/rotation assessment with attention codes,
+  - issued-certificate renewal assessments for tracked certificates,
+  - summarized counts by renewal state plus attention-required indicator.
+
+### Current rotation-policy assumptions
+
+- issued certificate windows default to:
+  - `renewal-soon`: 30 days before `notAfter`
+  - `renewal-required`: 7 days before `notAfter`
+- certificate authority windows default to:
+  - `renewal-required`: `rotationPolicy.rotateBeforeExpiryDays`
+  - `renewal-soon`: required window plus 30 lead days
+- `notAfter` is treated as exclusive for active validity (at `notAfter`, state is `expired`).
+- non-renewable certificate statuses (`revoked`, `superseded`) are excluded from tracked renewal counts by default, but can still be surfaced when explicitly requested.
+- operator attention codes are machine-oriented and stable by intent, allowing future automation/workflows to trigger actions without UI coupling.
 
 ## Story 6.1.3 startup bootstrap behavior
 
@@ -424,6 +454,8 @@ Story 6.2.1 and Story 6.2.2 add `IssueCertificateForSubjectUseCase` in the appli
 - `ResolveCertificateRevocationStatusUseCase.test.ts`: revocation registry status resolution for active/revoked/expired/not-found cases plus deterministic clock defaulting
 - `CertificateTrustEvaluationService.test.ts`: reusable trust evaluation boundaries (`notBefore` inclusive, `notAfter` exclusive), revoked-over-expiry precedence, subject-state downgrades, and invalid metadata handling
 - `CertificateLifecycleAuditPorts.test.ts`: certificate lifecycle audit sanitization/redaction behavior for sink delivery
+- `CertificateRenewalPlanningService.test.ts`: centralized renewal-state classification, stale-metadata detection, and CA rotation attention behavior
+- `GetCertificateRenewalPlanningUseCase.test.ts`: renewal planning aggregation, tracked-state summaries, and not-found CA attention handling
 - `InternalCertificateAuthorityIssuer.test.ts`: concrete root generation + signing pipeline behavior and issuance prerequisite failure coverage
 - `IdentityServerHost.test.ts`: host-level first-time initialization invocation seam coverage
 
