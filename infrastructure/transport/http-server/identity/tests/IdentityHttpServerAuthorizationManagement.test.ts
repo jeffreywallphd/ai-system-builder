@@ -105,7 +105,7 @@ describe("IdentityHttpServer authorization management routes", () => {
     });
     expect(revokeResponse.status).toBe(200);
 
-    const accessStateResponse = await fetch(`${harness.baseUrl}/api/v1/authorization/resources/asset/asset/asset-1/access-state?includeDenied=true&includeRevokedSharingGrants=true`, {
+    const accessStateResponse = await fetch(`${harness.baseUrl}/api/v1/authorization/resources/asset/asset/asset-1/access-state?includeDenied=true&includeRevokedSharingGrants=true&inspectedActorUserIdentityId=user-viewer`, {
       headers: {
         authorization: `Bearer ${owner.sessionToken}`,
       },
@@ -113,6 +113,8 @@ describe("IdentityHttpServer authorization management routes", () => {
     expect(accessStateResponse.status).toBe(200);
     const accessStateBody = await accessStateResponse.json();
     expect(accessStateBody.ok).toBe(true);
+    expect(accessStateBody.data.inspectorActorUserIdentityId).toBe(owner.userIdentityId);
+    expect(accessStateBody.data.inspectedActorUserIdentityId).toBe("user-viewer");
     expect(accessStateBody.data.resourcePolicyMetadata.visibility).toBe("shared");
     expect(accessStateBody.data.sharingGrants.some((grant: { grantId: string }) => grant.grantId === "share-1")).toBe(true);
   });

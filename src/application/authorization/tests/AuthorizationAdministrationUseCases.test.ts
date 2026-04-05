@@ -53,6 +53,7 @@ import { UpdateAuthorizationVisibilityUseCase } from "../use-cases/UpdateAuthori
 import { EvaluateAuthorizationPermissionUseCase } from "../use-cases/EvaluateAuthorizationPermissionUseCase";
 import { ListAuthorizationEffectiveAccessUseCase } from "../use-cases/ListAuthorizationEffectiveAccessUseCase";
 import { AuthorizationAdministrationErrorCodes } from "../use-cases/AuthorizationAdministrationUseCaseShared";
+import { AuthorizationPolicyDecisionEvaluator } from "../use-cases/AuthorizationPolicyDecisionEvaluator";
 
 class PersistenceHarness
   implements
@@ -711,5 +712,185 @@ describe("Authorization administration use cases", () => {
 
     expect(listed.value.permissions.length).toBeGreaterThan(0);
     expect(listed.value.permissions.every((entry) => entry.permissionKey.endsWith(".read"))).toBeTrue();
+  });
+
+  it("returns redaction-safe effective-access explanations for owner, sharing, visibility, and deny", async () => {
+    const harness = new PersistenceHarness();
+
+    harness.resourceMetadata.set(toAuthorizationResourceLookupKey({
+      resourceFamily: AuthorizationResourceFamilies.asset,
+      resourceType: "asset",
+      resourceId: "asset-owner",
+    }), {
+      resourceFamily: AuthorizationResourceFamilies.asset,
+      resourceType: "asset",
+      resourceId: "asset-owner",
+      ownerUserIdentityId: "user-target",
+      ownershipScope: ResourceOwnershipScopes.workspace,
+      workspaceId: "workspace-1",
+      visibility: ResourceVisibilities.private,
+      sharingPolicyMode: "owner-only",
+      allowResharing: false,
+      isPublishedCapable: false,
+      createdAt: "2026-04-05T10:00:00.000Z",
+      createdBy: "user-target",
+      lastModifiedAt: "2026-04-05T10:00:00.000Z",
+      lastModifiedBy: "user-target",
+      revision: 1,
+    });
+
+    harness.resourceMetadata.set(toAuthorizationResourceLookupKey({
+      resourceFamily: AuthorizationResourceFamilies.asset,
+      resourceType: "asset",
+      resourceId: "asset-shared",
+    }), {
+      resourceFamily: AuthorizationResourceFamilies.asset,
+      resourceType: "asset",
+      resourceId: "asset-shared",
+      ownerUserIdentityId: "user-owner",
+      ownershipScope: ResourceOwnershipScopes.workspace,
+      workspaceId: "workspace-1",
+      visibility: ResourceVisibilities.shared,
+      sharingPolicyMode: "explicit",
+      allowResharing: false,
+      isPublishedCapable: false,
+      createdAt: "2026-04-05T10:00:00.000Z",
+      createdBy: "user-owner",
+      lastModifiedAt: "2026-04-05T10:00:00.000Z",
+      lastModifiedBy: "user-owner",
+      revision: 1,
+    });
+
+    harness.sharingGrants.set("share-user-target", {
+      id: "share-user-target",
+      resourceFamily: AuthorizationResourceFamilies.asset,
+      resourceType: "asset",
+      resourceId: "asset-shared",
+      workspaceId: "workspace-1",
+      subject: {
+        kind: "user",
+        userIdentityId: "user-target",
+      },
+      permissionKeys: ["asset.read"],
+      grantedAt: "2026-04-05T10:05:00.000Z",
+      grantedByUserIdentityId: "user-owner",
+      createdAt: "2026-04-05T10:05:00.000Z",
+      createdBy: "user-owner",
+      lastModifiedAt: "2026-04-05T10:05:00.000Z",
+      lastModifiedBy: "user-owner",
+      revision: 1,
+    });
+
+    harness.resourceMetadata.set(toAuthorizationResourceLookupKey({
+      resourceFamily: AuthorizationResourceFamilies.asset,
+      resourceType: "asset",
+      resourceId: "asset-published",
+    }), {
+      resourceFamily: AuthorizationResourceFamilies.asset,
+      resourceType: "asset",
+      resourceId: "asset-published",
+      ownerUserIdentityId: "user-owner",
+      ownershipScope: ResourceOwnershipScopes.workspace,
+      workspaceId: "workspace-1",
+      visibility: ResourceVisibilities.published,
+      sharingPolicyMode: "published",
+      allowResharing: false,
+      isPublishedCapable: true,
+      publishedAt: "2026-04-05T10:10:00.000Z",
+      createdAt: "2026-04-05T10:10:00.000Z",
+      createdBy: "user-owner",
+      lastModifiedAt: "2026-04-05T10:10:00.000Z",
+      lastModifiedBy: "user-owner",
+      revision: 1,
+    });
+
+    harness.resourceMetadata.set(toAuthorizationResourceLookupKey({
+      resourceFamily: AuthorizationResourceFamilies.asset,
+      resourceType: "asset",
+      resourceId: "asset-denied",
+    }), {
+      resourceFamily: AuthorizationResourceFamilies.asset,
+      resourceType: "asset",
+      resourceId: "asset-denied",
+      ownerUserIdentityId: "user-owner",
+      ownershipScope: ResourceOwnershipScopes.workspace,
+      workspaceId: "workspace-1",
+      visibility: ResourceVisibilities.private,
+      sharingPolicyMode: "owner-only",
+      allowResharing: false,
+      isPublishedCapable: false,
+      createdAt: "2026-04-05T10:15:00.000Z",
+      createdBy: "user-owner",
+      lastModifiedAt: "2026-04-05T10:15:00.000Z",
+      lastModifiedBy: "user-owner",
+      revision: 1,
+    });
+
+    const reads = createReadRepositories(harness);
+    const decisionEvaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: reads.roleGrantReadRepository,
+      sharingGrantReadRepository: reads.sharingGrantReadRepository,
+      resourcePolicyMetadataReadRepository: reads.resourcePolicyMetadataReadRepository,
+      clock: {
+        now: () => new Date("2026-04-05T12:00:00.000Z"),
+      },
+    });
+
+    const useCase = new ListAuthorizationEffectiveAccessUseCase({
+      decisionEvaluator,
+      roleGrantReadRepository: reads.roleGrantReadRepository,
+      sharingGrantReadRepository: reads.sharingGrantReadRepository,
+      resourcePolicyMetadataReadRepository: reads.resourcePolicyMetadataReadRepository,
+    });
+
+    const owner = await useCase.execute({
+      actor: { actorUserIdentityId: "user-target", activeWorkspaceId: "workspace-1" },
+      resource: { resourceFamily: AuthorizationResourceFamilies.asset, resourceType: "asset", resourceId: "asset-owner" },
+      includeDenied: true,
+    });
+    expect(owner.ok).toBeTrue();
+    if (owner.ok) {
+      const read = owner.value.permissions.find((entry) => entry.permissionKey === "asset.read");
+      expect(read?.explanation.ownershipContext.contributedToDecision).toBeTrue();
+    }
+
+    const shared = await useCase.execute({
+      actor: { actorUserIdentityId: "user-target", activeWorkspaceId: "workspace-1" },
+      resource: { resourceFamily: AuthorizationResourceFamilies.asset, resourceType: "asset", resourceId: "asset-shared" },
+      includeDenied: true,
+    });
+    expect(shared.ok).toBeTrue();
+    if (shared.ok) {
+      const read = shared.value.permissions.find((entry) => entry.permissionKey === "asset.read");
+      expect(read?.explanation.sharingBasedGrants.contributedToDecision).toBeTrue();
+    }
+
+    const published = await useCase.execute({
+      actor: { actorUserIdentityId: "user-target", activeWorkspaceId: "workspace-1" },
+      resource: { resourceFamily: AuthorizationResourceFamilies.asset, resourceType: "asset", resourceId: "asset-published" },
+      includeDenied: true,
+    });
+    expect(published.ok).toBeTrue();
+    if (published.ok) {
+      const read = published.value.permissions.find((entry) => entry.permissionKey === "asset.read");
+      expect(read?.explanation.visibilityContribution.contributedToDecision).toBeTrue();
+      expect(read?.explanation.visibilityContribution.contributionReasonCode).toBe("visibility-published");
+    }
+
+    const denied = await useCase.execute({
+      actor: { actorUserIdentityId: "user-target", activeWorkspaceId: "workspace-1" },
+      resource: { resourceFamily: AuthorizationResourceFamilies.asset, resourceType: "asset", resourceId: "asset-denied" },
+      includeDenied: true,
+    });
+    expect(denied.ok).toBeTrue();
+    if (denied.ok) {
+      const read = denied.value.permissions.find((entry) => entry.permissionKey === "asset.read");
+      expect(read?.decision.isAllowed).toBeFalse();
+      expect(read?.explanation.ownershipContext.contributedToDecision).toBeFalse();
+      expect(read?.explanation.roleBasedGrants.contributedToDecision).toBeFalse();
+      expect(read?.explanation.directPermissionGrants.contributedToDecision).toBeFalse();
+      expect(read?.explanation.sharingBasedGrants.contributedToDecision).toBeFalse();
+      expect(read?.explanation.visibilityContribution.contributedToDecision).toBeFalse();
+    }
   });
 });

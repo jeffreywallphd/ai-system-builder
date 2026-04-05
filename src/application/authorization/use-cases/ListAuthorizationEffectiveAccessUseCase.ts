@@ -27,6 +27,32 @@ export interface ListAuthorizationEffectiveAccessUseCaseInput {
 export interface EffectiveAccessPermissionDecision {
   readonly permissionKey: CatalogPermissionKey;
   readonly decision: AuthorizationPolicyDecision;
+  readonly explanation: EffectiveAccessPermissionExplanation;
+}
+
+export interface EffectiveAccessPermissionExplanation {
+  readonly ownershipContext: Readonly<{
+    readonly isResourceOwner: boolean;
+    readonly contributedToDecision: boolean;
+  }>;
+  readonly roleBasedGrants: Readonly<{
+    readonly matchedRoleAssignmentIds: ReadonlyArray<string>;
+    readonly contributedToDecision: boolean;
+  }>;
+  readonly directPermissionGrants: Readonly<{
+    readonly matchedPermissionGrantIds: ReadonlyArray<string>;
+    readonly contributedToDecision: boolean;
+  }>;
+  readonly sharingBasedGrants: Readonly<{
+    readonly matchedSharingGrantIds: ReadonlyArray<string>;
+    readonly contributedToDecision: boolean;
+  }>;
+  readonly visibilityContribution: Readonly<{
+    readonly resourceVisibility: AuthorizationResourcePolicyMetadata["visibility"];
+    readonly sharingPolicyMode: AuthorizationResourcePolicyMetadata["sharingPolicyMode"];
+    readonly contributedToDecision: boolean;
+    readonly contributionReasonCode?: string;
+  }>;
 }
 
 export interface ListAuthorizationEffectiveAccessUseCaseResult {
@@ -107,6 +133,11 @@ export class ListAuthorizationEffectiveAccessUseCase {
       decisions.push(Object.freeze({
         permissionKey,
         decision: decision.decision,
+        explanation: buildPermissionExplanation({
+          actorUserIdentityId: parsed.actor.actorUserIdentityId,
+          metadata: resourcePolicyMetadata,
+          decision: decision.decision,
+        }),
       }));
     }
 
@@ -121,4 +152,48 @@ export class ListAuthorizationEffectiveAccessUseCase {
       }),
     };
   }
+}
+
+function buildPermissionExplanation(input: {
+  readonly actorUserIdentityId?: string;
+  readonly metadata: AuthorizationResourcePolicyMetadata;
+  readonly decision: AuthorizationPolicyDecision;
+}): EffectiveAccessPermissionExplanation {
+  const normalizedActorUserIdentityId = input.actorUserIdentityId?.trim();
+  const isResourceOwner = !!normalizedActorUserIdentityId && normalizedActorUserIdentityId === input.metadata.ownerUserIdentityId;
+  const ownershipContributed = input.decision.reasonCode === "owner-override";
+  const roleContributed = input.decision.matchedRoleAssignmentIds.length > 0 || input.decision.reasonCode === "matched-role-grant";
+  const permissionGrantContributed = input.decision.matchedPermissionGrantIds.length > 0 || (
+    input.decision.reasonCode === "matched-permission-grant" || input.decision.reasonCode === "explicit-deny-permission-grant"
+  );
+  const sharingContributed = input.decision.matchedSharingGrantIds.length > 0 || input.decision.reasonCode === "matched-sharing-grant";
+  const visibilityContributed = (
+    input.decision.reasonCode === "visibility-workspace-member"
+    || input.decision.reasonCode === "visibility-published"
+  );
+
+  return Object.freeze({
+    ownershipContext: Object.freeze({
+      isResourceOwner,
+      contributedToDecision: ownershipContributed,
+    }),
+    roleBasedGrants: Object.freeze({
+      matchedRoleAssignmentIds: input.decision.matchedRoleAssignmentIds,
+      contributedToDecision: roleContributed,
+    }),
+    directPermissionGrants: Object.freeze({
+      matchedPermissionGrantIds: input.decision.matchedPermissionGrantIds,
+      contributedToDecision: permissionGrantContributed,
+    }),
+    sharingBasedGrants: Object.freeze({
+      matchedSharingGrantIds: input.decision.matchedSharingGrantIds,
+      contributedToDecision: sharingContributed,
+    }),
+    visibilityContribution: Object.freeze({
+      resourceVisibility: input.metadata.visibility,
+      sharingPolicyMode: input.metadata.sharingPolicyMode,
+      contributedToDecision: visibilityContributed,
+      contributionReasonCode: visibilityContributed ? input.decision.reasonCode : undefined,
+    }),
+  });
 }

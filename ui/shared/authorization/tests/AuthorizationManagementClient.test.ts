@@ -26,6 +26,7 @@ describe("HttpAuthorizationManagementClient", () => {
       resourceFamily: "asset",
       resourceType: "asset",
       resourceId: "asset:1",
+      inspectedActorUserIdentityId: "user:inspected",
       includeDenied: true,
       includeRevokedSharingGrants: false,
       asOf: "2026-04-05T12:00:00.000Z",
@@ -64,7 +65,7 @@ describe("HttpAuthorizationManagementClient", () => {
 
     expect(requests.map((entry) => entry.method)).toEqual(["GET", "PATCH", "POST", "DELETE"]);
     expect(requests.map((entry) => entry.url)).toEqual([
-      "http://127.0.0.1:8788/api/v1/authorization/resources/asset/asset/asset%3A1/access-state?asOf=2026-04-05T12%3A00%3A00.000Z&includeDenied=true&includeRevokedSharingGrants=false",
+      "http://127.0.0.1:8788/api/v1/authorization/resources/asset/asset/asset%3A1/access-state?inspectedActorUserIdentityId=user%3Ainspected&asOf=2026-04-05T12%3A00%3A00.000Z&includeDenied=true&includeRevokedSharingGrants=false",
       "http://127.0.0.1:8788/api/v1/authorization/resources/asset/asset/asset%3A1/visibility",
       "http://127.0.0.1:8788/api/v1/authorization/resources/asset/asset/asset%3A1/sharing-grants",
       "http://127.0.0.1:8788/api/v1/authorization/resources/asset/asset/asset%3A1/sharing-grants/grant%3A1",

@@ -241,3 +241,25 @@ Mutation gate examples:
   - `not-found` -> HTTP `404`
   - `conflict` -> HTTP `409`
   - `internal` -> HTTP `500`
+
+## Access review and effective-access inspection (Story 4.4.3)
+
+- Effective-access reads now support authorized inspection of a target actor distinct from the requesting inspector:
+  - request adds optional `inspectedActorUserIdentityId` (defaults to the requesting actor).
+  - response echoes both `inspectorActorUserIdentityId` and `inspectedActorUserIdentityId`.
+- `AuthorizationManagementBackendApi.readAccessState(...)` keeps the existing inspector authorization gate (`<resource-family>.share|manage`) and evaluates effective permissions for the inspected actor.
+- Effective-access permission records now include a redaction-safe explanation envelope per permission, with explicit contribution channels:
+  - ownership context (`isResourceOwner`, whether owner override contributed),
+  - role-based grant contribution + matched role assignment ids,
+  - direct permission-grant contribution + matched permission grant ids,
+  - sharing-based grant contribution + matched sharing grant ids,
+  - visibility contribution (`resourceVisibility`, `sharingPolicyMode`, contribution flag, contribution reason code when visibility matched).
+- Story verification coverage includes representative explanation accuracy scenarios:
+  - owner-override contribution,
+  - explicit sharing contribution,
+  - published-visibility contribution,
+  - deny path with no contributing channels.
+- Transport and client seams now pass inspection target context end-to-end:
+  - HTTP query parameter `inspectedActorUserIdentityId` on `/access-state`,
+  - renderer HTTP client support,
+  - sharing management UI display of inspected actor context and per-permission contribution summaries.

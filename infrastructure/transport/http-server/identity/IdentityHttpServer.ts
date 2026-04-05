@@ -1339,6 +1339,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
             const includeDenied = parseOptionalBoolean(url.searchParams.get("includeDenied"));
             const includeRevokedSharingGrants = parseOptionalBoolean(url.searchParams.get("includeRevokedSharingGrants"));
             const asOf = normalizeOptionalString(url.searchParams.get("asOf"));
+            const inspectedActorUserIdentityId = normalizeOptionalString(url.searchParams.get("inspectedActorUserIdentityId"));
 
             if (asOf && !z.string().datetime({ offset: true }).safeParse(asOf).success) {
               const invalid = buildAuthorizationManagementInvalidRequestResponse("asOf must be a valid ISO-8601 timestamp.");
@@ -1353,6 +1354,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
 
             const apiResponse = await options.authorizationManagementBackendApi.readAccessState({
               actorUserIdentityId: context.principal.userIdentityId,
+              inspectedActorUserIdentityId,
               resource,
               asOf,
               includeDenied,

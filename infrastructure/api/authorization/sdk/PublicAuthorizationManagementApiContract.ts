@@ -161,17 +161,44 @@ export interface AuthorizationPermissionDecisionApiRecord {
   readonly matchedRoleAssignmentIds: ReadonlyArray<string>;
   readonly matchedPermissionGrantIds: ReadonlyArray<string>;
   readonly matchedSharingGrantIds: ReadonlyArray<string>;
+  readonly explanation: Readonly<{
+    readonly ownershipContext: Readonly<{
+      readonly isResourceOwner: boolean;
+      readonly contributedToDecision: boolean;
+    }>;
+    readonly roleBasedGrants: Readonly<{
+      readonly matchedRoleAssignmentIds: ReadonlyArray<string>;
+      readonly contributedToDecision: boolean;
+    }>;
+    readonly directPermissionGrants: Readonly<{
+      readonly matchedPermissionGrantIds: ReadonlyArray<string>;
+      readonly contributedToDecision: boolean;
+    }>;
+    readonly sharingBasedGrants: Readonly<{
+      readonly matchedSharingGrantIds: ReadonlyArray<string>;
+      readonly contributedToDecision: boolean;
+    }>;
+    readonly visibilityContribution: Readonly<{
+      readonly resourceVisibility: ResourceVisibility;
+      readonly sharingPolicyMode: SharingPolicyMode;
+      readonly contributedToDecision: boolean;
+      readonly contributionReasonCode?: string;
+    }>;
+  }>;
 }
 
 export interface AuthorizationAccessStateApiRequest {
   readonly actorUserIdentityId: string;
   readonly resource: AuthorizationManagedResourceRef;
+  readonly inspectedActorUserIdentityId?: string;
   readonly asOf?: string;
   readonly includeDenied?: boolean;
   readonly includeRevokedSharingGrants?: boolean;
 }
 
 export interface AuthorizationAccessStateApiResponse {
+  readonly inspectorActorUserIdentityId: string;
+  readonly inspectedActorUserIdentityId: string;
   readonly resource: AuthorizationManagedResourceRef;
   readonly resourcePolicyMetadata: AuthorizationResourcePolicyMetadataApiRecord;
   readonly roleAssignmentIds: ReadonlyArray<string>;

@@ -96,6 +96,7 @@ describe("AuthorizationManagementBackendApi", () => {
 
     const access = await api.readAccessState({
       actorUserIdentityId: "user-owner",
+      inspectedActorUserIdentityId: "user-viewer",
       resource: {
         resourceFamily: AuthorizationResourceFamilies.asset,
         resourceType: "asset",
@@ -110,9 +111,21 @@ describe("AuthorizationManagementBackendApi", () => {
       return;
     }
 
+    expect(access.data.inspectorActorUserIdentityId).toBe("user-owner");
+    expect(access.data.inspectedActorUserIdentityId).toBe("user-viewer");
     expect(access.data.resourcePolicyMetadata.visibility).toBe("shared");
     expect(access.data.sharingGrants.some((grantItem) => grantItem.grantId === "share-1")).toBeTrue();
     expect(access.data.permissions.length).toBeGreaterThan(0);
+    const readDecision = access.data.permissions.find((entry) => entry.permissionKey === "asset.read");
+    expect(readDecision).toBeDefined();
+    if (readDecision) {
+      expect(
+        readDecision.explanation.roleBasedGrants.contributedToDecision
+        || readDecision.explanation.sharingBasedGrants.contributedToDecision
+        || readDecision.explanation.visibilityContribution.contributedToDecision,
+      ).toBeTrue();
+      expect(readDecision.explanation.visibilityContribution.resourceVisibility).toBe("shared");
+    }
   });
 
   it("denies sharing management and access-state reads for unauthorized actor", async () => {

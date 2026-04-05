@@ -239,3 +239,25 @@ Command gate examples:
   - `not-found` -> HTTP `404`
   - `conflict` -> HTTP `409`
   - `internal` -> HTTP `500`
+
+## Access review and effective-access inspection (Story 4.4.3)
+
+- Effective-access inspection now supports a target actor that can differ from the requesting inspector:
+  - request supports optional `inspectedActorUserIdentityId` (defaults to caller),
+  - response includes both `inspectorActorUserIdentityId` and `inspectedActorUserIdentityId` for audit-safe traceability.
+- `AuthorizationManagementBackendApi.readAccessState(...)` preserves resource-level inspector authorization (`<resource-family>.share|manage`) and evaluates policy for the inspected actor.
+- Permission rows in access-state responses now include structured, redaction-safe explanation channels:
+  - ownership context and owner-override contribution,
+  - role-based grant contribution and matched role assignment ids,
+  - direct permission-grant contribution and matched grant ids,
+  - sharing-based grant contribution and matched sharing grant ids,
+  - visibility contribution details (`resourceVisibility`, `sharingPolicyMode`, contribution reason when applicable).
+- Coverage now verifies explanation accuracy for representative paths:
+  - owner override,
+  - explicit sharing allow,
+  - visibility-based allow (`published`),
+  - deny with no contributors.
+- Transport and UI seams now pass and surface inspected-actor context:
+  - `/access-state` accepts `inspectedActorUserIdentityId` query parameter,
+  - renderer authorization client emits the parameter,
+  - sharing-management UI can inspect another actor and renders contribution summaries per permission.
