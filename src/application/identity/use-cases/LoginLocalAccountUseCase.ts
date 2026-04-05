@@ -6,6 +6,11 @@ import {
   type UserIdentityProviderLink,
 } from "../../../domain/identity/IdentityDomain";
 import {
+  IdentityLifecycleEventContractVersions,
+  IdentityLifecycleEventTypes,
+  createIdentityLifecycleEvent,
+} from "../../../../application/contracts/IdentityLifecycleEventContracts";
+import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
   identityFailure,
@@ -17,6 +22,8 @@ import type { ICredentialMaterialRepository } from "../../../../application/iden
 import type { IIdentityClock } from "../../../../application/identity/ports/IIdentityClock";
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityCredentialAuthenticator } from "../../../../application/identity/ports/IIdentityCredentialAuthenticator";
+import type { IIdentityLifecycleEventPublisher } from "../../../../application/identity/ports/IIdentityLifecycleEventPublisher";
+import { publishIdentityLifecycleEventBestEffort } from "../../../../application/identity/services/IdentityLifecycleEventPublishing";
 import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
 import { validateIdentityProvider } from "../../../../application/identity/services/IdentityProviderCatalog";
 
@@ -56,6 +63,7 @@ interface LoginLocalAccountDependencies {
   readonly identityPolicyService: IdentityPolicyService;
   readonly credentialAuthenticator: IIdentityCredentialAuthenticator;
   readonly clock: IIdentityClock;
+  readonly eventPublisher?: IIdentityLifecycleEventPublisher;
 }
 
 export const LoginLocalAccountDefaults = Object.freeze({
@@ -109,6 +117,11 @@ export class LoginLocalAccountUseCase {
       providerSubject: normalizedProviderReference.value.providerSubject,
     });
     if (!userIdentity) {
+      await this.emitFailedLoginEvent(
+        providerResult.value.id,
+        normalizedProviderReference.value.providerSubject,
+        IdentityErrorCodes.notFound,
+      );
       return this.failure(
         IdentityErrorCodes.notFound,
         "Identity was not found for the requested local login path.",
@@ -121,6 +134,11 @@ export class LoginLocalAccountUseCase {
       normalizedProviderReference.value.providerSubject,
     );
     if (!accountStateResult.ok) {
+      await this.emitFailedLoginEvent(
+        providerResult.value.id,
+        normalizedProviderReference.value.providerSubject,
+        accountStateResult.error.code,
+      );
       return accountStateResult;
     }
 
@@ -129,6 +147,11 @@ export class LoginLocalAccountUseCase {
       providerSubject: normalizedProviderReference.value.providerSubject,
     });
     if (!credentialMaterial) {
+      await this.emitFailedLoginEvent(
+        providerResult.value.id,
+        normalizedProviderReference.value.providerSubject,
+        IdentityErrorCodes.invalidCredentials,
+      );
       return this.invalidCredentialsFailure();
     }
 
@@ -147,10 +170,15 @@ export class LoginLocalAccountUseCase {
       pepperVersion: credentialMaterial.pepperVersion,
     });
     if (!isValidCredential) {
+      await this.emitFailedLoginEvent(
+        providerResult.value.id,
+        normalizedProviderReference.value.providerSubject,
+        IdentityErrorCodes.invalidCredentials,
+      );
       return this.invalidCredentialsFailure();
     }
 
-    return identitySuccess(Object.freeze({
+    const result = identitySuccess(Object.freeze({
       userIdentityId: userIdentity.id,
       username: userIdentity.username,
       email: userIdentity.email,
@@ -161,6 +189,46 @@ export class LoginLocalAccountUseCase {
       authPath: this.dependencies.credentialAuthenticator.kind,
       authenticatedAt: this.dependencies.clock.now().toISOString(),
     }));
+
+    await publishIdentityLifecycleEventBestEffort(
+      this.dependencies.eventPublisher,
+      createIdentityLifecycleEvent({
+        eventType: IdentityLifecycleEventTypes.localAccountLoginSucceeded,
+        contractVersion: IdentityLifecycleEventContractVersions.v1,
+        occurredAt: result.value.authenticatedAt,
+        payload: {
+          userIdentityId: result.value.userIdentityId,
+          providerId: result.value.providerId,
+          providerSubject: result.value.providerSubject,
+          credentialMaterialId: result.value.credentialMaterialId,
+          authenticatedAt: result.value.authenticatedAt,
+          authPath: result.value.authPath,
+        },
+      }),
+    );
+
+    return result;
+  }
+
+  private async emitFailedLoginEvent(
+    providerId: string,
+    providerSubject: string,
+    errorCode: string,
+  ): Promise<void> {
+    await publishIdentityLifecycleEventBestEffort(
+      this.dependencies.eventPublisher,
+      createIdentityLifecycleEvent({
+        eventType: IdentityLifecycleEventTypes.localAccountLoginFailed,
+        contractVersion: IdentityLifecycleEventContractVersions.v1,
+        occurredAt: this.dependencies.clock.now().toISOString(),
+        payload: {
+          providerId,
+          providerSubject,
+          errorCode,
+          attemptedAt: this.dependencies.clock.now().toISOString(),
+        },
+      }),
+    );
   }
 
   private async resolveLocalProvider(

@@ -24,6 +24,8 @@ import type {
   IdentityUserIdentityListQuery,
 } from "../../contracts/IdentityApplicationContracts";
 import {
+  IdentityLifecycleEventTypes,
+  type IdentityLifecycleEvent,
   IdentityCredentialMaterialStatuses,
   IdentityErrorCodes,
   IdentityPrincipalLookupKinds,
@@ -32,6 +34,7 @@ import {
 } from "../../contracts/IdentityApplicationContracts";
 import type { ICredentialMaterialRepository } from "../ports/ICredentialMaterialRepository";
 import type { IIdentityClock } from "../ports/IIdentityClock";
+import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
 import type { ILocalPasswordCredentialService, LocalPasswordCredentialMaterial } from "../ports/ILocalPasswordCredentialService";
 import { IdentityPolicyService } from "../services/IdentityPolicyService";
@@ -176,6 +179,7 @@ class StubLocalPasswordCredentialService implements ILocalPasswordCredentialServ
 function createUseCase(
   adapter: InMemoryLoginAdapter,
   passwordCredentialService: ILocalPasswordCredentialService = new StubLocalPasswordCredentialService(),
+  eventPublisher?: IIdentityLifecycleEventPublisher,
 ): LoginLocalAccountUseCase {
   return new LoginLocalAccountUseCase({
     lookupRepository: adapter,
@@ -183,6 +187,7 @@ function createUseCase(
     identityPolicyService: new IdentityPolicyService(adapter),
     credentialAuthenticator: new LocalPasswordIdentityAuthenticator(passwordCredentialService),
     clock: adapter,
+    eventPublisher,
   });
 }
 
@@ -233,7 +238,12 @@ describe("LoginLocalAccountUseCase", () => {
   it("authenticates an active local identity and returns an authenticated principal payload", async () => {
     const adapter = new InMemoryLoginAdapter();
     await seedActiveLocalIdentity(adapter);
-    const useCase = createUseCase(adapter);
+    const events: IdentityLifecycleEvent[] = [];
+    const useCase = createUseCase(adapter, new StubLocalPasswordCredentialService(), {
+      publish: async (event) => {
+        events.push(event);
+      },
+    });
 
     const result = await useCase.execute({
       providerSubject: " Valid.User ",
@@ -258,6 +268,15 @@ describe("LoginLocalAccountUseCase", () => {
       authPath: "password",
       authenticatedAt: "2026-04-04T13:00:00.000Z",
     });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(expect.objectContaining({
+      eventType: IdentityLifecycleEventTypes.localAccountLoginSucceeded,
+      payload: expect.objectContaining({
+        userIdentityId: "user:1",
+        providerId: "provider:local-password",
+        providerSubject: "valid.user",
+      }),
+    }));
   });
 
   it("returns not-found when no identity exists for the local provider subject", async () => {
@@ -283,7 +302,12 @@ describe("LoginLocalAccountUseCase", () => {
   it("returns invalid-credentials when the candidate does not match active credential material", async () => {
     const adapter = new InMemoryLoginAdapter();
     await seedActiveLocalIdentity(adapter);
-    const useCase = createUseCase(adapter);
+    const events: IdentityLifecycleEvent[] = [];
+    const useCase = createUseCase(adapter, new StubLocalPasswordCredentialService(), {
+      publish: async (event) => {
+        events.push(event);
+      },
+    });
 
     const result = await useCase.execute({
       providerSubject: "valid.user",
@@ -298,6 +322,15 @@ describe("LoginLocalAccountUseCase", () => {
         code: "identity-invalid-credentials",
       }),
     });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(expect.objectContaining({
+      eventType: IdentityLifecycleEventTypes.localAccountLoginFailed,
+      payload: expect.objectContaining({
+        providerId: "provider:local-password",
+        providerSubject: "valid.user",
+        errorCode: "identity-invalid-credentials",
+      }),
+    }));
   });
 
   it("returns inactive-account when the identity is not active", async () => {

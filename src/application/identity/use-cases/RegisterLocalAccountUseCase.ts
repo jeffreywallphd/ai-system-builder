@@ -6,6 +6,11 @@ import {
   type CredentialPolicy,
 } from "../../../domain/identity/IdentityDomain";
 import {
+  IdentityLifecycleEventContractVersions,
+  IdentityLifecycleEventTypes,
+  createIdentityLifecycleEvent,
+} from "../../../../application/contracts/IdentityLifecycleEventContracts";
+import {
   IdentityCredentialMaterialStatuses,
   IdentityErrorBoundaries,
   IdentityErrorCodes,
@@ -21,6 +26,8 @@ import type { IIdentityIdGenerator } from "../../../../application/identity/port
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
 import type { IIdentityCredentialAuthenticator } from "../../../../application/identity/ports/IIdentityCredentialAuthenticator";
+import type { IIdentityLifecycleEventPublisher } from "../../../../application/identity/ports/IIdentityLifecycleEventPublisher";
+import { publishIdentityLifecycleEventBestEffort } from "../../../../application/identity/services/IdentityLifecycleEventPublishing";
 import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
 import { validateIdentityProvider } from "../../../../application/identity/services/IdentityProviderCatalog";
 
@@ -63,6 +70,7 @@ interface RegisterLocalAccountDependencies {
   readonly credentialAuthenticator: IIdentityCredentialAuthenticator;
   readonly idGenerator: IIdentityIdGenerator;
   readonly clock: IIdentityClock;
+  readonly eventPublisher?: IIdentityLifecycleEventPublisher;
 }
 
 export const RegisterLocalAccountDefaults = Object.freeze({
@@ -239,7 +247,7 @@ export class RegisterLocalAccountUseCase {
       updatedAt: nowIso,
     });
 
-    return identitySuccess(Object.freeze({
+    const result = identitySuccess(Object.freeze({
       userIdentityId,
       providerId: providerResult.value.id,
       providerSubject,
@@ -247,6 +255,25 @@ export class RegisterLocalAccountUseCase {
       credentialMaterialId,
       registeredAt: nowIso,
     }));
+
+    await publishIdentityLifecycleEventBestEffort(
+      this.dependencies.eventPublisher,
+      createIdentityLifecycleEvent({
+        eventType: IdentityLifecycleEventTypes.localAccountRegistered,
+        contractVersion: IdentityLifecycleEventContractVersions.v1,
+        occurredAt: nowIso,
+        payload: {
+          userIdentityId: result.value.userIdentityId,
+          providerId: result.value.providerId,
+          providerSubject: result.value.providerSubject,
+          credentialPolicyId: result.value.credentialPolicyId,
+          credentialMaterialId: result.value.credentialMaterialId,
+          registeredAt: result.value.registeredAt,
+        },
+      }),
+    );
+
+    return result;
   }
 
   private async resolveLocalProvider(

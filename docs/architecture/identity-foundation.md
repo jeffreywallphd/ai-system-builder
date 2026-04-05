@@ -55,6 +55,7 @@ Key invariants enforced in domain code:
 Primary files:
 
 - `application/contracts/IdentityApplicationContracts.ts`
+- `application/contracts/IdentityLifecycleEventContracts.ts`
 - `application/identity/ports/IIdentityLookupRepository.ts`
 - `application/identity/ports/IIdentityPersistenceRepository.ts`
 - `application/identity/ports/ICredentialMaterialRepository.ts`
@@ -65,9 +66,11 @@ Primary files:
 - `application/identity/ports/IIdentityIdGenerator.ts`
 - `application/identity/ports/IIdentityCredentialAuthenticator.ts`
 - `application/identity/ports/IIdentityCredentialResetVerifier.ts`
+- `application/identity/ports/IIdentityLifecycleEventPublisher.ts`
 - `application/identity/ports/ILocalPasswordCredentialService.ts`
 - `application/identity/services/IdentityPolicyService.ts`
 - `application/identity/services/IdentityProviderCatalog.ts`
+- `application/identity/services/IdentityLifecycleEventPublishing.ts`
 - `application/identity/services/LocalPasswordIdentityAuthenticator.ts`
 - `application/identity/services/IdentityBootstrapService.ts`
 - `src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`
@@ -329,6 +332,31 @@ Renderer behavior in this slice:
 - authenticated users can load local account listings and account-status detail from real backend endpoints
 - enable/disable account actions call the same production status-mutation endpoint and re-read account/list state from persisted backend truth
 - empty, loading, and error states are explicitly rendered for administration workflows
+
+## Identity Lifecycle Event Hooks (Story 1.4.4)
+
+Identity lifecycle event hooks are now formalized so audit/governance features can subscribe later without coupling identity flows to unfinished audit infrastructure.
+
+Contracts and ports:
+
+- event contract definitions: `application/contracts/IdentityLifecycleEventContracts.ts`
+- emission port seam: `application/identity/ports/IIdentityLifecycleEventPublisher.ts`
+- best-effort emission helper: `application/identity/services/IdentityLifecycleEventPublishing.ts`
+
+Current emission points:
+
+- `RegisterLocalAccountUseCase`: `identity.local-account.registered`
+- `LoginLocalAccountUseCase`: `identity.local-account.login-succeeded`
+- `LoginLocalAccountUseCase`: `identity.local-account.login-failed`
+- `ChangeLocalPasswordCredentialUseCase`: `identity.local-account.credential-changed`
+- `SetLocalIdentityAccountStatusUseCase` (disable flow): `identity.local-account.disabled`
+- `IdentityAuthenticatedSessionService.issueAuthenticatedSession(...)`: `identity.session.created`
+- `LogoutIdentitySessionUseCase`: `identity.session.logged-out`
+
+Reliability posture:
+
+- lifecycle event publication is intentionally best effort
+- publisher failures are swallowed by design so registration/login/session/logout lifecycle behavior is not blocked by unavailable downstream audit/governance sinks
 
 ## Separation From Device Trust and Session Trust
 

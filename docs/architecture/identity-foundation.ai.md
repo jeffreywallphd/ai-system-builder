@@ -16,8 +16,11 @@
 - `application/identity/services/IdentitySessionLifecycleService.ts`
 - `application/identity/services/IdentityAuthenticatedSessionService.ts`
 - `application/contracts/IdentityApplicationContracts.ts`
+- `application/contracts/IdentityLifecycleEventContracts.ts`
 - `application/identity/ports/*`
 - `application/identity/services/IdentityPolicyService.ts`
+- `application/identity/ports/IIdentityLifecycleEventPublisher.ts`
+- `application/identity/services/IdentityLifecycleEventPublishing.ts`
 - `application/identity/services/IdentityBootstrapService.ts`
 - `src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`
 - `src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`
@@ -102,7 +105,24 @@
 - Current renderer behavior:
   - authenticated account listing + status inspection use real backend endpoints
   - enable/disable actions update persisted backend state and refresh list/status views
-  - empty/loading/error states are explicit in the administration surface
+- empty/loading/error states are explicit in the administration surface
+
+## Identity lifecycle event hooks (story 1.4.4)
+
+- Identity lifecycle event contracts are now formalized in:
+  - `application/contracts/IdentityLifecycleEventContracts.ts`
+- The event publisher seam is an application port:
+  - `application/identity/ports/IIdentityLifecycleEventPublisher.ts`
+- Emission is best-effort by design through:
+  - `application/identity/services/IdentityLifecycleEventPublishing.ts`
+  - emission failures are intentionally swallowed so identity behavior does not hard depend on unfinished audit infrastructure.
+- Current local identity lifecycle emission points:
+  - `RegisterLocalAccountUseCase`: `identity.local-account.registered`
+  - `LoginLocalAccountUseCase`: `identity.local-account.login-succeeded`, `identity.local-account.login-failed`
+  - `ChangeLocalPasswordCredentialUseCase`: `identity.local-account.credential-changed`
+  - `SetLocalIdentityAccountStatusUseCase` (disable path): `identity.local-account.disabled`
+  - `IdentityAuthenticatedSessionService.issueAuthenticatedSession(...)`: `identity.session.created`
+  - `LogoutIdentitySessionUseCase`: `identity.session.logged-out`
 
 ## Local registration seam
 
