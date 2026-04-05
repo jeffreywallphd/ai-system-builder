@@ -13,6 +13,7 @@
 
 - `src/domain/identity/IdentityDomain.ts`
 - `src/domain/identity/IdentityPolicy.ts`
+- `application/identity/services/IdentitySessionLifecycleService.ts`
 - `application/contracts/IdentityApplicationContracts.ts`
 - `application/identity/ports/*`
 - `application/identity/services/IdentityPolicyService.ts`
@@ -92,9 +93,24 @@
 
 ## Boundary clarity: identity vs trust
 
-- Identity session records carry lifecycle state and optional client context only.
+- Identity session records carry lifecycle state and optional client context only (`accessChannel`, user agent, IP, device id).
 - Device trust and runtime/tool trust remain separate concerns (for example MCP trust modules).
 - No identity invariant currently depends on device-attestation or runtime trust decisions.
+
+## Session lifecycle model (story 1.3.1)
+
+- Session lifecycle transitions are now first-class exports in the domain:
+  - `IdentitySessionLifecycleTransitions`
+  - `isSessionTransitionAllowed(...)`
+- Session access channels are explicit (`desktop`, `thin-client`) so policy can differ by runtime surface.
+- `IdentitySessionLifecycleService` now centralizes:
+  - issuance with policy-derived TTL,
+  - refresh/rotation when applicable,
+  - revocation with explicit reasons,
+  - expiration sweeps for due active sessions.
+- Default policy posture:
+  - desktop: long-lived, refresh disabled,
+  - thin-client: shorter-lived, refresh enabled.
 
 ## Read next
 

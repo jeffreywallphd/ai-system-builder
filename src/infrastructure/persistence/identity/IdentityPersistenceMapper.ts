@@ -3,10 +3,12 @@ import {
   AuthProviderKinds,
   AuthProviderStatuses,
   CredentialStatuses,
+  IdentitySessionAccessChannels,
   IdentitySessionStatuses,
   UserIdentityStatuses,
   createCredentialPolicy,
   createSession,
+  type IdentitySessionAccessChannel,
   type AuthProvider,
   type CredentialPolicy,
   type CredentialState,
@@ -105,6 +107,7 @@ export interface SessionRow {
   readonly replaced_by_session_id: string | null;
   readonly revocation_reason: "logout" | "security" | "rotation" | "admin" | null;
   readonly revoked_at: string | null;
+  readonly client_access_channel: IdentitySessionAccessChannel | null;
   readonly client_user_agent: string | null;
   readonly client_ip_address: string | null;
   readonly client_device_id: string | null;
@@ -219,6 +222,7 @@ export function mapSessionRowToDomain(row: SessionRow): Session {
     issuedAt: new Date(row.issued_at),
     expiresAt: new Date(row.expires_at),
     client: {
+      accessChannel: row.client_access_channel ? assertSessionAccessChannel(row.client_access_channel) : undefined,
       userAgent: row.client_user_agent ?? undefined,
       ipAddress: row.client_ip_address ?? undefined,
       deviceId: row.client_device_id ?? undefined,
@@ -341,6 +345,7 @@ export function mapSessionToRowValues(session: Session): ReadonlyArray<unknown> 
     session.replacedBySessionId ?? null,
     session.revocation?.reason ?? null,
     session.revocation?.revokedAt ?? null,
+    session.client?.accessChannel ?? null,
     session.client?.userAgent ?? null,
     session.client?.ipAddress ?? null,
     session.client?.deviceId ?? null,
@@ -408,4 +413,11 @@ function assertSessionStatus(value: string): Session["status"] {
     return value as Session["status"];
   }
   throw new Error(`Persisted identity session status '${value}' is invalid.`);
+}
+
+function assertSessionAccessChannel(value: string): IdentitySessionAccessChannel {
+  if (Object.values(IdentitySessionAccessChannels).includes(value as IdentitySessionAccessChannel)) {
+    return value as IdentitySessionAccessChannel;
+  }
+  throw new Error(`Persisted identity session access channel '${value}' is invalid.`);
 }

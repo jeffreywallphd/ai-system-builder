@@ -25,10 +25,12 @@ import {
   AuthProviderKinds,
   AuthProviderStatuses,
   CredentialStatuses,
+  IdentitySessionAccessChannels,
   IdentitySessionStatuses,
   UserIdentityStatuses,
   createCredentialPolicy,
   createSession,
+  type IdentitySessionAccessChannel,
   type AuthProvider,
   type CredentialPolicy,
   type CredentialState,
@@ -128,6 +130,7 @@ interface SessionRow {
   readonly replaced_by_session_id: string | null;
   readonly revocation_reason: "logout" | "security" | "rotation" | "admin" | null;
   readonly revoked_at: string | null;
+  readonly client_access_channel: IdentitySessionAccessChannel | null;
   readonly client_user_agent: string | null;
   readonly client_ip_address: string | null;
   readonly client_device_id: string | null;
@@ -647,10 +650,11 @@ export class SqliteIdentityRepository
           replaced_by_session_id,
           revocation_reason,
           revoked_at,
+          client_access_channel,
           client_user_agent,
           client_ip_address,
           client_device_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(session_id) DO UPDATE SET
           user_identity_id = excluded.user_identity_id,
           provider_id = excluded.provider_id,
@@ -662,6 +666,7 @@ export class SqliteIdentityRepository
           replaced_by_session_id = excluded.replaced_by_session_id,
           revocation_reason = excluded.revocation_reason,
           revoked_at = excluded.revoked_at,
+          client_access_channel = excluded.client_access_channel,
           client_user_agent = excluded.client_user_agent,
           client_ip_address = excluded.client_ip_address,
           client_device_id = excluded.client_device_id
@@ -678,6 +683,7 @@ export class SqliteIdentityRepository
         session.replacedBySessionId ?? null,
         session.revocation?.reason ?? null,
         session.revocation?.revokedAt ?? null,
+        session.client?.accessChannel ?? null,
         session.client?.userAgent ?? null,
         session.client?.ipAddress ?? null,
         session.client?.deviceId ?? null,
@@ -706,6 +712,7 @@ export class SqliteIdentityRepository
           replaced_by_session_id,
           revocation_reason,
           revoked_at,
+          client_access_channel,
           client_user_agent,
           client_ip_address,
           client_device_id
@@ -756,6 +763,7 @@ export class SqliteIdentityRepository
           replaced_by_session_id,
           revocation_reason,
           revoked_at,
+          client_access_channel,
           client_user_agent,
           client_ip_address,
           client_device_id
@@ -1000,6 +1008,7 @@ function hydrateSession(row: SessionRow): Session {
     issuedAt: new Date(row.issued_at),
     expiresAt: new Date(row.expires_at),
     client: {
+      accessChannel: row.client_access_channel ? assertSessionAccessChannel(row.client_access_channel) : undefined,
       userAgent: row.client_user_agent ?? undefined,
       ipAddress: row.client_ip_address ?? undefined,
       deviceId: row.client_device_id ?? undefined,
@@ -1059,6 +1068,13 @@ function assertSessionStatus(value: string): Session["status"] {
     return value as Session["status"];
   }
   throw new Error(`Persisted session status '${value}' is invalid.`);
+}
+
+function assertSessionAccessChannel(value: string): IdentitySessionAccessChannel {
+  if (Object.values(IdentitySessionAccessChannels).includes(value as IdentitySessionAccessChannel)) {
+    return value as IdentitySessionAccessChannel;
+  }
+  throw new Error(`Persisted identity session access channel '${value}' is invalid.`);
 }
 
 function toBooleanInteger(value: boolean): number {

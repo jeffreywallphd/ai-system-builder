@@ -49,7 +49,7 @@ describe("SqliteIdentityRepository", () => {
     const db = openSqliteCompatDatabase(databasePath);
     const migrationVersion = db.prepare("SELECT MAX(version) AS version FROM identity_repository_migrations")
       .get() as { version?: number };
-    expect(migrationVersion.version).toBe(1);
+    expect(migrationVersion.version).toBe(2);
 
     const tableRows = db.prepare(`
       SELECT name
@@ -176,6 +176,7 @@ describe("SqliteIdentityRepository", () => {
       issuedAt: new Date("2026-04-04T12:00:00.000Z"),
       expiresAt: new Date("2026-04-04T16:00:00.000Z"),
       client: {
+        accessChannel: "thin-client",
         userAgent: "loom-test",
         ipAddress: "127.0.0.1",
         deviceId: "device-1",
@@ -191,6 +192,7 @@ describe("SqliteIdentityRepository", () => {
     }), "logout", new Date("2026-04-04T11:30:00.000Z")));
 
     expect((await repository.getSessionById(activeSession.id))?.status).toBe(IdentitySessionStatuses.active);
+    expect((await repository.getSessionById(activeSession.id))?.client?.accessChannel).toBe("thin-client");
     const activeOnly = await repository.listSessionsByUserIdentityId({
       userIdentityId: user.id,
       includeStatuses: [IdentitySessionStatuses.active],

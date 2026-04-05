@@ -109,6 +109,7 @@ describe("IdentityPersistenceMapper", () => {
       replaced_by_session_id: null,
       revocation_reason: "logout",
       revoked_at: "2026-04-04T12:30:00.000Z",
+      client_access_channel: "thin-client",
       client_user_agent: "agent",
       client_ip_address: "127.0.0.1",
       client_device_id: "device-1",
@@ -119,6 +120,7 @@ describe("IdentityPersistenceMapper", () => {
 
     expect(mappedCredential.hashAlgorithm).toBe("argon2id");
     expect(mappedSession.status).toBe(IdentitySessionStatuses.revoked);
+    expect(mappedSession.client?.accessChannel).toBe("thin-client");
     expect(mappedSession.revocation?.reason).toBe("logout");
   });
 });

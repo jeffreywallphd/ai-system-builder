@@ -6,6 +6,7 @@ import {
   AuthProviderCategories,
   AuthProviderKinds,
   CredentialStatuses,
+  IdentitySessionAccessChannels,
   IdentitySessionStatuses,
   createAuthProvider,
   createCredentialPolicy,
@@ -49,7 +50,7 @@ describe("SqliteIdentityPersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM identity_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(1);
+    expect(versionRow.version).toBe(2);
 
     const tables = database.prepare(`
       SELECT name
@@ -175,6 +176,9 @@ describe("SqliteIdentityPersistenceAdapter", () => {
       providerSubject: "alice-local",
       issuedAt: new Date("2026-04-04T12:00:00.000Z"),
       expiresAt: new Date("2026-04-04T14:00:00.000Z"),
+      client: {
+        accessChannel: IdentitySessionAccessChannels.thinClient,
+      },
     }));
 
     await adapter.saveSession(revokeSession(createSession({
@@ -187,6 +191,7 @@ describe("SqliteIdentityPersistenceAdapter", () => {
     }), "logout", new Date("2026-04-04T11:30:00.000Z")));
 
     expect((await adapter.getSessionById(activeSession.id))?.status).toBe(IdentitySessionStatuses.active);
+    expect((await adapter.getSessionById(activeSession.id))?.client?.accessChannel).toBe(IdentitySessionAccessChannels.thinClient);
 
     const activeOnly = await adapter.listSessionsByUserIdentityId({
       userIdentityId: user.id,
