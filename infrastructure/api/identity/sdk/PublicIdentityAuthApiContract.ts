@@ -22,6 +22,15 @@ export interface IdentityAuthApiError {
   readonly code: IdentityAuthApiErrorCode;
   readonly message: string;
   readonly validationErrors?: ReadonlyArray<IdentityAuthApiValidationError>;
+  readonly trustFailure?: {
+    readonly reason?: string;
+    readonly invalidationReasons?: ReadonlyArray<
+      "trusted-device-revoked"
+      | "trusted-device-trust-lost"
+      | "trusted-device-expired"
+      | "trusted-device-mismatch"
+    >;
+  };
 }
 
 export interface IdentityAuthApiResponse<T> {

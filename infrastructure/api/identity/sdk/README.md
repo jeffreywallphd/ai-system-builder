@@ -55,6 +55,9 @@ All responses are wrapped in `IdentityAuthApiResponse<T>`:
 
 - success: `{ ok: true, data: ... }`
 - failure: `{ ok: false, error: { code, message, validationErrors? } }`
+- trust-related validation failures can include:
+  - `error.trustFailure.reason`
+  - `error.trustFailure.invalidationReasons` (`trusted-device-revoked`, `trusted-device-trust-lost`, `trusted-device-expired`, `trusted-device-mismatch`)
 
 Stable error codes are declared in `IdentityAuthApiErrorCodes`:
 

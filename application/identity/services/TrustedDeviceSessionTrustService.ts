@@ -1,5 +1,6 @@
 import {
   DeviceTrustStatuses,
+  type DeviceTrustMaterialRef,
   type TrustedDevice,
 } from "../../../src/domain/identity/TrustedDeviceDomain";
 import {
@@ -81,7 +82,7 @@ export class TrustedDeviceSessionTrustService implements IIdentitySessionTrustSe
         trustRequirement: requirement,
         deviceTrustContext: evaluated.deviceTrustContext,
         trustedDeviceBindingId: evaluated.trustedDeviceBindingId,
-        trustMarker: input.client?.trustMarker?.trim() || evaluated.trustMarker,
+        trustMarker: evaluated.trustMarker,
       });
     }
 
@@ -208,6 +209,19 @@ function evaluateTrustedDeviceBinding(input: {
     );
   }
 
+  const expectedTrustMarker = buildTrustMarker(input.trustedDevice.id, input.trustedDevice.trustMaterialRef);
+  const sessionTrustMarker = input.existingSession?.client?.trustMarker?.trim();
+  if (sessionTrustMarker && !isCompatibleTrustMarker(sessionTrustMarker, expectedTrustMarker, input.trustedDevice.id)) {
+    return deniedTrust(
+      "Session trust marker is stale or mismatched for the trusted device.",
+      SessionDeviceTrustInvalidationReasons.trustedDeviceMismatch,
+      SessionDeviceTrustStates.untrusted,
+      input.evaluatedAt,
+      input.trustedDevice.id,
+      sessionTrustMarker,
+    );
+  }
+
   return Object.freeze({
     allowed: true,
     deviceTrustContext: Object.freeze({
@@ -220,10 +234,10 @@ function evaluateTrustedDeviceBinding(input: {
       }),
       invalidationReasons: Object.freeze([] as SessionDeviceTrustInvalidationReason[]),
       trustedDeviceBindingId: input.trustedDevice.id,
-      trustMarker: input.existingSession?.client?.trustMarker ?? buildTrustMarker(input.trustedDevice.id),
+      trustMarker: expectedTrustMarker,
     }),
     trustedDeviceBindingId: input.trustedDevice.id,
-    trustMarker: input.existingSession?.client?.trustMarker ?? buildTrustMarker(input.trustedDevice.id),
+    trustMarker: expectedTrustMarker,
   });
 }
 
@@ -292,6 +306,20 @@ function isTrustMaterialExpired(device: TrustedDevice, evaluatedAt: string): boo
   return new Date(expiresAt).getTime() <= new Date(evaluatedAt).getTime();
 }
 
-function buildTrustMarker(trustedDeviceId: string): string {
+function buildTrustMarker(trustedDeviceId: string, trustMaterialRef?: DeviceTrustMaterialRef): string {
+  const legacyBase = buildLegacyTrustMarker(trustedDeviceId);
+  if (!trustMaterialRef) {
+    return legacyBase;
+  }
+
+  const materialVersion = trustMaterialRef.version?.trim() || "na";
+  return `${legacyBase}|material:${trustMaterialRef.materialId}|kind:${trustMaterialRef.kind}|version:${materialVersion}|issued:${trustMaterialRef.issuedAt}`;
+}
+
+function buildLegacyTrustMarker(trustedDeviceId: string): string {
   return `trusted-device:${trustedDeviceId}`;
+}
+
+function isCompatibleTrustMarker(existing: string, expected: string, trustedDeviceId: string): boolean {
+  return existing === expected || existing === buildLegacyTrustMarker(trustedDeviceId);
 }

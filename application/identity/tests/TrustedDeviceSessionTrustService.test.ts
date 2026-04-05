@@ -161,4 +161,69 @@ describe("TrustedDeviceSessionTrustService", () => {
     }
     expect(evaluated.invalidationReasons).toEqual(["trusted-device-revoked"]);
   });
+
+  it("rejects active sessions when trust marker no longer matches trusted-device material", async () => {
+    const repository = new InMemoryTrustedDeviceRepository();
+    const service = new TrustedDeviceSessionTrustService({
+      trustedDeviceRepository: repository,
+      policies: {
+        desktop: "allow-pairing",
+        thinClient: "allow-untrusted",
+      },
+    });
+
+    const originalTrustedDevice = trustedDevice("user:1", "trusted-device:material");
+    await repository.createTrustedDevice(originalTrustedDevice);
+
+    const initialIssuance = await service.resolveSessionIssuanceTrust({
+      userIdentityId: "user:1",
+      accessChannel: IdentitySessionAccessChannels.thinClient,
+      requestedTrustRequirement: "require-trusted",
+      client: {
+        trustedDeviceBindingId: "trusted-device:material",
+      },
+      evaluatedAt: "2026-04-04T18:00:00.000Z",
+    });
+    if (!initialIssuance.allowed || !initialIssuance.trustMarker) {
+      throw new Error("Expected initial trust issuance marker.");
+    }
+
+    const rotatedTrustedDevice = createTrustedDevice({
+      ...originalTrustedDevice,
+      trustMaterialRef: createDeviceTrustMaterialRef({
+        materialId: "material:trusted-device:material:rotated",
+        kind: DeviceTrustMaterialKinds.sessionSigningKey,
+        issuedAt: "2026-04-04T19:00:00.000Z",
+        expiresAt: "2026-04-05T19:00:00.000Z",
+      }),
+      updatedAt: "2026-04-04T19:00:00.000Z",
+    });
+    await repository.updateTrustedDevice(rotatedTrustedDevice);
+
+    const staleSession = createSession({
+      id: "identity-session:stale-marker",
+      userIdentityId: "user:1",
+      providerId: "provider:local-password",
+      providerSubject: "user",
+      issuedAt: new Date("2026-04-04T18:01:00.000Z"),
+      expiresAt: new Date("2026-04-05T18:01:00.000Z"),
+      client: {
+        accessChannel: IdentitySessionAccessChannels.thinClient,
+        trustedDeviceBindingId: "trusted-device:material",
+        trustMarker: initialIssuance.trustMarker,
+      },
+    });
+
+    const evaluated = await service.evaluateSessionTrust({
+      session: staleSession,
+      evaluatedAt: "2026-04-04T19:05:00.000Z",
+    });
+
+    expect(evaluated.allowed).toBeFalse();
+    if (evaluated.allowed) {
+      throw new Error("Expected stale trust marker session to fail.");
+    }
+    expect(evaluated.invalidationReasons).toEqual(["trusted-device-mismatch"]);
+    expect(evaluated.reason).toContain("stale or mismatched");
+  });
 });

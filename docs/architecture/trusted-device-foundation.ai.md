@@ -7,6 +7,8 @@ Quick implementation-truth baseline for trusted-device domain/contracts introduc
 Session trust integration note:
 - runtime session contracts now use structured `deviceTrust` context (trusted device id, assurance level, trust snapshot, invalidation reasons) with legacy `trustedDeviceBindingId` / `trustMarker` compatibility fields preserved.
 - runtime host now wires trusted-device-backed session trust evaluation for issuance/validation (`TrustedDeviceSessionTrustService`) so session trust reflects current trusted-device state.
+- trust-denied runtime validation now invalidates active sessions and token material immediately, and trust failure metadata is surfaced for observability/user handling.
+- trusted session markers are now bound to trusted-device material metadata so stale or mismatched trust material can deterministically invalidate sessions.
 
 ## Canonical files
 
