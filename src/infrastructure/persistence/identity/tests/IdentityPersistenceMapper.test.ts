@@ -7,10 +7,12 @@ import {
   mapCredentialMaterialRowToRecord,
   mapCredentialPolicyRowToDomain,
   mapSessionRowToDomain,
+  mapSessionTokenMaterialRowToRecord,
   mapUserIdentityRowToDomain,
   type CredentialMaterialRow,
   type CredentialPolicyRow,
   type SessionRow,
+  type SessionTokenMaterialRow,
   type UserIdentityRow,
   type UserProviderLinkRow,
 } from "../IdentityPersistenceMapper";
@@ -122,5 +124,24 @@ describe("IdentityPersistenceMapper", () => {
     expect(mappedSession.status).toBe(IdentitySessionStatuses.revoked);
     expect(mappedSession.client?.accessChannel).toBe("thin-client");
     expect(mappedSession.revocation?.reason).toBe("logout");
+  });
+
+  it("maps session token material rows to contract records", () => {
+    const row: SessionTokenMaterialRow = {
+      session_id: "session:1",
+      token_hash: "hash:session:1",
+      hash_algorithm: "sha256",
+      token_type: "opaque-bearer",
+      created_at: "2026-04-04T12:00:00.000Z",
+      updated_at: "2026-04-04T12:10:00.000Z",
+      expires_at: "2026-04-04T14:00:00.000Z",
+      invalidated_at: null,
+    };
+
+    const mapped = mapSessionTokenMaterialRowToRecord(row);
+    expect(mapped.sessionId).toBe("session:1");
+    expect(mapped.tokenHash).toBe("hash:session:1");
+    expect(mapped.tokenType).toBe("opaque-bearer");
+    expect(mapped.invalidatedAt).toBeUndefined();
   });
 });

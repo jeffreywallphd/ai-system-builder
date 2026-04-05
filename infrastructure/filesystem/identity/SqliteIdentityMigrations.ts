@@ -1,4 +1,4 @@
-export const IDENTITY_SCHEMA_VERSION = 2;
+export const IDENTITY_SCHEMA_VERSION = 3;
 
 export const IDENTITY_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -140,5 +140,23 @@ export const IDENTITY_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Obj
   [2, `
     ALTER TABLE identity_sessions
       ADD COLUMN client_access_channel TEXT CHECK (client_access_channel IN ('desktop', 'thin-client'));
+  `],
+  [3, `
+    CREATE TABLE IF NOT EXISTS identity_session_token_material (
+      session_id TEXT PRIMARY KEY,
+      token_hash TEXT NOT NULL UNIQUE,
+      hash_algorithm TEXT NOT NULL CHECK (hash_algorithm IN ('sha256')),
+      token_type TEXT NOT NULL CHECK (token_type IN ('opaque-bearer')),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      invalidated_at TEXT,
+      FOREIGN KEY (session_id) REFERENCES identity_sessions(session_id) ON DELETE CASCADE
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS identity_session_token_material_token_hash_unique
+      ON identity_session_token_material(token_hash);
+    CREATE INDEX IF NOT EXISTS identity_session_token_material_expiry_idx
+      ON identity_session_token_material(expires_at ASC);
   `],
 ]);

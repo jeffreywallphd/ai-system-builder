@@ -3,6 +3,7 @@ import type {
   LoginLocalAccountUseCase,
   LoginLocalAccountErrorCode,
 } from "../../../src/application/identity/use-cases/LoginLocalAccountUseCase";
+import type { IdentitySessionAccessChannel } from "../../../src/domain/identity/IdentityDomain";
 import type {
   RegisterLocalAccountUseCase,
   RegisterLocalAccountErrorCode,
@@ -17,10 +18,12 @@ import {
   type RegisterLocalIdentityApiResponse,
 } from "./sdk/PublicIdentityAuthApiContract";
 import { IdentityAuthObservability, type IdentityAuthObservabilityOptions } from "./IdentityAuthObservability";
+import { IdentityAuthenticatedSessionService } from "../../../application/identity/services/IdentityAuthenticatedSessionService";
 
 interface IdentityAuthBackendApiDependencies {
   readonly registerLocalAccountUseCase: RegisterLocalAccountUseCase;
   readonly loginLocalAccountUseCase: LoginLocalAccountUseCase;
+  readonly authenticatedSessionService: IdentityAuthenticatedSessionService;
   readonly observability?: IdentityAuthObservabilityOptions;
 }
 
@@ -97,6 +100,30 @@ export class IdentityAuthBackendApi {
       return response;
     }
 
+    const issueSessionResult = await this.dependencies.authenticatedSessionService.issueAuthenticatedSession({
+      userIdentityId: result.value.userIdentityId,
+      providerId: result.value.providerId,
+      providerSubject: result.value.providerSubject,
+      accessChannel: normalizeAccessChannel(request.accessChannel),
+      client: request.client,
+    });
+    if (!issueSessionResult.ok) {
+      const response = Object.freeze({
+        ok: false,
+        error: {
+          code: IdentityAuthApiErrorCodes.internal,
+          message: "Identity login failed to issue a session.",
+        },
+      });
+      await this.observability.recordApiOutcome({
+        flow: "local-login",
+        request,
+        response,
+        errorCode: issueSessionResult.error.code,
+      });
+      return response;
+    }
+
     const response = Object.freeze({
       ok: true,
       data: Object.freeze({
@@ -108,6 +135,12 @@ export class IdentityAuthBackendApi {
         providerSubject: result.value.providerSubject,
         authPath: result.value.authPath,
         authenticatedAt: result.value.authenticatedAt,
+        sessionId: issueSessionResult.value.session.id,
+        sessionToken: issueSessionResult.value.token,
+        sessionTokenType: issueSessionResult.value.tokenType,
+        sessionIssuedAt: issueSessionResult.value.session.issuedAt,
+        sessionExpiresAt: issueSessionResult.value.session.expiresAt,
+        sessionAccessChannel: issueSessionResult.value.session.client?.accessChannel,
       }),
     });
 
@@ -186,4 +219,8 @@ export class IdentityAuthBackendApi {
         });
     }
   }
+}
+
+function normalizeAccessChannel(value?: "desktop" | "thin-client"): IdentitySessionAccessChannel {
+  return value ?? "thin-client";
 }

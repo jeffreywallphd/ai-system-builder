@@ -67,6 +67,10 @@ describe("IdentityAuthBackendApi", () => {
     expect(loggedIn.data?.userIdentityId).toBe(registered.data?.userIdentityId);
     expect(loggedIn.data?.username).toBe("valid.user");
     expect(loggedIn.data?.authenticatedAt).toBe("2026-04-04T18:00:00.000Z");
+    expect(loggedIn.data?.sessionId).toBeDefined();
+    expect(loggedIn.data?.sessionToken).toBeDefined();
+    expect(loggedIn.data?.sessionTokenType).toBe("Bearer");
+    expect(loggedIn.data?.sessionAccessChannel).toBe("thin-client");
   });
 
   it("maps duplicate registration to conflict and invalid login to authentication-failed", async () => {

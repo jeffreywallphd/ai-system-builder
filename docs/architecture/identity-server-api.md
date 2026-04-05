@@ -44,6 +44,12 @@ UI entry points now consume this same HTTP surface through renderer identity ada
 {
   "providerId": "string (optional)",
   "providerSubject": "string",
+  "accessChannel": "desktop | thin-client (optional, defaults to thin-client)",
+  "client": {
+    "userAgent": "string (optional)",
+    "ipAddress": "string (optional)",
+    "deviceId": "string (optional)"
+  },
   "credential": {
     "candidate": "string"
   }
@@ -86,10 +92,22 @@ All responses use one envelope:
     "providerId": "provider:local-password",
     "providerSubject": "normalized-subject",
     "authPath": "password",
-    "authenticatedAt": "2026-04-04T18:00:00.000Z"
+    "authenticatedAt": "2026-04-04T18:00:00.000Z",
+    "sessionId": "identity-session:...",
+    "sessionToken": "opaque-bearer-session-token",
+    "sessionTokenType": "Bearer",
+    "sessionIssuedAt": "2026-04-04T18:00:00.000Z",
+    "sessionExpiresAt": "2026-04-05T06:00:00.000Z",
+    "sessionAccessChannel": "thin-client"
   }
 }
 ```
+
+Session issuance notes:
+
+- Login success now issues and persists a production session in the same API flow.
+- Session lifecycle metadata persists in `identity_sessions`.
+- Token/signing material persists separately in `identity_session_token_material` as token hash metadata (raw token is not persisted).
 
 ## Stable error mapping
 

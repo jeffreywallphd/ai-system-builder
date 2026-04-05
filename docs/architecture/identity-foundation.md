@@ -29,6 +29,7 @@ Primary files:
 - `src/domain/identity/IdentityDomain.ts`
 - `src/domain/identity/IdentityPolicy.ts`
 - `application/identity/services/IdentitySessionLifecycleService.ts`
+- `application/identity/services/IdentityAuthenticatedSessionService.ts`
 
 Core concepts:
 
@@ -58,6 +59,8 @@ Primary files:
 - `application/identity/ports/IIdentityPersistenceRepository.ts`
 - `application/identity/ports/ICredentialMaterialRepository.ts`
 - `application/identity/ports/IIdentitySessionRepository.ts`
+- `application/identity/ports/IIdentitySessionTokenMaterialRepository.ts`
+- `application/identity/ports/IIdentitySessionTokenService.ts`
 - `application/identity/ports/IIdentityClock.ts`
 - `application/identity/ports/IIdentityIdGenerator.ts`
 - `application/identity/ports/IIdentityCredentialAuthenticator.ts`
@@ -71,6 +74,7 @@ Primary files:
 - `src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`
 - `src/application/identity/use-cases/LoginLocalAccountUseCase.ts`
 - `src/application/identity/use-cases/ChangeLocalPasswordCredentialUseCase.ts`
+- `infrastructure/security/identity/OpaqueIdentitySessionTokenService.ts`
 
 Application responsibilities:
 
@@ -98,7 +102,7 @@ Both adapters implement the same application ports and preserve the same schema/
 
 ## Persistence Design
 
-Current schema version: `1`
+Current schema version: `3`
 
 Tables:
 
@@ -108,6 +112,7 @@ Tables:
 - `identity_user_provider_links`
 - `identity_credential_material_records`
 - `identity_sessions`
+- `identity_session_token_material`
 - `identity_repository_migrations`
 
 Design choices:
@@ -116,6 +121,7 @@ Design choices:
 - provider-link and credential status state is in `identity_user_provider_links`
 - credential hash material is isolated in `identity_credential_material_records`
 - session lifecycle state is isolated in `identity_sessions`
+- opaque token hash/signing material is isolated in `identity_session_token_material`
 - provider metadata and policy metadata are normalized into dedicated tables
 
 Important constraints/indexes:
@@ -306,6 +312,24 @@ This keeps session semantics separate from login-attempt workflows and trusted-d
 
 This separation keeps local account lifecycle stable while enabling later device/session trust layers to compose on top instead of being embedded in core identity entities.
 
+## Session Issuance and Token Persistence Services (Story 1.3.2)
+
+Session issuance is now completed as an authenticated-session flow with explicit token-material separation:
+
+- `IdentityAuthenticatedSessionService.issueAuthenticatedSession(...)` composes successful authentication with `IdentitySessionLifecycleService.issueSession(...)`, issues an opaque bearer session token, persists only token hash material, and returns token plaintext once at issuance.
+- `IdentityAuthenticatedSessionService.resolveAuthenticatedSessionByToken(...)` validates token hash lookup against persisted token-material records, enforces active-session state, and performs expiry invalidation.
+- `IdentityAuthenticatedSessionService.invalidateAuthenticatedSession(...)` revokes the active session and invalidates associated token material.
+
+Token material boundaries:
+
+- token generation and hashing are encapsulated in `IIdentitySessionTokenService` (`OpaqueIdentitySessionTokenService` infrastructure implementation).
+- durable token material storage is encapsulated in `IIdentitySessionTokenMaterialRepository` and persisted separately from session metadata in `identity_session_token_material`.
+- session metadata (`identity_sessions`) remains focused on lifecycle/client context and avoids raw token/signing persistence.
+
+Local login transport now issues durable sessions in the same call path:
+
+- `IdentityAuthBackendApi.loginLocalAccount(...)` performs credential authentication via `LoginLocalAccountUseCase`, then issues/persists an authenticated session and returns session id/token/expiry metadata in the login success contract.
+
 ## Implemented Test Coverage
 
 Key tests for this foundation:
@@ -321,9 +345,11 @@ Key tests for this foundation:
 - `application/identity/tests/LoginLocalAccountUseCase.test.ts`
 - `application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
 - `application/identity/tests/IdentitySessionLifecycleService.test.ts`
+- `application/identity/tests/IdentityAuthenticatedSessionService.test.ts`
 - `application/identity/tests/IdentityAuthenticatorAndProviderCatalog.test.ts`
 - `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`
 - `infrastructure/security/identity/tests/ScryptLocalPasswordCredentialService.test.ts`
+- `infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`
 - `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `src/infrastructure/persistence/identity/tests/IdentityPersistenceMapper.test.ts`

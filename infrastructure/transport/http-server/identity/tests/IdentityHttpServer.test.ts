@@ -92,6 +92,7 @@ describe("IdentityHttpServer", () => {
       },
       body: JSON.stringify({
         providerSubject: "api.user",
+        accessChannel: "thin-client",
         credential: {
           candidate: "StrongPass!2026",
         },
@@ -103,6 +104,8 @@ describe("IdentityHttpServer", () => {
     expect(loginBody.ok).toBe(true);
     expect(loginBody.data.username).toBe("api.user");
     expect(loginBody.data.authPath).toBe("password");
+    expect(loginBody.data.sessionTokenType).toBe("Bearer");
+    expect(loginBody.data.sessionToken).toBeDefined();
   });
 
   it("returns stable API error responses for validation and auth failures", async () => {

@@ -14,6 +14,7 @@
 - `src/domain/identity/IdentityDomain.ts`
 - `src/domain/identity/IdentityPolicy.ts`
 - `application/identity/services/IdentitySessionLifecycleService.ts`
+- `application/identity/services/IdentityAuthenticatedSessionService.ts`
 - `application/contracts/IdentityApplicationContracts.ts`
 - `application/identity/ports/*`
 - `application/identity/services/IdentityPolicyService.ts`
@@ -34,12 +35,14 @@
 - `application/identity/services/LocalPasswordIdentityAuthenticator.ts`
 - `application/identity/ports/ILocalPasswordCredentialService.ts`
 - `infrastructure/security/identity/ScryptLocalPasswordCredentialService.ts`
+- `infrastructure/security/identity/OpaqueIdentitySessionTokenService.ts`
 
 ## Persistence shape
 
-- Tables: providers, policies, users, provider links, credential material history, sessions, migrations.
+- Tables: providers, policies, users, provider links, credential material history, sessions, session token material, migrations.
 - Constraints enforce uniqueness for username/email/provider subject and single active credential material per provider subject.
 - Credential hash material is isolated in `identity_credential_material_records`.
+- Session token hash/signing material is isolated in `identity_session_token_material`.
 
 ## Provider extension seam
 
@@ -111,6 +114,14 @@
 - Default policy posture:
   - desktop: long-lived, refresh disabled,
   - thin-client: shorter-lived, refresh enabled.
+
+## Session issuance/persistence model (story 1.3.2)
+
+- `IdentityAuthenticatedSessionService` composes successful login with session issuance and token persistence.
+- Opaque bearer token generation/hashing is encapsulated in `IIdentitySessionTokenService` (`OpaqueIdentitySessionTokenService`).
+- Token material persistence is encapsulated in `IIdentitySessionTokenMaterialRepository` and stored in `identity_session_token_material`.
+- Raw token values are returned only at issuance time and are not persisted in session metadata rows.
+- Login API flow now issues a persisted session and returns session metadata + bearer token fields.
 
 ## Read next
 

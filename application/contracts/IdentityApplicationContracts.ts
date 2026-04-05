@@ -58,6 +58,17 @@ export interface IdentitySessionListQuery {
   readonly limit?: number;
 }
 
+export interface IdentitySessionTokenMaterialRecord {
+  readonly sessionId: string;
+  readonly tokenHash: string;
+  readonly hashAlgorithm: "sha256";
+  readonly tokenType: "opaque-bearer";
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly expiresAt: string;
+  readonly invalidatedAt?: string;
+}
+
 export const IdentityIdNamespaces = Object.freeze({
   userIdentity: "user-identity",
   identitySession: "identity-session",

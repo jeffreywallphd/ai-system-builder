@@ -17,6 +17,7 @@ import {
   type UserIdentityProviderLink,
 } from "../../../domain/identity/IdentityDomain";
 import type { IdentityCredentialMaterialRecord } from "../../../../application/contracts/IdentityApplicationContracts";
+import type { IdentitySessionTokenMaterialRecord } from "../../../../application/contracts/IdentityApplicationContracts";
 
 export interface UserIdentityRow {
   readonly user_identity_id: string;
@@ -111,6 +112,17 @@ export interface SessionRow {
   readonly client_user_agent: string | null;
   readonly client_ip_address: string | null;
   readonly client_device_id: string | null;
+}
+
+export interface SessionTokenMaterialRow {
+  readonly session_id: string;
+  readonly token_hash: string;
+  readonly hash_algorithm: "sha256";
+  readonly token_type: "opaque-bearer";
+  readonly created_at: string;
+  readonly updated_at: string;
+  readonly expires_at: string;
+  readonly invalidated_at: string | null;
 }
 
 export function mapUserIdentityRowToDomain(
@@ -242,6 +254,21 @@ export function mapSessionRowToDomain(row: SessionRow): Session {
   });
 }
 
+export function mapSessionTokenMaterialRowToRecord(
+  row: SessionTokenMaterialRow,
+): IdentitySessionTokenMaterialRecord {
+  return Object.freeze({
+    sessionId: row.session_id,
+    tokenHash: row.token_hash,
+    hashAlgorithm: row.hash_algorithm,
+    tokenType: row.token_type,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    expiresAt: row.expires_at,
+    invalidatedAt: row.invalidated_at ?? undefined,
+  });
+}
+
 export function mapCredentialPolicyToRowValues(policy: CredentialPolicy): ReadonlyArray<unknown> {
   return Object.freeze([
     policy.id,
@@ -349,6 +376,21 @@ export function mapSessionToRowValues(session: Session): ReadonlyArray<unknown> 
     session.client?.userAgent ?? null,
     session.client?.ipAddress ?? null,
     session.client?.deviceId ?? null,
+  ]);
+}
+
+export function mapSessionTokenMaterialToRowValues(
+  record: IdentitySessionTokenMaterialRecord,
+): ReadonlyArray<unknown> {
+  return Object.freeze([
+    record.sessionId,
+    record.tokenHash,
+    record.hashAlgorithm,
+    record.tokenType,
+    record.createdAt,
+    record.updatedAt,
+    record.expiresAt,
+    record.invalidatedAt ?? null,
   ]);
 }
 

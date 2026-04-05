@@ -28,6 +28,12 @@ const RegisterRequestSchema: z.ZodType<RegisterLocalIdentityApiRequest> = z.obje
 const LoginRequestSchema: z.ZodType<LoginLocalIdentityApiRequest> = z.object({
   providerId: z.string().min(1).optional(),
   providerSubject: z.string().min(1),
+  accessChannel: z.enum(["desktop", "thin-client"]).optional(),
+  client: z.object({
+    userAgent: z.string().min(1).optional(),
+    ipAddress: z.string().min(1).optional(),
+    deviceId: z.string().min(1).optional(),
+  }).strict().optional(),
   credential: z.object({
     candidate: z.string().min(1),
   }).strict(),

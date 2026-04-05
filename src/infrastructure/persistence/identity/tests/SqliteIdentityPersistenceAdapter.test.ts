@@ -50,7 +50,7 @@ describe("SqliteIdentityPersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM identity_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(2);
+    expect(versionRow.version).toBe(3);
 
     const tables = database.prepare(`
       SELECT name
@@ -62,7 +62,8 @@ describe("SqliteIdentityPersistenceAdapter", () => {
           'identity_user_identities',
           'identity_user_provider_links',
           'identity_credential_material_records',
-          'identity_sessions'
+          'identity_sessions',
+          'identity_session_token_material'
         )
       ORDER BY name ASC
     `).all() as Array<{ name: string }>;
@@ -71,6 +72,7 @@ describe("SqliteIdentityPersistenceAdapter", () => {
       "identity_auth_providers",
       "identity_credential_material_records",
       "identity_credential_policies",
+      "identity_session_token_material",
       "identity_sessions",
       "identity_user_identities",
       "identity_user_provider_links",
@@ -192,6 +194,19 @@ describe("SqliteIdentityPersistenceAdapter", () => {
 
     expect((await adapter.getSessionById(activeSession.id))?.status).toBe(IdentitySessionStatuses.active);
     expect((await adapter.getSessionById(activeSession.id))?.client?.accessChannel).toBe(IdentitySessionAccessChannels.thinClient);
+    await adapter.saveSessionTokenMaterial({
+      sessionId: activeSession.id,
+      tokenHash: "hash:session:active",
+      hashAlgorithm: "sha256",
+      tokenType: "opaque-bearer",
+      createdAt: "2026-04-04T12:00:00.000Z",
+      updatedAt: "2026-04-04T12:00:00.000Z",
+      expiresAt: "2026-04-04T14:00:00.000Z",
+    });
+    expect((await adapter.getSessionTokenMaterialBySessionId(activeSession.id))?.tokenHash).toBe("hash:session:active");
+    expect((await adapter.getSessionTokenMaterialByTokenHash("hash:session:active"))?.sessionId).toBe(activeSession.id);
+    const invalidatedToken = await adapter.invalidateSessionTokenMaterial(activeSession.id, "2026-04-04T12:30:00.000Z");
+    expect(invalidatedToken?.invalidatedAt).toBe("2026-04-04T12:30:00.000Z");
 
     const activeOnly = await adapter.listSessionsByUserIdentityId({
       userIdentityId: user.id,

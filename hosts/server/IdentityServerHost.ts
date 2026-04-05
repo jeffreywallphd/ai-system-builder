@@ -10,12 +10,15 @@ import {
 import { IdentityIdNamespaces, type IdentityIdNamespace } from "../../application/contracts/IdentityApplicationContracts";
 import { IdentityPolicyService } from "../../application/identity/services/IdentityPolicyService";
 import { LocalPasswordIdentityAuthenticator } from "../../application/identity/services/LocalPasswordIdentityAuthenticator";
+import { IdentitySessionLifecycleService } from "../../application/identity/services/IdentitySessionLifecycleService";
+import { IdentityAuthenticatedSessionService } from "../../application/identity/services/IdentityAuthenticatedSessionService";
 import type { IIdentityClock } from "../../application/identity/ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../../application/identity/ports/IIdentityIdGenerator";
 import { RegisterLocalAccountUseCase } from "../../src/application/identity/use-cases/RegisterLocalAccountUseCase";
 import { LoginLocalAccountUseCase } from "../../src/application/identity/use-cases/LoginLocalAccountUseCase";
 import { SqliteIdentityRepository } from "../../infrastructure/filesystem/identity/SqliteIdentityRepository";
 import { ScryptLocalPasswordCredentialService } from "../../infrastructure/security/identity/ScryptLocalPasswordCredentialService";
+import { OpaqueIdentitySessionTokenService } from "../../infrastructure/security/identity/OpaqueIdentitySessionTokenService";
 import { IdentityAuthBackendApi } from "../../infrastructure/api/identity/IdentityAuthBackendApi";
 import {
   createIdentityHttpServer,
@@ -55,6 +58,18 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const identityPolicyService = new IdentityPolicyService(repository);
   const clock = new SystemIdentityClock();
   const idGenerator = new RandomIdentityIdGenerator();
+  const sessionLifecycleService = new IdentitySessionLifecycleService({
+    sessionRepository: repository,
+    clock,
+    idGenerator,
+  });
+  const authenticatedSessionService = new IdentityAuthenticatedSessionService({
+    lifecycleService: sessionLifecycleService,
+    sessionRepository: repository,
+    tokenMaterialRepository: repository,
+    tokenService: new OpaqueIdentitySessionTokenService(),
+    clock,
+  });
 
   const backendApi = new IdentityAuthBackendApi({
     registerLocalAccountUseCase: new RegisterLocalAccountUseCase({
@@ -73,6 +88,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       credentialAuthenticator: authenticator,
       clock,
     }),
+    authenticatedSessionService,
   });
 
   const server = createIdentityHttpServer({
