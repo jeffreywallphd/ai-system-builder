@@ -867,7 +867,9 @@ async function resolveManagedIdentityServerTlsRuntimeMaterial(input: {
   });
 
   if (!runtimeTrustPackage.ok) {
-    throw new Error(`Managed identity-server TLS startup failed: ${runtimeTrustPackage.error.message}`);
+    throw new Error(
+      `Managed identity-server TLS startup failed: runtime trust package retrieval failed (${runtimeTrustPackage.error.code}).`,
+    );
   }
 
   if (!runtimeTrustPackage.value.serialNumber) {
@@ -889,15 +891,11 @@ async function resolveManagedIdentityServerTlsRuntimeMaterial(input: {
 
   const privateKeyMaterial = await input.certificateAuthorityRepository.findTrustMaterialByRef(privateKeyMaterialRef);
   if (!privateKeyMaterial) {
-    throw new Error(
-      `Managed identity-server TLS startup failed: private key trust material '${privateKeyMaterialRef}' was not found.`,
-    );
+    throw new Error("Managed identity-server TLS startup failed: private key trust material is unavailable.");
   }
 
   if (privateKeyMaterial.kind !== TrustMaterialKinds.privateKeyEncryptedPem) {
-    throw new Error(
-      `Managed identity-server TLS startup failed: private key trust material '${privateKeyMaterialRef}' must have kind '${TrustMaterialKinds.privateKeyEncryptedPem}'.`,
-    );
+    throw new Error("Managed identity-server TLS startup failed: private key trust material kind is invalid.");
   }
 
   const loadedPrivateKey = await certificateMaterialStorage.loadRootMaterials({

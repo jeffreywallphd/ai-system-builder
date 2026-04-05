@@ -22,6 +22,8 @@
 - Adds certificate renewal/replacement execution workflow with explicit prior-certificate disposition controls and audit seams (Story 6.3.3).
 - Adds authoritative server host/runtime wiring that resolves managed server trust material through CA/certificate services before transport startup (Story 6.3.4).
 - Adds approved-node runtime trust retrieval wiring so trusted nodes can resolve managed certificate and trust-bundle material through node-authenticated retrieval paths (Story 6.3.5).
+- Adds certificate administration API wiring for CA status, metadata query, revocation, and renewal actions (Story 6.3.6).
+- Adds operational safeguards with redaction-safe diagnostics and observability hooks around certificate workflows (Story 6.3.7).
 
 ## Main artifacts to cite
 
@@ -374,6 +376,20 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - Route validation is explicit for query/body contracts (serial, status/trust filters, revocation and renewal inputs).
 - Response contracts are metadata/action focused and intentionally exclude secret-bearing certificate material fields and storage locators.
 - `startIdentityServerHost` now composes certificate admin operations through existing application use cases so later UI stories can consume one production API seam without additional transport refactors.
+
+## Story 6.3.7 operational safeguards, observability hooks, and redaction behavior
+
+- runtime trust-material resolution now fails safely when downstream distribution/material loading throws operational exceptions, returning stable internal failure outcomes instead of surfacing raw infrastructure errors.
+- `ResolveRuntimeTrustMaterialPackageUseCase` now supports optional observability hooks with sanitized success/failure events for operational diagnostics, while keeping hook execution non-blocking.
+- certificate operations backend error mapping now sanitizes client-facing messages so PEM payloads, secret-store refs, and trust-material internals are not leaked through API error text.
+- certificate operations backend now includes optional observability hook emission for operation-level success/failure events to improve production troubleshooting seams.
+- identity HTTP redaction now covers certificate workflow fields (certificate/key PEM, trust-material refs, secret refs) so request/response logging remains safe under certificate revoke/renew and related failure paths.
+- managed identity-server TLS startup remains fail-closed and now avoids embedding direct trust-material references in startup error strings.
+
+### Current constraints
+
+- observability hooks are best-effort and intentionally do not block certificate operations.
+- external/API errors remain concise and safety-focused; detailed operational root causes are expected to be captured in internal observability/audit sinks.
 
 ## Coverage in this slice
 

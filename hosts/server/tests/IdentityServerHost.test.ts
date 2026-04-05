@@ -492,6 +492,39 @@ describe("IdentityServerHost", () => {
     rmSync(tempDirectory, { recursive: true, force: true });
   });
 
+  it("fails closed with safe diagnostics when managed TLS private key trust material is unavailable", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-managed-tls-private-key-missing-"));
+    const databasePath = join(tempDirectory, "identity-managed-tls-private-key-missing.sqlite");
+    const managedTlsEnv = createManagedTlsEnvironment(tempDirectory);
+    await seedManagedTlsServerCertificate({
+      databasePath,
+      env: managedTlsEnv,
+      certificateStatus: "issued",
+    });
+
+    const missingPrivateKeyRef = "trust:server:key:missing";
+    try {
+      await startIdentityServerHost({
+        databasePath,
+        host: "127.0.0.1",
+        providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+          bootstrapSeedDefaults: true,
+        }),
+        env: {
+          ...managedTlsEnv,
+          AI_LOOM_INTERNAL_CA_SERVER_TLS_PRIVATE_KEY_MATERIAL_REF: missingPrivateKeyRef,
+        },
+      });
+      throw new Error("Expected managed TLS startup to fail.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).toContain("private key trust material is unavailable");
+      expect(message).not.toContain(missingPrivateKeyRef);
+    } finally {
+      rmSync(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("boots with managed TLS material resolved through certificate services", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-managed-tls-success-"));
     const databasePath = join(tempDirectory, "identity-managed-tls-success.sqlite");

@@ -1,7 +1,7 @@
 # Internal CA Foundation
 
 This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, Story 6.2.1, Story 6.2.2, Story 6.2.3, Story 6.2.4, Story 6.2.5, Story 6.2.6, and Story 6.2.7 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, certificate subject-profile issuance policy enforcement, concrete issuance signing/material persistence execution, node-trust-backed approved-node issuance eligibility, explicit certificate revocation workflow plus revocation-status enforcement seams, reusable certificate trust evaluation helpers, certificate lifecycle audit recording seams, and issued-certificate metadata query/listing seams for admin/API consumers.
-This note now also documents Story 6.3.1, Story 6.3.2, Story 6.3.3, Story 6.3.4, and Story 6.3.5 (Feature 6 / Epic 6.3): runtime trust-material export/distribution contracts, centralized certificate renewal/rotation planning services that classify renewal urgency and operator attention conditions before expiry, a certificate renewal/replacement workflow that issues successor certificates while keeping historical linkage explicit and auditable, authoritative server host/runtime composition wiring that resolves managed server trust material through the CA/certificate service layer before transport startup, and approved-node runtime retrieval wiring for managed trust package consumption.
+This note now also documents Story 6.3.1, Story 6.3.2, Story 6.3.3, Story 6.3.4, Story 6.3.5, Story 6.3.6, and Story 6.3.7 (Feature 6 / Epic 6.3): runtime trust-material export/distribution contracts, centralized certificate renewal/rotation planning services that classify renewal urgency and operator attention conditions before expiry, a certificate renewal/replacement workflow that issues successor certificates while keeping historical linkage explicit and auditable, authoritative server host/runtime composition wiring that resolves managed server trust material through the CA/certificate service layer before transport startup, approved-node runtime retrieval wiring for managed trust package consumption, certificate admin/API action surfaces, and operational safeguards with redaction-safe diagnostics/observability seams.
 
 ## Canonical artifacts
 
@@ -318,6 +318,22 @@ Story 6.3.6 exposes initial authoritative-server certificate administration rout
 - route handlers enforce authenticated trusted-session posture and strict query/body validation.
 - response contracts are redaction-safe by design and exclude secret-bearing material fields and storage locators.
 - host composition now wires certificate operations through application-layer use cases so UI/admin follow-on stories can consume one authoritative API surface.
+
+## Story 6.3.7 operational safeguards, observability hooks, and redaction around certificate workflows
+
+Story 6.3.7 hardens certificate lifecycle operations for production safety and diagnostics quality:
+
+- runtime trust material retrieval now fails safely on downstream distribution/storage exceptions with stable outcome codes, including explicit internal-failure classification for callers and adapters.
+- runtime trust material retrieval now supports optional observability hooks that emit sanitized success/failure operational events without exposing PEM payloads, secret refs, or protected locators.
+- certificate operations backend error handling now sanitizes potentially sensitive exception text before returning API-facing errors, preventing PEM blocks, secret-store refs, and trust-material internals from leaking through responses.
+- certificate operations backend now supports optional observability hooks for operation-level success/failure outcomes to improve runtime diagnostics and alerting seams.
+- HTTP request/response redaction used by identity/certificate routes now includes certificate-specific sensitive keys and text patterns (certificate/key PEM, protected secret refs, trust-material refs) so logs remain safe under failure paths.
+- managed identity-server TLS startup diagnostics remain fail-closed while avoiding direct trust-material reference leakage in thrown startup errors.
+
+### Known constraints
+
+- observability hooks are intentionally best-effort and non-blocking; failures in hook delivery do not alter certificate workflow outcomes.
+- API/client-facing certificate errors remain intentionally concise and safe; deeper root-cause detail should be captured through internal observability/audit sinks instead of response payloads.
 
 ## Story 6.1.3 startup bootstrap behavior
 

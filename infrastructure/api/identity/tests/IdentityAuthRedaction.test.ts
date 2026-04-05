@@ -23,6 +23,10 @@ describe("IdentityAuthRedaction", () => {
           { pinReference: "pin:alpha" },
           { artifact: { type: "one-time-code", value: "PAIR-CODE-ALPHA" } },
           { fingerprint: { algorithm: "sha256", value: "fingerprint-value-alpha" } },
+          {
+            certificateMaterialSecretRef: "secret-store:internal-ca:node-alpha-cert",
+            publicKeyPem: "-----BEGIN PUBLIC KEY-----abc-----END PUBLIC KEY-----",
+          },
         ],
       },
     };
@@ -39,6 +43,8 @@ describe("IdentityAuthRedaction", () => {
     expect(serialized.includes("PAIR-CODE-ALPHA")).toBeFalse();
     expect(serialized.includes("fingerprint-value-alpha")).toBeFalse();
     expect(serialized.includes("pin:alpha")).toBeFalse();
+    expect(serialized.includes("secret-store:internal-ca:node-alpha-cert")).toBeFalse();
+    expect(serialized.includes("BEGIN PUBLIC KEY")).toBeFalse();
     expect(serialized.includes("[REDACTED]")).toBeTrue();
   });
 
