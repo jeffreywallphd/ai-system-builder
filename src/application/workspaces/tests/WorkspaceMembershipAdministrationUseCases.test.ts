@@ -40,6 +40,19 @@ import {
   RemoveWorkspaceMemberUseCase,
   WorkspaceMembershipRemovalErrorCodes,
 } from "../use-cases/RemoveWorkspaceMemberUseCase";
+import {
+  AssignWorkspaceRoleUseCase,
+  WorkspaceRoleAssignmentErrorCodes,
+} from "../use-cases/AssignWorkspaceRoleUseCase";
+import {
+  ReassignWorkspaceRoleUseCase,
+  WorkspaceRoleReassignmentErrorCodes,
+} from "../use-cases/ReassignWorkspaceRoleUseCase";
+import {
+  RevokeWorkspaceRoleUseCase,
+  WorkspaceRoleRevocationErrorCodes,
+} from "../use-cases/RevokeWorkspaceRoleUseCase";
+import type { WorkspaceRoleAdministrationClock, WorkspaceRoleAdministrationIdGenerator } from "../use-cases/WorkspaceRoleAdministrationContext";
 
 class InMemoryWorkspaceMembershipAdministrationAdapter
   implements
@@ -162,7 +175,10 @@ class InMemoryWorkspaceMembershipAdministrationAdapter
 }
 
 class FixedMembershipAdministrationClock
-  implements WorkspaceMembershipAdministrationClock, WorkspaceMembershipStatusChangeClock {
+  implements
+    WorkspaceMembershipAdministrationClock,
+    WorkspaceMembershipStatusChangeClock,
+    WorkspaceRoleAdministrationClock {
   public constructor(private readonly timeIso: string) {}
 
   public now(): Date {
@@ -176,6 +192,15 @@ class SequenceMembershipAdministrationIdGenerator implements WorkspaceMembership
   public nextId(namespace: WorkspaceIdNamespace): string {
     this.index += 1;
     return `${namespace}:${this.index}`;
+  }
+}
+
+class SequenceRoleAdministrationIdGenerator implements WorkspaceRoleAdministrationIdGenerator {
+  private index = 0;
+
+  public nextId(namespace: WorkspaceIdNamespace): string {
+    this.index += 1;
+    return `${namespace}:role:${this.index}`;
   }
 }
 
@@ -531,5 +556,263 @@ describe("Workspace membership administration use cases", () => {
   it("exposes story-level id namespace constants for membership administration ids", () => {
     expect(WorkspaceIdNamespaces.workspaceMembership).toBe("workspace-membership");
     expect(WorkspaceIdNamespaces.workspaceRoleAssignment).toBe("workspace-role-assignment");
+  });
+});
+
+describe("Workspace role administration use cases", () => {
+  it("assigns workspace roles through explicit application flow and captures audit context", async () => {
+    const adapter = new InMemoryWorkspaceMembershipAdministrationAdapter();
+    const workspace = seedWorkspace(adapter);
+    adapter.memberships.set("membership:target", createWorkspaceMembership({
+      id: "membership:target",
+      workspaceId: workspace.id,
+      userIdentityId: "user:target",
+      status: WorkspaceMembershipStatuses.active,
+      joinedAt: "2026-04-05T11:20:00.000Z",
+      createdBy: "user:owner",
+      now: new Date("2026-04-05T11:20:00.000Z"),
+    }));
+
+    const useCase = new AssignWorkspaceRoleUseCase({
+      membershipRepository: adapter,
+      roleAssignmentRepository: adapter,
+      authorizationReadRepository: adapter,
+      transactionManager: adapter,
+      idGenerator: new SequenceRoleAdministrationIdGenerator(),
+      clock: new FixedMembershipAdministrationClock("2026-04-05T13:15:00.000Z"),
+    });
+
+    const assigned = await useCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:owner",
+      targetUserIdentityId: "user:target",
+      role: WorkspaceRoles.admin,
+      audit: {
+        reason: "delegate administration",
+        correlationId: "req-123",
+        metadata: {
+          ticket: "IAM-42",
+        },
+      },
+    });
+
+    expect(assigned.ok).toBe(true);
+    if (!assigned.ok) {
+      return;
+    }
+
+    expect(assigned.value.roleAssignment.role).toBe(WorkspaceRoles.admin);
+    expect(assigned.value.roleAssignment.assignedBy).toBe("user:owner");
+    expect(assigned.value.roleAssignment.assignedAt).toBe("2026-04-05T13:15:00.000Z");
+    expect(assigned.value.audit?.reason).toBe("delegate administration");
+    expect(assigned.value.audit?.correlationId).toBe("req-123");
+  });
+
+  it("blocks contradictory and unauthorized role assignments", async () => {
+    const adapter = new InMemoryWorkspaceMembershipAdministrationAdapter();
+    const workspace = seedWorkspace(adapter);
+    adapter.memberships.set("membership:target", createWorkspaceMembership({
+      id: "membership:target",
+      workspaceId: workspace.id,
+      userIdentityId: "user:target",
+      status: WorkspaceMembershipStatuses.active,
+      joinedAt: "2026-04-05T11:20:00.000Z",
+      createdBy: "user:owner",
+      now: new Date("2026-04-05T11:20:00.000Z"),
+    }));
+    adapter.roleAssignments.set("role:target-member", createWorkspaceRoleAssignment({
+      id: "role:target-member",
+      workspaceId: workspace.id,
+      userIdentityId: "user:target",
+      role: WorkspaceRoles.member,
+      assignedBy: "user:owner",
+      assignedAt: "2026-04-05T11:20:00.000Z",
+    }));
+    adapter.memberships.set("membership:non-admin", createWorkspaceMembership({
+      id: "membership:non-admin",
+      workspaceId: workspace.id,
+      userIdentityId: "user:non-admin",
+      status: WorkspaceMembershipStatuses.active,
+      joinedAt: "2026-04-05T11:40:00.000Z",
+      createdBy: "user:owner",
+      now: new Date("2026-04-05T11:40:00.000Z"),
+    }));
+    adapter.roleAssignments.set("role:non-admin-member", createWorkspaceRoleAssignment({
+      id: "role:non-admin-member",
+      workspaceId: workspace.id,
+      userIdentityId: "user:non-admin",
+      role: WorkspaceRoles.member,
+      assignedBy: "user:owner",
+      assignedAt: "2026-04-05T11:40:00.000Z",
+    }));
+
+    const useCase = new AssignWorkspaceRoleUseCase({
+      membershipRepository: adapter,
+      roleAssignmentRepository: adapter,
+      authorizationReadRepository: adapter,
+      transactionManager: adapter,
+      idGenerator: new SequenceRoleAdministrationIdGenerator(),
+      clock: new FixedMembershipAdministrationClock("2026-04-05T13:20:00.000Z"),
+    });
+
+    const duplicate = await useCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:owner",
+      targetUserIdentityId: "user:target",
+      role: WorkspaceRoles.member,
+    });
+    expect(duplicate.ok).toBe(false);
+    if (!duplicate.ok) {
+      expect(duplicate.error.code).toBe(WorkspaceRoleAssignmentErrorCodes.conflict);
+    }
+
+    const forbidden = await useCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:non-admin",
+      targetUserIdentityId: "user:target",
+      role: WorkspaceRoles.viewer,
+    });
+    expect(forbidden.ok).toBe(false);
+    if (!forbidden.ok) {
+      expect(forbidden.error.code).toBe(WorkspaceRoleAssignmentErrorCodes.forbidden);
+    }
+  });
+
+  it("reassigns roles by revoking prior assignment and creating a replacement record", async () => {
+    const adapter = new InMemoryWorkspaceMembershipAdministrationAdapter();
+    const workspace = seedWorkspace(adapter);
+    adapter.memberships.set("membership:target", createWorkspaceMembership({
+      id: "membership:target",
+      workspaceId: workspace.id,
+      userIdentityId: "user:target",
+      status: WorkspaceMembershipStatuses.active,
+      joinedAt: "2026-04-05T11:20:00.000Z",
+      createdBy: "user:owner",
+      now: new Date("2026-04-05T11:20:00.000Z"),
+    }));
+    adapter.roleAssignments.set("role:target-member", createWorkspaceRoleAssignment({
+      id: "role:target-member",
+      workspaceId: workspace.id,
+      userIdentityId: "user:target",
+      role: WorkspaceRoles.member,
+      assignedBy: "user:owner",
+      assignedAt: "2026-04-05T11:20:00.000Z",
+    }));
+
+    const useCase = new ReassignWorkspaceRoleUseCase({
+      membershipRepository: adapter,
+      roleAssignmentRepository: adapter,
+      authorizationReadRepository: adapter,
+      transactionManager: adapter,
+      idGenerator: new SequenceRoleAdministrationIdGenerator(),
+      clock: new FixedMembershipAdministrationClock("2026-04-05T13:25:00.000Z"),
+    });
+
+    const reassigned = await useCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:owner",
+      targetUserIdentityId: "user:target",
+      fromRole: WorkspaceRoles.member,
+      toRole: WorkspaceRoles.viewer,
+      audit: {
+        reason: "limit permissions",
+      },
+    });
+
+    expect(reassigned.ok).toBe(true);
+    if (!reassigned.ok) {
+      return;
+    }
+
+    expect(reassigned.value.revokedRoleAssignment.status).toBe(WorkspaceRoleAssignmentStatuses.revoked);
+    expect(reassigned.value.revokedRoleAssignment.revokedBy).toBe("user:owner");
+    expect(reassigned.value.assignedRoleAssignment.role).toBe(WorkspaceRoles.viewer);
+    expect(reassigned.value.assignedRoleAssignment.assignedBy).toBe("user:owner");
+    expect(reassigned.value.audit?.reason).toBe("limit permissions");
+  });
+
+  it("blocks reassign and revoke operations that violate continuity or role mutation constraints", async () => {
+    const adapter = new InMemoryWorkspaceMembershipAdministrationAdapter();
+    const workspace = seedWorkspace(adapter);
+
+    adapter.memberships.set("membership:owner", createWorkspaceMembership({
+      id: "membership:owner",
+      workspaceId: workspace.id,
+      userIdentityId: "user:owner",
+      status: WorkspaceMembershipStatuses.suspended,
+      suspendedAt: "2026-04-05T12:00:00.000Z",
+      joinedAt: "2026-04-05T11:00:00.000Z",
+      createdBy: "user:owner",
+      now: new Date("2026-04-05T12:00:00.000Z"),
+    }));
+    adapter.memberships.set("membership:admin", createWorkspaceMembership({
+      id: "membership:admin",
+      workspaceId: workspace.id,
+      userIdentityId: "user:admin",
+      status: WorkspaceMembershipStatuses.active,
+      joinedAt: "2026-04-05T11:10:00.000Z",
+      createdBy: "user:owner",
+      now: new Date("2026-04-05T11:10:00.000Z"),
+    }));
+    adapter.roleAssignments.set("role:admin", createWorkspaceRoleAssignment({
+      id: "role:admin",
+      workspaceId: workspace.id,
+      userIdentityId: "user:admin",
+      role: WorkspaceRoles.admin,
+      assignedBy: "user:owner",
+      assignedAt: "2026-04-05T11:10:00.000Z",
+    }));
+
+    const reassignUseCase = new ReassignWorkspaceRoleUseCase({
+      membershipRepository: adapter,
+      roleAssignmentRepository: adapter,
+      authorizationReadRepository: adapter,
+      transactionManager: adapter,
+      idGenerator: new SequenceRoleAdministrationIdGenerator(),
+      clock: new FixedMembershipAdministrationClock("2026-04-05T13:30:00.000Z"),
+    });
+    const revokeUseCase = new RevokeWorkspaceRoleUseCase({
+      membershipRepository: adapter,
+      roleAssignmentRepository: adapter,
+      authorizationReadRepository: adapter,
+      transactionManager: adapter,
+      clock: new FixedMembershipAdministrationClock("2026-04-05T13:30:00.000Z"),
+    });
+
+    const blockedReassignment = await reassignUseCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:admin",
+      targetUserIdentityId: "user:admin",
+      fromRole: WorkspaceRoles.admin,
+      toRole: WorkspaceRoles.viewer,
+    });
+    expect(blockedReassignment.ok).toBe(false);
+    if (!blockedReassignment.ok) {
+      expect(blockedReassignment.error.code).toBe(WorkspaceRoleReassignmentErrorCodes.conflict);
+      expect(blockedReassignment.error.message).toContain("retain at least one active owner or admin");
+    }
+
+    const blockedRevocation = await revokeUseCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:admin",
+      targetUserIdentityId: "user:admin",
+      role: WorkspaceRoles.admin,
+    });
+    expect(blockedRevocation.ok).toBe(false);
+    if (!blockedRevocation.ok) {
+      expect(blockedRevocation.error.code).toBe(WorkspaceRoleRevocationErrorCodes.conflict);
+      expect(blockedRevocation.error.message).toContain("retain at least one active owner or admin");
+    }
+
+    const invalidOwnerRevocation = await revokeUseCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:admin",
+      targetUserIdentityId: "user:owner",
+      role: WorkspaceRoles.owner,
+    });
+    expect(invalidOwnerRevocation.ok).toBe(false);
+    if (!invalidOwnerRevocation.ok) {
+      expect(invalidOwnerRevocation.error.code).toBe(WorkspaceRoleRevocationErrorCodes.invalidRequest);
+    }
   });
 });

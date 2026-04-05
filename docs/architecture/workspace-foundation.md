@@ -30,6 +30,12 @@ Scope in stories 3.1.1 through 3.1.5:
 - `src/application/workspaces/ports/IWorkspaceTransactionManager.ts`
 - `src/application/workspaces/ports/WorkspaceRepositoryPorts.ts`
 - `src/application/workspaces/use-cases/CreateWorkspaceUseCase.ts`
+- `src/application/workspaces/use-cases/AddWorkspaceMemberUseCase.ts`
+- `src/application/workspaces/use-cases/AssignWorkspaceRoleUseCase.ts`
+- `src/application/workspaces/use-cases/ChangeWorkspaceMembershipStatusUseCase.ts`
+- `src/application/workspaces/use-cases/ReassignWorkspaceRoleUseCase.ts`
+- `src/application/workspaces/use-cases/RemoveWorkspaceMemberUseCase.ts`
+- `src/application/workspaces/use-cases/RevokeWorkspaceRoleUseCase.ts`
 - `src/application/workspaces/use-cases/UpdateWorkspaceUseCase.ts`
 - `src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceMigrations.ts`
@@ -244,4 +250,27 @@ Story 3.1.4 extends the adapter integration tests to validate:
   - remove flow role revocation behavior
   - last-admin continuity edge-case enforcement
   - actionable result-code mapping across add/status/remove failure paths
+
+## Story 3.2.4 workspace role assignment and reassignment administration flows
+
+- Added role-focused use cases:
+  - `AssignWorkspaceRoleUseCase` (`src/application/workspaces/use-cases/AssignWorkspaceRoleUseCase.ts`)
+  - `ReassignWorkspaceRoleUseCase` (`src/application/workspaces/use-cases/ReassignWorkspaceRoleUseCase.ts`)
+  - `RevokeWorkspaceRoleUseCase` (`src/application/workspaces/use-cases/RevokeWorkspaceRoleUseCase.ts`)
+- Role administration now enforces explicit mutation policy:
+  - actor must have active workspace membership
+  - actor must have `owner` or `admin` role
+  - `owner` role mutation is blocked in role-administration flows and remains in ownership-transfer lifecycle
+- Role mutation invariants are now explicit in application orchestration:
+  - target membership must exist and be `active`
+  - duplicate active role assignment creation for `(workspaceId, userIdentityId, role)` is blocked
+  - contradictory reassignment requests (`fromRole === toRole`) are rejected
+  - continuity guard blocks admin-role removals that would leave no active `owner` or `admin` membership
+- Role mutation inputs now support optional audit context capture (`reason`, `correlationId`, `metadata`) for future admin UX and audit stream integration.
+- Coverage in `src/application/workspaces/tests/WorkspaceMembershipAdministrationUseCases.test.ts` now includes:
+  - role assignment happy path
+  - role reassignment revoke+replace behavior
+  - duplicate and unauthorized role mutation denials
+  - continuity-policy conflicts for last active admin-capable membership
+  - owner-role mutation rejection in role-administration paths
 
