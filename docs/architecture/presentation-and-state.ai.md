@@ -879,3 +879,19 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Access-state response context now displays both inspector and inspected actor identities so admin/user reviewers can confirm whose permissions are being analyzed.
 - Permission feedback rows now render contribution summaries per permission decision (owner/role/direct-grant/sharing/visibility), using backend-provided redaction-safe explanation channels.
 - Renderer transport seam now propagates inspected actor context through `ui/shared/authorization/AuthorizationManagementClient.ts` query parameters (`inspectedActorUserIdentityId`).
+
+## Authorization reporting UI update (story 4.4.6)
+
+- Added a dedicated admin reporting surface in `ui/pages/AuthorizationReportingPage.tsx`.
+- Renderer integration remains thin and contract-driven over authorization management APIs:
+  - reporting read call added to `ui/shared/authorization/AuthorizationManagementClient.ts`,
+  - service façade added in `ui/services/AuthorizationManagementService.ts`,
+  - no renderer-side policy evaluation or persistence querying logic.
+- Added route/navigation wiring for discoverability:
+  - `ROUTE_PATHS.authorizationReporting` (`/settings/sharing/reporting`) in `ui/routes/RouteConfig.ts`,
+  - route registration in `ui/routes/AppRouter.tsx`,
+  - settings entry link in `ui/pages/SettingsPage.tsx`.
+- Reporting page tables provide admin posture visibility across:
+  - workspace role assignments,
+  - unusual visibility/sharing-policy pattern flags,
+  - recent sharing mutations.

@@ -1,6 +1,7 @@
 import type {
   AuthorizationAccessStateApiResponse,
   AuthorizationManagementApiResponse,
+  AuthorizationWorkspaceSharingReportApiResponse,
   GrantAuthorizationSharingAccessApiResponse,
   RevokeAuthorizationSharingAccessApiResponse,
   UpdateAuthorizationVisibilityApiResponse,
@@ -43,6 +44,16 @@ export interface AuthorizationManagementClient {
     },
     sessionToken: string,
   ): Promise<AuthorizationManagementApiResponse<AuthorizationAccessStateApiResponse>>;
+  readWorkspaceSharingReport(
+    request: {
+      readonly workspaceId: string;
+      readonly asOf?: string;
+      readonly includeRevokedRoleAssignments?: boolean;
+      readonly includeRevokedSharingGrants?: boolean;
+      readonly recentSharingMutationsLimit?: number;
+    },
+    sessionToken: string,
+  ): Promise<AuthorizationManagementApiResponse<AuthorizationWorkspaceSharingReportApiResponse>>;
   updateVisibility(
     request: {
       readonly resourceFamily: AuthorizationResourceFamily;
@@ -133,6 +144,36 @@ export class HttpAuthorizationManagementClient implements AuthorizationManagemen
 
     return this.get(
       `${toResourcePath(request.resourceFamily, request.resourceType, request.resourceId)}/access-state${toQuerySuffix(query)}`,
+      sessionToken,
+    );
+  }
+
+  public async readWorkspaceSharingReport(
+    request: {
+      readonly workspaceId: string;
+      readonly asOf?: string;
+      readonly includeRevokedRoleAssignments?: boolean;
+      readonly includeRevokedSharingGrants?: boolean;
+      readonly recentSharingMutationsLimit?: number;
+    },
+    sessionToken: string,
+  ): Promise<AuthorizationManagementApiResponse<AuthorizationWorkspaceSharingReportApiResponse>> {
+    const query = new URLSearchParams();
+    if (request.asOf) {
+      query.set("asOf", request.asOf);
+    }
+    if (typeof request.includeRevokedRoleAssignments === "boolean") {
+      query.set("includeRevokedRoleAssignments", request.includeRevokedRoleAssignments ? "true" : "false");
+    }
+    if (typeof request.includeRevokedSharingGrants === "boolean") {
+      query.set("includeRevokedSharingGrants", request.includeRevokedSharingGrants ? "true" : "false");
+    }
+    if (typeof request.recentSharingMutationsLimit === "number") {
+      query.set("recentSharingMutationsLimit", request.recentSharingMutationsLimit.toString(10));
+    }
+
+    return this.get(
+      `/api/v1/authorization/reporting/workspaces/${encodeURIComponent(request.workspaceId)}${toQuerySuffix(query)}`,
       sessionToken,
     );
   }

@@ -456,8 +456,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       resourcePolicyMetadataReadRepository: authorizationPolicyReadAdapter,
     }),
     decisionEvaluator: authorizationDecisionEvaluator,
+    roleAssignmentPersistenceRepository: authorizationRepository,
     sharingGrantPersistenceRepository: authorizationRepository,
     resourcePolicyMetadataPersistenceRepository: authorizationRepository,
+    clock: workspaceClock,
   });
 
   const server = createIdentityHttpServer({

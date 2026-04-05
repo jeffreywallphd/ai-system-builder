@@ -261,6 +261,131 @@ describe("AuthorizationManagementBackendApi", () => {
     const failed = response.data.results.find((item) => item.status === "failed");
     expect(failed).toBeDefined();
   });
+
+  it("returns workspace authorization reporting data for authorized workspace administrators", async () => {
+    const { api, adapter } = await createHarness();
+
+    await adapter.upsertResourcePolicyMetadata({
+      record: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-private",
+        ownerUserIdentityId: "user-owner",
+        ownershipScope: ResourceOwnershipScopes.workspace,
+        workspaceId: "workspace-1",
+        visibility: ResourceVisibilities.private,
+        sharingPolicyMode: SharingPolicyModes.ownerOnly,
+        allowResharing: false,
+        isPublishedCapable: false,
+        createdAt: "2026-04-05T11:00:00.000Z",
+        createdBy: "user-owner",
+        lastModifiedAt: "2026-04-05T11:00:00.000Z",
+        lastModifiedBy: "user-owner",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-private-report-resource-policy",
+        context: {
+          actorUserIdentityId: "user-owner",
+          occurredAt: "2026-04-05T11:00:00.000Z",
+        },
+      },
+    });
+    await adapter.upsertResourcePolicyMetadata({
+      record: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-published",
+        ownerUserIdentityId: "user-owner",
+        ownershipScope: ResourceOwnershipScopes.workspace,
+        workspaceId: "workspace-1",
+        visibility: ResourceVisibilities.published,
+        sharingPolicyMode: SharingPolicyModes.published,
+        allowResharing: true,
+        isPublishedCapable: true,
+        createdAt: "2026-04-05T11:00:00.000Z",
+        createdBy: "user-owner",
+        lastModifiedAt: "2026-04-05T11:00:00.000Z",
+        lastModifiedBy: "user-owner",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-published-report-resource-policy",
+        context: {
+          actorUserIdentityId: "user-owner",
+          occurredAt: "2026-04-05T11:00:00.000Z",
+        },
+      },
+    });
+
+    await adapter.upsertSharingGrant({
+      record: {
+        id: "share-private-report",
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-private",
+        workspaceId: "workspace-1",
+        subject: {
+          kind: "workspace-role",
+          workspaceId: "workspace-1",
+          roleKey: "viewer",
+        },
+        permissionKeys: ["asset.read"],
+        grantedAt: "2026-04-05T11:20:00.000Z",
+        grantedByUserIdentityId: "user-owner",
+        createdAt: "2026-04-05T11:20:00.000Z",
+        createdBy: "user-owner",
+        lastModifiedAt: "2026-04-05T11:20:00.000Z",
+        lastModifiedBy: "user-owner",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-private-report-grant",
+        context: {
+          actorUserIdentityId: "user-owner",
+          occurredAt: "2026-04-05T11:20:00.000Z",
+        },
+      },
+    });
+
+    const report = await api.readWorkspaceSharingReport({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-1",
+      recentSharingMutationsLimit: 10,
+    });
+
+    expect(report.ok).toBeTrue();
+    if (!report.ok) {
+      return;
+    }
+
+    expect(report.data.workspaceId).toBe("workspace-1");
+    expect(report.data.roleAssignments.length).toBeGreaterThan(0);
+    expect(report.data.resourceVisibilityDistribution.total).toBeGreaterThanOrEqual(3);
+    expect(
+      report.data.unusualVisibilityPatterns.some((pattern) => pattern.reasonCodes.includes("private-resource-with-active-sharing-grants")),
+    ).toBeTrue();
+    expect(
+      report.data.unusualVisibilityPatterns.some((pattern) => pattern.reasonCodes.includes("published-visibility-without-published-at")),
+    ).toBeTrue();
+    expect(
+      report.data.recentSharingMutations.some((mutation) => mutation.grantId === "share-private-report"),
+    ).toBeTrue();
+  });
+
+  it("denies workspace authorization reporting for actors without workspace administrative permission", async () => {
+    const { api } = await createHarness();
+
+    const report = await api.readWorkspaceSharingReport({
+      actorUserIdentityId: "user-viewer",
+      workspaceId: "workspace-1",
+    });
+
+    expect(report.ok).toBeFalse();
+    if (!report.ok) {
+      expect(report.error?.code).toBe("forbidden");
+    }
+  });
 });
 
 async function createHarness(): Promise<{
@@ -416,8 +541,12 @@ async function createHarness(): Promise<{
       resourcePolicyMetadataReadRepository: readAdapter,
     }),
     decisionEvaluator,
+    roleAssignmentPersistenceRepository: adapter,
     sharingGrantPersistenceRepository: adapter,
     resourcePolicyMetadataPersistenceRepository: adapter,
+    clock: {
+      now: () => new Date("2026-04-05T12:00:00.000Z"),
+    },
   });
 
   return Object.freeze({ api, adapter });

@@ -245,3 +245,69 @@ export interface AuthorizationAccessStateApiResponse {
   readonly sharingGrants: ReadonlyArray<AuthorizationSharingGrantApiRecord>;
   readonly permissions: ReadonlyArray<AuthorizationPermissionDecisionApiRecord>;
 }
+
+export interface AuthorizationWorkspaceRoleAssignmentReportApiRecord {
+  readonly roleAssignmentId: string;
+  readonly actorUserIdentityId: string;
+  readonly roleKey: AuthorizationRoleKey;
+  readonly scope: "global" | "workspace" | "resource";
+  readonly status: "active" | "revoked";
+  readonly workspaceId?: string;
+  readonly resourceFamily?: AuthorizationResourceFamily;
+  readonly resourceType?: string;
+  readonly resourceId?: string;
+  readonly assignedAt: string;
+  readonly assignedByUserIdentityId: string;
+  readonly revokedAt?: string;
+  readonly revokedByUserIdentityId?: string;
+}
+
+export interface AuthorizationResourceVisibilityDistributionApiRecord {
+  readonly private: number;
+  readonly workspace: number;
+  readonly shared: number;
+  readonly published: number;
+  readonly total: number;
+}
+
+export interface AuthorizationUnusualVisibilityPatternApiRecord {
+  readonly resource: AuthorizationManagedResourceRef;
+  readonly workspaceId?: string;
+  readonly visibility: ResourceVisibility;
+  readonly sharingPolicyMode: SharingPolicyMode;
+  readonly activeSharingGrantCount: number;
+  readonly reasonCodes: ReadonlyArray<
+    | "private-resource-with-active-sharing-grants"
+    | "owner-only-policy-with-active-sharing-grants"
+    | "published-visibility-without-published-at"
+  >;
+}
+
+export interface AuthorizationSharingMutationReportApiRecord {
+  readonly grantId: string;
+  readonly mutationType: "granted" | "revoked";
+  readonly occurredAt: string;
+  readonly actorUserIdentityId: string;
+  readonly resource: AuthorizationManagedResourceRef;
+  readonly target: AuthorizationSharingTargetApiRecord;
+  readonly permissionKeys: ReadonlyArray<string>;
+}
+
+export interface AuthorizationWorkspaceSharingReportApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly asOf?: string;
+  readonly includeRevokedRoleAssignments?: boolean;
+  readonly includeRevokedSharingGrants?: boolean;
+  readonly recentSharingMutationsLimit?: number;
+}
+
+export interface AuthorizationWorkspaceSharingReportApiResponse {
+  readonly workspaceId: string;
+  readonly asOf: string;
+  readonly generatedAt: string;
+  readonly roleAssignments: ReadonlyArray<AuthorizationWorkspaceRoleAssignmentReportApiRecord>;
+  readonly resourceVisibilityDistribution: AuthorizationResourceVisibilityDistributionApiRecord;
+  readonly unusualVisibilityPatterns: ReadonlyArray<AuthorizationUnusualVisibilityPatternApiRecord>;
+  readonly recentSharingMutations: ReadonlyArray<AuthorizationSharingMutationReportApiRecord>;
+}

@@ -281,3 +281,22 @@ Mutation gate examples:
   - mapped to transport `conflict` responses for authorization-management endpoints.
 - Administrative continuity protection for role removal is a hard guardrail, not a confirmable prompt:
   - revoking an `admin` role is rejected when it would leave zero active `owner|admin` assignments in the workspace.
+
+## Authorization and sharing reporting read model (Story 4.4.6)
+
+- `AuthorizationManagementBackendApi` now exposes a workspace-scoped reporting query:
+  - `readWorkspaceSharingReport(...)`
+  - returns role-assignment posture, visibility distribution, unusual visibility/policy pattern flags, and recent sharing mutations.
+- Reporting queries are policy-protected through workspace-capability enforcement:
+  - requires `system.manage` on workspace capability target kind before data is returned.
+- `IdentityHttpServer` now exposes a read-only reporting endpoint:
+  - `GET /api/v1/authorization/reporting/workspaces/:workspaceId`
+  - optional query fields: `asOf`, `includeRevokedRoleAssignments`, `includeRevokedSharingGrants`, `recentSharingMutationsLimit`.
+- Reporting data uses authoritative persistence repositories:
+  - workspace-scoped role assignments from authorization role-assignment persistence,
+  - workspace-scoped resource policy metadata for visibility posture,
+  - workspace-scoped sharing grants for mutation review and unusual pattern detection.
+- Unusual visibility/policy pattern flags currently include:
+  - private resources with active sharing grants,
+  - owner-only sharing policy with active sharing grants,
+  - published visibility without `publishedAt`.
