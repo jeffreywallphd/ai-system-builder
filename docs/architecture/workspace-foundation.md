@@ -41,6 +41,7 @@ Scope in stories 3.1.1 through 3.1.5:
 - `src/application/workspaces/use-cases/WorkspaceAdministrationQueryService.ts`
 - `src/application/workspaces/use-cases/IssueWorkspaceInvitationUseCase.ts`
 - `src/application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase.ts`
+- `src/application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceMigrations.ts`
 - `src/infrastructure/persistence/workspaces/WorkspacePersistenceMapper.ts`
 - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter.ts`
@@ -177,6 +178,7 @@ Protected-resource composition is standardized through `withWorkspaceScopedOwner
 - `src/application/workspaces/tests/WorkspaceMembershipAdministrationUseCases.test.ts`
 - `src/application/workspaces/tests/WorkspaceAdministrationQueryService.test.ts`
 - `src/application/workspaces/tests/WorkspaceInvitationLifecycleUseCase.test.ts`
+- `src/application/workspaces/tests/ResolveAuthenticatedWorkspaceOnboardingUseCase.test.ts`
 - `src/infrastructure/persistence/workspaces/tests/WorkspacePersistenceMapper.test.ts`
 - `src/infrastructure/persistence/workspaces/tests/SqliteWorkspacePersistenceAdapter.test.ts`
 
@@ -341,4 +343,20 @@ Story 3.1.4 extends the adapter integration tests to validate:
   - cancellation authorization and revocation behavior,
   - expiry resolution and stale/reused token rejection,
   - identity/workspace-state compatibility failures.
+
+## Story 3.3.3 authenticated join and onboarding resolution flow
+
+- Added `ResolveAuthenticatedWorkspaceOnboardingUseCase` (`src/application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase.ts`) as the signed-in join orchestration entry point for invitation onboarding.
+- Authenticated join resolution now:
+  - requires explicit authenticated session context (`sessionId`, `userIdentityId`, `email`),
+  - exposes a session verification seam (`AuthenticatedWorkspaceOnboardingSessionVerifier`) for trusted-device and security posture checks,
+  - exposes a membership posture policy seam (`AuthenticatedWorkspaceOnboardingMembershipPolicy`) to resolve `active` vs `pending` onboarding outcomes without redesign.
+- Invitation acceptance now captures onboarding completion state in persisted invitation metadata:
+  - `ResolveWorkspaceInvitationLifecycleUseCase` accepts `resolvedOnboardingMetadata` in the `accept` flow,
+  - metadata is merged and persisted atomically with invitation acceptance + membership/role projection using `withWorkspaceInvitationOnboardingMetadata(...)`.
+- Identity mismatch and invalid invite scenarios continue to fail safely through existing invitation-lifecycle guards, while authenticated onboarding maps those outcomes to dedicated onboarding-safe error codes (`invalidInvite`, `forbidden`, `conflict`, etc.).
+- Added coverage:
+  - `ResolveAuthenticatedWorkspaceOnboardingUseCase.test.ts` for session verification, policy-driven pending onboarding, and invalid-invite mapping.
+  - updated `WorkspaceInvitationLifecycleUseCase.test.ts` to verify onboarding-resolution metadata persistence.
+  - updated `WorkspaceDomain.test.ts` for invitation onboarding metadata merge helper behavior.
 

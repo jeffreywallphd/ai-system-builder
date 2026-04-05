@@ -21,6 +21,7 @@ import {
   expireWorkspaceInvitation,
   revokeWorkspaceInvitation,
   transitionWorkspaceMembershipStatus,
+  withWorkspaceInvitationOnboardingMetadata,
   type WorkspaceInvitation,
   type WorkspaceMembership,
   type WorkspaceMembershipStatus,
@@ -68,6 +69,7 @@ export interface AcceptWorkspaceInvitationLifecycleInput extends WorkspaceInvita
   readonly invitationToken: string;
   readonly actorEmail: string;
   readonly acceptedMembershipStatus?: WorkspaceMembershipStatus;
+  readonly resolvedOnboardingMetadata?: Readonly<Record<string, unknown>>;
 }
 
 export interface DeclineWorkspaceInvitationLifecycleInput extends WorkspaceInvitationLifecycleInputBase {
@@ -400,6 +402,24 @@ export class ResolveWorkspaceInvitationLifecycleUseCase {
           ? error.message
           : "Invitation acceptance input is invalid.",
       );
+    }
+
+    if (input.resolvedOnboardingMetadata && Object.keys(input.resolvedOnboardingMetadata).length > 0) {
+      try {
+        acceptedInvitation = withWorkspaceInvitationOnboardingMetadata(acceptedInvitation, {
+          onboardingMetadata: input.resolvedOnboardingMetadata,
+          actorUserId: input.actorUserIdentityId,
+          now,
+          merge: true,
+        });
+      } catch (error) {
+        return this.failure(
+          WorkspaceInvitationLifecycleErrorCodes.invalidRequest,
+          error instanceof WorkspaceDomainError
+            ? error.message
+            : "Invitation acceptance onboarding metadata is invalid.",
+        );
+      }
     }
 
     const persist = async (): Promise<void> => {

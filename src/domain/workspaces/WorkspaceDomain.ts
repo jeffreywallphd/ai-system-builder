@@ -812,6 +812,42 @@ export function acceptWorkspaceInvitation(
   return accepted;
 }
 
+export function withWorkspaceInvitationOnboardingMetadata(
+  invitation: WorkspaceInvitation,
+  input: {
+    readonly onboardingMetadata?: Readonly<Record<string, unknown>>;
+    readonly actorUserId: string;
+    readonly now?: Date;
+    readonly merge?: boolean;
+  },
+): WorkspaceInvitation {
+  const normalizedOnboardingMetadata = normalizeOnboardingMetadata(input.onboardingMetadata);
+  if (!normalizedOnboardingMetadata) {
+    return invitation;
+  }
+
+  const nextOnboardingMetadata = input.merge === false
+    ? normalizedOnboardingMetadata
+    : normalizeOnboardingMetadata({
+      ...(invitation.onboardingMetadata ?? {}),
+      ...normalizedOnboardingMetadata,
+    });
+
+  if (!nextOnboardingMetadata) {
+    return invitation;
+  }
+
+  const nowIso = normalizeIsoTimestamp(input.now ?? new Date(), "Workspace invitation lastModifiedAt");
+  const updated: WorkspaceInvitation = Object.freeze({
+    ...invitation,
+    onboardingMetadata: nextOnboardingMetadata,
+    lastModifiedBy: normalizeRequired(input.actorUserId, "Workspace invitation lastModifiedBy"),
+    lastModifiedAt: nowIso,
+  });
+  assertInvitationState(updated);
+  return updated;
+}
+
 export function declineWorkspaceInvitation(
   invitation: WorkspaceInvitation,
   input: {

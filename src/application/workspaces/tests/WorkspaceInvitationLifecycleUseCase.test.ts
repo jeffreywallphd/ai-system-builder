@@ -442,6 +442,57 @@ describe("ResolveWorkspaceInvitationLifecycleUseCase", () => {
     expect(result.value.membership?.joinedAt).toBeUndefined();
   });
 
+  it("persists resolved onboarding metadata during invitation acceptance", async () => {
+    const adapter = new InMemoryWorkspaceInvitationLifecycleAdapter();
+    seedWorkspace(adapter);
+    seedPendingInvitation(adapter, {
+      token: "tok_onboarding_metadata_123",
+      targetUserIdentityIdHint: "user:member",
+    });
+
+    const useCase = new ResolveWorkspaceInvitationLifecycleUseCase({
+      workspaceRepository: adapter,
+      invitationRepository: adapter,
+      membershipRepository: adapter,
+      roleAssignmentRepository: adapter,
+      authorizationReadRepository: adapter,
+      transactionManager: adapter,
+      idGenerator: new SequenceWorkspaceInvitationLifecycleIdGenerator(),
+      clock: new FixedWorkspaceInvitationLifecycleClock("2026-04-05T12:06:00.000Z"),
+    });
+
+    const result = await useCase.execute({
+      action: WorkspaceInvitationLifecycleActions.accept,
+      workspaceId: "workspace:alpha",
+      actorUserIdentityId: "user:member",
+      actorEmail: "member@example.com",
+      invitationToken: "tok_onboarding_metadata_123",
+      resolvedOnboardingMetadata: {
+        onboardingResolution: {
+          completedAt: "2026-04-05T12:06:00.000Z",
+          flow: "authenticated-join",
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.invitation.onboardingMetadata).toBeDefined();
+    expect(result.value.invitation.onboardingMetadata?.onboardingResolution).toEqual({
+      completedAt: "2026-04-05T12:06:00.000Z",
+      flow: "authenticated-join",
+    });
+
+    const persisted = await adapter.findInvitationById("invite:alpha");
+    expect(persisted?.onboardingMetadata?.onboardingResolution).toEqual({
+      completedAt: "2026-04-05T12:06:00.000Z",
+      flow: "authenticated-join",
+    });
+  });
+
   it("declines pending invitations and persists declined lifecycle metadata", async () => {
     const adapter = new InMemoryWorkspaceInvitationLifecycleAdapter();
     seedWorkspace(adapter);
