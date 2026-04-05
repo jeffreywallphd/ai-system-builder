@@ -269,6 +269,146 @@ describe("IdentityHttpServer authorization management routes", () => {
     expect(body.ok).toBe(false);
     expect(body.error.code).toBe("forbidden");
   });
+
+  it("runs an end-to-end visibility and explicit-sharing precedence lifecycle across transport boundaries", async () => {
+    const harness = await startServer();
+    const owner = await registerAndLogin(harness.baseUrl, "auth.mgmt.owner.e2e", "auth-owner-e2e@example.com");
+    const viewer = await registerAndLogin(harness.baseUrl, "auth.mgmt.viewer.e2e", "auth-viewer-e2e@example.com");
+    await seedAuthorizationResource(harness.adapter, owner.userIdentityId, viewer.userIdentityId);
+
+    await harness.adapter.upsertResourcePolicyMetadata({
+      record: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-e2e",
+        ownerUserIdentityId: owner.userIdentityId,
+        ownershipScope: ResourceOwnershipScopes.workspace,
+        workspaceId: "workspace-1",
+        visibility: ResourceVisibilities.workspace,
+        sharingPolicyMode: SharingPolicyModes.workspaceMembers,
+        allowResharing: false,
+        isPublishedCapable: false,
+        createdAt: "2026-04-05T11:00:00.000Z",
+        createdBy: owner.userIdentityId,
+        lastModifiedAt: "2026-04-05T11:00:00.000Z",
+        lastModifiedBy: owner.userIdentityId,
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-e2e-resource",
+        context: {
+          actorUserIdentityId: owner.userIdentityId,
+          occurredAt: "2026-04-05T11:00:00.000Z",
+        },
+      },
+    });
+
+    const initiallyAllowed = await fetch(`${harness.baseUrl}/api/v1/authorization/resources/asset/asset/asset-e2e/access-state?inspectedActorUserIdentityId=${encodeURIComponent(viewer.userIdentityId)}&includeDenied=true`, {
+      headers: {
+        authorization: `Bearer ${owner.sessionToken}`,
+      },
+    });
+    expect(initiallyAllowed.status).toBe(200);
+    const initiallyAllowedBody = await initiallyAllowed.json();
+    const initiallyAllowedRead = initiallyAllowedBody.data.permissions.find((entry: { permissionKey: string }) => entry.permissionKey === "asset.read");
+    expect(initiallyAllowedRead?.isAllowed).toBe(true);
+
+    const narrowedVisibility = await fetch(`${harness.baseUrl}/api/v1/authorization/resources/asset/asset/asset-e2e/visibility`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${owner.sessionToken}`,
+      },
+      body: JSON.stringify({
+        workspaceId: "workspace-1",
+        visibility: "private",
+        sharingPolicyMode: "owner-only",
+        allowResharing: false,
+        sharingGrants: [],
+        isPublishedCapable: false,
+      }),
+    });
+    expect(narrowedVisibility.status).toBe(200);
+
+    const deniedAfterNarrowing = await fetch(`${harness.baseUrl}/api/v1/authorization/resources/asset/asset/asset-e2e/access-state?inspectedActorUserIdentityId=${encodeURIComponent(viewer.userIdentityId)}&includeDenied=true`, {
+      headers: {
+        authorization: `Bearer ${owner.sessionToken}`,
+      },
+    });
+    expect(deniedAfterNarrowing.status).toBe(200);
+    const deniedAfterNarrowingBody = await deniedAfterNarrowing.json();
+    const deniedRead = deniedAfterNarrowingBody.data.permissions.find((entry: { permissionKey: string }) => entry.permissionKey === "asset.read");
+    expect(deniedRead?.isAllowed).toBe(false);
+
+    const deniedMutation = await fetch(`${harness.baseUrl}/api/v1/authorization/resources/asset/asset/asset-e2e/sharing-grants`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${viewer.sessionToken}`,
+      },
+      body: JSON.stringify({
+        grant: {
+          id: "share-e2e-denied",
+          target: {
+            kind: "user",
+            userId: owner.userIdentityId,
+          },
+          permissionKeys: ["asset.read"],
+        },
+      }),
+    });
+    expect(deniedMutation.status).toBe(403);
+
+    const shareResponse = await fetch(`${harness.baseUrl}/api/v1/authorization/resources/asset/asset/asset-e2e/sharing-grants`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${owner.sessionToken}`,
+      },
+      body: JSON.stringify({
+        grant: {
+          id: "share-e2e-1",
+          target: {
+            kind: "user",
+            userId: viewer.userIdentityId,
+          },
+          permissionKeys: ["asset.read"],
+        },
+      }),
+    });
+    expect(shareResponse.status).toBe(200);
+
+    const allowedAfterShare = await fetch(`${harness.baseUrl}/api/v1/authorization/resources/asset/asset/asset-e2e/access-state?inspectedActorUserIdentityId=${encodeURIComponent(viewer.userIdentityId)}&includeDenied=true`, {
+      headers: {
+        authorization: `Bearer ${owner.sessionToken}`,
+      },
+    });
+    expect(allowedAfterShare.status).toBe(200);
+    const allowedAfterShareBody = await allowedAfterShare.json();
+    const allowedRead = allowedAfterShareBody.data.permissions.find((entry: { permissionKey: string }) => entry.permissionKey === "asset.read");
+    expect(allowedRead?.isAllowed).toBe(true);
+    expect(allowedRead?.explanation?.sharingBasedGrants?.contributedToDecision).toBe(true);
+
+    const revokeResponse = await fetch(`${harness.baseUrl}/api/v1/authorization/resources/asset/asset/asset-e2e/sharing-grants/share-e2e-1`, {
+      method: "DELETE",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${owner.sessionToken}`,
+      },
+      body: JSON.stringify({}),
+    });
+    expect(revokeResponse.status).toBe(200);
+
+    const reportResponse = await fetch(`${harness.baseUrl}/api/v1/authorization/reporting/workspaces/workspace-1?recentSharingMutationsLimit=10`, {
+      headers: {
+        authorization: `Bearer ${owner.sessionToken}`,
+      },
+    });
+    expect(reportResponse.status).toBe(200);
+    const reportBody = await reportResponse.json();
+    const mutation = reportBody.data.recentSharingMutations.find((entry: { grantId: string }) => entry.grantId === "share-e2e-1");
+    expect(mutation?.mutationType).toBe("revoked");
+  });
 });
 
 async function startServer(): Promise<{
