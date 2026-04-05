@@ -413,6 +413,59 @@ export const CertificateAuthorityStatusIntrospectionViewSchema = z.object({
   healthFlags: CertificateAuthorityStatusHealthFlagsSchema,
 });
 
+const CertificateTrustEvaluationStatusSchema = z.enum([
+  "active",
+  "revoked",
+  "expired",
+  "superseded",
+  "not-yet-valid",
+  "not-found",
+  "subject-inactive",
+  "invalid",
+]);
+
+export const IssuedCertificateOperationalTrustViewSchema = z.object({
+  status: CertificateTrustEvaluationStatusSchema,
+  active: z.boolean(),
+  revoked: z.boolean(),
+  expired: z.boolean(),
+  usable: z.boolean(),
+  checkedAt: CertificateAuthorityTimestampSchema,
+});
+
+export const IssuedCertificateMetadataViewSchema = z.object({
+  certificateAuthorityId: CertificateAuthorityIdentifierSchema,
+  serialNumber: z.string().trim().toUpperCase().regex(SerialPattern),
+  status: CertificateStatusSchema,
+  trust: IssuedCertificateOperationalTrustViewSchema,
+  subject: CertificateSubjectPersistenceRecordSchema,
+  subjectReference: CertificateSubjectReferencePersistenceRecordSchema,
+  usages: z.array(CertificateUsageKindSchema).min(1),
+  validity: CertificateValidityWindowPersistenceRecordSchema,
+  issuedAt: CertificateAuthorityTimestampSchema,
+  publicKeyAlgorithm: z.string().trim().min(1).max(255),
+  publicKeyFingerprintSha256: z.string().trim().max(256).optional(),
+  revocation: CertificateRevocationPersistenceRecordSchema.optional(),
+  supersededBySerialNumber: z.string().trim().toUpperCase().regex(SerialPattern).optional(),
+  createdAt: CertificateAuthorityTimestampSchema,
+  createdBy: CertificateAuthorityIdentifierSchema,
+  lastModifiedAt: CertificateAuthorityTimestampSchema,
+  lastModifiedBy: CertificateAuthorityIdentifierSchema,
+});
+
+export const CertificateMetadataListPaginationSchema = z.object({
+  limit: z.number().int().positive(),
+  offset: z.number().int().nonnegative(),
+  returned: z.number().int().nonnegative(),
+  hasMore: z.boolean(),
+});
+
+export const CertificateMetadataListViewSchema = z.object({
+  asOf: CertificateAuthorityTimestampSchema,
+  items: z.array(IssuedCertificateMetadataViewSchema),
+  pagination: CertificateMetadataListPaginationSchema,
+});
+
 export type RotationPolicyMetadataPersistenceRecordPayload = z.infer<typeof RotationPolicyMetadataPersistenceRecordSchema>;
 export type CertificateValidityWindowPersistenceRecordPayload = z.infer<typeof CertificateValidityWindowPersistenceRecordSchema>;
 export type CertificateSubjectPersistenceRecordPayload = z.infer<typeof CertificateSubjectPersistenceRecordSchema>;
@@ -425,6 +478,8 @@ export type CertificateStatusHistoryPersistenceRecordPayload = z.infer<typeof Ce
 export type CertificateRevocationHistoryPersistenceRecordPayload = z.infer<typeof CertificateRevocationHistoryPersistenceRecordSchema>;
 export type CertificateDistributionEventPersistenceRecordPayload = z.infer<typeof CertificateDistributionEventPersistenceRecordSchema>;
 export type CertificateAuthorityStatusIntrospectionViewPayload = z.infer<typeof CertificateAuthorityStatusIntrospectionViewSchema>;
+export type IssuedCertificateMetadataViewPayload = z.infer<typeof IssuedCertificateMetadataViewSchema>;
+export type CertificateMetadataListViewPayload = z.infer<typeof CertificateMetadataListViewSchema>;
 
 function formatZodPath(path: ReadonlyArray<string | number>): string {
   if (path.length === 0) {
@@ -524,6 +579,26 @@ export function parseCertificateAuthorityStatusIntrospectionView(
   return parseCertificateAuthoritySchema(
     "CertificateAuthorityStatusIntrospectionView",
     CertificateAuthorityStatusIntrospectionViewSchema,
+    payload,
+  );
+}
+
+export function parseIssuedCertificateMetadataView(
+  payload: unknown,
+): IssuedCertificateMetadataViewPayload {
+  return parseCertificateAuthoritySchema(
+    "IssuedCertificateMetadataView",
+    IssuedCertificateMetadataViewSchema,
+    payload,
+  );
+}
+
+export function parseCertificateMetadataListView(
+  payload: unknown,
+): CertificateMetadataListViewPayload {
+  return parseCertificateAuthoritySchema(
+    "CertificateMetadataListView",
+    CertificateMetadataListViewSchema,
     payload,
   );
 }

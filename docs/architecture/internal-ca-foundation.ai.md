@@ -16,6 +16,7 @@
 - Adds explicit certificate revocation command and revocation-status enforcement registry seams (Story 6.2.4).
 - Adds reusable certificate trust/validity evaluation helper seams for consistent lifecycle status decisions (Story 6.2.5).
 - Adds certificate lifecycle audit recording seams for initialization/issuance/revocation decisions and outcomes (Story 6.2.6).
+- Adds issued-certificate metadata list/detail query seams for trusted admin/API consumers (Story 6.2.7).
 
 ## Main artifacts to cite
 
@@ -33,6 +34,7 @@
 - `src/application/security/ports/INodeCertificateEligibilityPort.ts`
 - `src/application/security/ports/ICertificateRevocationStatusRegistry.ts`
 - `src/application/security/ports/CertificateLifecycleAuditPorts.ts`
+- `src/application/security/ports/CertificateQueryAuthorizationPorts.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
 - `src/application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase.ts`
@@ -40,6 +42,8 @@
 - `src/application/security/use-cases/RevokeIssuedCertificateUseCase.ts`
 - `src/application/security/use-cases/ResolveCertificateRevocationStatusUseCase.ts`
 - `src/application/security/use-cases/CertificateTrustEvaluationService.ts`
+- `src/application/security/use-cases/ListIssuedCertificateMetadataUseCase.ts`
+- `src/application/security/use-cases/GetIssuedCertificateMetadataUseCase.ts`
 - `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
@@ -50,6 +54,7 @@
 - `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
 - `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
+- `src/application/security/tests/IssuedCertificateMetadataQueryUseCases.test.ts`
 - `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
 - `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
@@ -213,6 +218,27 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - `certificate-revocation-started`
 - `certificate-revocation-succeeded`
 - `certificate-revocation-failed`
+
+## Story 6.2.7 issued-certificate metadata query/listing behavior
+
+- Adds `ListIssuedCertificateMetadataUseCase` for paged issued-certificate metadata listing with operational filters:
+  - subject-reference kind
+  - linked node id
+  - issuance date range
+  - certificate lifecycle status
+  - evaluated trust state
+- Adds `GetIssuedCertificateMetadataUseCase` for single-certificate metadata detail by serial.
+- Adds optional `CertificateQueryAuthorizationPorts` hook seam so trusted admin/API consumers can be authorized before query execution.
+- Adds stable shared DTO/schema contracts for list/detail metadata payloads used by future API/admin surfaces.
+
+### Redaction posture for query outputs
+
+- Excludes secret-bearing/internal references and unsafe internals from responses, including:
+  - `certificateMaterialRef`
+  - `certificateChainMaterialRef`
+  - `trustMaterialRef`
+  - trust-material storage locators / secret refs
+- Includes only operational trust metadata needed for visibility and decisions (subject/status/validity/revocation/trust summary).
 
 ## Coverage in this slice
 

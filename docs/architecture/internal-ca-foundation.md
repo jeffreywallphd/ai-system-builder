@@ -1,6 +1,6 @@
 # Internal CA Foundation
 
-This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, Story 6.2.1, Story 6.2.2, Story 6.2.3, Story 6.2.4, Story 6.2.5, and Story 6.2.6 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, certificate subject-profile issuance policy enforcement, concrete issuance signing/material persistence execution, node-trust-backed approved-node issuance eligibility, explicit certificate revocation workflow plus revocation-status enforcement seams, reusable certificate trust evaluation helpers, and certificate lifecycle audit recording seams.
+This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, Story 6.2.1, Story 6.2.2, Story 6.2.3, Story 6.2.4, Story 6.2.5, Story 6.2.6, and Story 6.2.7 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, certificate subject-profile issuance policy enforcement, concrete issuance signing/material persistence execution, node-trust-backed approved-node issuance eligibility, explicit certificate revocation workflow plus revocation-status enforcement seams, reusable certificate trust evaluation helpers, certificate lifecycle audit recording seams, and issued-certificate metadata query/listing seams for admin/API consumers.
 
 ## Canonical artifacts
 
@@ -19,6 +19,7 @@ This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.
 - `src/application/security/ports/INodeCertificateEligibilityPort.ts`
 - `src/application/security/ports/ICertificateRevocationStatusRegistry.ts`
 - `src/application/security/ports/CertificateLifecycleAuditPorts.ts`
+- `src/application/security/ports/CertificateQueryAuthorizationPorts.ts`
 - `src/application/security/ports/CertificateAuthorityPorts.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
@@ -27,6 +28,8 @@ This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.
 - `src/application/security/use-cases/RevokeIssuedCertificateUseCase.ts`
 - `src/application/security/use-cases/ResolveCertificateRevocationStatusUseCase.ts`
 - `src/application/security/use-cases/CertificateTrustEvaluationService.ts`
+- `src/application/security/use-cases/ListIssuedCertificateMetadataUseCase.ts`
+- `src/application/security/use-cases/GetIssuedCertificateMetadataUseCase.ts`
 - `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
 - `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
 - `src/application/security/tests/ResolveCertificateAuthorityStartupStateUseCase.test.ts`
@@ -37,6 +40,7 @@ This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.
 - `src/application/security/tests/ResolveCertificateRevocationStatusUseCase.test.ts`
 - `src/application/security/tests/CertificateTrustEvaluationService.test.ts`
 - `src/application/security/tests/CertificateLifecycleAuditPorts.test.ts`
+- `src/application/security/tests/IssuedCertificateMetadataQueryUseCases.test.ts`
 - `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
@@ -152,6 +156,28 @@ Story 6.2.6 adds a dedicated application-level audit seam for certificate trust 
 - `certificate-revocation-started`
 - `certificate-revocation-succeeded`
 - `certificate-revocation-failed`
+
+## Story 6.2.7 certificate metadata listing/query seams
+
+Story 6.2.7 adds read-side certificate visibility workflows for internal admin/API consumers:
+
+- `ListIssuedCertificateMetadataUseCase` returns paged, operationally filtered issued-certificate metadata views with support for:
+  - subject-reference type filtering (`node`, `device`, `service`)
+  - linked-node filtering (`linkedNodeId`)
+  - issuance-date range filtering (`issuedAfter`, `issuedBefore`)
+  - lifecycle-status filtering and trust-state filtering (`active`, `revoked`, `expired`, etc.)
+- `GetIssuedCertificateMetadataUseCase` returns detail metadata for a single issued certificate by serial number.
+- both query use cases support optional authorization seams through `CertificateQueryAuthorizationPorts` so only trusted internal actors can read metadata.
+- response DTOs and schema contracts now define stable metadata-only query payloads for downstream admin/API surfaces.
+
+### Redaction and safety posture
+
+- query responses intentionally exclude secret-bearing/internal material references:
+  - `certificateMaterialRef`
+  - `certificateChainMaterialRef`
+  - `trustMaterialRef`
+  - trust-material storage locators and protected secret references
+- query responses return operational metadata only: serials, statuses, trust evaluation summary, subject metadata, validity, revocation metadata, and audit stamps.
 
 ## Story 6.1.3 startup bootstrap behavior
 
