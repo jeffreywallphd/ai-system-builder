@@ -24,6 +24,7 @@ import type {
   AuthorizationSharingGrantRecord,
 } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import { EvaluateAuthorizationPolicyUseCase } from "../use-cases/EvaluateAuthorizationPolicyUseCase";
+import { EffectivePermissionResolutionService } from "../use-cases/EffectivePermissionResolutionService";
 import type { AuthorizationPolicyEvaluationPorts } from "../ports/AuthorizationPolicyEvaluationPorts";
 import type { IAuthorizationActorMembershipReadRepository } from "../ports/IAuthorizationActorMembershipReadRepository";
 import type { IAuthorizationPolicyEvaluator } from "../ports/IAuthorizationPolicyEvaluator";
@@ -236,5 +237,70 @@ describe("authorization application policy ports and evaluator seams", () => {
     }
 
     expect(result.error.code).toBe("authorization-evaluation-resource-not-found");
+  });
+
+  it("supports the effective-permission resolver as a drop-in policy evaluator", async () => {
+    const adapter = new InMemoryAuthorizationPortAdapter();
+    adapter.resourcePolicyMetadata = Object.freeze({
+      resourceFamily: AuthorizationResourceFamilies.asset,
+      resourceType: "asset",
+      resourceId: "asset-201",
+      ownerUserIdentityId: "user-owner",
+      ownershipScope: ResourceOwnershipScopes.workspace,
+      workspaceId: "workspace-alpha",
+      visibility: ResourceVisibilities.workspace,
+      sharingPolicyMode: "workspace-members",
+      allowResharing: false,
+      isPublishedCapable: false,
+    });
+    adapter.roleGrantSnapshot = Object.freeze({
+      roleAssignments: Object.freeze([
+        createRoleAssignment({
+          id: "role-viewer-drop-in",
+          actorUserIdentityId: "user-viewer",
+          roleKey: "guest",
+          scope: RoleAssignmentScopes.workspace,
+          workspaceId: "workspace-alpha",
+          assignedByUserIdentityId: "user-owner",
+          assignedAt: "2026-04-01T00:00:00.000Z",
+        }),
+      ]),
+      permissionGrants: Object.freeze([]),
+    });
+
+    const ports: AuthorizationPolicyEvaluationPorts = {
+      actorMembershipReadRepository: adapter,
+      roleGrantReadRepository: adapter,
+      sharingGrantReadRepository: adapter,
+      resourcePolicyMetadataReadRepository: adapter,
+      policyEvaluator: new EffectivePermissionResolutionService({
+        clock: {
+          now: () => new Date("2026-04-05T16:00:00.000Z"),
+        },
+      }),
+    };
+
+    const useCase = new EvaluateAuthorizationPolicyUseCase({ ports });
+    const result = await useCase.execute({
+      actor: {
+        actorUserIdentityId: "user-viewer",
+        activeWorkspaceId: "workspace-alpha",
+      },
+      resource: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-201",
+      },
+      requiredPermissionKey: "asset.read",
+      asOf: "2026-04-05T16:00:00.000Z",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.decision.outcome).toBe(PolicyDecisionOutcomes.allow);
+    expect(result.value.decision.reasonCode).toBe("visibility-workspace-member");
   });
 });
