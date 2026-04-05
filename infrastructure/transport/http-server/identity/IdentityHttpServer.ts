@@ -134,6 +134,11 @@ import {
   type WebSocketChannelPurpose,
   type WebSocketChannelRegistry,
 } from "../../../../src/infrastructure/transport/websocket/SecureWebSocketChannelContext";
+import {
+  buildThinClientSessionChannelContext,
+  evaluateThinClientWebSocketOriginPolicy,
+  type ThinClientSessionChannelContextDto,
+} from "../../../../src/shared/contracts/security/ThinClientTransportContracts";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 
@@ -676,6 +681,10 @@ interface AuthenticatedRequestContext {
   };
   readonly transport: {
     readonly connection: InboundHttpTransportConnectionState;
+    readonly channel: {
+      readonly accessChannel: "desktop" | "thin-client";
+      readonly thinClient?: ThinClientSessionChannelContextDto;
+    };
     readonly trustValidation: {
       readonly enforced: boolean;
       readonly scenario: TransportSecurityScenario;
@@ -691,7 +700,8 @@ interface WebSocketUpgradeDeniedReason {
     | "secure-transport-required"
     | "authentication-failed"
     | "transport-trust-rejected"
-    | "unsupported-channel-purpose";
+    | "unsupported-channel-purpose"
+    | "origin-not-allowed";
   readonly message: string;
   readonly closeCode?: number;
   readonly details?: Readonly<Record<string, unknown>>;
@@ -3745,6 +3755,28 @@ async function handleWebSocketUpgrade(input: {
     });
     return;
   }
+  const accessChannel = resolvedSession.data.session.accessChannel === "desktop" ? "desktop" : "thin-client";
+  const transportChannelContext = resolveTransportAccessChannelContext({
+    accessChannel,
+    request: input.request,
+  });
+  if (accessChannel === "thin-client") {
+    const originPolicy = enforceThinClientWebSocketOrigin({
+      request: input.request,
+      transportState,
+    });
+    if (!originPolicy.accepted) {
+      denyWebSocketUpgrade(input, requestId, 403, {
+        code: "origin-not-allowed",
+        closeCode: 4403,
+        message: "WebSocket origin is not allowed for thin-client sessions.",
+        details: Object.freeze({
+          reason: originPolicy.reason,
+        }),
+      });
+      return;
+    }
+  }
 
   const supportedPurposes = input.webSocket.supportedPurposes
     ?? Object.freeze(Object.values(WebSocketChannelPurposes));
@@ -3783,7 +3815,7 @@ async function handleWebSocketUpgrade(input: {
     defaultScenario,
   });
   const bypassTransportTrustValidation = Boolean(
-    input.transportTrust && shouldBypassTransportTrustValidation(transportState, input.transportTrust),
+    input.transportTrust && shouldBypassTransportTrustValidation(transportState, input.transportTrust, transportRouting),
   );
   if (input.transportTrust && !input.transportTrust.websocketValidator && !bypassTransportTrustValidation) {
     denyWebSocketUpgrade(input, requestId, 500, {
@@ -3818,7 +3850,6 @@ async function handleWebSocketUpgrade(input: {
   const sessionAssuranceLevel = normalizeSessionAssuranceLevel(
     resolvedSession.data.session.deviceTrustContext?.sessionAssuranceLevel,
   );
-  const accessChannel = resolvedSession.data.session.accessChannel === "desktop" ? "desktop" : "thin-client";
   const connectionId = `identity-ws:${requestId}`;
   const channelContext = buildWebSocketChannelContext({
     connectionId,
@@ -3826,7 +3857,7 @@ async function handleWebSocketUpgrade(input: {
     userIdentityId: resolvedSession.data.principal.userIdentityId,
     username: resolvedSession.data.principal.username,
     sessionId: resolvedSession.data.session.sessionId,
-    accessChannel,
+    accessChannel: transportChannelContext.accessChannel,
     trustedDeviceId: resolvedSession.data.session.deviceTrustContext?.trustedDeviceId,
     sessionAssuranceLevel,
     workspaceId: normalizeOptionalString(requestUrl.searchParams.get("workspaceId")),
@@ -3962,7 +3993,7 @@ async function requireAuthenticatedSession(
     defaultScenario,
   });
   const bypassTransportTrustValidation = Boolean(
-    transportTrust && shouldBypassTransportTrustValidation(transportState, transportTrust),
+    transportTrust && shouldBypassTransportTrustValidation(transportState, transportTrust, transportRouting),
   );
   if (transportTrust && !bypassTransportTrustValidation) {
     const transportValidationRequest = buildTransportTrustValidationRequest({
@@ -4004,6 +4035,10 @@ async function requireAuthenticatedSession(
     }),
     transport: Object.freeze({
       connection: transportState,
+      channel: resolveTransportAccessChannelContext({
+        accessChannel: resolvedSession.data.session.accessChannel === "desktop" ? "desktop" : "thin-client",
+        request,
+      }),
       trustValidation: Object.freeze({
         enforced: Boolean(transportTrust && !bypassTransportTrustValidation),
         scenario: transportRouting.scenario,
@@ -4043,8 +4078,14 @@ async function handleLogin(
 function shouldBypassTransportTrustValidation(
   transportState: InboundHttpTransportConnectionState,
   transportTrust: IdentityHttpServerTransportTrustOptions,
+  routing: {
+    readonly scenario: TransportSecurityScenario;
+  },
 ): boolean {
   if (!transportTrust.allowInsecureLoopback) {
+    return false;
+  }
+  if (routing.scenario !== TransportSecurityScenarios.desktopClientToControlPlane) {
     return false;
   }
   if (transportState.encryptedTransportEstablished) {
@@ -4144,7 +4185,10 @@ function resolveTransportTrustRouting(input: {
   readonly actorType: TransportConnectionActorType;
   readonly remotePeerType: TransportPeerType;
 } {
-  const scenario = input.options?.transportScenario ?? input.defaultScenario;
+  const inferredScenario = input.resolvedSession.session.accessChannel === "desktop"
+    ? TransportSecurityScenarios.desktopClientToControlPlane
+    : TransportSecurityScenarios.thinClientToControlPlane;
+  const scenario = input.options?.transportScenario ?? inferredScenario ?? input.defaultScenario;
   const actorType = input.options?.transportActorType ?? TransportConnectionActorTypes.userSession;
   const remotePeerType = input.options?.transportRemotePeerType
     ?? (input.resolvedSession.session.accessChannel === "desktop"
@@ -4154,6 +4198,35 @@ function resolveTransportTrustRouting(input: {
     scenario,
     actorType,
     remotePeerType,
+  });
+}
+
+function resolveTransportAccessChannelContext(input: {
+  readonly accessChannel: "desktop" | "thin-client";
+  readonly request: IncomingMessage;
+}): AuthenticatedRequestContext["transport"]["channel"] {
+  if (input.accessChannel === "desktop") {
+    return Object.freeze({
+      accessChannel: "desktop",
+    });
+  }
+
+  return Object.freeze({
+    accessChannel: "thin-client",
+    thinClient: buildThinClientSessionChannelContext({
+      userAgent: normalizeOptionalHeader(input.request.headers["user-agent"]),
+      origin: normalizeOptionalHeader(input.request.headers.origin),
+    }),
+  });
+}
+
+function enforceThinClientWebSocketOrigin(input: {
+  readonly request: IncomingMessage;
+  readonly transportState: InboundHttpTransportConnectionState;
+}) {
+  return evaluateThinClientWebSocketOriginPolicy({
+    originHeader: normalizeOptionalHeader(input.request.headers.origin),
+    expectedHost: input.transportState.host,
   });
 }
 

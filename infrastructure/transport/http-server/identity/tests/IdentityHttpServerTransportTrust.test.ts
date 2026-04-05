@@ -69,7 +69,10 @@ async function startServer(input: {
   });
 }
 
-async function registerAndLogin(baseUrl: string): Promise<string> {
+async function registerAndLogin(
+  baseUrl: string,
+  accessChannel: "desktop" | "thin-client" = "thin-client",
+): Promise<string> {
   const register = await fetch(`${baseUrl}/api/v1/identity/register`, {
     method: "POST",
     headers: {
@@ -91,6 +94,7 @@ async function registerAndLogin(baseUrl: string): Promise<string> {
     },
     body: JSON.stringify({
       providerSubject: "transport.trust.user",
+      accessChannel,
       credential: {
         candidate: "StrongPass!2026",
       },
@@ -196,7 +200,7 @@ describe("IdentityHttpServer transport trust", () => {
       },
     });
 
-    const sessionToken = await registerAndLogin(baseUrl);
+    const sessionToken = await registerAndLogin(baseUrl, "desktop");
     const resolvedSession = await fetch(`${baseUrl}/api/v1/identity/session`, {
       headers: {
         authorization: `Bearer ${sessionToken}`,
@@ -204,6 +208,63 @@ describe("IdentityHttpServer transport trust", () => {
     });
     expect(resolvedSession.status).toBe(200);
     expect(seenRequests).toHaveLength(0);
+  });
+
+  it("does not bypass transport trust validation for thin-client sessions on loopback", async () => {
+    const seenRequests: ValidateTransportConnectionTrustRequest[] = [];
+    const { baseUrl } = await startServer({
+      allowInsecureLoopback: true,
+      validate: async (request) => {
+        seenRequests.push(request);
+        return {
+          ok: false,
+          statusCode: 403,
+          body: {
+            ok: false,
+            error: {
+              code: "forbidden",
+              message: "Transport trust validation rejected this connection.",
+            },
+          },
+        };
+      },
+    });
+
+    const sessionToken = await registerAndLogin(baseUrl, "thin-client");
+    const resolvedSession = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      headers: {
+        authorization: `Bearer ${sessionToken}`,
+      },
+    });
+    expect(resolvedSession.status).toBe(403);
+    expect(seenRequests).toHaveLength(1);
+    expect(seenRequests[0]?.scenario).toBe("thin-client-to-control-plane");
+    expect(seenRequests[0]?.remotePeerType).toBe("thin-client");
+  });
+
+  it("maps desktop sessions to desktop transport scenario when validating trust", async () => {
+    const seenRequests: ValidateTransportConnectionTrustRequest[] = [];
+    const { baseUrl } = await startServer({
+      allowInsecureLoopback: false,
+      validate: async (request) => {
+        seenRequests.push(request);
+        return {
+          ok: true,
+          decision: {} as never,
+        };
+      },
+    });
+
+    const sessionToken = await registerAndLogin(baseUrl, "desktop");
+    const resolvedSession = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      headers: {
+        authorization: `Bearer ${sessionToken}`,
+      },
+    });
+    expect(resolvedSession.status).toBe(200);
+    expect(seenRequests).toHaveLength(1);
+    expect(seenRequests[0]?.scenario).toBe("desktop-client-to-control-plane");
+    expect(seenRequests[0]?.remotePeerType).toBe("desktop-client");
   });
 
   it("emits authenticated transport context through request logging payload", async () => {
@@ -223,7 +284,7 @@ describe("IdentityHttpServer transport trust", () => {
       }),
     });
 
-    const sessionToken = await registerAndLogin(baseUrl);
+    const sessionToken = await registerAndLogin(baseUrl, "thin-client");
     const resolvedSession = await fetch(`${baseUrl}/api/v1/identity/session`, {
       headers: {
         authorization: `Bearer ${sessionToken}`,
@@ -234,9 +295,11 @@ describe("IdentityHttpServer transport trust", () => {
     const completed = events.filter((event) => {
       const candidate = event as { readonly event?: string };
       return candidate.event === "identity-http.request.completed";
-    }) as Array<{ readonly details?: { readonly request?: { readonly transport?: { readonly connection?: { readonly channelType?: string } } } } }>;
+    }) as Array<{ readonly details?: { readonly request?: { readonly transport?: { readonly connection?: { readonly channelType?: string }; readonly channel?: { readonly accessChannel?: string; readonly thinClient?: { readonly browserSurface?: boolean } } } } } }>;
     expect(completed.length).toBeGreaterThan(0);
     const latest = completed[completed.length - 1];
     expect(latest?.details?.request?.transport?.connection?.channelType).toBe("http");
+    expect(latest?.details?.request?.transport?.channel?.accessChannel).toBe("thin-client");
+    expect(latest?.details?.request?.transport?.channel?.thinClient?.browserSurface).toBeTrue();
   });
 });

@@ -306,3 +306,31 @@ Story 7.2.3 adds desktop-side transport bootstrap behavior so desktop client cha
   - covers required/optional bootstrap posture, missing registration, missing pin, expired pin, and ready-state resolution.
 - `infrastructure/transport/http-client/tests/DesktopTrustedDeviceIdentityAuthClient.test.ts`
   - covers bootstrap-failure channel blocking, trust-context login injection, post-login trust-assurance gating, and non-required passthrough behavior.
+
+## Story 7.2.4 thin-client secure session channels for browser and mobile
+
+Story 7.2.4 formalizes thin-client browser/mobile channel behavior so thin-client runtime paths stay secure without inheriting desktop pairing assumptions.
+
+### Shared thin-client contracts
+
+- `src/shared/contracts/security/ThinClientTransportContracts.ts`
+  - defines thin-client channel context projection (`browser`, `mobile-browser`, `mobile-webview`, `unknown`);
+  - provides origin-policy evaluation helpers for thin-client websocket upgrade acceptance;
+  - keeps browser/mobile session-channel expectations reusable by host adapters.
+
+### Runtime adapter updates
+
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - derives transport-routing scenario from authenticated session channel (`desktop` vs `thin-client`) so transport validation is session-aware by default;
+  - enforces anti-bypass posture by limiting insecure loopback transport-trust bypass to desktop scenario only;
+  - injects normalized authenticated channel context (`transport.channel`) into request handler context/log payloads, including thin-client browser/mobile metadata;
+  - enforces thin-client websocket origin policy during upgrade handling (required origin, expected host match, secure scheme posture with loopback-safe HTTP exception).
+
+### Tests
+
+- `src/shared/contracts/security/tests/ThinClientTransportContracts.test.ts`
+  - covers thin-client form-factor classification, channel-context projection, and websocket origin-policy evaluation.
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerTransportTrust.test.ts`
+  - covers no trust-bypass for thin-client loopback sessions, desktop-only bypass continuity, desktop/thin-client scenario routing, and authenticated transport channel-context logging.
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
+  - covers thin-client websocket origin rejection and accepted thin-client websocket routing with valid origin.

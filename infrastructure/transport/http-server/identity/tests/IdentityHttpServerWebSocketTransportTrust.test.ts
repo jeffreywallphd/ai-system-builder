@@ -88,7 +88,10 @@ async function startServer(input: {
   });
 }
 
-async function registerAndLogin(baseUrl: string): Promise<string> {
+async function registerAndLogin(
+  baseUrl: string,
+  accessChannel: "desktop" | "thin-client" = "desktop",
+): Promise<string> {
   const register = await fetch(`${baseUrl}/api/v1/identity/register`, {
     method: "POST",
     headers: {
@@ -110,7 +113,7 @@ async function registerAndLogin(baseUrl: string): Promise<string> {
     },
     body: JSON.stringify({
       providerSubject: "ws.transport.user",
-      accessChannel: "desktop",
+      accessChannel,
       credential: {
         candidate: "StrongPass!2026",
       },
@@ -315,6 +318,69 @@ describe("IdentityHttpServer websocket transport trust", () => {
     expect(parsed.statusCode).toBe(403);
     expect(parsed.body?.error?.code).toBe("unsupported-channel-purpose");
     expect(parsed.body?.error?.closeCode).toBe(4403);
+  });
+
+  it("rejects thin-client websocket upgrades when origin header is missing", async () => {
+    const { baseUrl, port } = await startServer({
+      allowInsecureLoopback: false,
+      validateHttp: async () => ({
+        ok: true,
+        decision: {} as never,
+      }),
+      validateWebSocket: async () => ({
+        ok: true,
+        decision: {} as never,
+      }),
+    });
+    const token = await registerAndLogin(baseUrl, "thin-client");
+
+    const response = await sendWebSocketUpgradeRequest({
+      port,
+      path: "/ws?purpose=status",
+      authorization: token,
+    });
+    const parsed = parseUpgradeResponse(response);
+    expect(parsed.statusCode).toBe(403);
+    expect(parsed.body?.error?.code).toBe("origin-not-allowed");
+    expect(parsed.body?.error?.closeCode).toBe(4403);
+  });
+
+  it("accepts thin-client websocket upgrades with allowed origin and thin-client routing", async () => {
+    const seenRequests: ValidateTransportConnectionTrustRequest[] = [];
+    let capturedChannel: WebSocketChannelContext | undefined;
+    const { baseUrl, port } = await startServer({
+      allowInsecureLoopback: false,
+      validateHttp: async () => ({
+        ok: true,
+        decision: {} as never,
+      }),
+      validateWebSocket: async (request) => {
+        seenRequests.push(request);
+        return {
+          ok: true,
+          decision: {} as never,
+        };
+      },
+      onChannelEstablished: (channel) => {
+        capturedChannel = channel;
+      },
+    });
+    const token = await registerAndLogin(baseUrl, "thin-client");
+
+    const response = await sendWebSocketUpgradeRequest({
+      port,
+      path: "/ws?purpose=run-monitoring",
+      authorization: token,
+      headers: {
+        origin: `http://127.0.0.1:${port}`,
+      },
+    });
+    const parsed = parseUpgradeResponse(response);
+    expect(parsed.statusCode).toBe(101);
+    expect(seenRequests).toHaveLength(1);
+    expect(seenRequests[0]?.scenario).toBe("thin-client-to-control-plane");
+    expect(seenRequests[0]?.remotePeerType).toBe("thin-client");
+    expect(capturedChannel?.actor.accessChannel).toBe("thin-client");
   });
 
   it("establishes session-bound websocket channel context on accepted upgrades", async () => {
