@@ -1,7 +1,9 @@
 import {
   IdentitySessionAccessChannels,
   IdentitySessionStatuses,
+  SessionRevocationReasons,
   expireSession,
+  revokeSession,
   SessionAssuranceLevels,
   SessionDeviceTrustStates,
   type IdentitySessionAccessChannel,
@@ -203,12 +205,40 @@ export class IdentityAuthenticatedSessionService {
         })
       : undefined;
     if (trustEvaluation && !trustEvaluation.allowed) {
-      const failureDetails = trustEvaluation.invalidationReasons && trustEvaluation.invalidationReasons.length > 0
-        ? Object.freeze({
-            ...(trustEvaluation.details ?? {}),
-            sessionTrustInvalidationReasons: trustEvaluation.invalidationReasons,
-          })
-        : trustEvaluation.details;
+      const nowIso = now.toISOString();
+      const deniedTrustContext = mergeDeviceTrustContext(
+        session.client?.deviceTrust,
+        trustEvaluation.deviceTrustContext,
+        Object.freeze({
+          trustedDeviceBindingId: trustEvaluation.trustedDeviceBindingId,
+          trustMarker: trustEvaluation.trustMarker,
+        }),
+      );
+      const invalidatedSession = revokeSession(
+        Object.freeze({
+          ...session,
+          client: mergeSessionTrustContext(session, deniedTrustContext, trustEvaluation),
+        }),
+        SessionRevocationReasons.security,
+        now,
+      );
+      await this.dependencies.sessionRepository.saveSession(invalidatedSession);
+      await this.dependencies.tokenMaterialRepository.invalidateSessionTokenMaterial(
+        session.id,
+        nowIso,
+      );
+
+      const failureDetails = Object.freeze({
+        ...(trustEvaluation.details ?? {}),
+        ...(trustEvaluation.invalidationReasons && trustEvaluation.invalidationReasons.length > 0
+          ? { sessionTrustInvalidationReasons: trustEvaluation.invalidationReasons }
+          : {}),
+        sessionTrustFailureReason: trustEvaluation.reason,
+        sessionTrustFailure: true,
+        sessionInvalidated: true,
+        sessionInvalidatedAt: nowIso,
+        sessionId: session.id,
+      });
       return this.failure(
         IdentityErrorCodes.invalidSessionState,
         "Session trust requirements were not satisfied.",
@@ -402,5 +432,33 @@ function mergeDeviceTrustContext(
       ?? evaluated?.trustedDeviceId
       ?? persisted?.trustedDeviceId,
     trustMarker: evaluated?.trustMarker ?? persisted?.trustMarker ?? legacyEvaluation?.trustMarker,
+  });
+}
+
+function mergeSessionTrustContext(
+  session: Session,
+  deviceTrustContext: SessionDeviceTrustContext | undefined,
+  evaluation: {
+    readonly trustedDeviceBindingId?: string;
+    readonly trustMarker?: string;
+  },
+): Session["client"] {
+  if (!session.client && !deviceTrustContext && !evaluation.trustedDeviceBindingId && !evaluation.trustMarker) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    accessChannel: session.client?.accessChannel,
+    userAgent: session.client?.userAgent,
+    ipAddress: session.client?.ipAddress,
+    deviceId: session.client?.deviceId,
+    deviceTrust: deviceTrustContext,
+    trustedDeviceBindingId: evaluation.trustedDeviceBindingId
+      ?? deviceTrustContext?.trustedDeviceBindingId
+      ?? deviceTrustContext?.trustedDeviceId
+      ?? session.client?.trustedDeviceBindingId,
+    trustMarker: evaluation.trustMarker
+      ?? deviceTrustContext?.trustMarker
+      ?? session.client?.trustMarker,
   });
 }

@@ -53,6 +53,7 @@ import {
   type SetIdentityAdminAccountStatusApiResponse,
   type ResolveAuthenticatedSessionApiRequest,
   type ResolveAuthenticatedSessionApiResponse,
+  type IdentitySessionTrustInvalidationReason,
   type RegisterLocalIdentityApiRequest,
   type RegisterLocalIdentityApiResponse,
 } from "./sdk/PublicIdentityAuthApiContract";
@@ -412,7 +413,7 @@ export class IdentityAuthBackendApi {
     if (!resolved.ok) {
       return Object.freeze({
         ok: false,
-        error: this.mapSessionValidationError(resolved.error.code),
+        error: this.mapSessionValidationError(resolved.error),
       });
     }
 
@@ -737,14 +738,25 @@ export class IdentityAuthBackendApi {
     }
   }
 
-  private mapSessionValidationError(code: string): IdentityAuthApiError {
-    switch (code) {
+  private mapSessionValidationError(error: {
+    readonly code: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): IdentityAuthApiError {
+    const trustFailure = extractTrustFailure(error.details);
+
+    switch (error.code) {
       case IdentityErrorCodes.invalidRequest:
       case IdentityErrorCodes.invalidSessionState:
       case IdentityErrorCodes.notFound:
         return Object.freeze({
           code: IdentityAuthApiErrorCodes.authenticationFailed,
-          message: "Invalid session.",
+          message: trustFailure ? "Session trust validation failed." : "Invalid session.",
+          trustFailure: trustFailure
+            ? Object.freeze({
+                reason: trustFailure.reason,
+                invalidationReasons: trustFailure.invalidationReasons,
+              })
+            : undefined,
         });
       default:
         return Object.freeze({
@@ -835,6 +847,38 @@ export class IdentityAuthBackendApi {
       },
     });
   }
+}
+
+function extractTrustFailure(
+  details: Readonly<Record<string, unknown>> | undefined,
+): {
+  readonly reason?: string;
+  readonly invalidationReasons?: ReadonlyArray<IdentitySessionTrustInvalidationReason>;
+} | undefined {
+  if (!details || details.sessionTrustFailure !== true) {
+    return undefined;
+  }
+
+  const reason = typeof details.sessionTrustFailureReason === "string" && details.sessionTrustFailureReason.trim()
+    ? details.sessionTrustFailureReason.trim()
+    : undefined;
+
+  const rawReasons = details.sessionTrustInvalidationReasons;
+  const invalidationReasons = Array.isArray(rawReasons)
+    ? rawReasons.filter(isIdentitySessionTrustInvalidationReason)
+    : [];
+
+  return Object.freeze({
+    reason,
+    invalidationReasons: invalidationReasons.length > 0 ? Object.freeze([...invalidationReasons]) : undefined,
+  });
+}
+
+function isIdentitySessionTrustInvalidationReason(value: unknown): value is IdentitySessionTrustInvalidationReason {
+  return value === "trusted-device-revoked"
+    || value === "trusted-device-trust-lost"
+    || value === "trusted-device-expired"
+    || value === "trusted-device-mismatch";
 }
 
 function normalizeAccessChannel(value?: "desktop" | "thin-client"): IdentitySessionAccessChannel {

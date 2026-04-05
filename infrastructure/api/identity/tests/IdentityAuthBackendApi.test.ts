@@ -99,7 +99,7 @@ describe("IdentityAuthBackendApi", () => {
     expect(loggedIn.data?.sessionDeviceTrustContext?.sessionAssuranceLevel).toBe("authenticated-trusted");
     expect(loggedIn.data?.sessionDeviceTrustContext?.trustStateSnapshot?.state).toBe("trusted");
     expect(loggedIn.data?.sessionTrustedDeviceBindingId).toBe("trusted-device:alpha");
-    expect(loggedIn.data?.sessionTrustMarker).toBe("marker:alpha");
+    expect(loggedIn.data?.sessionTrustMarker?.startsWith("trusted-device:trusted-device:alpha|material:")).toBeTrue();
   });
 
   it("maps duplicate registration to conflict and invalid login to authentication-failed", async () => {
@@ -217,7 +217,7 @@ describe("IdentityAuthBackendApi", () => {
     expect(resolvedData.session.deviceTrustContext?.trustedDeviceId).toBe("trusted-device:resolve");
     expect(resolvedData.session.deviceTrustContext?.sessionAssuranceLevel).toBe("authenticated-trusted");
     expect(resolvedData.session.trustedDeviceBindingId).toBe("trusted-device:resolve");
-    expect(resolvedData.session.trustMarker).toBe("marker:resolve");
+    expect(resolvedData.session.trustMarker?.startsWith("trusted-device:trusted-device:resolve|material:")).toBeTrue();
 
     harness.adapter.setNow("2026-04-05T18:30:00.000Z");
     const expired = await harness.backendApi.resolveAuthenticatedSession({
@@ -299,6 +299,14 @@ describe("IdentityAuthBackendApi", () => {
     });
     expect(resolved.ok).toBeFalse();
     expect(resolved.error?.code).toBe("authentication-failed");
+    expect(resolved.error?.trustFailure?.invalidationReasons).toEqual(["trusted-device-revoked"]);
+    expect(resolved.error?.trustFailure?.reason).toContain("revoked");
+
+    const revokedSession = await harness.adapter.getSessionById(login.data.sessionId);
+    expect(revokedSession?.status).toBe("revoked");
+
+    const invalidatedTokenMaterial = await harness.adapter.getSessionTokenMaterialBySessionId(login.data.sessionId);
+    expect(invalidatedTokenMaterial?.invalidatedAt).toBe("2026-04-04T18:00:00.000Z");
   });
 
   it("supports explicit logout and authenticated session revocation flows", async () => {

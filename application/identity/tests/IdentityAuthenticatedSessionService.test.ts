@@ -504,6 +504,25 @@ describe("IdentityAuthenticatedSessionService", () => {
     expect(resolved.error.details).toEqual({
       policy: "future-device-trust",
       sessionTrustInvalidationReasons: ["trusted-device-trust-lost"],
+      sessionTrustFailureReason: "device not trusted",
+      sessionTrustFailure: true,
+      sessionInvalidated: true,
+      sessionInvalidatedAt: "2026-04-04T12:00:00.000Z",
+      sessionId: issued.value.session.id,
     });
+
+    const revokedSession = await adapter.getSessionById(issued.value.session.id);
+    expect(revokedSession?.status).toBe(IdentitySessionStatuses.revoked);
+
+    const invalidatedTokenMaterial = await adapter.getSessionTokenMaterialBySessionId(issued.value.session.id);
+    expect(invalidatedTokenMaterial?.invalidatedAt).toBe("2026-04-04T12:00:00.000Z");
+
+    const secondResolve = await service.resolveAuthenticatedSessionByToken({ token: issued.value.token });
+    expect(secondResolve.ok).toBeFalse();
+    if (secondResolve.ok) {
+      throw new Error("Expected second resolve failure for invalidated token.");
+    }
+    expect(secondResolve.error.code).toBe(IdentityErrorCodes.invalidSessionState);
+    expect(secondResolve.error.message).toBe("Session token is invalidated.");
   });
 });
