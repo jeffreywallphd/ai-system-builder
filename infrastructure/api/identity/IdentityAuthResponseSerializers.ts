@@ -14,6 +14,7 @@ import type { LocalIdentityAccountSummary } from "../../../src/application/ident
 import type { SetLocalIdentityAccountStatusResult } from "../../../src/application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
 import type { IssueAuthenticatedSessionResult } from "../../../application/identity/services/IdentityAuthenticatedSessionService";
 import type { LoginLocalAccountResult } from "../../../src/application/identity/use-cases/LoginLocalAccountUseCase";
+import type { SessionDeviceTrustContext } from "../../../src/domain/identity/IdentityDomain";
 
 export function serializeRegisterLocalIdentityResponse(value: RegisterLocalIdentityApiResponse): RegisterLocalIdentityApiResponse {
   return Object.freeze({
@@ -44,6 +45,9 @@ export function serializeLoginLocalIdentityResponse(
     sessionExpiresAt: session.session.expiresAt,
     sessionAccessChannel: session.session.client?.accessChannel,
     sessionDeviceId: session.session.client?.deviceId,
+    sessionDeviceTrustContext: serializeSessionDeviceTrustContext(
+      mapDomainSessionDeviceTrustContext(session.session.client?.deviceTrust),
+    ),
     sessionTrustedDeviceBindingId: session.session.client?.trustedDeviceBindingId,
     sessionTrustMarker: session.session.client?.trustMarker,
   });
@@ -65,6 +69,7 @@ export function serializeResolveAuthenticatedSessionResponse(
       providerSubject: value.session.providerSubject,
       accessChannel: value.session.accessChannel,
       deviceId: value.session.deviceId,
+      deviceTrustContext: serializeSessionDeviceTrustContext(value.session.deviceTrustContext),
       trustedDeviceBindingId: value.session.trustedDeviceBindingId,
       trustMarker: value.session.trustMarker,
       issuedAt: value.session.issuedAt,
@@ -154,5 +159,52 @@ function serializeLocalIdentityAccountSummary(account: LocalIdentityAccountSumma
     activeSessionCount: account.activeSessionCount,
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
+  });
+}
+
+function serializeSessionDeviceTrustContext(
+  value: ResolveAuthenticatedSessionApiResponse["session"]["deviceTrustContext"]
+    | LoginLocalIdentityApiResponse["sessionDeviceTrustContext"],
+) {
+  if (!value) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    trustedDeviceId: value.trustedDeviceId,
+    issuedOnTrustedDevice: value.issuedOnTrustedDevice,
+    sessionAssuranceLevel: value.sessionAssuranceLevel,
+    trustStateSnapshot: value.trustStateSnapshot
+      ? Object.freeze({
+          state: value.trustStateSnapshot.state,
+          evaluatedAt: value.trustStateSnapshot.evaluatedAt,
+        })
+      : undefined,
+    invalidationReasons: value.invalidationReasons ? Object.freeze([...value.invalidationReasons]) : undefined,
+    trustedDeviceBindingId: value.trustedDeviceBindingId,
+    trustMarker: value.trustMarker,
+  });
+}
+
+function mapDomainSessionDeviceTrustContext(
+  value?: SessionDeviceTrustContext,
+): ResolveAuthenticatedSessionApiResponse["session"]["deviceTrustContext"] | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    trustedDeviceId: value.trustedDeviceId,
+    issuedOnTrustedDevice: value.issuedOnTrustedDevice,
+    sessionAssuranceLevel: value.sessionAssuranceLevel,
+    trustStateSnapshot: value.snapshot
+      ? Object.freeze({
+          state: value.snapshot.state,
+          evaluatedAt: value.snapshot.evaluatedAt,
+        })
+      : undefined,
+    invalidationReasons: value.invalidationReasons ? Object.freeze([...value.invalidationReasons]) : undefined,
+    trustedDeviceBindingId: value.trustedDeviceBindingId,
+    trustMarker: value.trustMarker,
   });
 }

@@ -49,7 +49,7 @@ describe("SqliteIdentityRepository", () => {
     const db = openSqliteCompatDatabase(databasePath);
     const migrationVersion = db.prepare("SELECT MAX(version) AS version FROM identity_repository_migrations")
       .get() as { version?: number };
-    expect(migrationVersion.version).toBe(5);
+    expect(migrationVersion.version).toBe(6);
 
     const tableRows = db.prepare(`
       SELECT name
@@ -189,6 +189,16 @@ describe("SqliteIdentityRepository", () => {
         userAgent: "loom-test",
         ipAddress: "127.0.0.1",
         deviceId: "device-1",
+        deviceTrust: {
+          trustedDeviceId: "trusted-device:alpha",
+          issuedOnTrustedDevice: true,
+          sessionAssuranceLevel: "authenticated-trusted",
+          snapshot: {
+            state: "trusted",
+            evaluatedAt: "2026-04-04T12:00:00.000Z",
+          },
+          invalidationReasons: ["trusted-device-revoked"],
+        },
         trustedDeviceBindingId: "trusted-device:alpha",
         trustMarker: "marker:alpha",
       },
@@ -206,6 +216,8 @@ describe("SqliteIdentityRepository", () => {
     expect((await repository.getSessionById(activeSession.id))?.client?.accessChannel).toBe("thin-client");
     expect((await repository.getSessionById(activeSession.id))?.client?.trustedDeviceBindingId).toBe("trusted-device:alpha");
     expect((await repository.getSessionById(activeSession.id))?.client?.trustMarker).toBe("marker:alpha");
+    expect((await repository.getSessionById(activeSession.id))?.client?.deviceTrust?.sessionAssuranceLevel).toBe("authenticated-trusted");
+    expect((await repository.getSessionById(activeSession.id))?.client?.deviceTrust?.invalidationReasons).toEqual(["trusted-device-revoked"]);
     await repository.saveSessionTokenMaterial({
       sessionId: activeSession.id,
       tokenHash: "hash:session:active",

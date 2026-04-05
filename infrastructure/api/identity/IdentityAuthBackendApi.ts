@@ -184,7 +184,29 @@ export class IdentityAuthBackendApi {
       providerId: result.value.providerId,
       providerSubject: result.value.providerSubject,
       accessChannel: normalizeAccessChannel(request.accessChannel),
-      client: request.client,
+      client: request.client ? {
+        userAgent: request.client.userAgent,
+        ipAddress: request.client.ipAddress,
+        deviceId: request.client.deviceId,
+        deviceTrust: request.client.deviceTrustContext
+          ? Object.freeze({
+              trustedDeviceId: request.client.deviceTrustContext.trustedDeviceId,
+              issuedOnTrustedDevice: request.client.deviceTrustContext.issuedOnTrustedDevice,
+              sessionAssuranceLevel: request.client.deviceTrustContext.sessionAssuranceLevel,
+              snapshot: request.client.deviceTrustContext.trustStateSnapshot
+                ? Object.freeze({
+                    state: request.client.deviceTrustContext.trustStateSnapshot.state,
+                    evaluatedAt: request.client.deviceTrustContext.trustStateSnapshot.evaluatedAt,
+                  })
+                : undefined,
+              invalidationReasons: request.client.deviceTrustContext.invalidationReasons,
+              trustedDeviceBindingId: request.client.deviceTrustContext.trustedDeviceBindingId,
+              trustMarker: request.client.deviceTrustContext.trustMarker,
+            })
+          : undefined,
+        trustedDeviceBindingId: request.client.trustedDeviceBindingId,
+        trustMarker: request.client.trustMarker,
+      } : undefined,
     });
     if (!issueSessionResult.ok) {
       const response = Object.freeze({
@@ -292,6 +314,22 @@ export class IdentityAuthBackendApi {
           providerSubject: resolved.value.session.providerSubject,
           accessChannel: resolved.value.session.client?.accessChannel,
           deviceId: resolved.value.session.client?.deviceId,
+          deviceTrustContext: resolved.value.deviceTrustContext
+            ? Object.freeze({
+                trustedDeviceId: resolved.value.deviceTrustContext.trustedDeviceId,
+                issuedOnTrustedDevice: resolved.value.deviceTrustContext.issuedOnTrustedDevice,
+                sessionAssuranceLevel: resolved.value.deviceTrustContext.sessionAssuranceLevel,
+                trustStateSnapshot: resolved.value.deviceTrustContext.snapshot
+                  ? Object.freeze({
+                      state: resolved.value.deviceTrustContext.snapshot.state,
+                      evaluatedAt: resolved.value.deviceTrustContext.snapshot.evaluatedAt,
+                    })
+                  : undefined,
+                invalidationReasons: resolved.value.deviceTrustContext.invalidationReasons,
+                trustedDeviceBindingId: resolved.value.deviceTrustContext.trustedDeviceBindingId,
+                trustMarker: resolved.value.deviceTrustContext.trustMarker,
+              })
+            : undefined,
           trustedDeviceBindingId: resolved.value.trustedDeviceBindingId,
           trustMarker: resolved.value.trustMarker,
           issuedAt: resolved.value.session.issuedAt,

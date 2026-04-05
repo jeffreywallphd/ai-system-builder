@@ -547,9 +547,15 @@ export class SqliteIdentityPersistenceAdapter
         client_user_agent,
         client_ip_address,
         client_device_id,
+        client_trusted_device_id,
+        client_issued_on_trusted_device,
+        client_session_assurance_level,
+        client_device_trust_state,
+        client_device_trust_evaluated_at,
+        client_device_trust_invalidation_reasons_json,
         client_trusted_device_binding_id,
         client_trust_marker
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(session_id) DO UPDATE SET
         user_identity_id = excluded.user_identity_id,
         provider_id = excluded.provider_id,
@@ -565,6 +571,12 @@ export class SqliteIdentityPersistenceAdapter
         client_user_agent = excluded.client_user_agent,
         client_ip_address = excluded.client_ip_address,
         client_device_id = excluded.client_device_id,
+        client_trusted_device_id = excluded.client_trusted_device_id,
+        client_issued_on_trusted_device = excluded.client_issued_on_trusted_device,
+        client_session_assurance_level = excluded.client_session_assurance_level,
+        client_device_trust_state = excluded.client_device_trust_state,
+        client_device_trust_evaluated_at = excluded.client_device_trust_evaluated_at,
+        client_device_trust_invalidation_reasons_json = excluded.client_device_trust_invalidation_reasons_json,
         client_trusted_device_binding_id = excluded.client_trusted_device_binding_id,
         client_trust_marker = excluded.client_trust_marker
     `).run(...mapSessionToRowValues(session));
@@ -595,6 +607,12 @@ export class SqliteIdentityPersistenceAdapter
         client_user_agent,
         client_ip_address,
         client_device_id,
+        client_trusted_device_id,
+        client_issued_on_trusted_device,
+        client_session_assurance_level,
+        client_device_trust_state,
+        client_device_trust_evaluated_at,
+        client_device_trust_invalidation_reasons_json,
         client_trusted_device_binding_id,
         client_trust_marker
       FROM identity_sessions
@@ -646,6 +664,12 @@ export class SqliteIdentityPersistenceAdapter
         client_user_agent,
         client_ip_address,
         client_device_id,
+        client_trusted_device_id,
+        client_issued_on_trusted_device,
+        client_session_assurance_level,
+        client_device_trust_state,
+        client_device_trust_evaluated_at,
+        client_device_trust_invalidation_reasons_json,
         client_trusted_device_binding_id,
         client_trust_marker
       FROM identity_sessions

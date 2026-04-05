@@ -17,6 +17,7 @@ describe("IdentityAuthRedaction", () => {
         },
         metadata: [
           { trustMarker: "marker:alpha" },
+          { trustedDeviceId: "trusted-device:alpha" },
           { providerSubject: "alice" },
         ],
       },
@@ -29,6 +30,7 @@ describe("IdentityAuthRedaction", () => {
     expect(serialized.includes("CurrentSecret!2026")).toBeFalse();
     expect(serialized.includes("NewSecret!2027")).toBeFalse();
     expect(serialized.includes("marker:alpha")).toBeFalse();
+    expect(serialized.includes("trusted-device:alpha")).toBeFalse();
     expect(serialized.includes("[REDACTED]")).toBeTrue();
   });
 

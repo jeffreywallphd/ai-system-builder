@@ -1,4 +1,8 @@
-import type { Session } from "../../../src/domain/identity/IdentityDomain";
+import type {
+  Session,
+  SessionDeviceTrustContext,
+  SessionDeviceTrustInvalidationReason,
+} from "../../../src/domain/identity/IdentityDomain";
 
 export interface IdentitySessionTrustEvaluationInput {
   readonly session: Session;
@@ -7,6 +11,7 @@ export interface IdentitySessionTrustEvaluationInput {
 
 export interface IdentitySessionTrustEvaluationAllowed {
   readonly allowed: true;
+  readonly deviceTrustContext?: SessionDeviceTrustContext;
   readonly trustedDeviceBindingId?: string;
   readonly trustMarker?: string;
 }
@@ -14,6 +19,7 @@ export interface IdentitySessionTrustEvaluationAllowed {
 export interface IdentitySessionTrustEvaluationDenied {
   readonly allowed: false;
   readonly reason: string;
+  readonly invalidationReasons?: ReadonlyArray<SessionDeviceTrustInvalidationReason>;
   readonly details?: Readonly<Record<string, unknown>>;
 }
 

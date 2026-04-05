@@ -225,7 +225,40 @@ describe("IdentityDomain", () => {
     expect(session.client?.accessChannel).toBe("desktop");
     expect(session.client?.trustedDeviceBindingId).toBe("trusted-device:desktop-1");
     expect(session.client?.trustMarker).toBe("marker:desktop");
+    expect(session.client?.deviceTrust?.trustedDeviceId).toBe("trusted-device:desktop-1");
+    expect(session.client?.deviceTrust?.sessionAssuranceLevel).toBe("authenticated-trusted");
+    expect(session.client?.deviceTrust?.snapshot.state).toBe("unknown");
     expect(revoked.revocation?.reason).toBe("admin");
+  });
+
+  it("captures structured session device trust context at issuance", () => {
+    const session = createSession({
+      id: "session-trust-context",
+      userIdentityId: "user-3",
+      providerId: "provider:local-password",
+      providerSubject: "user-3",
+      issuedAt: new Date("2026-04-04T19:00:00.000Z"),
+      expiresAt: new Date("2026-04-04T20:00:00.000Z"),
+      client: {
+        accessChannel: "desktop",
+        deviceTrust: {
+          trustedDeviceId: "trusted-device:session-context",
+          issuedOnTrustedDevice: true,
+          sessionAssuranceLevel: "authenticated-trusted",
+          snapshot: {
+            state: "trusted",
+            evaluatedAt: "2026-04-04T19:00:00.000Z",
+          },
+          invalidationReasons: ["trusted-device-revoked", "trusted-device-revoked"],
+        },
+      },
+    });
+
+    expect(session.client?.deviceTrust?.trustedDeviceId).toBe("trusted-device:session-context");
+    expect(session.client?.deviceTrust?.issuedOnTrustedDevice).toBeTrue();
+    expect(session.client?.deviceTrust?.sessionAssuranceLevel).toBe("authenticated-trusted");
+    expect(session.client?.deviceTrust?.snapshot.state).toBe("trusted");
+    expect(session.client?.deviceTrust?.invalidationReasons).toEqual(["trusted-device-revoked"]);
   });
 
   it("only expires sessions after expiresAt", () => {

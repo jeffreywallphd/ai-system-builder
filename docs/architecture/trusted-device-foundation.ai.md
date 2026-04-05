@@ -4,6 +4,9 @@
 
 Quick implementation-truth baseline for trusted-device domain/contracts introduced in Feature 2 / Epic 2.1.
 
+Session trust integration note:
+- runtime session contracts now use structured `deviceTrust` context (trusted device id, assurance level, trust snapshot, invalidation reasons) with legacy `trustedDeviceBindingId` / `trustMarker` compatibility fields preserved.
+
 ## Canonical files
 
 - `src/domain/identity/TrustedDeviceDomain.ts`
@@ -76,7 +79,7 @@ Pairing service lifecycle contract (`ITrustedDevicePairingService`):
 
 ## Persistence update (Story 2.1.3)
 
-- SQLite migrations for trusted-device persistence now land in schema version `5` for both migration tracks:
+- SQLite migrations for trusted-device/session persistence now land in schema version `6` for both migration tracks:
   - `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
   - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceMigrations.ts`
 - New tables:

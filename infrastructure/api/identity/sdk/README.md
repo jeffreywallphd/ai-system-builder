@@ -14,8 +14,17 @@ This module defines the transport-facing request/response contracts for local ac
 - `GetIdentityAdminAccountStatusApiRequest`
 - `SetIdentityAdminAccountStatusApiRequest`
 
-`LoginLocalIdentityApiRequest.client` supports optional trusted-device seam context fields:
+`LoginLocalIdentityApiRequest.client` supports optional trusted-device context:
 
+- `deviceTrustContext`:
+  - `trustedDeviceId`
+  - `issuedOnTrustedDevice`
+  - `sessionAssuranceLevel`
+  - `trustStateSnapshot`
+  - `invalidationReasons`
+  - compatibility fields: `trustedDeviceBindingId`, `trustMarker`
+
+Legacy compatibility fields remain available:
 - `trustedDeviceBindingId`
 - `trustMarker`
 
@@ -31,7 +40,7 @@ This module defines the transport-facing request/response contracts for local ac
 - `GetIdentityAdminAccountStatusApiResponse`
 - `SetIdentityAdminAccountStatusApiResponse`
 
-Session responses may include trusted-device seam fields (`deviceId`, `trustedDeviceBindingId`, `trustMarker`) when present.
+Session responses may include device-bound trust context (`deviceTrustContext`) plus legacy compatibility fields (`trustedDeviceBindingId`, `trustMarker`) when present.
 
 ## Error envelope
 
