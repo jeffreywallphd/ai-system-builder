@@ -25,6 +25,9 @@
 - `src/application/identity/use-cases/ChangeLocalPasswordCredentialUseCase.ts`
 - `src/application/identity/use-cases/LogoutIdentitySessionUseCase.ts`
 - `src/application/identity/use-cases/RevokeIdentitySessionUseCase.ts`
+- `src/application/identity/use-cases/ListLocalIdentityAccountsUseCase.ts`
+- `src/application/identity/use-cases/GetLocalIdentityAccountStatusUseCase.ts`
+- `src/application/identity/use-cases/SetLocalIdentityAccountStatusUseCase.ts`
 - `infrastructure/api/identity/IdentityAuthBackendApi.ts`
 - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `hosts/server/IdentityServerHost.ts`
@@ -69,6 +72,21 @@
   - `VerifyLocalPasswordCredentialUseCase`
   - `ChangeLocalPasswordCredentialUseCase`
 - Result: local identity remains operational while future OIDC/OAuth/SAML/Google/Microsoft provider additions can plug into descriptor + adapter seams without redesigning identity ownership or provider-link semantics.
+
+## Local account administration use cases (story 1.4.2)
+
+- New application use cases:
+  - `src/application/identity/use-cases/ListLocalIdentityAccountsUseCase.ts`
+  - `src/application/identity/use-cases/GetLocalIdentityAccountStatusUseCase.ts`
+  - `src/application/identity/use-cases/SetLocalIdentityAccountStatusUseCase.ts`
+- New behavior:
+  - list local accounts with identity/provider-link/session status summaries
+  - view a specific local account status payload
+  - enable/disable local accounts through application orchestration
+  - account disablement revokes active sessions with `admin` reason so bearer tokens fail on next guarded use
+- Readiness seam:
+  - admin operations require explicit action context (`actorUserIdentityId` plus optional authorization/audit context fields) without embedding role-policy decisions inside identity use cases
+  - backend observability/audit flow taxonomy now includes administration operation types
 
 ## Local registration seam
 

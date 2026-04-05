@@ -9,6 +9,9 @@ This note documents the authoritative HTTP server endpoints for local identity r
 - `GET /api/v1/identity/session` (authenticated)
 - `POST /api/v1/identity/logout` (authenticated)
 - `POST /api/v1/identity/session/revoke` (authenticated)
+- `GET /api/v1/identity/admin/accounts` (authenticated)
+- `GET /api/v1/identity/admin/accounts/:userIdentityId` (authenticated)
+- `POST /api/v1/identity/admin/accounts/:userIdentityId/status` (authenticated)
 
 Implemented transport and host composition:
 
@@ -97,6 +100,50 @@ Request body:
 ```
 
 Validation is performed with `zod` at the HTTP transport boundary.
+
+### Admin account list request
+
+`GET /api/v1/identity/admin/accounts`
+
+Requires:
+
+- `Authorization: Bearer <session-token>`
+
+Optional query params:
+
+- `providerId` (defaults to local provider in backend API)
+- `status` (repeatable; one of `pending-activation`, `active`, `suspended`, `locked`, `deactivated`)
+- `limit`
+- `offset`
+
+### Admin account status request
+
+`GET /api/v1/identity/admin/accounts/:userIdentityId`
+
+Requires:
+
+- `Authorization: Bearer <session-token>`
+
+Optional query params:
+
+- `providerId`
+
+### Admin account status mutation request
+
+`POST /api/v1/identity/admin/accounts/:userIdentityId/status`
+
+Requires:
+
+- `Authorization: Bearer <session-token>`
+
+Request body:
+
+```json
+{
+  "action": "enable | disable",
+  "providerId": "string (optional)"
+}
+```
 
 ## Response contracts
 
@@ -201,6 +248,67 @@ All responses use one envelope:
 }
 ```
 
+### Admin account list success
+
+```json
+{
+  "ok": true,
+  "data": {
+    "accounts": [
+      {
+        "userIdentityId": "user-identity:...",
+        "username": "normalized-username",
+        "email": "user@example.com",
+        "displayName": "optional",
+        "accountStatus": "active",
+        "providerId": "provider:local-password",
+        "providerSubject": "normalized-subject",
+        "credentialStatus": "active",
+        "linkedAt": "2026-04-04T18:00:00.000Z",
+        "activeSessionCount": 1,
+        "createdAt": "2026-04-04T18:00:00.000Z",
+        "updatedAt": "2026-04-04T18:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+### Admin account status success
+
+```json
+{
+  "ok": true,
+  "data": {
+    "account": {
+      "userIdentityId": "user-identity:...",
+      "username": "normalized-username",
+      "accountStatus": "active",
+      "providerId": "provider:local-password",
+      "providerSubject": "normalized-subject",
+      "activeSessionCount": 1,
+      "createdAt": "2026-04-04T18:00:00.000Z",
+      "updatedAt": "2026-04-04T18:00:00.000Z"
+    }
+  }
+}
+```
+
+### Admin account status mutation success
+
+```json
+{
+  "ok": true,
+  "data": {
+    "userIdentityId": "user-identity:...",
+    "status": "suspended",
+    "changed": true,
+    "affectedSessionIds": ["identity-session:..."],
+    "updatedAt": "2026-04-04T18:20:00.000Z"
+  }
+}
+```
+
 Protected endpoint behavior:
 
 - `IdentityHttpServer` now includes authenticated-session guard infrastructure for bearer-token routes.
@@ -228,6 +336,8 @@ Error codes exposed to clients:
 - `account-inactive`
 - `unsupported-provider`
 - `internal`
+- `not-found`
+- `forbidden`
 
 HTTP status mapping:
 
@@ -236,6 +346,7 @@ HTTP status mapping:
 - `403` -> `account-inactive`
 - `409` -> `conflict`
 - `422` -> `unsupported-provider`
+- `404` -> `not-found`
 - `500` -> `internal`
 
 Application identity failures are translated through `IdentityAuthBackendApi` into this stable external set.
@@ -250,6 +361,7 @@ Authentication flow observability is centralized in:
 
 - recursive payload redaction (`redactSensitiveAuthPayload`) shared across backend and HTTP transport logs
 - structured flow events (`identity-auth.local-register.completed`, `identity-auth.local-login.completed`)
+- structured flow events now include administration flows (`identity-auth.admin-accounts-list.completed`, `identity-auth.admin-account-get.completed`, `identity-auth.admin-account-status-set.completed`)
 - `IdentityAuthAuditEventSink` hook interface for future audit/event-service integration without changing auth flow orchestration
 
 Redacted keys include:

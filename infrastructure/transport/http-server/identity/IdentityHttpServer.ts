@@ -6,11 +6,17 @@ import type { IdentityAuthBackendApi } from "../../../api/identity/IdentityAuthB
 import {
   IdentityAuthApiErrorCodes,
   type AuthenticatedIdentityPrincipalApiResponse,
+  type GetIdentityAdminAccountStatusApiRequest,
+  type GetIdentityAdminAccountStatusApiResponse,
   type IdentityAuthApiResponse,
+  type ListIdentityAdminAccountsApiRequest,
+  type ListIdentityAdminAccountsApiResponse,
   type LoginLocalIdentityApiRequest,
   type RevokeIdentitySessionApiRequest,
   type ResolveAuthenticatedSessionApiResponse,
   type RegisterLocalIdentityApiRequest,
+  type SetIdentityAdminAccountStatusApiRequest,
+  type SetIdentityAdminAccountStatusApiResponse,
 } from "../../../api/identity/sdk/PublicIdentityAuthApiContract";
 import { redactSensitiveAuthPayload } from "../../../api/identity/IdentityAuthObservability";
 
@@ -47,6 +53,19 @@ const LoginRequestSchema: z.ZodType<LoginLocalIdentityApiRequest> = z.object({
 const RevokeSessionRequestSchema: z.ZodType<Pick<RevokeIdentitySessionApiRequest, "sessionId" | "reason">> = z.object({
   sessionId: z.string().min(1),
   reason: z.enum(["logout", "security", "rotation", "admin"]).optional(),
+}).strict();
+
+const AdminAccountStatusValues = z.enum([
+  "pending-activation",
+  "active",
+  "suspended",
+  "locked",
+  "deactivated",
+]);
+
+const SetAdminAccountStatusRequestSchema: z.ZodType<Pick<SetIdentityAdminAccountStatusApiRequest, "action" | "providerId">> = z.object({
+  action: z.enum(["enable", "disable"]),
+  providerId: z.string().min(1).optional(),
 }).strict();
 
 export interface IdentityHttpServerLogEvent {
@@ -173,6 +192,128 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
               sessionToken: context.sessionToken,
               ...parsedRequest.data,
               actorUserIdentityId: context.principal.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (request.method === "GET" && path === "/api/v1/identity/admin/accounts") {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          async (context) => {
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const includeStatuses = url.searchParams.getAll("status");
+            const limit = parseOptionalInteger(url.searchParams.get("limit"));
+            const offset = parseOptionalInteger(url.searchParams.get("offset"));
+            const providerId = normalizeOptionalString(url.searchParams.get("providerId"));
+
+            const statusValidation = z.array(AdminAccountStatusValues).safeParse(includeStatuses);
+            if (!statusValidation.success) {
+              const validationError = buildQueryValidationError("status", "status values are invalid.");
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.listIdentityAdminAccounts({
+              context: buildAdminContext(context.principal.userIdentityId),
+              providerId,
+              includeStatuses: statusValidation.data,
+              limit,
+              offset,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              context: buildAdminContext(context.principal.userIdentityId),
+              providerId,
+              includeStatuses: statusValidation.data,
+              limit,
+              offset,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (request.method === "GET" && path.startsWith("/api/v1/identity/admin/accounts/")) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          async (context) => {
+            const userIdentityId = decodePathTail(path, "/api/v1/identity/admin/accounts/");
+            if (!userIdentityId) {
+              const invalid = buildInvalidRequestResponse("userIdentityId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const providerId = normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("providerId"));
+            const apiResponse = await options.backendApi.getIdentityAdminAccountStatus({
+              context: buildAdminContext(context.principal.userIdentityId),
+              userIdentityId,
+              providerId,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              context: buildAdminContext(context.principal.userIdentityId),
+              userIdentityId,
+              providerId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (request.method === "POST" && path.endsWith("/status") && path.startsWith("/api/v1/identity/admin/accounts/")) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          async (context) => {
+            const userIdentityId = decodePathTail(path, "/api/v1/identity/admin/accounts/", "/status");
+            if (!userIdentityId) {
+              const invalid = buildInvalidRequestResponse("userIdentityId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateRequest(
+              request,
+              SetAdminAccountStatusRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.setIdentityAdminAccountStatus({
+              context: buildAdminContext(context.principal.userIdentityId),
+              userIdentityId,
+              action: parsedRequest.data.action,
+              providerId: parsedRequest.data.providerId,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              context: buildAdminContext(context.principal.userIdentityId),
+              userIdentityId,
+              ...parsedRequest.data,
             }), apiResponse);
           },
         );
@@ -414,11 +555,79 @@ function mapStatusCode(response: IdentityAuthApiResponse<unknown>): number {
       return 401;
     case IdentityAuthApiErrorCodes.accountInactive:
       return 403;
+    case IdentityAuthApiErrorCodes.forbidden:
+      return 403;
     case IdentityAuthApiErrorCodes.unsupportedProvider:
       return 422;
+    case IdentityAuthApiErrorCodes.notFound:
+      return 404;
     default:
       return 500;
   }
+}
+
+function parseOptionalInteger(value: string | null): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed)) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
+function normalizeOptionalString(value: string | null): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized ? normalized : undefined;
+}
+
+function buildAdminContext(actorUserIdentityId: string): ListIdentityAdminAccountsApiRequest["context"] {
+  return Object.freeze({ actorUserIdentityId });
+}
+
+function decodePathTail(path: string, prefix: string, suffix = ""): string | undefined {
+  if (!path.startsWith(prefix) || (suffix && !path.endsWith(suffix))) {
+    return undefined;
+  }
+
+  const tail = suffix
+    ? path.slice(prefix.length, path.length - suffix.length)
+    : path.slice(prefix.length);
+
+  const decoded = decodeURIComponent(tail).trim();
+  return decoded ? decoded : undefined;
+}
+
+function buildInvalidRequestResponse(message: string): IdentityAuthApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: IdentityAuthApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
+function buildQueryValidationError(path: string, message: string): IdentityAuthApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: IdentityAuthApiErrorCodes.invalidRequest,
+      message: "Request validation failed.",
+      validationErrors: Object.freeze([Object.freeze({
+        path,
+        code: "invalid_enum_value",
+        message,
+      })]),
+    },
+  });
 }
 
 function extractBearerToken(authorizationHeader: string | string[] | undefined): string | undefined {

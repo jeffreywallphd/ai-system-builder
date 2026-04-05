@@ -1,12 +1,17 @@
 # Local Identity Auth API Contract
 
-This module defines the transport-facing request/response contracts for local account registration and login.
+This module defines the transport-facing request/response contracts for local account registration, login/session lifecycle, and local account administration.
 
 ## Requests
 
 - `RegisterLocalIdentityApiRequest`
 - `LoginLocalIdentityApiRequest`
 - `ResolveAuthenticatedSessionApiRequest`
+- `LogoutAuthenticatedSessionApiRequest`
+- `RevokeIdentitySessionApiRequest`
+- `ListIdentityAdminAccountsApiRequest`
+- `GetIdentityAdminAccountStatusApiRequest`
+- `SetIdentityAdminAccountStatusApiRequest`
 
 `LoginLocalIdentityApiRequest.client` supports optional trusted-device seam context fields:
 
@@ -18,6 +23,11 @@ This module defines the transport-facing request/response contracts for local ac
 - `RegisterLocalIdentityApiResponse`
 - `LoginLocalIdentityApiResponse`
 - `ResolveAuthenticatedSessionApiResponse`
+- `LogoutAuthenticatedSessionApiResponse`
+- `RevokeIdentitySessionApiResponse`
+- `ListIdentityAdminAccountsApiResponse`
+- `GetIdentityAdminAccountStatusApiResponse`
+- `SetIdentityAdminAccountStatusApiResponse`
 
 Session responses may include trusted-device seam fields (`deviceId`, `trustedDeviceBindingId`, `trustMarker`) when present.
 
@@ -35,4 +45,6 @@ Stable error codes are declared in `IdentityAuthApiErrorCodes`:
 - `authentication-failed`
 - `account-inactive`
 - `unsupported-provider`
+- `not-found`
+- `forbidden`
 - `internal`

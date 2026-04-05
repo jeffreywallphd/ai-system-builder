@@ -5,6 +5,18 @@ import type {
   LoginLocalAccountErrorCode,
 } from "../../../src/application/identity/use-cases/LoginLocalAccountUseCase";
 import type {
+  ListLocalIdentityAccountsUseCase,
+  ListLocalIdentityAccountsErrorCode,
+} from "../../../src/application/identity/use-cases/ListLocalIdentityAccountsUseCase";
+import type {
+  GetLocalIdentityAccountStatusUseCase,
+  GetLocalIdentityAccountStatusErrorCode,
+} from "../../../src/application/identity/use-cases/GetLocalIdentityAccountStatusUseCase";
+import type {
+  SetLocalIdentityAccountStatusUseCase,
+  SetLocalIdentityAccountStatusErrorCode,
+} from "../../../src/application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
+import type {
   LogoutIdentitySessionUseCase,
   LogoutIdentitySessionErrorCode,
 } from "../../../src/application/identity/use-cases/LogoutIdentitySessionUseCase";
@@ -21,12 +33,18 @@ import {
   IdentityAuthApiErrorCodes,
   type IdentityAuthApiError,
   type IdentityAuthApiResponse,
+  type GetIdentityAdminAccountStatusApiRequest,
+  type GetIdentityAdminAccountStatusApiResponse,
+  type ListIdentityAdminAccountsApiRequest,
+  type ListIdentityAdminAccountsApiResponse,
   type LoginLocalIdentityApiRequest,
   type LoginLocalIdentityApiResponse,
   type LogoutAuthenticatedSessionApiRequest,
   type LogoutAuthenticatedSessionApiResponse,
   type RevokeIdentitySessionApiRequest,
   type RevokeIdentitySessionApiResponse,
+  type SetIdentityAdminAccountStatusApiRequest,
+  type SetIdentityAdminAccountStatusApiResponse,
   type ResolveAuthenticatedSessionApiRequest,
   type ResolveAuthenticatedSessionApiResponse,
   type RegisterLocalIdentityApiRequest,
@@ -40,6 +58,9 @@ interface IdentityAuthBackendApiDependencies {
   readonly loginLocalAccountUseCase: LoginLocalAccountUseCase;
   readonly logoutIdentitySessionUseCase: LogoutIdentitySessionUseCase;
   readonly revokeIdentitySessionUseCase: RevokeIdentitySessionUseCase;
+  readonly listLocalIdentityAccountsUseCase: ListLocalIdentityAccountsUseCase;
+  readonly getLocalIdentityAccountStatusUseCase: GetLocalIdentityAccountStatusUseCase;
+  readonly setLocalIdentityAccountStatusUseCase: SetLocalIdentityAccountStatusUseCase;
   readonly identityLookupRepository: IIdentityLookupRepository;
   readonly authenticatedSessionService: IdentityAuthenticatedSessionService;
   readonly observability?: IdentityAuthObservabilityOptions;
@@ -299,6 +320,97 @@ export class IdentityAuthBackendApi {
     return response;
   }
 
+  public async listIdentityAdminAccounts(
+    request: ListIdentityAdminAccountsApiRequest,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminAccountsApiResponse>> {
+    const result = await this.dependencies.listLocalIdentityAccountsUseCase.execute(request);
+    if (!result.ok) {
+      const response = Object.freeze({ ok: false, error: this.mapAdminAccountError(result.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "admin-accounts-list",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
+    }
+
+    const response = Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        accounts: result.value.accounts,
+      }),
+    });
+    await this.observability.recordApiOutcome({
+      flow: "admin-accounts-list",
+      request,
+      response,
+    });
+    return response;
+  }
+
+  public async getIdentityAdminAccountStatus(
+    request: GetIdentityAdminAccountStatusApiRequest,
+  ): Promise<IdentityAuthApiResponse<GetIdentityAdminAccountStatusApiResponse>> {
+    const result = await this.dependencies.getLocalIdentityAccountStatusUseCase.execute(request);
+    if (!result.ok) {
+      const response = Object.freeze({ ok: false, error: this.mapAdminAccountError(result.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "admin-account-get",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
+    }
+
+    const response = Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        account: result.value.account,
+      }),
+    });
+    await this.observability.recordApiOutcome({
+      flow: "admin-account-get",
+      request,
+      response,
+    });
+    return response;
+  }
+
+  public async setIdentityAdminAccountStatus(
+    request: SetIdentityAdminAccountStatusApiRequest,
+  ): Promise<IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>> {
+    const result = await this.dependencies.setLocalIdentityAccountStatusUseCase.execute(request);
+    if (!result.ok) {
+      const response = Object.freeze({ ok: false, error: this.mapAdminAccountError(result.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "admin-account-status-set",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
+    }
+
+    const response = Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        userIdentityId: result.value.userIdentityId,
+        status: result.value.status,
+        changed: result.value.changed,
+        affectedSessionIds: result.value.affectedSessionIds,
+        updatedAt: result.value.updatedAt,
+      }),
+    });
+    await this.observability.recordApiOutcome({
+      flow: "admin-account-status-set",
+      request,
+      response,
+    });
+    return response;
+  }
+
   private mapRegisterError(code: RegisterLocalAccountErrorCode): IdentityAuthApiError {
     switch (code) {
       case IdentityErrorCodes.duplicateIdentity:
@@ -422,6 +534,36 @@ export class IdentityAuthBackendApi {
         return Object.freeze({
           code: IdentityAuthApiErrorCodes.internal,
           message: "Unexpected session revocation error.",
+        });
+    }
+  }
+
+  private mapAdminAccountError(
+    code: ListLocalIdentityAccountsErrorCode
+      | GetLocalIdentityAccountStatusErrorCode
+      | SetLocalIdentityAccountStatusErrorCode,
+  ): IdentityAuthApiError {
+    switch (code) {
+      case IdentityErrorCodes.invalidRequest:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.invalidRequest,
+          message: "The identity administration request is invalid.",
+        });
+      case IdentityErrorCodes.notFound:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.notFound,
+          message: "The requested identity account was not found.",
+        });
+      case IdentityErrorCodes.invalidState:
+      case IdentityErrorCodes.invalidSessionState:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.accountInactive,
+          message: "The identity account cannot process this status change.",
+        });
+      default:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.internal,
+          message: "Unexpected identity administration error.",
         });
     }
   }

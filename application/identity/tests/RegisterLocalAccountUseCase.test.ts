@@ -18,6 +18,7 @@ import type {
   IdentityOperationResult,
   IdentityPrincipalLookup,
   IdentityProviderSubjectReference,
+  IdentityUserIdentityListQuery,
 } from "../../contracts/IdentityApplicationContracts";
 import {
   IdentityCredentialMaterialStatuses,
@@ -59,6 +60,10 @@ class InMemoryIdentityRegistrationAdapter
 
   public async findUserIdentityById(userIdentityId: string): Promise<UserIdentity | undefined> {
     return this.users.get(userIdentityId.trim());
+  }
+
+  public async listUserIdentities(_query: IdentityUserIdentityListQuery): Promise<ReadonlyArray<UserIdentity>> {
+    return Object.freeze([...this.users.values()]);
   }
 
   public async findUserIdentityByPrincipal(lookup: IdentityPrincipalLookup): Promise<UserIdentity | undefined> {

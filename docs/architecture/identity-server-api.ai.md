@@ -10,6 +10,10 @@
 - Authenticated session termination and revocation endpoints:
   - `POST /api/v1/identity/logout`
   - `POST /api/v1/identity/session/revoke`
+- Authenticated account-administration endpoints:
+  - `GET /api/v1/identity/admin/accounts`
+  - `GET /api/v1/identity/admin/accounts/:userIdentityId`
+  - `POST /api/v1/identity/admin/accounts/:userIdentityId/status`
 - Login success now issues and persists authenticated sessions and returns bearer session credentials.
 - Transport validation at the boundary (`zod`) with stable failure envelopes.
 - Deterministic translation from inner identity errors to public API error codes.
@@ -38,6 +42,8 @@ Public error codes are intentionally bounded:
 - `authentication-failed`
 - `account-inactive`
 - `unsupported-provider`
+- `not-found`
+- `forbidden`
 - `internal`
 
 HTTP mapping:
@@ -47,6 +53,7 @@ HTTP mapping:
 - `403` inactive account
 - `409` conflict
 - `422` unsupported provider
+- `404` not found
 - `500` internal
 
 ## Redaction guarantee
@@ -54,6 +61,8 @@ HTTP mapping:
 Auth observability is centralized in `infrastructure/api/identity/IdentityAuthObservability.ts`.
 
 `IdentityAuthBackendApi` emits structured register/login completion events through this seam (success and failure), and the seam exposes `IdentityAuthAuditEventSink` for later audit-service integration.
+
+Administration API flows also emit structured observability/audit events (`admin-accounts-list`, `admin-account-get`, `admin-account-status-set`) through the same seam.
 
 Shared redaction (`redactSensitiveAuthPayload`) is reused by both backend and HTTP transport logging so sensitive fields never appear in logs. Redacted fields include credential/token material and identity-sensitive request fields (`username`, `providerSubject`, `email`).
 

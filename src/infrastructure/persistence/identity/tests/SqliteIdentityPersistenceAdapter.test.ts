@@ -133,6 +133,13 @@ describe("SqliteIdentityPersistenceAdapter", () => {
       providerId: provider.id,
       providerSubject: "alice-local",
     }))?.id).toBe(user.id);
+    const listedUsers = await adapter.listUserIdentities({
+      providerId: provider.id,
+      includeStatuses: ["active"],
+      limit: 10,
+      offset: 0,
+    });
+    expect(listedUsers.map((entry) => entry.id)).toEqual([user.id]);
 
     expect((await adapter.findAuthProviderById(provider.id))?.kind).toBe(AuthProviderKinds.localPassword);
     expect((await adapter.findCredentialPolicyById(policy.id))?.blockedSubstrings).toEqual(["loom"]);

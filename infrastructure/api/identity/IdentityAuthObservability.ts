@@ -2,7 +2,14 @@ import type { IdentityAuthApiResponse } from "./sdk/PublicIdentityAuthApiContrac
 
 export interface IdentityAuthObservabilityLogEvent {
   readonly event: string;
-  readonly flow: "local-register" | "local-login" | "local-logout" | "session-revoke";
+  readonly flow:
+    | "local-register"
+    | "local-login"
+    | "local-logout"
+    | "session-revoke"
+    | "admin-accounts-list"
+    | "admin-account-get"
+    | "admin-account-status-set";
   readonly outcome: "success" | "failure";
   readonly statusCode?: number;
   readonly requestId?: string;
@@ -20,7 +27,10 @@ export interface IdentityAuthAuditEvent {
     | "identity-auth.local.register"
     | "identity-auth.local.login"
     | "identity-auth.local.logout"
-    | "identity-auth.session.revoke";
+    | "identity-auth.session.revoke"
+    | "identity-auth.admin.accounts.list"
+    | "identity-auth.admin.account.get"
+    | "identity-auth.admin.account.status.set";
   readonly outcome: "success" | "failure";
   readonly occurredAt: string;
   readonly requestId?: string;
@@ -37,7 +47,14 @@ export interface IdentityAuthObservabilityOptions {
 }
 
 interface RecordApiOutcomeInput {
-  readonly flow: "local-register" | "local-login" | "local-logout" | "session-revoke";
+  readonly flow:
+    | "local-register"
+    | "local-login"
+    | "local-logout"
+    | "session-revoke"
+    | "admin-accounts-list"
+    | "admin-account-get"
+    | "admin-account-status-set";
   readonly request: Record<string, unknown>;
   readonly response: IdentityAuthApiResponse<unknown>;
   readonly statusCode?: number;
@@ -137,6 +154,12 @@ function toAuditType(flow: RecordApiOutcomeInput["flow"]): IdentityAuthAuditEven
       return "identity-auth.local.logout";
     case "session-revoke":
       return "identity-auth.session.revoke";
+    case "admin-accounts-list":
+      return "identity-auth.admin.accounts.list";
+    case "admin-account-get":
+      return "identity-auth.admin.account.get";
+    case "admin-account-status-set":
+      return "identity-auth.admin.account.status.set";
     default:
       return "identity-auth.local.login";
   }

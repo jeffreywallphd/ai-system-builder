@@ -4,6 +4,8 @@ export const IdentityAuthApiErrorCodes = Object.freeze({
   authenticationFailed: "authentication-failed",
   accountInactive: "account-inactive",
   unsupportedProvider: "unsupported-provider",
+  notFound: "not-found",
+  forbidden: "forbidden",
   internal: "internal",
 } as const);
 
@@ -133,4 +135,74 @@ export interface ResolveAuthenticatedSessionApiResponse {
     readonly issuedAt: string;
     readonly expiresAt: string;
   };
+}
+
+export interface IdentityAdminActionContextApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly authorization?: {
+    readonly assertions?: ReadonlyArray<string>;
+    readonly scope?: string;
+  };
+  readonly audit?: {
+    readonly reason?: string;
+    readonly correlationId?: string;
+    readonly metadata?: Readonly<Record<string, unknown>>;
+  };
+}
+
+export type IdentityAdminAccountStatus = "pending-activation" | "active" | "suspended" | "locked" | "deactivated";
+export type IdentityAdminCredentialStatus = "active" | "reset-required" | "locked" | "compromised" | "disabled";
+
+export interface IdentityAdminAccountSummaryApiResponse {
+  readonly userIdentityId: string;
+  readonly username: string;
+  readonly email?: string;
+  readonly displayName?: string;
+  readonly accountStatus: IdentityAdminAccountStatus;
+  readonly providerId: string;
+  readonly providerSubject: string;
+  readonly credentialStatus?: IdentityAdminCredentialStatus;
+  readonly credentialDisabledAt?: string;
+  readonly linkedAt: string;
+  readonly lastAuthenticatedAt?: string;
+  readonly activeSessionCount: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface ListIdentityAdminAccountsApiRequest {
+  readonly context: IdentityAdminActionContextApiRequest;
+  readonly providerId?: string;
+  readonly includeStatuses?: ReadonlyArray<IdentityAdminAccountStatus>;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface ListIdentityAdminAccountsApiResponse {
+  readonly accounts: ReadonlyArray<IdentityAdminAccountSummaryApiResponse>;
+}
+
+export interface GetIdentityAdminAccountStatusApiRequest {
+  readonly context: IdentityAdminActionContextApiRequest;
+  readonly userIdentityId: string;
+  readonly providerId?: string;
+}
+
+export interface GetIdentityAdminAccountStatusApiResponse {
+  readonly account: IdentityAdminAccountSummaryApiResponse;
+}
+
+export interface SetIdentityAdminAccountStatusApiRequest {
+  readonly context: IdentityAdminActionContextApiRequest;
+  readonly userIdentityId: string;
+  readonly action: "enable" | "disable";
+  readonly providerId?: string;
+}
+
+export interface SetIdentityAdminAccountStatusApiResponse {
+  readonly userIdentityId: string;
+  readonly status: IdentityAdminAccountStatus;
+  readonly changed: boolean;
+  readonly affectedSessionIds: ReadonlyArray<string>;
+  readonly updatedAt: string;
 }

@@ -8,6 +8,7 @@ import type {
   IdentityOperationResult,
   IdentityPrincipalLookup,
   IdentitySessionListQuery,
+  IdentityUserIdentityListQuery,
   IdentitySessionTokenMaterialRecord,
   IdentityProviderSubjectReference,
 } from "../../../application/contracts/IdentityApplicationContracts";
@@ -371,6 +372,59 @@ export class SqliteIdentityRepository
       .get(normalizedId) as UserRow | undefined;
 
     return row ? this.hydrateUserIdentity(row) : undefined;
+  }
+
+  public async listUserIdentities(query: IdentityUserIdentityListQuery): Promise<ReadonlyArray<UserIdentity>> {
+    const where: string[] = [];
+    const params: unknown[] = [];
+    let joins = "";
+
+    const providerId = normalizeLookup(query.providerId ?? "");
+    if (providerId) {
+      joins += `
+        JOIN identity_user_provider_links l
+          ON l.user_identity_id = u.user_identity_id
+      `;
+      where.push("l.provider_id = ?");
+      params.push(providerId);
+    }
+
+    if (query.includeStatuses && query.includeStatuses.length > 0) {
+      where.push(`u.status IN (${query.includeStatuses.map(() => "?").join(", ")})`);
+      params.push(...query.includeStatuses);
+    }
+
+    const hasLimit = Number.isInteger(query.limit) && (query.limit ?? 0) > 0;
+    const hasOffset = Number.isInteger(query.offset) && (query.offset ?? -1) >= 0;
+    if (hasLimit && hasOffset) {
+      params.push(query.limit, query.offset);
+    } else if (hasLimit) {
+      params.push(query.limit);
+    }
+
+    const rows = this.getDatabase()
+      .prepare(`
+        SELECT DISTINCT
+          u.user_identity_id,
+          u.username,
+          u.email,
+          u.display_name,
+          u.status,
+          u.created_at,
+          u.updated_at,
+          u.activated_at,
+          u.suspended_at,
+          u.locked_at,
+          u.deactivated_at
+        FROM identity_user_identities u
+        ${joins}
+        ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
+        ORDER BY u.created_at DESC
+        ${hasLimit && hasOffset ? "LIMIT ? OFFSET ?" : hasLimit ? "LIMIT ?" : ""}
+      `)
+      .all(...params) as UserRow[];
+
+    return Object.freeze(rows.map((row) => this.hydrateUserIdentity(row)));
   }
 
   public async countUserIdentities(): Promise<number> {
