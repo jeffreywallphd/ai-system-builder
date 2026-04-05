@@ -273,4 +273,234 @@ describe("SqliteAuthorizationPersistenceAdapter", () => {
 
     adapter.dispose();
   });
+
+  it("memoizes hot-path authorization reads when cache is enabled and invalidates on mutations", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-authorization-cache-enabled-"));
+    createdRoots.push(root);
+    const adapter = new SqliteAuthorizationPersistenceAdapter(path.join(root, "authorization.sqlite"), {
+      cache: {
+        enabled: true,
+      },
+    });
+
+    await adapter.upsertRoleAssignment({
+      record: {
+        id: "role-assignment:cache-1",
+        actorUserIdentityId: "user:cache-member",
+        roleKey: "member",
+        scope: RoleAssignmentScopes.workspace,
+        workspaceId: "workspace:cache",
+        status: RoleAssignmentStatuses.active,
+        assignedAt: "2026-04-05T12:00:00.000Z",
+        assignedByUserIdentityId: "user:owner",
+        createdAt: "2026-04-05T12:00:00.000Z",
+        createdBy: "user:owner",
+        lastModifiedAt: "2026-04-05T12:00:00.000Z",
+        lastModifiedBy: "user:owner",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "op:role-assignment:cache-1:create",
+        context: {
+          actorUserIdentityId: "user:owner",
+          occurredAt: "2026-04-05T12:00:00.000Z",
+        },
+      },
+    });
+
+    const roleListA = await adapter.listRoleAssignments({
+      workspaceId: "workspace:cache",
+      includeRevoked: false,
+    });
+    const roleListB = await adapter.listRoleAssignments({
+      workspaceId: "workspace:cache",
+      includeRevoked: false,
+    });
+    expect(roleListA).toBe(roleListB);
+
+    await adapter.upsertSharingGrant({
+      record: {
+        id: "sharing-grant:cache-1",
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset:cache",
+        workspaceId: "workspace:cache",
+        subject: {
+          kind: SharingSubjectKinds.user,
+          userIdentityId: "user:viewer",
+        },
+        permissionKeys: ["asset.read"],
+        grantedAt: "2026-04-05T12:05:00.000Z",
+        grantedByUserIdentityId: "user:owner",
+        createdAt: "2026-04-05T12:05:00.000Z",
+        createdBy: "user:owner",
+        lastModifiedAt: "2026-04-05T12:05:00.000Z",
+        lastModifiedBy: "user:owner",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "op:sharing-grant:cache-1:create",
+        context: {
+          actorUserIdentityId: "user:owner",
+          occurredAt: "2026-04-05T12:05:00.000Z",
+        },
+      },
+    });
+
+    const sharingListA = await adapter.listSharingGrants({
+      resource: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset:cache",
+      },
+      includeRevoked: false,
+      asOf: "2026-04-05T12:10:00.000Z",
+    });
+    const sharingListB = await adapter.listSharingGrants({
+      resource: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset:cache",
+      },
+      includeRevoked: false,
+      asOf: "2026-04-05T12:10:00.000Z",
+    });
+    expect(sharingListA).toBe(sharingListB);
+
+    await adapter.revokeSharingGrant({
+      sharingGrantId: "sharing-grant:cache-1",
+      revokedAt: "2026-04-05T12:20:00.000Z",
+      mutation: {
+        operationKey: "op:sharing-grant:cache-1:revoke",
+        context: {
+          actorUserIdentityId: "user:owner",
+          occurredAt: "2026-04-05T12:20:00.000Z",
+        },
+      },
+    });
+
+    const sharingListAfterRevoke = await adapter.listSharingGrants({
+      resource: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset:cache",
+      },
+      includeRevoked: false,
+      asOf: "2026-04-05T12:21:00.000Z",
+    });
+    expect(sharingListAfterRevoke).toHaveLength(0);
+
+    await adapter.upsertResourcePolicyMetadata({
+      record: {
+        resourceFamily: AuthorizationResourceFamilies.workflow,
+        resourceType: "workflow",
+        resourceId: "workflow:cache",
+        ownerUserIdentityId: "user:owner",
+        ownershipScope: ResourceOwnershipScopes.workspace,
+        workspaceId: "workspace:cache",
+        visibility: ResourceVisibilities.shared,
+        sharingPolicyMode: SharingPolicyModes.explicit,
+        allowResharing: false,
+        isPublishedCapable: false,
+        createdAt: "2026-04-05T12:15:00.000Z",
+        createdBy: "user:owner",
+        lastModifiedAt: "2026-04-05T12:15:00.000Z",
+        lastModifiedBy: "user:owner",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "op:resource-policy:cache-1:create",
+        context: {
+          actorUserIdentityId: "user:owner",
+          occurredAt: "2026-04-05T12:15:00.000Z",
+        },
+      },
+    });
+
+    const policyA = await adapter.findResourcePolicyMetadata({
+      resourceFamily: AuthorizationResourceFamilies.workflow,
+      resourceType: "workflow",
+      resourceId: "workflow:cache",
+    });
+    const policyB = await adapter.findResourcePolicyMetadata({
+      resourceFamily: AuthorizationResourceFamilies.workflow,
+      resourceType: "workflow",
+      resourceId: "workflow:cache",
+    });
+    expect(policyA).toBe(policyB);
+    expect(policyA?.visibility).toBe(ResourceVisibilities.shared);
+
+    await adapter.upsertResourcePolicyMetadata({
+      record: {
+        ...(policyA as NonNullable<typeof policyA>),
+        visibility: ResourceVisibilities.workspace,
+      },
+      mutation: {
+        operationKey: "op:resource-policy:cache-1:update",
+        expectedRevision: policyA?.revision,
+        context: {
+          actorUserIdentityId: "user:owner",
+          occurredAt: "2026-04-05T12:25:00.000Z",
+        },
+      },
+    });
+
+    const policyAfterUpdate = await adapter.findResourcePolicyMetadata({
+      resourceFamily: AuthorizationResourceFamilies.workflow,
+      resourceType: "workflow",
+      resourceId: "workflow:cache",
+    });
+    expect(policyAfterUpdate?.visibility).toBe(ResourceVisibilities.workspace);
+
+    adapter.dispose();
+  });
+
+  it("allows disabling authorization read caching", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-authorization-cache-disabled-"));
+    createdRoots.push(root);
+    const adapter = new SqliteAuthorizationPersistenceAdapter(path.join(root, "authorization.sqlite"), {
+      cache: {
+        enabled: false,
+      },
+    });
+
+    await adapter.upsertRoleAssignment({
+      record: {
+        id: "role-assignment:no-cache-1",
+        actorUserIdentityId: "user:no-cache",
+        roleKey: "member",
+        scope: RoleAssignmentScopes.workspace,
+        workspaceId: "workspace:no-cache",
+        status: RoleAssignmentStatuses.active,
+        assignedAt: "2026-04-05T12:00:00.000Z",
+        assignedByUserIdentityId: "user:owner",
+        createdAt: "2026-04-05T12:00:00.000Z",
+        createdBy: "user:owner",
+        lastModifiedAt: "2026-04-05T12:00:00.000Z",
+        lastModifiedBy: "user:owner",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "op:role-assignment:no-cache-1:create",
+        context: {
+          actorUserIdentityId: "user:owner",
+          occurredAt: "2026-04-05T12:00:00.000Z",
+        },
+      },
+    });
+
+    const roleListA = await adapter.listRoleAssignments({
+      workspaceId: "workspace:no-cache",
+      includeRevoked: false,
+    });
+    const roleListB = await adapter.listRoleAssignments({
+      workspaceId: "workspace:no-cache",
+      includeRevoked: false,
+    });
+
+    expect(roleListA).not.toBe(roleListB);
+    expect(roleListA).toEqual(roleListB);
+
+    adapter.dispose();
+  });
 });
