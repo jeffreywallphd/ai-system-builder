@@ -10,12 +10,15 @@ This note documents Story 4.1.5 (Feature 4 / Epic 4.1): application-layer author
 - `src/application/authorization/ports/IAuthorizationSharingGrantReadRepository.ts`
 - `src/application/authorization/ports/IAuthorizationResourcePolicyMetadataReadRepository.ts`
 - `src/application/authorization/ports/IAuthorizationPolicyEvaluator.ts`
+- `src/application/authorization/ports/IAuthorizationPolicyDecisionEvaluator.ts`
 - `src/application/authorization/ports/IAuthorizationPolicyEventRecorder.ts`
 - `src/application/authorization/ports/AuthorizationPolicyEvaluationPorts.ts`
 - `src/application/authorization/use-cases/EvaluateAuthorizationPolicyUseCase.ts`
 - `src/application/authorization/use-cases/EffectivePermissionResolutionService.ts`
+- `src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator.ts`
 - `src/application/authorization/tests/AuthorizationPolicyPortsContracts.test.ts`
 - `src/application/authorization/tests/EffectivePermissionResolutionService.test.ts`
+- `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
 
 ## Scope and intent
 
@@ -35,6 +38,8 @@ This note documents Story 4.1.5 (Feature 4 / Epic 4.1): application-layer author
   - loads explicit sharing grants for the protected resource.
 - `IAuthorizationPolicyEvaluator`
   - evaluates a fully resolved actor/resource context and returns a policy decision.
+- `IAuthorizationPolicyDecisionEvaluator`
+  - evaluates actor + permission + target (`resource-instance` or `workspace-capability`) and returns a typed allow/deny decision with stable denial reason semantics.
 - `IAuthorizationPolicyEventRecorder`
   - optional best-effort sink for policy-evaluation events.
 
@@ -55,10 +60,11 @@ This note documents Story 4.1.5 (Feature 4 / Epic 4.1): application-layer author
 4. Delegate decisioning to `IAuthorizationPolicyEvaluator`.
 5. Emit a best-effort evaluation event through `IAuthorizationPolicyEventRecorder` when configured.
 
-## Current evaluator baseline (Story 4.2.2)
+## Current evaluator baseline (Stories 4.2.2-4.2.3)
 
 - `EffectivePermissionResolutionService` is the concrete `IAuthorizationPolicyEvaluator` implementation for effective-permission resolution.
 - The service also exposes `resolvePermissions(...)` for batch capability checks in UI and thin-client surfaces, using the same precedence as enforcement decisions.
+- `AuthorizationPolicyDecisionEvaluator` is the concrete `IAuthorizationPolicyDecisionEvaluator` implementation for runtime callers that have actor/action/target references and need centralized decision resolution without ad hoc policy checks.
 
 ## Coverage
 

@@ -120,6 +120,73 @@ export interface AuthorizationPolicyEvaluationDecisionDto {
   readonly resolvedContext: AuthorizationPolicyEvaluationResolvedContext;
 }
 
+export const AuthorizationPolicyEvaluationTargetKinds = Object.freeze({
+  resourceInstance: "resource-instance",
+  workspaceCapability: "workspace-capability",
+});
+
+export type AuthorizationPolicyEvaluationTargetKind =
+  typeof AuthorizationPolicyEvaluationTargetKinds[keyof typeof AuthorizationPolicyEvaluationTargetKinds];
+
+export interface AuthorizationResourceInstanceEvaluationTarget {
+  readonly kind: typeof AuthorizationPolicyEvaluationTargetKinds.resourceInstance;
+  readonly resource: AuthorizationResourceReference;
+}
+
+export interface AuthorizationWorkspaceCapabilityEvaluationTarget {
+  readonly kind: typeof AuthorizationPolicyEvaluationTargetKinds.workspaceCapability;
+  readonly workspaceId: string;
+  readonly capabilityResourceType: string;
+}
+
+export type AuthorizationPolicyEvaluationTarget =
+  | AuthorizationResourceInstanceEvaluationTarget
+  | AuthorizationWorkspaceCapabilityEvaluationTarget;
+
+export const AuthorizationPolicyDecisionDenialReasons = Object.freeze({
+  resourcePolicyMetadataNotFound: "resource-policy-metadata-not-found",
+  explicitDenyPermissionGrant: "explicit-deny-permission-grant",
+  insufficientPermissions: "insufficient-permissions",
+  invalidEvaluationContext: "invalid-evaluation-context",
+});
+
+export type AuthorizationPolicyDecisionDenialReason =
+  typeof AuthorizationPolicyDecisionDenialReasons[keyof typeof AuthorizationPolicyDecisionDenialReasons];
+
+export interface AuthorizationPolicyDecisionDebugDetails {
+  readonly targetKind: AuthorizationPolicyEvaluationTargetKind;
+  readonly sourceKind: string;
+  readonly roleAssignmentCount: number;
+  readonly permissionGrantCount: number;
+  readonly sharingGrantCount: number;
+}
+
+export interface AuthorizationPolicyDecision {
+  readonly isAllowed: boolean;
+  readonly outcome: Extract<PolicyDecision["outcome"], "allow" | "deny">;
+  readonly requiredPermissionKey: PermissionKey;
+  readonly reasonCode: string;
+  readonly reason: string;
+  readonly denialReason?: AuthorizationPolicyDecisionDenialReason;
+  readonly evaluatedAt: string;
+  readonly matchedRoleAssignmentIds: ReadonlyArray<string>;
+  readonly matchedPermissionGrantIds: ReadonlyArray<string>;
+  readonly matchedSharingGrantIds: ReadonlyArray<string>;
+}
+
+export interface AuthorizationPolicyDecisionEvaluationRequest {
+  readonly actor: AuthorizationActorReference;
+  readonly requiredPermissionKey: PermissionKey;
+  readonly target: AuthorizationPolicyEvaluationTarget;
+  readonly asOf?: string;
+  readonly includeDebugDetails?: boolean;
+}
+
+export interface AuthorizationPolicyDecisionEvaluationResult {
+  readonly decision: AuthorizationPolicyDecision;
+  readonly debug?: AuthorizationPolicyDecisionDebugDetails;
+}
+
 export const AuthorizationPolicyEvaluationEventTypes = Object.freeze({
   evaluated: "authorization-policy-evaluated",
 });

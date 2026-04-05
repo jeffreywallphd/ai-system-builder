@@ -2,22 +2,28 @@
 
 ## Purpose
 
-Story 4.2.2 delivers the first production effective-permission resolver for Feature 4. The resolver combines role grants, ownership semantics, visibility rules, explicit sharing grants, and deny conditions into one deterministic decision path.
+Stories 4.2.2-4.2.3 deliver the production policy-evaluation core for Feature 4:
+
+- `EffectivePermissionResolutionService` provides deterministic allow/deny precedence.
+- `AuthorizationPolicyDecisionEvaluator` composes actor grants + resource metadata and emits typed authorization decisions for resource-instance and workspace-capability checks.
 
 ## Canonical files
 
 - `src/application/authorization/use-cases/EffectivePermissionResolutionService.ts`
+- `src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator.ts`
 - `src/application/authorization/tests/EffectivePermissionResolutionService.test.ts`
+- `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
 - `src/application/authorization/use-cases/EvaluateAuthorizationPolicyUseCase.ts`
 
 ## Stable interface
 
-`EffectivePermissionResolutionService` is reusable for both enforcement and capability checks:
+`EffectivePermissionResolutionService` remains the deterministic policy core used by higher-level evaluators. `AuthorizationPolicyDecisionEvaluator` is the caller-facing seam for Story 4.2.3:
 
-- Implements `IAuthorizationPolicyEvaluator` for API/runtime enforcement.
-- Exposes `resolvePermissions(...)` for batch UI capability resolution.
+- accepts actor + permission + target (`resource-instance` or `workspace-capability`),
+- loads role/grant state and resource policy metadata when needed,
+- returns typed decision payloads with stable denial reasons and optional redaction-safe debug details.
 
-Both entry points use the same evaluation rules.
+Both evaluators share the same precedence rules.
 
 ## Deterministic precedence order
 
@@ -55,6 +61,9 @@ Matrix-style tests validate:
 - explicit deny precedence over owner and role grants
 - default deny behavior
 - batch capability resolution shape
+- resource-metadata-missing deterministic deny reason (`resource-policy-metadata-not-found`)
+- workspace-capability checks without requiring a concrete resource instance
+- optional debug details for safe operational diagnostics (`counts` + `sourceKind` only)
 
 ## Extension guidance
 
