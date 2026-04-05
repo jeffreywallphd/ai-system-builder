@@ -1,6 +1,5 @@
 import {
   NodeApprovalStatuses,
-  NodeRevocationStates,
   NodeTrustStates,
   assignNodeCertificate,
   createNodeIdentity,
@@ -28,6 +27,7 @@ import {
   mapNodeTrustDomainError,
   normalizeOptional,
   normalizeRequired,
+  isNodeTrustLifecycleRevoked,
   toNodeTrustFailure,
 } from "./NodeTrustUseCaseShared";
 
@@ -127,7 +127,7 @@ export class ActivateApprovedNodeUseCase {
       );
     }
 
-    if (node.trustState === NodeTrustStates.revoked || node.revocation.state === NodeRevocationStates.revoked) {
+    if (isNodeTrustLifecycleRevoked(node)) {
       return toNodeTrustFailure(
         NodeTrustUseCaseErrorCodes.invalidState,
         `Node '${node.nodeId}' is revoked and cannot be activated.`,

@@ -1,6 +1,6 @@
 # Node Trusted Activation Workflow
 
-This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, Story 5.4.1, Story 5.4.2, and Story 5.4.3 (Feature 5 / Epic 5.3 and Epic 5.4): explicit activation of approved nodes into trusted operational state, capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, authenticated admin UI inventory inspection surfaces, durable node revocation behavior, node-authenticated trust enforcement, and node trust audit recording integration.
+This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, Story 5.4.1, Story 5.4.2, Story 5.4.3, and Story 5.4.5 (Feature 5 / Epic 5.3 and Epic 5.4): explicit activation of approved nodes into trusted operational state, capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, authenticated admin UI inventory inspection surfaces, durable node revocation behavior, node-authenticated trust enforcement, and lifecycle hardening for stale/duplicate enrollment and revoked-node edge cases.
 
 ## Purpose
 
@@ -33,6 +33,7 @@ This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.
 - `ui/pages/NodeInventoryPage.tsx`
 - `ui/pages/tests/NodeInventoryPage.test.tsx`
 - `ui/shared/nodes/tests/NodeInventoryClient.test.ts`
+- `ui/pages/NodeEnrollmentReviewPage.tsx`
 
 ## Lifecycle model
 
@@ -55,10 +56,15 @@ This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.
 - Activation is idempotent when repeated with equivalent certificate/trust metadata.
 - Re-activation attempts with conflicting certificate references are rejected.
 - Unapproved nodes cannot be activated.
+- Nodes carrying any revocation markers (`trustState`, revocation state, or revocation timestamps) cannot be activated.
 - Capability profiles are normalized and validated before registration/approval persistence.
 - Existing nodes approved via enrollment are updated to the approved enrollment capability profile.
 - Revocation is admin-authorized and durable. Revoked nodes keep persisted revocation metadata (`revokedAt`, `revokedByUserIdentityId`, optional `note`) and remain visible in inventory as `revoked`.
 - Repeated revocation requests against already-revoked nodes are safe no-op operations that preserve original revocation metadata.
+- Enrollment registration expires stale pending requests before accepting a retry to avoid indefinite queue blocking.
+- Enrollment registration rejects duplicate `requestId` reuse to prevent accidental or malicious request overwrite.
+- Approval is blocked for already-revoked nodes.
+- Rejecting a stale enrollment for a revoked node does not mutate the node back out of `revoked`.
 
 ## Capability registration rules
 
@@ -77,6 +83,7 @@ This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.
 - `node-approved`
 - `node-activated`
 - `node-revoked`
+- `node-enrollment-expired`
 - `node-heartbeat-recorded`
 - `node-heartbeat-rejected`
 

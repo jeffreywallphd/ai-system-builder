@@ -31,6 +31,7 @@ import {
   mapNodeTrustDomainError,
   normalizeOptional,
   normalizeRequired,
+  isNodeTrustLifecycleRevoked,
   toNodeTrustFailure,
 } from "./NodeTrustUseCaseShared";
 
@@ -133,6 +134,13 @@ export class ApproveNodeEnrollmentUseCase {
       return toNodeTrustFailure(
         NodeTrustUseCaseErrorCodes.forbidden,
         error instanceof Error ? error.message : "Actor is not authorized to approve nodes.",
+      );
+    }
+
+    if (existingNode && isNodeTrustLifecycleRevoked(existingNode)) {
+      return toNodeTrustFailure(
+        NodeTrustUseCaseErrorCodes.invalidState,
+        `Node '${existingNode.nodeId}' is revoked and cannot be re-approved from enrollment.`,
       );
     }
 

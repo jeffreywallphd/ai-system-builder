@@ -122,12 +122,7 @@ export function enforceNodeAuthenticatedOperationTrust<TValue>(
 ): NodeTrustUseCaseOutcome<TValue> | undefined {
   const operation = operationDescription.trim() || "perform this operation";
 
-  if (
-    node.revocation.state === NodeRevocationStates.revoked
-    || node.trustState === NodeTrustStates.revoked
-    || Boolean(node.revokedAt)
-    || Boolean(node.revocation.revokedAt)
-  ) {
+  if (isNodeTrustLifecycleRevoked(node)) {
     return toNodeTrustFailure(
       NodeTrustUseCaseErrorCodes.invalidState,
       `Node '${node.nodeId}' is revoked and cannot ${operation}.`,
@@ -168,4 +163,13 @@ export function enforceNodeAuthenticatedOperationTrust<TValue>(
   }
 
   return undefined;
+}
+
+export function isNodeTrustLifecycleRevoked(
+  node: Pick<NodeIdentityPersistenceRecord, "trustState" | "revocation" | "revokedAt">,
+): boolean {
+  return node.revocation.state === NodeRevocationStates.revoked
+    || node.trustState === NodeTrustStates.revoked
+    || Boolean(node.revokedAt)
+    || Boolean(node.revocation.revokedAt);
 }

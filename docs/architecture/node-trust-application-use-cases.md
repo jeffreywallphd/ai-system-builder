@@ -38,6 +38,8 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `RegisterNodeEnrollmentRequestUseCase`
   - validates request through domain constructors
   - blocks duplicate pending enrollment per node
+  - expires stale pending enrollment requests on registration retry to prevent indefinite queue blocking
+  - rejects duplicate enrollment `requestId` reuse to prevent request overwrite/confusion
   - persists enrollment request with mutation envelope metadata
 - `ReviewPendingNodeEnrollmentUseCase`
   - lists pending/under-review enrollment requests for administrative review
@@ -54,9 +56,11 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
   - upserts node approval state and activation prerequisites (`trustState=pending-approval`) using persistence ports
   - normalizes and validates approved enrollment capability profiles before persistence
   - updates existing node records with approved enrollment capability profiles for stable capability registration
+  - blocks approval when an existing node record is already revoked
 - `ActivateApprovedNodeUseCase`
   - authorizes activation action
   - requires node approval before trust activation and blocks revoked/unapproved nodes
+  - treats revocation timestamps as revocation markers to block activation for inconsistent revoked records
   - enforces certificate-backed trust prerequisites before transition to `trustState=trusted`
   - preserves approved capability profile and certificate/trust metadata on activation
   - is idempotent for repeated activation attempts
@@ -67,6 +71,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
   - persists decision metadata (`reviewedAt`, `reviewedByUserIdentityId`, `decisionNote`) on the enrollment request
   - emits rejection audit events that include persisted decision metadata
   - upserts node as rejected/quarantined for explicit lifecycle traceability
+  - keeps existing revoked node records immutable when rejecting stale enrollment requests
 - `RevokeNodeTrustUseCase`
   - authorizes revocation action
   - requires revocation reason when revoking non-revoked nodes
@@ -125,6 +130,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
   - best-effort audit publication seam with typed event vocabulary
   - non-blocking by default for current slice
   - activation audit events are distinct from heartbeat presence events
+  - stale pending enrollment auto-expiration events are included in lifecycle audit output (`node-enrollment-expired`)
 
 ## Boundary posture
 
@@ -143,12 +149,17 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts` validates:
 
 - enrollment registration orchestration
+- stale pending enrollment expiration + retry registration behavior
+- duplicate enrollment request-id conflict behavior
 - pending review listing (including denied review authorization path)
 - enrollment detail retrieval (including denied review authorization path)
 - approval flow including authorization gating, explicit lifecycle transition sequence, decision metadata persistence, certificate hook, and pending-activation trust-state staging
 - approval flow includes capability profile normalization/validation and existing-node capability profile updates
+- approval flow blocks already-revoked existing nodes
 - activation flow including approved-only guardrails, idempotent trusted-state transition, and activation audit publication
+- activation flow rejects records carrying revocation timestamps even when persisted revocation state is inconsistent
 - rejection flow including authorization gating, explicit lifecycle transition sequence, decision metadata persistence, and quarantine state mutation
+- rejection flow preserves revoked existing-node trust state for stale enrollment cleanup
 - revocation flow with certificate-revocation hook, authorization denial coverage, durable revocation metadata assertions, and safe repeat-revocation idempotency behavior
 - heartbeat recording with centralized node-authenticated trust enforcement and rejection coverage for unknown, pending, rejected, and revoked nodes
 - trusted inventory query filtering
