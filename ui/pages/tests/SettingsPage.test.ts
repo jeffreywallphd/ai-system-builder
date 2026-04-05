@@ -32,6 +32,8 @@ describe("SettingsPage", () => {
     expect(source).toContain("onSearchChange={(value) => void mcpStore.search({ query: value }).catch(() => undefined)}");
     expect(source).toContain("Authentication & install defaults");
     expect(source).toContain("Advanced development settings");
+    expect(source).toContain("Workspace administration");
+    expect(source).toContain("to={ROUTE_PATHS.workspaceAdmin}");
     expect(source).toContain('id="settings-authoring-default-view-mode"');
     expect(source).toContain("function NumberField");
   });

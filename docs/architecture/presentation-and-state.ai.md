@@ -830,3 +830,15 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Runtime window relaunch from System Runtime Run panel now prepares reopen-aware launch contracts through the same restore seam (`buildReopenRequest`), carrying forward prior runtime-session identity and persisted logical runtime state.
 - `ImageManipulationRuntimeEditorPanel` now accepts host-resolved restored session state, preserving existing session persistence behavior while avoiding a second restore path for reopen context.
 - Runtime lifecycle coverage is now explicit in `ui/runtime/tests/SystemRuntimeWindowLifecycle.test.ts`, including launch payload normalization, hydration default/binding readiness, restore success for reopened sessions, stale reference degradation, and invalid launch-query normalization.
+
+## Workspace administration UI update (story 3.4.2)
+
+- Added a dedicated authenticated renderer surface for workspace administration in `ui/pages/WorkspaceAdministrationPage.tsx`.
+- Renderer integration remains thin and contract-driven:
+  - transport client seam in `ui/shared/workspaces/WorkspaceAdministrationClient.ts`,
+  - page-facing service seam in `ui/services/WorkspaceAdministrationService.ts`,
+  - no UI-side tenancy business-rule reimplementation beyond basic form-shape validation.
+- Route/navigation integration now includes `ROUTE_PATHS.workspaceAdmin` (`/settings/workspaces`) with settings-entry discoverability:
+  - `ui/routes/RouteConfig.ts`,
+  - `ui/routes/AppRouter.tsx`,
+  - `ui/pages/SettingsPage.tsx`.

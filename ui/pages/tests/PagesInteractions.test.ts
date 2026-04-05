@@ -51,6 +51,7 @@ describe("ui/pages interactions", () => {
     expect(buildAutomate).toContain("appendAutomationIntentToPath");
     expect(buildAutomate).toContain("BuildIntents.automateTask");
     expect(settings).toContain("Advanced runtime settings");
+    expect(settings).toContain("Workspace administration");
     expect(notFound).toContain("to={ROUTE_PATHS.home}");
   });
 

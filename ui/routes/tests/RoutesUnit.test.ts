@@ -21,6 +21,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('key: "run"');
     expect(source).toContain('key: "workflow-editor"');
     expect(source).toContain('key: "settings"');
+    expect(source).toContain('key: "workspace-admin"');
     expect(source).toContain('key: "identity-admin"');
     expect(source).toContain('key: "mcp"');
     expect(source).toContain('key: "services"');
@@ -40,6 +41,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('promptTemplateStudio: "/studio-shell/prompt-template"');
     expect(source).toContain('embeddingIndexStudio: "/studio-shell/embedding-index"');
     expect(source).toContain('configProfileStudio: "/studio-shell/config-profile"');
+    expect(source).toContain('workspaceAdmin: "/settings/workspaces"');
     expect(source).toContain('identityAdmin: "/settings/identity-admin"');
     expect(source).toContain('key: "agent-studio"');
     expect(source).toContain('key: "registry"');
@@ -81,6 +83,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.notFound");
     expect(source).toContain('path: "/index.html"');
     expect(source).toContain("path: ROUTE_PATHS.settings");
+    expect(source).toContain("path: ROUTE_PATHS.workspaceAdmin");
     expect(source).toContain("path: ROUTE_PATHS.identityAdmin");
     expect(source).toContain("path: ROUTE_PATHS.mcp");
     expect(source).toContain("path: ROUTE_PATHS.services");

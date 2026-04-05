@@ -35,6 +35,7 @@ import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
 import IdentityAdminPage from "../pages/IdentityAdminPage";
 import TrustedDevicesPage from "../pages/TrustedDevicesPage";
+import WorkspaceAdministrationPage from "../pages/WorkspaceAdministrationPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
 import type { LoginLocalIdentityApiResponse } from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
@@ -124,6 +125,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.embeddingIndexStudio, element: <EmbeddingIndexStudioPage /> },
           { path: ROUTE_PATHS.configProfileStudio, element: <ConfigProfileStudioPage /> },
           { path: ROUTE_PATHS.settings, element: <SettingsPage /> },
+          { path: ROUTE_PATHS.workspaceAdmin, element: <WorkspaceAdministrationPage /> },
           { path: ROUTE_PATHS.identityAdmin, element: <IdentityAdminPage /> },
           { path: ROUTE_PATHS.trustedDevices, element: <TrustedDevicesPage /> },
         ],
