@@ -40,3 +40,8 @@
 - Port contract assumptions: `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
 - DTO helper coverage: `src/shared/dto/security/tests/CertificateAuthorityDtos.test.ts`
 - schema parse/validation behavior: `src/shared/schemas/security/tests/CertificateAuthoritySchemaContracts.test.ts`
+
+## Follow-on note
+
+- Story 6.1.2 adds persistence schema + adapter details in:
+  - `docs/architecture/internal-ca-persistence-contracts.ai.md`

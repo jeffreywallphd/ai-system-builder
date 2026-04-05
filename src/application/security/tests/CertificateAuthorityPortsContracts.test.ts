@@ -7,8 +7,14 @@ import {
   CertificateUsageKinds,
 } from "../../../domain/security/CertificateAuthorityDomain";
 import type {
+  CertificateDistributionEventLookupQuery,
+  CertificateDistributionEventPersistenceRecord,
   CertificateAuthorityRootPersistenceRecord,
   CertificateAuthorityRootLookupQuery,
+  CertificateRevocationHistoryLookupQuery,
+  CertificateRevocationHistoryPersistenceRecord,
+  CertificateStatusHistoryLookupQuery,
+  CertificateStatusHistoryPersistenceRecord,
   IssuedCertificateLookupQuery,
   IssuedCertificatePersistenceRecord,
   TrustMaterialReferenceLookupQuery,
@@ -19,6 +25,7 @@ import {
   normalizeCertificateAuthorityMutationOperationKey,
 } from "../../../shared/dto/security/CertificateAuthorityDtos";
 import type { ICertificateAuthorityRootPersistenceRepository } from "../ports/ICertificateAuthorityRootPersistenceRepository";
+import type { ICertificateLifecycleEventPersistenceRepository } from "../ports/ICertificateLifecycleEventPersistenceRepository";
 import type { IIssuedCertificatePersistenceRepository } from "../ports/IIssuedCertificatePersistenceRepository";
 import type { ITrustMaterialReferencePersistenceRepository } from "../ports/ITrustMaterialReferencePersistenceRepository";
 import type { CertificateAuthorityPersistencePorts } from "../ports/CertificateAuthorityPorts";
@@ -26,11 +33,15 @@ import type { CertificateAuthorityPersistencePorts } from "../ports/CertificateA
 class InMemoryCertificateAuthorityPersistenceAdapter
   implements
     ICertificateAuthorityRootPersistenceRepository,
+    ICertificateLifecycleEventPersistenceRepository,
     IIssuedCertificatePersistenceRepository,
     ITrustMaterialReferencePersistenceRepository {
   private readonly certificateAuthoritiesById = new Map<string, CertificateAuthorityRootPersistenceRecord>();
   private readonly certificatesBySerial = new Map<string, IssuedCertificatePersistenceRecord>();
   private readonly trustMaterialsByRef = new Map<string, TrustMaterialReferencePersistenceRecord>();
+  private readonly statusHistoryById = new Map<string, CertificateStatusHistoryPersistenceRecord>();
+  private readonly revocationsById = new Map<string, CertificateRevocationHistoryPersistenceRecord>();
+  private readonly distributionEventsById = new Map<string, CertificateDistributionEventPersistenceRecord>();
   private readonly mutationReplayByOperationKey = new Map<string, unknown>();
 
   async findCertificateAuthorityById(
@@ -261,6 +272,17 @@ class InMemoryCertificateAuthorityPersistenceAdapter
     });
 
     this.certificatesBySerial.set(serial, next);
+    const statusEventId = `status:${serial}:${next.status}:${next.lastModifiedAt}`;
+    this.statusHistoryById.set(statusEventId, Object.freeze({
+      statusEventId,
+      certificateAuthorityId: next.certificateAuthorityId,
+      serialNumber: next.serialNumber,
+      previousStatus: existing?.status,
+      currentStatus: next.status,
+      occurredAt: next.lastModifiedAt,
+      occurredBy: next.lastModifiedBy,
+      reason: "save-issued-certificate",
+    }));
     this.mutationReplayByOperationKey.set(operationKey, next);
     return Object.freeze({
       record: next,
@@ -327,6 +349,226 @@ class InMemoryCertificateAuthorityPersistenceAdapter
 
   async findTrustMaterialByRef(materialRef: string): Promise<TrustMaterialReferencePersistenceRecord | undefined> {
     return this.trustMaterialsByRef.get(materialRef);
+  }
+
+  async findLatestStatusEventBySerialNumber(
+    serialNumber: string,
+  ): Promise<CertificateStatusHistoryPersistenceRecord | undefined> {
+    const normalizedSerial = serialNumber.trim().toUpperCase();
+    return [...this.statusHistoryById.values()]
+      .filter((event) => event.serialNumber === normalizedSerial)
+      .sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt))[0];
+  }
+
+  async listCertificateStatusHistory(
+    query: CertificateStatusHistoryLookupQuery,
+  ): Promise<ReadonlyArray<CertificateStatusHistoryPersistenceRecord>> {
+    const rows = [...this.statusHistoryById.values()].filter((event) => {
+      if (query.certificateAuthorityId && event.certificateAuthorityId !== query.certificateAuthorityId) {
+        return false;
+      }
+      if (query.serialNumber && event.serialNumber !== query.serialNumber.trim().toUpperCase()) {
+        return false;
+      }
+      if (query.statuses && query.statuses.length > 0 && !query.statuses.includes(event.currentStatus)) {
+        return false;
+      }
+      if (query.occurredAfter && Date.parse(event.occurredAt) < Date.parse(query.occurredAfter)) {
+        return false;
+      }
+      if (query.occurredBefore && Date.parse(event.occurredAt) > Date.parse(query.occurredBefore)) {
+        return false;
+      }
+      return true;
+    }).sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt));
+
+    return this.page(rows, query.limit, query.offset);
+  }
+
+  async appendCertificateStatusHistory(input: {
+    readonly record: CertificateStatusHistoryPersistenceRecord;
+    readonly mutation: {
+      readonly operationKey: string;
+      readonly expectedRevision?: number;
+      readonly context: {
+        readonly actorUserIdentityId: string;
+        readonly occurredAt?: string;
+      };
+    };
+  }) {
+    const operationKey = normalizeCertificateAuthorityMutationOperationKey(input.mutation.operationKey);
+    const replay = this.mutationReplayByOperationKey.get(operationKey);
+    if (replay) {
+      return Object.freeze({
+        record: replay as CertificateStatusHistoryPersistenceRecord,
+        changed: false,
+        wasReplay: true,
+      });
+    }
+
+    const next = Object.freeze({
+      ...input.record,
+      serialNumber: input.record.serialNumber.trim().toUpperCase(),
+      occurredBy: input.mutation.context.actorUserIdentityId,
+      occurredAt: input.mutation.context.occurredAt ?? input.record.occurredAt,
+    });
+    this.statusHistoryById.set(next.statusEventId, next);
+    this.mutationReplayByOperationKey.set(operationKey, next);
+    return Object.freeze({
+      record: next,
+      changed: true,
+      wasReplay: false,
+    });
+  }
+
+  async findLatestCertificateRevocationBySerialNumber(
+    serialNumber: string,
+  ): Promise<CertificateRevocationHistoryPersistenceRecord | undefined> {
+    const normalizedSerial = serialNumber.trim().toUpperCase();
+    return [...this.revocationsById.values()]
+      .filter((revocation) => revocation.serialNumber === normalizedSerial)
+      .sort((left, right) => Date.parse(right.revokedAt) - Date.parse(left.revokedAt))[0];
+  }
+
+  async listCertificateRevocations(
+    query: CertificateRevocationHistoryLookupQuery,
+  ): Promise<ReadonlyArray<CertificateRevocationHistoryPersistenceRecord>> {
+    const rows = [...this.revocationsById.values()].filter((revocation) => {
+      if (query.certificateAuthorityId && revocation.certificateAuthorityId !== query.certificateAuthorityId) {
+        return false;
+      }
+      if (query.serialNumber && revocation.serialNumber !== query.serialNumber.trim().toUpperCase()) {
+        return false;
+      }
+      if (query.reasons && query.reasons.length > 0 && !query.reasons.includes(revocation.reason)) {
+        return false;
+      }
+      if (query.revokedAfter && Date.parse(revocation.revokedAt) < Date.parse(query.revokedAfter)) {
+        return false;
+      }
+      if (query.revokedBefore && Date.parse(revocation.revokedAt) > Date.parse(query.revokedBefore)) {
+        return false;
+      }
+      return true;
+    }).sort((left, right) => Date.parse(right.revokedAt) - Date.parse(left.revokedAt));
+
+    return this.page(rows, query.limit, query.offset);
+  }
+
+  async saveCertificateRevocation(input: {
+    readonly record: CertificateRevocationHistoryPersistenceRecord;
+    readonly mutation: {
+      readonly operationKey: string;
+      readonly expectedRevision?: number;
+      readonly context: {
+        readonly actorUserIdentityId: string;
+        readonly occurredAt?: string;
+      };
+    };
+  }) {
+    const operationKey = normalizeCertificateAuthorityMutationOperationKey(input.mutation.operationKey);
+    const replay = this.mutationReplayByOperationKey.get(operationKey);
+    if (replay) {
+      return Object.freeze({
+        record: replay as CertificateRevocationHistoryPersistenceRecord,
+        changed: false,
+        wasReplay: true,
+      });
+    }
+
+    const existing = this.revocationsById.get(input.record.revocationId);
+    const next = Object.freeze({
+      ...input.record,
+      serialNumber: input.record.serialNumber.trim().toUpperCase(),
+      revision: existing ? existing.revision + 1 : 1,
+      lastModifiedAt: input.mutation.context.occurredAt ?? input.record.lastModifiedAt,
+      lastModifiedBy: input.mutation.context.actorUserIdentityId,
+    });
+    this.revocationsById.set(next.revocationId, next);
+    this.mutationReplayByOperationKey.set(operationKey, next);
+    return Object.freeze({
+      record: next,
+      changed: !existing || JSON.stringify(existing) !== JSON.stringify(next),
+      wasReplay: false,
+    });
+  }
+
+  async listCertificateDistributionEvents(
+    query: CertificateDistributionEventLookupQuery,
+  ): Promise<ReadonlyArray<CertificateDistributionEventPersistenceRecord>> {
+    const rows = [...this.distributionEventsById.values()].filter((event) => {
+      if (query.materialRef && event.materialRef !== query.materialRef) {
+        return false;
+      }
+      if (query.certificateAuthorityId && event.certificateAuthorityId !== query.certificateAuthorityId) {
+        return false;
+      }
+      if (query.serialNumber && event.serialNumber !== query.serialNumber.trim().toUpperCase()) {
+        return false;
+      }
+      if (query.targetKinds && query.targetKinds.length > 0 && !query.targetKinds.includes(event.targetKind)) {
+        return false;
+      }
+      if (query.targetReferenceId && event.targetReferenceId !== query.targetReferenceId) {
+        return false;
+      }
+      if (query.workspaceId && event.workspaceId !== query.workspaceId) {
+        return false;
+      }
+      if (query.statuses && query.statuses.length > 0 && !query.statuses.includes(event.status)) {
+        return false;
+      }
+      if (query.occurredAfter && Date.parse(event.occurredAt) < Date.parse(query.occurredAfter)) {
+        return false;
+      }
+      if (query.occurredBefore && Date.parse(event.occurredAt) > Date.parse(query.occurredBefore)) {
+        return false;
+      }
+      return true;
+    }).sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt));
+
+    return this.page(rows, query.limit, query.offset);
+  }
+
+  async saveCertificateDistributionEvent(input: {
+    readonly record: CertificateDistributionEventPersistenceRecord;
+    readonly mutation: {
+      readonly operationKey: string;
+      readonly expectedRevision?: number;
+      readonly context: {
+        readonly actorUserIdentityId: string;
+        readonly occurredAt?: string;
+      };
+    };
+  }) {
+    const operationKey = normalizeCertificateAuthorityMutationOperationKey(input.mutation.operationKey);
+    const replay = this.mutationReplayByOperationKey.get(operationKey);
+    if (replay) {
+      return Object.freeze({
+        record: replay as CertificateDistributionEventPersistenceRecord,
+        changed: false,
+        wasReplay: true,
+      });
+    }
+
+    const existing = this.distributionEventsById.get(input.record.distributionEventId);
+    const next = Object.freeze({
+      ...input.record,
+      serialNumber: input.record.serialNumber?.trim().toUpperCase(),
+      revision: existing ? existing.revision + 1 : 1,
+      occurredBy: input.mutation.context.actorUserIdentityId,
+      occurredAt: input.mutation.context.occurredAt ?? input.record.occurredAt,
+      lastModifiedAt: input.mutation.context.occurredAt ?? input.record.lastModifiedAt,
+      lastModifiedBy: input.mutation.context.actorUserIdentityId,
+    });
+
+    this.distributionEventsById.set(next.distributionEventId, next);
+    this.mutationReplayByOperationKey.set(operationKey, next);
+    return Object.freeze({
+      record: next,
+      changed: !existing || JSON.stringify(existing) !== JSON.stringify(next),
+      wasReplay: false,
+    });
   }
 
   async listTrustMaterials(
@@ -398,6 +640,7 @@ describe("certificate authority application ports and repository contracts", () 
       certificateAuthorityRootPersistenceRepository: adapter,
       issuedCertificatePersistenceRepository: adapter,
       trustMaterialReferencePersistenceRepository: adapter,
+      certificateLifecycleEventPersistenceRepository: adapter,
     };
 
     await ports.certificateAuthorityRootPersistenceRepository.saveCertificateAuthority({
@@ -510,11 +753,15 @@ describe("certificate authority application ports and repository contracts", () 
       statuses: CertificateAuthorityPersistenceQueryPresets.revokedCertificateStatuses,
       includeRevoked: true,
     });
+    const statusHistory = await ports.certificateLifecycleEventPersistenceRepository.listCertificateStatusHistory({
+      serialNumber: "C0FFEE",
+    });
 
     expect(activeRoot?.certificateAuthorityId).toBe("ca:internal:root:v1");
     expect(revoked.record.status).toBe(CertificateStatuses.revoked);
     expect(revoked.record.revocation?.reason).toBe(CertificateRevocationReasons.policyViolation);
     expect(revokedCertificates).toHaveLength(1);
+    expect(statusHistory.length).toBeGreaterThanOrEqual(2);
   });
 
   it("supports rotation policy updates and trust material references", async () => {
@@ -523,6 +770,7 @@ describe("certificate authority application ports and repository contracts", () 
       certificateAuthorityRootPersistenceRepository: adapter,
       issuedCertificatePersistenceRepository: adapter,
       trustMaterialReferencePersistenceRepository: adapter,
+      certificateLifecycleEventPersistenceRepository: adapter,
     };
 
     await ports.certificateAuthorityRootPersistenceRepository.saveCertificateAuthority({
@@ -609,9 +857,39 @@ describe("certificate authority application ports and repository contracts", () 
     const trustMaterials = await ports.trustMaterialReferencePersistenceRepository.listTrustMaterials({
       kinds: ["certificate-chain-pem"],
     });
+    const distributionSaved = await ports.certificateLifecycleEventPersistenceRepository.saveCertificateDistributionEvent({
+      record: {
+        distributionEventId: "distribution:root:v2:node-01",
+        materialRef: "trust:bundle:root:v2",
+        certificateAuthorityId: "ca:internal:root:v2",
+        targetKind: "node",
+        targetReferenceId: "node:01",
+        transport: "node-trust-bundle-sync",
+        status: "published",
+        occurredAt: "2028-01-01T00:00:00.000Z",
+        occurredBy: "user:security-admin",
+        createdAt: "2028-01-01T00:00:00.000Z",
+        createdBy: "user:security-admin",
+        lastModifiedAt: "2028-01-01T00:00:00.000Z",
+        lastModifiedBy: "user:security-admin",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "op-distribution-save-v2",
+        context: {
+          actorUserIdentityId: "user:security-admin",
+          occurredAt: "2028-01-01T00:00:00.000Z",
+        },
+      },
+    });
+    const distributionEvents = await ports.certificateLifecycleEventPersistenceRepository.listCertificateDistributionEvents({
+      targetKinds: ["node"],
+    });
 
     expect(rotationUpdate.record.rotationPolicy.rotateBeforeExpiryDays).toBe(180);
     expect(trustMaterials).toHaveLength(1);
     expect(trustMaterials[0]?.materialRef).toBe("trust:bundle:root:v2");
+    expect(distributionSaved.record.status).toBe("published");
+    expect(distributionEvents).toHaveLength(1);
   });
 });

@@ -9,6 +9,10 @@ import {
   createCertificateSubjectDescriptor,
   createCertificateValidityWindow,
 } from "../../../domain/security/CertificateAuthorityDomain";
+import {
+  CertificateDistributionEventStatuses,
+  CertificateDistributionTargetKinds,
+} from "../../dto/security/CertificateAuthorityDtos";
 
 export interface CertificateAuthoritySchemaValidationIssue {
   readonly path: string;
@@ -151,6 +155,20 @@ export const CertificateRevocationPersistenceRecordSchema = z.object({
   note: z.string().trim().max(2000).optional(),
 });
 
+const CertificateDistributionTargetKindSchema = z.enum([
+  CertificateDistributionTargetKinds.node,
+  CertificateDistributionTargetKinds.server,
+  CertificateDistributionTargetKinds.device,
+  CertificateDistributionTargetKinds.service,
+]);
+
+const CertificateDistributionEventStatusSchema = z.enum([
+  CertificateDistributionEventStatuses.queued,
+  CertificateDistributionEventStatuses.published,
+  CertificateDistributionEventStatuses.failed,
+  CertificateDistributionEventStatuses.acknowledged,
+]);
+
 export const TrustMaterialReferencePersistenceRecordSchema = z.object({
   materialRef: CertificateAuthorityIdentifierSchema,
   kind: TrustMaterialKindSchema,
@@ -248,6 +266,79 @@ export const IssuedCertificatePersistenceRecordSchema = z.object({
   }
 });
 
+export const CertificateStatusHistoryPersistenceRecordSchema = z.object({
+  statusEventId: CertificateAuthorityIdentifierSchema,
+  certificateAuthorityId: CertificateAuthorityIdentifierSchema,
+  serialNumber: z.string().trim().toUpperCase().regex(SerialPattern),
+  previousStatus: CertificateStatusSchema.optional(),
+  currentStatus: CertificateStatusSchema,
+  occurredAt: CertificateAuthorityTimestampSchema,
+  occurredBy: CertificateAuthorityIdentifierSchema,
+  reason: z.string().trim().max(512).optional(),
+  note: z.string().trim().max(2000).optional(),
+}).superRefine((value, context) => {
+  if (value.previousStatus && value.previousStatus === value.currentStatus) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["currentStatus"],
+      message: "Certificate status history events cannot repeat the same previous and current status.",
+    });
+  }
+});
+
+export const CertificateRevocationHistoryPersistenceRecordSchema = z.object({
+  revocationId: CertificateAuthorityIdentifierSchema,
+  certificateAuthorityId: CertificateAuthorityIdentifierSchema,
+  serialNumber: z.string().trim().toUpperCase().regex(SerialPattern),
+  reason: z.enum([
+    CertificateRevocationReasons.unspecified,
+    CertificateRevocationReasons.keyCompromise,
+    CertificateRevocationReasons.caCompromise,
+    CertificateRevocationReasons.affiliationChanged,
+    CertificateRevocationReasons.superseded,
+    CertificateRevocationReasons.cessationOfOperation,
+    CertificateRevocationReasons.privilegeWithdrawn,
+    CertificateRevocationReasons.policyViolation,
+  ]),
+  revokedAt: CertificateAuthorityTimestampSchema,
+  revokedByActorId: CertificateAuthorityIdentifierSchema.optional(),
+  note: z.string().trim().max(2000).optional(),
+  createdAt: CertificateAuthorityTimestampSchema,
+  createdBy: CertificateAuthorityIdentifierSchema,
+  lastModifiedAt: CertificateAuthorityTimestampSchema,
+  lastModifiedBy: CertificateAuthorityIdentifierSchema,
+  revision: z.number().int().nonnegative(),
+});
+
+export const CertificateDistributionEventPersistenceRecordSchema = z.object({
+  distributionEventId: CertificateAuthorityIdentifierSchema,
+  materialRef: CertificateAuthorityIdentifierSchema,
+  certificateAuthorityId: CertificateAuthorityIdentifierSchema.optional(),
+  serialNumber: z.string().trim().toUpperCase().regex(SerialPattern).optional(),
+  targetKind: CertificateDistributionTargetKindSchema,
+  targetReferenceId: CertificateAuthorityIdentifierSchema,
+  workspaceId: CertificateAuthorityIdentifierSchema.optional(),
+  transport: z.string().trim().min(1).max(255),
+  deliveryLocatorRef: z.string().trim().min(1).max(1024).optional(),
+  status: CertificateDistributionEventStatusSchema,
+  occurredAt: CertificateAuthorityTimestampSchema,
+  occurredBy: CertificateAuthorityIdentifierSchema,
+  failureReason: z.string().trim().max(1024).optional(),
+  createdAt: CertificateAuthorityTimestampSchema,
+  createdBy: CertificateAuthorityIdentifierSchema,
+  lastModifiedAt: CertificateAuthorityTimestampSchema,
+  lastModifiedBy: CertificateAuthorityIdentifierSchema,
+  revision: z.number().int().nonnegative(),
+}).superRefine((value, context) => {
+  if (value.status === CertificateDistributionEventStatuses.failed && !value.failureReason) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["failureReason"],
+      message: "Failed distribution events require failureReason.",
+    });
+  }
+});
+
 export type RotationPolicyMetadataPersistenceRecordPayload = z.infer<typeof RotationPolicyMetadataPersistenceRecordSchema>;
 export type CertificateValidityWindowPersistenceRecordPayload = z.infer<typeof CertificateValidityWindowPersistenceRecordSchema>;
 export type CertificateSubjectPersistenceRecordPayload = z.infer<typeof CertificateSubjectPersistenceRecordSchema>;
@@ -256,6 +347,9 @@ export type CertificateRevocationPersistenceRecordPayload = z.infer<typeof Certi
 export type TrustMaterialReferencePersistenceRecordPayload = z.infer<typeof TrustMaterialReferencePersistenceRecordSchema>;
 export type CertificateAuthorityRootPersistenceRecordPayload = z.infer<typeof CertificateAuthorityRootPersistenceRecordSchema>;
 export type IssuedCertificatePersistenceRecordPayload = z.infer<typeof IssuedCertificatePersistenceRecordSchema>;
+export type CertificateStatusHistoryPersistenceRecordPayload = z.infer<typeof CertificateStatusHistoryPersistenceRecordSchema>;
+export type CertificateRevocationHistoryPersistenceRecordPayload = z.infer<typeof CertificateRevocationHistoryPersistenceRecordSchema>;
+export type CertificateDistributionEventPersistenceRecordPayload = z.infer<typeof CertificateDistributionEventPersistenceRecordSchema>;
 
 function formatZodPath(path: ReadonlyArray<string | number>): string {
   if (path.length === 0) {
@@ -315,6 +409,36 @@ export function parseTrustMaterialReferencePersistenceRecord(
   return parseCertificateAuthoritySchema(
     "TrustMaterialReferencePersistenceRecord",
     TrustMaterialReferencePersistenceRecordSchema,
+    payload,
+  );
+}
+
+export function parseCertificateStatusHistoryPersistenceRecord(
+  payload: unknown,
+): CertificateStatusHistoryPersistenceRecordPayload {
+  return parseCertificateAuthoritySchema(
+    "CertificateStatusHistoryPersistenceRecord",
+    CertificateStatusHistoryPersistenceRecordSchema,
+    payload,
+  );
+}
+
+export function parseCertificateRevocationHistoryPersistenceRecord(
+  payload: unknown,
+): CertificateRevocationHistoryPersistenceRecordPayload {
+  return parseCertificateAuthoritySchema(
+    "CertificateRevocationHistoryPersistenceRecord",
+    CertificateRevocationHistoryPersistenceRecordSchema,
+    payload,
+  );
+}
+
+export function parseCertificateDistributionEventPersistenceRecord(
+  payload: unknown,
+): CertificateDistributionEventPersistenceRecordPayload {
+  return parseCertificateAuthoritySchema(
+    "CertificateDistributionEventPersistenceRecord",
+    CertificateDistributionEventPersistenceRecordSchema,
     payload,
   );
 }

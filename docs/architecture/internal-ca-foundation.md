@@ -102,3 +102,8 @@ These seams let later stories implement bootstrapping, issuance, lookup, revocat
 - `CertificateAuthorityPortsContracts.test.ts`: repository contract assumptions for save/list/lookup/revoke/rotation/trust-material flows
 - `CertificateAuthorityDtos.test.ts`: query preset and lookup-key helper behavior
 - `CertificateAuthoritySchemaContracts.test.ts`: valid payload parsing and invalid payload rejection for CA/certificate/trust-material records
+
+## Related architecture note
+
+- Story 6.1.2 persistence schema and repository adapter details are documented in:
+  - `docs/architecture/internal-ca-persistence-contracts.md`
