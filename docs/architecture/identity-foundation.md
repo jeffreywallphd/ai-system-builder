@@ -343,6 +343,31 @@ Current protected route:
 
 - `GET /api/v1/identity/session` (requires `Authorization: Bearer <session-token>`)
 
+## Session Revocation and Logout Flows (Story 1.3.4)
+
+Session termination now includes explicit user logout and targeted session revocation orchestration:
+
+- `src/application/identity/use-cases/LogoutIdentitySessionUseCase.ts`
+- `src/application/identity/use-cases/RevokeIdentitySessionUseCase.ts`
+- `IdentityAuthenticatedSessionService.revokeAuthenticatedSessionById(...)`
+
+Authoritative transport/API additions:
+
+- `POST /api/v1/identity/logout` (revokes current bearer-authenticated session)
+- `POST /api/v1/identity/session/revoke` (revokes target session id for the authenticated principal)
+
+Revocation consistency behavior in this local slice:
+
+- `identity_sessions` lifecycle status is persisted as `revoked`
+- `identity_session_token_material.invalidated_at` is persisted for the associated session token material
+- protected routes reject revoked sessions on subsequent requests with deterministic `401` + `authentication-failed`
+
+Current authorization posture:
+
+- both new endpoints are bearer-token protected
+- session revoke enforces actor ownership of the target session in the application use case
+- system-driven revocation seams now exist in application services/use cases for future security/device-trust orchestration
+
 ## Implemented Test Coverage
 
 Key tests for this foundation:
@@ -359,6 +384,8 @@ Key tests for this foundation:
 - `application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
 - `application/identity/tests/IdentitySessionLifecycleService.test.ts`
 - `application/identity/tests/IdentityAuthenticatedSessionService.test.ts`
+- `application/identity/tests/LogoutIdentitySessionUseCase.test.ts`
+- `application/identity/tests/RevokeIdentitySessionUseCase.test.ts`
 - `application/identity/tests/IdentityAuthenticatorAndProviderCatalog.test.ts`
 - `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`
 - `infrastructure/security/identity/tests/ScryptLocalPasswordCredentialService.test.ts`

@@ -44,6 +44,8 @@ import { IdentityAuthenticatedSessionService } from "../../../../application/ide
 import { IdentityAuthBackendApi } from "../IdentityAuthBackendApi";
 import { RegisterLocalAccountUseCase } from "../../../../src/application/identity/use-cases/RegisterLocalAccountUseCase";
 import { LoginLocalAccountUseCase } from "../../../../src/application/identity/use-cases/LoginLocalAccountUseCase";
+import { LogoutIdentitySessionUseCase } from "../../../../src/application/identity/use-cases/LogoutIdentitySessionUseCase";
+import { RevokeIdentitySessionUseCase } from "../../../../src/application/identity/use-cases/RevokeIdentitySessionUseCase";
 import type { IdentityAuthObservabilityOptions } from "../IdentityAuthObservability";
 
 class InMemoryIdentityAdapter
@@ -334,6 +336,13 @@ export async function createIdentityAuthTestHarness(
       identityPolicyService,
       credentialAuthenticator,
       clock: adapter,
+    }),
+    logoutIdentitySessionUseCase: new LogoutIdentitySessionUseCase({
+      authenticatedSessionService,
+    }),
+    revokeIdentitySessionUseCase: new RevokeIdentitySessionUseCase({
+      sessionRepository: adapter,
+      authenticatedSessionService,
     }),
     identityLookupRepository: adapter,
     authenticatedSessionService,

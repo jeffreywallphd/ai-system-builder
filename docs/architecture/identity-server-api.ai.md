@@ -7,6 +7,9 @@
   - `POST /api/v1/identity/login`
 - Authenticated session validation endpoint and guard:
   - `GET /api/v1/identity/session` with `Authorization: Bearer <session-token>`
+- Authenticated session termination and revocation endpoints:
+  - `POST /api/v1/identity/logout`
+  - `POST /api/v1/identity/session/revoke`
 - Login success now issues and persists authenticated sessions and returns bearer session credentials.
 - Transport validation at the boundary (`zod`) with stable failure envelopes.
 - Deterministic translation from inner identity errors to public API error codes.
@@ -67,6 +70,16 @@ Shared redaction (`redactSensitiveAuthPayload`) is reused by both backend and HT
   - `sessionExpiresAt`
   - `sessionAccessChannel`
 - Session metadata and token material are separated in persistence (`identity_sessions` vs `identity_session_token_material`).
+
+## Logout and revocation contract update (story 1.3.4)
+
+- `POST /api/v1/identity/logout` revokes the bearer-authenticated current session with reason `logout`.
+- `POST /api/v1/identity/session/revoke` revokes an authenticated caller-selected session id (owned by the same principal in this slice) with explicit reason support (`logout`, `security`, `rotation`, `admin`).
+- Both routes are protected by the same bearer-session guard pattern used by `GET /api/v1/identity/session`.
+- Revocation updates both persistence surfaces:
+  - session lifecycle row in `identity_sessions` moves to `revoked`
+  - token material row in `identity_session_token_material` is invalidated (`invalidated_at`)
+- Guarded resource validation therefore rejects revoked sessions on the next request with `401` + `authentication-failed` under local SQLite consistency.
 
 ## Authenticated-session guard contract update (story 1.3.3)
 

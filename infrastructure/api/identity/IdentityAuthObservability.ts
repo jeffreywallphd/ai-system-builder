@@ -2,7 +2,7 @@ import type { IdentityAuthApiResponse } from "./sdk/PublicIdentityAuthApiContrac
 
 export interface IdentityAuthObservabilityLogEvent {
   readonly event: string;
-  readonly flow: "local-register" | "local-login";
+  readonly flow: "local-register" | "local-login" | "local-logout" | "session-revoke";
   readonly outcome: "success" | "failure";
   readonly statusCode?: number;
   readonly requestId?: string;
@@ -16,7 +16,11 @@ export interface IdentityAuthObservabilityLogger {
 }
 
 export interface IdentityAuthAuditEvent {
-  readonly type: "identity-auth.local.register" | "identity-auth.local.login";
+  readonly type:
+    | "identity-auth.local.register"
+    | "identity-auth.local.login"
+    | "identity-auth.local.logout"
+    | "identity-auth.session.revoke";
   readonly outcome: "success" | "failure";
   readonly occurredAt: string;
   readonly requestId?: string;
@@ -33,7 +37,7 @@ export interface IdentityAuthObservabilityOptions {
 }
 
 interface RecordApiOutcomeInput {
-  readonly flow: "local-register" | "local-login";
+  readonly flow: "local-register" | "local-login" | "local-logout" | "session-revoke";
   readonly request: Record<string, unknown>;
   readonly response: IdentityAuthApiResponse<unknown>;
   readonly statusCode?: number;
@@ -93,7 +97,7 @@ export class IdentityAuthObservability {
     }
 
     const auditEvent: IdentityAuthAuditEvent = Object.freeze({
-      type: input.flow === "local-register" ? "identity-auth.local.register" : "identity-auth.local.login",
+      type: toAuditType(input.flow),
       outcome: input.response.ok ? "success" : "failure",
       occurredAt: new Date().toISOString(),
       requestId: input.requestId,
@@ -118,6 +122,21 @@ export class IdentityAuthObservability {
         }),
       }));
     }
+  }
+}
+
+function toAuditType(flow: RecordApiOutcomeInput["flow"]): IdentityAuthAuditEvent["type"] {
+  switch (flow) {
+    case "local-register":
+      return "identity-auth.local.register";
+    case "local-login":
+      return "identity-auth.local.login";
+    case "local-logout":
+      return "identity-auth.local.logout";
+    case "session-revoke":
+      return "identity-auth.session.revoke";
+    default:
+      return "identity-auth.local.login";
   }
 }
 
