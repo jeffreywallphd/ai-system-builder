@@ -8,6 +8,9 @@ Story 4.3.1 adds reusable transport authorization adapters so request handlers c
 - `infrastructure/transport/authorization/AuthorizationTransportAdapters.ts`
 - `infrastructure/transport/authorization/index.ts`
 - `infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
+- `src/infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter.ts`
+- `infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
 
 ## Enforcement model
 
@@ -42,3 +45,9 @@ Surface mapping:
 - malformed context checks,
 - workspace-capability checks,
 - consistent mapping behavior across HTTP, WebSocket/stream, and IPC adapters.
+
+Story 4.3.2 also enforces workspace administration mutation authorization:
+
+- workspace membership and role mutations are policy-gated through centralized workspace-capability checks (`system.manage`) before use-case execution,
+- workspace settings mutations (metadata update, lifecycle transition) and invitation cancel mutations share the same policy gate,
+- unauthorized actors receive stable `forbidden` API responses while authorized admin flows continue to succeed.

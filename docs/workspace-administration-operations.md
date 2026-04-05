@@ -7,6 +7,8 @@ This runbook documents current workspace administration lifecycle and audit-hook
 - Workspace administration mutations execute through application use cases.
 - Successful writes emit best-effort audit events through `WorkspaceAdministrationAuditSink`.
 - Audit dispatch failures are swallowed intentionally in this story to avoid blocking admin operations.
+- Story 4.3.2 adds centralized workspace-capability policy checks (`system.manage`) ahead of workspace-sensitive admin mutations.
+- Self-service invitation onboarding remains separate from admin-only mutation routes.
 
 ## Event matrix
 

@@ -10,6 +10,9 @@ Story 4.3.1 introduces reusable transport-layer authorization enforcement adapte
 - `infrastructure/transport/authorization/AuthorizationTransportAdapters.ts`
 - `infrastructure/transport/authorization/index.ts`
 - `infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
+- `src/infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter.ts`
+- `infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
 
 ## Transport enforcement model
 
@@ -67,3 +70,9 @@ No handler reimplements policy precedence or role/share/visibility evaluation.
 - missing actor mapped to unauthorized,
 - malformed target context mapped to invalid-request,
 - workspace-capability evaluation path.
+
+Story 4.3.2 additionally verifies workspace administration mutation gating:
+
+- workspace membership and role mutation routes run a centralized policy decision check (`system.manage`) against a workspace-capability target before executing use cases,
+- update/lifecycle/invitation-cancel mutations use the same gate,
+- non-admin members receive stable `forbidden` API responses while owner/admin flows remain functional.
