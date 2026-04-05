@@ -83,10 +83,20 @@ Helpers support creation, visibility updates, and ownership transfer with invari
   - tenancy tables (`workspace_records`, `workspace_memberships`, `workspace_role_assignments`, `workspace_invitations`),
   - typed row/domain mappers,
   - repository adapter implementing all workspace repository ports.
+- Story 3.1.4 hardens concrete repository adapter behavior:
+  - full create/read/update/list + lookup persistence paths for workspace/membership/role-assignment/invitation contracts,
+  - stale-write guards using persisted mutation timestamps (`last_modified_at`, `updated_at`, revocation/assignment mutation ordering),
+  - explicit repository-operation error wrapping for clearer failure-path diagnostics.
 - SQL constraints/indexes enforce core operational guarantees:
   - single active owner role assignment per workspace,
   - no duplicate active role binding per `(workspaceId, userIdentityId, role)`,
   - no duplicate membership per workspace/user pair,
   - no duplicate pending invitation per workspace/email,
   - lifecycle metadata coherence via table-level `CHECK` constraints.
+
+## Story 3.1.4 verification additions
+
+- adapter integration tests now assert update round-trips for mutable tenancy aggregates.
+- stale update attempts are rejected once newer records are persisted.
+- constraint and mutation failures surface contextual repository operation messages.
 

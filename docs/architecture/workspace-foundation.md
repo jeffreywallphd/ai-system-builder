@@ -2,7 +2,7 @@
 
 This note documents the production workspace-tenancy foundation for Feature 3 / Epic 3.1.
 
-Scope in stories 3.1.1 through 3.1.3:
+Scope in stories 3.1.1 through 3.1.4:
 
 - workspace aggregate and lifecycle invariants
 - workspace membership aggregate and lifecycle invariants
@@ -12,6 +12,10 @@ Scope in stories 3.1.1 through 3.1.3:
 - application-layer workspace repository port contracts for persistence and query seams
 - shared workspace contract DTOs for create/update/query/list/invitation/membership/role mutation operations
 - SQLite persistence schema, migrations, row mappers, and repository adapter for workspace tenancy data
+- concrete repository adapter behavior for workspace, membership, role-assignment, and invitation persistence
+  - create/read/update/list + lookup paths
+  - stale-write protection on mutable records
+  - contextual persistence failure surfacing for operational debugging
 
 ## Canonical artifacts
 
@@ -147,4 +151,10 @@ Domain helpers provide controlled updates for ownership transfer and visibility 
 - `src/application/workspaces/tests/WorkspaceRepositoryPortsContracts.test.ts`
 - `src/infrastructure/persistence/workspaces/tests/WorkspacePersistenceMapper.test.ts`
 - `src/infrastructure/persistence/workspaces/tests/SqliteWorkspacePersistenceAdapter.test.ts`
+
+Story 3.1.4 extends the adapter integration tests to validate:
+
+- update mutations persist correctly for workspace/membership/role-assignment/invitation records
+- stale updates are rejected when a newer persisted record already exists
+- SQL constraint failures are surfaced with repository-operation context
 
