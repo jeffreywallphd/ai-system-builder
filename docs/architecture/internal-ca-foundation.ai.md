@@ -14,6 +14,7 @@
 - Adds concrete CA issuance signing + protected issued-material persistence seams (Story 6.2.2).
 - Adds node-trust-backed approved-node eligibility integration for certificate issuance (Story 6.2.3).
 - Adds explicit certificate revocation command and revocation-status enforcement registry seams (Story 6.2.4).
+- Adds reusable certificate trust/validity evaluation helper seams for consistent lifecycle status decisions (Story 6.2.5).
 
 ## Main artifacts to cite
 
@@ -36,6 +37,7 @@
 - `src/application/security/use-cases/IssueCertificateForSubjectUseCase.ts`
 - `src/application/security/use-cases/RevokeIssuedCertificateUseCase.ts`
 - `src/application/security/use-cases/ResolveCertificateRevocationStatusUseCase.ts`
+- `src/application/security/use-cases/CertificateTrustEvaluationService.ts`
 - `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
@@ -177,6 +179,18 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - `ResolveCertificateRevocationStatusUseCase` implements `ICertificateRevocationStatusRegistry` to provide a canonical revocation/status check seam for downstream transport and trust-enforcement consumers.
 - registry responses distinguish `revoked` from `expired` and `active` while also reporting `superseded`, `not-yet-valid`, and `not-found` trust states.
 
+## Story 6.2.5 trust evaluation helper behavior
+
+- `CertificateTrustEvaluationService` now centralizes certificate trust-state calculation from persisted metadata + evaluation time.
+- trust outcomes include:
+  - `active`, `revoked`, `expired`, `superseded`, `not-yet-valid`, `not-found`
+  - `subject-inactive` (optional linked-subject trust downgrade)
+  - `invalid` (malformed/unusable validity metadata)
+- boundary policy is explicit and shared:
+  - `notBefore` inclusive
+  - `notAfter` exclusive
+- `ResolveCertificateRevocationStatusUseCase` now delegates trust status calculation to this helper and exposes `usable` in revocation-status responses for transport/readiness checks.
+
 ## Coverage in this slice
 
 - Domain invariants and lifecycle transitions: `src/domain/security/tests/CertificateAuthorityDomain.test.ts`
@@ -194,6 +208,7 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - issuance policy + issued-material persistence/failure compensation coverage: `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
 - revocation command behavior (admin action / duplicate / invalid request): `src/application/security/tests/RevokeIssuedCertificateUseCase.test.ts`
 - revocation registry status enforcement behavior: `src/application/security/tests/ResolveCertificateRevocationStatusUseCase.test.ts`
+- trust evaluation helper and boundary coverage: `src/application/security/tests/CertificateTrustEvaluationService.test.ts`
 - concrete issuer signing pipeline coverage: `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - host initialization seam coverage: `hosts/server/tests/IdentityServerHost.test.ts`
 

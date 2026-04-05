@@ -7,8 +7,10 @@ import {
 import {
   CertificateAuthorityIntrospectionDiagnosticSeverities,
   CertificateAuthorityIntrospectionStates,
+  CertificateLinkedSubjectTrustStates,
   CertificateAuthorityPersistenceQueryPresets,
   CertificateDistributionTargetKinds,
+  CertificateTrustEvaluationStatuses,
   normalizeCertificateAuthorityMutationOperationKey,
   toCertificateAuthorityStatusLookupKey,
   toCertificateDistributionTargetLookupKey,
@@ -54,5 +56,12 @@ describe("CertificateAuthorityDtos", () => {
     expect(CertificateAuthorityIntrospectionStates.healthy).toBe("healthy");
     expect(CertificateAuthorityIntrospectionStates.blocked).toBe("blocked");
     expect(CertificateAuthorityIntrospectionDiagnosticSeverities.error).toBe("error");
+  });
+
+  it("exposes trust evaluation vocabularies", () => {
+    expect(CertificateTrustEvaluationStatuses.active).toBe("active");
+    expect(CertificateTrustEvaluationStatuses.subjectInactive).toBe("subject-inactive");
+    expect(CertificateTrustEvaluationStatuses.invalid).toBe("invalid");
+    expect(CertificateLinkedSubjectTrustStates.revoked).toBe("revoked");
   });
 });
