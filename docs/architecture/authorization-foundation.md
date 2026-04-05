@@ -137,3 +137,14 @@ Story 4.1.5 adds the application-layer authorization context-loading ports and p
   - `src/application/authorization/use-cases/EvaluateAuthorizationPolicyUseCase.ts`
 - Contract tests: `src/application/authorization/tests/AuthorizationPolicyPortsContracts.test.ts`
 - Developer reference: `docs/architecture/authorization-application-ports.md`
+
+## Schema validation contracts seam
+
+Story 4.1.6 adds shared authorization payload schemas for boundary validation of policy-related requests before use-case/domain orchestration.
+
+- Canonical contract files:
+  - `src/shared/schemas/authorization/AuthorizationSchemaContracts.ts`
+- Contract tests:
+  - `src/shared/schemas/authorization/tests/AuthorizationSchemaContracts.test.ts`
+- Developer reference:
+  - `docs/architecture/authorization-schema-validation-contracts.md`
