@@ -34,6 +34,8 @@ describe("SettingsPage", () => {
     expect(source).toContain("Advanced development settings");
     expect(source).toContain("Workspace administration");
     expect(source).toContain("to={ROUTE_PATHS.workspaceAdmin}");
+    expect(source).toContain("Node enrollment review");
+    expect(source).toContain("to={ROUTE_PATHS.nodeEnrollmentReview}");
     expect(source).toContain("Authorization reporting");
     expect(source).toContain("to={ROUTE_PATHS.authorizationReporting}");
     expect(source).toContain("Workspace memberships");

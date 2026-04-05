@@ -39,6 +39,7 @@ import RegisterPage from "../pages/RegisterPage";
 import IdentityAdminPage from "../pages/IdentityAdminPage";
 import TrustedDevicesPage from "../pages/TrustedDevicesPage";
 import WorkspaceAdministrationPage from "../pages/WorkspaceAdministrationPage";
+import NodeEnrollmentReviewPage from "../pages/NodeEnrollmentReviewPage";
 import WorkspaceMembershipThinClientPage from "../pages/WorkspaceMembershipThinClientPage";
 import WorkspaceInvitationOnboardingPage from "../pages/WorkspaceInvitationOnboardingPage";
 import ProtectedRoute from "./ProtectedRoute";
@@ -138,6 +139,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.authorizationSharingThin, element: <AuthorizationSharingThinClientPage /> },
           { path: ROUTE_PATHS.authorizationReporting, element: <AuthorizationReportingPage /> },
           { path: ROUTE_PATHS.workspaceAdmin, element: <WorkspaceAdministrationPage /> },
+          { path: ROUTE_PATHS.nodeEnrollmentReview, element: <NodeEnrollmentReviewPage /> },
           { path: ROUTE_PATHS.workspaceThinMembership, element: <WorkspaceMembershipThinClientPage /> },
           { path: ROUTE_PATHS.identityAdmin, element: <IdentityAdminPage /> },
           { path: ROUTE_PATHS.trustedDevices, element: <TrustedDevicesPage /> },

@@ -8,6 +8,7 @@ describe("ui/services contract adherence", () => {
     const workflowModule = await importModule("ui/services/WorkflowService.ts");
     const mcpModule = await importModule("ui/services/McpService.ts");
     const workspaceAdministrationModule = await importModule("ui/services/WorkspaceAdministrationService.ts");
+    const nodeEnrollmentReviewModule = await importModule("ui/services/NodeEnrollmentReviewService.ts");
     const authorizationManagementModule = await importModule("ui/services/AuthorizationManagementService.ts");
 
     expect(Object.keys(nodeModule)).toContain("NodeService");
@@ -15,6 +16,7 @@ describe("ui/services contract adherence", () => {
     expect(Object.keys(workflowModule)).toContain("WorkflowService");
     expect(Object.keys(mcpModule)).toContain("McpService");
     expect(Object.keys(workspaceAdministrationModule)).toContain("WorkspaceAdministrationService");
+    expect(Object.keys(nodeEnrollmentReviewModule)).toContain("NodeEnrollmentReviewService");
     expect(Object.keys(authorizationManagementModule)).toContain("AuthorizationManagementService");
   });
 });
