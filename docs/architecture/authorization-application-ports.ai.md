@@ -60,12 +60,35 @@ Story 4.1.5 defines application-layer authorization seams so policy evaluation o
 
 `EvaluateAuthorizationPolicyUseCase` is the example consumer that composes all ports, builds domain-safe contexts, delegates to `IAuthorizationPolicyEvaluator`, and returns typed decision results.
 
+Runtime callers should use `IAuthorizationPolicyDecisionEvaluator` to avoid duplicating context-loading and precedence logic.
+
 ## Current production evaluator baseline
 
 - `EffectivePermissionResolutionService` is the first concrete `IAuthorizationPolicyEvaluator` implementation (Story 4.2.2).
 - It also exposes a batch `resolvePermissions(...)` seam for UI capability checks, reusing the same precedence used for enforcement decisions.
 - `AuthorizationPolicyDecisionEvaluator` (Story 4.2.3) composes role/grant/resource metadata loading and `EffectivePermissionResolutionService` into one reusable decision seam that returns typed allow/deny results with stable denial reasons.
 - `AuthorizedResourceQueryService` (Story 4.2.5) composes metadata listing + per-resource decision evaluation into a reusable authorized list/search helper with workspace scope and owner/shared filters.
+
+Authoritative precedence order inside `EffectivePermissionResolutionService`:
+
+1. explicit deny permission grants
+2. owner override
+3. role baseline grants
+4. explicit allow permission grants
+5. explicit sharing grants
+6. visibility fallback (`workspace`/`published` for `read|list`)
+7. default deny
+
+This order is policy behavior, not an implementation detail; do not reimplement it outside evaluator services.
+
+## Repository loading responsibility map
+
+- role assignments + permission grants -> `IAuthorizationRoleGrantReadRepository`
+- resource metadata (owner/workspace/visibility/sharing policy) -> `IAuthorizationResourcePolicyMetadataReadRepository`
+- sharing grants -> `IAuthorizationSharingGrantReadRepository`
+- allow/deny composition -> `AuthorizationPolicyDecisionEvaluator` + `EffectivePermissionResolutionService`
+
+For protected list/search views, compose `AuthorizedResourceQueryService` first, then hydrate feature-specific rows by authorized keys.
 
 ## Audit-safe event shape (Story 4.2.6)
 
@@ -76,6 +99,7 @@ Story 4.1.5 defines application-layer authorization seams so policy evaluation o
 - Decision events include actor/workspace/resource references, permission, outcome, reason code, and compact counts only.
 - Mutation events include actor/workspace/resource references and mutation semantics (`entityKind`, `mutationKind`, `operationKey`, `changed`, `wasReplay`).
 - Free-form mutation reason/metadata is redacted through `AuthorizationAuditRedaction.ts` before emission.
+- Recorder failures are intentionally non-blocking so policy and mutation outcomes are not coupled to telemetry transport health.
 
 ## Administration command/query seams (Story 4.2.7)
 
@@ -88,3 +112,15 @@ Story 4.1.5 defines application-layer authorization seams so policy evaluation o
 - Command/query payloads are validated with Epic 4.1 authorization schemas.
 - Administrative mutations enforce actor authorization through `IAuthorizationPolicyDecisionEvaluator` before persistence writes.
 - Mutation side effects remain centralized in `AuthorizationPolicyMutationService` to preserve audit-event emission behavior.
+
+Mutation gate summary:
+
+- workspace role assignment/removal -> `system.manage` capability
+- sharing grant upsert/revoke -> `<resource-family>.share`
+- visibility updates -> `<resource-family>.manage`
+
+## Caching posture reference
+
+- Story 4.2.4 caching is adapter-local in `SqliteAuthorizationPersistenceAdapter` for role/sharing/resource-policy read hot paths.
+- Invalidation is explicit and mutation-scoped.
+- Evaluator services intentionally do not cache final decisions.

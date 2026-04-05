@@ -46,6 +46,29 @@ Story 4.2.7 adds production application command/query use cases for authorizatio
 
 Both evaluators share the same precedence rules.
 
+## Request-to-decision path
+
+Use this sequence when tracing an allow/deny result:
+
+1. Entry point selects the seam:
+   - `EvaluateAuthorizationPolicyUseCase` when the caller already has a concrete resource.
+   - `AuthorizationPolicyDecisionEvaluator` when the caller has actor + permission + target and needs resource/workspace-capability composition.
+2. Actor context is validated (`actorUserIdentityId` or `actorServiceId` required).
+3. Permission key is normalized with `createPermissionKey(...)`; invalid keys return deny/failure.
+4. Role/permission snapshot is loaded from `IAuthorizationRoleGrantReadRepository`.
+5. Resource-instance path:
+   - load metadata from `IAuthorizationResourcePolicyMetadataReadRepository.findResourcePolicyMetadata(...)`,
+   - load sharing grants from `IAuthorizationSharingGrantReadRepository.listSharingGrants(...)`,
+   - materialize domain-safe actor/resource contexts.
+6. Workspace-capability path:
+   - build synthetic private resource context (`workspace-capability:<workspaceId>:<capabilityResourceType>`),
+   - skip resource metadata/sharing-grant reads.
+7. Delegate to `EffectivePermissionResolutionService.resolvePermission(...)`.
+8. Return typed decision (`isAllowed`, `outcome`, `reasonCode`, optional `denialReason`, matched ids).
+9. Optionally emit best-effort audit events (`evaluated` always; `denied` on deny outcomes).
+
+`resource-policy-metadata-not-found` is a deterministic deny for resource-instance checks.
+
 ## Deterministic precedence order
 
 1. Explicit deny permission grants (`PermissionGrant.effect=deny`) matching scope + permission.
@@ -57,6 +80,17 @@ Both evaluators share the same precedence rules.
    - `workspace` visibility allows `read/list` for active workspace membership context.
    - `published` visibility allows `read/list`.
 7. Default deny.
+
+Reason-code mapping for resolution outcomes:
+
+- explicit deny -> `explicit-deny-permission-grant`
+- owner override -> `owner-override`
+- role grant -> `matched-role-grant`
+- explicit allow permission grant -> `matched-permission-grant`
+- sharing grant -> `matched-sharing-grant`
+- workspace visibility -> `visibility-workspace-member`
+- published visibility -> `visibility-published`
+- default deny -> `no-effective-permission`
 
 ## Matching semantics
 
@@ -70,6 +104,23 @@ Both evaluators share the same precedence rules.
   - workspace-role -> matching active workspace role assignment
   - workspace -> active workspace membership context
   - public -> published visibility
+
+## Repository responsibilities and seams
+
+- `IAuthorizationRoleGrantReadRepository`
+  - authoritative source for role assignments + direct permission grants.
+- `IAuthorizationResourcePolicyMetadataReadRepository`
+  - authoritative source for owner/workspace/visibility/sharing-policy metadata.
+- `IAuthorizationSharingGrantReadRepository`
+  - authoritative source for explicit resource-sharing grants.
+- `IAuthorizationPolicyDecisionEvaluator`
+  - orchestration seam for runtime callers; callers should not duplicate repository reads + precedence logic.
+- `EffectivePermissionResolutionService`
+  - only location for effective permission precedence logic.
+- `AuthorizedResourceQueryService`
+  - only location for list/search authorization filtering pattern.
+
+Do not re-implement precedence or visibility/share fallback in controllers, transport handlers, or feature services.
 
 ## Test coverage
 
@@ -104,6 +155,7 @@ Matrix-style tests validate:
 - Cache capacity is bounded per store via `maxEntriesPerStore` to avoid unbounded memory growth.
 - Cache usage is optional with adapter options:
   - `new SqliteAuthorizationPersistenceAdapter(path, { cache: { enabled: false } })`
+- Cache is adapter-local in-memory only. There is no cross-process/distributed cache and no decision-result cache in evaluator services.
 
 ## Authorized list/search query pattern (Story 4.2.5)
 
@@ -122,11 +174,18 @@ Integration example:
 2. Use the returned `{ resourceFamily, resourceType, resourceId }` tuples to query the module read model.
 3. Preserve ordering/pagination from the authorized query result to keep deterministic UI behavior.
 
+This prevents modules from leaking unauthorized rows and prevents each feature from inventing a different filtering strategy.
+
 ## Extension guidance
 
 - Keep persistence access in repository ports and context-assembly use cases.
 - Keep permission-composition logic in `EffectivePermissionResolutionService`.
 - Treat precedence changes as policy-versioned changes, not incidental refactors.
+- For a new resource family:
+  - add permission keys in `AuthorizationPermissionCatalog`,
+  - ensure role baselines in `AuthorizationRoleCatalog` if needed,
+  - persist and expose metadata through resource-policy repositories,
+  - reuse `AuthorizationPolicyDecisionEvaluator` / `AuthorizedResourceQueryService` rather than embedding checks in feature code.
 
 ## Audit event integration (Story 4.2.6)
 
@@ -140,6 +199,7 @@ Integration example:
   - sharing grant upsert/revoke,
   - resource policy upsert/soft-delete.
 - Audit metadata redaction is centralized in `AuthorizationAuditRedaction.ts`, which masks sensitive keys (for example `token`, `password`, `credential`, `apiKey`) and truncates long free-form strings.
+- Event recorder failures are swallowed intentionally so authorization decisions and mutations are not blocked by telemetry transport issues.
 
 ## Authorization administration use cases (Story 4.2.7)
 
@@ -157,3 +217,9 @@ Integration example:
   - workspace capability check (`system.manage`) for role administration,
   - resource-level share/manage checks (`<resource-family>.share|manage`) for sharing and visibility operations.
 - Mutations remain coordinated through `AuthorizationPolicyMutationService`, preserving centralized repository + audit-event side effects.
+
+Command gate examples:
+
+- `AssignAuthorizationRoleUseCase` -> requires workspace capability `system.manage`.
+- `GrantAuthorizationSharingAccessUseCase` -> requires `<resource-family>.share` and metadata/visibility consistency checks.
+- `UpdateAuthorizationVisibilityUseCase` -> requires `<resource-family>.manage`, validates ownership-scope constraints, then reconciles sharing grants to submitted target state.
