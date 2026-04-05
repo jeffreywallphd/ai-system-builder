@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Quick baseline for Story 5.1.2 node-trust persistence contracts (Feature 5 / Epic 5.1).
+Quick baseline for Story 5.1.2 and Story 5.1.3 node-trust persistence contracts and SQLite adapter implementation (Feature 5 / Epic 5.1).
 
 ## Canonical files
 
@@ -12,6 +12,11 @@ Quick baseline for Story 5.1.2 node-trust persistence contracts (Feature 5 / Epi
 - `src/application/nodes/ports/INodeEnrollmentRequestPersistenceRepository.ts`
 - `src/application/nodes/ports/NodeTrustPersistencePorts.ts`
 - `src/application/nodes/tests/NodeTrustPersistencePortsContracts.test.ts`
+- `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceMigrations.ts`
+- `src/infrastructure/persistence/nodes/NodeTrustPersistenceMapper.ts`
+- `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter.ts`
+- `src/infrastructure/persistence/nodes/tests/NodeTrustPersistenceMapper.test.ts`
+- `src/infrastructure/persistence/nodes/tests/SqliteNodeTrustPersistenceAdapter.test.ts`
 
 ## Core persistence model
 
@@ -46,9 +51,13 @@ Quick baseline for Story 5.1.2 node-trust persistence contracts (Feature 5 / Epi
   - node identity trust mutations/queries
   - enrollment request mutations/queries
 - Mutation envelopes require idempotency `operationKey` and support `expectedRevision` for optimistic-concurrency adapters.
+- SQLite adapter uses transactional upserts with immutable creation metadata and mutation replay snapshots in `node_trust_mutation_replays`.
+- Capability and deployment-tag lookups are materialized in normalized tables to keep admin/orchestration query paths index-friendly.
 
 ## Tests in this slice
 
 - `src/shared/dto/nodes/tests/NodeTrustPersistenceDtos.test.ts`
 - `src/shared/schemas/nodes/tests/NodeTrustPersistenceSchemaContracts.test.ts`
 - `src/application/nodes/tests/NodeTrustPersistencePortsContracts.test.ts`
+- `src/infrastructure/persistence/nodes/tests/NodeTrustPersistenceMapper.test.ts`
+- `src/infrastructure/persistence/nodes/tests/SqliteNodeTrustPersistenceAdapter.test.ts`
