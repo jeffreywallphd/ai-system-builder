@@ -7,6 +7,11 @@ import {
   type SessionRevocationReason,
 } from "../../../src/domain/identity/IdentityDomain";
 import {
+  IdentityLifecycleEventContractVersions,
+  IdentityLifecycleEventTypes,
+  createIdentityLifecycleEvent,
+} from "../../contracts/IdentityLifecycleEventContracts";
+import {
   IdentityErrorBoundaries,
   type IdentityErrorCode,
   IdentityErrorCodes,
@@ -16,10 +21,12 @@ import {
   type IdentityOperationResult,
 } from "../../contracts/IdentityApplicationContracts";
 import type { IIdentityClock } from "../ports/IIdentityClock";
+import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import type { IIdentitySessionRepository } from "../ports/IIdentitySessionRepository";
 import type { IIdentitySessionTokenMaterialRepository } from "../ports/IIdentitySessionTokenMaterialRepository";
 import type { IIdentitySessionTokenService } from "../ports/IIdentitySessionTokenService";
 import type { IIdentitySessionTrustEvaluator } from "../ports/IIdentitySessionTrustEvaluator";
+import { publishIdentityLifecycleEventBestEffort } from "./IdentityLifecycleEventPublishing";
 import { IdentitySessionLifecycleService } from "./IdentitySessionLifecycleService";
 
 export interface IssueAuthenticatedSessionInput {
@@ -77,6 +84,7 @@ interface IdentityAuthenticatedSessionServiceDependencies {
   readonly tokenService: IIdentitySessionTokenService;
   readonly clock: IIdentityClock;
   readonly sessionTrustEvaluator?: IIdentitySessionTrustEvaluator;
+  readonly eventPublisher?: IIdentityLifecycleEventPublisher;
 }
 
 export class IdentityAuthenticatedSessionService {
@@ -110,11 +118,31 @@ export class IdentityAuthenticatedSessionService {
       expiresAt: issued.value.session.expiresAt,
     }));
 
-    return identitySuccess(Object.freeze({
+    const result = identitySuccess(Object.freeze({
       session: issued.value.session,
       token: tokenMaterial.token,
       tokenType: "Bearer",
     }));
+
+    await publishIdentityLifecycleEventBestEffort(
+      this.dependencies.eventPublisher,
+      createIdentityLifecycleEvent({
+        eventType: IdentityLifecycleEventTypes.sessionCreated,
+        contractVersion: IdentityLifecycleEventContractVersions.v1,
+        occurredAt: result.value.session.issuedAt,
+        payload: {
+          sessionId: result.value.session.id,
+          userIdentityId: result.value.session.userIdentityId,
+          providerId: result.value.session.providerId,
+          providerSubject: result.value.session.providerSubject,
+          accessChannel: result.value.session.client?.accessChannel,
+          issuedAt: result.value.session.issuedAt,
+          expiresAt: result.value.session.expiresAt,
+        },
+      }),
+    );
+
+    return result;
   }
 
   public async resolveAuthenticatedSessionByToken(

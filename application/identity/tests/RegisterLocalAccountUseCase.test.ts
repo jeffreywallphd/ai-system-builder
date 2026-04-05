@@ -21,6 +21,8 @@ import type {
   IdentityUserIdentityListQuery,
 } from "../../contracts/IdentityApplicationContracts";
 import {
+  IdentityLifecycleEventTypes,
+  type IdentityLifecycleEvent,
   IdentityCredentialMaterialStatuses,
   IdentityErrorCodes,
   IdentityPrincipalLookupKinds,
@@ -31,6 +33,7 @@ import type { ICredentialMaterialRepository } from "../ports/ICredentialMaterial
 import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
+import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import type { IIdentityPersistenceRepository } from "../ports/IIdentityPersistenceRepository";
 import type { ILocalPasswordCredentialService } from "../ports/ILocalPasswordCredentialService";
 import { IdentityPolicyService } from "../services/IdentityPolicyService";
@@ -207,6 +210,7 @@ class StubPasswordCredentialService implements ILocalPasswordCredentialService {
 function createUseCase(
   adapter: InMemoryIdentityRegistrationAdapter,
   passwordCredentialService: ILocalPasswordCredentialService = new StubPasswordCredentialService(),
+  eventPublisher?: IIdentityLifecycleEventPublisher,
 ): RegisterLocalAccountUseCase {
   return new RegisterLocalAccountUseCase({
     lookupRepository: adapter,
@@ -216,6 +220,7 @@ function createUseCase(
     credentialAuthenticator: new LocalPasswordIdentityAuthenticator(passwordCredentialService),
     idGenerator: adapter,
     clock: adapter,
+    eventPublisher,
   });
 }
 
@@ -239,7 +244,12 @@ describe("RegisterLocalAccountUseCase", () => {
     const adapter = new InMemoryIdentityRegistrationAdapter();
     await seedLocalProviderAndPolicy(adapter);
     const passwordCredentialService = new StubPasswordCredentialService();
-    const useCase = createUseCase(adapter, passwordCredentialService);
+    const events: IdentityLifecycleEvent[] = [];
+    const useCase = createUseCase(adapter, passwordCredentialService, {
+      publish: async (event) => {
+        events.push(event);
+      },
+    });
 
     const result = await useCase.execute({
       username: "  New.User  ",
@@ -275,6 +285,15 @@ describe("RegisterLocalAccountUseCase", () => {
     expect(credential?.hashValue).not.toBe("Str0ng!Passphrase");
     expect(passwordCredentialService.lastNormalizedCandidate).toBe("Str0ng!Passphrase");
     expect(passwordCredentialService.lastHashedCandidate).toBe("Str0ng!Passphrase");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(expect.objectContaining({
+      eventType: IdentityLifecycleEventTypes.localAccountRegistered,
+      payload: expect.objectContaining({
+        userIdentityId: "user-identity:1",
+        providerId: "provider:local-password",
+        providerSubject: "new.user",
+      }),
+    }));
   });
 
   it("rejects invalid registration profile input with structured policy error", async () => {
@@ -401,5 +420,24 @@ describe("RegisterLocalAccountUseCase", () => {
         code: "identity-invalid-credentials",
       }),
     });
+  });
+
+  it("does not fail registration when lifecycle event publishing throws", async () => {
+    const adapter = new InMemoryIdentityRegistrationAdapter();
+    await seedLocalProviderAndPolicy(adapter);
+    const useCase = createUseCase(adapter, new StubPasswordCredentialService(), {
+      publish: async () => {
+        throw new Error("audit sink unavailable");
+      },
+    });
+
+    const result = await useCase.execute({
+      username: "event.resilient.user",
+      credential: {
+        candidate: "Str0ng!Passphrase",
+      },
+    });
+
+    expect(result.ok).toBe(true);
   });
 });

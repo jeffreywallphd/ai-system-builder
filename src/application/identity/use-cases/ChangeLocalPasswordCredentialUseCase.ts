@@ -9,6 +9,11 @@ import {
   type UserIdentityProviderLink,
 } from "../../../domain/identity/IdentityDomain";
 import {
+  IdentityLifecycleEventContractVersions,
+  IdentityLifecycleEventTypes,
+  createIdentityLifecycleEvent,
+} from "../../../../application/contracts/IdentityLifecycleEventContracts";
+import {
   IdentityCredentialMaterialStatuses,
   IdentityErrorBoundaries,
   IdentityErrorCodes,
@@ -24,8 +29,10 @@ import type { IIdentityClock } from "../../../../application/identity/ports/IIde
 import type { IIdentityCredentialAuthenticator } from "../../../../application/identity/ports/IIdentityCredentialAuthenticator";
 import type { IIdentityCredentialResetVerifier } from "../../../../application/identity/ports/IIdentityCredentialResetVerifier";
 import type { IIdentityIdGenerator } from "../../../../application/identity/ports/IIdentityIdGenerator";
+import type { IIdentityLifecycleEventPublisher } from "../../../../application/identity/ports/IIdentityLifecycleEventPublisher";
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
+import { publishIdentityLifecycleEventBestEffort } from "../../../../application/identity/services/IdentityLifecycleEventPublishing";
 import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
 import { validateIdentityProvider } from "../../../../application/identity/services/IdentityProviderCatalog";
 
@@ -95,6 +102,7 @@ interface ChangeLocalPasswordCredentialDependencies {
   readonly idGenerator: IIdentityIdGenerator;
   readonly clock: IIdentityClock;
   readonly credentialResetVerifier?: IIdentityCredentialResetVerifier;
+  readonly eventPublisher?: IIdentityLifecycleEventPublisher;
 }
 
 export const ChangeLocalPasswordCredentialDefaults = Object.freeze({
@@ -280,7 +288,7 @@ export class ChangeLocalPasswordCredentialUseCase {
     );
     await this.dependencies.persistenceRepository.saveUserIdentity(updatedIdentity);
 
-    return identitySuccess(Object.freeze({
+    const result = identitySuccess(Object.freeze({
       userIdentityId: userIdentity.id,
       providerId,
       providerSubject: providerLink.providerSubject,
@@ -290,6 +298,27 @@ export class ChangeLocalPasswordCredentialUseCase {
       changedAt: nowIso,
       verificationMode: verificationResult.value.verificationMode,
     }));
+
+    await publishIdentityLifecycleEventBestEffort(
+      this.dependencies.eventPublisher,
+      createIdentityLifecycleEvent({
+        eventType: IdentityLifecycleEventTypes.localCredentialChanged,
+        contractVersion: IdentityLifecycleEventContractVersions.v1,
+        occurredAt: result.value.changedAt,
+        payload: {
+          userIdentityId: result.value.userIdentityId,
+          providerId: result.value.providerId,
+          providerSubject: result.value.providerSubject,
+          credentialPolicyId: result.value.credentialPolicyId,
+          supersededCredentialMaterialId: result.value.supersededCredentialMaterialId,
+          credentialMaterialId: result.value.credentialMaterialId,
+          changedAt: result.value.changedAt,
+          verificationMode: result.value.verificationMode,
+        },
+      }),
+    );
+
+    return result;
   }
 
   private async verifyCredentialChangeAuthorization(input: {

@@ -22,6 +22,8 @@ import type {
   IdentityUserIdentityListQuery,
 } from "../../contracts/IdentityApplicationContracts";
 import {
+  IdentityLifecycleEventTypes,
+  type IdentityLifecycleEvent,
   IdentityCredentialMaterialStatuses,
   IdentityErrorCodes,
   IdentityPrincipalLookupKinds,
@@ -32,6 +34,7 @@ import type { ICredentialMaterialRepository } from "../ports/ICredentialMaterial
 import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityCredentialResetVerifier } from "../ports/IIdentityCredentialResetVerifier";
 import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
+import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../ports/IIdentityPersistenceRepository";
 import type { ILocalPasswordCredentialService, LocalPasswordCredentialMaterial } from "../ports/ILocalPasswordCredentialService";
@@ -203,6 +206,7 @@ class StubCredentialResetVerifier implements IIdentityCredentialResetVerifier {
 function createUseCase(
   adapter: InMemoryCredentialChangeAdapter,
   resetVerifier?: IIdentityCredentialResetVerifier,
+  eventPublisher?: IIdentityLifecycleEventPublisher,
 ): ChangeLocalPasswordCredentialUseCase {
   return new ChangeLocalPasswordCredentialUseCase({
     lookupRepository: adapter,
@@ -213,6 +217,7 @@ function createUseCase(
     idGenerator: adapter,
     clock: adapter,
     credentialResetVerifier: resetVerifier,
+    eventPublisher,
   });
 }
 
@@ -272,7 +277,12 @@ describe("ChangeLocalPasswordCredentialUseCase", () => {
   it("changes credential with old-credential verification and rotates active credential material", async () => {
     const adapter = new InMemoryCredentialChangeAdapter();
     await seedIdentity(adapter);
-    const useCase = createUseCase(adapter);
+    const events: IdentityLifecycleEvent[] = [];
+    const useCase = createUseCase(adapter, undefined, {
+      publish: async (event) => {
+        events.push(event);
+      },
+    });
 
     const result = await useCase.execute({
       userIdentityId: "user:1",
@@ -315,6 +325,15 @@ describe("ChangeLocalPasswordCredentialUseCase", () => {
     expect(providerLink?.credentialState?.status).toBe("active");
     expect(providerLink?.credentialState?.passwordChangedAt).toBe("2026-04-04T14:00:00.000Z");
     expect(providerLink?.credentialState?.failedAttempts).toBe(0);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(expect.objectContaining({
+      eventType: IdentityLifecycleEventTypes.localCredentialChanged,
+      payload: expect.objectContaining({
+        userIdentityId: "user:1",
+        providerId: "provider:local-password",
+        providerSubject: "valid.user",
+      }),
+    }));
   });
 
   it("rejects credential changes when old credential verification fails", async () => {

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "bun:test";
+import { IdentityLifecycleEventTypes, type IdentityLifecycleEvent } from "../../contracts/IdentityLifecycleEventContracts";
 import { IdentityErrorCodes, identityFailure, identitySuccess } from "../../contracts/IdentityApplicationContracts";
 import { LogoutIdentitySessionUseCase } from "../../../src/application/identity/use-cases/LogoutIdentitySessionUseCase";
 
 describe("LogoutIdentitySessionUseCase", () => {
   it("revokes the current session token with logout reason", async () => {
+    const events: IdentityLifecycleEvent[] = [];
     const useCase = new LogoutIdentitySessionUseCase({
       authenticatedSessionService: {
         invalidateAuthenticatedSession: async () => identitySuccess(Object.freeze({
@@ -22,6 +24,11 @@ describe("LogoutIdentitySessionUseCase", () => {
           }),
         })),
       },
+      eventPublisher: {
+        publish: async (event) => {
+          events.push(event);
+        },
+      },
     });
 
     const result = await useCase.execute({
@@ -36,6 +43,15 @@ describe("LogoutIdentitySessionUseCase", () => {
     expect(result.value.userIdentityId).toBe("user-identity:1");
     expect(result.value.revocationReason).toBe("logout");
     expect(result.value.revokedAt).toBe("2026-04-04T18:10:00.000Z");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(expect.objectContaining({
+      eventType: IdentityLifecycleEventTypes.sessionLoggedOut,
+      payload: expect.objectContaining({
+        sessionId: "identity-session:1",
+        userIdentityId: "user-identity:1",
+        revocationReason: "logout",
+      }),
+    }));
   });
 
   it("fails when session token is missing", async () => {

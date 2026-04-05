@@ -15,6 +15,10 @@ import {
   type Session,
   type UserIdentity,
 } from "../../../src/domain/identity/IdentityDomain";
+import {
+  IdentityLifecycleEventTypes,
+  type IdentityLifecycleEvent,
+} from "../../contracts/IdentityLifecycleEventContracts";
 import type {
   IdentityMutationOutcome,
   IdentityOperationResult,
@@ -230,6 +234,7 @@ describe("Local identity administration use cases", () => {
     await seedAdminIdentity(adapter);
 
     const revokeCalls: string[] = [];
+    const events: IdentityLifecycleEvent[] = [];
     const useCase = new SetLocalIdentityAccountStatusUseCase({
       lookupRepository: adapter,
       persistenceRepository: adapter,
@@ -247,6 +252,11 @@ describe("Local identity administration use cases", () => {
         },
       },
       clock: adapter,
+      eventPublisher: {
+        publish: async (event) => {
+          events.push(event);
+        },
+      },
     });
 
     const disabled = await useCase.execute({
@@ -264,6 +274,14 @@ describe("Local identity administration use cases", () => {
     expect(disabled.value.affectedSessionIds).toEqual(["session:active:1"]);
     expect(revokeCalls).toEqual(["session:active:1"]);
     expect((await adapter.getSessionById("session:active:1"))?.status).toBe(IdentitySessionStatuses.revoked);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(expect.objectContaining({
+      eventType: IdentityLifecycleEventTypes.localAccountDisabled,
+      payload: expect.objectContaining({
+        userIdentityId: "user:member",
+        actorUserIdentityId: "user:admin",
+      }),
+    }));
 
     const enabled = await useCase.execute({
       context: createAdminContext(),

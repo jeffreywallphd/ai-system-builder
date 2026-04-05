@@ -6,6 +6,11 @@ import {
   type UserIdentity,
 } from "../../../domain/identity/IdentityDomain";
 import {
+  IdentityLifecycleEventContractVersions,
+  IdentityLifecycleEventTypes,
+  createIdentityLifecycleEvent,
+} from "../../../../application/contracts/IdentityLifecycleEventContracts";
+import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
   identityFailure,
@@ -14,9 +19,11 @@ import {
   type IdentityOperationResult,
 } from "../../../../application/contracts/IdentityApplicationContracts";
 import type { IIdentityClock } from "../../../../application/identity/ports/IIdentityClock";
+import type { IIdentityLifecycleEventPublisher } from "../../../../application/identity/ports/IIdentityLifecycleEventPublisher";
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
 import type { IIdentitySessionRepository } from "../../../../application/identity/ports/IIdentitySessionRepository";
+import { publishIdentityLifecycleEventBestEffort } from "../../../../application/identity/services/IdentityLifecycleEventPublishing";
 import type { IdentityAuthenticatedSessionService } from "../../../../application/identity/services/IdentityAuthenticatedSessionService";
 import type { IdentityAdministrativeActionContext } from "./IdentityAdministrativeContext";
 
@@ -47,6 +54,7 @@ interface SetLocalIdentityAccountStatusDependencies {
   readonly sessionRepository: IIdentitySessionRepository;
   readonly authenticatedSessionService: Pick<IdentityAuthenticatedSessionService, "revokeAuthenticatedSessionById">;
   readonly clock: IIdentityClock;
+  readonly eventPublisher?: IIdentityLifecycleEventPublisher;
 }
 
 export const SetLocalIdentityAccountStatusDefaults = Object.freeze({
@@ -131,13 +139,34 @@ export class SetLocalIdentityAccountStatusUseCase {
       }
     }
 
-    return identitySuccess(Object.freeze({
+    const result = identitySuccess(Object.freeze({
       userIdentityId: transitionedIdentity.id,
       status: transitionedIdentity.status,
       changed: true,
       affectedSessionIds,
       updatedAt: transitionedIdentity.updatedAt,
     }));
+
+    if (input.action === "disable") {
+      await publishIdentityLifecycleEventBestEffort(
+        this.dependencies.eventPublisher,
+        createIdentityLifecycleEvent({
+          eventType: IdentityLifecycleEventTypes.localAccountDisabled,
+          contractVersion: IdentityLifecycleEventContractVersions.v1,
+          occurredAt: result.value.updatedAt,
+          payload: {
+            userIdentityId: result.value.userIdentityId,
+            actorUserIdentityId,
+            providerId,
+            status: result.value.status,
+            affectedSessionIds: result.value.affectedSessionIds,
+            disabledAt: result.value.updatedAt,
+          },
+        }),
+      );
+    }
+
+    return result;
   }
 
   private async revokeActiveSessionsForIdentity(userIdentityId: string): Promise<ReadonlyArray<string>> {

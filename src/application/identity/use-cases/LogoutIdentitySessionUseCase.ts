@@ -1,5 +1,10 @@
 import { SessionRevocationReasons } from "../../../domain/identity/IdentityDomain";
 import {
+  IdentityLifecycleEventContractVersions,
+  IdentityLifecycleEventTypes,
+  createIdentityLifecycleEvent,
+} from "../../../../application/contracts/IdentityLifecycleEventContracts";
+import {
   IdentityErrorBoundaries,
   type IdentityErrorCode,
   IdentityErrorCodes,
@@ -8,6 +13,8 @@ import {
   type IdentityOperationError,
   type IdentityOperationResult,
 } from "../../../../application/contracts/IdentityApplicationContracts";
+import type { IIdentityLifecycleEventPublisher } from "../../../../application/identity/ports/IIdentityLifecycleEventPublisher";
+import { publishIdentityLifecycleEventBestEffort } from "../../../../application/identity/services/IdentityLifecycleEventPublishing";
 import { type IdentityAuthenticatedSessionService } from "../../../../application/identity/services/IdentityAuthenticatedSessionService";
 
 export type LogoutIdentitySessionErrorCode =
@@ -28,6 +35,7 @@ export interface LogoutIdentitySessionResult {
 
 interface LogoutIdentitySessionDependencies {
   readonly authenticatedSessionService: Pick<IdentityAuthenticatedSessionService, "invalidateAuthenticatedSession">;
+  readonly eventPublisher?: IIdentityLifecycleEventPublisher;
 }
 
 export class LogoutIdentitySessionUseCase {
@@ -57,12 +65,29 @@ export class LogoutIdentitySessionUseCase {
       );
     }
 
-    return identitySuccess(Object.freeze({
+    const result = identitySuccess(Object.freeze({
       sessionId: invalidated.value.session.id,
       userIdentityId: invalidated.value.session.userIdentityId,
       revokedAt,
       revocationReason: SessionRevocationReasons.logout,
     }));
+
+    await publishIdentityLifecycleEventBestEffort(
+      this.dependencies.eventPublisher,
+      createIdentityLifecycleEvent({
+        eventType: IdentityLifecycleEventTypes.sessionLoggedOut,
+        contractVersion: IdentityLifecycleEventContractVersions.v1,
+        occurredAt: result.value.revokedAt,
+        payload: {
+          sessionId: result.value.sessionId,
+          userIdentityId: result.value.userIdentityId,
+          revocationReason: result.value.revocationReason,
+          revokedAt: result.value.revokedAt,
+        },
+      }),
+    );
+
+    return result;
   }
 
   private failure<TValue, TCode extends IdentityErrorCode>(

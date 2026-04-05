@@ -14,6 +14,7 @@ import { IdentitySessionLifecycleService } from "../../application/identity/serv
 import { IdentityAuthenticatedSessionService } from "../../application/identity/services/IdentityAuthenticatedSessionService";
 import type { IIdentityClock } from "../../application/identity/ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../../application/identity/ports/IIdentityIdGenerator";
+import type { IIdentityLifecycleEventPublisher } from "../../application/identity/ports/IIdentityLifecycleEventPublisher";
 import { RegisterLocalAccountUseCase } from "../../src/application/identity/use-cases/RegisterLocalAccountUseCase";
 import { LoginLocalAccountUseCase } from "../../src/application/identity/use-cases/LoginLocalAccountUseCase";
 import { LogoutIdentitySessionUseCase } from "../../src/application/identity/use-cases/LogoutIdentitySessionUseCase";
@@ -39,6 +40,7 @@ export interface IdentityServerHostOptions {
   readonly logger?: IdentityHttpServerLogger;
   readonly env?: Readonly<Record<string, string | undefined>>;
   readonly sessionPolicies?: IdentitySessionLifecyclePolicies;
+  readonly eventPublisher?: IIdentityLifecycleEventPublisher;
 }
 
 export interface IdentityServerHost {
@@ -69,6 +71,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const idGenerator = new RandomIdentityIdGenerator();
   const sessionPolicies = options.sessionPolicies
     ?? IdentitySessionPolicyConfig.fromEnv(options.env ?? process.env).policies;
+  const eventPublisher = options.eventPublisher;
   const sessionLifecycleService = new IdentitySessionLifecycleService({
     sessionRepository: repository,
     clock,
@@ -81,6 +84,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     tokenMaterialRepository: repository,
     tokenService: new OpaqueIdentitySessionTokenService(),
     clock,
+    eventPublisher,
   });
 
   const backendApi = new IdentityAuthBackendApi({
@@ -92,6 +96,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       credentialAuthenticator: authenticator,
       idGenerator,
       clock,
+      eventPublisher,
     }),
     loginLocalAccountUseCase: new LoginLocalAccountUseCase({
       lookupRepository: repository,
@@ -99,9 +104,11 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       identityPolicyService,
       credentialAuthenticator: authenticator,
       clock,
+      eventPublisher,
     }),
     logoutIdentitySessionUseCase: new LogoutIdentitySessionUseCase({
       authenticatedSessionService,
+      eventPublisher,
     }),
     revokeIdentitySessionUseCase: new RevokeIdentitySessionUseCase({
       sessionRepository: repository,
@@ -121,6 +128,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       sessionRepository: repository,
       authenticatedSessionService,
       clock,
+      eventPublisher,
     }),
     identityLookupRepository: repository,
     authenticatedSessionService,

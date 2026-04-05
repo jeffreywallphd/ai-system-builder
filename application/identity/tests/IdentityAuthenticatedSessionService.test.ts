@@ -5,6 +5,7 @@ import {
   SessionRevocationReasons,
   type Session,
 } from "../../../src/domain/identity/IdentityDomain";
+import { IdentityLifecycleEventTypes, type IdentityLifecycleEvent } from "../../contracts/IdentityLifecycleEventContracts";
 import type { IdentitySessionTokenMaterialRecord } from "../../contracts/IdentityApplicationContracts";
 import {
   IdentityErrorCodes,
@@ -170,6 +171,7 @@ describe("IdentityAuthenticatedSessionService", () => {
 
   it("issues persisted authenticated sessions and resolves active session by token", async () => {
     const adapter = new InMemoryIdentitySessionAdapter();
+    const events: IdentityLifecycleEvent[] = [];
     const lifecycleService = new IdentitySessionLifecycleService({
       sessionRepository: adapter,
       clock: adapter,
@@ -181,6 +183,11 @@ describe("IdentityAuthenticatedSessionService", () => {
       tokenMaterialRepository: adapter,
       tokenService: adapter,
       clock: adapter,
+      eventPublisher: {
+        publish: async (event) => {
+          events.push(event);
+        },
+      },
     });
 
     const issued = await service.issueAuthenticatedSession({
@@ -197,6 +204,14 @@ describe("IdentityAuthenticatedSessionService", () => {
 
     expect(issued.value.session.status).toBe(IdentitySessionStatuses.active);
     expect(issued.value.tokenType).toBe("Bearer");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(expect.objectContaining({
+      eventType: IdentityLifecycleEventTypes.sessionCreated,
+      payload: expect.objectContaining({
+        sessionId: issued.value.session.id,
+        userIdentityId: "user:1",
+      }),
+    }));
 
     const resolved = await service.resolveAuthenticatedSessionByToken({ token: issued.value.token });
     expect(resolved.ok).toBeTrue();
