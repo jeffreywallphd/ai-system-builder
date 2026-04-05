@@ -83,3 +83,23 @@ Validation behavior includes:
 
 - `NodeTrustApiContracts.test.ts` validates admin/internal transport separation and projection behavior.
 - `NodeTrustApiSchemaContracts.test.ts` validates request/response schemas, invariants, strictness against internal field leakage, and typed validation errors.
+
+## Story 5.2.2 server enrollment lifecycle
+
+Story 5.2.2 adds the first server-side enrollment transport flow on top of these shared contracts:
+
+- Backend API adapter:
+  - `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+  - `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- HTTP transport integration:
+  - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - `POST /api/v1/nodes/enrollments`
+  - `GET /api/v1/nodes/enrollments/pending`
+
+Lifecycle behavior for this slice:
+
+- Enrollment submissions are parsed with `parseNodeEnrollmentSubmissionRequestDto(...)` and rejected with stable `invalid-request` responses when malformed.
+- Valid submissions call `RegisterNodeEnrollmentRequestUseCase` and persist as pending (`submitted`) enrollment requests; they do not activate node trust or execution privileges.
+- Duplicate pending requests for the same `nodeId` return stable `conflict` responses.
+- Pending-review queries call `ReviewPendingNodeEnrollmentUseCase` and project records into `NodePendingEnrollmentSummaryDto` for admin-facing review flows.
+- Bootstrap public trust material is captured via submission payload metadata and `trustMaterialRef` promotion to `certificateRef` when no explicit certificate reference is provided.

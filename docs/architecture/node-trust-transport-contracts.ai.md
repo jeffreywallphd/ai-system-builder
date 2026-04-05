@@ -50,3 +50,17 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
 
 - Parse transport payloads at HTTP/IPC boundaries with `parse*` helpers before entering use cases.
 - Return admin-safe DTOs by default; only use internal DTOs for explicit internal service boundaries.
+
+## Story 5.2.2 additions
+
+- New server adapter files:
+  - `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+  - `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- New HTTP routes in `IdentityHttpServer.ts`:
+  - `POST /api/v1/nodes/enrollments` (bootstrap enrollment submission)
+  - `GET /api/v1/nodes/enrollments/pending` (admin pending-review query)
+- Enrollment submissions now:
+  - use `parseNodeEnrollmentSubmissionRequestDto(...)` at transport boundary,
+  - persist as pending enrollment records (not active nodes),
+  - return stable invalid/duplicate failures,
+  - expose pending summaries via admin-facing query flow.
