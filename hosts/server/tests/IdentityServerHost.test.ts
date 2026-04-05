@@ -16,7 +16,13 @@ import {
   createWorkspaceRoleAssignment,
 } from "../../../src/domain/workspaces/WorkspaceDomain";
 import { WorkspaceVisibilities } from "../../../src/shared/workspaces/WorkspaceOwnership";
-import { applyIdentityStartupConfiguration, startIdentityServerHost } from "../IdentityServerHost";
+import {
+  applyIdentityStartupConfiguration,
+  initializeCertificateAuthorityForFirstSetup,
+  startIdentityServerHost,
+} from "../IdentityServerHost";
+import type { InitializeInternalCertificateAuthorityInput, InitializeInternalCertificateAuthorityResult } from "../../../src/application/security/ports/ICertificateAuthorityIssuerPort";
+import { SqliteCertificateAuthorityPersistenceAdapter } from "../../../src/infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
 
 class InMemoryIdentityDefaultConfigurationRepository {
   public readonly providers = new Map<string, AuthProvider>();
@@ -30,6 +36,30 @@ class InMemoryIdentityDefaultConfigurationRepository {
   public async saveCredentialPolicy(policy: CredentialPolicy): Promise<CredentialPolicy> {
     this.policies.set(policy.id, policy);
     return policy;
+  }
+}
+
+class StubCertificateAuthorityIssuerPort {
+  public async initializeInternalCertificateAuthority(
+    input: InitializeInternalCertificateAuthorityInput,
+  ): Promise<InitializeInternalCertificateAuthorityResult> {
+    return Object.freeze({
+      certificateAuthorityId: input.certificateAuthorityId,
+      serialNumber: "AABBCCDD",
+      notBefore: "2026-04-05T00:00:00.000Z",
+      notAfter: "2036-04-05T00:00:00.000Z",
+      rootCertificatePem: "-----BEGIN CERTIFICATE-----root-cert-----END CERTIFICATE-----",
+      encryptedRootPrivateKeyPem: "-----BEGIN ENCRYPTED PRIVATE KEY-----root-key-----END ENCRYPTED PRIVATE KEY-----",
+      rootCertificateFingerprintSha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    });
+  }
+
+  public async issueCertificateMaterial(): Promise<never> {
+    throw new Error("not implemented in host test");
+  }
+
+  public async revokeCertificateMaterial(): Promise<never> {
+    throw new Error("not implemented in host test");
   }
 }
 
@@ -398,6 +428,51 @@ describe("IdentityServerHost", () => {
         AI_LOOM_INTERNAL_CA_ROOT_KEY_SECRET_REF: "secret-store:internal-ca:root-key",
       },
     })).rejects.toThrow("Internal CA startup validation failed");
+
+    rmSync(tempDirectory, { recursive: true, force: true });
+  });
+
+  it("initializes CA through host composition by invoking the application use case", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-ca-init-host-"));
+    const databasePath = join(tempDirectory, "identity-ca-init-host.sqlite");
+    const secretDirectory = join(tempDirectory, "protected-secrets");
+
+    const result = await initializeCertificateAuthorityForFirstSetup({
+      databasePath,
+      issuer: new StubCertificateAuthorityIssuerPort(),
+      env: {
+        AI_LOOM_INTERNAL_CA_PROTECTED_SECRETS_DIRECTORY: secretDirectory,
+        AI_LOOM_INTERNAL_CA_PROTECTED_SECRETS_KEY: Buffer.alloc(32, 11).toString("base64"),
+      },
+    }, {
+      operationKey: "host-ca-init-v1",
+      certificateAuthorityId: "ca:internal:root:v1",
+      displayName: "AI Loom Internal Root",
+      subject: {
+        commonName: "AI Loom Internal Root CA",
+        dnsNames: [],
+        ipAddresses: [],
+        uriSanEntries: [],
+      },
+      signatureAlgorithm: "sha256WithRSAEncryption",
+      validityDays: 3650,
+      actorUserIdentityId: "user:admin",
+      rootCertificateMaterialRef: "trust:ca:cert:v1",
+      rootPrivateKeyMaterialRef: "trust:ca:key:v1",
+      rootCertificateSecretRef: "secret-store:internal-ca:root-cert",
+      rootPrivateKeySecretRef: "secret-store:internal-ca:root-key",
+    });
+
+    const repository = new SqliteCertificateAuthorityPersistenceAdapter(databasePath);
+    const persistedAuthority = await repository.findCertificateAuthorityById("ca:internal:root:v1");
+    const rootCertificateTrustMaterial = await repository.findTrustMaterialByRef("trust:ca:cert:v1");
+    const rootPrivateKeyTrustMaterial = await repository.findTrustMaterialByRef("trust:ca:key:v1");
+    repository.dispose();
+
+    expect(result.outcome).toBe("initialized");
+    expect(persistedAuthority?.certificateAuthorityId).toBe("ca:internal:root:v1");
+    expect(rootCertificateTrustMaterial?.storageLocator).toBe("secret-store:internal-ca:root-cert");
+    expect(rootPrivateKeyTrustMaterial?.storageLocator).toBe("secret-store:internal-ca:root-key");
 
     rmSync(tempDirectory, { recursive: true, force: true });
   });

@@ -1,6 +1,6 @@
 # Internal CA Foundation
 
-This note documents Story 6.1.1, Story 6.1.3, and Story 6.1.4 (Feature 6 / Epic 6.1): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, and protected storage/loading for CA root materials.
+This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, and Story 6.1.5 (Feature 6 / Epic 6.1): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, and first-time CA initialization orchestration.
 
 ## Canonical artifacts
 
@@ -16,8 +16,10 @@ This note documents Story 6.1.1, Story 6.1.3, and Story 6.1.4 (Feature 6 / Epic 
 - `src/application/security/ports/ICertificateAuthorityRootMaterialStorage.ts`
 - `src/application/security/ports/CertificateAuthorityPorts.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
+- `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
 - `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
 - `src/application/security/tests/ResolveCertificateAuthorityStartupStateUseCase.test.ts`
+- `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
 - `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
@@ -101,6 +103,37 @@ Story 6.1.4 adds a concrete protected-storage pathway for CA root and signing ma
 
 Configuration is fail-closed: partial protected-storage configuration throws during startup validation path.
 
+## Story 6.1.5 first-time CA initialization
+
+Story 6.1.5 adds `InitializeCertificateAuthorityUseCase`, which is the application-layer orchestration for first-time authoritative server CA setup.
+
+### Initialization orchestration
+
+- calls `ICertificateAuthorityIssuerPort.initializeInternalCertificateAuthority` to generate initial root identity/signing material
+- persists certificate/private-key payloads via `ICertificateAuthorityRootMaterialStorage`
+- persists trust material metadata through `ITrustMaterialReferencePersistenceRepository`
+- persists CA root metadata through `ICertificateAuthorityRootPersistenceRepository`
+
+### Idempotency and guardrails
+
+- default conflict policy is explicit rejection when an active CA already exists
+- optional `return-existing` conflict policy provides safe idempotent readback of existing active CA metadata
+- if authority metadata exists only in non-active states, initialization fails with migration-required semantics
+- mutation operation keys are derived per persistence step to preserve replay-safe adapter behavior
+
+### Audit/event seam
+
+- optional structured audit hook emits:
+  - `ca-initialize-started`
+  - `ca-initialize-succeeded`
+  - `ca-initialize-failed`
+- audit payloads include redacted secret references only
+
+### Host invocation seam
+
+- `initializeCertificateAuthorityForFirstSetup` is exposed from `hosts/server/IdentityServerHost.ts`
+- the host composition path constructs infrastructure adapters and invokes `InitializeCertificateAuthorityUseCase`, keeping initialization logic in the application layer
+
 ### Failure mode expectations
 
 - unsafe partial states fail closed with structured diagnostics from the use case
@@ -172,6 +205,8 @@ These seams let later stories implement bootstrapping, issuance, lookup, revocat
 - `CertificateAuthorityPortsContracts.test.ts`: repository contract assumptions for save/list/lookup/revoke/rotation/trust-material flows
 - `CertificateAuthorityDtos.test.ts`: query preset and lookup-key helper behavior
 - `CertificateAuthoritySchemaContracts.test.ts`: valid payload parsing and invalid payload rejection for CA/certificate/trust-material records
+- `InitializeCertificateAuthorityUseCase.test.ts`: clean initialization path, conflict policy behavior, and metadata/material sync assertions
+- `IdentityServerHost.test.ts`: host-level first-time initialization invocation seam coverage
 
 ## Related architecture note
 

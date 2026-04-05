@@ -57,10 +57,18 @@ import {
   ResolveCertificateAuthorityStartupStateUseCase,
 } from "../../src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase";
 import {
+  InitializeCertificateAuthorityUseCase,
+  type InitializeCertificateAuthorityUseCaseInput,
+  type InitializeCertificateAuthorityUseCaseResult,
+  type CertificateAuthorityInitializationAuditEvent,
+} from "../../src/application/security/use-cases/InitializeCertificateAuthorityUseCase";
+import {
   EnvironmentCertificateAuthorityBootstrapConfigurationProvider,
   EnvironmentCertificateAuthoritySecretService,
 } from "../../src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter";
 import { createFileSystemProtectedSecretStoreFromEnvironment } from "../../src/infrastructure/security/secrets/FileSystemProtectedSecretStore";
+import type { ICertificateAuthorityIssuerPort } from "../../src/application/security/ports/ICertificateAuthorityIssuerPort";
+import { ProtectedCertificateAuthorityRootMaterialStorage } from "../../src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
 import { AuthorizationPolicyDecisionEvaluator } from "../../src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyMutationService } from "../../src/application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "../../src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
@@ -126,6 +134,13 @@ export interface IdentityServerHost {
   readonly port: number;
   readonly address: string;
   close(): Promise<void>;
+}
+
+export interface InitializeCertificateAuthorityForFirstSetupOptions {
+  readonly databasePath: string;
+  readonly issuer: ICertificateAuthorityIssuerPort;
+  readonly env?: Readonly<Record<string, string | undefined>>;
+  readonly auditHook?: (event: CertificateAuthorityInitializationAuditEvent) => Promise<void> | void;
 }
 
 interface IdentityDefaultConfigurationRepository {
@@ -655,4 +670,31 @@ async function validateCertificateAuthorityStartup(
 
   const startupState = await startupStateUseCase.execute();
   assertCertificateAuthorityStartupSafe(startupState);
+}
+
+export async function initializeCertificateAuthorityForFirstSetup(
+  options: InitializeCertificateAuthorityForFirstSetupOptions,
+  input: InitializeCertificateAuthorityUseCaseInput,
+): Promise<InitializeCertificateAuthorityUseCaseResult> {
+  const certificateAuthorityRepository = new SqliteCertificateAuthorityPersistenceAdapter(path.resolve(options.databasePath));
+  const env = options.env ?? process.env;
+  const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(env);
+  if (!protectedSecretStore) {
+    throw new Error("Internal CA protected secret storage must be configured before CA initialization.");
+  }
+
+  try {
+    const useCase = new InitializeCertificateAuthorityUseCase({
+      certificateAuthorityRepository,
+      trustMaterialRepository: certificateAuthorityRepository,
+      rootMaterialStorage: new ProtectedCertificateAuthorityRootMaterialStorage(
+        protectedSecretStore,
+      ),
+      issuer: options.issuer,
+      auditHook: options.auditHook,
+    });
+    return await useCase.execute(input);
+  } finally {
+    certificateAuthorityRepository.dispose();
+  }
 }

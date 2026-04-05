@@ -8,6 +8,7 @@
 - Adds focused domain/port/DTO/schema tests for the new contract surface.
 - Adds secure CA startup bootstrap validation seams (Story 6.1.3) for authoritative-host startup.
 - Adds protected secret storage/loading seams for CA root and signing assets (Story 6.1.4).
+- Adds first-time CA initialization orchestration with guarded idempotency and host invocation seam (Story 6.1.5).
 
 ## Main artifacts to cite
 
@@ -22,11 +23,14 @@
 - `src/application/security/ports/ICertificateAuthorityBootstrapSecretService.ts`
 - `src/application/security/ports/ICertificateAuthorityRootMaterialStorage.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
+- `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
 - `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
 - `src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage.ts`
 - `hosts/server/IdentityServerHost.ts`
+- `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
+- `hosts/server/tests/IdentityServerHost.test.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
 - `src/shared/schemas/security/CertificateAuthoritySchemaContracts.ts`
 
@@ -58,6 +62,24 @@
 
 Structured diagnostics emitted by the startup use case are designed for future operator/admin surfaces.
 
+## Story 6.1.5 first-time CA initialization behavior
+
+- `InitializeCertificateAuthorityUseCase` orchestrates:
+  - internal CA root/signing material generation via `ICertificateAuthorityIssuerPort`
+  - protected root material persistence via `ICertificateAuthorityRootMaterialStorage`
+  - trust metadata persistence via `ITrustMaterialReferencePersistenceRepository`
+  - CA root metadata persistence via `ICertificateAuthorityRootPersistenceRepository`
+- Guardrails:
+  - initialization is blocked when an active CA already exists (default policy)
+  - callers may opt into `return-existing` conflict policy for safe idempotent readback
+  - existing non-active authority metadata triggers migration-required failure semantics
+- Audit seam:
+  - optional structured audit hook emits `ca-initialize-started`, `ca-initialize-succeeded`, and `ca-initialize-failed`
+  - secret references are redacted in audit payloads
+- Host invocation seam:
+  - `initializeCertificateAuthorityForFirstSetup` composes host infrastructure and invokes the application use case
+  - host call path does not bypass application-layer orchestration
+
 ## Coverage in this slice
 
 - Domain invariants and lifecycle transitions: `src/domain/security/tests/CertificateAuthorityDomain.test.ts`
@@ -69,6 +91,8 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - schema parse/validation behavior: `src/shared/schemas/security/tests/CertificateAuthoritySchemaContracts.test.ts`
 - protected-secret store coverage: `src/infrastructure/security/secrets/tests/FileSystemProtectedSecretStore.test.ts`
 - protected CA material save/load coverage: `src/infrastructure/security/ca/tests/ProtectedCertificateAuthorityRootMaterialStorage.test.ts`
+- first-time CA initialization coverage: `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
+- host initialization seam coverage: `hosts/server/tests/IdentityServerHost.test.ts`
 
 ## Follow-on note
 
