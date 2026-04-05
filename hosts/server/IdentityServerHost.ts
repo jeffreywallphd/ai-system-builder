@@ -41,6 +41,24 @@ import { InitiateTrustedDevicePairingUseCase } from "../../src/application/ident
 import { ValidateTrustedDevicePairingUseCase } from "../../src/application/identity/use-cases/ValidateTrustedDevicePairingUseCase";
 import { CompleteTrustedDevicePairingUseCase } from "../../src/application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
 import { SqliteIdentityLifecycleEventPublisher } from "../../infrastructure/filesystem/identity/SqliteIdentityLifecycleEventPublisher";
+import { WorkspaceInvitationBackendApi } from "../../infrastructure/api/workspaces/WorkspaceInvitationBackendApi";
+import { SqliteWorkspacePersistenceAdapter } from "../../src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
+import {
+  IssueWorkspaceInvitationUseCase,
+  type WorkspaceInvitationIssuanceClock,
+  type WorkspaceInvitationIssuanceIdGenerator,
+  Sha256WorkspaceInvitationTokenIssuer,
+} from "../../src/application/workspaces/use-cases/IssueWorkspaceInvitationUseCase";
+import {
+  ResolveWorkspaceInvitationLifecycleUseCase,
+  type WorkspaceInvitationLifecycleClock,
+  type WorkspaceInvitationLifecycleIdGenerator,
+} from "../../src/application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase";
+import {
+  ResolveAuthenticatedWorkspaceOnboardingUseCase,
+  type AuthenticatedWorkspaceOnboardingClock,
+} from "../../src/application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase";
+import type { WorkspaceIdNamespace } from "../../src/shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   createIdentityHttpServer,
   type IdentityHttpServerLogger,
@@ -82,9 +100,24 @@ class RandomIdentityIdGenerator implements IIdentityIdGenerator {
   }
 }
 
+class SystemWorkspaceClock
+  implements WorkspaceInvitationIssuanceClock, WorkspaceInvitationLifecycleClock, AuthenticatedWorkspaceOnboardingClock {
+  public now(): Date {
+    return new Date();
+  }
+}
+
+class RandomWorkspaceIdGenerator
+  implements WorkspaceInvitationIssuanceIdGenerator, WorkspaceInvitationLifecycleIdGenerator {
+  public nextId(namespace: WorkspaceIdNamespace): string {
+    return `${namespace}:${randomUUID()}`;
+  }
+}
+
 export async function startIdentityServerHost(options: IdentityServerHostOptions): Promise<IdentityServerHost> {
   const repository = new SqliteIdentityRepository(path.resolve(options.databasePath));
   const trustedDeviceRepository = new SqliteTrustedDeviceRepository(path.resolve(options.databasePath));
+  const workspaceRepository = new SqliteWorkspacePersistenceAdapter(path.resolve(options.databasePath));
   const env = options.env ?? process.env;
   const providerAccountPolicies = options.providerAccountPolicies
     ?? IdentityProviderAccountPolicyConfig.fromEnv(env);
@@ -98,6 +131,8 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     ?? IdentitySessionPolicyConfig.fromEnv(env).policies;
   const sessionTrustPolicies = IdentitySessionTrustPolicyConfig.fromEnv(env).policies;
   const eventPublisher = options.eventPublisher ?? new SqliteIdentityLifecycleEventPublisher(path.resolve(options.databasePath));
+  const workspaceClock = new SystemWorkspaceClock();
+  const workspaceIdGenerator = new RandomWorkspaceIdGenerator();
   const sessionTrustService = new TrustedDeviceSessionTrustService({
     trustedDeviceRepository,
     policies: sessionTrustPolicies,
@@ -218,8 +253,34 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     },
   });
 
+  const resolveWorkspaceInvitationLifecycleUseCase = new ResolveWorkspaceInvitationLifecycleUseCase({
+    workspaceRepository,
+    invitationRepository: workspaceRepository,
+    membershipRepository: workspaceRepository,
+    roleAssignmentRepository: workspaceRepository,
+    authorizationReadRepository: workspaceRepository,
+    transactionManager: workspaceRepository,
+    idGenerator: workspaceIdGenerator,
+    clock: workspaceClock,
+  });
+  const workspaceBackendApi = new WorkspaceInvitationBackendApi({
+    issueWorkspaceInvitationUseCase: new IssueWorkspaceInvitationUseCase({
+      invitationRepository: workspaceRepository,
+      authorizationReadRepository: workspaceRepository,
+      transactionManager: workspaceRepository,
+      idGenerator: workspaceIdGenerator,
+      tokenIssuer: new Sha256WorkspaceInvitationTokenIssuer(),
+      clock: workspaceClock,
+    }),
+    resolveAuthenticatedWorkspaceOnboardingUseCase: new ResolveAuthenticatedWorkspaceOnboardingUseCase({
+      invitationLifecycleUseCase: resolveWorkspaceInvitationLifecycleUseCase,
+      clock: workspaceClock,
+    }),
+  });
+
   const server = createIdentityHttpServer({
     backendApi,
+    workspaceBackendApi,
     logger: options.logger,
   });
 
@@ -240,6 +301,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       server.close((error) => {
         repository.dispose();
         trustedDeviceRepository.dispose();
+        workspaceRepository.dispose();
         const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
         if (typeof disposablePublisher.dispose === "function") {
           disposablePublisher.dispose();
