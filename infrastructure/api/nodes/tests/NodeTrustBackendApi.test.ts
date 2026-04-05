@@ -10,6 +10,7 @@ import { ListTrustedNodeInventoryUseCase } from "../../../src/application/nodes/
 import { RecordNodeHeartbeatUseCase } from "../../../src/application/nodes/use-cases/RecordNodeHeartbeatUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { RejectNodeEnrollmentUseCase } from "../../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
+import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "../../../src/application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase";
 import { RevokeNodeTrustUseCase } from "../../../src/application/nodes/use-cases/RevokeNodeTrustUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
 import {
@@ -24,6 +25,14 @@ import {
 import { SqliteNodeTrustPersistenceAdapter } from "../../../src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
 import { SqliteNodeTrustAuditRecorder } from "../../../src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
 import { NodeTrustBackendApi } from "../NodeTrustBackendApi";
+import type {
+  ITrustMaterialDistributionPort,
+  PublishTrustBundleInput,
+  PublishTrustBundleResult,
+  ResolveRuntimeTrustMaterialPackageInput,
+  ResolveRuntimeTrustMaterialPackageResult,
+} from "../../../src/application/security/ports/ITrustMaterialDistributionPort";
+import { ResolveRuntimeTrustMaterialPackageUseCase } from "../../../src/application/security/use-cases/ResolveRuntimeTrustMaterialPackageUseCase";
 
 const cleanupPaths: string[] = [];
 const disposers: Array<() => void> = [];
@@ -84,6 +93,12 @@ function createHarness(): {
     recordNodeHeartbeatUseCase: new RecordNodeHeartbeatUseCase({
       nodeRepository: adapter,
       auditSink: auditRecorder,
+    }),
+    resolveApprovedNodeRuntimeTrustMaterialUseCase: new ResolveApprovedNodeRuntimeTrustMaterialUseCase({
+      nodeRepository: adapter,
+      runtimeTrustMaterialResolver: new ResolveRuntimeTrustMaterialPackageUseCase({
+        trustMaterialDistributionPort: new StubRuntimeTrustMaterialDistributionPort(),
+      }),
     }),
     listTrustedNodeInventoryUseCase: new ListTrustedNodeInventoryUseCase({
       nodeRepository: adapter,
@@ -415,6 +430,107 @@ describe("NodeTrustBackendApi", () => {
     expect(inventory.data.nodes[0]?.lastSeen?.observedBy).toBe("node-agent");
   });
 
+  it("returns managed runtime trust material for approved trusted node identities", async () => {
+    const harness = createHarness();
+    await harness.adapter.registerNode({
+      record: {
+        nodeId: "node:trusted:runtime-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Trusted Runtime 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:runtime-1:v1",
+        },
+        deploymentTags: ["runtime"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T17:00:00.000Z",
+        approvedAt: "2026-04-05T17:05:00.000Z",
+        createdAt: "2026-04-05T17:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T17:05:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-runtime-trusted-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const result = await harness.backendApi.resolveNodeRuntimeTrustMaterial({
+      actorUserIdentityId: "node:trusted:runtime-1",
+      nodeId: "node:trusted:runtime-1",
+      includeLeafCertificate: true,
+      includeCertificateChain: true,
+      includeTrustBundle: true,
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok || !result.data) {
+      return;
+    }
+    expect(result.data.runtimeTrustMaterial.targetKind).toBe("node");
+    expect(result.data.runtimeTrustMaterial.targetReferenceId).toBe("node:trusted:runtime-1");
+    expect(result.data.runtimeTrustMaterial.trustBundlePem).toContain("BEGIN CERTIFICATE");
+  });
+
+  it("rejects managed runtime trust material retrieval for unapproved nodes", async () => {
+    const harness = createHarness();
+    await harness.adapter.registerNode({
+      record: {
+        nodeId: "node:pending:runtime-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Pending Runtime 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.pending,
+        trustState: NodeTrustStates.pendingApproval,
+        certificate: {
+          certificateRef: "cert:runtime-pending-1:v1",
+        },
+        deploymentTags: ["runtime"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T17:00:00.000Z",
+        createdAt: "2026-04-05T17:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T17:00:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-runtime-pending-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const result = await harness.backendApi.resolveNodeRuntimeTrustMaterial({
+      actorUserIdentityId: "node:pending:runtime-1",
+      nodeId: "node:pending:runtime-1",
+      includeTrustBundle: true,
+    });
+
+    expect(result.ok).toBeFalse();
+    if (result.ok || !result.error) {
+      return;
+    }
+    expect(result.error.code).toBe("conflict");
+  });
+
   it("rejects heartbeat updates from unknown, pending, rejected, and revoked nodes", async () => {
     const harness = createHarness();
 
@@ -632,3 +748,27 @@ describe("NodeTrustBackendApi", () => {
     expect(pendingDetail.data.node.pendingEnrollment?.requestId).toBeDefined();
   });
 });
+
+class StubRuntimeTrustMaterialDistributionPort implements ITrustMaterialDistributionPort {
+  public async publishTrustBundle(_input: PublishTrustBundleInput): Promise<PublishTrustBundleResult> {
+    throw new Error("not implemented");
+  }
+
+  public async resolveRuntimeTrustMaterialPackage(
+    input: ResolveRuntimeTrustMaterialPackageInput,
+  ): Promise<ResolveRuntimeTrustMaterialPackageResult | undefined> {
+    return Object.freeze({
+      packageId: `runtime-trust-package:${input.targetKind}:${input.targetReferenceId}`,
+      occurredAt: input.occurredAt ?? "2026-04-05T00:00:00.000Z",
+      certificateAuthorityId: input.certificateAuthorityId ?? "ca:internal:root:v1",
+      serialNumber: input.serialNumber ?? "AA11",
+      targetKind: input.targetKind,
+      targetReferenceId: input.targetReferenceId,
+      workspaceId: input.workspaceId,
+      leafCertificatePem: "-----BEGIN CERTIFICATE-----leaf-----END CERTIFICATE-----",
+      certificateChainPem: "-----BEGIN CERTIFICATE-----chain-----END CERTIFICATE-----",
+      trustBundlePem: "-----BEGIN CERTIFICATE-----bundle-----END CERTIFICATE-----",
+      protectedReferences: Object.freeze([]),
+    });
+  }
+}

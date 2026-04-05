@@ -14,6 +14,7 @@ import {
   NodeInventoryPresenceStates,
   NodeTrustApiContractError,
   NodeTrustTransportScopes,
+  type NodeRuntimeTrustMaterialResponseDto,
   toNodeInventoryDetailDto,
   toNodeInventorySummaryDto,
   toNodeDetailDto,
@@ -240,5 +241,25 @@ describe("NodeTrustApiContracts", () => {
 
     expect(detail.pendingEnrollment?.requestId).toBe("enrollment:inventory-2");
     expect(detail.operationalState).toBe(NodeInventoryOperationalStates.pending);
+  });
+
+  it("supports runtime trust material response contracts for node runtime retrieval", () => {
+    const response: NodeRuntimeTrustMaterialResponseDto = Object.freeze({
+      runtimeTrustMaterial: Object.freeze({
+        packageId: "runtime-trust-package:node:node:compute-1",
+        occurredAt: "2026-04-05T12:45:00.000Z",
+        certificateAuthorityId: "ca:internal:root:v1",
+        serialNumber: "AA11",
+        targetKind: "node",
+        targetReferenceId: "node:compute-1",
+        leafCertificatePem: "-----BEGIN CERTIFICATE-----leaf-----END CERTIFICATE-----",
+        certificateChainPem: "-----BEGIN CERTIFICATE-----chain-----END CERTIFICATE-----",
+        trustBundlePem: "-----BEGIN CERTIFICATE-----bundle-----END CERTIFICATE-----",
+        protectedReferences: Object.freeze([]),
+      }),
+    });
+
+    expect(response.runtimeTrustMaterial.targetKind).toBe("node");
+    expect(response.runtimeTrustMaterial.targetReferenceId).toBe("node:compute-1");
   });
 });

@@ -21,6 +21,7 @@
 - Adds certificate renewal eligibility and rotation planning services for pre-expiry operations readiness (Story 6.3.2).
 - Adds certificate renewal/replacement execution workflow with explicit prior-certificate disposition controls and audit seams (Story 6.3.3).
 - Adds authoritative server host/runtime wiring that resolves managed server trust material through CA/certificate services before transport startup (Story 6.3.4).
+- Adds approved-node runtime trust retrieval wiring so trusted nodes can resolve managed certificate and trust-bundle material through node-authenticated retrieval paths (Story 6.3.5).
 
 ## Main artifacts to cite
 
@@ -54,6 +55,7 @@
 - `src/application/security/use-cases/GetCertificateRenewalPlanningUseCase.ts`
 - `src/application/security/use-cases/RenewIssuedCertificateUseCase.ts`
 - `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
+- `src/application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
 - `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
@@ -69,9 +71,12 @@
 - `src/application/security/tests/IssuedCertificateMetadataQueryUseCases.test.ts`
 - `src/application/security/tests/ResolveRuntimeTrustMaterialPackageUseCase.test.ts`
 - `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
+- `src/application/nodes/tests/ResolveApprovedNodeRuntimeTrustMaterialUseCase.test.ts`
 - `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - `src/infrastructure/security/certificates/tests/RuntimeTrustMaterialDistributionService.test.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
+- `infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
 - `src/shared/schemas/security/CertificateAuthoritySchemaContracts.ts`
 
@@ -336,6 +341,23 @@ Structured diagnostics emitted by the startup use case are designed for future o
   - configured TLS private-key trust material ref missing or wrong kind.
 - `IdentityHttpServer` now supports injected server factory composition so host runtime can start HTTPS using managed certificate material without changing transport handler logic.
 
+## Story 6.3.5 approved node runtime trust retrieval wiring behavior
+
+- `ResolveApprovedNodeRuntimeTrustMaterialUseCase` now composes node-trust lifecycle gating with managed runtime package retrieval by:
+  - requiring `actorUserIdentityId === nodeId`,
+  - requiring node lifecycle trust eligibility via `enforceNodeAuthenticatedOperationTrust(...)` (approved + trusted + non-revoked + certificate-present),
+  - delegating runtime trust package assembly to `ResolveRuntimeTrustMaterialPackageUseCase` (node target scope),
+  - rejecting protected-reference export for node retrieval requests.
+- `NodeTrustBackendApi` now exposes `resolveNodeRuntimeTrustMaterial(...)` as the node-facing application adapter seam for runtime trust retrieval.
+- `IdentityHttpServer` now exposes `GET /api/v1/nodes/{nodeId}/runtime-trust-material` with:
+  - authenticated node-principal binding checks,
+  - query validation for retrieval options,
+  - fail-closed responses for mismatched principal, invalid input, unapproved/revoked node state, and missing managed trust materials.
+- `startIdentityServerHost` now wires node runtime trust retrieval through managed certificate-service contracts by composing:
+  - `RuntimeTrustMaterialDistributionService`,
+  - `ResolveRuntimeTrustMaterialPackageUseCase`,
+  - `ResolveApprovedNodeRuntimeTrustMaterialUseCase` into `NodeTrustBackendApi`.
+
 ## Coverage in this slice
 
 - Domain invariants and lifecycle transitions: `src/domain/security/tests/CertificateAuthorityDomain.test.ts`
@@ -358,8 +380,10 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - renewal state classification and stale metadata detection coverage: `src/application/security/tests/CertificateRenewalPlanningService.test.ts`
 - renewal planning aggregation/attention coverage: `src/application/security/tests/GetCertificateRenewalPlanningUseCase.test.ts`
 - renewal/replacement success + failure coverage: `src/application/security/tests/RenewIssuedCertificateUseCase.test.ts`
+- approved-node runtime trust retrieval trust-gating coverage: `src/application/nodes/tests/ResolveApprovedNodeRuntimeTrustMaterialUseCase.test.ts`
 - concrete issuer signing pipeline coverage: `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - host initialization seam coverage: `hosts/server/tests/IdentityServerHost.test.ts`
+- node backend + HTTP transport retrieval coverage: `infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts` and `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 
 ## Follow-on note
 

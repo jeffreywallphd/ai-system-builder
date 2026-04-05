@@ -11,6 +11,9 @@ import {
   NodeTypes,
   createNodeCapabilityProfile,
 } from "../../../domain/nodes/NodeTrustDomain";
+import {
+  RuntimeTrustMaterialPackageViewSchema,
+} from "../security/CertificateAuthoritySchemaContracts";
 
 export interface NodeTrustApiSchemaValidationIssue {
   readonly path: string;
@@ -302,6 +305,18 @@ export const NodeHeartbeatPayloadDtoSchema = z.object({
   metadata: NodeTransportMetadataSchema.optional(),
 }).strict();
 
+export const ResolveNodeRuntimeTrustMaterialRequestDtoSchema = z.object({
+  actorUserIdentityId: NodeTrustApiIdentifierSchema,
+  nodeId: NodeTrustApiIdentifierSchema,
+  workspaceId: NodeTrustApiIdentifierSchema.optional(),
+  certificateAuthorityId: NodeTrustApiIdentifierSchema.optional(),
+  serialNumber: z.string().trim().toUpperCase().regex(/^[0-9A-F]{2,64}$/).optional(),
+  includeLeafCertificate: z.boolean().optional(),
+  includeCertificateChain: z.boolean().optional(),
+  includeTrustBundle: z.boolean().optional(),
+  occurredAt: NodeTrustApiTimestampSchema.optional(),
+}).strict();
+
 export const NodeEnrollmentDetailDtoSchema = z.object({
   requestId: NodeTrustApiIdentifierSchema,
   nodeId: NodeTrustApiIdentifierSchema,
@@ -389,6 +404,10 @@ export const NodeHeartbeatResponseDtoSchema = z.object({
   node: NodeDetailDtoSchema,
 }).strict();
 
+export const NodeRuntimeTrustMaterialResponseDtoSchema = z.object({
+  runtimeTrustMaterial: RuntimeTrustMaterialPackageViewSchema,
+}).strict();
+
 export const NodeInventoryPendingEnrollmentDtoSchema = z.object({
   requestId: NodeTrustApiIdentifierSchema,
   status: NodeEnrollmentRequestStatusSchema,
@@ -438,6 +457,7 @@ export type ApproveNodeEnrollmentActionRequestDtoPayload = z.infer<typeof Approv
 export type RejectNodeEnrollmentActionRequestDtoPayload = z.infer<typeof RejectNodeEnrollmentActionRequestDtoSchema>;
 export type RevokeNodeTrustActionRequestDtoPayload = z.infer<typeof RevokeNodeTrustActionRequestDtoSchema>;
 export type NodeHeartbeatPayloadDtoPayload = z.infer<typeof NodeHeartbeatPayloadDtoSchema>;
+export type ResolveNodeRuntimeTrustMaterialRequestDtoPayload = z.infer<typeof ResolveNodeRuntimeTrustMaterialRequestDtoSchema>;
 export type NodeEnrollmentDetailDtoPayload = z.infer<typeof NodeEnrollmentDetailDtoSchema>;
 export type NodeInternalEnrollmentDetailDtoPayload = z.infer<typeof NodeInternalEnrollmentDetailDtoSchema>;
 export type NodeDetailDtoPayload = z.infer<typeof NodeDetailDtoSchema>;
@@ -447,6 +467,7 @@ export type PendingEnrollmentListResponseDtoPayload = z.infer<typeof PendingEnro
 export type NodeEnrollmentDecisionResponseDtoPayload = z.infer<typeof NodeEnrollmentDecisionResponseDtoSchema>;
 export type NodeRevocationResponseDtoPayload = z.infer<typeof NodeRevocationResponseDtoSchema>;
 export type NodeHeartbeatResponseDtoPayload = z.infer<typeof NodeHeartbeatResponseDtoSchema>;
+export type NodeRuntimeTrustMaterialResponseDtoPayload = z.infer<typeof NodeRuntimeTrustMaterialResponseDtoSchema>;
 export type NodeInventoryPendingEnrollmentDtoPayload = z.infer<typeof NodeInventoryPendingEnrollmentDtoSchema>;
 export type NodeInventorySummaryDtoPayload = z.infer<typeof NodeInventorySummaryDtoSchema>;
 export type NodeInventoryDetailDtoPayload = z.infer<typeof NodeInventoryDetailDtoSchema>;
@@ -545,6 +566,16 @@ export function parseNodeHeartbeatPayloadDto(payload: unknown): NodeHeartbeatPay
   );
 }
 
+export function parseResolveNodeRuntimeTrustMaterialRequestDto(
+  payload: unknown,
+): ResolveNodeRuntimeTrustMaterialRequestDtoPayload {
+  return parseNodeTrustApiSchema(
+    "ResolveNodeRuntimeTrustMaterialRequestDto",
+    ResolveNodeRuntimeTrustMaterialRequestDtoSchema,
+    payload,
+  );
+}
+
 export function parseNodeEnrollmentDetailDto(payload: unknown): NodeEnrollmentDetailDtoPayload {
   return parseNodeTrustApiSchema(
     "NodeEnrollmentDetailDto",
@@ -615,6 +646,14 @@ export function parseNodeHeartbeatResponseDto(payload: unknown): NodeHeartbeatRe
   return parseNodeTrustApiSchema(
     "NodeHeartbeatResponseDto",
     NodeHeartbeatResponseDtoSchema,
+    payload,
+  );
+}
+
+export function parseNodeRuntimeTrustMaterialResponseDto(payload: unknown): NodeRuntimeTrustMaterialResponseDtoPayload {
+  return parseNodeTrustApiSchema(
+    "NodeRuntimeTrustMaterialResponseDto",
+    NodeRuntimeTrustMaterialResponseDtoSchema,
     payload,
   );
 }

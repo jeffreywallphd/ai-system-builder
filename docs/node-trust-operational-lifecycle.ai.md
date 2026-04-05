@@ -30,6 +30,19 @@ Story 5.4.5 operational baseline for the full node trust lifecycle with hardened
 7. Inventory: admin sees pending/active/offline/rejected/revoked states.
 8. Revocation: node becomes `revoked` with durable reason metadata.
 
+## Managed trust material provisioning
+
+- Approved and activated nodes retrieve managed runtime trust material through:
+  - `GET /api/v1/nodes/{nodeId}/runtime-trust-material`
+  - authenticated session bound to the same `nodeId` principal.
+- Retrieval uses application-level trust gating (`approved` + `trusted` + non-revoked + certificate-present) before resolving certificate/trust-bundle content.
+- Returned package content is node-safe runtime material:
+  - leaf certificate PEM,
+  - certificate chain PEM (when requested),
+  - trust bundle PEM (when requested).
+- Protected storage references are not exported to node runtime callers.
+- Unapproved, revoked, or principal-mismatched retrieval requests are rejected fail-closed.
+
 ## Hardening in this story
 
 - Duplicate pending enrollment per node is blocked.

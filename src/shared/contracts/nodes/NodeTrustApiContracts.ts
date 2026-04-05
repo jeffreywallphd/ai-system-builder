@@ -9,6 +9,7 @@ import type {
   NodeType,
 } from "../../../domain/nodes/NodeTrustDomain";
 import { NodeEnrollmentRequestStatuses } from "../../../domain/nodes/NodeTrustDomain";
+import type { RuntimeTrustMaterialPackageViewDto } from "../../dto/security/CertificateAuthorityDtos";
 
 export class NodeTrustApiContractError extends Error {
   constructor(message: string) {
@@ -156,6 +157,18 @@ export interface NodeHeartbeatPayloadDto {
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
+export interface ResolveNodeRuntimeTrustMaterialRequestDto {
+  readonly actorUserIdentityId: string;
+  readonly nodeId: string;
+  readonly workspaceId?: string;
+  readonly certificateAuthorityId?: string;
+  readonly serialNumber?: string;
+  readonly includeLeafCertificate?: boolean;
+  readonly includeCertificateChain?: boolean;
+  readonly includeTrustBundle?: boolean;
+  readonly occurredAt?: string;
+}
+
 export interface NodeEnrollmentDetailDto {
   readonly requestId: string;
   readonly nodeId: string;
@@ -267,6 +280,10 @@ export interface NodeRevocationResponseDto {
 
 export interface NodeHeartbeatResponseDto {
   readonly node: NodeDetailDto;
+}
+
+export interface NodeRuntimeTrustMaterialResponseDto {
+  readonly runtimeTrustMaterial: RuntimeTrustMaterialPackageViewDto;
 }
 
 export interface NodeInventoryListResponseDto {

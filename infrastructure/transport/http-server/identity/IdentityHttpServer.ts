@@ -60,6 +60,7 @@ import {
   type GetNodeEnrollmentDetailApiRequest,
   type GetNodeInventoryDetailApiRequest,
   type ListNodeInventoryApiRequest,
+  type ResolveNodeRuntimeTrustMaterialApiRequest,
   type ListTrustedNodeInventoryApiRequest,
   NodeTrustApiErrorCodes,
   type NodeTrustApiResponse,
@@ -77,6 +78,7 @@ import {
 import {
   parseApproveNodeEnrollmentActionRequestDto,
   parseNodeHeartbeatPayloadDto,
+  parseResolveNodeRuntimeTrustMaterialRequestDto,
   parseRevokeNodeTrustActionRequestDto,
   parseRejectNodeEnrollmentActionRequestDto,
   parseNodeEnrollmentSubmissionRequestDto,
@@ -1541,6 +1543,158 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapNodeTrustStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, revokeRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.nodeTrustBackendApi
+        && request.method === "GET"
+        && path.endsWith("/runtime-trust-material")
+        && path.startsWith("/api/v1/nodes/")
+        && !path.startsWith("/api/v1/nodes/enrollments/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const nodeId = decodePathTail(path, "/api/v1/nodes/", "/runtime-trust-material");
+            if (!nodeId) {
+              const invalid = buildNodeTrustInvalidRequestResponse("nodeId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            if (!isAuthenticatedNodePrincipalForNode(context, nodeId)) {
+              const forbidden = buildNodeTrustForbiddenResponse(
+                `Authenticated session is not authorized to retrieve runtime trust material for node '${nodeId}'.`,
+              );
+              writeJson(response, 403, forbidden);
+              logResponse(logger, requestId, request, 403, Object.freeze({
+                nodeId,
+                principalUserIdentityId: context.principal.userIdentityId,
+                principalUsername: context.principal.username,
+                sessionProviderSubject: context.session.providerSubject,
+              }), forbidden);
+              return;
+            }
+
+            const includeLeafCertificateInput = searchParams.get("includeLeafCertificate");
+            const includeCertificateChainInput = searchParams.get("includeCertificateChain");
+            const includeTrustBundleInput = searchParams.get("includeTrustBundle");
+            const includeLeafCertificate = parseOptionalBoolean(includeLeafCertificateInput);
+            const includeCertificateChain = parseOptionalBoolean(includeCertificateChainInput);
+            const includeTrustBundle = parseOptionalBoolean(includeTrustBundleInput);
+
+            if (includeLeafCertificateInput !== null && includeLeafCertificate === undefined) {
+              const invalid = buildNodeTrustQueryValidationError(
+                "includeLeafCertificate",
+                "includeLeafCertificate must be 'true' or 'false'.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                nodeId,
+                includeLeafCertificate: includeLeafCertificateInput,
+              }), invalid);
+              return;
+            }
+
+            if (includeCertificateChainInput !== null && includeCertificateChain === undefined) {
+              const invalid = buildNodeTrustQueryValidationError(
+                "includeCertificateChain",
+                "includeCertificateChain must be 'true' or 'false'.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                nodeId,
+                includeCertificateChain: includeCertificateChainInput,
+              }), invalid);
+              return;
+            }
+
+            if (includeTrustBundleInput !== null && includeTrustBundle === undefined) {
+              const invalid = buildNodeTrustQueryValidationError(
+                "includeTrustBundle",
+                "includeTrustBundle must be 'true' or 'false'.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                nodeId,
+                includeTrustBundle: includeTrustBundleInput,
+              }), invalid);
+              return;
+            }
+
+            let runtimeTrustMaterialRequest: ResolveNodeRuntimeTrustMaterialApiRequest;
+            try {
+              const parsedRequest = parseResolveNodeRuntimeTrustMaterialRequestDto({
+                actorUserIdentityId: nodeId,
+                nodeId,
+                workspaceId: normalizeOptionalString(searchParams.get("workspaceId")),
+                certificateAuthorityId: normalizeOptionalString(searchParams.get("certificateAuthorityId")),
+                serialNumber: normalizeOptionalString(searchParams.get("serialNumber")),
+                includeLeafCertificate,
+                includeCertificateChain,
+                includeTrustBundle,
+                occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+              });
+              runtimeTrustMaterialRequest = Object.freeze({
+                actorUserIdentityId: parsedRequest.actorUserIdentityId,
+                nodeId: parsedRequest.nodeId,
+                workspaceId: parsedRequest.workspaceId,
+                certificateAuthorityId: parsedRequest.certificateAuthorityId,
+                serialNumber: parsedRequest.serialNumber,
+                includeLeafCertificate: parsedRequest.includeLeafCertificate,
+                includeCertificateChain: parsedRequest.includeCertificateChain,
+                includeTrustBundle: parsedRequest.includeTrustBundle,
+                occurredAt: parsedRequest.occurredAt,
+              });
+            } catch (error) {
+              if (error instanceof NodeTrustApiSchemaValidationError) {
+                const invalid: NodeTrustApiResponse<never> = Object.freeze({
+                  ok: false,
+                  error: Object.freeze({
+                    code: NodeTrustApiErrorCodes.invalidRequest,
+                    message: "Request validation failed.",
+                    validationErrors: Object.freeze(error.issues.map((issue) => Object.freeze({
+                      path: issue.path,
+                      code: issue.code,
+                      message: issue.message,
+                    }))),
+                  }),
+                });
+                writeJson(response, 400, invalid);
+                logResponse(logger, requestId, request, 400, Object.freeze({
+                  nodeId,
+                  query: Object.freeze({
+                    workspaceId: normalizeOptionalString(searchParams.get("workspaceId")),
+                    certificateAuthorityId: normalizeOptionalString(searchParams.get("certificateAuthorityId")),
+                    serialNumber: normalizeOptionalString(searchParams.get("serialNumber")),
+                    includeLeafCertificate: includeLeafCertificateInput,
+                    includeCertificateChain: includeCertificateChainInput,
+                    includeTrustBundle: includeTrustBundleInput,
+                    occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+                  }),
+                }), invalid);
+                return;
+              }
+
+              const invalid = buildNodeTrustInvalidRequestResponse("Request validation failed.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                nodeId,
+              }), invalid);
+              return;
+            }
+
+            const apiResponse = await options.nodeTrustBackendApi.resolveNodeRuntimeTrustMaterial(runtimeTrustMaterialRequest);
+            const statusCode = mapNodeTrustStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, runtimeTrustMaterialRequest, apiResponse);
           },
         );
         return;

@@ -15,6 +15,7 @@ import {
   NodeHeartbeatPayloadDtoSchema,
   parseNodeInventoryDetailResponseDto,
   parseNodeInventoryListResponseDto,
+  parseNodeRuntimeTrustMaterialResponseDto,
   NodeTrustApiSchemaValidationError,
   parseNodeDetailDto,
   parseNodeEnrollmentDecisionResponseDto,
@@ -414,5 +415,25 @@ describe("NodeTrustApiSchemaContracts", () => {
       },
     });
     expect(detail.node.pendingEnrollment?.requestId).toBe("enrollment:pending-1");
+  });
+
+  it("parses node runtime trust material response payloads", () => {
+    const parsed = parseNodeRuntimeTrustMaterialResponseDto({
+      runtimeTrustMaterial: {
+        packageId: "runtime-trust-package:node:node:compute-1",
+        occurredAt: "2026-04-05T12:50:00.000Z",
+        certificateAuthorityId: "ca:internal:root:v1",
+        serialNumber: "AA11",
+        targetKind: "node",
+        targetReferenceId: "node:compute-1",
+        leafCertificatePem: "-----BEGIN CERTIFICATE-----leaf-----END CERTIFICATE-----",
+        certificateChainPem: "-----BEGIN CERTIFICATE-----chain-----END CERTIFICATE-----",
+        trustBundlePem: "-----BEGIN CERTIFICATE-----bundle-----END CERTIFICATE-----",
+        protectedReferences: [],
+      },
+    });
+
+    expect(parsed.runtimeTrustMaterial.targetKind).toBe("node");
+    expect(parsed.runtimeTrustMaterial.targetReferenceId).toBe("node:compute-1");
   });
 });
