@@ -138,17 +138,35 @@ describe("System runtime operational authorization", () => {
     const first = await runtimeApi.startExecution({
       systemId: "system:ops",
       versionId: "system:ops:v1",
-      requestContext: { trustedInternal: true },
+      requestContext: {
+        trustedInternal: true,
+        trustedInternalAuthorization: {
+          actorMode: "system-action",
+          systemActionId: "runtime-seed",
+        },
+      },
     });
     const second = await runtimeApi.startExecution({
       systemId: "system:ops",
       versionId: "system:ops:v1",
-      requestContext: { trustedInternal: true },
+      requestContext: {
+        trustedInternal: true,
+        trustedInternalAuthorization: {
+          actorMode: "system-action",
+          systemActionId: "runtime-seed",
+        },
+      },
     });
     const third = await runtimeApi.startExecution({
       systemId: "system:ops",
       versionId: "system:ops:v1",
-      requestContext: { trustedInternal: true },
+      requestContext: {
+        trustedInternal: true,
+        trustedInternalAuthorization: {
+          actorMode: "system-action",
+          systemActionId: "runtime-seed",
+        },
+      },
     });
     expect(first.ok).toBeTrue();
     expect(second.ok).toBeTrue();
@@ -368,5 +386,162 @@ describe("System runtime operational authorization", () => {
     });
     expect(deniedAudit.ok).toBeFalse();
     expect(deniedAudit.error?.code).toBe("forbidden");
+
+    const delegatedDeniedStatus = await runtimeApi.getExecutionStatus(runAllowed, {
+      trustedInternal: true,
+      trustedInternalAuthorization: {
+        actorMode: "propagate-caller",
+      },
+      accessContext: { callerKind: "user", callerId: "user-denied", metadata: { workspaceId: "workspace-alpha" } },
+    });
+    expect(delegatedDeniedStatus.ok).toBeFalse();
+    expect(delegatedDeniedStatus.error?.code).toBe("forbidden");
+  });
+
+  it("requires explicit system-action semantics for trusted internal authorization bypass when policy evaluator is active", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:ops",
+      versionId: "system:ops:v1",
+      metadata: {
+        metadata: {
+          taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: false }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+    const authRepositories = new InMemoryOperationalAuthorizationRepositories();
+    const runtimeApi = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        authorizationDecisionEvaluator: createEvaluator(authRepositories),
+        now: () => new Date(evaluationAsOf),
+      },
+    );
+
+    const missingSystemAction = await runtimeApi.startExecution({
+      systemId: "system:ops",
+      versionId: "system:ops:v1",
+      requestContext: {
+        trustedInternal: true,
+      },
+    });
+    expect(missingSystemAction.ok).toBeFalse();
+    expect(missingSystemAction.error?.code).toBe("invalid-request");
+
+    const explicitSystemAction = await runtimeApi.startExecution({
+      systemId: "system:ops",
+      versionId: "system:ops:v1",
+      requestContext: {
+        trustedInternal: true,
+        trustedInternalAuthorization: {
+          actorMode: "system-action",
+          systemActionId: "runtime-maintenance",
+        },
+      },
+    });
+    expect(explicitSystemAction.ok).toBeTrue();
+  });
+
+  it("preserves delegated actor scoping for async deferred execution polling", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:ops",
+      versionId: "system:ops:v1",
+      metadata: {
+        metadata: {
+          taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: false }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+    const authRepositories = new InMemoryOperationalAuthorizationRepositories();
+    const runtimeApi = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        authorizationDecisionEvaluator: createEvaluator(authRepositories),
+        now: () => new Date(evaluationAsOf),
+      },
+    );
+
+    const started = await runtimeApi.startExecutionAsync({
+      systemId: "system:ops",
+      versionId: "system:ops:v1",
+      requestContext: {
+        trustedInternal: true,
+        trustedInternalAuthorization: {
+          actorMode: "propagate-caller",
+        },
+        accessContext: {
+          callerKind: "user",
+          callerId: "user-owner",
+          metadata: { workspaceId: "workspace-alpha" },
+        },
+      },
+    });
+    expect(started.ok).toBeTrue();
+    const executionId = started.data!.executionId;
+    authRepositories.resourceMetadata.set(
+      toKey("runtime-execution", executionId),
+      Object.freeze({
+        resourceFamily: AuthorizationResourceFamilies.run,
+        resourceType: "runtime-execution",
+        resourceId: executionId,
+        ownerUserIdentityId: "user-owner",
+        ownershipScope: ResourceOwnershipScopes.workspace,
+        workspaceId: "workspace-alpha",
+        visibility: ResourceVisibilities.private,
+        sharingPolicyMode: SharingPolicyModes.ownerOnly,
+        allowResharing: false,
+        isPublishedCapable: false,
+      }),
+    );
+
+    const deniedPoll = await runtimeApi.pollExecution({
+      executionId,
+      requestContext: {
+        trustedInternal: true,
+        trustedInternalAuthorization: {
+          actorMode: "propagate-caller",
+        },
+        accessContext: {
+          callerKind: "user",
+          callerId: "user-denied",
+          metadata: { workspaceId: "workspace-alpha" },
+        },
+      },
+    });
+    expect(deniedPoll.ok).toBeFalse();
+    expect(deniedPoll.error?.code).toBe("forbidden");
   });
 });

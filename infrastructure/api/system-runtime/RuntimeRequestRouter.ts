@@ -78,6 +78,10 @@ export class RuntimeRequestRouter {
     const context = request.request as { readonly requestContext?: Parameters<SystemRuntimeBackendApi["startExecution"]>[0]["requestContext"] };
     const internalRequestContext = Object.freeze({
       trustedInternal: true,
+      trustedInternalAuthorization: Object.freeze({
+        actorMode: "system-action" as const,
+        systemActionId: "studio-shell-internal-router",
+      }),
       requestSource: RuntimeRequestSources.studioShellInternal,
       ...(context.requestContext ?? {}),
     });
