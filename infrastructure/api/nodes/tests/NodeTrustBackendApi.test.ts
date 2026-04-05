@@ -20,6 +20,7 @@ import {
   NodeTypes,
 } from "../../../src/domain/nodes/NodeTrustDomain";
 import { SqliteNodeTrustPersistenceAdapter } from "../../../src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
+import { SqliteNodeTrustAuditRecorder } from "../../../src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
 import { NodeTrustBackendApi } from "../NodeTrustBackendApi";
 
 const cleanupPaths: string[] = [];
@@ -40,17 +41,22 @@ afterEach(() => {
 function createHarness(): {
   readonly backendApi: NodeTrustBackendApi;
   readonly adapter: SqliteNodeTrustPersistenceAdapter;
+  readonly auditRecorder: SqliteNodeTrustAuditRecorder;
 } {
   const directory = mkdtempSync(path.join(tmpdir(), "ai-loom-node-trust-backend-api-"));
   cleanupPaths.push(directory);
   const adapter = new SqliteNodeTrustPersistenceAdapter(path.join(directory, "node-trust.sqlite"));
+  const auditRecorder = new SqliteNodeTrustAuditRecorder(path.join(directory, "node-trust.sqlite"));
   disposers.push(() => adapter.dispose());
+  disposers.push(() => auditRecorder.dispose());
   const backendApi = new NodeTrustBackendApi({
     registerNodeEnrollmentRequestUseCase: new RegisterNodeEnrollmentRequestUseCase({
       enrollmentRequestRepository: adapter,
+      auditSink: auditRecorder,
     }),
     reviewPendingNodeEnrollmentUseCase: new ReviewPendingNodeEnrollmentUseCase({
       enrollmentRequestRepository: adapter,
+      auditSink: auditRecorder,
     }),
     getNodeEnrollmentDetailUseCase: new GetNodeEnrollmentDetailUseCase({
       enrollmentRequestRepository: adapter,
@@ -62,30 +68,79 @@ function createHarness(): {
     approveNodeEnrollmentUseCase: new ApproveNodeEnrollmentUseCase({
       enrollmentRequestRepository: adapter,
       nodeRepository: adapter,
+      auditSink: auditRecorder,
     }),
     rejectNodeEnrollmentUseCase: new RejectNodeEnrollmentUseCase({
       enrollmentRequestRepository: adapter,
       nodeRepository: adapter,
+      auditSink: auditRecorder,
     }),
     recordNodeHeartbeatUseCase: new RecordNodeHeartbeatUseCase({
       nodeRepository: adapter,
+      auditSink: auditRecorder,
     }),
     listTrustedNodeInventoryUseCase: new ListTrustedNodeInventoryUseCase({
       nodeRepository: adapter,
+      auditSink: auditRecorder,
     }),
     listNodeInventoryUseCase: new ListNodeInventoryUseCase({
       nodeRepository: adapter,
       enrollmentRequestRepository: adapter,
+      auditSink: auditRecorder,
     }),
   });
 
   return Object.freeze({
     backendApi,
     adapter,
+    auditRecorder,
   });
 }
 
 describe("NodeTrustBackendApi", () => {
+  it("records node lifecycle audit events through the backend boundary", async () => {
+    const harness = createHarness();
+    const submit = await harness.backendApi.submitNodeEnrollment({
+      actorUserIdentityId: "node:bootstrap:audit-1",
+      nodeId: "node:compute:audit-1",
+      nodeType: NodeTypes.compute,
+      displayName: "Audit Node 1",
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        supportsRemoteScheduling: true,
+      },
+    });
+    expect(submit.ok).toBeTrue();
+    if (!submit.ok || !submit.data) {
+      return;
+    }
+
+    const approve = await harness.backendApi.approveNodeEnrollment({
+      actorUserIdentityId: "admin:user:audit-1",
+      requestId: submit.data.enrollment.requestId,
+      certificate: {
+        certificateRef: "cert:node:compute:audit-1:v1",
+      },
+    });
+    expect(approve.ok).toBeTrue();
+    if (!approve.ok) {
+      return;
+    }
+
+    const heartbeat = await harness.backendApi.recordNodeHeartbeat({
+      actorUserIdentityId: "node:compute:audit-1",
+      nodeId: "node:compute:audit-1",
+      heartbeatStatus: NodeHeartbeatStatuses.online,
+      observedBy: "node-agent",
+    });
+    expect(heartbeat.ok).toBeTrue();
+
+    const events = harness.auditRecorder.listRecent(10);
+    expect(events.some((event) => event.type === "node-enrollment-requested")).toBeTrue();
+    expect(events.some((event) => event.type === "node-approved")).toBeTrue();
+    expect(events.some((event) => event.type === "node-heartbeat-recorded")).toBeTrue();
+  });
+
   it("submits bootstrap enrollment requests and returns pending summaries", async () => {
     const harness = createHarness();
     const submit = await harness.backendApi.submitNodeEnrollment({

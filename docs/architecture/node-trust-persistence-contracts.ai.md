@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Quick baseline for Story 5.1.2 and Story 5.1.3 node-trust persistence contracts and SQLite adapter implementation (Feature 5 / Epic 5.1).
+Quick baseline for Story 5.1.2 and Story 5.1.3 node-trust persistence contracts and SQLite adapter implementation (Feature 5 / Epic 5.1), extended by Story 5.4.3 node trust audit recording persistence.
 
 ## Canonical files
 
@@ -15,8 +15,10 @@ Quick baseline for Story 5.1.2 and Story 5.1.3 node-trust persistence contracts 
 - `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceMigrations.ts`
 - `src/infrastructure/persistence/nodes/NodeTrustPersistenceMapper.ts`
 - `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter.ts`
+- `src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder.ts`
 - `src/infrastructure/persistence/nodes/tests/NodeTrustPersistenceMapper.test.ts`
 - `src/infrastructure/persistence/nodes/tests/SqliteNodeTrustPersistenceAdapter.test.ts`
+- `src/infrastructure/persistence/nodes/tests/SqliteNodeTrustAuditRecorder.test.ts`
 
 ## Core persistence model
 
@@ -65,6 +67,7 @@ Quick baseline for Story 5.1.2 and Story 5.1.3 node-trust persistence contracts 
 - Mutation envelopes require idempotency `operationKey` and support `expectedRevision` for optimistic-concurrency adapters.
 - SQLite adapter uses transactional upserts with immutable creation metadata and mutation replay snapshots in `node_trust_mutation_replays`.
 - Capability and deployment-tag lookups are materialized in normalized tables to keep admin/orchestration query paths index-friendly.
+- Node trust audit events now persist to `node_trust_audit_events` through `SqliteNodeTrustAuditRecorder`, keyed for actor/node/time governance queries.
 
 ## Tests in this slice
 

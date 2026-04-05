@@ -87,8 +87,10 @@ export class ReviewPendingNodeEnrollmentUseCase {
       type: NodeTrustAuditEventTypes.pendingEnrollmentReviewed,
       actorUserIdentityId,
       occurredAt: this.clock.now().toISOString(),
+      outcome: "success",
       details: Object.freeze({
         nodeId,
+        statuses,
         statusCount: statuses.length,
         returned: enrollments.length,
       }),

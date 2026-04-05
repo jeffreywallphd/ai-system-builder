@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import type { AuthProvider, CredentialPolicy } from "../../../src/domain/identity/IdentityDomain";
 import { IdentityProviderAccountPolicyConfig } from "../../../infrastructure/config/IdentityProviderAccountPolicyConfig";
 import { SqliteWorkspacePersistenceAdapter } from "../../../src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
+import { SqliteNodeTrustAuditRecorder } from "../../../src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
 import {
   WorkspaceMembershipStatuses,
   WorkspaceRoleAssignmentStatuses,
@@ -351,6 +352,12 @@ describe("IdentityServerHost", () => {
       expect(pendingBody.ok).toBe(true);
       expect(pendingBody.data.enrollments).toHaveLength(1);
       expect(pendingBody.data.enrollments[0].nodeId).toBe("node:host:1");
+
+      const auditRecorder = new SqliteNodeTrustAuditRecorder(databasePath);
+      const auditEvents = auditRecorder.listRecent(20);
+      expect(auditEvents.some((event) => event.type === "node-enrollment-requested")).toBeTrue();
+      expect(auditEvents.some((event) => event.type === "node-pending-enrollment-reviewed")).toBeTrue();
+      auditRecorder.dispose();
     } finally {
       await host.close();
       rmSync(tempDirectory, { recursive: true, force: true });

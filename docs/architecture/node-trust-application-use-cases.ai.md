@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Quick baseline for Story 5.1.4 node trust application orchestration seams, Story 5.2.1 node bootstrap identity generation, Story 5.2.3 admin review/approval decisions, Story 5.2.4 enrollment detail retrieval support, Story 5.3.4 admin inventory list/detail queries, Story 5.4.1 durable node revocation behavior, and Story 5.4.2 node-authenticated trust enforcement (Feature 5 / Epic 5.1, 5.2, 5.3, and 5.4).
+Quick baseline for Story 5.1.4 node trust application orchestration seams, Story 5.2.1 node bootstrap identity generation, Story 5.2.3 admin review/approval decisions, Story 5.2.4 enrollment detail retrieval support, Story 5.3.4 admin inventory list/detail queries, Story 5.4.1 durable node revocation behavior, Story 5.4.2 node-authenticated trust enforcement, and Story 5.4.3 node trust audit recording integration (Feature 5 / Epic 5.1, 5.2, 5.3, and 5.4).
 
 ## Canonical files
 
@@ -10,6 +10,7 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - `src/application/nodes/ports/NodeTrustAuthorizationPorts.ts`
 - `src/application/nodes/ports/NodeTrustCertificatePorts.ts`
 - `src/application/nodes/ports/NodeTrustAuditPorts.ts`
+- `src/application/nodes/tests/NodeTrustAuditPorts.test.ts`
 - `src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase.ts`
 - `src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase.ts`
 - `src/application/nodes/use-cases/GetNodeEnrollmentDetailUseCase.ts`
@@ -25,6 +26,8 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
 - `src/infrastructure/security/nodes/NodeBootstrapIdentityService.ts`
 - `src/infrastructure/security/nodes/tests/NodeBootstrapIdentityService.test.ts`
+- `src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder.ts`
+- `src/infrastructure/persistence/nodes/tests/SqliteNodeTrustAuditRecorder.test.ts`
 
 ## Lifecycle orchestration coverage
 
@@ -64,4 +67,5 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - Node-authenticated write operations should use `enforceNodeAuthenticatedOperationTrust(...)` from `NodeTrustUseCaseShared.ts` instead of ad-hoc state checks.
 - The centralized trust gate enforces approved + activated (`trustState=trusted`) + non-revoked + certificate-present preconditions before node-authenticated writes.
 - Heartbeat recording uses this centralized guard and rejects unknown, pending, rejected, and revoked nodes before writing `lastSeen` metadata.
+- Rejected heartbeat attempts now emit `node-heartbeat-rejected` audit events with `outcome=rejected` and trust-gate reason metadata.
 - Trusted inventory queries are the admin visibility read path for `lastSeenAt` / heartbeat status snapshots.

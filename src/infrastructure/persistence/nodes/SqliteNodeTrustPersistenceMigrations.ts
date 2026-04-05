@@ -1,4 +1,4 @@
-export const NODE_TRUST_PERSISTENCE_SCHEMA_VERSION = 1;
+export const NODE_TRUST_PERSISTENCE_SCHEMA_VERSION = 2;
 
 export const NODE_TRUST_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -155,5 +155,29 @@ export const NODE_TRUST_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, 
       record_snapshot_json TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+  `],
+  [2, `
+    CREATE TABLE IF NOT EXISTS node_trust_audit_events (
+      event_id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      occurred_at TEXT NOT NULL,
+      actor_user_identity_id TEXT NOT NULL,
+      node_id TEXT,
+      enrollment_request_id TEXT,
+      workspace_id TEXT,
+      deployment_id TEXT,
+      outcome TEXT,
+      event_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS node_trust_audit_events_recent_idx
+      ON node_trust_audit_events(occurred_at DESC, event_id DESC);
+    CREATE INDEX IF NOT EXISTS node_trust_audit_events_type_idx
+      ON node_trust_audit_events(event_type, occurred_at DESC, event_id DESC);
+    CREATE INDEX IF NOT EXISTS node_trust_audit_events_node_idx
+      ON node_trust_audit_events(node_id, occurred_at DESC, event_id DESC);
+    CREATE INDEX IF NOT EXISTS node_trust_audit_events_actor_idx
+      ON node_trust_audit_events(actor_user_identity_id, occurred_at DESC, event_id DESC);
   `],
 ]);

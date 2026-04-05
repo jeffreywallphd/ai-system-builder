@@ -234,9 +234,12 @@ export class RejectNodeEnrollmentUseCase {
       occurredAt: nowIso,
       nodeId: enrollment.nodeId,
       enrollmentRequestId: requestId,
+      outcome: "success",
       details: Object.freeze({
+        nodeType: nodeMutation.record.nodeType,
         trustState: nodeMutation.record.trustState,
         approvalStatus: nodeMutation.record.approvalStatus,
+        deploymentTags: nodeMutation.record.deploymentTags,
         reviewedAt: enrollmentMutation.record.reviewedAt,
         reviewedByUserIdentityId: enrollmentMutation.record.reviewedByUserIdentityId,
         decisionNote: enrollmentMutation.record.decisionNote,

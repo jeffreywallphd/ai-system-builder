@@ -80,10 +80,36 @@ export class RecordNodeHeartbeatUseCase {
 
     const node = await this.dependencies.nodeRepository.findNodeById(nodeId);
     if (!node) {
+      await publishNodeTrustAuditEventBestEffort(this.dependencies.auditSink, {
+        type: NodeTrustAuditEventTypes.heartbeatRejected,
+        actorUserIdentityId,
+        occurredAt: this.clock.now().toISOString(),
+        nodeId,
+        outcome: "rejected",
+        details: Object.freeze({
+          reasonCode: NodeTrustUseCaseErrorCodes.notFound,
+          reason: "Node identity was not found for heartbeat recording.",
+        }),
+      });
       return toNodeTrustFailure(NodeTrustUseCaseErrorCodes.notFound, `Node '${nodeId}' was not found.`);
     }
     const trustFailure = enforceNodeAuthenticatedOperationTrust(node, "report heartbeat presence");
     if (trustFailure) {
+      await publishNodeTrustAuditEventBestEffort(this.dependencies.auditSink, {
+        type: NodeTrustAuditEventTypes.heartbeatRejected,
+        actorUserIdentityId,
+        occurredAt: this.clock.now().toISOString(),
+        nodeId,
+        outcome: "rejected",
+        details: Object.freeze({
+          reasonCode: trustFailure.error.code,
+          reason: trustFailure.error.message,
+          approvalStatus: node.approvalStatus,
+          trustState: node.trustState,
+          revocationState: node.revocation.state,
+          deploymentTags: node.deploymentTags,
+        }),
+      });
       return trustFailure;
     }
 
@@ -95,6 +121,20 @@ export class RecordNodeHeartbeatUseCase {
         });
       }
     } catch (error) {
+      await publishNodeTrustAuditEventBestEffort(this.dependencies.auditSink, {
+        type: NodeTrustAuditEventTypes.heartbeatRejected,
+        actorUserIdentityId,
+        occurredAt: this.clock.now().toISOString(),
+        nodeId,
+        outcome: "rejected",
+        details: Object.freeze({
+          reasonCode: NodeTrustUseCaseErrorCodes.forbidden,
+          reason: error instanceof Error ? error.message : "Heartbeat authorization failed.",
+          approvalStatus: node.approvalStatus,
+          trustState: node.trustState,
+          revocationState: node.revocation.state,
+        }),
+      });
       return toNodeTrustFailure(
         NodeTrustUseCaseErrorCodes.forbidden,
         error instanceof Error ? error.message : "Actor is not authorized to record node heartbeat.",
@@ -128,6 +168,20 @@ export class RecordNodeHeartbeatUseCase {
         },
       );
     } catch (error) {
+      await publishNodeTrustAuditEventBestEffort(this.dependencies.auditSink, {
+        type: NodeTrustAuditEventTypes.heartbeatRejected,
+        actorUserIdentityId,
+        occurredAt: seenAt,
+        nodeId,
+        outcome: "rejected",
+        details: Object.freeze({
+          reasonCode: NodeTrustUseCaseErrorCodes.invalidRequest,
+          reason: error instanceof Error ? error.message : "Heartbeat payload validation failed.",
+          approvalStatus: node.approvalStatus,
+          trustState: node.trustState,
+          revocationState: node.revocation.state,
+        }),
+      });
       return mapNodeTrustDomainError(error, "Node heartbeat payload is invalid.")
         ?? toNodeTrustFailure(NodeTrustUseCaseErrorCodes.invalidRequest, "Node heartbeat payload is invalid.");
     }
@@ -156,9 +210,11 @@ export class RecordNodeHeartbeatUseCase {
       actorUserIdentityId,
       occurredAt: seenAt,
       nodeId,
+      outcome: "success",
       details: Object.freeze({
         heartbeatStatus: request.heartbeatStatus,
         observedBy: normalizeOptional(request.observedBy),
+        deploymentTags: mutation.record.deploymentTags,
       }),
     });
 
