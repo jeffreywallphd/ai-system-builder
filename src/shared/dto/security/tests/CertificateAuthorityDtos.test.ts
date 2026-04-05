@@ -6,8 +6,10 @@ import {
 } from "../../../../domain/security/CertificateAuthorityDomain";
 import {
   CertificateAuthorityPersistenceQueryPresets,
+  CertificateDistributionTargetKinds,
   normalizeCertificateAuthorityMutationOperationKey,
   toCertificateAuthorityStatusLookupKey,
+  toCertificateDistributionTargetLookupKey,
   toCertificateStatusLookupKey,
   toCertificateSubjectLookupKey,
 } from "../CertificateAuthorityDtos";
@@ -23,6 +25,11 @@ describe("CertificateAuthorityDtos", () => {
       referenceId: "node:1",
       workspaceId: "workspace:a",
     })).toBe("certificate-subject:node:node:1:workspace:a");
+    expect(toCertificateDistributionTargetLookupKey({
+      kind: CertificateDistributionTargetKinds.server,
+      referenceId: "server:authoritative",
+      workspaceId: "workspace:a",
+    })).toBe("certificate-distribution-target:server:server:authoritative:workspace:a");
   });
 
   it("exposes active/revoked query presets", () => {

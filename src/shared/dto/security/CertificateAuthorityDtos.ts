@@ -78,6 +78,26 @@ export interface CertificateRevocationPersistenceRecord {
   readonly note?: string;
 }
 
+export const CertificateDistributionTargetKinds = Object.freeze({
+  node: "node",
+  server: "server",
+  device: "device",
+  service: "service",
+});
+
+export type CertificateDistributionTargetKind =
+  typeof CertificateDistributionTargetKinds[keyof typeof CertificateDistributionTargetKinds];
+
+export const CertificateDistributionEventStatuses = Object.freeze({
+  queued: "queued",
+  published: "published",
+  failed: "failed",
+  acknowledged: "acknowledged",
+});
+
+export type CertificateDistributionEventStatus =
+  typeof CertificateDistributionEventStatuses[keyof typeof CertificateDistributionEventStatuses];
+
 export interface TrustMaterialReferencePersistenceRecord extends CertificateAuthorityPersistenceAuditStamp {
   readonly materialRef: string;
   readonly kind: TrustMaterialKind;
@@ -122,6 +142,46 @@ export interface IssuedCertificatePersistenceRecord extends CertificateAuthority
   readonly revision: number;
 }
 
+export interface CertificateStatusHistoryPersistenceRecord {
+  readonly statusEventId: string;
+  readonly certificateAuthorityId: string;
+  readonly serialNumber: string;
+  readonly previousStatus?: CertificateStatus;
+  readonly currentStatus: CertificateStatus;
+  readonly occurredAt: string;
+  readonly occurredBy: string;
+  readonly reason?: string;
+  readonly note?: string;
+}
+
+export interface CertificateRevocationHistoryPersistenceRecord extends CertificateAuthorityPersistenceAuditStamp {
+  readonly revocationId: string;
+  readonly certificateAuthorityId: string;
+  readonly serialNumber: string;
+  readonly reason: CertificateRevocationReason;
+  readonly revokedAt: string;
+  readonly revokedByActorId?: string;
+  readonly note?: string;
+  readonly revision: number;
+}
+
+export interface CertificateDistributionEventPersistenceRecord extends CertificateAuthorityPersistenceAuditStamp {
+  readonly distributionEventId: string;
+  readonly materialRef: string;
+  readonly certificateAuthorityId?: string;
+  readonly serialNumber?: string;
+  readonly targetKind: CertificateDistributionTargetKind;
+  readonly targetReferenceId: string;
+  readonly workspaceId?: string;
+  readonly transport: string;
+  readonly deliveryLocatorRef?: string;
+  readonly status: CertificateDistributionEventStatus;
+  readonly occurredAt: string;
+  readonly occurredBy: string;
+  readonly failureReason?: string;
+  readonly revision: number;
+}
+
 export interface CertificateAuthorityRootLookupQuery {
   readonly statuses?: ReadonlyArray<CertificateAuthorityStatus>;
   readonly includeRetired?: boolean;
@@ -148,6 +208,40 @@ export interface IssuedCertificateLookupQuery {
 export interface TrustMaterialReferenceLookupQuery {
   readonly kinds?: ReadonlyArray<TrustMaterialKind>;
   readonly materialRefPrefix?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface CertificateStatusHistoryLookupQuery {
+  readonly certificateAuthorityId?: string;
+  readonly serialNumber?: string;
+  readonly statuses?: ReadonlyArray<CertificateStatus>;
+  readonly occurredAfter?: string;
+  readonly occurredBefore?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface CertificateRevocationHistoryLookupQuery {
+  readonly certificateAuthorityId?: string;
+  readonly serialNumber?: string;
+  readonly reasons?: ReadonlyArray<CertificateRevocationReason>;
+  readonly revokedAfter?: string;
+  readonly revokedBefore?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface CertificateDistributionEventLookupQuery {
+  readonly materialRef?: string;
+  readonly certificateAuthorityId?: string;
+  readonly serialNumber?: string;
+  readonly targetKinds?: ReadonlyArray<CertificateDistributionTargetKind>;
+  readonly targetReferenceId?: string;
+  readonly workspaceId?: string;
+  readonly statuses?: ReadonlyArray<CertificateDistributionEventStatus>;
+  readonly occurredAfter?: string;
+  readonly occurredBefore?: string;
   readonly limit?: number;
   readonly offset?: number;
 }
@@ -193,6 +287,21 @@ export interface SaveTrustMaterialReferencePersistenceRecordInput {
   readonly mutation: CertificateAuthorityPersistenceMutationEnvelope;
 }
 
+export interface AppendCertificateStatusHistoryPersistenceRecordInput {
+  readonly record: CertificateStatusHistoryPersistenceRecord;
+  readonly mutation: CertificateAuthorityPersistenceMutationEnvelope;
+}
+
+export interface SaveCertificateRevocationHistoryPersistenceRecordInput {
+  readonly record: CertificateRevocationHistoryPersistenceRecord;
+  readonly mutation: CertificateAuthorityPersistenceMutationEnvelope;
+}
+
+export interface SaveCertificateDistributionEventPersistenceRecordInput {
+  readonly record: CertificateDistributionEventPersistenceRecord;
+  readonly mutation: CertificateAuthorityPersistenceMutationEnvelope;
+}
+
 export const CertificateAuthorityPersistenceQueryPresets = Object.freeze({
   activeStatuses: Object.freeze([CertificateAuthorityStatuses.active]),
   terminalStatuses: Object.freeze([
@@ -214,6 +323,15 @@ export function toCertificateAuthorityStatusLookupKey(status: CertificateAuthori
 export function toCertificateSubjectLookupKey(reference: CertificateSubjectReferencePersistenceRecord): string {
   const workspace = reference.workspaceId ? `:${reference.workspaceId}` : "";
   return `certificate-subject:${reference.kind}:${reference.referenceId}${workspace}`;
+}
+
+export function toCertificateDistributionTargetLookupKey(input: {
+  readonly kind: CertificateDistributionTargetKind;
+  readonly referenceId: string;
+  readonly workspaceId?: string;
+}): string {
+  const workspace = input.workspaceId ? `:${input.workspaceId}` : "";
+  return `certificate-distribution-target:${input.kind}:${input.referenceId}${workspace}`;
 }
 
 export function normalizeCertificateAuthorityMutationOperationKey(operationKey: string): string {

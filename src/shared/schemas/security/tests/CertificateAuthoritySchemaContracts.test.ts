@@ -8,6 +8,9 @@ import {
 import {
   CertificateAuthorityRootPersistenceRecordSchema,
   CertificateAuthoritySchemaValidationError,
+  parseCertificateDistributionEventPersistenceRecord,
+  parseCertificateRevocationHistoryPersistenceRecord,
+  parseCertificateStatusHistoryPersistenceRecord,
   IssuedCertificatePersistenceRecordSchema,
   parseCertificateAuthorityRootPersistenceRecord,
   parseIssuedCertificatePersistenceRecord,
@@ -169,5 +172,55 @@ describe("CertificateAuthoritySchemaContracts", () => {
     });
 
     expect(parsed.kind).toBe("certificate-chain-pem");
+  });
+
+  it("parses explicit status history and revocation history records", () => {
+    const statusEvent = parseCertificateStatusHistoryPersistenceRecord({
+      statusEventId: "status:event:1",
+      certificateAuthorityId: "ca:internal:root:v1",
+      serialNumber: "C0FFEE",
+      previousStatus: CertificateStatuses.issued,
+      currentStatus: CertificateStatuses.revoked,
+      occurredAt: "2026-06-01T00:00:00.000Z",
+      occurredBy: "user:security-admin",
+      reason: "security-policy",
+    });
+
+    const revocation = parseCertificateRevocationHistoryPersistenceRecord({
+      revocationId: "revocation:1",
+      certificateAuthorityId: "ca:internal:root:v1",
+      serialNumber: "C0FFEE",
+      reason: "policy-violation",
+      revokedAt: "2026-06-01T00:00:00.000Z",
+      revokedByActorId: "user:security-admin",
+      createdAt: "2026-06-01T00:00:00.000Z",
+      createdBy: "user:security-admin",
+      lastModifiedAt: "2026-06-01T00:00:00.000Z",
+      lastModifiedBy: "user:security-admin",
+      revision: 1,
+    });
+
+    expect(statusEvent.currentStatus).toBe(CertificateStatuses.revoked);
+    expect(revocation.reason).toBe("policy-violation");
+  });
+
+  it("validates failed distribution events include failure reasons", () => {
+    expect(() => parseCertificateDistributionEventPersistenceRecord({
+      distributionEventId: "distribution:event:1",
+      materialRef: "trust:bundle:node-01:v1",
+      certificateAuthorityId: "ca:internal:root:v1",
+      serialNumber: "C0FFEE",
+      targetKind: "node",
+      targetReferenceId: "node:01",
+      transport: "node-trust-bundle-sync",
+      status: "failed",
+      occurredAt: "2026-06-01T00:00:00.000Z",
+      occurredBy: "user:security-admin",
+      createdAt: "2026-06-01T00:00:00.000Z",
+      createdBy: "user:security-admin",
+      lastModifiedAt: "2026-06-01T00:00:00.000Z",
+      lastModifiedBy: "user:security-admin",
+      revision: 1,
+    })).toThrow(CertificateAuthoritySchemaValidationError);
   });
 });
