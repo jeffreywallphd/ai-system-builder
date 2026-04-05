@@ -84,6 +84,8 @@ import { ReassignWorkspaceRoleUseCase } from "../../src/application/workspaces/u
 import { RevokeWorkspaceRoleUseCase } from "../../src/application/workspaces/use-cases/RevokeWorkspaceRoleUseCase";
 import { ApproveNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase";
 import { GetNodeEnrollmentDetailUseCase } from "../../src/application/nodes/use-cases/GetNodeEnrollmentDetailUseCase";
+import { ListTrustedNodeInventoryUseCase } from "../../src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase";
+import { RecordNodeHeartbeatUseCase } from "../../src/application/nodes/use-cases/RecordNodeHeartbeatUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { RejectNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
@@ -485,6 +487,12 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     rejectNodeEnrollmentUseCase: new RejectNodeEnrollmentUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
+      nodeRepository: nodeTrustRepository,
+    }),
+    recordNodeHeartbeatUseCase: new RecordNodeHeartbeatUseCase({
+      nodeRepository: nodeTrustRepository,
+    }),
+    listTrustedNodeInventoryUseCase: new ListTrustedNodeInventoryUseCase({
       nodeRepository: nodeTrustRepository,
     }),
   });

@@ -2,18 +2,23 @@
 
 ## Scope
 
-Story 5.3.1 and Story 5.3.2 (Feature 5 / Epic 5.3): approved-node activation plus capability profile registration/validation.
+Story 5.3.1, Story 5.3.2, and Story 5.3.3 (Feature 5 / Epic 5.3): approved-node activation plus capability profile registration/validation and operational presence heartbeat ingestion.
 
 ## Canonical files
 
 - `src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase.ts`
 - `src/application/nodes/use-cases/ActivateApprovedNodeUseCase.ts`
+- `src/application/nodes/use-cases/RecordNodeHeartbeatUseCase.ts`
+- `src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase.ts`
 - `src/application/nodes/ports/NodeTrustAuthorizationPorts.ts`
 - `src/application/nodes/ports/NodeTrustAuditPorts.ts`
 - `src/domain/nodes/NodeTrustDomain.ts`
 - `src/shared/schemas/nodes/NodeTrustApiSchemaContracts.ts`
 - `src/shared/schemas/nodes/NodeTrustPersistenceSchemaContracts.ts`
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
+- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 
 ## Lifecycle semantics
 
@@ -25,6 +30,7 @@ Story 5.3.1 and Story 5.3.2 (Feature 5 / Epic 5.3): approved-node activation plu
   - certificate metadata may be attached as activation prerequisite material
 - Activation transitions only approved, non-revoked nodes from `pending-approval` to `trusted`.
 - Heartbeat presence remains independent (`RecordNodeHeartbeatUseCase`) and does not perform trust activation.
+- Heartbeat updates are accepted only for nodes that are already in `trustState=trusted`.
 
 ## Activation guardrails
 
@@ -58,3 +64,26 @@ Story 5.3.1 and Story 5.3.2 (Feature 5 / Epic 5.3): approved-node activation plu
 - Approval emits `node-approved`.
 - Activation emits `node-activated`.
 - Heartbeat emits `node-heartbeat-recorded`.
+
+## Presence transport and storage
+
+- Node heartbeat endpoint:
+  - `POST /api/v1/nodes/:nodeId/heartbeat`
+  - authenticated transport only
+  - request actor is bound to authenticated principal
+  - request `actorUserIdentityId` and `nodeId` fields are transport-bound from authenticated principal + route parameters (client values are ignored)
+- Admin visibility endpoint:
+  - `GET /api/v1/nodes/trusted`
+  - supports query filters: `nodeType`, `capability`, `deploymentTag`, `lastSeenAfter`, `lastSeenBefore`, `limit`, `offset`
+- Persisted presence fields:
+  - `lastSeen.lastSeenAt`
+  - `lastSeen.heartbeatStatus`
+  - `lastSeen.observedBy` (optional)
+
+## Heartbeat cadence guidance
+
+- Default cadence: every 30 seconds.
+- Alerting/offline guidance:
+  - degraded signal at >90 seconds since last heartbeat,
+  - offline signal at >180 seconds since last heartbeat.
+- Future certificate-authenticated transport can reuse the same heartbeat payload and persistence fields while replacing bearer-session principal resolution.

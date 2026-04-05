@@ -56,3 +56,5 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - Enrollment approval/rejection metadata (`reviewedAt`, `reviewedByUserIdentityId`, `decisionNote`) remains in persistence contracts so admin decisions are auditable and durable.
 - Approval/rejection audit events include the persisted decision metadata for downstream audit consumers.
 - Activation is explicitly separate from heartbeat presence writes so approval/activation lifecycle transitions and liveness updates remain independently auditable.
+- Heartbeat recording enforces trusted-node preconditions (`trustState=trusted`) before writing `lastSeen` metadata.
+- Trusted inventory queries are the admin visibility read path for `lastSeenAt` / heartbeat status snapshots.

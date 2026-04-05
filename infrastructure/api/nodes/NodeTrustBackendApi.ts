@@ -1,6 +1,8 @@
 import type {
   ApproveNodeEnrollmentUseCase,
   GetNodeEnrollmentDetailUseCase,
+  ListTrustedNodeInventoryUseCase,
+  RecordNodeHeartbeatUseCase,
   RegisterNodeEnrollmentRequestUseCase,
   RejectNodeEnrollmentUseCase,
   ReviewPendingNodeEnrollmentUseCase,
@@ -22,7 +24,11 @@ import {
   type ApproveNodeEnrollmentApiResponse,
   type GetNodeEnrollmentDetailApiRequest,
   type GetNodeEnrollmentDetailApiResponse,
+  type ListTrustedNodeInventoryApiRequest,
+  type ListTrustedNodeInventoryApiResponse,
   NodeTrustApiErrorCodes,
+  type RecordNodeHeartbeatApiRequest,
+  type RecordNodeHeartbeatApiResponse,
   type ListPendingNodeEnrollmentsApiRequest,
   type ListPendingNodeEnrollmentsApiResponse,
   type NodeTrustApiError,
@@ -39,6 +45,8 @@ interface NodeTrustBackendApiDependencies {
   readonly getNodeEnrollmentDetailUseCase: GetNodeEnrollmentDetailUseCase;
   readonly approveNodeEnrollmentUseCase: ApproveNodeEnrollmentUseCase;
   readonly rejectNodeEnrollmentUseCase: RejectNodeEnrollmentUseCase;
+  readonly recordNodeHeartbeatUseCase: RecordNodeHeartbeatUseCase;
+  readonly listTrustedNodeInventoryUseCase: ListTrustedNodeInventoryUseCase;
 }
 
 export class NodeTrustBackendApi {
@@ -213,6 +221,62 @@ export class NodeTrustBackendApi {
       data: Object.freeze({
         enrollment: toNodeEnrollmentDetailDto(this.toInternalEnrollment(outcome.value.enrollmentRequest)),
         node: toNodeDetailDto(this.toInternalNode(outcome.value.node)),
+      }),
+    });
+  }
+
+  public async recordNodeHeartbeat(
+    request: RecordNodeHeartbeatApiRequest,
+  ): Promise<NodeTrustApiResponse<RecordNodeHeartbeatApiResponse>> {
+    const outcome = await this.dependencies.recordNodeHeartbeatUseCase.execute({
+      actorUserIdentityId: request.actorUserIdentityId,
+      nodeId: request.nodeId,
+      heartbeatStatus: request.heartbeatStatus,
+      seenAt: request.seenAt,
+      observedBy: request.observedBy,
+      metadata: request.metadata,
+    });
+
+    if (!outcome.ok) {
+      return Object.freeze({
+        ok: false,
+        error: this.mapUseCaseError(outcome.error.code, outcome.error.message),
+      });
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        node: toNodeDetailDto(this.toInternalNode(outcome.value.node)),
+      }),
+    });
+  }
+
+  public async listTrustedNodeInventory(
+    request: ListTrustedNodeInventoryApiRequest,
+  ): Promise<NodeTrustApiResponse<ListTrustedNodeInventoryApiResponse>> {
+    const outcome = await this.dependencies.listTrustedNodeInventoryUseCase.execute({
+      actorUserIdentityId: request.actorUserIdentityId,
+      nodeTypes: request.nodeTypes,
+      capabilityAnyOf: request.capabilityAnyOf,
+      deploymentTagAnyOf: request.deploymentTagAnyOf,
+      lastSeenAfter: request.lastSeenAfter,
+      lastSeenBefore: request.lastSeenBefore,
+      limit: request.limit,
+      offset: request.offset,
+    });
+
+    if (!outcome.ok) {
+      return Object.freeze({
+        ok: false,
+        error: this.mapUseCaseError(outcome.error.code, outcome.error.message),
+      });
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        nodes: Object.freeze(outcome.value.nodes.map((node) => toNodeDetailDto(this.toInternalNode(node)))),
       }),
     });
   }
