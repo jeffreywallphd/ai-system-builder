@@ -422,6 +422,19 @@ const AuthorizationRevokeSharingRequestSchema = z.object({
   correlationId: z.string().min(1).optional(),
   metadata: z.record(z.unknown()).optional(),
 }).strict();
+const AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema = z.object({
+  workspaceId: z.string().min(1),
+  roleKey: WorkspaceRoleValues,
+  resources: z.array(z.object({
+    resourceFamily: AuthorizationResourceFamilyValues,
+    resourceType: z.string().min(1),
+    resourceId: z.string().min(1),
+  }).strict()).min(1).max(250),
+  permissionKeys: z.array(z.string().min(1)).min(1).max(32),
+  reason: z.string().min(1).optional(),
+  correlationId: z.string().min(1).optional(),
+  metadata: z.record(z.unknown()).optional(),
+}).strict();
 
 export interface IdentityHttpServerLogEvent {
   readonly event: string;
@@ -1305,6 +1318,55 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
               resource: pathParams.resource,
               grantId: pathParams.grantId,
               ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.authorizationManagementBackendApi
+        && request.method === "POST"
+        && path === "/api/v1/authorization/sharing-grants/workspace-role/bulk-upsert"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const parsedRequest = await parseAndValidateAuthorizationManagementRequest(
+              request,
+              AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.authorizationManagementBackendApi.bulkGrantWorkspaceRoleAccess({
+              actorUserIdentityId: context.principal.userIdentityId,
+              workspaceId: parsedRequest.data.workspaceId,
+              roleKey: parsedRequest.data.roleKey,
+              resources: parsedRequest.data.resources,
+              permissionKeys: parsedRequest.data.permissionKeys,
+              reason: parsedRequest.data.reason,
+              correlationId: parsedRequest.data.correlationId,
+              metadata: parsedRequest.data.metadata,
+            });
+            const statusCode = mapAuthorizationManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              workspaceId: parsedRequest.data.workspaceId,
+              roleKey: parsedRequest.data.roleKey,
+              resourceCount: parsedRequest.data.resources.length,
+              permissionKeys: parsedRequest.data.permissionKeys,
             }), apiResponse);
           },
         );

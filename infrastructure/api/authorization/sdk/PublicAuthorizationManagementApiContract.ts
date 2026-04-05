@@ -151,6 +151,45 @@ export interface RevokeAuthorizationSharingAccessApiResponse {
   readonly changed: boolean;
 }
 
+export interface BulkGrantAuthorizationWorkspaceRoleAccessApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly roleKey: AuthorizationRoleKey;
+  readonly resources: ReadonlyArray<AuthorizationManagedResourceRef>;
+  readonly permissionKeys: ReadonlyArray<string>;
+  readonly reason?: string;
+  readonly correlationId?: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export type BulkGrantAuthorizationWorkspaceRoleAccessApiResultItem =
+  | Readonly<{
+    resource: AuthorizationManagedResourceRef;
+    status: "created" | "updated" | "unchanged";
+    grantId: string;
+    changed: boolean;
+    revision: number;
+  }>
+  | Readonly<{
+    resource: AuthorizationManagedResourceRef;
+    status: "failed";
+    error: Readonly<{
+      code: string;
+      message: string;
+      reasonCode?: string;
+    }>;
+  }>;
+
+export interface BulkGrantAuthorizationWorkspaceRoleAccessApiResponse {
+  readonly workspaceId: string;
+  readonly roleKey: AuthorizationRoleKey;
+  readonly permissionKeys: ReadonlyArray<string>;
+  readonly totalResources: number;
+  readonly succeededResources: number;
+  readonly failedResources: number;
+  readonly results: ReadonlyArray<BulkGrantAuthorizationWorkspaceRoleAccessApiResultItem>;
+}
+
 export interface AuthorizationPermissionDecisionApiRecord {
   readonly permissionKey: CatalogPermissionKey;
   readonly isAllowed: boolean;

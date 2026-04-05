@@ -9,11 +9,13 @@ import {
 } from "../../../../domain/authorization/AuthorizationPermissionCatalog";
 import {
   AuthorizationPolicyEvaluationRequestDtoSchema,
+  AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema,
   AuthorizationResourcePolicyMetadataSchema,
   AuthorizationRoleAssignmentRequestSchema,
   AuthorizationSchemaValidationError,
   AuthorizationSharingGrantChangeRequestSchema,
   AuthorizationVisibilityUpdateRequestSchema,
+  parseAuthorizationBulkWorkspaceRoleSharingGrantRequest,
   parseAuthorizationRoleAssignmentRequest,
   parseAuthorizationSharingGrantChangeRequest,
   parseAuthorizationVisibilityUpdateRequest,
@@ -204,6 +206,53 @@ describe("AuthorizationSchemaContracts", () => {
         expect(error.schemaName).toBe("AuthorizationVisibilityUpdateRequest");
         expect(error.issues.some((issue) => issue.path === "sharingPolicyMode")).toBeTrue();
       }
+    });
+  });
+
+  describe("AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema", () => {
+    it("accepts canonical bulk workspace-role grant requests", () => {
+      const parsed = AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema.parse({
+        actorUserIdentityId: "user:owner-1",
+        workspaceId: "workspace:alpha",
+        roleKey: "viewer",
+        resources: [
+          {
+            resourceFamily: AuthorizationResourceFamilies.asset,
+            resourceType: "asset",
+            resourceId: "asset:1",
+          },
+          {
+            resourceFamily: AuthorizationResourceFamilies.template,
+            resourceType: "template",
+            resourceId: "template:2",
+          },
+        ],
+        permissionKeys: ["asset.read"],
+      });
+
+      expect(parsed.resources).toHaveLength(2);
+      expect(parsed.roleKey).toBe("viewer");
+    });
+
+    it("rejects duplicate resources in bulk requests", () => {
+      expect(() => parseAuthorizationBulkWorkspaceRoleSharingGrantRequest({
+        actorUserIdentityId: "user:owner-1",
+        workspaceId: "workspace:alpha",
+        roleKey: "viewer",
+        resources: [
+          {
+            resourceFamily: AuthorizationResourceFamilies.asset,
+            resourceType: "asset",
+            resourceId: "asset:1",
+          },
+          {
+            resourceFamily: AuthorizationResourceFamilies.asset,
+            resourceType: "asset",
+            resourceId: "asset:1",
+          },
+        ],
+        permissionKeys: ["asset.read"],
+      })).toThrow(AuthorizationSchemaValidationError);
     });
   });
 

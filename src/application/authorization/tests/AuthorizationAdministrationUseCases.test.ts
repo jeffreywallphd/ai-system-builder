@@ -50,6 +50,7 @@ import { RemoveAuthorizationRoleUseCase } from "../use-cases/RemoveAuthorization
 import { GrantAuthorizationSharingAccessUseCase } from "../use-cases/GrantAuthorizationSharingAccessUseCase";
 import { RevokeAuthorizationSharingAccessUseCase } from "../use-cases/RevokeAuthorizationSharingAccessUseCase";
 import { UpdateAuthorizationVisibilityUseCase } from "../use-cases/UpdateAuthorizationVisibilityUseCase";
+import { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "../use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
 import { EvaluateAuthorizationPermissionUseCase } from "../use-cases/EvaluateAuthorizationPermissionUseCase";
 import { ListAuthorizationEffectiveAccessUseCase } from "../use-cases/ListAuthorizationEffectiveAccessUseCase";
 import { AuthorizationAdministrationErrorCodes } from "../use-cases/AuthorizationAdministrationUseCaseShared";
@@ -404,6 +405,35 @@ function seedMetadata(harness: PersistenceHarness, resourceId: string, visibilit
   });
 }
 
+function seedMetadataWithWorkspace(
+  harness: PersistenceHarness,
+  resourceId: string,
+  workspaceId: string,
+  visibility: "shared" | "workspace" = "shared",
+): void {
+  harness.resourceMetadata.set(toAuthorizationResourceLookupKey({
+    resourceFamily: AuthorizationResourceFamilies.asset,
+    resourceType: "asset",
+    resourceId,
+  }), {
+    resourceFamily: AuthorizationResourceFamilies.asset,
+    resourceType: "asset",
+    resourceId,
+    ownerUserIdentityId: "user-owner",
+    ownershipScope: ResourceOwnershipScopes.workspace,
+    workspaceId,
+    visibility: visibility === "shared" ? ResourceVisibilities.shared : ResourceVisibilities.workspace,
+    sharingPolicyMode: visibility === "shared" ? "explicit" : "workspace-members",
+    allowResharing: false,
+    isPublishedCapable: false,
+    createdAt: "2026-04-05T10:00:00.000Z",
+    createdBy: "user-owner",
+    lastModifiedAt: "2026-04-05T10:00:00.000Z",
+    lastModifiedBy: "user-owner",
+    revision: 1,
+  });
+}
+
 describe("Authorization administration use cases", () => {
   it("assigns and removes roles", async () => {
     const harness = new PersistenceHarness();
@@ -638,6 +668,70 @@ describe("Authorization administration use cases", () => {
     expect(harness.sharingGrants.get("share-old")?.revokedAt).toBeDefined();
     expect(harness.sharingGrants.get("share-new")?.revokedAt).toBeUndefined();
     expect(visibility.value.sharingGrantMutations).toHaveLength(2);
+  });
+
+  it("bulk-grants workspace-role sharing with deterministic mixed-authority results", async () => {
+    const harness = new PersistenceHarness();
+    seedMetadataWithWorkspace(harness, "asset-allow", "workspace-1", "shared");
+    seedMetadataWithWorkspace(harness, "asset-deny", "workspace-1", "shared");
+    const decisionEvaluator = new StubDecisionEvaluator((request) => (
+      request.requiredPermissionKey === "asset.share"
+      && request.target.kind === "resource-instance"
+      && request.target.resource.resourceId === "asset-allow"
+    ));
+    const mutationService = createMutationService(harness);
+
+    const outcome = await new BulkGrantAuthorizationWorkspaceRoleAccessUseCase({
+      mutationService,
+      decisionEvaluator,
+      persistencePorts: {
+        roleAssignmentPersistenceRepository: harness,
+        sharingGrantPersistenceRepository: harness,
+        resourcePolicyMetadataPersistenceRepository: harness,
+      },
+      idGenerator: new SequenceIdGenerator(),
+    }).execute({
+      request: {
+        actorUserIdentityId: "user-admin",
+        workspaceId: "workspace-1",
+        roleKey: "viewer",
+        resources: [
+          {
+            resourceFamily: AuthorizationResourceFamilies.asset,
+            resourceType: "asset",
+            resourceId: "asset-allow",
+          },
+          {
+            resourceFamily: AuthorizationResourceFamilies.asset,
+            resourceType: "asset",
+            resourceId: "asset-deny",
+          },
+        ],
+        permissionKeys: ["asset.read"],
+      },
+    });
+
+    expect(outcome.ok).toBeTrue();
+    if (!outcome.ok) {
+      return;
+    }
+
+    expect(outcome.value.totalResources).toBe(2);
+    expect(outcome.value.succeededResources).toBe(1);
+    expect(outcome.value.failedResources).toBe(1);
+    const [first, second] = outcome.value.results;
+    expect(first?.status).toBe("created");
+    expect(second?.status).toBe("failed");
+    if (second?.status === "failed") {
+      expect(second.error.code).toBe(AuthorizationAdministrationErrorCodes.forbidden);
+    }
+
+    const allowGrants = [...harness.sharingGrants.values()]
+      .filter((grant) => grant.resourceId === "asset-allow" && !grant.revokedAt);
+    const denyGrants = [...harness.sharingGrants.values()]
+      .filter((grant) => grant.resourceId === "asset-deny" && !grant.revokedAt);
+    expect(allowGrants).toHaveLength(1);
+    expect(denyGrants).toHaveLength(0);
   });
 
   it("evaluates permission and lists effective access", async () => {

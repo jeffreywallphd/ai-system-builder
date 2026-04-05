@@ -25,6 +25,7 @@ This note documents Story 4.1.5 (Feature 4 / Epic 4.1): application-layer author
 - `src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase.ts`
 - `src/application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase.ts`
 - `src/application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase.ts`
+- `src/application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase.ts`
 - `src/application/authorization/use-cases/EvaluateAuthorizationPermissionUseCase.ts`
 - `src/application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase.ts`
 - `src/application/authorization/tests/AuthorizationPolicyPortsContracts.test.ts`
@@ -121,6 +122,7 @@ If a feature needs authorization-aware list/search behavior, use `AuthorizedReso
 - Authorization administration now exposes first-class application use cases so controllers/pages can call stable commands/queries instead of embedding policy logic:
   - role assignment commands (`AssignAuthorizationRoleUseCase`, `RemoveAuthorizationRoleUseCase`)
   - sharing commands (`GrantAuthorizationSharingAccessUseCase`, `RevokeAuthorizationSharingAccessUseCase`)
+  - bulk patterned sharing command (`BulkGrantAuthorizationWorkspaceRoleAccessUseCase`) for applying a workspace-role grant across selected resources in one request with deterministic per-resource outcomes
   - visibility command (`UpdateAuthorizationVisibilityUseCase`)
   - permission query (`EvaluateAuthorizationPermissionUseCase`)
   - effective-access query (`ListAuthorizationEffectiveAccessUseCase`)
@@ -132,6 +134,7 @@ Mutation permission gates:
 
 - workspace role assignment/removal -> `system.manage` workspace capability
 - explicit sharing grant/revoke -> `<resource-family>.share`
+- bulk workspace-role sharing grant upsert -> `<resource-family>.share` checked independently per targeted resource
 - visibility updates -> `<resource-family>.manage`
 
 ## Caching posture reference

@@ -53,6 +53,7 @@ import { AuthorizationPolicyMutationService } from "../../src/application/author
 import { GrantAuthorizationSharingAccessUseCase } from "../../src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
 import { RevokeAuthorizationSharingAccessUseCase } from "../../src/application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
 import { UpdateAuthorizationVisibilityUseCase } from "../../src/application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
+import { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "../../src/application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
 import { ListAuthorizationEffectiveAccessUseCase } from "../../src/application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
 import {
   IssueWorkspaceInvitationUseCase,
@@ -429,6 +430,16 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       clock: workspaceClock,
     }),
     updateVisibilityUseCase: new UpdateAuthorizationVisibilityUseCase({
+      mutationService: authorizationMutationService,
+      decisionEvaluator: authorizationDecisionEvaluator,
+      persistencePorts: {
+        roleAssignmentPersistenceRepository: authorizationRepository,
+        sharingGrantPersistenceRepository: authorizationRepository,
+        resourcePolicyMetadataPersistenceRepository: authorizationRepository,
+      },
+      clock: workspaceClock,
+    }),
+    bulkGrantWorkspaceRoleAccessUseCase: new BulkGrantAuthorizationWorkspaceRoleAccessUseCase({
       mutationService: authorizationMutationService,
       decisionEvaluator: authorizationDecisionEvaluator,
       persistencePorts: {
