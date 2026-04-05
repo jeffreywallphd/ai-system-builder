@@ -18,6 +18,11 @@ import {
   WorkspaceIdNamespaces,
   type WorkspaceIdNamespace,
 } from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
+import {
+  WorkspaceAdministrationAuditEventTypes,
+  publishWorkspaceAdministrationAuditEventBestEffort,
+  type WorkspaceAdministrationAuditSink,
+} from "./WorkspaceAdministrationAudit";
 
 export const WorkspaceMembershipAdditionErrorCodes = Object.freeze({
   invalidRequest: "workspace-membership-add-invalid-request",
@@ -74,6 +79,7 @@ interface AddWorkspaceMemberUseCaseDependencies {
   readonly transactionManager?: IWorkspaceTransactionManager;
   readonly idGenerator: WorkspaceMembershipAdministrationIdGenerator;
   readonly clock: WorkspaceMembershipAdministrationClock;
+  readonly auditSink?: WorkspaceAdministrationAuditSink;
 }
 
 export class AddWorkspaceMemberUseCase {
@@ -254,6 +260,19 @@ export class AddWorkspaceMemberUseCase {
         `Membership addition failed: ${error instanceof Error ? error.message : "unknown persistence failure."}`,
       );
     }
+
+    await publishWorkspaceAdministrationAuditEventBestEffort(this.dependencies.auditSink, {
+      type: WorkspaceAdministrationAuditEventTypes.membershipAdded,
+      workspaceId,
+      actorUserIdentityId,
+      occurredAt: nowIso,
+      details: Object.freeze({
+        targetUserIdentityId,
+        membershipId: membership.id,
+        status: membership.status,
+        roleAssignments: Object.freeze(roleAssignments.map((assignment) => assignment.role)),
+      }),
+    });
 
     return {
       ok: true,

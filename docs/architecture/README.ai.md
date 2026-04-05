@@ -61,6 +61,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 1 downstream handoff baseline: `docs/architecture/identity-feature-1-final-baseline.md`
 - Trusted-device domain/contracts baseline: `docs/architecture/trusted-device-foundation.md`
 - Workspace tenancy domain/contracts baseline: `docs/architecture/workspace-foundation.md`
+- Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).

@@ -20,6 +20,11 @@ import {
   WorkspaceIdNamespaces,
   type WorkspaceIdNamespace,
 } from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
+import {
+  WorkspaceAdministrationAuditEventTypes,
+  publishWorkspaceAdministrationAuditEventBestEffort,
+  type WorkspaceAdministrationAuditSink,
+} from "./WorkspaceAdministrationAudit";
 
 export const WorkspaceCreationErrorCodes = Object.freeze({
   invalidRequest: "workspace-invalid-request",
@@ -78,14 +83,7 @@ export interface WorkspaceCreationAuthorizationHook {
   }): Promise<void>;
 }
 
-export interface WorkspaceCreationAuditSink {
-  recordWorkspaceCreated(event: {
-    readonly workspaceId: string;
-    readonly slug: string;
-    readonly actorUserIdentityId: string;
-    readonly occurredAt: string;
-  }): Promise<void>;
-}
+export type WorkspaceCreationAuditSink = WorkspaceAdministrationAuditSink;
 
 interface CreateWorkspaceUseCaseDependencies {
   readonly workspaceRepository: IWorkspaceRepository;
@@ -235,11 +233,16 @@ export class CreateWorkspaceUseCase {
       );
     }
 
-    await this.publishWorkspaceCreatedAuditRecordBestEffort({
+    await publishWorkspaceAdministrationAuditEventBestEffort(this.dependencies.auditSink, {
+      type: WorkspaceAdministrationAuditEventTypes.workspaceCreated,
       workspaceId: workspace.id,
-      slug: workspace.slug,
       actorUserIdentityId,
       occurredAt: nowIso,
+      details: Object.freeze({
+        slug: workspace.slug,
+        status: workspace.status,
+        visibility: workspace.ownership.visibility,
+      }),
     });
 
     return {
@@ -280,23 +283,6 @@ export class CreateWorkspaceUseCase {
       WorkspaceCreationErrorCodes.duplicate,
       "Workspace initialization failed because a duplicate record already exists.",
     );
-  }
-
-  private async publishWorkspaceCreatedAuditRecordBestEffort(event: {
-    readonly workspaceId: string;
-    readonly slug: string;
-    readonly actorUserIdentityId: string;
-    readonly occurredAt: string;
-  }): Promise<void> {
-    if (!this.dependencies.auditSink) {
-      return;
-    }
-
-    try {
-      await this.dependencies.auditSink.recordWorkspaceCreated(event);
-    } catch {
-      // Intentionally best-effort until the audit pipeline is integrated in a dedicated story.
-    }
   }
 
   private failure(

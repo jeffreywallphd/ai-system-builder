@@ -20,6 +20,11 @@ import {
   type WorkspaceRoleAdministrationClock,
   type WorkspaceRoleAdministrationIdGenerator,
 } from "./WorkspaceRoleAdministrationContext";
+import {
+  WorkspaceAdministrationAuditEventTypes,
+  publishWorkspaceAdministrationAuditEventBestEffort,
+  type WorkspaceAdministrationAuditSink,
+} from "./WorkspaceAdministrationAudit";
 
 export const WorkspaceRoleAssignmentErrorCodes = Object.freeze({
   invalidRequest: "workspace-role-assignment-invalid-request",
@@ -69,6 +74,7 @@ interface AssignWorkspaceRoleUseCaseDependencies {
   readonly transactionManager?: IWorkspaceTransactionManager;
   readonly idGenerator: WorkspaceRoleAdministrationIdGenerator;
   readonly clock: WorkspaceRoleAdministrationClock;
+  readonly auditSink?: WorkspaceAdministrationAuditSink;
 }
 
 export class AssignWorkspaceRoleUseCase {
@@ -208,6 +214,19 @@ export class AssignWorkspaceRoleUseCase {
         `Workspace role assignment failed: ${error instanceof Error ? error.message : "unknown persistence failure."}`,
       );
     }
+
+    await publishWorkspaceAdministrationAuditEventBestEffort(this.dependencies.auditSink, {
+      type: WorkspaceAdministrationAuditEventTypes.roleAssigned,
+      workspaceId,
+      actorUserIdentityId,
+      occurredAt: nowIso,
+      details: Object.freeze({
+        targetUserIdentityId,
+        role,
+        roleAssignmentId: roleAssignment.id,
+        audit,
+      }),
+    });
 
     return {
       ok: true,

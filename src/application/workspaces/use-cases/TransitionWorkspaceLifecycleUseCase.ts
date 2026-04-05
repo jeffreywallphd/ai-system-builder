@@ -10,6 +10,11 @@ import {
   type Workspace,
   type WorkspaceStatus,
 } from "../../../domain/workspaces/WorkspaceDomain";
+import {
+  WorkspaceAdministrationAuditEventTypes,
+  publishWorkspaceAdministrationAuditEventBestEffort,
+  type WorkspaceAdministrationAuditSink,
+} from "./WorkspaceAdministrationAudit";
 
 export const WorkspaceLifecycleActions = Object.freeze({
   archive: "archive",
@@ -67,6 +72,7 @@ interface TransitionWorkspaceLifecycleUseCaseDependencies {
   readonly workspaceRepository: IWorkspaceRepository;
   readonly authorizationReadRepository: IWorkspaceAuthorizationReadRepository;
   readonly clock: WorkspaceLifecycleTransitionClock;
+  readonly auditSink?: WorkspaceAdministrationAuditSink;
 }
 
 export class TransitionWorkspaceLifecycleUseCase {
@@ -166,6 +172,18 @@ export class TransitionWorkspaceLifecycleUseCase {
         `Workspace lifecycle transition failed: ${error instanceof Error ? error.message : "unknown persistence failure."}`,
       );
     }
+
+    await publishWorkspaceAdministrationAuditEventBestEffort(this.dependencies.auditSink, {
+      type: WorkspaceAdministrationAuditEventTypes.workspaceLifecycleTransitioned,
+      workspaceId,
+      actorUserIdentityId,
+      occurredAt: this.dependencies.clock.now().toISOString(),
+      details: Object.freeze({
+        action: input.action,
+        fromStatus: snapshot.workspace.status,
+        toStatus: updated.status,
+      }),
+    });
 
     return {
       ok: true,

@@ -53,6 +53,7 @@ import {
   WorkspaceRoleRevocationErrorCodes,
 } from "../use-cases/RevokeWorkspaceRoleUseCase";
 import type { WorkspaceRoleAdministrationClock, WorkspaceRoleAdministrationIdGenerator } from "../use-cases/WorkspaceRoleAdministrationContext";
+import { WorkspaceAdministrationAuditEventTypes, type WorkspaceAdministrationAuditEvent } from "../use-cases/WorkspaceAdministrationAudit";
 
 class InMemoryWorkspaceMembershipAdministrationAdapter
   implements
@@ -239,6 +240,73 @@ function seedWorkspace(adapter: InMemoryWorkspaceMembershipAdministrationAdapter
 }
 
 describe("Workspace membership administration use cases", () => {
+  it("emits audit hooks for member add, status mutation, and remove", async () => {
+    const adapter = new InMemoryWorkspaceMembershipAdministrationAdapter();
+    const workspace = seedWorkspace(adapter);
+    const events: WorkspaceAdministrationAuditEvent[] = [];
+    const auditSink = {
+      async recordWorkspaceAdministrationEvent(event: WorkspaceAdministrationAuditEvent): Promise<void> {
+        events.push(event);
+      },
+    };
+
+    const addUseCase = new AddWorkspaceMemberUseCase({
+      membershipRepository: adapter,
+      roleAssignmentRepository: adapter,
+      authorizationReadRepository: adapter,
+      transactionManager: adapter,
+      idGenerator: new SequenceMembershipAdministrationIdGenerator(),
+      clock: new FixedMembershipAdministrationClock("2026-04-05T12:00:00.000Z"),
+      auditSink,
+    });
+    const statusUseCase = new ChangeWorkspaceMembershipStatusUseCase({
+      membershipRepository: adapter,
+      roleAssignmentRepository: adapter,
+      authorizationReadRepository: adapter,
+      transactionManager: adapter,
+      clock: new FixedMembershipAdministrationClock("2026-04-05T12:10:00.000Z"),
+      auditSink,
+    });
+    const removeUseCase = new RemoveWorkspaceMemberUseCase({
+      membershipRepository: adapter,
+      roleAssignmentRepository: adapter,
+      authorizationReadRepository: adapter,
+      transactionManager: adapter,
+      clock: new FixedMembershipAdministrationClock("2026-04-05T12:20:00.000Z"),
+      auditSink,
+    });
+
+    const added = await addUseCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:owner",
+      targetUserIdentityId: "user:audit-target",
+      initialStatus: WorkspaceMembershipStatuses.pending,
+    });
+    expect(added.ok).toBe(true);
+
+    const activated = await statusUseCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:owner",
+      targetUserIdentityId: "user:audit-target",
+      status: WorkspaceMembershipStatuses.active,
+    });
+    expect(activated.ok).toBe(true);
+
+    const removed = await removeUseCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:owner",
+      targetUserIdentityId: "user:audit-target",
+    });
+    expect(removed.ok).toBe(true);
+
+    expect(events.map((event) => event.type)).toEqual([
+      WorkspaceAdministrationAuditEventTypes.membershipAdded,
+      WorkspaceAdministrationAuditEventTypes.membershipStatusChanged,
+      WorkspaceAdministrationAuditEventTypes.membershipStatusChanged,
+    ]);
+    expect(events[2]?.details?.mutationKind).toBe("remove");
+  });
+
   it("adds members with default role and actor/timestamp attribution", async () => {
     const adapter = new InMemoryWorkspaceMembershipAdministrationAdapter();
     const workspace = seedWorkspace(adapter);
@@ -560,6 +628,85 @@ describe("Workspace membership administration use cases", () => {
 });
 
 describe("Workspace role administration use cases", () => {
+  it("emits audit hooks for assign, reassign, and revoke role mutations", async () => {
+    const adapter = new InMemoryWorkspaceMembershipAdministrationAdapter();
+    const workspace = seedWorkspace(adapter);
+    const events: WorkspaceAdministrationAuditEvent[] = [];
+    const auditSink = {
+      async recordWorkspaceAdministrationEvent(event: WorkspaceAdministrationAuditEvent): Promise<void> {
+        events.push(event);
+      },
+    };
+
+    adapter.memberships.set("membership:target", createWorkspaceMembership({
+      id: "membership:target",
+      workspaceId: workspace.id,
+      userIdentityId: "user:target",
+      status: WorkspaceMembershipStatuses.active,
+      joinedAt: "2026-04-05T11:20:00.000Z",
+      createdBy: "user:owner",
+      now: new Date("2026-04-05T11:20:00.000Z"),
+    }));
+
+    const assignUseCase = new AssignWorkspaceRoleUseCase({
+      membershipRepository: adapter,
+      roleAssignmentRepository: adapter,
+      authorizationReadRepository: adapter,
+      transactionManager: adapter,
+      idGenerator: new SequenceRoleAdministrationIdGenerator(),
+      clock: new FixedMembershipAdministrationClock("2026-04-05T13:15:00.000Z"),
+      auditSink,
+    });
+    const reassignUseCase = new ReassignWorkspaceRoleUseCase({
+      membershipRepository: adapter,
+      roleAssignmentRepository: adapter,
+      authorizationReadRepository: adapter,
+      transactionManager: adapter,
+      idGenerator: new SequenceRoleAdministrationIdGenerator(),
+      clock: new FixedMembershipAdministrationClock("2026-04-05T13:20:00.000Z"),
+      auditSink,
+    });
+    const revokeUseCase = new RevokeWorkspaceRoleUseCase({
+      membershipRepository: adapter,
+      roleAssignmentRepository: adapter,
+      authorizationReadRepository: adapter,
+      transactionManager: adapter,
+      clock: new FixedMembershipAdministrationClock("2026-04-05T13:25:00.000Z"),
+      auditSink,
+    });
+
+    const assigned = await assignUseCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:owner",
+      targetUserIdentityId: "user:target",
+      role: WorkspaceRoles.admin,
+    });
+    expect(assigned.ok).toBe(true);
+
+    const reassigned = await reassignUseCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:owner",
+      targetUserIdentityId: "user:target",
+      fromRole: WorkspaceRoles.admin,
+      toRole: WorkspaceRoles.viewer,
+    });
+    expect(reassigned.ok).toBe(true);
+
+    const revoked = await revokeUseCase.execute({
+      workspaceId: workspace.id,
+      actorUserIdentityId: "user:owner",
+      targetUserIdentityId: "user:target",
+      role: WorkspaceRoles.viewer,
+    });
+    expect(revoked.ok).toBe(true);
+
+    expect(events.map((event) => event.type)).toEqual([
+      WorkspaceAdministrationAuditEventTypes.roleAssigned,
+      WorkspaceAdministrationAuditEventTypes.roleReassigned,
+      WorkspaceAdministrationAuditEventTypes.roleRevoked,
+    ]);
+  });
+
   it("assigns workspace roles through explicit application flow and captures audit context", async () => {
     const adapter = new InMemoryWorkspaceMembershipAdministrationAdapter();
     const workspace = seedWorkspace(adapter);

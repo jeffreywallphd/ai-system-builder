@@ -9,6 +9,7 @@ import type { IWorkspaceMembershipRepository } from "../ports/IWorkspaceMembersh
 import type { IWorkspaceRoleAssignmentRepository } from "../ports/IWorkspaceRoleAssignmentRepository";
 import type { IWorkspaceTransactionManager } from "../ports/IWorkspaceTransactionManager";
 import { WorkspaceMembershipStatuses, type WorkspaceMembership } from "../../../domain/workspaces/WorkspaceDomain";
+import type { WorkspaceAdministrationAuditSink } from "./WorkspaceAdministrationAudit";
 
 export const WorkspaceMembershipRemovalErrorCodes = Object.freeze({
   invalidRequest: "workspace-membership-remove-invalid-request",
@@ -55,6 +56,7 @@ interface RemoveWorkspaceMemberUseCaseDependencies {
   readonly authorizationReadRepository: IWorkspaceAuthorizationReadRepository;
   readonly transactionManager?: IWorkspaceTransactionManager;
   readonly clock: WorkspaceMembershipStatusChangeClock;
+  readonly auditSink?: WorkspaceAdministrationAuditSink;
 }
 
 export class RemoveWorkspaceMemberUseCase {
@@ -67,6 +69,7 @@ export class RemoveWorkspaceMemberUseCase {
       authorizationReadRepository: dependencies.authorizationReadRepository,
       transactionManager: dependencies.transactionManager,
       clock: dependencies.clock,
+      auditSink: dependencies.auditSink,
     });
   }
 
@@ -76,6 +79,7 @@ export class RemoveWorkspaceMemberUseCase {
       actorUserIdentityId: input.actorUserIdentityId,
       targetUserIdentityId: input.targetUserIdentityId,
       status: WorkspaceMembershipStatuses.removed,
+      mutationKind: "remove",
     });
 
     if (outcome.ok) {

@@ -39,6 +39,7 @@ Scope in stories 3.1.1 through 3.1.5:
 - `src/application/workspaces/use-cases/UpdateWorkspaceUseCase.ts`
 - `src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase.ts`
 - `src/application/workspaces/use-cases/WorkspaceAdministrationQueryService.ts`
+- `src/application/workspaces/use-cases/WorkspaceAdministrationAudit.ts`
 - `src/application/workspaces/use-cases/IssueWorkspaceInvitationUseCase.ts`
 - `src/application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase.ts`
 - `src/application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase.ts`
@@ -202,7 +203,7 @@ Story 3.1.4 extends the adapter integration tests to validate:
   - write-time uniqueness failures are mapped to deterministic duplicate outcomes.
 - Added optional extension seams in the use case for:
   - authorization gating (`assertCanCreateWorkspace`),
-  - post-commit audit emission (`recordWorkspaceCreated`, best effort for now).
+  - post-commit audit emission (now aligned to `WorkspaceAdministrationAuditSink`, best effort in this slice).
 - Added transaction seam `IWorkspaceTransactionManager` and wired SQLite adapter support:
   - `SqliteWorkspacePersistenceAdapter.runInTransaction(...)` uses `BEGIN IMMEDIATE`, `COMMIT`, and rollback on error.
   - This allows workspace + membership + role initialization writes to be persisted atomically.
@@ -463,4 +464,27 @@ Story 3.1.4 extends the adapter integration tests to validate:
 - Added coverage for workspace-scoped ownership assignment and persistence round-trip:
   - `application/workflow-persistence/tests/WorkflowPersistenceUseCases.test.ts`
   - `application/workflow-persistence/tests/SqliteWorkflowPersistenceRepository.test.ts`
+
+## Story 3.4.5 workspace administration audit hooks and operational posture
+
+- Added a shared application-boundary audit seam in:
+  - `src/application/workspaces/use-cases/WorkspaceAdministrationAudit.ts`
+- The seam is intentionally integration-oriented, not a full audit subsystem:
+  - `WorkspaceAdministrationAuditSink.recordWorkspaceAdministrationEvent(...)` receives structured administration events.
+  - `publishWorkspaceAdministrationAuditEventBestEffort(...)` keeps dispatch non-blocking so admin actions do not fail when audit delivery fails.
+- Workspace administration mutation use cases now emit explicit post-persistence events:
+  - workspace create/update/lifecycle transitions,
+  - membership add/status/remove mutations,
+  - role assign/reassign/revoke mutations,
+  - invitation issuance and invitation acceptance.
+- Event emission points are at application use-case boundaries (after successful writes), so downstream adapters can route audit events to logs, queues, or durable audit streams without changing domain logic.
+- Added focused tests to verify hooks are invoked for core workspace administration flows in:
+  - `src/application/workspaces/tests/CreateWorkspaceUseCase.test.ts`
+  - `src/application/workspaces/tests/WorkspaceLifecycleUseCases.test.ts`
+  - `src/application/workspaces/tests/WorkspaceMembershipAdministrationUseCases.test.ts`
+  - `src/application/workspaces/tests/WorkspaceInvitationIssuanceUseCase.test.ts`
+  - `src/application/workspaces/tests/WorkspaceInvitationLifecycleUseCase.test.ts`
+- See:
+  - `docs/architecture/workspace-administration-audit-hooks.md` for architecture intent and boundaries.
+  - `docs/workspace-administration-operations.md` for operational event matrix and implementation guidance.
 
