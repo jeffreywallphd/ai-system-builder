@@ -19,7 +19,10 @@ import type {
   RevokeIssuedCertificatePersistenceRecordInput,
   SaveCertificateAuthorityRootPersistenceRecordInput,
   SaveIssuedCertificatePersistenceRecordInput,
+  SaveTrustMaterialReferencePersistenceRecordInput,
   SupersedeIssuedCertificatePersistenceRecordInput,
+  TrustMaterialReferenceLookupQuery,
+  TrustMaterialReferencePersistenceRecord,
   UpdateCertificateAuthorityRotationPolicyPersistenceRecordInput,
   UpdateCertificateAuthorityStatusPersistenceRecordInput,
 } from "../../../shared/dto/security/CertificateAuthorityDtos";
@@ -43,7 +46,9 @@ import type {
   RevokeCertificateMaterialResult,
 } from "../ports/ICertificateAuthorityIssuerPort";
 import type { ICertificateAuthorityRootPersistenceRepository } from "../ports/ICertificateAuthorityRootPersistenceRepository";
+import type { ICertificateAuthorityRootMaterialStorage } from "../ports/ICertificateAuthorityRootMaterialStorage";
 import type { IIssuedCertificatePersistenceRepository } from "../ports/IIssuedCertificatePersistenceRepository";
+import type { ITrustMaterialReferencePersistenceRepository } from "../ports/ITrustMaterialReferencePersistenceRepository";
 import type { INodeTrustIdentityPersistenceRepository } from "../../nodes/ports/INodeTrustIdentityPersistenceRepository";
 import {
   CertificateIssuancePolicyViolationError,
@@ -220,8 +225,103 @@ class InMemoryNodeRepository implements INodeTrustIdentityPersistenceRepository 
   }
 }
 
+class InMemoryTrustMaterialRepository implements ITrustMaterialReferencePersistenceRepository {
+  public readonly records = new Map<string, TrustMaterialReferencePersistenceRecord>();
+
+  public throwOnSave = false;
+
+  async findTrustMaterialByRef(materialRef: string): Promise<TrustMaterialReferencePersistenceRecord | undefined> {
+    return this.records.get(materialRef);
+  }
+
+  async listTrustMaterials(
+    _query: TrustMaterialReferenceLookupQuery,
+  ): Promise<ReadonlyArray<TrustMaterialReferencePersistenceRecord>> {
+    return [...this.records.values()];
+  }
+
+  async saveTrustMaterial(
+    input: SaveTrustMaterialReferencePersistenceRecordInput,
+  ): Promise<CertificateAuthorityPersistenceMutationResult<TrustMaterialReferencePersistenceRecord>> {
+    if (this.throwOnSave) {
+      throw new Error("trust-material-save-failed");
+    }
+    this.records.set(input.record.materialRef, input.record);
+    return {
+      record: input.record,
+      changed: true,
+      wasReplay: false,
+    };
+  }
+}
+
+class StubCertificateMaterialStorage implements ICertificateAuthorityRootMaterialStorage {
+  public readonly persisted = new Map<string, {
+    readonly secretRef: string;
+    readonly kind: string;
+    readonly plaintextValue: string;
+  }>();
+
+  async persistRootMaterials(input: {
+    readonly certificateAuthorityId: string;
+    readonly actorUserIdentityId: string;
+    readonly reason?: string;
+    readonly materials: ReadonlyArray<{
+      readonly materialRef: string;
+      readonly kind: string;
+      readonly plaintextValue: string;
+      readonly keyScope?: string;
+      readonly secretRef?: string;
+    }>;
+  }): Promise<ReadonlyArray<{
+    readonly materialRef: string;
+    readonly kind: "certificate-pem" | "certificate-chain-pem" | "private-key-encrypted-pem" | "crl-pem";
+    readonly secretRef: string;
+    readonly secretRefRedacted: string;
+    readonly keyScope: string;
+    readonly source: string;
+  }>> {
+    return input.materials.map((material) => {
+      const secretRef = material.secretRef ?? `secret-store:issued:${material.materialRef}`;
+      this.persisted.set(material.materialRef, {
+        secretRef,
+        kind: material.kind,
+        plaintextValue: material.plaintextValue,
+      });
+      return {
+        materialRef: material.materialRef,
+        kind: material.kind as "certificate-pem" | "certificate-chain-pem" | "private-key-encrypted-pem" | "crl-pem",
+        secretRef,
+        secretRefRedacted: "secret-st...acted",
+        keyScope: material.keyScope ?? "default",
+        source: "test",
+      };
+    });
+  }
+
+  async loadRootMaterials(
+    _input: {
+      readonly certificateAuthorityId: string;
+      readonly reason?: string;
+      readonly materials: ReadonlyArray<{
+        readonly materialRef: string;
+        readonly kind: string;
+        readonly secretRef: string;
+        readonly keyScope?: string;
+      }>;
+    },
+  ): Promise<ReadonlyArray<{
+    readonly materialRef: string;
+    readonly kind: "certificate-pem" | "certificate-chain-pem" | "private-key-encrypted-pem" | "crl-pem";
+    readonly plaintextValue: string;
+  }>> {
+    throw new Error("not implemented in test");
+  }
+}
+
 class StubIssuerPort {
   public issueCalls = 0;
+  public revokeCalls: RevokeCertificateMaterialInput[] = [];
 
   async initializeInternalCertificateAuthority(
     _input: InitializeInternalCertificateAuthorityInput,
@@ -243,9 +343,14 @@ class StubIssuerPort {
   }
 
   async revokeCertificateMaterial(
-    _input: RevokeCertificateMaterialInput,
+    input: RevokeCertificateMaterialInput,
   ): Promise<RevokeCertificateMaterialResult> {
-    throw new Error("not implemented in test");
+    this.revokeCalls.push(input);
+    return {
+      certificateAuthorityId: input.certificateAuthorityId,
+      serialNumber: input.serialNumber,
+      revokedAt: input.revokedAt ?? "2026-04-05T12:01:00.000Z",
+    };
   }
 }
 
@@ -261,10 +366,14 @@ describe("IssueCertificateForSubjectUseCase", () => {
       trustState: NodeTrustStates.pendingApproval,
     }));
     const issuer = new StubIssuerPort();
+    const trustMaterials = new InMemoryTrustMaterialRepository();
+    const certificateMaterialStorage = new StubCertificateMaterialStorage();
 
     const useCase = new IssueCertificateForSubjectUseCase({
       certificateAuthorityRepository: authorities,
       issuedCertificateRepository: issuedCertificates,
+      trustMaterialRepository: trustMaterials,
+      certificateMaterialStorage,
       issuer,
       nodeRepository,
     });
@@ -286,10 +395,14 @@ describe("IssueCertificateForSubjectUseCase", () => {
       revokedAt: "2026-04-04T11:00:00.000Z",
     }));
     const issuer = new StubIssuerPort();
+    const trustMaterials = new InMemoryTrustMaterialRepository();
+    const certificateMaterialStorage = new StubCertificateMaterialStorage();
 
     const useCase = new IssueCertificateForSubjectUseCase({
       certificateAuthorityRepository: authorities,
       issuedCertificateRepository: issuedCertificates,
+      trustMaterialRepository: trustMaterials,
+      certificateMaterialStorage,
       issuer,
       nodeRepository,
     });
@@ -309,10 +422,14 @@ describe("IssueCertificateForSubjectUseCase", () => {
       trustState: NodeTrustStates.pendingApproval,
     }));
     const issuer = new StubIssuerPort();
+    const trustMaterials = new InMemoryTrustMaterialRepository();
+    const certificateMaterialStorage = new StubCertificateMaterialStorage();
 
     const useCase = new IssueCertificateForSubjectUseCase({
       certificateAuthorityRepository: authorities,
       issuedCertificateRepository: issuedCertificates,
+      trustMaterialRepository: trustMaterials,
+      certificateMaterialStorage,
       issuer,
       nodeRepository,
     });
@@ -330,10 +447,14 @@ describe("IssueCertificateForSubjectUseCase", () => {
     authorities.authority = createAuthority();
     const issuedCertificates = new InMemoryIssuedCertificateRepository();
     const issuer = new StubIssuerPort();
+    const trustMaterials = new InMemoryTrustMaterialRepository();
+    const certificateMaterialStorage = new StubCertificateMaterialStorage();
 
     const useCase = new IssueCertificateForSubjectUseCase({
       certificateAuthorityRepository: authorities,
       issuedCertificateRepository: issuedCertificates,
+      trustMaterialRepository: trustMaterials,
+      certificateMaterialStorage,
       issuer,
     });
 
@@ -353,6 +474,66 @@ describe("IssueCertificateForSubjectUseCase", () => {
     const serviceResult = await useCase.execute(createServiceIssuanceRequest());
     expect(serviceResult.profileKind).toBe(CertificateSubjectProfileKinds.internalService);
     expect(issuer.issueCalls).toBe(1);
+  });
+
+  it("persists issued certificate and chain trust material references", async () => {
+    const authorities = new InMemoryCertificateAuthorityRepository();
+    authorities.authority = createAuthority();
+    const issuedCertificates = new InMemoryIssuedCertificateRepository();
+    const nodeRepository = new InMemoryNodeRepository();
+    nodeRepository.nodesById.set("node:compute:1", createNode({
+      nodeId: "node:compute:1",
+      approvalStatus: NodeApprovalStatuses.approved,
+      trustState: NodeTrustStates.pendingApproval,
+    }));
+    const issuer = new StubIssuerPort();
+    const trustMaterials = new InMemoryTrustMaterialRepository();
+    const certificateMaterialStorage = new StubCertificateMaterialStorage();
+
+    const useCase = new IssueCertificateForSubjectUseCase({
+      certificateAuthorityRepository: authorities,
+      issuedCertificateRepository: issuedCertificates,
+      trustMaterialRepository: trustMaterials,
+      certificateMaterialStorage,
+      issuer,
+      nodeRepository,
+    });
+
+    await useCase.execute(createNodeIssuanceRequest());
+
+    expect(issuedCertificates.records).toHaveLength(1);
+    expect(trustMaterials.records.get("trust:cert:node:1:v1")?.kind).toBe("certificate-pem");
+    expect(trustMaterials.records.get("trust:chain:ca:root:v1")?.kind).toBe("certificate-chain-pem");
+    expect(certificateMaterialStorage.persisted.get("trust:cert:node:1:v1")?.plaintextValue).toBe("issued-certificate-pem");
+  });
+
+  it("fails cleanly and attempts compensating revocation when trust material persistence fails after signing", async () => {
+    const authorities = new InMemoryCertificateAuthorityRepository();
+    authorities.authority = createAuthority();
+    const issuedCertificates = new InMemoryIssuedCertificateRepository();
+    const nodeRepository = new InMemoryNodeRepository();
+    nodeRepository.nodesById.set("node:compute:1", createNode({
+      nodeId: "node:compute:1",
+      approvalStatus: NodeApprovalStatuses.approved,
+      trustState: NodeTrustStates.pendingApproval,
+    }));
+    const issuer = new StubIssuerPort();
+    const trustMaterials = new InMemoryTrustMaterialRepository();
+    trustMaterials.throwOnSave = true;
+    const certificateMaterialStorage = new StubCertificateMaterialStorage();
+
+    const useCase = new IssueCertificateForSubjectUseCase({
+      certificateAuthorityRepository: authorities,
+      issuedCertificateRepository: issuedCertificates,
+      trustMaterialRepository: trustMaterials,
+      certificateMaterialStorage,
+      issuer,
+      nodeRepository,
+    });
+
+    await expect(useCase.execute(createNodeIssuanceRequest())).rejects.toThrow("trust-material-save-failed");
+    expect(issuer.revokeCalls).toHaveLength(1);
+    expect(issuedCertificates.records).toHaveLength(0);
   });
 });
 
