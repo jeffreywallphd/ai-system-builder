@@ -1,6 +1,13 @@
-import { createServer as createHttpServer, type IncomingMessage, type RequestListener, type Server, type ServerResponse } from "node:http";
+import {
+  createServer as createHttpServer,
+  type IncomingMessage,
+  type RequestListener,
+  type Server,
+  type ServerResponse,
+} from "node:http";
 import type { Server as HttpsServer } from "node:https";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import type { Socket } from "node:net";
 import { URL } from "node:url";
 import { z } from "zod";
 import type { IdentityAuthBackendApi } from "../../../api/identity/IdentityAuthBackendApi";
@@ -117,6 +124,16 @@ import {
   type TransportSecurityScenario,
 } from "../../../../src/domain/security/TransportSecurityDomain";
 import type { HttpTransportTrustValidationResult } from "../../../../src/infrastructure/transport/TransportTrustValidationAdapters";
+import type { WebSocketTransportTrustValidationResult } from "../../../../src/infrastructure/transport/TransportTrustValidationAdapters";
+import {
+  buildWebSocketChannelContext,
+  InMemoryWebSocketChannelRegistry,
+  parseWebSocketChannelPurpose,
+  WebSocketChannelPurposes,
+  type WebSocketChannelContext,
+  type WebSocketChannelPurpose,
+  type WebSocketChannelRegistry,
+} from "../../../../src/infrastructure/transport/websocket/SecureWebSocketChannelContext";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 
@@ -598,13 +615,25 @@ interface IdentityHttpServerTransportTrustOptions {
   readonly httpValidator: {
     validate(request: ValidateTransportConnectionTrustRequest): Promise<HttpTransportTrustValidationResult>;
   };
+  readonly websocketValidator?: {
+    validate(request: ValidateTransportConnectionTrustRequest): Promise<WebSocketTransportTrustValidationResult>;
+  };
   readonly allowInsecureLoopback: boolean;
   readonly defaultScenario?: TransportSecurityScenario;
 }
 
 interface IdentityHttpServerSecureTransportOptions {
   readonly requireHttps: boolean;
+  readonly requireWss?: boolean;
   readonly allowInsecureLoopback: boolean;
+}
+
+interface IdentityHttpServerWebSocketOptions {
+  readonly channelPathPrefix?: string;
+  readonly supportedPurposes?: ReadonlyArray<WebSocketChannelPurpose>;
+  readonly defaultPurpose?: WebSocketChannelPurpose;
+  readonly channelRegistry?: WebSocketChannelRegistry;
+  onChannelEstablished?(channel: WebSocketChannelContext, socket: Socket): Promise<void> | void;
 }
 
 export interface IdentityHttpServerOptions {
@@ -619,6 +648,7 @@ export interface IdentityHttpServerOptions {
   readonly serverFactory?: IdentityHttpServerFactory;
   readonly secureTransport?: IdentityHttpServerSecureTransportOptions;
   readonly transportTrust?: IdentityHttpServerTransportTrustOptions;
+  readonly webSocket?: IdentityHttpServerWebSocketOptions;
 }
 
 export type IdentityHttpServerInstance = Server | HttpsServer;
@@ -655,12 +685,25 @@ interface AuthenticatedRequestContext {
   };
 }
 
+interface WebSocketUpgradeDeniedReason {
+  readonly code:
+    | "invalid-upgrade-request"
+    | "secure-transport-required"
+    | "authentication-failed"
+    | "transport-trust-rejected"
+    | "unsupported-channel-purpose";
+  readonly message: string;
+  readonly closeCode?: number;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
 export function createIdentityHttpServer(options: IdentityHttpServerOptions): IdentityHttpServerInstance {
   const logger = options.logger ?? new ConsoleIdentityHttpServerLogger();
   const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
   const serverFactory = options.serverFactory ?? ((requestListener: RequestListener) => createHttpServer(requestListener));
+  const channelRegistry = options.webSocket?.channelRegistry ?? new InMemoryWebSocketChannelRegistry();
 
-  return serverFactory(async (request, response) => {
+  const server = serverFactory(async (request, response) => {
     const requestId = randomUUID();
     const path = new URL(request.url ?? "/", "http://localhost").pathname;
     const transportState = resolveInboundHttpTransportConnectionState(request);
@@ -3601,6 +3644,226 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
       }));
     }
   });
+
+  if (options.webSocket) {
+    server.on("upgrade", (request, socket) => {
+      void handleWebSocketUpgrade({
+        request,
+        socket,
+        logger,
+        backendApi: options.backendApi,
+        secureTransport: options.secureTransport,
+        transportTrust: options.transportTrust,
+        webSocket: options.webSocket,
+        channelRegistry,
+      }).catch((error) => {
+        logger.error(Object.freeze({
+          event: "identity-websocket.upgrade.unhandled-error",
+          requestId: randomUUID(),
+          method: request.method,
+          path: request.url,
+          statusCode: 500,
+          details: Object.freeze({
+            error: normalizeError(error),
+          }),
+        }));
+        socket.destroy();
+      });
+    });
+  }
+
+  return server;
+}
+
+async function handleWebSocketUpgrade(input: {
+  readonly request: IncomingMessage;
+  readonly socket: Socket;
+  readonly logger: IdentityHttpServerLogger;
+  readonly backendApi: IdentityAuthBackendApi;
+  readonly secureTransport: IdentityHttpServerSecureTransportOptions | undefined;
+  readonly transportTrust: IdentityHttpServerTransportTrustOptions | undefined;
+  readonly webSocket: IdentityHttpServerWebSocketOptions;
+  readonly channelRegistry: WebSocketChannelRegistry;
+}): Promise<void> {
+  const requestId = randomUUID();
+  const requestUrl = new URL(input.request.url ?? "/", "http://localhost");
+  const path = requestUrl.pathname;
+  const channelPathPrefix = normalizeOptionalString(input.webSocket.channelPathPrefix ?? "/ws") ?? "/ws";
+  const transportState = resolveInboundHttpTransportConnectionState(input.request);
+
+  if (!path.startsWith(channelPathPrefix)) {
+    denyWebSocketUpgrade(input, requestId, 404, {
+      code: "invalid-upgrade-request",
+      message: "WebSocket endpoint was not found.",
+    });
+    return;
+  }
+
+  const secureTransportDecision = enforceWebSocketSecureTransport({
+    secureTransport: input.secureTransport,
+    transportState,
+  });
+  if (!secureTransportDecision.ok) {
+    denyWebSocketUpgrade(input, requestId, secureTransportDecision.statusCode, secureTransportDecision.reason);
+    return;
+  }
+
+  const handshake = validateWebSocketUpgradeRequestHeaders(input.request);
+  if (!handshake.ok) {
+    denyWebSocketUpgrade(input, requestId, handshake.statusCode, handshake.reason);
+    return;
+  }
+
+  const sessionToken = extractBearerToken(input.request.headers.authorization);
+  if (!sessionToken) {
+    denyWebSocketUpgrade(input, requestId, 401, {
+      code: "authentication-failed",
+      closeCode: 4401,
+      message: "Missing Authorization bearer token for websocket upgrade.",
+    });
+    return;
+  }
+
+  const resolvedSession = await input.backendApi.resolveAuthenticatedSession({ sessionToken });
+  if (!resolvedSession.ok) {
+    const statusCode = mapStatusCode(resolvedSession);
+    denyWebSocketUpgrade(input, requestId, statusCode, {
+      code: "authentication-failed",
+      closeCode: 4401,
+      message: resolvedSession.error?.message ?? "WebSocket upgrade authentication failed.",
+      details: Object.freeze({
+        errorCode: resolvedSession.error?.code,
+      }),
+    });
+    return;
+  }
+  if (!resolvedSession.data) {
+    denyWebSocketUpgrade(input, requestId, 500, {
+      code: "authentication-failed",
+      closeCode: 1011,
+      message: "Session resolution returned no payload for websocket upgrade.",
+    });
+    return;
+  }
+
+  const supportedPurposes = input.webSocket.supportedPurposes
+    ?? Object.freeze(Object.values(WebSocketChannelPurposes));
+  const requestedPurpose = normalizeOptionalString(requestUrl.searchParams.get("purpose"));
+  const parsedPurpose = parseWebSocketChannelPurpose(requestedPurpose);
+  if (requestedPurpose && !parsedPurpose) {
+    denyWebSocketUpgrade(input, requestId, 403, {
+      code: "unsupported-channel-purpose",
+      closeCode: 4403,
+      message: "WebSocket channel purpose is not supported.",
+      details: Object.freeze({
+        purpose: requestedPurpose,
+      }),
+    });
+    return;
+  }
+  const purpose = parsedPurpose
+    ?? input.webSocket.defaultPurpose
+    ?? WebSocketChannelPurposes.status;
+  if (!supportedPurposes.includes(purpose)) {
+    denyWebSocketUpgrade(input, requestId, 403, {
+      code: "unsupported-channel-purpose",
+      closeCode: 4403,
+      message: "WebSocket channel purpose is not allowed.",
+      details: Object.freeze({
+        purpose,
+      }),
+    });
+    return;
+  }
+
+  const defaultScenario = input.transportTrust?.defaultScenario ?? TransportSecurityScenarios.thinClientToControlPlane;
+  const transportRouting = resolveTransportTrustRouting({
+    resolvedSession: resolvedSession.data,
+    options: undefined,
+    defaultScenario,
+  });
+  const bypassTransportTrustValidation = Boolean(
+    input.transportTrust && shouldBypassTransportTrustValidation(transportState, input.transportTrust),
+  );
+  if (input.transportTrust && !input.transportTrust.websocketValidator && !bypassTransportTrustValidation) {
+    denyWebSocketUpgrade(input, requestId, 500, {
+      code: "transport-trust-rejected",
+      closeCode: 1011,
+      message: "WebSocket transport trust validation is not configured.",
+    });
+    return;
+  }
+  if (input.transportTrust?.websocketValidator && !bypassTransportTrustValidation) {
+    const transportValidationRequest = buildWebSocketTransportTrustValidationRequest({
+      transportState,
+      requestId,
+      resolvedSession: resolvedSession.data,
+      routing: transportRouting,
+    });
+    const transportValidation = await input.transportTrust.websocketValidator.validate(transportValidationRequest);
+    if (!transportValidation.ok) {
+      denyWebSocketUpgrade(input, requestId, mapWebSocketCloseCodeToStatusCode(transportValidation.closeCode), {
+        code: "transport-trust-rejected",
+        closeCode: transportValidation.closeCode,
+        message: transportValidation.reason,
+        details: Object.freeze({
+          errorCode: transportValidation.error.code,
+          reasons: transportValidation.error.reasons,
+        }),
+      });
+      return;
+    }
+  }
+
+  const sessionAssuranceLevel = normalizeSessionAssuranceLevel(
+    resolvedSession.data.session.deviceTrustContext?.sessionAssuranceLevel,
+  );
+  const accessChannel = resolvedSession.data.session.accessChannel === "desktop" ? "desktop" : "thin-client";
+  const connectionId = `identity-ws:${requestId}`;
+  const channelContext = buildWebSocketChannelContext({
+    connectionId,
+    purpose,
+    userIdentityId: resolvedSession.data.principal.userIdentityId,
+    username: resolvedSession.data.principal.username,
+    sessionId: resolvedSession.data.session.sessionId,
+    accessChannel,
+    trustedDeviceId: resolvedSession.data.session.deviceTrustContext?.trustedDeviceId,
+    sessionAssuranceLevel,
+    workspaceId: normalizeOptionalString(requestUrl.searchParams.get("workspaceId")),
+    transport: Object.freeze({
+      trustValidationEnforced: Boolean(input.transportTrust && !bypassTransportTrustValidation),
+      scenario: transportRouting.scenario,
+      actorType: transportRouting.actorType,
+      remotePeerType: transportRouting.remotePeerType,
+    }),
+  });
+  input.channelRegistry.register(channelContext);
+  input.socket.once("close", () => {
+    input.channelRegistry.release(channelContext.channelId);
+  });
+
+  input.socket.write(buildWebSocketUpgradeAcceptedResponse(handshake.websocketKey));
+  input.logger.info(Object.freeze({
+    event: "identity-websocket.upgrade.accepted",
+    requestId,
+    method: input.request.method,
+    path,
+    statusCode: 101,
+    details: Object.freeze({
+      channelId: channelContext.channelId,
+      connectionId: channelContext.connectionId,
+      purpose: channelContext.purpose,
+      actor: Object.freeze({
+        userIdentityId: channelContext.actor.userIdentityId,
+        sessionId: channelContext.actor.sessionId,
+        accessChannel: channelContext.actor.accessChannel,
+      }),
+      workspaceScope: channelContext.workspaceScope,
+      transport: channelContext.transport,
+    }),
+  }));
+
+  await input.webSocket.onChannelEstablished?.(channelContext, input.socket);
 }
 
 async function handleRegister(
@@ -3831,6 +4094,43 @@ function buildTransportTrustValidationRequest(input: {
   });
 }
 
+function buildWebSocketTransportTrustValidationRequest(input: {
+  readonly transportState: InboundHttpTransportConnectionState;
+  readonly requestId: string;
+  readonly resolvedSession: ResolveAuthenticatedSessionApiResponse;
+  readonly routing: {
+    readonly scenario: TransportSecurityScenario;
+    readonly actorType: TransportConnectionActorType;
+    readonly remotePeerType: TransportPeerType;
+  };
+}): ValidateTransportConnectionTrustRequest {
+  return Object.freeze({
+    connectionId: `identity-ws:${input.requestId}`,
+    direction: TransportConnectionDirections.inbound,
+    scenario: input.routing.scenario,
+    channelType: input.transportState.encryptedTransportEstablished
+      ? TransportChannelTypes.wss
+      : TransportChannelTypes.ws,
+    actorType: input.routing.actorType,
+    localPeerType: TransportPeerTypes.authoritativeServer,
+    remotePeerType: input.routing.remotePeerType,
+    encryptedTransportEstablished: input.transportState.encryptedTransportEstablished,
+    mutualTlsEstablished: input.transportState.mutualTlsEstablished,
+    lanTrustAssumed: false,
+    userSessionEvidence: input.routing.actorType === TransportConnectionActorTypes.userSession
+      ? Object.freeze({
+        userIdentityId: input.resolvedSession.principal.userIdentityId,
+        loginAuthenticated: true,
+        trustedDeviceId: input.resolvedSession.session.deviceTrustContext?.trustedDeviceId,
+      })
+      : undefined,
+    peerCertificateEvidence: Object.freeze({
+      certificatePresented: input.transportState.peerCertificatePresented,
+      serialNumber: input.transportState.peerCertificateSerialNumber,
+    }),
+  });
+}
+
 function resolveTransportTrustRouting(input: {
   readonly resolvedSession: ResolveAuthenticatedSessionApiResponse;
   readonly options: {
@@ -3895,6 +4195,198 @@ function enforceApiSecureTransport(input: {
       }),
     }),
   });
+}
+
+function enforceWebSocketSecureTransport(input: {
+  readonly secureTransport: IdentityHttpServerSecureTransportOptions | undefined;
+  readonly transportState: InboundHttpTransportConnectionState;
+}): {
+  readonly ok: true;
+} | {
+  readonly ok: false;
+  readonly statusCode: number;
+  readonly reason: WebSocketUpgradeDeniedReason;
+} {
+  const requireWss = input.secureTransport?.requireWss ?? input.secureTransport?.requireHttps ?? false;
+  if (!requireWss) {
+    return Object.freeze({ ok: true });
+  }
+  if (input.transportState.encryptedTransportEstablished) {
+    return Object.freeze({ ok: true });
+  }
+  if (input.secureTransport?.allowInsecureLoopback && input.transportState.loopbackRequest) {
+    return Object.freeze({ ok: true });
+  }
+
+  return Object.freeze({
+    ok: false,
+    statusCode: 403,
+    reason: Object.freeze({
+      code: "secure-transport-required",
+      closeCode: 4403,
+      message: "Secure WebSocket transport is required for this endpoint.",
+    }),
+  });
+}
+
+function validateWebSocketUpgradeRequestHeaders(input: IncomingMessage): {
+  readonly ok: true;
+  readonly websocketKey: string;
+} | {
+  readonly ok: false;
+  readonly statusCode: number;
+  readonly reason: WebSocketUpgradeDeniedReason;
+} {
+  const upgrade = normalizeOptionalHeader(input.headers.upgrade);
+  if (upgrade?.toLowerCase() !== "websocket") {
+    return Object.freeze({
+      ok: false,
+      statusCode: 400,
+      reason: Object.freeze({
+        code: "invalid-upgrade-request",
+        closeCode: 4400,
+        message: "Upgrade header must be 'websocket'.",
+      }),
+    });
+  }
+
+  const connection = normalizeOptionalHeader(input.headers.connection)?.toLowerCase() ?? "";
+  if (!connection.includes("upgrade")) {
+    return Object.freeze({
+      ok: false,
+      statusCode: 400,
+      reason: Object.freeze({
+        code: "invalid-upgrade-request",
+        closeCode: 4400,
+        message: "Connection header must include 'Upgrade'.",
+      }),
+    });
+  }
+
+  const version = normalizeOptionalHeader(input.headers["sec-websocket-version"]);
+  if (version !== "13") {
+    return Object.freeze({
+      ok: false,
+      statusCode: 426,
+      reason: Object.freeze({
+        code: "invalid-upgrade-request",
+        closeCode: 4400,
+        message: "WebSocket version 13 is required.",
+      }),
+    });
+  }
+
+  const websocketKey = normalizeOptionalHeader(input.headers["sec-websocket-key"]);
+  if (!websocketKey) {
+    return Object.freeze({
+      ok: false,
+      statusCode: 400,
+      reason: Object.freeze({
+        code: "invalid-upgrade-request",
+        closeCode: 4400,
+        message: "Sec-WebSocket-Key header is required.",
+      }),
+    });
+  }
+
+  return Object.freeze({
+    ok: true,
+    websocketKey,
+  });
+}
+
+function denyWebSocketUpgrade(
+  input: {
+    readonly request: IncomingMessage;
+    readonly socket: Socket;
+    readonly logger: IdentityHttpServerLogger;
+  },
+  requestId: string,
+  statusCode: number,
+  reason: WebSocketUpgradeDeniedReason,
+): void {
+  const payload = Object.freeze({
+    ok: false,
+    error: Object.freeze({
+      code: reason.code,
+      message: reason.message,
+      closeCode: reason.closeCode,
+      details: reason.details,
+    }),
+  });
+  const body = JSON.stringify(payload);
+  const responseLines = [
+    `HTTP/1.1 ${statusCode} ${resolveHttpStatusText(statusCode)}`,
+    "Connection: close",
+    "Content-Type: application/json; charset=utf-8",
+    `Content-Length: ${Buffer.byteLength(body)}`,
+    "",
+    body,
+  ];
+  input.socket.end(responseLines.join("\r\n"));
+  input.logger.warn(Object.freeze({
+    event: "identity-websocket.upgrade.denied",
+    requestId,
+    method: input.request.method,
+    path: input.request.url,
+    statusCode,
+    details: Object.freeze({
+      denial: reason,
+    }),
+  }));
+}
+
+function buildWebSocketUpgradeAcceptedResponse(websocketKey: string): string {
+  const accept = createHash("sha1")
+    .update(`${websocketKey}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`, "utf8")
+    .digest("base64");
+  return [
+    "HTTP/1.1 101 Switching Protocols",
+    "Upgrade: websocket",
+    "Connection: Upgrade",
+    `Sec-WebSocket-Accept: ${accept}`,
+    "",
+    "",
+  ].join("\r\n");
+}
+
+function resolveHttpStatusText(statusCode: number): string {
+  switch (statusCode) {
+    case 400:
+      return "Bad Request";
+    case 401:
+      return "Unauthorized";
+    case 403:
+      return "Forbidden";
+    case 404:
+      return "Not Found";
+    case 426:
+      return "Upgrade Required";
+    default:
+      return "Internal Server Error";
+  }
+}
+
+function mapWebSocketCloseCodeToStatusCode(closeCode: number): number {
+  if (closeCode === 4400) {
+    return 400;
+  }
+  if (closeCode === 4401) {
+    return 401;
+  }
+  if (closeCode === 4403) {
+    return 403;
+  }
+  return 500;
+}
+
+function normalizeOptionalHeader(value: string | string[] | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const candidate = Array.isArray(value) ? value[0] : value;
+  const normalized = candidate?.trim();
+  return normalized ? normalized : undefined;
 }
 
 function resolveInboundHttpTransportConnectionState(request: IncomingMessage): InboundHttpTransportConnectionState {

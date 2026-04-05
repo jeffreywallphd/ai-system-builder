@@ -132,7 +132,10 @@ import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "../../src/applic
 import { RevokeNodeTrustUseCase } from "../../src/application/nodes/use-cases/RevokeNodeTrustUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
 import { InternalCertificateAuthorityIssuer } from "../../src/infrastructure/security/ca/InternalCertificateAuthorityIssuer";
-import { HttpTransportTrustValidationAdapter } from "../../src/infrastructure/transport/TransportTrustValidationAdapters";
+import {
+  HttpTransportTrustValidationAdapter,
+  WebSocketTransportTrustValidationAdapter,
+} from "../../src/infrastructure/transport/TransportTrustValidationAdapters";
 import type { WorkspaceIdNamespace } from "../../src/shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   evaluateTransportConnectionTrust,
@@ -742,6 +745,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     transportTrustValidator,
     transportSecurityObservability,
   );
+  const websocketTransportTrustValidator = new WebSocketTransportTrustValidationAdapter(
+    transportTrustValidator,
+    transportSecurityObservability,
+  );
   const managedTlsMaterial = await resolveManagedIdentityServerTlsRuntimeMaterial({
     certificateAuthorityRepository,
     env,
@@ -762,6 +769,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     logger: options.logger,
     secureTransport: Object.freeze({
       requireHttps: secureTransportConfig.requireSecureHttp,
+      requireWss: secureTransportConfig.requireSecureWebSocket,
       allowInsecureLoopback: secureTransportConfig.allowInsecureLoopback,
     }),
     serverFactory: managedTlsMaterial
@@ -770,9 +778,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     transportTrust: secureTransportConfig.enforceTransportTrustValidation
       ? Object.freeze({
         httpValidator: httpTransportTrustValidator,
+        websocketValidator: websocketTransportTrustValidator,
         allowInsecureLoopback: secureTransportConfig.allowInsecureLoopback,
       })
       : undefined,
+    webSocket: Object.freeze({
+      channelPathPrefix: "/ws",
+    }),
   });
 
   await new Promise<void>((resolve, reject) => {

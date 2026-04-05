@@ -34,6 +34,9 @@ Story 7.1.2 adds centralized trust-state resolution and transport adapter mappin
 - `src/infrastructure/security/tests/TransportSecurityObservabilityReporter.test.ts`
 - `src/infrastructure/transport/TransportTrustValidationAdapters.ts`
 - `src/infrastructure/transport/tests/TransportTrustValidationAdapters.test.ts`
+- `src/infrastructure/transport/websocket/SecureWebSocketChannelContext.ts`
+- `src/infrastructure/transport/websocket/tests/SecureWebSocketChannelContext.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
 
 ## Domain vocabulary
 
@@ -227,3 +230,43 @@ Story 7.2.1 hardens the authoritative identity HTTP adapter so production API tr
   - fail-closed insecure API rejection when HTTPS is required;
   - explicit loopback fallback allowance behavior;
   - authenticated-route access to normalized transport context via request logging payload.
+
+## Story 7.2.2 secure websocket upgrade and session-bound channels
+
+Story 7.2.2 adds an upgrade gate for runtime websocket channels so accepted sockets are bound to authenticated session/device identity and transport trust posture before channel use.
+
+### Runtime adapter updates
+
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - adds explicit websocket upgrade handling on `/ws` routes;
+  - validates websocket handshake headers (`Upgrade`, `Connection`, `Sec-WebSocket-*`) before upgrade;
+  - enforces secure websocket transport posture (`requireWss`, loopback policy);
+  - resolves and validates authenticated session context for upgrade requests;
+  - routes websocket trust validation through `WebSocketTransportTrustValidationAdapter` when transport trust enforcement is active;
+  - emits structured, auditable denial envelopes for handshake/auth/trust/purpose failures;
+  - constructs session-bound websocket channel context with actor/session/device metadata, workspace scope, purpose, and capabilities.
+- `hosts/server/IdentityServerHost.ts`
+  - composes `WebSocketTransportTrustValidationAdapter` and wires websocket trust validation into the identity server host composition.
+- `src/infrastructure/transport/websocket/SecureWebSocketChannelContext.ts`
+  - defines websocket purpose/capability taxonomy for status, queue monitoring, run monitoring, and stream-control channels;
+  - provides immutable channel-context construction and in-memory channel registry lifecycle helpers (register on accepted upgrade, release on socket close).
+
+### Denial posture
+
+- Unauthorized upgrades are rejected with structured `authentication-failed` denial metadata.
+- Downgraded or insecure websocket attempts are rejected with `secure-transport-required`.
+- Transport-trust denial responses include mapped websocket close semantics for audit and protocol-safe handling.
+- Unsupported channel-purpose requests are rejected before upgrade establishment.
+
+### Tests
+
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts` covers:
+  - secure websocket enforcement rejection;
+  - missing-auth websocket upgrade rejection;
+  - transport-trust websocket denial mapping;
+  - unsupported purpose rejection;
+  - accepted upgrade creation of session-bound channel context.
+- `src/infrastructure/transport/websocket/tests/SecureWebSocketChannelContext.test.ts` covers:
+  - purpose parsing and capability mapping;
+  - channel-context construction with actor/transport metadata;
+  - channel registry registration and release lifecycle.
