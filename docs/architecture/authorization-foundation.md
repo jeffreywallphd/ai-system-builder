@@ -126,3 +126,14 @@ Story 4.1.4 adds a reusable protected-resource contract for visibility and expli
 - Canonical contract file: `src/shared/contracts/authorization/ResourceVisibilitySharingContracts.ts`
 - Contract tests: `src/shared/contracts/authorization/tests/ResourceVisibilitySharingContracts.test.ts`
 - Developer reference: `docs/architecture/authorization-visibility-sharing-contracts.md`
+
+## Application ports + policy evaluator seam
+
+Story 4.1.5 adds the application-layer authorization context-loading ports and policy-evaluation interfaces used by enforcement use-cases.
+
+- Canonical contract files:
+  - `src/application/authorization/contracts/AuthorizationPolicyEvaluationContracts.ts`
+  - `src/application/authorization/ports/AuthorizationPolicyEvaluationPorts.ts`
+  - `src/application/authorization/use-cases/EvaluateAuthorizationPolicyUseCase.ts`
+- Contract tests: `src/application/authorization/tests/AuthorizationPolicyPortsContracts.test.ts`
+- Developer reference: `docs/architecture/authorization-application-ports.md`

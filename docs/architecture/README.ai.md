@@ -67,6 +67,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Authorization permission matrix and key catalog reference: `docs/architecture/authorization-permission-catalog.md`
 - Authorization workspace role-definition and baseline role-grant reference: `docs/architecture/authorization-role-reference.md`
 - Authorization protected-resource visibility + explicit-sharing contracts: `docs/architecture/authorization-visibility-sharing-contracts.md`
+- Authorization application-layer policy evaluation ports and adapter-boundary contracts: `docs/architecture/authorization-application-ports.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).
