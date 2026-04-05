@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Quick baseline for Story 5.1.4 node trust application orchestration seams, Story 5.2.1 node bootstrap identity generation, Story 5.2.3 admin review/approval decisions, Story 5.2.4 enrollment detail retrieval support, Story 5.3.4 admin inventory list/detail queries, Story 5.4.1 durable node revocation behavior, Story 5.4.2 node-authenticated trust enforcement, and Story 5.4.3 node trust audit recording integration (Feature 5 / Epic 5.1, 5.2, 5.3, and 5.4).
+Quick baseline for Story 5.1.4 node trust application orchestration seams, Story 5.2.1 node bootstrap identity generation, Story 5.2.3 admin review/approval decisions, Story 5.2.4 enrollment detail retrieval support, Story 5.3.4 admin inventory list/detail queries, Story 5.4.1 durable node revocation behavior, Story 5.4.2 node-authenticated trust enforcement, Story 5.4.3 node trust audit recording integration, and Story 6.2.3 node-certificate issuance eligibility integration (Feature 5 / Epic 5.1, 5.2, 5.3, and 5.4 plus Feature 6 / Epic 6.2 integration seam).
 
 ## Canonical files
 
@@ -23,7 +23,9 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - `src/application/nodes/use-cases/NodeInventoryReadModels.ts`
 - `src/application/nodes/use-cases/ListNodeInventoryUseCase.ts`
 - `src/application/nodes/use-cases/GetNodeInventoryDetailUseCase.ts`
+- `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
+- `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
 - `src/infrastructure/security/nodes/NodeBootstrapIdentityService.ts`
 - `src/infrastructure/security/nodes/tests/NodeBootstrapIdentityService.test.ts`
 - `src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder.ts`
@@ -65,6 +67,7 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 
 - Authorization policy engines can plug in through `NodeTrustAuthorizationHook` without changing use-case signatures.
 - PKI/certificate services can plug in through `NodeTrustCertificateHook` without changing node approval/revocation orchestration.
+- Certificate issuance policy enforcement can consume node-trust lifecycle evidence through `ResolveApprovedNodeCertificateEligibilityUseCase` via the security-layer `INodeCertificateEligibilityPort` seam.
 - Audit pipelines can plug in through `NodeTrustAuditSink` while preserving non-blocking application flow.
 - stale pending enrollment expiration emits `node-enrollment-expired` audit events.
 - Enrollment approval/rejection metadata (`reviewedAt`, `reviewedByUserIdentityId`, `decisionNote`) remains in persistence contracts so admin decisions are auditable and durable.

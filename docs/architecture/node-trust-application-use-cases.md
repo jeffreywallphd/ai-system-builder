@@ -1,6 +1,6 @@
 # Node Trust Application Use Cases
 
-This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment, Story 5.2.3 (Feature 5 / Epic 5.2): admin review/approval decisions for pending node enrollment, Story 5.2.4 (Feature 5 / Epic 5.2): enrollment detail retrieval transport orchestration support, Story 5.3.4 (Feature 5 / Epic 5.3): admin inventory list/detail query read models across trust and presence states, Story 5.4.1 (Feature 5 / Epic 5.4): durable node revocation semantics and repeat-revocation safety, Story 5.4.2 (Feature 5 / Epic 5.4): node-authenticated trust enforcement for runtime operations, and Story 5.4.3 (Feature 5 / Epic 5.4): node trust audit recording integration.
+This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment, Story 5.2.3 (Feature 5 / Epic 5.2): admin review/approval decisions for pending node enrollment, Story 5.2.4 (Feature 5 / Epic 5.2): enrollment detail retrieval transport orchestration support, Story 5.3.4 (Feature 5 / Epic 5.3): admin inventory list/detail query read models across trust and presence states, Story 5.4.1 (Feature 5 / Epic 5.4): durable node revocation semantics and repeat-revocation safety, Story 5.4.2 (Feature 5 / Epic 5.4): node-authenticated trust enforcement for runtime operations, Story 5.4.3 (Feature 5 / Epic 5.4): node trust audit recording integration, and Story 6.2.3 (Feature 6 / Epic 6.2): approved-node certificate issuance eligibility integration with node trust state.
 
 ## Canonical files
 
@@ -21,7 +21,9 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `src/application/nodes/use-cases/NodeInventoryReadModels.ts`
 - `src/application/nodes/use-cases/ListNodeInventoryUseCase.ts`
 - `src/application/nodes/use-cases/GetNodeInventoryDetailUseCase.ts`
+- `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
+- `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
 - `src/infrastructure/security/nodes/NodeBootstrapIdentityService.ts`
 - `src/infrastructure/security/nodes/tests/NodeBootstrapIdentityService.test.ts`
 - `src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder.ts`
@@ -105,6 +107,11 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
   - recovers idempotently when bootstrap material already exists
   - keeps lifecycle state explicitly untrusted (`approvalStatus=pending`, `trustState=pending-enrollment`)
   - builds normalized enrollment submission payloads with bootstrap trust-material metadata
+- `ResolveApprovedNodeCertificateEligibilityUseCase`
+  - provides node-trust-backed eligibility decisions for approved-node certificate issuance
+  - requires coherent enrollment linkage (`node.enrollmentRequestId`) and approved enrollment status
+  - validates capability-profile integrity and enrollment-to-node capability-profile consistency
+  - blocks issuance for revoked, unapproved, malformed, or enrollment-incoherent node records
 
 ## Shared application contracts
 
@@ -126,6 +133,8 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
   - explicit certificate issuance and optional revocation hook
   - allows later PKI integration without changing use-case boundaries
   - approval flow can trigger certificate issuance while keeping certificate concerns outside enrollment-decision state transitions
+- `INodeCertificateEligibilityPort` (security-side seam) + `ResolveApprovedNodeCertificateEligibilityUseCase` (node-side implementation)
+  - allows certificate issuance workflows to consume node lifecycle evidence without coupling certificate use-cases to node persistence internals
 - `NodeTrustAuditSink`
   - best-effort audit publication seam with typed event vocabulary
   - non-blocking by default for current slice
