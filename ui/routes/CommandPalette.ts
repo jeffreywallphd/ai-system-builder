@@ -102,6 +102,14 @@ export class CommandPaletteEntryResolver {
         category: "navigation",
         action: Object.freeze({ kind: CommandPaletteActionKinds.navigate, launchPath: ROUTE_PATHS.settings }),
       }),
+      Object.freeze({
+        id: "nav:identity-admin",
+        label: "Identity admin",
+        description: "Open Identity administration.",
+        keywords: Object.freeze(["go", "open", "identity", "admin", "accounts"]),
+        category: "navigation",
+        action: Object.freeze({ kind: CommandPaletteActionKinds.navigate, launchPath: ROUTE_PATHS.identityAdmin }),
+      }),
     ]);
   }
 }
@@ -112,7 +120,7 @@ export class CommandPaletteService {
   public resolveModel(_context: CommandPaletteContext, query: CommandPaletteQuery): CommandPaletteModel {
     const entries = this.resolver.resolveEntries();
     return Object.freeze({
-      placeholder: "Jump to Build, Run, Explore, Data, or Manage",
+      placeholder: "Jump to Build, Run, Explore, Data, Manage, or Identity admin",
       entries: toScoredEntries(entries, query.searchText),
     });
   }

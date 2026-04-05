@@ -7,8 +7,8 @@ describe("CommandPaletteService", () => {
     const service = new CommandPaletteService();
     const model = service.resolveDefaultModel({ pathname: ROUTE_PATHS.build, search: "" });
 
-    expect(model.entries).toHaveLength(5);
-    expect(model.entries.map((entry) => entry.label)).toEqual(["Build", "Run", "Explore", "Data", "Manage"]);
+    expect(model.entries).toHaveLength(6);
+    expect(model.entries.map((entry) => entry.label)).toEqual(["Build", "Run", "Explore", "Data", "Manage", "Identity admin"]);
     expect(model.entries.every((entry) => !entry.label.toLowerCase().includes("studio"))).toBeTrue();
     expect(model.entries.every((entry) => !entry.label.toLowerCase().includes("taxonomy"))).toBeTrue();
   });
@@ -27,6 +27,14 @@ describe("CommandPaletteService", () => {
     const dataEntry = model.entries.find((entry) => entry.label === "Data");
 
     expect(dataEntry?.action.launchPath).toBe(ROUTE_PATHS.datasetStudio);
+  });
+
+  it("routes the Identity admin menu entry to identity administration", () => {
+    const service = new CommandPaletteService();
+    const model = service.resolveDefaultModel({ pathname: ROUTE_PATHS.build, search: "" });
+    const identityAdminEntry = model.entries.find((entry) => entry.label === "Identity admin");
+
+    expect(identityAdminEntry?.action.launchPath).toBe(ROUTE_PATHS.identityAdmin);
   });
 });
 

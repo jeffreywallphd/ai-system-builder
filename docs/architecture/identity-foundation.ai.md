@@ -88,6 +88,22 @@
   - admin operations require explicit action context (`actorUserIdentityId` plus optional authorization/audit context fields) without embedding role-policy decisions inside identity use cases
   - backend observability/audit flow taxonomy now includes administration operation types
 
+## Identity administration server + UI surface (story 1.4.3)
+
+- Authoritative admin routes are exposed for list/get/status-set:
+  - `GET /api/v1/identity/admin/accounts`
+  - `GET /api/v1/identity/admin/accounts/:userIdentityId`
+  - `POST /api/v1/identity/admin/accounts/:userIdentityId/status`
+- Renderer identity client/service seams now include those contracts:
+  - `ui/shared/identity/IdentityAuthClient.ts`
+  - `ui/services/IdentityAuthService.ts`
+- Renderer administration UI now lives in:
+  - `ui/pages/IdentityAdminPage.tsx`
+- Current renderer behavior:
+  - authenticated account listing + status inspection use real backend endpoints
+  - enable/disable actions update persisted backend state and refresh list/status views
+  - empty/loading/error states are explicit in the administration surface
+
 ## Local registration seam
 
 - `RegisterLocalAccountUseCase` runs full local registration orchestration in the application layer.
