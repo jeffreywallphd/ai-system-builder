@@ -163,3 +163,10 @@ Story 4.1.7 adds migration-ready persistence DTOs and repository-port contracts 
   - `src/application/authorization/tests/AuthorizationPolicyPersistencePortsContracts.test.ts`
 - Developer reference:
   - `docs/architecture/authorization-persistence-contracts.md`
+
+## End-to-end baseline seam
+
+Story 4.1.8 documents the consolidated implementation baseline for the full Epic 4.1 authorization foundation, including extension rules and permission-check flow references.
+
+- Baseline reference:
+  - `docs/architecture/authorization-feature-4-epic-4.1-baseline.md`
