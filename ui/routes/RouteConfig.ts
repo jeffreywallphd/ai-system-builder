@@ -54,6 +54,8 @@ export const ROUTE_PATHS = Object.freeze({
   embeddingIndexStudio: "/studio-shell/embedding-index",
   configProfileStudio: "/studio-shell/config-profile",
   settings: "/settings",
+  authorizationSharing: "/settings/sharing",
+  authorizationSharingThin: "/settings/sharing/thin",
   workspaceAdmin: "/settings/workspaces",
   workspaceThinMembership: "/settings/workspaces/thin",
   workspaceInvitationAccept: "/workspaces/:workspaceId/invitations/:invitationToken/accept",
@@ -314,6 +316,18 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     path: ROUTE_PATHS.settings,
     title: "Settings",
     showInNavigation: true,
+  }),
+  Object.freeze({
+    key: "authorization-sharing",
+    path: ROUTE_PATHS.authorizationSharing,
+    title: "Resource sharing and visibility",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "authorization-sharing-thin",
+    path: ROUTE_PATHS.authorizationSharingThin,
+    title: "Sharing access review",
+    showInNavigation: false,
   }),
   Object.freeze({
     key: "workspace-admin",

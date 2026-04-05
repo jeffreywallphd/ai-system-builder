@@ -22,6 +22,9 @@ import { AssetValidationSummary, DependencyCompatibilityPanel } from "../compone
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { RegistryService } from "../services/RegistryService";
 import { StandardAssetDetailView } from "../components/registry/StandardAssetDetailView";
+import AuthorizationSharingManagementPanel from "../components/authorization/AuthorizationSharingManagementPanel";
+import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
+import { buildAuthorizationSharingDesktopPath, buildAuthorizationSharingThinClientPath } from "../web/authorization/AuthorizationSharingRoutes";
 
 function removeRoot(
   nodes: ReadonlyArray<RegistryDependencyGraphNode>,
@@ -42,6 +45,8 @@ export default function AssetDetailPage(): JSX.Element {
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [favoriteRevision, setFavoriteRevision] = useState(0);
+  const [session] = useState(() => new IdentityAuthSessionStore().getSession());
+  const sessionToken = session?.sessionToken;
   const registryContextQuery = useMemo(() => new URLSearchParams(location.search).get("registryContext")?.trim(), [location.search]);
   const registryBackPath = registryContextQuery
     ? `${ROUTE_PATHS.registry}?${registryContextQuery}`
@@ -156,6 +161,53 @@ export default function AssetDetailPage(): JSX.Element {
   return (
     <section className="ui-page ui-stack ui-stack--md" data-testid="registry-asset-detail-page">
       <StandardAssetDetailView asset={asset} actionContext={actionContext} backPath={registryBackPath} />
+
+      <section className="ui-card">
+        <div className="ui-card__header ui-row ui-row--wrap" style={{ justifyContent: "space-between", gap: "var(--space-sm)" }}>
+          <div className="ui-stack ui-stack--2xs">
+            <h2 className="ui-card__title">Sharing and visibility</h2>
+            <p className="ui-card__subtitle">Manage who can access this asset and review effective permission decisions.</p>
+          </div>
+          <div className="ui-page__actions">
+            <Link
+              className="ui-button ui-button--secondary ui-button--sm"
+              to={buildAuthorizationSharingDesktopPath({
+                resourceFamily: "asset",
+                resourceType: "asset",
+                resourceId: asset.assetId,
+              })}
+            >
+              Open full sharing manager
+            </Link>
+            <Link
+              className="ui-button ui-button--secondary ui-button--sm"
+              to={buildAuthorizationSharingThinClientPath({
+                resourceFamily: "asset",
+                resourceType: "asset",
+                resourceId: asset.assetId,
+              })}
+            >
+              Open compact sharing view
+            </Link>
+          </div>
+        </div>
+        <div className="ui-card__body">
+          {sessionToken ? (
+            <AuthorizationSharingManagementPanel
+              sessionToken={sessionToken}
+              compact
+              allowResourceEditing={false}
+              initialResource={Object.freeze({
+                resourceFamily: "asset",
+                resourceType: "asset",
+                resourceId: asset.assetId,
+              })}
+            />
+          ) : (
+            <p className="ui-text-secondary">Sign in again to load sharing and visibility controls for this asset.</p>
+          )}
+        </div>
+      </section>
 
       <div className="ui-row ui-row--wrap" style={{ justifyContent: "space-between", gap: "0.75rem" }}>
         <ContextualRecommendationsPanel recommendations={recommendations} />
