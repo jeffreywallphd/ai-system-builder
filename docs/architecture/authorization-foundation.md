@@ -21,6 +21,8 @@ This note documents Story 4.1.1 (Feature 4 / Epic 4.1): core authorization domai
 - `src/domain/authorization/AuthorizationDomain.ts`
 - `src/domain/authorization/tests/AuthorizationDomain.test.ts`
 - `src/shared/contracts/authorization/AuthorizationPolicyContracts.ts`
+- `src/shared/contracts/authorization/ResourceVisibilitySharingContracts.ts`
+- `src/shared/contracts/authorization/tests/ResourceVisibilitySharingContracts.test.ts`
 - `src/domain/authorization/AuthorizationPermissionCatalog.ts`
 - `src/domain/authorization/tests/AuthorizationPermissionCatalog.test.ts`
 - `src/domain/authorization/AuthorizationRoleDefinitions.ts`
@@ -116,3 +118,11 @@ Story 4.1.2 adds the canonical permission catalog and resource-action matrix for
 Story 4.1.3 adds the canonical workspace role-definition layer and role-to-permission baseline mappings for policy evaluation inputs.
 
 - Developer reference: `docs/architecture/authorization-role-reference.md`
+
+## Visibility + sharing contract seam
+
+Story 4.1.4 adds a reusable protected-resource contract for visibility and explicit sharing metadata.
+
+- Canonical contract file: `src/shared/contracts/authorization/ResourceVisibilitySharingContracts.ts`
+- Contract tests: `src/shared/contracts/authorization/tests/ResourceVisibilitySharingContracts.test.ts`
+- Developer reference: `docs/architecture/authorization-visibility-sharing-contracts.md`
