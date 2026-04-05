@@ -46,6 +46,7 @@ import { WorkspaceInvitationBackendApi } from "../../infrastructure/api/workspac
 import { WorkspaceAdministrationBackendApi } from "../../infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
 import { AuthorizationManagementBackendApi } from "../../infrastructure/api/authorization/AuthorizationManagementBackendApi";
 import { NodeTrustBackendApi } from "../../infrastructure/api/nodes/NodeTrustBackendApi";
+import { CertificateOperationsBackendApi } from "../../infrastructure/api/security/CertificateOperationsBackendApi";
 import { SqliteWorkspacePersistenceAdapter } from "../../src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import { WorkspaceAuthorizationPolicyReadAdapter } from "../../src/infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
 import { SqliteAuthorizationPersistenceAdapter } from "../../src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter";
@@ -73,6 +74,11 @@ import { ProtectedCertificateAuthorityRootMaterialStorage } from "../../src/infr
 import { RuntimeTrustMaterialDistributionService } from "../../src/infrastructure/security/certificates/RuntimeTrustMaterialDistributionService";
 import { ResolveRuntimeTrustMaterialPackageUseCase } from "../../src/application/security/use-cases/ResolveRuntimeTrustMaterialPackageUseCase";
 import { ResolveCertificateRevocationStatusUseCase } from "../../src/application/security/use-cases/ResolveCertificateRevocationStatusUseCase";
+import { GetCertificateAuthorityStatusIntrospectionUseCase } from "../../src/application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase";
+import { ListIssuedCertificateMetadataUseCase } from "../../src/application/security/use-cases/ListIssuedCertificateMetadataUseCase";
+import { GetIssuedCertificateMetadataUseCase } from "../../src/application/security/use-cases/GetIssuedCertificateMetadataUseCase";
+import { RevokeIssuedCertificateUseCase } from "../../src/application/security/use-cases/RevokeIssuedCertificateUseCase";
+import { RenewIssuedCertificateUseCase } from "../../src/application/security/use-cases/RenewIssuedCertificateUseCase";
 import { TrustMaterialKinds } from "../../src/domain/security/CertificateAuthorityDomain";
 import { AuthorizationPolicyDecisionEvaluator } from "../../src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyMutationService } from "../../src/application/authorization/use-cases/AuthorizationPolicyMutationService";
@@ -114,9 +120,11 @@ import { ListTrustedNodeInventoryUseCase } from "../../src/application/nodes/use
 import { RecordNodeHeartbeatUseCase } from "../../src/application/nodes/use-cases/RecordNodeHeartbeatUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { RejectNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
+import { ResolveApprovedNodeCertificateEligibilityUseCase } from "../../src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase";
 import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "../../src/application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase";
 import { RevokeNodeTrustUseCase } from "../../src/application/nodes/use-cases/RevokeNodeTrustUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
+import { InternalCertificateAuthorityIssuer } from "../../src/infrastructure/security/ca/InternalCertificateAuthorityIssuer";
 import type { WorkspaceIdNamespace } from "../../src/shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   createIdentityHttpServer,
@@ -542,6 +550,61 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       trustMaterialDistributionPort: runtimeTrustMaterialDistributionService,
     })
     : undefined;
+  const startupStateResolver = new ResolveCertificateAuthorityStartupStateUseCase({
+    configurationProvider: new EnvironmentCertificateAuthorityBootstrapConfigurationProvider(env),
+    secretService: new EnvironmentCertificateAuthoritySecretService(env, {
+      protectedSecretStore,
+    }),
+    certificateAuthorityRepository,
+    trustMaterialRepository: certificateAuthorityRepository,
+  });
+  const certificateMaterialStorage = protectedSecretStore
+    ? new ProtectedCertificateAuthorityRootMaterialStorage(protectedSecretStore)
+    : undefined;
+  const certificateAuthorityIssuer = certificateMaterialStorage
+    ? new InternalCertificateAuthorityIssuer({
+      certificateAuthorityRepository,
+      trustMaterialRepository: certificateAuthorityRepository,
+      rootMaterialStorage: certificateMaterialStorage,
+    })
+    : undefined;
+  const nodeCertificateEligibilityPort = new ResolveApprovedNodeCertificateEligibilityUseCase({
+    nodeRepository: nodeTrustRepository,
+    enrollmentRequestRepository: nodeTrustRepository,
+  });
+  const renewIssuedCertificateUseCase = certificateMaterialStorage && certificateAuthorityIssuer
+    ? new RenewIssuedCertificateUseCase({
+      certificateAuthorityRepository,
+      issuedCertificateRepository: certificateAuthorityRepository,
+      trustMaterialRepository: certificateAuthorityRepository,
+      certificateMaterialStorage,
+      issuer: certificateAuthorityIssuer,
+      nodeCertificateEligibilityPort,
+    })
+    : {
+      execute: async () => {
+        throw new Error("Certificate renewal is unavailable because protected secret storage is not configured.");
+      },
+    } as RenewIssuedCertificateUseCase;
+  const certificateOperationsBackendApi = new CertificateOperationsBackendApi({
+    getCertificateAuthorityStatusIntrospectionUseCase: new GetCertificateAuthorityStatusIntrospectionUseCase({
+      startupStateResolver,
+      certificateAuthorityRepository,
+      issuedCertificateRepository: certificateAuthorityRepository,
+      certificateLifecycleEventRepository: certificateAuthorityRepository,
+    }),
+    listIssuedCertificateMetadataUseCase: new ListIssuedCertificateMetadataUseCase({
+      issuedCertificateRepository: certificateAuthorityRepository,
+    }),
+    getIssuedCertificateMetadataUseCase: new GetIssuedCertificateMetadataUseCase({
+      issuedCertificateRepository: certificateAuthorityRepository,
+    }),
+    revokeIssuedCertificateUseCase: new RevokeIssuedCertificateUseCase({
+      issuedCertificateRepository: certificateAuthorityRepository,
+      certificateLifecycleEventRepository: certificateAuthorityRepository,
+    }),
+    renewIssuedCertificateUseCase,
+  });
   const nodeTrustBackendApi = new NodeTrustBackendApi({
     registerNodeEnrollmentRequestUseCase: new RegisterNodeEnrollmentRequestUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
@@ -597,6 +660,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
 
   const server = createIdentityHttpServer({
     backendApi,
+    certificateOperationsBackendApi,
     nodeTrustBackendApi,
     authorizationManagementBackendApi,
     workspaceBackendApi,

@@ -358,6 +358,23 @@ Structured diagnostics emitted by the startup use case are designed for future o
   - `ResolveRuntimeTrustMaterialPackageUseCase`,
   - `ResolveApprovedNodeRuntimeTrustMaterialUseCase` into `NodeTrustBackendApi`.
 
+## Story 6.3.6 certificate admin/API surface behavior
+
+- Adds `CertificateOperationsBackendApi` as the authoritative adapter for CA/certificate admin operations:
+  - CA status introspection read
+  - issued certificate metadata list/detail reads
+  - certificate revocation command
+  - certificate renewal command
+- Adds trusted-session-protected HTTP routes in `IdentityHttpServer`:
+  - `GET /api/v1/security/certificates/authority/status`
+  - `GET /api/v1/security/certificates`
+  - `GET /api/v1/security/certificates/:serialNumber`
+  - `POST /api/v1/security/certificates/:serialNumber/revoke`
+  - `POST /api/v1/security/certificates/:serialNumber/renew`
+- Route validation is explicit for query/body contracts (serial, status/trust filters, revocation and renewal inputs).
+- Response contracts are metadata/action focused and intentionally exclude secret-bearing certificate material fields and storage locators.
+- `startIdentityServerHost` now composes certificate admin operations through existing application use cases so later UI stories can consume one production API seam without additional transport refactors.
+
 ## Coverage in this slice
 
 - Domain invariants and lifecycle transitions: `src/domain/security/tests/CertificateAuthorityDomain.test.ts`

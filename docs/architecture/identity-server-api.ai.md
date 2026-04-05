@@ -24,6 +24,12 @@
   - `POST /api/v1/identity/trusted-devices/pairing/initiate`
   - `POST /api/v1/identity/trusted-devices/pairing/validate`
   - `POST /api/v1/identity/trusted-devices/pairing/complete`
+- Authenticated certificate operations endpoints (trusted session required):
+  - `GET /api/v1/security/certificates/authority/status`
+  - `GET /api/v1/security/certificates`
+  - `GET /api/v1/security/certificates/:serialNumber`
+  - `POST /api/v1/security/certificates/:serialNumber/revoke`
+  - `POST /api/v1/security/certificates/:serialNumber/renew`
 - Login success now issues and persists authenticated sessions and returns bearer session credentials.
 - Transport validation at the boundary (`zod`) with stable failure envelopes.
 - Deterministic translation from inner identity errors to public API error codes.
@@ -96,6 +102,11 @@ Trusted-device response serialization is now similarly allowlist-mapped and inte
 - pairing token hash material
 - internal trust-material persistence references
 
+Certificate operations transport responses are metadata/action projected and intentionally exclude:
+- private key payloads and certificate PEM payloads
+- trust-material storage locators and protected secret references
+- secret-bearing issued-certificate material refs (`certificateMaterialRef`, `certificateChainMaterialRef`, `trustMaterialRef`)
+
 ## UI state hardening (story 1.4.5)
 
 Renderer session persistence now stores a narrowed allowlist shape (`IdentityAuthPersistedSession`) in `ui/shared/identity/IdentityAuthSessionStore.ts` instead of persisting the full login response payload.
@@ -129,6 +140,10 @@ Persisted session records now intentionally exclude:
 - High-assurance routes now enforce trusted session assurance in middleware:
   - `POST /api/v1/identity/credential/change`
   - `GET|POST /api/v1/identity/admin/accounts*`
+  - `GET /api/v1/security/certificates/authority/status`
+  - `GET /api/v1/security/certificates*`
+  - `POST /api/v1/security/certificates/:serialNumber/revoke`
+  - `POST /api/v1/security/certificates/:serialNumber/renew`
 
 ## Credential change contract update
 
@@ -164,7 +179,9 @@ Persisted session records now intentionally exclude:
 
 - `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `infrastructure/api/identity/IdentityAuthObservability.ts`
+- `infrastructure/api/security/tests/CertificateOperationsBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerCertificateOperations.test.ts`
 - trusted-device transport lifecycle coverage in backend + HTTP integration tests (list/detail/revoke/rename + pairing initiate/validate/complete)
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
 - `ui/pages/tests/IdentityAdminPage.test.tsx`

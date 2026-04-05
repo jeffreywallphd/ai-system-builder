@@ -300,6 +300,25 @@ Story 6.3.5 wires approved-node runtime trust retrieval through managed CA/certi
   - `ResolveRuntimeTrustMaterialPackageUseCase`,
   - `ResolveApprovedNodeRuntimeTrustMaterialUseCase` into `NodeTrustBackendApi`.
 
+## Story 6.3.6 admin/API surfaces for certificate status and lifecycle actions
+
+Story 6.3.6 exposes initial authoritative-server certificate administration routes backed by existing certificate use cases:
+
+- `CertificateOperationsBackendApi` now adapts CA/certificate application services into stable API outcomes for:
+  - CA status introspection
+  - issued-certificate metadata list/detail
+  - explicit certificate revocation
+  - certificate renewal/replacement trigger
+- `IdentityHttpServer` now exposes trusted-session-protected routes:
+  - `GET /api/v1/security/certificates/authority/status`
+  - `GET /api/v1/security/certificates`
+  - `GET /api/v1/security/certificates/:serialNumber`
+  - `POST /api/v1/security/certificates/:serialNumber/revoke`
+  - `POST /api/v1/security/certificates/:serialNumber/renew`
+- route handlers enforce authenticated trusted-session posture and strict query/body validation.
+- response contracts are redaction-safe by design and exclude secret-bearing material fields and storage locators.
+- host composition now wires certificate operations through application-layer use cases so UI/admin follow-on stories can consume one authoritative API surface.
+
 ## Story 6.1.3 startup bootstrap behavior
 
 Startup validation now uses an application use case (`ResolveCertificateAuthorityStartupStateUseCase`) so the host composition layer does not read CA material directly.
