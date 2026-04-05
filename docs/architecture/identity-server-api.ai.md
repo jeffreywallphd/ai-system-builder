@@ -5,6 +5,8 @@
 - Authoritative HTTP endpoints for local identity registration and login:
   - `POST /api/v1/identity/register`
   - `POST /api/v1/identity/login`
+- Authenticated session validation endpoint and guard:
+  - `GET /api/v1/identity/session` with `Authorization: Bearer <session-token>`
 - Login success now issues and persists authenticated sessions and returns bearer session credentials.
 - Transport validation at the boundary (`zod`) with stable failure envelopes.
 - Deterministic translation from inner identity errors to public API error codes.
@@ -65,6 +67,15 @@ Shared redaction (`redactSensitiveAuthPayload`) is reused by both backend and HT
   - `sessionExpiresAt`
   - `sessionAccessChannel`
 - Session metadata and token material are separated in persistence (`identity_sessions` vs `identity_session_token_material`).
+
+## Authenticated-session guard contract update (story 1.3.3)
+
+- `IdentityHttpServer` now includes guard-style request infrastructure for protected routes.
+- Guard extracts bearer tokens from `Authorization` headers, validates active session state through `IdentityAuthBackendApi.resolveAuthenticatedSession(...)`, and supplies downstream handler context with:
+  - resolved principal (`userIdentityId`, `username`, optional profile fields)
+  - resolved session metadata (`sessionId`, provider/channel, issue/expiry times)
+- Protected route `GET /api/v1/identity/session` now returns that context for authenticated clients.
+- Missing, invalid, expired, and revoked sessions are consistently rejected as `401` + `authentication-failed`.
 
 ## Tests
 

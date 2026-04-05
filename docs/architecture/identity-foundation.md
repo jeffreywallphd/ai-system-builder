@@ -330,6 +330,19 @@ Local login transport now issues durable sessions in the same call path:
 
 - `IdentityAuthBackendApi.loginLocalAccount(...)` performs credential authentication via `LoginLocalAccountUseCase`, then issues/persists an authenticated session and returns session id/token/expiry metadata in the login success contract.
 
+## Authenticated Session Validation Guard (Story 1.3.3)
+
+Authenticated session validation for protected APIs is now implemented through transport guard infrastructure composed with application identity services:
+
+- `IdentityHttpServer` provides bearer-token guard handling for authenticated routes in the HTTP transport layer.
+- `IdentityAuthBackendApi.resolveAuthenticatedSession(...)` composes session-token validation with principal lookup using application ports (`IdentityAuthenticatedSessionService` + `IIdentityLookupRepository`).
+- Guard success passes authenticated context (principal + session metadata) to downstream route handlers without leaking transport concerns into application/domain logic.
+- Guard failures normalize missing, invalid, expired, and revoked sessions to stable client behavior (`401` + `authentication-failed`).
+
+Current protected route:
+
+- `GET /api/v1/identity/session` (requires `Authorization: Bearer <session-token>`)
+
 ## Implemented Test Coverage
 
 Key tests for this foundation:

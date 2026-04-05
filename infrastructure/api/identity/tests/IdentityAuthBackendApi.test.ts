@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { SessionRevocationReasons, revokeSession } from "../../../../src/domain/identity/IdentityDomain";
 import { createIdentityAuthTestHarness } from "./TestIdentityAuthHarness";
 import type {
   IdentityAuthAuditEvent,
@@ -105,6 +106,81 @@ describe("IdentityAuthBackendApi", () => {
 
     expect(missing.ok).toBeFalse();
     expect(missing.error?.code).toBe("authentication-failed");
+  });
+
+  it("resolves authenticated principal context and rejects expired or revoked sessions", async () => {
+    const harness = await createIdentityAuthTestHarness();
+
+    const register = await harness.backendApi.registerLocalAccount({
+      username: "session.validation.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(register.ok).toBeTrue();
+
+    const login = await harness.backendApi.loginLocalAccount({
+      providerSubject: "session.validation.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(login.ok).toBeTrue();
+    if (!login.ok) {
+      throw new Error("Expected login success.");
+    }
+    const loginData = login.data;
+    if (!loginData) {
+      throw new Error("Expected login response payload.");
+    }
+
+    const resolved = await harness.backendApi.resolveAuthenticatedSession({
+      sessionToken: loginData.sessionToken,
+    });
+    expect(resolved.ok).toBeTrue();
+    if (!resolved.ok) {
+      throw new Error("Expected authenticated session resolution success.");
+    }
+    const resolvedData = resolved.data;
+    if (!resolvedData) {
+      throw new Error("Expected resolved authenticated session payload.");
+    }
+    expect(resolvedData.principal.username).toBe("session.validation.user");
+    expect(resolvedData.session.sessionId).toBe(loginData.sessionId);
+
+    harness.adapter.setNow("2026-04-05T18:30:00.000Z");
+    const expired = await harness.backendApi.resolveAuthenticatedSession({
+      sessionToken: loginData.sessionToken,
+    });
+    expect(expired.ok).toBeFalse();
+    expect(expired.error?.code).toBe("authentication-failed");
+
+    const secondLogin = await harness.backendApi.loginLocalAccount({
+      providerSubject: "session.validation.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(secondLogin.ok).toBeTrue();
+    if (!secondLogin.ok) {
+      throw new Error("Expected second login success.");
+    }
+    const secondLoginData = secondLogin.data;
+    if (!secondLoginData) {
+      throw new Error("Expected second login payload.");
+    }
+
+    const session = await harness.adapter.getSessionById(secondLoginData.sessionId);
+    if (!session) {
+      throw new Error("Expected persisted session for revocation test.");
+    }
+
+    await harness.adapter.saveSession(revokeSession(session, SessionRevocationReasons.security, harness.adapter.now()));
+    const revoked = await harness.backendApi.resolveAuthenticatedSession({
+      sessionToken: secondLoginData.sessionToken,
+    });
+    expect(revoked.ok).toBeFalse();
+    expect(revoked.error?.code).toBe("authentication-failed");
   });
 
   it("emits structured redacted observability events for register/login success and failure", async () => {

@@ -1,4 +1,5 @@
 import { IdentityErrorCodes } from "../../../application/contracts/IdentityApplicationContracts";
+import type { IIdentityLookupRepository } from "../../../application/identity/ports/IIdentityLookupRepository";
 import type {
   LoginLocalAccountUseCase,
   LoginLocalAccountErrorCode,
@@ -14,6 +15,8 @@ import {
   type IdentityAuthApiResponse,
   type LoginLocalIdentityApiRequest,
   type LoginLocalIdentityApiResponse,
+  type ResolveAuthenticatedSessionApiRequest,
+  type ResolveAuthenticatedSessionApiResponse,
   type RegisterLocalIdentityApiRequest,
   type RegisterLocalIdentityApiResponse,
 } from "./sdk/PublicIdentityAuthApiContract";
@@ -23,6 +26,7 @@ import { IdentityAuthenticatedSessionService } from "../../../application/identi
 interface IdentityAuthBackendApiDependencies {
   readonly registerLocalAccountUseCase: RegisterLocalAccountUseCase;
   readonly loginLocalAccountUseCase: LoginLocalAccountUseCase;
+  readonly identityLookupRepository: IIdentityLookupRepository;
   readonly authenticatedSessionService: IdentityAuthenticatedSessionService;
   readonly observability?: IdentityAuthObservabilityOptions;
 }
@@ -152,6 +156,53 @@ export class IdentityAuthBackendApi {
     return response;
   }
 
+  public async resolveAuthenticatedSession(
+    request: ResolveAuthenticatedSessionApiRequest,
+  ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>> {
+    const resolved = await this.dependencies.authenticatedSessionService.resolveAuthenticatedSessionByToken({
+      token: request.sessionToken,
+    });
+    if (!resolved.ok) {
+      return Object.freeze({
+        ok: false,
+        error: this.mapSessionValidationError(resolved.error.code),
+      });
+    }
+
+    const principal = await this.dependencies.identityLookupRepository.findUserIdentityById(
+      resolved.value.session.userIdentityId,
+    );
+    if (!principal) {
+      return Object.freeze({
+        ok: false,
+        error: {
+          code: IdentityAuthApiErrorCodes.authenticationFailed,
+          message: "Invalid session.",
+        },
+      });
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        principal: Object.freeze({
+          userIdentityId: principal.id,
+          username: principal.username,
+          email: principal.email,
+          displayName: principal.displayName,
+        }),
+        session: Object.freeze({
+          sessionId: resolved.value.session.id,
+          providerId: resolved.value.session.providerId,
+          providerSubject: resolved.value.session.providerSubject,
+          accessChannel: resolved.value.session.client?.accessChannel,
+          issuedAt: resolved.value.session.issuedAt,
+          expiresAt: resolved.value.session.expiresAt,
+        }),
+      }),
+    });
+  }
+
   private mapRegisterError(code: RegisterLocalAccountErrorCode): IdentityAuthApiError {
     switch (code) {
       case IdentityErrorCodes.duplicateIdentity:
@@ -216,6 +267,23 @@ export class IdentityAuthBackendApi {
         return Object.freeze({
           code: IdentityAuthApiErrorCodes.internal,
           message: "Unexpected identity login error.",
+        });
+    }
+  }
+
+  private mapSessionValidationError(code: string): IdentityAuthApiError {
+    switch (code) {
+      case IdentityErrorCodes.invalidRequest:
+      case IdentityErrorCodes.invalidSessionState:
+      case IdentityErrorCodes.notFound:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.authenticationFailed,
+          message: "Invalid session.",
+        });
+      default:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.internal,
+          message: "Unexpected session validation error.",
         });
     }
   }

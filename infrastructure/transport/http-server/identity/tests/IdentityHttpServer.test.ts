@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
+import { SessionRevocationReasons, revokeSession } from "../../../../../src/domain/identity/IdentityDomain";
 import {
   createIdentityHttpServer,
   type IdentityHttpServerLogEvent,
@@ -38,7 +39,9 @@ afterEach(async () => {
   })));
 });
 
-async function startServer(logger: CapturingLogger): Promise<{ readonly baseUrl: string }> {
+async function startServer(
+  logger: CapturingLogger,
+): Promise<{ readonly baseUrl: string; readonly harness: Awaited<ReturnType<typeof createIdentityAuthTestHarness>> }> {
   const harness = await createIdentityAuthTestHarness();
   const server = createIdentityHttpServer({
     backendApi: harness.backendApi,
@@ -58,6 +61,7 @@ async function startServer(logger: CapturingLogger): Promise<{ readonly baseUrl:
   const address = server.address() as AddressInfo;
   return Object.freeze({
     baseUrl: `http://127.0.0.1:${address.port}`,
+    harness,
   });
 }
 
@@ -170,5 +174,103 @@ describe("IdentityHttpServer", () => {
     const serializedEvents = JSON.stringify(logger.events);
     expect(serializedEvents.includes("LeakySecret!2026")).toBeFalse();
     expect(serializedEvents.includes("[REDACTED]")).toBeTrue();
+  });
+
+  it("protects session endpoints with bearer validation and resolves principal context", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl, harness } = await startServer(logger);
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "guard.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+
+    const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "guard.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(loginResponse.status).toBe(200);
+    const loginBody = await loginResponse.json();
+
+    const missingToken = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      method: "GET",
+    });
+    expect(missingToken.status).toBe(401);
+    const missingTokenBody = await missingToken.json();
+    expect(missingTokenBody.ok).toBe(false);
+    expect(missingTokenBody.error.code).toBe("authentication-failed");
+
+    const validSessionResponse = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+    });
+    expect(validSessionResponse.status).toBe(200);
+    const validSessionBody = await validSessionResponse.json();
+    expect(validSessionBody.ok).toBe(true);
+    expect(validSessionBody.data.principal.username).toBe("guard.user");
+    expect(validSessionBody.data.session.sessionId).toBe(loginBody.data.sessionId);
+
+    const issuedSession = await harness.adapter.getSessionById(loginBody.data.sessionId);
+    if (!issuedSession) {
+      throw new Error("Expected persisted session for protected endpoint test.");
+    }
+
+    await harness.adapter.saveSession(revokeSession(issuedSession, SessionRevocationReasons.security, harness.adapter.now()));
+    const revokedResponse = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+    });
+    expect(revokedResponse.status).toBe(401);
+    const revokedBody = await revokedResponse.json();
+    expect(revokedBody.ok).toBe(false);
+    expect(revokedBody.error.code).toBe("authentication-failed");
+
+    const secondLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "guard.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(secondLoginResponse.status).toBe(200);
+    const secondLoginBody = await secondLoginResponse.json();
+
+    harness.adapter.setNow("2026-04-05T18:30:00.000Z");
+    const expiredResponse = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${secondLoginBody.data.sessionToken}`,
+      },
+    });
+    expect(expiredResponse.status).toBe(401);
+    const expiredBody = await expiredResponse.json();
+    expect(expiredBody.ok).toBe(false);
+    expect(expiredBody.error.code).toBe("authentication-failed");
   });
 });

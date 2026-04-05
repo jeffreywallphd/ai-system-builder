@@ -5,8 +5,10 @@ import { z } from "zod";
 import type { IdentityAuthBackendApi } from "../../../api/identity/IdentityAuthBackendApi";
 import {
   IdentityAuthApiErrorCodes,
+  type AuthenticatedIdentityPrincipalApiResponse,
   type IdentityAuthApiResponse,
   type LoginLocalIdentityApiRequest,
+  type ResolveAuthenticatedSessionApiResponse,
   type RegisterLocalIdentityApiRequest,
 } from "../../../api/identity/sdk/PublicIdentityAuthApiContract";
 import { redactSensitiveAuthPayload } from "../../../api/identity/IdentityAuthObservability";
@@ -60,6 +62,12 @@ export interface IdentityHttpServerOptions {
   readonly maxBodyBytes?: number;
 }
 
+interface AuthenticatedRequestContext {
+  readonly principal: AuthenticatedIdentityPrincipalApiResponse;
+  readonly session: ResolveAuthenticatedSessionApiResponse["session"];
+  readonly sessionToken: string;
+}
+
 export function createIdentityHttpServer(options: IdentityHttpServerOptions): Server {
   const logger = options.logger ?? new ConsoleIdentityHttpServerLogger();
   const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
@@ -75,30 +83,37 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
     }));
 
     try {
-      if (request.method !== "POST") {
-        writeJson(response, 404, {
-          ok: false,
-          error: {
-            code: IdentityAuthApiErrorCodes.invalidRequest,
-            message: "Route not found.",
-          },
-        });
-        logger.warn(Object.freeze({
-          event: "identity-http.request.not-found",
-          requestId,
-          method: request.method,
-          path,
-          statusCode: 404,
-        }));
-        return;
-      }
-
-      if (path === "/api/v1/identity/register") {
+      if (request.method === "POST" && path === "/api/v1/identity/register") {
         await handleRegister(request, response, requestId, options.backendApi, logger, maxBodyBytes);
         return;
       }
-      if (path === "/api/v1/identity/login") {
+      if (request.method === "POST" && path === "/api/v1/identity/login") {
         await handleLogin(request, response, requestId, options.backendApi, logger, maxBodyBytes);
+        return;
+      }
+      if (request.method === "GET" && path === "/api/v1/identity/session") {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          async (context) => {
+            const responseBody: IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse> = Object.freeze({
+              ok: true,
+              data: Object.freeze({
+                principal: context.principal,
+                session: context.session,
+              }),
+            });
+            writeJson(response, 200, responseBody);
+            logResponse(logger, requestId, request, 200, Object.freeze({
+              principal: context.principal,
+              session: context.session,
+              sessionToken: context.sessionToken,
+            }), responseBody);
+          },
+        );
         return;
       }
 
@@ -162,6 +177,49 @@ async function handleRegister(
   const statusCode = mapStatusCode(apiResponse);
   writeJson(response, statusCode, apiResponse);
   logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+}
+
+async function requireAuthenticatedSession(
+  request: IncomingMessage,
+  response: ServerResponse,
+  requestId: string,
+  backendApi: IdentityAuthBackendApi,
+  logger: IdentityHttpServerLogger,
+  onAuthenticated: (context: AuthenticatedRequestContext) => Promise<void>,
+): Promise<void> {
+  const sessionToken = extractBearerToken(request.headers.authorization);
+  if (!sessionToken) {
+    const authFailure = buildAuthenticationFailedResponse("Missing Authorization bearer token.");
+    writeJson(response, 401, authFailure);
+    logResponse(logger, requestId, request, 401, Object.freeze({}), authFailure);
+    return;
+  }
+
+  const resolvedSession = await backendApi.resolveAuthenticatedSession({ sessionToken });
+  if (!resolvedSession.ok) {
+    const statusCode = mapStatusCode(resolvedSession);
+    writeJson(response, statusCode, resolvedSession);
+    logResponse(logger, requestId, request, statusCode, Object.freeze({ sessionToken }), resolvedSession);
+    return;
+  }
+  if (!resolvedSession.data) {
+    const internalFailure: IdentityAuthApiResponse<never> = Object.freeze({
+      ok: false,
+      error: {
+        code: IdentityAuthApiErrorCodes.internal,
+        message: "Session resolution returned no payload.",
+      },
+    });
+    writeJson(response, 500, internalFailure);
+    logResponse(logger, requestId, request, 500, Object.freeze({ sessionToken }), internalFailure);
+    return;
+  }
+
+  await onAuthenticated(Object.freeze({
+    principal: resolvedSession.data.principal,
+    session: resolvedSession.data.session,
+    sessionToken,
+  }));
 }
 
 async function handleLogin(
@@ -299,6 +357,35 @@ function mapStatusCode(response: IdentityAuthApiResponse<unknown>): number {
     default:
       return 500;
   }
+}
+
+function extractBearerToken(authorizationHeader: string | string[] | undefined): string | undefined {
+  if (!authorizationHeader) {
+    return undefined;
+  }
+
+  const value = Array.isArray(authorizationHeader) ? authorizationHeader[0] : authorizationHeader;
+  if (!value) {
+    return undefined;
+  }
+
+  const match = value.match(/^\s*Bearer\s+(.+)\s*$/i);
+  if (!match) {
+    return undefined;
+  }
+
+  const token = match[1]?.trim();
+  return token ? token : undefined;
+}
+
+function buildAuthenticationFailedResponse(message: string): IdentityAuthApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: IdentityAuthApiErrorCodes.authenticationFailed,
+      message,
+    },
+  });
 }
 
 function logResponse<TRequest extends Record<string, unknown>>(

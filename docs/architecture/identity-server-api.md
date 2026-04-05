@@ -6,6 +6,7 @@ This note documents the authoritative HTTP server endpoints for local identity r
 
 - `POST /api/v1/identity/register`
 - `POST /api/v1/identity/login`
+- `GET /api/v1/identity/session` (authenticated)
 
 Implemented transport and host composition:
 
@@ -56,6 +57,14 @@ UI entry points now consume this same HTTP surface through renderer identity ada
 }
 ```
 
+### Authenticated session resolve request
+
+`GET /api/v1/identity/session`
+
+Requires:
+
+- `Authorization: Bearer <session-token>`
+
 Validation is performed with `zod` at the HTTP transport boundary.
 
 ## Response contracts
@@ -102,6 +111,37 @@ All responses use one envelope:
   }
 }
 ```
+
+### Authenticated session success
+
+```json
+{
+  "ok": true,
+  "data": {
+    "principal": {
+      "userIdentityId": "user-identity:...",
+      "username": "normalized-username",
+      "email": "user@example.com",
+      "displayName": "optional"
+    },
+    "session": {
+      "sessionId": "identity-session:...",
+      "providerId": "provider:local-password",
+      "providerSubject": "normalized-subject",
+      "accessChannel": "thin-client",
+      "issuedAt": "2026-04-04T18:00:00.000Z",
+      "expiresAt": "2026-04-05T06:00:00.000Z"
+    }
+  }
+}
+```
+
+Protected endpoint behavior:
+
+- `IdentityHttpServer` now includes authenticated-session guard infrastructure for bearer-token routes.
+- The guard validates token format and resolves session/principal through `IdentityAuthBackendApi.resolveAuthenticatedSession(...)`.
+- On success, the guard passes authenticated principal/session context into downstream handlers.
+- Missing, invalid, expired, and revoked sessions are rejected consistently with `401` + `authentication-failed`.
 
 Session issuance notes:
 
