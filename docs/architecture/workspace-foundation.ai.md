@@ -9,6 +9,14 @@ Implementation-truth baseline for workspace tenancy domain contracts introduced 
 - `src/shared/workspaces/WorkspaceOwnership.ts`
 - `src/domain/workspaces/WorkspaceDomain.ts`
 - `src/domain/workspaces/tests/WorkspaceDomain.test.ts`
+- `src/shared/contracts/workspaces/WorkspaceRepositoryContracts.ts`
+- `src/application/workspaces/ports/IWorkspaceRepository.ts`
+- `src/application/workspaces/ports/IWorkspaceMembershipRepository.ts`
+- `src/application/workspaces/ports/IWorkspaceRoleAssignmentRepository.ts`
+- `src/application/workspaces/ports/IWorkspaceInvitationRepository.ts`
+- `src/application/workspaces/ports/IWorkspaceAuthorizationReadRepository.ts`
+- `src/application/workspaces/ports/WorkspaceRepositoryPorts.ts`
+- `src/application/workspaces/tests/WorkspaceRepositoryPortsContracts.test.ts`
 
 ## Aggregates and value contracts
 
@@ -58,5 +66,11 @@ Helpers support creation, visibility updates, and ownership transfer with invari
 
 - Invariants live in domain code, not presentation validation.
 - Contracts use existing identity-linked terminology (`userIdentityId`, `workspaceId`).
-- This slice is foundation-only: no repository or transport adapters added yet.
+- Story 3.1.2 adds application repository seams only (no infrastructure adapters):
+  - workspace aggregate lookup/persistence,
+  - workspace membership lookup/persistence,
+  - workspace role-assignment lookup/persistence + active-role counting,
+  - workspace invitation lookup/persistence + pending-by-email lookup,
+  - workspace-scoped authorization read snapshot projection.
+- Shared workspace contract DTOs now define explicit create/update/query/list/mutation payloads and action attribution context for audit-friendly actor metadata.
 
