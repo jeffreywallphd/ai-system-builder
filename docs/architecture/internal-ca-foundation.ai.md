@@ -7,6 +7,7 @@
 - Adds shared DTO/schema contracts for CA and certificate records.
 - Adds focused domain/port/DTO/schema tests for the new contract surface.
 - Adds secure CA startup bootstrap validation seams (Story 6.1.3) for authoritative-host startup.
+- Adds protected secret storage/loading seams for CA root and signing assets (Story 6.1.4).
 
 ## Main artifacts to cite
 
@@ -19,8 +20,12 @@
 - `src/application/security/ports/CertificateAuthorityPorts.ts`
 - `src/application/security/ports/ICertificateAuthorityBootstrapConfigurationProvider.ts`
 - `src/application/security/ports/ICertificateAuthorityBootstrapSecretService.ts`
+- `src/application/security/ports/ICertificateAuthorityRootMaterialStorage.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
+- `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
+- `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
+- `src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage.ts`
 - `hosts/server/IdentityServerHost.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
 - `src/shared/schemas/security/CertificateAuthoritySchemaContracts.ts`
@@ -40,6 +45,8 @@
 - No infrastructure signing, key storage, or transport handlers are implemented in this story.
 - Later stories should implement concrete bootstrap, issuance, revocation, rotation, and distribution behavior behind these ports.
 - Host startup composes CA bootstrap checks through application use cases and adapters, not host-level raw secret/key handling.
+- Startup secret metadata checks support `env:` and `secret-store:` references.
+- Protected-store configuration is fail-closed when partially configured or unavailable.
 
 ## Story 6.1.3 startup-state model
 
@@ -60,6 +67,8 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - Host fail-closed startup coverage: `hosts/server/tests/IdentityServerHost.test.ts`
 - DTO helper coverage: `src/shared/dto/security/tests/CertificateAuthorityDtos.test.ts`
 - schema parse/validation behavior: `src/shared/schemas/security/tests/CertificateAuthoritySchemaContracts.test.ts`
+- protected-secret store coverage: `src/infrastructure/security/secrets/tests/FileSystemProtectedSecretStore.test.ts`
+- protected CA material save/load coverage: `src/infrastructure/security/ca/tests/ProtectedCertificateAuthorityRootMaterialStorage.test.ts`
 
 ## Follow-on note
 

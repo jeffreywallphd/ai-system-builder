@@ -1,7 +1,10 @@
 import { CertificateAuthorityStatuses } from "../../../domain/security/CertificateAuthorityDomain";
 import type { CertificateAuthorityBootstrapConfiguration } from "../ports/ICertificateAuthorityBootstrapConfigurationProvider";
 import type { ICertificateAuthorityBootstrapConfigurationProvider } from "../ports/ICertificateAuthorityBootstrapConfigurationProvider";
-import type { ICertificateAuthorityBootstrapSecretService } from "../ports/ICertificateAuthorityBootstrapSecretService";
+import type {
+  CertificateAuthoritySecretMetadata,
+  ICertificateAuthorityBootstrapSecretService,
+} from "../ports/ICertificateAuthorityBootstrapSecretService";
 import type { ICertificateAuthorityRootPersistenceRepository } from "../ports/ICertificateAuthorityRootPersistenceRepository";
 import type { ITrustMaterialReferencePersistenceRepository } from "../ports/ITrustMaterialReferencePersistenceRepository";
 
@@ -25,6 +28,7 @@ export const CertificateAuthorityStartupDiagnosticCodes = Object.freeze({
   authoritySecretMissing: "authority-secret-missing",
   authorityTrustMaterialMissing: "authority-trust-material-missing",
   authorityTrustMaterialKindMismatch: "authority-trust-material-kind-mismatch",
+  authoritySecretSourceUnavailable: "authority-secret-source-unavailable",
   authorityCompromised: "authority-compromised",
   authorityRetired: "authority-retired",
   authorityConfigurationMismatch: "authority-configuration-mismatch",
@@ -132,12 +136,28 @@ export class ResolveCertificateAuthorityStartupStateUseCase {
       return toResult(CertificateAuthorityStartupStates.invalid, configuration.source, diagnostics, configuration.certificateAuthorityId);
     }
 
-    const rootCertificateSecret = await this.dependencies.secretService.getSecretMetadata(
-      configuration.rootCertificateSecretRef as string,
-    );
-    const rootPrivateKeySecret = await this.dependencies.secretService.getSecretMetadata(
-      configuration.rootPrivateKeySecretRef as string,
-    );
+    let rootCertificateSecret: CertificateAuthoritySecretMetadata;
+    let rootPrivateKeySecret: CertificateAuthoritySecretMetadata;
+    try {
+      rootCertificateSecret = await this.dependencies.secretService.getSecretMetadata(
+        configuration.rootCertificateSecretRef as string,
+      );
+      rootPrivateKeySecret = await this.dependencies.secretService.getSecretMetadata(
+        configuration.rootPrivateKeySecretRef as string,
+      );
+    } catch (error) {
+      diagnostics.push(createDiagnostic({
+        code: CertificateAuthorityStartupDiagnosticCodes.authoritySecretSourceUnavailable,
+        source: "secret",
+        message: `Root CA secret source is unavailable: ${toErrorMessage(error)}`,
+      }));
+      return toResult(
+        CertificateAuthorityStartupStates.invalid,
+        configuration.source,
+        diagnostics,
+        configuration.certificateAuthorityId,
+      );
+    }
 
     const authority = await this.dependencies.certificateAuthorityRepository.findCertificateAuthorityById(
       configuration.certificateAuthorityId,
@@ -255,6 +275,13 @@ export class ResolveCertificateAuthorityStartupStateUseCase {
       authority.certificateAuthorityId,
     );
   }
+}
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  return "unknown secret source failure";
 }
 
 export class CertificateAuthorityStartupValidationError extends Error {

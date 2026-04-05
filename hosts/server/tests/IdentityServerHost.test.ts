@@ -380,4 +380,25 @@ describe("IdentityServerHost", () => {
 
     rmSync(tempDirectory, { recursive: true, force: true });
   });
+
+  it("fails closed when protected CA secret refs are configured but protected storage is unavailable", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-ca-protected-secret-unavailable-"));
+    const databasePath = join(tempDirectory, "identity-ca-protected-secret-unavailable.sqlite");
+    await expect(startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+      env: {
+        AI_LOOM_INTERNAL_CA_ID: "ca:internal:root:v1",
+        AI_LOOM_INTERNAL_CA_ROOT_CERT_MATERIAL_REF: "trust:ca:cert:v1",
+        AI_LOOM_INTERNAL_CA_ROOT_KEY_MATERIAL_REF: "trust:ca:key:v1",
+        AI_LOOM_INTERNAL_CA_ROOT_CERT_SECRET_REF: "secret-store:internal-ca:root-cert",
+        AI_LOOM_INTERNAL_CA_ROOT_KEY_SECRET_REF: "secret-store:internal-ca:root-key",
+      },
+    })).rejects.toThrow("Internal CA startup validation failed");
+
+    rmSync(tempDirectory, { recursive: true, force: true });
+  });
 });

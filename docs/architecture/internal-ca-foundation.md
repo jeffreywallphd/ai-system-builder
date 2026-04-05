@@ -1,6 +1,6 @@
 # Internal CA Foundation
 
-This note documents Story 6.1.1 and Story 6.1.3 (Feature 6 / Epic 6.1): the internal certificate-authority domain language, application service boundaries, and secure startup bootstrap validation path for root CA lifecycle, certificate issuance/revocation, rotation metadata, trust material references, and host startup safety checks.
+This note documents Story 6.1.1, Story 6.1.3, and Story 6.1.4 (Feature 6 / Epic 6.1): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, and protected storage/loading for CA root materials.
 
 ## Canonical artifacts
 
@@ -13,12 +13,18 @@ This note documents Story 6.1.1 and Story 6.1.3 (Feature 6 / Epic 6.1): the inte
 - `src/application/security/ports/ITrustMaterialDistributionPort.ts`
 - `src/application/security/ports/ICertificateAuthorityBootstrapConfigurationProvider.ts`
 - `src/application/security/ports/ICertificateAuthorityBootstrapSecretService.ts`
+- `src/application/security/ports/ICertificateAuthorityRootMaterialStorage.ts`
 - `src/application/security/ports/CertificateAuthorityPorts.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
 - `src/application/security/tests/ResolveCertificateAuthorityStartupStateUseCase.test.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
+- `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
+- `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
+- `src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage.ts`
 - `src/infrastructure/security/tests/InternalCertificateAuthorityBootstrapEnvironmentAdapter.test.ts`
+- `src/infrastructure/security/secrets/tests/FileSystemProtectedSecretStore.test.ts`
+- `src/infrastructure/security/ca/tests/ProtectedCertificateAuthorityRootMaterialStorage.test.ts`
 - `hosts/server/IdentityServerHost.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
@@ -71,9 +77,29 @@ Startup validation now uses an application use case (`ResolveCertificateAuthorit
 `InternalCertificateAuthorityBootstrapEnvironmentAdapter` provides production-oriented environment-backed adapters for:
 
 - approved config loading (`AI_LOOM_INTERNAL_CA_*` keys)
-- secret metadata checks via explicit `env:<VARIABLE_NAME>` references
+- secret metadata checks via explicit `env:<VARIABLE_NAME>` or `secret-store:<ID>` references
 
-The secret service seam validates presence only and intentionally keeps raw key handling outside host composition.
+The secret service seam validates presence only and intentionally keeps raw key handling outside host composition. When protected storage is configured, startup checks fail closed if the protected store is unavailable.
+
+## Story 6.1.4 protected CA material storage
+
+Story 6.1.4 adds a concrete protected-storage pathway for CA root and signing materials:
+
+- `ProtectedCertificateAuthorityRootMaterialStorage` persists/loads CA materials through protected interfaces only.
+- `FileSystemProtectedSecretStore` stores encrypted-at-rest secret records keyed by `secret-store:` references.
+- `ScopedAesGcmEncryptionService` enforces AES-256-GCM envelope encryption with key-scope support for future key hierarchy changes.
+- logging/events expose only redacted secret references.
+
+### Protected storage environment configuration
+
+- `AI_LOOM_INTERNAL_CA_PROTECTED_SECRETS_DIRECTORY`
+  - required when protected secret storage is enabled
+- `AI_LOOM_INTERNAL_CA_PROTECTED_SECRETS_KEY`
+  - default AES-256 key (base64 or 64-char hex)
+- `AI_LOOM_INTERNAL_CA_PROTECTED_SECRETS_KEYS_BY_SCOPE`
+  - optional scoped keys as comma-separated `<scope>:<key>` entries
+
+Configuration is fail-closed: partial protected-storage configuration throws during startup validation path.
 
 ### Failure mode expectations
 

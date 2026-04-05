@@ -87,6 +87,8 @@ web_modules/
 *.jks
 *.kdbx
 secrets/
+!src/infrastructure/security/secrets/
+!src/infrastructure/security/secrets/**
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
