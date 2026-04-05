@@ -40,6 +40,7 @@ import { UpdateTrustedDeviceDisplayNameUseCase } from "../../src/application/ide
 import { InitiateTrustedDevicePairingUseCase } from "../../src/application/identity/use-cases/InitiateTrustedDevicePairingUseCase";
 import { ValidateTrustedDevicePairingUseCase } from "../../src/application/identity/use-cases/ValidateTrustedDevicePairingUseCase";
 import { CompleteTrustedDevicePairingUseCase } from "../../src/application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
+import { SqliteIdentityLifecycleEventPublisher } from "../../infrastructure/filesystem/identity/SqliteIdentityLifecycleEventPublisher";
 import {
   createIdentityHttpServer,
   type IdentityHttpServerLogger,
@@ -96,18 +97,24 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const sessionPolicies = options.sessionPolicies
     ?? IdentitySessionPolicyConfig.fromEnv(env).policies;
   const sessionTrustPolicies = IdentitySessionTrustPolicyConfig.fromEnv(env).policies;
-  const eventPublisher = options.eventPublisher;
+  const eventPublisher = options.eventPublisher ?? new SqliteIdentityLifecycleEventPublisher(path.resolve(options.databasePath));
   const sessionTrustService = new TrustedDeviceSessionTrustService({
     trustedDeviceRepository,
     policies: sessionTrustPolicies,
   });
   const trustedDeviceAdminUserIdentityIds = parseOptionalCsvList(env.IDENTITY_TRUSTED_DEVICE_ADMIN_USER_IDS);
-  const trustedDeviceManagementService = new TrustedDeviceManagementService(trustedDeviceRepository, idGenerator, clock);
+  const trustedDeviceManagementService = new TrustedDeviceManagementService(
+    trustedDeviceRepository,
+    idGenerator,
+    clock,
+    eventPublisher,
+  );
   const trustedDevicePairingService = new TrustedDevicePairingService({
     trustedDeviceRepository,
     pairingRepository: trustedDeviceRepository,
     idGenerator,
     clock,
+    eventPublisher,
   });
   const sessionLifecycleService = new IdentitySessionLifecycleService({
     sessionRepository: repository,
@@ -233,6 +240,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       server.close((error) => {
         repository.dispose();
         trustedDeviceRepository.dispose();
+        const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
+        if (typeof disposablePublisher.dispose === "function") {
+          disposablePublisher.dispose();
+        }
         if (error) {
           reject(error);
           return;

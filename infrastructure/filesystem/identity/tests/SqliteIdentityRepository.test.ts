@@ -49,7 +49,7 @@ describe("SqliteIdentityRepository", () => {
     const db = openSqliteCompatDatabase(databasePath);
     const migrationVersion = db.prepare("SELECT MAX(version) AS version FROM identity_repository_migrations")
       .get() as { version?: number };
-    expect(migrationVersion.version).toBe(6);
+    expect(migrationVersion.version).toBe(7);
 
     const tableRows = db.prepare(`
       SELECT name
@@ -62,7 +62,8 @@ describe("SqliteIdentityRepository", () => {
           'identity_user_provider_links',
           'identity_credential_material_records',
           'identity_sessions',
-          'identity_session_token_material'
+          'identity_session_token_material',
+          'identity_lifecycle_audit_events'
         )
       ORDER BY name ASC
     `).all() as Array<{ name: string }>;
@@ -70,6 +71,7 @@ describe("SqliteIdentityRepository", () => {
       "identity_auth_providers",
       "identity_credential_material_records",
       "identity_credential_policies",
+      "identity_lifecycle_audit_events",
       "identity_session_token_material",
       "identity_sessions",
       "identity_user_identities",

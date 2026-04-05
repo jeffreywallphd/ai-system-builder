@@ -1,4 +1,4 @@
-export const IDENTITY_PERSISTENCE_SCHEMA_VERSION = 6;
+export const IDENTITY_PERSISTENCE_SCHEMA_VERSION = 7;
 
 export const IDENTITY_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -312,5 +312,25 @@ export const IDENTITY_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, st
 
     ALTER TABLE identity_sessions
       ADD COLUMN client_device_trust_invalidation_reasons_json TEXT;
+  `],
+  [7, `
+    CREATE TABLE IF NOT EXISTS identity_lifecycle_audit_events (
+      event_id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      occurred_at TEXT NOT NULL,
+      user_identity_id TEXT,
+      trusted_device_id TEXT,
+      session_id TEXT,
+      event_json TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS identity_lifecycle_audit_events_recent_idx
+      ON identity_lifecycle_audit_events(occurred_at DESC, event_id DESC);
+    CREATE INDEX IF NOT EXISTS identity_lifecycle_audit_events_user_idx
+      ON identity_lifecycle_audit_events(user_identity_id, occurred_at DESC, event_id DESC);
+    CREATE INDEX IF NOT EXISTS identity_lifecycle_audit_events_device_idx
+      ON identity_lifecycle_audit_events(trusted_device_id, occurred_at DESC, event_id DESC);
+    CREATE INDEX IF NOT EXISTS identity_lifecycle_audit_events_session_idx
+      ON identity_lifecycle_audit_events(session_id, occurred_at DESC, event_id DESC);
   `],
 ]);

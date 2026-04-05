@@ -433,13 +433,15 @@ Authentication flow observability is centralized in:
 - `infrastructure/api/identity/IdentityAuthRedaction.ts`
 - `infrastructure/api/identity/IdentityAuthResponseSerializers.ts`
 
-`IdentityAuthBackendApi` emits structured registration/login completion events through this seam for both success and failure outcomes. The observability seam includes:
+`IdentityAuthBackendApi` emits structured auth/admin/trusted-device API completion events through this seam for both success and failure outcomes. The observability seam includes:
 
 - centralized recursive payload and freeform-string redaction (`redactSensitiveAuthPayload`, `redactSensitiveText`) shared across backend and HTTP transport logs
 - structured flow events (`identity-auth.local-register.completed`, `identity-auth.local-login.completed`)
 - structured flow events now include administration flows (`identity-auth.admin-accounts-list.completed`, `identity-auth.admin-account-get.completed`, `identity-auth.admin-account-status-set.completed`)
-- `IdentityAuthAuditEventSink` hook interface for future audit/event-service integration without changing auth flow orchestration
+- structured flow events now include trusted-device flows (self-service list/get/revoke/rename, pairing initiate/validate/complete, and admin trusted-device list/revoke)
+- `IdentityAuthAuditEventSink` hook interface for audit/event-service integration without changing auth flow orchestration
 - safe-by-default response serialization in `IdentityAuthResponseSerializers.ts` so transport payloads are allowlist-mapped instead of use-case object pass-through
+- trusted-device lifecycle governance audit events are additionally emitted through the application lifecycle-event publisher seam and persisted by default in host composition via `SqliteIdentityLifecycleEventPublisher`
 
 Redacted keys include:
 

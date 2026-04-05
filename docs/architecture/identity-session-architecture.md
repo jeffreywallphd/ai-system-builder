@@ -248,6 +248,7 @@ Current behavior:
 - `IdentityServerHost` now wires `TrustedDeviceSessionTrustService` as the default `IIdentitySessionTrustEvaluator`
 - bound sessions fail closed at validation when trusted-device state is missing, revoked, expired, or mismatched
 - trust-denied validation now lazily invalidates the current active session by revoking it (`security`) and invalidating token material immediately
+- trust-denied runtime invalidation now emits a lifecycle audit event (`identity.session.trust-invalidated`) with session/user/device linkage and invalidation-reason metadata
 - trust-denied validation failures surface a distinct trust-failure API path (`error.trustFailure.reason`, `error.trustFailure.invalidationReasons`) for client handling and observability
 - trusted-session trust markers are material-aware; trust-marker mismatch against current trusted-device material is treated as stale/mismatched trust and rejected
 - login/session issuance resolves trust from repository state and supports trust posture selection (`allow-untrusted`, `allow-pairing`, `require-trusted`)

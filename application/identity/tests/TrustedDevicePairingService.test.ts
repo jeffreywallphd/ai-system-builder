@@ -31,6 +31,7 @@ import {
   type TrustedDeviceRevocationRequest,
 } from "../../contracts/IdentityApplicationContracts";
 import { IdentityErrorCodes, identityFailure, identitySuccess } from "../../contracts/IdentityApplicationContracts";
+import { IdentityLifecycleEventTypes, type IdentityLifecycleEvent } from "../../contracts/IdentityLifecycleEventContracts";
 import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
 import type { ITrustedDevicePairingRepository } from "../ports/ITrustedDevicePairingRepository";
@@ -172,15 +173,69 @@ function hashPairingToken(value: string): string {
 }
 
 describe("TrustedDevicePairingService completion", () => {
-  it("completes pairing and persists trusted-device trust material", async () => {
+  it("emits audit event on pairing initiation", async () => {
     const adapter = new InMemoryTrustedDeviceAdapter();
     const clock = new FixedClock();
+    const events: IdentityLifecycleEvent[] = [];
     const service = new TrustedDevicePairingService({
       trustedDeviceRepository: adapter,
       pairingRepository: adapter,
       idGenerator: new SequentialIdGenerator(),
       clock,
       pairingTokenHasher: hashPairingToken,
+      eventPublisher: {
+        publish: async (event) => {
+          events.push(event);
+        },
+      },
+    });
+
+    await adapter.createTrustedDevice(createTrustedDevice({
+      id: "trusted-device:initiate",
+      userIdentityId: "user:initiate",
+      displayName: "Initiate Device",
+      fingerprint: createDeviceFingerprint({
+        algorithm: DeviceFingerprintAlgorithms.sha256,
+        value: "fingerprint:initiate",
+      }),
+      pairingMethod: DevicePairingMethods.oneTimeCode,
+      trustStatus: DeviceTrustStatuses.pendingPairing,
+      registeredAt: "2026-04-04T11:58:00.000Z",
+      updatedAt: "2026-04-04T11:58:00.000Z",
+    }));
+
+    const initiated = await service.initiatePairing({
+      trustedDeviceId: "trusted-device:initiate",
+      userIdentityId: "user:initiate",
+      artifactType: PairingTokenArtifactTypes.oneTimeCode,
+      actorBinding: {
+        scope: PairingTokenActorScopes.sameUser,
+        userIdentityId: "user:initiate",
+      },
+      issuance: {},
+      maxValidationAttempts: 3,
+      expiresAt: "2026-04-04T12:30:00.000Z",
+    });
+
+    expect(initiated.pairingToken.pairingTokenId).toBeDefined();
+    expect(events.some((event) => event.eventType === IdentityLifecycleEventTypes.trustedDevicePairingInitiated)).toBeTrue();
+  });
+
+  it("completes pairing and persists trusted-device trust material", async () => {
+    const adapter = new InMemoryTrustedDeviceAdapter();
+    const clock = new FixedClock();
+    const events: IdentityLifecycleEvent[] = [];
+    const service = new TrustedDevicePairingService({
+      trustedDeviceRepository: adapter,
+      pairingRepository: adapter,
+      idGenerator: new SequentialIdGenerator(),
+      clock,
+      pairingTokenHasher: hashPairingToken,
+      eventPublisher: {
+        publish: async (event) => {
+          events.push(event);
+        },
+      },
     });
 
     const trustedDevice = createTrustedDevice({
@@ -253,18 +308,26 @@ describe("TrustedDevicePairingService completion", () => {
     expect(completed.trustedDevice.trustStatus).toBe(DeviceTrustStatuses.trusted);
     expect(completed.trustedDevice.trustMaterialRef?.materialId).toBe("material:alpha");
     expect(completed.pairingSession.trustMaterialRegistration?.pinReference).toBe("pin:alpha");
+    expect(events.some((event) => event.eventType === IdentityLifecycleEventTypes.trustedDevicePairingCompleted)).toBeTrue();
+    expect(events.some((event) => event.eventType === IdentityLifecycleEventTypes.trustedDeviceTrustStatusChanged)).toBeTrue();
   });
 
   it("rejects expired pairing artifacts and does not trust the device", async () => {
     const adapter = new InMemoryTrustedDeviceAdapter();
     const clock = new FixedClock();
     clock.setNow("2026-04-04T12:45:00.000Z");
+    const events: IdentityLifecycleEvent[] = [];
     const service = new TrustedDevicePairingService({
       trustedDeviceRepository: adapter,
       pairingRepository: adapter,
       idGenerator: new SequentialIdGenerator(),
       clock,
       pairingTokenHasher: hashPairingToken,
+      eventPublisher: {
+        publish: async (event) => {
+          events.push(event);
+        },
+      },
     });
 
     await adapter.createTrustedDevice(createTrustedDevice({
@@ -321,6 +384,10 @@ describe("TrustedDevicePairingService completion", () => {
 
     const persistedSession = await adapter.getPairingSessionById("pairing-session:expired");
     expect(persistedSession?.status).toBe(PairingSessionStatuses.expired);
+    expect(events.some((event) => (
+      event.eventType === IdentityLifecycleEventTypes.trustedDevicePairingFailed
+      && (event.payload as { failureReason?: string }).failureReason === "expired"
+    ))).toBeTrue();
   });
 
   it("treats repeated completion as idempotent and does not duplicate state", async () => {

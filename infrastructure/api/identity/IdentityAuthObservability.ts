@@ -11,7 +11,16 @@ export interface IdentityAuthObservabilityLogEvent {
     | "session-revoke"
     | "admin-accounts-list"
     | "admin-account-get"
-    | "admin-account-status-set";
+    | "admin-account-status-set"
+    | "trusted-device.list"
+    | "trusted-device.get"
+    | "trusted-device.revoke"
+    | "trusted-device.display-name.update"
+    | "trusted-device.pairing.initiate"
+    | "trusted-device.pairing.validate"
+    | "trusted-device.pairing.complete"
+    | "admin-trusted-device.list"
+    | "admin-trusted-device.revoke";
   readonly outcome: "success" | "failure";
   readonly statusCode?: number;
   readonly requestId?: string;
@@ -33,7 +42,16 @@ export interface IdentityAuthAuditEvent {
     | "identity-auth.session.revoke"
     | "identity-auth.admin.accounts.list"
     | "identity-auth.admin.account.get"
-    | "identity-auth.admin.account.status.set";
+    | "identity-auth.admin.account.status.set"
+    | "identity-auth.trusted-device.list"
+    | "identity-auth.trusted-device.get"
+    | "identity-auth.trusted-device.revoke"
+    | "identity-auth.trusted-device.display-name.update"
+    | "identity-auth.trusted-device.pairing.initiate"
+    | "identity-auth.trusted-device.pairing.validate"
+    | "identity-auth.trusted-device.pairing.complete"
+    | "identity-auth.admin.trusted-device.list"
+    | "identity-auth.admin.trusted-device.revoke";
   readonly outcome: "success" | "failure";
   readonly occurredAt: string;
   readonly requestId?: string;
@@ -58,7 +76,16 @@ interface RecordApiOutcomeInput {
     | "session-revoke"
     | "admin-accounts-list"
     | "admin-account-get"
-    | "admin-account-status-set";
+    | "admin-account-status-set"
+    | "trusted-device.list"
+    | "trusted-device.get"
+    | "trusted-device.revoke"
+    | "trusted-device.display-name.update"
+    | "trusted-device.pairing.initiate"
+    | "trusted-device.pairing.validate"
+    | "trusted-device.pairing.complete"
+    | "admin-trusted-device.list"
+    | "admin-trusted-device.revoke";
   readonly request: Record<string, unknown>;
   readonly response: IdentityAuthApiResponse<unknown>;
   readonly statusCode?: number;
@@ -148,6 +175,24 @@ function toAuditType(flow: RecordApiOutcomeInput["flow"]): IdentityAuthAuditEven
       return "identity-auth.admin.account.get";
     case "admin-account-status-set":
       return "identity-auth.admin.account.status.set";
+    case "trusted-device.list":
+      return "identity-auth.trusted-device.list";
+    case "trusted-device.get":
+      return "identity-auth.trusted-device.get";
+    case "trusted-device.revoke":
+      return "identity-auth.trusted-device.revoke";
+    case "trusted-device.display-name.update":
+      return "identity-auth.trusted-device.display-name.update";
+    case "trusted-device.pairing.initiate":
+      return "identity-auth.trusted-device.pairing.initiate";
+    case "trusted-device.pairing.validate":
+      return "identity-auth.trusted-device.pairing.validate";
+    case "trusted-device.pairing.complete":
+      return "identity-auth.trusted-device.pairing.complete";
+    case "admin-trusted-device.list":
+      return "identity-auth.admin.trusted-device.list";
+    case "admin-trusted-device.revoke":
+      return "identity-auth.admin.trusted-device.revoke";
     default:
       return "identity-auth.local.login";
   }

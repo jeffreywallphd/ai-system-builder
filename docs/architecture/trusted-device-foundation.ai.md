@@ -135,3 +135,18 @@ Pairing service lifecycle contract (`ITrustedDevicePairingService`):
 - `application/identity/tests/TrustedDevicePairingService.test.ts`
 - `application/identity/tests/CompleteTrustedDevicePairingUseCase.test.ts`
 - `infrastructure/filesystem/identity/tests/TrustedDevicePairingCompletionIntegration.test.ts`
+
+## Audit coverage update (story 2.3.4)
+
+- Trusted-device lifecycle events now emit through the identity lifecycle event publisher abstraction (best-effort, non-blocking).
+- New lifecycle event types cover:
+  - pairing initiated,
+  - pairing completed,
+  - pairing failed (`expired`, `invalid-token`),
+  - trusted-device revoked,
+  - trusted-device trust-status changed.
+- Event payloads include actor/target linkage where available (`userIdentityId`, `trustedDeviceId`, `pairingSessionId`, `pairingTokenId`, optional workspace and actor metadata).
+- Sensitive pairing material remains excluded from audit payloads:
+  - raw pairing artifact/token values are never emitted,
+  - trust pin/token secrets are not persisted in lifecycle audit payloads.
+- Identity server host now wires a SQLite-backed lifecycle event publisher by default (`SqliteIdentityLifecycleEventPublisher`) so these events are durably recorded without coupling trusted-device services to a specific storage implementation.

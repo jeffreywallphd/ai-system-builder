@@ -12,8 +12,14 @@ import type {
 import { IdentityIdNamespaces, IdentityErrorCodes } from "../../contracts/IdentityApplicationContracts";
 import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
+import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import type { ITrustedDeviceManagementService } from "../ports/ITrustedDeviceManagementService";
 import type { ITrustedDeviceRepository } from "../ports/ITrustedDeviceRepository";
+import {
+  IdentityLifecycleEventContractVersions,
+  IdentityLifecycleEventTypes,
+  createIdentityLifecycleEvent,
+} from "../../contracts/IdentityLifecycleEventContracts";
 import {
   createTrustedDevice,
   pairTrustedDevice,
@@ -21,12 +27,14 @@ import {
   updateTrustedDeviceDisplayName,
 } from "../../../src/domain/identity/TrustedDeviceDomain";
 import { mapTrustedDeviceRecord } from "./TrustedDeviceServiceMappers";
+import { publishIdentityLifecycleEventBestEffort } from "./IdentityLifecycleEventPublishing";
 
 export class TrustedDeviceManagementService implements ITrustedDeviceManagementService {
   public constructor(
     private readonly repository: ITrustedDeviceRepository,
     private readonly idGenerator: IIdentityIdGenerator,
     private readonly clock: IIdentityClock,
+    private readonly eventPublisher?: IIdentityLifecycleEventPublisher,
   ) {}
 
   public async registerTrustedDevice(request: TrustedDeviceRegistrationRequest): Promise<TrustedDeviceRecord> {
@@ -109,6 +117,52 @@ export class TrustedDeviceManagementService implements ITrustedDeviceManagementS
       | typeof IdentityErrorCodes.notFound
     >
   > {
-    return this.repository.revokeTrustedDevice(request);
+    const existing = await this.repository.getTrustedDeviceById(request.trustedDeviceId);
+    const result = await this.repository.revokeTrustedDevice(request);
+    if (!result.ok || !result.value.changed) {
+      return result;
+    }
+
+    const revokedDevice = await this.repository.getTrustedDeviceById(request.trustedDeviceId);
+    if (!revokedDevice) {
+      return result;
+    }
+
+    await publishIdentityLifecycleEventBestEffort(
+      this.eventPublisher,
+      createIdentityLifecycleEvent({
+        eventType: IdentityLifecycleEventTypes.trustedDeviceRevoked,
+        contractVersion: IdentityLifecycleEventContractVersions.v1,
+        occurredAt: revokedDevice.revocation?.revokedAt ?? request.revokedAt ?? revokedDevice.updatedAt,
+        payload: {
+          trustedDeviceId: revokedDevice.id,
+          userIdentityId: revokedDevice.userIdentityId,
+          workspaceId: revokedDevice.workspaceId,
+          revokedByUserIdentityId: revokedDevice.revocation?.revokedByUserIdentityId ?? request.revokedByUserIdentityId,
+          revocationReason: revokedDevice.revocation?.reason ?? request.reason,
+          revokedAt: revokedDevice.revocation?.revokedAt ?? request.revokedAt ?? revokedDevice.updatedAt,
+        },
+      }),
+    );
+    await publishIdentityLifecycleEventBestEffort(
+      this.eventPublisher,
+      createIdentityLifecycleEvent({
+        eventType: IdentityLifecycleEventTypes.trustedDeviceTrustStatusChanged,
+        contractVersion: IdentityLifecycleEventContractVersions.v1,
+        occurredAt: revokedDevice.updatedAt,
+        payload: {
+          trustedDeviceId: revokedDevice.id,
+          userIdentityId: revokedDevice.userIdentityId,
+          workspaceId: revokedDevice.workspaceId,
+          previousStatus: existing?.trustStatus ?? revokedDevice.trustStatus,
+          nextStatus: revokedDevice.trustStatus,
+          changedAt: revokedDevice.updatedAt,
+          changedByUserIdentityId: revokedDevice.revocation?.revokedByUserIdentityId ?? request.revokedByUserIdentityId,
+          reason: "device-revoked",
+        },
+      }),
+    );
+
+    return result;
   }
 }
