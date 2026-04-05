@@ -101,6 +101,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     trustedDeviceRepository,
     policies: sessionTrustPolicies,
   });
+  const trustedDeviceAdminUserIdentityIds = parseOptionalCsvList(env.IDENTITY_TRUSTED_DEVICE_ADMIN_USER_IDS);
   const trustedDeviceManagementService = new TrustedDeviceManagementService(trustedDeviceRepository, idGenerator, clock);
   const trustedDevicePairingService = new TrustedDevicePairingService({
     trustedDeviceRepository,
@@ -205,6 +206,9 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       allowLocalRegistration: providerAccountPolicies.allowLocalRegistration,
       allowLocalAdministration: providerAccountPolicies.allowLocalAdministration,
     },
+    trustedDeviceAdministration: {
+      bootstrapAdminUserIdentityIds: trustedDeviceAdminUserIdentityIds,
+    },
   });
 
   const server = createIdentityHttpServer({
@@ -273,4 +277,18 @@ function normalizeNamespace(namespace: IdentityIdNamespace): string {
     default:
       return namespace;
   }
+}
+
+function parseOptionalCsvList(value: string | undefined): ReadonlyArray<string> | undefined {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  const entries = normalized
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  return entries.length > 0 ? Object.freeze(entries) : undefined;
 }

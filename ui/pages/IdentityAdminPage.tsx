@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type {
   IdentityAdminAccountSummaryApiResponse,
   IdentityAdminAccountStatus,
+  TrustedDeviceSummaryApiResponse,
 } from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { IdentityAuthService } from "../services/IdentityAuthService";
@@ -24,6 +25,11 @@ export default function IdentityAdminPage(): JSX.Element {
   const [accountStatusError, setAccountStatusError] = useState<string>();
   const [actionError, setActionError] = useState<string>();
   const [actionStatus, setActionStatus] = useState<string>();
+  const [adminDevices, setAdminDevices] = useState<ReadonlyArray<TrustedDeviceSummaryApiResponse>>(Object.freeze([]));
+  const [isLoadingAdminDevices, setIsLoadingAdminDevices] = useState(false);
+  const [adminDevicesError, setAdminDevicesError] = useState<string>();
+  const [adminWorkspaceFilter, setAdminWorkspaceFilter] = useState("");
+  const [revokingTrustedDeviceId, setRevokingTrustedDeviceId] = useState<string>();
 
   const sessionToken = session?.sessionToken;
   const actorUserIdentityId = session?.userIdentityId;
@@ -94,6 +100,34 @@ export default function IdentityAdminPage(): JSX.Element {
     }
   };
 
+  const loadAdminDevices = async (userIdentityId: string, workspaceId?: string): Promise<void> => {
+    if (!sessionToken || !actorUserIdentityId) {
+      return;
+    }
+
+    setIsLoadingAdminDevices(true);
+    setAdminDevicesError(undefined);
+    try {
+      const response = await authService.listIdentityAdminTrustedDevices({
+        context: { actorUserIdentityId },
+        userIdentityId,
+        workspaceId,
+      }, sessionToken);
+      if (!response.ok || !response.data) {
+        setAdminDevices(Object.freeze([]));
+        setAdminDevicesError(response.error?.message ?? "Unable to load trusted devices for the selected account.");
+        return;
+      }
+
+      setAdminDevices(response.data.devices);
+    } catch {
+      setAdminDevices(Object.freeze([]));
+      setAdminDevicesError("Identity administration request failed while loading trusted devices.");
+    } finally {
+      setIsLoadingAdminDevices(false);
+    }
+  };
+
   useEffect(() => {
     if (!sessionToken || !actorUserIdentityId) {
       return;
@@ -105,10 +139,12 @@ export default function IdentityAdminPage(): JSX.Element {
   useEffect(() => {
     if (!selectedUserIdentityId) {
       setSelectedAccount(undefined);
+      setAdminDevices(Object.freeze([]));
       return;
     }
 
     void loadAccountStatus(selectedUserIdentityId);
+    void loadAdminDevices(selectedUserIdentityId, normalizeOptionalInput(adminWorkspaceFilter));
   }, [selectedUserIdentityId]);
 
   const setAccountStatus = async (action: AccountAction): Promise<void> => {
@@ -141,6 +177,39 @@ export default function IdentityAdminPage(): JSX.Element {
       setActionError("Identity administration request failed while updating account status.");
     } finally {
       setIsMutatingStatus(false);
+    }
+  };
+
+  const revokeTrustedDevice = async (device: TrustedDeviceSummaryApiResponse): Promise<void> => {
+    if (!sessionToken || !actorUserIdentityId || !selectedUserIdentityId) {
+      return;
+    }
+    if (!window.confirm(`Revoke trust for "${device.displayName}"? Existing trusted sessions on this device may be invalidated.`)) {
+      return;
+    }
+
+    setRevokingTrustedDeviceId(device.trustedDeviceId);
+    setActionError(undefined);
+    setActionStatus(undefined);
+    try {
+      const response = await authService.revokeIdentityAdminTrustedDevice({
+        context: { actorUserIdentityId },
+        trustedDeviceId: device.trustedDeviceId,
+        reason: "admin-action",
+      }, sessionToken);
+      if (!response.ok || !response.data) {
+        setActionError(response.error?.message ?? "Unable to revoke trusted device.");
+        return;
+      }
+
+      setActionStatus(response.data.revoked
+        ? `Revoked trusted device "${device.displayName}".`
+        : `Trusted device "${device.displayName}" was already revoked.`);
+      await loadAdminDevices(selectedUserIdentityId, normalizeOptionalInput(adminWorkspaceFilter));
+    } catch {
+      setActionError("Identity administration request failed while revoking trusted device.");
+    } finally {
+      setRevokingTrustedDeviceId(undefined);
     }
   };
 
@@ -189,9 +258,10 @@ export default function IdentityAdminPage(): JSX.Element {
               void loadAccounts(selectedUserIdentityId);
               if (selectedUserIdentityId) {
                 void loadAccountStatus(selectedUserIdentityId);
+                void loadAdminDevices(selectedUserIdentityId, normalizeOptionalInput(adminWorkspaceFilter));
               }
             }}
-            disabled={isLoadingAccounts || isLoadingAccountStatus}
+            disabled={isLoadingAccounts || isLoadingAccountStatus || isLoadingAdminDevices}
           >
             Refresh
           </button>
@@ -309,6 +379,80 @@ export default function IdentityAdminPage(): JSX.Element {
             ) : null}
           </div>
         </section>
+
+        <section className="ui-card ui-identity-admin-page__card">
+          <div className="ui-card__header">
+            <h2 className="ui-card__title">Trusted device oversight</h2>
+            <p className="ui-card__subtitle">Inspect and revoke trusted devices for the selected account.</p>
+          </div>
+          <div className="ui-card__body ui-stack ui-stack--md">
+            <label className="ui-field">
+              <span className="ui-field__label">Workspace filter (optional)</span>
+              <input
+                className="ui-input"
+                value={adminWorkspaceFilter}
+                onChange={(event) => setAdminWorkspaceFilter(event.target.value)}
+                placeholder="workspace id"
+              />
+            </label>
+            <div className="ui-page__actions">
+              <button
+                type="button"
+                className="ui-button ui-button--secondary ui-button--sm"
+                disabled={!selectedUserIdentityId || isLoadingAdminDevices}
+                onClick={() => {
+                  if (selectedUserIdentityId) {
+                    void loadAdminDevices(selectedUserIdentityId, normalizeOptionalInput(adminWorkspaceFilter));
+                  }
+                }}
+              >
+                {isLoadingAdminDevices ? "Loading..." : "Load devices"}
+              </button>
+            </div>
+            {adminDevicesError ? <p className="ui-text-secondary" role="alert">{adminDevicesError}</p> : null}
+            {!selectedUserIdentityId ? <p className="ui-text-secondary">Select an account before loading trusted devices.</p> : null}
+            {selectedUserIdentityId && !isLoadingAdminDevices && adminDevices.length === 0 ? (
+              <p className="ui-text-secondary">No trusted devices match the current filter.</p>
+            ) : null}
+            {adminDevices.length > 0 ? (
+              <div className="ui-table-wrapper">
+                <table className="ui-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Device</th>
+                      <th scope="col">Trust</th>
+                      <th scope="col">Workspace</th>
+                      <th scope="col">Last seen</th>
+                      <th scope="col">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminDevices.map((device) => (
+                      <tr key={device.trustedDeviceId}>
+                        <td>{device.displayName}</td>
+                        <td><span className={`ui-badge ${trustedDeviceStatusBadgeClass(device.trustStatus)}`}>{device.trustStatus}</span></td>
+                        <td>{device.workspaceId ?? "Global"}</td>
+                        <td>{device.lastSeenAt ? formatDate(device.lastSeenAt) : "Never"}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="ui-button ui-button--danger ui-button--sm"
+                            disabled={device.trustStatus === "revoked" || revokingTrustedDeviceId === device.trustedDeviceId}
+                            onClick={() => {
+                              void revokeTrustedDevice(device);
+                            }}
+                          >
+                            {revokingTrustedDeviceId === device.trustedDeviceId ? "Revoking..." : "Revoke"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
+        </section>
       </div>
     </section>
   );
@@ -326,4 +470,30 @@ function statusBadgeClass(status: IdentityAdminAccountStatus): string {
     default:
       return "ui-badge--neutral";
   }
+}
+
+function trustedDeviceStatusBadgeClass(status: TrustedDeviceSummaryApiResponse["trustStatus"]): string {
+  switch (status) {
+    case "trusted":
+      return "ui-badge--success";
+    case "pending-pairing":
+      return "ui-badge--warning";
+    case "revoked":
+      return "ui-badge--danger";
+    default:
+      return "ui-badge--neutral";
+  }
+}
+
+function normalizeOptionalInput(value: string): string | undefined {
+  const normalized = value.trim();
+  return normalized ? normalized : undefined;
+}
+
+function formatDate(value: string): string {
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) {
+    return value;
+  }
+  return new Date(parsed).toLocaleString();
 }

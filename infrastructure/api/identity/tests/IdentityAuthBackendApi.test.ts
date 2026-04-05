@@ -571,6 +571,70 @@ describe("IdentityAuthBackendApi", () => {
     expect(revoked.data?.revoked).toBeTrue();
   });
 
+  it("supports admin trusted-device oversight with authorization checks", async () => {
+    const harness = await createIdentityAuthTestHarness({
+      trustedDeviceAdministration: {
+        bootstrapAdminUserIdentityIds: ["user-identity:1"],
+      },
+    });
+
+    const adminRegister = await harness.backendApi.registerLocalAccount({
+      username: "trusted.device.admin",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(adminRegister.ok).toBeTrue();
+    if (!adminRegister.ok || !adminRegister.data) {
+      throw new Error("Expected admin registration payload.");
+    }
+
+    const memberRegister = await harness.backendApi.registerLocalAccount({
+      username: "trusted.device.member",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(memberRegister.ok).toBeTrue();
+    if (!memberRegister.ok || !memberRegister.data) {
+      throw new Error("Expected member registration payload.");
+    }
+
+    await harness.provisionTrustedDevice({
+      trustedDeviceId: "trusted-device:admin-inspect",
+      userIdentityId: memberRegister.data.userIdentityId,
+      trustStatus: "trusted",
+    });
+
+    const denied = await harness.backendApi.listIdentityAdminTrustedDevices({
+      context: {
+        actorUserIdentityId: memberRegister.data.userIdentityId,
+      },
+      userIdentityId: adminRegister.data.userIdentityId,
+    });
+    expect(denied.ok).toBeFalse();
+    expect(denied.error?.code).toBe("forbidden");
+
+    const listed = await harness.backendApi.listIdentityAdminTrustedDevices({
+      context: {
+        actorUserIdentityId: adminRegister.data.userIdentityId,
+      },
+      userIdentityId: memberRegister.data.userIdentityId,
+    });
+    expect(listed.ok).toBeTrue();
+    expect(listed.data?.devices.some((device) => device.trustedDeviceId === "trusted-device:admin-inspect")).toBeTrue();
+
+    const revoked = await harness.backendApi.revokeIdentityAdminTrustedDevice({
+      context: {
+        actorUserIdentityId: adminRegister.data.userIdentityId,
+      },
+      trustedDeviceId: "trusted-device:admin-inspect",
+      reason: "admin-action",
+    });
+    expect(revoked.ok).toBeTrue();
+    expect(revoked.data?.revoked).toBeTrue();
+  });
+
   it("emits structured redacted observability events for register/login success and failure", async () => {
     const logger = new CapturingObservabilityLogger();
     const auditEventSink = new CapturingAuditEventSink();
@@ -732,5 +796,24 @@ describe("IdentityAuthBackendApi", () => {
     });
     expect(setStatus.ok).toBeFalse();
     expect(setStatus.error?.code).toBe("forbidden");
+
+    const listTrustedDevices = await harness.backendApi.listIdentityAdminTrustedDevices({
+      context: {
+        actorUserIdentityId: "user:admin",
+      },
+      userIdentityId: "user:missing",
+    });
+    expect(listTrustedDevices.ok).toBeFalse();
+    expect(listTrustedDevices.error?.code).toBe("forbidden");
+
+    const revokeTrustedDevice = await harness.backendApi.revokeIdentityAdminTrustedDevice({
+      context: {
+        actorUserIdentityId: "user:admin",
+      },
+      trustedDeviceId: "trusted-device:missing",
+      reason: "admin-action",
+    });
+    expect(revokeTrustedDevice.ok).toBeFalse();
+    expect(revokeTrustedDevice.error?.code).toBe("forbidden");
   });
 });

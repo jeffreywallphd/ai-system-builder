@@ -362,6 +362,19 @@ export interface ListTrustedDevicesApiResponse {
   readonly devices: ReadonlyArray<TrustedDeviceSummaryApiResponse>;
 }
 
+export interface ListIdentityAdminTrustedDevicesApiRequest {
+  readonly context: IdentityAdminActionContextApiRequest;
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly includeStatuses?: ReadonlyArray<TrustedDeviceTrustStatus>;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface ListIdentityAdminTrustedDevicesApiResponse {
+  readonly devices: ReadonlyArray<TrustedDeviceSummaryApiResponse>;
+}
+
 export interface GetTrustedDeviceApiRequest {
   readonly trustedDeviceId: string;
 }
@@ -379,6 +392,19 @@ export interface RevokeTrustedDeviceApiRequest {
 }
 
 export interface RevokeTrustedDeviceApiResponse {
+  readonly trustedDeviceId: string;
+  readonly revoked: boolean;
+}
+
+export interface RevokeIdentityAdminTrustedDeviceApiRequest {
+  readonly context: IdentityAdminActionContextApiRequest;
+  readonly trustedDeviceId: string;
+  readonly reason: TrustedDeviceRevocationReason;
+  readonly note?: string;
+  readonly revokedAt?: string;
+}
+
+export interface RevokeIdentityAdminTrustedDeviceApiResponse {
   readonly trustedDeviceId: string;
   readonly revoked: boolean;
 }

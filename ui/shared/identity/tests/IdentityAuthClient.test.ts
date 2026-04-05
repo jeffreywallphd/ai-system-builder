@@ -53,6 +53,19 @@ describe("HttpIdentityAuthClient", () => {
       action: "disable",
       providerId: "provider:local-password",
     }, "token-5");
+    await client.listIdentityAdminTrustedDevices({
+      context: { actorUserIdentityId: "user-1" },
+      userIdentityId: "user-2",
+      workspaceId: "workspace:alpha",
+      includeStatuses: ["trusted"],
+      limit: 5,
+      offset: 2,
+    }, "token-5b");
+    await client.revokeIdentityAdminTrustedDevice({
+      context: { actorUserIdentityId: "user-1" },
+      trustedDeviceId: "trusted-device:beta",
+      reason: "admin-action",
+    }, "token-5c");
     await client.listTrustedDevices({
       userIdentityId: "user-1",
       includeStatuses: ["pending-pairing", "trusted"],
@@ -106,6 +119,8 @@ describe("HttpIdentityAuthClient", () => {
       "GET",
       "POST",
       "POST",
+      "GET",
+      "POST",
       "POST",
       "GET",
       "GET",
@@ -128,6 +143,8 @@ describe("HttpIdentityAuthClient", () => {
       "http://127.0.0.1:8788/api/v1/identity/admin/accounts?status=active&status=suspended&limit=10&offset=20",
       "http://127.0.0.1:8788/api/v1/identity/admin/accounts/user-2?providerId=provider%3Alocal-password",
       "http://127.0.0.1:8788/api/v1/identity/admin/accounts/user-2/status",
+      "http://127.0.0.1:8788/api/v1/identity/admin/trusted-devices?userIdentityId=user-2&workspaceId=workspace%3Aalpha&status=trusted&limit=5&offset=2",
+      "http://127.0.0.1:8788/api/v1/identity/admin/trusted-devices/trusted-device%3Abeta/revoke",
       "http://127.0.0.1:8788/api/v1/identity/trusted-devices?status=pending-pairing&status=trusted&limit=5&offset=10",
       "http://127.0.0.1:8788/api/v1/identity/trusted-devices/trusted-device%3Aalpha",
       "http://127.0.0.1:8788/api/v1/identity/trusted-devices/trusted-device%3Aalpha/revoke",
@@ -143,12 +160,14 @@ describe("HttpIdentityAuthClient", () => {
     expect(requests[6]?.authorization).toBe("Bearer token-3");
     expect(requests[7]?.authorization).toBe("Bearer token-4");
     expect(requests[8]?.authorization).toBe("Bearer token-5");
-    expect(requests[9]?.authorization).toBe("Bearer token-6");
-    expect(requests[10]?.authorization).toBe("Bearer token-7");
-    expect(requests[11]?.authorization).toBe("Bearer token-8");
-    expect(requests[12]?.authorization).toBe("Bearer token-9");
-    expect(requests[13]?.authorization).toBe("Bearer token-10");
-    expect(requests[14]?.authorization).toBe("Bearer token-11");
-    expect(requests[15]?.authorization).toBe("Bearer token-12");
+    expect(requests[9]?.authorization).toBe("Bearer token-5b");
+    expect(requests[10]?.authorization).toBe("Bearer token-5c");
+    expect(requests[11]?.authorization).toBe("Bearer token-6");
+    expect(requests[12]?.authorization).toBe("Bearer token-7");
+    expect(requests[13]?.authorization).toBe("Bearer token-8");
+    expect(requests[14]?.authorization).toBe("Bearer token-9");
+    expect(requests[15]?.authorization).toBe("Bearer token-10");
+    expect(requests[16]?.authorization).toBe("Bearer token-11");
+    expect(requests[17]?.authorization).toBe("Bearer token-12");
   });
 });

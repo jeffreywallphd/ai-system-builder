@@ -68,6 +68,8 @@ import {
   type GetIdentityAdminAccountStatusApiResponse,
   type ListIdentityAdminAccountsApiRequest,
   type ListIdentityAdminAccountsApiResponse,
+  type ListIdentityAdminTrustedDevicesApiRequest,
+  type ListIdentityAdminTrustedDevicesApiResponse,
   type ListTrustedDevicesApiRequest,
   type ListTrustedDevicesApiResponse,
   type LoginLocalIdentityApiRequest,
@@ -84,6 +86,8 @@ import {
   type RevokeIdentitySessionApiResponse,
   type RevokeTrustedDeviceApiRequest,
   type RevokeTrustedDeviceApiResponse,
+  type RevokeIdentityAdminTrustedDeviceApiRequest,
+  type RevokeIdentityAdminTrustedDeviceApiResponse,
   type SetIdentityAdminAccountStatusApiRequest,
   type SetIdentityAdminAccountStatusApiResponse,
   type ResolveAuthenticatedSessionApiRequest,
@@ -96,6 +100,11 @@ import {
   type ValidateTrustedDevicePairingApiRequest,
   type ValidateTrustedDevicePairingApiResponse,
 } from "./sdk/PublicIdentityAuthApiContract";
+import {
+  RoleAwareTrustedDeviceAdministrativeAuthorizationPolicy,
+  TrustedDeviceAdministrativeActions,
+  type TrustedDeviceAdministrativeAuthorizationPolicy,
+} from "../../../src/application/identity/use-cases/TrustedDeviceAdministrativeAuthorization";
 import { IdentityAuthObservability, type IdentityAuthObservabilityOptions } from "./IdentityAuthObservability";
 import { IdentityAuthenticatedSessionService } from "../../../application/identity/services/IdentityAuthenticatedSessionService";
 import {
@@ -145,6 +154,11 @@ interface IdentityAuthBackendApiDependencies {
     readonly allowLocalRegistration?: boolean;
     readonly allowLocalAdministration?: boolean;
   };
+  readonly trustedDeviceAdministration?: {
+    readonly policy?: TrustedDeviceAdministrativeAuthorizationPolicy;
+    readonly bootstrapAdminUserIdentityIds?: ReadonlyArray<string>;
+    readonly adminAssertions?: ReadonlyArray<string>;
+  };
 }
 
 export class IdentityAuthBackendApi {
@@ -153,6 +167,7 @@ export class IdentityAuthBackendApi {
     readonly allowLocalRegistration: boolean;
     readonly allowLocalAdministration: boolean;
   };
+  private readonly trustedDeviceAdministrationPolicy: TrustedDeviceAdministrativeAuthorizationPolicy;
 
   public constructor(private readonly dependencies: IdentityAuthBackendApiDependencies) {
     this.observability = new IdentityAuthObservability(dependencies.observability);
@@ -160,6 +175,11 @@ export class IdentityAuthBackendApi {
       allowLocalRegistration: dependencies.featurePolicies?.allowLocalRegistration ?? true,
       allowLocalAdministration: dependencies.featurePolicies?.allowLocalAdministration ?? true,
     });
+    this.trustedDeviceAdministrationPolicy = dependencies.trustedDeviceAdministration?.policy
+      ?? new RoleAwareTrustedDeviceAdministrativeAuthorizationPolicy({
+        bootstrapAdminUserIdentityIds: dependencies.trustedDeviceAdministration?.bootstrapAdminUserIdentityIds,
+        adminAssertions: dependencies.trustedDeviceAdministration?.adminAssertions,
+      });
   }
 
   public async registerLocalAccount(
@@ -685,6 +705,133 @@ export class IdentityAuthBackendApi {
     return response;
   }
 
+  public async listIdentityAdminTrustedDevices(
+    request: ListIdentityAdminTrustedDevicesApiRequest,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminTrustedDevicesApiResponse>> {
+    if (!this.featurePolicies.allowLocalAdministration) {
+      return this.adminOperationsDisabledResponse();
+    }
+
+    const decision = this.trustedDeviceAdministrationPolicy.evaluate({
+      action: TrustedDeviceAdministrativeActions.listTrustedDevices,
+      context: request.context,
+      targetUserIdentityId: request.userIdentityId,
+      targetWorkspaceId: request.workspaceId,
+    });
+    if (!decision.allowed) {
+      const response = this.adminAuthorizationDeniedResponse<ListIdentityAdminTrustedDevicesApiResponse>(
+        decision.message ?? "Trusted-device administrative access denied.",
+      );
+      await this.observability.recordApiOutcome({
+        flow: "admin-trusted-device.list",
+        request,
+        response,
+      });
+      return response;
+    }
+
+    const result = await this.dependencies.listTrustedDevicesUseCase.execute({
+      userIdentityId: request.userIdentityId,
+      workspaceId: request.workspaceId,
+      includeStatuses: request.includeStatuses,
+      limit: request.limit,
+      offset: request.offset,
+    });
+    if (!result.ok) {
+      const response = Object.freeze({ ok: false, error: this.mapTrustedDeviceError(result.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "admin-trusted-device.list",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
+    }
+
+    const response = Object.freeze({
+      ok: true,
+      data: serializeListTrustedDevicesResponse(result.value.devices),
+    });
+    await this.observability.recordApiOutcome({
+      flow: "admin-trusted-device.list",
+      request,
+      response,
+    });
+    return response;
+  }
+
+  public async revokeIdentityAdminTrustedDevice(
+    request: RevokeIdentityAdminTrustedDeviceApiRequest,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentityAdminTrustedDeviceApiResponse>> {
+    if (!this.featurePolicies.allowLocalAdministration) {
+      return this.adminOperationsDisabledResponse();
+    }
+
+    const existing = await this.dependencies.getTrustedDeviceUseCase.execute({
+      trustedDeviceId: request.trustedDeviceId,
+    });
+    if (!existing.ok) {
+      const response = Object.freeze({ ok: false, error: this.mapTrustedDeviceError(existing.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "admin-trusted-device.revoke",
+        request,
+        response,
+        errorCode: existing.error.code,
+      });
+      return response;
+    }
+
+    const decision = this.trustedDeviceAdministrationPolicy.evaluate({
+      action: TrustedDeviceAdministrativeActions.revokeTrustedDevice,
+      context: request.context,
+      targetUserIdentityId: existing.value.trustedDevice.userIdentityId,
+      targetWorkspaceId: existing.value.trustedDevice.workspaceId,
+    });
+    if (!decision.allowed) {
+      const response = this.adminAuthorizationDeniedResponse<RevokeIdentityAdminTrustedDeviceApiResponse>(
+        decision.message ?? "Trusted-device administrative access denied.",
+      );
+      await this.observability.recordApiOutcome({
+        flow: "admin-trusted-device.revoke",
+        request,
+        response,
+      });
+      return response;
+    }
+
+    const result = await this.dependencies.revokeTrustedDeviceUseCase.execute({
+      trustedDeviceId: request.trustedDeviceId,
+      reason: request.reason,
+      revokedByUserIdentityId: request.context.actorUserIdentityId,
+      note: request.note,
+      revokedAt: request.revokedAt,
+    });
+    if (!result.ok) {
+      const response = Object.freeze({ ok: false, error: this.mapTrustedDeviceError(result.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "admin-trusted-device.revoke",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
+    }
+
+    const response = Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        trustedDeviceId: request.trustedDeviceId,
+        revoked: result.value.changed,
+      }),
+    });
+    await this.observability.recordApiOutcome({
+      flow: "admin-trusted-device.revoke",
+      request,
+      response,
+    });
+    return response;
+  }
+
   public async listTrustedDevices(
     request: ListTrustedDevicesApiRequest,
   ): Promise<IdentityAuthApiResponse<ListTrustedDevicesApiResponse>> {
@@ -1186,6 +1333,16 @@ export class IdentityAuthBackendApi {
       error: {
         code: IdentityAuthApiErrorCodes.forbidden,
         message: "Local identity administration is disabled by identity policy configuration.",
+      },
+    });
+  }
+
+  private adminAuthorizationDeniedResponse<TResponse>(message: string): IdentityAuthApiResponse<TResponse> {
+    return Object.freeze({
+      ok: false,
+      error: {
+        code: IdentityAuthApiErrorCodes.forbidden,
+        message,
       },
     });
   }

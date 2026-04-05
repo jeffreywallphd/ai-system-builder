@@ -12,6 +12,8 @@ import type {
   InitiateTrustedDevicePairingApiResponse,
   ListIdentityAdminAccountsApiRequest,
   ListIdentityAdminAccountsApiResponse,
+  ListIdentityAdminTrustedDevicesApiRequest,
+  ListIdentityAdminTrustedDevicesApiResponse,
   ListTrustedDevicesApiRequest,
   ListTrustedDevicesApiResponse,
   LoginLocalIdentityApiRequest,
@@ -19,6 +21,8 @@ import type {
   LogoutAuthenticatedSessionApiResponse,
   RevokeTrustedDeviceApiRequest,
   RevokeTrustedDeviceApiResponse,
+  RevokeIdentityAdminTrustedDeviceApiRequest,
+  RevokeIdentityAdminTrustedDeviceApiResponse,
   RevokeIdentitySessionApiRequest,
   RevokeIdentitySessionApiResponse,
   ResolveAuthenticatedSessionApiResponse,
@@ -61,6 +65,14 @@ export interface IdentityAuthClient {
     request: SetIdentityAdminAccountStatusApiRequest,
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>>;
+  listIdentityAdminTrustedDevices(
+    request: ListIdentityAdminTrustedDevicesApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminTrustedDevicesApiResponse>>;
+  revokeIdentityAdminTrustedDevice(
+    request: RevokeIdentityAdminTrustedDeviceApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentityAdminTrustedDeviceApiResponse>>;
   changeLocalPasswordCredential(
     request: ChangeLocalPasswordCredentialApiRequest,
     sessionToken: string,
@@ -190,6 +202,50 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
       {
         action: request.action,
         providerId: request.providerId,
+      },
+      {
+        authorization: `Bearer ${sessionToken}`,
+      },
+    );
+  }
+
+  public async listIdentityAdminTrustedDevices(
+    request: ListIdentityAdminTrustedDevicesApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminTrustedDevicesApiResponse>> {
+    const query = new URLSearchParams();
+    query.set("userIdentityId", request.userIdentityId);
+    if (request.workspaceId) {
+      query.set("workspaceId", request.workspaceId);
+    }
+    if (request.includeStatuses) {
+      for (const status of request.includeStatuses) {
+        query.append("status", status);
+      }
+    }
+    if (typeof request.limit === "number") {
+      query.set("limit", String(request.limit));
+    }
+    if (typeof request.offset === "number") {
+      query.set("offset", String(request.offset));
+    }
+    const queryString = query.toString();
+    const suffix = queryString ? `?${queryString}` : "";
+    return this.get(`/api/v1/identity/admin/trusted-devices${suffix}`, {
+      authorization: `Bearer ${sessionToken}`,
+    });
+  }
+
+  public async revokeIdentityAdminTrustedDevice(
+    request: RevokeIdentityAdminTrustedDeviceApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentityAdminTrustedDeviceApiResponse>> {
+    return this.post(
+      `/api/v1/identity/admin/trusted-devices/${encodeURIComponent(request.trustedDeviceId)}/revoke`,
+      {
+        reason: request.reason,
+        note: request.note,
+        revokedAt: request.revokedAt,
       },
       {
         authorization: `Bearer ${sessionToken}`,
