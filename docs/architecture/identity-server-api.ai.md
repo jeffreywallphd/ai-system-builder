@@ -16,6 +16,14 @@
   - `GET /api/v1/identity/admin/accounts`
   - `GET /api/v1/identity/admin/accounts/:userIdentityId`
   - `POST /api/v1/identity/admin/accounts/:userIdentityId/status`
+- Authenticated trusted-device management and pairing endpoints:
+  - `GET /api/v1/identity/trusted-devices`
+  - `GET /api/v1/identity/trusted-devices/:trustedDeviceId`
+  - `POST /api/v1/identity/trusted-devices/:trustedDeviceId/revoke`
+  - `POST /api/v1/identity/trusted-devices/:trustedDeviceId/display-name`
+  - `POST /api/v1/identity/trusted-devices/pairing/initiate`
+  - `POST /api/v1/identity/trusted-devices/pairing/validate`
+  - `POST /api/v1/identity/trusted-devices/pairing/complete`
 - Login success now issues and persists authenticated sessions and returns bearer session credentials.
 - Transport validation at the boundary (`zod`) with stable failure envelopes.
 - Deterministic translation from inner identity errors to public API error codes.
@@ -74,6 +82,11 @@ Administration API flows also emit structured observability/audit events (`admin
 Shared redaction (`redactSensitiveAuthPayload`, `redactSensitiveText`) is reused by backend/audit/HTTP transport logging so sensitive fields and bearer-like token strings never appear in logs. Redacted fields include credential/token material and identity-sensitive request fields (`username`, `providerSubject`, `email`).
 
 API response payload construction is now explicitly serializer-based in `IdentityAuthResponseSerializers.ts`, which keeps response contracts allowlist-mapped and prevents accidental field leakage from future use-case output expansion.
+
+Trusted-device response serialization is now similarly allowlist-mapped and intentionally excludes:
+- raw device fingerprints
+- pairing token hash material
+- internal trust-material persistence references
 
 ## UI state hardening (story 1.4.5)
 
@@ -144,6 +157,7 @@ Persisted session records now intentionally exclude:
 - `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `infrastructure/api/identity/IdentityAuthObservability.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- trusted-device transport lifecycle coverage in backend + HTTP integration tests (list/detail/revoke/rename + pairing initiate/validate/complete)
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
 - `ui/pages/tests/IdentityAdminPage.test.tsx`
 

@@ -296,3 +296,236 @@ export interface SetIdentityAdminAccountStatusApiResponse {
   readonly affectedSessionIds: ReadonlyArray<string>;
   readonly updatedAt: string;
 }
+
+export type TrustedDeviceTrustStatus = "pending-pairing" | "trusted" | "revoked" | "expired";
+export type TrustedDevicePairingMethod =
+  | "one-time-code"
+  | "qr-code"
+  | "passkey"
+  | "admin-provisioned"
+  | "recovery-flow";
+export type TrustedDeviceRevocationReason =
+  | "user-request"
+  | "admin-action"
+  | "lost-device"
+  | "suspected-compromise"
+  | "workspace-access-removed"
+  | "policy-violation";
+export type TrustedDevicePairingArtifactType = "one-time-code" | "qr-payload";
+export type TrustedDevicePairingTokenStatus = "issued" | "consumed" | "expired" | "invalidated";
+export type TrustedDevicePairingSessionStatus =
+  | "initiated"
+  | "validated"
+  | "completed"
+  | "expired"
+  | "invalidated"
+  | "rejected";
+export type TrustedDevicePairingActorScope = "same-user" | "workspace-admin" | "bootstrap-admin" | "session-bound";
+
+export interface TrustedDeviceMetadataApiResponse {
+  readonly platform?: string;
+  readonly osVersion?: string;
+  readonly appVersion?: string;
+  readonly deviceModel?: string;
+  readonly locale?: string;
+}
+
+export interface TrustedDeviceSummaryApiResponse {
+  readonly trustedDeviceId: string;
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly displayName: string;
+  readonly pairingMethod: TrustedDevicePairingMethod;
+  readonly trustStatus: TrustedDeviceTrustStatus;
+  readonly registeredAt: string;
+  readonly pairedAt?: string;
+  readonly lastSeenAt?: string;
+  readonly metadata: TrustedDeviceMetadataApiResponse;
+  readonly revocation?: {
+    readonly reason: TrustedDeviceRevocationReason;
+    readonly revokedAt: string;
+    readonly revokedByUserIdentityId?: string;
+    readonly note?: string;
+  };
+  readonly updatedAt: string;
+}
+
+export interface ListTrustedDevicesApiRequest {
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly includeStatuses?: ReadonlyArray<TrustedDeviceTrustStatus>;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface ListTrustedDevicesApiResponse {
+  readonly devices: ReadonlyArray<TrustedDeviceSummaryApiResponse>;
+}
+
+export interface GetTrustedDeviceApiRequest {
+  readonly trustedDeviceId: string;
+}
+
+export interface GetTrustedDeviceApiResponse {
+  readonly trustedDevice: TrustedDeviceSummaryApiResponse;
+}
+
+export interface RevokeTrustedDeviceApiRequest {
+  readonly trustedDeviceId: string;
+  readonly reason: TrustedDeviceRevocationReason;
+  readonly revokedByUserIdentityId?: string;
+  readonly note?: string;
+  readonly revokedAt?: string;
+}
+
+export interface RevokeTrustedDeviceApiResponse {
+  readonly trustedDeviceId: string;
+  readonly revoked: boolean;
+}
+
+export interface UpdateTrustedDeviceDisplayNameApiRequest {
+  readonly trustedDeviceId: string;
+  readonly displayName: string;
+  readonly updatedAt?: string;
+}
+
+export interface UpdateTrustedDeviceDisplayNameApiResponse {
+  readonly trustedDevice: TrustedDeviceSummaryApiResponse;
+}
+
+export interface InitiateTrustedDevicePairingApiRequest {
+  readonly trustedDeviceId: string;
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly artifactType: TrustedDevicePairingArtifactType;
+  readonly actorBinding: {
+    readonly scope: TrustedDevicePairingActorScope;
+    readonly userIdentityId?: string;
+    readonly sessionId?: string;
+  };
+  readonly issuance?: {
+    readonly issuedByUserIdentityId?: string;
+    readonly issuedFromIpAddress?: string;
+    readonly issuedFromUserAgent?: string;
+    readonly channelHint?: string;
+  };
+  readonly maxValidationAttempts?: number;
+  readonly expiresAt: string;
+}
+
+export interface TrustedDevicePairingSessionApiResponse {
+  readonly pairingSessionId: string;
+  readonly trustedDeviceId: string;
+  readonly status: TrustedDevicePairingSessionStatus;
+  readonly initiatedAt: string;
+  readonly validatedAt?: string;
+  readonly completedAt?: string;
+  readonly completedByUserIdentityId?: string;
+  readonly rejectedAt?: string;
+  readonly rejectionReason?: "invalid-token" | "token-reused" | "token-expired" | "actor-scope-violation";
+  readonly rejectionNote?: string;
+  readonly invalidatedAt?: string;
+  readonly expiredAt?: string;
+  readonly updatedAt: string;
+}
+
+export interface TrustedDevicePairingTokenApiResponse {
+  readonly pairingTokenId: string;
+  readonly pairingSessionId: string;
+  readonly trustedDeviceId: string;
+  readonly status: TrustedDevicePairingTokenStatus;
+  readonly artifactType: TrustedDevicePairingArtifactType;
+  readonly issuedAt: string;
+  readonly expiresAt: string;
+  readonly failedValidationAttempts: number;
+  readonly maxValidationAttempts: number;
+  readonly lastValidationAttemptAt?: string;
+  readonly consumedAt?: string;
+  readonly consumedByUserIdentityId?: string;
+  readonly invalidationReason?:
+    | "manual-cancel"
+    | "invalid-token-presented"
+    | "token-reused"
+    | "attempt-limit-reached"
+    | "trusted-device-revoked";
+  readonly invalidatedAt?: string;
+  readonly invalidatedByUserIdentityId?: string;
+  readonly invalidationNote?: string;
+  readonly updatedAt: string;
+}
+
+export interface InitiateTrustedDevicePairingApiResponse {
+  readonly pairingSession: TrustedDevicePairingSessionApiResponse;
+  readonly pairingToken: TrustedDevicePairingTokenApiResponse;
+  readonly artifact: {
+    readonly type: TrustedDevicePairingArtifactType;
+    readonly value: string;
+    readonly redactedHint?: string;
+  };
+}
+
+export interface ValidateTrustedDevicePairingApiRequest {
+  readonly pairingSessionId: string;
+  readonly pairingTokenId?: string;
+  readonly trustedDeviceId: string;
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly presentedToken: string;
+  readonly attemptedAt?: string;
+}
+
+export interface ValidateTrustedDevicePairingApiResponse {
+  readonly outcome:
+    | "valid"
+    | "invalid"
+    | "expired"
+    | "reused"
+    | "invalidated"
+    | "attempts-exhausted"
+    | "actor-scope-violation";
+  readonly attemptsRemaining: number;
+  readonly pairingSession: TrustedDevicePairingSessionApiResponse;
+  readonly pairingToken: TrustedDevicePairingTokenApiResponse;
+}
+
+export interface CompleteTrustedDevicePairingApiRequest {
+  readonly pairingSessionId: string;
+  readonly pairingTokenId: string;
+  readonly trustedDeviceId: string;
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly trustedDeviceRegistration?: {
+    readonly displayName: string;
+    readonly fingerprint: {
+      readonly algorithm: "sha256" | "sha512" | "opaque";
+      readonly value: string;
+      readonly capturedAt: string;
+    };
+    readonly pairingMethod: TrustedDevicePairingMethod;
+    readonly metadata?: TrustedDeviceMetadataApiResponse & {
+      readonly lastIpAddress?: string;
+    };
+    readonly registeredAt?: string;
+  };
+  readonly presentedToken: string;
+  readonly completedAt?: string;
+  readonly completedByUserIdentityId?: string;
+  readonly trustMaterialRef?: {
+    readonly materialId: string;
+    readonly kind: "session-signing-key" | "attestation-key" | "opaque-marker";
+    readonly version?: string;
+    readonly issuedAt: string;
+    readonly expiresAt?: string;
+  };
+  readonly trustMaterialRegistration?: {
+    readonly materialKind: "session-signing-key" | "attestation-key" | "opaque-marker";
+    readonly pinReference: string;
+    readonly publicKeyFingerprint?: string;
+  };
+}
+
+export interface CompleteTrustedDevicePairingApiResponse {
+  readonly pairingSession: TrustedDevicePairingSessionApiResponse;
+  readonly pairingToken: TrustedDevicePairingTokenApiResponse;
+  readonly trustedDevice: TrustedDeviceSummaryApiResponse;
+}

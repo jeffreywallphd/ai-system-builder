@@ -10,15 +10,29 @@ import {
   type AuthenticatedIdentityPrincipalApiResponse,
   type GetIdentityAdminAccountStatusApiRequest,
   type GetIdentityAdminAccountStatusApiResponse,
+  type ListTrustedDevicesApiRequest,
+  type ListTrustedDevicesApiResponse,
   type IdentityAuthApiResponse,
   type ListIdentityAdminAccountsApiRequest,
   type ListIdentityAdminAccountsApiResponse,
   type LoginLocalIdentityApiRequest,
+  type CompleteTrustedDevicePairingApiRequest,
+  type CompleteTrustedDevicePairingApiResponse,
+  type GetTrustedDeviceApiRequest,
+  type GetTrustedDeviceApiResponse,
+  type InitiateTrustedDevicePairingApiRequest,
+  type InitiateTrustedDevicePairingApiResponse,
+  type RevokeTrustedDeviceApiRequest,
+  type RevokeTrustedDeviceApiResponse,
   type RevokeIdentitySessionApiRequest,
   type ResolveAuthenticatedSessionApiResponse,
   type RegisterLocalIdentityApiRequest,
   type SetIdentityAdminAccountStatusApiRequest,
   type SetIdentityAdminAccountStatusApiResponse,
+  type UpdateTrustedDeviceDisplayNameApiRequest,
+  type UpdateTrustedDeviceDisplayNameApiResponse,
+  type ValidateTrustedDevicePairingApiRequest,
+  type ValidateTrustedDevicePairingApiResponse,
 } from "../../../api/identity/sdk/PublicIdentityAuthApiContract";
 import { redactSensitiveAuthPayload, redactSensitiveText } from "../../../api/identity/IdentityAuthRedaction";
 
@@ -122,6 +136,109 @@ const ChangeCredentialRequestSchema: z.ZodType<ChangeLocalPasswordCredentialApiR
     candidate: z.string().min(1),
   }).strict(),
   verification: ChangeCredentialVerificationSchema,
+}).strict();
+
+const TrustedDeviceStatusValues = z.enum(["pending-pairing", "trusted", "revoked", "expired"]);
+const TrustedDevicePairingMethodValues = z.enum([
+  "one-time-code",
+  "qr-code",
+  "passkey",
+  "admin-provisioned",
+  "recovery-flow",
+]);
+const TrustedDeviceRevocationReasonValues = z.enum([
+  "user-request",
+  "admin-action",
+  "lost-device",
+  "suspected-compromise",
+  "workspace-access-removed",
+  "policy-violation",
+]);
+
+const RevokeTrustedDeviceRequestSchema: z.ZodType<
+  Pick<RevokeTrustedDeviceApiRequest, "reason" | "note" | "revokedAt">
+> = z.object({
+  reason: TrustedDeviceRevocationReasonValues,
+  note: z.string().min(1).max(1024).optional(),
+  revokedAt: z.string().datetime().optional(),
+}).strict();
+
+const UpdateTrustedDeviceDisplayNameRequestSchema: z.ZodType<
+  Pick<UpdateTrustedDeviceDisplayNameApiRequest, "displayName" | "updatedAt">
+> = z.object({
+  displayName: z.string().min(1).max(80),
+  updatedAt: z.string().datetime().optional(),
+}).strict();
+
+const InitiateTrustedDevicePairingRequestSchema: z.ZodType<InitiateTrustedDevicePairingApiRequest> = z.object({
+  trustedDeviceId: z.string().min(1),
+  userIdentityId: z.string().min(1),
+  workspaceId: z.string().min(1).optional(),
+  artifactType: z.enum(["one-time-code", "qr-payload"]),
+  actorBinding: z.object({
+    scope: z.enum(["same-user", "workspace-admin", "bootstrap-admin", "session-bound"]),
+    userIdentityId: z.string().min(1).optional(),
+    sessionId: z.string().min(1).optional(),
+  }).strict(),
+  issuance: z.object({
+    issuedByUserIdentityId: z.string().min(1).optional(),
+    issuedFromIpAddress: z.string().min(1).optional(),
+    issuedFromUserAgent: z.string().min(1).optional(),
+    channelHint: z.string().min(1).optional(),
+  }).strict().optional(),
+  maxValidationAttempts: z.number().int().min(1).optional(),
+  expiresAt: z.string().datetime(),
+}).strict();
+
+const ValidateTrustedDevicePairingRequestSchema: z.ZodType<ValidateTrustedDevicePairingApiRequest> = z.object({
+  pairingSessionId: z.string().min(1),
+  pairingTokenId: z.string().min(1).optional(),
+  trustedDeviceId: z.string().min(1),
+  userIdentityId: z.string().min(1),
+  workspaceId: z.string().min(1).optional(),
+  presentedToken: z.string().min(1),
+  attemptedAt: z.string().datetime().optional(),
+}).strict();
+
+const CompleteTrustedDevicePairingRequestSchema: z.ZodType<CompleteTrustedDevicePairingApiRequest> = z.object({
+  pairingSessionId: z.string().min(1),
+  pairingTokenId: z.string().min(1),
+  trustedDeviceId: z.string().min(1),
+  userIdentityId: z.string().min(1),
+  workspaceId: z.string().min(1).optional(),
+  trustedDeviceRegistration: z.object({
+    displayName: z.string().min(1).max(80),
+    fingerprint: z.object({
+      algorithm: z.enum(["sha256", "sha512", "opaque"]),
+      value: z.string().min(1),
+      capturedAt: z.string().datetime(),
+    }).strict(),
+    pairingMethod: TrustedDevicePairingMethodValues,
+    metadata: z.object({
+      platform: z.string().min(1).optional(),
+      osVersion: z.string().min(1).optional(),
+      appVersion: z.string().min(1).optional(),
+      deviceModel: z.string().min(1).optional(),
+      locale: z.string().min(1).optional(),
+      lastIpAddress: z.string().min(1).optional(),
+    }).strict().optional(),
+    registeredAt: z.string().datetime().optional(),
+  }).strict().optional(),
+  presentedToken: z.string().min(1),
+  completedAt: z.string().datetime().optional(),
+  completedByUserIdentityId: z.string().min(1).optional(),
+  trustMaterialRef: z.object({
+    materialId: z.string().min(1),
+    kind: z.enum(["session-signing-key", "attestation-key", "opaque-marker"]),
+    version: z.string().min(1).optional(),
+    issuedAt: z.string().datetime(),
+    expiresAt: z.string().datetime().optional(),
+  }).strict().optional(),
+  trustMaterialRegistration: z.object({
+    materialKind: z.enum(["session-signing-key", "attestation-key", "opaque-marker"]),
+    pinReference: z.string().min(1),
+    publicKeyFingerprint: z.string().min(1).optional(),
+  }).strict().optional(),
 }).strict();
 
 export interface IdentityHttpServerLogEvent {
@@ -424,6 +541,312 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
               context: buildAdminContext(context.principal.userIdentityId),
               userIdentityId,
               ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (request.method === "GET" && path === "/api/v1/identity/trusted-devices") {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const includeStatuses = url.searchParams.getAll("status");
+            const statusValidation = z.array(TrustedDeviceStatusValues).safeParse(includeStatuses);
+            if (!statusValidation.success) {
+              const validationError = buildQueryValidationError("status", "status values are invalid.");
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.listTrustedDevices({
+              userIdentityId: context.principal.userIdentityId,
+              workspaceId: normalizeOptionalString(url.searchParams.get("workspaceId")),
+              includeStatuses: statusValidation.data,
+              limit: parseOptionalInteger(url.searchParams.get("limit")),
+              offset: parseOptionalInteger(url.searchParams.get("offset")),
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              userIdentityId: context.principal.userIdentityId,
+              workspaceId: normalizeOptionalString(url.searchParams.get("workspaceId")),
+              includeStatuses: statusValidation.data,
+              limit: parseOptionalInteger(url.searchParams.get("limit")),
+              offset: parseOptionalInteger(url.searchParams.get("offset")),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (request.method === "GET" && path.startsWith("/api/v1/identity/trusted-devices/")) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const trustedDeviceId = decodePathTail(path, "/api/v1/identity/trusted-devices/");
+            if (!trustedDeviceId) {
+              const invalid = buildInvalidRequestResponse("trustedDeviceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.getTrustedDevice({
+              trustedDeviceId,
+            });
+            if (apiResponse.ok && apiResponse.data?.trustedDevice.userIdentityId !== context.principal.userIdentityId) {
+              const forbidden = buildForbiddenResponse("Trusted device is not available for this account.");
+              writeJson(response, 403, forbidden);
+              logResponse(logger, requestId, request, 403, Object.freeze({
+                trustedDeviceId,
+                actorUserIdentityId: context.principal.userIdentityId,
+              }), forbidden);
+              return;
+            }
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              trustedDeviceId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (request.method === "POST" && path.endsWith("/revoke") && path.startsWith("/api/v1/identity/trusted-devices/")) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const trustedDeviceId = decodePathTail(path, "/api/v1/identity/trusted-devices/", "/revoke");
+            if (!trustedDeviceId) {
+              const invalid = buildInvalidRequestResponse("trustedDeviceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const authorizedDevice = await options.backendApi.getTrustedDevice({ trustedDeviceId });
+            if (authorizedDevice.ok && authorizedDevice.data?.trustedDevice.userIdentityId !== context.principal.userIdentityId) {
+              const forbidden = buildForbiddenResponse("Trusted device is not available for this account.");
+              writeJson(response, 403, forbidden);
+              logResponse(logger, requestId, request, 403, Object.freeze({
+                trustedDeviceId,
+                actorUserIdentityId: context.principal.userIdentityId,
+              }), forbidden);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateRequest(
+              request,
+              RevokeTrustedDeviceRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.revokeTrustedDevice({
+              trustedDeviceId,
+              reason: parsedRequest.data.reason,
+              note: parsedRequest.data.note,
+              revokedAt: parsedRequest.data.revokedAt,
+              revokedByUserIdentityId: context.principal.userIdentityId,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              trustedDeviceId,
+              ...parsedRequest.data,
+              revokedByUserIdentityId: context.principal.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        request.method === "POST"
+        && path.endsWith("/display-name")
+        && path.startsWith("/api/v1/identity/trusted-devices/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const trustedDeviceId = decodePathTail(path, "/api/v1/identity/trusted-devices/", "/display-name");
+            if (!trustedDeviceId) {
+              const invalid = buildInvalidRequestResponse("trustedDeviceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const authorizedDevice = await options.backendApi.getTrustedDevice({ trustedDeviceId });
+            if (authorizedDevice.ok && authorizedDevice.data?.trustedDevice.userIdentityId !== context.principal.userIdentityId) {
+              const forbidden = buildForbiddenResponse("Trusted device is not available for this account.");
+              writeJson(response, 403, forbidden);
+              logResponse(logger, requestId, request, 403, Object.freeze({
+                trustedDeviceId,
+                actorUserIdentityId: context.principal.userIdentityId,
+              }), forbidden);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateRequest(
+              request,
+              UpdateTrustedDeviceDisplayNameRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.updateTrustedDeviceDisplayName({
+              trustedDeviceId,
+              displayName: parsedRequest.data.displayName,
+              updatedAt: parsedRequest.data.updatedAt,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              trustedDeviceId,
+              ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (request.method === "POST" && path === "/api/v1/identity/trusted-devices/pairing/initiate") {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const parsedRequest = await parseAndValidateRequest(
+              request,
+              InitiateTrustedDevicePairingRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.initiateTrustedDevicePairing({
+              ...parsedRequest.data,
+              userIdentityId: context.principal.userIdentityId,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              ...parsedRequest.data,
+              userIdentityId: context.principal.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (request.method === "POST" && path === "/api/v1/identity/trusted-devices/pairing/validate") {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const parsedRequest = await parseAndValidateRequest(
+              request,
+              ValidateTrustedDevicePairingRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.validateTrustedDevicePairing({
+              ...parsedRequest.data,
+              userIdentityId: context.principal.userIdentityId,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              ...parsedRequest.data,
+              userIdentityId: context.principal.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (request.method === "POST" && path === "/api/v1/identity/trusted-devices/pairing/complete") {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const parsedRequest = await parseAndValidateRequest(
+              request,
+              CompleteTrustedDevicePairingRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.completeTrustedDevicePairing({
+              ...parsedRequest.data,
+              userIdentityId: context.principal.userIdentityId,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              ...parsedRequest.data,
+              userIdentityId: context.principal.userIdentityId,
             }), apiResponse);
           },
         );
@@ -745,6 +1168,16 @@ function buildInvalidRequestResponse(message: string): IdentityAuthApiResponse<n
     ok: false,
     error: {
       code: IdentityAuthApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
+function buildForbiddenResponse(message: string): IdentityAuthApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: IdentityAuthApiErrorCodes.forbidden,
       message,
     },
   });

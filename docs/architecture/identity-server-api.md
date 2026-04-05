@@ -13,6 +13,13 @@ This note documents the authoritative HTTP server endpoints for local identity r
 - `GET /api/v1/identity/admin/accounts` (authenticated)
 - `GET /api/v1/identity/admin/accounts/:userIdentityId` (authenticated)
 - `POST /api/v1/identity/admin/accounts/:userIdentityId/status` (authenticated)
+- `GET /api/v1/identity/trusted-devices` (authenticated)
+- `GET /api/v1/identity/trusted-devices/:trustedDeviceId` (authenticated)
+- `POST /api/v1/identity/trusted-devices/:trustedDeviceId/revoke` (authenticated)
+- `POST /api/v1/identity/trusted-devices/:trustedDeviceId/display-name` (authenticated)
+- `POST /api/v1/identity/trusted-devices/pairing/initiate` (authenticated)
+- `POST /api/v1/identity/trusted-devices/pairing/validate` (authenticated)
+- `POST /api/v1/identity/trusted-devices/pairing/complete` (authenticated)
 
 Implemented transport and host composition:
 
@@ -130,6 +137,14 @@ Request body:
 
 Validation is performed with `zod` at the HTTP transport boundary.
 
+### Trusted-device requests
+
+Trusted-device transport contracts are defined in `infrastructure/api/identity/sdk/PublicIdentityAuthApiContract.ts` and include:
+
+- device management: list, detail, revoke, and display-name update request/response contracts
+- pairing lifecycle: initiation, validation, and completion request/response contracts
+- all trusted-device routes run through authenticated session guard middleware and resolve actor context from bearer session state
+
 ### Admin account list request
 
 `GET /api/v1/identity/admin/accounts`
@@ -180,6 +195,12 @@ All responses use one envelope:
 
 - success: `{ "ok": true, "data": ... }`
 - failure: `{ "ok": false, "error": { "code": "...", "message": "...", "validationErrors"?: [...] } }`
+
+Trusted-device responses are allowlist-projected and intentionally exclude:
+
+- raw device fingerprint material
+- pairing token hashes
+- trust material references and other internal trust persistence fields
 
 ### Register success
 
@@ -452,6 +473,7 @@ Renderer session persistence is intentionally minimized:
 - `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `infrastructure/api/identity/IdentityAuthObservability.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- trusted-device API route and contract coverage in the same backend/HTTP test suites
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
 - `ui/pages/tests/IdentityAdminPage.test.tsx`
 

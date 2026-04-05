@@ -482,6 +482,95 @@ describe("IdentityAuthBackendApi", () => {
     expect(resolveDisabledSession.error?.code).toBe("authentication-failed");
   });
 
+  it("supports trusted-device management and pairing backend flows", async () => {
+    const harness = await createIdentityAuthTestHarness();
+
+    const register = await harness.backendApi.registerLocalAccount({
+      username: "trusted.device.backend.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(register.ok).toBeTrue();
+    if (!register.ok || !register.data) {
+      throw new Error("Expected registration payload.");
+    }
+
+    await harness.provisionTrustedDevice({
+      trustedDeviceId: "trusted-device:backend-flow",
+      userIdentityId: register.data.userIdentityId,
+      trustStatus: "pending-pairing",
+    });
+
+    const listed = await harness.backendApi.listTrustedDevices({
+      userIdentityId: register.data.userIdentityId,
+    });
+    expect(listed.ok).toBeTrue();
+    expect(listed.data?.devices.some((device) => device.trustedDeviceId === "trusted-device:backend-flow")).toBeTrue();
+    expect(listed.data?.devices[0]?.metadata).toBeDefined();
+
+    const detailed = await harness.backendApi.getTrustedDevice({
+      trustedDeviceId: "trusted-device:backend-flow",
+    });
+    expect(detailed.ok).toBeTrue();
+    expect(detailed.data?.trustedDevice.trustedDeviceId).toBe("trusted-device:backend-flow");
+
+    const renamed = await harness.backendApi.updateTrustedDeviceDisplayName({
+      trustedDeviceId: "trusted-device:backend-flow",
+      displayName: "Backend Flow Device",
+    });
+    expect(renamed.ok).toBeTrue();
+    expect(renamed.data?.trustedDevice.displayName).toBe("Backend Flow Device");
+
+    const initiated = await harness.backendApi.initiateTrustedDevicePairing({
+      trustedDeviceId: "trusted-device:backend-flow",
+      userIdentityId: register.data.userIdentityId,
+      artifactType: "one-time-code",
+      actorBinding: {
+        scope: "same-user",
+        userIdentityId: register.data.userIdentityId,
+      },
+      expiresAt: "2026-04-04T18:30:00.000Z",
+    });
+    expect(initiated.ok).toBeTrue();
+    if (!initiated.ok || !initiated.data) {
+      throw new Error("Expected initiated pairing payload.");
+    }
+
+    const validated = await harness.backendApi.validateTrustedDevicePairing({
+      pairingSessionId: initiated.data.pairingSession.pairingSessionId,
+      pairingTokenId: initiated.data.pairingToken.pairingTokenId,
+      trustedDeviceId: "trusted-device:backend-flow",
+      userIdentityId: register.data.userIdentityId,
+      presentedToken: initiated.data.artifact.value,
+    });
+    expect(validated.ok).toBeTrue();
+    expect(validated.data?.outcome).toBe("valid");
+
+    const completed = await harness.backendApi.completeTrustedDevicePairing({
+      pairingSessionId: initiated.data.pairingSession.pairingSessionId,
+      pairingTokenId: initiated.data.pairingToken.pairingTokenId,
+      trustedDeviceId: "trusted-device:backend-flow",
+      userIdentityId: register.data.userIdentityId,
+      presentedToken: initiated.data.artifact.value,
+      trustMaterialRef: {
+        materialId: "material:trusted-device:backend-flow",
+        kind: "session-signing-key",
+        issuedAt: "2026-04-04T18:00:00.000Z",
+      },
+    });
+    expect(completed.ok).toBeTrue();
+    expect(completed.data?.trustedDevice.trustStatus).toBe("trusted");
+
+    const revoked = await harness.backendApi.revokeTrustedDevice({
+      trustedDeviceId: "trusted-device:backend-flow",
+      reason: "user-request",
+      revokedByUserIdentityId: register.data.userIdentityId,
+    });
+    expect(revoked.ok).toBeTrue();
+    expect(revoked.data?.revoked).toBeTrue();
+  });
+
   it("emits structured redacted observability events for register/login success and failure", async () => {
     const logger = new CapturingObservabilityLogger();
     const auditEventSink = new CapturingAuditEventSink();

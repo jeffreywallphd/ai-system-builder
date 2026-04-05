@@ -1,6 +1,7 @@
 const REDACTED_VALUE = "[REDACTED]";
 
 const SENSITIVE_FIELD_KEYS = new Set([
+  "artifact",
   "authorization",
   "assertion",
   "bearertoken",
@@ -9,6 +10,7 @@ const SENSITIVE_FIELD_KEYS = new Set([
   "credential",
   "currentcredential",
   "email",
+  "fingerprint",
   "hash",
   "hashvalue",
   "otp",

@@ -20,6 +20,10 @@ import {
   revokeTrustedDevice,
   type TrustedDevice,
 } from "../../../../src/domain/identity/TrustedDeviceDomain";
+import type {
+  PairingSession,
+  PairingToken,
+} from "../../../../src/domain/identity/TrustedDevicePairingDomain";
 import {
   IdentityCredentialMaterialStatuses,
   IdentityErrorCodes,
@@ -37,6 +41,9 @@ import {
   type IdentitySessionTokenMaterialRecord,
   type TrustedDeviceListQuery,
   type TrustedDeviceLookupByFingerprintQuery,
+  type TrustedDevicePairingInvalidationRequest,
+  type TrustedDevicePairingSessionRecord,
+  type TrustedDevicePairingTokenRecord,
   type TrustedDeviceRevocationRequest,
   type IdentityUserIdentityListQuery,
 } from "../../../../application/contracts/IdentityApplicationContracts";
@@ -48,7 +55,10 @@ import type { IIdentityPersistenceRepository } from "../../../../application/ide
 import type { IIdentitySessionRepository } from "../../../../application/identity/ports/IIdentitySessionRepository";
 import type { IIdentitySessionTokenMaterialRepository } from "../../../../application/identity/ports/IIdentitySessionTokenMaterialRepository";
 import type { IIdentitySessionTokenService } from "../../../../application/identity/ports/IIdentitySessionTokenService";
+import type { ITrustedDevicePairingRepository } from "../../../../application/identity/ports/ITrustedDevicePairingRepository";
 import type { ITrustedDeviceRepository } from "../../../../application/identity/ports/ITrustedDeviceRepository";
+import { TrustedDeviceManagementService } from "../../../../application/identity/services/TrustedDeviceManagementService";
+import { TrustedDevicePairingService } from "../../../../application/identity/services/TrustedDevicePairingService";
 import type {
   ILocalPasswordCredentialService,
   LocalPasswordCredentialMaterial,
@@ -67,7 +77,20 @@ import { RevokeIdentitySessionUseCase } from "../../../../src/application/identi
 import { ListLocalIdentityAccountsUseCase } from "../../../../src/application/identity/use-cases/ListLocalIdentityAccountsUseCase";
 import { GetLocalIdentityAccountStatusUseCase } from "../../../../src/application/identity/use-cases/GetLocalIdentityAccountStatusUseCase";
 import { SetLocalIdentityAccountStatusUseCase } from "../../../../src/application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
+import { ListTrustedDevicesUseCase } from "../../../../src/application/identity/use-cases/ListTrustedDevicesUseCase";
+import { GetTrustedDeviceUseCase } from "../../../../src/application/identity/use-cases/GetTrustedDeviceUseCase";
+import { RevokeTrustedDeviceUseCase } from "../../../../src/application/identity/use-cases/RevokeTrustedDeviceUseCase";
+import { UpdateTrustedDeviceDisplayNameUseCase } from "../../../../src/application/identity/use-cases/UpdateTrustedDeviceDisplayNameUseCase";
+import { InitiateTrustedDevicePairingUseCase } from "../../../../src/application/identity/use-cases/InitiateTrustedDevicePairingUseCase";
+import { ValidateTrustedDevicePairingUseCase } from "../../../../src/application/identity/use-cases/ValidateTrustedDevicePairingUseCase";
+import { CompleteTrustedDevicePairingUseCase } from "../../../../src/application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
 import type { IdentityAuthObservabilityOptions } from "../IdentityAuthObservability";
+import {
+  mapPairingSessionRecord,
+  mapPairingTokenRecord,
+  mapSessionRecordToDomain,
+  mapTokenRecordToDomain,
+} from "../../../../application/identity/services/TrustedDeviceServiceMappers";
 
 class InMemoryIdentityAdapter
   implements
@@ -79,13 +102,16 @@ class InMemoryIdentityAdapter
     IIdentityClock,
     IIdentityIdGenerator,
     IIdentitySessionTokenService,
-    ITrustedDeviceRepository {
+    ITrustedDeviceRepository,
+    ITrustedDevicePairingRepository {
   private readonly users = new Map<string, UserIdentity>();
   private readonly providers = new Map<string, AuthProvider>();
   private readonly policies = new Map<string, CredentialPolicy>();
   private readonly credentialMaterial = new Map<string, IdentityCredentialMaterialRecord>();
   private readonly sessions = new Map<string, Session>();
   private readonly trustedDevices = new Map<string, TrustedDevice>();
+  private readonly pairingSessions = new Map<string, PairingSession>();
+  private readonly pairingTokens = new Map<string, PairingToken>();
   private readonly sessionTokenMaterialBySessionId = new Map<string, IdentitySessionTokenMaterialRecord>();
   private readonly sessionTokenMaterialByHash = new Map<string, IdentitySessionTokenMaterialRecord>();
   private idCounter = 0;
@@ -382,6 +408,114 @@ class InMemoryIdentityAdapter
     return identitySuccess(Object.freeze({ changed: true }));
   }
 
+  public async createPairingSession(
+    session: TrustedDevicePairingSessionRecord,
+  ): Promise<TrustedDevicePairingSessionRecord> {
+    const domain = mapSessionRecordToDomain(session);
+    this.pairingSessions.set(domain.id, domain);
+    return mapPairingSessionRecord(domain);
+  }
+
+  public async createPairingToken(token: TrustedDevicePairingTokenRecord): Promise<TrustedDevicePairingTokenRecord> {
+    const domain = mapTokenRecordToDomain(token);
+    this.pairingTokens.set(domain.id, domain);
+    return mapPairingTokenRecord(domain);
+  }
+
+  public async getPairingSessionById(pairingSessionId: string): Promise<TrustedDevicePairingSessionRecord | undefined> {
+    const session = this.pairingSessions.get(pairingSessionId.trim());
+    return session ? mapPairingSessionRecord(session) : undefined;
+  }
+
+  public async getPairingTokenById(pairingTokenId: string): Promise<TrustedDevicePairingTokenRecord | undefined> {
+    const token = this.pairingTokens.get(pairingTokenId.trim());
+    return token ? mapPairingTokenRecord(token) : undefined;
+  }
+
+  public async getPairingTokenBySessionId(
+    pairingSessionId: string,
+  ): Promise<TrustedDevicePairingTokenRecord | undefined> {
+    const token = [...this.pairingTokens.values()].find((entry) => entry.pairingSessionId === pairingSessionId.trim());
+    return token ? mapPairingTokenRecord(token) : undefined;
+  }
+
+  public async updatePairingSession(
+    session: TrustedDevicePairingSessionRecord,
+  ): Promise<TrustedDevicePairingSessionRecord> {
+    return this.createPairingSession(session);
+  }
+
+  public async updatePairingToken(token: TrustedDevicePairingTokenRecord): Promise<TrustedDevicePairingTokenRecord> {
+    return this.createPairingToken(token);
+  }
+
+  public async invalidatePairingArtifacts(
+    request: TrustedDevicePairingInvalidationRequest,
+  ): Promise<
+    IdentityOperationResult<
+      IdentityMutationOutcome,
+      | typeof IdentityErrorCodes.invalidRequest
+      | typeof IdentityErrorCodes.invalidState
+      | typeof IdentityErrorCodes.notFound
+    >
+  > {
+    const now = request.invalidatedAt ?? this.now().toISOString();
+    let changed = false;
+
+    if (request.pairingTokenId) {
+      const token = this.pairingTokens.get(request.pairingTokenId.trim());
+      if (!token) {
+        return identityFailure({
+          code: IdentityErrorCodes.notFound,
+          message: "Pairing token was not found.",
+          boundary: "infrastructure",
+          retryable: false,
+        });
+      }
+
+      this.pairingTokens.set(token.id, mapTokenRecordToDomain({
+        ...mapPairingTokenRecord(token),
+        status: "invalidated",
+        invalidationReason: request.reason,
+        invalidatedAt: now,
+        invalidatedByUserIdentityId: request.invalidatedByUserIdentityId,
+        invalidationNote: request.note,
+        updatedAt: now,
+      }));
+      changed = true;
+    }
+
+    if (request.pairingSessionId) {
+      const session = this.pairingSessions.get(request.pairingSessionId.trim());
+      if (!session) {
+        return identityFailure({
+          code: IdentityErrorCodes.notFound,
+          message: "Pairing session was not found.",
+          boundary: "infrastructure",
+          retryable: false,
+        });
+      }
+      this.pairingSessions.set(session.id, mapSessionRecordToDomain({
+        ...mapPairingSessionRecord(session),
+        status: "invalidated",
+        invalidatedAt: now,
+        updatedAt: now,
+      }));
+      changed = true;
+    }
+
+    if (!request.pairingTokenId && !request.pairingSessionId) {
+      return identityFailure({
+        code: IdentityErrorCodes.invalidRequest,
+        message: "pairingSessionId or pairingTokenId is required.",
+        boundary: "infrastructure",
+        retryable: false,
+      });
+    }
+
+    return identitySuccess(Object.freeze({ changed }));
+  }
+
   public async provisionTrustedDevice(input: {
     readonly trustedDeviceId: string;
     readonly userIdentityId: string;
@@ -480,6 +614,13 @@ export async function createIdentityAuthTestHarness(
       thinClient: "allow-untrusted",
     },
   });
+  const trustedDeviceManagementService = new TrustedDeviceManagementService(adapter, adapter, adapter);
+  const trustedDevicePairingService = new TrustedDevicePairingService({
+    trustedDeviceRepository: adapter,
+    pairingRepository: adapter,
+    idGenerator: adapter,
+    clock: adapter,
+  });
   const authenticatedSessionService = new IdentityAuthenticatedSessionService({
     lifecycleService: sessionLifecycleService,
     sessionRepository: adapter,
@@ -536,6 +677,27 @@ export async function createIdentityAuthTestHarness(
       sessionRepository: adapter,
       authenticatedSessionService,
       clock: adapter,
+    }),
+    listTrustedDevicesUseCase: new ListTrustedDevicesUseCase({
+      trustedDeviceManagementService,
+    }),
+    getTrustedDeviceUseCase: new GetTrustedDeviceUseCase({
+      trustedDeviceManagementService,
+    }),
+    revokeTrustedDeviceUseCase: new RevokeTrustedDeviceUseCase({
+      trustedDeviceManagementService,
+    }),
+    updateTrustedDeviceDisplayNameUseCase: new UpdateTrustedDeviceDisplayNameUseCase({
+      trustedDeviceManagementService,
+    }),
+    initiateTrustedDevicePairingUseCase: new InitiateTrustedDevicePairingUseCase({
+      pairingService: trustedDevicePairingService,
+    }),
+    validateTrustedDevicePairingUseCase: new ValidateTrustedDevicePairingUseCase({
+      pairingService: trustedDevicePairingService,
+    }),
+    completeTrustedDevicePairingUseCase: new CompleteTrustedDevicePairingUseCase({
+      pairingService: trustedDevicePairingService,
     }),
     identityLookupRepository: adapter,
     authenticatedSessionService,

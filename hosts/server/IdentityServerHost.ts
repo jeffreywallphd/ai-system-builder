@@ -30,7 +30,16 @@ import { IdentitySessionPolicyConfig } from "../../infrastructure/config/Identit
 import { IdentitySessionTrustPolicyConfig } from "../../infrastructure/config/IdentitySessionTrustPolicyConfig";
 import { IdentityProviderAccountPolicyConfig } from "../../infrastructure/config/IdentityProviderAccountPolicyConfig";
 import { SqliteTrustedDeviceRepository } from "../../infrastructure/filesystem/identity/SqliteTrustedDeviceRepository";
+import { TrustedDeviceManagementService } from "../../application/identity/services/TrustedDeviceManagementService";
+import { TrustedDevicePairingService } from "../../application/identity/services/TrustedDevicePairingService";
 import { TrustedDeviceSessionTrustService } from "../../application/identity/services/TrustedDeviceSessionTrustService";
+import { ListTrustedDevicesUseCase } from "../../src/application/identity/use-cases/ListTrustedDevicesUseCase";
+import { GetTrustedDeviceUseCase } from "../../src/application/identity/use-cases/GetTrustedDeviceUseCase";
+import { RevokeTrustedDeviceUseCase } from "../../src/application/identity/use-cases/RevokeTrustedDeviceUseCase";
+import { UpdateTrustedDeviceDisplayNameUseCase } from "../../src/application/identity/use-cases/UpdateTrustedDeviceDisplayNameUseCase";
+import { InitiateTrustedDevicePairingUseCase } from "../../src/application/identity/use-cases/InitiateTrustedDevicePairingUseCase";
+import { ValidateTrustedDevicePairingUseCase } from "../../src/application/identity/use-cases/ValidateTrustedDevicePairingUseCase";
+import { CompleteTrustedDevicePairingUseCase } from "../../src/application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
 import {
   createIdentityHttpServer,
   type IdentityHttpServerLogger,
@@ -91,6 +100,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const sessionTrustService = new TrustedDeviceSessionTrustService({
     trustedDeviceRepository,
     policies: sessionTrustPolicies,
+  });
+  const trustedDeviceManagementService = new TrustedDeviceManagementService(trustedDeviceRepository, idGenerator, clock);
+  const trustedDevicePairingService = new TrustedDevicePairingService({
+    trustedDeviceRepository,
+    pairingRepository: trustedDeviceRepository,
+    idGenerator,
+    clock,
   });
   const sessionLifecycleService = new IdentitySessionLifecycleService({
     sessionRepository: repository,
@@ -160,6 +176,27 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       authenticatedSessionService,
       clock,
       eventPublisher,
+    }),
+    listTrustedDevicesUseCase: new ListTrustedDevicesUseCase({
+      trustedDeviceManagementService,
+    }),
+    getTrustedDeviceUseCase: new GetTrustedDeviceUseCase({
+      trustedDeviceManagementService,
+    }),
+    revokeTrustedDeviceUseCase: new RevokeTrustedDeviceUseCase({
+      trustedDeviceManagementService,
+    }),
+    updateTrustedDeviceDisplayNameUseCase: new UpdateTrustedDeviceDisplayNameUseCase({
+      trustedDeviceManagementService,
+    }),
+    initiateTrustedDevicePairingUseCase: new InitiateTrustedDevicePairingUseCase({
+      pairingService: trustedDevicePairingService,
+    }),
+    validateTrustedDevicePairingUseCase: new ValidateTrustedDevicePairingUseCase({
+      pairingService: trustedDevicePairingService,
+    }),
+    completeTrustedDevicePairingUseCase: new CompleteTrustedDevicePairingUseCase({
+      pairingService: trustedDevicePairingService,
     }),
     identityLookupRepository: repository,
     authenticatedSessionService,
