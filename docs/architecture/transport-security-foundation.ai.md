@@ -2,17 +2,24 @@
 
 ## Purpose
 
-Story 7.1.1 baseline for Feature 7 / Epic 7.1: secure transport domain/application contracts for HTTPS/WSS/TLS connection acceptance decisions.
+Story 7.1.1 + 7.1.2 baseline for Feature 7 / Epic 7.1: secure transport domain/application contracts plus centralized trust-state validation for HTTPS/WSS/TLS connection acceptance decisions.
 
 ## Canonical files
 
 - `src/domain/security/TransportSecurityDomain.ts`
 - `src/application/security/ports/TransportSecurityPorts.ts`
 - `src/application/security/use-cases/EvaluateTransportConnectionPolicyUseCase.ts`
+- `src/application/security/ports/TransportTrustValidationPorts.ts`
+- `src/application/security/use-cases/ValidateTransportConnectionTrustUseCase.ts`
 - `src/shared/contracts/security/TransportSecurityContracts.ts`
 - `src/domain/security/tests/TransportSecurityDomain.test.ts`
 - `src/application/security/tests/EvaluateTransportConnectionPolicyUseCase.test.ts`
+- `src/application/security/tests/ValidateTransportConnectionTrustUseCase.test.ts`
 - `src/shared/contracts/security/tests/TransportSecurityContracts.test.ts`
+- `src/infrastructure/security/ServerManagedTransportTrustStateResolver.ts`
+- `src/infrastructure/security/tests/ServerManagedTransportTrustStateResolver.test.ts`
+- `src/infrastructure/transport/TransportTrustValidationAdapters.ts`
+- `src/infrastructure/transport/tests/TransportTrustValidationAdapters.test.ts`
 
 ## Core contract model
 
@@ -56,15 +63,23 @@ User trust is not treated as node trust.
 - `ITransportConnectionPolicyEvaluatorPort`
 - `ITransportConnectionPolicyAuditPort` (optional, non-blocking)
 - `EvaluateTransportConnectionPolicyUseCase` composes policy resolve + trust decision + audit event.
+- `TransportTrustValidationPorts` adds trust-state resolution seams for:
+  - trusted-device metadata/state
+  - node trust/revocation/certificate posture
+  - peer certificate revocation/trust posture
+- `ValidateTransportConnectionTrustUseCase` is the centralized flow that resolves trust state and then performs one policy decision with structured rejection reasons.
 
 ## Adapter usage guidance
 
 - Construct `TransportConnectionContext` at transport boundary from request/session/cert evidence.
-- Resolve/evaluate policy before accepting channel.
+- Prefer invoking `ValidateTransportConnectionTrustUseCase` from host adapters so state-resolution + policy evaluation stay centralized.
+- Use transport adapters (`HTTP` / `WebSocket`) to map validation outcomes to safe protocol responses.
 - Map rejection reasons to host-level response semantics (HTTP/WS/service) without re-implementing trust rules in each host.
 
 ## Test coverage in this slice
 
 - domain baseline policy + rejection rules
 - application orchestration and audit behavior
+- centralized trust-state resolution + validation scenarios
+- transport adapter mapping behavior for accepted vs denied trust decisions
 - shared DTO contract projection and validation guards
