@@ -23,6 +23,9 @@ import {
 } from "../IdentityServerHost";
 import type { InitializeInternalCertificateAuthorityInput, InitializeInternalCertificateAuthorityResult } from "../../../src/application/security/ports/ICertificateAuthorityIssuerPort";
 import { SqliteCertificateAuthorityPersistenceAdapter } from "../../../src/infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
+import { InternalCertificateAuthorityIssuer } from "../../../src/infrastructure/security/ca/InternalCertificateAuthorityIssuer";
+import { createFileSystemProtectedSecretStoreFromEnvironment } from "../../../src/infrastructure/security/secrets/FileSystemProtectedSecretStore";
+import { ProtectedCertificateAuthorityRootMaterialStorage } from "../../../src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
 
 class InMemoryIdentityDefaultConfigurationRepository {
   public readonly providers = new Map<string, AuthProvider>();
@@ -432,6 +435,73 @@ describe("IdentityServerHost", () => {
     rmSync(tempDirectory, { recursive: true, force: true });
   });
 
+  it("fails closed when managed TLS is enabled but runtime trust material cannot be resolved", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-managed-tls-missing-runtime-package-"));
+    const databasePath = join(tempDirectory, "identity-managed-tls-missing-runtime-package.sqlite");
+    const protectedSecretsDirectory = join(tempDirectory, "protected-secrets");
+
+    await expect(startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+      env: {
+        AI_LOOM_INTERNAL_CA_SERVER_MANAGED_TLS_ENABLED: "true",
+        AI_LOOM_INTERNAL_CA_SERVER_TLS_PRIVATE_KEY_MATERIAL_REF: "trust:server:key:missing",
+        AI_LOOM_INTERNAL_CA_PROTECTED_SECRETS_DIRECTORY: protectedSecretsDirectory,
+        AI_LOOM_INTERNAL_CA_PROTECTED_SECRETS_KEY: Buffer.alloc(32, 21).toString("base64"),
+      },
+    })).rejects.toThrow("Managed identity-server TLS startup failed");
+
+    rmSync(tempDirectory, { recursive: true, force: true });
+  });
+
+  it("fails closed when managed TLS resolves a revoked server certificate", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-managed-tls-revoked-"));
+    const databasePath = join(tempDirectory, "identity-managed-tls-revoked.sqlite");
+    const managedTlsEnv = createManagedTlsEnvironment(tempDirectory);
+    await seedManagedTlsServerCertificate({
+      databasePath,
+      env: managedTlsEnv,
+      certificateStatus: "revoked",
+    });
+
+    await expect(startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+      env: managedTlsEnv,
+    })).rejects.toThrow("is not usable");
+
+    rmSync(tempDirectory, { recursive: true, force: true });
+  });
+
+  it("boots with managed TLS material resolved through certificate services", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-managed-tls-success-"));
+    const databasePath = join(tempDirectory, "identity-managed-tls-success.sqlite");
+    const managedTlsEnv = createManagedTlsEnvironment(tempDirectory);
+    await seedManagedTlsServerCertificate({
+      databasePath,
+      env: managedTlsEnv,
+      certificateStatus: "issued",
+    });
+
+    const host = await startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+      env: managedTlsEnv,
+    });
+
+    await host.close();
+    rmSync(tempDirectory, { recursive: true, force: true });
+  });
+
   it("initializes CA through host composition by invoking the application use case", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-ca-init-host-"));
     const databasePath = join(tempDirectory, "identity-ca-init-host.sqlite");
@@ -477,3 +547,116 @@ describe("IdentityServerHost", () => {
     rmSync(tempDirectory, { recursive: true, force: true });
   });
 });
+
+function createManagedTlsEnvironment(tempDirectory: string): Readonly<Record<string, string>> {
+  const protectedSecretsDirectory = join(tempDirectory, "protected-secrets");
+  return Object.freeze({
+    AI_LOOM_INTERNAL_CA_ID: "ca:internal:root:v1",
+    AI_LOOM_INTERNAL_CA_ROOT_CERT_MATERIAL_REF: "trust:ca:cert:v1",
+    AI_LOOM_INTERNAL_CA_ROOT_KEY_MATERIAL_REF: "trust:ca:key:v1",
+    AI_LOOM_INTERNAL_CA_ROOT_CERT_SECRET_REF: "secret-store:internal-ca:root-cert",
+    AI_LOOM_INTERNAL_CA_ROOT_KEY_SECRET_REF: "secret-store:internal-ca:root-key",
+    AI_LOOM_INTERNAL_CA_SERVER_MANAGED_TLS_ENABLED: "true",
+    AI_LOOM_INTERNAL_CA_SERVER_REFERENCE_ID: "server:authoritative",
+    AI_LOOM_INTERNAL_CA_SERVER_TLS_PRIVATE_KEY_MATERIAL_REF: "trust:ca:key:v1",
+    AI_LOOM_INTERNAL_CA_PROTECTED_SECRETS_DIRECTORY: protectedSecretsDirectory,
+    AI_LOOM_INTERNAL_CA_PROTECTED_SECRETS_KEY: Buffer.alloc(32, 47).toString("base64"),
+  });
+}
+
+async function seedManagedTlsServerCertificate(input: {
+  readonly databasePath: string;
+  readonly env: Readonly<Record<string, string | undefined>>;
+  readonly certificateStatus: "issued" | "revoked";
+}): Promise<void> {
+  const repository = new SqliteCertificateAuthorityPersistenceAdapter(input.databasePath);
+  const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(input.env);
+  if (!protectedSecretStore) {
+    throw new Error("Managed TLS test setup requires protected secret storage.");
+  }
+
+  const issuer = new InternalCertificateAuthorityIssuer({
+    certificateAuthorityRepository: repository,
+    trustMaterialRepository: repository,
+    rootMaterialStorage: new ProtectedCertificateAuthorityRootMaterialStorage(protectedSecretStore),
+  });
+
+  const initialized = await initializeCertificateAuthorityForFirstSetup({
+    databasePath: input.databasePath,
+    issuer,
+    env: input.env,
+  }, {
+    operationKey: `managed-tls-test-ca-init:${Date.now()}`,
+    certificateAuthorityId: "ca:internal:root:v1",
+    displayName: "AI Loom Internal Root",
+    subject: {
+      commonName: "AI Loom Internal Root CA",
+      dnsNames: ["ca.ai-loom.internal"],
+      ipAddresses: [],
+      uriSanEntries: [],
+    },
+    signatureAlgorithm: "sha256WithRSAEncryption",
+    validityDays: 3650,
+    actorUserIdentityId: "user:admin",
+    rootCertificateMaterialRef: "trust:ca:cert:v1",
+    rootPrivateKeyMaterialRef: "trust:ca:key:v1",
+    rootCertificateSecretRef: "secret-store:internal-ca:root-cert",
+    rootPrivateKeySecretRef: "secret-store:internal-ca:root-key",
+  });
+
+  if (initialized.outcome !== "initialized") {
+    throw new Error("Managed TLS test setup expected certificate authority initialization.");
+  }
+
+  const issuedAt = "2026-04-05T12:00:00.000Z";
+  const revokedAt = "2026-04-05T12:30:00.000Z";
+  await repository.saveIssuedCertificate({
+    mutation: {
+      operationKey: `managed-tls-test-issued-cert:${Date.now()}`,
+      context: {
+        actorUserIdentityId: "user:admin",
+        occurredAt: issuedAt,
+      },
+    },
+    record: {
+      certificateAuthorityId: "ca:internal:root:v1",
+      serialNumber: "AA11BB22",
+      status: input.certificateStatus,
+      subject: {
+        commonName: "authoritative.ai-loom.internal",
+        dnsNames: ["authoritative.ai-loom.internal"],
+        ipAddresses: [],
+        uriSanEntries: [],
+      },
+      subjectReference: {
+        kind: "service",
+        referenceId: "server:authoritative",
+      },
+      usages: ["server-auth", "client-auth"],
+      validity: {
+        notBefore: "2026-04-05T11:00:00.000Z",
+        notAfter: "2027-04-05T11:00:00.000Z",
+      },
+      issuedAt,
+      certificateMaterialRef: "trust:ca:cert:v1",
+      certificateChainMaterialRef: "trust:ca:cert:v1",
+      trustMaterialRef: "trust:ca:cert:v1",
+      publicKeyAlgorithm: "rsa-4096",
+      publicKeyFingerprintSha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      revocation: input.certificateStatus === "revoked"
+        ? {
+          reason: "superseded",
+          revokedAt,
+          revokedByActorId: "user:admin",
+          note: "managed tls revoked test",
+        }
+        : undefined,
+      createdAt: issuedAt,
+      createdBy: "user:admin",
+      lastModifiedAt: input.certificateStatus === "revoked" ? revokedAt : issuedAt,
+      lastModifiedBy: "user:admin",
+      revision: 1,
+    },
+  });
+  repository.dispose();
+}

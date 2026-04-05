@@ -20,6 +20,7 @@
 - Adds runtime trust-material export/distribution contracts for scoped runtime consumers (Story 6.3.1).
 - Adds certificate renewal eligibility and rotation planning services for pre-expiry operations readiness (Story 6.3.2).
 - Adds certificate renewal/replacement execution workflow with explicit prior-certificate disposition controls and audit seams (Story 6.3.3).
+- Adds authoritative server host/runtime wiring that resolves managed server trust material through CA/certificate services before transport startup (Story 6.3.4).
 
 ## Main artifacts to cite
 
@@ -60,6 +61,7 @@
 - `src/infrastructure/security/ca/InternalCertificateAuthorityIssuer.ts`
 - `src/infrastructure/security/certificates/RuntimeTrustMaterialDistributionService.ts`
 - `hosts/server/IdentityServerHost.ts`
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
 - `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
@@ -320,6 +322,20 @@ Structured diagnostics emitted by the startup use case are designed for future o
   - `certificate-renewal-succeeded`
   - `certificate-renewal-failed`
 
+## Story 6.3.4 authoritative server runtime wiring behavior
+
+- `startIdentityServerHost` now supports managed TLS bootstrap posture (`AI_LOOM_INTERNAL_CA_SERVER_MANAGED_TLS_ENABLED=true`) so authoritative transport startup depends on managed certificate services.
+- managed runtime material resolution is composed through:
+  - `ResolveRuntimeTrustMaterialPackageUseCase` + `RuntimeTrustMaterialDistributionService` for server-scoped trust package retrieval,
+  - `ResolveCertificateRevocationStatusUseCase` for certificate trust-state enforcement,
+  - `ProtectedCertificateAuthorityRootMaterialStorage` for protected private-key material loading.
+- startup fails closed when managed runtime trust materials are missing or unsafe:
+  - runtime trust package not found,
+  - package missing server serial or leaf certificate payload,
+  - resolved server certificate trust status is not usable (revoked/expired/not valid),
+  - configured TLS private-key trust material ref missing or wrong kind.
+- `IdentityHttpServer` now supports injected server factory composition so host runtime can start HTTPS using managed certificate material without changing transport handler logic.
+
 ## Coverage in this slice
 
 - Domain invariants and lifecycle transitions: `src/domain/security/tests/CertificateAuthorityDomain.test.ts`
@@ -327,7 +343,7 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - Port contract assumptions: `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
 - Bootstrap startup state coverage: `src/application/security/tests/ResolveCertificateAuthorityStartupStateUseCase.test.ts`
 - Environment adapter coverage: `src/infrastructure/security/tests/InternalCertificateAuthorityBootstrapEnvironmentAdapter.test.ts`
-- Host fail-closed startup coverage: `hosts/server/tests/IdentityServerHost.test.ts`
+- Host fail-closed startup coverage (including managed TLS runtime trust startup outcomes): `hosts/server/tests/IdentityServerHost.test.ts`
 - DTO helper coverage: `src/shared/dto/security/tests/CertificateAuthorityDtos.test.ts`
 - schema parse/validation behavior: `src/shared/schemas/security/tests/CertificateAuthoritySchemaContracts.test.ts`
 - protected-secret store coverage: `src/infrastructure/security/secrets/tests/FileSystemProtectedSecretStore.test.ts`

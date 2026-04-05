@@ -1,4 +1,5 @@
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { createServer as createHttpServer, type IncomingMessage, type RequestListener, type Server, type ServerResponse } from "node:http";
+import type { Server as HttpsServer } from "node:https";
 import { randomUUID } from "node:crypto";
 import { URL } from "node:url";
 import { z } from "zod";
@@ -535,7 +536,11 @@ export interface IdentityHttpServerOptions {
   readonly workspaceAdministrationBackendApi?: WorkspaceAdministrationBackendApi;
   readonly logger?: IdentityHttpServerLogger;
   readonly maxBodyBytes?: number;
+  readonly serverFactory?: IdentityHttpServerFactory;
 }
+
+export type IdentityHttpServerInstance = Server | HttpsServer;
+export type IdentityHttpServerFactory = (requestListener: RequestListener) => IdentityHttpServerInstance;
 
 interface AuthenticatedRequestContext {
   readonly principal: AuthenticatedIdentityPrincipalApiResponse;
@@ -547,11 +552,12 @@ interface AuthenticatedRequestContext {
   };
 }
 
-export function createIdentityHttpServer(options: IdentityHttpServerOptions): Server {
+export function createIdentityHttpServer(options: IdentityHttpServerOptions): IdentityHttpServerInstance {
   const logger = options.logger ?? new ConsoleIdentityHttpServerLogger();
   const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+  const serverFactory = options.serverFactory ?? ((requestListener: RequestListener) => createHttpServer(requestListener));
 
-  return createServer(async (request, response) => {
+  return serverFactory(async (request, response) => {
     const requestId = randomUUID();
     const path = new URL(request.url ?? "/", "http://localhost").pathname;
     logger.info(Object.freeze({
