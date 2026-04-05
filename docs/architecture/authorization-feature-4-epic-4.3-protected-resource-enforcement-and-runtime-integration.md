@@ -22,6 +22,8 @@ Story 4.3.1 adds reusable transport authorization adapters so request handlers c
 - `infrastructure/api/system-runtime/tests/SystemRuntimeOperationalAuthorization.test.ts`
 - `infrastructure/api/system-runtime/RuntimeRequestRouter.ts`
 - `infrastructure/api/system-runtime/tests/RuntimeRequestRouter.test.ts`
+- `docs/architecture/authorization-enforcement-integration-patterns.md`
+- `docs/architecture/authorization-enforcement-integration-patterns.ai.md`
 
 ## Enforcement model
 
@@ -136,3 +138,12 @@ Story 4.3.7 test coverage validates:
 - delegated trusted-internal callers still receiving `forbidden` when policy denies access,
 - explicit system-action requirement for trusted-internal bypass in authorization-enabled runtime contexts,
 - async/deferred polling paths preserving delegated actor scope.
+
+Story 4.3.8 documents the enforcement extension playbook for new runtime/resource surfaces:
+
+- new docs codify canonical guard usage for HTTP/WebSocket/IPC routes so transport handlers do not embed ad hoc permission checks,
+- resource-module integration rules now require stable protected-resource tuple contracts (`resourceFamily`/`resourceType`/`resourceId`) and deterministic non-leaky deny behavior where applicable,
+- authorized query patterns now explicitly separate detail checks, list filtering, and queue-plus-item filtering expectations to avoid mixed visibility leakage,
+- redaction guidance is centralized on `deriveAuthorizationResponseAccessLevel(...)` and `shapeAuthorizationAwareResponse(...)` so partial visibility does not expose sensitive fields,
+- UI capability loading guidance now requires backend-derived `actorAccess.capabilities` and presenter-based consumption rather than page-local permission literals,
+- async/trusted-internal runtime guidance now documents required `trustedInternalAuthorization` semantics (`propagate-caller` vs `system-action`) and delegated scope preservation expectations for deferred polling.

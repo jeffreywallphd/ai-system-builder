@@ -24,6 +24,8 @@ Story 4.3.1 introduces reusable transport-layer authorization enforcement adapte
 - `infrastructure/api/system-runtime/tests/SystemRuntimeOperationalAuthorization.test.ts`
 - `infrastructure/api/system-runtime/RuntimeRequestRouter.ts`
 - `infrastructure/api/system-runtime/tests/RuntimeRequestRouter.test.ts`
+- `docs/architecture/authorization-enforcement-integration-patterns.md`
+- `docs/architecture/authorization-enforcement-integration-patterns.ai.md`
 
 ## Transport enforcement model
 
@@ -160,3 +162,12 @@ Story 4.3.7 verification covers:
 - trusted internal delegated-caller requests still receiving `forbidden` when policy denies actor access,
 - trusted internal system-action bypass requiring explicit `systemActionId` when authorization is active,
 - async/deferred polling paths honoring delegated actor scope instead of implicit privileged bypass.
+
+Story 4.3.8 adds contributor-facing enforcement documentation for new surfaces:
+
+- canonical transport guard usage patterns for HTTP/WebSocket/IPC handlers so route code does not re-implement permission logic,
+- protected-resource contract expectations for stable `resourceFamily`/`resourceType`/`resourceId` tuples and non-leaky deny behavior where required,
+- authorized query patterns for detail reads, list filtering, and queue-level + per-item runtime filtering,
+- centralized partial-visibility redaction guidance using `deriveAuthorizationResponseAccessLevel(...)` + `shapeAuthorizationAwareResponse(...)`,
+- capability-loading guidance requiring backend-derived `actorAccess.capabilities` plus presenter-level UI consumption,
+- async/trusted-internal semantics guidance for `trustedInternalAuthorization` (`propagate-caller` vs `system-action`) and delegated actor scope preservation in deferred flows.
