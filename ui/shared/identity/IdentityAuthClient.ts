@@ -1,14 +1,24 @@
 import type {
   ChangeLocalPasswordCredentialApiRequest,
   ChangeLocalPasswordCredentialApiResponse,
+  CompleteTrustedDevicePairingApiRequest,
+  CompleteTrustedDevicePairingApiResponse,
   GetIdentityAdminAccountStatusApiRequest,
   GetIdentityAdminAccountStatusApiResponse,
+  GetTrustedDeviceApiRequest,
+  GetTrustedDeviceApiResponse,
   IdentityAuthApiResponse,
+  InitiateTrustedDevicePairingApiRequest,
+  InitiateTrustedDevicePairingApiResponse,
   ListIdentityAdminAccountsApiRequest,
   ListIdentityAdminAccountsApiResponse,
+  ListTrustedDevicesApiRequest,
+  ListTrustedDevicesApiResponse,
   LoginLocalIdentityApiRequest,
   LoginLocalIdentityApiResponse,
   LogoutAuthenticatedSessionApiResponse,
+  RevokeTrustedDeviceApiRequest,
+  RevokeTrustedDeviceApiResponse,
   RevokeIdentitySessionApiRequest,
   RevokeIdentitySessionApiResponse,
   ResolveAuthenticatedSessionApiResponse,
@@ -16,6 +26,10 @@ import type {
   RegisterLocalIdentityApiResponse,
   SetIdentityAdminAccountStatusApiRequest,
   SetIdentityAdminAccountStatusApiResponse,
+  UpdateTrustedDeviceDisplayNameApiRequest,
+  UpdateTrustedDeviceDisplayNameApiResponse,
+  ValidateTrustedDevicePairingApiRequest,
+  ValidateTrustedDevicePairingApiResponse,
 } from "../../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 
 export interface IdentityAuthClient {
@@ -51,6 +65,34 @@ export interface IdentityAuthClient {
     request: ChangeLocalPasswordCredentialApiRequest,
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<ChangeLocalPasswordCredentialApiResponse>>;
+  listTrustedDevices(
+    request: ListTrustedDevicesApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListTrustedDevicesApiResponse>>;
+  getTrustedDevice(
+    request: GetTrustedDeviceApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<GetTrustedDeviceApiResponse>>;
+  revokeTrustedDevice(
+    request: RevokeTrustedDeviceApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeTrustedDeviceApiResponse>>;
+  updateTrustedDeviceDisplayName(
+    request: UpdateTrustedDeviceDisplayNameApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<UpdateTrustedDeviceDisplayNameApiResponse>>;
+  initiateTrustedDevicePairing(
+    request: InitiateTrustedDevicePairingApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<InitiateTrustedDevicePairingApiResponse>>;
+  validateTrustedDevicePairing(
+    request: ValidateTrustedDevicePairingApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ValidateTrustedDevicePairingApiResponse>>;
+  completeTrustedDevicePairing(
+    request: CompleteTrustedDevicePairingApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<CompleteTrustedDevicePairingApiResponse>>;
 }
 
 export class HttpIdentityAuthClient implements IdentityAuthClient {
@@ -161,6 +203,113 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
   ): Promise<IdentityAuthApiResponse<ChangeLocalPasswordCredentialApiResponse>> {
     return this.post(
       "/api/v1/identity/credential/change",
+      request,
+      {
+        authorization: `Bearer ${sessionToken}`,
+      },
+    );
+  }
+
+  public async listTrustedDevices(
+    request: ListTrustedDevicesApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListTrustedDevicesApiResponse>> {
+    const query = new URLSearchParams();
+    if (request.workspaceId) {
+      query.set("workspaceId", request.workspaceId);
+    }
+    if (request.includeStatuses) {
+      for (const status of request.includeStatuses) {
+        query.append("status", status);
+      }
+    }
+    if (typeof request.limit === "number") {
+      query.set("limit", String(request.limit));
+    }
+    if (typeof request.offset === "number") {
+      query.set("offset", String(request.offset));
+    }
+    const queryString = query.toString();
+    const suffix = queryString ? `?${queryString}` : "";
+    return this.get(`/api/v1/identity/trusted-devices${suffix}`, {
+      authorization: `Bearer ${sessionToken}`,
+    });
+  }
+
+  public async getTrustedDevice(
+    request: GetTrustedDeviceApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<GetTrustedDeviceApiResponse>> {
+    return this.get(`/api/v1/identity/trusted-devices/${encodeURIComponent(request.trustedDeviceId)}`, {
+      authorization: `Bearer ${sessionToken}`,
+    });
+  }
+
+  public async revokeTrustedDevice(
+    request: RevokeTrustedDeviceApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeTrustedDeviceApiResponse>> {
+    return this.post(
+      `/api/v1/identity/trusted-devices/${encodeURIComponent(request.trustedDeviceId)}/revoke`,
+      {
+        reason: request.reason,
+        note: request.note,
+        revokedAt: request.revokedAt,
+      },
+      {
+        authorization: `Bearer ${sessionToken}`,
+      },
+    );
+  }
+
+  public async updateTrustedDeviceDisplayName(
+    request: UpdateTrustedDeviceDisplayNameApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<UpdateTrustedDeviceDisplayNameApiResponse>> {
+    return this.post(
+      `/api/v1/identity/trusted-devices/${encodeURIComponent(request.trustedDeviceId)}/display-name`,
+      {
+        displayName: request.displayName,
+        updatedAt: request.updatedAt,
+      },
+      {
+        authorization: `Bearer ${sessionToken}`,
+      },
+    );
+  }
+
+  public async initiateTrustedDevicePairing(
+    request: InitiateTrustedDevicePairingApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<InitiateTrustedDevicePairingApiResponse>> {
+    return this.post(
+      "/api/v1/identity/trusted-devices/pairing/initiate",
+      request,
+      {
+        authorization: `Bearer ${sessionToken}`,
+      },
+    );
+  }
+
+  public async validateTrustedDevicePairing(
+    request: ValidateTrustedDevicePairingApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ValidateTrustedDevicePairingApiResponse>> {
+    return this.post(
+      "/api/v1/identity/trusted-devices/pairing/validate",
+      request,
+      {
+        authorization: `Bearer ${sessionToken}`,
+      },
+    );
+  }
+
+  public async completeTrustedDevicePairing(
+    request: CompleteTrustedDevicePairingApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<CompleteTrustedDevicePairingApiResponse>> {
+    return this.post(
+      "/api/v1/identity/trusted-devices/pairing/complete",
       request,
       {
         authorization: `Bearer ${sessionToken}`,

@@ -193,6 +193,7 @@ The app no longer treats scaffold execution as if it were the primary production
 - Identity foundation overview: `docs/architecture/identity-foundation.md`
 - Identity server API contract: `docs/architecture/identity-server-api.md`
 - Feature 1 final baseline and downstream implementation notes: `docs/architecture/identity-feature-1-final-baseline.md`
+- Trusted-device user workflows: `docs/trusted-device-workflows.md`
 
 ## Node execution truthfulness categories
 

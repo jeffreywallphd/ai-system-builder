@@ -19,6 +19,7 @@ The renderer uses manual composition plus class-based stores/services; it is not
   - `ui/pages/LoginPage.tsx`
   - `ui/pages/RegisterPage.tsx`
   - `ui/pages/IdentityAdminPage.tsx` (account list/status inspection + enable/disable actions via authenticated admin endpoints)
+  - `ui/pages/TrustedDevicesPage.tsx` (trusted-device list/revocation + pairing initiate/validate/complete flow through authenticated trusted-device endpoints)
 - Identity renderer seams follow `shared` / `desktop` / `web` splits:
   - `ui/shared/identity/*`
   - `ui/desktop/identity/*`

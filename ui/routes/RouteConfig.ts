@@ -55,6 +55,7 @@ export const ROUTE_PATHS = Object.freeze({
   configProfileStudio: "/studio-shell/config-profile",
   settings: "/settings",
   identityAdmin: "/settings/identity-admin",
+  trustedDevices: "/settings/trusted-devices",
   notFound: "*",
 });
 
@@ -315,6 +316,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "identity-admin",
     path: ROUTE_PATHS.identityAdmin,
     title: "Identity administration",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "trusted-devices",
+    path: ROUTE_PATHS.trustedDevices,
+    title: "Trusted devices",
     showInNavigation: false,
   }),
 ]);

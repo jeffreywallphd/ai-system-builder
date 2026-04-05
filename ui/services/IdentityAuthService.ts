@@ -1,15 +1,25 @@
 import type {
   ChangeLocalPasswordCredentialApiRequest,
   ChangeLocalPasswordCredentialApiResponse,
+  CompleteTrustedDevicePairingApiRequest,
+  CompleteTrustedDevicePairingApiResponse,
   GetIdentityAdminAccountStatusApiRequest,
   GetIdentityAdminAccountStatusApiResponse,
+  GetTrustedDeviceApiRequest,
+  GetTrustedDeviceApiResponse,
   IdentityAuthApiResponse,
+  InitiateTrustedDevicePairingApiRequest,
+  InitiateTrustedDevicePairingApiResponse,
   ListIdentityAdminAccountsApiRequest,
   ListIdentityAdminAccountsApiResponse,
+  ListTrustedDevicesApiRequest,
+  ListTrustedDevicesApiResponse,
   LoginLocalIdentityApiRequest,
   LoginLocalIdentityApiResponse,
   LogoutAuthenticatedSessionApiRequest,
   LogoutAuthenticatedSessionApiResponse,
+  RevokeTrustedDeviceApiRequest,
+  RevokeTrustedDeviceApiResponse,
   RevokeIdentitySessionApiRequest,
   RevokeIdentitySessionApiResponse,
   ResolveAuthenticatedSessionApiRequest,
@@ -18,6 +28,10 @@ import type {
   RegisterLocalIdentityApiResponse,
   SetIdentityAdminAccountStatusApiRequest,
   SetIdentityAdminAccountStatusApiResponse,
+  UpdateTrustedDeviceDisplayNameApiRequest,
+  UpdateTrustedDeviceDisplayNameApiResponse,
+  ValidateTrustedDevicePairingApiRequest,
+  ValidateTrustedDevicePairingApiResponse,
 } from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
 import { HttpIdentityAuthClient, type IdentityAuthClient } from "../shared/identity/IdentityAuthClient";
@@ -87,6 +101,55 @@ export class IdentityAuthService {
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<ChangeLocalPasswordCredentialApiResponse>> {
     return this.client.changeLocalPasswordCredential(request, sessionToken);
+  }
+
+  public listTrustedDevices(
+    request: ListTrustedDevicesApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListTrustedDevicesApiResponse>> {
+    return this.client.listTrustedDevices(request, sessionToken);
+  }
+
+  public getTrustedDevice(
+    request: GetTrustedDeviceApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<GetTrustedDeviceApiResponse>> {
+    return this.client.getTrustedDevice(request, sessionToken);
+  }
+
+  public revokeTrustedDevice(
+    request: RevokeTrustedDeviceApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeTrustedDeviceApiResponse>> {
+    return this.client.revokeTrustedDevice(request, sessionToken);
+  }
+
+  public updateTrustedDeviceDisplayName(
+    request: UpdateTrustedDeviceDisplayNameApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<UpdateTrustedDeviceDisplayNameApiResponse>> {
+    return this.client.updateTrustedDeviceDisplayName(request, sessionToken);
+  }
+
+  public initiateTrustedDevicePairing(
+    request: InitiateTrustedDevicePairingApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<InitiateTrustedDevicePairingApiResponse>> {
+    return this.client.initiateTrustedDevicePairing(request, sessionToken);
+  }
+
+  public validateTrustedDevicePairing(
+    request: ValidateTrustedDevicePairingApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ValidateTrustedDevicePairingApiResponse>> {
+    return this.client.validateTrustedDevicePairing(request, sessionToken);
+  }
+
+  public completeTrustedDevicePairing(
+    request: CompleteTrustedDevicePairingApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<CompleteTrustedDevicePairingApiResponse>> {
+    return this.client.completeTrustedDevicePairing(request, sessionToken);
   }
 }
 

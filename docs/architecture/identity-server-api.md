@@ -34,6 +34,7 @@ UI entry points now consume this same HTTP surface through renderer identity ada
 - web/thin-client endpoint resolver: `ui/web/identity/resolveWebIdentityApiBaseUrl.ts`
 - UI-facing service: `ui/services/IdentityAuthService.ts`
 - admin UI surface: `ui/pages/IdentityAdminPage.tsx` (account list, status inspection, enable/disable actions)
+- trusted-device UI surface: `ui/pages/TrustedDevicesPage.tsx` (pairing initiation/validation/completion + trusted-device list/revocation flows)
 
 ## Request contracts
 
@@ -476,6 +477,7 @@ Renderer session persistence is intentionally minimized:
 - trusted-device API route and contract coverage in the same backend/HTTP test suites
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
 - `ui/pages/tests/IdentityAdminPage.test.tsx`
+- `ui/pages/tests/TrustedDevicesPage.test.tsx`
 
 ## Related docs
 

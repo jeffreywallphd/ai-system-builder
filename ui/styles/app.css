@@ -1030,8 +1030,61 @@ body {
   color: var(--color-success);
 }
 
+.ui-trusted-devices-page__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: var(--space-lg);
+}
+
+.ui-trusted-devices-page__alert {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.ui-trusted-devices-page__alert--error {
+  color: var(--color-danger);
+}
+
+.ui-trusted-devices-page__alert--success {
+  color: var(--color-success);
+}
+
+.ui-trusted-devices-page__pairing-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.ui-trusted-devices-page__pairing-panel {
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.26);
+}
+
+.ui-trusted-devices-page__artifact-value {
+  font-family: "Fira Code", "Consolas", monospace;
+}
+
+.ui-trusted-devices-page__table-row--selected {
+  background: rgba(79, 156, 249, 0.12);
+}
+
+.ui-trusted-devices-page__device-select {
+  justify-content: flex-start;
+  width: 100%;
+}
+
 @media (max-width: 980px) {
   .ui-identity-admin-page__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ui-trusted-devices-page__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ui-trusted-devices-page__pairing-options {
     grid-template-columns: 1fr;
   }
 }
