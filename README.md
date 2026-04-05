@@ -187,6 +187,12 @@ The app no longer treats scaffold execution as if it were the primary production
 - `ui/composition/**`: explicit dev-vs-desktop repository composition
 - `forge.config.ts`: Electron Forge packaging configuration
 
+## Identity session docs
+
+- Session architecture and integration expectations: `docs/architecture/identity-session-architecture.md`
+- Identity foundation overview: `docs/architecture/identity-foundation.md`
+- Identity server API contract: `docs/architecture/identity-server-api.md`
+
 ## Node execution truthfulness categories
 
 Workflow and node execution now report structured truthfulness categories end to end:

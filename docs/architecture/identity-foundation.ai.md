@@ -200,4 +200,5 @@
 
 - Full architecture note: `docs/architecture/identity-foundation.md`
 - Server endpoint contract note: `docs/architecture/identity-server-api.md`
+- Session subsystem note: `docs/architecture/identity-session-architecture.md`
 

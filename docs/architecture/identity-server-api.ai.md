@@ -99,3 +99,7 @@ Shared redaction (`redactSensitiveAuthPayload`) is reused by both backend and HT
 - `infrastructure/api/identity/IdentityAuthObservability.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
+
+## Related docs
+
+- `docs/architecture/identity-session-architecture.md` (session subsystem baseline)
