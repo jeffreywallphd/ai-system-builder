@@ -43,6 +43,7 @@ Renderer client surface now uses the same endpoint contract:
 - `ui/web/identity/resolveWebIdentityApiBaseUrl.ts`
 - `ui/services/IdentityAuthService.ts`
 - `ui/pages/IdentityAdminPage.tsx` (authenticated identity administration UI surface)
+- `ui/pages/TrustedDevicesPage.tsx` (authenticated trusted-device pairing/management UI surface)
 
 ## Public error contract
 
@@ -160,6 +161,7 @@ Persisted session records now intentionally exclude:
 - trusted-device transport lifecycle coverage in backend + HTTP integration tests (list/detail/revoke/rename + pairing initiate/validate/complete)
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
 - `ui/pages/tests/IdentityAdminPage.test.tsx`
+- `ui/pages/tests/TrustedDevicesPage.test.tsx`
 
 ## Related docs
 

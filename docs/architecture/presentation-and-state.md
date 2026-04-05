@@ -19,6 +19,7 @@ The renderer is a React application whose pages and components depend on a manua
   - `ui/pages/LoginPage.tsx`
   - `ui/pages/RegisterPage.tsx`
   - `ui/pages/IdentityAdminPage.tsx`
+  - `ui/pages/TrustedDevicesPage.tsx`
 - Identity transport and environment seams are split by renderer convention:
   - shared transport/session/validation: `ui/shared/identity/*`
   - desktop endpoint resolution: `ui/desktop/identity/*`

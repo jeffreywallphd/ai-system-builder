@@ -176,6 +176,12 @@ export default function IdentityAdminPage(): JSX.Element {
           </p>
         </div>
         <div className="ui-page__actions">
+          <Link
+            className="ui-button ui-button--secondary ui-button--sm"
+            to={ROUTE_PATHS.trustedDevices}
+          >
+            Trusted devices
+          </Link>
           <button
             type="button"
             className="ui-button ui-button--secondary ui-button--sm"
