@@ -370,6 +370,34 @@ export const AuthorizationVisibilityUpdateRequestSchema = z
     }
   });
 
+export const AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema = z
+  .object({
+    actorUserIdentityId: AuthorizationIdentifierSchema,
+    workspaceId: AuthorizationIdentifierSchema,
+    roleKey: WorkspaceAuthorizationRoleKeySchema,
+    resources: z.array(AuthorizationResourceReferenceSchema)
+      .min(1, "At least one target resource is required.")
+      .max(250, "Bulk sharing grants support up to 250 resources per request."),
+    permissionKeys: z.array(AuthorizationPermissionKeySchema)
+      .min(1, "At least one permission key is required.")
+      .max(32, "Bulk sharing grants support up to 32 permission keys per request."),
+  })
+  .superRefine((value, context) => {
+    const seen = new Set<string>();
+    for (const [index, resource] of value.resources.entries()) {
+      const lookupKey = `${resource.resourceFamily}:${resource.resourceType}:${resource.resourceId}`;
+      if (seen.has(lookupKey)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["resources", index],
+          message: "Duplicate resources are not allowed in bulk sharing grant requests.",
+        });
+      } else {
+        seen.add(lookupKey);
+      }
+    }
+  });
+
 const AuthorizationRoleAssignmentRequestBaseSchema = z.object({
   workspaceId: AuthorizationIdentifierSchema,
   actorUserIdentityId: AuthorizationIdentifierSchema,
@@ -505,6 +533,7 @@ export const AuthorizationResourcePolicyMetadataSchema = z
 export type AuthorizationPolicyEvaluationRequestDtoPayload = z.infer<typeof AuthorizationPolicyEvaluationRequestDtoSchema>;
 export type AuthorizationSharingGrantChangeRequest = z.infer<typeof AuthorizationSharingGrantChangeRequestSchema>;
 export type AuthorizationVisibilityUpdateRequest = z.infer<typeof AuthorizationVisibilityUpdateRequestSchema>;
+export type AuthorizationBulkWorkspaceRoleSharingGrantRequest = z.infer<typeof AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema>;
 export type AuthorizationRoleAssignmentRequest = z.infer<typeof AuthorizationRoleAssignmentRequestSchema>;
 export type AuthorizationResourcePolicyMetadataPayload = z.infer<typeof AuthorizationResourcePolicyMetadataSchema>;
 
@@ -564,6 +593,16 @@ export function parseAuthorizationVisibilityUpdateRequest(
   return parseAuthorizationSchema(
     "AuthorizationVisibilityUpdateRequest",
     AuthorizationVisibilityUpdateRequestSchema,
+    payload,
+  );
+}
+
+export function parseAuthorizationBulkWorkspaceRoleSharingGrantRequest(
+  payload: unknown,
+): AuthorizationBulkWorkspaceRoleSharingGrantRequest {
+  return parseAuthorizationSchema(
+    "AuthorizationBulkWorkspaceRoleSharingGrantRequest",
+    AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema,
     payload,
   );
 }

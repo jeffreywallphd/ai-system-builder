@@ -27,6 +27,7 @@ Story 4.1.5 defines application-layer authorization seams so policy evaluation o
 - `src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase.ts`
 - `src/application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase.ts`
 - `src/application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase.ts`
+- `src/application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase.ts`
 - `src/application/authorization/use-cases/EvaluateAuthorizationPermissionUseCase.ts`
 - `src/application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase.ts`
 - `src/application/authorization/tests/AuthorizationPolicyPortsContracts.test.ts`
@@ -106,6 +107,7 @@ For protected list/search views, compose `AuthorizedResourceQueryService` first,
 - Authorization administration now exposes first-class application use cases so controllers/pages can call stable commands/queries instead of embedding policy logic:
   - role assignment commands (`AssignAuthorizationRoleUseCase`, `RemoveAuthorizationRoleUseCase`)
   - sharing commands (`GrantAuthorizationSharingAccessUseCase`, `RevokeAuthorizationSharingAccessUseCase`)
+  - bulk patterned sharing command (`BulkGrantAuthorizationWorkspaceRoleAccessUseCase`) for applying one workspace-role grant shape across selected resources with per-resource outcomes
   - visibility command (`UpdateAuthorizationVisibilityUseCase`)
   - permission query (`EvaluateAuthorizationPermissionUseCase`)
   - effective-access query (`ListAuthorizationEffectiveAccessUseCase`)
@@ -117,6 +119,7 @@ Mutation gate summary:
 
 - workspace role assignment/removal -> `system.manage` capability
 - sharing grant upsert/revoke -> `<resource-family>.share`
+- bulk workspace-role sharing grant upsert -> `<resource-family>.share` evaluated per targeted resource
 - visibility updates -> `<resource-family>.manage`
 
 ## Caching posture reference

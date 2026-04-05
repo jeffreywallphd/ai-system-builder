@@ -32,12 +32,14 @@ Core validation coverage includes:
   - `AuthorizationPolicyEvaluationRequestDtoSchema`
   - `AuthorizationSharingGrantChangeRequestSchema`
   - `AuthorizationVisibilityUpdateRequestSchema`
+  - `AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema`
   - `AuthorizationRoleAssignmentRequestSchema`
   - `AuthorizationResourcePolicyMetadataSchema`
 - parse helpers with typed failures:
   - `parseAuthorizationPolicyEvaluationRequestDto(...)`
   - `parseAuthorizationSharingGrantChangeRequest(...)`
   - `parseAuthorizationVisibilityUpdateRequest(...)`
+  - `parseAuthorizationBulkWorkspaceRoleSharingGrantRequest(...)`
   - `parseAuthorizationRoleAssignmentRequest(...)`
   - `parseAuthorizationResourcePolicyMetadata(...)`
 
@@ -78,4 +80,5 @@ In short: schemas protect boundary contracts; domain logic protects behavioral c
 - malformed sharing-subject forms
 - malformed role assignment operations
 - publication metadata violations
+- duplicate bulk resource targets and oversized bulk sharing payloads
 - typed `AuthorizationSchemaValidationError` failure shape

@@ -2,6 +2,7 @@ import type { ListAuthorizationEffectiveAccessUseCase } from "../../../src/appli
 import type { GrantAuthorizationSharingAccessUseCase } from "../../../src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
 import type { RevokeAuthorizationSharingAccessUseCase } from "../../../src/application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
 import type { UpdateAuthorizationVisibilityUseCase } from "../../../src/application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
+import type { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "../../../src/application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
 import type { IAuthorizationPolicyDecisionEvaluator } from "../../../src/application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
 import type { IAuthorizationSharingGrantPersistenceRepository } from "../../../src/application/authorization/ports/IAuthorizationSharingGrantPersistenceRepository";
 import type { IAuthorizationResourcePolicyMetadataPersistenceRepository } from "../../../src/application/authorization/ports/IAuthorizationResourcePolicyMetadataPersistenceRepository";
@@ -11,6 +12,8 @@ import {
   AuthorizationManagementApiErrorCodes,
   type AuthorizationAccessStateApiRequest,
   type AuthorizationAccessStateApiResponse,
+  type BulkGrantAuthorizationWorkspaceRoleAccessApiRequest,
+  type BulkGrantAuthorizationWorkspaceRoleAccessApiResponse,
   type AuthorizationManagementApiError,
   type AuthorizationManagementApiResponse,
   type AuthorizationResourcePolicyMetadataApiRecord,
@@ -28,6 +31,7 @@ interface AuthorizationManagementBackendApiDependencies {
   readonly grantSharingAccessUseCase: GrantAuthorizationSharingAccessUseCase;
   readonly revokeSharingAccessUseCase: RevokeAuthorizationSharingAccessUseCase;
   readonly updateVisibilityUseCase: UpdateAuthorizationVisibilityUseCase;
+  readonly bulkGrantWorkspaceRoleAccessUseCase: BulkGrantAuthorizationWorkspaceRoleAccessUseCase;
   readonly listEffectiveAccessUseCase: ListAuthorizationEffectiveAccessUseCase;
   readonly decisionEvaluator: IAuthorizationPolicyDecisionEvaluator;
   readonly sharingGrantPersistenceRepository: IAuthorizationSharingGrantPersistenceRepository;
@@ -112,6 +116,60 @@ export class AuthorizationManagementBackendApi {
       data: Object.freeze({
         grant: toSharingGrantApiRecord(outcome.value.record),
         changed: outcome.value.changed,
+      }),
+    });
+  }
+
+  public async bulkGrantWorkspaceRoleAccess(
+    request: BulkGrantAuthorizationWorkspaceRoleAccessApiRequest,
+  ): Promise<AuthorizationManagementApiResponse<BulkGrantAuthorizationWorkspaceRoleAccessApiResponse>> {
+    const outcome = await this.dependencies.bulkGrantWorkspaceRoleAccessUseCase.execute({
+      request: {
+        actorUserIdentityId: request.actorUserIdentityId,
+        workspaceId: request.workspaceId,
+        roleKey: request.roleKey,
+        resources: request.resources,
+        permissionKeys: request.permissionKeys,
+      },
+      reason: request.reason,
+      correlationId: request.correlationId,
+      metadata: request.metadata,
+    });
+
+    if (!outcome.ok) {
+      return this.failedFromAdministrationOutcome(outcome.error.code, outcome.error.message, outcome.error.details);
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        workspaceId: outcome.value.workspaceId,
+        roleKey: outcome.value.roleKey,
+        permissionKeys: outcome.value.permissionKeys,
+        totalResources: outcome.value.totalResources,
+        succeededResources: outcome.value.succeededResources,
+        failedResources: outcome.value.failedResources,
+        results: Object.freeze(outcome.value.results.map((result) => {
+          if (result.status === "failed") {
+            return Object.freeze({
+              resource: result.resource,
+              status: "failed" as const,
+              error: Object.freeze({
+                code: result.error.code,
+                message: result.error.message,
+                reasonCode: toReasonCode(result.error.details),
+              }),
+            });
+          }
+
+          return Object.freeze({
+            resource: result.resource,
+            status: result.status,
+            grantId: result.grantId,
+            changed: result.changed,
+            revision: result.mutation.record.revision,
+          });
+        })),
       }),
     });
   }

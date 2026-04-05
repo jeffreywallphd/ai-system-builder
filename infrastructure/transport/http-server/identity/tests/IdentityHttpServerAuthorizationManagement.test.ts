@@ -14,6 +14,7 @@ import { AuthorizationPolicyDecisionEvaluator } from "../../../../../src/applica
 import { GrantAuthorizationSharingAccessUseCase } from "../../../../../src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
 import { RevokeAuthorizationSharingAccessUseCase } from "../../../../../src/application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
 import { UpdateAuthorizationVisibilityUseCase } from "../../../../../src/application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
+import { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "../../../../../src/application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
 import { ListAuthorizationEffectiveAccessUseCase } from "../../../../../src/application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
 import { AuthorizationResourceFamilies } from "../../../../../src/domain/authorization/AuthorizationPermissionCatalog";
 import {
@@ -164,6 +165,68 @@ describe("IdentityHttpServer authorization management routes", () => {
     expect(invalidBody.error.code).toBe("invalid-request");
     expect(Array.isArray(invalidBody.error.validationErrors)).toBe(true);
   });
+
+  it("supports bulk workspace-role sharing grant operations with partial failures", async () => {
+    const harness = await startServer();
+    const owner = await registerAndLogin(harness.baseUrl, "auth.mgmt.owner.bulk", "auth-owner-bulk@example.com");
+    await seedAuthorizationResource(harness.adapter, owner.userIdentityId, "user-viewer");
+    await harness.adapter.upsertResourcePolicyMetadata({
+      record: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-private",
+        ownerUserIdentityId: owner.userIdentityId,
+        ownershipScope: ResourceOwnershipScopes.workspace,
+        workspaceId: "workspace-1",
+        visibility: ResourceVisibilities.private,
+        sharingPolicyMode: SharingPolicyModes.ownerOnly,
+        allowResharing: false,
+        isPublishedCapable: false,
+        createdAt: "2026-04-05T11:00:00.000Z",
+        createdBy: owner.userIdentityId,
+        lastModifiedAt: "2026-04-05T11:00:00.000Z",
+        lastModifiedBy: owner.userIdentityId,
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-private-resource",
+        context: {
+          actorUserIdentityId: owner.userIdentityId,
+          occurredAt: "2026-04-05T11:00:00.000Z",
+        },
+      },
+    });
+
+    const bulkResponse = await fetch(`${harness.baseUrl}/api/v1/authorization/sharing-grants/workspace-role/bulk-upsert`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${owner.sessionToken}`,
+      },
+      body: JSON.stringify({
+        workspaceId: "workspace-1",
+        roleKey: "viewer",
+        resources: [
+          {
+            resourceFamily: "asset",
+            resourceType: "asset",
+            resourceId: "asset-1",
+          },
+          {
+            resourceFamily: "asset",
+            resourceType: "asset",
+            resourceId: "asset-private",
+          },
+        ],
+        permissionKeys: ["asset.read"],
+      }),
+    });
+    expect(bulkResponse.status).toBe(200);
+    const bulkBody = await bulkResponse.json();
+    expect(bulkBody.ok).toBe(true);
+    expect(bulkBody.data.succeededResources).toBe(1);
+    expect(bulkBody.data.failedResources).toBe(1);
+  });
 });
 
 async function startServer(): Promise<{
@@ -217,6 +280,15 @@ async function startServer(): Promise<{
       },
     }),
     updateVisibilityUseCase: new UpdateAuthorizationVisibilityUseCase({
+      mutationService,
+      decisionEvaluator,
+      persistencePorts: {
+        roleAssignmentPersistenceRepository: adapter,
+        sharingGrantPersistenceRepository: adapter,
+        resourcePolicyMetadataPersistenceRepository: adapter,
+      },
+    }),
+    bulkGrantWorkspaceRoleAccessUseCase: new BulkGrantAuthorizationWorkspaceRoleAccessUseCase({
       mutationService,
       decisionEvaluator,
       persistencePorts: {

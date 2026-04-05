@@ -6,6 +6,7 @@ import { AuthorizationManagementBackendApi } from "../AuthorizationManagementBac
 import { GrantAuthorizationSharingAccessUseCase } from "../../../../src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
 import { RevokeAuthorizationSharingAccessUseCase } from "../../../../src/application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
 import { UpdateAuthorizationVisibilityUseCase } from "../../../../src/application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
+import { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "../../../../src/application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
 import { ListAuthorizationEffectiveAccessUseCase } from "../../../../src/application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
 import { AuthorizationPolicyMutationService } from "../../../../src/application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { AuthorizationPolicyDecisionEvaluator } from "../../../../src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
@@ -167,9 +168,72 @@ describe("AuthorizationManagementBackendApi", () => {
       expect(deniedAccessRead.error?.code).toBe("forbidden");
     }
   });
+
+  it("bulk-grants workspace-role sharing and reports per-resource failures", async () => {
+    const { api, adapter } = await createHarness();
+
+    await adapter.upsertResourcePolicyMetadata({
+      record: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-private",
+        ownerUserIdentityId: "user-owner",
+        ownershipScope: ResourceOwnershipScopes.workspace,
+        workspaceId: "workspace-1",
+        visibility: ResourceVisibilities.private,
+        sharingPolicyMode: SharingPolicyModes.ownerOnly,
+        allowResharing: false,
+        isPublishedCapable: false,
+        createdAt: "2026-04-05T11:00:00.000Z",
+        createdBy: "user-owner",
+        lastModifiedAt: "2026-04-05T11:00:00.000Z",
+        lastModifiedBy: "user-owner",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-private-resource-policy",
+        context: {
+          actorUserIdentityId: "user-owner",
+          occurredAt: "2026-04-05T11:00:00.000Z",
+        },
+      },
+    });
+
+    const response = await api.bulkGrantWorkspaceRoleAccess({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-1",
+      roleKey: "viewer",
+      resources: [
+        {
+          resourceFamily: AuthorizationResourceFamilies.asset,
+          resourceType: "asset",
+          resourceId: "asset-1",
+        },
+        {
+          resourceFamily: AuthorizationResourceFamilies.asset,
+          resourceType: "asset",
+          resourceId: "asset-private",
+        },
+      ],
+      permissionKeys: ["asset.read"],
+    });
+
+    expect(response.ok).toBeTrue();
+    if (!response.ok) {
+      return;
+    }
+
+    expect(response.data.succeededResources).toBe(1);
+    expect(response.data.failedResources).toBe(1);
+    const failed = response.data.results.find((item) => item.status === "failed");
+    expect(failed).toBeDefined();
+  });
 });
 
-async function createHarness(): Promise<{ readonly api: AuthorizationManagementBackendApi }> {
+async function createHarness(): Promise<{
+  readonly api: AuthorizationManagementBackendApi;
+  readonly adapter: SqliteAuthorizationPersistenceAdapter;
+}> {
   const root = mkdtempSync(path.join(tmpdir(), "ai-loom-authorization-management-api-"));
   createdRoots.push(root);
 
@@ -303,6 +367,15 @@ async function createHarness(): Promise<{ readonly api: AuthorizationManagementB
         resourcePolicyMetadataPersistenceRepository: adapter,
       },
     }),
+    bulkGrantWorkspaceRoleAccessUseCase: new BulkGrantAuthorizationWorkspaceRoleAccessUseCase({
+      mutationService,
+      decisionEvaluator,
+      persistencePorts: {
+        roleAssignmentPersistenceRepository: adapter,
+        sharingGrantPersistenceRepository: adapter,
+        resourcePolicyMetadataPersistenceRepository: adapter,
+      },
+    }),
     listEffectiveAccessUseCase: new ListAuthorizationEffectiveAccessUseCase({
       decisionEvaluator,
       roleGrantReadRepository: readAdapter,
@@ -314,5 +387,5 @@ async function createHarness(): Promise<{ readonly api: AuthorizationManagementB
     resourcePolicyMetadataPersistenceRepository: adapter,
   });
 
-  return Object.freeze({ api });
+  return Object.freeze({ api, adapter });
 }

@@ -14,6 +14,7 @@ Story 4.1.6 adds shared authorization payload schemas so malformed requests fail
 - `AuthorizationPolicyEvaluationRequestDtoSchema`
 - `AuthorizationSharingGrantChangeRequestSchema`
 - `AuthorizationVisibilityUpdateRequestSchema`
+- `AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema`
 - `AuthorizationRoleAssignmentRequestSchema`
 - `AuthorizationResourcePolicyMetadataSchema`
 
@@ -23,6 +24,7 @@ Plus reusable parse helpers and typed validation errors:
 - `parseAuthorizationPolicyEvaluationRequestDto(...)`
 - `parseAuthorizationSharingGrantChangeRequest(...)`
 - `parseAuthorizationVisibilityUpdateRequest(...)`
+- `parseAuthorizationBulkWorkspaceRoleSharingGrantRequest(...)`
 - `parseAuthorizationRoleAssignmentRequest(...)`
 - `parseAuthorizationResourcePolicyMetadata(...)`
 
@@ -36,6 +38,7 @@ Schema-level refinements mirror previously defined authorization contracts/invar
 - public sharing target only for `published`
 - role reassignment requires distinct source/target roles
 - published metadata requires publication capability + timestamp
+- bulk workspace-role sharing grants reject duplicate resources and enforce bounded target counts
 
 ## Boundary guidance
 
