@@ -1,6 +1,6 @@
 # Node Trusted Activation Workflow
 
-This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, and Story 5.3.4 (Feature 5 / Epic 5.3): explicit activation of approved nodes into trusted operational state, capability profile registration/validation, operational presence heartbeat ingestion, and admin inventory list/detail views across lifecycle states.
+This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, and Story 5.3.5 (Feature 5 / Epic 5.3): explicit activation of approved nodes into trusted operational state, capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, and authenticated admin UI inventory inspection surfaces.
 
 ## Purpose
 
@@ -28,6 +28,11 @@ This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, and Story 5.3.4 (Feat
 - `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
 - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+- `ui/shared/nodes/NodeInventoryClient.ts`
+- `ui/services/NodeInventoryService.ts`
+- `ui/pages/NodeInventoryPage.tsx`
+- `ui/pages/tests/NodeInventoryPage.test.tsx`
+- `ui/shared/nodes/tests/NodeInventoryClient.test.ts`
 
 ## Lifecycle model
 
@@ -104,6 +109,24 @@ This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, and Story 5.3.4 (Feat
   - `unknown` when no heartbeat snapshot exists yet
 - `pendingEnrollment`
   - detail-only object that includes pending enrollment metadata when available (`requestId`, `status`, `requestedAt`, optional review note/timestamp)
+
+## Admin inventory UI usage
+
+- Authenticated admin route:
+  - `GET` renderer route: `/settings/node-inventory`
+  - settings entry point: Settings -> `Trusted node inventory`
+- The UI consumes real inventory contracts directly:
+  - list: `GET /api/v1/nodes/inventory`
+  - detail: `GET /api/v1/nodes/inventory/:nodeId`
+- Supported inventory filter controls:
+  - `operationalState`, `presenceState`, `approvalStatus`, `enrollmentStatus`
+  - `nodeType`, `capability`, `deploymentTag`
+  - `lastSeenAfter`, `lastSeenBefore`
+- Primary operational distinctions are rendered explicitly:
+  - `pending`, `active`, `offline`, `revoked` status surfaces remain visually distinct through badge treatment and list/detail projections.
+- UI behavior is backend-truthful and non-placeholder:
+  - list rows and detail panels are populated only from API responses,
+  - loading, empty, and error states are explicit in both inventory and detail surfaces.
 
 ## Heartbeat cadence guidance
 

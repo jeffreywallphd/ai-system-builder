@@ -2,7 +2,7 @@
 
 ## Scope
 
-Story 5.3.1, Story 5.3.2, Story 5.3.3, and Story 5.3.4 (Feature 5 / Epic 5.3): approved-node activation plus capability profile registration/validation, operational presence heartbeat ingestion, and admin inventory list/detail query views.
+Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, and Story 5.3.5 (Feature 5 / Epic 5.3): approved-node activation plus capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, and renderer-side admin inventory inspection UI.
 
 ## Canonical files
 
@@ -22,6 +22,11 @@ Story 5.3.1, Story 5.3.2, Story 5.3.3, and Story 5.3.4 (Feature 5 / Epic 5.3): a
 - `infrastructure/api/nodes/NodeTrustBackendApi.ts`
 - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+- `ui/shared/nodes/NodeInventoryClient.ts`
+- `ui/services/NodeInventoryService.ts`
+- `ui/pages/NodeInventoryPage.tsx`
+- `ui/pages/tests/NodeInventoryPage.test.tsx`
+- `ui/shared/nodes/tests/NodeInventoryClient.test.ts`
 
 ## Lifecycle semantics
 
@@ -87,6 +92,23 @@ Story 5.3.1, Story 5.3.2, Story 5.3.3, and Story 5.3.4 (Feature 5 / Epic 5.3): a
   - `lastSeen.lastSeenAt`
   - `lastSeen.heartbeatStatus`
   - `lastSeen.observedBy` (optional)
+
+## Admin UI inventory inspection
+
+- Route surface:
+  - renderer route: `/settings/node-inventory`
+  - discoverable via Settings quick action: `Trusted node inventory`
+- Renderer contracts:
+  - list inventory via `GET /api/v1/nodes/inventory`
+  - inspect detail via `GET /api/v1/nodes/inventory/:nodeId`
+- Supported UI filters align to backend query contract:
+  - `operationalState`, `presenceState`, `approvalStatus`, `enrollmentStatus`
+  - `nodeType`, `capability`, `deploymentTag`
+  - `lastSeenAfter`, `lastSeenBefore`
+- Renderer behavior:
+  - explicit loading/empty/error states for list and detail panes,
+  - no placeholder node data,
+  - state labels and badge treatment keep `pending`, `active`, `offline`, and `revoked` distinct for operators.
 
 ## Heartbeat cadence guidance
 

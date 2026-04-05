@@ -40,6 +40,7 @@ import IdentityAdminPage from "../pages/IdentityAdminPage";
 import TrustedDevicesPage from "../pages/TrustedDevicesPage";
 import WorkspaceAdministrationPage from "../pages/WorkspaceAdministrationPage";
 import NodeEnrollmentReviewPage from "../pages/NodeEnrollmentReviewPage";
+import NodeInventoryPage from "../pages/NodeInventoryPage";
 import WorkspaceMembershipThinClientPage from "../pages/WorkspaceMembershipThinClientPage";
 import WorkspaceInvitationOnboardingPage from "../pages/WorkspaceInvitationOnboardingPage";
 import ProtectedRoute from "./ProtectedRoute";
@@ -140,6 +141,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.authorizationReporting, element: <AuthorizationReportingPage /> },
           { path: ROUTE_PATHS.workspaceAdmin, element: <WorkspaceAdministrationPage /> },
           { path: ROUTE_PATHS.nodeEnrollmentReview, element: <NodeEnrollmentReviewPage /> },
+          { path: ROUTE_PATHS.nodeInventory, element: <NodeInventoryPage /> },
           { path: ROUTE_PATHS.workspaceThinMembership, element: <WorkspaceMembershipThinClientPage /> },
           { path: ROUTE_PATHS.identityAdmin, element: <IdentityAdminPage /> },
           { path: ROUTE_PATHS.trustedDevices, element: <TrustedDevicesPage /> },

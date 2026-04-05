@@ -1126,6 +1126,42 @@ body {
   min-height: 6rem;
 }
 
+.ui-node-inventory-page__alert {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.ui-node-inventory-page__alert--error {
+  color: var(--color-danger);
+}
+
+.ui-node-inventory-page__filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-sm);
+}
+
+.ui-node-inventory-page__grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: var(--space-lg);
+}
+
+.ui-node-inventory-page__table-row--selected {
+  background: rgba(79, 156, 249, 0.12);
+}
+
+.ui-node-inventory-page__select-button {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.ui-node-inventory-page__detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
 .ui-authorization-sharing__field-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -1306,6 +1342,11 @@ body {
   }
 
   .ui-node-enrollment-review-page__detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ui-node-inventory-page__grid,
+  .ui-node-inventory-page__detail-grid {
     grid-template-columns: 1fr;
   }
 
