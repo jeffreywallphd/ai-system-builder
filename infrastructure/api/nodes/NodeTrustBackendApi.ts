@@ -7,6 +7,7 @@ import type {
   RecordNodeHeartbeatUseCase,
   RegisterNodeEnrollmentRequestUseCase,
   RejectNodeEnrollmentUseCase,
+  RevokeNodeTrustUseCase,
   ReviewPendingNodeEnrollmentUseCase,
 } from "../../src/application/nodes/use-cases";
 import type {
@@ -41,14 +42,16 @@ import {
   type ListTrustedNodeInventoryApiRequest,
   type ListTrustedNodeInventoryApiResponse,
   NodeTrustApiErrorCodes,
-  type RecordNodeHeartbeatApiRequest,
-  type RecordNodeHeartbeatApiResponse,
   type ListPendingNodeEnrollmentsApiRequest,
   type ListPendingNodeEnrollmentsApiResponse,
   type NodeTrustApiError,
   type NodeTrustApiResponse,
+  type RecordNodeHeartbeatApiRequest,
+  type RecordNodeHeartbeatApiResponse,
   type RejectNodeEnrollmentApiRequest,
   type RejectNodeEnrollmentApiResponse,
+  type RevokeNodeTrustApiRequest,
+  type RevokeNodeTrustApiResponse,
   type SubmitNodeEnrollmentApiRequest,
   type SubmitNodeEnrollmentApiResponse,
 } from "./sdk/PublicNodeTrustApiContract";
@@ -60,6 +63,7 @@ interface NodeTrustBackendApiDependencies {
   readonly getNodeInventoryDetailUseCase: GetNodeInventoryDetailUseCase;
   readonly approveNodeEnrollmentUseCase: ApproveNodeEnrollmentUseCase;
   readonly rejectNodeEnrollmentUseCase: RejectNodeEnrollmentUseCase;
+  readonly revokeNodeTrustUseCase: RevokeNodeTrustUseCase;
   readonly recordNodeHeartbeatUseCase: RecordNodeHeartbeatUseCase;
   readonly listTrustedNodeInventoryUseCase: ListTrustedNodeInventoryUseCase;
   readonly listNodeInventoryUseCase: ListNodeInventoryUseCase;
@@ -236,6 +240,34 @@ export class NodeTrustBackendApi {
       ok: true,
       data: Object.freeze({
         enrollment: toNodeEnrollmentDetailDto(this.toInternalEnrollment(outcome.value.enrollmentRequest)),
+        node: toNodeDetailDto(this.toInternalNode(outcome.value.node)),
+      }),
+    });
+  }
+
+  public async revokeNodeTrust(
+    request: RevokeNodeTrustApiRequest,
+  ): Promise<NodeTrustApiResponse<RevokeNodeTrustApiResponse>> {
+    const outcome = await this.dependencies.revokeNodeTrustUseCase.execute({
+      actorUserIdentityId: request.actorUserIdentityId,
+      nodeId: request.nodeId,
+      reason: request.reason,
+      revokedAt: request.revokedAt,
+      note: request.note,
+      correlationId: request.correlationId,
+      metadata: request.metadata,
+    });
+
+    if (!outcome.ok) {
+      return Object.freeze({
+        ok: false,
+        error: this.mapUseCaseError(outcome.error.code, outcome.error.message),
+      });
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
         node: toNodeDetailDto(this.toInternalNode(outcome.value.node)),
       }),
     });

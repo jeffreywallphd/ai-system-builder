@@ -2,10 +2,12 @@ import type {
   GetNodeInventoryDetailApiResponse,
   ListNodeInventoryApiResponse,
   NodeTrustApiResponse,
+  RevokeNodeTrustApiResponse,
 } from "../../../infrastructure/api/nodes/sdk/PublicNodeTrustApiContract";
 import type {
   NodeInventoryOperationalState,
   NodeInventoryPresenceState,
+  RevokeNodeTrustActionRequestDto,
 } from "../../../src/shared/contracts/nodes/NodeTrustApiContracts";
 import type {
   NodeApprovalStatus,
@@ -37,6 +39,10 @@ export interface NodeInventoryClient {
     },
     sessionToken: string,
   ): Promise<NodeTrustApiResponse<GetNodeInventoryDetailApiResponse>>;
+  revokeNodeTrust(
+    request: Pick<RevokeNodeTrustActionRequestDto, "nodeId" | "reason" | "revokedAt" | "note">,
+    sessionToken: string,
+  ): Promise<NodeTrustApiResponse<RevokeNodeTrustApiResponse>>;
 }
 
 export class HttpNodeInventoryClient implements NodeInventoryClient {
@@ -86,13 +92,46 @@ export class HttpNodeInventoryClient implements NodeInventoryClient {
     return this.get(`/api/v1/nodes/inventory/${encodeURIComponent(request.nodeId)}`, sessionToken);
   }
 
+  public async revokeNodeTrust(
+    request: Pick<RevokeNodeTrustActionRequestDto, "nodeId" | "reason" | "revokedAt" | "note">,
+    sessionToken: string,
+  ): Promise<NodeTrustApiResponse<RevokeNodeTrustApiResponse>> {
+    return this.post(
+      `/api/v1/nodes/${encodeURIComponent(request.nodeId)}/revoke`,
+      Object.freeze({
+        reason: request.reason,
+        revokedAt: request.revokedAt,
+        note: request.note,
+      }),
+      sessionToken,
+    );
+  }
+
   private async get<TResponse>(path: string, sessionToken: string): Promise<TResponse> {
+    return this.request<TResponse>("GET", path, sessionToken);
+  }
+
+  private async post<TResponse>(
+    path: string,
+    body: Readonly<Record<string, unknown>>,
+    sessionToken: string,
+  ): Promise<TResponse> {
+    return this.request<TResponse>("POST", path, sessionToken, body);
+  }
+
+  private async request<TResponse>(
+    method: "GET" | "POST",
+    path: string,
+    sessionToken: string,
+    body?: Readonly<Record<string, unknown>>,
+  ): Promise<TResponse> {
     const response = await fetch(`${this.baseUrl}${path}`, {
-      method: "GET",
+      method,
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${sessionToken}`,
       },
+      body: body ? JSON.stringify(body) : undefined,
     });
     return await response.json() as TResponse;
   }

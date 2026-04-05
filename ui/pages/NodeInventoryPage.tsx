@@ -3,7 +3,11 @@ import { Link } from "react-router-dom";
 import {
   NodeApprovalStatuses,
   NodeEnrollmentRequestStatuses,
+  NodeRevocationReasons,
+  NodeRevocationStates,
   NodeRoleCapabilities,
+  NodeTrustStates,
+  type NodeRevocationReason,
   NodeTypes,
 } from "../../src/domain/nodes/NodeTrustDomain";
 import {
@@ -59,7 +63,12 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
   const [selectedNodeDetail, setSelectedNodeDetail] = useState<NodeInventoryDetailDto>();
   const [isLoadingInventory, setIsLoadingInventory] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [isRevoking, setIsRevoking] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
+  const [statusMessage, setStatusMessage] = useState<string>();
+  const [revocationReason, setRevocationReason] = useState<NodeRevocationReason>(NodeRevocationReasons.operatorAction);
+  const [revocationNote, setRevocationNote] = useState("");
+  const [revocationConfirmationNodeId, setRevocationConfirmationNodeId] = useState("");
 
   const selectedNode = nodes.find((node) => node.nodeId === selectedNodeId);
 
@@ -145,6 +154,12 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
     void refresh();
   }, [sessionToken]);
 
+  useEffect(() => {
+    setRevocationReason(NodeRevocationReasons.operatorAction);
+    setRevocationNote("");
+    setRevocationConfirmationNodeId("");
+  }, [selectedNodeDetail?.nodeId]);
+
   if (!sessionToken || !session || sessionStore.isSessionExpired(session)) {
     return (
       <section className="ui-page ui-node-inventory-page">
@@ -189,6 +204,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
       </div>
 
       {errorMessage ? <p className="ui-node-inventory-page__alert ui-node-inventory-page__alert--error" role="alert">{errorMessage}</p> : null}
+      {statusMessage ? <p className="ui-node-inventory-page__alert ui-node-inventory-page__alert--success" role="status">{statusMessage}</p> : null}
 
       <section className="ui-card">
         <div className="ui-card__header">
@@ -505,6 +521,102 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
                   <div className="ui-text-secondary">State: {selectedNodeDetail.revocation.state}</div>
                   <div className="ui-text-secondary">Reason: {selectedNodeDetail.revocation.reason ?? "n/a"}</div>
                   <div className="ui-text-secondary">Note: {selectedNodeDetail.revocation.note ?? "n/a"}</div>
+                  <div className="ui-text-secondary">Revoked at: {formatTimestamp(selectedNodeDetail.revocation.revokedAt) ?? "n/a"}</div>
+                </div>
+
+                <div className="ui-stack ui-stack--2xs">
+                  <strong>Trust actions</strong>
+                  {selectedNodeDetail.revocation.state === NodeRevocationStates.revoked || selectedNodeDetail.trustState === NodeTrustStates.revoked
+                    ? (
+                      <p className="ui-text-secondary">
+                        This node is already revoked and no longer treated as active.
+                      </p>
+                    )
+                    : (
+                      <>
+                        <label className="ui-field">
+                          <span className="ui-field__label">Revocation reason</span>
+                          <select
+                            className="ui-select"
+                            value={revocationReason}
+                            onChange={(event) => setRevocationReason(event.target.value as NodeRevocationReason)}
+                            disabled={isRevoking}
+                          >
+                            <option value={NodeRevocationReasons.operatorAction}>operator-action</option>
+                            <option value={NodeRevocationReasons.ownerRequest}>owner-request</option>
+                            <option value={NodeRevocationReasons.policyViolation}>policy-violation</option>
+                            <option value={NodeRevocationReasons.certificateCompromise}>certificate-compromise</option>
+                            <option value={NodeRevocationReasons.decommissioned}>decommissioned</option>
+                          </select>
+                        </label>
+                        <label className="ui-field">
+                          <span className="ui-field__label">Administrative note (optional)</span>
+                          <textarea
+                            className="ui-textarea ui-node-inventory-page__revocation-note"
+                            value={revocationNote}
+                            maxLength={2000}
+                            onChange={(event) => setRevocationNote(event.target.value)}
+                            placeholder="Include ticket id, incident, or operator context"
+                            disabled={isRevoking}
+                          />
+                        </label>
+                        <label className="ui-field">
+                          <span className="ui-field__label">Confirmation</span>
+                          <input
+                            className="ui-input"
+                            value={revocationConfirmationNodeId}
+                            onChange={(event) => setRevocationConfirmationNodeId(event.target.value)}
+                            placeholder={`Type ${selectedNodeDetail.nodeId} to confirm`}
+                            disabled={isRevoking}
+                          />
+                        </label>
+                        <div className="ui-page__actions">
+                          <button
+                            type="button"
+                            className="ui-button ui-button--danger ui-button--sm"
+                            disabled={isRevoking || revocationConfirmationNodeId.trim() !== selectedNodeDetail.nodeId}
+                            onClick={() => {
+                              if (!sessionToken) {
+                                return;
+                              }
+                              if (revocationConfirmationNodeId.trim() !== selectedNodeDetail.nodeId) {
+                                setErrorMessage("Type the exact node id to confirm revocation.");
+                                return;
+                              }
+                              setIsRevoking(true);
+                              setErrorMessage(undefined);
+                              setStatusMessage(undefined);
+                              void (async () => {
+                                try {
+                                  const response = await service.revokeNodeTrust({
+                                    nodeId: selectedNodeDetail.nodeId,
+                                    reason: revocationReason,
+                                    note: revocationNote.trim() || undefined,
+                                  }, sessionToken);
+                                  if (!response.ok || !response.data) {
+                                    setErrorMessage(response.error?.message ?? "Unable to revoke node trust.");
+                                    return;
+                                  }
+                                  setStatusMessage(
+                                    `Revoked "${response.data.node.displayName}" at ${formatTimestamp(response.data.node.revocation.revokedAt) ?? "current time"}.`,
+                                  );
+                                  await refresh(selectedNodeDetail.nodeId);
+                                } catch {
+                                  setErrorMessage("Node trust revocation request failed.");
+                                } finally {
+                                  setIsRevoking(false);
+                                }
+                              })();
+                            }}
+                          >
+                            {isRevoking ? "Revoking..." : "Revoke node trust"}
+                          </button>
+                        </div>
+                        <p className="ui-text-secondary ui-text-small">
+                          Revoked nodes remain visible in inventory and are blocked from active trusted participation.
+                        </p>
+                      </>
+                    )}
                 </div>
 
                 {selectedNodeDetail.pendingEnrollment ? (

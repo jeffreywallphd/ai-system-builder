@@ -19,6 +19,10 @@ export class NodeInventoryService {
   public getNodeInventoryDetail: NodeInventoryClient["getNodeInventoryDetail"] = (request, sessionToken) => (
     this.client.getNodeInventoryDetail(request, sessionToken)
   );
+
+  public revokeNodeTrust: NodeInventoryClient["revokeNodeTrust"] = (request, sessionToken) => (
+    this.client.revokeNodeTrust(request, sessionToken)
+  );
 }
 
 function createDefaultNodeInventoryClient(): NodeInventoryClient {

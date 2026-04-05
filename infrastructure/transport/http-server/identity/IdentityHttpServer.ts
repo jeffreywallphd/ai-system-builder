@@ -64,6 +64,7 @@ import {
   type NodeTrustApiResponse,
   type RecordNodeHeartbeatApiRequest,
   type RejectNodeEnrollmentApiRequest,
+  type RevokeNodeTrustApiRequest,
 } from "../../../api/nodes/sdk/PublicNodeTrustApiContract";
 import { redactSensitiveAuthPayload, redactSensitiveText } from "../../../api/identity/IdentityAuthRedaction";
 import {
@@ -75,6 +76,7 @@ import {
 import {
   parseApproveNodeEnrollmentActionRequestDto,
   parseNodeHeartbeatPayloadDto,
+  parseRevokeNodeTrustActionRequestDto,
   parseRejectNodeEnrollmentActionRequestDto,
   parseNodeEnrollmentSubmissionRequestDto,
   NodeTrustApiSchemaValidationError,
@@ -82,6 +84,7 @@ import {
   type NodeHeartbeatPayloadDtoPayload,
   type NodeEnrollmentSubmissionRequestDtoPayload,
   type RejectNodeEnrollmentActionRequestDtoPayload,
+  type RevokeNodeTrustActionRequestDtoPayload,
 } from "../../../../src/shared/schemas/nodes/NodeTrustApiSchemaContracts";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
@@ -1478,6 +1481,60 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
             const statusCode = mapNodeTrustStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, inventoryDetailRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.nodeTrustBackendApi
+        && request.method === "POST"
+        && path.endsWith("/revoke")
+        && path.startsWith("/api/v1/nodes/")
+        && !path.startsWith("/api/v1/nodes/enrollments/")
+        && !path.startsWith("/api/v1/nodes/inventory/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const nodeId = decodePathTail(path, "/api/v1/nodes/", "/revoke");
+            if (!nodeId) {
+              const invalid = buildNodeTrustInvalidRequestResponse("nodeId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateRevokeNodeTrustRequest(
+              request,
+              context.principal.userIdentityId,
+              nodeId,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const revokeRequest: RevokeNodeTrustApiRequest = Object.freeze({
+              actorUserIdentityId: parsedRequest.data.actorUserIdentityId,
+              nodeId: parsedRequest.data.nodeId,
+              reason: parsedRequest.data.reason,
+              revokedAt: parsedRequest.data.revokedAt,
+              note: parsedRequest.data.note,
+              correlationId: parsedRequest.data.correlationId,
+              metadata: parsedRequest.data.metadata,
+            });
+            const apiResponse = await options.nodeTrustBackendApi.revokeNodeTrust(revokeRequest);
+            const statusCode = mapNodeTrustStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, revokeRequest, apiResponse);
           },
         );
         return;
@@ -3345,6 +3402,30 @@ async function parseAndValidateRejectNodeEnrollmentRequest(
     logger,
     maxBodyBytes,
     parseRejectNodeEnrollmentActionRequestDto,
+  );
+}
+
+async function parseAndValidateRevokeNodeTrustRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  nodeId: string,
+  requestLogId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: RevokeNodeTrustActionRequestDtoPayload }
+  | { readonly ok: false; readonly statusCode: number; readonly body: NodeTrustApiResponse<never> }
+> {
+  return parseAndValidateNodeTrustActionRequest(
+    request,
+    Object.freeze({
+      actorUserIdentityId,
+      nodeId,
+    }),
+    requestLogId,
+    logger,
+    maxBodyBytes,
+    parseRevokeNodeTrustActionRequestDto,
   );
 }
 

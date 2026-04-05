@@ -10,10 +10,12 @@ import { ListTrustedNodeInventoryUseCase } from "../../../src/application/nodes/
 import { RecordNodeHeartbeatUseCase } from "../../../src/application/nodes/use-cases/RecordNodeHeartbeatUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { RejectNodeEnrollmentUseCase } from "../../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
+import { RevokeNodeTrustUseCase } from "../../../src/application/nodes/use-cases/RevokeNodeTrustUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
 import {
   NodeApprovalStatuses,
   NodeHeartbeatStatuses,
+  NodeRevocationReasons,
   NodeRevocationStates,
   NodeRoleCapabilities,
   NodeTrustStates,
@@ -72,6 +74,10 @@ function createHarness(): {
     }),
     rejectNodeEnrollmentUseCase: new RejectNodeEnrollmentUseCase({
       enrollmentRequestRepository: adapter,
+      nodeRepository: adapter,
+      auditSink: auditRecorder,
+    }),
+    revokeNodeTrustUseCase: new RevokeNodeTrustUseCase({
       nodeRepository: adapter,
       auditSink: auditRecorder,
     }),
@@ -290,6 +296,60 @@ describe("NodeTrustBackendApi", () => {
     }
     expect(rejected.data.enrollment.status).toBe("rejected");
     expect(rejected.data.node.trustState).toBe("quarantined");
+  });
+
+  it("revokes trusted nodes and returns updated trust state", async () => {
+    const harness = createHarness();
+    await harness.adapter.registerNode({
+      record: {
+        nodeId: "node:trusted:revoke-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Trusted Revoke 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:revoke-1:v1",
+        },
+        deploymentTags: ["inventory"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T17:00:00.000Z",
+        approvedAt: "2026-04-05T17:05:00.000Z",
+        createdAt: "2026-04-05T17:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T17:05:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-revoke-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const revoke = await harness.backendApi.revokeNodeTrust({
+      actorUserIdentityId: "admin:user:revoke-1",
+      nodeId: "node:trusted:revoke-1",
+      reason: NodeRevocationReasons.operatorAction,
+      note: "Node retired from service.",
+    });
+
+    expect(revoke.ok).toBeTrue();
+    if (!revoke.ok || !revoke.data) {
+      return;
+    }
+    expect(revoke.data.node.trustState).toBe(NodeTrustStates.revoked);
+    expect(revoke.data.node.revocation.state).toBe(NodeRevocationStates.revoked);
+    expect(revoke.data.node.revocation.reason).toBe(NodeRevocationReasons.operatorAction);
+    expect(revoke.data.node.revocation.note).toBe("Node retired from service.");
+    expect(revoke.data.node.revokedAt).toBeDefined();
   });
 
   it("records heartbeat for trusted nodes and exposes last-seen in inventory queries", async () => {
