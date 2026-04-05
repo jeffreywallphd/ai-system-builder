@@ -1,6 +1,6 @@
 # Node Trust Application Use Cases
 
-This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment, Story 5.2.3 (Feature 5 / Epic 5.2): admin review/approval decisions for pending node enrollment, Story 5.2.4 (Feature 5 / Epic 5.2): enrollment detail retrieval transport orchestration support, Story 5.3.4 (Feature 5 / Epic 5.3): admin inventory list/detail query read models across trust and presence states, and Story 5.4.1 (Feature 5 / Epic 5.4): durable node revocation semantics and repeat-revocation safety.
+This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment, Story 5.2.3 (Feature 5 / Epic 5.2): admin review/approval decisions for pending node enrollment, Story 5.2.4 (Feature 5 / Epic 5.2): enrollment detail retrieval transport orchestration support, Story 5.3.4 (Feature 5 / Epic 5.3): admin inventory list/detail query read models across trust and presence states, Story 5.4.1 (Feature 5 / Epic 5.4): durable node revocation semantics and repeat-revocation safety, and Story 5.4.2 (Feature 5 / Epic 5.4): node-authenticated trust enforcement for runtime operations.
 
 ## Canonical files
 
@@ -74,7 +74,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
   - emits revocation audit events for both initial revocation and safe already-revoked retries (`alreadyRevoked` detail flag)
 - `RecordNodeHeartbeatUseCase`
   - authorizes heartbeat writes
-  - enforces trusted-node precondition before heartbeat writes (`trustState=trusted`)
+  - enforces centralized node-authenticated trust preconditions before heartbeat writes (approved + trusted + non-revoked + certificate-present)
   - validates heartbeat update against domain rules (for example revoked nodes cannot update heartbeat)
   - persists last-seen metadata
 - `ListTrustedNodeInventoryUseCase`
@@ -105,6 +105,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - mutation envelope builder with actor/context metadata
 - deterministic ID generator namespace seams
 - shared normalization and domain-error mapping helpers
+- `enforceNodeAuthenticatedOperationTrust(...)` for reusable node-authenticated trust gating across heartbeat and future node-scoped runtime operations
 
 ## Hook-port seams
 
@@ -145,7 +146,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - activation flow including approved-only guardrails, idempotent trusted-state transition, and activation audit publication
 - rejection flow including authorization gating, explicit lifecycle transition sequence, decision metadata persistence, and quarantine state mutation
 - revocation flow with certificate-revocation hook, authorization denial coverage, durable revocation metadata assertions, and safe repeat-revocation idempotency behavior
-- heartbeat recording with trusted-node-only guardrails and revoked-node rejection behavior
+- heartbeat recording with centralized node-authenticated trust enforcement and rejection coverage for unknown, pending, rejected, and revoked nodes
 - trusted inventory query filtering
 - full inventory query filtering across node + pending-enrollment read models
 - node inventory detail retrieval for pending-only and persisted node records

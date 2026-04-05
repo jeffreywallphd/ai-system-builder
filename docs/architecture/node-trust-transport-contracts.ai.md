@@ -108,3 +108,11 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
   - return admin-safe lifecycle summaries across `active`, `pending`, `rejected`, `revoked`, and `offline` states,
   - support filters for approval status, operational state, enrollment status, presence state, node type, capability, deployment tags, and last-seen windows,
   - provide pending-enrollment detail context when a node has not yet materialized into a trusted node identity record.
+
+## Story 5.4.2 additions
+
+- `POST /api/v1/nodes/:nodeId/heartbeat` now enforces node-principal binding before request payload parsing:
+  - authenticated principal/session identity must match route `nodeId` (username/providerSubject/userIdentityId match),
+  - non-matching principals receive `forbidden`.
+- Node-authenticated write flows continue to bind actor/node fields at transport boundary (payload spoofed actor/node values are ignored).
+- Application layer now owns reusable trust-state enforcement through `enforceNodeAuthenticatedOperationTrust(...)`, keeping transport checks focused on authenticated identity binding and preserving compatibility with upcoming certificate-authenticated transport.

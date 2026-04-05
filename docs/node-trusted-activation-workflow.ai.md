@@ -2,7 +2,7 @@
 
 ## Scope
 
-Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, and Story 5.4.1 (Feature 5 / Epic 5.3 and 5.4): approved-node activation plus capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, renderer-side admin inventory inspection UI, and durable revocation semantics.
+Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, Story 5.4.1, and Story 5.4.2 (Feature 5 / Epic 5.3 and 5.4): approved-node activation plus capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, renderer-side admin inventory inspection UI, durable revocation semantics, and node-authenticated trust enforcement.
 
 ## Canonical files
 
@@ -38,7 +38,7 @@ Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, and Story 5.4.1
   - certificate metadata may be attached as activation prerequisite material
 - Activation transitions only approved, non-revoked nodes from `pending-approval` to `trusted`.
 - Heartbeat presence remains independent (`RecordNodeHeartbeatUseCase`) and does not perform trust activation.
-- Heartbeat updates are accepted only for nodes that are already in `trustState=trusted`.
+- Heartbeat updates are accepted only for nodes that pass centralized node-authenticated trust gates (approved + trusted + non-revoked + certificate-present).
 
 ## Activation guardrails
 
@@ -83,8 +83,8 @@ Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, and Story 5.4.1
 - Node heartbeat endpoint:
   - `POST /api/v1/nodes/:nodeId/heartbeat`
   - authenticated transport only
-  - request actor is bound to authenticated principal
-  - request `actorUserIdentityId` and `nodeId` fields are transport-bound from authenticated principal + route parameters (client values are ignored)
+  - authenticated principal/session identity must be bound to route `nodeId`
+  - request `actorUserIdentityId` and `nodeId` fields are transport-bound from authenticated node identity + route parameters (client values are ignored)
 - Admin visibility endpoint:
   - `GET /api/v1/nodes/trusted`
   - supports query filters: `nodeType`, `capability`, `deploymentTag`, `lastSeenAfter`, `lastSeenBefore`, `limit`, `offset`

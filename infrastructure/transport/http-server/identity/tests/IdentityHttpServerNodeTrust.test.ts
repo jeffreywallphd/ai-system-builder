@@ -441,6 +441,65 @@ describe("IdentityHttpServer node trust routes", () => {
     expect(inventoryBody.data.nodes.some((node: { nodeId: string }) => node.nodeId === "node:trusted:hb-1")).toBeTrue();
   });
 
+  it("rejects heartbeat updates when the authenticated principal is not bound to the nodeId", async () => {
+    const { baseUrl, nodeTrustAdapter } = await startServer();
+    const admin = await registerAndLogin(baseUrl, "node.heartbeat.admin");
+
+    await nodeTrustAdapter.registerNode({
+      record: {
+        nodeId: "node:trusted:bound-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Trusted Bound Node 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:trusted:bound-1:v1",
+        },
+        deploymentTags: ["presence"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:00:00.000Z",
+        approvedAt: "2026-04-05T18:01:00.000Z",
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T18:01:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-hb-bound-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/nodes/${encodeURIComponent("node:trusted:bound-1")}/heartbeat`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${admin.sessionToken}`,
+        },
+        body: JSON.stringify({
+          heartbeatStatus: NodeHeartbeatStatuses.online,
+          seenAt: "2026-04-05T18:02:30.000Z",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("forbidden");
+  });
+
   it("returns admin inventory list/detail with operational and presence filters", async () => {
     const { baseUrl, nodeTrustAdapter } = await startServer();
     const admin = await registerAndLogin(baseUrl, "node.inventory.filter.admin");

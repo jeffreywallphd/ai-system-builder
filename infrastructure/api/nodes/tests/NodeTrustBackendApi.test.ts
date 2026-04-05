@@ -300,7 +300,7 @@ describe("NodeTrustBackendApi", () => {
     expect(inventory.data.nodes[0]?.lastSeen?.observedBy).toBe("node-agent");
   });
 
-  it("rejects heartbeat updates from unknown or non-trusted nodes", async () => {
+  it("rejects heartbeat updates from unknown, pending, rejected, and revoked nodes", async () => {
     const harness = createHarness();
 
     const unknown = await harness.backendApi.recordNodeHeartbeat({
@@ -351,6 +351,87 @@ describe("NodeTrustBackendApi", () => {
     expect(nonTrusted.ok).toBeFalse();
     if (!nonTrusted.ok && nonTrusted.error) {
       expect(nonTrusted.error.code).toBe("conflict");
+    }
+
+    await harness.adapter.registerNode({
+      record: {
+        nodeId: "node:rejected:presence-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Rejected Presence 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.rejected,
+        trustState: NodeTrustStates.quarantined,
+        deploymentTags: ["presence"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T17:00:00.000Z",
+        createdAt: "2026-04-05T17:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T17:00:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-presence-rejected",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const rejected = await harness.backendApi.recordNodeHeartbeat({
+      actorUserIdentityId: "node:rejected:presence-1",
+      nodeId: "node:rejected:presence-1",
+      heartbeatStatus: NodeHeartbeatStatuses.online,
+    });
+    expect(rejected.ok).toBeFalse();
+    if (!rejected.ok && rejected.error) {
+      expect(rejected.error.code).toBe("conflict");
+    }
+
+    await harness.adapter.registerNode({
+      record: {
+        nodeId: "node:revoked:presence-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Revoked Presence 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.rejected,
+        trustState: NodeTrustStates.revoked,
+        deploymentTags: ["presence"],
+        revocation: {
+          state: NodeRevocationStates.revoked,
+        },
+        enrolledAt: "2026-04-05T17:00:00.000Z",
+        revokedAt: "2026-04-05T17:20:00.000Z",
+        createdAt: "2026-04-05T17:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T17:20:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-presence-revoked",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const revoked = await harness.backendApi.recordNodeHeartbeat({
+      actorUserIdentityId: "node:revoked:presence-1",
+      nodeId: "node:revoked:presence-1",
+      heartbeatStatus: NodeHeartbeatStatuses.online,
+    });
+    expect(revoked.ok).toBeFalse();
+    if (!revoked.ok && revoked.error) {
+      expect(revoked.error.code).toBe("conflict");
     }
   });
 
