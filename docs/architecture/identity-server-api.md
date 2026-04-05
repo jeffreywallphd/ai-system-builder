@@ -477,6 +477,21 @@ Protected endpoint behavior:
   - `POST /api/v1/security/certificates/:serialNumber/revoke`
   - `POST /api/v1/security/certificates/:serialNumber/renew`
 
+## Secure transport adapter setup (story 7.2.1)
+
+- `IdentityHttpServer` now supports explicit secure transport adapter configuration:
+  - `secureTransport.requireHttps`
+  - `secureTransport.allowInsecureLoopback`
+- The adapter enforces secure transport at the top of the `/api/*` request pipeline.
+- Insecure API requests are denied consistently before route handlers execute when HTTPS is required and loopback fallback is not allowed.
+- Authenticated route context now includes normalized transport metadata:
+  - channel type (`http`/`https`)
+  - encrypted transport and mTLS flags
+  - peer certificate presence/serial metadata
+  - loopback detection and socket address metadata
+  - trust-validation routing metadata (scenario/actor/remote peer + enforcement state)
+- `IdentityServerHost` composes these options from `HostSecureTransportConfig` and injects them into the HTTP adapter, preserving host-level composition boundaries.
+
 Session issuance notes:
 
 - Login success now issues and persists a production session in the same API flow.

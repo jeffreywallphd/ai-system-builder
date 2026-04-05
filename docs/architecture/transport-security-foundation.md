@@ -201,3 +201,29 @@ Freeform strings are also sanitized for:
 - secret assignment fragments;
 - filesystem path fragments;
 - PEM block payloads.
+
+## Story 7.2.1 secure HTTPS adapter posture
+
+Story 7.2.1 hardens the authoritative identity HTTP adapter so production API traffic is fail-closed for insecure transport and route handlers receive standardized channel metadata.
+
+### Runtime adapter updates
+
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - adds explicit secure transport adapter config (`requireHttps`, `allowInsecureLoopback`);
+  - enforces secure transport for `/api/*` requests before business handlers run;
+  - centralizes inbound channel-state extraction (scheme, mTLS/certificate presence, loopback detection, socket addresses);
+  - injects authenticated request transport context (connection + trust-routing metadata) into guarded handlers.
+- `hosts/server/IdentityServerHost.ts`
+  - composes secure transport options from `HostSecureTransportConfig` and injects them into the HTTP adapter.
+
+### Rejection posture
+
+- When secure HTTP is required and the request is neither TLS-protected nor explicitly loopback-allowed, the adapter returns a consistent denial envelope and does not invoke route handlers.
+- Authenticated routes keep the existing trust-validator path; the new secure transport gate runs first and remains independent from UI concerns.
+
+### Tests
+
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerTransportTrust.test.ts` now covers:
+  - fail-closed insecure API rejection when HTTPS is required;
+  - explicit loopback fallback allowance behavior;
+  - authenticated-route access to normalized transport context via request logging payload.

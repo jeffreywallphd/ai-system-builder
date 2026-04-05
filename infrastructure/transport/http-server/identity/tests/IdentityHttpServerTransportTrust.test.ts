@@ -4,6 +4,7 @@ import type { Server } from "node:http";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
 import {
   createIdentityHttpServer,
+  type IdentityHttpServerLogEvent,
   type IdentityHttpServerLogger,
 } from "../IdentityHttpServer";
 import type { ValidateTransportConnectionTrustRequest } from "../../../../../src/application/security/ports/TransportTrustValidationPorts";
@@ -11,9 +12,9 @@ import { TransportSecurityScenarios } from "../../../../../src/domain/security/T
 import type { HttpTransportTrustValidationResult } from "../../../../../src/infrastructure/transport/TransportTrustValidationAdapters";
 
 class NoopLogger implements IdentityHttpServerLogger {
-  public info(): void {}
-  public warn(): void {}
-  public error(): void {}
+  public info(_event: IdentityHttpServerLogEvent): void {}
+  public warn(_event: IdentityHttpServerLogEvent): void {}
+  public error(_event: IdentityHttpServerLogEvent): void {}
 }
 
 const servers: Server[] = [];
@@ -32,12 +33,18 @@ afterEach(async () => {
 
 async function startServer(input: {
   readonly allowInsecureLoopback: boolean;
+  readonly secureTransport?: {
+    readonly requireHttps: boolean;
+    readonly allowInsecureLoopback: boolean;
+  };
+  readonly logger?: IdentityHttpServerLogger;
   readonly validate: (request: ValidateTransportConnectionTrustRequest) => Promise<HttpTransportTrustValidationResult>;
 }): Promise<{ readonly baseUrl: string }> {
   const harness = await createIdentityAuthTestHarness();
   const server = createIdentityHttpServer({
     backendApi: harness.backendApi,
-    logger: new NoopLogger(),
+    logger: input.logger ?? new NoopLogger(),
+    secureTransport: input.secureTransport,
     transportTrust: {
       httpValidator: {
         validate: input.validate,
@@ -95,6 +102,65 @@ async function registerAndLogin(baseUrl: string): Promise<string> {
 }
 
 describe("IdentityHttpServer transport trust", () => {
+  it("rejects insecure API requests before handlers when HTTPS is required", async () => {
+    const { baseUrl } = await startServer({
+      allowInsecureLoopback: false,
+      secureTransport: {
+        requireHttps: true,
+        allowInsecureLoopback: false,
+      },
+      validate: async () => ({
+        ok: true,
+        decision: {} as never,
+      }),
+    });
+
+    const register = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "transport.trust.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(register.status).toBe(403);
+    const body = await register.json() as { readonly ok: boolean; readonly error?: { readonly code?: string } };
+    expect(body.ok).toBe(false);
+    expect(body.error?.code).toBe("forbidden");
+  });
+
+  it("allows loopback API requests when secure transport permits explicit loopback fallback", async () => {
+    const { baseUrl } = await startServer({
+      allowInsecureLoopback: true,
+      secureTransport: {
+        requireHttps: true,
+        allowInsecureLoopback: true,
+      },
+      validate: async () => ({
+        ok: true,
+        decision: {} as never,
+      }),
+    });
+
+    const register = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "transport.trust.loopback.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(register.status).toBe(200);
+  });
+
   it("rejects authenticated routes when transport trust validator denies request", async () => {
     const { baseUrl } = await startServer({
       allowInsecureLoopback: false,
@@ -138,5 +204,39 @@ describe("IdentityHttpServer transport trust", () => {
     });
     expect(resolvedSession.status).toBe(200);
     expect(seenRequests).toHaveLength(0);
+  });
+
+  it("emits authenticated transport context through request logging payload", async () => {
+    const events: unknown[] = [];
+    class CapturingLogger extends NoopLogger {
+      public override info(event: IdentityHttpServerLogEvent): void {
+        events.push(event);
+      }
+    }
+
+    const { baseUrl } = await startServer({
+      allowInsecureLoopback: true,
+      logger: new CapturingLogger(),
+      validate: async () => ({
+        ok: true,
+        decision: {} as never,
+      }),
+    });
+
+    const sessionToken = await registerAndLogin(baseUrl);
+    const resolvedSession = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      headers: {
+        authorization: `Bearer ${sessionToken}`,
+      },
+    });
+    expect(resolvedSession.status).toBe(200);
+
+    const completed = events.filter((event) => {
+      const candidate = event as { readonly event?: string };
+      return candidate.event === "identity-http.request.completed";
+    }) as Array<{ readonly details?: { readonly request?: { readonly transport?: { readonly connection?: { readonly channelType?: string } } } } }>;
+    expect(completed.length).toBeGreaterThan(0);
+    const latest = completed[completed.length - 1];
+    expect(latest?.details?.request?.transport?.connection?.channelType).toBe("http");
   });
 });
