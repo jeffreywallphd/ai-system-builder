@@ -158,6 +158,7 @@ Bearer-token validation path (`resolveAuthenticatedSessionByToken`) enforces:
 Current session-related endpoints:
 
 - `GET /api/v1/identity/session` (authenticated)
+- `POST /api/v1/identity/credential/change` (authenticated)
 - `POST /api/v1/identity/logout` (authenticated)
 - `POST /api/v1/identity/session/revoke` (authenticated)
 

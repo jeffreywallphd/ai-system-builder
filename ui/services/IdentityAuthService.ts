@@ -1,4 +1,6 @@
 import type {
+  ChangeLocalPasswordCredentialApiRequest,
+  ChangeLocalPasswordCredentialApiResponse,
   GetIdentityAdminAccountStatusApiRequest,
   GetIdentityAdminAccountStatusApiResponse,
   IdentityAuthApiResponse,
@@ -78,6 +80,13 @@ export class IdentityAuthService {
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>> {
     return this.client.setIdentityAdminAccountStatus(request, sessionToken);
+  }
+
+  public changeLocalPasswordCredential(
+    request: ChangeLocalPasswordCredentialApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ChangeLocalPasswordCredentialApiResponse>> {
+    return this.client.changeLocalPasswordCredential(request, sessionToken);
   }
 }
 

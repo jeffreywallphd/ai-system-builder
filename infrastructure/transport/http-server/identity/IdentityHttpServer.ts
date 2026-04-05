@@ -4,7 +4,9 @@ import { URL } from "node:url";
 import { z } from "zod";
 import type { IdentityAuthBackendApi } from "../../../api/identity/IdentityAuthBackendApi";
 import {
+  ChangeLocalPasswordCredentialVerificationModes,
   IdentityAuthApiErrorCodes,
+  type ChangeLocalPasswordCredentialApiRequest,
   type AuthenticatedIdentityPrincipalApiResponse,
   type GetIdentityAdminAccountStatusApiRequest,
   type GetIdentityAdminAccountStatusApiResponse,
@@ -66,6 +68,31 @@ const AdminAccountStatusValues = z.enum([
 const SetAdminAccountStatusRequestSchema: z.ZodType<Pick<SetIdentityAdminAccountStatusApiRequest, "action" | "providerId">> = z.object({
   action: z.enum(["enable", "disable"]),
   providerId: z.string().min(1).optional(),
+}).strict();
+
+const ChangeCredentialCurrentVerificationSchema = z.object({
+  mode: z.literal(ChangeLocalPasswordCredentialVerificationModes.currentCredential).optional(),
+  currentCredential: z.string().min(1),
+}).strict();
+
+const ChangeCredentialResetVerificationSchema = z.object({
+  mode: z.literal(ChangeLocalPasswordCredentialVerificationModes.resetAssertion),
+  resetAssertion: z.string().min(1),
+}).strict();
+
+const ChangeCredentialVerificationSchema = z.union([
+  ChangeCredentialCurrentVerificationSchema,
+  ChangeCredentialResetVerificationSchema,
+]);
+
+const ChangeCredentialRequestSchema: z.ZodType<ChangeLocalPasswordCredentialApiRequest> = z.object({
+  providerId: z.string().min(1).optional(),
+  providerSubject: z.string().min(1).optional(),
+  credentialPolicyId: z.string().min(1).optional(),
+  newCredential: z.object({
+    candidate: z.string().min(1),
+  }).strict(),
+  verification: ChangeCredentialVerificationSchema,
 }).strict();
 
 export interface IdentityHttpServerLogEvent {
@@ -192,6 +219,41 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
               sessionToken: context.sessionToken,
               ...parsedRequest.data,
               actorUserIdentityId: context.principal.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (request.method === "POST" && path === "/api/v1/identity/credential/change") {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          async (context) => {
+            const parsedRequest = await parseAndValidateRequest(
+              request,
+              ChangeCredentialRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.changeLocalPasswordCredential({
+              userIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              sessionToken: context.sessionToken,
+              userIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
             }), apiResponse);
           },
         );

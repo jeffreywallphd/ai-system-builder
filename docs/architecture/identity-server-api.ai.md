@@ -10,6 +10,8 @@
 - Authenticated session termination and revocation endpoints:
   - `POST /api/v1/identity/logout`
   - `POST /api/v1/identity/session/revoke`
+- Authenticated credential-rotation endpoint:
+  - `POST /api/v1/identity/credential/change`
 - Authenticated account-administration endpoints:
   - `GET /api/v1/identity/admin/accounts`
   - `GET /api/v1/identity/admin/accounts/:userIdentityId`
@@ -100,6 +102,17 @@ Persisted session records now intentionally exclude:
 - Session metadata and token material are separated in persistence (`identity_sessions` vs `identity_session_token_material`).
 - Session expiry/refresh behavior is policy-configurable through environment-backed identity session policy settings (`IDENTITY_SESSION_*`) rather than hard-coded expiry constants.
 - Trusted-device seam metadata is context-only in this slice (persisted + returned) and not yet used for authorization decisions.
+
+## Credential change contract update
+
+- `POST /api/v1/identity/credential/change` is now a bearer-authenticated endpoint for local password rotation.
+- Request supports provider override fields and verification mode payloads (`current-credential` default, `reset-assertion` extension seam).
+- Endpoint resolves actor identity from bearer-authenticated principal context and delegates to `ChangeLocalPasswordCredentialUseCase`.
+- Success responses include superseded/new credential material ids, changed timestamp, and verification mode.
+- Error mapping stays in the stable external error set:
+  - invalid verification/current credential -> `authentication-failed`
+  - policy/request violations -> `invalid-request`
+  - inactive account/provider mismatches -> existing `account-inactive` / `unsupported-provider` behaviors.
 
 ## Logout and revocation contract update (story 1.3.4)
 

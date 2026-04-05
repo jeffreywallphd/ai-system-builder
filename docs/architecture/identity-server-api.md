@@ -7,6 +7,7 @@ This note documents the authoritative HTTP server endpoints for local identity r
 - `POST /api/v1/identity/register`
 - `POST /api/v1/identity/login`
 - `GET /api/v1/identity/session` (authenticated)
+- `POST /api/v1/identity/credential/change` (authenticated)
 - `POST /api/v1/identity/logout` (authenticated)
 - `POST /api/v1/identity/session/revoke` (authenticated)
 - `GET /api/v1/identity/admin/accounts` (authenticated)
@@ -82,6 +83,32 @@ Requires:
 - `Authorization: Bearer <session-token>`
 
 No request body is required.
+
+### Credential change request
+
+`POST /api/v1/identity/credential/change`
+
+Requires:
+
+- `Authorization: Bearer <session-token>`
+
+Request body:
+
+```json
+{
+  "providerId": "string (optional)",
+  "providerSubject": "string (optional)",
+  "credentialPolicyId": "string (optional)",
+  "newCredential": {
+    "candidate": "string"
+  },
+  "verification": {
+    "mode": "current-credential (default) | reset-assertion",
+    "currentCredential": "string (required for current-credential mode)",
+    "resetAssertion": "string (required for reset-assertion mode)"
+  }
+}
+```
 
 ### Session revoke request
 
@@ -231,6 +258,24 @@ All responses use one envelope:
     "userIdentityId": "user-identity:...",
     "revokedAt": "2026-04-04T18:10:00.000Z",
     "revocationReason": "logout"
+  }
+}
+```
+
+### Credential change success
+
+```json
+{
+  "ok": true,
+  "data": {
+    "userIdentityId": "user-identity:...",
+    "providerId": "provider:local-password",
+    "providerSubject": "normalized-subject",
+    "credentialPolicyId": "policy:local-password",
+    "supersededCredentialMaterialId": "credential:...",
+    "credentialMaterialId": "credential:...",
+    "changedAt": "2026-04-04T18:12:00.000Z",
+    "verificationMode": "current-credential"
   }
 }
 ```

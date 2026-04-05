@@ -261,6 +261,51 @@ describe("IdentityAuthBackendApi", () => {
     expect(postRevokeResolve.error?.code).toBe("authentication-failed");
   });
 
+  it("changes credentials for an authenticated account and invalidates prior credentials", async () => {
+    const harness = await createIdentityAuthTestHarness();
+
+    const register = await harness.backendApi.registerLocalAccount({
+      username: "credential.change.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(register.ok).toBeTrue();
+    if (!register.ok || !register.data) {
+      throw new Error("Expected register success.");
+    }
+
+    const change = await harness.backendApi.changeLocalPasswordCredential({
+      userIdentityId: register.data.userIdentityId,
+      newCredential: {
+        candidate: "StrongerPass!2027",
+      },
+      verification: {
+        currentCredential: "StrongPass!2026",
+      },
+    });
+    expect(change.ok).toBeTrue();
+    expect(change.data?.userIdentityId).toBe(register.data.userIdentityId);
+    expect(change.data?.verificationMode).toBe("current-credential");
+
+    const oldCredentialLogin = await harness.backendApi.loginLocalAccount({
+      providerSubject: "credential.change.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(oldCredentialLogin.ok).toBeFalse();
+    expect(oldCredentialLogin.error?.code).toBe("authentication-failed");
+
+    const newCredentialLogin = await harness.backendApi.loginLocalAccount({
+      providerSubject: "credential.change.user",
+      credential: {
+        candidate: "StrongerPass!2027",
+      },
+    });
+    expect(newCredentialLogin.ok).toBeTrue();
+  });
+
   it("supports local account administration list/read/status-change flows", async () => {
     const harness = await createIdentityAuthTestHarness();
 
@@ -366,6 +411,18 @@ describe("IdentityAuthBackendApi", () => {
       },
     });
     expect(successfulLogin.ok).toBeTrue();
+    const credentialChange = successfulLogin.ok && successfulLogin.data
+      ? await harness.backendApi.changeLocalPasswordCredential({
+        userIdentityId: successfulLogin.data.userIdentityId,
+        newCredential: {
+          candidate: "AnotherSecret!2027",
+        },
+        verification: {
+          currentCredential: "StrongPass!2026",
+        },
+      })
+      : undefined;
+    expect(credentialChange?.ok).toBeTrue();
 
     expect(logger.infoEvents.length).toBeGreaterThanOrEqual(1);
     expect(logger.warnEvents.length).toBeGreaterThanOrEqual(1);
@@ -377,22 +434,26 @@ describe("IdentityAuthBackendApi", () => {
     });
     expect(serializedLogs.includes("StrongPass!2026")).toBeFalse();
     expect(serializedLogs.includes("LeakySecret!2026")).toBeFalse();
+    expect(serializedLogs.includes("AnotherSecret!2027")).toBeFalse();
     expect(serializedLogs.includes("trusted-device:redaction")).toBeFalse();
     expect(serializedLogs.includes("marker:redaction")).toBeFalse();
     expect(successfulLogin.ok && serializedLogs.includes(successfulLogin.data?.sessionToken ?? "")).toBeFalse();
     expect(serializedLogs.includes("[REDACTED]")).toBeTrue();
 
-    expect(auditEventSink.events.length).toBe(3);
+    expect(auditEventSink.events.length).toBe(4);
     expect(auditEventSink.events[0]?.type).toBe("identity-auth.local.register");
     expect(auditEventSink.events[0]?.outcome).toBe("success");
     expect(auditEventSink.events[1]?.type).toBe("identity-auth.local.login");
     expect(auditEventSink.events[1]?.outcome).toBe("failure");
     expect(auditEventSink.events[2]?.type).toBe("identity-auth.local.login");
     expect(auditEventSink.events[2]?.outcome).toBe("success");
+    expect(auditEventSink.events[3]?.type).toBe("identity-auth.local.credential.change");
+    expect(auditEventSink.events[3]?.outcome).toBe("success");
 
     const serializedAuditEvents = JSON.stringify(auditEventSink.events);
     expect(serializedAuditEvents.includes("StrongPass!2026")).toBeFalse();
     expect(serializedAuditEvents.includes("LeakySecret!2026")).toBeFalse();
+    expect(serializedAuditEvents.includes("AnotherSecret!2027")).toBeFalse();
     expect(serializedAuditEvents.includes("trusted-device:redaction")).toBeFalse();
     expect(serializedAuditEvents.includes("marker:redaction")).toBeFalse();
     expect(successfulLogin.ok && serializedAuditEvents.includes(successfulLogin.data?.sessionToken ?? "")).toBeFalse();

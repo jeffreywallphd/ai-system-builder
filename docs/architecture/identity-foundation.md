@@ -212,6 +212,7 @@ Local identity registration/login is now exposed through an authoritative HTTP t
 
 - `POST /api/v1/identity/register`
 - `POST /api/v1/identity/login`
+- `POST /api/v1/identity/credential/change` (authenticated)
 
 Primary transport files:
 

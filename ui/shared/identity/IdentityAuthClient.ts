@@ -1,4 +1,6 @@
 import type {
+  ChangeLocalPasswordCredentialApiRequest,
+  ChangeLocalPasswordCredentialApiResponse,
   GetIdentityAdminAccountStatusApiRequest,
   GetIdentityAdminAccountStatusApiResponse,
   IdentityAuthApiResponse,
@@ -45,6 +47,10 @@ export interface IdentityAuthClient {
     request: SetIdentityAdminAccountStatusApiRequest,
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>>;
+  changeLocalPasswordCredential(
+    request: ChangeLocalPasswordCredentialApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ChangeLocalPasswordCredentialApiResponse>>;
 }
 
 export class HttpIdentityAuthClient implements IdentityAuthClient {
@@ -143,6 +149,19 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
         action: request.action,
         providerId: request.providerId,
       },
+      {
+        authorization: `Bearer ${sessionToken}`,
+      },
+    );
+  }
+
+  public async changeLocalPasswordCredential(
+    request: ChangeLocalPasswordCredentialApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ChangeLocalPasswordCredentialApiResponse>> {
+    return this.post(
+      "/api/v1/identity/credential/change",
+      request,
       {
         authorization: `Bearer ${sessionToken}`,
       },

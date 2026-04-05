@@ -209,9 +209,25 @@ describe("IdentityHttpServer", () => {
         authorization: `Bearer ${loginBody.data.sessionToken}`,
       },
     });
+    await fetch(`${baseUrl}/api/v1/identity/credential/change`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+      body: JSON.stringify({
+        newCredential: {
+          candidate: "AnotherLeakySecret!2026",
+        },
+        verification: {
+          currentCredential: "StrongPass!2026",
+        },
+      }),
+    });
 
     const serializedEvents = JSON.stringify(logger.events);
     expect(serializedEvents.includes("LeakySecret!2026")).toBeFalse();
+    expect(serializedEvents.includes("AnotherLeakySecret!2026")).toBeFalse();
     expect(serializedEvents.includes("trusted-device:redaction")).toBeFalse();
     expect(serializedEvents.includes("marker:redaction")).toBeFalse();
     expect(serializedEvents.includes(loginBody.data.sessionToken)).toBeFalse();
@@ -417,6 +433,88 @@ describe("IdentityHttpServer", () => {
     expect(invalidAfterRevoke.status).toBe(401);
   });
 
+  it("supports bearer-authenticated local credential change", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "credential.change.api.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+
+    const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "credential.change.api.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(loginResponse.status).toBe(200);
+    const loginBody = await loginResponse.json();
+
+    const changeCredentialResponse = await fetch(`${baseUrl}/api/v1/identity/credential/change`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+      body: JSON.stringify({
+        newCredential: {
+          candidate: "StrongerPass!2027",
+        },
+        verification: {
+          currentCredential: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(changeCredentialResponse.status).toBe(200);
+    const changeCredentialBody = await changeCredentialResponse.json();
+    expect(changeCredentialBody.ok).toBe(true);
+    expect(changeCredentialBody.data.verificationMode).toBe("current-credential");
+
+    const oldCredentialLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "credential.change.api.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(oldCredentialLoginResponse.status).toBe(401);
+
+    const newCredentialLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "credential.change.api.user",
+        credential: {
+          candidate: "StrongerPass!2027",
+        },
+      }),
+    });
+    expect(newCredentialLoginResponse.status).toBe(200);
+  });
+
   it("supports bearer-authenticated local account administration endpoints", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger);
@@ -496,5 +594,127 @@ describe("IdentityHttpServer", () => {
       },
     });
     expect(sessionAfterDisable.status).toBe(401);
+  });
+
+  it("hardens the full local identity lifecycle journey across endpoints", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        username: "lifecycle.user",
+        email: "lifecycle.user@example.com",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+    const registerBody = await registerResponse.json();
+
+    const firstLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        providerSubject: "lifecycle.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(firstLoginResponse.status).toBe(200);
+    const firstLoginBody = await firstLoginResponse.json();
+
+    const sessionResolveResponse = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${firstLoginBody.data.sessionToken}`,
+      },
+    });
+    expect(sessionResolveResponse.status).toBe(200);
+
+    const changeCredentialResponse = await fetch(`${baseUrl}/api/v1/identity/credential/change`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${firstLoginBody.data.sessionToken}`,
+      },
+      body: JSON.stringify({
+        newCredential: {
+          candidate: "StrongerPass!2027",
+        },
+        verification: {
+          currentCredential: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(changeCredentialResponse.status).toBe(200);
+
+    const logoutResponse = await fetch(`${baseUrl}/api/v1/identity/logout`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${firstLoginBody.data.sessionToken}`,
+      },
+    });
+    expect(logoutResponse.status).toBe(200);
+
+    const oldCredentialLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        providerSubject: "lifecycle.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(oldCredentialLoginResponse.status).toBe(401);
+
+    const secondLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        providerSubject: "lifecycle.user",
+        credential: {
+          candidate: "StrongerPass!2027",
+        },
+      }),
+    });
+    expect(secondLoginResponse.status).toBe(200);
+    const secondLoginBody = await secondLoginResponse.json();
+
+    const disableResponse = await fetch(`${baseUrl}/api/v1/identity/admin/accounts/${encodeURIComponent(registerBody.data.userIdentityId)}/status`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${secondLoginBody.data.sessionToken}`,
+      },
+      body: JSON.stringify({
+        action: "disable",
+      }),
+    });
+    expect(disableResponse.status).toBe(200);
+
+    const disabledSessionResponse = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${secondLoginBody.data.sessionToken}`,
+      },
+    });
+    expect(disabledSessionResponse.status).toBe(401);
+
+    const disabledLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        providerSubject: "lifecycle.user",
+        credential: {
+          candidate: "StrongerPass!2027",
+        },
+      }),
+    });
+    expect(disabledLoginResponse.status).toBe(403);
   });
 });

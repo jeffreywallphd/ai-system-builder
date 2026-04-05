@@ -16,6 +16,7 @@ import type { IIdentityIdGenerator } from "../../application/identity/ports/IIde
 import type { IIdentityLifecycleEventPublisher } from "../../application/identity/ports/IIdentityLifecycleEventPublisher";
 import { RegisterLocalAccountUseCase } from "../../src/application/identity/use-cases/RegisterLocalAccountUseCase";
 import { LoginLocalAccountUseCase } from "../../src/application/identity/use-cases/LoginLocalAccountUseCase";
+import { ChangeLocalPasswordCredentialUseCase } from "../../src/application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
 import { LogoutIdentitySessionUseCase } from "../../src/application/identity/use-cases/LogoutIdentitySessionUseCase";
 import { RevokeIdentitySessionUseCase } from "../../src/application/identity/use-cases/RevokeIdentitySessionUseCase";
 import { ListLocalIdentityAccountsUseCase } from "../../src/application/identity/use-cases/ListLocalIdentityAccountsUseCase";
@@ -113,6 +114,16 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       credentialMaterialRepository: repository,
       identityPolicyService,
       credentialAuthenticator: authenticator,
+      clock,
+      eventPublisher,
+    }),
+    changeLocalPasswordCredentialUseCase: new ChangeLocalPasswordCredentialUseCase({
+      lookupRepository: repository,
+      persistenceRepository: repository,
+      credentialMaterialRepository: repository,
+      identityPolicyService,
+      credentialAuthenticator: authenticator,
+      idGenerator,
       clock,
       eventPublisher,
     }),

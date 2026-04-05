@@ -1,7 +1,10 @@
 import { describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import type { AuthProvider, CredentialPolicy } from "../../../src/domain/identity/IdentityDomain";
 import { IdentityProviderAccountPolicyConfig } from "../../../infrastructure/config/IdentityProviderAccountPolicyConfig";
-import { applyIdentityStartupConfiguration } from "../IdentityServerHost";
+import { applyIdentityStartupConfiguration, startIdentityServerHost } from "../IdentityServerHost";
 
 class InMemoryIdentityDefaultConfigurationRepository {
   public readonly providers = new Map<string, AuthProvider>();
@@ -65,5 +68,53 @@ describe("IdentityServerHost", () => {
 
     expect(repository.providers.size).toBe(0);
     expect(repository.policies.size).toBe(0);
+  });
+
+  it("boots the runtime host with seeded local provider/policy and serves lifecycle endpoints", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-host-test-"));
+    const databasePath = join(tempDirectory, "identity-host.sqlite");
+    const host = await startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+    });
+
+    try {
+      const loginBeforeRegister = await fetch(`http://${host.address}/api/v1/identity/login`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          providerSubject: "host.lifecycle.user",
+          credential: {
+            candidate: "StrongPass!2026",
+          },
+        }),
+      });
+      expect(loginBeforeRegister.status).toBe(401);
+
+      const register = await fetch(`http://${host.address}/api/v1/identity/register`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          username: "host.lifecycle.user",
+          credential: {
+            candidate: "StrongPass!2026",
+          },
+        }),
+      });
+      expect(register.status).toBe(200);
+      const registerBody = await register.json();
+      expect(registerBody.ok).toBe(true);
+      expect(registerBody.data.providerId).toBe("provider:local-password");
+    } finally {
+      await host.close();
+      rmSync(tempDirectory, { recursive: true, force: true });
+    }
   });
 });

@@ -9,6 +9,7 @@ This module defines the transport-facing request/response contracts for local ac
 - `ResolveAuthenticatedSessionApiRequest`
 - `LogoutAuthenticatedSessionApiRequest`
 - `RevokeIdentitySessionApiRequest`
+- `ChangeLocalPasswordCredentialApiRequest`
 - `ListIdentityAdminAccountsApiRequest`
 - `GetIdentityAdminAccountStatusApiRequest`
 - `SetIdentityAdminAccountStatusApiRequest`
@@ -25,6 +26,7 @@ This module defines the transport-facing request/response contracts for local ac
 - `ResolveAuthenticatedSessionApiResponse`
 - `LogoutAuthenticatedSessionApiResponse`
 - `RevokeIdentitySessionApiResponse`
+- `ChangeLocalPasswordCredentialApiResponse`
 - `ListIdentityAdminAccountsApiResponse`
 - `GetIdentityAdminAccountStatusApiResponse`
 - `SetIdentityAdminAccountStatusApiResponse`
