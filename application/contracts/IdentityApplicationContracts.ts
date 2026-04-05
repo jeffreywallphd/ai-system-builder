@@ -8,6 +8,16 @@ import type {
   DeviceTrustMaterialRef,
   DeviceTrustStatus,
 } from "../../src/domain/identity/TrustedDeviceDomain";
+import type {
+  PairingPinnedTrustMaterialRegistration,
+  PairingSessionRejectionReason,
+  PairingSessionStatus,
+  PairingTokenActorBinding,
+  PairingTokenArtifactType,
+  PairingTokenInvalidationReason,
+  PairingTokenIssuanceMetadata,
+  PairingTokenStatus,
+} from "../../src/domain/identity/TrustedDevicePairingDomain";
 
 export const IdentityPrincipalLookupKinds = Object.freeze({
   username: "username",
@@ -178,6 +188,145 @@ export interface TrustedDeviceLastSeenUpdate {
   }>;
 }
 
+export interface TrustedDevicePairingSessionRecord {
+  readonly id: string;
+  readonly trustedDeviceId: string;
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly pairingTokenId: string;
+  readonly status: PairingSessionStatus;
+  readonly initiatedAt: string;
+  readonly validatedAt?: string;
+  readonly completedAt?: string;
+  readonly completedByUserIdentityId?: string;
+  readonly trustMaterialRegistration?: PairingPinnedTrustMaterialRegistration;
+  readonly rejectedAt?: string;
+  readonly rejectionReason?: PairingSessionRejectionReason;
+  readonly rejectionNote?: string;
+  readonly invalidatedAt?: string;
+  readonly expiredAt?: string;
+  readonly updatedAt: string;
+}
+
+export interface TrustedDevicePairingTokenRecord {
+  readonly id: string;
+  readonly pairingSessionId: string;
+  readonly trustedDeviceId: string;
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly artifactType: PairingTokenArtifactType;
+  readonly tokenHash: string;
+  readonly hashAlgorithm: "sha256";
+  readonly actorBinding: PairingTokenActorBinding;
+  readonly issuance: PairingTokenIssuanceMetadata;
+  readonly status: PairingTokenStatus;
+  readonly issuedAt: string;
+  readonly expiresAt: string;
+  readonly failedValidationAttempts: number;
+  readonly maxValidationAttempts: number;
+  readonly lastValidationAttemptAt?: string;
+  readonly consumedAt?: string;
+  readonly consumedByUserIdentityId?: string;
+  readonly invalidationReason?: PairingTokenInvalidationReason;
+  readonly invalidatedAt?: string;
+  readonly invalidatedByUserIdentityId?: string;
+  readonly invalidationNote?: string;
+  readonly updatedAt: string;
+}
+
+export interface TrustedDevicePairingInitiationRequest {
+  readonly trustedDeviceId: string;
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly artifactType: PairingTokenArtifactType;
+  readonly actorBinding: PairingTokenActorBinding;
+  readonly issuance?: PairingTokenIssuanceMetadata;
+  readonly maxValidationAttempts?: number;
+  readonly expiresAt: string;
+}
+
+export interface TrustedDevicePairingArtifact {
+  readonly type: PairingTokenArtifactType;
+  readonly value: string;
+  readonly redactedHint?: string;
+}
+
+export interface TrustedDevicePairingInitiationResponse {
+  readonly pairingSession: TrustedDevicePairingSessionRecord;
+  readonly pairingToken: TrustedDevicePairingTokenRecord;
+  readonly artifact: TrustedDevicePairingArtifact;
+}
+
+export interface TrustedDevicePairingValidationRequest {
+  readonly pairingSessionId: string;
+  readonly pairingTokenId?: string;
+  readonly trustedDeviceId: string;
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly presentedToken: string;
+  readonly attemptedAt?: string;
+}
+
+export const PairingTokenValidationOutcomes = Object.freeze({
+  valid: "valid",
+  invalid: "invalid",
+  expired: "expired",
+  reused: "reused",
+  invalidated: "invalidated",
+  attemptsExhausted: "attempts-exhausted",
+  actorScopeViolation: "actor-scope-violation",
+});
+
+export type PairingTokenValidationOutcome =
+  typeof PairingTokenValidationOutcomes[keyof typeof PairingTokenValidationOutcomes];
+
+export interface TrustedDevicePairingValidationResponse {
+  readonly outcome: PairingTokenValidationOutcome;
+  readonly pairingSession: TrustedDevicePairingSessionRecord;
+  readonly pairingToken: TrustedDevicePairingTokenRecord;
+  readonly attemptsRemaining: number;
+}
+
+export interface TrustedDevicePairingCompletionRequest {
+  readonly pairingSessionId: string;
+  readonly pairingTokenId: string;
+  readonly trustedDeviceId: string;
+  readonly userIdentityId: string;
+  readonly workspaceId?: string;
+  readonly presentedToken: string;
+  readonly completedAt?: string;
+  readonly completedByUserIdentityId?: string;
+  readonly trustMaterialRef?: DeviceTrustMaterialRef;
+  readonly trustMaterialRegistration?: PairingPinnedTrustMaterialRegistration;
+}
+
+export interface TrustedDevicePairingCompletionResponse {
+  readonly pairingSession: TrustedDevicePairingSessionRecord;
+  readonly pairingToken: TrustedDevicePairingTokenRecord;
+  readonly trustedDevice: TrustedDeviceRecord;
+}
+
+export interface TrustedDevicePairingExpirationRequest {
+  readonly pairingSessionId?: string;
+  readonly pairingTokenId?: string;
+  readonly expiresBefore: string;
+  readonly includeAlreadyExpired?: boolean;
+}
+
+export interface TrustedDevicePairingExpirationResult {
+  readonly expiredSessions: number;
+  readonly expiredTokens: number;
+}
+
+export interface TrustedDevicePairingInvalidationRequest {
+  readonly pairingSessionId?: string;
+  readonly pairingTokenId?: string;
+  readonly reason: PairingTokenInvalidationReason;
+  readonly invalidatedByUserIdentityId?: string;
+  readonly note?: string;
+  readonly invalidatedAt?: string;
+}
+
 export const IdentityIdNamespaces = Object.freeze({
   userIdentity: "user-identity",
   identitySession: "identity-session",
@@ -185,6 +334,8 @@ export const IdentityIdNamespaces = Object.freeze({
   credentialPolicy: "credential-policy",
   credentialMaterial: "credential-material",
   trustedDevice: "trusted-device",
+  trustedDevicePairingSession: "trusted-device-pairing-session",
+  trustedDevicePairingToken: "trusted-device-pairing-token",
 });
 
 export type IdentityIdNamespace =
