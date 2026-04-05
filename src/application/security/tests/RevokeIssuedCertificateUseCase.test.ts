@@ -7,6 +7,7 @@ import {
   RevokeIssuedCertificateInvalidRequestError,
   RevokeIssuedCertificateUseCase,
 } from "../use-cases/RevokeIssuedCertificateUseCase";
+import type { CertificateLifecycleAuditEvent, CertificateLifecycleAuditSink } from "../ports/CertificateLifecycleAuditPorts";
 import type {
   AppendCertificateStatusHistoryPersistenceRecordInput,
   CertificateAuthorityPersistenceMutationResult,
@@ -158,10 +159,19 @@ class InMemoryLifecycleEventRepository implements ICertificateLifecycleEventPers
   }
 }
 
+class CapturingCertificateLifecycleAuditSink implements CertificateLifecycleAuditSink {
+  public readonly events: CertificateLifecycleAuditEvent[] = [];
+
+  public async recordCertificateLifecycleAuditEvent(event: CertificateLifecycleAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 describe("RevokeIssuedCertificateUseCase", () => {
   it("revokes an issued certificate via explicit admin action and persists revocation metadata", async () => {
     const issuedCertificates = new InMemoryIssuedCertificateRepository();
     const lifecycleEvents = new InMemoryLifecycleEventRepository();
+    const auditSink = new CapturingCertificateLifecycleAuditSink();
     issuedCertificates.recordsBySerial.set("C0FFEE", createIssuedRecord({
       serialNumber: "C0FFEE",
       status: CertificateStatuses.issued,
@@ -171,6 +181,7 @@ describe("RevokeIssuedCertificateUseCase", () => {
     const useCase = new RevokeIssuedCertificateUseCase({
       issuedCertificateRepository: issuedCertificates,
       certificateLifecycleEventRepository: lifecycleEvents,
+      auditSink,
     });
 
     const result = await useCase.execute({
@@ -188,11 +199,16 @@ describe("RevokeIssuedCertificateUseCase", () => {
     expect(result.revocation.revokedAt).toBe("2026-07-01T00:00:00.000Z");
     expect(lifecycleEvents.revocationsBySerial.get("C0FFEE")?.reason).toBe(CertificateRevocationReasons.policyViolation);
     expect(issuedCertificates.recordsBySerial.get("C0FFEE")?.status).toBe(CertificateStatuses.revoked);
+    expect(auditSink.events.map((event) => event.type)).toEqual([
+      "certificate-revocation-started",
+      "certificate-revocation-succeeded",
+    ]);
   });
 
   it("rejects duplicate revocation attempts", async () => {
     const issuedCertificates = new InMemoryIssuedCertificateRepository();
     const lifecycleEvents = new InMemoryLifecycleEventRepository();
+    const auditSink = new CapturingCertificateLifecycleAuditSink();
     issuedCertificates.recordsBySerial.set("C0FFEE", createIssuedRecord({
       serialNumber: "C0FFEE",
       status: CertificateStatuses.revoked,
@@ -207,6 +223,7 @@ describe("RevokeIssuedCertificateUseCase", () => {
     const useCase = new RevokeIssuedCertificateUseCase({
       issuedCertificateRepository: issuedCertificates,
       certificateLifecycleEventRepository: lifecycleEvents,
+      auditSink,
     });
 
     await expect(useCase.execute({
@@ -215,6 +232,11 @@ describe("RevokeIssuedCertificateUseCase", () => {
       revocationReason: CertificateRevocationReasons.policyViolation,
       actorUserIdentityId: "user:security-admin",
     })).rejects.toBeInstanceOf(IssuedCertificateAlreadyRevokedError);
+    expect(auditSink.events.map((event) => event.type)).toEqual([
+      "certificate-revocation-started",
+      "certificate-revocation-failed",
+    ]);
+    expect((auditSink.events[1]?.details as Record<string, unknown>)?.code).toBe("certificate-revocation-already-revoked");
   });
 
   it("rejects invalid revocation requests", async () => {

@@ -15,6 +15,7 @@
 - Adds node-trust-backed approved-node eligibility integration for certificate issuance (Story 6.2.3).
 - Adds explicit certificate revocation command and revocation-status enforcement registry seams (Story 6.2.4).
 - Adds reusable certificate trust/validity evaluation helper seams for consistent lifecycle status decisions (Story 6.2.5).
+- Adds certificate lifecycle audit recording seams for initialization/issuance/revocation decisions and outcomes (Story 6.2.6).
 
 ## Main artifacts to cite
 
@@ -31,6 +32,7 @@
 - `src/application/security/ports/ICertificateAuthorityRootMaterialStorage.ts`
 - `src/application/security/ports/INodeCertificateEligibilityPort.ts`
 - `src/application/security/ports/ICertificateRevocationStatusRegistry.ts`
+- `src/application/security/ports/CertificateLifecycleAuditPorts.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
 - `src/application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase.ts`
@@ -191,6 +193,27 @@ Structured diagnostics emitted by the startup use case are designed for future o
   - `notAfter` exclusive
 - `ResolveCertificateRevocationStatusUseCase` now delegates trust status calculation to this helper and exposes `usable` in revocation-status responses for transport/readiness checks.
 
+## Story 6.2.6 certificate lifecycle audit hooks behavior
+
+- Adds `CertificateLifecycleAuditPorts` as the application-boundary security audit seam for CA lifecycle operations.
+- Dispatch is best-effort so trust operations remain authoritative even when audit delivery fails.
+- Audit payloads are sanitized/redacted before sink delivery to avoid leaking secret refs, PEM/key payloads, and similarly sensitive material fields.
+- Initialization, issuance, and revocation use cases emit actor-attributed lifecycle events.
+- Issuance now distinguishes blocked trust-policy decisions (`certificate-issuance-blocked`) from runtime failures after signing (`certificate-issuance-failed`).
+
+### Audited lifecycle events
+
+- `ca-initialize-started`
+- `ca-initialize-succeeded`
+- `ca-initialize-failed`
+- `certificate-issuance-started`
+- `certificate-issuance-succeeded`
+- `certificate-issuance-blocked`
+- `certificate-issuance-failed`
+- `certificate-revocation-started`
+- `certificate-revocation-succeeded`
+- `certificate-revocation-failed`
+
 ## Coverage in this slice
 
 - Domain invariants and lifecycle transitions: `src/domain/security/tests/CertificateAuthorityDomain.test.ts`
@@ -209,6 +232,7 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - revocation command behavior (admin action / duplicate / invalid request): `src/application/security/tests/RevokeIssuedCertificateUseCase.test.ts`
 - revocation registry status enforcement behavior: `src/application/security/tests/ResolveCertificateRevocationStatusUseCase.test.ts`
 - trust evaluation helper and boundary coverage: `src/application/security/tests/CertificateTrustEvaluationService.test.ts`
+- lifecycle audit sanitization behavior: `src/application/security/tests/CertificateLifecycleAuditPorts.test.ts`
 - concrete issuer signing pipeline coverage: `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - host initialization seam coverage: `hosts/server/tests/IdentityServerHost.test.ts`
 

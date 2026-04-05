@@ -4,6 +4,11 @@ import type { ICertificateAuthorityRootMaterialStorage } from "../ports/ICertifi
 import type { ICertificateAuthorityRootPersistenceRepository } from "../ports/ICertificateAuthorityRootPersistenceRepository";
 import type { ITrustMaterialReferencePersistenceRepository } from "../ports/ITrustMaterialReferencePersistenceRepository";
 import {
+  CertificateLifecycleAuditEventTypes,
+  publishCertificateLifecycleAuditEventBestEffort,
+  type CertificateLifecycleAuditSink,
+} from "../ports/CertificateLifecycleAuditPorts";
+import {
   normalizeCertificateAuthorityMutationOperationKey,
   type CertificateAuthorityRootPersistenceRecord,
   type CertificateSubjectPersistenceRecord,
@@ -106,6 +111,7 @@ export interface InitializeCertificateAuthorityUseCaseDependencies {
   readonly trustMaterialRepository: ITrustMaterialReferencePersistenceRepository;
   readonly rootMaterialStorage: ICertificateAuthorityRootMaterialStorage;
   readonly issuer: ICertificateAuthorityIssuerPort;
+  readonly auditSink?: CertificateLifecycleAuditSink;
   readonly auditHook?: (event: CertificateAuthorityInitializationAuditEvent) => Promise<void> | void;
 }
 
@@ -114,12 +120,13 @@ export class InitializeCertificateAuthorityUseCase {
 
   public async execute(input: InitializeCertificateAuthorityUseCaseInput): Promise<InitializeCertificateAuthorityUseCaseResult> {
     const normalized = normalizeInput(input);
-    await this.emitAudit({
-      event: "ca-initialize-started",
-      certificateAuthorityId: normalized.certificateAuthorityId,
-      operationKey: normalized.operationKey,
-      actorUserIdentityId: normalized.actorUserIdentityId,
-    });
+      await this.emitAudit({
+        event: "ca-initialize-started",
+        occurredAt: normalized.occurredAt,
+        certificateAuthorityId: normalized.certificateAuthorityId,
+        operationKey: normalized.operationKey,
+        actorUserIdentityId: normalized.actorUserIdentityId,
+      });
 
     try {
       const existingAuthorities = await this.dependencies.certificateAuthorityRepository.listCertificateAuthorities({
@@ -134,6 +141,7 @@ export class InitializeCertificateAuthorityUseCase {
           const existingResult = await this.toExistingResult(activeAuthority);
           await this.emitAudit({
             event: "ca-initialize-succeeded",
+            occurredAt: normalized.occurredAt,
             certificateAuthorityId: existingResult.certificateAuthorityId,
             operationKey: normalized.operationKey,
             actorUserIdentityId: normalized.actorUserIdentityId,
@@ -280,6 +288,7 @@ export class InitializeCertificateAuthorityUseCase {
 
       await this.emitAudit({
         event: "ca-initialize-succeeded",
+        occurredAt: normalized.occurredAt,
         certificateAuthorityId: result.certificateAuthorityId,
         operationKey: normalized.operationKey,
         actorUserIdentityId: normalized.actorUserIdentityId,
@@ -294,6 +303,7 @@ export class InitializeCertificateAuthorityUseCase {
     } catch (error) {
       await this.emitAudit({
         event: "ca-initialize-failed",
+        occurredAt: normalized.occurredAt,
         certificateAuthorityId: normalized.certificateAuthorityId,
         operationKey: normalized.operationKey,
         actorUserIdentityId: normalized.actorUserIdentityId,
@@ -334,16 +344,24 @@ export class InitializeCertificateAuthorityUseCase {
     });
   }
 
-  private async emitAudit(event: CertificateAuthorityInitializationAuditEvent): Promise<void> {
-    if (!this.dependencies.auditHook) {
-      return;
+  private async emitAudit(
+    event: CertificateAuthorityInitializationAuditEvent & { readonly occurredAt?: string },
+  ): Promise<void> {
+    if (this.dependencies.auditHook) {
+      try {
+        await this.dependencies.auditHook(event);
+      } catch {
+        // Audit hook failures are intentionally non-fatal to avoid blocking initialization lifecycle.
+      }
     }
 
-    try {
-      await this.dependencies.auditHook(event);
-    } catch {
-      // Audit hook failures are intentionally non-fatal to avoid blocking initialization lifecycle.
-    }
+    await publishCertificateLifecycleAuditEventBestEffort(this.dependencies.auditSink, {
+      type: event.event,
+      actorUserIdentityId: event.actorUserIdentityId,
+      occurredAt: event.occurredAt ?? new Date().toISOString(),
+      certificateAuthorityId: event.certificateAuthorityId,
+      details: toCertificateLifecycleAuditDetails(event),
+    });
   }
 }
 
@@ -496,4 +514,32 @@ function redactSecretRef(secretRef: string): string {
     return "[redacted]";
   }
   return `${normalized.slice(0, 10)}...${normalized.slice(-6)}`;
+}
+
+function toCertificateLifecycleAuditDetails(
+  event: CertificateAuthorityInitializationAuditEvent,
+): Readonly<Record<string, unknown>> {
+  switch (event.event) {
+    case CertificateLifecycleAuditEventTypes.certificateAuthorityInitializationStarted:
+      return Object.freeze({
+        operationKey: event.operationKey,
+      });
+    case CertificateLifecycleAuditEventTypes.certificateAuthorityInitializationSucceeded:
+      return Object.freeze({
+        operationKey: event.operationKey,
+        outcome: event.outcome,
+        rootCertificateMaterialRef: event.rootCertificateMaterialRef,
+        rootPrivateKeyMaterialRef: event.rootPrivateKeyMaterialRef,
+        rootCertificateSecretRef: event.rootCertificateSecretRefRedacted,
+        rootPrivateKeySecretRef: event.rootPrivateKeySecretRefRedacted,
+      });
+    case CertificateLifecycleAuditEventTypes.certificateAuthorityInitializationFailed:
+      return Object.freeze({
+        operationKey: event.operationKey,
+        code: event.code,
+        message: event.message,
+      });
+    default:
+      return Object.freeze({});
+  }
 }

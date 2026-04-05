@@ -27,6 +27,10 @@ import type { ICertificateAuthorityRootMaterialStorage } from "../ports/ICertifi
 import type { ICertificateAuthorityIssuerPort } from "../ports/ICertificateAuthorityIssuerPort";
 import type { IIssuedCertificatePersistenceRepository } from "../ports/IIssuedCertificatePersistenceRepository";
 import type { ITrustMaterialReferencePersistenceRepository } from "../ports/ITrustMaterialReferencePersistenceRepository";
+import {
+  publishCertificateLifecycleAuditEventBestEffort,
+  type CertificateLifecycleAuditSink,
+} from "../ports/CertificateLifecycleAuditPorts";
 
 export class CertificateIssuancePolicyViolationError extends Error {
   public constructor(public readonly violations: ReadonlyArray<string>) {
@@ -79,12 +83,14 @@ export interface IssueCertificateForSubjectUseCaseDependencies {
   readonly certificateMaterialStorage: ICertificateAuthorityRootMaterialStorage;
   readonly issuer: ICertificateAuthorityIssuerPort;
   readonly nodeCertificateEligibilityPort?: INodeCertificateEligibilityPort;
+  readonly auditSink?: CertificateLifecycleAuditSink;
   readonly auditHook?: (event: CertificateIssuanceAuditEvent) => Promise<void> | void;
 }
 
 export type CertificateIssuanceAuditEvent =
   | {
     readonly event: "certificate-issuance-started";
+    readonly occurredAt: string;
     readonly operationKey: string;
     readonly certificateAuthorityId?: string;
     readonly profileKind: CertificateSubjectProfileKind;
@@ -94,6 +100,7 @@ export type CertificateIssuanceAuditEvent =
   }
   | {
     readonly event: "certificate-issuance-succeeded";
+    readonly occurredAt: string;
     readonly operationKey: string;
     readonly certificateAuthorityId: string;
     readonly serialNumber: string;
@@ -103,7 +110,20 @@ export type CertificateIssuanceAuditEvent =
     readonly certificateChainMaterialRefRedacted?: string;
   }
   | {
+    readonly event: "certificate-issuance-blocked";
+    readonly occurredAt: string;
+    readonly operationKey: string;
+    readonly certificateAuthorityId?: string;
+    readonly profileKind: CertificateSubjectProfileKind;
+    readonly actorUserIdentityId: string;
+    readonly code: string;
+    readonly message: string;
+    readonly subjectReferenceKind: string;
+    readonly subjectReferenceId: string;
+  }
+  | {
     readonly event: "certificate-issuance-failed";
+    readonly occurredAt: string;
     readonly operationKey: string;
     readonly certificateAuthorityId?: string;
     readonly profileKind: CertificateSubjectProfileKind;
@@ -120,6 +140,7 @@ export class IssueCertificateForSubjectUseCase {
     const normalized = normalizeInput(input);
     await this.emitAudit({
       event: "certificate-issuance-started",
+      occurredAt: normalized.occurredAt,
       operationKey: normalized.operationKey,
       certificateAuthorityId: normalized.certificateAuthorityId,
       profileKind: normalized.profileKind,
@@ -135,6 +156,7 @@ export class IssueCertificateForSubjectUseCase {
       }
       | undefined;
     let compensatingRevocationAttempted = false;
+    let issuerInvoked = false;
 
     try {
       const certificateAuthority = normalized.certificateAuthorityId
@@ -188,6 +210,7 @@ export class IssueCertificateForSubjectUseCase {
         publicKeyPem: normalized.publicKeyPem,
         signatureAlgorithm: normalized.signatureAlgorithm,
       });
+      issuerInvoked = true;
       issued = Object.freeze({
         certificateAuthorityId: issuedMaterial.certificateAuthorityId,
         serialNumber: issuedMaterial.serialNumber,
@@ -249,6 +272,7 @@ export class IssueCertificateForSubjectUseCase {
 
       await this.emitAudit({
         event: "certificate-issuance-succeeded",
+        occurredAt: normalized.occurredAt,
         operationKey: normalized.operationKey,
         certificateAuthorityId: issuedMaterial.certificateAuthorityId,
         serialNumber: issuedMaterial.serialNumber,
@@ -275,16 +299,32 @@ export class IssueCertificateForSubjectUseCase {
       if (issued) {
         compensatingRevocationAttempted = await this.tryCompensatingRevocation(normalized, issued);
       }
-      await this.emitAudit({
-        event: "certificate-issuance-failed",
-        operationKey: normalized.operationKey,
-        certificateAuthorityId: issued?.certificateAuthorityId ?? normalized.certificateAuthorityId,
-        profileKind: normalized.profileKind,
-        actorUserIdentityId: normalized.actorUserIdentityId,
-        code: toErrorCode(error),
-        message: toErrorMessage(error),
-        compensatingRevocationAttempted,
-      });
+      if (!issuerInvoked) {
+        await this.emitAudit({
+          event: "certificate-issuance-blocked",
+          occurredAt: normalized.occurredAt,
+          operationKey: normalized.operationKey,
+          certificateAuthorityId: normalized.certificateAuthorityId,
+          profileKind: normalized.profileKind,
+          actorUserIdentityId: normalized.actorUserIdentityId,
+          code: toErrorCode(error),
+          message: toErrorMessage(error),
+          subjectReferenceKind: normalized.subjectReference.kind,
+          subjectReferenceId: normalized.subjectReference.referenceId,
+        });
+      } else {
+        await this.emitAudit({
+          event: "certificate-issuance-failed",
+          occurredAt: normalized.occurredAt,
+          operationKey: normalized.operationKey,
+          certificateAuthorityId: issued?.certificateAuthorityId ?? normalized.certificateAuthorityId,
+          profileKind: normalized.profileKind,
+          actorUserIdentityId: normalized.actorUserIdentityId,
+          code: toErrorCode(error),
+          message: toErrorMessage(error),
+          compensatingRevocationAttempted,
+        });
+      }
       throw error;
     }
   }
@@ -391,15 +431,22 @@ export class IssueCertificateForSubjectUseCase {
   }
 
   private async emitAudit(event: CertificateIssuanceAuditEvent): Promise<void> {
-    if (!this.dependencies.auditHook) {
-      return;
+    if (this.dependencies.auditHook) {
+      try {
+        await this.dependencies.auditHook(event);
+      } catch {
+        // Audit failures are intentionally non-fatal.
+      }
     }
 
-    try {
-      await this.dependencies.auditHook(event);
-    } catch {
-      // Audit failures are intentionally non-fatal.
-    }
+    await publishCertificateLifecycleAuditEventBestEffort(this.dependencies.auditSink, {
+      type: event.event,
+      actorUserIdentityId: event.actorUserIdentityId,
+      occurredAt: event.occurredAt,
+      certificateAuthorityId: event.certificateAuthorityId,
+      serialNumber: "serialNumber" in event ? event.serialNumber : undefined,
+      details: toAuditDetails(event),
+    });
   }
 }
 
@@ -510,4 +557,42 @@ function toErrorCode(error: unknown): string {
     return "certificate-issuance-policy-violation";
   }
   return "certificate-issuance-failed";
+}
+
+function toAuditDetails(event: CertificateIssuanceAuditEvent): Readonly<Record<string, unknown>> {
+  switch (event.event) {
+    case "certificate-issuance-started":
+      return Object.freeze({
+        operationKey: event.operationKey,
+        profileKind: event.profileKind,
+        subjectReferenceKind: event.subjectReferenceKind,
+        subjectReferenceId: event.subjectReferenceId,
+      });
+    case "certificate-issuance-succeeded":
+      return Object.freeze({
+        operationKey: event.operationKey,
+        profileKind: event.profileKind,
+        certificateMaterialRef: event.certificateMaterialRefRedacted,
+        certificateChainMaterialRef: event.certificateChainMaterialRefRedacted,
+      });
+    case "certificate-issuance-blocked":
+      return Object.freeze({
+        operationKey: event.operationKey,
+        profileKind: event.profileKind,
+        code: event.code,
+        message: event.message,
+        subjectReferenceKind: event.subjectReferenceKind,
+        subjectReferenceId: event.subjectReferenceId,
+      });
+    case "certificate-issuance-failed":
+      return Object.freeze({
+        operationKey: event.operationKey,
+        profileKind: event.profileKind,
+        code: event.code,
+        message: event.message,
+        compensatingRevocationAttempted: event.compensatingRevocationAttempted,
+      });
+    default:
+      return Object.freeze({});
+  }
 }

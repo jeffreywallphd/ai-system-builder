@@ -1,6 +1,6 @@
 # Internal CA Foundation
 
-This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, Story 6.2.1, Story 6.2.2, Story 6.2.3, Story 6.2.4, and Story 6.2.5 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, certificate subject-profile issuance policy enforcement, concrete issuance signing/material persistence execution, node-trust-backed approved-node issuance eligibility, explicit certificate revocation workflow plus revocation-status enforcement seams, and reusable certificate trust evaluation helpers.
+This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, Story 6.2.1, Story 6.2.2, Story 6.2.3, Story 6.2.4, Story 6.2.5, and Story 6.2.6 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, certificate subject-profile issuance policy enforcement, concrete issuance signing/material persistence execution, node-trust-backed approved-node issuance eligibility, explicit certificate revocation workflow plus revocation-status enforcement seams, reusable certificate trust evaluation helpers, and certificate lifecycle audit recording seams.
 
 ## Canonical artifacts
 
@@ -18,6 +18,7 @@ This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.
 - `src/application/security/ports/ICertificateAuthorityRootMaterialStorage.ts`
 - `src/application/security/ports/INodeCertificateEligibilityPort.ts`
 - `src/application/security/ports/ICertificateRevocationStatusRegistry.ts`
+- `src/application/security/ports/CertificateLifecycleAuditPorts.ts`
 - `src/application/security/ports/CertificateAuthorityPorts.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
@@ -35,6 +36,7 @@ This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.
 - `src/application/security/tests/RevokeIssuedCertificateUseCase.test.ts`
 - `src/application/security/tests/ResolveCertificateRevocationStatusUseCase.test.ts`
 - `src/application/security/tests/CertificateTrustEvaluationService.test.ts`
+- `src/application/security/tests/CertificateLifecycleAuditPorts.test.ts`
 - `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
@@ -127,6 +129,29 @@ Story 6.2.5 adds reusable certificate validity/trust evaluation behavior for dow
   - `notAfter` is exclusive
 - `ResolveCertificateRevocationStatusUseCase` now delegates certificate status calculation to `CertificateTrustEvaluationService` so revocation registry and future consumers share one trust decision pathway.
 - revocation status responses now include `usable` for callers that need a single transport-readiness boolean alongside categorical status.
+
+## Story 6.2.6 certificate lifecycle audit recording hooks
+
+Story 6.2.6 adds a dedicated application-level audit seam for certificate trust lifecycle operations:
+
+- `CertificateLifecycleAuditPorts` defines the stable security audit event vocabulary and sink contract consumed by CA lifecycle use cases.
+- audit dispatch is best-effort, keeping CA initialization/issuance/revocation workflows non-blocking when the audit sink is unavailable.
+- sensitive audit details are sanitized/redacted before sink delivery (secret refs, key material, PEM payload fields, and similarly sensitive keys).
+- initialization, issuance, and revocation workflows now emit structured lifecycle events with actor attribution where available.
+- issuance now distinguishes blocked trust decisions (`certificate-issuance-blocked`) from operational failures after signing (`certificate-issuance-failed`).
+
+### Audited lifecycle events
+
+- `ca-initialize-started`
+- `ca-initialize-succeeded`
+- `ca-initialize-failed`
+- `certificate-issuance-started`
+- `certificate-issuance-succeeded`
+- `certificate-issuance-blocked`
+- `certificate-issuance-failed`
+- `certificate-revocation-started`
+- `certificate-revocation-succeeded`
+- `certificate-revocation-failed`
 
 ## Story 6.1.3 startup bootstrap behavior
 
@@ -348,6 +373,7 @@ Story 6.2.1 and Story 6.2.2 add `IssueCertificateForSubjectUseCase` in the appli
 - `RevokeIssuedCertificateUseCase.test.ts`: explicit admin revocation flow, duplicate revocation rejection, and invalid request handling
 - `ResolveCertificateRevocationStatusUseCase.test.ts`: revocation registry status resolution for active/revoked/expired/not-found cases plus deterministic clock defaulting
 - `CertificateTrustEvaluationService.test.ts`: reusable trust evaluation boundaries (`notBefore` inclusive, `notAfter` exclusive), revoked-over-expiry precedence, subject-state downgrades, and invalid metadata handling
+- `CertificateLifecycleAuditPorts.test.ts`: certificate lifecycle audit sanitization/redaction behavior for sink delivery
 - `InternalCertificateAuthorityIssuer.test.ts`: concrete root generation + signing pipeline behavior and issuance prerequisite failure coverage
 - `IdentityServerHost.test.ts`: host-level first-time initialization invocation seam coverage
 
