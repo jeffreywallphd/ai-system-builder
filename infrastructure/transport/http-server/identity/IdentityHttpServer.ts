@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { IdentityAuthBackendApi } from "../../../api/identity/IdentityAuthBackendApi";
 import type { AuthorizationManagementBackendApi } from "../../../api/authorization/AuthorizationManagementBackendApi";
 import type { NodeTrustBackendApi } from "../../../api/nodes/NodeTrustBackendApi";
+import type { CertificateOperationsBackendApi } from "../../../api/security/CertificateOperationsBackendApi";
 import type { WorkspaceInvitationBackendApi } from "../../../api/workspaces/WorkspaceInvitationBackendApi";
 import type { WorkspaceAdministrationBackendApi } from "../../../api/workspaces/WorkspaceAdministrationBackendApi";
 import {
@@ -68,6 +69,13 @@ import {
   type RejectNodeEnrollmentApiRequest,
   type RevokeNodeTrustApiRequest,
 } from "../../../api/nodes/sdk/PublicNodeTrustApiContract";
+import {
+  CertificateOperationsApiErrorCodes,
+  type CertificateOperationsApiResponse,
+  type ListIssuedCertificatesApiRequest,
+  type RenewIssuedCertificateApiRequest,
+  type RevokeIssuedCertificateApiRequest,
+} from "../../../api/security/sdk/PublicCertificateOperationsApiContract";
 import { redactSensitiveAuthPayload, redactSensitiveText } from "../../../api/identity/IdentityAuthRedaction";
 import {
   NodeApprovalStatuses,
@@ -75,6 +83,13 @@ import {
   NodeRoleCapabilities,
   NodeTypes,
 } from "../../../../src/domain/nodes/NodeTrustDomain";
+import {
+  CertificateRevocationReasons,
+  CertificateStatuses,
+  CertificateSubjectReferenceKinds,
+  CertificateUsageKinds,
+} from "../../../../src/domain/security/CertificateAuthorityDomain";
+import { CertificateTrustEvaluationStatuses } from "../../../../src/shared/dto/security/CertificateAuthorityDtos";
 import {
   parseApproveNodeEnrollmentActionRequestDto,
   parseNodeHeartbeatPayloadDto,
@@ -354,6 +369,42 @@ const NodeCapabilityValues = z.enum([
   NodeRoleCapabilities.storageAccess,
   NodeRoleCapabilities.previewWorker,
 ]);
+const CertificateRevocationReasonValues = new Set<string>(Object.values(CertificateRevocationReasons));
+const CertificateStatusValues = new Set<string>(Object.values(CertificateStatuses));
+const CertificateSubjectReferenceKindValues = new Set<string>(Object.values(CertificateSubjectReferenceKinds));
+const CertificateUsageValues = new Set<string>(Object.values(CertificateUsageKinds));
+const CertificateTrustStatusValues = new Set<string>(Object.values(CertificateTrustEvaluationStatuses));
+
+const RevokeIssuedCertificateRequestSchema = z.object({
+  revocationReason: z.string().refine((value) => CertificateRevocationReasonValues.has(value), {
+    message: "revocationReason is invalid.",
+  }),
+  revokedAt: z.string().datetime().optional(),
+  note: z.string().trim().min(1).max(2000).optional(),
+  reason: z.string().trim().min(1).max(255).optional(),
+  correlationId: z.string().trim().min(1).max(255).optional(),
+}).strict();
+
+const RenewIssuedCertificateRequestSchema = z.object({
+  operationKey: z.string().trim().min(1).optional(),
+  validityDays: z.number().int().positive().optional(),
+  publicKeyPem: z.string().trim().min(1),
+  publicKeyAlgorithm: z.string().trim().min(1),
+  publicKeyFingerprintSha256: z.string().trim().min(1).optional(),
+  signatureAlgorithm: z.string().trim().min(1).optional(),
+  certificateMaterialRef: z.string().trim().min(1),
+  certificateChainMaterialRef: z.string().trim().min(1).optional(),
+  trustMaterialRef: z.string().trim().min(1).optional(),
+  certificateMaterialSecretRef: z.string().trim().min(1).optional(),
+  certificateMaterialKeyScope: z.string().trim().min(1).optional(),
+  certificateChainMaterialSecretRef: z.string().trim().min(1).optional(),
+  certificateChainMaterialKeyScope: z.string().trim().min(1).optional(),
+  previousCertificateDisposition: z.enum(["supersede", "preserve"]).optional(),
+  gracePeriodDays: z.number().int().nonnegative().optional(),
+  occurredAt: z.string().datetime().optional(),
+  reason: z.string().trim().min(1).max(255).optional(),
+  correlationId: z.string().trim().min(1).max(255).optional(),
+}).strict();
 
 const IssueWorkspaceInvitationRequestSchema: z.ZodType<Pick<
   IssueWorkspaceInvitationApiRequest,
@@ -532,6 +583,7 @@ export interface IdentityHttpServerLogger {
 
 export interface IdentityHttpServerOptions {
   readonly backendApi: IdentityAuthBackendApi;
+  readonly certificateOperationsBackendApi?: CertificateOperationsBackendApi;
   readonly authorizationManagementBackendApi?: AuthorizationManagementBackendApi;
   readonly nodeTrustBackendApi?: NodeTrustBackendApi;
   readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
@@ -1240,6 +1292,327 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               ...parsedRequest.data,
               userIdentityId: context.principal.userIdentityId,
             }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.certificateOperationsBackendApi
+        && request.method === "GET"
+        && path === "/api/v1/security/certificates/authority/status"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const asOf = normalizeOptionalString(url.searchParams.get("asOf"));
+            const rotationWarningWindowDaysInput = url.searchParams.get("rotationWarningWindowDays");
+            const certificateExpiryWarningWindowDaysInput = url.searchParams.get("certificateExpiryWarningWindowDays");
+            const rotationWarningWindowDays = parseOptionalInteger(rotationWarningWindowDaysInput);
+            const certificateExpiryWarningWindowDays = parseOptionalInteger(certificateExpiryWarningWindowDaysInput);
+
+            if (
+              rotationWarningWindowDaysInput !== null
+              && (rotationWarningWindowDays === undefined || rotationWarningWindowDays < 1)
+            ) {
+              const invalid = buildCertificateOperationsQueryValidationError(
+                "rotationWarningWindowDays",
+                "rotationWarningWindowDays must be an integer >= 1.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            if (
+              certificateExpiryWarningWindowDaysInput !== null
+              && (certificateExpiryWarningWindowDays === undefined || certificateExpiryWarningWindowDays < 1)
+            ) {
+              const invalid = buildCertificateOperationsQueryValidationError(
+                "certificateExpiryWarningWindowDays",
+                "certificateExpiryWarningWindowDays must be an integer >= 1.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const apiResponse = await options.certificateOperationsBackendApi.getCertificateAuthorityStatus({
+              actorUserIdentityId: context.principal.userIdentityId,
+              asOf,
+              rotationWarningWindowDays,
+              certificateExpiryWarningWindowDays,
+            });
+            const statusCode = mapCertificateOperationsStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              asOf,
+              rotationWarningWindowDays,
+              certificateExpiryWarningWindowDays,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.certificateOperationsBackendApi
+        && request.method === "GET"
+        && path === "/api/v1/security/certificates"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const statuses = url.searchParams.getAll("status");
+            const subjectReferenceKinds = url.searchParams.getAll("subjectReferenceKind");
+            const usageAnyOf = url.searchParams.getAll("usage");
+            const trustStatuses = url.searchParams.getAll("trustStatus");
+            const includeRevokedInput = url.searchParams.get("includeRevoked");
+            const includeRevoked = parseOptionalBoolean(includeRevokedInput);
+            const limitInput = url.searchParams.get("limit");
+            const offsetInput = url.searchParams.get("offset");
+            const limit = parseOptionalInteger(limitInput);
+            const offset = parseOptionalInteger(offsetInput);
+
+            if (statuses.some((status) => !CertificateStatusValues.has(status))) {
+              const invalid = buildCertificateOperationsQueryValidationError("status", "status values are invalid.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            if (subjectReferenceKinds.some((kind) => !CertificateSubjectReferenceKindValues.has(kind))) {
+              const invalid = buildCertificateOperationsQueryValidationError(
+                "subjectReferenceKind",
+                "subjectReferenceKind values are invalid.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            if (usageAnyOf.some((usage) => !CertificateUsageValues.has(usage))) {
+              const invalid = buildCertificateOperationsQueryValidationError("usage", "usage values are invalid.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            if (trustStatuses.some((status) => !CertificateTrustStatusValues.has(status))) {
+              const invalid = buildCertificateOperationsQueryValidationError(
+                "trustStatus",
+                "trustStatus values are invalid.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            if (includeRevokedInput !== null && includeRevoked === undefined) {
+              const invalid = buildCertificateOperationsQueryValidationError(
+                "includeRevoked",
+                "includeRevoked must be 'true' or 'false'.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            if (limitInput !== null && (limit === undefined || limit < 1)) {
+              const invalid = buildCertificateOperationsQueryValidationError("limit", "limit must be an integer >= 1.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            if (offsetInput !== null && (offset === undefined || offset < 0)) {
+              const invalid = buildCertificateOperationsQueryValidationError(
+                "offset",
+                "offset must be an integer >= 0.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const listRequest: ListIssuedCertificatesApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              certificateAuthorityId: normalizeOptionalString(url.searchParams.get("certificateAuthorityId")),
+              statuses: statuses.length > 0
+                ? statuses as NonNullable<ListIssuedCertificatesApiRequest["statuses"]>
+                : undefined,
+              subjectReferenceKinds: subjectReferenceKinds.length > 0
+                ? subjectReferenceKinds as NonNullable<ListIssuedCertificatesApiRequest["subjectReferenceKinds"]>
+                : undefined,
+              subjectReferenceId: normalizeOptionalString(url.searchParams.get("subjectReferenceId")),
+              linkedNodeId: normalizeOptionalString(url.searchParams.get("linkedNodeId")),
+              subjectCommonNameContains: normalizeOptionalString(url.searchParams.get("subjectCommonNameContains")),
+              usageAnyOf: usageAnyOf.length > 0
+                ? usageAnyOf as NonNullable<ListIssuedCertificatesApiRequest["usageAnyOf"]>
+                : undefined,
+              issuedAfter: normalizeOptionalString(url.searchParams.get("issuedAfter")),
+              issuedBefore: normalizeOptionalString(url.searchParams.get("issuedBefore")),
+              trustStatuses: trustStatuses.length > 0
+                ? trustStatuses as NonNullable<ListIssuedCertificatesApiRequest["trustStatuses"]>
+                : undefined,
+              includeRevoked,
+              asOf: normalizeOptionalString(url.searchParams.get("asOf")),
+              limit,
+              offset,
+            });
+
+            const apiResponse = await options.certificateOperationsBackendApi.listIssuedCertificates(listRequest);
+            const statusCode = mapCertificateOperationsStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, listRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.certificateOperationsBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/security/certificates/")
+        && !path.endsWith("/revoke")
+        && !path.endsWith("/renew")
+        && !path.endsWith("/authority/status")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const serialNumber = decodePathTail(path, "/api/v1/security/certificates/");
+            if (!serialNumber || serialNumber.includes("/")) {
+              const invalid = buildCertificateOperationsInvalidRequestResponse("serialNumber is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const apiResponse = await options.certificateOperationsBackendApi.getIssuedCertificate({
+              actorUserIdentityId: context.principal.userIdentityId,
+              serialNumber,
+              asOf: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("asOf")),
+            });
+            const statusCode = mapCertificateOperationsStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              serialNumber,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.certificateOperationsBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/security/certificates/")
+        && path.endsWith("/revoke")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const serialNumber = decodePathTail(path, "/api/v1/security/certificates/", "/revoke");
+            if (!serialNumber || serialNumber.includes("/")) {
+              const invalid = buildCertificateOperationsInvalidRequestResponse("serialNumber is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateRequest(
+              request,
+              RevokeIssuedCertificateRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const revokeRequest: RevokeIssuedCertificateApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              serialNumber,
+              ...parsedRequest.data,
+            });
+            const apiResponse = await options.certificateOperationsBackendApi.revokeIssuedCertificate(revokeRequest);
+            const statusCode = mapCertificateOperationsStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, revokeRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.certificateOperationsBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/security/certificates/")
+        && path.endsWith("/renew")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const serialNumber = decodePathTail(path, "/api/v1/security/certificates/", "/renew");
+            if (!serialNumber || serialNumber.includes("/")) {
+              const invalid = buildCertificateOperationsInvalidRequestResponse("serialNumber is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateRequest(
+              request,
+              RenewIssuedCertificateRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const renewRequest: RenewIssuedCertificateApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              serialNumber,
+              ...parsedRequest.data,
+            });
+            const apiResponse = await options.certificateOperationsBackendApi.renewIssuedCertificate(renewRequest);
+            const statusCode = mapCertificateOperationsStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, renewRequest, apiResponse);
           },
         );
         return;
@@ -3832,6 +4205,27 @@ function mapNodeTrustStatusCode(response: NodeTrustApiResponse<unknown>): number
   }
 }
 
+function mapCertificateOperationsStatusCode(response: CertificateOperationsApiResponse<unknown>): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error?.code) {
+    case CertificateOperationsApiErrorCodes.invalidRequest:
+      return 400;
+    case CertificateOperationsApiErrorCodes.authenticationFailed:
+      return 401;
+    case CertificateOperationsApiErrorCodes.forbidden:
+      return 403;
+    case CertificateOperationsApiErrorCodes.notFound:
+      return 404;
+    case CertificateOperationsApiErrorCodes.conflict:
+      return 409;
+    default:
+      return 500;
+  }
+}
+
 function parseOptionalInteger(value: string | null): number | undefined {
   if (!value) {
     return undefined;
@@ -4072,6 +4466,16 @@ function buildNodeTrustInvalidRequestResponse(message: string): NodeTrustApiResp
   });
 }
 
+function buildCertificateOperationsInvalidRequestResponse(message: string): CertificateOperationsApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: CertificateOperationsApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
 function buildNodeTrustForbiddenResponse(message: string): NodeTrustApiResponse<never> {
   return Object.freeze({
     ok: false,
@@ -4126,6 +4530,24 @@ function buildNodeTrustQueryValidationError(path: string, message: string): Node
     ok: false,
     error: {
       code: NodeTrustApiErrorCodes.invalidRequest,
+      message: "Request validation failed.",
+      validationErrors: Object.freeze([Object.freeze({
+        path,
+        code: "invalid_enum_value",
+        message,
+      })]),
+    },
+  });
+}
+
+function buildCertificateOperationsQueryValidationError(
+  path: string,
+  message: string,
+): CertificateOperationsApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: CertificateOperationsApiErrorCodes.invalidRequest,
       message: "Request validation failed.",
       validationErrors: Object.freeze([Object.freeze({
         path,

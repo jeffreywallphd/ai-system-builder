@@ -20,6 +20,11 @@ This note documents the authoritative HTTP server endpoints for local identity r
 - `POST /api/v1/identity/trusted-devices/pairing/initiate` (authenticated)
 - `POST /api/v1/identity/trusted-devices/pairing/validate` (authenticated)
 - `POST /api/v1/identity/trusted-devices/pairing/complete` (authenticated)
+- `GET /api/v1/security/certificates/authority/status` (authenticated, trusted session required)
+- `GET /api/v1/security/certificates` (authenticated, trusted session required)
+- `GET /api/v1/security/certificates/:serialNumber` (authenticated, trusted session required)
+- `POST /api/v1/security/certificates/:serialNumber/revoke` (authenticated, trusted session required)
+- `POST /api/v1/security/certificates/:serialNumber/renew` (authenticated, trusted session required)
 
 Implemented transport and host composition:
 
@@ -190,6 +195,79 @@ Request body:
 }
 ```
 
+### Certificate operations requests
+
+`GET /api/v1/security/certificates/authority/status`
+
+Optional query params:
+
+- `asOf` (ISO-8601 timestamp)
+- `rotationWarningWindowDays` (integer >= 1)
+- `certificateExpiryWarningWindowDays` (integer >= 1)
+
+`GET /api/v1/security/certificates`
+
+Optional query params:
+
+- `certificateAuthorityId`
+- repeatable `status` (`issued | revoked | expired | superseded`)
+- repeatable `subjectReferenceKind` (`node | device | service`)
+- `subjectReferenceId`
+- `linkedNodeId`
+- `subjectCommonNameContains`
+- repeatable `usage` (`server-auth | client-auth | mutual-tls | node-enrollment | device-trust | service-identity`)
+- `issuedAfter`, `issuedBefore`, `asOf` (ISO-8601 timestamps)
+- repeatable `trustStatus` (`active | revoked | expired | superseded | not-yet-valid | not-found | subject-inactive | invalid`)
+- `includeRevoked` (`true | false`)
+- `limit` (integer >= 1), `offset` (integer >= 0)
+
+`GET /api/v1/security/certificates/:serialNumber`
+
+Optional query params:
+
+- `asOf` (ISO-8601 timestamp)
+
+`POST /api/v1/security/certificates/:serialNumber/revoke`
+
+Request body:
+
+```json
+{
+  "revocationReason": "unspecified | key-compromise | ca-compromise | affiliation-changed | superseded | cessation-of-operation | privilege-withdrawn | policy-violation",
+  "revokedAt": "string (optional, ISO-8601)",
+  "note": "string (optional)",
+  "reason": "string (optional)",
+  "correlationId": "string (optional)"
+}
+```
+
+`POST /api/v1/security/certificates/:serialNumber/renew`
+
+Request body:
+
+```json
+{
+  "operationKey": "string (optional)",
+  "validityDays": "number (optional)",
+  "publicKeyPem": "string",
+  "publicKeyAlgorithm": "string",
+  "publicKeyFingerprintSha256": "string (optional)",
+  "signatureAlgorithm": "string (optional)",
+  "certificateMaterialRef": "string",
+  "certificateChainMaterialRef": "string (optional)",
+  "trustMaterialRef": "string (optional)",
+  "certificateMaterialSecretRef": "string (optional)",
+  "certificateMaterialKeyScope": "string (optional)",
+  "certificateChainMaterialSecretRef": "string (optional)",
+  "certificateChainMaterialKeyScope": "string (optional)",
+  "previousCertificateDisposition": "supersede | preserve (optional)",
+  "gracePeriodDays": "number (optional)",
+  "occurredAt": "string (optional, ISO-8601)",
+  "reason": "string (optional)",
+  "correlationId": "string (optional)"
+}
+```
+
 ## Response contracts
 
 All responses use one envelope:
@@ -202,6 +280,12 @@ Trusted-device responses are allowlist-projected and intentionally exclude:
 - raw device fingerprint material
 - pairing token hashes
 - trust material references and other internal trust persistence fields
+
+Certificate operations responses are metadata/action projected and intentionally exclude:
+
+- private keys, PEM leaf material, and certificate chain payloads
+- trust-material storage locators and protected secret references
+- internal material-reference fields from issued-certificate records (`certificateMaterialRef`, `certificateChainMaterialRef`, `trustMaterialRef`)
 
 ### Register success
 
@@ -388,6 +472,10 @@ Protected endpoint behavior:
 - High-assurance routes require trusted session assurance and return `403` + `forbidden` when trust is insufficient:
   - `POST /api/v1/identity/credential/change`
   - `GET|POST /api/v1/identity/admin/accounts*`
+  - `GET /api/v1/security/certificates/authority/status`
+  - `GET /api/v1/security/certificates*`
+  - `POST /api/v1/security/certificates/:serialNumber/revoke`
+  - `POST /api/v1/security/certificates/:serialNumber/renew`
 
 Session issuance notes:
 
@@ -475,7 +563,9 @@ Renderer session persistence is intentionally minimized:
 
 - `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `infrastructure/api/identity/IdentityAuthObservability.ts`
+- `infrastructure/api/security/tests/CertificateOperationsBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerCertificateOperations.test.ts`
 - trusted-device API route and contract coverage in the same backend/HTTP test suites
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
 - `ui/pages/tests/IdentityAdminPage.test.tsx`
