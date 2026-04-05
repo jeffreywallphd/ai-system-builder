@@ -1,19 +1,28 @@
 # Workspace Foundation
 
-This note documents the initial production workspace-tenancy domain foundation for Feature 3 / Epic 3.1.
+This note documents the initial production workspace-tenancy foundation for Feature 3 / Epic 3.1.
 
-Scope in this story is intentionally domain-first:
+Scope in stories 3.1.1 and 3.1.2 is intentionally inner-layer first:
 
 - workspace aggregate and lifecycle invariants
 - workspace membership aggregate and lifecycle invariants
 - workspace role-assignment aggregate and role-governance invariants
 - workspace invitation aggregate and invitation lifecycle invariants
 - reusable workspace-scoped ownership metadata patterns for downstream protected resources
+- application-layer workspace repository port contracts for persistence and query seams
+- shared workspace contract DTOs for create/update/query/list/invitation/membership/role mutation operations
 
-## Canonical domain artifacts
+## Canonical artifacts
 
 - `src/shared/workspaces/WorkspaceOwnership.ts`
 - `src/domain/workspaces/WorkspaceDomain.ts`
+- `src/shared/contracts/workspaces/WorkspaceRepositoryContracts.ts`
+- `src/application/workspaces/ports/IWorkspaceRepository.ts`
+- `src/application/workspaces/ports/IWorkspaceMembershipRepository.ts`
+- `src/application/workspaces/ports/IWorkspaceRoleAssignmentRepository.ts`
+- `src/application/workspaces/ports/IWorkspaceInvitationRepository.ts`
+- `src/application/workspaces/ports/IWorkspaceAuthorizationReadRepository.ts`
+- `src/application/workspaces/ports/WorkspaceRepositoryPorts.ts`
 
 ## Core concepts and contracts
 
@@ -102,10 +111,14 @@ Domain helpers provide controlled updates for ownership transfer and visibility 
 ## Architectural posture
 
 - Domain invariants are enforced in code, not deferred to UI validation.
-- Contracts are designed for application-layer orchestration and repository adapters in later stories.
+- Application use cases now have explicit repository seams for workspace aggregates, memberships, invitations, role assignments, and authorization read snapshots.
+- Read-model needs and write-model persistence boundaries are separated at the application contract level.
+- Shared contracts include explicit actor attribution (`WorkspaceAdministrativeActionContext`) for audit-friendly lifecycle and membership mutations.
 - Terminology aligns with existing identity and trusted-device baselines (`userIdentityId`, workspace linkage, lifecycle transition maps, structured mutation attribution).
+- No infrastructure details (SQL rows, storage engine APIs, transport objects) leak into workspace application contracts.
 
 ## Tests in this slice
 
 - `src/domain/workspaces/tests/WorkspaceDomain.test.ts`
+- `src/application/workspaces/tests/WorkspaceRepositoryPortsContracts.test.ts`
 
