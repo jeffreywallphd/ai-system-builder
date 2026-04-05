@@ -39,6 +39,7 @@ import type {
 } from "../ports/NodeTrustCertificatePorts";
 import { RegisterNodeEnrollmentRequestUseCase } from "../use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../use-cases/ReviewPendingNodeEnrollmentUseCase";
+import { GetNodeEnrollmentDetailUseCase } from "../use-cases/GetNodeEnrollmentDetailUseCase";
 import { ApproveNodeEnrollmentUseCase } from "../use-cases/ApproveNodeEnrollmentUseCase";
 import { RejectNodeEnrollmentUseCase } from "../use-cases/RejectNodeEnrollmentUseCase";
 import { RevokeNodeTrustUseCase } from "../use-cases/RevokeNodeTrustUseCase";
@@ -472,6 +473,100 @@ describe("node trust application use-cases", () => {
 
     const result = await useCase.execute({
       actorUserIdentityId: "member-1",
+    });
+
+    expect(result.ok).toBeFalse();
+    if (!result.ok) {
+      expect(result.error.code).toBe(NodeTrustUseCaseErrorCodes.forbidden);
+      expect(result.error.message).toContain("admin role required");
+    }
+  });
+
+  it("returns enrollment detail records for authorized administrators", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.saveEnrollmentRequest({
+      record: {
+        requestId: "enroll-detail-1",
+        nodeId: "node-detail-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Detail Node",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["us-east-1"],
+        requestedAt: "2026-04-05T17:00:00.000Z",
+        status: NodeEnrollmentRequestStatuses.submitted,
+        createdAt: "2026-04-05T17:00:00.000Z",
+        createdBy: "node-detail-1",
+        lastModifiedAt: "2026-04-05T17:00:00.000Z",
+        lastModifiedBy: "node-detail-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-detail",
+        context: {
+          actorUserIdentityId: "node-detail-1",
+        },
+      },
+    });
+
+    const useCase = new GetNodeEnrollmentDetailUseCase({
+      enrollmentRequestRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "admin-1",
+      requestId: "enroll-detail-1",
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.enrollmentRequest.requestId).toBe("enroll-detail-1");
+    expect(result.value.enrollmentRequest.nodeId).toBe("node-detail-1");
+  });
+
+  it("blocks unauthorized actors from reading enrollment detail records", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.saveEnrollmentRequest({
+      record: {
+        requestId: "enroll-detail-denied-1",
+        nodeId: "node-detail-denied-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Detail Denied Node",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["us-east-1"],
+        requestedAt: "2026-04-05T17:00:00.000Z",
+        status: NodeEnrollmentRequestStatuses.submitted,
+        createdAt: "2026-04-05T17:00:00.000Z",
+        createdBy: "node-detail-denied-1",
+        lastModifiedAt: "2026-04-05T17:00:00.000Z",
+        lastModifiedBy: "node-detail-denied-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-detail-denied",
+        context: {
+          actorUserIdentityId: "node-detail-denied-1",
+        },
+      },
+    });
+
+    const useCase = new GetNodeEnrollmentDetailUseCase({
+      enrollmentRequestRepository: repository,
+      authorizationHook: createDenyingAuthorizationHook({ reviewPending: true }),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "member-1",
+      requestId: "enroll-detail-denied-1",
     });
 
     expect(result.ok).toBeFalse();

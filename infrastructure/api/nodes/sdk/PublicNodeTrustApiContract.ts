@@ -1,7 +1,11 @@
 import type {
+  ApproveNodeEnrollmentActionRequestDto,
+  NodeEnrollmentDecisionResponseDto,
+  NodeEnrollmentDetailDto,
   NodeEnrollmentSubmissionRequestDto,
   NodeEnrollmentSubmissionResponseDto,
   NodePendingEnrollmentSummaryDto,
+  RejectNodeEnrollmentActionRequestDto,
 } from "../../../../src/shared/contracts/nodes/NodeTrustApiContracts";
 import { NodeEnrollmentRequestStatuses } from "../../../../src/domain/nodes/NodeTrustDomain";
 
@@ -53,3 +57,20 @@ export interface ListPendingNodeEnrollmentsApiRequest {
 export interface ListPendingNodeEnrollmentsApiResponse {
   readonly enrollments: ReadonlyArray<NodePendingEnrollmentSummaryDto>;
 }
+
+export interface GetNodeEnrollmentDetailApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly requestId: string;
+}
+
+export interface GetNodeEnrollmentDetailApiResponse {
+  readonly enrollment: NodeEnrollmentDetailDto;
+}
+
+export type ApproveNodeEnrollmentApiRequest = ApproveNodeEnrollmentActionRequestDto;
+
+export type ApproveNodeEnrollmentApiResponse = NodeEnrollmentDecisionResponseDto;
+
+export type RejectNodeEnrollmentApiRequest = RejectNodeEnrollmentActionRequestDto;
+
+export type RejectNodeEnrollmentApiResponse = NodeEnrollmentDecisionResponseDto;

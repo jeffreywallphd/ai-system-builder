@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Quick baseline for Story 5.1.4 node trust application orchestration seams, Story 5.2.1 node bootstrap identity generation, and Story 5.2.3 admin review/approval decisions (Feature 5 / Epic 5.1 and Epic 5.2).
+Quick baseline for Story 5.1.4 node trust application orchestration seams, Story 5.2.1 node bootstrap identity generation, Story 5.2.3 admin review/approval decisions, and Story 5.2.4 enrollment detail retrieval support (Feature 5 / Epic 5.1 and Epic 5.2).
 
 ## Canonical files
 
@@ -12,6 +12,7 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - `src/application/nodes/ports/NodeTrustAuditPorts.ts`
 - `src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase.ts`
 - `src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase.ts`
+- `src/application/nodes/use-cases/GetNodeEnrollmentDetailUseCase.ts`
 - `src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase.ts`
 - `src/application/nodes/use-cases/RejectNodeEnrollmentUseCase.ts`
 - `src/application/nodes/use-cases/RevokeNodeTrustUseCase.ts`
@@ -25,6 +26,7 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 
 - register enrollment request
 - review/list pending enrollment queue
+- fetch a single enrollment detail for admin review workflows
 - approve node (admin-authorized, explicit lifecycle transitions, decision metadata, certificate hook seam)
 - reject node (admin-authorized, explicit lifecycle transitions, decision metadata)
 - revoke node trust (including certificate-revocation seam)

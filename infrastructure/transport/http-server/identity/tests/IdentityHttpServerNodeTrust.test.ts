@@ -7,7 +7,10 @@ import { tmpdir } from "node:os";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
 import { NodeTrustBackendApi } from "../../../../api/nodes/NodeTrustBackendApi";
 import { createIdentityHttpServer } from "../IdentityHttpServer";
+import { ApproveNodeEnrollmentUseCase } from "../../../../../src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase";
+import { GetNodeEnrollmentDetailUseCase } from "../../../../../src/application/nodes/use-cases/GetNodeEnrollmentDetailUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../../../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
+import { RejectNodeEnrollmentUseCase } from "../../../../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../../../../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
 import { NodeRoleCapabilities, NodeTypes } from "../../../../../src/domain/nodes/NodeTrustDomain";
 import { SqliteNodeTrustPersistenceAdapter } from "../../../../../src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
@@ -47,6 +50,17 @@ async function startServer(): Promise<{
     reviewPendingNodeEnrollmentUseCase: new ReviewPendingNodeEnrollmentUseCase({
       enrollmentRequestRepository: nodeTrustAdapter,
     }),
+    getNodeEnrollmentDetailUseCase: new GetNodeEnrollmentDetailUseCase({
+      enrollmentRequestRepository: nodeTrustAdapter,
+    }),
+    approveNodeEnrollmentUseCase: new ApproveNodeEnrollmentUseCase({
+      enrollmentRequestRepository: nodeTrustAdapter,
+      nodeRepository: nodeTrustAdapter,
+    }),
+    rejectNodeEnrollmentUseCase: new RejectNodeEnrollmentUseCase({
+      enrollmentRequestRepository: nodeTrustAdapter,
+      nodeRepository: nodeTrustAdapter,
+    }),
   });
 
   const server = createIdentityHttpServer({
@@ -72,7 +86,7 @@ async function startServer(): Promise<{
 async function registerAndLogin(
   baseUrl: string,
   username: string,
-): Promise<{ readonly sessionToken: string }> {
+): Promise<{ readonly userIdentityId: string; readonly sessionToken: string }> {
   const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -84,6 +98,7 @@ async function registerAndLogin(
     }),
   });
   expect(registerResponse.status).toBe(200);
+  const registerBody = await registerResponse.json();
 
   const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
     method: "POST",
@@ -98,6 +113,7 @@ async function registerAndLogin(
   expect(loginResponse.status).toBe(200);
   const loginBody = await loginResponse.json();
   return Object.freeze({
+    userIdentityId: registerBody.data.userIdentityId,
     sessionToken: loginBody.data.sessionToken,
   });
 }
@@ -208,5 +224,105 @@ describe("IdentityHttpServer node trust routes", () => {
     const duplicateBody = await duplicateSubmit.json();
     expect(duplicateBody.ok).toBe(false);
     expect(duplicateBody.error.code).toBe("conflict");
+  });
+
+  it("supports detail review and approval/rejection workflows for authenticated admins", async () => {
+    const { baseUrl, nodeTrustAdapter } = await startServer();
+    const admin = await registerAndLogin(baseUrl, "node.review.admin");
+
+    const submitResponse = await fetch(`${baseUrl}/api/v1/nodes/enrollments`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        actorUserIdentityId: "node:bootstrap:compute-3",
+        nodeId: "node:compute:3",
+        nodeType: NodeTypes.compute,
+        displayName: "Compute Node 3",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          supportsRemoteScheduling: true,
+        },
+      }),
+    });
+    expect(submitResponse.status).toBe(200);
+    const submitBody = await submitResponse.json();
+    const requestId = submitBody.data.enrollment.requestId as string;
+
+    const detailResponse = await fetch(`${baseUrl}/api/v1/nodes/enrollments/${encodeURIComponent(requestId)}`, {
+      headers: {
+        authorization: `Bearer ${admin.sessionToken}`,
+      },
+    });
+    expect(detailResponse.status).toBe(200);
+    const detailBody = await detailResponse.json();
+    expect(detailBody.ok).toBe(true);
+    expect(detailBody.data.enrollment.requestId).toBe(requestId);
+    expect(detailBody.data.enrollment.nodeId).toBe("node:compute:3");
+
+    const unauthenticatedDetail = await fetch(`${baseUrl}/api/v1/nodes/enrollments/${encodeURIComponent(requestId)}`);
+    expect(unauthenticatedDetail.status).toBe(401);
+
+    const approveResponse = await fetch(`${baseUrl}/api/v1/nodes/enrollments/${encodeURIComponent(requestId)}/approve`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${admin.sessionToken}`,
+      },
+      body: JSON.stringify({
+        actorUserIdentityId: "spoofed-actor-id",
+        requestId: "spoofed-request",
+        decisionNote: "Approved after review",
+        certificate: {
+          certificateRef: "cert:node:compute:3:v1",
+          certificateAuthorityRef: "ca:internal",
+          certificateThumbprint: "thumbprint-internal",
+        },
+      }),
+    });
+    expect(approveResponse.status).toBe(200);
+    const approveBody = await approveResponse.json();
+    expect(approveBody.ok).toBe(true);
+    expect(approveBody.data.enrollment.status).toBe("approved");
+    expect(approveBody.data.enrollment.reviewedByUserIdentityId).toBeUndefined();
+    expect(approveBody.data.node.trustState).toBe("trusted");
+    expect(approveBody.data.node.certificate.certificateRef).toBe("cert:node:compute:3:v1");
+    expect(approveBody.data.node.certificate.certificateAuthorityRef).toBeUndefined();
+    expect(approveBody.data.node.certificate.certificateThumbprint).toBeUndefined();
+    const persistedApproval = await nodeTrustAdapter.findEnrollmentRequestById(requestId);
+    expect(persistedApproval?.reviewedByUserIdentityId).toBe(admin.userIdentityId);
+
+    const secondSubmitResponse = await fetch(`${baseUrl}/api/v1/nodes/enrollments`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        actorUserIdentityId: "node:bootstrap:edge-4",
+        nodeId: "node:edge:4",
+        nodeType: NodeTypes.edge,
+        displayName: "Edge Node 4",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          supportsRemoteScheduling: false,
+        },
+      }),
+    });
+    expect(secondSubmitResponse.status).toBe(200);
+    const secondSubmitBody = await secondSubmitResponse.json();
+    const rejectRequestId = secondSubmitBody.data.enrollment.requestId as string;
+
+    const rejectResponse = await fetch(`${baseUrl}/api/v1/nodes/enrollments/${encodeURIComponent(rejectRequestId)}/reject`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${admin.sessionToken}`,
+      },
+      body: JSON.stringify({
+        decisionNote: "Rejected due to capacity policy",
+      }),
+    });
+    expect(rejectResponse.status).toBe(200);
+    const rejectBody = await rejectResponse.json();
+    expect(rejectBody.ok).toBe(true);
+    expect(rejectBody.data.enrollment.status).toBe("rejected");
+    expect(rejectBody.data.node.trustState).toBe("quarantined");
   });
 });
