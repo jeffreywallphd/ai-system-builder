@@ -1,7 +1,7 @@
 import type {
-  AuthorizationPolicyEvaluationRecordedEvent,
+  AuthorizationPolicyRecordedEvent,
 } from "../contracts/AuthorizationPolicyEvaluationContracts";
 
 export interface IAuthorizationPolicyEventRecorder {
-  recordPolicyEvaluationEvent(event: AuthorizationPolicyEvaluationRecordedEvent): Promise<void>;
+  recordPolicyEvaluationEvent(event: AuthorizationPolicyRecordedEvent): Promise<void>;
 }

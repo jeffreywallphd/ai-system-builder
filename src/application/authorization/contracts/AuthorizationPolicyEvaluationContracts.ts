@@ -200,15 +200,77 @@ export interface AuthorizationPolicyDecisionEvaluationResult {
 
 export const AuthorizationPolicyEvaluationEventTypes = Object.freeze({
   evaluated: "authorization-policy-evaluated",
+  denied: "authorization-policy-denied",
+  roleAssignmentUpserted: "authorization-role-assignment-upserted",
+  roleAssignmentRevoked: "authorization-role-assignment-revoked",
+  sharingGrantUpserted: "authorization-sharing-grant-upserted",
+  sharingGrantRevoked: "authorization-sharing-grant-revoked",
+  resourcePolicyUpserted: "authorization-resource-policy-upserted",
+  resourcePolicySoftDeleted: "authorization-resource-policy-soft-deleted",
 });
 
 export type AuthorizationPolicyEvaluationEventType =
-  typeof AuthorizationPolicyEvaluationEventTypes[keyof typeof AuthorizationPolicyEvaluationEventTypes];
+  | typeof AuthorizationPolicyEvaluationEventTypes.evaluated
+  | typeof AuthorizationPolicyEvaluationEventTypes.denied;
+
+export interface AuthorizationPolicyAuditActor {
+  readonly actorUserIdentityId?: string;
+  readonly actorServiceId?: string;
+}
+
+export interface AuthorizationPolicyAuditResource {
+  readonly resourceFamily?: AuthorizationResourceFamily;
+  readonly resourceType?: string;
+  readonly resourceId?: string;
+}
 
 export interface AuthorizationPolicyEvaluationRecordedEvent {
   readonly type: AuthorizationPolicyEvaluationEventType;
   readonly occurredAt: string;
   readonly correlationId?: string;
-  readonly request: AuthorizationPolicyEvaluationRequestDto;
-  readonly result: AuthorizationPolicyEvaluationDecisionDto;
+  readonly actor: AuthorizationPolicyAuditActor;
+  readonly workspaceId?: string;
+  readonly resource?: AuthorizationPolicyAuditResource;
+  readonly requiredPermissionKey: PermissionKey;
+  readonly outcome: AuthorizationPolicyDecision["outcome"];
+  readonly reasonCode: string;
+  readonly denialReason?: AuthorizationPolicyDecisionDenialReason;
+  readonly roleAssignmentCount: number;
+  readonly permissionGrantCount: number;
+  readonly sharingGrantCount: number;
 }
+
+export interface AuthorizationPolicyDeniedRecordedEvent extends AuthorizationPolicyEvaluationRecordedEvent {
+  readonly type: typeof AuthorizationPolicyEvaluationEventTypes.denied;
+}
+
+export interface AuthorizationPolicyMutationRecordedEvent {
+  readonly type: AuthorizationPolicyMutationEventType;
+  readonly occurredAt: string;
+  readonly correlationId?: string;
+  readonly actor: AuthorizationPolicyAuditActor;
+  readonly workspaceId?: string;
+  readonly resource?: AuthorizationPolicyAuditResource;
+  readonly mutation: Readonly<{
+    entityKind: "role-assignment" | "sharing-grant" | "resource-policy";
+    mutationKind: "upsert" | "revoke" | "soft-delete";
+    operationKey: string;
+    expectedRevision?: number;
+    changed: boolean;
+    wasReplay: boolean;
+  }>;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
+export type AuthorizationPolicyMutationEventType =
+  | typeof AuthorizationPolicyEvaluationEventTypes.roleAssignmentUpserted
+  | typeof AuthorizationPolicyEvaluationEventTypes.roleAssignmentRevoked
+  | typeof AuthorizationPolicyEvaluationEventTypes.sharingGrantUpserted
+  | typeof AuthorizationPolicyEvaluationEventTypes.sharingGrantRevoked
+  | typeof AuthorizationPolicyEvaluationEventTypes.resourcePolicyUpserted
+  | typeof AuthorizationPolicyEvaluationEventTypes.resourcePolicySoftDeleted;
+
+export type AuthorizationPolicyRecordedEvent =
+  | AuthorizationPolicyEvaluationRecordedEvent
+  | AuthorizationPolicyDeniedRecordedEvent
+  | AuthorizationPolicyMutationRecordedEvent;

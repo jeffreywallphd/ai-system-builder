@@ -12,6 +12,7 @@ import {
 } from "../../../domain/authorization/AuthorizationDomain";
 import { AuthorizationResourceFamilies } from "../../../domain/authorization/AuthorizationPermissionCatalog";
 import type {
+  AuthorizationPolicyRecordedEvent,
   AuthorizationActorMembershipLookupQuery,
   AuthorizationActorMembershipRecord,
   AuthorizationActorRoleGrantSnapshot,
@@ -24,6 +25,7 @@ import type {
   AuthorizationSharingGrantLookupQuery,
   AuthorizationSharingGrantRecord,
 } from "../contracts/AuthorizationPolicyEvaluationContracts";
+import { AuthorizationPolicyEvaluationEventTypes } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import { EvaluateAuthorizationPolicyUseCase } from "../use-cases/EvaluateAuthorizationPolicyUseCase";
 import { EffectivePermissionResolutionService } from "../use-cases/EffectivePermissionResolutionService";
 import type { AuthorizationPolicyEvaluationPorts } from "../ports/AuthorizationPolicyEvaluationPorts";
@@ -41,7 +43,7 @@ class InMemoryAuthorizationPortAdapter
     IAuthorizationSharingGrantReadRepository,
     IAuthorizationResourcePolicyMetadataReadRepository,
     IAuthorizationPolicyEventRecorder {
-  public readonly recordedEvents: unknown[] = [];
+  public readonly recordedEvents: AuthorizationPolicyRecordedEvent[] = [];
 
   public actorMemberships: ReadonlyArray<AuthorizationActorMembershipRecord> = Object.freeze([]);
   public roleGrantSnapshot: AuthorizationActorRoleGrantSnapshot = Object.freeze({
@@ -81,7 +83,7 @@ class InMemoryAuthorizationPortAdapter
     return this.resourcePolicyMetadata ? Object.freeze([this.resourcePolicyMetadata]) : Object.freeze([]);
   }
 
-  async recordPolicyEvaluationEvent(event: unknown): Promise<void> {
+  async recordPolicyEvaluationEvent(event: AuthorizationPolicyRecordedEvent): Promise<void> {
     this.recordedEvents.push(event);
   }
 }
@@ -213,6 +215,24 @@ describe("authorization application policy ports and evaluator seams", () => {
     expect(result.value.resolvedContext.actorMemberships).toHaveLength(1);
     expect(result.value.resolvedContext.sharingGrants).toHaveLength(1);
     expect(adapter.recordedEvents).toHaveLength(1);
+    expect(adapter.recordedEvents[0]?.type).toBe(AuthorizationPolicyEvaluationEventTypes.evaluated);
+    expect(adapter.recordedEvents[0]).toMatchObject({
+      actor: {
+        actorUserIdentityId: "user-admin",
+      },
+      workspaceId: "workspace-alpha",
+      resource: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-101",
+      },
+      requiredPermissionKey: "asset.read",
+      outcome: "allow",
+      reasonCode: "matched-role",
+      roleAssignmentCount: 1,
+      permissionGrantCount: 1,
+      sharingGrantCount: 1,
+    });
   });
 
   it("returns a typed not-found failure when resource policy metadata is missing", async () => {
@@ -309,5 +329,58 @@ describe("authorization application policy ports and evaluator seams", () => {
 
     expect(result.value.decision.outcome).toBe(PolicyDecisionOutcomes.allow);
     expect(result.value.decision.reasonCode).toBe("visibility-workspace-member");
+  });
+
+  it("emits a secondary denied event for denied policy outcomes", async () => {
+    const adapter = new InMemoryAuthorizationPortAdapter();
+    adapter.resourcePolicyMetadata = Object.freeze({
+      resourceFamily: AuthorizationResourceFamilies.asset,
+      resourceType: "asset",
+      resourceId: "asset-201",
+      ownerUserIdentityId: "user-owner",
+      ownershipScope: ResourceOwnershipScopes.workspace,
+      workspaceId: "workspace-alpha",
+      visibility: ResourceVisibilities.private,
+      sharingPolicyMode: "owner-only",
+      allowResharing: false,
+      isPublishedCapable: false,
+    });
+
+    const ports: AuthorizationPolicyEvaluationPorts = {
+      actorMembershipReadRepository: adapter,
+      roleGrantReadRepository: adapter,
+      sharingGrantReadRepository: adapter,
+      resourcePolicyMetadataReadRepository: adapter,
+      policyEvaluator: new RoleAwareAllowEvaluator(),
+      policyEventRecorder: adapter,
+    };
+
+    const useCase = new EvaluateAuthorizationPolicyUseCase({ ports });
+    const result = await useCase.execute({
+      actor: {
+        actorUserIdentityId: "user-viewer",
+      },
+      resource: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-201",
+      },
+      requiredPermissionKey: "asset.read",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.decision.outcome).toBe("deny");
+    expect(adapter.recordedEvents).toHaveLength(2);
+    expect(adapter.recordedEvents[0]?.type).toBe(AuthorizationPolicyEvaluationEventTypes.evaluated);
+    expect(adapter.recordedEvents[1]?.type).toBe(AuthorizationPolicyEvaluationEventTypes.denied);
+    expect(adapter.recordedEvents[1]).toMatchObject({
+      outcome: "deny",
+      requiredPermissionKey: "asset.read",
+      reasonCode: "no-matching-role",
+    });
   });
 });

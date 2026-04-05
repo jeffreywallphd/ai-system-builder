@@ -19,10 +19,13 @@ Story 4.1.5 defines application-layer authorization seams so policy evaluation o
 - `src/application/authorization/use-cases/EffectivePermissionResolutionService.ts`
 - `src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator.ts`
 - `src/application/authorization/use-cases/AuthorizedResourceQueryService.ts`
+- `src/application/authorization/use-cases/AuthorizationPolicyMutationService.ts`
+- `src/application/authorization/use-cases/AuthorizationAuditRedaction.ts`
 - `src/application/authorization/tests/AuthorizationPolicyPortsContracts.test.ts`
 - `src/application/authorization/tests/EffectivePermissionResolutionService.test.ts`
 - `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
 - `src/application/authorization/tests/AuthorizedResourceQueryService.test.ts`
+- `src/application/authorization/tests/AuthorizationPolicyMutationService.test.ts`
 
 ## Contract summary
 
@@ -35,7 +38,7 @@ Story 4.1.5 defines application-layer authorization seams so policy evaluation o
 - No infrastructure types in application contracts.
 - Policy evaluator is a dedicated application interface (`IAuthorizationPolicyEvaluator`) so enforcement logic remains swappable.
 - Resource-scoped and workspace-capability decisions are also available through `IAuthorizationPolicyDecisionEvaluator`, which centralizes actor/action/target evaluation for runtime callers.
-- Event recording is optional and best-effort (`IAuthorizationPolicyEventRecorder`).
+- Event recording is optional and best-effort (`IAuthorizationPolicyEventRecorder`) for both decision summaries and mutation audit events.
 - `IAuthorizationResourcePolicyMetadataReadRepository` also supports list metadata lookup for authorization-aware list/search composition.
 
 ## Expected adapter behavior
@@ -55,3 +58,13 @@ Story 4.1.5 defines application-layer authorization seams so policy evaluation o
 - It also exposes a batch `resolvePermissions(...)` seam for UI capability checks, reusing the same precedence used for enforcement decisions.
 - `AuthorizationPolicyDecisionEvaluator` (Story 4.2.3) composes role/grant/resource metadata loading and `EffectivePermissionResolutionService` into one reusable decision seam that returns typed allow/deny results with stable denial reasons.
 - `AuthorizedResourceQueryService` (Story 4.2.5) composes metadata listing + per-resource decision evaluation into a reusable authorized list/search helper with workspace scope and owner/shared filters.
+
+## Audit-safe event shape (Story 4.2.6)
+
+- `IAuthorizationPolicyEventRecorder` now accepts a union of authorization recorded events:
+  - evaluated decision summary,
+  - denied decision summary,
+  - mutation audit events for role/sharing/visibility-policy writes.
+- Decision events include actor/workspace/resource references, permission, outcome, reason code, and compact counts only.
+- Mutation events include actor/workspace/resource references and mutation semantics (`entityKind`, `mutationKind`, `operationKey`, `changed`, `wasReplay`).
+- Free-form mutation reason/metadata is redacted through `AuthorizationAuditRedaction.ts` before emission.

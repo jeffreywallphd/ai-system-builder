@@ -7,11 +7,13 @@ import {
   AuthorizationDomainError,
 } from "../../../domain/authorization/AuthorizationDomain";
 import type {
+  AuthorizationPolicyDeniedRecordedEvent,
   AuthorizationPolicyEvaluationDecisionDto,
   AuthorizationPolicyEvaluationRequestDto,
   AuthorizationSharingGrantRecord,
 } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import {
+  AuthorizationPolicyDecisionDenialReasons,
   AuthorizationPolicyEvaluationEventTypes,
 } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import type { AuthorizationPolicyEvaluationPorts } from "../ports/AuthorizationPolicyEvaluationPorts";
@@ -204,13 +206,40 @@ export class EvaluateAuthorizationPolicyUseCase {
     }
 
     try {
-      await recorder.recordPolicyEvaluationEvent({
+      const evaluationEvent = {
         type: AuthorizationPolicyEvaluationEventTypes.evaluated,
         occurredAt: this.clock.now().toISOString(),
         correlationId: normalizeOptional(request.correlationId),
-        request,
-        result,
-      });
+        actor: Object.freeze({
+          actorUserIdentityId: normalizeOptional(request.actor.actorUserIdentityId),
+          actorServiceId: normalizeOptional(request.actor.actorServiceId),
+        }),
+        workspaceId: result.resolvedContext.resourcePolicyMetadata.workspaceId,
+        resource: Object.freeze({
+          resourceFamily: request.resource.resourceFamily,
+          resourceType: request.resource.resourceType,
+          resourceId: request.resource.resourceId,
+        }),
+        requiredPermissionKey: request.requiredPermissionKey,
+        outcome: result.decision.outcome,
+        reasonCode: result.decision.reasonCode,
+        denialReason: result.decision.outcome === "deny"
+          ? toDenialReason(result.decision.reasonCode)
+          : undefined,
+        roleAssignmentCount: result.resolvedContext.roleAssignments.length,
+        permissionGrantCount: result.resolvedContext.permissionGrants.length,
+        sharingGrantCount: result.resolvedContext.sharingGrants.length,
+      } as const;
+
+      await recorder.recordPolicyEvaluationEvent(evaluationEvent);
+
+      if (result.decision.outcome === "deny") {
+        const deniedEvent: AuthorizationPolicyDeniedRecordedEvent = {
+          ...evaluationEvent,
+          type: AuthorizationPolicyEvaluationEventTypes.denied,
+        };
+        await recorder.recordPolicyEvaluationEvent(deniedEvent);
+      }
     } catch {
       // Best-effort by design; adapters can fail independently from authorization flow.
     }
@@ -235,4 +264,17 @@ export class EvaluateAuthorizationPolicyUseCase {
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
+}
+
+function toDenialReason(reasonCode: string) {
+  if (reasonCode === AuthorizationPolicyDecisionDenialReasons.explicitDenyPermissionGrant) {
+    return AuthorizationPolicyDecisionDenialReasons.explicitDenyPermissionGrant;
+  }
+  if (reasonCode === AuthorizationPolicyDecisionDenialReasons.resourcePolicyMetadataNotFound) {
+    return AuthorizationPolicyDecisionDenialReasons.resourcePolicyMetadataNotFound;
+  }
+  if (reasonCode === "no-effective-permission") {
+    return AuthorizationPolicyDecisionDenialReasons.insufficientPermissions;
+  }
+  return AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext;
 }
