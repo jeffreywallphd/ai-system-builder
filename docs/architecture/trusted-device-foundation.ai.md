@@ -13,6 +13,10 @@ Quick implementation-truth baseline for trusted-device domain/contracts introduc
 - `application/identity/ports/ITrustedDeviceManagementService.ts`
 - `application/identity/ports/ITrustedDevicePairingRepository.ts`
 - `application/identity/ports/ITrustedDevicePairingService.ts`
+- `infrastructure/filesystem/identity/SqliteTrustedDeviceRepository.ts`
+- `infrastructure/filesystem/identity/TrustedDevicePersistenceMapper.ts`
+- `src/infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter.ts`
+- `src/infrastructure/persistence/identity/TrustedDevicePersistenceMapper.ts`
 
 ## Core model
 
@@ -70,9 +74,32 @@ Pairing service lifecycle contract (`ITrustedDevicePairingService`):
 - expire pairing attempts/tokens/sessions
 - invalidate pairing artifacts
 
+## Persistence update (Story 2.1.3)
+
+- SQLite migrations for trusted-device persistence now land in schema version `5` for both migration tracks:
+  - `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
+  - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceMigrations.ts`
+- New tables:
+  - `identity_trusted_devices`
+  - `identity_trusted_device_pairing_sessions`
+  - `identity_trusted_device_pairing_tokens`
+- New constraints/index posture:
+  - user/workspace/fingerprint uniqueness for trusted devices
+  - one pairing token per session + unique token hash
+  - status/expiry indexes for pairing token/session expiration sweeps
+  - trust-status/update indexes for trusted-device listing/admin flows
+- Repository adapter behavior now covers:
+  - create/query/update trusted devices
+  - trusted-device revocation contract semantics (`invalidRequest`/`notFound`/`invalidState`)
+  - create/query/update pairing session and token records
+  - pairing-artifact invalidation with deterministic state transition handling
+
 ## Tests in this slice
 
 - `src/domain/identity/tests/TrustedDeviceDomain.test.ts`
 - `src/domain/identity/tests/TrustedDevicePairingDomain.test.ts`
 - `application/contracts/tests/IdentityApplicationContracts.test.ts`
 - `application/identity/tests/IdentityPortsContracts.test.ts`
+- `src/infrastructure/persistence/identity/tests/TrustedDevicePersistenceMapper.test.ts`
+- `src/infrastructure/persistence/identity/tests/SqliteTrustedDevicePersistenceAdapter.test.ts`
+- `infrastructure/filesystem/identity/tests/SqliteTrustedDeviceRepository.test.ts`

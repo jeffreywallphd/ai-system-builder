@@ -2,13 +2,13 @@
 
 This note documents the trusted-device domain and application contract foundation introduced for Feature 2 / Epic 2.1.
 
-Scope in this story is intentionally inner-layer only:
+Scope in the initial stories was intentionally inner-layer only:
 - domain model and lifecycle invariants,
 - application repository/service ports,
 - shared trusted-device contracts for downstream adapters and UI.
 - pairing token/session lifecycle contracts for explicit trusted-device enrollment.
 
-No storage adapter, API route, or UI workflow is introduced in this slice.
+Story 2.1.3 extends this foundation with infrastructure persistence adapters and schema migrations. API routes and UI pairing flows remain out of scope here.
 
 ## Implemented canonical artifacts
 
@@ -134,7 +134,29 @@ This aligns with existing identity session trust seams (`trustedDeviceBindingId`
 
 - Domain remains framework/storage agnostic.
 - Application layer declares ports and shared contracts only.
-- No infrastructure logic leaks into domain/application trusted-device artifacts.
+- Infrastructure now provides SQLite-backed adapters for trusted-device and pairing repository ports.
+- No persistence-specific concerns leak into domain/application trusted-device artifacts.
+
+## Persistence and migrations (Story 2.1.3)
+
+Primary persistence artifacts:
+- `infrastructure/filesystem/identity/SqliteTrustedDeviceRepository.ts`
+- `infrastructure/filesystem/identity/TrustedDevicePersistenceMapper.ts`
+- `src/infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter.ts`
+- `src/infrastructure/persistence/identity/TrustedDevicePersistenceMapper.ts`
+- `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts` (schema version 5)
+- `src/infrastructure/persistence/identity/SqliteIdentityPersistenceMigrations.ts` (schema version 5)
+
+New SQLite tables:
+- `identity_trusted_devices`
+- `identity_trusted_device_pairing_sessions`
+- `identity_trusted_device_pairing_tokens`
+
+Persistence guarantees now covered:
+- durable trusted-device and pairing artifact storage with explicit status fields.
+- uniqueness constraints for user/workspace fingerprint tuples and single token/session bindings.
+- deterministic invalidation and revocation state updates with audit-relevant timestamps.
+- expiration-oriented indexes for pairing tokens/sessions and trust-status indexes for admin/session workflows.
 
 ## Test coverage in this story
 
@@ -144,3 +166,7 @@ This aligns with existing identity session trust seams (`trustedDeviceBindingId`
 - Application contract and port compile/lifecycle coverage:
   - `application/contracts/tests/IdentityApplicationContracts.test.ts`
   - `application/identity/tests/IdentityPortsContracts.test.ts`
+- Persistence mapper and adapter coverage:
+  - `src/infrastructure/persistence/identity/tests/TrustedDevicePersistenceMapper.test.ts`
+  - `src/infrastructure/persistence/identity/tests/SqliteTrustedDevicePersistenceAdapter.test.ts`
+  - `infrastructure/filesystem/identity/tests/SqliteTrustedDeviceRepository.test.ts`

@@ -49,7 +49,7 @@ describe("SqliteIdentityRepository", () => {
     const db = openSqliteCompatDatabase(databasePath);
     const migrationVersion = db.prepare("SELECT MAX(version) AS version FROM identity_repository_migrations")
       .get() as { version?: number };
-    expect(migrationVersion.version).toBe(4);
+    expect(migrationVersion.version).toBe(5);
 
     const tableRows = db.prepare(`
       SELECT name

@@ -50,7 +50,7 @@ describe("SqliteIdentityPersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM identity_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(4);
+    expect(versionRow.version).toBe(5);
 
     const tables = database.prepare(`
       SELECT name
