@@ -2,7 +2,7 @@
 
 This note documents the production workspace-tenancy foundation for Feature 3 / Epic 3.1.
 
-Scope in stories 3.1.1 through 3.1.4:
+Scope in stories 3.1.1 through 3.1.5:
 
 - workspace aggregate and lifecycle invariants
 - workspace membership aggregate and lifecycle invariants
@@ -109,12 +109,20 @@ Scope in stories 3.1.1 through 3.1.4:
 - `workspaceId`
 - `ownerUserId`
 - `visibility` (`private`, `team`, `public`)
+- optional `sharingPolicy` reference (`policyId`, optional `policyVersion`)
 - `createdBy`
 - `lastModifiedBy`
 - `createdAt`
 - `lastModifiedAt`
 
-Domain helpers provide controlled updates for ownership transfer and visibility changes so downstream resource aggregates can reuse the same mutation and attribution semantics.
+Domain helpers provide controlled updates for ownership transfer, visibility changes, sharing-policy linkage, and mutation attribution (`touchWorkspaceOwnershipMetadata`) so downstream resource aggregates can reuse the same semantics.
+
+Protected-resource composition is standardized through `withWorkspaceScopedOwnership(...)`:
+
+- protected resources keep a canonical top-level `workspaceId`
+- protected resources attach ownership metadata under `ownership`
+- resource `workspaceId` must match `ownership.workspaceId` (enforced by helper validation)
+- downstream systems (assets, workflows, runs, logs) should compose this shared envelope rather than introducing parallel workspace-link fields
 
 ## Architectural posture
 
@@ -148,6 +156,7 @@ Domain helpers provide controlled updates for ownership transfer and visibility 
 ## Tests in this slice
 
 - `src/domain/workspaces/tests/WorkspaceDomain.test.ts`
+- `src/shared/workspaces/tests/WorkspaceOwnership.test.ts`
 - `src/application/workspaces/tests/WorkspaceRepositoryPortsContracts.test.ts`
 - `src/infrastructure/persistence/workspaces/tests/WorkspacePersistenceMapper.test.ts`
 - `src/infrastructure/persistence/workspaces/tests/SqliteWorkspacePersistenceAdapter.test.ts`

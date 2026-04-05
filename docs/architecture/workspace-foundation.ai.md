@@ -46,12 +46,20 @@ Shared ownership model for workspace-scoped protected resources:
 - `workspaceId`
 - `ownerUserId`
 - `visibility` (`private`, `team`, `public`)
+- optional `sharingPolicy` reference (`policyId`, optional `policyVersion`)
 - `createdBy`
 - `lastModifiedBy`
 - `createdAt`
 - `lastModifiedAt`
 
-Helpers support creation, visibility updates, and ownership transfer with invariant checks.
+Helpers support creation, rehydration, ownership touch attribution, visibility updates, sharing-policy updates, and ownership transfer with invariant checks.
+
+Protected-resource composition pattern is canonical:
+
+- protected resources keep top-level `workspaceId`
+- ownership metadata is attached under `ownership`
+- `withWorkspaceScopedOwnership(...)` enforces `resource.workspaceId === ownership.workspaceId`
+- downstream slices (assets, workflows, runs, logs) should reuse this envelope as-is instead of defining alternate workspace linkage conventions
 
 ## Key invariants enforced
 
@@ -99,4 +107,5 @@ Helpers support creation, visibility updates, and ownership transfer with invari
 - adapter integration tests now assert update round-trips for mutable tenancy aggregates.
 - stale update attempts are rejected once newer records are persisted.
 - constraint and mutation failures surface contextual repository operation messages.
+- ownership metadata standards now include dedicated shared tests at `src/shared/workspaces/tests/WorkspaceOwnership.test.ts`.
 

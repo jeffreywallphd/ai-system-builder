@@ -2,6 +2,7 @@ import {
   WorkspaceOwnershipError,
   WorkspaceVisibilities,
   createWorkspaceOwnershipMetadata,
+  touchWorkspaceOwnershipMetadata,
   withWorkspaceOwner,
   withWorkspaceOwnershipVisibility,
   type WorkspaceOwnershipMetadata,
@@ -429,11 +430,11 @@ export function transitionWorkspaceStatus(
     return workspace;
   }
 
-  const updatedOwnership = Object.freeze({
-    ...workspace.ownership,
-    lastModifiedBy: normalizeRequired(actorUserId, "Workspace lastModifiedBy"),
-    lastModifiedAt: normalizeIsoTimestamp(now, "Workspace lastModifiedAt"),
-  });
+  const updatedOwnership = touchWorkspaceOwnershipMetadata(
+    workspace.ownership,
+    normalizeRequired(actorUserId, "Workspace lastModifiedBy"),
+    now,
+  );
 
   const updated: Workspace = Object.freeze({
     ...workspace,
@@ -474,11 +475,11 @@ export function updateWorkspaceDetails(
       throw error;
     }
   } else {
-    nextOwnership = Object.freeze({
-      ...nextOwnership,
-      lastModifiedBy: actorUserId,
-      lastModifiedAt: nowIso,
-    });
+    nextOwnership = touchWorkspaceOwnershipMetadata(
+      nextOwnership,
+      actorUserId,
+      new Date(nowIso),
+    );
   }
 
   const updated: Workspace = Object.freeze({
