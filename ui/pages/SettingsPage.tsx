@@ -73,6 +73,9 @@ export default function SettingsPage(): JSX.Element {
           <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.nodeEnrollmentReview}>
             Node enrollment review
           </Link>
+          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.nodeInventory}>
+            Trusted node inventory
+          </Link>
           <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.workspaceThinMembership}>
             Workspace memberships
           </Link>

@@ -59,6 +59,7 @@ export const ROUTE_PATHS = Object.freeze({
   authorizationReporting: "/settings/sharing/reporting",
   workspaceAdmin: "/settings/workspaces",
   nodeEnrollmentReview: "/settings/node-enrollments",
+  nodeInventory: "/settings/node-inventory",
   workspaceThinMembership: "/settings/workspaces/thin",
   workspaceInvitationAccept: "/workspaces/:workspaceId/invitations/:invitationToken/accept",
   identityAdmin: "/settings/identity-admin",
@@ -347,6 +348,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "node-enrollment-review",
     path: ROUTE_PATHS.nodeEnrollmentReview,
     title: "Node enrollment review",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "node-inventory",
+    path: ROUTE_PATHS.nodeInventory,
+    title: "Trusted node inventory",
     showInNavigation: false,
   }),
   Object.freeze({

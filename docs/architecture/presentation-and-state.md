@@ -1024,3 +1024,18 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - role assignments,
   - unusual visibility/sharing-policy patterns,
   - recent sharing mutations.
+
+## Trusted node inventory UI update (story 5.3.5)
+
+- Added authenticated admin node inventory inspection page:
+  - `ui/pages/NodeInventoryPage.tsx`
+  - route: `ROUTE_PATHS.nodeInventory` -> `/settings/node-inventory`
+  - settings quick-link integration in `ui/pages/SettingsPage.tsx`.
+- Renderer integration remains thin and backend-contract driven:
+  - transport client seam: `ui/shared/nodes/NodeInventoryClient.ts`
+  - page-facing service seam: `ui/services/NodeInventoryService.ts`
+  - contracts consumed as-is from inventory list/detail endpoints (`/api/v1/nodes/inventory`, `/api/v1/nodes/inventory/:nodeId`).
+- Inventory UI behavior:
+  - filter controls for trust/presence/approval/enrollment/node-type/capability/deployment-tag/last-seen range,
+  - explicit pending/active/offline/revoked state labels via badge treatment in list/detail,
+  - explicit loading, empty, and error states without placeholder node data.
