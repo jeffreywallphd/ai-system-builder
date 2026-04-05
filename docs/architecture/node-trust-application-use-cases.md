@@ -1,6 +1,6 @@
 # Node Trust Application Use Cases
 
-This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment, Story 5.2.3 (Feature 5 / Epic 5.2): admin review/approval decisions for pending node enrollment, Story 5.2.4 (Feature 5 / Epic 5.2): enrollment detail retrieval transport orchestration support, Story 5.3.4 (Feature 5 / Epic 5.3): admin inventory list/detail query read models across trust and presence states, Story 5.4.1 (Feature 5 / Epic 5.4): durable node revocation semantics and repeat-revocation safety, and Story 5.4.2 (Feature 5 / Epic 5.4): node-authenticated trust enforcement for runtime operations.
+This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment, Story 5.2.3 (Feature 5 / Epic 5.2): admin review/approval decisions for pending node enrollment, Story 5.2.4 (Feature 5 / Epic 5.2): enrollment detail retrieval transport orchestration support, Story 5.3.4 (Feature 5 / Epic 5.3): admin inventory list/detail query read models across trust and presence states, Story 5.4.1 (Feature 5 / Epic 5.4): durable node revocation semantics and repeat-revocation safety, Story 5.4.2 (Feature 5 / Epic 5.4): node-authenticated trust enforcement for runtime operations, and Story 5.4.3 (Feature 5 / Epic 5.4): node trust audit recording integration.
 
 ## Canonical files
 
@@ -8,6 +8,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `src/application/nodes/ports/NodeTrustAuthorizationPorts.ts`
 - `src/application/nodes/ports/NodeTrustCertificatePorts.ts`
 - `src/application/nodes/ports/NodeTrustAuditPorts.ts`
+- `src/application/nodes/tests/NodeTrustAuditPorts.test.ts`
 - `src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase.ts`
 - `src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase.ts`
 - `src/application/nodes/use-cases/GetNodeEnrollmentDetailUseCase.ts`
@@ -23,6 +24,8 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
 - `src/infrastructure/security/nodes/NodeBootstrapIdentityService.ts`
 - `src/infrastructure/security/nodes/tests/NodeBootstrapIdentityService.test.ts`
+- `src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder.ts`
+- `src/infrastructure/persistence/nodes/tests/SqliteNodeTrustAuditRecorder.test.ts`
 
 ## Scope and intent
 
@@ -77,6 +80,7 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
   - enforces centralized node-authenticated trust preconditions before heartbeat writes (approved + trusted + non-revoked + certificate-present)
   - validates heartbeat update against domain rules (for example revoked nodes cannot update heartbeat)
   - persists last-seen metadata
+  - emits `node-heartbeat-rejected` audit events for rejected trust-gate and heartbeat-security failures
 - `ListTrustedNodeInventoryUseCase`
   - authorizes trusted inventory queries
   - queries trusted-node-only inventory using persistence query presets and filters

@@ -242,9 +242,12 @@ export class ActivateApprovedNodeUseCase {
       actorUserIdentityId,
       occurredAt: activatedAt,
       nodeId: currentNode.nodeId,
+      outcome: "success",
       details: Object.freeze({
+        nodeType: mutation.record.nodeType,
         approvalStatus: mutation.record.approvalStatus,
         trustState: mutation.record.trustState,
+        deploymentTags: mutation.record.deploymentTags,
         capabilityCount: mutation.record.capabilityProfile.enabledCapabilities.length,
         certificateRef: mutation.record.certificate?.certificateRef,
       }),

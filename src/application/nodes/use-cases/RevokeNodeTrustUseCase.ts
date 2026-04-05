@@ -135,7 +135,10 @@ export class RevokeNodeTrustUseCase {
         actorUserIdentityId,
         occurredAt: this.clock.now().toISOString(),
         nodeId,
+        outcome: "already-applied",
         details: Object.freeze({
+          nodeType: node.nodeType,
+          deploymentTags: node.deploymentTags,
           reason: node.revocation.reason,
           revokedByUserIdentityId: node.revocation.revokedByUserIdentityId,
           note: node.revocation.note,
@@ -221,7 +224,10 @@ export class RevokeNodeTrustUseCase {
       actorUserIdentityId,
       occurredAt: revokedAt,
       nodeId,
+      outcome: "success",
       details: Object.freeze({
+        nodeType: mutation.record.nodeType,
+        deploymentTags: mutation.record.deploymentTags,
         reason: requiredReason,
         revokedByUserIdentityId: actorUserIdentityId,
         note,

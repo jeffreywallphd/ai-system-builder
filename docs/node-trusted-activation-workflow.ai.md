@@ -2,7 +2,7 @@
 
 ## Scope
 
-Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, Story 5.4.1, and Story 5.4.2 (Feature 5 / Epic 5.3 and 5.4): approved-node activation plus capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, renderer-side admin inventory inspection UI, durable revocation semantics, and node-authenticated trust enforcement.
+Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, Story 5.4.1, Story 5.4.2, and Story 5.4.3 (Feature 5 / Epic 5.3 and 5.4): approved-node activation plus capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, renderer-side admin inventory inspection UI, durable revocation semantics, node-authenticated trust enforcement, and node trust audit recording integration.
 
 ## Canonical files
 
@@ -77,6 +77,19 @@ Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, Story 5.4.1, an
 - Activation emits `node-activated`.
 - Revocation emits `node-revoked`.
 - Heartbeat emits `node-heartbeat-recorded`.
+- Rejected heartbeat security/trust-gate writes emit `node-heartbeat-rejected`.
+
+## Audited trust actions
+
+- enrollment request registration (`node-enrollment-requested`)
+- pending enrollment review (`node-pending-enrollment-reviewed`)
+- enrollment approval (`node-approved`)
+- enrollment rejection (`node-rejected`)
+- trusted activation (`node-activated`)
+- node trust revocation, including safe repeat revocation (`node-revoked`)
+- heartbeat write success (`node-heartbeat-recorded`)
+- heartbeat write rejected for trust/security reasons (`node-heartbeat-rejected`)
+- sensitive trust-material detail keys are redacted before sink delivery (`[REDACTED]`)
 
 ## Presence transport and storage
 

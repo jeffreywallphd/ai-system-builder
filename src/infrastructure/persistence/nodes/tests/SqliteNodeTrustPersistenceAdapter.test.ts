@@ -65,7 +65,7 @@ describe("SqliteNodeTrustPersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM node_trust_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(1);
+    expect(versionRow.version).toBe(2);
 
     const tables = database.prepare(`
       SELECT name
@@ -76,13 +76,15 @@ describe("SqliteNodeTrustPersistenceAdapter", () => {
           'node_enrollment_requests',
           'node_trust_identity_capabilities',
           'node_trust_identity_deployment_tags',
-          'node_trust_mutation_replays'
+          'node_trust_mutation_replays',
+          'node_trust_audit_events'
         )
       ORDER BY name ASC
     `).all() as Array<{ name: string }>;
 
     expect(tables.map((table) => table.name)).toEqual([
       "node_enrollment_requests",
+      "node_trust_audit_events",
       "node_trust_identities",
       "node_trust_identity_capabilities",
       "node_trust_identity_deployment_tags",

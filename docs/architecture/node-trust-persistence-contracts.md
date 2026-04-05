@@ -1,6 +1,6 @@
 # Node Trust Persistence Contracts
 
-This note documents Story 5.1.2 and Story 5.1.3 (Feature 5 / Epic 5.1): production-ready node trust persistence contracts and their SQLite implementation for node identities and enrollment requests.
+This note documents Story 5.1.2 and Story 5.1.3 (Feature 5 / Epic 5.1): production-ready node trust persistence contracts and their SQLite implementation for node identities and enrollment requests, plus Story 5.4.3 (Feature 5 / Epic 5.4): node trust audit recording persistence integration.
 
 ## Canonical artifacts
 
@@ -15,8 +15,10 @@ This note documents Story 5.1.2 and Story 5.1.3 (Feature 5 / Epic 5.1): producti
 - `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceMigrations.ts`
 - `src/infrastructure/persistence/nodes/NodeTrustPersistenceMapper.ts`
 - `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter.ts`
+- `src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder.ts`
 - `src/infrastructure/persistence/nodes/tests/NodeTrustPersistenceMapper.test.ts`
 - `src/infrastructure/persistence/nodes/tests/SqliteNodeTrustPersistenceAdapter.test.ts`
+- `src/infrastructure/persistence/nodes/tests/SqliteNodeTrustAuditRecorder.test.ts`
 
 ## Scope and intent
 
@@ -117,11 +119,12 @@ Validation locks core persistence invariants at the schema boundary:
 
 ## SQLite adapter implementation notes
 
-- Schema is versioned with `node_trust_repository_migrations` and currently pinned at version `1`.
+- Schema is versioned with `node_trust_repository_migrations` and currently pinned at version `2`.
 - Core tables:
   - `node_trust_identities`
   - `node_enrollment_requests`
   - `node_trust_mutation_replays`
+  - `node_trust_audit_events`
 - Normalized lookup tables for query efficiency:
   - `node_trust_identity_capabilities`
   - `node_trust_identity_deployment_tags`
@@ -131,6 +134,7 @@ Validation locks core persistence invariants at the schema boundary:
   - preserves immutable creation metadata on updates,
   - updates capability/deployment lookup projections transactionally with node identity writes.
 - Mapper utilities perform schema-validated row-to-record and record-to-row conversion so infrastructure does not bypass node trust invariants.
+- `SqliteNodeTrustAuditRecorder` implements the `NodeTrustAuditSink` application seam and stores sanitized node trust lifecycle audit envelopes for governance and forensics read paths.
 
 ## Test coverage
 

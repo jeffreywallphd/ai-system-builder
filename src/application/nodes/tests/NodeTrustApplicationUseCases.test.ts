@@ -1440,6 +1440,7 @@ describe("node trust application use-cases", () => {
 
   it("records heartbeat for active nodes and rejects revoked-node heartbeat updates", async () => {
     const repository = new InMemoryNodeTrustRepository();
+    const audit = new RecordingAuditSink();
     await repository.registerNode({
       record: {
         nodeId: "node-compute-heartbeat",
@@ -1478,7 +1479,7 @@ describe("node trust application use-cases", () => {
       nodeRepository: repository,
       authorizationHook: createAllowAllAuthorizationHook(),
       clock: createFixedClock("2026-04-05T18:31:00.000Z"),
-      auditSink: new RecordingAuditSink(),
+      auditSink: audit,
     });
 
     const heartbeat = await heartbeatUseCase.execute({
@@ -1520,15 +1521,19 @@ describe("node trust application use-cases", () => {
     if (!revokedHeartbeat.ok) {
       expect(revokedHeartbeat.error.code).toBe(NodeTrustUseCaseErrorCodes.invalidState);
     }
+
+    expect(audit.events.some((event) => event.type === NodeTrustAuditEventTypes.heartbeatRecorded)).toBeTrue();
+    expect(audit.events.some((event) => event.type === NodeTrustAuditEventTypes.heartbeatRejected)).toBeTrue();
   });
 
   it("enforces node-authenticated trust gates for approved, pending, rejected, unknown, and revoked states", async () => {
     const repository = new InMemoryNodeTrustRepository();
+    const audit = new RecordingAuditSink();
     const heartbeatUseCase = new RecordNodeHeartbeatUseCase({
       nodeRepository: repository,
       authorizationHook: createAllowAllAuthorizationHook(),
       clock: createFixedClock("2026-04-05T18:40:00.000Z"),
-      auditSink: new RecordingAuditSink(),
+      auditSink: audit,
     });
 
     await repository.registerNode({
@@ -1705,6 +1710,9 @@ describe("node trust application use-cases", () => {
       expect(revoked.error.code).toBe(NodeTrustUseCaseErrorCodes.invalidState);
       expect(revoked.error.message).toContain("revoked");
     }
+
+    expect(audit.events.filter((event) => event.type === NodeTrustAuditEventTypes.heartbeatRecorded)).toHaveLength(1);
+    expect(audit.events.filter((event) => event.type === NodeTrustAuditEventTypes.heartbeatRejected)).toHaveLength(4);
   });
 
   it("lists trusted node inventory with capability filters", async () => {

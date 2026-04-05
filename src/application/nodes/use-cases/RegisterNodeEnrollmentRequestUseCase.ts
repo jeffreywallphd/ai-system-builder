@@ -182,8 +182,11 @@ export class RegisterNodeEnrollmentRequestUseCase {
       occurredAt: this.clock.now().toISOString(),
       nodeId,
       enrollmentRequestId: mutation.record.requestId,
+      outcome: "success",
       details: Object.freeze({
+        nodeType: mutation.record.nodeType,
         status: mutation.record.status,
+        deploymentTags: mutation.record.deploymentTags,
         capabilities: mutation.record.capabilityProfile.enabledCapabilities,
       }),
     });

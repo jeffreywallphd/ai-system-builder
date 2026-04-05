@@ -50,6 +50,7 @@ import { WorkspaceAuthorizationPolicyReadAdapter } from "../../src/infrastructur
 import { SqliteAuthorizationPersistenceAdapter } from "../../src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter";
 import { SqliteAuthorizationPolicyReadAdapter } from "../../src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter";
 import { SqliteNodeTrustPersistenceAdapter } from "../../src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
+import { SqliteNodeTrustAuditRecorder } from "../../src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
 import { AuthorizationPolicyDecisionEvaluator } from "../../src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyMutationService } from "../../src/application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "../../src/application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
@@ -151,6 +152,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const workspaceRepository = new SqliteWorkspacePersistenceAdapter(path.resolve(options.databasePath));
   const authorizationRepository = new SqliteAuthorizationPersistenceAdapter(path.resolve(options.databasePath));
   const nodeTrustRepository = new SqliteNodeTrustPersistenceAdapter(path.resolve(options.databasePath));
+  const nodeTrustAuditRecorder = new SqliteNodeTrustAuditRecorder(path.resolve(options.databasePath));
   const env = options.env ?? process.env;
   const providerAccountPolicies = options.providerAccountPolicies
     ?? IdentityProviderAccountPolicyConfig.fromEnv(env);
@@ -474,9 +476,11 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const nodeTrustBackendApi = new NodeTrustBackendApi({
     registerNodeEnrollmentRequestUseCase: new RegisterNodeEnrollmentRequestUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
+      auditSink: nodeTrustAuditRecorder,
     }),
     reviewPendingNodeEnrollmentUseCase: new ReviewPendingNodeEnrollmentUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
+      auditSink: nodeTrustAuditRecorder,
     }),
     getNodeEnrollmentDetailUseCase: new GetNodeEnrollmentDetailUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
@@ -484,16 +488,20 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     approveNodeEnrollmentUseCase: new ApproveNodeEnrollmentUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
       nodeRepository: nodeTrustRepository,
+      auditSink: nodeTrustAuditRecorder,
     }),
     rejectNodeEnrollmentUseCase: new RejectNodeEnrollmentUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
       nodeRepository: nodeTrustRepository,
+      auditSink: nodeTrustAuditRecorder,
     }),
     recordNodeHeartbeatUseCase: new RecordNodeHeartbeatUseCase({
       nodeRepository: nodeTrustRepository,
+      auditSink: nodeTrustAuditRecorder,
     }),
     listTrustedNodeInventoryUseCase: new ListTrustedNodeInventoryUseCase({
       nodeRepository: nodeTrustRepository,
+      auditSink: nodeTrustAuditRecorder,
     }),
   });
 
@@ -526,6 +534,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
         workspaceRepository.dispose();
         authorizationRepository.dispose();
         nodeTrustRepository.dispose();
+        nodeTrustAuditRecorder.dispose();
         const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
         if (typeof disposablePublisher.dispose === "function") {
           disposablePublisher.dispose();

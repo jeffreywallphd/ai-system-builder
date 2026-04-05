@@ -1,6 +1,6 @@
 # Node Trusted Activation Workflow
 
-This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, Story 5.4.1, and Story 5.4.2 (Feature 5 / Epic 5.3 and Epic 5.4): explicit activation of approved nodes into trusted operational state, capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, authenticated admin UI inventory inspection surfaces, durable node revocation behavior, and node-authenticated trust enforcement.
+This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, Story 5.4.1, Story 5.4.2, and Story 5.4.3 (Feature 5 / Epic 5.3 and Epic 5.4): explicit activation of approved nodes into trusted operational state, capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, authenticated admin UI inventory inspection surfaces, durable node revocation behavior, node-authenticated trust enforcement, and node trust audit recording integration.
 
 ## Purpose
 
@@ -78,6 +78,19 @@ This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.
 - `node-activated`
 - `node-revoked`
 - `node-heartbeat-recorded`
+- `node-heartbeat-rejected`
+
+## Audited trust actions
+
+- enrollment request registration (`node-enrollment-requested`)
+- pending enrollment review (`node-pending-enrollment-reviewed`)
+- enrollment approval (`node-approved`)
+- enrollment rejection (`node-rejected`)
+- trusted activation (`node-activated`)
+- node trust revocation, including safe repeat-revocation (`node-revoked`)
+- heartbeat write success (`node-heartbeat-recorded`)
+- heartbeat write rejected for trust/security reasons (`node-heartbeat-rejected`)
+- sensitive trust-material detail keys are redacted before sink delivery (`[REDACTED]`)
 
 ## Presence transport and stored data
 
