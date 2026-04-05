@@ -37,6 +37,10 @@ export interface NodeCertificateBootstrapEnvelopeDto {
   readonly attestationFormat?: string;
   readonly attestationEvidence?: string;
   readonly requestedCertificateProfile?: string;
+  readonly trustMaterialRef?: string;
+  readonly publicKeyAlgorithm?: string;
+  readonly publicKeyFingerprintSha256?: string;
+  readonly publicKeyPem?: string;
 }
 
 export interface NodeCertificateAssignmentDto {

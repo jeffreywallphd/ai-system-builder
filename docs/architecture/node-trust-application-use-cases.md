@@ -1,6 +1,6 @@
 # Node Trust Application Use Cases
 
-This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams.
+This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust application-layer use cases and orchestration seams, plus Story 5.2.1 (Feature 5 / Epic 5.2): node-side bootstrap identity material generation for enrollment.
 
 ## Canonical files
 
@@ -16,6 +16,8 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `src/application/nodes/use-cases/RecordNodeHeartbeatUseCase.ts`
 - `src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase.ts`
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
+- `src/infrastructure/security/nodes/NodeBootstrapIdentityService.ts`
+- `src/infrastructure/security/nodes/tests/NodeBootstrapIdentityService.test.ts`
 
 ## Scope and intent
 
@@ -53,6 +55,12 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - `ListTrustedNodeInventoryUseCase`
   - authorizes trusted inventory queries
   - queries trusted-node-only inventory using persistence query presets and filters
+- `NodeBootstrapIdentityService`
+  - generates durable local bootstrap identity for `compute` and `hybrid` nodes
+  - persists one local bootstrap record and Ed25519 keypair in a secure node-local directory
+  - recovers idempotently when bootstrap material already exists
+  - keeps lifecycle state explicitly untrusted (`approvalStatus=pending`, `trustState=pending-enrollment`)
+  - builds normalized enrollment submission payloads with bootstrap trust-material metadata
 
 ## Shared application contracts
 
@@ -98,3 +106,10 @@ This note documents Story 5.1.4 (Feature 5 / Epic 5.1): initial node trust appli
 - revocation flow with certificate-revocation hook
 - heartbeat recording and revoked-node rejection behavior
 - trusted inventory query filtering
+
+`src/infrastructure/security/nodes/tests/NodeBootstrapIdentityService.test.ts` validates:
+
+- bootstrap identity/keypair creation and normalized record fields
+- idempotent recovery when material is already present
+- compute/hybrid support guardrails and unsupported node-type rejection
+- enrollment payload compatibility with node-trust transport schema parsing

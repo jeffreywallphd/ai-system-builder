@@ -70,6 +70,7 @@ Validation behavior includes:
 - trusted/revoked lifecycle coherence checks for node detail payloads
 - pending-summary status restrictions (`submitted`, `under-review` only)
 - bootstrap envelope minimum-content checks
+- bootstrap public trust-material metadata support (`trustMaterialRef`, public key algorithm/fingerprint/PEM)
 - typed schema validation failures via `NodeTrustApiSchemaValidationError`
 
 ## Boundary guidance for adapters

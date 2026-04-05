@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Quick baseline for Story 5.1.4 node trust application orchestration seams (Feature 5 / Epic 5.1).
+Quick baseline for Story 5.1.4 node trust application orchestration seams plus Story 5.2.1 node bootstrap identity generation (Feature 5 / Epic 5.1 and Epic 5.2).
 
 ## Canonical files
 
@@ -18,6 +18,8 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams (Featu
 - `src/application/nodes/use-cases/RecordNodeHeartbeatUseCase.ts`
 - `src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase.ts`
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
+- `src/infrastructure/security/nodes/NodeBootstrapIdentityService.ts`
+- `src/infrastructure/security/nodes/tests/NodeBootstrapIdentityService.test.ts`
 
 ## Lifecycle orchestration coverage
 
@@ -28,6 +30,8 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams (Featu
 - revoke node trust (including certificate-revocation seam)
 - record node heartbeat
 - query trusted node inventory
+- generate/recover node-local bootstrap identity + trust material
+- build enrollment submission payloads from persisted bootstrap material
 
 ## Boundary notes
 

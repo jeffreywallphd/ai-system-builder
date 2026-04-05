@@ -76,6 +76,44 @@ describe("NodeTrustApiSchemaContracts", () => {
     })).toThrow("Bootstrap envelope must include at least one bootstrap field");
   });
 
+  it("accepts bootstrap payloads with public trust material details", () => {
+    const parsed = parseNodeEnrollmentSubmissionRequestDto({
+      actorUserIdentityId: "node:compute-1",
+      nodeId: "node:compute-1",
+      nodeType: NodeTypes.compute,
+      displayName: "Compute Node 1",
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        supportsRemoteScheduling: true,
+      },
+      bootstrap: {
+        trustMaterialRef: "node-public-key:spki-sha256:abc123",
+        publicKeyAlgorithm: "ed25519",
+        publicKeyFingerprintSha256: "06cc95adf2bc86f465ee0a5f9f9f7305fd0f273577f8d1808cd5551f0bb7f8bf",
+        publicKeyPem: "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----",
+      },
+    });
+
+    expect(parsed.bootstrap?.trustMaterialRef).toBe("node-public-key:spki-sha256:abc123");
+    expect(parsed.bootstrap?.publicKeyAlgorithm).toBe("ed25519");
+  });
+
+  it("rejects bootstrap payloads with public key material missing trust reference", () => {
+    expect(() => parseNodeEnrollmentSubmissionRequestDto({
+      actorUserIdentityId: "node:compute-1",
+      nodeId: "node:compute-1",
+      nodeType: NodeTypes.compute,
+      displayName: "Compute Node 1",
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        supportsRemoteScheduling: true,
+      },
+      bootstrap: {
+        publicKeyPem: "-----BEGIN PUBLIC KEY-----\nMIIB...\n-----END PUBLIC KEY-----",
+      },
+    })).toThrow("requires trustMaterialRef");
+  });
+
   it("rejects internal-only certificate fields from admin node detail payloads", () => {
     expect(() => NodeDetailDtoSchema.parse({
       nodeId: "node:compute-002",
