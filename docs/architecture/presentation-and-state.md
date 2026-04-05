@@ -984,3 +984,20 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - `ROUTE_PATHS.workspaceThinMembership` (`/settings/workspaces/thin`) for compact membership/invitation management,
   - `ROUTE_PATHS.workspaceInvitationAccept` (`/workspaces/:workspaceId/invitations/:invitationToken/accept`) for invite acceptance onboarding.
 - Responsive surface behavior for these pages is implemented in shared app styles (`ui/styles/app.css`) using dedicated thin-page layout classes to keep operations usable on smaller screens.
+
+## Authorization sharing management UI update (story 4.4.2)
+
+- Added shared renderer authorization-management transport + service seams:
+  - `ui/shared/authorization/AuthorizationManagementClient.ts`
+  - `ui/services/AuthorizationManagementService.ts`
+- Added reusable sharing/visibility management UI in `ui/components/authorization/AuthorizationSharingManagementPanel.tsx` that now supports:
+  - loading current access state,
+  - updating visibility and sharing policy,
+  - listing/revoking current sharing grants,
+  - adding per-user/per-workspace-role/per-workspace/public grants,
+  - rendering effective permission feedback and validation errors from backend API responses.
+- Added dedicated desktop and thin-client sharing management pages:
+  - `ui/pages/AuthorizationSharingManagementPage.tsx` at `ROUTE_PATHS.authorizationSharing` (`/settings/sharing`)
+  - `ui/pages/AuthorizationSharingThinClientPage.tsx` at `ROUTE_PATHS.authorizationSharingThin` (`/settings/sharing/thin`)
+- Added web route helpers in `ui/web/authorization/AuthorizationSharingRoutes.ts` to build deep links into desktop/thin sharing surfaces.
+- Added representative resource-surface integration in `ui/pages/AssetDetailPage.tsx` so asset detail now exposes working sharing and visibility controls backed by authorization management APIs.

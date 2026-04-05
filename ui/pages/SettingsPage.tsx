@@ -58,6 +58,12 @@ export default function SettingsPage(): JSX.Element {
           </p>
         </div>
         <div className="ui-page__actions">
+          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.authorizationSharing}>
+            Sharing and visibility
+          </Link>
+          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.authorizationSharingThin}>
+            Sharing access review
+          </Link>
           <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.workspaceAdmin}>
             Workspace administration
           </Link>

@@ -1088,6 +1088,44 @@ body {
   padding: var(--space-sm);
 }
 
+.ui-authorization-sharing__field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-sm);
+}
+
+.ui-authorization-sharing__grant-card {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: var(--radius-lg);
+  background: rgba(15, 23, 42, 0.26);
+  padding: var(--space-sm);
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.ui-authorization-sharing__alert {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.ui-authorization-sharing__alert--error {
+  color: var(--color-danger);
+}
+
+.ui-authorization-sharing__alert--success {
+  color: var(--color-success);
+}
+
+.ui-authorization-sharing__validation-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
+
 .ui-select--sm {
   min-height: var(--control-height-sm);
 }
