@@ -13,6 +13,7 @@ import {
   CertificateAuthorityInitializationOutcomes,
   InitializeCertificateAuthorityUseCase,
 } from "../use-cases/InitializeCertificateAuthorityUseCase";
+import type { CertificateLifecycleAuditEvent, CertificateLifecycleAuditSink } from "../ports/CertificateLifecycleAuditPorts";
 import type {
   CertificateAuthorityPersistenceMutationResult,
   CertificateAuthorityRootLookupQuery,
@@ -193,6 +194,14 @@ class StubRootMaterialStorage {
   }
 }
 
+class CapturingCertificateLifecycleAuditSink implements CertificateLifecycleAuditSink {
+  public readonly events: CertificateLifecycleAuditEvent[] = [];
+
+  public async recordCertificateLifecycleAuditEvent(event: CertificateLifecycleAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 describe("InitializeCertificateAuthorityUseCase", () => {
   it("initializes internal CA metadata and protected material references in a clean environment", async () => {
     const repositories = new InMemoryCertificateAuthorityRepositories();
@@ -244,6 +253,46 @@ describe("InitializeCertificateAuthorityUseCase", () => {
       "ca-initialize-started",
       "ca-initialize-succeeded",
     ]);
+  });
+
+  it("emits lifecycle audit sink events for initialization operations", async () => {
+    const repositories = new InMemoryCertificateAuthorityRepositories();
+    const issuer = new StubCertificateAuthorityIssuerPort();
+    const materialStorage = new StubRootMaterialStorage();
+    const auditSink = new CapturingCertificateLifecycleAuditSink();
+    const useCase = new InitializeCertificateAuthorityUseCase({
+      certificateAuthorityRepository: repositories,
+      trustMaterialRepository: repositories,
+      rootMaterialStorage: materialStorage,
+      issuer,
+      auditSink,
+    });
+
+    await useCase.execute({
+      operationKey: "initialize-ca-root-v1",
+      certificateAuthorityId: "ca:internal:root:v1",
+      displayName: "AI Loom Internal Root",
+      subject: {
+        commonName: "AI Loom Internal Root CA",
+        dnsNames: [],
+        ipAddresses: [],
+        uriSanEntries: [],
+      },
+      signatureAlgorithm: "sha256WithRSAEncryption",
+      validityDays: 3650,
+      actorUserIdentityId: "user:admin",
+      rootCertificateMaterialRef: "trust:ca:cert:v1",
+      rootPrivateKeyMaterialRef: "trust:ca:key:v1",
+      rootCertificateSecretRef: "secret-store:internal-ca:root-cert",
+      rootPrivateKeySecretRef: "secret-store:internal-ca:root-key",
+      occurredAt: "2026-04-05T00:00:00.000Z",
+    });
+
+    expect(auditSink.events.map((event) => event.type)).toEqual([
+      "ca-initialize-started",
+      "ca-initialize-succeeded",
+    ]);
+    expect((auditSink.events[1]?.details as Record<string, unknown>)?.rootPrivateKeySecretRef).toBe("[REDACTED]");
   });
 
   it("blocks repeated initialization when active root CA already exists by default", async () => {

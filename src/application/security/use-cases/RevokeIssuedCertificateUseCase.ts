@@ -15,6 +15,10 @@ import {
   type CertificateRevocationPersistenceRecord,
   type IssuedCertificatePersistenceRecord,
 } from "../../../shared/dto/security/CertificateAuthorityDtos";
+import {
+  publishCertificateLifecycleAuditEventBestEffort,
+  type CertificateLifecycleAuditSink,
+} from "../ports/CertificateLifecycleAuditPorts";
 
 export class RevokeIssuedCertificateInvalidRequestError extends Error {
   public constructor(message: string) {
@@ -53,89 +57,121 @@ export interface RevokeIssuedCertificateUseCaseResult {
 export interface RevokeIssuedCertificateUseCaseDependencies {
   readonly issuedCertificateRepository: IIssuedCertificatePersistenceRepository;
   readonly certificateLifecycleEventRepository: ICertificateLifecycleEventPersistenceRepository;
+  readonly auditSink?: CertificateLifecycleAuditSink;
+  readonly auditHook?: (event: CertificateRevocationAuditEvent) => Promise<void> | void;
 }
+
+export type CertificateRevocationAuditEvent =
+  | {
+    readonly event: "certificate-revocation-started";
+    readonly operationKey: string;
+    readonly serialNumber: string;
+    readonly actorUserIdentityId: string;
+    readonly certificateAuthorityId?: string;
+    readonly revocationReason: CertificateRevocationReason;
+    readonly occurredAt: string;
+  }
+  | {
+    readonly event: "certificate-revocation-succeeded";
+    readonly operationKey: string;
+    readonly serialNumber: string;
+    readonly actorUserIdentityId: string;
+    readonly certificateAuthorityId: string;
+    readonly previousStatus: IssuedCertificatePersistenceRecord["status"];
+    readonly currentStatus: IssuedCertificatePersistenceRecord["status"];
+    readonly revocationReason: CertificateRevocationReason;
+    readonly occurredAt: string;
+  }
+  | {
+    readonly event: "certificate-revocation-failed";
+    readonly operationKey: string;
+    readonly serialNumber: string;
+    readonly actorUserIdentityId: string;
+    readonly certificateAuthorityId?: string;
+    readonly revocationReason: CertificateRevocationReason;
+    readonly code: string;
+    readonly message: string;
+    readonly occurredAt: string;
+  };
 
 export class RevokeIssuedCertificateUseCase {
   public constructor(private readonly dependencies: RevokeIssuedCertificateUseCaseDependencies) {}
 
   public async execute(input: RevokeIssuedCertificateUseCaseInput): Promise<RevokeIssuedCertificateUseCaseResult> {
     const normalized = normalizeInput(input);
-    const existing = await this.dependencies.issuedCertificateRepository.findIssuedCertificateBySerialNumber(
-      normalized.serialNumber,
-    );
-
-    if (!existing) {
-      throw new RevokeIssuedCertificateInvalidRequestError(
-        `Issued certificate '${normalized.serialNumber}' was not found.`,
-      );
-    }
-
-    if (existing.status === CertificateStatuses.revoked) {
-      throw new IssuedCertificateAlreadyRevokedError(normalized.serialNumber);
-    }
-
-    if (existing.status !== CertificateStatuses.issued) {
-      throw new RevokeIssuedCertificateInvalidRequestError(
-        `Issued certificate '${normalized.serialNumber}' cannot be revoked from status '${existing.status}'.`,
-      );
-    }
-
-    const domainCertificate = createIssuedCertificate({
-      certificateAuthorityId: existing.certificateAuthorityId,
-      serialNumber: createCertificateSerialNumber(existing.serialNumber),
-      status: existing.status,
-      subject: createCertificateSubjectDescriptor(existing.subject),
-      subjectReference: existing.subjectReference,
-      usages: existing.usages,
-      validity: createCertificateValidityWindow(existing.validity),
-      issuedAt: existing.issuedAt,
-      certificateMaterialRef: existing.certificateMaterialRef,
-      certificateChainMaterialRef: existing.certificateChainMaterialRef,
-      trustMaterialRef: existing.trustMaterialRef,
-      publicKeyAlgorithm: existing.publicKeyAlgorithm,
-      publicKeyFingerprintSha256: existing.publicKeyFingerprintSha256,
-      revocation: existing.revocation,
-      supersededBySerialNumber: existing.supersededBySerialNumber,
-      createdAt: existing.createdAt,
-      updatedAt: existing.lastModifiedAt,
-    });
-
-    const revokedDomainCertificate = revokeIssuedCertificate(domainCertificate, {
-      reason: normalized.revocationReason,
-      revokedAt: normalized.revokedAt,
-      revokedByActorId: normalized.actorUserIdentityId,
-      note: normalized.note,
-    });
-
-    const revokedAt = revokedDomainCertificate.revocation?.revokedAt as string;
-    const revocation: CertificateRevocationPersistenceRecord = Object.freeze({
-      reason: revokedDomainCertificate.revocation?.reason as CertificateRevocationReason,
-      revokedAt,
-      revokedByActorId: revokedDomainCertificate.revocation?.revokedByActorId,
-      note: revokedDomainCertificate.revocation?.note,
-    });
-
-    const revokeResult = await this.dependencies.issuedCertificateRepository.revokeIssuedCertificate({
+    await this.emitAudit({
+      event: "certificate-revocation-started",
+      operationKey: normalized.operationKey,
       serialNumber: normalized.serialNumber,
-      revocation,
-      mutation: {
-        operationKey: `${normalized.operationKey}:revoke-issued-certificate`,
-        context: {
-          actorUserIdentityId: normalized.actorUserIdentityId,
-          occurredAt: revokedAt,
-          reason: normalized.reason,
-          correlationId: normalized.correlationId,
-        },
-      },
+      actorUserIdentityId: normalized.actorUserIdentityId,
+      revocationReason: normalized.revocationReason,
+      occurredAt: normalized.revokedAt,
     });
 
-    const existingRevocation = await this.dependencies.certificateLifecycleEventRepository
-      .findLatestCertificateRevocationBySerialNumber(normalized.serialNumber);
+    let certificateAuthorityId: string | undefined;
+    try {
+      const existing = await this.dependencies.issuedCertificateRepository.findIssuedCertificateBySerialNumber(
+        normalized.serialNumber,
+      );
 
-    if (!existingRevocation || existingRevocation.revokedAt !== revokedAt || existingRevocation.reason !== revocation.reason) {
-      await this.dependencies.certificateLifecycleEventRepository.saveCertificateRevocation({
+      if (!existing) {
+        throw new RevokeIssuedCertificateInvalidRequestError(
+          `Issued certificate '${normalized.serialNumber}' was not found.`,
+        );
+      }
+
+      certificateAuthorityId = existing.certificateAuthorityId;
+
+      if (existing.status === CertificateStatuses.revoked) {
+        throw new IssuedCertificateAlreadyRevokedError(normalized.serialNumber);
+      }
+
+      if (existing.status !== CertificateStatuses.issued) {
+        throw new RevokeIssuedCertificateInvalidRequestError(
+          `Issued certificate '${normalized.serialNumber}' cannot be revoked from status '${existing.status}'.`,
+        );
+      }
+
+      const domainCertificate = createIssuedCertificate({
+        certificateAuthorityId: existing.certificateAuthorityId,
+        serialNumber: createCertificateSerialNumber(existing.serialNumber),
+        status: existing.status,
+        subject: createCertificateSubjectDescriptor(existing.subject),
+        subjectReference: existing.subjectReference,
+        usages: existing.usages,
+        validity: createCertificateValidityWindow(existing.validity),
+        issuedAt: existing.issuedAt,
+        certificateMaterialRef: existing.certificateMaterialRef,
+        certificateChainMaterialRef: existing.certificateChainMaterialRef,
+        trustMaterialRef: existing.trustMaterialRef,
+        publicKeyAlgorithm: existing.publicKeyAlgorithm,
+        publicKeyFingerprintSha256: existing.publicKeyFingerprintSha256,
+        revocation: existing.revocation,
+        supersededBySerialNumber: existing.supersededBySerialNumber,
+        createdAt: existing.createdAt,
+        updatedAt: existing.lastModifiedAt,
+      });
+
+      const revokedDomainCertificate = revokeIssuedCertificate(domainCertificate, {
+        reason: normalized.revocationReason,
+        revokedAt: normalized.revokedAt,
+        revokedByActorId: normalized.actorUserIdentityId,
+        note: normalized.note,
+      });
+
+      const revokedAt = revokedDomainCertificate.revocation?.revokedAt as string;
+      const revocation: CertificateRevocationPersistenceRecord = Object.freeze({
+        reason: revokedDomainCertificate.revocation?.reason as CertificateRevocationReason,
+        revokedAt,
+        revokedByActorId: revokedDomainCertificate.revocation?.revokedByActorId,
+        note: revokedDomainCertificate.revocation?.note,
+      });
+
+      const revokeResult = await this.dependencies.issuedCertificateRepository.revokeIssuedCertificate({
+        serialNumber: normalized.serialNumber,
+        revocation,
         mutation: {
-          operationKey: `${normalized.operationKey}:save-revocation-history`,
+          operationKey: `${normalized.operationKey}:revoke-issued-certificate`,
           context: {
             actorUserIdentityId: normalized.actorUserIdentityId,
             occurredAt: revokedAt,
@@ -143,30 +179,93 @@ export class RevokeIssuedCertificateUseCase {
             correlationId: normalized.correlationId,
           },
         },
-        record: Object.freeze({
-          revocationId: toRevocationId(normalized.serialNumber, revokedAt),
-          certificateAuthorityId: revokeResult.record.certificateAuthorityId,
-          serialNumber: normalized.serialNumber,
-          reason: revocation.reason,
-          revokedAt,
-          revokedByActorId: revocation.revokedByActorId,
-          note: revocation.note,
-          createdAt: revokedAt,
-          createdBy: normalized.actorUserIdentityId,
-          lastModifiedAt: revokedAt,
-          lastModifiedBy: normalized.actorUserIdentityId,
-          revision: 0,
-        }),
       });
+
+      const existingRevocation = await this.dependencies.certificateLifecycleEventRepository
+        .findLatestCertificateRevocationBySerialNumber(normalized.serialNumber);
+
+      if (!existingRevocation || existingRevocation.revokedAt !== revokedAt || existingRevocation.reason !== revocation.reason) {
+        await this.dependencies.certificateLifecycleEventRepository.saveCertificateRevocation({
+          mutation: {
+            operationKey: `${normalized.operationKey}:save-revocation-history`,
+            context: {
+              actorUserIdentityId: normalized.actorUserIdentityId,
+              occurredAt: revokedAt,
+              reason: normalized.reason,
+              correlationId: normalized.correlationId,
+            },
+          },
+          record: Object.freeze({
+            revocationId: toRevocationId(normalized.serialNumber, revokedAt),
+            certificateAuthorityId: revokeResult.record.certificateAuthorityId,
+            serialNumber: normalized.serialNumber,
+            reason: revocation.reason,
+            revokedAt,
+            revokedByActorId: revocation.revokedByActorId,
+            note: revocation.note,
+            createdAt: revokedAt,
+            createdBy: normalized.actorUserIdentityId,
+            lastModifiedAt: revokedAt,
+            lastModifiedBy: normalized.actorUserIdentityId,
+            revision: 0,
+          }),
+        });
+      }
+
+      const result = Object.freeze({
+        certificateAuthorityId: revokeResult.record.certificateAuthorityId,
+        serialNumber: revokeResult.record.serialNumber,
+        previousStatus: existing.status,
+        currentStatus: revokeResult.record.status,
+        revokedAt,
+        revocation,
+      });
+
+      await this.emitAudit({
+        event: "certificate-revocation-succeeded",
+        operationKey: normalized.operationKey,
+        serialNumber: normalized.serialNumber,
+        actorUserIdentityId: normalized.actorUserIdentityId,
+        certificateAuthorityId: result.certificateAuthorityId,
+        previousStatus: result.previousStatus,
+        currentStatus: result.currentStatus,
+        revocationReason: result.revocation.reason,
+        occurredAt: result.revokedAt,
+      });
+
+      return result;
+    } catch (error) {
+      await this.emitAudit({
+        event: "certificate-revocation-failed",
+        operationKey: normalized.operationKey,
+        serialNumber: normalized.serialNumber,
+        actorUserIdentityId: normalized.actorUserIdentityId,
+        certificateAuthorityId,
+        revocationReason: normalized.revocationReason,
+        code: toErrorCode(error),
+        message: toErrorMessage(error),
+        occurredAt: normalized.revokedAt,
+      });
+      throw error;
+    }
+  }
+
+  private async emitAudit(event: CertificateRevocationAuditEvent): Promise<void> {
+    if (this.dependencies.auditHook) {
+      try {
+        await this.dependencies.auditHook(event);
+      } catch {
+        // Intentionally non-fatal.
+      }
     }
 
-    return Object.freeze({
-      certificateAuthorityId: revokeResult.record.certificateAuthorityId,
-      serialNumber: revokeResult.record.serialNumber,
-      previousStatus: existing.status,
-      currentStatus: revokeResult.record.status,
-      revokedAt,
-      revocation,
+    await publishCertificateLifecycleAuditEventBestEffort(this.dependencies.auditSink, {
+      type: event.event,
+      actorUserIdentityId: event.actorUserIdentityId,
+      occurredAt: event.occurredAt,
+      certificateAuthorityId: event.certificateAuthorityId,
+      serialNumber: event.serialNumber,
+      details: toAuditDetails(event),
     });
   }
 }
@@ -238,4 +337,47 @@ function normalizeTimestamp(value?: string): string {
 
 function toRevocationId(serialNumber: string, revokedAt: string): string {
   return `revocation:${serialNumber}:${Date.parse(revokedAt)}`;
+}
+
+function toErrorCode(error: unknown): string {
+  if (error instanceof IssuedCertificateAlreadyRevokedError) {
+    return "certificate-revocation-already-revoked";
+  }
+  if (error instanceof RevokeIssuedCertificateInvalidRequestError) {
+    return "certificate-revocation-invalid-request";
+  }
+  return "certificate-revocation-failed";
+}
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  return "certificate revocation failed";
+}
+
+function toAuditDetails(event: CertificateRevocationAuditEvent): Readonly<Record<string, unknown>> {
+  switch (event.event) {
+    case "certificate-revocation-started":
+      return Object.freeze({
+        operationKey: event.operationKey,
+        revocationReason: event.revocationReason,
+      });
+    case "certificate-revocation-succeeded":
+      return Object.freeze({
+        operationKey: event.operationKey,
+        previousStatus: event.previousStatus,
+        currentStatus: event.currentStatus,
+        revocationReason: event.revocationReason,
+      });
+    case "certificate-revocation-failed":
+      return Object.freeze({
+        operationKey: event.operationKey,
+        revocationReason: event.revocationReason,
+        code: event.code,
+        message: event.message,
+      });
+    default:
+      return Object.freeze({});
+  }
 }

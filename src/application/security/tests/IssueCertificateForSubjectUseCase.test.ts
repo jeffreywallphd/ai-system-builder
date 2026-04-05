@@ -42,6 +42,7 @@ import {
   IssueCertificateForSubjectUseCase,
 } from "../use-cases/IssueCertificateForSubjectUseCase";
 import { CertificateSubjectProfileKinds } from "../../../domain/security/CertificateIssuancePolicyDomain";
+import type { CertificateLifecycleAuditEvent, CertificateLifecycleAuditSink } from "../ports/CertificateLifecycleAuditPorts";
 
 class InMemoryCertificateAuthorityRepository implements ICertificateAuthorityRootPersistenceRepository {
   public authority?: CertificateAuthorityRootPersistenceRecord;
@@ -308,6 +309,14 @@ class StubIssuerPort {
   }
 }
 
+class CapturingCertificateLifecycleAuditSink implements CertificateLifecycleAuditSink {
+  public readonly events: CertificateLifecycleAuditEvent[] = [];
+
+  public async recordCertificateLifecycleAuditEvent(event: CertificateLifecycleAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 describe("IssueCertificateForSubjectUseCase", () => {
   it("requires node eligibility integration for approved-node issuance", async () => {
     const authorities = new InMemoryCertificateAuthorityRepository();
@@ -525,6 +534,80 @@ describe("IssueCertificateForSubjectUseCase", () => {
     await expect(useCase.execute(createNodeIssuanceRequest())).rejects.toThrow("trust-material-save-failed");
     expect(issuer.revokeCalls).toHaveLength(1);
     expect(issuedCertificates.records).toHaveLength(0);
+  });
+
+  it("emits a blocked issuance audit event when policy gate prevents signing", async () => {
+    const authorities = new InMemoryCertificateAuthorityRepository();
+    authorities.authority = createAuthority();
+    const issuedCertificates = new InMemoryIssuedCertificateRepository();
+    const nodeEligibilityPort = new StubNodeEligibilityPort();
+    nodeEligibilityPort.decisionsByNodeId.set("node:compute:1", {
+      eligible: false,
+      violations: Object.freeze(["Node 'node:compute:1' must be approved before certificate issuance."]),
+    });
+    const issuer = new StubIssuerPort();
+    const trustMaterials = new InMemoryTrustMaterialRepository();
+    const certificateMaterialStorage = new StubCertificateMaterialStorage();
+    const auditSink = new CapturingCertificateLifecycleAuditSink();
+
+    const useCase = new IssueCertificateForSubjectUseCase({
+      certificateAuthorityRepository: authorities,
+      issuedCertificateRepository: issuedCertificates,
+      trustMaterialRepository: trustMaterials,
+      certificateMaterialStorage,
+      issuer,
+      nodeCertificateEligibilityPort: nodeEligibilityPort,
+      auditSink,
+    });
+
+    await expect(useCase.execute(createNodeIssuanceRequest())).rejects.toBeInstanceOf(CertificateIssuancePolicyViolationError);
+
+    expect(auditSink.events.map((event) => event.type)).toEqual([
+      "certificate-issuance-started",
+      "certificate-issuance-blocked",
+    ]);
+    expect((auditSink.events[1]?.details as Record<string, unknown>)?.code).toBe("certificate-issuance-policy-violation");
+  });
+
+  it("emits a failed issuance audit event when post-signing persistence fails", async () => {
+    const authorities = new InMemoryCertificateAuthorityRepository();
+    authorities.authority = createAuthority();
+    const issuedCertificates = new InMemoryIssuedCertificateRepository();
+    const nodeEligibilityPort = new StubNodeEligibilityPort();
+    nodeEligibilityPort.decisionsByNodeId.set("node:compute:1", {
+      eligible: true,
+      metadata: Object.freeze({
+        nodeId: "node:compute:1",
+        enrollmentRequestId: "enroll:node:compute:1:v1",
+        capabilityProfile: Object.freeze({
+          enabledCapabilities: Object.freeze(["api", "executor"]),
+          supportsRemoteScheduling: true,
+        }),
+      }),
+    });
+    const issuer = new StubIssuerPort();
+    const trustMaterials = new InMemoryTrustMaterialRepository();
+    trustMaterials.throwOnSave = true;
+    const certificateMaterialStorage = new StubCertificateMaterialStorage();
+    const auditSink = new CapturingCertificateLifecycleAuditSink();
+
+    const useCase = new IssueCertificateForSubjectUseCase({
+      certificateAuthorityRepository: authorities,
+      issuedCertificateRepository: issuedCertificates,
+      trustMaterialRepository: trustMaterials,
+      certificateMaterialStorage,
+      issuer,
+      nodeCertificateEligibilityPort: nodeEligibilityPort,
+      auditSink,
+    });
+
+    await expect(useCase.execute(createNodeIssuanceRequest())).rejects.toThrow("trust-material-save-failed");
+
+    expect(auditSink.events.map((event) => event.type)).toEqual([
+      "certificate-issuance-started",
+      "certificate-issuance-failed",
+    ]);
+    expect((auditSink.events[1]?.details as Record<string, unknown>)?.compensatingRevocationAttempted).toBe(true);
   });
 });
 
