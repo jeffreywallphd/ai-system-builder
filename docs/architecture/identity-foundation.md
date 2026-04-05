@@ -268,6 +268,27 @@ Recommended extension path:
 3. Reuse existing domain lifecycle transitions and operation-result taxonomy.
 4. Keep provider-specific credential/token details isolated in provider adapters and dedicated persistence fields/tables.
 
+## Provider Abstraction Formalization (Story 1.4.1)
+
+Auth provider abstraction is now explicit in application services so local auth is one provider path inside a broader provider model:
+
+- `application/identity/services/IdentityProviderCatalog.ts` now defines provider descriptors with:
+  - provider category/kind mapping
+  - authenticator capability metadata (`supportedAuthenticators`, usernameless sign-in support)
+  - provider-specific credential handling seams (`materialMode`, credential-policy support, credential-material-record support)
+  - identity linkage semantics (`provider-subject` linkage under platform-owned `UserIdentity`)
+- shared provider validation rules now evaluate runtime provider records against descriptor requirements (category, status, authenticator compatibility, credential handling requirements) through `validateIdentityProvider(...)`
+
+Current local-account flows now consume the same provider abstraction instead of duplicating local-only checks:
+
+- `IdentityBootstrapService.resolveBootstrapProvider(...)`
+- `RegisterLocalAccountUseCase.resolveLocalProvider(...)`
+- `LoginLocalAccountUseCase.resolveLocalProvider(...)`
+- `VerifyLocalPasswordCredentialUseCase.resolveLocalProvider(...)`
+- `ChangeLocalPasswordCredentialUseCase.resolveLocalProvider(...)`
+
+This keeps local auth fully functional while making provider-path assumptions explicit and testable, so adding OIDC/Google/Microsoft/SAML-style providers can follow descriptor + adapter composition without changing identity ownership semantics (`UserIdentity` remains the authorization subject with provider-subject links).
+
 ## Separation From Device Trust and Session Trust
 
 Identity in this foundation answers:

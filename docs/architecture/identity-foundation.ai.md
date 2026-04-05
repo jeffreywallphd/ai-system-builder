@@ -54,6 +54,22 @@
 - Identity links are provider-subject based, so external provider integration can reuse current contracts.
 - Local-password specific normalization is isolated in policy logic, not hardcoded through the whole stack.
 
+## Provider abstraction formalization (story 1.4.1)
+
+- `application/identity/services/IdentityProviderCatalog.ts` now acts as the explicit provider abstraction surface:
+  - descriptor map per provider kind/category
+  - capability metadata (`supportedAuthenticators`, usernameless sign-in support)
+  - credential-handling metadata (`materialMode`, credential-policy support, credential-material-record support)
+  - identity-linkage semantics (provider-subject linkage with platform-owned `UserIdentity` as authorization subject)
+- shared provider validation (`validateIdentityProvider(...)`) now checks runtime providers against required capabilities/status/category for each auth flow.
+- Local auth use cases and bootstrap now rely on the shared provider abstraction instead of inline local-provider checks:
+  - `IdentityBootstrapService`
+  - `RegisterLocalAccountUseCase`
+  - `LoginLocalAccountUseCase`
+  - `VerifyLocalPasswordCredentialUseCase`
+  - `ChangeLocalPasswordCredentialUseCase`
+- Result: local identity remains operational while future OIDC/OAuth/SAML/Google/Microsoft provider additions can plug into descriptor + adapter seams without redesigning identity ownership or provider-link semantics.
+
 ## Local registration seam
 
 - `RegisterLocalAccountUseCase` runs full local registration orchestration in the application layer.
