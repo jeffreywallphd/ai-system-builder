@@ -8,8 +8,10 @@ import {
 import {
   CertificateAuthorityRootPersistenceRecordSchema,
   CertificateAuthoritySchemaValidationError,
+  parseCertificateMetadataListView,
   parseCertificateAuthorityStatusIntrospectionView,
   parseCertificateDistributionEventPersistenceRecord,
+  parseIssuedCertificateMetadataView,
   parseCertificateRevocationHistoryPersistenceRecord,
   parseCertificateStatusHistoryPersistenceRecord,
   IssuedCertificatePersistenceRecordSchema,
@@ -279,5 +281,58 @@ describe("CertificateAuthoritySchemaContracts", () => {
 
     expect(parsed.state).toBe("healthy");
     expect(parsed.authority?.certificateCounts.total).toBe(2);
+  });
+
+  it("parses sanitized issued certificate metadata views and list responses", () => {
+    const item = parseIssuedCertificateMetadataView({
+      certificateAuthorityId: "ca:internal:root:v1",
+      serialNumber: "AA11",
+      status: "issued",
+      trust: {
+        status: "active",
+        active: true,
+        revoked: false,
+        expired: false,
+        usable: true,
+        checkedAt: "2026-08-20T00:00:00.000Z",
+      },
+      subject: {
+        commonName: "node-01.ai-loom.internal",
+        dnsNames: ["node-01.ai-loom.internal"],
+        ipAddresses: [],
+        uriSanEntries: [],
+      },
+      subjectReference: {
+        kind: "node",
+        referenceId: "node:01",
+        workspaceId: "workspace:alpha",
+      },
+      usages: ["server-auth"],
+      validity: {
+        notBefore: "2026-01-01T00:00:00.000Z",
+        notAfter: "2027-01-01T00:00:00.000Z",
+      },
+      issuedAt: "2026-01-01T00:00:00.000Z",
+      publicKeyAlgorithm: "rsa-4096",
+      publicKeyFingerprintSha256: "sha256:abc",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      createdBy: "user:admin",
+      lastModifiedAt: "2026-01-01T00:00:00.000Z",
+      lastModifiedBy: "user:admin",
+    });
+
+    const list = parseCertificateMetadataListView({
+      asOf: "2026-08-20T00:00:00.000Z",
+      items: [item],
+      pagination: {
+        limit: 25,
+        offset: 0,
+        returned: 1,
+        hasMore: false,
+      },
+    });
+
+    expect(item.trust.status).toBe("active");
+    expect(list.pagination.returned).toBe(1);
   });
 });

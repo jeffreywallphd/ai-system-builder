@@ -425,6 +425,48 @@ export interface CertificateAuthorityStatusIntrospectionViewDto {
   readonly healthFlags: CertificateAuthorityStatusHealthFlagsDto;
 }
 
+export interface IssuedCertificateOperationalTrustViewDto {
+  readonly status: CertificateTrustEvaluationStatus;
+  readonly active: boolean;
+  readonly revoked: boolean;
+  readonly expired: boolean;
+  readonly usable: boolean;
+  readonly checkedAt: string;
+}
+
+export interface IssuedCertificateMetadataViewDto {
+  readonly certificateAuthorityId: string;
+  readonly serialNumber: string;
+  readonly status: CertificateStatus;
+  readonly trust: IssuedCertificateOperationalTrustViewDto;
+  readonly subject: CertificateSubjectPersistenceRecord;
+  readonly subjectReference: CertificateSubjectReferencePersistenceRecord;
+  readonly usages: ReadonlyArray<CertificateUsageKind>;
+  readonly validity: CertificateValidityWindowPersistenceRecord;
+  readonly issuedAt: string;
+  readonly publicKeyAlgorithm: string;
+  readonly publicKeyFingerprintSha256?: string;
+  readonly revocation?: CertificateRevocationPersistenceRecord;
+  readonly supersededBySerialNumber?: string;
+  readonly createdAt: string;
+  readonly createdBy: string;
+  readonly lastModifiedAt: string;
+  readonly lastModifiedBy: string;
+}
+
+export interface CertificateMetadataListPaginationDto {
+  readonly limit: number;
+  readonly offset: number;
+  readonly returned: number;
+  readonly hasMore: boolean;
+}
+
+export interface CertificateMetadataListViewDto {
+  readonly asOf: string;
+  readonly items: ReadonlyArray<IssuedCertificateMetadataViewDto>;
+  readonly pagination: CertificateMetadataListPaginationDto;
+}
+
 export const CertificateAuthorityPersistenceQueryPresets = Object.freeze({
   activeStatuses: Object.freeze([CertificateAuthorityStatuses.active]),
   terminalStatuses: Object.freeze([
