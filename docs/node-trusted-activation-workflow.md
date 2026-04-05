@@ -144,6 +144,25 @@ This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.
   - list rows and detail panels are populated only from API responses,
   - loading, empty, and error states are explicit in both inventory and detail surfaces.
 
+## Admin node revocation procedure
+
+Use this workflow when an approved/trusted node must be removed from active trust participation.
+
+1. Open **Settings -> Trusted node inventory** (`/settings/node-inventory`) with an authenticated admin session.
+2. Select the target node in the inventory table and review current trust/revocation metadata in the detail pane.
+3. In **Trust actions**, choose a revocation reason, optionally enter an administrative note, and type the exact `nodeId` to confirm.
+4. Execute **Revoke node trust**; the UI sends `POST /api/v1/nodes/:nodeId/revoke` with the selected reason/note.
+5. Confirm post-action state:
+   - detail pane shows `trustState=revoked`,
+   - revocation state/reason/revoked timestamp are populated,
+   - node remains visible in inventory and is categorized as `operationalState=revoked`.
+
+Operational notes:
+
+- Revocation API requests are authenticated; actor identity is bound from the authenticated session, and `nodeId` is bound from route path.
+- Request payload validation uses shared node-trust schema contracts (`reason` required and constrained to canonical revocation values).
+- Repeated revocation requests are safe no-op operations that preserve original revocation metadata.
+
 ## Heartbeat cadence guidance
 
 - Recommended steady-state cadence: every 30 seconds.

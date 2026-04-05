@@ -128,6 +128,24 @@ Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, Story 5.4.1, St
   - no placeholder node data,
   - state labels and badge treatment keep `pending`, `active`, `offline`, and `revoked` distinct for operators.
 
+## Admin node revocation procedure
+
+1. Open `/settings/node-inventory` with an authenticated admin session.
+2. Select the target node and review trust + revocation metadata in the detail panel.
+3. In **Trust actions**, select revocation reason, add optional administrative note, and type exact `nodeId` confirmation.
+4. Submit **Revoke node trust**; the UI invokes `POST /api/v1/nodes/:nodeId/revoke`.
+5. Verify result:
+   - `trustState=revoked`
+   - revocation state/reason/revoked timestamp populated
+   - node remains visible in inventory as `operationalState=revoked`
+
+Guardrails:
+
+- actor identity is bound from authenticated session (client spoof values ignored),
+- route `nodeId` is transport-bound from URL path,
+- request validation uses shared node-trust schema contracts,
+- repeated revoke requests are safe no-op and preserve original revocation metadata.
+
 ## Heartbeat cadence guidance
 
 - Default cadence: every 30 seconds.

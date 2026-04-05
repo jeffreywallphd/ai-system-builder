@@ -13,7 +13,9 @@ import type {
   NodeEnrollmentSubmissionResponseDto,
   NodeHeartbeatPayloadDto,
   NodeHeartbeatResponseDto,
+  NodeRevocationResponseDto,
   NodePendingEnrollmentSummaryDto,
+  RevokeNodeTrustActionRequestDto,
   RejectNodeEnrollmentActionRequestDto,
 } from "../../../../src/shared/contracts/nodes/NodeTrustApiContracts";
 import {
@@ -87,6 +89,10 @@ export type ApproveNodeEnrollmentApiResponse = NodeEnrollmentDecisionResponseDto
 export type RejectNodeEnrollmentApiRequest = RejectNodeEnrollmentActionRequestDto;
 
 export type RejectNodeEnrollmentApiResponse = NodeEnrollmentDecisionResponseDto;
+
+export type RevokeNodeTrustApiRequest = RevokeNodeTrustActionRequestDto;
+
+export type RevokeNodeTrustApiResponse = NodeRevocationResponseDto;
 
 export type RecordNodeHeartbeatApiRequest = NodeHeartbeatPayloadDto;
 

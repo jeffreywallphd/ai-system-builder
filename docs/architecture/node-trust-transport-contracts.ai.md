@@ -116,3 +116,23 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
   - non-matching principals receive `forbidden`.
 - Node-authenticated write flows continue to bind actor/node fields at transport boundary (payload spoofed actor/node values are ignored).
 - Application layer now owns reusable trust-state enforcement through `enforceNodeAuthenticatedOperationTrust(...)`, keeping transport checks focused on authenticated identity binding and preserving compatibility with upcoming certificate-authenticated transport.
+
+## Story 5.4.4 additions
+
+- New admin revocation endpoint:
+  - `POST /api/v1/nodes/:nodeId/revoke`
+  - validates with `parseRevokeNodeTrustActionRequestDto(...)`
+  - binds actor from authenticated session principal
+  - binds `nodeId` from route path and ignores spoofed payload values
+  - returns admin-safe `NodeRevocationResponseDto`
+- Backend and contract surface expanded:
+  - `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+  - `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- Renderer wiring expanded:
+  - `ui/shared/nodes/NodeInventoryClient.ts`
+  - `ui/services/NodeInventoryService.ts`
+  - `ui/pages/NodeInventoryPage.tsx`
+- Admin inventory detail now provides production revoke flow with:
+  - revocation reason + optional note,
+  - explicit node-id confirmation safeguard,
+  - post-action trust-state refresh from backend.

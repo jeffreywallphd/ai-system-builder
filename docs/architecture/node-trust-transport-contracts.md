@@ -224,3 +224,34 @@ Application enforcement guidance:
 - Node-authenticated operations must call `enforceNodeAuthenticatedOperationTrust(...)` to avoid scattered state checks.
 - This centralized gate enforces approved + activated (`trustState=trusted`) + non-revoked + certificate-present preconditions before node-scoped writes.
 - Future node-authenticated handlers (for example execution registration flows) should reuse this same helper to preserve consistent denial semantics and certificate-transport compatibility.
+
+## Story 5.4.4 admin revocation and trust-state management transport/UI hooks
+
+Story 5.4.4 adds concrete admin-facing revocation transport and renderer wiring on top of node inventory/detail.
+
+Canonical artifacts:
+
+- `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+- `infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
+- `ui/shared/nodes/NodeInventoryClient.ts`
+- `ui/services/NodeInventoryService.ts`
+- `ui/pages/NodeInventoryPage.tsx`
+- `ui/shared/nodes/tests/NodeInventoryClient.test.ts`
+
+Added API operation:
+
+- `POST /api/v1/nodes/:nodeId/revoke`
+  - validates payload via `parseRevokeNodeTrustActionRequestDto(...)`
+  - binds actor identity from authenticated admin session principal
+  - binds `nodeId` from route path (client body spoof values are ignored)
+  - executes `RevokeNodeTrustUseCase` via backend API
+  - returns admin-safe `NodeRevocationResponseDto`
+
+Renderer behavior for this slice:
+
+- Node detail includes production revoke controls (reason, optional note, explicit node-id confirmation).
+- Success path refreshes real inventory/detail state from backend.
+- Revoked nodes are explicitly marked and remain visible as non-active trust participants.

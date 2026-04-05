@@ -15,6 +15,7 @@ import { ListTrustedNodeInventoryUseCase } from "../../../../../src/application/
 import { RecordNodeHeartbeatUseCase } from "../../../../../src/application/nodes/use-cases/RecordNodeHeartbeatUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "../../../../../src/application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { RejectNodeEnrollmentUseCase } from "../../../../../src/application/nodes/use-cases/RejectNodeEnrollmentUseCase";
+import { RevokeNodeTrustUseCase } from "../../../../../src/application/nodes/use-cases/RevokeNodeTrustUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../../../../../src/application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
 import {
   NodeApprovalStatuses,
@@ -75,6 +76,9 @@ async function startServer(): Promise<{
     }),
     rejectNodeEnrollmentUseCase: new RejectNodeEnrollmentUseCase({
       enrollmentRequestRepository: nodeTrustAdapter,
+      nodeRepository: nodeTrustAdapter,
+    }),
+    revokeNodeTrustUseCase: new RevokeNodeTrustUseCase({
       nodeRepository: nodeTrustAdapter,
     }),
     recordNodeHeartbeatUseCase: new RecordNodeHeartbeatUseCase({
@@ -350,6 +354,101 @@ describe("IdentityHttpServer node trust routes", () => {
     expect(rejectBody.ok).toBe(true);
     expect(rejectBody.data.enrollment.status).toBe("rejected");
     expect(rejectBody.data.node.trustState).toBe("quarantined");
+  });
+
+  it("revokes nodes through authenticated admin route and persists revocation state", async () => {
+    const { baseUrl, nodeTrustAdapter } = await startServer();
+    const admin = await registerAndLogin(baseUrl, "node.revoke.admin");
+
+    await nodeTrustAdapter.registerNode({
+      record: {
+        nodeId: "node:trusted:revoke-http-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Trusted Revoke HTTP 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:revoke-http-1:v1",
+        },
+        deploymentTags: ["inventory-http"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:00:00.000Z",
+        approvedAt: "2026-04-05T18:01:00.000Z",
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T18:01:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-revoke-http-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const unauthenticated = await fetch(
+      `${baseUrl}/api/v1/nodes/${encodeURIComponent("node:trusted:revoke-http-1")}/revoke`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          reason: NodeRevocationReasons.operatorAction,
+        }),
+      },
+    );
+    expect(unauthenticated.status).toBe(401);
+
+    const invalidRequest = await fetch(
+      `${baseUrl}/api/v1/nodes/${encodeURIComponent("node:trusted:revoke-http-1")}/revoke`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${admin.sessionToken}`,
+        },
+        body: JSON.stringify({
+          reason: "invalid-reason",
+        }),
+      },
+    );
+    expect(invalidRequest.status).toBe(400);
+
+    const revoke = await fetch(
+      `${baseUrl}/api/v1/nodes/${encodeURIComponent("node:trusted:revoke-http-1")}/revoke`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${admin.sessionToken}`,
+        },
+        body: JSON.stringify({
+          actorUserIdentityId: "spoofed-admin",
+          nodeId: "spoofed-node-id",
+          reason: NodeRevocationReasons.operatorAction,
+          note: "Revoked from admin route.",
+        }),
+      },
+    );
+    expect(revoke.status).toBe(200);
+    const revokeBody = await revoke.json();
+    expect(revokeBody.ok).toBe(true);
+    expect(revokeBody.data.node.nodeId).toBe("node:trusted:revoke-http-1");
+    expect(revokeBody.data.node.trustState).toBe("revoked");
+    expect(revokeBody.data.node.revocation.state).toBe("revoked");
+    expect(revokeBody.data.node.revocation.reason).toBe(NodeRevocationReasons.operatorAction);
+
+    const persisted = await nodeTrustAdapter.findNodeById("node:trusted:revoke-http-1");
+    expect(persisted?.trustState).toBe(NodeTrustStates.revoked);
+    expect(persisted?.revocation.state).toBe(NodeRevocationStates.revoked);
+    expect(persisted?.revocation.revokedByUserIdentityId).toBe(admin.userIdentityId);
   });
 
   it("records node heartbeat, updates lastSeen, and ignores spoofed payload actor/node fields", async () => {

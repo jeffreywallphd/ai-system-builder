@@ -1135,6 +1135,10 @@ body {
   color: var(--color-danger);
 }
 
+.ui-node-inventory-page__alert--success {
+  color: var(--color-success);
+}
+
 .ui-node-inventory-page__filters-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1160,6 +1164,10 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-sm);
+}
+
+.ui-node-inventory-page__revocation-note {
+  min-height: 6rem;
 }
 
 .ui-authorization-sharing__field-grid {
