@@ -15,10 +15,15 @@ Implemented in this slice:
 
 Out of scope in this slice:
 
-- full end-user registration/login API handlers
 - external identity provider protocol adapters (OIDC/OAuth/SAML/passkey)
 - device trust scoring and device attestation
 - runtime/tool trust policy engines
+
+## Final baseline handoff
+
+For downstream implementation dependencies and extension notes, see:
+
+- `docs/architecture/identity-feature-1-final-baseline.md`
 
 ## Layered Architecture
 
