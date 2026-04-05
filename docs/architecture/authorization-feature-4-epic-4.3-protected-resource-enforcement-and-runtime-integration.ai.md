@@ -17,6 +17,9 @@ Story 4.3.1 introduces reusable transport-layer authorization enforcement adapte
 - `infrastructure/api/registry/RegistryBackendApi.ts`
 - `infrastructure/api/studio-shell/tests/ReferenceImageOutputAuthorization.test.ts`
 - `infrastructure/api/registry/tests/RegistryBackendApiAuthorization.test.ts`
+- `infrastructure/api/studio-shell/tests/OperationalRunAuthorization.test.ts`
+- `infrastructure/api/system-runtime/SystemRuntimeBackendApi.ts`
+- `infrastructure/api/system-runtime/tests/SystemRuntimeOperationalAuthorization.test.ts`
 
 ## Transport enforcement model
 
@@ -95,3 +98,20 @@ Story 4.3.3 verification includes:
 - explicit-sharing allowed reads,
 - denied/non-leaky parity checks for output reads,
 - registry denied-vs-missing parity for asset detail reads.
+
+Story 4.3.4 adds operational run/queue/log enforcement and monitoring visibility controls:
+
+- `StudioShellBackendApi` now enforces `run.read` checks on workflow-run detail/rerun source reads and applies per-item run authorization filtering on workflow-run and reference-image run-history list responses.
+- Reference-image run history uses runtime-system scoped run resource ids for policy targets, preserving workspace/owner/share visibility semantics in operational timeline views.
+- `SystemRuntimeBackendApi` now composes authorization checks for operational resources:
+  - `run.read` for execution status/result/session/poll visibility paths,
+  - `queue.read` for recent execution queue list visibility,
+  - `log.read` for execution trace and audit-trail retrieval paths.
+- Queue list responses enforce both queue-level gate and per-run filtering to avoid denied run entry leakage.
+
+Story 4.3.4 verification includes:
+
+- owner/collaborator/admin/denied run visibility scenarios,
+- list filtering + per-item authorization parity on workflow-run and reference-image run-history reads,
+- denied runtime status/trace/audit access behavior for unauthorized actors,
+- runtime queue list filtering when queue scope is visible but individual runs are not.
