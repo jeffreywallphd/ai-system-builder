@@ -84,10 +84,21 @@ describe("SqliteWorkflowPersistenceRepository", () => {
       name: "SQLite Workflow",
       draft: createValidDraft(),
       metadata: { summary: "Initial", tags: ["sqlite", "workflow"] },
-      ownershipContext: { ownerId: "user:1", studioId: "studio-workflows", sessionId: "session-1" },
+      ownershipContext: {
+        ownerId: "user:1",
+        studioId: "studio-workflows",
+        sessionId: "session-1",
+        tenantId: "workspace:sqlite-1",
+      },
+      workspace: {
+        workspaceId: "workspace:sqlite-1",
+        visibility: "team",
+      },
     });
     expect(created.status).toBe(WorkflowPersistenceStatuses.draft);
     expect(created.revision.persistenceRevision).toBe(1);
+    expect(created.ownershipContext?.workspaceOwnership?.workspaceId).toBe("workspace:sqlite-1");
+    expect(created.ownershipContext?.workspaceOwnership?.ownerUserId).toBe("user:1");
 
     const updated = await update.execute({
       id: created.id,
@@ -105,6 +116,7 @@ describe("SqliteWorkflowPersistenceRepository", () => {
     const loaded = await get.execute(created.id);
     expect(loaded?.name).toBe("SQLite Workflow Updated");
     expect(loaded?.definition.draft.steps[0]?.id).toBe("step-1");
+    expect(loaded?.ownershipContext?.workspaceOwnership?.workspaceId).toBe("workspace:sqlite-1");
 
     const duplicated = await duplicate.execute({
       sourceWorkflowId: created.id,

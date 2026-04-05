@@ -448,3 +448,19 @@ Story 3.1.4 extends the adapter integration tests to validate:
   - `ui/pages/tests/WorkspaceInvitationOnboardingPage.test.tsx`
   - updated route/pages settings coverage tests for new thin-client routes and settings links.
 
+## Story 3.4.4 workspace scoping helpers for protected-resource creation flows
+
+- Added shared workspace-scoping helper conventions for protected-resource ownership assignment in:
+  - `application/workflow-persistence/WorkflowWorkspaceScoping.ts`
+- Workflow persistence ownership context now supports explicit workspace metadata composition:
+  - `workspaceId` and `workspaceOwnership` can now be carried in `WorkflowPersistenceOwnershipContext`
+  - canonical workspace ownership envelope is normalized through shared workspace ownership helpers from `src/shared/workspaces/WorkspaceOwnership.ts`
+- Updated protected-resource creation paths to use the shared workspace-scoping helper:
+  - `application/workflow-persistence/CreatePersistedWorkflowUseCase.ts`
+  - `application/workflow-persistence/DuplicatePersistedWorkflowUseCase.ts`
+- Updated Studio Shell duplicate request contract shape to expose workspace-scoping fragments for workflow duplication flows:
+  - `infrastructure/api/studio-shell/StudioShellBackendApi.ts`
+- Added coverage for workspace-scoped ownership assignment and persistence round-trip:
+  - `application/workflow-persistence/tests/WorkflowPersistenceUseCases.test.ts`
+  - `application/workflow-persistence/tests/SqliteWorkflowPersistenceRepository.test.ts`
+

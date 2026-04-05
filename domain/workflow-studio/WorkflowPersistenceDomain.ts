@@ -8,6 +8,10 @@ import {
   type WorkflowLifecycleState,
   WorkflowLifecycleStates,
 } from "./WorkflowStudioDomain";
+import {
+  rehydrateWorkspaceOwnershipMetadata,
+  type WorkspaceOwnershipMetadata,
+} from "../../src/shared/workspaces/WorkspaceOwnership";
 
 function normalizeRequired(value: string, label: string): string {
   const normalized = value.trim();
@@ -40,14 +44,32 @@ function normalizeOwnershipContext(
     return undefined;
   }
 
+  const workspaceId = normalizeOptional(ownershipContext.workspaceId);
+  const workspaceOwnership = ownershipContext.workspaceOwnership
+    ? rehydrateWorkspaceOwnershipMetadata(ownershipContext.workspaceOwnership)
+    : undefined;
+  if (workspaceId && workspaceOwnership && workspaceId !== workspaceOwnership.workspaceId) {
+    throw new Error("Workflow persistence ownership workspaceId must match workspaceOwnership.workspaceId.");
+  }
+  const resolvedWorkspaceId = workspaceId ?? workspaceOwnership?.workspaceId;
+
   const normalized: WorkflowPersistenceOwnershipContext = Object.freeze({
     ownerId: normalizeOptional(ownershipContext.ownerId),
     tenantId: normalizeOptional(ownershipContext.tenantId),
     studioId: normalizeOptional(ownershipContext.studioId),
     sessionId: normalizeOptional(ownershipContext.sessionId),
+    workspaceId: resolvedWorkspaceId,
+    workspaceOwnership,
   });
 
-  if (!normalized.ownerId && !normalized.tenantId && !normalized.studioId && !normalized.sessionId) {
+  if (
+    !normalized.ownerId
+    && !normalized.tenantId
+    && !normalized.studioId
+    && !normalized.sessionId
+    && !normalized.workspaceId
+    && !normalized.workspaceOwnership
+  ) {
     return undefined;
   }
 
@@ -87,6 +109,8 @@ export interface WorkflowPersistenceOwnershipContext {
   readonly tenantId?: string;
   readonly studioId?: string;
   readonly sessionId?: string;
+  readonly workspaceId?: string;
+  readonly workspaceOwnership?: WorkspaceOwnershipMetadata;
 }
 
 export interface WorkflowPersistenceRevisionMetadata {

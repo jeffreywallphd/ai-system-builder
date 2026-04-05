@@ -373,3 +373,19 @@ Protected-resource composition pattern is canonical:
   - `ui/pages/tests/WorkspaceInvitationOnboardingPage.test.tsx`
   - updated route/settings/pages interaction tests.
 
+## Story 3.4.4 workspace scoping helpers for protected-resource creation flows
+
+- Added shared workspace-scoping helper conventions for protected-resource creation ownership assignment in:
+  - `application/workflow-persistence/WorkflowWorkspaceScoping.ts`
+- Workflow persistence ownership context now carries explicit workspace ownership composition fields:
+  - optional `workspaceId`
+  - optional canonical `workspaceOwnership` envelope aligned to `src/shared/workspaces/WorkspaceOwnership.ts`
+- Workflow protected-resource creation paths now resolve ownership through the shared helper:
+  - `application/workflow-persistence/CreatePersistedWorkflowUseCase.ts`
+  - `application/workflow-persistence/DuplicatePersistedWorkflowUseCase.ts`
+- Studio Shell workflow duplication request contract now includes workspace-scoping fragments to support explicit workspace ownership assignment:
+  - `infrastructure/api/studio-shell/StudioShellBackendApi.ts`
+- Added coverage for workspace-scoped assignment and persistence round-trip:
+  - `application/workflow-persistence/tests/WorkflowPersistenceUseCases.test.ts`
+  - `application/workflow-persistence/tests/SqliteWorkflowPersistenceRepository.test.ts`
+

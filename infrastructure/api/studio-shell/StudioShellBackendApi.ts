@@ -30,6 +30,10 @@ import { CreatePersistedWorkflowUseCase } from "../../../application/workflow-pe
 import { DuplicatePersistedWorkflowUseCase } from "../../../application/workflow-persistence/DuplicatePersistedWorkflowUseCase";
 import { GetPersistedWorkflowUseCase } from "../../../application/workflow-persistence/GetPersistedWorkflowUseCase";
 import { UpdatePersistedWorkflowUseCase } from "../../../application/workflow-persistence/UpdatePersistedWorkflowUseCase";
+import type {
+  ProtectedResourceActorContext,
+  WorkspaceScopingInput,
+} from "../../../application/workflow-persistence/WorkflowWorkspaceScoping";
 import { GetWorkflowRunDetailUseCase } from "../../../application/workflow-run-history/GetWorkflowRunDetailUseCase";
 import { ListWorkflowRunSummariesUseCase } from "../../../application/workflow-run-history/ListWorkflowRunSummariesUseCase";
 import {
@@ -660,7 +664,19 @@ export interface DuplicatePersistedWorkflowRequest {
     readonly tenantId?: string;
     readonly studioId?: string;
     readonly sessionId?: string;
+    readonly workspaceId?: string;
+    readonly workspaceOwnership?: {
+      readonly workspaceId: string;
+      readonly ownerUserId: string;
+      readonly visibility: "private" | "team" | "public";
+      readonly createdBy: string;
+      readonly lastModifiedBy: string;
+      readonly createdAt: string;
+      readonly lastModifiedAt: string;
+    };
   };
+  readonly actorContext?: ProtectedResourceActorContext;
+  readonly workspace?: WorkspaceScopingInput;
   readonly versionLabel?: string;
 }
 
