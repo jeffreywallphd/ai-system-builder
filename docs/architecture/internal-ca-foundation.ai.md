@@ -12,6 +12,7 @@
 - Adds CA status/health introspection query seams for internal/admin consumers (Story 6.1.6).
 - Adds certificate subject profiles and pre-issuance policy enforcement seams (Story 6.2.1).
 - Adds concrete CA issuance signing + protected issued-material persistence seams (Story 6.2.2).
+- Adds node-trust-backed approved-node eligibility integration for certificate issuance (Story 6.2.3).
 
 ## Main artifacts to cite
 
@@ -26,10 +27,12 @@
 - `src/application/security/ports/ICertificateAuthorityBootstrapConfigurationProvider.ts`
 - `src/application/security/ports/ICertificateAuthorityBootstrapSecretService.ts`
 - `src/application/security/ports/ICertificateAuthorityRootMaterialStorage.ts`
+- `src/application/security/ports/INodeCertificateEligibilityPort.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
 - `src/application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase.ts`
 - `src/application/security/use-cases/IssueCertificateForSubjectUseCase.ts`
+- `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
 - `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
@@ -39,6 +42,7 @@
 - `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
 - `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
+- `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
 - `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
@@ -146,6 +150,17 @@ Structured diagnostics emitted by the startup use case are designed for future o
   - persists trust-material metadata references aligned to issued material refs
   - emits redacted issuance audit events (`started`, `succeeded`, `failed`)
   - attempts best-effort compensating certificate revocation when post-signing persistence fails
+
+## Story 6.2.3 node approval integration for issuance eligibility
+
+- `IssueCertificateForSubjectUseCase` now depends on `INodeCertificateEligibilityPort` for `approved-node` profile checks instead of directly querying node persistence.
+- `ResolveApprovedNodeCertificateEligibilityUseCase` provides the node-trust integration seam by checking:
+  - node approval status and trust state eligibility,
+  - revocation state/timestamps,
+  - enrollment linkage presence and enrollment approval state,
+  - capability-profile validity and enrollment-to-node capability-profile consistency.
+- Approved-node issuance now fails closed when node trust metadata is missing, malformed, revoked, unapproved, or enrollment-incoherent.
+- Issued certificate subject linkage remains durable through `subjectReference.kind='node'` + `subjectReference.referenceId=<nodeId>` with eligibility derived from node-trust records.
 
 ## Coverage in this slice
 

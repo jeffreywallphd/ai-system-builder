@@ -4,12 +4,6 @@ import {
   CertificateSubjectReferenceKinds,
   CertificateUsageKinds,
 } from "../../../domain/security/CertificateAuthorityDomain";
-import {
-  NodeApprovalStatuses,
-  NodeRevocationStates,
-  NodeTrustStates,
-  NodeTypes,
-} from "../../../domain/nodes/NodeTrustDomain";
 import type {
   CertificateAuthorityPersistenceMutationResult,
   CertificateAuthorityRootLookupQuery,
@@ -27,16 +21,10 @@ import type {
   UpdateCertificateAuthorityStatusPersistenceRecordInput,
 } from "../../../shared/dto/security/CertificateAuthorityDtos";
 import type {
-  NodeIdentityPersistenceLookupQuery,
-  NodeIdentityPersistenceRecord,
-  NodeTrustPersistenceMutationResult,
-  RecordNodeLastSeenPersistenceRecordInput,
-  RegisterNodeIdentityPersistenceRecordInput,
-  RevokeNodeIdentityPersistenceRecordInput,
-  UpdateNodeApprovalPersistenceRecordInput,
-  UpdateNodeCapabilityProfilePersistenceRecordInput,
-  UpdateNodeCertificateReferencePersistenceRecordInput,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+  ApprovedNodeCertificateEligibilityDecision,
+  ApprovedNodeCertificateEligibilityInput,
+  INodeCertificateEligibilityPort,
+} from "../ports/INodeCertificateEligibilityPort";
 import type {
   IssueCertificateMaterialInput,
   IssueCertificateMaterialResult,
@@ -49,7 +37,6 @@ import type { ICertificateAuthorityRootPersistenceRepository } from "../ports/IC
 import type { ICertificateAuthorityRootMaterialStorage } from "../ports/ICertificateAuthorityRootMaterialStorage";
 import type { IIssuedCertificatePersistenceRepository } from "../ports/IIssuedCertificatePersistenceRepository";
 import type { ITrustMaterialReferencePersistenceRepository } from "../ports/ITrustMaterialReferencePersistenceRepository";
-import type { INodeTrustIdentityPersistenceRepository } from "../../nodes/ports/INodeTrustIdentityPersistenceRepository";
 import {
   CertificateIssuancePolicyViolationError,
   IssueCertificateForSubjectUseCase,
@@ -172,56 +159,23 @@ class InMemoryIssuedCertificateRepository implements IIssuedCertificatePersisten
   }
 }
 
-class InMemoryNodeRepository implements INodeTrustIdentityPersistenceRepository {
-  public readonly nodesById = new Map<string, NodeIdentityPersistenceRecord>();
+class StubNodeEligibilityPort implements INodeCertificateEligibilityPort {
+  public readonly decisionsByNodeId = new Map<string, ApprovedNodeCertificateEligibilityDecision>();
 
-  async findNodeById(nodeId: string): Promise<NodeIdentityPersistenceRecord | undefined> {
-    return this.nodesById.get(nodeId);
-  }
+  public readonly calls: ApprovedNodeCertificateEligibilityInput[] = [];
 
-  async listNodes(_query: NodeIdentityPersistenceLookupQuery): Promise<ReadonlyArray<NodeIdentityPersistenceRecord>> {
-    return [...this.nodesById.values()];
-  }
-
-  async registerNode(
-    input: RegisterNodeIdentityPersistenceRecordInput,
-  ): Promise<NodeTrustPersistenceMutationResult<NodeIdentityPersistenceRecord>> {
-    this.nodesById.set(input.record.nodeId, input.record);
-    return {
-      record: input.record,
-      changed: true,
-      wasReplay: false,
-    };
-  }
-
-  async updateNodeApproval(
-    _input: UpdateNodeApprovalPersistenceRecordInput,
-  ): Promise<NodeTrustPersistenceMutationResult<NodeIdentityPersistenceRecord>> {
-    throw new Error("not implemented in test");
-  }
-
-  async updateNodeCertificateReference(
-    _input: UpdateNodeCertificateReferencePersistenceRecordInput,
-  ): Promise<NodeTrustPersistenceMutationResult<NodeIdentityPersistenceRecord>> {
-    throw new Error("not implemented in test");
-  }
-
-  async updateNodeCapabilityProfile(
-    _input: UpdateNodeCapabilityProfilePersistenceRecordInput,
-  ): Promise<NodeTrustPersistenceMutationResult<NodeIdentityPersistenceRecord>> {
-    throw new Error("not implemented in test");
-  }
-
-  async revokeNode(
-    _input: RevokeNodeIdentityPersistenceRecordInput,
-  ): Promise<NodeTrustPersistenceMutationResult<NodeIdentityPersistenceRecord>> {
-    throw new Error("not implemented in test");
-  }
-
-  async recordNodeLastSeen(
-    _input: RecordNodeLastSeenPersistenceRecordInput,
-  ): Promise<NodeTrustPersistenceMutationResult<NodeIdentityPersistenceRecord>> {
-    throw new Error("not implemented in test");
+  async resolveApprovedNodeCertificateEligibility(
+    input: ApprovedNodeCertificateEligibilityInput,
+  ): Promise<ApprovedNodeCertificateEligibilityDecision> {
+    this.calls.push(input);
+    const decision = this.decisionsByNodeId.get(input.nodeId);
+    if (!decision) {
+      return Object.freeze({
+        eligible: false,
+        violations: Object.freeze([`Node '${input.nodeId}' does not exist and cannot receive an issued certificate.`]),
+      });
+    }
+    return decision;
   }
 }
 
@@ -355,16 +309,10 @@ class StubIssuerPort {
 }
 
 describe("IssueCertificateForSubjectUseCase", () => {
-  it("prevents node issuance for unapproved nodes before issuer invocation", async () => {
+  it("requires node eligibility integration for approved-node issuance", async () => {
     const authorities = new InMemoryCertificateAuthorityRepository();
     authorities.authority = createAuthority();
     const issuedCertificates = new InMemoryIssuedCertificateRepository();
-    const nodeRepository = new InMemoryNodeRepository();
-    nodeRepository.nodesById.set("node:compute:1", createNode({
-      nodeId: "node:compute:1",
-      approvalStatus: NodeApprovalStatuses.pending,
-      trustState: NodeTrustStates.pendingApproval,
-    }));
     const issuer = new StubIssuerPort();
     const trustMaterials = new InMemoryTrustMaterialRepository();
     const certificateMaterialStorage = new StubCertificateMaterialStorage();
@@ -375,7 +323,34 @@ describe("IssueCertificateForSubjectUseCase", () => {
       trustMaterialRepository: trustMaterials,
       certificateMaterialStorage,
       issuer,
-      nodeRepository,
+    });
+
+    await expect(useCase.execute(createNodeIssuanceRequest())).rejects.toThrow(
+      "Node certificate eligibility port is required for approved-node certificate issuance.",
+    );
+    expect(issuer.issueCalls).toBe(0);
+  });
+
+  it("prevents node issuance for unapproved nodes before issuer invocation", async () => {
+    const authorities = new InMemoryCertificateAuthorityRepository();
+    authorities.authority = createAuthority();
+    const issuedCertificates = new InMemoryIssuedCertificateRepository();
+    const nodeEligibilityPort = new StubNodeEligibilityPort();
+    nodeEligibilityPort.decisionsByNodeId.set("node:compute:1", {
+      eligible: false,
+      violations: Object.freeze(["Node 'node:compute:1' must be approved before certificate issuance."]),
+    });
+    const issuer = new StubIssuerPort();
+    const trustMaterials = new InMemoryTrustMaterialRepository();
+    const certificateMaterialStorage = new StubCertificateMaterialStorage();
+
+    const useCase = new IssueCertificateForSubjectUseCase({
+      certificateAuthorityRepository: authorities,
+      issuedCertificateRepository: issuedCertificates,
+      trustMaterialRepository: trustMaterials,
+      certificateMaterialStorage,
+      issuer,
+      nodeCertificateEligibilityPort: nodeEligibilityPort,
     });
 
     await expect(useCase.execute(createNodeIssuanceRequest())).rejects.toBeInstanceOf(CertificateIssuancePolicyViolationError);
@@ -386,14 +361,11 @@ describe("IssueCertificateForSubjectUseCase", () => {
     const authorities = new InMemoryCertificateAuthorityRepository();
     authorities.authority = createAuthority();
     const issuedCertificates = new InMemoryIssuedCertificateRepository();
-    const nodeRepository = new InMemoryNodeRepository();
-    nodeRepository.nodesById.set("node:compute:1", createNode({
-      nodeId: "node:compute:1",
-      approvalStatus: NodeApprovalStatuses.approved,
-      trustState: NodeTrustStates.revoked,
-      revocationState: NodeRevocationStates.revoked,
-      revokedAt: "2026-04-04T11:00:00.000Z",
-    }));
+    const nodeEligibilityPort = new StubNodeEligibilityPort();
+    nodeEligibilityPort.decisionsByNodeId.set("node:compute:1", {
+      eligible: false,
+      violations: Object.freeze(["Node 'node:compute:1' is revoked and cannot receive a certificate."]),
+    });
     const issuer = new StubIssuerPort();
     const trustMaterials = new InMemoryTrustMaterialRepository();
     const certificateMaterialStorage = new StubCertificateMaterialStorage();
@@ -404,7 +376,7 @@ describe("IssueCertificateForSubjectUseCase", () => {
       trustMaterialRepository: trustMaterials,
       certificateMaterialStorage,
       issuer,
-      nodeRepository,
+      nodeCertificateEligibilityPort: nodeEligibilityPort,
     });
 
     await expect(useCase.execute(createNodeIssuanceRequest())).rejects.toBeInstanceOf(CertificateIssuancePolicyViolationError);
@@ -415,12 +387,18 @@ describe("IssueCertificateForSubjectUseCase", () => {
     const authorities = new InMemoryCertificateAuthorityRepository();
     authorities.authority = createAuthority();
     const issuedCertificates = new InMemoryIssuedCertificateRepository();
-    const nodeRepository = new InMemoryNodeRepository();
-    nodeRepository.nodesById.set("node:compute:1", createNode({
-      nodeId: "node:compute:1",
-      approvalStatus: NodeApprovalStatuses.approved,
-      trustState: NodeTrustStates.pendingApproval,
-    }));
+    const nodeEligibilityPort = new StubNodeEligibilityPort();
+    nodeEligibilityPort.decisionsByNodeId.set("node:compute:1", {
+      eligible: true,
+      metadata: Object.freeze({
+        nodeId: "node:compute:1",
+        enrollmentRequestId: "enroll:node:compute:1:v1",
+        capabilityProfile: Object.freeze({
+          enabledCapabilities: Object.freeze(["api", "executor"]),
+          supportsRemoteScheduling: true,
+        }),
+      }),
+    });
     const issuer = new StubIssuerPort();
     const trustMaterials = new InMemoryTrustMaterialRepository();
     const certificateMaterialStorage = new StubCertificateMaterialStorage();
@@ -431,7 +409,7 @@ describe("IssueCertificateForSubjectUseCase", () => {
       trustMaterialRepository: trustMaterials,
       certificateMaterialStorage,
       issuer,
-      nodeRepository,
+      nodeCertificateEligibilityPort: nodeEligibilityPort,
     });
 
     const result = await useCase.execute(createNodeIssuanceRequest());
@@ -440,6 +418,7 @@ describe("IssueCertificateForSubjectUseCase", () => {
     expect(issuer.issueCalls).toBe(1);
     expect(issuedCertificates.records).toHaveLength(1);
     expect(issuedCertificates.records[0]?.subjectReference.referenceId).toBe("node:compute:1");
+    expect(nodeEligibilityPort.calls).toHaveLength(1);
   });
 
   it("keeps authoritative-server and internal-service issuance paths separated", async () => {
@@ -480,12 +459,18 @@ describe("IssueCertificateForSubjectUseCase", () => {
     const authorities = new InMemoryCertificateAuthorityRepository();
     authorities.authority = createAuthority();
     const issuedCertificates = new InMemoryIssuedCertificateRepository();
-    const nodeRepository = new InMemoryNodeRepository();
-    nodeRepository.nodesById.set("node:compute:1", createNode({
-      nodeId: "node:compute:1",
-      approvalStatus: NodeApprovalStatuses.approved,
-      trustState: NodeTrustStates.pendingApproval,
-    }));
+    const nodeEligibilityPort = new StubNodeEligibilityPort();
+    nodeEligibilityPort.decisionsByNodeId.set("node:compute:1", {
+      eligible: true,
+      metadata: Object.freeze({
+        nodeId: "node:compute:1",
+        enrollmentRequestId: "enroll:node:compute:1:v1",
+        capabilityProfile: Object.freeze({
+          enabledCapabilities: Object.freeze(["api", "executor"]),
+          supportsRemoteScheduling: true,
+        }),
+      }),
+    });
     const issuer = new StubIssuerPort();
     const trustMaterials = new InMemoryTrustMaterialRepository();
     const certificateMaterialStorage = new StubCertificateMaterialStorage();
@@ -496,7 +481,7 @@ describe("IssueCertificateForSubjectUseCase", () => {
       trustMaterialRepository: trustMaterials,
       certificateMaterialStorage,
       issuer,
-      nodeRepository,
+      nodeCertificateEligibilityPort: nodeEligibilityPort,
     });
 
     await useCase.execute(createNodeIssuanceRequest());
@@ -511,12 +496,18 @@ describe("IssueCertificateForSubjectUseCase", () => {
     const authorities = new InMemoryCertificateAuthorityRepository();
     authorities.authority = createAuthority();
     const issuedCertificates = new InMemoryIssuedCertificateRepository();
-    const nodeRepository = new InMemoryNodeRepository();
-    nodeRepository.nodesById.set("node:compute:1", createNode({
-      nodeId: "node:compute:1",
-      approvalStatus: NodeApprovalStatuses.approved,
-      trustState: NodeTrustStates.pendingApproval,
-    }));
+    const nodeEligibilityPort = new StubNodeEligibilityPort();
+    nodeEligibilityPort.decisionsByNodeId.set("node:compute:1", {
+      eligible: true,
+      metadata: Object.freeze({
+        nodeId: "node:compute:1",
+        enrollmentRequestId: "enroll:node:compute:1:v1",
+        capabilityProfile: Object.freeze({
+          enabledCapabilities: Object.freeze(["api", "executor"]),
+          supportsRemoteScheduling: true,
+        }),
+      }),
+    });
     const issuer = new StubIssuerPort();
     const trustMaterials = new InMemoryTrustMaterialRepository();
     trustMaterials.throwOnSave = true;
@@ -528,7 +519,7 @@ describe("IssueCertificateForSubjectUseCase", () => {
       trustMaterialRepository: trustMaterials,
       certificateMaterialStorage,
       issuer,
-      nodeRepository,
+      nodeCertificateEligibilityPort: nodeEligibilityPort,
     });
 
     await expect(useCase.execute(createNodeIssuanceRequest())).rejects.toThrow("trust-material-save-failed");
@@ -566,39 +557,6 @@ function createAuthority(): CertificateAuthorityRootPersistenceRecord {
     createdAt: "2026-01-01T00:00:00.000Z",
     createdBy: "user:admin",
     lastModifiedAt: "2026-01-01T00:00:00.000Z",
-    lastModifiedBy: "user:admin",
-    revision: 1,
-  });
-}
-
-function createNode(input: {
-  readonly nodeId: string;
-  readonly approvalStatus: NodeIdentityPersistenceRecord["approvalStatus"];
-  readonly trustState: NodeIdentityPersistenceRecord["trustState"];
-  readonly revocationState?: NodeIdentityPersistenceRecord["revocation"]["state"];
-  readonly revokedAt?: string;
-}): NodeIdentityPersistenceRecord {
-  return Object.freeze({
-    nodeId: input.nodeId,
-    nodeType: NodeTypes.compute,
-    displayName: input.nodeId,
-    capabilityProfile: {
-      enabledCapabilities: ["api", "executor"],
-      supportsRemoteScheduling: true,
-    },
-    approvalStatus: input.approvalStatus,
-    trustState: input.trustState,
-    deploymentTags: ["cluster:a"],
-    revocation: {
-      state: input.revocationState ?? NodeRevocationStates.active,
-      revokedAt: input.revokedAt,
-    },
-    enrolledAt: "2026-04-01T00:00:00.000Z",
-    approvedAt: input.approvalStatus === NodeApprovalStatuses.approved ? "2026-04-02T00:00:00.000Z" : undefined,
-    revokedAt: input.revokedAt,
-    createdAt: "2026-04-01T00:00:00.000Z",
-    createdBy: "user:admin",
-    lastModifiedAt: "2026-04-02T00:00:00.000Z",
     lastModifiedBy: "user:admin",
     revision: 1,
   });

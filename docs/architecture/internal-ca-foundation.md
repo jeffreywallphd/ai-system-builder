@@ -1,6 +1,6 @@
 # Internal CA Foundation
 
-This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, Story 6.2.1, and Story 6.2.2 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, certificate subject-profile issuance policy enforcement, and concrete issuance signing/material persistence execution.
+This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.1.6, Story 6.2.1, Story 6.2.2, and Story 6.2.3 (Feature 6 / Epic 6.1 and Epic 6.2): the internal certificate-authority domain language, application service boundaries, secure startup bootstrap validation, protected storage/loading for CA root materials, first-time CA initialization orchestration, CA status/introspection query services, certificate subject-profile issuance policy enforcement, concrete issuance signing/material persistence execution, and node-trust-backed approved-node issuance eligibility.
 
 ## Canonical artifacts
 
@@ -16,16 +16,19 @@ This note documents Story 6.1.1, Story 6.1.3, Story 6.1.4, Story 6.1.5, Story 6.
 - `src/application/security/ports/ICertificateAuthorityBootstrapConfigurationProvider.ts`
 - `src/application/security/ports/ICertificateAuthorityBootstrapSecretService.ts`
 - `src/application/security/ports/ICertificateAuthorityRootMaterialStorage.ts`
+- `src/application/security/ports/INodeCertificateEligibilityPort.ts`
 - `src/application/security/ports/CertificateAuthorityPorts.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
 - `src/application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase.ts`
 - `src/application/security/use-cases/IssueCertificateForSubjectUseCase.ts`
+- `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
 - `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
 - `src/application/security/tests/ResolveCertificateAuthorityStartupStateUseCase.test.ts`
 - `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
 - `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
+- `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
 - `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
@@ -71,6 +74,19 @@ Story 6.2.2 adds the concrete end-to-end certificate issuance execution path:
 - `IssueCertificateForSubjectUseCase` now persists protected issued certificate/chain artifacts plus trust-material metadata references in the issuance path before final issued-certificate metadata write.
 - issuance emits redacted structured audit events (`certificate-issuance-started|succeeded|failed`) without exposing secret refs or plaintext material.
 - issuance failure handling now includes best-effort compensating revocation when post-signing persistence fails, so failure is bounded and explicit.
+
+## Story 6.2.3 node approval integration for issuance eligibility
+
+Story 6.2.3 aligns certificate issuance trust with node-trust lifecycle evidence:
+
+- `IssueCertificateForSubjectUseCase` now gates `approved-node` issuance through `INodeCertificateEligibilityPort` instead of reading node persistence directly.
+- `ResolveApprovedNodeCertificateEligibilityUseCase` implements the node-trust integration seam and validates:
+  - node approval/trust-state eligibility,
+  - revocation state and revocation timestamps,
+  - enrollment linkage and approved enrollment status,
+  - capability-profile integrity and enrollment-to-node capability-profile coherence.
+- `approved-node` issuance now fails closed when node trust data is missing, malformed, revoked, unapproved, or enrollment-incoherent.
+- issued certificate subject linkage remains durable through persisted `subjectReference` (`kind='node'`, `referenceId=<nodeId>`), with linkage eligibility derived from node-trust records.
 
 ## Story 6.1.3 startup bootstrap behavior
 

@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import type { NodeIdentityPersistenceRecord } from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
 import {
   normalizeCertificateAuthorityMutationOperationKey,
   type IssuedCertificatePersistenceRecord,
@@ -19,8 +18,10 @@ import {
   evaluateCertificateIssuancePolicy,
   type CertificateSubjectProfileKind,
 } from "../../../domain/security/CertificateIssuancePolicyDomain";
-import { NodeApprovalStatuses, NodeRevocationStates, NodeTrustStates } from "../../../domain/nodes/NodeTrustDomain";
-import type { INodeTrustIdentityPersistenceRepository } from "../../nodes/ports/INodeTrustIdentityPersistenceRepository";
+import type {
+  ApprovedNodeCertificateEligibilityMetadata,
+  INodeCertificateEligibilityPort,
+} from "../ports/INodeCertificateEligibilityPort";
 import type { ICertificateAuthorityRootPersistenceRepository } from "../ports/ICertificateAuthorityRootPersistenceRepository";
 import type { ICertificateAuthorityRootMaterialStorage } from "../ports/ICertificateAuthorityRootMaterialStorage";
 import type { ICertificateAuthorityIssuerPort } from "../ports/ICertificateAuthorityIssuerPort";
@@ -77,7 +78,7 @@ export interface IssueCertificateForSubjectUseCaseDependencies {
   readonly trustMaterialRepository: ITrustMaterialReferencePersistenceRepository;
   readonly certificateMaterialStorage: ICertificateAuthorityRootMaterialStorage;
   readonly issuer: ICertificateAuthorityIssuerPort;
-  readonly nodeRepository?: INodeTrustIdentityPersistenceRepository;
+  readonly nodeCertificateEligibilityPort?: INodeCertificateEligibilityPort;
   readonly auditHook?: (event: CertificateIssuanceAuditEvent) => Promise<void> | void;
 }
 
@@ -166,14 +167,21 @@ export class IssueCertificateForSubjectUseCase {
         throw new CertificateIssuancePolicyViolationError(evaluation.violations);
       }
 
+      let nodeEligibilityMetadata: ApprovedNodeCertificateEligibilityMetadata | undefined;
       if (normalized.profileKind === CertificateSubjectProfileKinds.approvedNode) {
-        await this.assertEligibleNodeSubject(normalized.subjectReference.referenceId);
+        nodeEligibilityMetadata = await this.assertEligibleNodeSubject(normalized.subjectReference.referenceId);
       }
+      const resolvedSubjectReference = nodeEligibilityMetadata
+        ? Object.freeze({
+          ...normalized.subjectReference,
+          referenceId: nodeEligibilityMetadata.nodeId,
+        })
+        : normalized.subjectReference;
 
       const issuedMaterial = await this.dependencies.issuer.issueCertificateMaterial({
         certificateAuthorityId: certificateAuthority.certificateAuthorityId,
         subject: normalized.subject,
-        subjectReference: normalized.subjectReference,
+        subjectReference: resolvedSubjectReference,
         usages: normalized.usages,
         validityDays: normalized.validityDays,
         actorUserIdentityId: normalized.actorUserIdentityId,
@@ -191,7 +199,7 @@ export class IssueCertificateForSubjectUseCase {
         certificateAuthorityId: certificateAuthority.certificateAuthorityId,
         serialNumber: createCertificateSerialNumber(issuedMaterial.serialNumber),
         subject: normalized.subject,
-        subjectReference: normalized.subjectReference,
+        subjectReference: resolvedSubjectReference,
         usages: normalized.usages,
         validity: createCertificateValidityWindow({
           notBefore: issuedMaterial.notBefore,
@@ -281,22 +289,20 @@ export class IssueCertificateForSubjectUseCase {
     }
   }
 
-  private async assertEligibleNodeSubject(nodeId: string): Promise<void> {
-    if (!this.dependencies.nodeRepository) {
-      throw new Error("Node repository is required for approved-node certificate issuance.");
+  private async assertEligibleNodeSubject(nodeId: string): Promise<ApprovedNodeCertificateEligibilityMetadata> {
+    if (!this.dependencies.nodeCertificateEligibilityPort) {
+      throw new Error("Node certificate eligibility port is required for approved-node certificate issuance.");
     }
 
-    const node = await this.dependencies.nodeRepository.findNodeById(nodeId);
-    if (!node) {
-      throw new CertificateIssuancePolicyViolationError([
-        `Node '${nodeId}' does not exist and cannot receive an issued certificate.`,
-      ]);
+    const decision = await this.dependencies.nodeCertificateEligibilityPort.resolveApprovedNodeCertificateEligibility({
+      nodeId,
+    });
+
+    if (!decision.eligible) {
+      throw new CertificateIssuancePolicyViolationError(decision.violations);
     }
 
-    const violations = evaluateNodeTrustPrerequisites(node);
-    if (violations.length > 0) {
-      throw new CertificateIssuancePolicyViolationError(violations);
-    }
+    return decision.metadata;
   }
 
   private async persistIssuedMaterials(
@@ -395,31 +401,6 @@ export class IssueCertificateForSubjectUseCase {
       // Audit failures are intentionally non-fatal.
     }
   }
-}
-
-function evaluateNodeTrustPrerequisites(node: NodeIdentityPersistenceRecord): ReadonlyArray<string> {
-  const violations: string[] = [];
-  if (node.approvalStatus !== NodeApprovalStatuses.approved) {
-    violations.push(`Node '${node.nodeId}' must be approved before certificate issuance.`);
-  }
-
-  if (
-    node.trustState !== NodeTrustStates.pendingApproval
-    && node.trustState !== NodeTrustStates.trusted
-  ) {
-    violations.push(`Node '${node.nodeId}' must be in pending-approval or trusted state before certificate issuance.`);
-  }
-
-  if (
-    node.trustState === NodeTrustStates.revoked
-    || node.revocation.state === NodeRevocationStates.revoked
-    || Boolean(node.revokedAt)
-    || Boolean(node.revocation.revokedAt)
-  ) {
-    violations.push(`Node '${node.nodeId}' is revoked and cannot receive a certificate.`);
-  }
-
-  return Object.freeze(violations);
 }
 
 function normalizeInput(input: IssueCertificateForSubjectUseCaseInput): {

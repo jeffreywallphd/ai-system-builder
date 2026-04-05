@@ -11,3 +11,4 @@ export * from "./ListTrustedNodeInventoryUseCase";
 export * from "./NodeInventoryReadModels";
 export * from "./ListNodeInventoryUseCase";
 export * from "./GetNodeInventoryDetailUseCase";
+export * from "./ResolveApprovedNodeCertificateEligibilityUseCase";
