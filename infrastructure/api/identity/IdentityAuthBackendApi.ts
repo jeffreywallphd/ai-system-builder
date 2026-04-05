@@ -52,6 +52,16 @@ import {
 } from "./sdk/PublicIdentityAuthApiContract";
 import { IdentityAuthObservability, type IdentityAuthObservabilityOptions } from "./IdentityAuthObservability";
 import { IdentityAuthenticatedSessionService } from "../../../application/identity/services/IdentityAuthenticatedSessionService";
+import {
+  serializeGetIdentityAdminAccountStatusResponse,
+  serializeListIdentityAdminAccountsResponse,
+  serializeLoginLocalIdentityResponse,
+  serializeLogoutAuthenticatedSessionResponse,
+  serializeRegisterLocalIdentityResponse,
+  serializeResolveAuthenticatedSessionResponse,
+  serializeRevokeIdentitySessionResponse,
+  serializeSetIdentityAdminAccountStatusResponse,
+} from "./IdentityAuthResponseSerializers";
 
 interface IdentityAuthBackendApiDependencies {
   readonly registerLocalAccountUseCase: RegisterLocalAccountUseCase;
@@ -101,7 +111,7 @@ export class IdentityAuthBackendApi {
 
     const response = Object.freeze({
       ok: true,
-      data: Object.freeze({
+      data: serializeRegisterLocalIdentityResponse({
         userIdentityId: result.value.userIdentityId,
         providerId: result.value.providerId,
         providerSubject: result.value.providerSubject,
@@ -165,25 +175,7 @@ export class IdentityAuthBackendApi {
 
     const response = Object.freeze({
       ok: true,
-      data: Object.freeze({
-        userIdentityId: result.value.userIdentityId,
-        username: result.value.username,
-        email: result.value.email,
-        displayName: result.value.displayName,
-        providerId: result.value.providerId,
-        providerSubject: result.value.providerSubject,
-        authPath: result.value.authPath,
-        authenticatedAt: result.value.authenticatedAt,
-        sessionId: issueSessionResult.value.session.id,
-        sessionToken: issueSessionResult.value.token,
-        sessionTokenType: issueSessionResult.value.tokenType,
-        sessionIssuedAt: issueSessionResult.value.session.issuedAt,
-        sessionExpiresAt: issueSessionResult.value.session.expiresAt,
-        sessionAccessChannel: issueSessionResult.value.session.client?.accessChannel,
-        sessionDeviceId: issueSessionResult.value.session.client?.deviceId,
-        sessionTrustedDeviceBindingId: issueSessionResult.value.session.client?.trustedDeviceBindingId,
-        sessionTrustMarker: issueSessionResult.value.session.client?.trustMarker,
-      }),
+      data: serializeLoginLocalIdentityResponse(result.value, issueSessionResult.value),
     });
 
     await this.observability.recordApiOutcome({
@@ -222,14 +214,14 @@ export class IdentityAuthBackendApi {
 
     return Object.freeze({
       ok: true,
-      data: Object.freeze({
-        principal: Object.freeze({
+      data: serializeResolveAuthenticatedSessionResponse({
+        principal: {
           userIdentityId: principal.id,
           username: principal.username,
           email: principal.email,
           displayName: principal.displayName,
-        }),
-        session: Object.freeze({
+        },
+        session: {
           sessionId: resolved.value.session.id,
           providerId: resolved.value.session.providerId,
           providerSubject: resolved.value.session.providerSubject,
@@ -239,7 +231,7 @@ export class IdentityAuthBackendApi {
           trustMarker: resolved.value.trustMarker,
           issuedAt: resolved.value.session.issuedAt,
           expiresAt: resolved.value.session.expiresAt,
-        }),
+        },
       }),
     });
   }
@@ -266,12 +258,7 @@ export class IdentityAuthBackendApi {
 
     const response = Object.freeze({
       ok: true,
-      data: Object.freeze({
-        sessionId: result.value.sessionId,
-        userIdentityId: result.value.userIdentityId,
-        revokedAt: result.value.revokedAt,
-        revocationReason: result.value.revocationReason,
-      }),
+      data: serializeLogoutAuthenticatedSessionResponse(result.value),
     });
     await this.observability.recordApiOutcome({
       flow: "local-logout",
@@ -305,12 +292,7 @@ export class IdentityAuthBackendApi {
 
     const response = Object.freeze({
       ok: true,
-      data: Object.freeze({
-        sessionId: result.value.sessionId,
-        userIdentityId: result.value.userIdentityId,
-        revokedAt: result.value.revokedAt,
-        revocationReason: result.value.revocationReason,
-      }),
+      data: serializeRevokeIdentitySessionResponse(result.value),
     });
     await this.observability.recordApiOutcome({
       flow: "session-revoke",
@@ -337,7 +319,7 @@ export class IdentityAuthBackendApi {
 
     const response = Object.freeze({
       ok: true,
-      data: Object.freeze({
+      data: serializeListIdentityAdminAccountsResponse({
         accounts: result.value.accounts,
       }),
     });
@@ -366,7 +348,7 @@ export class IdentityAuthBackendApi {
 
     const response = Object.freeze({
       ok: true,
-      data: Object.freeze({
+      data: serializeGetIdentityAdminAccountStatusResponse({
         account: result.value.account,
       }),
     });
@@ -395,13 +377,7 @@ export class IdentityAuthBackendApi {
 
     const response = Object.freeze({
       ok: true,
-      data: Object.freeze({
-        userIdentityId: result.value.userIdentityId,
-        status: result.value.status,
-        changed: result.value.changed,
-        affectedSessionIds: result.value.affectedSessionIds,
-        updatedAt: result.value.updatedAt,
-      }),
+      data: serializeSetIdentityAdminAccountStatusResponse(result.value),
     });
     await this.observability.recordApiOutcome({
       flow: "admin-account-status-set",

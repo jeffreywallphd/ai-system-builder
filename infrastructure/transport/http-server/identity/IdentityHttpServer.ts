@@ -18,7 +18,7 @@ import {
   type SetIdentityAdminAccountStatusApiRequest,
   type SetIdentityAdminAccountStatusApiResponse,
 } from "../../../api/identity/sdk/PublicIdentityAuthApiContract";
-import { redactSensitiveAuthPayload } from "../../../api/identity/IdentityAuthObservability";
+import { redactSensitiveAuthPayload, redactSensitiveText } from "../../../api/identity/IdentityAuthRedaction";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 
@@ -693,7 +693,7 @@ function logResponse<TRequest extends Record<string, unknown>>(
 
 function normalizeError(error: unknown): string {
   if (error instanceof Error) {
-    return error.message;
+    return redactSensitiveText(error.message);
   }
   return "Unknown error";
 }

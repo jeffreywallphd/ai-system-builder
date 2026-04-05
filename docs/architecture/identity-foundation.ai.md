@@ -124,6 +124,26 @@
   - `IdentityAuthenticatedSessionService.issueAuthenticatedSession(...)`: `identity.session.created`
   - `LogoutIdentitySessionUseCase`: `identity.session.logged-out`
 
+## Sensitive-data redaction hardening (story 1.4.5)
+
+Identity data-handling now uses centralized redaction and serializer seams to prevent accidental leakage of credential material, bearer/session secrets, and recovery-sensitive identity metadata.
+
+Primary hardening seams:
+
+- `infrastructure/api/identity/IdentityAuthRedaction.ts`
+  - recursive object/array redaction by sensitive-key policy
+  - freeform string redaction for bearer/session token patterns in error/log text
+- `infrastructure/api/identity/IdentityAuthResponseSerializers.ts`
+  - explicit allowlist mapping for identity API response payloads (including admin list/get/status outputs)
+- `ui/shared/identity/IdentityAuthSessionStore.ts`
+  - narrowed persisted session allowlist shape (`IdentityAuthPersistedSession`) for local runtime continuity without persisting non-required sensitive/trust metadata
+
+Operational effect:
+
+- backend observability, audit events, and transport logs all share one redaction posture
+- identity API payloads avoid direct use-case object pass-through
+- UI local storage no longer retains provider-subject/email/trust-marker/trusted-device metadata by default
+
 ## Local registration seam
 
 - `RegisterLocalAccountUseCase` runs full local registration orchestration in the application layer.

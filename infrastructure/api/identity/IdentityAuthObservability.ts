@@ -1,4 +1,5 @@
 import type { IdentityAuthApiResponse } from "./sdk/PublicIdentityAuthApiContract";
+import { redactSensitiveAuthPayload, redactSensitiveText } from "./IdentityAuthRedaction";
 
 export interface IdentityAuthObservabilityLogEvent {
   readonly event: string;
@@ -61,24 +62,6 @@ interface RecordApiOutcomeInput {
   readonly requestId?: string;
   readonly errorCode?: string;
 }
-
-const SENSITIVE_FIELD_KEYS = new Set([
-  "authorization",
-  "bearertoken",
-  "candidate",
-  "credential",
-  "email",
-  "hashvalue",
-  "password",
-  "pepperversion",
-  "providersubject",
-  "salt",
-  "secret",
-  "token",
-  "trustmarker",
-  "trusteddevicebindingid",
-  "username",
-]);
 
 export class IdentityAuthObservability {
   private readonly logger: IdentityAuthObservabilityLogger;
@@ -165,30 +148,9 @@ function toAuditType(flow: RecordApiOutcomeInput["flow"]): IdentityAuthAuditEven
   }
 }
 
-export function redactSensitiveAuthPayload(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return Object.freeze(value.map((entry) => redactSensitiveAuthPayload(entry)));
-  }
-
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-
-  const output: Record<string, unknown> = {};
-  for (const [key, nestedValue] of Object.entries(value)) {
-    if (SENSITIVE_FIELD_KEYS.has(key.toLowerCase())) {
-      output[key] = "[REDACTED]";
-      continue;
-    }
-    output[key] = redactSensitiveAuthPayload(nestedValue);
-  }
-
-  return Object.freeze(output);
-}
-
 function normalizeError(error: unknown): string {
   if (error instanceof Error) {
-    return error.message;
+    return redactSensitiveText(error.message);
   }
   return "Unknown error";
 }
