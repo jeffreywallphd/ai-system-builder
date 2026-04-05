@@ -9,6 +9,7 @@ Stories 4.2.2-4.2.3 deliver the production policy-evaluation core for Feature 4:
 
 Story 4.2.4 adds optional hot-path caching for authorization persistence reads used repeatedly by policy-evaluation and list screens.
 Story 4.2.5 adds reusable authorization-aware list/search query composition so workspace views only return resources visible to the requesting actor.
+Story 4.2.6 adds audit-friendly authorization event emission for mutation operations and deny-focused decision outcomes.
 
 ## Canonical files
 
@@ -18,7 +19,10 @@ Story 4.2.5 adds reusable authorization-aware list/search query composition so w
 - `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
 - `src/application/authorization/use-cases/EvaluateAuthorizationPolicyUseCase.ts`
 - `src/application/authorization/use-cases/AuthorizedResourceQueryService.ts`
+- `src/application/authorization/use-cases/AuthorizationPolicyMutationService.ts`
+- `src/application/authorization/use-cases/AuthorizationAuditRedaction.ts`
 - `src/application/authorization/tests/AuthorizedResourceQueryService.test.ts`
+- `src/application/authorization/tests/AuthorizationPolicyMutationService.test.ts`
 - `src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter.ts`
 - `src/infrastructure/persistence/authorization/tests/SqliteAuthorizationPersistenceAdapter.test.ts`
 
@@ -119,3 +123,16 @@ Example integration pattern:
 - Keep context loading in repository-backed use cases (`EvaluateAuthorizationPolicyUseCase`) and keep resolution logic inside the resolver service.
 - Preserve precedence ordering unless a versioned authorization policy story explicitly changes it.
 - Add new role keys via role catalog contracts before expecting role-baseline grants in this resolver.
+
+## Audit event integration (Story 4.2.6)
+
+- Decision event emission remains best-effort and non-blocking via `IAuthorizationPolicyEventRecorder`.
+- `EvaluateAuthorizationPolicyUseCase` now emits compact, audit-safe decision summaries:
+  - `authorization-policy-evaluated` for all completed evaluations.
+  - `authorization-policy-denied` for deny outcomes.
+- Full request/resolved-context snapshots are intentionally not emitted in events to avoid over-logging sensitive or verbose content.
+- `AuthorizationPolicyMutationService` is the application mutation seam that wraps authorization persistence mutations and emits structured mutation events for:
+  - role assignment upsert/revoke,
+  - sharing grant upsert/revoke,
+  - resource policy upsert/soft-delete.
+- Audit metadata redaction is centralized in `AuthorizationAuditRedaction.ts`, which masks sensitive keys (for example `token`, `password`, `credential`, `apiKey`) and truncates long free-form strings.

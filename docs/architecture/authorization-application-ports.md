@@ -17,10 +17,13 @@ This note documents Story 4.1.5 (Feature 4 / Epic 4.1): application-layer author
 - `src/application/authorization/use-cases/EffectivePermissionResolutionService.ts`
 - `src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator.ts`
 - `src/application/authorization/use-cases/AuthorizedResourceQueryService.ts`
+- `src/application/authorization/use-cases/AuthorizationPolicyMutationService.ts`
+- `src/application/authorization/use-cases/AuthorizationAuditRedaction.ts`
 - `src/application/authorization/tests/AuthorizationPolicyPortsContracts.test.ts`
 - `src/application/authorization/tests/EffectivePermissionResolutionService.test.ts`
 - `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
 - `src/application/authorization/tests/AuthorizedResourceQueryService.test.ts`
+- `src/application/authorization/tests/AuthorizationPolicyMutationService.test.ts`
 
 ## Scope and intent
 
@@ -43,7 +46,7 @@ This note documents Story 4.1.5 (Feature 4 / Epic 4.1): application-layer author
 - `IAuthorizationPolicyDecisionEvaluator`
   - evaluates actor + permission + target (`resource-instance` or `workspace-capability`) and returns a typed allow/deny decision with stable denial reason semantics.
 - `IAuthorizationPolicyEventRecorder`
-  - optional best-effort sink for policy-evaluation events.
+  - optional best-effort sink for audit-safe decision and mutation events.
 - `IAuthorizationResourcePolicyMetadataReadRepository`
   - supports both single-resource metadata lookup and workspace-aware metadata listing for authorization-filtered list/search use cases.
 
@@ -70,6 +73,16 @@ This note documents Story 4.1.5 (Feature 4 / Epic 4.1): application-layer author
 - The service also exposes `resolvePermissions(...)` for batch capability checks in UI and thin-client surfaces, using the same precedence as enforcement decisions.
 - `AuthorizationPolicyDecisionEvaluator` is the concrete `IAuthorizationPolicyDecisionEvaluator` implementation for runtime callers that have actor/action/target references and need centralized decision resolution without ad hoc policy checks.
 - `AuthorizedResourceQueryService` (Story 4.2.5) is the reusable authorization-aware list/search helper that composes workspace metadata listing and per-resource decision evaluation with owner/shared filters.
+
+## Audit-safe event shape (Story 4.2.6)
+
+- `IAuthorizationPolicyEventRecorder` now accepts a union of authorization recorded events:
+  - evaluated decision summary,
+  - denied decision summary,
+  - mutation audit events for role/sharing/visibility-policy writes.
+- Decision events include actor/workspace/resource references, permission, outcome, reason code, and compact counts only.
+- Mutation events include actor/workspace/resource references and mutation semantics (`entityKind`, `mutationKind`, `operationKey`, `changed`, `wasReplay`).
+- Free-form mutation reason/metadata is redacted through `AuthorizationAuditRedaction.ts` before emission.
 
 ## Coverage
 
