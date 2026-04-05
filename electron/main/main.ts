@@ -23,7 +23,10 @@ import {
 } from "../../infrastructure/config/HostSecureTransportConfig";
 import { RendererDeliveryModes } from "../../domain/runtime/AppRuntimeProfile";
 import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
-import type { DesktopBootstrapContext } from "../shared/DesktopContracts";
+import type {
+  DesktopBootstrapContext,
+  DesktopIdentityTransportTrustBootstrap,
+} from "../shared/DesktopContracts";
 import { SqliteAssetSystemRepository } from "../../infrastructure/filesystem/SqliteAssetSystemRepository";
 import { InMemoryAssetLineageGraphProjectionSink } from "../../infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink";
 import { ExplainCanonicalVersionExistenceUseCase, ListCanonicalAssetsUseCase, LoadCanonicalAssetDetailUseCase } from "../../application/assets-system/CanonicalAssetReadUseCases";
@@ -121,6 +124,27 @@ let workflowPersistenceRepository: SqliteWorkflowPersistenceRepository | undefin
 let bootstrapContext: DesktopBootstrapContext | undefined;
 const runtimeWindowByReuseKey = new Map<string, BrowserWindow>();
 
+const DESKTOP_TRUST_STORAGE_KEYS = Object.freeze({
+  trustedDeviceBindingId: "identity.desktop.transport.trusted-device-binding-id",
+  trustMarker: "identity.desktop.transport.trust-marker",
+  materialKind: "identity.desktop.transport.material-kind",
+  pinReference: "identity.desktop.transport.pin-reference",
+  publicKeyFingerprint: "identity.desktop.transport.public-key-fingerprint",
+  issuedAt: "identity.desktop.transport.issued-at",
+  expiresAt: "identity.desktop.transport.expires-at",
+});
+
+const DESKTOP_TRUST_ENV_KEYS = Object.freeze({
+  enforcement: "AI_LOOM_DESKTOP_TRUST_BOOTSTRAP_ENFORCEMENT",
+  trustedDeviceBindingId: "AI_LOOM_DESKTOP_TRUSTED_DEVICE_BINDING_ID",
+  trustMarker: "AI_LOOM_DESKTOP_TRUST_MARKER",
+  materialKind: "AI_LOOM_DESKTOP_TRUST_MATERIAL_KIND",
+  pinReference: "AI_LOOM_DESKTOP_TRUST_PIN_REFERENCE",
+  publicKeyFingerprint: "AI_LOOM_DESKTOP_TRUST_PUBLIC_KEY_FINGERPRINT",
+  issuedAt: "AI_LOOM_DESKTOP_TRUST_ISSUED_AT",
+  expiresAt: "AI_LOOM_DESKTOP_TRUST_EXPIRES_AT",
+});
+
 function createRendererSearch(params: Record<string, string | undefined>): string | undefined {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -160,6 +184,114 @@ function listEntries(rootPath: string, recursive = false): ReadonlyArray<ReturnT
   };
   walk(rootPath);
   return results;
+}
+
+function resolveDesktopIdentityTransportTrustBootstrap(): DesktopIdentityTransportTrustBootstrap | undefined {
+  const enforcement = normalizeTrustBootstrapEnforcement(process.env[DESKTOP_TRUST_ENV_KEYS.enforcement]);
+  const trustedDeviceBindingId = readDesktopTrustValue({
+    storageKey: DESKTOP_TRUST_STORAGE_KEYS.trustedDeviceBindingId,
+    envKey: DESKTOP_TRUST_ENV_KEYS.trustedDeviceBindingId,
+  });
+  const pinReference = readDesktopTrustSecretValue({
+    storageKey: DESKTOP_TRUST_STORAGE_KEYS.pinReference,
+    envKey: DESKTOP_TRUST_ENV_KEYS.pinReference,
+  });
+
+  const trustConfigured = Boolean(trustedDeviceBindingId || pinReference);
+  const effectiveEnforcement = enforcement ?? (trustConfigured ? "required" : "optional");
+  if (!trustConfigured && effectiveEnforcement !== "required") {
+    return undefined;
+  }
+
+  const materialKind = normalizeMaterialKind(
+    readDesktopTrustValue({
+      storageKey: DESKTOP_TRUST_STORAGE_KEYS.materialKind,
+      envKey: DESKTOP_TRUST_ENV_KEYS.materialKind,
+    }),
+  ) ?? "opaque-marker";
+
+  return Object.freeze({
+    enforcement: effectiveEnforcement,
+    registeredDevice: trustedDeviceBindingId
+      ? Object.freeze({
+          trustedDeviceBindingId,
+          trustMarker: readDesktopTrustSecretValue({
+            storageKey: DESKTOP_TRUST_STORAGE_KEYS.trustMarker,
+            envKey: DESKTOP_TRUST_ENV_KEYS.trustMarker,
+          }),
+        })
+      : undefined,
+    pinnedTrustMaterial: pinReference
+      ? Object.freeze({
+          pinReference,
+          materialKind,
+          publicKeyFingerprint: readDesktopTrustValue({
+            storageKey: DESKTOP_TRUST_STORAGE_KEYS.publicKeyFingerprint,
+            envKey: DESKTOP_TRUST_ENV_KEYS.publicKeyFingerprint,
+          }),
+          issuedAt: readDesktopTrustValue({
+            storageKey: DESKTOP_TRUST_STORAGE_KEYS.issuedAt,
+            envKey: DESKTOP_TRUST_ENV_KEYS.issuedAt,
+          }),
+          expiresAt: readDesktopTrustValue({
+            storageKey: DESKTOP_TRUST_STORAGE_KEYS.expiresAt,
+            envKey: DESKTOP_TRUST_ENV_KEYS.expiresAt,
+          }),
+        })
+      : undefined,
+  });
+}
+
+function readDesktopTrustValue(input: {
+  readonly storageKey: string;
+  readonly envKey: string;
+}): string | undefined {
+  const fromStorage = normalizeOptional(storageDatabase?.getItem(input.storageKey) ?? undefined);
+  if (fromStorage) {
+    return fromStorage;
+  }
+  return normalizeOptional(process.env[input.envKey]);
+}
+
+function readDesktopTrustSecretValue(input: {
+  readonly storageKey: string;
+  readonly envKey: string;
+}): string | undefined {
+  const encoded = storageDatabase?.getItem(`secure:${input.storageKey}`);
+  if (encoded) {
+    try {
+      const decrypted = safeStorage.decryptString(Buffer.from(encoded, "base64"));
+      const normalized = normalizeOptional(decrypted);
+      if (normalized) {
+        return normalized;
+      }
+    } catch {
+      // fall through to non-secret and env fallback
+    }
+  }
+  return readDesktopTrustValue(input);
+}
+
+function normalizeMaterialKind(
+  value: string | undefined,
+): "session-signing-key" | "attestation-key" | "opaque-marker" | undefined {
+  if (value === "session-signing-key" || value === "attestation-key" || value === "opaque-marker") {
+    return value;
+  }
+  return undefined;
+}
+
+function normalizeTrustBootstrapEnforcement(value: string | undefined): "required" | "optional" | undefined {
+  const normalized = normalizeOptional(value)?.toLowerCase();
+  if (normalized === "required" || normalized === "optional") {
+    return normalized;
+  }
+  return undefined;
+}
+
+function normalizeOptional(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
 }
 
 function createDesktopAgentRunner(params: {
@@ -368,6 +500,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
       port: 8790,
     },
     pythonRuntime,
+    identityTransportTrust: resolveDesktopIdentityTransportTrustBootstrap(),
   });
 
   ipcMain.on("ai-loom-desktop:get-bootstrap-sync", (event) => {

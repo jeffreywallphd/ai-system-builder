@@ -37,6 +37,7 @@ import type {
   ValidateTrustedDevicePairingApiRequest,
   ValidateTrustedDevicePairingApiResponse,
 } from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+import { DesktopTrustedDeviceIdentityAuthClient } from "../../infrastructure/transport/http-client/DesktopTrustedDeviceIdentityAuthClient";
 import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
 import { HttpIdentityAuthClient, type IdentityAuthClient } from "../shared/identity/IdentityAuthClient";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
@@ -174,5 +175,7 @@ export class IdentityAuthService {
 function createDefaultIdentityAuthClient(): IdentityAuthClient {
   const desktopBaseUrl = resolveDesktopIdentityApiBaseUrl();
   const baseUrl = desktopBaseUrl ?? resolveWebIdentityApiBaseUrl();
-  return new HttpIdentityAuthClient(baseUrl);
+  return new DesktopTrustedDeviceIdentityAuthClient(
+    new HttpIdentityAuthClient(baseUrl),
+  );
 }

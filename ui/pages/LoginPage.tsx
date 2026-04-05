@@ -1,6 +1,9 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import type { LoginLocalIdentityApiResponse } from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+import type {
+  IdentityAuthApiError,
+  LoginLocalIdentityApiResponse,
+} from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { IdentityAuthService } from "../services/IdentityAuthService";
 import { resolveIdentityAccessChannel, resolveIdentityClientContext } from "../shared/identity/IdentityAuthEnvironment";
@@ -49,7 +52,7 @@ export default function LoginPage({ onAuthenticated, authNotice }: LoginPageProp
       });
 
       if (!response.ok || !response.data) {
-        setErrorMessage(renderApiError(response.error?.message, response.error?.validationErrors));
+        setErrorMessage(renderApiError(response.error));
         return;
       }
 
@@ -131,13 +134,22 @@ export default function LoginPage({ onAuthenticated, authNotice }: LoginPageProp
   );
 }
 
-function renderApiError(
-  message?: string,
-  validationErrors?: ReadonlyArray<{ path: string; message: string }>,
-): string {
+function renderApiError(error: IdentityAuthApiError | undefined): string {
+  const trustFailureReason = error?.trustFailure?.reason;
+  if (trustFailureReason === "registration-missing" || trustFailureReason === "pinned-trust-material-missing") {
+    return "Trusted device verification is required. Pair this desktop with your account before signing in.";
+  }
+  if (
+    trustFailureReason === "pinned-trust-material-expired"
+    || trustFailureReason === "session-assurance-not-trusted"
+  ) {
+    return "Trusted device trust material has expired. Re-pair this desktop client and sign in again.";
+  }
+
+  const validationErrors = error?.validationErrors;
   if (!validationErrors || validationErrors.length === 0) {
-    return message || "Login failed.";
+    return error?.message || "Login failed.";
   }
   const details = validationErrors.map((entry) => `${entry.path}: ${entry.message}`).join("; ");
-  return `${message || "Login failed."} ${details}`;
+  return `${error?.message || "Login failed."} ${details}`;
 }

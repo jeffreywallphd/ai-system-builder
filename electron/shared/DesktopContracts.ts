@@ -20,6 +20,26 @@ export interface DesktopPythonRuntimeInfo {
   readonly isAvailable: boolean;
 }
 
+export interface DesktopTrustedDeviceRegistrationBootstrap {
+  readonly trustedDeviceBindingId: string;
+  readonly trustMarker?: string;
+  readonly registeredAt?: string;
+}
+
+export interface DesktopPinnedTrustMaterialBootstrap {
+  readonly pinReference: string;
+  readonly materialKind: "session-signing-key" | "attestation-key" | "opaque-marker";
+  readonly publicKeyFingerprint?: string;
+  readonly issuedAt?: string;
+  readonly expiresAt?: string;
+}
+
+export interface DesktopIdentityTransportTrustBootstrap {
+  readonly enforcement: "required" | "optional";
+  readonly registeredDevice?: DesktopTrustedDeviceRegistrationBootstrap;
+  readonly pinnedTrustMaterial?: DesktopPinnedTrustMaterialBootstrap;
+}
+
 export interface DesktopBootstrapContext {
   readonly runtimeConfig: AppRuntimeConfigValues;
   readonly storage: DesktopStoragePaths;
@@ -28,6 +48,7 @@ export interface DesktopBootstrapContext {
     readonly port: number;
   };
   readonly pythonRuntime: DesktopPythonRuntimeInfo;
+  readonly identityTransportTrust?: DesktopIdentityTransportTrustBootstrap;
 }
 
 export interface DesktopKeyValueStorageBridge {
