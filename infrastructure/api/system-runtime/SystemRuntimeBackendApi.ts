@@ -73,6 +73,12 @@ import {
 import type { IAuthorizationPolicyDecisionEvaluator } from "../../../src/application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyEvaluationTargetKinds } from "../../../src/application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
 import { AuthorizationResourceFamilies } from "../../../src/domain/authorization/AuthorizationPermissionCatalog";
+import {
+  AuthorizationResponseAccessLevels,
+  deriveAuthorizationResponseAccessLevel,
+  shapeAuthorizationAwareResponse,
+  type AuthorizationResponseAccessLevel,
+} from "../../../src/application/authorization/use-cases/AuthorizationResponseRedaction";
 
 export type {
   RuntimeExecutionResultReadModel,
@@ -166,6 +172,18 @@ export interface SystemRuntimeAuthorizationOptions {
   readonly logProtectedResourceType?: string;
   readonly now?: () => Date;
 }
+
+const RuntimeExecutionTracePartialRedactionRules = Object.freeze([
+  Object.freeze({ path: "trace.events" }),
+  Object.freeze({ path: "trace.logs" }),
+]);
+
+const RuntimeExecutionResultPartialRedactionRules = Object.freeze([
+  Object.freeze({ path: "output" }),
+  Object.freeze({ path: "diagnostics" }),
+  Object.freeze({ path: "serialized.outputs" }),
+  Object.freeze({ path: "serialized.diagnostics.entries" }),
+]);
 
 export class SystemRuntimeBackendApi {
   private static readonly EXTERNAL_POLL_RESPONSE_CACHE_TTL_MS = 75;
@@ -557,6 +575,13 @@ export class SystemRuntimeBackendApi {
   ): Promise<SystemRuntimeApiResponse<RuntimeExecutionTraceReadModel>> {
     return this.wrap(async () => {
       await this.getExecutionStatusAuthorized(request.executionId, request.requestContext);
+      const accessLevel = await this.resolveOperationalResourceAccessLevel({
+        requestContext: request.requestContext,
+        requiredPermissionKey: "run.read",
+        resourceFamily: AuthorizationResourceFamilies.run,
+        resourceType: this.runProtectedResourceType,
+        resourceId: request.executionId,
+      });
       await this.assertOperationalResourceAuthorized({
         requestContext: request.requestContext,
         requiredPermissionKey: "log.read",
@@ -564,10 +589,16 @@ export class SystemRuntimeBackendApi {
         resourceType: this.logProtectedResourceType,
         resourceId: request.executionId,
       });
-      return this.service.getExecutionTrace(request.executionId, {
+      const trace = this.service.getExecutionTrace(request.executionId, {
         eventLimit: request.eventLimit,
         logLimit: request.logLimit,
       });
+      const shaped = shapeAuthorizationAwareResponse({
+        accessLevel,
+        value: trace,
+        partialRules: RuntimeExecutionTracePartialRedactionRules,
+      });
+      return shaped.value ?? trace;
     });
   }
 
@@ -583,6 +614,13 @@ export class SystemRuntimeBackendApi {
   ): Promise<SystemRuntimeApiResponse<RuntimeExecutionResultApiModel>> {
     return this.wrap(async () => {
       await this.getExecutionStatusAuthorized(request.executionId, request.requestContext);
+      const accessLevel = await this.resolveOperationalResourceAccessLevel({
+        requestContext: request.requestContext,
+        requiredPermissionKey: "run.read",
+        resourceFamily: AuthorizationResourceFamilies.run,
+        resourceType: this.runProtectedResourceType,
+        resourceId: request.executionId,
+      });
       const base = this.service.getExecutionResult(request.executionId);
       const nodeResultLimit = this.normalizeOptionalBoundedInteger(request.nodeResultLimit, 1, 500, "nodeResultLimit");
       const diagnosticsLimit = this.normalizeOptionalBoundedInteger(request.diagnosticsLimit, 1, 500, "diagnosticsLimit");
@@ -591,10 +629,16 @@ export class SystemRuntimeBackendApi {
         nodeResults: Object.freeze(nodeResultLimit ? base.nodeResults.slice(0, nodeResultLimit) : [...base.nodeResults]),
         diagnostics: Object.freeze(diagnosticsLimit ? base.diagnostics.slice(0, diagnosticsLimit) : [...base.diagnostics]),
       });
-      return Object.freeze({
+      const projected = Object.freeze({
         ...bounded,
         serialized: this.outputSerializer.serialize(bounded),
       });
+      const shaped = shapeAuthorizationAwareResponse({
+        accessLevel,
+        value: projected,
+        partialRules: RuntimeExecutionResultPartialRedactionRules,
+      });
+      return shaped.value ?? projected;
     });
   }
 
@@ -1186,8 +1230,22 @@ export class SystemRuntimeBackendApi {
     readonly resourceType: string;
     readonly resourceId: string;
   }): Promise<boolean> {
+    const accessLevel = await this.resolveOperationalResourceAccessLevel(input);
+    return accessLevel !== AuthorizationResponseAccessLevels.deny;
+  }
+
+  private async resolveOperationalResourceAccessLevel(input: {
+    readonly requestContext?: RuntimeApiRequestContext;
+    readonly requiredPermissionKey: "run.read" | "queue.read" | "log.read";
+    readonly resourceFamily:
+      | typeof AuthorizationResourceFamilies.run
+      | typeof AuthorizationResourceFamilies.queue
+      | typeof AuthorizationResourceFamilies.log;
+    readonly resourceType: string;
+    readonly resourceId: string;
+  }): Promise<AuthorizationResponseAccessLevel> {
     if (!this.authorizationDecisionEvaluator || input.requestContext?.trustedInternal) {
-      return true;
+      return AuthorizationResponseAccessLevels.full;
     }
     const callerContext = this.resolveCallerContext({ requestContext: input.requestContext });
     const actorUserIdentityId = callerContext?.callerKind === "user"
@@ -1197,7 +1255,7 @@ export class SystemRuntimeBackendApi {
       ? callerContext.callerId?.trim()
       : undefined;
     if (!actorUserIdentityId && !actorServiceId) {
-      return false;
+      return AuthorizationResponseAccessLevels.deny;
     }
     const metadata = callerContext?.metadata as {
       readonly workspaceId?: unknown;
@@ -1230,7 +1288,7 @@ export class SystemRuntimeBackendApi {
       }),
       asOf: this.now().toISOString(),
     });
-    return decision.decision.isAllowed;
+    return deriveAuthorizationResponseAccessLevel(decision.decision);
   }
 
   private resolveTenantContext(input: {

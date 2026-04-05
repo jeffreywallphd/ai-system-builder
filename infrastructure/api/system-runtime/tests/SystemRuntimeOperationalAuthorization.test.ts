@@ -145,11 +145,18 @@ describe("System runtime operational authorization", () => {
       versionId: "system:ops:v1",
       requestContext: { trustedInternal: true },
     });
+    const third = await runtimeApi.startExecution({
+      systemId: "system:ops",
+      versionId: "system:ops:v1",
+      requestContext: { trustedInternal: true },
+    });
     expect(first.ok).toBeTrue();
     expect(second.ok).toBeTrue();
+    expect(third.ok).toBeTrue();
 
     const runAllowed = first.data!.executionId;
     const runPrivateOther = second.data!.executionId;
+    const runWorkspaceVisible = third.data!.executionId;
     authRepositories.resourceMetadata.set(
       toKey("runtime-queue", "system:ops::system:ops:v1"),
       Object.freeze({
@@ -196,6 +203,21 @@ describe("System runtime operational authorization", () => {
       }),
     );
     authRepositories.resourceMetadata.set(
+      toKey("runtime-execution", runWorkspaceVisible),
+      Object.freeze({
+        resourceFamily: AuthorizationResourceFamilies.run,
+        resourceType: "runtime-execution",
+        resourceId: runWorkspaceVisible,
+        ownerUserIdentityId: "user-owner",
+        ownershipScope: ResourceOwnershipScopes.workspace,
+        workspaceId: "workspace-alpha",
+        visibility: ResourceVisibilities.workspace,
+        sharingPolicyMode: SharingPolicyModes.workspaceMembers,
+        allowResharing: false,
+        isPublishedCapable: false,
+      }),
+    );
+    authRepositories.resourceMetadata.set(
       toKey("runtime-log", runAllowed),
       Object.freeze({
         resourceFamily: AuthorizationResourceFamilies.log,
@@ -225,6 +247,21 @@ describe("System runtime operational authorization", () => {
         isPublishedCapable: false,
       }),
     );
+    authRepositories.resourceMetadata.set(
+      toKey("runtime-log", runWorkspaceVisible),
+      Object.freeze({
+        resourceFamily: AuthorizationResourceFamilies.log,
+        resourceType: "runtime-log",
+        resourceId: runWorkspaceVisible,
+        ownerUserIdentityId: "user-owner",
+        ownershipScope: ResourceOwnershipScopes.workspace,
+        workspaceId: "workspace-alpha",
+        visibility: ResourceVisibilities.workspace,
+        sharingPolicyMode: SharingPolicyModes.workspaceMembers,
+        allowResharing: false,
+        isPublishedCapable: false,
+      }),
+    );
     authRepositories.sharingGrants = Object.freeze([
       Object.freeze({
         id: "share-runtime-run-1",
@@ -247,6 +284,15 @@ describe("System runtime operational authorization", () => {
           workspaceId: "workspace-alpha",
           assignedByUserIdentityId: "user-owner",
           assignedAt: "2026-04-05T12:00:00.000Z",
+        }),
+        createRoleAssignment({
+          id: "role-guest-runtime-1",
+          actorUserIdentityId: "user-guest",
+          roleKey: "guest",
+          scope: RoleAssignmentScopes.workspace,
+          workspaceId: "workspace-alpha",
+          assignedByUserIdentityId: "user-owner",
+          assignedAt: "2026-04-05T12:30:00.000Z",
         }),
       ]),
       permissionGrants: Object.freeze([]),
@@ -284,6 +330,24 @@ describe("System runtime operational authorization", () => {
       accessContext: { callerKind: "user", callerId: "user-admin", metadata: { workspaceId: "workspace-alpha" } },
     });
     expect(adminStatus.ok).toBeTrue();
+
+    const guestResult = await runtimeApi.getExecutionResult(runWorkspaceVisible, {
+      accessContext: { callerKind: "user", callerId: "user-guest", metadata: { workspaceId: "workspace-alpha" } },
+    });
+    expect(guestResult.ok).toBeTrue();
+    expect(guestResult.data?.output).toBeUndefined();
+    expect(guestResult.data?.diagnostics).toBeUndefined();
+    expect(guestResult.data?.serialized.outputs).toBeUndefined();
+
+    const guestTrace = await runtimeApi.getExecutionTrace({
+      executionId: runWorkspaceVisible,
+      requestContext: {
+        accessContext: { callerKind: "user", callerId: "user-guest", metadata: { workspaceId: "workspace-alpha" } },
+      },
+    });
+    expect(guestTrace.ok).toBeTrue();
+    expect(guestTrace.data?.trace.events).toBeUndefined();
+    expect(guestTrace.data?.trace.logs).toBeUndefined();
 
     const collabQueue = await runtimeApi.listRecentExecutionsForSystem({
       assetId: "system:ops",

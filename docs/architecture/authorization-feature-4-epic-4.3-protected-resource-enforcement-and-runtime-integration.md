@@ -91,3 +91,16 @@ Story 4.3.4 test coverage validates:
 - reference-image run-history filtering parity across owner/collaborator/admin/denied scenarios,
 - runtime execution status/trace/audit authorization denies for unauthorized actors,
 - runtime queue listing filtering behavior when callers can view queue metadata but only a subset of runs.
+
+Story 4.3.5 adds centralized authorization-aware response redaction for protected reads:
+
+- reusable response shaping utilities now support explicit `deny` vs `partial` vs `full` response modes so handlers can avoid binary expose-all behavior,
+- partial visibility outcomes redact sensitive payload fields for protected read models (for example workflow run execution input/output payload details, reference-image run parameter snapshots/lineage source hints, and runtime trace/result sensitive fields),
+- authorization integration preserves existing non-leaky deny behavior (`not-found`/`forbidden`) while allowing partial callers to receive safe metadata-level projections when policy allows existence without full content access.
+
+Story 4.3.5 test coverage validates:
+
+- redaction helper access-level classification for owner/share/role/visibility outcomes,
+- deterministic remove/mask redaction path behavior,
+- workflow run detail partial redaction for workspace-visibility role-based callers,
+- runtime result/trace partial redaction for workspace-visibility operational callers.
