@@ -36,6 +36,7 @@ import { LocalPasswordIdentityAuthenticator } from "../../../../application/iden
 import { IdentityAuthBackendApi } from "../IdentityAuthBackendApi";
 import { RegisterLocalAccountUseCase } from "../../../../src/application/identity/use-cases/RegisterLocalAccountUseCase";
 import { LoginLocalAccountUseCase } from "../../../../src/application/identity/use-cases/LoginLocalAccountUseCase";
+import type { IdentityAuthObservabilityOptions } from "../IdentityAuthObservability";
 
 class InMemoryIdentityAdapter
   implements
@@ -193,7 +194,9 @@ export interface IdentityAuthTestHarness {
   readonly adapter: InMemoryIdentityAdapter;
 }
 
-export async function createIdentityAuthTestHarness(): Promise<IdentityAuthTestHarness> {
+export async function createIdentityAuthTestHarness(
+  options: { readonly observability?: IdentityAuthObservabilityOptions } = {},
+): Promise<IdentityAuthTestHarness> {
   const adapter = new InMemoryIdentityAdapter();
 
   await adapter.saveAuthProvider(createAuthProvider({
@@ -227,6 +230,7 @@ export async function createIdentityAuthTestHarness(): Promise<IdentityAuthTestH
       credentialAuthenticator,
       clock: adapter,
     }),
+    observability: options.observability,
   });
 
   return Object.freeze({ backendApi, adapter });
