@@ -334,8 +334,10 @@ function formatTrustStatus(status: string): string {
       return "trusted (approved)";
     case "rejected":
       return "quarantined (rejected)";
-    case "cancelled":
-      return "enrollment cancelled";
+    case "withdrawn":
+      return "enrollment withdrawn";
+    case "expired":
+      return "enrollment expired";
     default:
       return status;
   }

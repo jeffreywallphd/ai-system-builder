@@ -1,4 +1,7 @@
-import { createNodeEnrollmentRequest } from "../../../domain/nodes/NodeTrustDomain";
+import {
+  NodeEnrollmentRequestStatuses,
+  createNodeEnrollmentRequest,
+} from "../../../domain/nodes/NodeTrustDomain";
 import type {
   NodeRoleCapability,
   NodeType,
@@ -61,6 +64,7 @@ interface RegisterNodeEnrollmentRequestUseCaseDependencies {
   readonly idGenerator?: NodeTrustUseCaseIdGenerator;
   readonly clock?: NodeTrustUseCaseClock;
   readonly auditSink?: NodeTrustAuditSink;
+  readonly pendingEnrollmentStaleAfterMs?: number;
 }
 
 export class RegisterNodeEnrollmentRequestUseCase {
@@ -68,11 +72,16 @@ export class RegisterNodeEnrollmentRequestUseCase {
 
   private readonly clock: NodeTrustUseCaseClock;
 
+  private readonly pendingEnrollmentStaleAfterMs: number;
+
   public constructor(private readonly dependencies: RegisterNodeEnrollmentRequestUseCaseDependencies) {
     this.idGenerator = dependencies.idGenerator ?? new DefaultNodeTrustUseCaseIdGenerator();
     this.clock = dependencies.clock ?? {
       now: () => new Date(),
     };
+    this.pendingEnrollmentStaleAfterMs = Number.isFinite(dependencies.pendingEnrollmentStaleAfterMs)
+      ? Math.max(0, dependencies.pendingEnrollmentStaleAfterMs as number)
+      : 1000 * 60 * 60 * 24 * 7;
   }
 
   public async execute(
@@ -102,7 +111,41 @@ export class RegisterNodeEnrollmentRequestUseCase {
       );
     }
 
-    const pending = await this.dependencies.enrollmentRequestRepository.findPendingEnrollmentRequestByNodeId(nodeId);
+    const nowIso = this.clock.now().toISOString();
+    let pending = await this.dependencies.enrollmentRequestRepository.findPendingEnrollmentRequestByNodeId(nodeId);
+    if (pending && this.isStalePendingEnrollmentRequest(pending.requestedAt)) {
+      const staleMutation = await this.dependencies.enrollmentRequestRepository.transitionEnrollmentRequestStatus({
+        requestId: pending.requestId,
+        toStatus: NodeEnrollmentRequestStatuses.expired,
+        mutation: createNodeTrustMutationEnvelope({
+          actorUserIdentityId,
+          operationPrefix: "expire-stale-enrollment-request",
+          idGenerator: this.idGenerator,
+          clock: this.clock,
+          reason: "stale-pending-enrollment",
+          correlationId: request.correlationId,
+          metadata: request.metadata,
+        }),
+      });
+
+      await publishNodeTrustAuditEventBestEffort(this.dependencies.auditSink, {
+        type: NodeTrustAuditEventTypes.enrollmentExpired,
+        actorUserIdentityId,
+        occurredAt: nowIso,
+        nodeId,
+        enrollmentRequestId: staleMutation.record.requestId,
+        outcome: "success",
+        details: Object.freeze({
+          previousStatus: pending.status,
+          expiredBy: "stale-registration-retry",
+          staleAfterMs: this.pendingEnrollmentStaleAfterMs,
+          requestedAt: pending.requestedAt,
+        }),
+      });
+
+      pending = undefined;
+    }
+
     if (pending) {
       return toNodeTrustFailure(
         NodeTrustUseCaseErrorCodes.conflict,
@@ -122,8 +165,20 @@ export class RegisterNodeEnrollmentRequestUseCase {
         "Id generator returned an empty enrollment request id.",
       );
     }
+    const existingByRequestId = await this.dependencies.enrollmentRequestRepository.findEnrollmentRequestById(requestId);
+    if (existingByRequestId) {
+      return toNodeTrustFailure(
+        NodeTrustUseCaseErrorCodes.conflict,
+        `Enrollment request '${requestId}' already exists.`,
+        {
+          requestId: existingByRequestId.requestId,
+          nodeId: existingByRequestId.nodeId,
+          status: existingByRequestId.status,
+        },
+      );
+    }
 
-    const requestedAt = normalizeOptional(request.requestedAt) ?? this.clock.now().toISOString();
+    const requestedAt = normalizeOptional(request.requestedAt) ?? nowIso;
 
     let enrollmentRequest: ReturnType<typeof createNodeEnrollmentRequest>;
     try {
@@ -209,5 +264,17 @@ export class RegisterNodeEnrollmentRequestUseCase {
       supportsRemoteScheduling: profile.supportsRemoteScheduling,
       maxConcurrentWorkloads: profile.maxConcurrentWorkloads,
     });
+  }
+
+  private isStalePendingEnrollmentRequest(requestedAt: string): boolean {
+    if (this.pendingEnrollmentStaleAfterMs <= 0) {
+      return false;
+    }
+    const requestedAtEpoch = Date.parse(requestedAt);
+    if (!Number.isFinite(requestedAtEpoch)) {
+      return false;
+    }
+    const staleAfterEpoch = this.clock.now().getTime() - this.pendingEnrollmentStaleAfterMs;
+    return requestedAtEpoch <= staleAfterEpoch;
   }
 }

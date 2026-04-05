@@ -32,12 +32,17 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 ## Lifecycle orchestration coverage
 
 - register enrollment request
+  - stale pending request auto-expiration on retry
+  - duplicate enrollment `requestId` conflict rejection
 - review/list pending enrollment queue
 - fetch a single enrollment detail for admin review workflows
 - approve node (admin-authorized, explicit lifecycle transitions, decision metadata, certificate hook seam)
 - approve node includes capability profile normalization/validation and existing-node capability-profile registration
+  - approve blocks already-revoked existing nodes
 - activate approved node (idempotent trusted-state transition with capability and certificate/trust metadata continuity)
+  - activate blocks records with revocation timestamps even when revocation-state persistence is inconsistent
 - reject node (admin-authorized, explicit lifecycle transitions, decision metadata)
+  - reject preserves revoked existing-node trust state for stale enrollment cleanup
 - revoke node trust (including certificate-revocation seam, durable revocation metadata persistence, and safe repeat-revocation no-op handling)
 - record node heartbeat
 - query trusted node inventory
@@ -61,6 +66,7 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - Authorization policy engines can plug in through `NodeTrustAuthorizationHook` without changing use-case signatures.
 - PKI/certificate services can plug in through `NodeTrustCertificateHook` without changing node approval/revocation orchestration.
 - Audit pipelines can plug in through `NodeTrustAuditSink` while preserving non-blocking application flow.
+- stale pending enrollment expiration emits `node-enrollment-expired` audit events.
 - Enrollment approval/rejection metadata (`reviewedAt`, `reviewedByUserIdentityId`, `decisionNote`) remains in persistence contracts so admin decisions are auditable and durable.
 - Approval/rejection audit events include the persisted decision metadata for downstream audit consumers.
 - Activation is explicitly separate from heartbeat presence writes so approval/activation lifecycle transitions and liveness updates remain independently auditable.

@@ -29,6 +29,7 @@ import {
   mapNodeTrustDomainError,
   normalizeOptional,
   normalizeRequired,
+  isNodeTrustLifecycleRevoked,
   toNodeTrustFailure,
 } from "./NodeTrustUseCaseShared";
 
@@ -163,21 +164,27 @@ export class RejectNodeEnrollmentUseCase {
 
     const nowIso = this.clock.now().toISOString();
     const nodeMutation = existingNode
-      ? await this.dependencies.nodeRepository.updateNodeApproval({
-        nodeId: existingNode.nodeId,
-        approvalStatus: NodeApprovalStatuses.rejected,
-        trustState: NodeTrustStates.quarantined,
-        mutation: createNodeTrustMutationEnvelope({
-          actorUserIdentityId,
-          operationPrefix: "reject-node",
-          idGenerator: this.idGenerator,
-          clock: this.clock,
-          expectedRevision: request.expectedNodeRevision,
-          reason: request.reason,
-          correlationId: request.correlationId,
-          metadata: request.metadata,
-        }),
-      })
+      ? isNodeTrustLifecycleRevoked(existingNode)
+        ? Object.freeze({
+          record: existingNode,
+          changed: false,
+          wasReplay: false,
+        })
+        : await this.dependencies.nodeRepository.updateNodeApproval({
+          nodeId: existingNode.nodeId,
+          approvalStatus: NodeApprovalStatuses.rejected,
+          trustState: NodeTrustStates.quarantined,
+          mutation: createNodeTrustMutationEnvelope({
+            actorUserIdentityId,
+            operationPrefix: "reject-node",
+            idGenerator: this.idGenerator,
+            clock: this.clock,
+            expectedRevision: request.expectedNodeRevision,
+            reason: request.reason,
+            correlationId: request.correlationId,
+            metadata: request.metadata,
+          }),
+        })
       : await this.dependencies.nodeRepository.registerNode({
         record: {
           nodeId: enrollment.nodeId,

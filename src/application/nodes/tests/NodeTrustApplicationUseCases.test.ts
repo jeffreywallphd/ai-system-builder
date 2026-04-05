@@ -1945,4 +1945,327 @@ describe("node trust application use-cases", () => {
     expect(result.value.node.pendingEnrollment?.requestId).toBe("pending-detail-1");
     expect(result.value.node.presenceState).toBe("unknown");
   });
+
+  it("expires stale pending enrollment requests and allows re-enrollment retries", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.saveEnrollmentRequest({
+      record: {
+        requestId: "enroll-stale-1",
+        nodeId: "node-stale-retry-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Stale Retry 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["stale"],
+        requestedAt: "2026-04-01T18:00:00.000Z",
+        status: NodeEnrollmentRequestStatuses.submitted,
+        createdAt: "2026-04-01T18:00:00.000Z",
+        createdBy: "node-stale-retry-1",
+        lastModifiedAt: "2026-04-01T18:00:00.000Z",
+        lastModifiedBy: "node-stale-retry-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-stale-enrollment-1",
+        context: {
+          actorUserIdentityId: "node-stale-retry-1",
+        },
+      },
+    });
+
+    const useCase = new RegisterNodeEnrollmentRequestUseCase({
+      enrollmentRequestRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      clock: createFixedClock("2026-04-05T18:00:00.000Z"),
+      pendingEnrollmentStaleAfterMs: 1000 * 60 * 60 * 24,
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "node-stale-retry-1",
+      nodeId: "node-stale-retry-1",
+      nodeType: NodeTypes.compute,
+      displayName: "Stale Retry 1 New Request",
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.executor],
+      },
+      deploymentTags: ["stale"],
+      requestId: "enroll-stale-2",
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      return;
+    }
+
+    const stale = await repository.findEnrollmentRequestById("enroll-stale-1");
+    expect(stale?.status).toBe(NodeEnrollmentRequestStatuses.expired);
+    expect(result.value.enrollmentRequest.requestId).toBe("enroll-stale-2");
+  });
+
+  it("rejects enrollment registrations that reuse an existing request id", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    const useCase = new RegisterNodeEnrollmentRequestUseCase({
+      enrollmentRequestRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      clock: createFixedClock("2026-04-05T18:10:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const first = await useCase.execute({
+      actorUserIdentityId: "node-dup-request-1",
+      nodeId: "node-dup-request-1",
+      nodeType: NodeTypes.compute,
+      displayName: "Duplicate Request Id Node 1",
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.executor],
+      },
+      requestId: "enroll-request-duplicate-1",
+    });
+    expect(first.ok).toBeTrue();
+
+    const duplicate = await useCase.execute({
+      actorUserIdentityId: "node-dup-request-2",
+      nodeId: "node-dup-request-2",
+      nodeType: NodeTypes.hybrid,
+      displayName: "Duplicate Request Id Node 2",
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.executor],
+      },
+      requestId: "enroll-request-duplicate-1",
+    });
+
+    expect(duplicate.ok).toBeFalse();
+    if (!duplicate.ok) {
+      expect(duplicate.error.code).toBe(NodeTrustUseCaseErrorCodes.conflict);
+      expect(duplicate.error.message).toContain("already exists");
+    }
+  });
+
+  it("blocks enrollment approval when the target node is already revoked", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.saveEnrollmentRequest({
+      record: {
+        requestId: "enroll-revoked-approve-1",
+        nodeId: "node-revoked-approve-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Revoked Approval Guard 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["revoked"],
+        requestedAt: "2026-04-05T18:11:00.000Z",
+        status: NodeEnrollmentRequestStatuses.submitted,
+        createdAt: "2026-04-05T18:11:00.000Z",
+        createdBy: "node-revoked-approve-1",
+        lastModifiedAt: "2026-04-05T18:11:00.000Z",
+        lastModifiedBy: "node-revoked-approve-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-enroll-revoked-approve-1",
+        context: {
+          actorUserIdentityId: "node-revoked-approve-1",
+        },
+      },
+    });
+    await repository.registerNode({
+      record: {
+        nodeId: "node-revoked-approve-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Revoked Approval Guard 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.rejected,
+        trustState: NodeTrustStates.revoked,
+        deploymentTags: ["revoked"],
+        revocation: {
+          state: NodeRevocationStates.revoked,
+          reason: NodeRevocationReasons.operatorAction,
+          revokedAt: "2026-04-05T18:10:00.000Z",
+          revokedByUserIdentityId: "admin-1",
+        },
+        enrolledAt: "2026-04-05T18:00:00.000Z",
+        revokedAt: "2026-04-05T18:10:00.000Z",
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T18:10:00.000Z",
+        lastModifiedBy: "admin-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-node-revoked-approve-1",
+        context: {
+          actorUserIdentityId: "admin-1",
+        },
+      },
+    });
+
+    const useCase = new ApproveNodeEnrollmentUseCase({
+      enrollmentRequestRepository: repository,
+      nodeRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      clock: createFixedClock("2026-04-05T18:12:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "admin-2",
+      requestId: "enroll-revoked-approve-1",
+      certificateRef: "cert:revoked-approve-1:v1",
+    });
+
+    expect(result.ok).toBeFalse();
+    if (!result.ok) {
+      expect(result.error.code).toBe(NodeTrustUseCaseErrorCodes.invalidState);
+      expect(result.error.message).toContain("revoked");
+    }
+  });
+
+  it("keeps revoked node trust state immutable when rejecting a stale enrollment", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.saveEnrollmentRequest({
+      record: {
+        requestId: "enroll-revoked-reject-1",
+        nodeId: "node-revoked-reject-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Revoked Reject Guard 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["revoked"],
+        requestedAt: "2026-04-05T18:13:00.000Z",
+        status: NodeEnrollmentRequestStatuses.submitted,
+        createdAt: "2026-04-05T18:13:00.000Z",
+        createdBy: "node-revoked-reject-1",
+        lastModifiedAt: "2026-04-05T18:13:00.000Z",
+        lastModifiedBy: "node-revoked-reject-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-enroll-revoked-reject-1",
+        context: {
+          actorUserIdentityId: "node-revoked-reject-1",
+        },
+      },
+    });
+    await repository.registerNode({
+      record: {
+        nodeId: "node-revoked-reject-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Revoked Reject Guard 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.rejected,
+        trustState: NodeTrustStates.revoked,
+        deploymentTags: ["revoked"],
+        revocation: {
+          state: NodeRevocationStates.revoked,
+          reason: NodeRevocationReasons.operatorAction,
+          revokedAt: "2026-04-05T18:10:00.000Z",
+          revokedByUserIdentityId: "admin-1",
+        },
+        enrolledAt: "2026-04-05T18:00:00.000Z",
+        revokedAt: "2026-04-05T18:10:00.000Z",
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T18:10:00.000Z",
+        lastModifiedBy: "admin-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-node-revoked-reject-1",
+        context: {
+          actorUserIdentityId: "admin-1",
+        },
+      },
+    });
+
+    const useCase = new RejectNodeEnrollmentUseCase({
+      enrollmentRequestRepository: repository,
+      nodeRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      clock: createFixedClock("2026-04-05T18:14:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "admin-2",
+      requestId: "enroll-revoked-reject-1",
+      decisionNote: "Rejecting stale submission for revoked node.",
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.enrollmentRequest.status).toBe(NodeEnrollmentRequestStatuses.rejected);
+    expect(result.value.node?.trustState).toBe(NodeTrustStates.revoked);
+    expect(result.value.nodeMutation?.changed).toBeFalse();
+  });
+
+  it("rejects activation when revocation timestamps are present even if state is inconsistent", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.registerNode({
+      record: {
+        nodeId: "node-activation-revoked-metadata-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Activation Revoked Metadata 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.pendingApproval,
+        certificate: {
+          certificateRef: "cert:activation-revoked-metadata-1:v1",
+        },
+        deploymentTags: ["activation"],
+        revocation: {
+          state: NodeRevocationStates.active,
+          revokedAt: "2026-04-05T18:10:00.000Z",
+        },
+        enrolledAt: "2026-04-05T18:00:00.000Z",
+        revokedAt: "2026-04-05T18:10:00.000Z",
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T18:10:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-activation-revoked-metadata-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+
+    const useCase = new ActivateApprovedNodeUseCase({
+      nodeRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      clock: createFixedClock("2026-04-05T18:15:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "admin-1",
+      nodeId: "node-activation-revoked-metadata-1",
+    });
+
+    expect(result.ok).toBeFalse();
+    if (!result.ok) {
+      expect(result.error.code).toBe(NodeTrustUseCaseErrorCodes.invalidState);
+      expect(result.error.message).toContain("revoked");
+    }
+  });
 });
