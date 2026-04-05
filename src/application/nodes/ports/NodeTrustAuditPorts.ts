@@ -2,6 +2,7 @@ export const NodeTrustAuditEventTypes = Object.freeze({
   enrollmentRequested: "node-enrollment-requested",
   pendingEnrollmentReviewed: "node-pending-enrollment-reviewed",
   nodeApproved: "node-approved",
+  nodeActivated: "node-activated",
   nodeRejected: "node-rejected",
   nodeRevoked: "node-revoked",
   heartbeatRecorded: "node-heartbeat-recorded",

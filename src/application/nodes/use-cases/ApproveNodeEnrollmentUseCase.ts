@@ -173,7 +173,7 @@ export class ApproveNodeEnrollmentUseCase {
     }
 
     const nowIso = this.clock.now().toISOString();
-    const trustState = certificate.value ? NodeTrustStates.trusted : NodeTrustStates.pendingApproval;
+    const trustState = NodeTrustStates.pendingApproval;
 
     const nodeMutation = existingNode
       ? await this.updateExistingNode(existingNode, {

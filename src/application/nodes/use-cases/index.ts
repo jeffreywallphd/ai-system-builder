@@ -3,6 +3,7 @@ export * from "./RegisterNodeEnrollmentRequestUseCase";
 export * from "./ReviewPendingNodeEnrollmentUseCase";
 export * from "./GetNodeEnrollmentDetailUseCase";
 export * from "./ApproveNodeEnrollmentUseCase";
+export * from "./ActivateApprovedNodeUseCase";
 export * from "./RejectNodeEnrollmentUseCase";
 export * from "./RevokeNodeTrustUseCase";
 export * from "./RecordNodeHeartbeatUseCase";

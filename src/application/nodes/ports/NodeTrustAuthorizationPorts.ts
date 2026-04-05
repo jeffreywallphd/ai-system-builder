@@ -33,6 +33,10 @@ export interface NodeTrustAuthorizationHook {
     readonly actorUserIdentityId: string;
     readonly node: NodeIdentityPersistenceRecord;
   }): Promise<void>;
+  assertCanActivateNode?(input: {
+    readonly actorUserIdentityId: string;
+    readonly node: NodeIdentityPersistenceRecord;
+  }): Promise<void>;
   assertCanQueryTrustedNodeInventory(input: {
     readonly actorUserIdentityId: string;
     readonly query: NodeIdentityPersistenceLookupQuery;
