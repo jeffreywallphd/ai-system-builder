@@ -15,6 +15,7 @@ import type {
   AuthorizationActorRoleGrantSnapshot,
   AuthorizationActorRoleGrantSnapshotQuery,
   AuthorizationResourcePolicyMetadata,
+  AuthorizationResourcePolicyMetadataListQuery,
   AuthorizationResourcePolicyMetadataLookupQuery,
   AuthorizationSharingGrantLookupQuery,
   AuthorizationSharingGrantRecord,
@@ -58,6 +59,12 @@ class InMemoryDecisionPolicyRepositories
     query: AuthorizationResourcePolicyMetadataLookupQuery,
   ): Promise<AuthorizationResourcePolicyMetadata | undefined> {
     return this.resourcePolicyMetadataByResourceKey.get(toResourceKey(query.resource.resourceType, query.resource.resourceId));
+  }
+
+  async listResourcePolicyMetadata(
+    _query: AuthorizationResourcePolicyMetadataListQuery,
+  ): Promise<ReadonlyArray<AuthorizationResourcePolicyMetadata>> {
+    return Object.freeze([...this.resourcePolicyMetadataByResourceKey.values()]);
   }
 }
 

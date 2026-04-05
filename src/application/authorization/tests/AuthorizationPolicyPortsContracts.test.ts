@@ -19,6 +19,7 @@ import type {
   AuthorizationPolicyEvaluatorRequest,
   AuthorizationPolicyEvaluatorResult,
   AuthorizationResourcePolicyMetadata,
+  AuthorizationResourcePolicyMetadataListQuery,
   AuthorizationResourcePolicyMetadataLookupQuery,
   AuthorizationSharingGrantLookupQuery,
   AuthorizationSharingGrantRecord,
@@ -72,6 +73,12 @@ class InMemoryAuthorizationPortAdapter
     _query: AuthorizationResourcePolicyMetadataLookupQuery,
   ): Promise<AuthorizationResourcePolicyMetadata | undefined> {
     return this.resourcePolicyMetadata;
+  }
+
+  async listResourcePolicyMetadata(
+    _query: AuthorizationResourcePolicyMetadataListQuery,
+  ): Promise<ReadonlyArray<AuthorizationResourcePolicyMetadata>> {
+    return this.resourcePolicyMetadata ? Object.freeze([this.resourcePolicyMetadata]) : Object.freeze([]);
   }
 
   async recordPolicyEvaluationEvent(event: unknown): Promise<void> {
