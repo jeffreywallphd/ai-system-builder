@@ -300,3 +300,24 @@ Mutation gate examples:
   - private resources with active sharing grants,
   - owner-only sharing policy with active sharing grants,
   - published visibility without `publishedAt`.
+
+## End-to-end authorization/sharing integration hardening (Story 4.4.7)
+
+- Integration coverage now includes full authorization precedence lifecycle scenarios that cross persistence, policy evaluation, application APIs, HTTP transport, and UI route/page seams.
+- Backend API integration tests now verify a deterministic lifecycle for a workspace resource:
+  - baseline allow from workspace visibility,
+  - narrowing visibility to private + owner-only and confirming deny,
+  - explicit sharing grant restore of access,
+  - grant revoke restoring deny,
+  - reporting read model surfacing resulting mutation history.
+- HTTP server integration tests now verify the same lifecycle over transport contracts:
+  - authenticated owner mutation success,
+  - non-admin mutation attempts denied with stable `403` responses,
+  - access-state reads reflecting visibility/share precedence changes,
+  - reporting endpoint returning revoked sharing mutation evidence for audit review.
+- UI page integration tests now verify authenticated desktop/thin-client sharing management surfaces render stable operational affordances and route handoff links without coupling to incidental DOM structure.
+- These scenarios are designed to catch regressions in:
+  - effective-permission precedence (visibility vs explicit sharing),
+  - mutation enforcement and denial semantics,
+  - transport contract stability for management/reporting flows,
+  - desktop/thin-client sharing surface wiring integrity.

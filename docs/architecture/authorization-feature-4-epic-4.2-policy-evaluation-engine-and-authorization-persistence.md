@@ -298,3 +298,24 @@ Command gate examples:
   - private resources with active sharing grants,
   - owner-only policy resources with active sharing grants,
   - published resources missing `publishedAt`.
+
+## End-to-end authorization/sharing integration hardening (Story 4.4.7)
+
+- Integration coverage now includes full authorization precedence lifecycle scenarios spanning persistence, policy evaluation, application APIs, HTTP transport, and UI route/page seams.
+- Backend API integration tests verify a deterministic lifecycle for a workspace resource:
+  - allow via workspace visibility,
+  - narrow visibility to private + owner-only and confirm deny,
+  - restore access with explicit sharing grant,
+  - revoke sharing grant and confirm deny again,
+  - confirm reporting includes resulting sharing mutation evidence.
+- HTTP server integration tests verify the same lifecycle across transport contracts:
+  - owner mutation success with authenticated session context,
+  - unauthorized/non-admin mutation attempts returning stable `403` responses,
+  - access-state reads reflecting precedence transitions,
+  - reporting endpoint exposing revoked mutation history for audit review.
+- UI page integration tests verify authenticated desktop and thin-client sharing surfaces expose expected management affordances and route handoff links without relying on brittle, incidental markup.
+- This Story 4.4.7 matrix is intended to catch regressions in:
+  - precedence resolution between visibility and explicit sharing,
+  - mutation enforcement and denial behavior,
+  - transport-level authorization management/reporting contract mapping,
+  - sharing-surface desktop/thin-client integration wiring.

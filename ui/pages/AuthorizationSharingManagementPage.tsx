@@ -3,11 +3,18 @@ import { Link, useSearchParams } from "react-router-dom";
 import type { AuthorizationResourceFamily } from "../../src/domain/authorization/AuthorizationPermissionCatalog";
 import AuthorizationSharingManagementPanel from "../components/authorization/AuthorizationSharingManagementPanel";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
+import type { AuthorizationManagementService } from "../services/AuthorizationManagementService";
 import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
+import type { IdentityAuthSessionStore as IdentityAuthSessionStoreContract } from "../shared/identity/IdentityAuthSessionStore";
 import { buildAuthorizationSharingThinClientPath } from "../web/authorization/AuthorizationSharingRoutes";
 
-export default function AuthorizationSharingManagementPage(): JSX.Element {
-  const sessionStore = useMemo(() => new IdentityAuthSessionStore(), []);
+interface AuthorizationSharingManagementPageProps {
+  readonly service?: AuthorizationManagementService;
+  readonly sessionStore?: IdentityAuthSessionStoreContract;
+}
+
+export default function AuthorizationSharingManagementPage(props: AuthorizationSharingManagementPageProps = {}): JSX.Element {
+  const sessionStore = useMemo(() => props.sessionStore ?? new IdentityAuthSessionStore(), [props.sessionStore]);
   const [session] = useState(() => sessionStore.getSession());
   const [searchParams] = useSearchParams();
   const sessionToken = session?.sessionToken;
@@ -58,6 +65,7 @@ export default function AuthorizationSharingManagementPage(): JSX.Element {
 
       <AuthorizationSharingManagementPanel
         sessionToken={sessionToken}
+        service={props.service}
         initialResource={resourceId ? Object.freeze({
           resourceFamily,
           resourceType,

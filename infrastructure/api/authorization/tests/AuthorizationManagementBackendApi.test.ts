@@ -386,6 +386,166 @@ describe("AuthorizationManagementBackendApi", () => {
       expect(report.error?.code).toBe("forbidden");
     }
   });
+
+  it("enforces precedence transitions across visibility and sharing with reportable mutation history", async () => {
+    const { api, adapter } = await createHarness();
+
+    await adapter.upsertResourcePolicyMetadata({
+      record: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-precedence",
+        ownerUserIdentityId: "user-owner",
+        ownershipScope: ResourceOwnershipScopes.workspace,
+        workspaceId: "workspace-1",
+        visibility: ResourceVisibilities.workspace,
+        sharingPolicyMode: SharingPolicyModes.workspaceMembers,
+        allowResharing: false,
+        isPublishedCapable: false,
+        createdAt: "2026-04-05T11:00:00.000Z",
+        createdBy: "user-owner",
+        lastModifiedAt: "2026-04-05T11:00:00.000Z",
+        lastModifiedBy: "user-owner",
+        revision: 0,
+      },
+      mutation: {
+        operationKey: "seed-precedence-resource-policy",
+        context: {
+          actorUserIdentityId: "user-owner",
+          occurredAt: "2026-04-05T11:00:00.000Z",
+        },
+      },
+    });
+
+    const initiallyAllowed = await api.readAccessState({
+      actorUserIdentityId: "user-owner",
+      inspectedActorUserIdentityId: "user-viewer",
+      resource: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-precedence",
+      },
+      includeDenied: true,
+    });
+    expect(initiallyAllowed.ok).toBeTrue();
+    if (initiallyAllowed.ok) {
+      const read = initiallyAllowed.data.permissions.find((entry) => entry.permissionKey === "asset.read");
+      expect(read?.isAllowed).toBeTrue();
+      expect(read?.explanation.visibilityContribution.contributedToDecision).toBeTrue();
+    }
+
+    const narrowedVisibility = await api.updateVisibility({
+      actorUserIdentityId: "user-owner",
+      resource: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-precedence",
+      },
+      workspaceId: "workspace-1",
+      visibility: "private",
+      sharingPolicyMode: "owner-only",
+      allowResharing: false,
+      sharingGrants: [],
+      isPublishedCapable: false,
+    });
+    expect(narrowedVisibility.ok).toBeTrue();
+
+    const deniedAfterNarrowing = await api.readAccessState({
+      actorUserIdentityId: "user-owner",
+      inspectedActorUserIdentityId: "user-viewer",
+      resource: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-precedence",
+      },
+      includeDenied: true,
+    });
+    expect(deniedAfterNarrowing.ok).toBeTrue();
+    if (deniedAfterNarrowing.ok) {
+      const read = deniedAfterNarrowing.data.permissions.find((entry) => entry.permissionKey === "asset.read");
+      expect(read?.isAllowed).toBeFalse();
+      expect(read?.explanation.sharingBasedGrants.contributedToDecision).toBeFalse();
+      expect(read?.explanation.visibilityContribution.contributedToDecision).toBeFalse();
+    }
+
+    const shareGrant = await api.grantSharingAccess({
+      actorUserIdentityId: "user-owner",
+      resource: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-precedence",
+      },
+      grant: {
+        id: "share-precedence-1",
+        target: {
+          kind: "user",
+          userId: "user-viewer",
+        },
+        permissionKeys: ["asset.read"],
+      },
+    });
+    expect(shareGrant.ok).toBeTrue();
+
+    const allowedAfterShare = await api.readAccessState({
+      actorUserIdentityId: "user-owner",
+      inspectedActorUserIdentityId: "user-viewer",
+      resource: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-precedence",
+      },
+      includeDenied: true,
+    });
+    expect(allowedAfterShare.ok).toBeTrue();
+    if (allowedAfterShare.ok) {
+      const read = allowedAfterShare.data.permissions.find((entry) => entry.permissionKey === "asset.read");
+      expect(read?.isAllowed).toBeTrue();
+      expect(read?.explanation.sharingBasedGrants.contributedToDecision).toBeTrue();
+    }
+
+    const revoked = await api.revokeSharingAccess({
+      actorUserIdentityId: "user-owner",
+      resource: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-precedence",
+      },
+      grantId: "share-precedence-1",
+    });
+    expect(revoked.ok).toBeTrue();
+
+    const deniedAfterRevoke = await api.readAccessState({
+      actorUserIdentityId: "user-owner",
+      inspectedActorUserIdentityId: "user-viewer",
+      resource: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-precedence",
+      },
+      includeDenied: true,
+    });
+    expect(deniedAfterRevoke.ok).toBeTrue();
+    if (deniedAfterRevoke.ok) {
+      const read = deniedAfterRevoke.data.permissions.find((entry) => entry.permissionKey === "asset.read");
+      expect(read?.isAllowed).toBeFalse();
+      expect(read?.explanation.sharingBasedGrants.contributedToDecision).toBeFalse();
+    }
+
+    const report = await api.readWorkspaceSharingReport({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-1",
+      recentSharingMutationsLimit: 2,
+    });
+
+    expect(report.ok).toBeTrue();
+    if (!report.ok) {
+      return;
+    }
+
+    const precedenceMutations = report.data.recentSharingMutations.filter((mutation) => mutation.grantId === "share-precedence-1");
+    expect(precedenceMutations).toHaveLength(1);
+    expect(precedenceMutations[0]?.mutationType).toBe("revoked");
+  });
 });
 
 async function createHarness(): Promise<{
