@@ -1,4 +1,5 @@
 import { RoleAssignmentScopes, RoleAssignmentStatuses } from "../../../domain/authorization/AuthorizationDomain";
+import { WorkspaceAuthorizationRoleKeys } from "../../../domain/authorization/AuthorizationRoleDefinitions";
 import type { AuthorizationPersistenceMutationResult, AuthorizationRoleAssignmentPersistenceRecord } from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
 import { parseAuthorizationRoleAssignmentRequest } from "../../../shared/schemas/authorization/AuthorizationSchemaContracts";
 import type { AuthorizationPolicyPersistencePorts } from "../ports/AuthorizationPolicyPersistencePorts";
@@ -14,6 +15,7 @@ import {
   mapAuthorizationSchemaValidationError,
   toAuthorizationFailure,
 } from "./AuthorizationAdministrationUseCaseShared";
+import { AuthorizationHighRiskChangeCodes } from "./AuthorizationHighRiskChangeSafeguards";
 
 export interface RemoveAuthorizationRoleUseCaseInput {
   readonly request: unknown;
@@ -96,6 +98,13 @@ export class RemoveAuthorizationRoleUseCase {
       );
     }
 
+    if (parsed.roleKey === WorkspaceAuthorizationRoleKeys.admin) {
+      const continuity = await this.assertWorkspaceAdministrativeContinuity(parsed.workspaceId, parsed.targetUserIdentityId);
+      if (!continuity.ok) {
+        return continuity.outcome;
+      }
+    }
+
     const result = await this.dependencies.mutationService.revokeRoleAssignment({
       roleAssignmentId: assignment.id,
       revokedByUserIdentityId: parsed.actorUserIdentityId,
@@ -114,6 +123,52 @@ export class RemoveAuthorizationRoleUseCase {
     return {
       ok: true,
       value: result,
+    };
+  }
+
+  private async assertWorkspaceAdministrativeContinuity(
+    workspaceId: string,
+    targetUserIdentityId: string,
+  ): Promise<{ readonly ok: true } | { readonly ok: false; readonly outcome: AuthorizationAdministrationOutcome<AuthorizationPersistenceMutationResult<AuthorizationRoleAssignmentPersistenceRecord>> }> {
+    const activeAssignments = await this.dependencies.persistencePorts.roleAssignmentPersistenceRepository.listRoleAssignments({
+      workspaceId,
+      scope: RoleAssignmentScopes.workspace,
+      statuses: [RoleAssignmentStatuses.active],
+      includeRevoked: false,
+    });
+
+    const activeAdministrativeUsers = new Set<string>();
+    for (const roleAssignment of activeAssignments) {
+      if (
+        roleAssignment.roleKey === WorkspaceAuthorizationRoleKeys.owner
+        || roleAssignment.roleKey === WorkspaceAuthorizationRoleKeys.admin
+      ) {
+        activeAdministrativeUsers.add(roleAssignment.actorUserIdentityId);
+      }
+    }
+
+    const targetHasOwnerRole = activeAssignments.some((roleAssignment) => (
+      roleAssignment.actorUserIdentityId === targetUserIdentityId
+      && roleAssignment.roleKey === WorkspaceAuthorizationRoleKeys.owner
+    ));
+    if (!targetHasOwnerRole) {
+      activeAdministrativeUsers.delete(targetUserIdentityId);
+    }
+
+    if (activeAdministrativeUsers.size > 0) {
+      return { ok: true };
+    }
+
+    return {
+      ok: false,
+      outcome: toAuthorizationFailure(
+        AuthorizationAdministrationErrorCodes.conflict,
+        "Workspace must retain at least one active owner or admin role assignment. Assign a replacement administrator before this change.",
+        {
+          reasonCode: AuthorizationHighRiskChangeCodes.lastWorkspaceAdministratorRemoval,
+          riskCodes: Object.freeze([AuthorizationHighRiskChangeCodes.lastWorkspaceAdministratorRemoval]),
+        },
+      ),
     };
   }
 }

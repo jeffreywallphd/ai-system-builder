@@ -316,6 +316,8 @@ export class AuthorizationManagementBackendApi {
       case AuthorizationAdministrationErrorCodes.conflict:
       case AuthorizationAdministrationErrorCodes.invalidState:
         return this.failed(AuthorizationManagementApiErrorCodes.conflict, message);
+      case AuthorizationAdministrationErrorCodes.highRiskConfirmationRequired:
+        return this.failed(AuthorizationManagementApiErrorCodes.conflict, message, toReasonCode(details));
       default:
         return this.failed(AuthorizationManagementApiErrorCodes.internal, message);
     }

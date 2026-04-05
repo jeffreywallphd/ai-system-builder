@@ -263,3 +263,21 @@ Mutation gate examples:
   - HTTP query parameter `inspectedActorUserIdentityId` on `/access-state`,
   - renderer HTTP client support,
   - sharing management UI display of inspected actor context and per-permission contribution summaries.
+
+## High-risk sharing and visibility safeguards (Story 4.4.5)
+
+- Authorization administration mutations now include server-side safeguards for irreversible or high-risk access changes:
+  - broadening visibility exposure (`private -> shared/workspace`, `shared -> workspace`, any transition to `published`),
+  - enabling resource resharing (`allowResharing: false -> true`),
+  - creating or widening broad-subject sharing grants (`workspace`, `workspace-role`, `public`),
+  - adding elevated sharing permission actions (for example `.manage`, `.share`, `.update`, `.delete`, `.execute`, `.publish`),
+  - removing the last active workspace administrator assignment (`owner|admin` continuity check).
+- Risk checks execute in application use-case logic (`GrantAuthorizationSharingAccessUseCase`, `UpdateAuthorizationVisibilityUseCase`, `RemoveAuthorizationRoleUseCase`) so enforcement is not dependent on UI confirmation prompts.
+- For confirmable high-risk mutations, callers must include explicit confirmation metadata:
+  - `metadata.authorizationHighRiskConfirmation.confirmedRiskCodes: string[]`
+  - all detected risk codes for the mutation must be acknowledged before write execution.
+- Missing acknowledgements return deterministic administration failure code:
+  - `authorization-administration-high-risk-confirmation-required`
+  - mapped to transport `conflict` responses for authorization-management endpoints.
+- Administrative continuity protection for role removal is a hard guardrail, not a confirmable prompt:
+  - revoking an `admin` role is rejected when it would leave zero active `owner|admin` assignments in the workspace.

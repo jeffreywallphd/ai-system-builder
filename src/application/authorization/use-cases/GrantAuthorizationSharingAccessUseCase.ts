@@ -14,6 +14,14 @@ import {
   mapAuthorizationSchemaValidationError,
   toAuthorizationFailure,
 } from "./AuthorizationAdministrationUseCaseShared";
+import {
+  AuthorizationHighRiskChangeCodes,
+  type AuthorizationHighRiskChangeCode,
+  assertHighRiskChangesConfirmed,
+  containsSharePermissionEscalation,
+  deriveAddedPermissionKeys,
+  isBroadShareTarget,
+} from "./AuthorizationHighRiskChangeSafeguards";
 
 export interface GrantAuthorizationSharingAccessUseCaseInput {
   readonly request: unknown;
@@ -119,6 +127,28 @@ export class GrantAuthorizationSharingAccessUseCase {
       );
     }
 
+    const addedPermissionKeys = deriveAddedPermissionKeys(existing?.permissionKeys, parsed.grant.permissionKeys);
+    const riskCodes = new Set<AuthorizationHighRiskChangeCode>();
+    if (isBroadShareTarget(parsed.grant.target)) {
+      const isNewGrant = !existing || !!existing.revokedAt;
+      const broadensSubjectReach = existing ? !isBroadPersistenceSubject(existing.subject) : false;
+      if (isNewGrant || broadensSubjectReach || addedPermissionKeys.length > 0) {
+        riskCodes.add(AuthorizationHighRiskChangeCodes.broadSubjectShare);
+      }
+    }
+    if (containsSharePermissionEscalation(addedPermissionKeys)) {
+      riskCodes.add(AuthorizationHighRiskChangeCodes.sharePermissionEscalation);
+    }
+
+    const unconfirmedHighRisk = assertHighRiskChangesConfirmed({
+      actorUserIdentityId: parsed.actorUserIdentityId,
+      riskCodes: [...riskCodes],
+      metadata: input.metadata,
+    });
+    if (unconfirmedHighRisk) {
+      return unconfirmedHighRisk;
+    }
+
     const nowIso = this.clock.now().toISOString();
     const result = await this.dependencies.mutationService.upsertSharingGrant({
       record: {
@@ -185,4 +215,22 @@ function toPersistenceSubject(subject: Extract<AuthorizationSharingGrantChangeRe
   return {
     kind: "public" as const,
   };
+}
+
+function isBroadPersistenceSubject(subject: {
+  readonly kind: "user" | "workspace-role" | "workspace" | "public";
+  readonly roleKey?: string;
+}): boolean {
+  if (subject.kind === "workspace" || subject.kind === "public") {
+    return true;
+  }
+
+  if (subject.kind === "workspace-role") {
+    return isBroadShareTarget({
+      kind: "workspace-role",
+      roleKey: subject.roleKey,
+    });
+  }
+
+  return false;
 }

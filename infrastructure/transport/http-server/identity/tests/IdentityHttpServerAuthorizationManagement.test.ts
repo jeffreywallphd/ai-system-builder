@@ -92,6 +92,11 @@ describe("IdentityHttpServer authorization management routes", () => {
           },
           permissionKeys: ["asset.read"],
         },
+        metadata: {
+          authorizationHighRiskConfirmation: {
+            confirmedRiskCodes: ["broad-subject-share"],
+          },
+        },
       }),
     });
     expect(grantResponse.status).toBe(200);

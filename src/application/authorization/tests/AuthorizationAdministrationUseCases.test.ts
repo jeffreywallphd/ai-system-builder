@@ -11,6 +11,7 @@ import {
   createRoleAssignment,
 } from "../../../domain/authorization/AuthorizationDomain";
 import { AuthorizationResourceFamilies } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+import { WorkspaceAuthorizationRoleKeys } from "../../../domain/authorization/AuthorizationRoleDefinitions";
 import type {
   AuthorizationActorRoleGrantSnapshotQuery,
   AuthorizationPolicyDecisionEvaluationRequest,
@@ -55,6 +56,7 @@ import { EvaluateAuthorizationPermissionUseCase } from "../use-cases/EvaluateAut
 import { ListAuthorizationEffectiveAccessUseCase } from "../use-cases/ListAuthorizationEffectiveAccessUseCase";
 import { AuthorizationAdministrationErrorCodes } from "../use-cases/AuthorizationAdministrationUseCaseShared";
 import { AuthorizationPolicyDecisionEvaluator } from "../use-cases/AuthorizationPolicyDecisionEvaluator";
+import { AuthorizationHighRiskChangeCodes } from "../use-cases/AuthorizationHighRiskChangeSafeguards";
 
 class PersistenceHarness
   implements
@@ -540,6 +542,53 @@ describe("Authorization administration use cases", () => {
     }
   });
 
+  it("blocks removal of the last active workspace administrator assignment", async () => {
+    const harness = new PersistenceHarness();
+    const mutationService = createMutationService(harness);
+    const decisionEvaluator = new StubDecisionEvaluator((request) => request.requiredPermissionKey === "system.manage");
+
+    harness.roleAssignments.set("admin-target", {
+      id: "admin-target",
+      actorUserIdentityId: "user-target",
+      roleKey: WorkspaceAuthorizationRoleKeys.admin,
+      scope: RoleAssignmentScopes.workspace,
+      workspaceId: "workspace-1",
+      status: RoleAssignmentStatuses.active,
+      assignedAt: "2026-04-05T09:00:00.000Z",
+      assignedByUserIdentityId: "user-owner",
+      createdAt: "2026-04-05T09:00:00.000Z",
+      createdBy: "user-owner",
+      lastModifiedAt: "2026-04-05T09:00:00.000Z",
+      lastModifiedBy: "user-owner",
+      revision: 1,
+    });
+
+    const outcome = await new RemoveAuthorizationRoleUseCase({
+      mutationService,
+      decisionEvaluator,
+      persistencePorts: {
+        roleAssignmentPersistenceRepository: harness,
+        sharingGrantPersistenceRepository: harness,
+        resourcePolicyMetadataPersistenceRepository: harness,
+      },
+      idGenerator: new SequenceIdGenerator(),
+    }).execute({
+      request: {
+        operation: "revoke",
+        workspaceId: "workspace-1",
+        actorUserIdentityId: "user-admin",
+        targetUserIdentityId: "user-target",
+        roleKey: "admin",
+      },
+    });
+
+    expect(outcome.ok).toBeFalse();
+    if (!outcome.ok) {
+      expect(outcome.error.code).toBe(AuthorizationAdministrationErrorCodes.conflict);
+      expect(outcome.error.details?.reasonCode).toBe(AuthorizationHighRiskChangeCodes.lastWorkspaceAdministratorRemoval);
+    }
+  });
+
   it("grants/revokes sharing and updates visibility", async () => {
     const harness = new PersistenceHarness();
     seedMetadata(harness, "asset-1", "shared");
@@ -668,6 +717,147 @@ describe("Authorization administration use cases", () => {
     expect(harness.sharingGrants.get("share-old")?.revokedAt).toBeDefined();
     expect(harness.sharingGrants.get("share-new")?.revokedAt).toBeUndefined();
     expect(visibility.value.sharingGrantMutations).toHaveLength(2);
+  });
+
+  it("requires explicit high-risk confirmation when creating broad sharing grants", async () => {
+    const harness = new PersistenceHarness();
+    seedMetadata(harness, "asset-high-risk-share", "shared");
+    const decisionEvaluator = new StubDecisionEvaluator((request) => request.requiredPermissionKey === "asset.share");
+    const mutationService = createMutationService(harness);
+
+    const useCase = new GrantAuthorizationSharingAccessUseCase({
+      mutationService,
+      decisionEvaluator,
+      persistencePorts: {
+        roleAssignmentPersistenceRepository: harness,
+        sharingGrantPersistenceRepository: harness,
+        resourcePolicyMetadataPersistenceRepository: harness,
+      },
+      idGenerator: new SequenceIdGenerator(),
+    });
+
+    const blocked = await useCase.execute({
+      request: {
+        operation: "upsert",
+        actorUserIdentityId: "user-admin",
+        resource: {
+          resourceFamily: AuthorizationResourceFamilies.asset,
+          resourceType: "asset",
+          resourceId: "asset-high-risk-share",
+        },
+        workspaceId: "workspace-1",
+        visibility: "shared",
+        grant: {
+          id: "share-role-broad",
+          target: {
+            kind: "workspace-role",
+            workspaceId: "workspace-1",
+            roleKey: "viewer",
+          },
+          permissionKeys: ["asset.read"],
+        },
+      },
+    });
+    expect(blocked.ok).toBeFalse();
+    if (!blocked.ok) {
+      expect(blocked.error.code).toBe(AuthorizationAdministrationErrorCodes.highRiskConfirmationRequired);
+    }
+
+    const confirmed = await useCase.execute({
+      request: {
+        operation: "upsert",
+        actorUserIdentityId: "user-admin",
+        resource: {
+          resourceFamily: AuthorizationResourceFamilies.asset,
+          resourceType: "asset",
+          resourceId: "asset-high-risk-share",
+        },
+        workspaceId: "workspace-1",
+        visibility: "shared",
+        grant: {
+          id: "share-role-broad",
+          target: {
+            kind: "workspace-role",
+            workspaceId: "workspace-1",
+            roleKey: "viewer",
+          },
+          permissionKeys: ["asset.read"],
+        },
+      },
+      metadata: {
+        authorizationHighRiskConfirmation: {
+          confirmedRiskCodes: [AuthorizationHighRiskChangeCodes.broadSubjectShare],
+        },
+      },
+    });
+    expect(confirmed.ok).toBeTrue();
+  });
+
+  it("requires explicit high-risk confirmation when broadening visibility to published", async () => {
+    const harness = new PersistenceHarness();
+    seedMetadata(harness, "asset-high-risk-visibility", "workspace");
+    const decisionEvaluator = new StubDecisionEvaluator((request) => request.requiredPermissionKey === "asset.manage");
+    const mutationService = createMutationService(harness);
+    const useCase = new UpdateAuthorizationVisibilityUseCase({
+      mutationService,
+      decisionEvaluator,
+      persistencePorts: {
+        roleAssignmentPersistenceRepository: harness,
+        sharingGrantPersistenceRepository: harness,
+        resourcePolicyMetadataPersistenceRepository: harness,
+      },
+      idGenerator: new SequenceIdGenerator(),
+    });
+
+    const blocked = await useCase.execute({
+      request: {
+        actorUserIdentityId: "user-admin",
+        subject: {
+          resourceFamily: AuthorizationResourceFamilies.asset,
+          resourceType: "asset",
+          resourceId: "asset-high-risk-visibility",
+        },
+        workspaceId: "workspace-1",
+        visibility: "published",
+        sharingPolicyMode: "published",
+        allowResharing: false,
+        sharingGrants: [],
+        isPublishedCapable: true,
+        publishedAt: "2026-04-05T12:00:00.000Z",
+      },
+    });
+    expect(blocked.ok).toBeFalse();
+    if (!blocked.ok) {
+      expect(blocked.error.code).toBe(AuthorizationAdministrationErrorCodes.highRiskConfirmationRequired);
+    }
+
+    const confirmed = await useCase.execute({
+      request: {
+        actorUserIdentityId: "user-admin",
+        subject: {
+          resourceFamily: AuthorizationResourceFamilies.asset,
+          resourceType: "asset",
+          resourceId: "asset-high-risk-visibility",
+        },
+        workspaceId: "workspace-1",
+        visibility: "published",
+        sharingPolicyMode: "published",
+        allowResharing: false,
+        sharingGrants: [],
+        isPublishedCapable: true,
+        publishedAt: "2026-04-05T12:00:00.000Z",
+      },
+      metadata: {
+        authorizationHighRiskConfirmation: {
+          confirmedRiskCodes: [
+            AuthorizationHighRiskChangeCodes.visibilityBroadened,
+            AuthorizationHighRiskChangeCodes.resourcePublished,
+          ],
+        },
+      },
+    });
+
+    expect(confirmed.ok).toBeTrue();
   });
 
   it("bulk-grants workspace-role sharing with deterministic mixed-authority results", async () => {

@@ -18,6 +18,15 @@ import {
   mapAuthorizationSchemaValidationError,
   toAuthorizationFailure,
 } from "./AuthorizationAdministrationUseCaseShared";
+import {
+  AuthorizationHighRiskChangeCodes,
+  type AuthorizationHighRiskChangeCode,
+  assertHighRiskChangesConfirmed,
+  containsSharePermissionEscalation,
+  deriveAddedPermissionKeys,
+  deriveVisibilityExposureRank,
+  isBroadShareTarget,
+} from "./AuthorizationHighRiskChangeSafeguards";
 
 export interface UpdateAuthorizationVisibilityUseCaseInput {
   readonly request: unknown;
@@ -105,6 +114,46 @@ export class UpdateAuthorizationVisibilityUseCase {
       );
     }
 
+    const existingGrants = await this.dependencies.persistencePorts.sharingGrantPersistenceRepository.listSharingGrants({
+      resource: parsed.subject,
+      includeRevoked: false,
+    });
+    const existingGrantById = new Map(existingGrants.map((grant) => [grant.id, grant]));
+    const riskCodes = new Set<AuthorizationHighRiskChangeCode>();
+
+    if (deriveVisibilityExposureRank(parsed.visibility) > deriveVisibilityExposureRank(existingMetadata.visibility)) {
+      riskCodes.add(AuthorizationHighRiskChangeCodes.visibilityBroadened);
+    }
+
+    if (existingMetadata.visibility !== ResourceVisibilities.published && parsed.visibility === ResourceVisibilities.published) {
+      riskCodes.add(AuthorizationHighRiskChangeCodes.resourcePublished);
+    }
+
+    if (!existingMetadata.allowResharing && parsed.allowResharing) {
+      riskCodes.add(AuthorizationHighRiskChangeCodes.resharingEnabled);
+    }
+
+    for (const grant of parsed.sharingGrants) {
+      const previousGrant = existingGrantById.get(grant.id);
+      const addedPermissionKeys = deriveAddedPermissionKeys(previousGrant?.permissionKeys, grant.permissionKeys);
+      const broadensSubjectReach = previousGrant ? !isBroadPersistenceSubject(previousGrant.subject) : false;
+      if (isBroadShareTarget(grant.target) && (!previousGrant || broadensSubjectReach || addedPermissionKeys.length > 0)) {
+        riskCodes.add(AuthorizationHighRiskChangeCodes.broadSubjectShare);
+      }
+      if (containsSharePermissionEscalation(addedPermissionKeys)) {
+        riskCodes.add(AuthorizationHighRiskChangeCodes.sharePermissionEscalation);
+      }
+    }
+
+    const unconfirmedHighRisk = assertHighRiskChangesConfirmed({
+      actorUserIdentityId: parsed.actorUserIdentityId,
+      riskCodes: [...riskCodes],
+      metadata: input.metadata,
+    });
+    if (unconfirmedHighRisk) {
+      return unconfirmedHighRisk;
+    }
+
     const nowIso = this.clock.now().toISOString();
     const metadataMutation = await this.dependencies.mutationService.upsertResourcePolicyMetadata({
       record: {
@@ -131,11 +180,6 @@ export class UpdateAuthorizationVisibilityUseCase {
         correlationId: input.correlationId,
         metadata: input.metadata,
       }),
-    });
-
-    const existingGrants = await this.dependencies.persistencePorts.sharingGrantPersistenceRepository.listSharingGrants({
-      resource: parsed.subject,
-      includeRevoked: false,
     });
 
     const mutations: AuthorizationPersistenceMutationResult<AuthorizationSharingGrantPersistenceRecord>[] = [];
@@ -232,4 +276,22 @@ function toPersistenceSubject(subject: ReturnType<typeof parseAuthorizationVisib
   return {
     kind: "public" as const,
   };
+}
+
+function isBroadPersistenceSubject(subject: {
+  readonly kind: "user" | "workspace-role" | "workspace" | "public";
+  readonly roleKey?: string;
+}): boolean {
+  if (subject.kind === "workspace" || subject.kind === "public") {
+    return true;
+  }
+
+  if (subject.kind === "workspace-role") {
+    return isBroadShareTarget({
+      kind: "workspace-role",
+      roleKey: subject.roleKey,
+    });
+  }
+
+  return false;
 }
