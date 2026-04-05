@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Story 4.1.7 defines migration-ready persistence contracts for authorization records before infrastructure adapters are implemented.
+Story 4.1.7 defines migration-ready persistence contracts for authorization records, and Story 4.2.1 delivers the production SQLite adapter implementing those contracts.
 
 ## Canonical files
 
@@ -13,6 +13,11 @@ Story 4.1.7 defines migration-ready persistence contracts for authorization reco
 - `src/application/authorization/ports/IAuthorizationResourcePolicyMetadataPersistenceRepository.ts`
 - `src/application/authorization/ports/AuthorizationPolicyPersistencePorts.ts`
 - `src/application/authorization/tests/AuthorizationPolicyPersistencePortsContracts.test.ts`
+- `src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceMigrations.ts`
+- `src/infrastructure/persistence/authorization/AuthorizationPersistenceMapper.ts`
+- `src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter.ts`
+- `src/infrastructure/persistence/authorization/tests/AuthorizationPersistenceMapper.test.ts`
+- `src/infrastructure/persistence/authorization/tests/SqliteAuthorizationPersistenceAdapter.test.ts`
 
 ## Core contracts
 
@@ -37,6 +42,28 @@ Story 4.1.7 defines migration-ready persistence contracts for authorization reco
 - Deterministic key helpers are provided for:
   - resource tuple lookup keys
   - sharing subject lookup keys
+
+## Production adapter notes (Story 4.2.1)
+
+- The SQLite adapter centralizes authorization persistence logic under `src/infrastructure/persistence/authorization`.
+- Mapper utilities isolate row parsing and DTO/domain-shape mapping so database details do not leak into application code.
+- Versioned migrations are reproducible and tracked through `authorization_repository_migrations`.
+- Schema tables:
+  - `authorization_role_assignments`
+  - `authorization_sharing_grants`
+  - `authorization_resource_policy_metadata`
+  - `authorization_mutation_replays`
+- Adapter behavior includes:
+  - idempotent replay via `operationKey`,
+  - optimistic concurrency via `expectedRevision`,
+  - revocation and soft-delete lifecycle persistence,
+  - workspace/actor/resource/subject keyed query paths used by policy evaluation and admin flows.
+
+## Migration guidance
+
+- Run migrations only via adapter initialization.
+- Append-only migration policy: add a new migration version instead of editing prior versions.
+- Keep persistence SQL in the authorization infrastructure module; avoid SQL in use cases or application services.
 
 ## Verification posture
 
