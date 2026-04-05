@@ -218,6 +218,9 @@ export class ApproveNodeEnrollmentUseCase {
       details: Object.freeze({
         trustState: nodeMutation.record.trustState,
         approvalStatus: nodeMutation.record.approvalStatus,
+        reviewedAt: enrollmentMutation.record.reviewedAt,
+        reviewedByUserIdentityId: enrollmentMutation.record.reviewedByUserIdentityId,
+        decisionNote: enrollmentMutation.record.decisionNote,
         certificateRef: nodeMutation.record.certificate?.certificateRef,
       }),
     });
