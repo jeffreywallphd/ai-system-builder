@@ -115,3 +115,16 @@ Story 4.3.4 verification includes:
 - list filtering + per-item authorization parity on workflow-run and reference-image run-history reads,
 - denied runtime status/trace/audit access behavior for unauthorized actors,
 - runtime queue list filtering when queue scope is visible but individual runs are not.
+
+Story 4.3.5 introduces centralized authorization-aware response redaction:
+
+- a reusable response-shaping utility now models `deny` vs `partial` vs `full` access outcomes for protected payloads,
+- partial-access reads redact sensitive fields (workflow run execution input/output details, reference-image run parameter/lineage details, runtime trace/result sensitive sections) while preserving safe metadata visibility,
+- deny outcomes continue to use non-leaky patterns (`not-found`/`forbidden`) and partial outcomes avoid policy-bypass content leakage.
+
+Story 4.3.5 verification covers:
+
+- access-level derivation across owner/share/role/visibility decisions,
+- deterministic rule-based remove/mask redaction behavior,
+- workflow run detail partial redaction for workspace visibility role access,
+- runtime result/trace partial redaction for workspace visibility operational access.

@@ -132,6 +132,12 @@ import type { DatasetInstance } from "../../../domain/system-runtime/DatasetInst
 import type { IAuthorizationPolicyDecisionEvaluator } from "../../../src/application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyEvaluationTargetKinds } from "../../../src/application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
 import { AuthorizationResourceFamilies } from "../../../src/domain/authorization/AuthorizationPermissionCatalog";
+import {
+  AuthorizationResponseAccessLevels,
+  deriveAuthorizationResponseAccessLevel,
+  shapeAuthorizationAwareResponse,
+  type AuthorizationResponseAccessLevel,
+} from "../../../src/application/authorization/use-cases/AuthorizationResponseRedaction";
 
 export interface StudioShellApiError {
   readonly code:
@@ -798,6 +804,20 @@ export interface WorkflowRunDetailReadModel {
   readonly executionContext?: WorkflowRunDetailRecord["executionContext"];
   readonly outputs?: WorkflowRunDetailRecord["outputs"];
 }
+
+const WorkflowRunDetailPartialRedactionRules = Object.freeze([
+  Object.freeze({ path: "executionContext.executionInput" }),
+  Object.freeze({ path: "outputs.outputValues" }),
+  Object.freeze({ path: "outputs.resultMessages" }),
+]);
+
+const ReferenceImageRunPartialRedactionRules = Object.freeze([
+  Object.freeze({ path: "inputs.parameterSummary" }),
+  Object.freeze({ path: "lineage.sourceImageAssetId" }),
+  Object.freeze({ path: "lineage.sourceImageRecordId" }),
+  Object.freeze({ path: "lineage.sourceDatasetInstanceId" }),
+  Object.freeze({ path: "lineage.traceId" }),
+]);
 
 export class StudioShellBackendApi {
   private readonly service: DefaultStudioShellApplicationService;
@@ -1986,15 +2006,17 @@ export class StudioShellBackendApi {
     }
     const allowed: Array<ImageRunHistoryListing["runs"][number]> = [];
     for (const run of runs) {
-      if (await this.isOperationalResourceReadAllowed({
+      const access = await this.evaluateOperationalResourceReadAccess({
         authorization,
         requiredPermissionKey: "run.read",
         resourceFamily: AuthorizationResourceFamilies.run,
         resourceType: this.referenceImageRunProtectedResourceType,
         resourceId: this.createReferenceImageRunProtectedResourceId(systemId, run.runId),
-      })) {
-        allowed.push(run);
+      });
+      if (!access.isAllowed) {
+        continue;
       }
+      allowed.push(this.shapeReferenceImageRunReadModel(run, access.accessLevel));
     }
     return Object.freeze(allowed);
   }
@@ -2024,20 +2046,25 @@ export class StudioShellBackendApi {
   private async assertWorkflowRunReadAuthorized(
     runId: string,
     authorization?: OperationalAccessAuthorizationContext,
-  ): Promise<void> {
+  ): Promise<{ readonly accessLevel: AuthorizationResponseAccessLevel }> {
     if (!this.authorizationDecisionEvaluator) {
-      return;
+      return Object.freeze({
+        accessLevel: AuthorizationResponseAccessLevels.full,
+      });
     }
-    const allowed = await this.isOperationalResourceReadAllowed({
+    const access = await this.evaluateOperationalResourceReadAccess({
       authorization,
       requiredPermissionKey: "run.read",
       resourceFamily: AuthorizationResourceFamilies.run,
       resourceType: this.workflowRunProtectedResourceType,
       resourceId: runId,
     });
-    if (!allowed) {
+    if (!access.isAllowed) {
       throw new Error(`not-found:Workflow run '${runId}' was not found.`);
     }
+    return Object.freeze({
+      accessLevel: access.accessLevel,
+    });
   }
 
   private async isOperationalResourceReadAllowed(input: {
@@ -2047,12 +2074,32 @@ export class StudioShellBackendApi {
     readonly resourceType: string;
     readonly resourceId: string;
   }): Promise<boolean> {
+    const access = await this.evaluateOperationalResourceReadAccess(input);
+    return access.isAllowed;
+  }
+
+  private async evaluateOperationalResourceReadAccess(input: {
+    readonly authorization?: OperationalAccessAuthorizationContext;
+    readonly requiredPermissionKey: "run.read";
+    readonly resourceFamily: typeof AuthorizationResourceFamilies.run;
+    readonly resourceType: string;
+    readonly resourceId: string;
+  }): Promise<{
+    readonly isAllowed: boolean;
+    readonly accessLevel: AuthorizationResponseAccessLevel;
+  }> {
     if (!this.authorizationDecisionEvaluator) {
-      return true;
+      return Object.freeze({
+        isAllowed: true,
+        accessLevel: AuthorizationResponseAccessLevels.full,
+      });
     }
     const actorUserIdentityId = input.authorization?.actorUserIdentityId?.trim();
     if (!actorUserIdentityId) {
-      return false;
+      return Object.freeze({
+        isAllowed: false,
+        accessLevel: AuthorizationResponseAccessLevels.deny,
+      });
     }
     const decision = await this.authorizationDecisionEvaluator.evaluateDecision({
       actor: Object.freeze({
@@ -2071,7 +2118,10 @@ export class StudioShellBackendApi {
       }),
       asOf: input.authorization?.asOf?.trim() || this.now().toISOString(),
     });
-    return decision.decision.isAllowed;
+    return Object.freeze({
+      isAllowed: decision.decision.isAllowed,
+      accessLevel: deriveAuthorizationResponseAccessLevel(decision.decision),
+    });
   }
 
   private async resolveReferenceImageDatasetForBinding(input: {
@@ -2290,7 +2340,7 @@ export class StudioShellBackendApi {
       if (!normalizedRunId) {
         throw new StudioShellInvalidRequestError("Workflow run id is required.");
       }
-      await this.assertWorkflowRunReadAuthorized(normalizedRunId, authorization);
+      const access = await this.assertWorkflowRunReadAuthorized(normalizedRunId, authorization);
 
       const detail = await this.getWorkflowRunDetailUseCase.execute(normalizedRunId);
       if (!detail) {
@@ -2300,7 +2350,10 @@ export class StudioShellBackendApi {
         );
       }
 
-      return this.toWorkflowRunDetailReadModel(detail);
+      return this.shapeWorkflowRunDetailReadModel(
+        this.toWorkflowRunDetailReadModel(detail),
+        access.accessLevel,
+      );
     });
   }
 
@@ -2591,6 +2644,37 @@ export class StudioShellBackendApi {
         })
         : undefined,
     } satisfies WorkflowRunDetailReadModel);
+  }
+
+  private shapeWorkflowRunDetailReadModel(
+    value: WorkflowRunDetailReadModel,
+    accessLevel: AuthorizationResponseAccessLevel,
+  ): WorkflowRunDetailReadModel {
+    if (accessLevel === AuthorizationResponseAccessLevels.full) {
+      return value;
+    }
+
+    const shaped = shapeAuthorizationAwareResponse({
+      accessLevel,
+      value,
+      partialRules: WorkflowRunDetailPartialRedactionRules,
+    });
+    return shaped.value ?? value;
+  }
+
+  private shapeReferenceImageRunReadModel(
+    value: ImageRunHistoryListing["runs"][number],
+    accessLevel: AuthorizationResponseAccessLevel,
+  ): ImageRunHistoryListing["runs"][number] {
+    if (accessLevel === AuthorizationResponseAccessLevels.full) {
+      return value;
+    }
+    const shaped = shapeAuthorizationAwareResponse({
+      accessLevel,
+      value,
+      partialRules: ReferenceImageRunPartialRedactionRules,
+    });
+    return shaped.value ?? value;
   }
 
   private toWorkflowRunDiagnosticReadModels(

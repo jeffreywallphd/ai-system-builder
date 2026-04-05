@@ -117,6 +117,37 @@ describe("Operational run authorization", () => {
         },
       }),
     }));
+    await workflowRuns.upsertDetail(createWorkflowRunDetailRecord({
+      runId: "run:wf:workspace-visible",
+      summary: createWorkflowRunSummaryRecord({
+        runId: "run:wf:workspace-visible",
+        status: WorkflowRunStatuses.completed,
+        triggerSource: WorkflowRunTriggerSources.manual,
+        workflow: { workflowId: "workflow:beta", workflowName: "Workflow Beta" },
+        correlation: { executionRunId: "run:wf:workspace-visible" },
+        timestamps: {
+          startedAt: "2026-04-05T14:00:00.000Z",
+          endedAt: "2026-04-05T14:00:03.000Z",
+          updatedAt: "2026-04-05T14:00:03.000Z",
+        },
+      }),
+      executionContext: Object.freeze({
+        executionInput: Object.freeze({
+          parameters: Object.freeze({
+            prompt: "hidden prompt",
+            modelConfig: Object.freeze({
+              temperature: 0.4,
+            }),
+          }),
+        }),
+      }),
+      outputs: Object.freeze({
+        outputAssetIds: Object.freeze(["asset:run:wf:workspace-visible:1"]),
+        outputCount: 1,
+        resultMessages: Object.freeze(["hidden result message"]),
+        outputValues: Object.freeze({ payload: "hidden output payload" }),
+      }),
+    }));
 
     const repositories = new InMemoryOperationalAuthorizationRepositories();
     repositories.resourceMetadata.set(
@@ -149,6 +180,21 @@ describe("Operational run authorization", () => {
         isPublishedCapable: false,
       }),
     );
+    repositories.resourceMetadata.set(
+      toKey("workflow-run", "run:wf:workspace-visible"),
+      Object.freeze({
+        resourceFamily: AuthorizationResourceFamilies.run,
+        resourceType: "workflow-run",
+        resourceId: "run:wf:workspace-visible",
+        ownerUserIdentityId: "user-owner",
+        ownershipScope: ResourceOwnershipScopes.workspace,
+        workspaceId: "workspace-alpha",
+        visibility: ResourceVisibilities.workspace,
+        sharingPolicyMode: SharingPolicyModes.workspaceMembers,
+        allowResharing: false,
+        isPublishedCapable: false,
+      }),
+    );
     repositories.sharingGrants = Object.freeze([
       Object.freeze({
         id: "share-run-1",
@@ -171,6 +217,15 @@ describe("Operational run authorization", () => {
           workspaceId: "workspace-alpha",
           assignedByUserIdentityId: "user-owner",
           assignedAt: "2026-04-05T10:00:00.000Z",
+        }),
+        createRoleAssignment({
+          id: "role-guest-1",
+          actorUserIdentityId: "user-guest",
+          roleKey: "guest",
+          scope: RoleAssignmentScopes.workspace,
+          workspaceId: "workspace-alpha",
+          assignedByUserIdentityId: "user-owner",
+          assignedAt: "2026-04-05T10:30:00.000Z",
         }),
       ]),
       permissionGrants: Object.freeze([]),
@@ -213,6 +268,15 @@ describe("Operational run authorization", () => {
     });
     expect(deniedDetail.ok).toBeFalse();
     expect(deniedDetail.error?.code).toBe("not-found");
+
+    const guestDetail = await api.getWorkflowRunDetail("run:wf:workspace-visible", {
+      actorUserIdentityId: "user-guest",
+      activeWorkspaceId: "workspace-alpha",
+    });
+    expect(guestDetail.ok).toBeTrue();
+    expect(guestDetail.data?.executionContext?.executionInput).toBeUndefined();
+    expect(guestDetail.data?.outputs?.resultMessages).toBeUndefined();
+    expect(guestDetail.data?.outputs?.outputValues).toBeUndefined();
   });
 
   it("filters reference-image run history by owner/share/admin visibility", async () => {
