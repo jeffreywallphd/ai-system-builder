@@ -467,6 +467,28 @@ export interface CertificateMetadataListViewDto {
   readonly pagination: CertificateMetadataListPaginationDto;
 }
 
+export interface RuntimeTrustMaterialProtectedReferenceDto {
+  readonly materialRef: string;
+  readonly kind: TrustMaterialKind;
+  readonly accessRef: string;
+  readonly accessRefRedacted: string;
+  readonly fingerprintSha256?: string;
+}
+
+export interface RuntimeTrustMaterialPackageViewDto {
+  readonly packageId: string;
+  readonly occurredAt: string;
+  readonly certificateAuthorityId: string;
+  readonly serialNumber?: string;
+  readonly targetKind: CertificateDistributionTargetKind;
+  readonly targetReferenceId: string;
+  readonly workspaceId?: string;
+  readonly leafCertificatePem?: string;
+  readonly certificateChainPem?: string;
+  readonly trustBundlePem?: string;
+  readonly protectedReferences: ReadonlyArray<RuntimeTrustMaterialProtectedReferenceDto>;
+}
+
 export const CertificateAuthorityPersistenceQueryPresets = Object.freeze({
   activeStatuses: Object.freeze([CertificateAuthorityStatuses.active]),
   terminalStatuses: Object.freeze([

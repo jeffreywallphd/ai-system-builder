@@ -466,6 +466,28 @@ export const CertificateMetadataListViewSchema = z.object({
   pagination: CertificateMetadataListPaginationSchema,
 });
 
+export const RuntimeTrustMaterialProtectedReferenceSchema = z.object({
+  materialRef: CertificateAuthorityIdentifierSchema,
+  kind: TrustMaterialKindSchema,
+  accessRef: z.string().trim().min(1).max(1024),
+  accessRefRedacted: z.string().trim().min(1).max(1024),
+  fingerprintSha256: z.string().trim().max(256).optional(),
+});
+
+export const RuntimeTrustMaterialPackageViewSchema = z.object({
+  packageId: CertificateAuthorityIdentifierSchema,
+  occurredAt: CertificateAuthorityTimestampSchema,
+  certificateAuthorityId: CertificateAuthorityIdentifierSchema,
+  serialNumber: z.string().trim().toUpperCase().regex(SerialPattern).optional(),
+  targetKind: CertificateDistributionTargetKindSchema,
+  targetReferenceId: CertificateAuthorityIdentifierSchema,
+  workspaceId: CertificateAuthorityIdentifierSchema.optional(),
+  leafCertificatePem: z.string().trim().min(1).optional(),
+  certificateChainPem: z.string().trim().min(1).optional(),
+  trustBundlePem: z.string().trim().min(1).optional(),
+  protectedReferences: z.array(RuntimeTrustMaterialProtectedReferenceSchema),
+});
+
 export type RotationPolicyMetadataPersistenceRecordPayload = z.infer<typeof RotationPolicyMetadataPersistenceRecordSchema>;
 export type CertificateValidityWindowPersistenceRecordPayload = z.infer<typeof CertificateValidityWindowPersistenceRecordSchema>;
 export type CertificateSubjectPersistenceRecordPayload = z.infer<typeof CertificateSubjectPersistenceRecordSchema>;
@@ -480,6 +502,7 @@ export type CertificateDistributionEventPersistenceRecordPayload = z.infer<typeo
 export type CertificateAuthorityStatusIntrospectionViewPayload = z.infer<typeof CertificateAuthorityStatusIntrospectionViewSchema>;
 export type IssuedCertificateMetadataViewPayload = z.infer<typeof IssuedCertificateMetadataViewSchema>;
 export type CertificateMetadataListViewPayload = z.infer<typeof CertificateMetadataListViewSchema>;
+export type RuntimeTrustMaterialPackageViewPayload = z.infer<typeof RuntimeTrustMaterialPackageViewSchema>;
 
 function formatZodPath(path: ReadonlyArray<string | number>): string {
   if (path.length === 0) {
@@ -599,6 +622,16 @@ export function parseCertificateMetadataListView(
   return parseCertificateAuthoritySchema(
     "CertificateMetadataListView",
     CertificateMetadataListViewSchema,
+    payload,
+  );
+}
+
+export function parseRuntimeTrustMaterialPackageView(
+  payload: unknown,
+): RuntimeTrustMaterialPackageViewPayload {
+  return parseCertificateAuthoritySchema(
+    "RuntimeTrustMaterialPackageView",
+    RuntimeTrustMaterialPackageViewSchema,
     payload,
   );
 }

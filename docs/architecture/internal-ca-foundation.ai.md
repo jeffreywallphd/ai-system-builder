@@ -17,6 +17,7 @@
 - Adds reusable certificate trust/validity evaluation helper seams for consistent lifecycle status decisions (Story 6.2.5).
 - Adds certificate lifecycle audit recording seams for initialization/issuance/revocation decisions and outcomes (Story 6.2.6).
 - Adds issued-certificate metadata list/detail query seams for trusted admin/API consumers (Story 6.2.7).
+- Adds runtime trust-material export/distribution contracts for scoped runtime consumers (Story 6.3.1).
 
 ## Main artifacts to cite
 
@@ -35,6 +36,7 @@
 - `src/application/security/ports/ICertificateRevocationStatusRegistry.ts`
 - `src/application/security/ports/CertificateLifecycleAuditPorts.ts`
 - `src/application/security/ports/CertificateQueryAuthorizationPorts.ts`
+- `src/application/security/ports/CertificateRuntimeTrustMaterialAuthorizationPort.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
 - `src/application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase.ts`
@@ -44,19 +46,23 @@
 - `src/application/security/use-cases/CertificateTrustEvaluationService.ts`
 - `src/application/security/use-cases/ListIssuedCertificateMetadataUseCase.ts`
 - `src/application/security/use-cases/GetIssuedCertificateMetadataUseCase.ts`
+- `src/application/security/use-cases/ResolveRuntimeTrustMaterialPackageUseCase.ts`
 - `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
 - `src/infrastructure/security/secrets/FileSystemProtectedSecretStore.ts`
 - `src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage.ts`
 - `src/infrastructure/security/ca/InternalCertificateAuthorityIssuer.ts`
+- `src/infrastructure/security/certificates/RuntimeTrustMaterialDistributionService.ts`
 - `hosts/server/IdentityServerHost.ts`
 - `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
 - `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
 - `src/application/security/tests/IssuedCertificateMetadataQueryUseCases.test.ts`
+- `src/application/security/tests/ResolveRuntimeTrustMaterialPackageUseCase.test.ts`
 - `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
 - `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
+- `src/infrastructure/security/certificates/tests/RuntimeTrustMaterialDistributionService.test.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
 - `src/shared/schemas/security/CertificateAuthoritySchemaContracts.ts`
@@ -239,6 +245,22 @@ Structured diagnostics emitted by the startup use case are designed for future o
   - `trustMaterialRef`
   - trust-material storage locators / secret refs
 - Includes only operational trust metadata needed for visibility and decisions (subject/status/validity/revocation/trust summary).
+
+## Story 6.3.1 runtime trust-material export/distribution behavior
+
+- `ITrustMaterialDistributionPort` now provides runtime retrieval contracts (`resolveRuntimeTrustMaterialPackage`) for server/node/device/service runtime consumers.
+- `ResolveRuntimeTrustMaterialPackageUseCase` is the application boundary for:
+  - request normalization and validation,
+  - caller authorization via `CertificateRuntimeTrustMaterialAuthorizationHook`,
+  - deterministic `invalid-request`, `forbidden`, and `not-found` outcomes.
+- `RuntimeTrustMaterialDistributionService` implements concrete runtime package assembly by:
+  - loading scoped issued-certificate + CA metadata,
+  - enforcing target-scope alignment (subject kind/reference/workspace),
+  - resolving trust material metadata references,
+  - loading certificate/chain/root material through protected storage seams,
+  - returning only requested package outputs (leaf cert, chain, trust bundle, protected references).
+- private key plaintext is intentionally excluded from runtime package outputs.
+- retrieval success is tracked through persisted `certificate_distribution_events` (`published`) for operational follow-up.
 
 ## Coverage in this slice
 
