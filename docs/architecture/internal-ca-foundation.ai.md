@@ -13,6 +13,7 @@
 - Adds certificate subject profiles and pre-issuance policy enforcement seams (Story 6.2.1).
 - Adds concrete CA issuance signing + protected issued-material persistence seams (Story 6.2.2).
 - Adds node-trust-backed approved-node eligibility integration for certificate issuance (Story 6.2.3).
+- Adds explicit certificate revocation command and revocation-status enforcement registry seams (Story 6.2.4).
 
 ## Main artifacts to cite
 
@@ -28,10 +29,13 @@
 - `src/application/security/ports/ICertificateAuthorityBootstrapSecretService.ts`
 - `src/application/security/ports/ICertificateAuthorityRootMaterialStorage.ts`
 - `src/application/security/ports/INodeCertificateEligibilityPort.ts`
+- `src/application/security/ports/ICertificateRevocationStatusRegistry.ts`
 - `src/application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase.ts`
 - `src/application/security/use-cases/InitializeCertificateAuthorityUseCase.ts`
 - `src/application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase.ts`
 - `src/application/security/use-cases/IssueCertificateForSubjectUseCase.ts`
+- `src/application/security/use-cases/RevokeIssuedCertificateUseCase.ts`
+- `src/application/security/use-cases/ResolveCertificateRevocationStatusUseCase.ts`
 - `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
@@ -162,6 +166,17 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - Approved-node issuance now fails closed when node trust metadata is missing, malformed, revoked, unapproved, or enrollment-incoherent.
 - Issued certificate subject linkage remains durable through `subjectReference.kind='node'` + `subjectReference.referenceId=<nodeId>` with eligibility derived from node-trust records.
 
+## Story 6.2.4 revocation workflow + status enforcement behavior
+
+- `RevokeIssuedCertificateUseCase` adds an explicit application-layer revocation command that:
+  - validates serial/reason/actor inputs and revocation timestamps,
+  - rejects duplicate revocation attempts,
+  - rejects invalid revocation states (non-issued certificate status),
+  - persists revocation metadata through issued-certificate persistence boundaries.
+- `RevokeIssuedCertificateUseCase` also guarantees a queryable revocation-history record through lifecycle-event persistence when a repository implementation does not auto-write revocation history.
+- `ResolveCertificateRevocationStatusUseCase` implements `ICertificateRevocationStatusRegistry` to provide a canonical revocation/status check seam for downstream transport and trust-enforcement consumers.
+- registry responses distinguish `revoked` from `expired` and `active` while also reporting `superseded`, `not-yet-valid`, and `not-found` trust states.
+
 ## Coverage in this slice
 
 - Domain invariants and lifecycle transitions: `src/domain/security/tests/CertificateAuthorityDomain.test.ts`
@@ -177,6 +192,8 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - first-time CA initialization coverage: `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - CA introspection state/health/sanitization coverage: `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
 - issuance policy + issued-material persistence/failure compensation coverage: `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
+- revocation command behavior (admin action / duplicate / invalid request): `src/application/security/tests/RevokeIssuedCertificateUseCase.test.ts`
+- revocation registry status enforcement behavior: `src/application/security/tests/ResolveCertificateRevocationStatusUseCase.test.ts`
 - concrete issuer signing pipeline coverage: `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - host initialization seam coverage: `hosts/server/tests/IdentityServerHost.test.ts`
 
