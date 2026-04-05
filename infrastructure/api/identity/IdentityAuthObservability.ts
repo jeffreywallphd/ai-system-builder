@@ -58,6 +58,8 @@ const SENSITIVE_FIELD_KEYS = new Set([
   "salt",
   "secret",
   "token",
+  "trustmarker",
+  "trusteddevicebindingid",
   "username",
 ]);
 

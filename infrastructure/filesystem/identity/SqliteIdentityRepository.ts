@@ -136,6 +136,8 @@ interface SessionRow {
   readonly client_user_agent: string | null;
   readonly client_ip_address: string | null;
   readonly client_device_id: string | null;
+  readonly client_trusted_device_binding_id: string | null;
+  readonly client_trust_marker: string | null;
 }
 
 interface SessionTokenMaterialRow {
@@ -664,11 +666,13 @@ export class SqliteIdentityRepository
           replaced_by_session_id,
           revocation_reason,
           revoked_at,
-          client_access_channel,
-          client_user_agent,
-          client_ip_address,
-          client_device_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        client_access_channel,
+        client_user_agent,
+        client_ip_address,
+        client_device_id,
+        client_trusted_device_binding_id,
+        client_trust_marker
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(session_id) DO UPDATE SET
           user_identity_id = excluded.user_identity_id,
           provider_id = excluded.provider_id,
@@ -683,7 +687,9 @@ export class SqliteIdentityRepository
           client_access_channel = excluded.client_access_channel,
           client_user_agent = excluded.client_user_agent,
           client_ip_address = excluded.client_ip_address,
-          client_device_id = excluded.client_device_id
+          client_device_id = excluded.client_device_id,
+          client_trusted_device_binding_id = excluded.client_trusted_device_binding_id,
+          client_trust_marker = excluded.client_trust_marker
       `)
       .run(
         session.id,
@@ -701,6 +707,8 @@ export class SqliteIdentityRepository
         session.client?.userAgent ?? null,
         session.client?.ipAddress ?? null,
         session.client?.deviceId ?? null,
+        session.client?.trustedDeviceBindingId ?? null,
+        session.client?.trustMarker ?? null,
       );
 
     return session;
@@ -729,7 +737,9 @@ export class SqliteIdentityRepository
           client_access_channel,
           client_user_agent,
           client_ip_address,
-          client_device_id
+          client_device_id,
+          client_trusted_device_binding_id,
+          client_trust_marker
         FROM identity_sessions
         WHERE session_id = ?
       `)
@@ -780,7 +790,9 @@ export class SqliteIdentityRepository
           client_access_channel,
           client_user_agent,
           client_ip_address,
-          client_device_id
+          client_device_id,
+          client_trusted_device_binding_id,
+          client_trust_marker
         FROM identity_sessions
         WHERE ${where.join(" AND ")}
         ORDER BY issued_at DESC
@@ -1139,6 +1151,8 @@ function hydrateSession(row: SessionRow): Session {
       userAgent: row.client_user_agent ?? undefined,
       ipAddress: row.client_ip_address ?? undefined,
       deviceId: row.client_device_id ?? undefined,
+      trustedDeviceBindingId: row.client_trusted_device_binding_id ?? undefined,
+      trustMarker: row.client_trust_marker ?? undefined,
     },
   });
 

@@ -8,11 +8,18 @@ This module defines the transport-facing request/response contracts for local ac
 - `LoginLocalIdentityApiRequest`
 - `ResolveAuthenticatedSessionApiRequest`
 
+`LoginLocalIdentityApiRequest.client` supports optional trusted-device seam context fields:
+
+- `trustedDeviceBindingId`
+- `trustMarker`
+
 ## Success responses
 
 - `RegisterLocalIdentityApiResponse`
 - `LoginLocalIdentityApiResponse`
 - `ResolveAuthenticatedSessionApiResponse`
+
+Session responses may include trusted-device seam fields (`deviceId`, `trustedDeviceBindingId`, `trustMarker`) when present.
 
 ## Error envelope
 

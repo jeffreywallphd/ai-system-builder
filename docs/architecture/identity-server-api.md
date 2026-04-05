@@ -51,7 +51,9 @@ UI entry points now consume this same HTTP surface through renderer identity ada
   "client": {
     "userAgent": "string (optional)",
     "ipAddress": "string (optional)",
-    "deviceId": "string (optional)"
+    "deviceId": "string (optional)",
+    "trustedDeviceBindingId": "string (optional, future trusted-device seam)",
+    "trustMarker": "string (optional, future trusted-device seam)"
   },
   "credential": {
     "candidate": "string"
@@ -136,7 +138,10 @@ All responses use one envelope:
     "sessionTokenType": "Bearer",
     "sessionIssuedAt": "2026-04-04T18:00:00.000Z",
     "sessionExpiresAt": "2026-04-05T06:00:00.000Z",
-    "sessionAccessChannel": "thin-client"
+    "sessionAccessChannel": "thin-client",
+    "sessionDeviceId": "device:example",
+    "sessionTrustedDeviceBindingId": "trusted-device:example",
+    "sessionTrustMarker": "marker:example"
   }
 }
 ```
@@ -158,6 +163,9 @@ All responses use one envelope:
       "providerId": "provider:local-password",
       "providerSubject": "normalized-subject",
       "accessChannel": "thin-client",
+      "deviceId": "device:example",
+      "trustedDeviceBindingId": "trusted-device:example",
+      "trustMarker": "marker:example",
       "issuedAt": "2026-04-04T18:00:00.000Z",
       "expiresAt": "2026-04-05T06:00:00.000Z"
     }
@@ -208,6 +216,7 @@ Session issuance notes:
 - Token/signing material persists separately in `identity_session_token_material` as token hash metadata (raw token is not persisted).
 - Revocation and logout invalidate token material (`invalidated_at`) and mark session lifecycle state `revoked`, so protected session validation fails on the next request without additional eventual-consistency delay in this local persistence slice.
 - Session expiry behavior is policy-driven through environment-backed configuration (`IDENTITY_SESSION_*` variables for desktop/thin-client TTL, refresh, and optional inactivity timeout), so returned `sessionExpiresAt` values reflect configured policy instead of fixed constants.
+- Session context now includes trusted-device seam fields (`trustedDeviceBindingId`, `trustMarker`) for future trust policy composition; they are persisted and returned as context but not used as authorization decisions in this slice.
 
 ## Stable error mapping
 
@@ -255,6 +264,8 @@ Redacted keys include:
 - `hashValue`
 - `salt`
 - `pepperVersion`
+- `trustedDeviceBindingId`
+- `trustMarker`
 - `username`
 - `providerSubject`
 - `email`

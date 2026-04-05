@@ -43,6 +43,8 @@ export interface IssueIdentitySessionInput {
     readonly userAgent?: string;
     readonly ipAddress?: string;
     readonly deviceId?: string;
+    readonly trustedDeviceBindingId?: string;
+    readonly trustMarker?: string;
   };
 }
 
@@ -184,6 +186,8 @@ export class IdentitySessionLifecycleService {
         userAgent: input.client?.userAgent,
         ipAddress: input.client?.ipAddress,
         deviceId: input.client?.deviceId,
+        trustedDeviceBindingId: input.client?.trustedDeviceBindingId,
+        trustMarker: input.client?.trustMarker,
       },
     });
 

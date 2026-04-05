@@ -61,7 +61,7 @@ Shared redaction (`redactSensitiveAuthPayload`) is reused by both backend and HT
 
 - Login request now accepts optional session-context fields:
   - `accessChannel` (`desktop` or `thin-client`; default `thin-client`)
-  - optional `client` context (`userAgent`, `ipAddress`, `deviceId`)
+  - optional `client` context (`userAgent`, `ipAddress`, `deviceId`, `trustedDeviceBindingId`, `trustMarker`)
 - Login success now includes issued-session fields:
   - `sessionId`
   - `sessionToken`
@@ -69,8 +69,10 @@ Shared redaction (`redactSensitiveAuthPayload`) is reused by both backend and HT
   - `sessionIssuedAt`
   - `sessionExpiresAt`
   - `sessionAccessChannel`
+  - optional trusted-device seam fields (`sessionDeviceId`, `sessionTrustedDeviceBindingId`, `sessionTrustMarker`)
 - Session metadata and token material are separated in persistence (`identity_sessions` vs `identity_session_token_material`).
 - Session expiry/refresh behavior is policy-configurable through environment-backed identity session policy settings (`IDENTITY_SESSION_*`) rather than hard-coded expiry constants.
+- Trusted-device seam metadata is context-only in this slice (persisted + returned) and not yet used for authorization decisions.
 
 ## Logout and revocation contract update (story 1.3.4)
 
@@ -87,7 +89,7 @@ Shared redaction (`redactSensitiveAuthPayload`) is reused by both backend and HT
 - `IdentityHttpServer` now includes guard-style request infrastructure for protected routes.
 - Guard extracts bearer tokens from `Authorization` headers, validates active session state through `IdentityAuthBackendApi.resolveAuthenticatedSession(...)`, and supplies downstream handler context with:
   - resolved principal (`userIdentityId`, `username`, optional profile fields)
-  - resolved session metadata (`sessionId`, provider/channel, issue/expiry times)
+  - resolved session metadata (`sessionId`, provider/channel, issue/expiry times, optional `deviceId`, `trustedDeviceBindingId`, `trustMarker`)
 - Protected route `GET /api/v1/identity/session` now returns that context for authenticated clients.
 - Missing, invalid, expired, and revoked sessions are consistently rejected as `401` + `authentication-failed`.
 

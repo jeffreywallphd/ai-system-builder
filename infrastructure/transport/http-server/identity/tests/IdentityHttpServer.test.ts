@@ -201,6 +201,11 @@ describe("IdentityHttpServer", () => {
       },
       body: JSON.stringify({
         providerSubject: "guard.user",
+        client: {
+          deviceId: "device:guard",
+          trustedDeviceBindingId: "trusted-device:guard",
+          trustMarker: "marker:guard",
+        },
         credential: {
           candidate: "StrongPass!2026",
         },
@@ -228,6 +233,9 @@ describe("IdentityHttpServer", () => {
     expect(validSessionBody.ok).toBe(true);
     expect(validSessionBody.data.principal.username).toBe("guard.user");
     expect(validSessionBody.data.session.sessionId).toBe(loginBody.data.sessionId);
+    expect(validSessionBody.data.session.deviceId).toBe("device:guard");
+    expect(validSessionBody.data.session.trustedDeviceBindingId).toBe("trusted-device:guard");
+    expect(validSessionBody.data.session.trustMarker).toBe("marker:guard");
 
     const issuedSession = await harness.adapter.getSessionById(loginBody.data.sessionId);
     if (!issuedSession) {

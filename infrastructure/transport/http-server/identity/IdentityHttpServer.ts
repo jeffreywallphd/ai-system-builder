@@ -36,6 +36,8 @@ const LoginRequestSchema: z.ZodType<LoginLocalIdentityApiRequest> = z.object({
     userAgent: z.string().min(1).optional(),
     ipAddress: z.string().min(1).optional(),
     deviceId: z.string().min(1).optional(),
+    trustedDeviceBindingId: z.string().min(1).optional(),
+    trustMarker: z.string().min(1).optional(),
   }).strict().optional(),
   credential: z.object({
     candidate: z.string().min(1),

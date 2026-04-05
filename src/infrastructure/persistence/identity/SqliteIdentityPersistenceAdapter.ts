@@ -494,8 +494,10 @@ export class SqliteIdentityPersistenceAdapter
         client_access_channel,
         client_user_agent,
         client_ip_address,
-        client_device_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        client_device_id,
+        client_trusted_device_binding_id,
+        client_trust_marker
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(session_id) DO UPDATE SET
         user_identity_id = excluded.user_identity_id,
         provider_id = excluded.provider_id,
@@ -510,7 +512,9 @@ export class SqliteIdentityPersistenceAdapter
         client_access_channel = excluded.client_access_channel,
         client_user_agent = excluded.client_user_agent,
         client_ip_address = excluded.client_ip_address,
-        client_device_id = excluded.client_device_id
+        client_device_id = excluded.client_device_id,
+        client_trusted_device_binding_id = excluded.client_trusted_device_binding_id,
+        client_trust_marker = excluded.client_trust_marker
     `).run(...mapSessionToRowValues(session));
 
     return session;
@@ -538,7 +542,9 @@ export class SqliteIdentityPersistenceAdapter
         client_access_channel,
         client_user_agent,
         client_ip_address,
-        client_device_id
+        client_device_id,
+        client_trusted_device_binding_id,
+        client_trust_marker
       FROM identity_sessions
       WHERE session_id = ?
     `).get(normalizedSessionId) as SessionRow | undefined;
@@ -587,7 +593,9 @@ export class SqliteIdentityPersistenceAdapter
         client_access_channel,
         client_user_agent,
         client_ip_address,
-        client_device_id
+        client_device_id,
+        client_trusted_device_binding_id,
+        client_trust_marker
       FROM identity_sessions
       WHERE ${clauses.join(" AND ")}
       ORDER BY issued_at DESC

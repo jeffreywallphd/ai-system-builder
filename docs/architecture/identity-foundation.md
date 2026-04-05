@@ -102,7 +102,7 @@ Both adapters implement the same application ports and preserve the same schema/
 
 ## Persistence Design
 
-Current schema version: `3`
+Current schema version: `4`
 
 Tables:
 
@@ -281,7 +281,7 @@ Identity does not currently represent device trust posture or runtime trust post
 
 Specifically:
 
-- `Session.client` fields (`accessChannel`, `userAgent`, `ipAddress`, `deviceId`) are informational/session-context metadata, not a trust decision model.
+- `Session.client` fields (`accessChannel`, `userAgent`, `ipAddress`, `deviceId`, `trustedDeviceBindingId`, `trustMarker`) are informational/session-context metadata, not a trust decision model.
 - MCP/runtime trust policy code lives in separate trust modules (for example `domain/mcp/McpToolTrust.ts`) and is not coupled into identity domain logic.
 - No identity rule depends on device-attestation state, runtime sandbox trust state, or tool trust decisions.
 
@@ -402,6 +402,31 @@ Default policy posture remains explicit and secure by default:
 - thin-client: `ttlMinutes=720` (12 hours), `allowRefresh=true`, inactivity timeout unset
 
 When inactivity timeout is configured, validation updates session/token expiry on activity (bounded by absolute TTL), and inactive sessions are expired/rejected once the inactivity window elapses.
+
+## Trusted-Device Session Binding Seams (Story 1.3.6)
+
+Session contracts, persistence rows, and authenticated-session validation now include production-ready seams for future trusted-device integration without introducing a trust implementation in this slice.
+
+Added optional session client context fields:
+
+- `trustedDeviceBindingId` (future association key to trusted-device records)
+- `trustMarker` (future opaque trust marker for policy engines)
+
+These fields are persisted in `identity_sessions` as:
+
+- `client_trusted_device_binding_id`
+- `client_trust_marker`
+
+Validation seam:
+
+- `IdentityAuthenticatedSessionService` now accepts optional `IIdentitySessionTrustEvaluator`.
+- When configured, it can evaluate resolved sessions during bearer-token validation and deny runtime access with existing invalid-session-state semantics.
+- No default trust evaluator is wired in this slice, so current behavior is unchanged unless a caller explicitly composes one.
+
+Principal/session resolution seam:
+
+- `resolveAuthenticatedSession` responses can now include session `deviceId`, `trustedDeviceBindingId`, and `trustMarker`.
+- This allows later trusted-device policy work to enrich authenticated runtime context without refactoring core identity/session layers.
 
 ## Implemented Test Coverage
 

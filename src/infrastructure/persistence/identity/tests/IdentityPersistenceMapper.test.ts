@@ -115,6 +115,8 @@ describe("IdentityPersistenceMapper", () => {
       client_user_agent: "agent",
       client_ip_address: "127.0.0.1",
       client_device_id: "device-1",
+      client_trusted_device_binding_id: "trusted-device:alpha",
+      client_trust_marker: "marker:alpha",
     };
 
     const mappedCredential = mapCredentialMaterialRowToRecord(credentialRow);
@@ -123,6 +125,8 @@ describe("IdentityPersistenceMapper", () => {
     expect(mappedCredential.hashAlgorithm).toBe("argon2id");
     expect(mappedSession.status).toBe(IdentitySessionStatuses.revoked);
     expect(mappedSession.client?.accessChannel).toBe("thin-client");
+    expect(mappedSession.client?.trustedDeviceBindingId).toBe("trusted-device:alpha");
+    expect(mappedSession.client?.trustMarker).toBe("marker:alpha");
     expect(mappedSession.revocation?.reason).toBe("logout");
   });
 

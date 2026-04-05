@@ -55,6 +55,8 @@ export interface LoginLocalIdentityApiRequest {
     readonly userAgent?: string;
     readonly ipAddress?: string;
     readonly deviceId?: string;
+    readonly trustedDeviceBindingId?: string;
+    readonly trustMarker?: string;
   };
   readonly credential: {
     readonly candidate: string;
@@ -76,6 +78,9 @@ export interface LoginLocalIdentityApiResponse {
   readonly sessionIssuedAt: string;
   readonly sessionExpiresAt: string;
   readonly sessionAccessChannel?: "desktop" | "thin-client";
+  readonly sessionDeviceId?: string;
+  readonly sessionTrustedDeviceBindingId?: string;
+  readonly sessionTrustMarker?: string;
 }
 
 export type IdentitySessionRevocationReason = "logout" | "security" | "rotation" | "admin";
@@ -122,6 +127,9 @@ export interface ResolveAuthenticatedSessionApiResponse {
     readonly providerId: string;
     readonly providerSubject: string;
     readonly accessChannel?: "desktop" | "thin-client";
+    readonly deviceId?: string;
+    readonly trustedDeviceBindingId?: string;
+    readonly trustMarker?: string;
     readonly issuedAt: string;
     readonly expiresAt: string;
   };
