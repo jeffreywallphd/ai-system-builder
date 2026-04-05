@@ -4,6 +4,8 @@
 
 Story 4.1.2 canonical permission registry for authorization policy checks.
 
+Story 4.1.3 role-definition contracts consume this catalog for baseline role grants; see `docs/architecture/authorization-role-reference.md`.
+
 ## Canonical files
 
 - `src/domain/authorization/AuthorizationPermissionCatalog.ts`
