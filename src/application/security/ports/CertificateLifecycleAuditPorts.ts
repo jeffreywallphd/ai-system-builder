@@ -9,6 +9,9 @@ export const CertificateLifecycleAuditEventTypes = Object.freeze({
   certificateRevocationStarted: "certificate-revocation-started",
   certificateRevocationSucceeded: "certificate-revocation-succeeded",
   certificateRevocationFailed: "certificate-revocation-failed",
+  certificateRenewalStarted: "certificate-renewal-started",
+  certificateRenewalSucceeded: "certificate-renewal-succeeded",
+  certificateRenewalFailed: "certificate-renewal-failed",
 });
 
 export type CertificateLifecycleAuditEventType =

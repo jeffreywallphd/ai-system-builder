@@ -19,6 +19,7 @@
 - Adds issued-certificate metadata list/detail query seams for trusted admin/API consumers (Story 6.2.7).
 - Adds runtime trust-material export/distribution contracts for scoped runtime consumers (Story 6.3.1).
 - Adds certificate renewal eligibility and rotation planning services for pre-expiry operations readiness (Story 6.3.2).
+- Adds certificate renewal/replacement execution workflow with explicit prior-certificate disposition controls and audit seams (Story 6.3.3).
 
 ## Main artifacts to cite
 
@@ -50,6 +51,7 @@
 - `src/application/security/use-cases/ResolveRuntimeTrustMaterialPackageUseCase.ts`
 - `src/application/security/use-cases/CertificateRenewalPlanningService.ts`
 - `src/application/security/use-cases/GetCertificateRenewalPlanningUseCase.ts`
+- `src/application/security/use-cases/RenewIssuedCertificateUseCase.ts`
 - `src/application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase.ts`
 - `src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter.ts`
 - `src/infrastructure/security/encryption/ScopedAesGcmEncryptionService.ts`
@@ -61,6 +63,7 @@
 - `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
 - `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
+- `src/application/security/tests/RenewIssuedCertificateUseCase.test.ts`
 - `src/application/security/tests/IssuedCertificateMetadataQueryUseCases.test.ts`
 - `src/application/security/tests/ResolveRuntimeTrustMaterialPackageUseCase.test.ts`
 - `src/application/nodes/tests/ResolveApprovedNodeCertificateEligibilityUseCase.test.ts`
@@ -227,6 +230,9 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - `certificate-revocation-started`
 - `certificate-revocation-succeeded`
 - `certificate-revocation-failed`
+- `certificate-renewal-started`
+- `certificate-renewal-succeeded`
+- `certificate-renewal-failed`
 
 ## Story 6.2.7 issued-certificate metadata query/listing behavior
 
@@ -296,6 +302,24 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - non-renewable issued statuses (`revoked`, `superseded`) are excluded from tracked renewal counts by default.
 - attention outputs are code-first and automation-friendly so future jobs/controllers can trigger remediation without redesign.
 
+## Story 6.3.3 renewal/replacement execution workflow behavior
+
+- `RenewIssuedCertificateUseCase` adds a production-ready manual/service-triggered renewal command that:
+  - validates request shape (serial, actor, material refs, key parameters),
+  - loads the previous issued certificate and rejects non-renewable lifecycle statuses (`revoked`, `superseded`),
+  - derives the renewal profile from existing subject linkage and rejects unsupported mappings.
+- replacement issuance is delegated to `IssueCertificateForSubjectUseCase`, preserving centralized policy checks, CA validity enforcement, approved-node eligibility enforcement, protected material persistence, and issuance auditing.
+- previous certificate disposition is now explicit:
+  - `supersede` (default) marks the prior cert as `superseded` with `supersededBySerialNumber` linkage.
+  - `preserve` leaves prior status untouched for overlap/grace operation windows.
+- overlap semantics are fail-closed:
+  - `gracePeriodDays > 0` is valid only with `previousCertificateDisposition='preserve'`.
+  - invalid combinations are rejected.
+- renewal lifecycle audit outcomes are emitted via `CertificateLifecycleAuditPorts`:
+  - `certificate-renewal-started`
+  - `certificate-renewal-succeeded`
+  - `certificate-renewal-failed`
+
 ## Coverage in this slice
 
 - Domain invariants and lifecycle transitions: `src/domain/security/tests/CertificateAuthorityDomain.test.ts`
@@ -317,6 +341,7 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - lifecycle audit sanitization behavior: `src/application/security/tests/CertificateLifecycleAuditPorts.test.ts`
 - renewal state classification and stale metadata detection coverage: `src/application/security/tests/CertificateRenewalPlanningService.test.ts`
 - renewal planning aggregation/attention coverage: `src/application/security/tests/GetCertificateRenewalPlanningUseCase.test.ts`
+- renewal/replacement success + failure coverage: `src/application/security/tests/RenewIssuedCertificateUseCase.test.ts`
 - concrete issuer signing pipeline coverage: `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - host initialization seam coverage: `hosts/server/tests/IdentityServerHost.test.ts`
 
