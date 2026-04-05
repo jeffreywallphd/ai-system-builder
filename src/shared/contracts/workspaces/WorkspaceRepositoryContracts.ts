@@ -87,6 +87,12 @@ export interface WorkspacePendingInvitationLookupQuery {
   readonly asOf?: string;
 }
 
+export interface WorkspacePendingInvitationByTokenHashLookupQuery {
+  readonly workspaceId: string;
+  readonly invitationTokenHash: string;
+  readonly asOf?: string;
+}
+
 export interface WorkspaceAuthorizationSnapshotQuery {
   readonly workspaceId: string;
   readonly userIdentityId: string;
@@ -173,6 +179,10 @@ export interface CreateWorkspaceInvitationRecordInput {
   readonly invitedEmail: string;
   readonly invitedByUserId: string;
   readonly invitedRoles: ReadonlyArray<WorkspaceRole>;
+  readonly invitationTokenHash?: string;
+  readonly invitationTokenHint?: string;
+  readonly targetUserIdentityIdHint?: string;
+  readonly onboardingMetadata?: Readonly<Record<string, unknown>>;
   readonly status?: WorkspaceInvitationStatus;
   readonly createdAt?: string;
   readonly expiresAt: string;

@@ -89,6 +89,10 @@ describe("WorkspacePersistenceMapper", () => {
       invited_email: "member@example.com",
       invited_by_user_id: "user:owner",
       invited_roles_json: "[\"member\",\"viewer\",\"member\"]",
+      invitation_token_hash: "a99e84df4126ed9f2f0968fcb8fa7f9d68ac36f0536ef66d67f5cb1586f2fd1d",
+      invitation_token_hint: "abcd1234",
+      target_user_identity_id_hint: "user:member",
+      onboarding_metadata_json: "{\"source\":\"admin-console\"}",
       status: WorkspaceInvitationStatuses.pending,
       created_at: "2026-04-05T12:00:00.000Z",
       expires_at: "2026-04-06T12:00:00.000Z",
@@ -100,6 +104,9 @@ describe("WorkspacePersistenceMapper", () => {
 
     const mapped = mapWorkspaceInvitationRowToDomain(row);
     expect(mapped.invitedRoles).toEqual([WorkspaceRoles.member, WorkspaceRoles.viewer]);
+    expect(mapped.invitationTokenHint).toBe("abcd1234");
+    expect(mapped.targetUserIdentityIdHint).toBe("user:member");
+    expect(mapped.onboardingMetadata?.source).toBe("admin-console");
     expect(normalizeSlugLookup(" Team-Alpha ")).toBe("team-alpha");
     expect(normalizeEmailLookup(" MEMBER@EXAMPLE.COM ")).toBe("member@example.com");
   });

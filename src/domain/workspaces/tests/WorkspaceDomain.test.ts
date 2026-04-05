@@ -212,11 +212,20 @@ describe("WorkspaceDomain", () => {
       invitedEmail: " Member@Example.com ",
       invitedByUserId: "user-owner",
       invitedRoles: [WorkspaceRoles.member, WorkspaceRoles.member],
+      invitationTokenHash: "1336d5d4f04047f8f9477f073b90f18f636991d2f1492f4fbe95f5cb98f40e29",
+      invitationTokenHint: "token301",
+      targetUserIdentityIdHint: "user-member",
+      onboardingMetadata: {
+        source: "domain-test",
+      },
       createdAt: "2026-04-05T16:00:00.000Z",
       expiresAt: "2026-04-05T17:00:00.000Z",
     });
     expect(invitation.invitedEmail).toBe("member@example.com");
     expect(invitation.invitedRoles).toEqual([WorkspaceRoles.member]);
+    expect(invitation.invitationTokenHint).toBe("token301");
+    expect(invitation.targetUserIdentityIdHint).toBe("user-member");
+    expect(invitation.onboardingMetadata?.source).toBe("domain-test");
 
     const accepted = acceptWorkspaceInvitation(invitation, {
       acceptedByUserIdentityId: "user-member",
@@ -244,5 +253,15 @@ describe("WorkspaceDomain", () => {
 
     const expired = expireWorkspaceInvitation(expiring, new Date("2026-04-05T16:31:00.000Z"));
     expect(expired.status).toBe(WorkspaceInvitationStatuses.expired);
+
+    expect(() => createWorkspaceInvitation({
+      id: "invite-invalid-hash",
+      workspaceId: "workspace-1",
+      invitedEmail: "bad@example.com",
+      invitedByUserId: "user-owner",
+      invitedRoles: [WorkspaceRoles.member],
+      invitationTokenHash: "not-a-hash",
+      expiresAt: "2026-04-06T16:30:00.000Z",
+    })).toThrow("invitationTokenHash");
   });
 });

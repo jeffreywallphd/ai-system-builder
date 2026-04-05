@@ -128,6 +128,10 @@ export interface WorkspaceInvitation {
   readonly invitedEmail: string;
   readonly invitedByUserId: string;
   readonly invitedRoles: ReadonlyArray<WorkspaceRole>;
+  readonly invitationTokenHash?: string;
+  readonly invitationTokenHint?: string;
+  readonly targetUserIdentityIdHint?: string;
+  readonly onboardingMetadata?: Readonly<Record<string, unknown>>;
   readonly status: WorkspaceInvitationStatus;
   readonly createdAt: string;
   readonly expiresAt: string;
@@ -270,6 +274,54 @@ function normalizeInvitationEmail(email: string): string {
   return normalized;
 }
 
+function normalizeInvitationTokenHash(value?: string): string | undefined {
+  const normalized = normalizeOptional(value)?.toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+  if (!/^[a-f0-9]{64}$/.test(normalized)) {
+    throw new WorkspaceDomainError("Workspace invitation invitationTokenHash must be a lowercase sha256 hex digest.");
+  }
+  return normalized;
+}
+
+function normalizeInvitationTokenHint(value?: string): string | undefined {
+  const normalized = normalizeOptional(value);
+  if (!normalized) {
+    return undefined;
+  }
+  if (normalized.length > 32) {
+    throw new WorkspaceDomainError("Workspace invitation invitationTokenHint must be 32 characters or fewer.");
+  }
+  return normalized;
+}
+
+function normalizeTargetUserIdentityIdHint(value?: string): string | undefined {
+  const normalized = normalizeOptional(value);
+  if (!normalized) {
+    return undefined;
+  }
+  if (normalized.length > 256) {
+    throw new WorkspaceDomainError("Workspace invitation targetUserIdentityIdHint must be 256 characters or fewer.");
+  }
+  return normalized;
+}
+
+function normalizeOnboardingMetadata(
+  value?: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const entries = Object.entries(value);
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  return Object.freeze({ ...value });
+}
+
 function normalizeRoles(roles: ReadonlyArray<WorkspaceRole>): ReadonlyArray<WorkspaceRole> {
   if (roles.length === 0) {
     throw new WorkspaceDomainError("Workspace invitedRoles must include at least one role.");
@@ -358,6 +410,9 @@ function assertRoleAssignmentState(assignment: WorkspaceRoleAssignment): void {
 function assertInvitationState(invitation: WorkspaceInvitation): void {
   if (new Date(invitation.expiresAt).getTime() <= new Date(invitation.createdAt).getTime()) {
     throw new WorkspaceDomainError("Workspace invitation expiresAt must be later than createdAt.");
+  }
+  if (invitation.invitationTokenHint && !invitation.invitationTokenHash) {
+    throw new WorkspaceDomainError("Workspace invitation invitationTokenHint requires invitationTokenHash.");
   }
   if (invitation.status === WorkspaceInvitationStatuses.accepted && !invitation.acceptedByUserIdentityId) {
     throw new WorkspaceDomainError("Accepted workspace invitations must include acceptedByUserIdentityId.");
@@ -685,6 +740,10 @@ export function createWorkspaceInvitation(input: {
   readonly invitedEmail: string;
   readonly invitedByUserId: string;
   readonly invitedRoles: ReadonlyArray<WorkspaceRole>;
+  readonly invitationTokenHash?: string;
+  readonly invitationTokenHint?: string;
+  readonly targetUserIdentityIdHint?: string;
+  readonly onboardingMetadata?: Readonly<Record<string, unknown>>;
   readonly status?: WorkspaceInvitationStatus;
   readonly createdAt?: Date | string;
   readonly expiresAt: Date | string;
@@ -700,6 +759,10 @@ export function createWorkspaceInvitation(input: {
     invitedEmail: normalizeInvitationEmail(input.invitedEmail),
     invitedByUserId: normalizeRequired(input.invitedByUserId, "Workspace invitation invitedByUserId"),
     invitedRoles: normalizeRoles(input.invitedRoles),
+    invitationTokenHash: normalizeInvitationTokenHash(input.invitationTokenHash),
+    invitationTokenHint: normalizeInvitationTokenHint(input.invitationTokenHint),
+    targetUserIdentityIdHint: normalizeTargetUserIdentityIdHint(input.targetUserIdentityIdHint),
+    onboardingMetadata: normalizeOnboardingMetadata(input.onboardingMetadata),
     status: normalizeInvitationStatus(input.status),
     createdAt,
     expiresAt: normalizeIsoTimestamp(input.expiresAt, "Workspace invitation expiresAt"),
