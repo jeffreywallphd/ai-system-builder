@@ -43,6 +43,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - `electron/main/main.ts`
 - `src/domain/identity/IdentityDomain.ts`
 - `src/domain/identity/TrustedDeviceDomain.ts`
+- `src/domain/nodes/NodeTrustDomain.ts`
 - `src/shared/workspaces/WorkspaceOwnership.ts`
 - `src/domain/workspaces/WorkspaceDomain.ts`
 - `src/domain/authorization/AuthorizationDomain.ts`
@@ -62,6 +63,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Detailed session subsystem architecture: `docs/architecture/identity-session-architecture.md`
 - Feature 1 downstream handoff baseline: `docs/architecture/identity-feature-1-final-baseline.md`
 - Trusted-device domain/contracts baseline: `docs/architecture/trusted-device-foundation.md`
+- Node trust domain/contracts baseline: `docs/architecture/node-trust-foundation.md`
 - Workspace tenancy domain/contracts baseline: `docs/architecture/workspace-foundation.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
 - Authorization permission matrix and key catalog reference: `docs/architecture/authorization-permission-catalog.md`
