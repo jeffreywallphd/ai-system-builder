@@ -304,3 +304,32 @@ Protected-resource composition pattern is canonical:
 - Added HTTP integration coverage for route behavior and contract shape in:
   - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceInvitations.test.ts`
 
+## Story 3.4.1 workspace administration backend endpoints and presenters
+
+- Added workspace administration API contracts for admin surfaces:
+  - `infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract.ts`
+  - updated `infrastructure/api/workspaces/sdk/index.ts`
+- Added `WorkspaceAdministrationBackendApi` (`infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`) as the transport-facing orchestration/presenter layer for workspace administration screens.
+- Backend API behavior now:
+  - reuses existing application use cases/query service (no direct domain/persistence bypass),
+  - exposes explicit response contracts for workspace list/admin-view/members/invitations/roles,
+  - exposes admin mutation flows for workspace create/update/lifecycle, member add/status/remove, role assign/reassign/revoke, and invitation cancellation,
+  - maps internal use-case/query errors into stable external error codes for UI clients.
+- Extended authoritative HTTP transport (`infrastructure/transport/http-server/identity/IdentityHttpServer.ts`) with authenticated workspace administration endpoints:
+  - `GET /api/v1/workspaces`
+  - `POST /api/v1/workspaces`
+  - `GET /api/v1/workspaces/:workspaceId/admin-view`
+  - `PATCH /api/v1/workspaces/:workspaceId`
+  - `POST /api/v1/workspaces/:workspaceId/lifecycle`
+  - `GET|POST /api/v1/workspaces/:workspaceId/members`
+  - `POST /api/v1/workspaces/:workspaceId/members/:userIdentityId/status`
+  - `DELETE /api/v1/workspaces/:workspaceId/members/:userIdentityId`
+  - `GET|POST /api/v1/workspaces/:workspaceId/invitations` (existing POST invite issuance plus new GET list)
+  - `DELETE /api/v1/workspaces/:workspaceId/invitations/:invitationId`
+  - `GET /api/v1/workspaces/:workspaceId/roles`
+  - `POST /api/v1/workspaces/:workspaceId/roles/{assign|reassign|revoke}`
+- Host composition now wires the workspace administration backend at runtime in `hosts/server/IdentityServerHost.ts`.
+- Added HTTP/host integration coverage updates for route behavior and response shape:
+  - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
+  - updated `hosts/server/tests/IdentityServerHost.test.ts`
+

@@ -42,6 +42,7 @@ import { ValidateTrustedDevicePairingUseCase } from "../../src/application/ident
 import { CompleteTrustedDevicePairingUseCase } from "../../src/application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
 import { SqliteIdentityLifecycleEventPublisher } from "../../infrastructure/filesystem/identity/SqliteIdentityLifecycleEventPublisher";
 import { WorkspaceInvitationBackendApi } from "../../infrastructure/api/workspaces/WorkspaceInvitationBackendApi";
+import { WorkspaceAdministrationBackendApi } from "../../infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
 import { SqliteWorkspacePersistenceAdapter } from "../../src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import {
   IssueWorkspaceInvitationUseCase,
@@ -58,6 +59,16 @@ import {
   ResolveAuthenticatedWorkspaceOnboardingUseCase,
   type AuthenticatedWorkspaceOnboardingClock,
 } from "../../src/application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase";
+import { WorkspaceAdministrationQueryService } from "../../src/application/workspaces/use-cases/WorkspaceAdministrationQueryService";
+import { CreateWorkspaceUseCase } from "../../src/application/workspaces/use-cases/CreateWorkspaceUseCase";
+import { UpdateWorkspaceUseCase } from "../../src/application/workspaces/use-cases/UpdateWorkspaceUseCase";
+import { TransitionWorkspaceLifecycleUseCase } from "../../src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase";
+import { AddWorkspaceMemberUseCase } from "../../src/application/workspaces/use-cases/AddWorkspaceMemberUseCase";
+import { ChangeWorkspaceMembershipStatusUseCase } from "../../src/application/workspaces/use-cases/ChangeWorkspaceMembershipStatusUseCase";
+import { RemoveWorkspaceMemberUseCase } from "../../src/application/workspaces/use-cases/RemoveWorkspaceMemberUseCase";
+import { AssignWorkspaceRoleUseCase } from "../../src/application/workspaces/use-cases/AssignWorkspaceRoleUseCase";
+import { ReassignWorkspaceRoleUseCase } from "../../src/application/workspaces/use-cases/ReassignWorkspaceRoleUseCase";
+import { RevokeWorkspaceRoleUseCase } from "../../src/application/workspaces/use-cases/RevokeWorkspaceRoleUseCase";
 import type { WorkspaceIdNamespace } from "../../src/shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   createIdentityHttpServer,
@@ -277,10 +288,91 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       clock: workspaceClock,
     }),
   });
+  const workspaceAdministrationBackendApi = new WorkspaceAdministrationBackendApi({
+    workspaceQueryService: new WorkspaceAdministrationQueryService({
+      workspaceRepository,
+      membershipRepository: workspaceRepository,
+      roleAssignmentRepository: workspaceRepository,
+      invitationRepository: workspaceRepository,
+      authorizationReadRepository: workspaceRepository,
+      clock: workspaceClock,
+    }),
+    workspaceRepository,
+    membershipRepository: workspaceRepository,
+    roleAssignmentRepository: workspaceRepository,
+    invitationRepository: workspaceRepository,
+    authorizationReadRepository: workspaceRepository,
+    createWorkspaceUseCase: new CreateWorkspaceUseCase({
+      workspaceRepository,
+      membershipRepository: workspaceRepository,
+      roleAssignmentRepository: workspaceRepository,
+      transactionManager: workspaceRepository,
+      idGenerator: workspaceIdGenerator,
+      clock: workspaceClock,
+    }),
+    updateWorkspaceUseCase: new UpdateWorkspaceUseCase({
+      workspaceRepository,
+      authorizationReadRepository: workspaceRepository,
+      clock: workspaceClock,
+    }),
+    transitionWorkspaceLifecycleUseCase: new TransitionWorkspaceLifecycleUseCase({
+      workspaceRepository,
+      authorizationReadRepository: workspaceRepository,
+      clock: workspaceClock,
+    }),
+    addWorkspaceMemberUseCase: new AddWorkspaceMemberUseCase({
+      membershipRepository: workspaceRepository,
+      roleAssignmentRepository: workspaceRepository,
+      authorizationReadRepository: workspaceRepository,
+      transactionManager: workspaceRepository,
+      idGenerator: workspaceIdGenerator,
+      clock: workspaceClock,
+    }),
+    changeWorkspaceMembershipStatusUseCase: new ChangeWorkspaceMembershipStatusUseCase({
+      membershipRepository: workspaceRepository,
+      roleAssignmentRepository: workspaceRepository,
+      authorizationReadRepository: workspaceRepository,
+      transactionManager: workspaceRepository,
+      clock: workspaceClock,
+    }),
+    removeWorkspaceMemberUseCase: new RemoveWorkspaceMemberUseCase({
+      membershipRepository: workspaceRepository,
+      roleAssignmentRepository: workspaceRepository,
+      authorizationReadRepository: workspaceRepository,
+      transactionManager: workspaceRepository,
+      clock: workspaceClock,
+    }),
+    assignWorkspaceRoleUseCase: new AssignWorkspaceRoleUseCase({
+      membershipRepository: workspaceRepository,
+      roleAssignmentRepository: workspaceRepository,
+      authorizationReadRepository: workspaceRepository,
+      transactionManager: workspaceRepository,
+      idGenerator: workspaceIdGenerator,
+      clock: workspaceClock,
+    }),
+    reassignWorkspaceRoleUseCase: new ReassignWorkspaceRoleUseCase({
+      membershipRepository: workspaceRepository,
+      roleAssignmentRepository: workspaceRepository,
+      authorizationReadRepository: workspaceRepository,
+      transactionManager: workspaceRepository,
+      idGenerator: workspaceIdGenerator,
+      clock: workspaceClock,
+    }),
+    revokeWorkspaceRoleUseCase: new RevokeWorkspaceRoleUseCase({
+      membershipRepository: workspaceRepository,
+      roleAssignmentRepository: workspaceRepository,
+      authorizationReadRepository: workspaceRepository,
+      transactionManager: workspaceRepository,
+      clock: workspaceClock,
+    }),
+    resolveWorkspaceInvitationLifecycleUseCase: resolveWorkspaceInvitationLifecycleUseCase,
+    clock: workspaceClock,
+  });
 
   const server = createIdentityHttpServer({
     backendApi,
     workspaceBackendApi,
+    workspaceAdministrationBackendApi,
     logger: options.logger,
   });
 

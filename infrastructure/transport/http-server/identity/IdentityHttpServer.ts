@@ -4,6 +4,7 @@ import { URL } from "node:url";
 import { z } from "zod";
 import type { IdentityAuthBackendApi } from "../../../api/identity/IdentityAuthBackendApi";
 import type { WorkspaceInvitationBackendApi } from "../../../api/workspaces/WorkspaceInvitationBackendApi";
+import type { WorkspaceAdministrationBackendApi } from "../../../api/workspaces/WorkspaceAdministrationBackendApi";
 import {
   ChangeLocalPasswordCredentialVerificationModes,
   IdentityAuthApiErrorCodes,
@@ -43,6 +44,10 @@ import {
   type IssueWorkspaceInvitationApiRequest,
   type WorkspaceInvitationApiResponse,
 } from "../../../api/workspaces/sdk/PublicWorkspaceInvitationApiContract";
+import {
+  WorkspaceAdministrationApiErrorCodes,
+  type WorkspaceAdministrationApiResponse,
+} from "../../../api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 import { redactSensitiveAuthPayload, redactSensitiveText } from "../../../api/identity/IdentityAuthRedaction";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
@@ -259,6 +264,12 @@ const CompleteTrustedDevicePairingRequestSchema: z.ZodType<CompleteTrustedDevice
 }).strict();
 
 const WorkspaceRoleValues = z.enum(["owner", "admin", "member", "viewer"]);
+const WorkspaceStatusValues = z.enum(["provisioning", "active", "suspended", "archived"]);
+const WorkspaceVisibilityValues = z.enum(["private", "team", "public"]);
+const WorkspaceMembershipStatusValues = z.enum(["pending", "active", "suspended", "removed"]);
+const WorkspaceRoleAssignmentStatusValues = z.enum(["active", "revoked"]);
+const WorkspaceInvitationStatusValues = z.enum(["pending", "accepted", "declined", "revoked", "expired"]);
+const WorkspaceLifecycleActionValues = z.enum(["archive", "reactivate", "suspend", "activate"]);
 
 const IssueWorkspaceInvitationRequestSchema: z.ZodType<Pick<
   IssueWorkspaceInvitationApiRequest,
@@ -280,6 +291,65 @@ const AcceptWorkspaceInvitationOnboardingRequestSchema: z.ZodType<Pick<
   onboardingMetadata: z.record(z.unknown()).optional(),
 }).strict();
 
+const CreateWorkspaceRequestSchema = z.object({
+  slug: z.string().min(1),
+  displayName: z.string().min(1),
+  description: z.string().optional(),
+  visibility: WorkspaceVisibilityValues.optional(),
+  status: WorkspaceStatusValues.optional(),
+}).strict();
+
+const UpdateWorkspaceRequestSchema = z.object({
+  displayName: z.string().min(1).optional(),
+  description: z.string().optional(),
+  visibility: WorkspaceVisibilityValues.optional(),
+}).strict();
+
+const TransitionWorkspaceLifecycleRequestSchema = z.object({
+  action: WorkspaceLifecycleActionValues,
+}).strict();
+
+const AddWorkspaceMemberRequestSchema = z.object({
+  targetUserIdentityId: z.string().min(1),
+  initialStatus: WorkspaceMembershipStatusValues.optional(),
+  roles: z.array(WorkspaceRoleValues).min(1).optional(),
+}).strict();
+
+const ChangeWorkspaceMembershipStatusRequestSchema = z.object({
+  status: WorkspaceMembershipStatusValues,
+}).strict();
+
+const WorkspaceRoleAuditSchema = z.object({
+  reason: z.string().min(1).optional(),
+  correlationId: z.string().min(1).optional(),
+  metadata: z.record(z.unknown()).optional(),
+}).strict();
+
+const AssignWorkspaceRoleRequestSchema = z.object({
+  targetUserIdentityId: z.string().min(1),
+  role: WorkspaceRoleValues,
+  reason: WorkspaceRoleAuditSchema.shape.reason,
+  correlationId: WorkspaceRoleAuditSchema.shape.correlationId,
+  metadata: WorkspaceRoleAuditSchema.shape.metadata,
+}).strict();
+
+const ReassignWorkspaceRoleRequestSchema = z.object({
+  targetUserIdentityId: z.string().min(1),
+  fromRole: WorkspaceRoleValues,
+  toRole: WorkspaceRoleValues,
+  reason: WorkspaceRoleAuditSchema.shape.reason,
+  correlationId: WorkspaceRoleAuditSchema.shape.correlationId,
+  metadata: WorkspaceRoleAuditSchema.shape.metadata,
+}).strict();
+
+const RevokeWorkspaceRoleRequestSchema = z.object({
+  targetUserIdentityId: z.string().min(1),
+  role: WorkspaceRoleValues,
+  reason: WorkspaceRoleAuditSchema.shape.reason,
+  correlationId: WorkspaceRoleAuditSchema.shape.correlationId,
+  metadata: WorkspaceRoleAuditSchema.shape.metadata,
+}).strict();
+
 export interface IdentityHttpServerLogEvent {
   readonly event: string;
   readonly requestId: string;
@@ -298,6 +368,7 @@ export interface IdentityHttpServerLogger {
 export interface IdentityHttpServerOptions {
   readonly backendApi: IdentityAuthBackendApi;
   readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
+  readonly workspaceAdministrationBackendApi?: WorkspaceAdministrationBackendApi;
   readonly logger?: IdentityHttpServerLogger;
   readonly maxBodyBytes?: number;
 }
@@ -1003,6 +1074,703 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
       }
 
       if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "GET"
+        && path === "/api/v1/workspaces"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const statuses = url.searchParams.getAll("status");
+            const apiResponse = await options.workspaceAdministrationBackendApi.listWorkspaces({
+              actorUserIdentityId: context.principal.userIdentityId,
+              ownerUserIdentityId: normalizeOptionalString(url.searchParams.get("ownerUserIdentityId")),
+              statuses: statuses.length > 0 ? statuses.filter((status) => WorkspaceStatusValues.safeParse(status).success) as Array<z.infer<typeof WorkspaceStatusValues>> : undefined,
+              visibility: parseOptionalEnum(url.searchParams.get("visibility"), WorkspaceVisibilityValues.options),
+              slugPrefix: normalizeOptionalString(url.searchParams.get("slugPrefix")),
+              limit: parseOptionalInteger(url.searchParams.get("limit")),
+              offset: parseOptionalInteger(url.searchParams.get("offset")),
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              query: Object.fromEntries(url.searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "POST"
+        && path === "/api/v1/workspaces"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
+              request,
+              CreateWorkspaceRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.workspaceAdministrationBackendApi.createWorkspace({
+              actorUserIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "GET"
+        && path.endsWith("/admin-view")
+        && path.startsWith("/api/v1/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/admin-view");
+            if (!workspaceId) {
+              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const apiResponse = await options.workspaceAdministrationBackendApi.readWorkspaceAdministrationView({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              asOf: normalizeOptionalString(url.searchParams.get("asOf")),
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "PATCH"
+        && path.startsWith("/api/v1/workspaces/")
+        && !path.endsWith("/lifecycle")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const workspaceId = decodePathTail(path, "/api/v1/workspaces/");
+            if (!workspaceId) {
+              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
+              request,
+              UpdateWorkspaceRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.workspaceAdministrationBackendApi.updateWorkspace({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "POST"
+        && path.endsWith("/lifecycle")
+        && path.startsWith("/api/v1/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/lifecycle");
+            if (!workspaceId) {
+              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
+              request,
+              TransitionWorkspaceLifecycleRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.workspaceAdministrationBackendApi.transitionWorkspaceLifecycle({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              action: parsedRequest.data.action,
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              action: parsedRequest.data.action,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "GET"
+        && path.endsWith("/members")
+        && path.startsWith("/api/v1/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/members");
+            if (!workspaceId) {
+              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const statuses = url.searchParams.getAll("status")
+              .filter((status) => WorkspaceMembershipStatusValues.safeParse(status).success) as Array<z.infer<typeof WorkspaceMembershipStatusValues>>;
+            const apiResponse = await options.workspaceAdministrationBackendApi.listWorkspaceMemberships({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              userIdentityId: normalizeOptionalString(url.searchParams.get("userIdentityId")),
+              statuses: statuses.length > 0 ? statuses : undefined,
+              invitationId: normalizeOptionalString(url.searchParams.get("invitationId")),
+              invitedByUserIdentityId: normalizeOptionalString(url.searchParams.get("invitedByUserIdentityId")),
+              limit: parseOptionalInteger(url.searchParams.get("limit")),
+              offset: parseOptionalInteger(url.searchParams.get("offset")),
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              query: Object.fromEntries(url.searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "POST"
+        && path.endsWith("/members")
+        && path.startsWith("/api/v1/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/members");
+            if (!workspaceId) {
+              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
+              request,
+              AddWorkspaceMemberRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.workspaceAdministrationBackendApi.addWorkspaceMember({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "POST"
+        && path.endsWith("/status")
+        && path.includes("/members/")
+        && path.startsWith("/api/v1/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const pathParams = decodeWorkspaceUserScopedPath(path, "/members/", "/status");
+            if (!pathParams) {
+              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId and userIdentityId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
+              request,
+              ChangeWorkspaceMembershipStatusRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.workspaceAdministrationBackendApi.changeWorkspaceMembershipStatus({
+              workspaceId: pathParams.workspaceId,
+              targetUserIdentityId: pathParams.userIdentityId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              status: parsedRequest.data.status,
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: pathParams.workspaceId,
+              targetUserIdentityId: pathParams.userIdentityId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              status: parsedRequest.data.status,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "DELETE"
+        && path.includes("/members/")
+        && path.startsWith("/api/v1/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const pathParams = decodeWorkspaceUserScopedPath(path, "/members/");
+            if (!pathParams) {
+              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId and userIdentityId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const apiResponse = await options.workspaceAdministrationBackendApi.removeWorkspaceMember({
+              workspaceId: pathParams.workspaceId,
+              targetUserIdentityId: pathParams.userIdentityId,
+              actorUserIdentityId: context.principal.userIdentityId,
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: pathParams.workspaceId,
+              targetUserIdentityId: pathParams.userIdentityId,
+              actorUserIdentityId: context.principal.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "GET"
+        && path.endsWith("/invitations")
+        && path.startsWith("/api/v1/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/invitations");
+            if (!workspaceId) {
+              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const statuses = url.searchParams.getAll("status")
+              .filter((status) => WorkspaceInvitationStatusValues.safeParse(status).success) as Array<z.infer<typeof WorkspaceInvitationStatusValues>>;
+            const apiResponse = await options.workspaceAdministrationBackendApi.listWorkspaceInvitations({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              invitedEmail: normalizeOptionalString(url.searchParams.get("invitedEmail")),
+              invitedByUserIdentityId: normalizeOptionalString(url.searchParams.get("invitedByUserIdentityId")),
+              statuses: statuses.length > 0 ? statuses : undefined,
+              activeOnly: parseOptionalBoolean(url.searchParams.get("activeOnly")),
+              expiresBefore: normalizeOptionalString(url.searchParams.get("expiresBefore")),
+              expiresAfter: normalizeOptionalString(url.searchParams.get("expiresAfter")),
+              asOf: normalizeOptionalString(url.searchParams.get("asOf")),
+              limit: parseOptionalInteger(url.searchParams.get("limit")),
+              offset: parseOptionalInteger(url.searchParams.get("offset")),
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              query: Object.fromEntries(url.searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "DELETE"
+        && path.includes("/invitations/")
+        && path.startsWith("/api/v1/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const pathParams = decodeWorkspaceEntityPath(path, "/invitations/");
+            if (!pathParams) {
+              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId and invitationId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const apiResponse = await options.workspaceAdministrationBackendApi.cancelWorkspaceInvitation({
+              workspaceId: pathParams.workspaceId,
+              invitationId: pathParams.entityId,
+              actorUserIdentityId: context.principal.userIdentityId,
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: pathParams.workspaceId,
+              invitationId: pathParams.entityId,
+              actorUserIdentityId: context.principal.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "GET"
+        && path.endsWith("/roles")
+        && path.startsWith("/api/v1/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/roles");
+            if (!workspaceId) {
+              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const roles = url.searchParams.getAll("role")
+              .filter((role) => WorkspaceRoleValues.safeParse(role).success) as Array<z.infer<typeof WorkspaceRoleValues>>;
+            const statuses = url.searchParams.getAll("status")
+              .filter((status) => WorkspaceRoleAssignmentStatusValues.safeParse(status).success) as Array<z.infer<typeof WorkspaceRoleAssignmentStatusValues>>;
+            const apiResponse = await options.workspaceAdministrationBackendApi.listWorkspaceRoleAssignments({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              userIdentityId: normalizeOptionalString(url.searchParams.get("userIdentityId")),
+              roles: roles.length > 0 ? roles : undefined,
+              statuses: statuses.length > 0 ? statuses : undefined,
+              limit: parseOptionalInteger(url.searchParams.get("limit")),
+              offset: parseOptionalInteger(url.searchParams.get("offset")),
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              query: Object.fromEntries(url.searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "POST"
+        && path.endsWith("/roles/assign")
+        && path.startsWith("/api/v1/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/roles/assign");
+            if (!workspaceId) {
+              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
+              request,
+              AssignWorkspaceRoleRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.workspaceAdministrationBackendApi.assignWorkspaceRole({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "POST"
+        && path.endsWith("/roles/reassign")
+        && path.startsWith("/api/v1/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/roles/reassign");
+            if (!workspaceId) {
+              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
+              request,
+              ReassignWorkspaceRoleRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.workspaceAdministrationBackendApi.reassignWorkspaceRole({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        options.workspaceAdministrationBackendApi
+        && request.method === "POST"
+        && path.endsWith("/roles/revoke")
+        && path.startsWith("/api/v1/workspaces/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          undefined,
+          async (context) => {
+            const workspaceId = decodePathTail(path, "/api/v1/workspaces/", "/roles/revoke");
+            if (!workspaceId) {
+              const invalid = buildWorkspaceAdministrationInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateWorkspaceAdministrationRequest(
+              request,
+              RevokeWorkspaceRoleRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.workspaceAdministrationBackendApi.revokeWorkspaceRole({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            });
+            const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId,
+              actorUserIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
         options.workspaceBackendApi
         && request.method === "POST"
         && path.endsWith("/invitations")
@@ -1402,6 +2170,60 @@ async function parseAndValidateWorkspaceRequest<T>(
   return { ok: true, data: validation.data };
 }
 
+async function parseAndValidateWorkspaceAdministrationRequest<T>(
+  request: IncomingMessage,
+  schema: z.ZodType<T>,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: T }
+  | { readonly ok: false; readonly statusCode: number; readonly body: WorkspaceAdministrationApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildWorkspaceAdministrationInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "workspace-admin-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  const validation = schema.safeParse(parsedBody.value);
+  if (!validation.success) {
+    const body: WorkspaceAdministrationApiResponse<never> = Object.freeze({
+      ok: false,
+      error: {
+        code: WorkspaceAdministrationApiErrorCodes.invalidRequest,
+        message: "Request validation failed.",
+        validationErrors: Object.freeze(validation.error.issues.map((issue) => Object.freeze({
+          path: issue.path.join("."),
+          code: issue.code,
+          message: issue.message,
+        }))),
+      },
+    });
+    logger.warn(Object.freeze({
+      event: "workspace-admin-http.request.validation-failed",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+      details: {
+        request: redactSensitiveAuthPayload(parsedBody.value),
+        issues: body.error?.validationErrors,
+      },
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  return { ok: true, data: validation.data };
+}
+
 async function parseJsonBody(
   request: IncomingMessage,
   maxBodyBytes: number,
@@ -1480,6 +2302,29 @@ function mapWorkspaceStatusCode(response: WorkspaceInvitationApiResponse<unknown
   }
 }
 
+function mapWorkspaceAdministrationStatusCode(response: WorkspaceAdministrationApiResponse<unknown>): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error?.code) {
+    case WorkspaceAdministrationApiErrorCodes.invalidRequest:
+      return 400;
+    case WorkspaceAdministrationApiErrorCodes.authenticationFailed:
+      return 401;
+    case WorkspaceAdministrationApiErrorCodes.forbidden:
+      return 403;
+    case WorkspaceAdministrationApiErrorCodes.notFound:
+      return 404;
+    case WorkspaceAdministrationApiErrorCodes.conflict:
+      return 409;
+    case WorkspaceAdministrationApiErrorCodes.invalidTransition:
+      return 422;
+    default:
+      return 500;
+  }
+}
+
 function parseOptionalInteger(value: string | null): number | undefined {
   if (!value) {
     return undefined;
@@ -1491,6 +2336,29 @@ function parseOptionalInteger(value: string | null): number | undefined {
   }
 
   return parsed;
+}
+
+function parseOptionalBoolean(value: string | null): boolean | undefined {
+  if (value === null) {
+    return undefined;
+  }
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  return undefined;
+}
+
+function parseOptionalEnum<TValue extends string>(
+  value: string | null,
+  enumeration: ReadonlyArray<TValue>,
+): TValue | undefined {
+  if (!value) {
+    return undefined;
+  }
+  return enumeration.includes(value as TValue) ? (value as TValue) : undefined;
 }
 
 function normalizeOptionalString(value: string | null): string | undefined {
@@ -1519,6 +2387,59 @@ function decodePathTail(path: string, prefix: string, suffix = ""): string | und
   return decoded ? decoded : undefined;
 }
 
+function decodeWorkspaceEntityPath(
+  path: string,
+  separator: string,
+): { readonly workspaceId: string; readonly entityId: string } | undefined {
+  if (!path.startsWith("/api/v1/workspaces/") || !path.includes(separator)) {
+    return undefined;
+  }
+
+  const markerIndex = path.indexOf(separator, "/api/v1/workspaces/".length);
+  if (markerIndex < 0) {
+    return undefined;
+  }
+
+  const workspaceRaw = path.slice("/api/v1/workspaces/".length, markerIndex);
+  const entityRaw = path.slice(markerIndex + separator.length);
+  const workspaceId = decodeURIComponent(workspaceRaw).trim();
+  const entityId = decodeURIComponent(entityRaw).trim();
+  if (!workspaceId || !entityId) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    workspaceId,
+    entityId,
+  });
+}
+
+function decodeWorkspaceUserScopedPath(
+  path: string,
+  separator: "/members/",
+  suffix?: "/status",
+): { readonly workspaceId: string; readonly userIdentityId: string } | undefined {
+  const withEntity = decodeWorkspaceEntityPath(path, separator);
+  if (!withEntity) {
+    return undefined;
+  }
+
+  const userIdentityId = suffix
+    ? withEntity.entityId.endsWith(suffix)
+      ? withEntity.entityId.slice(0, withEntity.entityId.length - suffix.length).trim()
+      : ""
+    : withEntity.entityId;
+
+  if (!userIdentityId) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    workspaceId: withEntity.workspaceId,
+    userIdentityId,
+  });
+}
+
 function buildInvalidRequestResponse(message: string): IdentityAuthApiResponse<never> {
   return Object.freeze({
     ok: false,
@@ -1534,6 +2455,16 @@ function buildWorkspaceInvalidRequestResponse(message: string): WorkspaceInvitat
     ok: false,
     error: {
       code: WorkspaceInvitationApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
+function buildWorkspaceAdministrationInvalidRequestResponse(message: string): WorkspaceAdministrationApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: WorkspaceAdministrationApiErrorCodes.invalidRequest,
       message,
     },
   });
