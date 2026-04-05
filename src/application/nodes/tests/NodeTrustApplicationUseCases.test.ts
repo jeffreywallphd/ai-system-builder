@@ -381,7 +381,7 @@ describe("node trust application use-cases", () => {
       nodeType: NodeTypes.compute,
       displayName: "Compute Node 1",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
       },
       deploymentTags: ["us-east-1"],
     });
@@ -405,7 +405,7 @@ describe("node trust application use-cases", () => {
         nodeType: NodeTypes.compute,
         displayName: "Compute Node 1",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         deploymentTags: ["us-east-1"],
@@ -453,7 +453,7 @@ describe("node trust application use-cases", () => {
         nodeType: NodeTypes.compute,
         displayName: "Review Denied Node",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         deploymentTags: ["us-east-1"],
@@ -499,7 +499,7 @@ describe("node trust application use-cases", () => {
         nodeType: NodeTypes.compute,
         displayName: "Detail Node",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         deploymentTags: ["us-east-1"],
@@ -547,7 +547,7 @@ describe("node trust application use-cases", () => {
         nodeType: NodeTypes.compute,
         displayName: "Detail Denied Node",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         deploymentTags: ["us-east-1"],
@@ -595,7 +595,7 @@ describe("node trust application use-cases", () => {
         nodeType: NodeTypes.hybrid,
         displayName: "Hybrid Node 1",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution, NodeRoleCapabilities.modelInference],
+          enabledCapabilities: [NodeRoleCapabilities.executor, NodeRoleCapabilities.api],
           supportsRemoteScheduling: true,
         },
         deploymentTags: ["hybrid"],
@@ -641,6 +641,10 @@ describe("node trust application use-cases", () => {
     expect(result.value.enrollmentRequest.decisionNote).toBe("Validated compute profile.");
     expect(result.value.node.approvalStatus).toBe(NodeApprovalStatuses.approved);
     expect(result.value.node.trustState).toBe(NodeTrustStates.pendingApproval);
+    expect(result.value.node.capabilityProfile.enabledCapabilities).toEqual([
+      NodeRoleCapabilities.api,
+      NodeRoleCapabilities.executor,
+    ]);
     expect(result.value.node.certificate?.certificateRef).toBe("cert:node-hybrid-1:v1");
     expect(certificateHook.issuedForNodeIds).toEqual(["node-hybrid-1"]);
     expect(repository.enrollmentStatusTransitions.map((entry) => entry.toStatus)).toEqual([
@@ -663,7 +667,7 @@ describe("node trust application use-cases", () => {
         nodeType: NodeTypes.compute,
         displayName: "Approve Denied Node",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         deploymentTags: ["us-west-2"],
@@ -707,6 +711,127 @@ describe("node trust application use-cases", () => {
     expect(repository.nodes.size).toBe(0);
   });
 
+  it("rejects enrollment registration when capability profile declaration is incomplete", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    const useCase = new RegisterNodeEnrollmentRequestUseCase({
+      enrollmentRequestRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      clock: createFixedClock("2026-04-05T18:00:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "node:hybrid-invalid-capability",
+      nodeId: "node-hybrid-invalid-capability",
+      nodeType: NodeTypes.hybrid,
+      displayName: "Hybrid Invalid Capability Node",
+      capabilityProfile: {
+        enabledCapabilities: [
+          NodeRoleCapabilities.scheduler,
+          NodeRoleCapabilities.executor,
+        ],
+        supportsRemoteScheduling: true,
+      },
+    });
+
+    expect(result.ok).toBeFalse();
+    if (!result.ok) {
+      expect(result.error.code).toBe(NodeTrustUseCaseErrorCodes.invalidRequest);
+      expect(result.error.message).toContain("must also include 'api'");
+    }
+  });
+
+  it("updates existing node capability profile from approved enrollment metadata", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.registerNode({
+      record: {
+        nodeId: "node-existing-capability-1",
+        nodeType: NodeTypes.hybrid,
+        displayName: "Existing Capability Node",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.pending,
+        trustState: NodeTrustStates.pendingApproval,
+        deploymentTags: ["hybrid"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:00:00.000Z",
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "system",
+        lastModifiedAt: "2026-04-05T18:00:00.000Z",
+        lastModifiedBy: "system",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-existing-capability-node",
+        context: {
+          actorUserIdentityId: "system",
+        },
+      },
+    });
+
+    await repository.saveEnrollmentRequest({
+      record: {
+        requestId: "enroll-existing-capability-1",
+        nodeId: "node-existing-capability-1",
+        nodeType: NodeTypes.hybrid,
+        displayName: "Existing Capability Node",
+        capabilityProfile: {
+          enabledCapabilities: [
+            NodeRoleCapabilities.api,
+            NodeRoleCapabilities.executor,
+            NodeRoleCapabilities.previewWorker,
+          ],
+          supportsRemoteScheduling: true,
+          maxConcurrentWorkloads: 3,
+        },
+        deploymentTags: ["hybrid"],
+        requestedAt: "2026-04-05T18:00:00.000Z",
+        status: NodeEnrollmentRequestStatuses.submitted,
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "node-existing-capability-1",
+        lastModifiedAt: "2026-04-05T18:00:00.000Z",
+        lastModifiedBy: "node-existing-capability-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-existing-capability-enrollment",
+        context: {
+          actorUserIdentityId: "node-existing-capability-1",
+        },
+      },
+    });
+
+    const useCase = new ApproveNodeEnrollmentUseCase({
+      enrollmentRequestRepository: repository,
+      nodeRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      clock: createFixedClock("2026-04-05T18:05:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "admin-1",
+      requestId: "enroll-existing-capability-1",
+      certificateRef: "cert:node-existing-capability-1:v1",
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.node.capabilityProfile.enabledCapabilities).toEqual([
+      NodeRoleCapabilities.api,
+      NodeRoleCapabilities.executor,
+      NodeRoleCapabilities.previewWorker,
+    ]);
+    expect(result.value.node.capabilityProfile.maxConcurrentWorkloads).toBe(3);
+  });
+
   it("transitions approved nodes to trusted state through explicit activation lifecycle", async () => {
     const repository = new InMemoryNodeTrustRepository();
     const certificateHook = new StubCertificateHook();
@@ -718,8 +843,8 @@ describe("node trust application use-cases", () => {
         displayName: "Activation Lifecycle Node 1",
         capabilityProfile: {
           enabledCapabilities: [
-            NodeRoleCapabilities.workflowExecution,
-            NodeRoleCapabilities.modelInference,
+            NodeRoleCapabilities.executor,
+            NodeRoleCapabilities.api,
           ],
           supportsRemoteScheduling: true,
         },
@@ -780,8 +905,8 @@ describe("node trust application use-cases", () => {
     }
     expect(activation.value.node.trustState).toBe(NodeTrustStates.trusted);
     expect(activation.value.node.capabilityProfile.enabledCapabilities).toEqual([
-      NodeRoleCapabilities.workflowExecution,
-      NodeRoleCapabilities.modelInference,
+      NodeRoleCapabilities.api,
+      NodeRoleCapabilities.executor,
     ]);
   });
 
@@ -795,8 +920,9 @@ describe("node trust application use-cases", () => {
         displayName: "Activation Node 1",
         capabilityProfile: {
           enabledCapabilities: [
-            NodeRoleCapabilities.workflowExecution,
-            NodeRoleCapabilities.schedulingParticipation,
+            NodeRoleCapabilities.api,
+            NodeRoleCapabilities.executor,
+            NodeRoleCapabilities.scheduler,
           ],
           supportsRemoteScheduling: true,
           maxConcurrentWorkloads: 4,
@@ -848,8 +974,9 @@ describe("node trust application use-cases", () => {
     expect(result.value.node.approvalStatus).toBe(NodeApprovalStatuses.approved);
     expect(result.value.node.trustState).toBe(NodeTrustStates.trusted);
     expect(result.value.node.capabilityProfile.enabledCapabilities).toEqual([
-      NodeRoleCapabilities.workflowExecution,
-      NodeRoleCapabilities.schedulingParticipation,
+      NodeRoleCapabilities.api,
+      NodeRoleCapabilities.executor,
+      NodeRoleCapabilities.scheduler,
     ]);
     expect(result.value.node.certificate?.certificateRef).toBe("cert:node-activate-1:v1");
     expect(result.value.mutation.changed).toBeTrue();
@@ -864,7 +991,7 @@ describe("node trust application use-cases", () => {
         nodeType: NodeTypes.compute,
         displayName: "Activation Node 2",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         approvalStatus: NodeApprovalStatuses.approved,
@@ -931,7 +1058,7 @@ describe("node trust application use-cases", () => {
         nodeType: NodeTypes.compute,
         displayName: "Activation Node Unapproved",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         approvalStatus: NodeApprovalStatuses.pending,
@@ -986,7 +1113,7 @@ describe("node trust application use-cases", () => {
         nodeType: NodeTypes.edge,
         displayName: "Edge Node 1",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: false,
         },
         deploymentTags: ["edge"],
@@ -1051,7 +1178,7 @@ describe("node trust application use-cases", () => {
         nodeType: NodeTypes.edge,
         displayName: "Reject Denied Node",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: false,
         },
         deploymentTags: ["edge"],
@@ -1104,7 +1231,7 @@ describe("node trust application use-cases", () => {
         nodeType: NodeTypes.compute,
         displayName: "Compute Node 9",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         approvalStatus: NodeApprovalStatuses.approved,
@@ -1165,7 +1292,7 @@ describe("node trust application use-cases", () => {
         nodeType: NodeTypes.compute,
         displayName: "Compute Heartbeat",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         approvalStatus: NodeApprovalStatuses.approved,
@@ -1250,7 +1377,7 @@ describe("node trust application use-cases", () => {
         nodeType: NodeTypes.compute,
         displayName: "Trusted 1",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         approvalStatus: NodeApprovalStatuses.approved,
@@ -1284,7 +1411,7 @@ describe("node trust application use-cases", () => {
         nodeType: NodeTypes.compute,
         displayName: "Quarantined 1",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         approvalStatus: NodeApprovalStatuses.rejected,
@@ -1316,7 +1443,7 @@ describe("node trust application use-cases", () => {
 
     const result = await useCase.execute({
       actorUserIdentityId: "admin-1",
-      capabilityAnyOf: [NodeRoleCapabilities.workflowExecution],
+      capabilityAnyOf: [NodeRoleCapabilities.executor],
     });
 
     expect(result.ok).toBeTrue();

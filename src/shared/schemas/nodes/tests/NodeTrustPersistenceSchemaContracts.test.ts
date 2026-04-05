@@ -22,8 +22,8 @@ describe("NodeTrustPersistenceSchemaContracts", () => {
       displayName: "Compute Node 001",
       capabilityProfile: {
         enabledCapabilities: [
-          NodeRoleCapabilities.workflowExecution,
-          NodeRoleCapabilities.modelInference,
+          NodeRoleCapabilities.executor,
+          NodeRoleCapabilities.api,
         ],
         supportsRemoteScheduling: true,
       },
@@ -55,7 +55,7 @@ describe("NodeTrustPersistenceSchemaContracts", () => {
       nodeType: NodeTypes.compute,
       displayName: "Compute Node 002",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
         supportsRemoteScheduling: true,
       },
       approvalStatus: NodeApprovalStatuses.pending,
@@ -80,7 +80,7 @@ describe("NodeTrustPersistenceSchemaContracts", () => {
       nodeType: NodeTypes.hybrid,
       displayName: "Hybrid Node 001",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
         supportsRemoteScheduling: true,
       },
       deploymentTags: ["hybrid"],
@@ -98,5 +98,29 @@ describe("NodeTrustPersistenceSchemaContracts", () => {
     expect(() => parseNodeIdentityPersistenceRecord({
       nodeType: NodeTypes.compute,
     })).toThrow(NodeTrustPersistenceSchemaValidationError);
+  });
+
+  it("rejects incomplete capability combinations in persistence payloads", () => {
+    expect(() => NodeIdentityPersistenceRecordSchema.parse({
+      nodeId: "node:compute-003",
+      nodeType: NodeTypes.compute,
+      displayName: "Compute Node 003",
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.previewWorker],
+        supportsRemoteScheduling: false,
+      },
+      approvalStatus: NodeApprovalStatuses.pending,
+      trustState: NodeTrustStates.pendingApproval,
+      deploymentTags: ["us-east-1"],
+      revocation: {
+        state: NodeRevocationStates.active,
+      },
+      enrolledAt: "2026-04-05T12:00:00.000Z",
+      createdAt: "2026-04-05T12:00:00.000Z",
+      createdBy: "system-bootstrap",
+      lastModifiedAt: "2026-04-05T12:00:00.000Z",
+      lastModifiedBy: "system-bootstrap",
+      revision: 0,
+    })).toThrow("must also include 'executor'");
   });
 });

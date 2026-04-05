@@ -84,12 +84,12 @@ export const NODE_TRUST_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, 
       node_id TEXT NOT NULL,
       capability TEXT NOT NULL CHECK (
         capability IN (
-          'workflow-execution',
-          'model-inference',
-          'model-training',
-          'mcp-tool-execution',
+          'ui',
+          'api',
+          'scheduler',
+          'executor',
           'storage-access',
-          'scheduling-participation'
+          'preview-worker'
         )
       ),
       PRIMARY KEY (node_id, capability),

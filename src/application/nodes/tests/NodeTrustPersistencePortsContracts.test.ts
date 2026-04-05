@@ -376,7 +376,7 @@ describe("node trust persistence repository contract assumptions", () => {
       nodeType: NodeTypes.compute,
       displayName: "Compute Node 001",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
         supportsRemoteScheduling: true,
         maxConcurrentWorkloads: 2,
       },
@@ -450,7 +450,7 @@ describe("node trust persistence repository contract assumptions", () => {
 
     const activeNodes = await ports.nodeTrustIdentityPersistenceRepository.listNodes({
       activeOnly: true,
-      capabilityAnyOf: [NodeRoleCapabilities.workflowExecution],
+      capabilityAnyOf: [NodeRoleCapabilities.executor],
       deploymentTagAnyOf: ["US-EAST-1"],
       certificateAssigned: true,
     });
@@ -475,8 +475,8 @@ describe("node trust persistence repository contract assumptions", () => {
       displayName: "Hybrid Node 001",
       capabilityProfile: {
         enabledCapabilities: [
-          NodeRoleCapabilities.workflowExecution,
-          NodeRoleCapabilities.modelInference,
+          NodeRoleCapabilities.executor,
+          NodeRoleCapabilities.api,
         ],
         supportsRemoteScheduling: true,
       },
@@ -546,7 +546,7 @@ describe("node trust persistence repository contract assumptions", () => {
         nodeType: NodeTypes.compute,
         displayName: "Compute Node 002",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         approvalStatus: NodeApprovalStatuses.approved,

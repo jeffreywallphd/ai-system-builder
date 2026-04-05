@@ -38,7 +38,7 @@ describe("SqliteNodeTrustPersistenceAdapter", () => {
         nodeType: NodeTypes.compute,
         displayName: "Bootstrap Node",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
         },
         approvalStatus: NodeApprovalStatuses.pending,
@@ -103,7 +103,7 @@ describe("SqliteNodeTrustPersistenceAdapter", () => {
         nodeType: NodeTypes.compute,
         displayName: "Compute 001",
         capabilityProfile: {
-          enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+          enabledCapabilities: [NodeRoleCapabilities.executor],
           supportsRemoteScheduling: true,
           maxConcurrentWorkloads: 2,
         },
@@ -192,7 +192,7 @@ describe("SqliteNodeTrustPersistenceAdapter", () => {
     const activeNodes = await adapter.listNodes({
       activeOnly: true,
       certificateAssigned: true,
-      capabilityAnyOf: [NodeRoleCapabilities.workflowExecution],
+      capabilityAnyOf: [NodeRoleCapabilities.executor],
       deploymentTagAnyOf: ["US-EAST-1"],
       includeRevoked: false,
     });
@@ -231,8 +231,8 @@ describe("SqliteNodeTrustPersistenceAdapter", () => {
         displayName: "Hybrid 001",
         capabilityProfile: {
           enabledCapabilities: [
-            NodeRoleCapabilities.workflowExecution,
-            NodeRoleCapabilities.modelInference,
+            NodeRoleCapabilities.executor,
+            NodeRoleCapabilities.api,
           ],
           supportsRemoteScheduling: true,
         },

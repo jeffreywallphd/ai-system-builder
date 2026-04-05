@@ -7,6 +7,7 @@ import {
   NodeRoleCapabilities,
   NodeTrustStates,
   NodeTypes,
+  createNodeCapabilityProfile,
   type NodeApprovalStatus,
   type NodeEnrollmentRequestStatus,
   type NodeHeartbeatStatus,
@@ -22,6 +23,7 @@ import type {
 } from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
 import {
   parseNodeEnrollmentRequestPersistenceRecord,
+  parseNodeIdentityPersistenceRecord,
 } from "../../../shared/schemas/nodes/NodeTrustPersistenceSchemaContracts";
 
 export interface NodeIdentityRow {
@@ -143,7 +145,7 @@ export function mapNodeIdentityRowToRecord(row: NodeIdentityRow): NodeIdentityPe
     revision: row.revision,
   };
 
-  return Object.freeze(record);
+  return Object.freeze(parseNodeIdentityPersistenceRecord(record));
 }
 
 export function mapNodeIdentityRecordToRowValues(record: NodeIdentityPersistenceRecord): ReadonlyArray<unknown> {
@@ -255,10 +257,19 @@ export function normalizeNodeTrustLookup(value: string): string | undefined {
 }
 
 function parseNodeRoleCapabilities(value: string): ReadonlyArray<NodeRoleCapability> {
-  const parsed = parseStringArray(value)
-    .map((entry) => assertNodeRoleCapability(entry))
+  const normalized = parseStringArray(value)
+    .map((entry) => {
+      const normalized = normalizeNodeRoleCapability(entry);
+      if (!normalized) {
+        throw new Error(`Persisted node capability '${entry}' is invalid.`);
+      }
+      return normalized;
+    })
     .filter((entry, index, source) => source.indexOf(entry) === index);
-  return Object.freeze(parsed);
+
+  return createNodeCapabilityProfile({
+    enabledCapabilities: normalized,
+  }).enabledCapabilities;
 }
 
 function parseDeploymentTags(value: string): ReadonlyArray<string> {
@@ -328,11 +339,23 @@ function assertNodeHeartbeatStatus(value: string | null): NodeHeartbeatStatus {
   throw new Error(`Persisted node heartbeat status '${value}' is invalid.`);
 }
 
-function assertNodeRoleCapability(value: string): NodeRoleCapability {
+function normalizeNodeRoleCapability(value: string): NodeRoleCapability | undefined {
   if (Object.values(NodeRoleCapabilities).includes(value as NodeRoleCapability)) {
     return value as NodeRoleCapability;
   }
-  throw new Error(`Persisted node capability '${value}' is invalid.`);
+
+  switch (value) {
+    case "workflow-execution":
+    case "model-training":
+      return NodeRoleCapabilities.executor;
+    case "model-inference":
+    case "mcp-tool-execution":
+      return NodeRoleCapabilities.api;
+    case "scheduling-participation":
+      return NodeRoleCapabilities.scheduler;
+    default:
+      return undefined;
+  }
 }
 
 function assertNodeEnrollmentRequestStatus(value: string): NodeEnrollmentRequestStatus {

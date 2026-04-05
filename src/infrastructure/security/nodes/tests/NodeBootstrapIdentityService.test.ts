@@ -30,7 +30,7 @@ describe("NodeBootstrapIdentityService", () => {
       nodeType: NodeTypes.compute,
       displayName: "Compute Worker 1",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
       },
       deploymentTags: ["us-east-1", "GPU", "gpu"],
     });
@@ -62,8 +62,8 @@ describe("NodeBootstrapIdentityService", () => {
       displayName: "Hybrid Worker 1",
       capabilityProfile: {
         enabledCapabilities: [
-          NodeRoleCapabilities.workflowExecution,
-          NodeRoleCapabilities.modelInference,
+          NodeRoleCapabilities.executor,
+          NodeRoleCapabilities.api,
         ],
       },
     });
@@ -71,7 +71,7 @@ describe("NodeBootstrapIdentityService", () => {
       nodeType: NodeTypes.hybrid,
       displayName: "Hybrid Worker Renamed",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
       },
     });
 
@@ -95,7 +95,7 @@ describe("NodeBootstrapIdentityService", () => {
       nodeType: NodeTypes.edge,
       displayName: "Edge Node",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
       },
     })).rejects.toThrow(NodeBootstrapIdentityServiceError);
   });
@@ -109,7 +109,7 @@ describe("NodeBootstrapIdentityService", () => {
       nodeType: NodeTypes.compute,
       displayName: "Compute Node",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
       },
     });
 
@@ -119,7 +119,7 @@ describe("NodeBootstrapIdentityService", () => {
       nodeType: NodeTypes.compute,
       displayName: "Compute Node",
       capabilityProfile: {
-        enabledCapabilities: [NodeRoleCapabilities.workflowExecution],
+        enabledCapabilities: [NodeRoleCapabilities.executor],
       },
     })).rejects.toThrow(NodeBootstrapIdentityServiceError);
   });

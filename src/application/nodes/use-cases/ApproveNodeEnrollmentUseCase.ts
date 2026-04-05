@@ -3,6 +3,7 @@ import {
   NodeEnrollmentRequestStatuses,
   NodeRevocationStates,
   NodeTrustStates,
+  createNodeCapabilityProfile,
   createNodeEnrollmentRequest,
   transitionNodeEnrollmentRequestStatus,
 } from "../../../domain/nodes/NodeTrustDomain";
@@ -64,6 +65,25 @@ interface ApproveNodeEnrollmentUseCaseDependencies {
   readonly idGenerator?: NodeTrustUseCaseIdGenerator;
   readonly clock?: NodeTrustUseCaseClock;
   readonly auditSink?: NodeTrustAuditSink;
+}
+
+function areCapabilityProfilesEqual(
+  left: NodeIdentityPersistenceRecord["capabilityProfile"],
+  right: NodeIdentityPersistenceRecord["capabilityProfile"],
+): boolean {
+  if (left.supportsRemoteScheduling !== right.supportsRemoteScheduling) {
+    return false;
+  }
+  if (left.capabilityProfileVersion !== right.capabilityProfileVersion) {
+    return false;
+  }
+  if (left.maxConcurrentWorkloads !== right.maxConcurrentWorkloads) {
+    return false;
+  }
+  if (left.enabledCapabilities.length !== right.enabledCapabilities.length) {
+    return false;
+  }
+  return left.enabledCapabilities.every((capability, index) => right.enabledCapabilities[index] === capability);
 }
 
 export class ApproveNodeEnrollmentUseCase {
@@ -174,12 +194,20 @@ export class ApproveNodeEnrollmentUseCase {
 
     const nowIso = this.clock.now().toISOString();
     const trustState = NodeTrustStates.pendingApproval;
+    let approvedCapabilityProfile: ReturnType<typeof createNodeCapabilityProfile>;
+    try {
+      approvedCapabilityProfile = createNodeCapabilityProfile(transitionTarget.capabilityProfile);
+    } catch (error) {
+      return mapNodeTrustDomainError(error, "Enrollment capability profile is invalid.")
+        ?? toNodeTrustFailure(NodeTrustUseCaseErrorCodes.invalidRequest, "Enrollment capability profile is invalid.");
+    }
 
     const nodeMutation = existingNode
       ? await this.updateExistingNode(existingNode, {
         actorUserIdentityId,
         approvedAt: request.reviewedAt ?? nowIso,
         trustState,
+        capabilityProfile: approvedCapabilityProfile,
         certificate: certificate.value,
         request,
       })
@@ -187,6 +215,7 @@ export class ApproveNodeEnrollmentUseCase {
         actorUserIdentityId,
         approvedAt: request.reviewedAt ?? nowIso,
         trustState,
+        capabilityProfile: approvedCapabilityProfile,
         certificate: certificate.value,
         request,
       });
@@ -299,11 +328,12 @@ export class ApproveNodeEnrollmentUseCase {
       readonly actorUserIdentityId: string;
       readonly approvedAt: string;
       readonly trustState: typeof NodeTrustStates[keyof typeof NodeTrustStates];
+      readonly capabilityProfile: NodeIdentityPersistenceRecord["capabilityProfile"];
       readonly certificate?: NodeIdentityPersistenceRecord["certificate"];
       readonly request: ApproveNodeEnrollmentUseCaseRequest;
     },
   ): Promise<NodeTrustPersistenceMutationResult<NodeIdentityPersistenceRecord>> {
-    const approvalMutation = await this.dependencies.nodeRepository.updateNodeApproval({
+    let currentMutation = await this.dependencies.nodeRepository.updateNodeApproval({
       nodeId: existingNode.nodeId,
       approvalStatus: NodeApprovalStatuses.approved,
       approvedAt: input.approvedAt,
@@ -321,8 +351,25 @@ export class ApproveNodeEnrollmentUseCase {
       }),
     });
 
+    if (!areCapabilityProfilesEqual(currentMutation.record.capabilityProfile, input.capabilityProfile)) {
+      currentMutation = await this.dependencies.nodeRepository.updateNodeCapabilityProfile({
+        nodeId: existingNode.nodeId,
+        capabilityProfile: input.capabilityProfile,
+        mutation: createNodeTrustMutationEnvelope({
+          actorUserIdentityId: input.actorUserIdentityId,
+          operationPrefix: "approve-node-capabilities",
+          idGenerator: this.idGenerator,
+          clock: this.clock,
+          expectedRevision: currentMutation.record.revision,
+          reason: input.request.reason,
+          correlationId: input.request.correlationId,
+          metadata: input.request.metadata,
+        }),
+      });
+    }
+
     if (!input.certificate) {
-      return approvalMutation;
+      return currentMutation;
     }
 
     return this.dependencies.nodeRepository.updateNodeCertificateReference({
@@ -333,7 +380,7 @@ export class ApproveNodeEnrollmentUseCase {
         operationPrefix: "assign-node-certificate",
         idGenerator: this.idGenerator,
         clock: this.clock,
-        expectedRevision: approvalMutation.record.revision,
+        expectedRevision: currentMutation.record.revision,
         reason: input.request.reason,
         correlationId: input.request.correlationId,
         metadata: input.request.metadata,
@@ -347,6 +394,7 @@ export class ApproveNodeEnrollmentUseCase {
       readonly actorUserIdentityId: string;
       readonly approvedAt: string;
       readonly trustState: typeof NodeTrustStates[keyof typeof NodeTrustStates];
+      readonly capabilityProfile: NodeIdentityPersistenceRecord["capabilityProfile"];
       readonly certificate?: NodeIdentityPersistenceRecord["certificate"];
       readonly request: ApproveNodeEnrollmentUseCaseRequest;
     },
@@ -357,7 +405,7 @@ export class ApproveNodeEnrollmentUseCase {
         nodeId: enrollment.nodeId,
         nodeType: enrollment.nodeType,
         displayName: enrollment.displayName,
-        capabilityProfile: enrollment.capabilityProfile,
+        capabilityProfile: input.capabilityProfile,
         approvalStatus: NodeApprovalStatuses.approved,
         trustState: input.trustState,
         certificate: input.certificate,

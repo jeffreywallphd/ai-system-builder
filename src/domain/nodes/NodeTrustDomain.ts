@@ -35,12 +35,12 @@ export const NodeTypes = Object.freeze({
 export type NodeType = typeof NodeTypes[keyof typeof NodeTypes];
 
 export const NodeRoleCapabilities = Object.freeze({
-  workflowExecution: "workflow-execution",
-  modelInference: "model-inference",
-  modelTraining: "model-training",
-  mcpToolExecution: "mcp-tool-execution",
+  ui: "ui",
+  api: "api",
+  scheduler: "scheduler",
+  executor: "executor",
   storageAccess: "storage-access",
-  schedulingParticipation: "scheduling-participation",
+  previewWorker: "preview-worker",
 });
 
 export type NodeRoleCapability = typeof NodeRoleCapabilities[keyof typeof NodeRoleCapabilities];
@@ -229,6 +229,30 @@ function normalizeOptional(value?: string | null): string | undefined {
   return normalized ? normalized : undefined;
 }
 
+const LegacyNodeRoleCapabilityAliases: Readonly<Record<string, NodeRoleCapability>> = Object.freeze({
+  "workflow-execution": NodeRoleCapabilities.executor,
+  "model-inference": NodeRoleCapabilities.api,
+  "model-training": NodeRoleCapabilities.executor,
+  "mcp-tool-execution": NodeRoleCapabilities.api,
+  "scheduling-participation": NodeRoleCapabilities.scheduler,
+});
+
+const NodeRoleCapabilityPriority = Object.freeze([
+  NodeRoleCapabilities.ui,
+  NodeRoleCapabilities.api,
+  NodeRoleCapabilities.scheduler,
+  NodeRoleCapabilities.executor,
+  NodeRoleCapabilities.storageAccess,
+  NodeRoleCapabilities.previewWorker,
+]);
+
+const NodeRoleCapabilityPriorityByValue = Object.freeze(
+  NodeRoleCapabilityPriority.reduce<Record<NodeRoleCapability, number>>((acc, value, index) => {
+    acc[value] = index;
+    return acc;
+  }, Object.create(null) as Record<NodeRoleCapability, number>),
+);
+
 function normalizeIsoTimestamp(value: Date | string, field: string): string {
   const iso = value instanceof Date ? value.toISOString() : value.trim();
   const parsed = new Date(iso);
@@ -383,21 +407,42 @@ function assertNodeIdentityState(node: NodeIdentity): void {
 }
 
 export function createNodeCapabilityProfile(input: {
-  readonly enabledCapabilities: ReadonlyArray<NodeRoleCapability>;
+  readonly enabledCapabilities: ReadonlyArray<NodeRoleCapability | string>;
   readonly capabilityProfileVersion?: string;
   readonly supportsRemoteScheduling?: boolean;
   readonly maxConcurrentWorkloads?: number;
 }): NodeCapabilityProfile {
   const deduped = new Set<NodeRoleCapability>();
   for (const capability of input.enabledCapabilities) {
-    if (!Object.values(NodeRoleCapabilities).includes(capability)) {
+    const normalizedCapability = normalizeNodeRoleCapability(capability);
+    if (!normalizedCapability) {
       throw new NodeTrustDomainError(`Node role capability '${String(capability)}' is invalid.`);
     }
-    deduped.add(capability);
+    deduped.add(normalizedCapability);
   }
 
   if (deduped.size === 0) {
     throw new NodeTrustDomainError("Node capability profile must include at least one enabled capability.");
+  }
+
+  if (deduped.has(NodeRoleCapabilities.ui) && !deduped.has(NodeRoleCapabilities.api)) {
+    throw new NodeTrustDomainError("Node capability profile with 'ui' capability must also include 'api'.");
+  }
+
+  if (deduped.has(NodeRoleCapabilities.scheduler) && !deduped.has(NodeRoleCapabilities.api)) {
+    throw new NodeTrustDomainError("Node capability profile with 'scheduler' capability must also include 'api'.");
+  }
+
+  if (deduped.has(NodeRoleCapabilities.scheduler) && !deduped.has(NodeRoleCapabilities.executor)) {
+    throw new NodeTrustDomainError(
+      "Node capability profile with 'scheduler' capability must also include 'executor'.",
+    );
+  }
+
+  if (deduped.has(NodeRoleCapabilities.previewWorker) && !deduped.has(NodeRoleCapabilities.executor)) {
+    throw new NodeTrustDomainError(
+      "Node capability profile with 'preview-worker' capability must also include 'executor'.",
+    );
   }
 
   const maxConcurrentWorkloads = input.maxConcurrentWorkloads;
@@ -408,12 +453,36 @@ export function createNodeCapabilityProfile(input: {
     throw new NodeTrustDomainError("Node capability profile maxConcurrentWorkloads must be a positive integer.");
   }
 
+  if (maxConcurrentWorkloads !== undefined && !deduped.has(NodeRoleCapabilities.executor)) {
+    throw new NodeTrustDomainError(
+      "Node capability profile maxConcurrentWorkloads requires 'executor' capability.",
+    );
+  }
+
+  const supportsRemoteScheduling = input.supportsRemoteScheduling ?? deduped.has(NodeRoleCapabilities.executor);
+  if (supportsRemoteScheduling && !deduped.has(NodeRoleCapabilities.executor)) {
+    throw new NodeTrustDomainError(
+      "Node capability profile supportsRemoteScheduling requires 'executor' capability.",
+    );
+  }
+
   return Object.freeze({
-    enabledCapabilities: Object.freeze([...deduped.values()]),
+    enabledCapabilities: Object.freeze(
+      [...deduped.values()].sort((left, right) => (
+        NodeRoleCapabilityPriorityByValue[left] - NodeRoleCapabilityPriorityByValue[right]
+      )),
+    ),
     capabilityProfileVersion: normalizeOptional(input.capabilityProfileVersion),
-    supportsRemoteScheduling: input.supportsRemoteScheduling ?? deduped.has(NodeRoleCapabilities.schedulingParticipation),
+    supportsRemoteScheduling,
     maxConcurrentWorkloads,
   });
+}
+
+function normalizeNodeRoleCapability(value: string): NodeRoleCapability | undefined {
+  if (Object.values(NodeRoleCapabilities).includes(value as NodeRoleCapability)) {
+    return value as NodeRoleCapability;
+  }
+  return LegacyNodeRoleCapabilityAliases[value];
 }
 
 export function createLastSeenMetadata(input: {
