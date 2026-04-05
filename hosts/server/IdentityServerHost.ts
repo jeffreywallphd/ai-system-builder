@@ -16,6 +16,8 @@ import type { IIdentityClock } from "../../application/identity/ports/IIdentityC
 import type { IIdentityIdGenerator } from "../../application/identity/ports/IIdentityIdGenerator";
 import { RegisterLocalAccountUseCase } from "../../src/application/identity/use-cases/RegisterLocalAccountUseCase";
 import { LoginLocalAccountUseCase } from "../../src/application/identity/use-cases/LoginLocalAccountUseCase";
+import { LogoutIdentitySessionUseCase } from "../../src/application/identity/use-cases/LogoutIdentitySessionUseCase";
+import { RevokeIdentitySessionUseCase } from "../../src/application/identity/use-cases/RevokeIdentitySessionUseCase";
 import { SqliteIdentityRepository } from "../../infrastructure/filesystem/identity/SqliteIdentityRepository";
 import { ScryptLocalPasswordCredentialService } from "../../infrastructure/security/identity/ScryptLocalPasswordCredentialService";
 import { OpaqueIdentitySessionTokenService } from "../../infrastructure/security/identity/OpaqueIdentitySessionTokenService";
@@ -87,6 +89,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       identityPolicyService,
       credentialAuthenticator: authenticator,
       clock,
+    }),
+    logoutIdentitySessionUseCase: new LogoutIdentitySessionUseCase({
+      authenticatedSessionService,
+    }),
+    revokeIdentitySessionUseCase: new RevokeIdentitySessionUseCase({
+      sessionRepository: repository,
+      authenticatedSessionService,
     }),
     identityLookupRepository: repository,
     authenticatedSessionService,

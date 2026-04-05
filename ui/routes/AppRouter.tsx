@@ -40,13 +40,16 @@ import type { LoginLocalIdentityApiResponse } from "../../infrastructure/api/ide
 export interface AppRouterProps {
   readonly isAuthenticated?: boolean;
   readonly onAuthenticated?: (session: LoginLocalIdentityApiResponse) => void;
+  readonly onLogout?: () => Promise<void> | void;
 }
 
 export default function AppRouter({
   isAuthenticated = true,
   onAuthenticated,
+  onLogout,
 }: AppRouterProps): JSX.Element {
   const handleAuthenticated = onAuthenticated ?? (() => undefined);
+  const handleLogout = onLogout ?? (() => undefined);
   const routes = useMemo<ReadonlyArray<RouteObject>>(
     () => [
       {
@@ -67,7 +70,7 @@ export default function AppRouter({
             isAllowed={isAuthenticated}
             redirectTo={ROUTE_PATHS.login}
           >
-            <AppLayout />
+            <AppLayout onRequestLogout={handleLogout} />
           </ProtectedRoute>
         ),
         children: [
@@ -125,7 +128,7 @@ export default function AppRouter({
       },
       { path: ROUTE_PATHS.notFound, element: <NotFoundPage /> },
     ],
-    [handleAuthenticated, isAuthenticated]
+    [handleAuthenticated, handleLogout, isAuthenticated]
   );
   const router = useMemo(() => createBrowserRouter([...routes]), [routes]);
 

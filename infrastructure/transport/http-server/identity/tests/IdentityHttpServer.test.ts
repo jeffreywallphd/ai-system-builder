@@ -273,4 +273,97 @@ describe("IdentityHttpServer", () => {
     expect(expiredBody.ok).toBe(false);
     expect(expiredBody.error.code).toBe("authentication-failed");
   });
+
+  it("supports bearer-authenticated logout and targeted session revocation", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "logout.api.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+
+    const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "logout.api.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(loginResponse.status).toBe(200);
+    const loginBody = await loginResponse.json();
+
+    const logoutResponse = await fetch(`${baseUrl}/api/v1/identity/logout`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+    });
+    expect(logoutResponse.status).toBe(200);
+    const logoutBody = await logoutResponse.json();
+    expect(logoutBody.ok).toBe(true);
+    expect(logoutBody.data.sessionId).toBe(loginBody.data.sessionId);
+    expect(logoutBody.data.revocationReason).toBe("logout");
+
+    const invalidAfterLogout = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${loginBody.data.sessionToken}`,
+      },
+    });
+    expect(invalidAfterLogout.status).toBe(401);
+
+    const secondLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "logout.api.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(secondLoginResponse.status).toBe(200);
+    const secondLoginBody = await secondLoginResponse.json();
+
+    const revokeResponse = await fetch(`${baseUrl}/api/v1/identity/session/revoke`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${secondLoginBody.data.sessionToken}`,
+      },
+      body: JSON.stringify({
+        sessionId: secondLoginBody.data.sessionId,
+        reason: "security",
+      }),
+    });
+    expect(revokeResponse.status).toBe(200);
+    const revokeBody = await revokeResponse.json();
+    expect(revokeBody.ok).toBe(true);
+    expect(revokeBody.data.revocationReason).toBe("security");
+
+    const invalidAfterRevoke = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${secondLoginBody.data.sessionToken}`,
+      },
+    });
+    expect(invalidAfterRevoke.status).toBe(401);
+  });
 });

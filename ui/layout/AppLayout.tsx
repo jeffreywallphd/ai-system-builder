@@ -51,13 +51,18 @@ function getWorkflowEditorExitPrompt(workflowName?: string): string {
   return `You have unsaved changes in ${label}. Click OK to save before leaving, or Cancel to discard those changes.`;
 }
 
-export default function AppLayout(): JSX.Element {
+export interface AppLayoutProps {
+  readonly onRequestLogout?: () => Promise<void> | void;
+}
+
+export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Element {
   const { runtimeConsoleStore, workflowStore } = useUiDependencies();
   const location = useLocation();
   const contextNavigationService = useMemo(() => new ContextNavigationService(), []);
   const contextNavigation = contextNavigationService.resolve({ pathname: location.pathname, search: location.search });
   const [runtimeConsoleState, setRuntimeConsoleState] = useState<RuntimeConsoleState>(fallbackConsoleState);
   const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const globalCommandTrigger = useMemo(() => new GlobalCommandTrigger(), []);
   const previousPathnameRef = useRef(location.pathname);
 
@@ -165,6 +170,19 @@ export default function AppLayout(): JSX.Element {
     return <SystemRuntimeWindowHost />;
   }
 
+  const requestLogout = async (): Promise<void> => {
+    if (!onRequestLogout || isSigningOut) {
+      return;
+    }
+
+    setIsSigningOut(true);
+    try {
+      await onRequestLogout();
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
   return (
     <div className="ui-app ui-surface-app">
       <header className="ui-app__header">
@@ -178,6 +196,16 @@ export default function AppLayout(): JSX.Element {
           </Link>
 
           <div className="ui-app__header-actions ui-row ui-row--end">
+            <button
+              type="button"
+              className="ui-button ui-button--ghost ui-button--sm"
+              onClick={() => {
+                void requestLogout();
+              }}
+              disabled={isSigningOut}
+            >
+              {isSigningOut ? "Signing out..." : "Sign out"}
+            </button>
             <button
               type="button"
               className="ui-button ui-button--ghost ui-button--sm ui-app__menu-trigger"

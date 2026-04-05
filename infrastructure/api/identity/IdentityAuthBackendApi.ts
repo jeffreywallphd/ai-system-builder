@@ -4,6 +4,14 @@ import type {
   LoginLocalAccountUseCase,
   LoginLocalAccountErrorCode,
 } from "../../../src/application/identity/use-cases/LoginLocalAccountUseCase";
+import type {
+  LogoutIdentitySessionUseCase,
+  LogoutIdentitySessionErrorCode,
+} from "../../../src/application/identity/use-cases/LogoutIdentitySessionUseCase";
+import type {
+  RevokeIdentitySessionUseCase,
+  RevokeIdentitySessionErrorCode,
+} from "../../../src/application/identity/use-cases/RevokeIdentitySessionUseCase";
 import type { IdentitySessionAccessChannel } from "../../../src/domain/identity/IdentityDomain";
 import type {
   RegisterLocalAccountUseCase,
@@ -15,6 +23,10 @@ import {
   type IdentityAuthApiResponse,
   type LoginLocalIdentityApiRequest,
   type LoginLocalIdentityApiResponse,
+  type LogoutAuthenticatedSessionApiRequest,
+  type LogoutAuthenticatedSessionApiResponse,
+  type RevokeIdentitySessionApiRequest,
+  type RevokeIdentitySessionApiResponse,
   type ResolveAuthenticatedSessionApiRequest,
   type ResolveAuthenticatedSessionApiResponse,
   type RegisterLocalIdentityApiRequest,
@@ -26,6 +38,8 @@ import { IdentityAuthenticatedSessionService } from "../../../application/identi
 interface IdentityAuthBackendApiDependencies {
   readonly registerLocalAccountUseCase: RegisterLocalAccountUseCase;
   readonly loginLocalAccountUseCase: LoginLocalAccountUseCase;
+  readonly logoutIdentitySessionUseCase: LogoutIdentitySessionUseCase;
+  readonly revokeIdentitySessionUseCase: RevokeIdentitySessionUseCase;
   readonly identityLookupRepository: IIdentityLookupRepository;
   readonly authenticatedSessionService: IdentityAuthenticatedSessionService;
   readonly observability?: IdentityAuthObservabilityOptions;
@@ -203,6 +217,82 @@ export class IdentityAuthBackendApi {
     });
   }
 
+  public async logoutAuthenticatedSession(
+    request: LogoutAuthenticatedSessionApiRequest,
+  ): Promise<IdentityAuthApiResponse<LogoutAuthenticatedSessionApiResponse>> {
+    const result = await this.dependencies.logoutIdentitySessionUseCase.execute({
+      sessionToken: request.sessionToken,
+    });
+    if (!result.ok) {
+      const response = Object.freeze({
+        ok: false,
+        error: this.mapLogoutError(result.error.code),
+      });
+      await this.observability.recordApiOutcome({
+        flow: "local-logout",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
+    }
+
+    const response = Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        sessionId: result.value.sessionId,
+        userIdentityId: result.value.userIdentityId,
+        revokedAt: result.value.revokedAt,
+        revocationReason: result.value.revocationReason,
+      }),
+    });
+    await this.observability.recordApiOutcome({
+      flow: "local-logout",
+      request,
+      response,
+    });
+    return response;
+  }
+
+  public async revokeIdentitySession(
+    request: RevokeIdentitySessionApiRequest,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentitySessionApiResponse>> {
+    const result = await this.dependencies.revokeIdentitySessionUseCase.execute({
+      sessionId: request.sessionId,
+      actorUserIdentityId: request.actorUserIdentityId,
+      reason: request.reason,
+    });
+    if (!result.ok) {
+      const response = Object.freeze({
+        ok: false,
+        error: this.mapRevokeSessionError(result.error.code),
+      });
+      await this.observability.recordApiOutcome({
+        flow: "session-revoke",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
+    }
+
+    const response = Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        sessionId: result.value.sessionId,
+        userIdentityId: result.value.userIdentityId,
+        revokedAt: result.value.revokedAt,
+        revocationReason: result.value.revocationReason,
+      }),
+    });
+    await this.observability.recordApiOutcome({
+      flow: "session-revoke",
+      request,
+      response,
+    });
+    return response;
+  }
+
   private mapRegisterError(code: RegisterLocalAccountErrorCode): IdentityAuthApiError {
     switch (code) {
       case IdentityErrorCodes.duplicateIdentity:
@@ -284,6 +374,48 @@ export class IdentityAuthBackendApi {
         return Object.freeze({
           code: IdentityAuthApiErrorCodes.internal,
           message: "Unexpected session validation error.",
+        });
+    }
+  }
+
+  private mapLogoutError(code: LogoutIdentitySessionErrorCode): IdentityAuthApiError {
+    switch (code) {
+      case IdentityErrorCodes.invalidRequest:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.invalidRequest,
+          message: "The logout request is invalid.",
+        });
+      case IdentityErrorCodes.invalidSessionState:
+      case IdentityErrorCodes.notFound:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.authenticationFailed,
+          message: "Invalid session.",
+        });
+      default:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.internal,
+          message: "Unexpected logout error.",
+        });
+    }
+  }
+
+  private mapRevokeSessionError(code: RevokeIdentitySessionErrorCode): IdentityAuthApiError {
+    switch (code) {
+      case IdentityErrorCodes.invalidRequest:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.invalidRequest,
+          message: "The session revocation request is invalid.",
+        });
+      case IdentityErrorCodes.invalidSessionState:
+      case IdentityErrorCodes.notFound:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.authenticationFailed,
+          message: "Invalid session.",
+        });
+      default:
+        return Object.freeze({
+          code: IdentityAuthApiErrorCodes.internal,
+          message: "Unexpected session revocation error.",
         });
     }
   }

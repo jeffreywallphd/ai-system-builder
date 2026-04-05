@@ -183,6 +183,68 @@ describe("IdentityAuthBackendApi", () => {
     expect(revoked.error?.code).toBe("authentication-failed");
   });
 
+  it("supports explicit logout and authenticated session revocation flows", async () => {
+    const harness = await createIdentityAuthTestHarness();
+
+    const register = await harness.backendApi.registerLocalAccount({
+      username: "logout.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(register.ok).toBeTrue();
+
+    const login = await harness.backendApi.loginLocalAccount({
+      providerSubject: "logout.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(login.ok).toBeTrue();
+    if (!login.ok || !login.data) {
+      throw new Error("Expected login success.");
+    }
+
+    const logout = await harness.backendApi.logoutAuthenticatedSession({
+      sessionToken: login.data.sessionToken,
+    });
+    expect(logout.ok).toBeTrue();
+    expect(logout.data?.sessionId).toBe(login.data.sessionId);
+    expect(logout.data?.revocationReason).toBe("logout");
+
+    const postLogoutResolve = await harness.backendApi.resolveAuthenticatedSession({
+      sessionToken: login.data.sessionToken,
+    });
+    expect(postLogoutResolve.ok).toBeFalse();
+    expect(postLogoutResolve.error?.code).toBe("authentication-failed");
+
+    const secondLogin = await harness.backendApi.loginLocalAccount({
+      providerSubject: "logout.user",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(secondLogin.ok).toBeTrue();
+    if (!secondLogin.ok || !secondLogin.data) {
+      throw new Error("Expected second login success.");
+    }
+
+    const revoke = await harness.backendApi.revokeIdentitySession({
+      actorUserIdentityId: secondLogin.data.userIdentityId,
+      sessionId: secondLogin.data.sessionId,
+      reason: "security",
+    });
+    expect(revoke.ok).toBeTrue();
+    expect(revoke.data?.sessionId).toBe(secondLogin.data.sessionId);
+    expect(revoke.data?.revocationReason).toBe("security");
+
+    const postRevokeResolve = await harness.backendApi.resolveAuthenticatedSession({
+      sessionToken: secondLogin.data.sessionToken,
+    });
+    expect(postRevokeResolve.ok).toBeFalse();
+    expect(postRevokeResolve.error?.code).toBe("authentication-failed");
+  });
+
   it("emits structured redacted observability events for register/login success and failure", async () => {
     const logger = new CapturingObservabilityLogger();
     const auditEventSink = new CapturingAuditEventSink();

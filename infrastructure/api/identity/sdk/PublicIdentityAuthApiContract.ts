@@ -78,8 +78,34 @@ export interface LoginLocalIdentityApiResponse {
   readonly sessionAccessChannel?: "desktop" | "thin-client";
 }
 
+export type IdentitySessionRevocationReason = "logout" | "security" | "rotation" | "admin";
+
 export interface ResolveAuthenticatedSessionApiRequest {
   readonly sessionToken: string;
+}
+
+export interface LogoutAuthenticatedSessionApiRequest {
+  readonly sessionToken: string;
+}
+
+export interface LogoutAuthenticatedSessionApiResponse {
+  readonly sessionId: string;
+  readonly userIdentityId: string;
+  readonly revokedAt: string;
+  readonly revocationReason: IdentitySessionRevocationReason;
+}
+
+export interface RevokeIdentitySessionApiRequest {
+  readonly sessionId: string;
+  readonly actorUserIdentityId?: string;
+  readonly reason?: IdentitySessionRevocationReason;
+}
+
+export interface RevokeIdentitySessionApiResponse {
+  readonly sessionId: string;
+  readonly userIdentityId: string;
+  readonly revokedAt: string;
+  readonly revocationReason: IdentitySessionRevocationReason;
 }
 
 export interface AuthenticatedIdentityPrincipalApiResponse {

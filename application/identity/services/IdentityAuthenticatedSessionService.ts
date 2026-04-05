@@ -55,6 +55,15 @@ export interface InvalidateAuthenticatedSessionResult {
   readonly session: Session;
 }
 
+export interface RevokeAuthenticatedSessionByIdInput {
+  readonly sessionId: string;
+  readonly reason: SessionRevocationReason;
+}
+
+export interface RevokeAuthenticatedSessionByIdResult {
+  readonly session: Session;
+}
+
 interface IdentityAuthenticatedSessionServiceDependencies {
   readonly lifecycleService: IdentitySessionLifecycleService;
   readonly sessionRepository: IIdentitySessionRepository;
@@ -178,6 +187,40 @@ export class IdentityAuthenticatedSessionService {
     }));
   }
 
+  public async revokeAuthenticatedSessionById(
+    input: RevokeAuthenticatedSessionByIdInput,
+  ): Promise<IdentityOperationResult<
+    RevokeAuthenticatedSessionByIdResult,
+    typeof IdentityErrorCodes.invalidRequest | typeof IdentityErrorCodes.invalidSessionState | typeof IdentityErrorCodes.notFound
+  >> {
+    const sessionId = normalizeRequired(input.sessionId);
+    if (!sessionId) {
+      return this.failure(IdentityErrorCodes.invalidRequest, "Session id is required.");
+    }
+
+    const existingSession = await this.dependencies.sessionRepository.getSessionById(sessionId);
+    if (!existingSession) {
+      return this.failure(IdentityErrorCodes.notFound, `Session '${sessionId}' was not found.`);
+    }
+
+    const revoked = await this.dependencies.lifecycleService.revokeSession({
+      sessionId,
+      reason: input.reason,
+    });
+    if (!revoked.ok) {
+      return revoked;
+    }
+
+    await this.dependencies.tokenMaterialRepository.invalidateSessionTokenMaterial(
+      revoked.value.session.id,
+      this.dependencies.clock.now().toISOString(),
+    );
+
+    return identitySuccess(Object.freeze({
+      session: revoked.value.session,
+    }));
+  }
+
   private failure<TValue, TCode extends IdentityErrorCode>(
     code: TCode,
     message: string,
@@ -196,6 +239,11 @@ export class IdentityAuthenticatedSessionService {
 }
 
 function normalizeToken(value: string): string | undefined {
+  const normalized = value.trim();
+  return normalized ? normalized : undefined;
+}
+
+function normalizeRequired(value: string): string | undefined {
   const normalized = value.trim();
   return normalized ? normalized : undefined;
 }

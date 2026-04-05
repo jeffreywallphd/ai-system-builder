@@ -23,6 +23,8 @@
 - `src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`
 - `src/application/identity/use-cases/LoginLocalAccountUseCase.ts`
 - `src/application/identity/use-cases/ChangeLocalPasswordCredentialUseCase.ts`
+- `src/application/identity/use-cases/LogoutIdentitySessionUseCase.ts`
+- `src/application/identity/use-cases/RevokeIdentitySessionUseCase.ts`
 - `infrastructure/api/identity/IdentityAuthBackendApi.ts`
 - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `hosts/server/IdentityServerHost.ts`
@@ -133,6 +135,20 @@
 - Successful guard evaluation passes authenticated context (principal + session metadata) to downstream handlers.
 - Missing, invalid, expired, and revoked sessions are normalized to the same external failure posture (`401` + `authentication-failed`).
 - Current protected endpoint: `GET /api/v1/identity/session`.
+
+## Session logout/revocation model (story 1.3.4)
+
+- Logout is now an explicit application/API flow that revokes the bearer-authenticated current session:
+  - `LogoutIdentitySessionUseCase`
+  - `POST /api/v1/identity/logout`
+- Targeted revocation is now an explicit application/API flow for authenticated principals:
+  - `RevokeIdentitySessionUseCase`
+  - `POST /api/v1/identity/session/revoke`
+- `IdentityAuthenticatedSessionService.revokeAuthenticatedSessionById(...)` now supports system-driven revocation seams by session id.
+- Revocation updates both persistence surfaces in this slice:
+  - `identity_sessions.status` becomes `revoked`
+  - `identity_session_token_material.invalidated_at` is set
+- Resulting consistency behavior is immediate for subsequent guard checks in local SQLite-backed runtime state: revoked sessions are rejected as `401` + `authentication-failed`.
 
 ## Read next
 

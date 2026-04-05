@@ -4,6 +4,7 @@ import { AppProviders } from "./composition/AppProviders";
 import { AppRuntimeConfig } from "../infrastructure/config/AppRuntimeConfig";
 import type { LoginLocalIdentityApiResponse } from "../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { IdentityAuthSessionStore } from "./shared/identity/IdentityAuthSessionStore";
+import { IdentityAuthService } from "./services/IdentityAuthService";
 
 export interface AppProps {
   readonly isAuthenticated?: boolean;
@@ -15,6 +16,7 @@ export default function App({
   config,
 }: AppProps): JSX.Element {
   const sessionStore = useMemo(() => new IdentityAuthSessionStore(), []);
+  const authService = useMemo(() => new IdentityAuthService(), []);
   const [authenticated, setAuthenticated] = useState<boolean>(() => {
     if (typeof isAuthenticated === "boolean") {
       return isAuthenticated;
@@ -33,10 +35,26 @@ export default function App({
     setAuthenticated(true);
   };
 
+  const handleLogout = async (): Promise<void> => {
+    const session = sessionStore.getSession();
+    if (session?.sessionToken) {
+      try {
+        await authService.logoutAuthenticatedSession({
+          sessionToken: session.sessionToken,
+        });
+      } catch {
+        // Local session cleanup still proceeds to prevent stale authenticated UI state.
+      }
+    }
+    sessionStore.clearSession();
+    setAuthenticated(false);
+  };
+
   const router = (
     <AppRouter
       isAuthenticated={authenticated}
       onAuthenticated={handleAuthenticated}
+      onLogout={handleLogout}
     />
   );
 

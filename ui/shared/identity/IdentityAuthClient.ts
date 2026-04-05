@@ -2,6 +2,9 @@ import type {
   IdentityAuthApiResponse,
   LoginLocalIdentityApiRequest,
   LoginLocalIdentityApiResponse,
+  LogoutAuthenticatedSessionApiResponse,
+  RevokeIdentitySessionApiRequest,
+  RevokeIdentitySessionApiResponse,
   RegisterLocalIdentityApiRequest,
   RegisterLocalIdentityApiResponse,
 } from "../../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
@@ -13,6 +16,13 @@ export interface IdentityAuthClient {
   loginLocalAccount(
     request: LoginLocalIdentityApiRequest,
   ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>>;
+  logoutAuthenticatedSession(
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<LogoutAuthenticatedSessionApiResponse>>;
+  revokeIdentitySession(
+    request: RevokeIdentitySessionApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentitySessionApiResponse>>;
 }
 
 export class HttpIdentityAuthClient implements IdentityAuthClient {
@@ -35,14 +45,33 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     return this.post("/api/v1/identity/login", request);
   }
 
+  public async logoutAuthenticatedSession(
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<LogoutAuthenticatedSessionApiResponse>> {
+    return this.post("/api/v1/identity/logout", {}, {
+      authorization: `Bearer ${sessionToken}`,
+    });
+  }
+
+  public async revokeIdentitySession(
+    request: RevokeIdentitySessionApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentitySessionApiResponse>> {
+    return this.post("/api/v1/identity/session/revoke", request, {
+      authorization: `Bearer ${sessionToken}`,
+    });
+  }
+
   private async post<TResponse>(
     path: string,
     body: Readonly<Record<string, unknown>>,
+    headers: Readonly<Record<string, string>> = {},
   ): Promise<IdentityAuthApiResponse<TResponse>> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        ...headers,
       },
       body: JSON.stringify(body),
     });

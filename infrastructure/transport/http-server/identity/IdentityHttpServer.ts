@@ -8,6 +8,7 @@ import {
   type AuthenticatedIdentityPrincipalApiResponse,
   type IdentityAuthApiResponse,
   type LoginLocalIdentityApiRequest,
+  type RevokeIdentitySessionApiRequest,
   type ResolveAuthenticatedSessionApiResponse,
   type RegisterLocalIdentityApiRequest,
 } from "../../../api/identity/sdk/PublicIdentityAuthApiContract";
@@ -39,6 +40,11 @@ const LoginRequestSchema: z.ZodType<LoginLocalIdentityApiRequest> = z.object({
   credential: z.object({
     candidate: z.string().min(1),
   }).strict(),
+}).strict();
+
+const RevokeSessionRequestSchema: z.ZodType<Pick<RevokeIdentitySessionApiRequest, "sessionId" | "reason">> = z.object({
+  sessionId: z.string().min(1),
+  reason: z.enum(["logout", "security", "rotation", "admin"]).optional(),
 }).strict();
 
 export interface IdentityHttpServerLogEvent {
@@ -112,6 +118,60 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
               session: context.session,
               sessionToken: context.sessionToken,
             }), responseBody);
+          },
+        );
+        return;
+      }
+      if (request.method === "POST" && path === "/api/v1/identity/logout") {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          async (context) => {
+            const apiResponse = await options.backendApi.logoutAuthenticatedSession({
+              sessionToken: context.sessionToken,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({ sessionToken: context.sessionToken }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (request.method === "POST" && path === "/api/v1/identity/session/revoke") {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          async (context) => {
+            const parsedRequest = await parseAndValidateRequest(
+              request,
+              RevokeSessionRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.revokeIdentitySession({
+              sessionId: parsedRequest.data.sessionId,
+              reason: parsedRequest.data.reason,
+              actorUserIdentityId: context.principal.userIdentityId,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              sessionToken: context.sessionToken,
+              ...parsedRequest.data,
+              actorUserIdentityId: context.principal.userIdentityId,
+            }), apiResponse);
           },
         );
         return;

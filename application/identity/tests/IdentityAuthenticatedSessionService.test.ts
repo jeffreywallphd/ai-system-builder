@@ -252,4 +252,46 @@ describe("IdentityAuthenticatedSessionService", () => {
     const material = await adapter.getSessionTokenMaterialBySessionId(issued.value.session.id);
     expect(material?.invalidatedAt).toBe("2026-04-04T12:02:00.000Z");
   });
+
+  it("revokes sessions by id and invalidates token material", async () => {
+    const adapter = new InMemoryIdentitySessionAdapter();
+    const lifecycleService = new IdentitySessionLifecycleService({
+      sessionRepository: adapter,
+      clock: adapter,
+      idGenerator: adapter,
+    });
+    const service = new IdentityAuthenticatedSessionService({
+      lifecycleService,
+      sessionRepository: adapter,
+      tokenMaterialRepository: adapter,
+      tokenService: adapter,
+      clock: adapter,
+    });
+
+    const issued = await service.issueAuthenticatedSession({
+      userIdentityId: "user:1",
+      providerId: "provider:local-password",
+      providerSubject: "alice",
+      accessChannel: IdentitySessionAccessChannels.thinClient,
+    });
+    if (!issued.ok) {
+      throw new Error("Expected issue success.");
+    }
+
+    const revoked = await service.revokeAuthenticatedSessionById({
+      sessionId: issued.value.session.id,
+      reason: SessionRevocationReasons.security,
+    });
+    expect(revoked.ok).toBeTrue();
+    if (!revoked.ok) {
+      throw new Error("Expected session revoke success.");
+    }
+    expect(revoked.value.session.status).toBe(IdentitySessionStatuses.revoked);
+
+    const material = await adapter.getSessionTokenMaterialBySessionId(issued.value.session.id);
+    expect(material?.invalidatedAt).toBeDefined();
+
+    const resolved = await service.resolveAuthenticatedSessionByToken({ token: issued.value.token });
+    expect(resolved.ok).toBeFalse();
+  });
 });

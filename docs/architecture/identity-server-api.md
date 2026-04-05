@@ -7,6 +7,8 @@ This note documents the authoritative HTTP server endpoints for local identity r
 - `POST /api/v1/identity/register`
 - `POST /api/v1/identity/login`
 - `GET /api/v1/identity/session` (authenticated)
+- `POST /api/v1/identity/logout` (authenticated)
+- `POST /api/v1/identity/session/revoke` (authenticated)
 
 Implemented transport and host composition:
 
@@ -64,6 +66,33 @@ UI entry points now consume this same HTTP surface through renderer identity ada
 Requires:
 
 - `Authorization: Bearer <session-token>`
+
+### Logout request
+
+`POST /api/v1/identity/logout`
+
+Requires:
+
+- `Authorization: Bearer <session-token>`
+
+No request body is required.
+
+### Session revoke request
+
+`POST /api/v1/identity/session/revoke`
+
+Requires:
+
+- `Authorization: Bearer <session-token>`
+
+Request body:
+
+```json
+{
+  "sessionId": "identity-session:...",
+  "reason": "logout | security | rotation | admin (optional)"
+}
+```
 
 Validation is performed with `zod` at the HTTP transport boundary.
 
@@ -136,18 +165,48 @@ All responses use one envelope:
 }
 ```
 
+### Logout success
+
+```json
+{
+  "ok": true,
+  "data": {
+    "sessionId": "identity-session:...",
+    "userIdentityId": "user-identity:...",
+    "revokedAt": "2026-04-04T18:10:00.000Z",
+    "revocationReason": "logout"
+  }
+}
+```
+
+### Session revoke success
+
+```json
+{
+  "ok": true,
+  "data": {
+    "sessionId": "identity-session:...",
+    "userIdentityId": "user-identity:...",
+    "revokedAt": "2026-04-04T18:15:00.000Z",
+    "revocationReason": "security"
+  }
+}
+```
+
 Protected endpoint behavior:
 
 - `IdentityHttpServer` now includes authenticated-session guard infrastructure for bearer-token routes.
 - The guard validates token format and resolves session/principal through `IdentityAuthBackendApi.resolveAuthenticatedSession(...)`.
 - On success, the guard passes authenticated principal/session context into downstream handlers.
 - Missing, invalid, expired, and revoked sessions are rejected consistently with `401` + `authentication-failed`.
+- Logout and session-revoke routes share the same bearer-token guard.
 
 Session issuance notes:
 
 - Login success now issues and persists a production session in the same API flow.
 - Session lifecycle metadata persists in `identity_sessions`.
 - Token/signing material persists separately in `identity_session_token_material` as token hash metadata (raw token is not persisted).
+- Revocation and logout invalidate token material (`invalidated_at`) and mark session lifecycle state `revoked`, so protected session validation fails on the next request without additional eventual-consistency delay in this local persistence slice.
 
 ## Stable error mapping
 
