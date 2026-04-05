@@ -310,6 +310,26 @@ Authorization and audit readiness posture:
 - identity application logic does not perform role/permission policy decisions in this slice, keeping identity lifecycle concerns separate from future authorization policy engines
 - backend observability/audit flow taxonomy now includes administration flows for later audit sink integration
 
+## Identity Administration API/UI Surfaces (Story 1.4.3)
+
+Identity administration capabilities are now exposed through authoritative server routes and renderer surfaces:
+
+- HTTP endpoints:
+  - `GET /api/v1/identity/admin/accounts`
+  - `GET /api/v1/identity/admin/accounts/:userIdentityId`
+  - `POST /api/v1/identity/admin/accounts/:userIdentityId/status`
+- renderer API/client seams:
+  - `ui/shared/identity/IdentityAuthClient.ts`
+  - `ui/services/IdentityAuthService.ts`
+- renderer admin page:
+  - `ui/pages/IdentityAdminPage.tsx`
+
+Renderer behavior in this slice:
+
+- authenticated users can load local account listings and account-status detail from real backend endpoints
+- enable/disable account actions call the same production status-mutation endpoint and re-read account/list state from persisted backend truth
+- empty, loading, and error states are explicitly rendered for administration workflows
+
 ## Separation From Device Trust and Session Trust
 
 Identity in this foundation answers:
@@ -529,6 +549,7 @@ Key tests for this foundation:
 - `infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`
 - `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `ui/pages/tests/IdentityAdminPage.test.tsx`
 - `src/infrastructure/persistence/identity/tests/IdentityPersistenceMapper.test.ts`
 - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
 

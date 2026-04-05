@@ -1,5 +1,9 @@
 import type {
+  GetIdentityAdminAccountStatusApiRequest,
+  GetIdentityAdminAccountStatusApiResponse,
   IdentityAuthApiResponse,
+  ListIdentityAdminAccountsApiRequest,
+  ListIdentityAdminAccountsApiResponse,
   LoginLocalIdentityApiRequest,
   LoginLocalIdentityApiResponse,
   LogoutAuthenticatedSessionApiRequest,
@@ -10,6 +14,8 @@ import type {
   ResolveAuthenticatedSessionApiResponse,
   RegisterLocalIdentityApiRequest,
   RegisterLocalIdentityApiResponse,
+  SetIdentityAdminAccountStatusApiRequest,
+  SetIdentityAdminAccountStatusApiResponse,
 } from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
 import { HttpIdentityAuthClient, type IdentityAuthClient } from "../shared/identity/IdentityAuthClient";
@@ -51,6 +57,27 @@ export class IdentityAuthService {
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<RevokeIdentitySessionApiResponse>> {
     return this.client.revokeIdentitySession(request, sessionToken);
+  }
+
+  public listIdentityAdminAccounts(
+    request: ListIdentityAdminAccountsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminAccountsApiResponse>> {
+    return this.client.listIdentityAdminAccounts(request, sessionToken);
+  }
+
+  public getIdentityAdminAccountStatus(
+    request: GetIdentityAdminAccountStatusApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<GetIdentityAdminAccountStatusApiResponse>> {
+    return this.client.getIdentityAdminAccountStatus(request, sessionToken);
+  }
+
+  public setIdentityAdminAccountStatus(
+    request: SetIdentityAdminAccountStatusApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>> {
+    return this.client.setIdentityAdminAccountStatus(request, sessionToken);
   }
 }
 

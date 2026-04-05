@@ -1,5 +1,9 @@
 import type {
+  GetIdentityAdminAccountStatusApiRequest,
+  GetIdentityAdminAccountStatusApiResponse,
   IdentityAuthApiResponse,
+  ListIdentityAdminAccountsApiRequest,
+  ListIdentityAdminAccountsApiResponse,
   LoginLocalIdentityApiRequest,
   LoginLocalIdentityApiResponse,
   LogoutAuthenticatedSessionApiResponse,
@@ -8,6 +12,8 @@ import type {
   ResolveAuthenticatedSessionApiResponse,
   RegisterLocalIdentityApiRequest,
   RegisterLocalIdentityApiResponse,
+  SetIdentityAdminAccountStatusApiRequest,
+  SetIdentityAdminAccountStatusApiResponse,
 } from "../../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 
 export interface IdentityAuthClient {
@@ -27,6 +33,18 @@ export interface IdentityAuthClient {
     request: RevokeIdentitySessionApiRequest,
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<RevokeIdentitySessionApiResponse>>;
+  listIdentityAdminAccounts(
+    request: ListIdentityAdminAccountsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminAccountsApiResponse>>;
+  getIdentityAdminAccountStatus(
+    request: GetIdentityAdminAccountStatusApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<GetIdentityAdminAccountStatusApiResponse>>;
+  setIdentityAdminAccountStatus(
+    request: SetIdentityAdminAccountStatusApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>>;
 }
 
 export class HttpIdentityAuthClient implements IdentityAuthClient {
@@ -72,6 +90,63 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     return this.post("/api/v1/identity/session/revoke", request, {
       authorization: `Bearer ${sessionToken}`,
     });
+  }
+
+  public async listIdentityAdminAccounts(
+    request: ListIdentityAdminAccountsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminAccountsApiResponse>> {
+    const query = new URLSearchParams();
+    if (request.providerId) {
+      query.set("providerId", request.providerId);
+    }
+    if (request.includeStatuses) {
+      for (const status of request.includeStatuses) {
+        query.append("status", status);
+      }
+    }
+    if (typeof request.limit === "number") {
+      query.set("limit", String(request.limit));
+    }
+    if (typeof request.offset === "number") {
+      query.set("offset", String(request.offset));
+    }
+    const queryString = query.toString();
+    const suffix = queryString ? `?${queryString}` : "";
+    return this.get(`/api/v1/identity/admin/accounts${suffix}`, {
+      authorization: `Bearer ${sessionToken}`,
+    });
+  }
+
+  public async getIdentityAdminAccountStatus(
+    request: GetIdentityAdminAccountStatusApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<GetIdentityAdminAccountStatusApiResponse>> {
+    const query = new URLSearchParams();
+    if (request.providerId) {
+      query.set("providerId", request.providerId);
+    }
+    const queryString = query.toString();
+    const suffix = queryString ? `?${queryString}` : "";
+    return this.get(`/api/v1/identity/admin/accounts/${encodeURIComponent(request.userIdentityId)}${suffix}`, {
+      authorization: `Bearer ${sessionToken}`,
+    });
+  }
+
+  public async setIdentityAdminAccountStatus(
+    request: SetIdentityAdminAccountStatusApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>> {
+    return this.post(
+      `/api/v1/identity/admin/accounts/${encodeURIComponent(request.userIdentityId)}/status`,
+      {
+        action: request.action,
+        providerId: request.providerId,
+      },
+      {
+        authorization: `Bearer ${sessionToken}`,
+      },
+    );
   }
 
   private async post<TResponse>(

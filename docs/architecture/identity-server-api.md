@@ -25,6 +25,7 @@ UI entry points now consume this same HTTP surface through renderer identity ada
 - desktop endpoint resolver: `ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`
 - web/thin-client endpoint resolver: `ui/web/identity/resolveWebIdentityApiBaseUrl.ts`
 - UI-facing service: `ui/services/IdentityAuthService.ts`
+- admin UI surface: `ui/pages/IdentityAdminPage.tsx` (account list, status inspection, enable/disable actions)
 
 ## Request contracts
 
@@ -390,6 +391,7 @@ Redacted keys include:
 - `infrastructure/api/identity/IdentityAuthObservability.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
+- `ui/pages/tests/IdentityAdminPage.test.tsx`
 
 ## Related docs
 

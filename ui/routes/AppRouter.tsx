@@ -33,6 +33,7 @@ import AssetDetailPage from "../pages/AssetDetailPage";
 import RunPage from "../pages/RunPage";
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
+import IdentityAdminPage from "../pages/IdentityAdminPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
 import type { LoginLocalIdentityApiResponse } from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
@@ -122,6 +123,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.embeddingIndexStudio, element: <EmbeddingIndexStudioPage /> },
           { path: ROUTE_PATHS.configProfileStudio, element: <ConfigProfileStudioPage /> },
           { path: ROUTE_PATHS.settings, element: <SettingsPage /> },
+          { path: ROUTE_PATHS.identityAdmin, element: <IdentityAdminPage /> },
         ],
       },
       {

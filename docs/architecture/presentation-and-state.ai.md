@@ -18,6 +18,7 @@ The renderer uses manual composition plus class-based stores/services; it is not
 - Minimal production auth routes live in:
   - `ui/pages/LoginPage.tsx`
   - `ui/pages/RegisterPage.tsx`
+  - `ui/pages/IdentityAdminPage.tsx` (account list/status inspection + enable/disable actions via authenticated admin endpoints)
 - Identity renderer seams follow `shared` / `desktop` / `web` splits:
   - `ui/shared/identity/*`
   - `ui/desktop/identity/*`

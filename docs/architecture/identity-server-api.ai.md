@@ -32,6 +32,7 @@ Renderer client surface now uses the same endpoint contract:
 - `ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`
 - `ui/web/identity/resolveWebIdentityApiBaseUrl.ts`
 - `ui/services/IdentityAuthService.ts`
+- `ui/pages/IdentityAdminPage.tsx` (authenticated identity administration UI surface)
 
 ## Public error contract
 
@@ -108,6 +109,7 @@ Shared redaction (`redactSensitiveAuthPayload`) is reused by both backend and HT
 - `infrastructure/api/identity/IdentityAuthObservability.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
+- `ui/pages/tests/IdentityAdminPage.test.tsx`
 
 ## Related docs
 

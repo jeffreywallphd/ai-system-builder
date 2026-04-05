@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { useUiDependencies } from "../composition/AppProviders";
 import { WorkspaceDataMode, type UiSettings } from "../settings/UiSettings";
 import type { UiSettingsState } from "../settings/UiSettingsStore";
 import type { McpStoreState } from "../state/McpStore";
 import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 import McpRuntimeStatusPanel from "../components/execution/McpRuntimeStatusPanel";
+import { ROUTE_PATHS } from "../routes/RouteConfig";
 
 export default function SettingsPage(): JSX.Element {
   const { settingsStore, mcpStore, runtimeConsoleStore } = useUiDependencies();
@@ -54,6 +56,11 @@ export default function SettingsPage(): JSX.Element {
             Configure where AI Loom Studio stores shared data, how models are organized,
             and the runtime endpoints the UI should use.
           </p>
+        </div>
+        <div className="ui-page__actions">
+          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.identityAdmin}>
+            Identity administration
+          </Link>
         </div>
       </div>
 

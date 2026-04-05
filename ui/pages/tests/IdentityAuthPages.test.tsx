@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import LoginPage from "../LoginPage";
 import RegisterPage from "../RegisterPage";
+import IdentityAdminPage from "../IdentityAdminPage";
 
 describe("Identity auth pages", () => {
   it("renders login and registration form controls", () => {
@@ -16,6 +17,9 @@ describe("Identity auth pages", () => {
     const registerHtml = renderToStaticMarkup(
       React.createElement(MemoryRouter, undefined, React.createElement(RegisterPage)),
     );
+    const adminHtml = renderToStaticMarkup(
+      React.createElement(MemoryRouter, undefined, React.createElement(IdentityAdminPage)),
+    );
 
     expect(loginHtml).toContain("Sign in to AI Loom Studio");
     expect(loginHtml).toContain("Username");
@@ -23,5 +27,6 @@ describe("Identity auth pages", () => {
     expect(loginHtml).toContain("Your session expired. Sign in again to continue.");
     expect(registerHtml).toContain("Create a local AI Loom account");
     expect(registerHtml).toContain("Confirm password");
+    expect(adminHtml).toContain("Identity administration");
   });
 });

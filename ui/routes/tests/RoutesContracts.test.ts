@@ -35,6 +35,7 @@ describe("ui/routes contract adherence", () => {
     expect(source).toContain('systemStudio: "/studio-shell/system"');
     expect(source).toContain('schemaStudio: "/studio-shell/schema"');
     expect(source).toContain('settings: "/settings"');
+    expect(source).toContain('identityAdmin: "/settings/identity-admin"');
     expect(source).toContain('notFound: "*"');
   });
 });
