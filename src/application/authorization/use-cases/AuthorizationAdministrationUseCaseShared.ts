@@ -9,6 +9,7 @@ export const AuthorizationAdministrationErrorCodes = Object.freeze({
   notFound: "authorization-administration-not-found",
   conflict: "authorization-administration-conflict",
   invalidState: "authorization-administration-invalid-state",
+  highRiskConfirmationRequired: "authorization-administration-high-risk-confirmation-required",
 });
 
 export type AuthorizationAdministrationErrorCode =

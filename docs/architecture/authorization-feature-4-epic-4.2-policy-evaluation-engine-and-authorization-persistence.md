@@ -261,3 +261,21 @@ Command gate examples:
   - `/access-state` accepts `inspectedActorUserIdentityId` query parameter,
   - renderer authorization client emits the parameter,
   - sharing-management UI can inspect another actor and renders contribution summaries per permission.
+
+## High-risk sharing and visibility safeguards (Story 4.4.5)
+
+- Authorization administration commands now enforce server-side safeguards for irreversible/high-risk policy transitions:
+  - visibility broadening (`private -> shared/workspace`, `shared -> workspace`, and transitions to `published`),
+  - turning on resharing (`allowResharing` false to true),
+  - creating or widening broad-subject shares (`workspace`, `workspace-role`, `public`),
+  - escalating shared permission actions (for example `.manage`, `.share`, `.update`, `.delete`, `.execute`, `.publish`),
+  - revoking the last active workspace administrator assignment.
+- Safeguards are implemented in application use-case logic (`GrantAuthorizationSharingAccessUseCase`, `UpdateAuthorizationVisibilityUseCase`, `RemoveAuthorizationRoleUseCase`) rather than relying on UI-only prompts.
+- Confirmable high-risk mutations require explicit acknowledgement metadata:
+  - `metadata.authorizationHighRiskConfirmation.confirmedRiskCodes: string[]`
+  - all detected risk codes must be present before mutation writes proceed.
+- If acknowledgement is missing, authorization administration returns:
+  - `authorization-administration-high-risk-confirmation-required`
+  - transport/API mapping uses `conflict` for deterministic caller handling.
+- Workspace administrative continuity is a hard guardrail:
+  - admin-role revocation is rejected when it would leave no active `owner|admin` role assignment in the workspace.

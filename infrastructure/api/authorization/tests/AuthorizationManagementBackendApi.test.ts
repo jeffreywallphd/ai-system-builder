@@ -78,6 +78,11 @@ describe("AuthorizationManagementBackendApi", () => {
         },
         permissionKeys: ["asset.read"],
       },
+      metadata: {
+        authorizationHighRiskConfirmation: {
+          confirmedRiskCodes: ["broad-subject-share"],
+        },
+      },
     });
     expect(grant.ok).toBeTrue();
 
@@ -166,6 +171,34 @@ describe("AuthorizationManagementBackendApi", () => {
     expect(deniedAccessRead.ok).toBeFalse();
     if (!deniedAccessRead.ok) {
       expect(deniedAccessRead.error?.code).toBe("forbidden");
+    }
+  });
+
+  it("returns conflict when high-risk sharing changes are not explicitly confirmed", async () => {
+    const { api } = await createHarness();
+
+    const response = await api.grantSharingAccess({
+      actorUserIdentityId: "user-owner",
+      resource: {
+        resourceFamily: AuthorizationResourceFamilies.asset,
+        resourceType: "asset",
+        resourceId: "asset-1",
+      },
+      grant: {
+        id: "share-risk-blocked",
+        target: {
+          kind: "workspace-role",
+          workspaceId: "workspace-1",
+          roleKey: "viewer",
+        },
+        permissionKeys: ["asset.read"],
+      },
+    });
+
+    expect(response.ok).toBeFalse();
+    if (!response.ok) {
+      expect(response.error?.code).toBe("conflict");
+      expect(response.error?.reasonCode).toBe("authorization-administration-high-risk-confirmation-required");
     }
   });
 
