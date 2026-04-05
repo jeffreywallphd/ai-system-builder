@@ -201,3 +201,26 @@ Sensitive data posture:
 
 - inventory DTOs intentionally expose operational trust state, capability profile, and presence metadata needed by admin UIs
 - internal trust fields (for example revocation actor identity, certificate authority refs, certificate thumbprints, and persistence revision internals) remain excluded
+
+## Story 5.4.2 node-authenticated trust enforcement transport hooks
+
+Story 5.4.2 tightens node-authenticated operation enforcement on transport + application boundaries.
+
+Canonical artifacts:
+
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/application/nodes/use-cases/NodeTrustUseCaseShared.ts`
+- `src/application/nodes/use-cases/RecordNodeHeartbeatUseCase.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+
+Heartbeat transport enforcement:
+
+- `POST /api/v1/nodes/:nodeId/heartbeat` still requires authenticated transport and strict schema payload validation.
+- The route now rejects authenticated sessions that are not bound to route `nodeId` (principal/session identifiers must match the node identity).
+- Actor identity for node-authenticated heartbeat is transport-bound from authenticated node context, so client-supplied actor/node fields remain ignored.
+
+Application enforcement guidance:
+
+- Node-authenticated operations must call `enforceNodeAuthenticatedOperationTrust(...)` to avoid scattered state checks.
+- This centralized gate enforces approved + activated (`trustState=trusted`) + non-revoked + certificate-present preconditions before node-scoped writes.
+- Future node-authenticated handlers (for example execution registration flows) should reuse this same helper to preserve consistent denial semantics and certificate-transport compatibility.

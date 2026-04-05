@@ -1,6 +1,6 @@
 # Node Trusted Activation Workflow
 
-This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, and Story 5.4.1 (Feature 5 / Epic 5.3 and Epic 5.4): explicit activation of approved nodes into trusted operational state, capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, authenticated admin UI inventory inspection surfaces, and durable node revocation behavior.
+This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, Story 5.4.1, and Story 5.4.2 (Feature 5 / Epic 5.3 and Epic 5.4): explicit activation of approved nodes into trusted operational state, capability profile registration/validation, operational presence heartbeat ingestion, admin inventory list/detail query views, authenticated admin UI inventory inspection surfaces, durable node revocation behavior, and node-authenticated trust enforcement.
 
 ## Purpose
 
@@ -48,7 +48,7 @@ This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.
   - preserves approved capability profile and trust metadata
 - Presence step:
   - heartbeat updates remain separate and do not activate trust
-  - heartbeat updates require `trustState=trusted`
+  - heartbeat updates require centralized node-authenticated trust gates (approved + trusted + non-revoked + certificate-present)
 
 ## Idempotency and safety
 
@@ -84,8 +84,8 @@ This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.
 - Node heartbeat endpoint:
   - `POST /api/v1/nodes/:nodeId/heartbeat`
   - requires authenticated transport
-  - binds actor identity to authenticated principal
-  - transport binds `actorUserIdentityId` and `nodeId` from authenticated principal + route parameters so client-supplied spoof values are ignored
+  - requires authenticated principal/session identity bound to route `nodeId`
+  - transport binds `actorUserIdentityId` and `nodeId` from authenticated node identity + route parameters so client-supplied spoof values are ignored
 - Admin visibility endpoint:
   - `GET /api/v1/nodes/trusted`
   - query filters: `nodeType`, `capability`, `deploymentTag`, `lastSeenAfter`, `lastSeenBefore`, `limit`, `offset`

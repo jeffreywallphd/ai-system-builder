@@ -1522,6 +1522,191 @@ describe("node trust application use-cases", () => {
     }
   });
 
+  it("enforces node-authenticated trust gates for approved, pending, rejected, unknown, and revoked states", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    const heartbeatUseCase = new RecordNodeHeartbeatUseCase({
+      nodeRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      clock: createFixedClock("2026-04-05T18:40:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    await repository.registerNode({
+      record: {
+        nodeId: "node-heartbeat-approved-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Heartbeat Approved",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:heartbeat-approved-1:v1",
+        },
+        deploymentTags: ["heartbeat"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:30:00.000Z",
+        approvedAt: "2026-04-05T18:31:00.000Z",
+        createdAt: "2026-04-05T18:30:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T18:31:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-heartbeat-approved-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+    await repository.registerNode({
+      record: {
+        nodeId: "node-heartbeat-pending-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Heartbeat Pending",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.pending,
+        trustState: NodeTrustStates.pendingApproval,
+        deploymentTags: ["heartbeat"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:30:00.000Z",
+        createdAt: "2026-04-05T18:30:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T18:30:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-heartbeat-pending-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+    await repository.registerNode({
+      record: {
+        nodeId: "node-heartbeat-rejected-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Heartbeat Rejected",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.rejected,
+        trustState: NodeTrustStates.quarantined,
+        deploymentTags: ["heartbeat"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:30:00.000Z",
+        createdAt: "2026-04-05T18:30:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T18:30:00.000Z",
+        lastModifiedBy: "seed",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-heartbeat-rejected-1",
+        context: {
+          actorUserIdentityId: "seed",
+        },
+      },
+    });
+    await repository.registerNode({
+      record: {
+        nodeId: "node-heartbeat-revoked-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Heartbeat Revoked",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.rejected,
+        trustState: NodeTrustStates.revoked,
+        deploymentTags: ["heartbeat"],
+        revocation: {
+          state: NodeRevocationStates.revoked,
+          reason: NodeRevocationReasons.operatorAction,
+          revokedAt: "2026-04-05T18:35:00.000Z",
+          revokedByUserIdentityId: "admin-1",
+        },
+        enrolledAt: "2026-04-05T18:30:00.000Z",
+        revokedAt: "2026-04-05T18:35:00.000Z",
+        createdAt: "2026-04-05T18:30:00.000Z",
+        createdBy: "seed",
+        lastModifiedAt: "2026-04-05T18:35:00.000Z",
+        lastModifiedBy: "admin-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-heartbeat-revoked-1",
+        context: {
+          actorUserIdentityId: "admin-1",
+        },
+      },
+    });
+
+    const approved = await heartbeatUseCase.execute({
+      actorUserIdentityId: "node-heartbeat-approved-1",
+      nodeId: "node-heartbeat-approved-1",
+      heartbeatStatus: NodeHeartbeatStatuses.online,
+    });
+    expect(approved.ok).toBeTrue();
+
+    const unknown = await heartbeatUseCase.execute({
+      actorUserIdentityId: "node-heartbeat-unknown-1",
+      nodeId: "node-heartbeat-unknown-1",
+      heartbeatStatus: NodeHeartbeatStatuses.online,
+    });
+    expect(unknown.ok).toBeFalse();
+    if (!unknown.ok) {
+      expect(unknown.error.code).toBe(NodeTrustUseCaseErrorCodes.notFound);
+    }
+
+    const pending = await heartbeatUseCase.execute({
+      actorUserIdentityId: "node-heartbeat-pending-1",
+      nodeId: "node-heartbeat-pending-1",
+      heartbeatStatus: NodeHeartbeatStatuses.online,
+    });
+    expect(pending.ok).toBeFalse();
+    if (!pending.ok) {
+      expect(pending.error.code).toBe(NodeTrustUseCaseErrorCodes.invalidState);
+      expect(pending.error.message).toContain("pending approval");
+    }
+
+    const rejected = await heartbeatUseCase.execute({
+      actorUserIdentityId: "node-heartbeat-rejected-1",
+      nodeId: "node-heartbeat-rejected-1",
+      heartbeatStatus: NodeHeartbeatStatuses.online,
+    });
+    expect(rejected.ok).toBeFalse();
+    if (!rejected.ok) {
+      expect(rejected.error.code).toBe(NodeTrustUseCaseErrorCodes.invalidState);
+      expect(rejected.error.message).toContain("rejected");
+    }
+
+    const revoked = await heartbeatUseCase.execute({
+      actorUserIdentityId: "node-heartbeat-revoked-1",
+      nodeId: "node-heartbeat-revoked-1",
+      heartbeatStatus: NodeHeartbeatStatuses.online,
+    });
+    expect(revoked.ok).toBeFalse();
+    if (!revoked.ok) {
+      expect(revoked.error.code).toBe(NodeTrustUseCaseErrorCodes.invalidState);
+      expect(revoked.error.message).toContain("revoked");
+    }
+  });
+
   it("lists trusted node inventory with capability filters", async () => {
     const repository = new InMemoryNodeTrustRepository();
     const audit = new RecordingAuditSink();

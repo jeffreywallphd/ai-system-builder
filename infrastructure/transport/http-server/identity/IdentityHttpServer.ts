@@ -1504,10 +1504,23 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Se
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
               return;
             }
+            if (!isAuthenticatedNodePrincipalForNode(context, nodeId)) {
+              const forbidden = buildNodeTrustForbiddenResponse(
+                `Authenticated session is not authorized to submit heartbeat for node '${nodeId}'.`,
+              );
+              writeJson(response, 403, forbidden);
+              logResponse(logger, requestId, request, 403, Object.freeze({
+                nodeId,
+                principalUserIdentityId: context.principal.userIdentityId,
+                principalUsername: context.principal.username,
+                sessionProviderSubject: context.session.providerSubject,
+              }), forbidden);
+              return;
+            }
 
             const parsedRequest = await parseAndValidateNodeHeartbeatRequest(
               request,
-              context.principal.userIdentityId,
+              nodeId,
               nodeId,
               requestId,
               logger,
@@ -3818,6 +3831,16 @@ function buildNodeTrustInvalidRequestResponse(message: string): NodeTrustApiResp
   });
 }
 
+function buildNodeTrustForbiddenResponse(message: string): NodeTrustApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: NodeTrustApiErrorCodes.forbidden,
+      message,
+    },
+  });
+}
+
 function buildForbiddenResponse(message: string): IdentityAuthApiResponse<never> {
   return Object.freeze({
     ok: false,
@@ -3826,6 +3849,20 @@ function buildForbiddenResponse(message: string): IdentityAuthApiResponse<never>
       message,
     },
   });
+}
+
+function isAuthenticatedNodePrincipalForNode(context: AuthenticatedRequestContext, nodeId: string): boolean {
+  const expectedNodeId = nodeId.trim();
+  if (!expectedNodeId) {
+    return false;
+  }
+
+  const candidateValues = [
+    context.principal.userIdentityId,
+    context.principal.username,
+    context.session.providerSubject,
+  ];
+  return candidateValues.some((candidate) => candidate.trim() === expectedNodeId);
 }
 
 function buildQueryValidationError(path: string, message: string): IdentityAuthApiResponse<never> {

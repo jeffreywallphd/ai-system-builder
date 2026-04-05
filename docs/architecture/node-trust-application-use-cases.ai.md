@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Quick baseline for Story 5.1.4 node trust application orchestration seams, Story 5.2.1 node bootstrap identity generation, Story 5.2.3 admin review/approval decisions, Story 5.2.4 enrollment detail retrieval support, Story 5.3.4 admin inventory list/detail queries, and Story 5.4.1 durable node revocation behavior (Feature 5 / Epic 5.1, 5.2, 5.3, and 5.4).
+Quick baseline for Story 5.1.4 node trust application orchestration seams, Story 5.2.1 node bootstrap identity generation, Story 5.2.3 admin review/approval decisions, Story 5.2.4 enrollment detail retrieval support, Story 5.3.4 admin inventory list/detail queries, Story 5.4.1 durable node revocation behavior, and Story 5.4.2 node-authenticated trust enforcement (Feature 5 / Epic 5.1, 5.2, 5.3, and 5.4).
 
 ## Canonical files
 
@@ -61,5 +61,7 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - Enrollment approval/rejection metadata (`reviewedAt`, `reviewedByUserIdentityId`, `decisionNote`) remains in persistence contracts so admin decisions are auditable and durable.
 - Approval/rejection audit events include the persisted decision metadata for downstream audit consumers.
 - Activation is explicitly separate from heartbeat presence writes so approval/activation lifecycle transitions and liveness updates remain independently auditable.
-- Heartbeat recording enforces trusted-node preconditions (`trustState=trusted`) before writing `lastSeen` metadata.
+- Node-authenticated write operations should use `enforceNodeAuthenticatedOperationTrust(...)` from `NodeTrustUseCaseShared.ts` instead of ad-hoc state checks.
+- The centralized trust gate enforces approved + activated (`trustState=trusted`) + non-revoked + certificate-present preconditions before node-authenticated writes.
+- Heartbeat recording uses this centralized guard and rejects unknown, pending, rejected, and revoked nodes before writing `lastSeen` metadata.
 - Trusted inventory queries are the admin visibility read path for `lastSeenAt` / heartbeat status snapshots.

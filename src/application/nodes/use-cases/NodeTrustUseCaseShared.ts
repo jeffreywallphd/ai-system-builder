@@ -1,4 +1,10 @@
 import { NodeTrustDomainError } from "../../../domain/nodes/NodeTrustDomain";
+import {
+  NodeApprovalStatuses,
+  NodeRevocationStates,
+  NodeTrustStates,
+} from "../../../domain/nodes/NodeTrustDomain";
+import type { NodeIdentityPersistenceRecord } from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
 import type { NodeTrustPersistenceMutationEnvelope } from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
 
 export const NodeTrustUseCaseErrorCodes = Object.freeze({
@@ -108,4 +114,58 @@ export function mapNodeTrustDomainError<TValue>(
   }
 
   return toNodeTrustFailure(NodeTrustUseCaseErrorCodes.invalidRequest, error.message || fallbackMessage);
+}
+
+export function enforceNodeAuthenticatedOperationTrust<TValue>(
+  node: NodeIdentityPersistenceRecord,
+  operationDescription: string,
+): NodeTrustUseCaseOutcome<TValue> | undefined {
+  const operation = operationDescription.trim() || "perform this operation";
+
+  if (
+    node.revocation.state === NodeRevocationStates.revoked
+    || node.trustState === NodeTrustStates.revoked
+    || Boolean(node.revokedAt)
+    || Boolean(node.revocation.revokedAt)
+  ) {
+    return toNodeTrustFailure(
+      NodeTrustUseCaseErrorCodes.invalidState,
+      `Node '${node.nodeId}' is revoked and cannot ${operation}.`,
+    );
+  }
+
+  if (node.approvalStatus !== NodeApprovalStatuses.approved) {
+    const approvalMessage = node.approvalStatus === NodeApprovalStatuses.pending
+      ? "is pending approval"
+      : node.approvalStatus === NodeApprovalStatuses.rejected
+        ? "has been rejected"
+        : "is not approved";
+    return toNodeTrustFailure(
+      NodeTrustUseCaseErrorCodes.invalidState,
+      `Node '${node.nodeId}' ${approvalMessage} and cannot ${operation}.`,
+    );
+  }
+
+  if (node.trustState !== NodeTrustStates.trusted) {
+    const trustMessage = node.trustState === NodeTrustStates.pendingEnrollment
+      ? "is pending enrollment"
+      : node.trustState === NodeTrustStates.pendingApproval
+        ? "is pending activation"
+        : node.trustState === NodeTrustStates.quarantined
+          ? "is quarantined"
+          : "is not trusted";
+    return toNodeTrustFailure(
+      NodeTrustUseCaseErrorCodes.invalidState,
+      `Node '${node.nodeId}' ${trustMessage} and cannot ${operation}.`,
+    );
+  }
+
+  if (!normalizeOptional(node.certificate?.certificateRef)) {
+    return toNodeTrustFailure(
+      NodeTrustUseCaseErrorCodes.invalidState,
+      `Node '${node.nodeId}' is missing a certificate reference and cannot ${operation}.`,
+    );
+  }
+
+  return undefined;
 }

@@ -1,5 +1,4 @@
 import {
-  NodeTrustStates,
   createNodeIdentity,
   recordNodeLastSeen,
   type NodeHeartbeatStatus,
@@ -17,14 +16,15 @@ import {
 } from "../ports/NodeTrustAuditPorts";
 import {
   DefaultNodeTrustUseCaseIdGenerator,
-  NodeTrustUseCaseErrorCodes,
   type NodeTrustUseCaseClock,
   type NodeTrustUseCaseIdGenerator,
   type NodeTrustUseCaseOutcome,
   createNodeTrustMutationEnvelope,
+  enforceNodeAuthenticatedOperationTrust,
   mapNodeTrustDomainError,
   normalizeOptional,
   normalizeRequired,
+  NodeTrustUseCaseErrorCodes,
   toNodeTrustFailure,
 } from "./NodeTrustUseCaseShared";
 
@@ -82,11 +82,9 @@ export class RecordNodeHeartbeatUseCase {
     if (!node) {
       return toNodeTrustFailure(NodeTrustUseCaseErrorCodes.notFound, `Node '${nodeId}' was not found.`);
     }
-    if (node.trustState !== NodeTrustStates.trusted) {
-      return toNodeTrustFailure(
-        NodeTrustUseCaseErrorCodes.invalidState,
-        `Node '${nodeId}' is not trusted and cannot report heartbeat presence.`,
-      );
+    const trustFailure = enforceNodeAuthenticatedOperationTrust(node, "report heartbeat presence");
+    if (trustFailure) {
+      return trustFailure;
     }
 
     try {
