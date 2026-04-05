@@ -18,6 +18,7 @@ This note now also documents Story 6.3.5 (Feature 6 / Epic 6.3): approved-node r
 - `src/application/nodes/use-cases/RejectNodeEnrollmentUseCase.ts`
 - `src/application/nodes/use-cases/RevokeNodeTrustUseCase.ts`
 - `src/application/nodes/use-cases/RecordNodeHeartbeatUseCase.ts`
+- `src/application/nodes/use-cases/RecordNodeOperationalUpdateUseCase.ts`
 - `src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase.ts`
 - `src/application/nodes/use-cases/NodeInventoryReadModels.ts`
 - `src/application/nodes/use-cases/ListNodeInventoryUseCase.ts`
@@ -91,6 +92,11 @@ This note now also documents Story 6.3.5 (Feature 6 / Epic 6.3): approved-node r
   - validates heartbeat update against domain rules (for example revoked nodes cannot update heartbeat)
   - persists last-seen metadata
   - emits `node-heartbeat-rejected` audit events for rejected trust-gate and heartbeat-security failures
+- `RecordNodeOperationalUpdateUseCase`
+  - authorizes node operational update writes on the same trust gate used by node-authenticated operations
+  - records heartbeat/last-seen updates and optionally synchronizes capability profiles + deployment tags in one mutation path
+  - validates operational updates using existing node domain invariants before persistence mutation
+  - emits heartbeat audit events with synchronization metadata (`capabilityProfileSynchronized`, `deploymentTagsSynchronized`) for orchestration consumers
 - `ListTrustedNodeInventoryUseCase`
   - authorizes trusted inventory queries
   - queries trusted-node-only inventory using persistence query presets and filters

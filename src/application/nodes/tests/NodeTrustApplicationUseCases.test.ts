@@ -45,6 +45,7 @@ import { ActivateApprovedNodeUseCase } from "../use-cases/ActivateApprovedNodeUs
 import { RejectNodeEnrollmentUseCase } from "../use-cases/RejectNodeEnrollmentUseCase";
 import { RevokeNodeTrustUseCase } from "../use-cases/RevokeNodeTrustUseCase";
 import { RecordNodeHeartbeatUseCase } from "../use-cases/RecordNodeHeartbeatUseCase";
+import { RecordNodeOperationalUpdateUseCase } from "../use-cases/RecordNodeOperationalUpdateUseCase";
 import { ListTrustedNodeInventoryUseCase } from "../use-cases/ListTrustedNodeInventoryUseCase";
 import { GetNodeInventoryDetailUseCase } from "../use-cases/GetNodeInventoryDetailUseCase";
 import { ListNodeInventoryUseCase } from "../use-cases/ListNodeInventoryUseCase";
@@ -1524,6 +1525,80 @@ describe("node trust application use-cases", () => {
 
     expect(audit.events.some((event) => event.type === NodeTrustAuditEventTypes.heartbeatRecorded)).toBeTrue();
     expect(audit.events.some((event) => event.type === NodeTrustAuditEventTypes.heartbeatRejected)).toBeTrue();
+  });
+
+  it("records secure operational updates and synchronizes capability/deployment metadata", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    const audit = new RecordingAuditSink();
+    await repository.registerNode({
+      record: {
+        nodeId: "node-operational-sync-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Operational Sync 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        approvalStatus: NodeApprovalStatuses.approved,
+        trustState: NodeTrustStates.trusted,
+        certificate: {
+          certificateRef: "cert:node-operational-sync-1:v1",
+        },
+        deploymentTags: ["edge-east"],
+        revocation: {
+          state: NodeRevocationStates.active,
+        },
+        enrolledAt: "2026-04-05T18:30:00.000Z",
+        approvedAt: "2026-04-05T18:30:30.000Z",
+        createdAt: "2026-04-05T18:30:00.000Z",
+        createdBy: "system",
+        lastModifiedAt: "2026-04-05T18:30:00.000Z",
+        lastModifiedBy: "system",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-operational-sync-1",
+        context: {
+          actorUserIdentityId: "system",
+        },
+      },
+    });
+
+    const useCase = new RecordNodeOperationalUpdateUseCase({
+      nodeRepository: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      clock: createFixedClock("2026-04-05T18:31:00.000Z"),
+      auditSink: audit,
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "node-operational-sync-1",
+      nodeId: "node-operational-sync-1",
+      heartbeatStatus: NodeHeartbeatStatuses.degraded,
+      seenAt: "2026-04-05T18:31:30.000Z",
+      observedBy: "node-agent-v2",
+      capabilityProfile: {
+        enabledCapabilities: [NodeRoleCapabilities.api, NodeRoleCapabilities.executor],
+        supportsRemoteScheduling: true,
+      },
+      deploymentTags: ["EDGE-WEST", "scheduler"],
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.node.lastSeen?.heartbeatStatus).toBe(NodeHeartbeatStatuses.degraded);
+    expect(result.value.node.lastSeen?.lastSeenAt).toBe("2026-04-05T18:31:30.000Z");
+    expect(result.value.node.capabilityProfile.enabledCapabilities).toEqual([
+      NodeRoleCapabilities.api,
+      NodeRoleCapabilities.executor,
+    ]);
+    expect(result.value.node.deploymentTags).toEqual(["edge-west", "scheduler"]);
+    expect(result.value.update.capabilityProfileSynchronized).toBeTrue();
+    expect(result.value.update.deploymentTagsSynchronized).toBeTrue();
+    expect(audit.events.some((event) => event.type === NodeTrustAuditEventTypes.heartbeatRecorded)).toBeTrue();
   });
 
   it("enforces node-authenticated trust gates for approved, pending, rejected, unknown, and revoked states", async () => {

@@ -5,6 +5,7 @@ import type {
   ListNodeInventoryUseCase,
   ListTrustedNodeInventoryUseCase,
   RecordNodeHeartbeatUseCase,
+  RecordNodeOperationalUpdateUseCase,
   RegisterNodeEnrollmentRequestUseCase,
   RejectNodeEnrollmentUseCase,
   ResolveApprovedNodeRuntimeTrustMaterialUseCase,
@@ -50,6 +51,8 @@ import {
   type NodeTrustApiResponse,
   type RecordNodeHeartbeatApiRequest,
   type RecordNodeHeartbeatApiResponse,
+  type RecordNodeOperationalUpdateApiRequest,
+  type RecordNodeOperationalUpdateApiResponse,
   type RejectNodeEnrollmentApiRequest,
   type RejectNodeEnrollmentApiResponse,
   type RevokeNodeTrustApiRequest,
@@ -71,6 +74,7 @@ interface NodeTrustBackendApiDependencies {
   readonly rejectNodeEnrollmentUseCase: RejectNodeEnrollmentUseCase;
   readonly revokeNodeTrustUseCase: RevokeNodeTrustUseCase;
   readonly recordNodeHeartbeatUseCase: RecordNodeHeartbeatUseCase;
+  readonly recordNodeOperationalUpdateUseCase?: RecordNodeOperationalUpdateUseCase;
   readonly resolveApprovedNodeRuntimeTrustMaterialUseCase?: ResolveApprovedNodeRuntimeTrustMaterialUseCase;
   readonly resolveNodeMutualTlsTransportIdentityUseCase?: ResolveNodeMutualTlsTransportIdentityUseCase;
   readonly listTrustedNodeInventoryUseCase: ListTrustedNodeInventoryUseCase;
@@ -304,6 +308,51 @@ export class NodeTrustBackendApi {
       ok: true,
       data: Object.freeze({
         node: toNodeDetailDto(this.toInternalNode(outcome.value.node)),
+      }),
+    });
+  }
+
+  public async recordNodeOperationalUpdate(
+    request: RecordNodeOperationalUpdateApiRequest,
+  ): Promise<NodeTrustApiResponse<RecordNodeOperationalUpdateApiResponse>> {
+    if (!this.dependencies.recordNodeOperationalUpdateUseCase) {
+      return Object.freeze({
+        ok: false,
+        error: Object.freeze({
+          code: NodeTrustApiErrorCodes.internal,
+          message: "Node operational update recording is not configured for this runtime.",
+        }),
+      });
+    }
+
+    const outcome = await this.dependencies.recordNodeOperationalUpdateUseCase.execute({
+      actorUserIdentityId: request.actorUserIdentityId,
+      nodeId: request.nodeId,
+      heartbeatStatus: request.heartbeatStatus,
+      seenAt: request.seenAt,
+      observedBy: request.observedBy,
+      capabilityProfile: request.capabilityProfile,
+      deploymentTags: request.deploymentTags,
+      metadata: request.metadata,
+    });
+
+    if (!outcome.ok) {
+      return Object.freeze({
+        ok: false,
+        error: this.mapUseCaseError(outcome.error.code, outcome.error.message),
+      });
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        node: toNodeDetailDto(this.toInternalNode(outcome.value.node)),
+        update: Object.freeze({
+          heartbeatRecorded: outcome.value.update.heartbeatRecorded,
+          capabilityProfileSynchronized: outcome.value.update.capabilityProfileSynchronized,
+          deploymentTagsSynchronized: outcome.value.update.deploymentTagsSynchronized,
+          transportAuthenticatedNodeId: outcome.value.node.nodeId,
+        }),
       }),
     });
   }

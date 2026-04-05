@@ -19,6 +19,7 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - `src/application/nodes/use-cases/RejectNodeEnrollmentUseCase.ts`
 - `src/application/nodes/use-cases/RevokeNodeTrustUseCase.ts`
 - `src/application/nodes/use-cases/RecordNodeHeartbeatUseCase.ts`
+- `src/application/nodes/use-cases/RecordNodeOperationalUpdateUseCase.ts`
 - `src/application/nodes/use-cases/ListTrustedNodeInventoryUseCase.ts`
 - `src/application/nodes/use-cases/NodeInventoryReadModels.ts`
 - `src/application/nodes/use-cases/ListNodeInventoryUseCase.ts`
@@ -49,6 +50,7 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
   - reject preserves revoked existing-node trust state for stale enrollment cleanup
 - revoke node trust (including certificate-revocation seam, durable revocation metadata persistence, and safe repeat-revocation no-op handling)
 - record node heartbeat
+- record node operational update (heartbeat + capability/deployment sync)
 - query trusted node inventory
 - query trusted node inventory with normalized capability filtering
 - query full admin inventory with operational summary states (`active`, `pending`, `rejected`, `revoked`, `offline`)
@@ -80,5 +82,7 @@ Quick baseline for Story 5.1.4 node trust application orchestration seams, Story
 - Node-authenticated write operations should use `enforceNodeAuthenticatedOperationTrust(...)` from `NodeTrustUseCaseShared.ts` instead of ad-hoc state checks.
 - The centralized trust gate enforces approved + activated (`trustState=trusted`) + non-revoked + certificate-present preconditions before node-authenticated writes.
 - Heartbeat recording uses this centralized guard and rejects unknown, pending, rejected, and revoked nodes before writing `lastSeen` metadata.
+- `RecordNodeOperationalUpdateUseCase` uses the same trust gate and can also synchronize capability profile + deployment tags from authenticated node channels.
+- Operational update audit details include synchronization flags so scheduling/orchestration services can consume deterministic node metadata updates.
 - Rejected heartbeat attempts now emit `node-heartbeat-rejected` audit events with `outcome=rejected` and trust-gate reason metadata.
 - Trusted inventory queries are the admin visibility read path for `lastSeenAt` / heartbeat status snapshots.

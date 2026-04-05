@@ -157,6 +157,11 @@ export interface NodeHeartbeatPayloadDto {
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
+export interface NodeOperationalUpdatePayloadDto extends NodeHeartbeatPayloadDto {
+  readonly capabilityProfile?: NodeCapabilityProfileDto;
+  readonly deploymentTags?: ReadonlyArray<string>;
+}
+
 export interface ResolveNodeRuntimeTrustMaterialRequestDto {
   readonly actorUserIdentityId: string;
   readonly nodeId: string;
@@ -280,6 +285,16 @@ export interface NodeRevocationResponseDto {
 
 export interface NodeHeartbeatResponseDto {
   readonly node: NodeDetailDto;
+}
+
+export interface NodeOperationalUpdateResponseDto {
+  readonly node: NodeDetailDto;
+  readonly update: {
+    readonly heartbeatRecorded: true;
+    readonly capabilityProfileSynchronized: boolean;
+    readonly deploymentTagsSynchronized: boolean;
+    readonly transportAuthenticatedNodeId: string;
+  };
 }
 
 export interface NodeRuntimeTrustMaterialResponseDto {

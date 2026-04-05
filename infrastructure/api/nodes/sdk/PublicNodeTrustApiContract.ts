@@ -13,6 +13,8 @@ import type {
   NodeEnrollmentSubmissionResponseDto,
   NodeHeartbeatPayloadDto,
   NodeHeartbeatResponseDto,
+  NodeOperationalUpdatePayloadDto,
+  NodeOperationalUpdateResponseDto,
   NodeRuntimeTrustMaterialResponseDto,
   NodeRevocationResponseDto,
   NodePendingEnrollmentSummaryDto,
@@ -99,6 +101,10 @@ export type RevokeNodeTrustApiResponse = NodeRevocationResponseDto;
 export type RecordNodeHeartbeatApiRequest = NodeHeartbeatPayloadDto;
 
 export type RecordNodeHeartbeatApiResponse = NodeHeartbeatResponseDto;
+
+export type RecordNodeOperationalUpdateApiRequest = NodeOperationalUpdatePayloadDto;
+
+export type RecordNodeOperationalUpdateApiResponse = NodeOperationalUpdateResponseDto;
 
 export type ResolveNodeRuntimeTrustMaterialApiRequest = ResolveNodeRuntimeTrustMaterialRequestDto;
 

@@ -129,6 +129,29 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
   now uses dedicated node mTLS transport validation when host transport trust enforcement is configured.
 - Node certificate identity binding is validated against trusted node records through application use-case boundaries rather than direct transport persistence access.
 
+## Story 7.3.2 additions
+
+- Adds secure node operational exchange endpoint:
+  - `POST /api/v1/nodes/:nodeId/operational-update`
+- New shared contracts:
+  - `NodeOperationalUpdatePayloadDto`
+  - `NodeOperationalUpdateResponseDto`
+- New schema parse/validation helpers:
+  - `parseNodeOperationalUpdatePayloadDto(...)`
+  - `parseNodeOperationalUpdateResponseDto(...)`
+- Transport posture:
+  - route uses `requireAuthenticatedNodeTransport(...)` and therefore reuses mTLS node-channel validation when transport trust is enabled;
+  - route-injected node identity overrides payload-claimed `actorUserIdentityId` and `nodeId`.
+- Operational synchronization scope:
+  - heartbeat status + last-seen metadata;
+  - optional capability-profile synchronization;
+  - optional deployment-tag synchronization.
+- Response metadata now includes:
+  - `transportAuthenticatedNodeId`,
+  - `capabilityProfileSynchronized`,
+  - `deploymentTagsSynchronized`,
+  for downstream orchestration/scheduling services.
+
 ## Story 5.4.4 additions
 
 - New admin revocation endpoint:
