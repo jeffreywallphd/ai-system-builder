@@ -9,6 +9,8 @@ Implementation baseline for Story 4.1.1: core authorization domain/value models 
 - `src/domain/authorization/AuthorizationDomain.ts`
 - `src/domain/authorization/tests/AuthorizationDomain.test.ts`
 - `src/shared/contracts/authorization/AuthorizationPolicyContracts.ts`
+- `src/domain/authorization/AuthorizationPermissionCatalog.ts`
+- `src/domain/authorization/tests/AuthorizationPermissionCatalog.test.ts`
 
 ## Core contracts
 
@@ -51,3 +53,4 @@ Defined in `src/shared/contracts/authorization/AuthorizationPolicyContracts.ts` 
 
 - Domain-only implementation: no UI, no transport, no persistence, no Electron/Express/filesystem coupling.
 - Story provides the authoritative type system and invariants required before runtime enforcement wiring.
+- Story 4.1.2 adds the canonical permission matrix/registry seam; see `docs/architecture/authorization-permission-catalog.md`.

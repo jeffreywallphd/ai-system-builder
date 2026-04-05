@@ -21,6 +21,8 @@ This note documents Story 4.1.1 (Feature 4 / Epic 4.1): core authorization domai
 - `src/domain/authorization/AuthorizationDomain.ts`
 - `src/domain/authorization/tests/AuthorizationDomain.test.ts`
 - `src/shared/contracts/authorization/AuthorizationPolicyContracts.ts`
+- `src/domain/authorization/AuthorizationPermissionCatalog.ts`
+- `src/domain/authorization/tests/AuthorizationPermissionCatalog.test.ts`
 
 ## Core domain concepts
 
@@ -100,3 +102,9 @@ This note documents Story 4.1.1 (Feature 4 / Epic 4.1): core authorization domai
   - `AuthorizationPolicyEvaluationRequest`
   - `AuthorizationPolicyEvaluationResult`
 - This story provides authoritative policy-model contracts for upcoming application-layer policy services and enforcement seams without coupling to transport/storage decisions.
+
+## Permission catalog seam
+
+Story 4.1.2 adds the canonical permission catalog and resource-action matrix for deterministic permission naming and reusable permission lookups.
+
+- Developer reference: `docs/architecture/authorization-permission-catalog.md`
