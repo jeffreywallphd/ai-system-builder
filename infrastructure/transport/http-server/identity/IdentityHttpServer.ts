@@ -9,6 +9,7 @@ import {
   type LoginLocalIdentityApiRequest,
   type RegisterLocalIdentityApiRequest,
 } from "../../../api/identity/sdk/PublicIdentityAuthApiContract";
+import { redactSensitiveAuthPayload } from "../../../api/identity/IdentityAuthObservability";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 
@@ -233,7 +234,7 @@ async function parseAndValidateRequest<T>(
       path: request.url,
       statusCode: 400,
       details: {
-        request: redactSensitiveFields(parsedBody.value),
+        request: redactSensitiveAuthPayload(parsedBody.value),
         issues: body.error.validationErrors,
       },
     }));
@@ -309,8 +310,8 @@ function logResponse<TRequest extends Record<string, unknown>>(
     path: request.url,
     statusCode,
     details: {
-      request: redactSensitiveFields(requestPayload),
-      response: redactSensitiveFields(responsePayload),
+      request: redactSensitiveAuthPayload(requestPayload),
+      response: redactSensitiveAuthPayload(responsePayload),
     },
   });
 
@@ -324,36 +325,6 @@ function logResponse<TRequest extends Record<string, unknown>>(
   }
 
   logger.info(event);
-}
-
-function redactSensitiveFields(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return Object.freeze(value.map((entry) => redactSensitiveFields(entry)));
-  }
-
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-
-  const output: Record<string, unknown> = {};
-  for (const [key, nestedValue] of Object.entries(value)) {
-    const normalizedKey = key.toLowerCase();
-    if (
-      normalizedKey === "candidate"
-      || normalizedKey === "credential"
-      || normalizedKey === "hashvalue"
-      || normalizedKey === "salt"
-      || normalizedKey === "pepperversion"
-      || normalizedKey === "authorization"
-      || normalizedKey === "bearertoken"
-    ) {
-      output[key] = "[REDACTED]";
-      continue;
-    }
-    output[key] = redactSensitiveFields(nestedValue);
-  }
-
-  return Object.freeze(output);
 }
 
 function normalizeError(error: unknown): string {

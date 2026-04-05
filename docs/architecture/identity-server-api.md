@@ -113,24 +113,39 @@ HTTP status mapping:
 
 Application identity failures are translated through `IdentityAuthBackendApi` into this stable external set.
 
-## Secure logging and redaction
+## Secure logging, redaction, and observability hooks
 
-`IdentityHttpServer` logs request/response events with structured fields while redacting sensitive credential material.
+Authentication flow observability is centralized in:
+
+- `infrastructure/api/identity/IdentityAuthObservability.ts`
+
+`IdentityAuthBackendApi` emits structured registration/login completion events through this seam for both success and failure outcomes. The observability seam includes:
+
+- recursive payload redaction (`redactSensitiveAuthPayload`) shared across backend and HTTP transport logs
+- structured flow events (`identity-auth.local-register.completed`, `identity-auth.local-login.completed`)
+- `IdentityAuthAuditEventSink` hook interface for future audit/event-service integration without changing auth flow orchestration
 
 Redacted keys include:
 
 - `credential`
 - `candidate`
+- `password`
+- `secret`
+- `token`
+- `authorization`
+- `bearerToken`
 - `hashValue`
 - `salt`
 - `pepperVersion`
-- `authorization`
-- `bearerToken`
+- `username`
+- `providerSubject`
+- `email`
 
-The transport tests verify that raw credential candidates do not appear in log output.
+`IdentityHttpServer` continues to emit transport-level request lifecycle logs and now uses the same shared redaction utility for validation and response-path logging.
 
 ## Test coverage
 
 - `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
+- `infrastructure/api/identity/IdentityAuthObservability.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`

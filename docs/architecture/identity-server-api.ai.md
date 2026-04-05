@@ -7,7 +7,7 @@
   - `POST /api/v1/identity/login`
 - Transport validation at the boundary (`zod`) with stable failure envelopes.
 - Deterministic translation from inner identity errors to public API error codes.
-- Structured HTTP logging with credential redaction.
+- Structured authentication observability with centralized redaction and audit-ready event hooks.
 
 ## Main files
 
@@ -45,10 +45,15 @@ HTTP mapping:
 
 ## Redaction guarantee
 
-HTTP transport logging redacts sensitive fields (`credential`, `candidate`, `hashValue`, `salt`, `pepperVersion`, auth token fields) before writing structured log entries.
+Auth observability is centralized in `infrastructure/api/identity/IdentityAuthObservability.ts`.
+
+`IdentityAuthBackendApi` emits structured register/login completion events through this seam (success and failure), and the seam exposes `IdentityAuthAuditEventSink` for later audit-service integration.
+
+Shared redaction (`redactSensitiveAuthPayload`) is reused by both backend and HTTP transport logging so sensitive fields never appear in logs. Redacted fields include credential/token material and identity-sensitive request fields (`username`, `providerSubject`, `email`).
 
 ## Tests
 
 - `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
+- `infrastructure/api/identity/IdentityAuthObservability.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`

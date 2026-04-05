@@ -16,14 +16,20 @@ import {
   type RegisterLocalIdentityApiRequest,
   type RegisterLocalIdentityApiResponse,
 } from "./sdk/PublicIdentityAuthApiContract";
+import { IdentityAuthObservability, type IdentityAuthObservabilityOptions } from "./IdentityAuthObservability";
 
 interface IdentityAuthBackendApiDependencies {
   readonly registerLocalAccountUseCase: RegisterLocalAccountUseCase;
   readonly loginLocalAccountUseCase: LoginLocalAccountUseCase;
+  readonly observability?: IdentityAuthObservabilityOptions;
 }
 
 export class IdentityAuthBackendApi {
-  public constructor(private readonly dependencies: IdentityAuthBackendApiDependencies) {}
+  private readonly observability: IdentityAuthObservability;
+
+  public constructor(private readonly dependencies: IdentityAuthBackendApiDependencies) {
+    this.observability = new IdentityAuthObservability(dependencies.observability);
+  }
 
   public async registerLocalAccount(
     request: RegisterLocalIdentityApiRequest,
@@ -41,10 +47,17 @@ export class IdentityAuthBackendApi {
     });
 
     if (!result.ok) {
-      return Object.freeze({ ok: false, error: this.mapRegisterError(result.error.code) });
+      const response = Object.freeze({ ok: false, error: this.mapRegisterError(result.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "local-register",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
     }
 
-    return Object.freeze({
+    const response = Object.freeze({
       ok: true,
       data: Object.freeze({
         userIdentityId: result.value.userIdentityId,
@@ -53,6 +66,13 @@ export class IdentityAuthBackendApi {
         registeredAt: result.value.registeredAt,
       }),
     });
+
+    await this.observability.recordApiOutcome({
+      flow: "local-register",
+      request,
+      response,
+    });
+    return response;
   }
 
   public async loginLocalAccount(
@@ -67,10 +87,17 @@ export class IdentityAuthBackendApi {
     });
 
     if (!result.ok) {
-      return Object.freeze({ ok: false, error: this.mapLoginError(result.error.code) });
+      const response = Object.freeze({ ok: false, error: this.mapLoginError(result.error.code) });
+      await this.observability.recordApiOutcome({
+        flow: "local-login",
+        request,
+        response,
+        errorCode: result.error.code,
+      });
+      return response;
     }
 
-    return Object.freeze({
+    const response = Object.freeze({
       ok: true,
       data: Object.freeze({
         userIdentityId: result.value.userIdentityId,
@@ -83,6 +110,13 @@ export class IdentityAuthBackendApi {
         authenticatedAt: result.value.authenticatedAt,
       }),
     });
+
+    await this.observability.recordApiOutcome({
+      flow: "local-login",
+      request,
+      response,
+    });
+    return response;
   }
 
   private mapRegisterError(code: RegisterLocalAccountErrorCode): IdentityAuthApiError {
