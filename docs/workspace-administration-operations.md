@@ -1,6 +1,6 @@
 # Workspace Administration Operations
 
-This runbook documents current workspace administration lifecycle and audit-hook behavior for Story 3.4.5.
+This runbook documents current workspace administration lifecycle, audit-hook behavior, and Story 11.3.1 encryption-policy administration behavior.
 
 ## Operational behavior in this slice
 
@@ -9,6 +9,14 @@ This runbook documents current workspace administration lifecycle and audit-hook
 - Audit dispatch failures are swallowed intentionally in this story to avoid blocking admin operations.
 - Story 4.3.2 adds centralized workspace-capability policy checks (`system.manage`) ahead of workspace-sensitive admin mutations.
 - Self-service invitation onboarding remains separate from admin-only mutation routes.
+- Workspace create/update flows now accept explicit `encryptionPolicy` fields:
+  - `encryptionMode`
+  - `contentEncryptionRequired`
+  - `keyScope`
+  - `allowPreviewDecryption`
+  - `allowWorkerDecryption`
+- Workspace list/admin read DTOs now include `encryptionPolicy` for operator visibility and downstream policy consumers.
+- Invalid encryption-policy combinations are rejected by workspace domain/application validation.
 
 ## Event matrix
 

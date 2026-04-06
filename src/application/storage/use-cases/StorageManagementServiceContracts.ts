@@ -2,9 +2,12 @@ import type {
   StorageAccessMode,
   StorageAccessScope,
   StorageBackendType,
+  StorageEncryptionKeyScope,
+  StorageEncryptionMode,
   StorageInstance,
   StorageLifecycleState,
   StorageReplicationMode,
+  StorageRetentionExpiryAction,
 } from "../../../domain/storage/StorageDomain";
 import type {
   StorageBackendCapabilitySnapshot,
@@ -69,6 +72,17 @@ export interface CreateStorageInstanceCommand {
     readonly immutableWrites?: boolean;
     readonly allowCrossWorkspaceReads?: boolean;
     readonly labels?: Readonly<Record<string, string>>;
+    readonly security?: {
+      readonly encryptionMode?: StorageEncryptionMode;
+      readonly contentEncryptionRequired?: boolean;
+      readonly keyScope?: StorageEncryptionKeyScope;
+      readonly allowPreviewDecryption?: boolean;
+      readonly allowWorkerDecryption?: boolean;
+    };
+    readonly lifecycle?: {
+      readonly retentionExpiryAction?: StorageRetentionExpiryAction;
+      readonly purgeGracePeriodDays?: number;
+    };
     readonly encryption: {
       readonly profileId: string;
       readonly keyReferenceId?: string;
@@ -96,6 +110,29 @@ export interface UpdateStorageMetadataCommand {
   readonly storageInstanceId: string;
   readonly displayName?: string;
   readonly labels?: Readonly<Record<string, string>>;
+  readonly policy?: {
+    readonly maxObjectBytes?: number;
+    readonly retentionDays?: number;
+    readonly immutableWrites?: boolean;
+    readonly allowCrossWorkspaceReads?: boolean;
+    readonly labels?: Readonly<Record<string, string>>;
+    readonly security?: {
+      readonly encryptionMode?: StorageEncryptionMode;
+      readonly contentEncryptionRequired?: boolean;
+      readonly keyScope?: StorageEncryptionKeyScope;
+      readonly allowPreviewDecryption?: boolean;
+      readonly allowWorkerDecryption?: boolean;
+    };
+    readonly lifecycle?: {
+      readonly retentionExpiryAction?: StorageRetentionExpiryAction;
+      readonly purgeGracePeriodDays?: number;
+    };
+    readonly encryption?: {
+      readonly profileId?: string;
+      readonly keyReferenceId?: string;
+      readonly envelopeRequired?: boolean;
+    };
+  };
   readonly occurredAt?: string;
   readonly includeCapabilities?: boolean;
 }

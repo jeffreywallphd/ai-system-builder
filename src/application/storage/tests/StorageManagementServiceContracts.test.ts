@@ -272,6 +272,13 @@ describe("StorageManagementService", () => {
       },
       policy: {
         policyId: "policy-alpha",
+        security: {
+          encryptionMode: "platform-managed",
+          contentEncryptionRequired: true,
+          keyScope: "workspace",
+          allowPreviewDecryption: false,
+          allowWorkerDecryption: false,
+        },
         encryption: {
           profileId: "profile-default",
           envelopeRequired: true,
@@ -301,6 +308,17 @@ describe("StorageManagementService", () => {
       labels: {
         tier: "platinum",
       },
+      policy: {
+        security: {
+          encryptionMode: "customer-managed",
+          keyScope: "workspace",
+          allowWorkerDecryption: true,
+        },
+        encryption: {
+          keyReferenceId: "kms://workspace-alpha/storage",
+          envelopeRequired: true,
+        },
+      },
       includeCapabilities: true,
     });
 
@@ -310,6 +328,9 @@ describe("StorageManagementService", () => {
     }
     expect(updated.value.storageInstance.displayName).toBe("Workspace Alpha Primary");
     expect(updated.value.storageInstance.policy.labels.tier).toBe("platinum");
+    expect(updated.value.storageInstance.policy.security.encryptionMode).toBe("customer-managed");
+    expect(updated.value.storageInstance.policy.security.allowWorkerDecryption).toBe(true);
+    expect(updated.value.storageInstance.policy.encryption.keyReferenceId).toBe("kms://workspace-alpha/storage");
     expect(updated.value.accessSummary?.allowedActions).toContain("update-metadata");
 
     const listed = await service.listAccessibleStorageInstances({
@@ -400,6 +421,41 @@ describe("StorageManagementService", () => {
       requestedBackendProvisioning: true,
       provisioningStatus: StorageProvisioningOperationStatuses.accepted,
     }));
+  });
+
+  it("rejects invalid encryption policy combinations during metadata updates", async () => {
+    const repository = new InMemoryStorageInstanceRepository();
+    await repository.createStorageInstance(buildStorageInstance(), {
+      operationKey: "seed:storage-invalid-policy",
+      actorUserIdentityId: "user-admin",
+      correlationId: "corr-seed-storage-invalid-policy",
+    });
+
+    const service = new StorageManagementService({
+      repository,
+      policyPort: new PolicyPort(),
+    });
+
+    const invalid = await service.updateStorageMetadata({
+      actorUserIdentityId: "user-admin",
+      workspaceId: "workspace-alpha",
+      operationKey: "storage:update:invalid-policy",
+      correlationId: "corr-storage-update-invalid-policy",
+      storageInstanceId: "storage-alpha",
+      policy: {
+        security: {
+          encryptionMode: "none",
+          contentEncryptionRequired: true,
+        },
+      },
+    });
+
+    expect(invalid).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: StorageManagementErrorCodes.invalidRequest,
+      }),
+    });
   });
 
   it("returns policy-violation for denied policy actions", async () => {

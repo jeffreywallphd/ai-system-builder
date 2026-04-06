@@ -1,5 +1,7 @@
 import type {
   Workspace,
+  WorkspaceEncryptionKeyScope,
+  WorkspaceEncryptionMode,
   WorkspaceInvitation,
   WorkspaceInvitationStatus,
   WorkspaceMembership,
@@ -112,6 +114,13 @@ export interface CreateWorkspaceRecordInput {
   readonly slug: string;
   readonly displayName: string;
   readonly description?: string;
+  readonly encryptionPolicy?: {
+    readonly encryptionMode?: WorkspaceEncryptionMode;
+    readonly contentEncryptionRequired?: boolean;
+    readonly keyScope?: WorkspaceEncryptionKeyScope;
+    readonly allowPreviewDecryption?: boolean;
+    readonly allowWorkerDecryption?: boolean;
+  };
   readonly ownerUserId: string;
   readonly visibility?: WorkspaceVisibility;
   readonly status?: WorkspaceStatus;
@@ -123,6 +132,13 @@ export interface UpdateWorkspaceRecordInput {
   readonly displayName?: string;
   readonly description?: string;
   readonly visibility?: WorkspaceVisibility;
+  readonly encryptionPolicy?: {
+    readonly encryptionMode?: WorkspaceEncryptionMode;
+    readonly contentEncryptionRequired?: boolean;
+    readonly keyScope?: WorkspaceEncryptionKeyScope;
+    readonly allowPreviewDecryption?: boolean;
+    readonly allowWorkerDecryption?: boolean;
+  };
   readonly status?: WorkspaceStatus;
   readonly action: WorkspaceAdministrativeActionContext;
 }

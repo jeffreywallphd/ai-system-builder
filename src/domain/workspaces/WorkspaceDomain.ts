@@ -84,12 +84,39 @@ export const WorkspaceInvitationStatuses = Object.freeze({
 export type WorkspaceInvitationStatus =
   typeof WorkspaceInvitationStatuses[keyof typeof WorkspaceInvitationStatuses];
 
+export const WorkspaceEncryptionModes = Object.freeze({
+  none: "none",
+  platformManaged: "platform-managed",
+  customerManaged: "customer-managed",
+});
+
+export type WorkspaceEncryptionMode =
+  typeof WorkspaceEncryptionModes[keyof typeof WorkspaceEncryptionModes];
+
+export const WorkspaceEncryptionKeyScopes = Object.freeze({
+  workspace: "workspace",
+  storageInstance: "storage-instance",
+  platform: "platform",
+});
+
+export type WorkspaceEncryptionKeyScope =
+  typeof WorkspaceEncryptionKeyScopes[keyof typeof WorkspaceEncryptionKeyScopes];
+
+export interface WorkspaceEncryptionPolicy {
+  readonly encryptionMode: WorkspaceEncryptionMode;
+  readonly contentEncryptionRequired: boolean;
+  readonly keyScope: WorkspaceEncryptionKeyScope;
+  readonly allowPreviewDecryption: boolean;
+  readonly allowWorkerDecryption: boolean;
+}
+
 export interface Workspace {
   readonly id: string;
   readonly slug: string;
   readonly displayName: string;
   readonly description?: string;
   readonly status: WorkspaceStatus;
+  readonly encryptionPolicy: WorkspaceEncryptionPolicy;
   readonly ownership: WorkspaceOwnershipMetadata;
 }
 
@@ -266,6 +293,73 @@ function normalizeWorkspaceDescription(value?: string): string | undefined {
   return normalized;
 }
 
+function normalizeWorkspaceEncryptionMode(value?: WorkspaceEncryptionMode): WorkspaceEncryptionMode {
+  const mode = value ?? WorkspaceEncryptionModes.platformManaged;
+  if (!Object.values(WorkspaceEncryptionModes).includes(mode)) {
+    throw new WorkspaceDomainError(`Workspace encryption policy encryptionMode '${String(value)}' is invalid.`);
+  }
+  return mode;
+}
+
+function normalizeWorkspaceEncryptionKeyScope(value?: WorkspaceEncryptionKeyScope): WorkspaceEncryptionKeyScope {
+  const keyScope = value ?? WorkspaceEncryptionKeyScopes.workspace;
+  if (!Object.values(WorkspaceEncryptionKeyScopes).includes(keyScope)) {
+    throw new WorkspaceDomainError(`Workspace encryption policy keyScope '${String(value)}' is invalid.`);
+  }
+  return keyScope;
+}
+
+function normalizeWorkspaceEncryptionPolicy(input?: {
+  readonly encryptionMode?: WorkspaceEncryptionMode;
+  readonly contentEncryptionRequired?: boolean;
+  readonly keyScope?: WorkspaceEncryptionKeyScope;
+  readonly allowPreviewDecryption?: boolean;
+  readonly allowWorkerDecryption?: boolean;
+}): WorkspaceEncryptionPolicy {
+  const encryptionMode = normalizeWorkspaceEncryptionMode(input?.encryptionMode);
+  const contentEncryptionRequired = input?.contentEncryptionRequired ?? true;
+  const keyScope = normalizeWorkspaceEncryptionKeyScope(input?.keyScope);
+  const allowPreviewDecryption = input?.allowPreviewDecryption ?? false;
+  const allowWorkerDecryption = input?.allowWorkerDecryption ?? false;
+
+  if (encryptionMode === WorkspaceEncryptionModes.none) {
+    if (contentEncryptionRequired) {
+      throw new WorkspaceDomainError(
+        "Workspace encryption policy encryptionMode 'none' cannot require content encryption.",
+      );
+    }
+    if (allowPreviewDecryption || allowWorkerDecryption) {
+      throw new WorkspaceDomainError(
+        "Workspace encryption policy encryptionMode 'none' cannot allow preview or worker decryption.",
+      );
+    }
+  } else if (!contentEncryptionRequired) {
+    throw new WorkspaceDomainError(
+      `Workspace encryption policy encryptionMode '${encryptionMode}' requires contentEncryptionRequired=true.`,
+    );
+  }
+
+  if (keyScope === WorkspaceEncryptionKeyScopes.platform && encryptionMode === WorkspaceEncryptionModes.customerManaged) {
+    throw new WorkspaceDomainError(
+      "Workspace encryption policy customer-managed encryption cannot use platform key scope.",
+    );
+  }
+
+  if (!contentEncryptionRequired && (allowPreviewDecryption || allowWorkerDecryption)) {
+    throw new WorkspaceDomainError(
+      "Workspace encryption policy cannot allow decryption when contentEncryptionRequired=false.",
+    );
+  }
+
+  return Object.freeze({
+    encryptionMode,
+    contentEncryptionRequired,
+    keyScope,
+    allowPreviewDecryption,
+    allowWorkerDecryption,
+  });
+}
+
 function normalizeInvitationEmail(email: string): string {
   const normalized = normalizeRequired(email, "Workspace invitation invitedEmail").toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
@@ -439,6 +533,13 @@ export function createWorkspace(input: {
   readonly slug: string;
   readonly displayName: string;
   readonly description?: string;
+  readonly encryptionPolicy?: {
+    readonly encryptionMode?: WorkspaceEncryptionMode;
+    readonly contentEncryptionRequired?: boolean;
+    readonly keyScope?: WorkspaceEncryptionKeyScope;
+    readonly allowPreviewDecryption?: boolean;
+    readonly allowWorkerDecryption?: boolean;
+  };
   readonly ownerUserId: string;
   readonly visibility?: WorkspaceVisibility;
   readonly createdBy: string;
@@ -467,6 +568,7 @@ export function createWorkspace(input: {
     displayName: normalizeWorkspaceName(input.displayName),
     description: normalizeWorkspaceDescription(input.description),
     status: normalizeWorkspaceStatus(input.status),
+    encryptionPolicy: normalizeWorkspaceEncryptionPolicy(input.encryptionPolicy),
     ownership,
   });
 
@@ -506,6 +608,13 @@ export function updateWorkspaceDetails(
     readonly displayName?: string;
     readonly description?: string;
     readonly visibility?: WorkspaceVisibility;
+    readonly encryptionPolicy?: {
+      readonly encryptionMode?: WorkspaceEncryptionMode;
+      readonly contentEncryptionRequired?: boolean;
+      readonly keyScope?: WorkspaceEncryptionKeyScope;
+      readonly allowPreviewDecryption?: boolean;
+      readonly allowWorkerDecryption?: boolean;
+    };
     readonly actorUserId: string;
     readonly now?: Date;
   },
@@ -541,6 +650,16 @@ export function updateWorkspaceDetails(
     ...workspace,
     displayName: nextDisplayName,
     description: nextDescription,
+    encryptionPolicy: normalizeWorkspaceEncryptionPolicy({
+      encryptionMode: input.encryptionPolicy?.encryptionMode ?? workspace.encryptionPolicy.encryptionMode,
+      contentEncryptionRequired:
+        input.encryptionPolicy?.contentEncryptionRequired ?? workspace.encryptionPolicy.contentEncryptionRequired,
+      keyScope: input.encryptionPolicy?.keyScope ?? workspace.encryptionPolicy.keyScope,
+      allowPreviewDecryption:
+        input.encryptionPolicy?.allowPreviewDecryption ?? workspace.encryptionPolicy.allowPreviewDecryption,
+      allowWorkerDecryption:
+        input.encryptionPolicy?.allowWorkerDecryption ?? workspace.encryptionPolicy.allowWorkerDecryption,
+    }),
     ownership: nextOwnership,
   });
   assertWorkspaceState(updated);

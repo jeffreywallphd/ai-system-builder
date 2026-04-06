@@ -3,6 +3,7 @@
 ## Scope
 
 - Operational behavior and extension guidance for Story 3.4.5 workspace administration audit hooks.
+- Story 11.3.1 workspace encryption-policy administration fields for create/update/list flows.
 
 ## Current behavior
 
@@ -11,6 +12,14 @@
 - Audit dispatch failure is intentionally non-blocking in this slice.
 - Story 4.3.2 adds centralized policy gating for workspace-sensitive mutations (`system.manage` workspace capability) before mutation use cases execute.
 - Self-service invitation onboarding remains outside this admin mutation gate.
+- Workspace create and update admin flows now accept explicit `encryptionPolicy` input:
+  - `encryptionMode`
+  - `contentEncryptionRequired`
+  - `keyScope`
+  - `allowPreviewDecryption`
+  - `allowWorkerDecryption`
+- Workspace admin list/read DTOs now surface workspace `encryptionPolicy` so policy posture is inspectable by downstream services and administration surfaces.
+- Invalid workspace encryption-policy combinations are rejected at domain/application boundaries.
 
 ## Event coverage
 

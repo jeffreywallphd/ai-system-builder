@@ -1,6 +1,8 @@
 import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
 import type { IWorkspaceRepository } from "../ports/IWorkspaceRepository";
 import {
+  WorkspaceEncryptionKeyScope,
+  WorkspaceEncryptionMode,
   WorkspaceDomainError,
   WorkspaceMembershipStatuses,
   WorkspaceRoles,
@@ -36,6 +38,13 @@ export interface UpdateWorkspaceUseCaseInput {
   readonly displayName?: string;
   readonly description?: string;
   readonly visibility?: WorkspaceVisibility;
+  readonly encryptionPolicy?: {
+    readonly encryptionMode?: WorkspaceEncryptionMode;
+    readonly contentEncryptionRequired?: boolean;
+    readonly keyScope?: WorkspaceEncryptionKeyScope;
+    readonly allowPreviewDecryption?: boolean;
+    readonly allowWorkerDecryption?: boolean;
+  };
 }
 
 export interface UpdateWorkspaceUseCaseResult {
@@ -82,6 +91,7 @@ export class UpdateWorkspaceUseCase {
       input.displayName === undefined
       && input.description === undefined
       && input.visibility === undefined
+      && input.encryptionPolicy === undefined
     ) {
       return this.failure(
         WorkspaceUpdateErrorCodes.invalidRequest,
@@ -124,6 +134,7 @@ export class UpdateWorkspaceUseCase {
         displayName: input.displayName,
         description: input.description,
         visibility: input.visibility,
+        encryptionPolicy: input.encryptionPolicy,
         actorUserId: actorUserIdentityId,
         now: this.dependencies.clock.now(),
       });
@@ -154,6 +165,7 @@ export class UpdateWorkspaceUseCase {
         displayNameChanged: updated.displayName !== snapshot.workspace.displayName,
         descriptionChanged: updated.description !== snapshot.workspace.description,
         visibilityChanged: updated.ownership.visibility !== snapshot.workspace.ownership.visibility,
+        encryptionPolicyChanged: JSON.stringify(updated.encryptionPolicy) !== JSON.stringify(snapshot.workspace.encryptionPolicy),
       }),
     });
 

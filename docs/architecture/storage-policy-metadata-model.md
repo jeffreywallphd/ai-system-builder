@@ -61,3 +61,7 @@ This story establishes the policy seams required by storage architecture for lat
 - preview/worker decryption authorization can bind directly to explicit allow flags
 - lifecycle enforcement and retention cleanup jobs can bind directly to `retentionExpiryAction` + grace metadata
 - policy model extensions can add typed fields in `security` or `lifecycle` without replacing the core model shape
+
+## Story 11.3.1 alignment note
+
+Story 11.3.1 keeps this policy model authoritative by exposing the same typed `security` fields through storage administration create/update application contracts and persisted storage-instance metadata, so future encryption enforcement flows do not require alternate policy schemas.

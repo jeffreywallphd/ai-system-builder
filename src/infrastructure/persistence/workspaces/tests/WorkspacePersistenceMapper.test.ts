@@ -30,6 +30,11 @@ describe("WorkspacePersistenceMapper", () => {
       status: WorkspaceStatuses.active,
       owner_user_id: "user:owner",
       visibility: WorkspaceVisibilities.team,
+      encryption_mode: "platform-managed",
+      content_encryption_required: 1,
+      key_scope: "workspace",
+      allow_preview_decryption: 0,
+      allow_worker_decryption: 0,
       created_by: "user:owner",
       last_modified_by: "user:owner",
       created_at: "2026-04-05T12:00:00.000Z",
@@ -41,6 +46,8 @@ describe("WorkspacePersistenceMapper", () => {
     expect(mapped.slug).toBe("team-alpha");
     expect(mapped.status).toBe(WorkspaceStatuses.active);
     expect(mapped.ownership.visibility).toBe(WorkspaceVisibilities.team);
+    expect(mapped.encryptionPolicy.encryptionMode).toBe("platform-managed");
+    expect(mapped.encryptionPolicy.contentEncryptionRequired).toBe(true);
   });
 
   it("maps membership and role assignment rows to domain contracts", () => {

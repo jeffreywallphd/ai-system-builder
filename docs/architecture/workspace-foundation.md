@@ -488,3 +488,24 @@ Story 3.1.4 extends the adapter integration tests to validate:
   - `docs/architecture/workspace-administration-audit-hooks.md` for architecture intent and boundaries.
   - `docs/workspace-administration-operations.md` for operational event matrix and implementation guidance.
 
+## Story 11.3.1 workspace encryption-policy administration baseline
+
+- Workspace tenancy contracts now include explicit encryption-policy metadata on the `Workspace` aggregate:
+  - `encryptionMode` (`none | platform-managed | customer-managed`)
+  - `contentEncryptionRequired`
+  - `keyScope` (`workspace | storage-instance | platform`)
+  - `allowPreviewDecryption`
+  - `allowWorkerDecryption`
+- Workspace domain creation and update flows (`createWorkspace(...)`, `updateWorkspaceDetails(...)`) now normalize and validate this policy with secure defaults:
+  - default mode is `platform-managed`
+  - content encryption required defaults to `true`
+  - preview/worker decryption defaults to `false`
+  - contradictory combinations (for example `none` mode with required encryption/decryption allowances, or customer-managed with platform key scope) are rejected.
+- Workspace administration mutation/query seams now expose this policy as first-class data:
+  - create/update use-case inputs accept `encryptionPolicy` fragments
+  - workspace list/admin DTOs include current workspace encryption-policy state
+  - workspace update audit metadata includes whether encryption-policy state changed.
+- Workspace persistence now aligns to the encryption-policy model:
+  - `workspace_records` includes `encryption_mode`, `content_encryption_required`, `key_scope`, `allow_preview_decryption`, `allow_worker_decryption`
+  - schema migration version is incremented with additive column migration for existing databases.
+

@@ -194,6 +194,13 @@ describe("CreateWorkspaceUseCase", () => {
       displayName: "Team Alpha",
       description: "Alpha workspace",
       visibility: WorkspaceVisibilities.team,
+      encryptionPolicy: {
+        encryptionMode: "customer-managed",
+        contentEncryptionRequired: true,
+        keyScope: "workspace",
+        allowPreviewDecryption: false,
+        allowWorkerDecryption: true,
+      },
       actorUserIdentityId: "user:owner",
     });
 
@@ -207,6 +214,13 @@ describe("CreateWorkspaceUseCase", () => {
     expect(result.value.workspace.ownership.createdBy).toBe("user:owner");
     expect(result.value.workspace.ownership.lastModifiedBy).toBe("user:owner");
     expect(result.value.workspace.ownership.createdAt).toBe("2026-04-05T16:00:00.000Z");
+    expect(result.value.workspace.encryptionPolicy).toEqual({
+      encryptionMode: "customer-managed",
+      contentEncryptionRequired: true,
+      keyScope: "workspace",
+      allowPreviewDecryption: false,
+      allowWorkerDecryption: true,
+    });
     expect(result.value.creatorMembership.status).toBe(WorkspaceMembershipStatuses.active);
     expect(result.value.creatorMembership.joinedAt).toBe("2026-04-05T16:00:00.000Z");
     expect(result.value.creatorRoleAssignment.role).toBe(WorkspaceRoles.owner);

@@ -483,6 +483,13 @@ describe("WorkspaceAdministrationQueryService", () => {
     expect(workspace?.id).toBe("workspace:alpha");
     expect(workspace?.membershipSummary.active).toBe(3);
     expect(workspace?.membershipSummary.pending).toBe(1);
+    expect(workspace?.encryptionPolicy).toEqual({
+      encryptionMode: "platform-managed",
+      contentEncryptionRequired: true,
+      keyScope: "workspace",
+      allowPreviewDecryption: false,
+      allowWorkerDecryption: false,
+    });
     expect(workspace?.roleSummary.activeAssignments).toBe(3);
     expect(workspace?.invitationSummary.pending).toBe(2);
     expect(workspace?.invitationSummary.activePending).toBe(1);

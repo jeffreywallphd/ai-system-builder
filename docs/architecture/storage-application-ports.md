@@ -47,6 +47,19 @@ It now also documents Story 9.3.5 storage-management audit governance integratio
 
 These contracts are backend-neutral and operate on `StorageInstance` metadata plus logical object keys, not caller-supplied filesystem paths.
 
+## Policy-aware storage administration contracts (Story 11.3.1)
+
+Storage administration mutation contracts now expose encryption-policy and lifecycle-policy fields directly so later enforcement stories can consume authoritative policy state without reshaping these use-case interfaces:
+
+- `CreateStorageInstanceCommand.policy` now supports:
+  - `security` (`encryptionMode`, `contentEncryptionRequired`, `keyScope`, `allowPreviewDecryption`, `allowWorkerDecryption`)
+  - `lifecycle` (`retentionExpiryAction`, optional `purgeGracePeriodDays`)
+- `UpdateStorageMetadataCommand` now supports optional `policy` updates for:
+  - baseline policy posture (`maxObjectBytes`, `retentionDays`, `immutableWrites`, `allowCrossWorkspaceReads`, labels)
+  - encryption posture (`profileId`, `keyReferenceId`, `envelopeRequired`)
+  - security/lifecycle policy fragments (same shape as create).
+- `StorageManagementService.updateStorageMetadata(...)` now applies these fields through `updateStoragePolicy(...)`, keeping domain validation centralized and rejecting contradictory policy combinations.
+
 ## Logical access resolution contracts (Story 9.3.3)
 
 `StorageLogicalAccessResolutionService` introduces a centralized server-side seam that resolves logical storage references and operation intents into authorized backend object-operation plans:

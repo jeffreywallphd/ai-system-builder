@@ -3,6 +3,8 @@ import type { IWorkspaceRepository } from "../ports/IWorkspaceRepository";
 import type { IWorkspaceRoleAssignmentRepository } from "../ports/IWorkspaceRoleAssignmentRepository";
 import type { IWorkspaceTransactionManager } from "../ports/IWorkspaceTransactionManager";
 import {
+  WorkspaceEncryptionKeyScope,
+  WorkspaceEncryptionMode,
   WorkspaceDomainError,
   WorkspaceMembershipStatuses,
   WorkspaceRoles,
@@ -47,6 +49,13 @@ export interface CreateWorkspaceUseCaseInput {
   readonly displayName: string;
   readonly description?: string;
   readonly visibility?: WorkspaceVisibility;
+  readonly encryptionPolicy?: {
+    readonly encryptionMode?: WorkspaceEncryptionMode;
+    readonly contentEncryptionRequired?: boolean;
+    readonly keyScope?: WorkspaceEncryptionKeyScope;
+    readonly allowPreviewDecryption?: boolean;
+    readonly allowWorkerDecryption?: boolean;
+  };
   readonly status?: WorkspaceStatus;
   readonly actorUserIdentityId: string;
 }
@@ -133,6 +142,7 @@ export class CreateWorkspaceUseCase {
         slug: input.slug,
         displayName: input.displayName,
         description: input.description,
+        encryptionPolicy: input.encryptionPolicy,
         ownerUserId: actorUserIdentityId,
         visibility: input.visibility,
         createdBy: actorUserIdentityId,
@@ -242,6 +252,7 @@ export class CreateWorkspaceUseCase {
         slug: workspace.slug,
         status: workspace.status,
         visibility: workspace.ownership.visibility,
+        encryptionPolicy: workspace.encryptionPolicy,
       }),
     });
 
