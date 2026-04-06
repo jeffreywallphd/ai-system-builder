@@ -35,6 +35,10 @@ import type { IIdentityPersistenceRepository } from "../../../../application/ide
 import { publishIdentityLifecycleEventBestEffort } from "../../../../application/identity/services/IdentityLifecycleEventPublishing";
 import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
 import { validateIdentityProvider } from "../../../../application/identity/services/IdentityProviderCatalog";
+import {
+  runInTransactionBoundary,
+  type IPlatformTransactionManager,
+} from "../../common/ports/PlatformTransactionPorts";
 
 export const ChangeLocalPasswordCredentialVerificationModes = Object.freeze({
   currentCredential: "current-credential",
@@ -97,6 +101,7 @@ interface ChangeLocalPasswordCredentialDependencies {
   readonly lookupRepository: IIdentityLookupRepository;
   readonly persistenceRepository: IIdentityPersistenceRepository;
   readonly credentialMaterialRepository: ICredentialMaterialRepository;
+  readonly transactionManager?: IPlatformTransactionManager;
   readonly identityPolicyService: IdentityPolicyService;
   readonly credentialAuthenticator: IIdentityCredentialAuthenticator;
   readonly idGenerator: IIdentityIdGenerator;
@@ -242,39 +247,7 @@ export class ChangeLocalPasswordCredentialUseCase {
 
     const now = this.dependencies.clock.now();
     const nowIso = now.toISOString();
-    const supersedeResult = await this.dependencies.credentialMaterialRepository.markCredentialMaterialSuperseded(
-      activeCredentialMaterial.id,
-      nowIso,
-    );
-    if (!supersedeResult.ok) {
-      return this.failure(
-        IdentityErrorCodes.invalidRequest,
-        supersedeResult.error.message,
-        supersedeResult.error.details,
-      );
-    }
-    if (!supersedeResult.value.changed) {
-      return this.failure(
-        IdentityErrorCodes.invalidState,
-        `Credential material '${activeCredentialMaterial.id}' could not be superseded.`,
-      );
-    }
-
     const newCredentialMaterialId = this.dependencies.idGenerator.nextId(IdentityIdNamespaces.credentialMaterial);
-    await this.dependencies.credentialMaterialRepository.saveCredentialMaterial({
-      id: newCredentialMaterialId,
-      userIdentityId: userIdentity.id,
-      providerId,
-      providerSubject: providerLink.providerSubject,
-      hashAlgorithm,
-      hashValue,
-      salt: this.normalizeOptional(hashedCredentialMaterial.salt),
-      pepperVersion: this.normalizeOptional(hashedCredentialMaterial.pepperVersion),
-      status: IdentityCredentialMaterialStatuses.active,
-      createdAt: nowIso,
-      updatedAt: nowIso,
-    });
-
     const updatedCredentialState = createLocalCredentialState({
       policy: credentialPolicyResult.value,
       passwordChangedAt: now,
@@ -286,7 +259,46 @@ export class ChangeLocalPasswordCredentialUseCase {
       updatedCredentialState,
       now,
     );
-    await this.dependencies.persistenceRepository.saveUserIdentity(updatedIdentity);
+    const persistenceOutcome = await runInTransactionBoundary(this.dependencies.transactionManager, async () => {
+      const supersedeResult = await this.dependencies.credentialMaterialRepository.markCredentialMaterialSuperseded(
+        activeCredentialMaterial.id,
+        nowIso,
+      );
+      if (!supersedeResult.ok) {
+        return this.failure(
+          IdentityErrorCodes.invalidRequest,
+          supersedeResult.error.message,
+          supersedeResult.error.details,
+        );
+      }
+      if (!supersedeResult.value.changed) {
+        return this.failure(
+          IdentityErrorCodes.invalidState,
+          `Credential material '${activeCredentialMaterial.id}' could not be superseded.`,
+        );
+      }
+
+      await this.dependencies.credentialMaterialRepository.saveCredentialMaterial({
+        id: newCredentialMaterialId,
+        userIdentityId: userIdentity.id,
+        providerId,
+        providerSubject: providerLink.providerSubject,
+        hashAlgorithm,
+        hashValue,
+        salt: this.normalizeOptional(hashedCredentialMaterial.salt),
+        pepperVersion: this.normalizeOptional(hashedCredentialMaterial.pepperVersion),
+        status: IdentityCredentialMaterialStatuses.active,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      });
+      await this.dependencies.persistenceRepository.saveUserIdentity(updatedIdentity);
+
+      return identitySuccess(undefined);
+    });
+
+    if (!persistenceOutcome.ok) {
+      return persistenceOutcome;
+    }
 
     const result = identitySuccess(Object.freeze({
       userIdentityId: userIdentity.id,

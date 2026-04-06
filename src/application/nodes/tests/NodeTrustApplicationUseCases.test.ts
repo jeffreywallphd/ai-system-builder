@@ -37,6 +37,7 @@ import type {
   IssueNodeCertificateHookInput,
   NodeTrustCertificateHook,
 } from "../ports/NodeTrustCertificatePorts";
+import type { IPlatformTransactionManager } from "../../common/ports/PlatformTransactionPorts";
 import { RegisterNodeEnrollmentRequestUseCase } from "../use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { ReviewPendingNodeEnrollmentUseCase } from "../use-cases/ReviewPendingNodeEnrollmentUseCase";
 import { GetNodeEnrollmentDetailUseCase } from "../use-cases/GetNodeEnrollmentDetailUseCase";
@@ -52,7 +53,7 @@ import { ListNodeInventoryUseCase } from "../use-cases/ListNodeInventoryUseCase"
 import { NodeTrustUseCaseErrorCodes } from "../use-cases/NodeTrustUseCaseShared";
 
 class InMemoryNodeTrustRepository
-  implements INodeTrustIdentityPersistenceRepository, INodeEnrollmentRequestPersistenceRepository {
+  implements INodeTrustIdentityPersistenceRepository, INodeEnrollmentRequestPersistenceRepository, IPlatformTransactionManager {
   public readonly nodes = new Map<string, NodeIdentityPersistenceRecord>();
   public readonly enrollmentRequests = new Map<string, NodeEnrollmentRequestPersistenceRecord>();
   public readonly enrollmentStatusTransitions: Array<{
@@ -62,6 +63,7 @@ class InMemoryNodeTrustRepository
     readonly reviewedByUserIdentityId?: string;
     readonly decisionNote?: string;
   }> = [];
+  public transactionCallCount = 0;
 
   async findNodeById(nodeId: string): Promise<NodeIdentityPersistenceRecord | undefined> {
     return this.nodes.get(nodeId);
@@ -278,6 +280,30 @@ class InMemoryNodeTrustRepository
       },
       mutation: input.mutation,
     });
+  }
+
+  async runInTransaction<TValue>(operation: () => Promise<TValue>): Promise<TValue> {
+    this.transactionCallCount += 1;
+    const snapshot = Object.freeze({
+      nodes: new Map(this.nodes),
+      enrollmentRequests: new Map(this.enrollmentRequests),
+      enrollmentStatusTransitions: [...this.enrollmentStatusTransitions],
+    });
+    try {
+      return await operation();
+    } catch (error) {
+      this.nodes.clear();
+      this.enrollmentRequests.clear();
+      this.enrollmentStatusTransitions.length = 0;
+      for (const [key, value] of snapshot.nodes.entries()) {
+        this.nodes.set(key, value);
+      }
+      for (const [key, value] of snapshot.enrollmentRequests.entries()) {
+        this.enrollmentRequests.set(key, value);
+      }
+      this.enrollmentStatusTransitions.push(...snapshot.enrollmentStatusTransitions);
+      throw error;
+    }
   }
 }
 
@@ -664,6 +690,52 @@ describe("node trust application use-cases", () => {
     expect(event?.details?.reviewedByUserIdentityId).toBe("admin-1");
     expect(event?.details?.reviewedAt).toBe("2026-04-05T18:05:00.000Z");
     expect(event?.details?.decisionNote).toBe("Validated compute profile.");
+  });
+
+  it("routes node approval persistence through the configured transaction manager", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.saveEnrollmentRequest({
+      record: {
+        requestId: "enroll-approve-transaction-1",
+        nodeId: "node-approve-transaction-1",
+        nodeType: NodeTypes.compute,
+        displayName: "Approve Transaction Node 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+        },
+        deploymentTags: ["transaction"],
+        requestedAt: "2026-04-05T18:00:00.000Z",
+        status: NodeEnrollmentRequestStatuses.submitted,
+        createdAt: "2026-04-05T18:00:00.000Z",
+        createdBy: "node-approve-transaction-1",
+        lastModifiedAt: "2026-04-05T18:00:00.000Z",
+        lastModifiedBy: "node-approve-transaction-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-approve-transaction-1",
+        context: {
+          actorUserIdentityId: "node-approve-transaction-1",
+        },
+      },
+    });
+    const useCase = new ApproveNodeEnrollmentUseCase({
+      enrollmentRequestRepository: repository,
+      nodeRepository: repository,
+      transactionManager: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      clock: createFixedClock("2026-04-05T18:06:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "admin-transaction-1",
+      requestId: "enroll-approve-transaction-1",
+    });
+
+    expect(result.ok).toBeTrue();
+    expect(repository.transactionCallCount).toBe(1);
   });
 
   it("blocks unauthorized actors from approving enrollment requests", async () => {
@@ -1175,6 +1247,52 @@ describe("node trust application use-cases", () => {
     expect(event?.details?.reviewedByUserIdentityId).toBe("admin-1");
     expect(event?.details?.reviewedAt).toBe("2026-04-05T18:15:00.000Z");
     expect(event?.details?.decisionNote).toBe("Node inventory exceeded for region.");
+  });
+
+  it("routes node rejection persistence through the configured transaction manager", async () => {
+    const repository = new InMemoryNodeTrustRepository();
+    await repository.saveEnrollmentRequest({
+      record: {
+        requestId: "enroll-reject-transaction-1",
+        nodeId: "node-reject-transaction-1",
+        nodeType: NodeTypes.edge,
+        displayName: "Reject Transaction Node 1",
+        capabilityProfile: {
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: false,
+        },
+        deploymentTags: ["transaction"],
+        requestedAt: "2026-04-05T18:10:00.000Z",
+        status: NodeEnrollmentRequestStatuses.submitted,
+        createdAt: "2026-04-05T18:10:00.000Z",
+        createdBy: "node-reject-transaction-1",
+        lastModifiedAt: "2026-04-05T18:10:00.000Z",
+        lastModifiedBy: "node-reject-transaction-1",
+        revision: 1,
+      },
+      mutation: {
+        operationKey: "seed-reject-transaction-1",
+        context: {
+          actorUserIdentityId: "node-reject-transaction-1",
+        },
+      },
+    });
+    const useCase = new RejectNodeEnrollmentUseCase({
+      enrollmentRequestRepository: repository,
+      nodeRepository: repository,
+      transactionManager: repository,
+      authorizationHook: createAllowAllAuthorizationHook(),
+      clock: createFixedClock("2026-04-05T18:16:00.000Z"),
+      auditSink: new RecordingAuditSink(),
+    });
+
+    const result = await useCase.execute({
+      actorUserIdentityId: "admin-transaction-1",
+      requestId: "enroll-reject-transaction-1",
+    });
+
+    expect(result.ok).toBeTrue();
+    expect(repository.transactionCallCount).toBe(1);
   });
 
   it("blocks unauthorized actors from rejecting enrollment requests", async () => {

@@ -17,6 +17,10 @@ import type { INodeTrustIdentityPersistenceRepository } from "../ports/INodeTrus
 import type { NodeTrustAuthorizationHook } from "../ports/NodeTrustAuthorizationPorts";
 import type { NodeTrustCertificateHook } from "../ports/NodeTrustCertificatePorts";
 import {
+  runInTransactionBoundary,
+  type IPlatformTransactionManager,
+} from "../../common/ports/PlatformTransactionPorts";
+import {
   NodeTrustAuditEventTypes,
   publishNodeTrustAuditEventBestEffort,
   type NodeTrustAuditSink,
@@ -61,6 +65,7 @@ export interface ApproveNodeEnrollmentUseCaseResponse {
 interface ApproveNodeEnrollmentUseCaseDependencies {
   readonly enrollmentRequestRepository: INodeEnrollmentRequestPersistenceRepository;
   readonly nodeRepository: INodeTrustIdentityPersistenceRepository;
+  readonly transactionManager?: IPlatformTransactionManager;
   readonly authorizationHook?: NodeTrustAuthorizationHook;
   readonly certificateHook?: NodeTrustCertificateHook;
   readonly idGenerator?: NodeTrustUseCaseIdGenerator;
@@ -144,41 +149,22 @@ export class ApproveNodeEnrollmentUseCase {
       );
     }
 
-    let transitionTarget = enrollment;
-    if (enrollment.status === NodeEnrollmentRequestStatuses.submitted) {
-      const underReview = await this.dependencies.enrollmentRequestRepository.transitionEnrollmentRequestStatus({
-        requestId: enrollment.requestId,
-        toStatus: NodeEnrollmentRequestStatuses.underReview,
-        mutation: createNodeTrustMutationEnvelope({
-          actorUserIdentityId,
-          operationPrefix: "approve-node-enrollment-under-review",
-          idGenerator: this.idGenerator,
-          clock: this.clock,
-          expectedRevision: request.expectedEnrollmentRevision,
-          reason: request.reason,
-          correlationId: request.correlationId,
-          metadata: request.metadata,
-        }),
-      });
-      transitionTarget = underReview.record;
-    }
-
     try {
       transitionNodeEnrollmentRequestStatus(
         createNodeEnrollmentRequest({
-          requestId: transitionTarget.requestId,
-          nodeId: transitionTarget.nodeId,
-          nodeType: transitionTarget.nodeType,
-          displayName: transitionTarget.displayName,
-          capabilityProfile: transitionTarget.capabilityProfile,
-          deploymentTags: transitionTarget.deploymentTags,
-          certificateRef: transitionTarget.certificateRef,
-          status: transitionTarget.status,
-          requestedAt: transitionTarget.requestedAt,
-          reviewedAt: transitionTarget.reviewedAt,
-          reviewedByUserIdentityId: transitionTarget.reviewedByUserIdentityId,
-          decisionNote: transitionTarget.decisionNote,
-          updatedAt: transitionTarget.lastModifiedAt,
+          requestId: enrollment.requestId,
+          nodeId: enrollment.nodeId,
+          nodeType: enrollment.nodeType,
+          displayName: enrollment.displayName,
+          capabilityProfile: enrollment.capabilityProfile,
+          deploymentTags: enrollment.deploymentTags,
+          certificateRef: enrollment.certificateRef,
+          status: enrollment.status,
+          requestedAt: enrollment.requestedAt,
+          reviewedAt: enrollment.reviewedAt,
+          reviewedByUserIdentityId: enrollment.reviewedByUserIdentityId,
+          decisionNote: enrollment.decisionNote,
+          updatedAt: enrollment.lastModifiedAt,
         }),
         NodeEnrollmentRequestStatuses.approved,
         {
@@ -195,6 +181,7 @@ export class ApproveNodeEnrollmentUseCase {
         );
     }
 
+    let transitionTarget = enrollment;
     const certificate = await this.resolveCertificate(request, transitionTarget, actorUserIdentityId);
     if (!certificate.ok) {
       return certificate;
@@ -210,40 +197,62 @@ export class ApproveNodeEnrollmentUseCase {
         ?? toNodeTrustFailure(NodeTrustUseCaseErrorCodes.invalidRequest, "Enrollment capability profile is invalid.");
     }
 
-    const nodeMutation = existingNode
-      ? await this.updateExistingNode(existingNode, {
-        actorUserIdentityId,
-        approvedAt: request.reviewedAt ?? nowIso,
-        trustState,
-        capabilityProfile: approvedCapabilityProfile,
-        certificate: certificate.value,
-        request,
-      })
-      : await this.registerNodeFromEnrollment(transitionTarget, {
-        actorUserIdentityId,
-        approvedAt: request.reviewedAt ?? nowIso,
-        trustState,
-        capabilityProfile: approvedCapabilityProfile,
-        certificate: certificate.value,
-        request,
-      });
+    let nodeMutation: NodeTrustPersistenceMutationResult<NodeIdentityPersistenceRecord>;
+    let enrollmentMutation: NodeTrustPersistenceMutationResult<NodeEnrollmentRequestPersistenceRecord>;
+    await runInTransactionBoundary(this.dependencies.transactionManager, async () => {
+      if (enrollment.status === NodeEnrollmentRequestStatuses.submitted) {
+        const underReview = await this.dependencies.enrollmentRequestRepository.transitionEnrollmentRequestStatus({
+          requestId: enrollment.requestId,
+          toStatus: NodeEnrollmentRequestStatuses.underReview,
+          mutation: createNodeTrustMutationEnvelope({
+            actorUserIdentityId,
+            operationPrefix: "approve-node-enrollment-under-review",
+            idGenerator: this.idGenerator,
+            clock: this.clock,
+            expectedRevision: request.expectedEnrollmentRevision,
+            reason: request.reason,
+            correlationId: request.correlationId,
+            metadata: request.metadata,
+          }),
+        });
+        transitionTarget = underReview.record;
+      }
 
-    const enrollmentMutation = await this.dependencies.enrollmentRequestRepository.transitionEnrollmentRequestStatus({
-      requestId,
-      toStatus: NodeEnrollmentRequestStatuses.approved,
-      reviewedAt: request.reviewedAt ?? nowIso,
-      reviewedByUserIdentityId: actorUserIdentityId,
-      decisionNote: normalizeOptional(request.decisionNote),
-      mutation: createNodeTrustMutationEnvelope({
-        actorUserIdentityId,
-        operationPrefix: "approve-node-enrollment",
-        idGenerator: this.idGenerator,
-        clock: this.clock,
-        expectedRevision: request.expectedEnrollmentRevision,
-        reason: request.reason,
-        correlationId: request.correlationId,
-        metadata: request.metadata,
-      }),
+      nodeMutation = existingNode
+        ? await this.updateExistingNode(existingNode, {
+          actorUserIdentityId,
+          approvedAt: request.reviewedAt ?? nowIso,
+          trustState,
+          capabilityProfile: approvedCapabilityProfile,
+          certificate: certificate.value,
+          request,
+        })
+        : await this.registerNodeFromEnrollment(transitionTarget, {
+          actorUserIdentityId,
+          approvedAt: request.reviewedAt ?? nowIso,
+          trustState,
+          capabilityProfile: approvedCapabilityProfile,
+          certificate: certificate.value,
+          request,
+        });
+
+      enrollmentMutation = await this.dependencies.enrollmentRequestRepository.transitionEnrollmentRequestStatus({
+        requestId,
+        toStatus: NodeEnrollmentRequestStatuses.approved,
+        reviewedAt: request.reviewedAt ?? nowIso,
+        reviewedByUserIdentityId: actorUserIdentityId,
+        decisionNote: normalizeOptional(request.decisionNote),
+        mutation: createNodeTrustMutationEnvelope({
+          actorUserIdentityId,
+          operationPrefix: "approve-node-enrollment",
+          idGenerator: this.idGenerator,
+          clock: this.clock,
+          expectedRevision: request.expectedEnrollmentRevision,
+          reason: request.reason,
+          correlationId: request.correlationId,
+          metadata: request.metadata,
+        }),
+      });
     });
 
     await publishNodeTrustAuditEventBestEffort(this.dependencies.auditSink, {
@@ -254,24 +263,24 @@ export class ApproveNodeEnrollmentUseCase {
       enrollmentRequestId: requestId,
       outcome: "success",
       details: Object.freeze({
-        nodeType: nodeMutation.record.nodeType,
-        trustState: nodeMutation.record.trustState,
-        approvalStatus: nodeMutation.record.approvalStatus,
-        deploymentTags: nodeMutation.record.deploymentTags,
-        reviewedAt: enrollmentMutation.record.reviewedAt,
-        reviewedByUserIdentityId: enrollmentMutation.record.reviewedByUserIdentityId,
-        decisionNote: enrollmentMutation.record.decisionNote,
-        certificateRef: nodeMutation.record.certificate?.certificateRef,
+        nodeType: nodeMutation!.record.nodeType,
+        trustState: nodeMutation!.record.trustState,
+        approvalStatus: nodeMutation!.record.approvalStatus,
+        deploymentTags: nodeMutation!.record.deploymentTags,
+        reviewedAt: enrollmentMutation!.record.reviewedAt,
+        reviewedByUserIdentityId: enrollmentMutation!.record.reviewedByUserIdentityId,
+        decisionNote: enrollmentMutation!.record.decisionNote,
+        certificateRef: nodeMutation!.record.certificate?.certificateRef,
       }),
     });
 
     return {
       ok: true,
       value: Object.freeze({
-        enrollmentRequest: enrollmentMutation.record,
-        node: nodeMutation.record,
-        enrollmentMutation,
-        nodeMutation,
+        enrollmentRequest: enrollmentMutation!.record,
+        node: nodeMutation!.record,
+        enrollmentMutation: enrollmentMutation!,
+        nodeMutation: nodeMutation!,
       }),
     };
   }

@@ -41,6 +41,12 @@ import type { ILocalPasswordCredentialService, LocalPasswordCredentialMaterial }
 import { IdentityPolicyService } from "../services/IdentityPolicyService";
 import { LocalPasswordIdentityAuthenticator } from "../services/LocalPasswordIdentityAuthenticator";
 import { ChangeLocalPasswordCredentialUseCase } from "../../../src/application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
+import type { IPlatformTransactionManager } from "../../../src/application/common/ports/PlatformTransactionPorts";
+
+interface IdentityCredentialChangeAdapterSnapshot {
+  readonly users: Map<string, UserIdentity>;
+  readonly credentialMaterial: Map<string, IdentityCredentialMaterialRecord>;
+}
 
 class InMemoryCredentialChangeAdapter
   implements IIdentityLookupRepository, IIdentityPersistenceRepository, ICredentialMaterialRepository, IIdentityClock, IIdentityIdGenerator {
@@ -49,6 +55,7 @@ class InMemoryCredentialChangeAdapter
   private readonly policies = new Map<string, CredentialPolicy>();
   private readonly credentialMaterial = new Map<string, IdentityCredentialMaterialRecord>();
   private sequence = 0;
+  public failCredentialSave = false;
 
   public now(): Date {
     return new Date("2026-04-04T14:00:00.000Z");
@@ -148,6 +155,9 @@ class InMemoryCredentialChangeAdapter
   }
 
   public async saveCredentialMaterial(record: IdentityCredentialMaterialRecord): Promise<IdentityCredentialMaterialRecord> {
+    if (this.failCredentialSave) {
+      throw new Error("credential persistence failure");
+    }
     this.credentialMaterial.set(record.id, record);
     return record;
   }
@@ -173,6 +183,41 @@ class InMemoryCredentialChangeAdapter
       updatedAt: supersededAt,
     });
     return identitySuccess({ changed: true });
+  }
+
+  public createSnapshot(): IdentityCredentialChangeAdapterSnapshot {
+    return Object.freeze({
+      users: new Map(this.users),
+      credentialMaterial: new Map(this.credentialMaterial),
+    });
+  }
+
+  public restoreSnapshot(snapshot: IdentityCredentialChangeAdapterSnapshot): void {
+    this.users.clear();
+    this.credentialMaterial.clear();
+    for (const [key, value] of snapshot.users.entries()) {
+      this.users.set(key, value);
+    }
+    for (const [key, value] of snapshot.credentialMaterial.entries()) {
+      this.credentialMaterial.set(key, value);
+    }
+  }
+}
+
+class InMemoryCredentialChangeTransactionManager implements IPlatformTransactionManager {
+  public callCount = 0;
+
+  public constructor(private readonly adapter: InMemoryCredentialChangeAdapter) {}
+
+  public async runInTransaction<TValue>(operation: () => Promise<TValue>): Promise<TValue> {
+    this.callCount += 1;
+    const snapshot = this.adapter.createSnapshot();
+    try {
+      return await operation();
+    } catch (error) {
+      this.adapter.restoreSnapshot(snapshot);
+      throw error;
+    }
   }
 }
 
@@ -207,11 +252,13 @@ function createUseCase(
   adapter: InMemoryCredentialChangeAdapter,
   resetVerifier?: IIdentityCredentialResetVerifier,
   eventPublisher?: IIdentityLifecycleEventPublisher,
+  transactionManager?: IPlatformTransactionManager,
 ): ChangeLocalPasswordCredentialUseCase {
   return new ChangeLocalPasswordCredentialUseCase({
     lookupRepository: adapter,
     persistenceRepository: adapter,
     credentialMaterialRepository: adapter,
+    transactionManager,
     identityPolicyService: new IdentityPolicyService(adapter),
     credentialAuthenticator: new LocalPasswordIdentityAuthenticator(new StubLocalPasswordCredentialService()),
     idGenerator: adapter,
@@ -508,5 +555,59 @@ describe("ChangeLocalPasswordCredentialUseCase", () => {
         code: "identity-policy-violation",
       }),
     });
+  });
+
+  it("routes credential rotation writes through the configured transaction manager", async () => {
+    const adapter = new InMemoryCredentialChangeAdapter();
+    await seedIdentity(adapter);
+    const transactionManager = new InMemoryCredentialChangeTransactionManager(adapter);
+    const useCase = createUseCase(adapter, undefined, undefined, transactionManager);
+
+    const result = await useCase.execute({
+      userIdentityId: "user:1",
+      newCredential: {
+        candidate: "N3w!CredentialValue",
+      },
+      verification: {
+        currentCredential: "Current!Pass123",
+      },
+    });
+
+    expect(result.ok).toBeTrue();
+    expect(transactionManager.callCount).toBe(1);
+  });
+
+  it("rolls back credential supersede when persistence fails inside the transaction boundary", async () => {
+    const adapter = new InMemoryCredentialChangeAdapter();
+    await seedIdentity(adapter);
+    adapter.failCredentialSave = true;
+    const transactionManager = new InMemoryCredentialChangeTransactionManager(adapter);
+    const useCase = createUseCase(adapter, undefined, undefined, transactionManager);
+
+    await expect(useCase.execute({
+      userIdentityId: "user:1",
+      newCredential: {
+        candidate: "N3w!CredentialValue",
+      },
+      verification: {
+        currentCredential: "Current!Pass123",
+      },
+    })).rejects.toThrow("credential persistence failure");
+
+    expect(transactionManager.callCount).toBe(1);
+    const activeMaterial = await adapter.getActiveCredentialMaterial({
+      providerId: "provider:local-password",
+      providerSubject: "valid.user",
+    });
+    expect(activeMaterial?.id).toBe("credential:active");
+    const history = await adapter.listCredentialMaterialHistory({
+      reference: {
+        providerId: "provider:local-password",
+        providerSubject: "valid.user",
+      },
+      includeInactive: true,
+    });
+    expect(history).toHaveLength(1);
+    expect(history[0]?.status).toBe("active");
   });
 });

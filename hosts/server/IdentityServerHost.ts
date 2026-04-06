@@ -425,6 +425,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       lookupRepository: repository,
       persistenceRepository: repository,
       credentialMaterialRepository: repository,
+      transactionManager: repository,
       identityPolicyService,
       credentialAuthenticator: authenticator,
       idGenerator,
@@ -748,11 +749,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     approveNodeEnrollmentUseCase: new ApproveNodeEnrollmentUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
       nodeRepository: nodeTrustRepository,
+      transactionManager: nodeTrustRepository,
       auditSink: nodeTrustAuditRecorder,
     }),
     rejectNodeEnrollmentUseCase: new RejectNodeEnrollmentUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
       nodeRepository: nodeTrustRepository,
+      transactionManager: nodeTrustRepository,
       auditSink: nodeTrustAuditRecorder,
     }),
     revokeNodeTrustUseCase: new RevokeNodeTrustUseCase({
