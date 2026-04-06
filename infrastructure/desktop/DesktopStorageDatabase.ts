@@ -148,6 +148,7 @@ export class DesktopStorageDatabase implements IProductionStorageInitializer {
   }
 
   private applyMigrations(db: Database.Database): ReadonlyArray<string> {
+    this.ensureMigrationTable(db);
     const applied = new Set(
       (db.prepare("SELECT version FROM schema_migrations ORDER BY version ASC").all() as Array<{ version: number }>)
         .map((row) => row.version),
@@ -174,5 +175,15 @@ export class DesktopStorageDatabase implements IProductionStorageInitializer {
     }
 
     return Object.freeze(appliedNames);
+  }
+
+  private ensureMigrationTable(db: Database.Database): void {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        version INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      )
+    `);
   }
 }
