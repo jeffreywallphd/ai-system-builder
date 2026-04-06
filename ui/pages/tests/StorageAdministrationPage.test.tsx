@@ -49,6 +49,9 @@ describe("StorageAdministrationPage", () => {
     expect(html).toContain("List query");
     expect(html).toContain("Storage instances");
     expect(html).toContain("Storage detail");
+    expect(html).toContain("Sync posture");
+    expect(html).toContain("Operational status");
+    expect(html).toContain("Synchronization posture");
     expect(html).toContain("No storage instances matched the current query.");
   });
 });

@@ -10,6 +10,7 @@ import {
   type StorageBackendType,
   type StorageLifecycleState,
 } from "../../src/domain/storage/StorageDomain";
+import { StorageSyncStatuses, type StorageSyncStatus } from "../../src/shared/contracts/storage/StorageTransportContracts";
 import type { StorageInstanceSummaryDto } from "../../src/shared/contracts/storage/StorageTransportContracts";
 import StorageInstanceWorkflowPanel from "../components/storage/StorageInstanceWorkflowPanel";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
@@ -31,9 +32,16 @@ interface StorageListInsight {
   readonly workspaceScope?: string;
   readonly policySummary?: string;
   readonly healthSummary?: string;
+  readonly usabilitySummary?: string;
+  readonly syncSummary?: string;
+  readonly syncCapable?: boolean;
+  readonly syncStatus?: StorageSyncStatus;
   readonly healthStatus?: GetStorageInstanceHealthApiResponse["operationalStatus"];
+  readonly readinessState?: StorageReadinessState;
   readonly loading: boolean;
 }
+
+type StorageReadinessState = "healthy" | "degraded" | "inactive" | "unhealthy";
 
 const defaultFilters: StorageFilterState = Object.freeze({
   backendType: "",
@@ -145,10 +153,13 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
         const insight: StorageListInsight = Object.freeze({
           workspaceScope: detail?.access.scope,
           policySummary: detail ? summarizePolicyForList(detail) : undefined,
-          healthSummary: health
-            ? summarizeHealthForList(health)
-            : (fallbackError ? "Unavailable" : "Unavailable"),
+          healthSummary: health ? summarizeHealthForList(health) : (fallbackError ? "Unavailable" : "Unavailable"),
+          usabilitySummary: health ? summarizeUsabilityForList(health) : undefined,
+          syncSummary: health ? summarizeSyncForList(health) : undefined,
+          syncCapable: health?.synchronization.syncCapable,
+          syncStatus: health?.synchronizationStatus,
           healthStatus: health?.operationalStatus,
+          readinessState: health ? deriveReadinessState(health) : undefined,
           loading: false,
         });
 
@@ -387,7 +398,9 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
                       <th scope="col">Backend type</th>
                       <th scope="col">Workspace scope</th>
                       <th scope="col">Lifecycle</th>
-                      <th scope="col">Health summary</th>
+                      <th scope="col">Health</th>
+                      <th scope="col">Sync posture</th>
+                      <th scope="col">Availability</th>
                       <th scope="col">Policy highlights</th>
                     </tr>
                   </thead>
@@ -421,11 +434,19 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
                           </td>
                           <td>
                             {insight?.loading ? "Checking..." : (
-                              <span className={`ui-badge ${healthBadgeClass(insight?.healthStatus)}`}>
+                              <span className={`ui-badge ${readinessBadgeClass(insight?.readinessState, insight?.healthStatus)}`}>
                                 {insight?.healthSummary ?? "Unavailable"}
                               </span>
                             )}
                           </td>
+                          <td>
+                            {insight?.loading ? "Checking..." : (
+                              <span className={`ui-badge ${syncBadgeClass(insight?.syncCapable, insight?.syncStatus)}`}>
+                                {insight?.syncSummary ?? "Unavailable"}
+                              </span>
+                            )}
+                          </td>
+                          <td>{insight?.loading ? "Checking..." : (insight?.usabilitySummary ?? "Unavailable")}</td>
                           <td>{insight?.loading ? "Loading..." : (insight?.policySummary ?? "Unavailable")}</td>
                         </tr>
                       );
@@ -522,17 +543,19 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
                 </div>
 
                 <div className="ui-stack ui-stack--2xs">
-                  <strong>Replication and health</strong>
-                  <div className="ui-text-secondary">Replication mode: {selectedDetail.replication.mode}</div>
-                  <div className="ui-text-secondary">Last sync status: {selectedDetail.replication.lastSyncStatus}</div>
-                  <div className="ui-text-secondary">Last sync at: {formatTimestamp(selectedDetail.replication.lastSyncAt) ?? "n/a"}</div>
-                  <div className="ui-text-secondary">Sync lag seconds: {selectedDetail.replication.syncLagSeconds ?? "n/a"}</div>
+                  <strong>Operational status</strong>
                   {selectedHealth ? (
                     <>
                       <div className="ui-text-secondary">
+                        Availability: <span className={`ui-badge ${readinessBadgeClass(deriveReadinessState(selectedHealth), selectedHealth.operationalStatus)}`}>
+                          {presentReadinessLabel(deriveReadinessState(selectedHealth))}
+                        </span>
+                      </div>
+                      <div className="ui-text-secondary">
                         Operational status: <span className={`ui-badge ${healthBadgeClass(selectedHealth.operationalStatus)}`}>{selectedHealth.operationalStatus}</span>
                       </div>
-                      <div className="ui-text-secondary">Health reason: {selectedHealth.reasonCode}</div>
+                      <div className="ui-text-secondary">Usability summary: {describeUsability(selectedHealth)}</div>
+                      <div className="ui-text-secondary">Health reason code: {selectedHealth.reasonCode}</div>
                       <div className="ui-text-secondary">Last checked: {formatTimestamp(selectedHealth.lastCheckedAt)}</div>
                       <div className="ui-text-secondary">
                         Notes: {selectedHealth.operationalNotes.length > 0 ? selectedHealth.operationalNotes.join(" ") : "No additional notes."}
@@ -541,6 +564,50 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
                   ) : (
                     <div className="ui-text-secondary">Health details unavailable for this selection.</div>
                   )}
+                </div>
+
+                <div className="ui-stack ui-stack--2xs">
+                  <strong>Capability profile</strong>
+                  {selectedHealth?.capabilities ? (
+                    <>
+                      <div className="ui-text-secondary">Managed lifecycle support: {yesNo(selectedHealth.capabilities.supportsManagedLifecycle)}</div>
+                      <div className="ui-text-secondary">Asynchronous replication support: {yesNo(selectedHealth.capabilities.supportsAsyncReplication)}</div>
+                      <div className="ui-text-secondary">Synchronous replication support: {yesNo(selectedHealth.capabilities.supportsSyncReplication)}</div>
+                      <div className="ui-text-secondary">Active read-only support: {yesNo(selectedHealth.capabilities.supportsReadOnlyActive)}</div>
+                      <div className="ui-text-secondary">Cross-workspace read support: {yesNo(selectedHealth.capabilities.supportsCrossWorkspaceReads)}</div>
+                      <div className="ui-text-secondary">Max object size limit: {formatMaxObjectLimit(selectedHealth.capabilities.maxObjectBytesLimit)}</div>
+                      <div className="ui-text-secondary">
+                        Capability notes: {selectedHealth.capabilities.notes && selectedHealth.capabilities.notes.length > 0
+                          ? selectedHealth.capabilities.notes.join(" ")
+                          : "No additional capability notes."}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="ui-text-secondary">Capability details are not available for this storage selection.</div>
+                  )}
+                </div>
+
+                <div className="ui-stack ui-stack--2xs">
+                  <strong>Synchronization posture</strong>
+                  <div className="ui-text-secondary">
+                    Sync capability: <span className={`ui-badge ${syncBadgeClass(selectedHealth?.synchronization.syncCapable, selectedHealth?.synchronizationStatus)}`}>
+                      {selectedHealth ? summarizeSyncForList(selectedHealth) : "Unavailable"}
+                    </span>
+                  </div>
+                  <div className="ui-text-secondary">
+                    Sync status: <span className={`ui-badge ${syncStatusBadgeClass(selectedHealth?.synchronizationStatus)}`}>
+                      {selectedHealth?.synchronizationStatus ?? "unknown"}
+                    </span>
+                  </div>
+                  <div className="ui-text-secondary">
+                    Deployment availability: {selectedHealth?.synchronization.deploymentAvailability ?? "unknown"}
+                  </div>
+                  <div className="ui-text-secondary">
+                    Synchronization reason: {selectedHealth?.synchronization.reasonCode ?? "No additional synchronization reason."}
+                  </div>
+                  <div className="ui-text-secondary">Replication mode: {selectedDetail.replication.mode}</div>
+                  <div className="ui-text-secondary">Last sync at: {formatTimestamp(selectedDetail.replication.lastSyncAt) ?? "n/a"}</div>
+                  <div className="ui-text-secondary">Sync lag seconds: {selectedDetail.replication.syncLagSeconds ?? "n/a"}</div>
                 </div>
               </>
             ) : null}
@@ -570,17 +637,61 @@ function summarizePolicyForList(storage: GetStorageInstanceDetailApiResponse["st
 }
 
 function summarizeHealthForList(health: GetStorageInstanceHealthApiResponse): string {
-  const status = health.operationalStatus;
-  if (status === "healthy") {
+  const readiness = deriveReadinessState(health);
+  if (readiness === "healthy") {
     return "Healthy";
   }
-  if (status === "inactive") {
+  if (readiness === "degraded") {
+    return "Degraded";
+  }
+  if (readiness === "inactive") {
     return "Inactive";
   }
-  if (status === "unsupported") {
-    return "Unsupported";
+  return health.operationalStatus === "unsupported" ? "Unsupported" : "Unhealthy";
+}
+
+function summarizeUsabilityForList(health: GetStorageInstanceHealthApiResponse): string {
+  const readiness = deriveReadinessState(health);
+  if (readiness === "healthy") {
+    return "Ready";
   }
-  return "Attention needed";
+  if (readiness === "degraded") {
+    return "Limited";
+  }
+  if (readiness === "inactive") {
+    return "Not usable";
+  }
+  return "Blocked";
+}
+
+function summarizeSyncForList(health: GetStorageInstanceHealthApiResponse): string {
+  if (!health.synchronization.syncCapable) {
+    return "No sync support";
+  }
+
+  if (health.synchronization.deploymentAvailability === "configured-inactive") {
+    return "Sync capable (inactive)";
+  }
+  if (health.synchronization.deploymentAvailability === "unavailable") {
+    return "Sync unavailable";
+  }
+
+  switch (health.synchronizationStatus) {
+    case StorageSyncStatuses.healthy:
+      return "Sync healthy";
+    case StorageSyncStatuses.running:
+      return "Sync running";
+    case StorageSyncStatuses.pending:
+      return "Sync pending";
+    case StorageSyncStatuses.degraded:
+      return "Sync degraded";
+    case StorageSyncStatuses.failed:
+      return "Sync failed";
+    case StorageSyncStatuses.disabled:
+      return "Sync disabled";
+    default:
+      return "Sync status unknown";
+  }
 }
 
 function formatRetention(retentionDays: number | undefined, expiryAction: string): string {
@@ -641,3 +752,114 @@ function healthBadgeClass(
       return "ui-badge--neutral";
   }
 }
+
+function syncBadgeClass(syncCapable?: boolean, syncStatus?: StorageSyncStatus): string {
+  if (!syncCapable) {
+    return "ui-badge--neutral";
+  }
+  return syncStatusBadgeClass(syncStatus);
+}
+
+function syncStatusBadgeClass(syncStatus?: StorageSyncStatus): string {
+  switch (syncStatus) {
+    case StorageSyncStatuses.healthy:
+      return "ui-badge--success";
+    case StorageSyncStatuses.running:
+    case StorageSyncStatuses.pending:
+    case StorageSyncStatuses.disabled:
+      return "ui-badge--warning";
+    case StorageSyncStatuses.degraded:
+      return "ui-badge--warning";
+    case StorageSyncStatuses.failed:
+      return "ui-badge--danger";
+    default:
+      return "ui-badge--neutral";
+  }
+}
+
+function deriveReadinessState(health: GetStorageInstanceHealthApiResponse): StorageReadinessState {
+  if (health.operationalStatus === "unsupported" || health.operationalStatus === "unhealthy") {
+    return "unhealthy";
+  }
+  if (health.lifecycleState === StorageLifecycleStates.degraded) {
+    return "degraded";
+  }
+  if (health.operationalStatus === "inactive" || health.lifecycleState !== StorageLifecycleStates.active) {
+    return "inactive";
+  }
+  if (health.synchronization.syncCapable) {
+    if (health.synchronizationStatus === StorageSyncStatuses.failed) {
+      return "unhealthy";
+    }
+    if (health.synchronizationStatus === StorageSyncStatuses.degraded) {
+      return "degraded";
+    }
+  }
+  return "healthy";
+}
+
+function presentReadinessLabel(readiness: StorageReadinessState): string {
+  switch (readiness) {
+    case "healthy":
+      return "Ready";
+    case "degraded":
+      return "Degraded";
+    case "inactive":
+      return "Inactive";
+    default:
+      return "Unavailable";
+  }
+}
+
+function readinessBadgeClass(
+  readiness?: StorageReadinessState,
+  operationalStatus?: GetStorageInstanceHealthApiResponse["operationalStatus"],
+): string {
+  if (readiness === "healthy") {
+    return "ui-badge--success";
+  }
+  if (readiness === "degraded") {
+    return "ui-badge--warning";
+  }
+  if (readiness === "inactive") {
+    return "ui-badge--warning";
+  }
+  return healthBadgeClass(operationalStatus);
+}
+
+function describeUsability(health: GetStorageInstanceHealthApiResponse): string {
+  const readiness = deriveReadinessState(health);
+  if (readiness === "healthy") {
+    return "Ready for managed workloads.";
+  }
+  if (readiness === "degraded") {
+    return "Usable with reduced reliability. Review operational notes before production use.";
+  }
+  if (readiness === "inactive") {
+    return "Not usable because the instance is inactive.";
+  }
+  if (health.operationalStatus === "unsupported") {
+    return "Not usable because this backend capability profile does not meet current storage requirements.";
+  }
+  return "Not usable because health inspection reports an operational failure.";
+}
+
+function yesNo(value: boolean): string {
+  return value ? "supported" : "not supported";
+}
+
+function formatMaxObjectLimit(value?: number): string {
+  if (typeof value !== "number" || value <= 0) {
+    return "Not specified";
+  }
+  return `${value.toLocaleString()} bytes`;
+}
+
+export const StorageAdministrationPagePresentation = Object.freeze({
+  summarizeHealthForList,
+  summarizeUsabilityForList,
+  summarizeSyncForList,
+  deriveReadinessState,
+  describeUsability,
+  presentReadinessLabel,
+});

@@ -4,6 +4,7 @@
 
 - Story 9.4.1 initial storage admin UI implementation.
 - Story 9.4.2 create/edit workflow implementation for managed storage instances.
+- Story 9.4.3 operational status/capability/sync posture presentation.
 - Adds list/detail inspection plus create/edit administration workflows.
 
 ## Canonical files
@@ -25,8 +26,15 @@
   - workspace scope
   - lifecycle
   - health summary
+  - sync posture
+  - availability summary
   - policy highlights
 - Detail view projects lifecycle/access/policy/replication/health contracts with explicit loading/empty/error handling.
+- Story 9.4.3 adds inspection-driven readiness rendering:
+  - `healthy`, `degraded`, `inactive`, and `unhealthy/unsupported` distinctions
+  - operational usability messaging for non-usable instances
+  - capability profile summary using contract-safe support flags
+  - synchronization posture clarity (sync-capable vs not, deployment availability, sync status)
 - Create workflow captures backend/access/policy metadata and validates via shared storage schema contracts before submit.
 - Edit workflow updates allowed metadata/policy-label fields only and validates via shared storage schema contracts.
 - Mutation flows apply confirmation prompts and render API validation feedback with path-level detail.
@@ -43,4 +51,5 @@
 - `ui/shared/storage/tests/StorageAdministrationClient.test.ts`
 - `ui/components/storage/tests/StorageInstanceWorkflowPanel.test.tsx`
 - `ui/pages/tests/StorageAdministrationPage.test.tsx`
+- `ui/pages/tests/StorageAdministrationPage.presentation.test.ts`
 - `ui/web/storage/tests/StorageAdministrationRoutes.test.ts`
