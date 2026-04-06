@@ -65,6 +65,9 @@ export function createBrowserDevelopmentVitePlugin(): Plugin {
           databasePath: BROWSER_IDENTITY_DATABASE_PATH,
           host: identityHostAddress,
           port: requestedIdentityHostPort,
+          cors: {
+            allowLoopbackOrigins: true,
+          },
         });
         identityApiBaseUrl = assertSecureTransportEndpoint(
           `http://${identityHostAddress}:${identityServerHost.port}`,
