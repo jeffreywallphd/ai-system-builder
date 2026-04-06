@@ -3,10 +3,13 @@ import {
   SecretActorTypes,
   SecretKinds,
   SecretScopes,
-  type SecretAccessActor,
   type SecretKind,
 } from "../../../domain/security/SecretDomain";
 import type { ServerComposedSecretService } from "./SecretServiceComposition";
+import {
+  ServerPlatformProviderIds,
+  ServerPlatformSecretConsumers,
+} from "./ServerPlatformSecretConsumers";
 
 const SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS = Object.freeze({
   requiredSecretIds: "AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS",
@@ -25,6 +28,8 @@ interface SystemSecretDefinition {
     readonly labels: Readonly<Record<string, string>>;
   };
   readonly runtimePurpose: string;
+  readonly runtimeConsumer: "provider-credential" | "server-signing";
+  readonly providerId?: "openai" | "huggingface";
   readonly legacyEnvironmentVariable?: string;
 }
 
@@ -41,6 +46,8 @@ const SystemSecretDefinitions: ReadonlyArray<SystemSecretDefinition> = Object.fr
       }),
     }),
     runtimePurpose: "server-provider-openai-runtime",
+    runtimeConsumer: "provider-credential",
+    providerId: ServerPlatformProviderIds.openAi,
     legacyEnvironmentVariable: SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS.openAiApiKey,
   }),
   Object.freeze({
@@ -55,6 +62,8 @@ const SystemSecretDefinitions: ReadonlyArray<SystemSecretDefinition> = Object.fr
       }),
     }),
     runtimePurpose: "server-provider-huggingface-runtime",
+    runtimeConsumer: "provider-credential",
+    providerId: ServerPlatformProviderIds.huggingFace,
     legacyEnvironmentVariable: SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS.huggingFaceApiToken,
   }),
   Object.freeze({
@@ -69,6 +78,7 @@ const SystemSecretDefinitions: ReadonlyArray<SystemSecretDefinition> = Object.fr
       }),
     }),
     runtimePurpose: "identity-session-token-signing",
+    runtimeConsumer: "server-signing",
     legacyEnvironmentVariable: SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS.identitySessionSigningPrivateKey,
   }),
 ]);
@@ -146,7 +156,9 @@ export async function bootstrapSystemSecretsFromEnvironment(
     input.env[SYSTEM_SECRET_BOOTSTRAP_ENV_KEYS.migrateLegacyEnvironmentValues],
   ) ?? true;
   const administrativeActor = createAdministrativeActor();
-  const runtimeActor = createRuntimeActor();
+  const platformSecretConsumers = new ServerPlatformSecretConsumers(
+    input.secretService.runtimeSecretConsumptionAdapters,
+  );
 
   for (const secretId of requiredSecretIds) {
     const definition = SystemSecretDefinitionsById.get(secretId);
@@ -219,19 +231,23 @@ export async function bootstrapSystemSecretsFromEnvironment(
       }
     }
 
-    const runtimeCheck = await input.secretService.retrieveSecretPlaintextForRuntimeUseCase.execute({
-      actor: runtimeActor,
-      secretId: definition.secretId,
-      operationKey: `op:system-secret-bootstrap:validate:${definition.secretId}:${now().getTime()}`,
-      runtimeContext: Object.freeze({
+    const runtimeCheck = definition.runtimeConsumer === "provider-credential"
+      ? await platformSecretConsumers.resolveServerProviderCredential({
+        providerId: definition.providerId as "openai" | "huggingface",
+        secretId: definition.secretId,
+        operationKey: `op:system-secret-bootstrap:validate:${definition.secretId}:${now().getTime()}`,
         serviceIdentity: "runtime:server:system-secret-bootstrap",
-        scope: Object.freeze({
-          scope: SecretScopes.server,
-        }),
         justification: `validate required system secret for '${definition.runtimePurpose}'`,
-      }),
-      occurredAt: now().toISOString(),
-    });
+        occurredAt: now().toISOString(),
+      })
+      : await platformSecretConsumers.resolveIdentitySessionSigningMaterial({
+        secretId: definition.secretId,
+        operationKey: `op:system-secret-bootstrap:validate:${definition.secretId}:${now().getTime()}`,
+        serviceIdentity: "runtime:server:system-secret-bootstrap",
+        signingPurpose: definition.runtimePurpose,
+        justification: `validate required system secret for '${definition.runtimePurpose}'`,
+        occurredAt: now().toISOString(),
+      });
 
     if (!runtimeCheck.ok) {
       diagnostics.push(Object.freeze({
@@ -267,7 +283,7 @@ export async function assertSystemSecretBootstrapSafe(
   return result;
 }
 
-function createAdministrativeActor(): SecretAccessActor {
+function createAdministrativeActor() {
   return Object.freeze({
     actorId: "system:secret-bootstrap",
     actorType: SecretActorTypes.serverAdmin,
@@ -275,14 +291,6 @@ function createAdministrativeActor(): SecretAccessActor {
       SecretAccessActions.create,
       SecretAccessActions.readMetadata,
     ]),
-  });
-}
-
-function createRuntimeActor(): SecretAccessActor {
-  return Object.freeze({
-    actorId: "runtime:server:system-secret-bootstrap",
-    actorType: SecretActorTypes.serverRuntime,
-    grantedActions: Object.freeze([SecretAccessActions.retrievePlaintext]),
   });
 }
 

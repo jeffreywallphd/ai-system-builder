@@ -77,6 +77,7 @@ import { ServerManagedTransportTrustStateResolver } from "../../src/infrastructu
 import { TransportSecurityObservabilityReporter } from "../../src/infrastructure/security/TransportSecurityObservabilityReporter";
 import { createFileSystemProtectedSecretStoreFromEnvironment } from "../../src/infrastructure/security/secrets/FileSystemProtectedSecretStore";
 import { composeServerSecretService, type ServerComposedSecretService } from "../../src/infrastructure/security/secrets/SecretServiceComposition";
+import { ServerPlatformSecretConsumers } from "../../src/infrastructure/security/secrets/ServerPlatformSecretConsumers";
 import { assertSystemSecretBootstrapSafe } from "../../src/infrastructure/security/secrets/SystemSecretBootstrapService";
 import type { ICertificateAuthorityIssuerPort } from "../../src/application/security/ports/ICertificateAuthorityIssuerPort";
 import { ProtectedCertificateAuthorityRootMaterialStorage } from "../../src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
@@ -182,6 +183,7 @@ export interface IdentityServerHost {
   readonly port: number;
   readonly address: string;
   readonly secretService: ServerComposedSecretService;
+  readonly platformSecretConsumers: ServerPlatformSecretConsumers;
   close(): Promise<void>;
 }
 
@@ -846,11 +848,15 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   if (!secretService) {
     throw new Error("Secret service composition is unavailable.");
   }
+  const platformSecretConsumers = new ServerPlatformSecretConsumers(
+    secretService.runtimeSecretConsumptionAdapters,
+  );
 
   return Object.freeze({
     port: addressInfo.port,
     address: `${addressInfo.address}:${addressInfo.port}`,
     secretService,
+    platformSecretConsumers,
     close: () => new Promise<void>((resolve, reject) => {
       server.close((error) => {
         repository.dispose();

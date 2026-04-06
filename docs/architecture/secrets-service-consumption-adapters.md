@@ -1,10 +1,13 @@
 # Secret Service Consumption Adapters
 
-This note documents Story 8.2.5 (Feature 8 / Epic 8.2): add service-to-service secret consumption adapters so runtime consumers use formal secret retrieval flows instead of direct configuration or secret-store access.
+This note documents Story 8.2.5 (Feature 8 / Epic 8.2) and Story 8.3.4 (Feature 8 / Epic 8.3): service-to-service secret consumption adapters and first platform configuration consumer integration so runtime modules use formal secret retrieval flows instead of direct configuration or secret-store access.
 
 ## Canonical files
 
 - `src/application/security/services/SecretRuntimeConsumptionAdapters.ts`
+- `src/infrastructure/security/secrets/ServerPlatformSecretConsumers.ts`
+- `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts`
+- `src/infrastructure/security/secrets/tests/ServerPlatformSecretConsumers.test.ts`
 - `src/application/security/tests/SecretRuntimeConsumptionAdapters.test.ts`
 - `src/infrastructure/security/secrets/SecretServiceComposition.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
@@ -19,6 +22,13 @@ This note documents Story 8.2.5 (Feature 8 / Epic 8.2): add service-to-service s
 
 All methods call `retrieveSecretPlaintextForRuntime(...)` through `SecretRuntimeResolutionUseCaseContracts`, and do not perform any direct secret-store, database, or crypto operations.
 
+`ServerPlatformSecretConsumers` now provides the first concrete platform-facing consumer surface:
+
+- `resolveServerProviderCredential(...)`
+- `resolveIdentitySessionSigningMaterial(...)`
+
+This service depends only on `runtimeSecretConsumptionAdapters`, giving host/runtime modules a formal seam for protected provider credentials and server signing material.
+
 ## Runtime secret dependency pattern
 
 Services that need credentials should depend on this pattern:
@@ -30,6 +40,13 @@ Services that need credentials should depend on this pattern:
    - server signing credential -> server scope
 3. Use returned `credential` (alias of runtime `plaintext`) for the immediate operation only.
 4. Avoid persistent caching/logging of returned plaintext values.
+
+For server platform configuration consumers, use the same pattern through `ServerPlatformSecretConsumers`:
+
+1. identify a formal secret id for the platform dependency (for example `secret:server:provider:openai` or `secret:server:signing:identity-session`)
+2. call `resolveServerProviderCredential(...)` or `resolveIdentitySessionSigningMaterial(...)`
+3. use returned `credential` only for the immediate operation
+4. do not fall back to plaintext legacy environment configuration for runtime consumption
 
 ## Policy and audit alignment
 
@@ -45,6 +62,12 @@ This keeps authorization and audit behavior in the existing secret retrieval use
 
 `composeServerSecretService(...)` now publishes `runtimeSecretConsumptionAdapters` alongside existing secret use cases. Host-level and infrastructure services can adopt this seam incrementally without changing storage or crypto internals.
 
+Story 8.3.4 integration adopts this seam in `SystemSecretBootstrapService` runtime validation:
+
+- required server provider credentials (`openai`, `huggingface`) are validated through `ServerPlatformSecretConsumers.resolveServerProviderCredential(...)`
+- required identity-session signing material is validated through `ServerPlatformSecretConsumers.resolveIdentitySessionSigningMaterial(...)`
+- runtime validation no longer uses ad hoc direct retrieval wiring in bootstrap logic
+
 ## Tests
 
 Added/updated tests verify:
@@ -52,3 +75,5 @@ Added/updated tests verify:
 - adapters route each credential type through formal runtime retrieval with correct actor/scope context
 - adapter error paths are passthrough from formal retrieval
 - composed server host exposes adapters and can retrieve a server-scoped credential through the adapter surface
+- platform consumer methods route through runtime adapter semantics and preserve error passthrough behavior
+- host startup bootstrap migration can immediately resolve migrated provider credentials through `platformSecretConsumers`

@@ -122,4 +122,33 @@ describe("SystemSecretBootstrapService", () => {
       service.dispose();
     }
   });
+
+  it("migrates and validates identity-session signing material through platform secret consumers", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "ai-loom-system-secret-bootstrap-signing-"));
+    createdRoots.push(root);
+    const service = composeServerSecretService({
+      databasePath: path.join(root, "identity.sqlite"),
+      env: {
+        AI_LOOM_SECRET_MASTER_KEY_ID: "kek:server:default",
+        AI_LOOM_SECRET_MASTER_KEY: Buffer.alloc(32, 13).toString("base64"),
+        AI_LOOM_SECRET_ENCRYPTED_PAYLOAD_DIRECTORY: path.join(root, "secret-envelopes"),
+      },
+    });
+
+    try {
+      const result = await bootstrapSystemSecretsFromEnvironment({
+        env: {
+          AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS: "secret:server:signing:identity-session",
+          AI_LOOM_IDENTITY_SESSION_SIGNING_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----v1-----END PRIVATE KEY-----",
+        },
+        secretService: service,
+      });
+
+      expect(result.state).toBe(SystemSecretBootstrapStates.ready);
+      expect(result.migratedSecretIds).toEqual(["secret:server:signing:identity-session"]);
+      expect(result.diagnostics).toHaveLength(0);
+    } finally {
+      service.dispose();
+    }
+  });
 });
