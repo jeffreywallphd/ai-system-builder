@@ -51,6 +51,18 @@
   - records deterministic lifecycle transitions (`configured -> composing -> starting -> ready -> stopping -> stopped`)
   - composes desktop runtime startup through host-owned adapters without authoritative control-plane role leakage
 
+## Hybrid composition root + entrypoint (story 12.2.3)
+- `src/hosts/hybrid/HybridHostCompositionRoot.ts` now provides a reusable hybrid composition root adapter.
+- `src/hosts/hybrid/HybridHostEntrypoint.ts` provides a dedicated executable hybrid host assembly entrypoint.
+- Hybrid adapter behavior:
+  - validates hybrid startup dependency boundary coverage
+  - composes host-aware hybrid service registration plans
+  - asserts required hybrid service coverage before feature registration starts host runtime
+  - enforces explicit capability-driven composition rules for desktop-facing + node/runtime capabilities
+  - rejects control-plane ownership blur by disallowing direct local authoritative source in hybrid composition root
+  - supports intentional authoritative execution by delegating to the authoritative server host assembly mode
+  - records deterministic lifecycle transitions (`configured -> composing -> starting -> ready -> stopping -> stopped`)
+
 ## Unified bootstrap pipeline and startup context (story 12.1.2)
 - Added `src/hosts/bootstrap/HostBootstrapPipeline.ts` as a shared host startup seam.
 - Startup context is now explicit and reusable across hosts:
@@ -94,6 +106,8 @@
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostEntrypoint.test.ts`
+- `src/hosts/hybrid/tests/HybridHostCompositionRoot.test.ts`
+- `src/hosts/hybrid/tests/HybridHostEntrypoint.test.ts`
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
 - `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
 

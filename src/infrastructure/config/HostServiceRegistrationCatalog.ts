@@ -222,6 +222,15 @@ export const DesktopHostRequiredServiceIds = Object.freeze([
   "svc:platform:observability",
 ]);
 
+export const HybridHostRequiredServiceIds = Object.freeze([
+  "svc:application:hybrid-orchestration",
+  "svc:infrastructure:hybrid-runtime-adapters",
+  "svc:platform:ui-runtime-bridge",
+  "svc:platform:execution-runtime",
+  "svc:platform:boot-lifecycle",
+  "svc:platform:observability",
+]);
+
 const ServiceRegistry = createHostServiceRegistry(ServiceRegistrations);
 
 export function resolveHostServiceRegistrationIds(host: Pick<HostRuntimeIdentity, "hostId">): ReadonlyArray<string> {
@@ -262,6 +271,17 @@ export function assertDesktopHostServiceCoverage(plan: HostServiceRegistrationPl
     if (!selected.has(requiredServiceId)) {
       throw new HostServiceRegistrationError(
         `Desktop host composition is missing required service '${requiredServiceId}'.`,
+      );
+    }
+  }
+}
+
+export function assertHybridHostServiceCoverage(plan: HostServiceRegistrationPlan): void {
+  const selected = new Set(plan.selectedServices.map((service) => service.serviceId));
+  for (const requiredServiceId of HybridHostRequiredServiceIds) {
+    if (!selected.has(requiredServiceId)) {
+      throw new HostServiceRegistrationError(
+        `Hybrid host composition is missing required service '${requiredServiceId}'.`,
       );
     }
   }

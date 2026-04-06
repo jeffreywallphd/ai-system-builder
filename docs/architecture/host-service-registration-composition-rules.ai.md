@@ -18,6 +18,7 @@
   - host-specific service sets
   - authoritative required-service assertions
   - desktop required-service assertions
+  - hybrid required-service assertions
 
 ## Authoritative server behavior
 - `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now:
@@ -30,6 +31,12 @@
   - composes host service registration in bootstrap `dependencies` stage
   - stores plan artifact in startup context
   - enforces desktop required-service coverage before runtime host start
+
+## Hybrid host behavior
+- `src/hosts/hybrid/HybridHostCompositionRoot.ts` now:
+  - composes host service registration in bootstrap `dependencies` stage
+  - stores plan artifact in startup context
+  - enforces hybrid required-service coverage before runtime host start
 
 ## Contributor checklist for new services
 1. Add the service to `HostServiceRegistrationCatalog.ts`.
@@ -45,4 +52,5 @@
 - `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
+- `src/hosts/hybrid/tests/HybridHostCompositionRoot.test.ts`
 

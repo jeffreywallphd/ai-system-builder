@@ -31,6 +31,14 @@ describe("HostRuntimeCatalog", () => {
     expect(worker.controlPlaneRole).toBe(HostControlPlaneRoles.none);
   });
 
+  it("keeps hybrid runtime as control-plane client with bounded execution capabilities", () => {
+    const hybrid = resolveHostRuntimeFromCatalog(HostRuntimeKinds.hybrid);
+    expect(hybrid.controlPlaneRole).toBe(HostControlPlaneRoles.controlPlaneClient);
+    expect(hybrid.capabilities.includes(HostCapabilityFlags.nodeExecution)).toBeTrue();
+    expect(hybrid.capabilities.includes(HostCapabilityFlags.workerRuntime)).toBeTrue();
+    expect(hybrid.capabilities.includes(HostCapabilityFlags.controlPlaneAuthority)).toBeFalse();
+  });
+
   it("publishes explicit responsibilities and startup dependencies for each host", () => {
     for (const host of Object.values(HostRuntimeCatalog)) {
       expect(host.responsibilities.length).toBeGreaterThan(0);

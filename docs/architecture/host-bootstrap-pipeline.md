@@ -65,6 +65,17 @@ This keeps the common startup sequence stable while preserving host-level extens
 - validates required desktop service coverage before `feature-registration`
 - starts and stops desktop runtime through host-owned adapter callbacks while preserving deterministic lifecycle transitions
 
+## Hybrid host integration
+
+`src/hosts/hybrid/HybridHostCompositionRoot.ts` now also uses the shared bootstrap pipeline:
+
+- builds a startup context from hybrid boot configuration + deployment profile + environment
+- composes host-aware hybrid service registration plans during `dependencies`
+- validates required hybrid service coverage before `feature-registration`
+- enforces explicit capability-composition rules for desktop-facing plus node/runtime capabilities
+- rejects direct local authoritative ownership in hybrid composition root and keeps intentional authoritative execution delegated through authoritative server host assembly mode
+- starts and stops hybrid runtime through host-owned adapter callbacks while preserving deterministic lifecycle transitions
+
 ## Contributor startup-sequence guidance
 
 When extending host startup:
@@ -80,3 +91,4 @@ When extending host startup:
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
+- `src/hosts/hybrid/tests/HybridHostCompositionRoot.test.ts`

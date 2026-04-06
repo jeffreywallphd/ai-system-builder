@@ -47,6 +47,13 @@
 - Bootstrap `dependencies` now composes host-aware desktop service registration plans and `feature-registration` enforces desktop required-service coverage before runtime host start.
 - Desktop runtime start/stop is delegated through host-owned adapter callbacks while preserving lifecycle transition semantics (`composing -> starting -> ready -> stopping -> stopped`).
 
+## Hybrid host adoption
+- `src/hosts/hybrid/HybridHostCompositionRoot.ts` now composes startup through the shared pipeline.
+- Startup context is built from boot + deployment profile + environment.
+- Bootstrap `dependencies` now composes host-aware hybrid service registration plans and `feature-registration` enforces hybrid required-service coverage before runtime host start.
+- Hybrid startup enforces explicit capability composition rules for desktop-facing and node/runtime capabilities while keeping control-plane authority delegated to authoritative server host mode.
+- Hybrid runtime start/stop is delegated through host-owned adapter callbacks while preserving lifecycle transition semantics (`composing -> starting -> ready -> stopping -> stopped`).
+
 ## Contributor guidance
 - Put reusable setup in canonical stages.
 - Keep host-specific startup in host customization stages.
@@ -58,3 +65,4 @@
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
+- `src/hosts/hybrid/tests/HybridHostCompositionRoot.test.ts`
