@@ -1,5 +1,4 @@
 import path from "node:path";
-import { evaluateSecretAccessDecision } from "../../../domain/security/SecretDomain";
 import type { ISecretOperationalLogger } from "../../../application/security/ports/SecretObservabilityPorts";
 import type {
   ISecretAccessAuditPort,
@@ -8,7 +7,13 @@ import type {
   SecretAccessAuditEvent,
 } from "../../../application/security/ports/SecretServicePorts";
 import { CreateSecretUseCase } from "../../../application/security/use-cases/CreateSecretUseCase";
+import { DeleteSecretUseCase } from "../../../application/security/use-cases/DeleteSecretUseCase";
+import { DisableSecretUseCase } from "../../../application/security/use-cases/DisableSecretUseCase";
 import { GetSecretMetadataUseCase } from "../../../application/security/use-cases/GetSecretMetadataUseCase";
+import { ListSecretsUseCase } from "../../../application/security/use-cases/ListSecretsUseCase";
+import { RetrieveSecretPlaintextForRuntimeUseCase } from "../../../application/security/use-cases/RetrieveSecretPlaintextForRuntimeUseCase";
+import { RotateSecretUseCase } from "../../../application/security/use-cases/RotateSecretUseCase";
+import { SecretAuthorizationPolicyEvaluator } from "../../../application/security/use-cases/SecretAuthorizationPolicyEvaluator";
 import { SecretScopeResolver } from "../../../application/security/use-cases/SecretScopeResolver";
 import { SqliteSecretRecordPersistenceAdapter } from "../../persistence/security/SqliteSecretRecordPersistenceAdapter";
 import { SecretObservabilityReporter } from "../SecretObservabilityReporter";
@@ -29,6 +34,11 @@ export interface SecretServiceCompositionStatus {
 export interface ServerComposedSecretService {
   readonly createSecretUseCase: CreateSecretUseCase;
   readonly getSecretMetadataUseCase: GetSecretMetadataUseCase;
+  readonly retrieveSecretPlaintextForRuntimeUseCase: RetrieveSecretPlaintextForRuntimeUseCase;
+  readonly rotateSecretUseCase: RotateSecretUseCase;
+  readonly disableSecretUseCase: DisableSecretUseCase;
+  readonly deleteSecretUseCase: DeleteSecretUseCase;
+  readonly listSecretsUseCase: ListSecretsUseCase;
   readonly secretScopeResolver: SecretScopeResolver;
   readonly status: SecretServiceCompositionStatus;
   dispose(): void;
@@ -77,6 +87,38 @@ export function composeServerSecretService(input: ComposeServerSecretServiceInpu
       secretAccessAuditPort: accessAuditPort,
       secretObservabilityPort: observabilityPort,
     }),
+    retrieveSecretPlaintextForRuntimeUseCase: new RetrieveSecretPlaintextForRuntimeUseCase({
+      secretRecordRepository,
+      secretEncryptionPort,
+      secretAccessPolicyPort: accessPolicyPort,
+      secretAccessAuditPort: accessAuditPort,
+      secretObservabilityPort: observabilityPort,
+    }),
+    rotateSecretUseCase: new RotateSecretUseCase({
+      secretRecordRepository,
+      secretEncryptionPort,
+      secretAccessPolicyPort: accessPolicyPort,
+      secretAccessAuditPort: accessAuditPort,
+      secretObservabilityPort: observabilityPort,
+    }),
+    disableSecretUseCase: new DisableSecretUseCase({
+      secretRecordRepository,
+      secretAccessPolicyPort: accessPolicyPort,
+      secretAccessAuditPort: accessAuditPort,
+      secretObservabilityPort: observabilityPort,
+    }),
+    deleteSecretUseCase: new DeleteSecretUseCase({
+      secretRecordRepository,
+      secretAccessPolicyPort: accessPolicyPort,
+      secretAccessAuditPort: accessAuditPort,
+      secretObservabilityPort: observabilityPort,
+    }),
+    listSecretsUseCase: new ListSecretsUseCase({
+      secretRecordRepository,
+      secretAccessPolicyPort: accessPolicyPort,
+      secretAccessAuditPort: accessAuditPort,
+      secretObservabilityPort: observabilityPort,
+    }),
     secretScopeResolver: new SecretScopeResolver({
       secretRecordRepository,
       secretAccessPolicyPort: accessPolicyPort,
@@ -89,8 +131,10 @@ export function composeServerSecretService(input: ComposeServerSecretServiceInpu
 }
 
 class DomainSecretAccessPolicyPort implements ISecretAccessPolicyPort {
+  private readonly evaluator = new SecretAuthorizationPolicyEvaluator();
+
   public async evaluateSecretAccess(input: Parameters<ISecretAccessPolicyPort["evaluateSecretAccess"]>[0]) {
-    return evaluateSecretAccessDecision(input);
+    return this.evaluator.evaluateSecretAccess(input);
   }
 }
 
