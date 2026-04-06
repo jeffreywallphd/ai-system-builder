@@ -75,6 +75,7 @@ import {
 import { ServerManagedTransportTrustStateResolver } from "../../src/infrastructure/security/ServerManagedTransportTrustStateResolver";
 import { TransportSecurityObservabilityReporter } from "../../src/infrastructure/security/TransportSecurityObservabilityReporter";
 import { createFileSystemProtectedSecretStoreFromEnvironment } from "../../src/infrastructure/security/secrets/FileSystemProtectedSecretStore";
+import { composeServerSecretService, type ServerComposedSecretService } from "../../src/infrastructure/security/secrets/SecretServiceComposition";
 import type { ICertificateAuthorityIssuerPort } from "../../src/application/security/ports/ICertificateAuthorityIssuerPort";
 import { ProtectedCertificateAuthorityRootMaterialStorage } from "../../src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
 import { RuntimeTrustMaterialDistributionService } from "../../src/infrastructure/security/certificates/RuntimeTrustMaterialDistributionService";
@@ -178,6 +179,7 @@ export interface IdentityServerHostOptions {
 export interface IdentityServerHost {
   readonly port: number;
   readonly address: string;
+  readonly secretService: ServerComposedSecretService;
   close(): Promise<void>;
 }
 
@@ -269,8 +271,15 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     hostAddress,
     env,
   });
+  let secretService: ServerComposedSecretService | undefined;
   try {
     const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(env);
+    secretService = composeServerSecretService({
+      databasePath: options.databasePath,
+      env,
+      observabilityLogger: createSecretOperationalLogger(options.logger),
+      auditHook: createSecretAccessAuditHook(options.logger),
+    });
     const providerAccountPolicies = options.providerAccountPolicies
       ?? IdentityProviderAccountPolicyConfig.fromEnv(env);
     await applyIdentityStartupConfiguration(repository, providerAccountPolicies);
@@ -819,10 +828,14 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   });
 
   const addressInfo = server.address() as AddressInfo;
+  if (!secretService) {
+    throw new Error("Secret service composition is unavailable.");
+  }
 
   return Object.freeze({
     port: addressInfo.port,
     address: `${addressInfo.address}:${addressInfo.port}`,
+    secretService,
     close: () => new Promise<void>((resolve, reject) => {
       server.close((error) => {
         repository.dispose();
@@ -832,6 +845,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
         nodeTrustRepository.dispose();
         nodeTrustAuditRecorder.dispose();
         certificateAuthorityRepository.dispose();
+        secretService?.dispose();
         const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
         if (typeof disposablePublisher.dispose === "function") {
           disposablePublisher.dispose();
@@ -852,6 +866,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     nodeTrustRepository.dispose();
     nodeTrustAuditRecorder.dispose();
     certificateAuthorityRepository.dispose();
+    secretService?.dispose();
     throw error;
   }
 }
@@ -933,6 +948,87 @@ function resolveIdentityDevLoginRouteEnabled(env: Readonly<Record<string, string
 function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
+function createSecretOperationalLogger(logger: IdentityHttpServerLogger | undefined): {
+  info(event: Record<string, unknown>): void;
+  warn(event: Record<string, unknown>): void;
+  error(event: Record<string, unknown>): void;
+} | undefined {
+  if (!logger) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    info: (event: Record<string, unknown>) => {
+      logger.info({
+        event: "secret.operation",
+        requestId: resolveOptionalString(event.secretId) ?? resolveOptionalString(event.actorId),
+        details: Object.freeze({
+          secret: event,
+        }),
+      });
+    },
+    warn: (event: Record<string, unknown>) => {
+      logger.warn({
+        event: "secret.operation",
+        requestId: resolveOptionalString(event.secretId) ?? resolveOptionalString(event.actorId),
+        details: Object.freeze({
+          secret: event,
+        }),
+      });
+    },
+    error: (event: Record<string, unknown>) => {
+      logger.error({
+        event: "secret.operation",
+        requestId: resolveOptionalString(event.secretId) ?? resolveOptionalString(event.actorId),
+        details: Object.freeze({
+          secret: event,
+        }),
+      });
+    },
+  });
+}
+
+function createSecretAccessAuditHook(
+  logger: IdentityHttpServerLogger | undefined,
+): ((event: {
+  readonly secretId?: string;
+  readonly action: string;
+  readonly decision: string;
+  readonly reason: string;
+  readonly actorId: string;
+  readonly occurredAt: string;
+}) => void) | undefined {
+  if (!logger) {
+    return undefined;
+  }
+
+  return (event) => {
+    const level = event.decision === "denied" ? "warn" : "info";
+    logger[level]({
+      event: "secret.access",
+      requestId: event.secretId ?? event.actorId,
+      details: Object.freeze({
+        secret: Object.freeze({
+          secretId: event.secretId,
+          action: event.action,
+          decision: event.decision,
+          reason: event.reason,
+          actorId: event.actorId,
+          occurredAt: event.occurredAt,
+        }),
+      }),
+    });
+  };
+}
+
+function resolveOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
 }
 
 async function validateCertificateAuthorityStartup(
