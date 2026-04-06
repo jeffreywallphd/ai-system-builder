@@ -17,6 +17,7 @@ Story 8.2.1 + Story 8.2.2 + Story 8.2.3 baseline for Feature 8 / Epic 8.2: enfor
 - `src/infrastructure/security/secrets/SecretServiceComposition.ts`
 - `src/application/security/tests/SecretAuthorizationPolicyAndGovernanceUseCases.test.ts`
 - `src/application/security/tests/SecretCreateAndMetadataUseCases.test.ts`
+- `src/infrastructure/security/secrets/tests/SecretServiceGovernance.integration.test.ts`
 - `docs/architecture/secrets-authorization-policies.md`
 
 ## Behavior summary
@@ -86,3 +87,4 @@ Coverage verifies role/scope boundaries and governance semantics:
 - runtime retrieval rejects missing justification context
 - unauthorized rotate/delete return non-leaky not-found responses
 - list/disable behavior honors workspace and user ownership boundaries
+- high-fidelity composed-service integration flow validates create/list/get/retrieve/rotate/disable lifecycle with real SQLite persistence, envelope encryption, scope authorization denials, and audit redaction checks
