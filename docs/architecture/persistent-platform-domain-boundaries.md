@@ -180,11 +180,53 @@ The goal is to keep repository implementation aligned to domain/application cont
   - `src/application/identity/ports/IdentityRepositoryPorts.ts`
 - Shared identity persistence DTO boundary for repository contracts:
   - `src/shared/dto/identity/IdentityPersistenceDtos.ts`
+- Story 13.1.3 shared persistence DTO/schema/mapper boundary additions:
+  - common persistence metadata + mutation contracts:
+    - `src/shared/dto/persistence/PersistenceBoundaryDtos.ts`
+  - common mapper boundary contracts and replay helper:
+    - `src/shared/dto/persistence/PersistenceMapperBoundary.ts`
+  - workspace persistence DTO contracts:
+    - `src/shared/dto/workspaces/WorkspacePersistenceDtos.ts`
+  - storage persistence DTO contracts:
+    - `src/shared/dto/storage/StoragePersistenceDtos.ts`
+  - cross-domain platform run/audit persistence DTO contracts:
+    - `src/shared/dto/platform/PlatformPersistenceDtos.ts`
+  - reusable persistence schema primitives:
+    - `src/shared/schemas/persistence/PersistenceSchemaPrimitives.ts`
+  - workspace persistence schema contracts:
+    - `src/shared/schemas/workspaces/WorkspacePersistenceSchemaContracts.ts`
+  - storage persistence schema contracts:
+    - `src/shared/schemas/storage/StoragePersistenceSchemaContracts.ts`
+  - platform run/audit persistence schema contracts:
+    - `src/shared/schemas/platform/PlatformPersistenceSchemaContracts.ts`
 - Contract tests:
   - `src/domain/platform/tests/PlatformPersistenceBoundaries.test.ts`
   - `src/application/common/tests/PlatformPersistenceBoundaryPorts.test.ts`
   - `src/application/identity/tests/IdentityRepositoryPortsContracts.test.ts`
   - `src/shared/dto/identity/tests/IdentityPersistenceDtos.test.ts`
+  - `src/shared/dto/persistence/tests/PersistenceBoundaryDtos.test.ts`
+  - `src/shared/dto/persistence/tests/PersistenceMapperBoundary.test.ts`
+  - `src/shared/dto/workspaces/tests/WorkspacePersistenceDtos.test.ts`
+  - `src/shared/dto/storage/tests/StoragePersistenceDtos.test.ts`
+  - `src/shared/dto/platform/tests/PlatformPersistenceDtos.test.ts`
+  - `src/shared/schemas/persistence/tests/PersistenceSchemaPrimitives.test.ts`
+  - `src/shared/schemas/workspaces/tests/WorkspacePersistenceSchemaContracts.test.ts`
+  - `src/shared/schemas/storage/tests/StoragePersistenceSchemaContracts.test.ts`
+  - `src/shared/schemas/platform/tests/PlatformPersistenceSchemaContracts.test.ts`
+
+## Mapper responsibility guidance (Story 13.1.3)
+
+- Mapper boundaries are adapter-local but contract-driven:
+  - infrastructure row/document shapes stay in infrastructure mapper files,
+  - shared DTO contracts in `src/shared/dto/*` define stable persistence record shapes that repository ports consume.
+- Adapter mappers should validate shared persistence DTO payloads through shared schema parse helpers before returning records to application/domain layers.
+- Sensitive fields must stay explicit in persistence records:
+  - include token/hash/encrypted-field descriptors through `PersistenceSensitiveFieldDescriptor`,
+  - never expose raw secret/key/token plaintext above infrastructure.
+- Tenancy and audit metadata are mandatory for authoritative writes:
+  - include `tenancy` metadata (`platform`/`workspace`/`user`/`node`/`mixed`),
+  - include audit/version metadata so migrations and optimistic concurrency remain deterministic.
+- Replay/idempotency behavior should route through normalized operation keys and typed mapper replay parsers instead of ad hoc JSON parsing in adapters.
 
 ## Result
 
