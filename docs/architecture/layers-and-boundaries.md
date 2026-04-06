@@ -274,3 +274,11 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - Added host/runtime composition seam at `src/infrastructure/security/secrets/SecretServiceComposition.ts`.
 - Authoritative server wiring in `hosts/server/IdentityServerHost.ts` now composes secret repository, encryption port, access policy, observability, and audit hook collaborators without moving host bootstrap logic into domain/application layers.
 - Host startup fail-closed behavior now rejects partial secret master-key configuration while keeping composition explicit at the outer layer.
+
+## Direction 12 boundary note: Host runtime composition contracts (story 12.1.1)
+
+- Added explicit host runtime domain contracts in `src/domain/hosts/HostRuntimeDomain.ts` for runtime kind, control-plane role, capability flags, and startup dependency boundary layers.
+- Added application-level composition-root contracts in `src/application/common/HostCompositionContracts.ts` for boot configuration, lifecycle transitions, executable boundary checks, and control-plane eligibility assertions.
+- Added shared projection contracts in `src/shared/contracts/hosts/HostCompositionContracts.ts` so host identity/boot payloads are stable across host-internal and runtime transport boundaries.
+- Added canonical host runtime catalog and responsibilities in `src/hosts/HostRuntimeCatalog.ts` for server, desktop, hybrid, web, and worker hosts.
+- Added authoritative server composition adapter in `src/hosts/server/AuthoritativeServerCompositionRoot.ts`, keeping authoritative control-plane wiring explicit and separate from node execution capability contracts.

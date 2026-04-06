@@ -1,0 +1,56 @@
+# AI Companion: Host Runtime Composition Boundaries
+
+## Purpose
+- Make host runtime composition explicit and reusable across server, desktop, hybrid, web, and worker assemblies.
+- Keep authoritative control-plane responsibility explicit and separate from general node execution capability.
+
+## Core contracts introduced
+- Domain host model and validation:
+  - `src/domain/hosts/HostRuntimeDomain.ts`
+  - explicit runtime kind (`server`, `desktop`, `hybrid`, `web`, `worker`)
+  - explicit control-plane role (`authoritative-server`, `control-plane-client`, `none`)
+  - explicit capability flags (`control-plane-authority`, `node-execution`, UI/shell/runtime flags)
+  - startup dependency boundary declaration by layer (`shared-contracts`, `domain`, `application`, `infrastructure`, `host`)
+- Application composition-root contracts:
+  - `src/application/common/HostCompositionContracts.ts`
+  - shared boot configuration contract
+  - lifecycle phase transitions and transition validation
+  - executable composition-root contract boundary
+  - required startup dependency checks against declared boundary
+- Shared contract projection:
+  - `src/shared/contracts/hosts/HostCompositionContracts.ts`
+  - stable DTO projection for host identity and boot configuration
+
+## Canonical host runtime catalog
+- `src/hosts/HostRuntimeCatalog.ts` now defines runtime profiles for:
+  - server (authoritative control plane)
+  - desktop (control-plane client shell)
+  - hybrid (desktop + local worker composition)
+  - web (thin-client composition)
+  - worker (background execution composition)
+- Each profile now carries:
+  - explicit responsibilities
+  - capability set
+  - startup dependency boundaries
+
+## Authoritative server composition root
+- `src/hosts/server/AuthoritativeServerCompositionRoot.ts` provides a reusable composition root adapter for authoritative server startup.
+- This adapter:
+  - enforces authoritative server role at compose-time
+  - enforces required startup dependency boundary coverage
+  - records deterministic lifecycle transitions (`configured -> composing -> starting -> ready -> stopping -> stopped`)
+  - composes the existing production host startup path through `startIdentityServerHost`
+
+## Boundary rule now explicit
+- Control-plane authority and node execution are separate concerns by contract:
+  - only `authoritative-server` role may carry `control-plane-authority`
+  - node execution is optional and host-specific (`hybrid`/`worker`)
+  - authoritative server can remain authoritative without being a node executor
+
+## Tests
+- `src/domain/hosts/tests/HostRuntimeDomain.test.ts`
+- `src/application/common/tests/HostCompositionContracts.test.ts`
+- `src/shared/contracts/hosts/tests/HostCompositionContracts.test.ts`
+- `src/hosts/tests/HostRuntimeCatalog.test.ts`
+- `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
+
