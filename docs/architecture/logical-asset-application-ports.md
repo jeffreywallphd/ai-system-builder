@@ -492,3 +492,25 @@ Forward-looking extension notes (future epics):
 - explicit sharing policy evaluation can extend the same sanitized error surface and logical-asset authorization seams.
 - publishable/share links should reuse opaque grant patterns with short-lived scope and redacted audit/log payload posture.
 - scoped content encryption can extend existing encryption policy/key-resolution seams without changing external asset contracts.
+
+## Story 11.3.3: authorized preview/worker decryption gates
+
+Added explicit application-layer decryption gate evaluation in protected asset retrieval so encrypted content is only decrypted for the requesting operation when policy allows it:
+
+- Updated `AssetDownloadService` to evaluate a decryption-authorization decision object (not just raw booleans) for encrypted content requests.
+- Enforced explicit purpose-scoped decryption outcomes for:
+  - `inline-preview` (preview decryption gate),
+  - `worker-process` (worker decryption gate).
+- Gate enforcement now happens in both phases:
+  - before issuing temporary content access material (`authorizeAssetDownload`),
+  - before opening/decrypting server-managed content streams (`openAuthorizedAssetDownloadStream`).
+- Added explicit grant scope validation (`workspaceId`, `actorUserId`, `assetId`) after token resolution, so decryption remains actor/context-bound even if downstream grant adapters misbehave.
+- Added rejected audit outcomes for decryption gate denials and encryption-required violations, with stable machine-readable reason codes suitable for future governance and signed/temporary-access evolution.
+
+Coverage added/extended:
+
+- `src/application/assets/tests/AssetDownloadService.test.ts`
+  - preview decryption denied when policy disallows,
+  - worker decryption denied when policy disallows,
+  - stream-open re-evaluates policy and denies decryption when posture changes after token issuance,
+  - rejected audit event assertions for denied preview decryption.
