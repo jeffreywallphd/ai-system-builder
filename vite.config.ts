@@ -2,18 +2,23 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { createBrowserDevelopmentVitePlugin } from "./infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin";
 import { AppDistributionTargets, getAppRuntimeProfile } from "./domain/runtime/AppRuntimeProfile";
 
 const REPOSITORY_ROOT = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(async ({ mode }) => {
   const runtimeProfile = getAppRuntimeProfile(mode === "browser" ? "browser-development" : "desktop-development");
+  const plugins = [react()];
+
+  if (runtimeProfile.distributionTarget === AppDistributionTargets.viteBrowser) {
+    const { createBrowserDevelopmentVitePlugin } = await import(
+      "./infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin"
+    );
+    plugins.push(createBrowserDevelopmentVitePlugin());
+  }
 
   return {
-    plugins: runtimeProfile.distributionTarget === AppDistributionTargets.viteBrowser
-      ? [react(), createBrowserDevelopmentVitePlugin()]
-      : [react()],
+    plugins,
     resolve: {
       alias: runtimeProfile.hostKind === "browser"
         ? [
