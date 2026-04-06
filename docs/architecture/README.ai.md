@@ -77,6 +77,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Secret rotation baseline for version activation preconditions, lineage-preserving supersession, and race-safe activation semantics: `docs/architecture/secrets-rotation-and-version-activation-workflows.md`
 - Secret authorization policy baseline for permission-checked operations, runtime-vs-human retrieval rules, and non-leaky deny behavior: `docs/architecture/secrets-authorization-policies.md`
 - Secret metadata API baseline for internal create/list/get/disable management routes and metadata-only response contracts: `docs/architecture/secrets-metadata-management-internal-apis.md`
+- Secret-backed feature extension guardrails and contributor checklist: `docs/architecture/secrets-feature-extension-guidance.md`
 - Secret classification baseline for naming-prefix conventions, metadata-label requirements, and classification validation boundaries: `docs/architecture/secrets-classification-and-metadata-conventions.md`
 - Secret master-key re-encryption operations baseline for controlled KEK migration, progress tracking, and restartable recovery: `docs/secret-master-key-reencryption-operations.md`
 - Node bootstrap identity/trust-material operations baseline: `docs/node-bootstrap-identity-operations.md`
@@ -198,5 +199,6 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Canonical architecture note for this slice: `docs/architecture/secrets-service-composition.md`.
 - Runtime-facing service-to-service secret consumption adapters now expose workspace/user/server credential retrieval through formal retrieval use cases in `src/application/security/services/SecretRuntimeConsumptionAdapters.ts`.
 - Canonical architecture note for this slice: `docs/architecture/secrets-service-consumption-adapters.md`.
+
 
 
