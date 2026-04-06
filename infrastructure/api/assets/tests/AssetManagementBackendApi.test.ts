@@ -591,6 +591,7 @@ describe("AssetManagementBackendApi", () => {
       return;
     }
     expect(response.error.code).toBe("not-found");
+    expect(response.error.message).toBe("Requested asset resource was not found.");
   });
 
   it("maps download authorization deny errors to forbidden", async () => {
@@ -619,6 +620,7 @@ describe("AssetManagementBackendApi", () => {
       return;
     }
     expect(response.error.code).toBe("forbidden");
+    expect(response.error.message).toBe("Asset operation is not permitted for the current actor.");
   });
 
   it("maps preview-not-found failures from service errors", async () => {
@@ -646,6 +648,7 @@ describe("AssetManagementBackendApi", () => {
       return;
     }
     expect(response.error.code).toBe("not-found");
+    expect(response.error.message).toBe("Requested asset resource was not found.");
   });
 
   it("returns archived and deleted asset DTOs for lifecycle mutations", async () => {
@@ -681,5 +684,65 @@ describe("AssetManagementBackendApi", () => {
       return;
     }
     expect(deleted.data.asset.assetId).toBe("asset-upload-001");
+  });
+
+  it("redacts sensitive error details and normalizes non-validation messages", async () => {
+    const downloadService = {
+      async authorizeAssetDownload() {
+        return {
+          ok: false as const,
+          error: {
+            code: "asset-policy-violation" as const,
+            message: "Storage object 'workspaces/workspace-alpha/assets/private.bin' denied.",
+            details: Object.freeze({
+              objectKey: "workspaces/workspace-alpha/assets/private.bin",
+              fileName: "private.bin",
+              reasonCode: "policy-denied",
+              nested: Object.freeze({
+                path: "C:/sensitive/path/file.bin",
+              }),
+            }),
+          },
+        };
+      },
+      async openAuthorizedAssetDownloadStream() {
+        return {
+          ok: false as const,
+          error: {
+            code: "asset-access-denied" as const,
+            message: "Denied.",
+          },
+        };
+      },
+    };
+
+    const backendApi = new AssetManagementBackendApi({
+      uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
+      generatedOutputRegistrationService: new StubAssetGeneratedOutputRegistrationService() as unknown as AssetGeneratedOutputRegistrationService,
+      uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
+      discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
+      detailService: new StubAssetDetailService() as unknown as AssetDetailService,
+      downloadService: downloadService as unknown as AssetDownloadService,
+      previewService: new StubAssetPreviewService() as unknown as AssetPreviewService,
+      lifecycleService: new StubAssetLifecycleService() as unknown as AssetLifecycleService,
+    });
+
+    const response = await backendApi.authorizeAssetDownload({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-upload-001",
+      purpose: "download",
+    });
+
+    expect(response.ok).toBeFalse();
+    if (response.ok || !response.error) {
+      return;
+    }
+    expect(response.error.code).toBe("invalid-state");
+    expect(response.error.message).toBe("Asset operation is not allowed in the current resource state.");
+    expect(response.error.details?.objectKey).toBe("[REDACTED]");
+    expect(response.error.details?.fileName).toBe("[REDACTED]");
+    expect((response.error.details?.nested as Record<string, unknown>)?.path).toBe("[REDACTED]");
+    expect(response.error.details?.reasonCode).toBe("policy-denied");
   });
 });

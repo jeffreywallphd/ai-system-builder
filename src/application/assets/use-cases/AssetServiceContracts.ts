@@ -93,6 +93,9 @@ export interface BeginAssetUploadRequest extends AssetMutationContext {
   readonly expiresInSeconds?: number;
 }
 
+const MaxDeclaredAssetContentBytes = 10 * 1024 * 1024 * 1024;
+const MaxMimeTypeLength = 255;
+
 export interface GetAssetByIdQuery extends AssetRequestContext {
   readonly assetId: string;
   readonly includeDeleted?: boolean;
@@ -336,6 +339,19 @@ function normalizeRequiredInteger(value: number, field: string, minimum: number)
   return value;
 }
 
+function normalizeBoundedRequiredInteger(
+  value: number,
+  field: string,
+  minimum: number,
+  maximum: number,
+): number {
+  const normalized = normalizeRequiredInteger(value, field, minimum);
+  if (normalized > maximum) {
+    throw new AssetServiceContractError(`${field} must be <= ${String(maximum)}.`);
+  }
+  return normalized;
+}
+
 function normalizeFileName(value: string): string {
   const normalized = normalizeRequired(value, "fileName");
   if (normalized.length > 255) {
@@ -370,6 +386,21 @@ function normalizeObjectKey(value: string): string {
   return normalized;
 }
 
+function normalizeMimeTypeValue(value: string, field: string): string {
+  const normalized = normalizeRequired(value, field).toLowerCase();
+  if (normalized.length > MaxMimeTypeLength) {
+    throw new AssetServiceContractError(`${field} must be ${String(MaxMimeTypeLength)} characters or fewer.`);
+  }
+  const mediaType = normalized.split(";")[0]?.trim();
+  if (!mediaType) {
+    throw new AssetServiceContractError(`${field} must be a valid media type.`);
+  }
+  if (!/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i.test(mediaType)) {
+    throw new AssetServiceContractError(`${field} must be a valid media type.`);
+  }
+  return mediaType;
+}
+
 function normalizeAssetVersionCreationInput(input: AssetVersionCreationInput): AssetVersionCreationInput {
   return Object.freeze({
     versionId: normalizeRequired(input.versionId, "Asset versionId"),
@@ -378,8 +409,13 @@ function normalizeAssetVersionCreationInput(input: AssetVersionCreationInput): A
     objectVersionId: normalizeOptional(input.objectVersionId),
     area: input.area,
     content: Object.freeze({
-      mimeType: normalizeRequired(input.content.mimeType, "Asset content mimeType").toLowerCase(),
-      sizeBytes: normalizeRequiredInteger(input.content.sizeBytes, "Asset content sizeBytes", 0),
+      mimeType: normalizeMimeTypeValue(input.content.mimeType, "Asset content mimeType"),
+      sizeBytes: normalizeBoundedRequiredInteger(
+        input.content.sizeBytes,
+        "Asset content sizeBytes",
+        0,
+        MaxDeclaredAssetContentBytes,
+      ),
       checksum: Object.freeze({
         algorithm: input.content.checksum.algorithm,
         digest: normalizeRequired(input.content.checksum.digest, "Asset content checksum digest").toLowerCase(),
@@ -592,8 +628,8 @@ export function validateBeginAssetUploadRequest(input: BeginAssetUploadRequest):
     assetId: normalizeRequired(input.assetId, "assetId"),
     storageInstanceId: normalizeRequired(input.storageInstanceId, "storageInstanceId"),
     fileName: normalizeFileName(input.fileName),
-    mimeType: normalizeRequired(input.mimeType, "mimeType").toLowerCase(),
-    sizeBytes: normalizeRequiredInteger(input.sizeBytes, "sizeBytes", 0),
+    mimeType: normalizeMimeTypeValue(input.mimeType, "mimeType"),
+    sizeBytes: normalizeBoundedRequiredInteger(input.sizeBytes, "sizeBytes", 0, MaxDeclaredAssetContentBytes),
     area: input.area ?? "input",
     expiresInSeconds: normalizePositiveInteger(input.expiresInSeconds, "expiresInSeconds", 1),
   });

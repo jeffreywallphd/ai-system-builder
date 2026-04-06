@@ -3657,8 +3657,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               }));
             } catch (error) {
               if (!response.headersSent) {
-                const failed = buildAssetManagementInvalidRequestResponse(
-                  error instanceof Error ? error.message : "Download stream failed.",
+                const failed = buildAssetManagementInternalErrorResponse(
+                  "Download content stream could not be completed.",
                 );
                 writeJson(response, 500, failed);
                 logResponse(logger, requestId, request, 500, streamRequest, failed);
@@ -8349,6 +8349,16 @@ function buildAssetManagementInvalidRequestResponse(message: string): AssetManag
     ok: false,
     error: {
       code: AssetManagementApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
+function buildAssetManagementInternalErrorResponse(message: string): AssetManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: AssetManagementApiErrorCodes.internal,
       message,
     },
   });

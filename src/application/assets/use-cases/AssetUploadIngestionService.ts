@@ -140,6 +140,19 @@ export class AssetUploadIngestionService {
       return this.failure(AssetServiceErrorCodes.invalidState, "Upload session has expired.");
     }
 
+    const requestedMimeType = normalizeOptionalIncomingMimeType(input.contentType);
+    if (input.contentType && !requestedMimeType) {
+      await this.markUploadIncomplete(uploadSession, occurredAt, "upload-content-type-invalid", "Upload content type is invalid.");
+      return this.failure(AssetServiceErrorCodes.invalidRequest, "contentType must be a valid media type.");
+    }
+    if (
+      requestedMimeType
+      && !isCompatibleMimeType(requestedMimeType, uploadSession.expected.mimeType)
+    ) {
+      await this.markUploadIncomplete(uploadSession, occurredAt, "upload-content-type-mismatch", "Upload content type does not match expected mime type.");
+      return this.failure(AssetServiceErrorCodes.invalidRequest, "Upload content type does not match upload session expectations.");
+    }
+
     const asset = await this.dependencies.repository.findAssetById(uploadSession.assetId);
     if (!asset || asset.ownership.workspaceId !== input.workspaceId) {
       await this.markUploadIncomplete(uploadSession, occurredAt, "asset-not-found", "Asset was not found.");
@@ -318,7 +331,7 @@ export class AssetUploadIngestionService {
         );
       }
 
-      const finalizedMimeType = normalizeMimeType(input.contentType ?? uploadSession.expected.mimeType);
+      const finalizedMimeType = requestedMimeType ?? normalizeMimeType(uploadSession.expected.mimeType);
       const finalizedAsset = addAssetVersion(asset, {
         versionId: finalizedVersionId,
         location: createAssetLocationRef({
@@ -407,7 +420,7 @@ export class AssetUploadIngestionService {
         uploadSession,
         occurredAt,
         reasonCode,
-        error instanceof Error ? error.message : "Upload ingestion failed.",
+        resolveUploadFailureMessage(error),
       );
       await this.publishRejectedAuditEvent({
         occurredAt,
@@ -441,7 +454,7 @@ export class AssetUploadIngestionService {
 
       return this.failure(
         AssetServiceErrorCodes.internal,
-        error instanceof Error ? error.message : "Upload ingestion failed.",
+        "Upload ingestion failed due to an internal error.",
       );
     }
   }
@@ -513,17 +526,17 @@ export class AssetUploadIngestionService {
   private failureFromStorageObjectError(error: StorageObjectAccessError): AssetServiceResult<never> {
     switch (error.code) {
       case StorageObjectErrorCodes.sizeLimitExceeded:
-        return this.failure(AssetServiceErrorCodes.policyViolation, error.message, error.context);
+        return this.failure(AssetServiceErrorCodes.policyViolation, "Upload payload exceeds storage policy limits.", error.context);
       case StorageObjectErrorCodes.notFound:
-        return this.failure(AssetServiceErrorCodes.contentUnavailable, error.message, error.context);
+        return this.failure(AssetServiceErrorCodes.contentUnavailable, "Upload target content is unavailable.", error.context);
       case StorageObjectErrorCodes.invalidRequest:
-        return this.failure(AssetServiceErrorCodes.invalidRequest, error.message, error.context);
+        return this.failure(AssetServiceErrorCodes.invalidRequest, "Upload content request is invalid.", error.context);
       case StorageObjectErrorCodes.conflict:
-        return this.failure(AssetServiceErrorCodes.conflict, error.message, error.context);
+        return this.failure(AssetServiceErrorCodes.conflict, "Upload content conflicts with existing storage state.", error.context);
       case StorageObjectErrorCodes.backendUnsupported:
       case StorageObjectErrorCodes.ioFailure:
       default:
-        return this.failure(AssetServiceErrorCodes.internal, error.message, error.context);
+        return this.failure(AssetServiceErrorCodes.internal, "Upload storage write failed.", error.context);
     }
   }
 
@@ -666,6 +679,21 @@ function normalizeMimeType(value: string): string {
   return withoutParameters;
 }
 
+function normalizeOptionalIncomingMimeType(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const normalized = normalizeMimeType(value);
+  if (!/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i.test(normalized)) {
+    return undefined;
+  }
+  return normalized;
+}
+
+function isCompatibleMimeType(actual: string, expected: string): boolean {
+  return normalizeMimeType(actual) === normalizeMimeType(expected);
+}
+
 function resolveUploadFailureCode(error: unknown): string {
   if (error instanceof UploadPayloadTooLargeError) {
     return "upload-payload-too-large";
@@ -674,6 +702,19 @@ function resolveUploadFailureCode(error: unknown): string {
     return error.code;
   }
   return "upload-ingestion-failed";
+}
+
+function resolveUploadFailureMessage(error: unknown): string {
+  if (error instanceof UploadPayloadTooLargeError) {
+    return "Upload payload exceeded expected size.";
+  }
+  if (error instanceof StorageObjectAccessError) {
+    return "Storage write failed during upload finalization.";
+  }
+  if (error instanceof AssetDomainError) {
+    return "Asset metadata validation failed during upload finalization.";
+  }
+  return "Upload ingestion failed.";
 }
 
 function buildAssetContentAad(input: {

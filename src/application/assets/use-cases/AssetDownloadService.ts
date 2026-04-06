@@ -426,7 +426,7 @@ export class AssetDownloadService {
     } catch (error) {
       return this.failure(
         AssetServiceErrorCodes.contentUnavailable,
-        error instanceof Error ? error.message : "Asset content stream is unavailable.",
+        "Asset content stream is unavailable.",
       );
     }
   }
