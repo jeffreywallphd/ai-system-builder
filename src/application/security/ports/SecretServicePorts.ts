@@ -38,6 +38,11 @@ export interface SecretMutationResult {
   readonly wasReplay: boolean;
 }
 
+export interface SecretConditionalSaveResult extends SecretMutationResult {
+  readonly record: SecretRecord;
+  readonly conditionMatched: boolean;
+}
+
 export interface ISecretRecordPersistenceRepository {
   findSecretById(secretId: string): Promise<SecretRecord | undefined>;
   findSecretByNameAndScope(input: {
@@ -47,6 +52,11 @@ export interface ISecretRecordPersistenceRepository {
   listSecrets(query: SecretListQuery): Promise<ReadonlyArray<SecretReference>>;
   createSecret(input: SecretCreatePersistenceInput): Promise<SecretMutationResult & { readonly record: SecretRecord }>;
   saveSecret(record: SecretRecord, mutation: SecretCreatePersistenceInput["mutation"]): Promise<SecretMutationResult & { readonly record: SecretRecord }>;
+  saveSecretWhenCurrentVersionMatches?(
+    record: SecretRecord,
+    mutation: SecretCreatePersistenceInput["mutation"],
+    expectedCurrentVersionId: string | undefined,
+  ): Promise<SecretConditionalSaveResult>;
   deleteSecret(secretId: string, mutation: SecretCreatePersistenceInput["mutation"]): Promise<SecretMutationResult>;
 }
 
