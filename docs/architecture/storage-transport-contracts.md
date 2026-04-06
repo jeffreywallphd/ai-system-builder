@@ -43,6 +43,11 @@ Story 9.1.5 extends this transport surface with a structured storage access summ
 - access metadata: mode/scope plus permission summary booleans for read/write/policy/lifecycle operations
 - access metadata (Story 9.1.5): ownership/workspace context, effective action permissions, allowed actions, and policy-restricted capabilities
 - replication/sync metadata: replication mode/config, sync health state, optional last-sync indicators
+  - synchronization eligibility metadata for authoritative API reporting:
+    - `syncCapable`
+    - `supportsReplicationSyncOperation`
+    - `deploymentAvailability` (`active`, `configured-inactive`, `unavailable`)
+    - optional `reasonCode` and `evaluatedAt`
 
 ## Redaction and non-leakage posture
 
@@ -65,6 +70,9 @@ Story 9.1.5 extends this transport surface with a structured storage access summ
   - `allowedActions` must align to effective permissions marked `allowed`
   - access ownership/workspace metadata must match detail identity fields
   - read-only access cannot advertise metadata update action as allowed
+- synchronization metadata coherence checks:
+  - `deploymentAvailability='unavailable'` cannot report `syncCapable=true`
+  - `supportsReplicationSyncOperation=true` requires `syncCapable=true`
 - strict object schemas rejecting unknown payload keys
 - deterministic create-policy defaults at schema boundary for omitted security/lifecycle metadata fields
 

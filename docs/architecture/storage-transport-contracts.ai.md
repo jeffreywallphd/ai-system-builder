@@ -23,6 +23,7 @@ Story 9.1.5 extends the detail access model from UI booleans to an authorization
   - policy metadata (including explicit security + lifecycle hooks)
   - access summary with ownership/workspace context, effective action permissions, allowed actions, and policy-restricted capabilities
   - replication + sync metadata
+    - includes explicit synchronization eligibility metadata (`syncCapable`, `supportsReplicationSyncOperation`, `deploymentAvailability`, optional reason/timestamp)
 - create/update/list/detail command/query DTOs and response DTOs
 - internal-vs-admin-safe projection seam for sensitive storage references
 
@@ -45,6 +46,7 @@ Story 9.1.5 extends the detail access model from UI booleans to an authorization
   - list pagination bounds
   - strict unknown-key rejection
   - access-summary consistency checks (allowed actions must map to allowed effective permissions, and ownership/workspace context must match detail payload identity)
+  - synchronization consistency checks (unavailable deployment cannot report sync-capable; sync operation support requires sync-capable)
 - create-policy parsing applies deterministic defaults for omitted security/lifecycle policy metadata fields.
 - Parse helpers throw `StorageTransportSchemaValidationError` with typed issue metadata.
 

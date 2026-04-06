@@ -8,7 +8,10 @@ import {
   StoragePolicyRestrictedCapabilities,
   StorageReplicationModes,
 } from "../../../../domain/storage/StorageDomain";
-import { StorageSyncStatuses } from "../../../contracts/storage/StorageTransportContracts";
+import {
+  StorageSyncDeploymentAvailabilities,
+  StorageSyncStatuses,
+} from "../../../contracts/storage/StorageTransportContracts";
 import {
   StorageTransportSchemaValidationError,
   parseCreateStorageInstanceRequestDto,
@@ -261,6 +264,13 @@ describe("StorageTransportSchemaContracts", () => {
         replication: {
           mode: StorageReplicationModes.none,
           lastSyncStatus: StorageSyncStatuses.disabled,
+          synchronization: {
+            syncCapable: true,
+            supportsReplicationSyncOperation: false,
+            deploymentAvailability: StorageSyncDeploymentAvailabilities.configuredInactive,
+            reasonCode: "sync-deployment-configured-inactive",
+            evaluatedAt: "2026-04-06T12:09:00.000Z",
+          },
         },
         sensitiveRedaction: {
           contractVersion: "storage-transport/v1",
@@ -275,6 +285,7 @@ describe("StorageTransportSchemaContracts", () => {
 
     expect(parsed.storage.policy.hasEncryptionKeyReference).toBeFalse();
     expect(parsed.storage.sensitiveRedaction?.redactedFields[0]?.field).toBe("encryptionKeyReferenceId");
+    expect(parsed.storage.replication.synchronization?.deploymentAvailability).toBe("configured-inactive");
 
     expect(() => parseCreateStorageInstanceResponseDto({
       storage: {
@@ -333,6 +344,63 @@ describe("StorageTransportSchemaContracts", () => {
         replication: {
           mode: StorageReplicationModes.none,
           lastSyncStatus: StorageSyncStatuses.disabled,
+        },
+      },
+    })).toThrow(StorageTransportSchemaValidationError);
+  });
+
+  it("rejects contradictory synchronization metadata in detail responses", () => {
+    expect(() => parseGetStorageInstanceDetailResponseDto({
+      storage: {
+        storageInstanceId: "storage-managed-300",
+        workspaceId: "workspace:alpha",
+        backendType: StorageBackendTypes.objectStorage,
+        display: {
+          displayName: "Shared Outputs",
+        },
+        lifecycle: {
+          state: StorageLifecycleStates.active,
+          createdAt: "2026-04-06T12:00:00.000Z",
+          lastModifiedAt: "2026-04-06T12:10:00.000Z",
+        },
+        ownerUserIdentityId: "user:owner-1",
+        access: {
+          workspaceId: "workspace:alpha",
+          ownerUserIdentityId: "user:owner-1",
+          mode: StorageAccessModes.readWrite,
+          scope: StorageAccessScopes.workspaceMembers,
+          isOwner: true,
+          source: "authorization-policy",
+          effectivePermissions: [{
+            action: StorageManagedActions.view,
+            effect: "allowed",
+          }],
+          allowedActions: [StorageManagedActions.view],
+          policyRestrictedCapabilities: [],
+        },
+        policy: {
+          policyId: "policy:storage:300",
+          immutableWrites: false,
+          allowCrossWorkspaceReads: false,
+          labels: {},
+          encryptionMode: "platform-managed",
+          contentEncryptionRequired: true,
+          keyScope: "workspace",
+          allowPreviewDecryption: false,
+          allowWorkerDecryption: false,
+          retentionExpiryAction: "none",
+          encryptionProfileId: "enc:profile:default",
+          envelopeRequired: true,
+          hasEncryptionKeyReference: false,
+        },
+        replication: {
+          mode: StorageReplicationModes.none,
+          lastSyncStatus: StorageSyncStatuses.disabled,
+          synchronization: {
+            syncCapable: true,
+            supportsReplicationSyncOperation: true,
+            deploymentAvailability: StorageSyncDeploymentAvailabilities.unavailable,
+          },
         },
       },
     })).toThrow(StorageTransportSchemaValidationError);
