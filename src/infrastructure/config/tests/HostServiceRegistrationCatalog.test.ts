@@ -59,13 +59,15 @@ describe("HostServiceRegistrationCatalog", () => {
   it("asserts required desktop host service coverage", () => {
     const plan = composeHostServiceRegistrationPlan({
       host: DesktopHostRuntime,
-      requiredStartupDependencyIds: ["dep:application:desktop-runtime-services"],
+      requiredStartupDependencyIds: DesktopHostRuntime.startupDependencies.map((dependency) => dependency.dependencyId),
     });
     expect(() => assertDesktopHostServiceCoverage(plan)).not.toThrow();
     const selected = new Set(plan.selectedServices.map((service) => service.serviceId));
     for (const requiredServiceId of DesktopHostRequiredServiceIds) {
       expect(selected.has(requiredServiceId)).toBeTrue();
     }
+    expect(Object.keys(plan.startupDependencyCoverage)).toContain("dep:shared:host-contracts");
+    expect(Object.keys(plan.startupDependencyCoverage)).toContain("dep:host:desktop-bootstrap");
   });
 
   it("asserts required hybrid host service coverage", () => {
@@ -135,4 +137,3 @@ describe("HostServiceRegistration", () => {
     ])).toThrow(HostServiceRegistrationError);
   });
 });
-
