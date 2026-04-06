@@ -213,6 +213,24 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
   - `src/infrastructure/persistence/common/tests/PersistenceTenancyScopeQuery.test.ts`
   - `src/infrastructure/persistence/common/tests/SafeSqliteRepositoryBase.test.ts`
 
+## Story 13.3.3 redaction-safe persistence diagnostics and error translation
+
+- New cross-cutting persistence failure modules now provide stable application-safe failure shaping:
+  - `src/infrastructure/persistence/PersistenceFailure.ts`
+  - `src/infrastructure/persistence/PersistenceErrorTranslation.ts`
+- New infrastructure logging helpers now provide default persistence diagnostic redaction:
+  - `src/infrastructure/logging/PersistenceRedaction.ts`
+  - `src/infrastructure/logging/PersistenceDiagnosticsLogger.ts`
+- `SafeSqliteRepositoryBase` now translates raw mutation exceptions into structured persistence failures and emits sanitized diagnostics, including:
+  - stable persistence failure codes for conflict/concurrency/unavailable/not-found/permission/invalid/internal classes,
+  - retryable metadata for application error-handling decisions,
+  - redaction-safe logging that strips prompt content, secret/token values, and filesystem/database paths by default.
+- SQLite adapters that already extend `SafeSqliteRepositoryBase` now inherit this behavior consistently.
+- Added test coverage:
+  - `src/infrastructure/persistence/tests/PersistenceErrorTranslation.test.ts`
+  - `src/infrastructure/logging/tests/PersistenceRedaction.test.ts`
+  - `src/infrastructure/persistence/common/tests/SafeSqliteRepositoryBase.test.ts`
+
 ## Mapper guidance for contributors
 
 - Keep mapper implementations in infrastructure, but drive them from shared DTO + schema contracts.

@@ -338,6 +338,24 @@ The goal is to keep repository implementation aligned to domain/application cont
   - `src/infrastructure/persistence/common/tests/PersistenceTenancyScopeQuery.test.ts`
   - `src/infrastructure/persistence/common/tests/SafeSqliteRepositoryBase.test.ts`
 
+## Story 13.3.3 redaction-safe persistence diagnostics and error translation
+
+- Cross-cutting persistence failure contracts now include stable application-safe error types under:
+  - `src/infrastructure/persistence/PersistenceFailure.ts`
+  - `src/infrastructure/persistence/PersistenceErrorTranslation.ts`
+- Shared persistence diagnostics logging now includes default redaction-safe helpers under:
+  - `src/infrastructure/logging/PersistenceRedaction.ts`
+  - `src/infrastructure/logging/PersistenceDiagnosticsLogger.ts`
+- `SafeSqliteRepositoryBase` now translates raw mutation failures into structured `PersistenceFailure` errors, with:
+  - stable failure codes (`conflict`, `concurrencyConflict`, `unavailable`, `notFound`, `permissionDenied`, `invalidRequest`, `internal`),
+  - retryable classification metadata for application-level handling,
+  - redaction-safe structured diagnostics logs that avoid leaking prompt text, secrets/tokens, and filesystem/database paths.
+- SQLite adapters already inheriting `SafeSqliteRepositoryBase` now consume this cross-cutting behavior consistently without per-adapter error redaction duplication.
+- Added verification coverage:
+  - `src/infrastructure/persistence/tests/PersistenceErrorTranslation.test.ts`
+  - `src/infrastructure/logging/tests/PersistenceRedaction.test.ts`
+  - `src/infrastructure/persistence/common/tests/SafeSqliteRepositoryBase.test.ts`
+
 ## Mapper responsibility guidance (Story 13.1.3)
 
 - Mapper boundaries are adapter-local but contract-driven:
