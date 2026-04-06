@@ -197,6 +197,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For admin/user sharing-management and access-review operations guidance, read [`../authorization-sharing-management-and-access-review.md`](../authorization-sharing-management-and-access-review.md).
 - For workspace administration audit hook seams and integration boundaries, read [`workspace-administration-audit-hooks.md`](./workspace-administration-audit-hooks.md).
 - For cross-domain authoritative aggregate boundaries, write-vs-read persistence model ownership, and repository target baseline for Feature 13 foundation work, read [`persistent-platform-domain-boundaries.md`](./persistent-platform-domain-boundaries.md).
+- For contributor extension rules and integration regression expectations for persistent platform services, read [`persistent-platform-service-extension-guidance.md`](./persistent-platform-service-extension-guidance.md).
 - For Feature 1 completion baseline and downstream dependency notes (trusted device, workspace membership, authorization), read [`identity-feature-1-final-baseline.md`](./identity-feature-1-final-baseline.md).
 
 ## Direction 4 (Phase 1) foundation

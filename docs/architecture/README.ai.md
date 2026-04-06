@@ -115,6 +115,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Story 12.4.3 host extension guardrails (architecture tests + contributor host/layer workflow): `docs/architecture/host-composition-extension-guardrails-12.4.3.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
 - Cross-domain authoritative aggregate boundaries and repository target baseline for Feature 13: `docs/architecture/persistent-platform-domain-boundaries.md`
+- Contributor extension rules and integration-regression expectations for Feature 13 persistent platform services: `docs/architecture/persistent-platform-service-extension-guidance.md`
 - Authorization permission matrix and key catalog reference: `docs/architecture/authorization-permission-catalog.md`
 - Authorization workspace role-definition and baseline role-grant reference: `docs/architecture/authorization-role-reference.md`
 - Authorization protected-resource visibility + explicit-sharing contracts: `docs/architecture/authorization-visibility-sharing-contracts.md`
