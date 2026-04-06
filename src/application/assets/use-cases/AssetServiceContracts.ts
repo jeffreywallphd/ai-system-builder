@@ -1,0 +1,435 @@
+import type {
+  Asset,
+  AssetKind,
+  AssetLifecycleState,
+  AssetSharingPolicyReference,
+  AssetStorageArea,
+  AssetVisibility,
+} from "../../../domain/assets/AssetDomain";
+
+export class AssetServiceContractError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AssetServiceContractError";
+  }
+}
+
+export const AssetServiceErrorCodes = Object.freeze({
+  invalidRequest: "asset-invalid-request",
+  accessDenied: "asset-access-denied",
+  notFound: "asset-not-found",
+  conflict: "asset-conflict",
+  invalidState: "asset-invalid-state",
+  policyViolation: "asset-policy-violation",
+  contentUnavailable: "asset-content-unavailable",
+  internal: "asset-internal",
+});
+
+export type AssetServiceErrorCode = typeof AssetServiceErrorCodes[keyof typeof AssetServiceErrorCodes];
+
+export interface AssetServiceError {
+  readonly code: AssetServiceErrorCode;
+  readonly message: string;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
+export type AssetServiceResult<TValue> =
+  | {
+    readonly ok: true;
+    readonly value: TValue;
+  }
+  | {
+    readonly ok: false;
+    readonly error: AssetServiceError;
+  };
+
+export interface AssetRequestContext {
+  readonly actorUserId: string;
+  readonly workspaceId: string;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+}
+
+export interface AssetMutationContext extends AssetRequestContext {
+  readonly operationKey: string;
+}
+
+export interface AssetVersionCreationInput {
+  readonly versionId: string;
+  readonly storageInstanceId: string;
+  readonly objectKey: string;
+  readonly objectVersionId?: string;
+  readonly area: AssetStorageArea;
+  readonly content: {
+    readonly mimeType: string;
+    readonly sizeBytes: number;
+    readonly checksum: {
+      readonly algorithm: "sha256" | "sha512" | "md5";
+      readonly digest: string;
+    };
+    readonly originalFileName?: string;
+  };
+}
+
+export interface RegisterAssetRequest extends AssetMutationContext {
+  readonly assetId: string;
+  readonly kind: AssetKind;
+  readonly ownerUserId?: string;
+  readonly visibility: AssetVisibility;
+  readonly sharingPolicyRef?: AssetSharingPolicyReference;
+  readonly storageInstanceId: string;
+  readonly initialVersion: AssetVersionCreationInput;
+}
+
+export interface GetAssetByIdQuery extends AssetRequestContext {
+  readonly assetId: string;
+  readonly includeDeleted?: boolean;
+}
+
+export interface ListAssetsQuery extends AssetRequestContext {
+  readonly ownerUserId?: string;
+  readonly storageInstanceId?: string;
+  readonly assetKinds?: ReadonlyArray<AssetKind>;
+  readonly visibilities?: ReadonlyArray<AssetVisibility>;
+  readonly lifecycleStates?: ReadonlyArray<AssetLifecycleState>;
+  readonly sourceAssetId?: string;
+  readonly sourceAssetVersionId?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface FinalizeAssetUploadRequest extends AssetMutationContext {
+  readonly assetId: string;
+  readonly uploadSessionId: string;
+  readonly version: AssetVersionCreationInput;
+  readonly setAsCurrentVersion?: boolean;
+}
+
+export const AssetDownloadPurposes = Object.freeze({
+  download: "download",
+  inlinePreview: "inline-preview",
+  workerProcess: "worker-process",
+});
+
+export type AssetDownloadPurpose = typeof AssetDownloadPurposes[keyof typeof AssetDownloadPurposes];
+
+export interface AuthorizeAssetDownloadRequest extends AssetRequestContext {
+  readonly assetId: string;
+  readonly versionId?: string;
+  readonly purpose: AssetDownloadPurpose;
+  readonly fileNameHint?: string;
+  readonly expiresInSeconds?: number;
+}
+
+export interface ResolveAssetPreviewQuery extends AssetRequestContext {
+  readonly assetId: string;
+  readonly versionId?: string;
+  readonly preferredMimeTypes?: ReadonlyArray<string>;
+}
+
+export interface RegisterGeneratedOutputRequest extends AssetMutationContext {
+  readonly assetId: string;
+  readonly ownerUserId?: string;
+  readonly visibility: AssetVisibility;
+  readonly sharingPolicyRef?: AssetSharingPolicyReference;
+  readonly storageInstanceId: string;
+  readonly outputVersion: AssetVersionCreationInput;
+  readonly lineage: ReadonlyArray<{
+    readonly sourceAssetId: string;
+    readonly sourceAssetVersionId?: string;
+    readonly relation?: string;
+  }>;
+}
+
+export interface ArchiveAssetRequest extends AssetMutationContext {
+  readonly assetId: string;
+}
+
+export interface DeleteAssetRequest extends AssetMutationContext {
+  readonly assetId: string;
+}
+
+export interface AssetDownloadAuthorization {
+  readonly assetId: string;
+  readonly versionId: string;
+  readonly workspaceId: string;
+  readonly storageInstanceId: string;
+  readonly objectKey: string;
+  readonly objectVersionId?: string;
+  readonly mimeType: string;
+  readonly sizeBytes: number;
+  readonly contentToken: string;
+  readonly expiresAt: string;
+  readonly contentDispositionFileName?: string;
+}
+
+export interface AssetPreviewResolution {
+  readonly assetId: string;
+  readonly versionId: string;
+  readonly previewAssetId?: string;
+  readonly previewVersionId?: string;
+  readonly previewMimeType?: string;
+  readonly previewStorageInstanceId?: string;
+  readonly previewObjectKey?: string;
+}
+
+export interface RegisterAssetResult {
+  readonly asset: Asset;
+}
+
+export interface GetAssetByIdResult {
+  readonly asset: Asset;
+}
+
+export interface ListAssetsResult {
+  readonly items: ReadonlyArray<Asset>;
+}
+
+export interface FinalizeAssetUploadResult {
+  readonly asset: Asset;
+  readonly finalizedVersionId: string;
+}
+
+export interface RegisterGeneratedOutputResult {
+  readonly asset: Asset;
+}
+
+function normalizeRequired(value: string, field: string): string {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new AssetServiceContractError(`${field} is required.`);
+  }
+  return normalized;
+}
+
+function normalizeOptional(value?: string | null): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function normalizeTimestamp(value: string | undefined, field: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new AssetServiceContractError(`${field} must be a valid timestamp.`);
+  }
+  return parsed.toISOString();
+}
+
+function normalizePositiveInteger(
+  value: number | undefined,
+  field: string,
+  minimum: number,
+): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Number.isInteger(value) || value < minimum) {
+    throw new AssetServiceContractError(`${field} must be an integer >= ${String(minimum)}.`);
+  }
+  return value;
+}
+
+function normalizeRequiredInteger(value: number, field: string, minimum: number): number {
+  if (!Number.isInteger(value) || value < minimum) {
+    throw new AssetServiceContractError(`${field} must be an integer >= ${String(minimum)}.`);
+  }
+  return value;
+}
+
+function normalizeObjectKey(value: string): string {
+  const normalized = normalizeRequired(value, "Asset objectKey");
+  if (normalized.startsWith("/")) {
+    throw new AssetServiceContractError("Asset objectKey cannot be an absolute path.");
+  }
+  if (normalized.includes("\\")) {
+    throw new AssetServiceContractError("Asset objectKey cannot use Windows path separators.");
+  }
+  if (/^[a-zA-Z]:\//.test(normalized)) {
+    throw new AssetServiceContractError("Asset objectKey cannot use drive-letter prefixes.");
+  }
+  if (normalized.split("/").some((segment) => !segment || segment === "." || segment === "..")) {
+    throw new AssetServiceContractError("Asset objectKey contains invalid traversal segments.");
+  }
+  return normalized;
+}
+
+function normalizeAssetVersionCreationInput(input: AssetVersionCreationInput): AssetVersionCreationInput {
+  return Object.freeze({
+    versionId: normalizeRequired(input.versionId, "Asset versionId"),
+    storageInstanceId: normalizeRequired(input.storageInstanceId, "Asset storageInstanceId"),
+    objectKey: normalizeObjectKey(input.objectKey),
+    objectVersionId: normalizeOptional(input.objectVersionId),
+    area: input.area,
+    content: Object.freeze({
+      mimeType: normalizeRequired(input.content.mimeType, "Asset content mimeType").toLowerCase(),
+      sizeBytes: normalizeRequiredInteger(input.content.sizeBytes, "Asset content sizeBytes", 0),
+      checksum: Object.freeze({
+        algorithm: input.content.checksum.algorithm,
+        digest: normalizeRequired(input.content.checksum.digest, "Asset content checksum digest").toLowerCase(),
+      }),
+      originalFileName: normalizeOptional(input.content.originalFileName),
+    }),
+  });
+}
+
+function normalizeRequestContext<TValue extends AssetRequestContext>(value: TValue): TValue {
+  return Object.freeze({
+    ...value,
+    actorUserId: normalizeRequired(value.actorUserId, "actorUserId"),
+    workspaceId: normalizeRequired(value.workspaceId, "workspaceId"),
+    correlationId: normalizeOptional(value.correlationId),
+    occurredAt: normalizeTimestamp(value.occurredAt, "occurredAt"),
+  }) as TValue;
+}
+
+function normalizeMutationContext<TValue extends AssetMutationContext>(value: TValue): TValue {
+  const normalizedContext = normalizeRequestContext(value);
+  return Object.freeze({
+    ...normalizedContext,
+    operationKey: normalizeRequired(value.operationKey, "operationKey"),
+  }) as TValue;
+}
+
+export function validateRegisterAssetRequest(input: RegisterAssetRequest): RegisterAssetRequest {
+  const normalized = normalizeMutationContext(input);
+  return Object.freeze({
+    ...normalized,
+    assetId: normalizeRequired(input.assetId, "assetId"),
+    ownerUserId: normalizeOptional(input.ownerUserId),
+    storageInstanceId: normalizeRequired(input.storageInstanceId, "storageInstanceId"),
+    sharingPolicyRef: input.sharingPolicyRef
+      ? Object.freeze({
+        policyId: normalizeRequired(input.sharingPolicyRef.policyId, "sharingPolicyRef.policyId"),
+        policyVersion: normalizeOptional(input.sharingPolicyRef.policyVersion),
+      })
+      : undefined,
+    initialVersion: normalizeAssetVersionCreationInput(input.initialVersion),
+  });
+}
+
+export function validateListAssetsQuery(input: ListAssetsQuery): ListAssetsQuery {
+  const normalized = normalizeRequestContext(input);
+  return Object.freeze({
+    ...normalized,
+    ownerUserId: normalizeOptional(input.ownerUserId),
+    storageInstanceId: normalizeOptional(input.storageInstanceId),
+    sourceAssetId: normalizeOptional(input.sourceAssetId),
+    sourceAssetVersionId: normalizeOptional(input.sourceAssetVersionId),
+    limit: normalizePositiveInteger(input.limit, "limit", 1),
+    offset: normalizePositiveInteger(input.offset, "offset", 0),
+  });
+}
+
+export function validateFinalizeAssetUploadRequest(
+  input: FinalizeAssetUploadRequest,
+): FinalizeAssetUploadRequest {
+  const normalized = normalizeMutationContext(input);
+  return Object.freeze({
+    ...normalized,
+    assetId: normalizeRequired(input.assetId, "assetId"),
+    uploadSessionId: normalizeRequired(input.uploadSessionId, "uploadSessionId"),
+    version: normalizeAssetVersionCreationInput(input.version),
+    setAsCurrentVersion: input.setAsCurrentVersion ?? true,
+  });
+}
+
+export function validateAuthorizeAssetDownloadRequest(
+  input: AuthorizeAssetDownloadRequest,
+): AuthorizeAssetDownloadRequest {
+  const normalized = normalizeRequestContext(input);
+  const expiresInSeconds = normalizePositiveInteger(input.expiresInSeconds, "expiresInSeconds", 1);
+  return Object.freeze({
+    ...normalized,
+    assetId: normalizeRequired(input.assetId, "assetId"),
+    versionId: normalizeOptional(input.versionId),
+    purpose: input.purpose,
+    fileNameHint: normalizeOptional(input.fileNameHint),
+    expiresInSeconds,
+  });
+}
+
+export function validateResolveAssetPreviewQuery(input: ResolveAssetPreviewQuery): ResolveAssetPreviewQuery {
+  const normalized = normalizeRequestContext(input);
+  return Object.freeze({
+    ...normalized,
+    assetId: normalizeRequired(input.assetId, "assetId"),
+    versionId: normalizeOptional(input.versionId),
+    preferredMimeTypes: input.preferredMimeTypes
+      ? Object.freeze(
+        input.preferredMimeTypes
+          .map((value) => normalizeRequired(value, "preferredMimeTypes[]").toLowerCase()),
+      )
+      : undefined,
+  });
+}
+
+export function validateRegisterGeneratedOutputRequest(
+  input: RegisterGeneratedOutputRequest,
+): RegisterGeneratedOutputRequest {
+  const normalized = normalizeMutationContext(input);
+  const lineage = Object.freeze(
+    input.lineage.map((entry) => Object.freeze({
+      sourceAssetId: normalizeRequired(entry.sourceAssetId, "lineage.sourceAssetId"),
+      sourceAssetVersionId: normalizeOptional(entry.sourceAssetVersionId),
+      relation: normalizeOptional(entry.relation),
+    })),
+  );
+  return Object.freeze({
+    ...normalized,
+    assetId: normalizeRequired(input.assetId, "assetId"),
+    ownerUserId: normalizeOptional(input.ownerUserId),
+    sharingPolicyRef: input.sharingPolicyRef
+      ? Object.freeze({
+        policyId: normalizeRequired(input.sharingPolicyRef.policyId, "sharingPolicyRef.policyId"),
+        policyVersion: normalizeOptional(input.sharingPolicyRef.policyVersion),
+      })
+      : undefined,
+    storageInstanceId: normalizeRequired(input.storageInstanceId, "storageInstanceId"),
+    outputVersion: normalizeAssetVersionCreationInput(input.outputVersion),
+    lineage,
+  });
+}
+
+export function validateArchiveAssetRequest(input: ArchiveAssetRequest): ArchiveAssetRequest {
+  const normalized = normalizeMutationContext(input);
+  return Object.freeze({
+    ...normalized,
+    assetId: normalizeRequired(input.assetId, "assetId"),
+  });
+}
+
+export function validateDeleteAssetRequest(input: DeleteAssetRequest): DeleteAssetRequest {
+  const normalized = normalizeMutationContext(input);
+  return Object.freeze({
+    ...normalized,
+    assetId: normalizeRequired(input.assetId, "assetId"),
+  });
+}
+
+export interface AssetLookupUseCaseContracts {
+  getAssetById(query: GetAssetByIdQuery): Promise<AssetServiceResult<GetAssetByIdResult>>;
+  listAssets(query: ListAssetsQuery): Promise<AssetServiceResult<ListAssetsResult>>;
+  authorizeAssetDownload(
+    request: AuthorizeAssetDownloadRequest,
+  ): Promise<AssetServiceResult<AssetDownloadAuthorization>>;
+  resolveAssetPreview(
+    query: ResolveAssetPreviewQuery,
+  ): Promise<AssetServiceResult<AssetPreviewResolution>>;
+}
+
+export interface AssetMutationUseCaseContracts {
+  registerAsset(request: RegisterAssetRequest): Promise<AssetServiceResult<RegisterAssetResult>>;
+  finalizeAssetUpload(
+    request: FinalizeAssetUploadRequest,
+  ): Promise<AssetServiceResult<FinalizeAssetUploadResult>>;
+  registerGeneratedOutput(
+    request: RegisterGeneratedOutputRequest,
+  ): Promise<AssetServiceResult<RegisterGeneratedOutputResult>>;
+  archiveAsset(request: ArchiveAssetRequest): Promise<AssetServiceResult<RegisterAssetResult>>;
+  deleteAsset(request: DeleteAssetRequest): Promise<AssetServiceResult<RegisterAssetResult>>;
+}
+
+export interface IAssetManagementService extends AssetLookupUseCaseContracts, AssetMutationUseCaseContracts {}
