@@ -1,6 +1,6 @@
 # Secrets Persistence Contracts
 
-This note documents Story 8.1.2 (Feature 8 / Epic 8.1): durable SQLite persistence schema and repository implementation for secret records and secret version material.
+This note documents Story 8.1.2 (Feature 8 / Epic 8.1) and Story 11.2.3 (Feature 11 / Epic 11.2): durable secret persistence with protected metadata handling.
 
 ## Canonical artifacts
 
@@ -9,7 +9,9 @@ This note documents Story 8.1.2 (Feature 8 / Epic 8.1): durable SQLite persisten
 - `src/infrastructure/persistence/security/SqliteSecretRecordPersistenceMigrations.ts`
 - `src/infrastructure/persistence/security/SecretRecordPersistenceMapper.ts`
 - `src/infrastructure/persistence/security/SqliteSecretRecordPersistenceAdapter.ts`
+- `src/infrastructure/persistence/security/ProtectedSecretRecordPersistenceRepository.ts`
 - `src/infrastructure/persistence/security/tests/SqliteSecretRecordPersistenceAdapter.test.ts`
+- `src/infrastructure/persistence/security/tests/ProtectedSecretRecordPersistenceRepository.test.ts`
 
 ## Scope and intent
 
@@ -47,6 +49,17 @@ Schema tracks:
 - `secret_version_material` stores encrypted payload locator + digest + byte-length + key-encryption-context JSON.
 - Repository mapping reconstructs full `SecretRecord` domain objects from these related tables without flattening encrypted material into the metadata row.
 
+Story 11.2.3 adds a protected repository boundary:
+
+- `ProtectedSecretRecordPersistenceRepository` wraps `SqliteSecretRecordPersistenceAdapter`
+- secret metadata description is encrypted before persistence and decrypted on reads/lists
+- underlying SQLite schema and repository contracts remain unchanged
+
+## Field-level protection rationale
+
+- encrypted field: `metadata_description` (freeform secret metadata content)
+- plaintext-by-design fields: `machine_key_name`, tags, labels, state/scope ownership columns for queryability and existing list/filter semantics
+
 ## Repository behavior
 
 `SqliteSecretRecordPersistenceAdapter` implements `ISecretRecordPersistenceRepository` with:
@@ -57,6 +70,8 @@ Schema tracks:
 - fetch by normalized key name + scope owner
 - list with scope/state/kind/tag filtering and paging
 - soft-delete mutation (`deleteSecret`) that marks records deleted instead of hard deleting rows
+
+`ProtectedSecretRecordPersistenceRepository` preserves the same application repository contract while enforcing metadata-at-rest protection on designated fields.
 
 ## Test coverage
 
