@@ -84,6 +84,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Node bootstrap identity/trust-material operations baseline: `docs/node-bootstrap-identity-operations.md`
 - Workspace tenancy domain/contracts baseline: `docs/architecture/workspace-foundation.md`
 - Managed storage domain/contracts baseline: `docs/architecture/storage-foundation.md`
+- Managed storage application ports/use-case contract baseline: `docs/architecture/storage-application-ports.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
 - Authorization permission matrix and key catalog reference: `docs/architecture/authorization-permission-catalog.md`
 - Authorization workspace role-definition and baseline role-grant reference: `docs/architecture/authorization-role-reference.md`
