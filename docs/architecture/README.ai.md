@@ -81,6 +81,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Secret-backed feature extension guardrails and contributor checklist: `docs/architecture/secrets-feature-extension-guidance.md`
 - Secret classification baseline for naming-prefix conventions, metadata-label requirements, and classification validation boundaries: `docs/architecture/secrets-classification-and-metadata-conventions.md`
 - Encryption-at-rest policy foundation baseline for explicit policy vocabulary, inheritance/override contracts, and encrypted-material reference invariants: `docs/architecture/encryption-at-rest-policy-foundation.md`
+- Encryption-at-rest shared policy DTO/schema/contract baseline for workspace/storage policy exchange and descriptor validation seams: `docs/architecture/encryption-at-rest-policy-shared-contracts.md`
 - Secret master-key re-encryption operations baseline for controlled KEK migration, progress tracking, and restartable recovery: `docs/secret-master-key-reencryption-operations.md`
 - Node bootstrap identity/trust-material operations baseline: `docs/node-bootstrap-identity-operations.md`
 - Workspace tenancy domain/contracts baseline: `docs/architecture/workspace-foundation.md`
