@@ -19,6 +19,7 @@ import {
   HostDeploymentProfileIds,
   HostStartupEnvironmentKeys,
 } from "../../../infrastructure/config/HostStartupConfiguration";
+import type { SqlitePersistenceRuntime } from "../../../infrastructure/persistence/sqlite/SqlitePersistenceRuntime";
 
 describe("AuthoritativeServerCompositionRoot", () => {
   it("composes and stops authoritative server runtime with lifecycle transitions", async () => {
@@ -283,6 +284,73 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(observedEnvironmentName).toBe("production");
     expect(observedCapabilities).toContain(HostCapabilityFlags.controlPlaneAuthority);
     await runtime.stop();
+  });
+
+  it("initializes and disposes persistence runtime through bootstrap and lifecycle cleanup", async () => {
+    const calls: string[] = [];
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+      },
+      startHost: async () => ({
+        port: 5600,
+        address: "127.0.0.1:5600",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        close: async () => {
+          calls.push("host-close");
+        },
+      }),
+      bootstrap: {
+        createPersistenceRuntime: ({ hostConfiguration, environment }) => {
+          expect(hostConfiguration.databasePath).toBe("test.sqlite");
+          expect(environment.NODE_ENV).toBe("test");
+          return Object.freeze({
+            configuration: Object.freeze({
+              databasePath: hostConfiguration.databasePath,
+              pragmas: Object.freeze({
+                journalMode: "WAL",
+                foreignKeys: true,
+              }),
+            }),
+            start: async () => {
+              calls.push("persistence-start");
+              return Object.freeze({
+                databasePath: hostConfiguration.databasePath,
+                migrationIdsApplied: Object.freeze([]),
+              });
+            },
+            getConnection: () => {
+              throw new Error("not needed for composition test");
+            },
+            dispose: async () => {
+              calls.push("persistence-dispose");
+            },
+          }) satisfies SqlitePersistenceRuntime;
+        },
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-persistence-lifecycle-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+      environment: {
+        NODE_ENV: "test",
+      },
+    });
+
+    const runtime = await root.compose(boot);
+    expect(runtime.phase).toBe("ready");
+    expect(calls).toEqual(["persistence-start"]);
+
+    await runtime.stop();
+    expect(calls).toEqual([
+      "persistence-start",
+      "host-close",
+      "persistence-dispose",
+    ]);
   });
 });
 

@@ -43,6 +43,14 @@ All local startup paths now run through host composition entrypoint assemblies.
 - Worker host only: `npm run dev:host:worker`
 - Combined local control-plane + worker hosts: `npm run dev:host:control-plane-worker`
 
+Authoritative server persistence bootstrap configuration:
+
+- Primary database path: `AI_LOOM_SERVER_DATABASE_PATH`
+- Optional SQLite bootstrap overrides:
+  - `AI_LOOM_PERSISTENCE_SQLITE_DATABASE_PATH`
+  - `AI_LOOM_PERSISTENCE_SQLITE_JOURNAL_MODE`
+  - `AI_LOOM_PERSISTENCE_SQLITE_FOREIGN_KEYS`
+
 This starts:
 
 - the Vite renderer on `http://127.0.0.1:5174`

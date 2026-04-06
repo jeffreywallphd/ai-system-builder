@@ -45,6 +45,9 @@ The entrypoint defaults to a full authoritative startup dependency contract and 
 - `AI_LOOM_SERVER_DATABASE_PATH`: SQLite path for authoritative server persistence.
 - `AI_LOOM_SERVER_HOST`: bind address (for example `127.0.0.1`).
 - `AI_LOOM_SERVER_PORT`: bind port.
+- `AI_LOOM_PERSISTENCE_SQLITE_DATABASE_PATH`: optional SQLite bootstrap fallback path.
+- `AI_LOOM_PERSISTENCE_SQLITE_JOURNAL_MODE`: optional SQLite journal mode override for bootstrap/runtime initialization.
+- `AI_LOOM_PERSISTENCE_SQLITE_FOREIGN_KEYS`: optional SQLite foreign-key enforcement toggle for bootstrap/runtime initialization.
 
 ### Defaults
 
@@ -59,6 +62,11 @@ When run as a script, the entrypoint:
 - logs startup address and phase
 - handles `SIGINT`/`SIGTERM` by stopping the host gracefully
 - exits non-zero on startup failure
+
+During host composition:
+- the bootstrap `persistence` stage initializes the shared SQLite persistence runtime (`src/infrastructure/persistence/sqlite/SqlitePersistenceRuntime.ts`)
+- startup failure cleanup disposes persistence runtime resources
+- normal host shutdown also disposes persistence runtime resources after host transport shutdown
 
 Repository startup command:
 - `npm run start:authoritative-server`

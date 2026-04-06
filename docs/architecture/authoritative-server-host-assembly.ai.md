@@ -22,11 +22,18 @@
   - `AI_LOOM_SERVER_DATABASE_PATH`
   - `AI_LOOM_SERVER_HOST`
   - `AI_LOOM_SERVER_PORT`
+  - `AI_LOOM_PERSISTENCE_SQLITE_DATABASE_PATH`
+  - `AI_LOOM_PERSISTENCE_SQLITE_JOURNAL_MODE`
+  - `AI_LOOM_PERSISTENCE_SQLITE_FOREIGN_KEYS`
 - Script-mode behavior:
   - starts host
   - logs runtime address/phase
   - handles `SIGINT`/`SIGTERM` for graceful stop
   - exits non-zero on startup failure
+- Persistence lifecycle behavior:
+  - `persistence` stage initializes `src/infrastructure/persistence/sqlite/SqlitePersistenceRuntime.ts`
+  - startup failure cleanup disposes persistence runtime resources
+  - normal host stop also disposes persistence runtime resources
 - Repository command: `npm run start:authoritative-server`
 
 ## Entrypoint consumers

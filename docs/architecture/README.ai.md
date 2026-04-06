@@ -105,6 +105,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Shared host bootstrap pipeline and startup context baseline (canonical startup sequence + host customization seams): `docs/architecture/host-bootstrap-pipeline.md`
 - Host-safe service registration and host-aware dependency composition rules baseline: `docs/architecture/host-service-registration-composition-rules.md`
 - Authoritative server executable host assembly baseline (dedicated startup entrypoint + runtime lifecycle expectations): `docs/architecture/authoritative-server-host-assembly.md`
+- Shared SQLite persistence bootstrap/runtime baseline for authoritative startup lifecycle and migration-hook coordination: `docs/architecture/persistence-bootstrap-and-lifecycle.md`
 - Desktop executable host assembly baseline (dedicated startup entrypoint + desktop runtime lifecycle expectations): `docs/architecture/desktop-host-assembly.md`
 - Hybrid executable host assembly baseline (hybrid capability composition rules + authoritative delegation mode): `docs/architecture/hybrid-host-assembly.md`
 - Web executable host assembly baseline (thin-client delivery composition boundaries + startup entrypoint expectations): `docs/architecture/web-host-assembly.md`
