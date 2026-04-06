@@ -51,6 +51,11 @@ Renderer client surface now uses the same endpoint contract:
 - `ui/pages/IdentityAdminPage.tsx` (authenticated identity administration UI surface)
 - `ui/pages/TrustedDevicesPage.tsx` (authenticated trusted-device pairing/management UI surface)
 
+Browser development host wiring now self-bootstraps identity transport for `dev:browser`:
+
+- `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` now starts `IdentityServerHost` during Vite serve bootstrap.
+- The plugin injects browser runtime bootstrap env (`window.aiLoomBrowserDevelopment.env.VITE_IDENTITY_API_BASE_URL`) so runtime config and the web identity endpoint resolver consume the managed identity API base URL without requiring manual `.env` setup.
+
 ## Public error contract
 
 Public error codes are intentionally bounded:
