@@ -1,5 +1,7 @@
 import type {
+  ActivateStorageInstanceApiResponse,
   CreateStorageInstanceApiResponse,
+  DeactivateStorageInstanceApiResponse,
   GetStorageInstanceDetailApiResponse,
   GetStorageInstanceHealthApiResponse,
   ListStorageInstancesApiResponse,
@@ -76,6 +78,31 @@ export interface StorageAdministrationClient {
     },
     sessionToken: string,
   ): Promise<StorageManagementApiResponse<UpdateStorageInstanceMetadataApiResponse>>;
+  activateStorageInstance(
+    request: {
+      readonly workspaceId: string;
+      readonly storageInstanceId: string;
+      readonly operationKey?: string;
+      readonly correlationId?: string;
+      readonly activatedAt?: string;
+      readonly requestBackendActivation?: boolean;
+      readonly includeCapabilities?: boolean;
+    },
+    sessionToken: string,
+  ): Promise<StorageManagementApiResponse<ActivateStorageInstanceApiResponse>>;
+  deactivateStorageInstance(
+    request: {
+      readonly workspaceId: string;
+      readonly storageInstanceId: string;
+      readonly operationKey?: string;
+      readonly correlationId?: string;
+      readonly targetLifecycleState?: "suspended" | "archived";
+      readonly deactivatedAt?: string;
+      readonly requestBackendDeactivation?: boolean;
+      readonly includeCapabilities?: boolean;
+    },
+    sessionToken: string,
+  ): Promise<StorageManagementApiResponse<DeactivateStorageInstanceApiResponse>>;
   listStorageInstances(
     request: {
       readonly workspaceId: string;
@@ -265,6 +292,62 @@ export class HttpStorageAdministrationClient implements StorageAdministrationCli
     appendOptional(query, "occurredAt", request.occurredAt);
     return this.get(
       `/api/v1/storage/instances/${encodeURIComponent(request.storageInstanceId)}/health${toQuerySuffix(query)}`,
+      sessionToken,
+    );
+  }
+
+  public async activateStorageInstance(
+    request: {
+      readonly workspaceId: string;
+      readonly storageInstanceId: string;
+      readonly operationKey?: string;
+      readonly correlationId?: string;
+      readonly activatedAt?: string;
+      readonly requestBackendActivation?: boolean;
+      readonly includeCapabilities?: boolean;
+    },
+    sessionToken: string,
+  ): Promise<StorageManagementApiResponse<ActivateStorageInstanceApiResponse>> {
+    const query = new URLSearchParams();
+    query.set("workspaceId", request.workspaceId);
+    return this.post(
+      `/api/v1/storage/instances/${encodeURIComponent(request.storageInstanceId)}/activate${toQuerySuffix(query)}`,
+      {
+        operationKey: request.operationKey,
+        correlationId: request.correlationId,
+        activatedAt: request.activatedAt,
+        requestBackendActivation: request.requestBackendActivation,
+        includeCapabilities: request.includeCapabilities,
+      },
+      sessionToken,
+    );
+  }
+
+  public async deactivateStorageInstance(
+    request: {
+      readonly workspaceId: string;
+      readonly storageInstanceId: string;
+      readonly operationKey?: string;
+      readonly correlationId?: string;
+      readonly targetLifecycleState?: "suspended" | "archived";
+      readonly deactivatedAt?: string;
+      readonly requestBackendDeactivation?: boolean;
+      readonly includeCapabilities?: boolean;
+    },
+    sessionToken: string,
+  ): Promise<StorageManagementApiResponse<DeactivateStorageInstanceApiResponse>> {
+    const query = new URLSearchParams();
+    query.set("workspaceId", request.workspaceId);
+    return this.post(
+      `/api/v1/storage/instances/${encodeURIComponent(request.storageInstanceId)}/deactivate${toQuerySuffix(query)}`,
+      {
+        operationKey: request.operationKey,
+        correlationId: request.correlationId,
+        targetLifecycleState: request.targetLifecycleState,
+        deactivatedAt: request.deactivatedAt,
+        requestBackendDeactivation: request.requestBackendDeactivation,
+        includeCapabilities: request.includeCapabilities,
+      },
       sessionToken,
     );
   }

@@ -87,22 +87,43 @@ describe("HttpStorageAdministrationClient", () => {
       occurredAt: "2026-04-06T10:10:00.000Z",
       includeCapabilities: true,
     }, "token-5");
+    await client.activateStorageInstance({
+      workspaceId: "workspace:alpha",
+      storageInstanceId: "storage:created:1",
+      operationKey: "op-storage-activate-1",
+      includeCapabilities: true,
+    }, "token-6");
+    await client.deactivateStorageInstance({
+      workspaceId: "workspace:alpha",
+      storageInstanceId: "storage:created:1",
+      targetLifecycleState: "suspended",
+      deactivatedAt: "2026-04-06T10:12:00.000Z",
+      requestBackendDeactivation: true,
+      includeCapabilities: true,
+    }, "token-7");
 
-    expect(requests.map((entry) => entry.method)).toEqual(["GET", "GET", "GET", "POST", "PATCH"]);
+    expect(requests.map((entry) => entry.method)).toEqual(["GET", "GET", "GET", "POST", "PATCH", "POST", "POST"]);
     expect(requests.map((entry) => entry.url)).toEqual([
       "http://127.0.0.1:8788/api/v1/storage/instances?workspaceId=workspace%3Aalpha&backendType=object-storage&lifecycleState=active&accessMode=read-write&accessScope=workspace-members&occurredAt=2026-04-06T10%3A00%3A00.000Z&includeCapabilities=true&limit=25&offset=5",
       "http://127.0.0.1:8788/api/v1/storage/instances/storage%3Aimages%3A1?workspaceId=workspace%3Aalpha&includeCapabilities=true",
       "http://127.0.0.1:8788/api/v1/storage/instances/storage%3Aimages%3A1/health?workspaceId=workspace%3Aalpha&occurredAt=2026-04-06T10%3A05%3A00.000Z",
       "http://127.0.0.1:8788/api/v1/storage/instances?workspaceId=workspace%3Aalpha",
       "http://127.0.0.1:8788/api/v1/storage/instances/storage%3Acreated%3A1/metadata?workspaceId=workspace%3Aalpha",
+      "http://127.0.0.1:8788/api/v1/storage/instances/storage%3Acreated%3A1/activate?workspaceId=workspace%3Aalpha",
+      "http://127.0.0.1:8788/api/v1/storage/instances/storage%3Acreated%3A1/deactivate?workspaceId=workspace%3Aalpha",
     ]);
     expect(requests[0]?.authorization).toBe("Bearer token-1");
     expect(requests[1]?.authorization).toBe("Bearer token-2");
     expect(requests[2]?.authorization).toBe("Bearer token-3");
     expect(requests[3]?.authorization).toBe("Bearer token-4");
     expect(requests[4]?.authorization).toBe("Bearer token-5");
+    expect(requests[5]?.authorization).toBe("Bearer token-6");
+    expect(requests[6]?.authorization).toBe("Bearer token-7");
     expect(requests[3]?.body).toContain("\"storageInstanceId\":\"storage:created:1\"");
     expect(requests[4]?.body).toContain("\"displayName\":\"Created storage updated\"");
     expect(requests[4]?.body).toContain("\"occurredAt\":\"2026-04-06T10:10:00.000Z\"");
+    expect(requests[5]?.body).toContain("\"operationKey\":\"op-storage-activate-1\"");
+    expect(requests[6]?.body).toContain("\"targetLifecycleState\":\"suspended\"");
+    expect(requests[6]?.body).toContain("\"requestBackendDeactivation\":true");
   });
 });
