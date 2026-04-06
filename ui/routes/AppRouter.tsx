@@ -43,6 +43,7 @@ import NodeEnrollmentReviewPage from "../pages/NodeEnrollmentReviewPage";
 import NodeInventoryPage from "../pages/NodeInventoryPage";
 import WorkspaceMembershipThinClientPage from "../pages/WorkspaceMembershipThinClientPage";
 import WorkspaceInvitationOnboardingPage from "../pages/WorkspaceInvitationOnboardingPage";
+import SecretMetadataManagementPage from "../pages/SecretMetadataManagementPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
 import type { LoginLocalIdentityApiResponse } from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
@@ -147,6 +148,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.workspaceThinMembership, element: <WorkspaceMembershipThinClientPage /> },
           { path: ROUTE_PATHS.identityAdmin, element: <IdentityAdminPage /> },
           { path: ROUTE_PATHS.trustedDevices, element: <TrustedDevicesPage /> },
+          { path: ROUTE_PATHS.secretsAdmin, element: <SecretMetadataManagementPage /> },
         ],
       },
       {

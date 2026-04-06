@@ -91,6 +91,7 @@ import {
   type DisableSecretMetadataApiRequest,
   type GetSecretMetadataApiRequest,
   type ListSecretMetadataApiRequest,
+  type RotateSecretMetadataApiRequest,
   type SecretMetadataApiResponse,
 } from "../../../api/security/sdk/PublicSecretMetadataApiContract";
 import { redactSensitiveAuthPayload, redactSensitiveText } from "../../../api/identity/IdentityAuthRedaction";
@@ -128,6 +129,7 @@ import {
   DisableSecretMetadataCommandSchema,
   GetSecretMetadataQuerySchema,
   ListSecretMetadataQuerySchema,
+  RotateSecretMetadataCommandSchema,
 } from "../../../../src/shared/schemas/security/SecretApiSchemaContracts";
 import type { ValidateTransportConnectionTrustRequest } from "../../../../src/application/security/ports/TransportTrustValidationPorts";
 import { TransportConnectionDirections } from "../../../../src/application/security/ports/TransportTrustValidationPorts";
@@ -1754,6 +1756,75 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapSecretMetadataStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, getRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.secretMetadataBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/security/secrets/")
+        && path.endsWith("/rotate")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const secretId = decodePathTail(path, "/api/v1/security/secrets/", "/rotate");
+            if (!secretId || secretId.includes("/")) {
+              const invalid = buildSecretMetadataInvalidRequestResponse("secretId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedBody = await parseJsonBody(request, maxBodyBytes);
+            if (!parsedBody.ok) {
+              const invalid = buildSecretMetadataInvalidRequestResponse(parsedBody.error);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = RotateSecretMetadataCommandSchema.safeParse({
+              ...(parsedBody.value as Record<string, unknown>),
+              secretId,
+            });
+            if (!parsedRequest.success) {
+              const invalid = buildSecretMetadataValidationErrors(parsedRequest.error.issues);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const rotateRequest: RotateSecretMetadataApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              secretId: parsedRequest.data.secretId,
+              plaintext: parsedRequest.data.plaintext,
+              operationKey: parsedRequest.data.operationKey,
+              expectedCurrentVersionId: parsedRequest.data.expectedCurrentVersionId,
+              rotatedAt: parsedRequest.data.rotatedAt,
+              actorWorkspaceId: parsedRequest.data.actorWorkspaceId,
+            });
+            const apiResponse = await options.secretMetadataBackendApi.rotateSecret(rotateRequest);
+            const statusCode = mapSecretMetadataStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              secretId: rotateRequest.secretId,
+              operationKey: rotateRequest.operationKey,
+              expectedCurrentVersionId: rotateRequest.expectedCurrentVersionId,
+              rotatedAt: rotateRequest.rotatedAt,
+              actorWorkspaceId: rotateRequest.actorWorkspaceId,
+              plaintextProvided: true,
+            }), apiResponse);
           },
         );
         return;

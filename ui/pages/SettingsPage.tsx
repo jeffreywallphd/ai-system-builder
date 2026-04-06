@@ -85,6 +85,9 @@ export default function SettingsPage(): JSX.Element {
           <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.identityAdmin}>
             Identity administration
           </Link>
+          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.secretsAdmin}>
+            Secret metadata management
+          </Link>
         </div>
       </div>
 

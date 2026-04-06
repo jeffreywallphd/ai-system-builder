@@ -108,3 +108,17 @@ export interface DisableSecretMetadataApiRequest {
 export interface DisableSecretMetadataApiResponse {
   readonly secret: SecretMetadataApiRecord;
 }
+
+export interface RotateSecretMetadataApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly actorWorkspaceId?: string;
+  readonly operationKey?: string;
+  readonly secretId: string;
+  readonly plaintext: string;
+  readonly expectedCurrentVersionId?: string;
+  readonly rotatedAt?: string;
+}
+
+export interface RotateSecretMetadataApiResponse {
+  readonly secret: SecretMetadataApiRecord;
+}

@@ -40,6 +40,8 @@ describe("SettingsPage", () => {
     expect(source).toContain("to={ROUTE_PATHS.authorizationReporting}");
     expect(source).toContain("Workspace memberships");
     expect(source).toContain("to={ROUTE_PATHS.workspaceThinMembership}");
+    expect(source).toContain("Secret metadata management");
+    expect(source).toContain("to={ROUTE_PATHS.secretsAdmin}");
     expect(source).toContain('id="settings-authoring-default-view-mode"');
     expect(source).toContain("function NumberField");
   });

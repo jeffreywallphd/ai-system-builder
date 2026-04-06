@@ -38,6 +38,15 @@ export interface DisableSecretCommandDto {
   readonly actorWorkspaceId?: string;
 }
 
+export interface RotateSecretCommandDto {
+  readonly secretId: string;
+  readonly plaintext: string;
+  readonly operationKey?: string;
+  readonly expectedCurrentVersionId?: string;
+  readonly rotatedAt?: string;
+  readonly actorWorkspaceId?: string;
+}
+
 export interface GetSecretMetadataQueryDto {
   readonly secretId: string;
   readonly actorWorkspaceId?: string;

@@ -6,6 +6,7 @@ import {
   parseDisableSecretMetadataCommand,
   parseGetSecretMetadataQuery,
   parseListSecretMetadataQuery,
+  parseRotateSecretMetadataCommand,
 } from "../SecretApiSchemaContracts";
 
 describe("SecretApiSchemaContracts", () => {
@@ -72,7 +73,7 @@ describe("SecretApiSchemaContracts", () => {
     }
   });
 
-  it("parses list/get/disable query and command payloads", () => {
+  it("parses list/get/disable/rotate query and command payloads", () => {
     const listParsed = parseListSecretMetadataQuery({
       owner: {
         scope: SecretScopes.user,
@@ -100,6 +101,14 @@ describe("SecretApiSchemaContracts", () => {
       operationKey: "op:disable:1",
     });
     expect(disableParsed.operationKey).toBe("op:disable:1");
+
+    const rotateParsed = parseRotateSecretMetadataCommand({
+      secretId: "secret:user:openai",
+      plaintext: "sk-live-rotated",
+      operationKey: "op:rotate:1",
+      expectedCurrentVersionId: "secret:user:openai:v1",
+    });
+    expect(rotateParsed.operationKey).toBe("op:rotate:1");
   });
 
   it("rejects unsafe metadata label keys", () => {

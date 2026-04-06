@@ -64,6 +64,7 @@ export const ROUTE_PATHS = Object.freeze({
   workspaceInvitationAccept: "/workspaces/:workspaceId/invitations/:invitationToken/accept",
   identityAdmin: "/settings/identity-admin",
   trustedDevices: "/settings/trusted-devices",
+  secretsAdmin: "/settings/secrets",
   notFound: "*",
 });
 
@@ -378,6 +379,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "trusted-devices",
     path: ROUTE_PATHS.trustedDevices,
     title: "Trusted devices",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "secrets-admin",
+    path: ROUTE_PATHS.secretsAdmin,
+    title: "Secret metadata management",
     showInNavigation: false,
   }),
 ]);
