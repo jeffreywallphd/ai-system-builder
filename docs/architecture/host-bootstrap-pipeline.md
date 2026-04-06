@@ -54,6 +54,7 @@ This keeps the common startup sequence stable while preserving host-level extens
 - starts the production identity server during `feature-registration`
 - records host lifecycle transitions around pipeline execution (`composing -> starting -> ready`)
 - preserves existing stop/failure semantics
+- composes host-aware service registration plans during `dependencies` and validates authoritative control-plane service coverage before `feature-registration`
 
 ## Contributor startup-sequence guidance
 

@@ -86,6 +86,26 @@ Each catalog entry contains explicit responsibilities, capability flags, and sta
 
 The authoritative server composition root now consumes this pipeline to keep host startup order explicit and reusable while preserving clean boundary ownership.
 
+## Host-aware service registration and dependency composition rules (story 12.1.3)
+
+`src/infrastructure/config/HostServiceRegistration.ts` now defines reusable host service registration contracts and validation rules for:
+
+- application ports
+- infrastructure adapters
+- platform services
+
+The registration layer enforces:
+
+- layer-safe registration kind alignment
+- dependency-cycle prevention
+- host capability and control-plane role gating
+- startup dependency coverage for required boot dependencies
+- host-safe exposure boundaries for UI, transport, execution, and persistence composition
+
+`src/infrastructure/config/HostServiceRegistrationCatalog.ts` now provides canonical host-specific registration sets and authoritative control-plane required service assertions.
+
+`src/hosts/server/AuthoritativeServerCompositionRoot.ts` now composes service registration plans in the `dependencies` stage and validates authoritative control-plane coverage before feature registration starts the runtime host.
+
 ## Architectural boundary clarification
 
 The contracts now explicitly state that:
@@ -102,4 +122,5 @@ The contracts now explicitly state that:
 - `src/hosts/tests/HostRuntimeCatalog.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
+- `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
 

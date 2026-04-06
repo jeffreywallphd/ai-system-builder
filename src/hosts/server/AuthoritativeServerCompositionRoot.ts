@@ -15,10 +15,16 @@ import {
   createHostStartupContext,
   composeHostBootstrapPipeline,
   executeHostBootstrapPipeline,
+  type HostBootstrapStageId,
   type HostBootstrapReusableStageHandlers,
   type HostSpecificBootstrapStage,
   type HostStartupLifecycleHooks,
 } from "../bootstrap/HostBootstrapPipeline";
+import {
+  assertAuthoritativeControlPlaneServiceCoverage,
+  composeHostServiceRegistrationPlan,
+} from "../../infrastructure/config/HostServiceRegistrationCatalog";
+import type { HostServiceRegistrationPlan } from "../../infrastructure/config/HostServiceRegistration";
 import {
   startIdentityServerHost,
   type IdentityServerHost,
@@ -46,10 +52,14 @@ export interface AuthoritativeServerCompositionRootOptions {
     readonly stageHandlers?: HostBootstrapReusableStageHandlers;
     readonly hostSpecificStages?: ReadonlyArray<HostSpecificBootstrapStage>;
     readonly lifecycleHooks?: HostStartupLifecycleHooks;
+    readonly composeServiceRegistrationPlan?: (boot: HostBootConfiguration) => HostServiceRegistrationPlan;
+    readonly assertServiceCoverage?: (plan: HostServiceRegistrationPlan) => void;
   };
 }
 
 const StartedHostArtifactKey = "artifact:host:server:authoritative:runtime";
+export const AuthoritativeServerServiceRegistrationPlanArtifactKey =
+  "artifact:host:server:authoritative:service-registration-plan";
 
 function combineStartupLifecycleHooks(
   primary: HostStartupLifecycleHooks | undefined,
@@ -73,6 +83,25 @@ function combineStartupLifecycleHooks(
       await secondary?.onPipelineCompleted?.(event);
     },
   });
+}
+
+function combineStageHandlers(
+  base: HostBootstrapReusableStageHandlers,
+  overrides: HostBootstrapReusableStageHandlers | undefined,
+): HostBootstrapReusableStageHandlers {
+  const combined: HostBootstrapReusableStageHandlers = {};
+  for (const stageId of Object.values(HostBootstrapStageIds) as ReadonlyArray<HostBootstrapStageId>) {
+    const baseHandler = base[stageId];
+    const overrideHandler = overrides?.[stageId];
+    if (!baseHandler && !overrideHandler) {
+      continue;
+    }
+    combined[stageId] = async (context) => {
+      await baseHandler?.(context);
+      await overrideHandler?.(context);
+    };
+  }
+  return Object.freeze(combined);
 }
 
 export function createAuthoritativeServerCompositionRoot(
@@ -122,19 +151,35 @@ export function createAuthoritativeServerCompositionRoot(
           metadata: input.bootstrap?.deploymentProfile?.metadata,
         });
 
-        const stageHandlers: HostBootstrapReusableStageHandlers = {
+        const defaultStageHandlers: HostBootstrapReusableStageHandlers = {
           [HostBootstrapStageIds.configuration]: (context) => {
             context.setArtifact(
               "artifact:host:server:authoritative:host-options",
               context.hostConfiguration as IdentityServerHostOptions,
             );
           },
+          [HostBootstrapStageIds.dependencies]: (context) => {
+            const composePlan = input.bootstrap?.composeServiceRegistrationPlan
+              ?? ((composedBoot: HostBootConfiguration) => composeHostServiceRegistrationPlan({
+                host: composedBoot.host,
+                requiredStartupDependencyIds: composedBoot.requiredDependencyIds,
+              }));
+            const plan = composePlan(context.boot);
+            context.setArtifact(AuthoritativeServerServiceRegistrationPlanArtifactKey, plan);
+          },
           [HostBootstrapStageIds.featureRegistration]: async (context) => {
+            const plan = context.getArtifact<HostServiceRegistrationPlan>(
+              AuthoritativeServerServiceRegistrationPlanArtifactKey,
+            );
+            if (!plan) {
+              throw new Error("Authoritative server startup requires a composed host service registration plan.");
+            }
+            (input.bootstrap?.assertServiceCoverage ?? assertAuthoritativeControlPlaneServiceCoverage)(plan);
             const composedHost = await startHost(context.hostConfiguration as IdentityServerHostOptions);
             context.setArtifact(StartedHostArtifactKey, composedHost);
           },
-          ...(input.bootstrap?.stageHandlers ?? {}),
         };
+        const stageHandlers = combineStageHandlers(defaultStageHandlers, input.bootstrap?.stageHandlers);
 
         const lifecycleHooks = combineStartupLifecycleHooks({
           onStageStarting: (event) => {

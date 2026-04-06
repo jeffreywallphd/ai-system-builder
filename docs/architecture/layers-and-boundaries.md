@@ -282,3 +282,10 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - Added shared projection contracts in `src/shared/contracts/hosts/HostCompositionContracts.ts` so host identity/boot payloads are stable across host-internal and runtime transport boundaries.
 - Added canonical host runtime catalog and responsibilities in `src/hosts/HostRuntimeCatalog.ts` for server, desktop, hybrid, web, and worker hosts.
 - Added authoritative server composition adapter in `src/hosts/server/AuthoritativeServerCompositionRoot.ts`, keeping authoritative control-plane wiring explicit and separate from node execution capability contracts.
+
+## Direction 12 boundary note: Host service registration and composition rules (story 12.1.3)
+
+- Added host-aware registration/composition seams in `src/infrastructure/config/HostServiceRegistration.ts` and `src/infrastructure/config/HostServiceRegistrationCatalog.ts`.
+- Service composition now classifies application ports, infrastructure adapters, and platform services explicitly, with boundary-layer validation and dependency-cycle prevention.
+- Host-safe gating now enforces capability/role requirements and exposure boundaries (`ui`, `transport`, `execution`, `persistence`) during composition.
+- Authoritative server composition now resolves service registration plans in the host bootstrap `dependencies` stage and enforces required control-plane service coverage before runtime startup in `feature-registration`.

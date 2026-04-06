@@ -60,6 +60,16 @@
 - Host-specific startup customization is supported through stage overrides and appended host stages (`runAfterStageId`) without copying common boot code.
 - `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now runs authoritative server startup through this shared pipeline.
 
+## Host service registration and dependency composition rules (story 12.1.3)
+- Added host-aware service registration contracts in `src/infrastructure/config/HostServiceRegistration.ts` for:
+  - registration kind + boundary layer enforcement
+  - dependency-cycle prevention
+  - host capability/control-plane role gating
+  - startup dependency coverage validation
+  - exposure-boundary checks (`ui`, `transport`, `execution`, `persistence`)
+- Added canonical host service catalog and authoritative required-service coverage assertions in `src/infrastructure/config/HostServiceRegistrationCatalog.ts`.
+- `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now composes service registration plans during bootstrap `dependencies` and validates authoritative service coverage before host feature-registration startup.
+
 ## Boundary rule now explicit
 - Control-plane authority and node execution are separate concerns by contract:
   - only `authoritative-server` role may carry `control-plane-authority`
@@ -73,4 +83,5 @@
 - `src/hosts/tests/HostRuntimeCatalog.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
+- `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
 
