@@ -208,7 +208,7 @@ export class IdentityAuthBackendApi {
     });
 
     if (!result.ok) {
-      const response = Object.freeze({ ok: false, error: this.mapRegisterError(result.error.code) });
+      const response = Object.freeze({ ok: false, error: this.mapRegisterError(result.error) });
       await this.observability.recordApiOutcome({
         flow: "local-register",
         request,
@@ -1089,8 +1089,11 @@ export class IdentityAuthBackendApi {
     }
   }
 
-  private mapRegisterError(code: RegisterLocalAccountErrorCode): IdentityAuthApiError {
-    switch (code) {
+  private mapRegisterError(error: {
+    readonly code: RegisterLocalAccountErrorCode;
+    readonly message: string;
+  }): IdentityAuthApiError {
+    switch (error.code) {
       case IdentityErrorCodes.duplicateIdentity:
         return Object.freeze({
           code: IdentityAuthApiErrorCodes.conflict,
@@ -1111,7 +1114,10 @@ export class IdentityAuthBackendApi {
       case IdentityErrorCodes.invalidRequest:
         return Object.freeze({
           code: IdentityAuthApiErrorCodes.invalidRequest,
-          message: "The registration request is invalid.",
+          message: resolveUserInputInvalidRequestMessage(
+            error.message,
+            "The registration request is invalid.",
+          ),
         });
       default:
         return Object.freeze({
@@ -1414,4 +1420,9 @@ function normalizeSessionTrustRequirement(
     default:
       return undefined;
   }
+}
+
+function resolveUserInputInvalidRequestMessage(message: string, fallback: string): string {
+  const normalized = message.trim();
+  return normalized.length > 0 ? normalized : fallback;
 }

@@ -217,6 +217,31 @@ describe("IdentityHttpServer", () => {
     expect(failedLoginBody.error.code).toBe("authentication-failed");
   });
 
+  it("returns specific registration policy error details for weak credential input", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+
+    const invalidResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "weak.policy.user",
+        credential: {
+          candidate: "1",
+        },
+      }),
+    });
+
+    expect(invalidResponse.status).toBe(400);
+    const invalidBody = await invalidResponse.json();
+    expect(invalidBody.ok).toBe(false);
+    expect(invalidBody.error.code).toBe("invalid-request");
+    expect(invalidBody.error.message).toContain("Credential policy validation failed.");
+    expect(invalidBody.error.message).not.toBe("The registration request is invalid.");
+  });
+
   it("redacts credential and token material in transport logs", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger);
