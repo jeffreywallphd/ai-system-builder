@@ -18,6 +18,7 @@
 - Initializes SQLite connection pragmas (`journal_mode`, `foreign_keys`).
 - Ensures bootstrap metadata + migration-ledger tables exist.
 - Executes registered bootstrap migration hooks with checksum validation and replay safety.
+- Bootstrap migration execution now treats duplicate-column errors from `ALTER TABLE ... ADD COLUMN` as idempotent replay when schemas already contain the column (legacy drift/partial-apply recovery).
 
 ## Host lifecycle wiring
 
