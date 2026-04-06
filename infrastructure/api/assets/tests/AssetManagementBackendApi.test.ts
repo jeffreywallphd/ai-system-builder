@@ -14,6 +14,7 @@ import { AssetManagementBackendApi } from "../AssetManagementBackendApi";
 import { AssetUploadInitiationService } from "../../../../src/application/assets/use-cases/AssetUploadInitiationService";
 import { AssetUploadIngestionService } from "../../../../src/application/assets/use-cases/AssetUploadIngestionService";
 import { AssetDiscoveryService } from "../../../../src/application/assets/use-cases/AssetDiscoveryService";
+import { AssetDetailService } from "../../../../src/application/assets/use-cases/AssetDetailService";
 
 class StubAssetUploadInitiationService {
   private readonly asset: Asset = createAsset({
@@ -159,12 +160,61 @@ class StubAssetDiscoveryService {
   }
 }
 
+class StubAssetDetailService {
+  public deny = false;
+
+  public async getAssetById() {
+    if (this.deny) {
+      return {
+        ok: false as const,
+        error: {
+          code: "asset-not-found" as const,
+          message: "Asset not found.",
+        },
+      };
+    }
+
+    const asset = new StubAssetUploadInitiationService()["asset"];
+    return {
+      ok: true as const,
+      value: {
+        asset,
+        metadata: Object.freeze({
+          isOwnedByActor: true,
+          uploadState: "ready" as const,
+          previewAvailable: true,
+          previewMimeTypeHint: "image/png",
+          allowedActions: Object.freeze({
+            canInitiateUpload: true,
+            canAuthorizeDownload: true,
+            canResolvePreview: true,
+            canArchive: true,
+            canDelete: true,
+          }),
+          links: Object.freeze({
+            self: "/api/v1/assets/asset-upload-001?workspaceId=workspace-alpha",
+            list: "/api/v1/assets?workspaceId=workspace-alpha",
+            initiateUpload: "/api/v1/assets/asset-upload-001/uploads/initiate?workspaceId=workspace-alpha",
+            authorizeDownload: "/api/v1/assets/asset-upload-001/downloads/authorize?workspaceId=workspace-alpha",
+            resolvePreview: "/api/v1/assets/asset-upload-001/preview?workspaceId=workspace-alpha",
+            listGeneratedOutputsBySource: "/api/v1/assets?workspaceId=workspace-alpha&sourceAssetId=asset-upload-001",
+          }),
+          lineage: Object.freeze({
+            sources: Object.freeze([]),
+          }),
+        }),
+      },
+    };
+  }
+}
+
 describe("AssetManagementBackendApi", () => {
   it("returns register and initiate upload DTOs for successful requests", async () => {
     const backendApi = new AssetManagementBackendApi({
       uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
       uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
       discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
+      detailService: new StubAssetDetailService() as unknown as AssetDetailService,
     });
 
     const registered = await backendApi.registerAsset({
@@ -240,6 +290,19 @@ describe("AssetManagementBackendApi", () => {
     }
     expect(listed.data.items[0]?.assetId).toBe("asset-upload-001");
     expect(listed.data.pagination.returned).toBe(1);
+
+    const detail = await backendApi.getAssetDetail({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-upload-001",
+    });
+    expect(detail.ok).toBeTrue();
+    if (!detail.ok || !detail.data) {
+      return;
+    }
+    expect(detail.data.asset.assetId).toBe("asset-upload-001");
+    expect(detail.data.asset.uploadState).toBe("ready");
+    expect(detail.data.asset.allowedActions?.canInitiateUpload).toBeTrue();
   });
 
   it("returns invalid-request for missing actor identity", async () => {
@@ -247,6 +310,7 @@ describe("AssetManagementBackendApi", () => {
       uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
       uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
       discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
+      detailService: new StubAssetDetailService() as unknown as AssetDetailService,
     });
 
     const response = await backendApi.initiateAssetUpload({
@@ -274,5 +338,29 @@ describe("AssetManagementBackendApi", () => {
       return;
     }
     expect(listResponse.error.code).toBe("invalid-request");
+  });
+
+  it("maps detail not-found failures from service errors", async () => {
+    const detailService = new StubAssetDetailService();
+    detailService.deny = true;
+
+    const backendApi = new AssetManagementBackendApi({
+      uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
+      uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
+      discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
+      detailService: detailService as unknown as AssetDetailService,
+    });
+
+    const response = await backendApi.getAssetDetail({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-upload-001",
+    });
+
+    expect(response.ok).toBeFalse();
+    if (response.ok || !response.error) {
+      return;
+    }
+    expect(response.error.code).toBe("not-found");
   });
 });

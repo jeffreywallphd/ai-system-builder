@@ -58,11 +58,41 @@ describe("AssetTransportContracts", () => {
   }
 
   it("projects logical asset detail payloads with contract version markers", () => {
-    const dto = toAssetDetailDto(buildAsset());
+    const dto = toAssetDetailDto(buildAsset(), {
+      isOwnedByActor: true,
+      uploadState: "ready",
+      previewAvailable: true,
+      previewMimeTypeHint: "application/json",
+      allowedActions: {
+        canInitiateUpload: true,
+        canAuthorizeDownload: true,
+        canResolvePreview: true,
+        canArchive: true,
+        canDelete: true,
+      },
+      links: {
+        self: "/api/v1/assets/asset-contract-001?workspaceId=workspace-a",
+        list: "/api/v1/assets?workspaceId=workspace-a",
+        initiateUpload: "/api/v1/assets/asset-contract-001/uploads/initiate?workspaceId=workspace-a",
+        authorizeDownload: "/api/v1/assets/asset-contract-001/downloads/authorize?workspaceId=workspace-a",
+        resolvePreview: "/api/v1/assets/asset-contract-001/preview?workspaceId=workspace-a",
+        listGeneratedOutputsBySource: "/api/v1/assets?workspaceId=workspace-a&sourceAssetId=asset-contract-001",
+      },
+      lineage: {
+        sources: [{
+          sourceAssetId: "asset-source-001",
+          sourceAssetVersionId: "asset-source-001:v1",
+          relation: "derived-from",
+        }],
+      },
+    });
 
     expect(dto.contractVersion).toBe(AssetTransportContractVersions.v1);
     expect(dto.assetId).toBe("asset-contract-001");
     expect(dto.currentVersion.versionId).toBe("asset-contract-001:v1");
+    expect(dto.uploadState).toBe("ready");
+    expect(dto.allowedActions?.canInitiateUpload).toBeTrue();
+    expect(dto.lineage?.sources[0]?.sourceAssetId).toBe("asset-source-001");
     expect((dto as unknown as { path?: string }).path).toBeUndefined();
   });
 

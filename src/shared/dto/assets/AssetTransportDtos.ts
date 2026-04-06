@@ -16,6 +16,7 @@ import {
   validateAuthorizeAssetDownloadRequest,
   validateDeleteAssetRequest,
   validateFinalizeAssetUploadRequest,
+  validateGetAssetByIdQuery,
   validateListAssetsQuery,
   validateRegisterAssetRequest,
   validateRegisterGeneratedOutputRequest,
@@ -115,6 +116,10 @@ export function toListAssetsQuery(value: ListAssetsQueryDto): ListAssetsQuery {
   return validateListAssetsQuery(value);
 }
 
+export function toGetAssetByIdQuery(value: GetAssetByIdQueryDto): GetAssetByIdQuery {
+  return validateGetAssetByIdQuery(value);
+}
+
 export function toFinalizeAssetUploadRequest(value: FinalizeAssetUploadRequestDto): FinalizeAssetUploadRequest {
   return validateFinalizeAssetUploadRequest(value);
 }
@@ -153,9 +158,39 @@ export function toRegisterAssetResponseDto(asset: Asset): RegisterAssetResponseD
   });
 }
 
-export function toGetAssetByIdResponseDto(asset: Asset): GetAssetByIdResponseDto {
+export function toGetAssetByIdResponseDto(
+  asset: Asset,
+  metadata?: {
+    readonly isOwnedByActor: boolean;
+    readonly uploadState: "ready" | "archived" | "deleted";
+    readonly previewAvailable: boolean;
+    readonly previewMimeTypeHint?: string;
+    readonly allowedActions: {
+      readonly canInitiateUpload: boolean;
+      readonly canAuthorizeDownload: boolean;
+      readonly canResolvePreview: boolean;
+      readonly canArchive: boolean;
+      readonly canDelete: boolean;
+    };
+    readonly links: {
+      readonly self: string;
+      readonly list: string;
+      readonly initiateUpload: string;
+      readonly authorizeDownload: string;
+      readonly resolvePreview: string;
+      readonly listGeneratedOutputsBySource: string;
+    };
+    readonly lineage: {
+      readonly sources: ReadonlyArray<{
+        readonly sourceAssetId: string;
+        readonly sourceAssetVersionId?: string;
+        readonly relation?: string;
+      }>;
+    };
+  },
+): GetAssetByIdResponseDto {
   return Object.freeze({
-    asset: toAssetDetailResponse(asset),
+    asset: toAssetDetailDto(asset, metadata),
   });
 }
 

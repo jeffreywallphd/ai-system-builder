@@ -7,6 +7,7 @@ import { AssetManagementBackendApi } from "../../../../api/assets/AssetManagemen
 import { AssetUploadInitiationService } from "../../../../../src/application/assets/use-cases/AssetUploadInitiationService";
 import { AssetUploadIngestionService } from "../../../../../src/application/assets/use-cases/AssetUploadIngestionService";
 import { AssetDiscoveryService } from "../../../../../src/application/assets/use-cases/AssetDiscoveryService";
+import { AssetDetailService } from "../../../../../src/application/assets/use-cases/AssetDetailService";
 import {
   AssetKinds,
   AssetVisibilities,
@@ -69,6 +70,7 @@ class StubAssetUploadInitiationService {
   });
 
   public denyUploads = false;
+  public hideDetails = false;
 
   public async registerAsset() {
     return {
@@ -127,6 +129,48 @@ class StubAssetUploadInitiationService {
       },
     };
   }
+
+  public async getAssetById() {
+    if (this.hideDetails) {
+      return {
+        ok: false as const,
+        error: {
+          code: "asset-not-found" as const,
+          message: "Asset was not found for the workspace.",
+        },
+      };
+    }
+    return {
+      ok: true as const,
+      value: {
+        asset: this.asset,
+        metadata: Object.freeze({
+          isOwnedByActor: true,
+          uploadState: "ready" as const,
+          previewAvailable: true,
+          previewMimeTypeHint: "image/png",
+          allowedActions: Object.freeze({
+            canInitiateUpload: true,
+            canAuthorizeDownload: true,
+            canResolvePreview: true,
+            canArchive: true,
+            canDelete: true,
+          }),
+          links: Object.freeze({
+            self: "/api/v1/assets/asset-upload-001?workspaceId=workspace-alpha",
+            list: "/api/v1/assets?workspaceId=workspace-alpha",
+            initiateUpload: "/api/v1/assets/asset-upload-001/uploads/initiate?workspaceId=workspace-alpha",
+            authorizeDownload: "/api/v1/assets/asset-upload-001/downloads/authorize?workspaceId=workspace-alpha",
+            resolvePreview: "/api/v1/assets/asset-upload-001/preview?workspaceId=workspace-alpha",
+            listGeneratedOutputsBySource: "/api/v1/assets?workspaceId=workspace-alpha&sourceAssetId=asset-upload-001",
+          }),
+          lineage: Object.freeze({
+            sources: Object.freeze([]),
+          }),
+        }),
+      },
+    };
+  }
 }
 
 class StubAssetUploadIngestionService {
@@ -171,6 +215,7 @@ async function startServer(
     uploadInitiationService: initiationService as unknown as AssetUploadInitiationService,
     uploadIngestionService: ingestionService as unknown as AssetUploadIngestionService,
     discoveryService: initiationService as unknown as AssetDiscoveryService,
+    detailService: initiationService as unknown as AssetDetailService,
   });
 
   const server = createIdentityHttpServer({
@@ -360,5 +405,50 @@ describe("IdentityHttpServer asset management routes", () => {
     expect(body.data.items).toHaveLength(1);
     expect(body.data.items[0]?.assetId).toBe("asset-upload-001");
     expect(body.data.pagination.returned).toBe(1);
+  });
+
+  it("supports authenticated asset detail retrieval", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const baseUrl = await startServer(service);
+    const token = await registerAndLogin(baseUrl, "asset.http.owner.5");
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/assets/asset-upload-001?workspaceId=workspace-alpha`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.asset.assetId).toBe("asset-upload-001");
+    expect(body.data.asset.uploadState).toBe("ready");
+    expect(body.data.asset.links.self).toContain("/api/v1/assets/asset-upload-001");
+  });
+
+  it("returns safe not-found behavior for unauthorized detail retrieval", async () => {
+    const service = new StubAssetUploadInitiationService();
+    service.hideDetails = true;
+    const baseUrl = await startServer(service);
+    const token = await registerAndLogin(baseUrl, "asset.http.owner.6");
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/assets/asset-upload-001?workspaceId=workspace-alpha`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(404);
+    const body = await response.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("not-found");
   });
 });

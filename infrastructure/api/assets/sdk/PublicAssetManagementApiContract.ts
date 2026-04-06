@@ -158,3 +158,16 @@ export interface ListAssetsApiResponse {
     readonly hasMore: boolean;
   };
 }
+
+export interface GetAssetDetailApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly assetId: string;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+  readonly includeDeleted?: boolean;
+}
+
+export interface GetAssetDetailApiResponse {
+  readonly asset: AssetDetailDto;
+}

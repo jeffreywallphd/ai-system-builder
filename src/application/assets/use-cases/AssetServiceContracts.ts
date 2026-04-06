@@ -96,6 +96,39 @@ export interface GetAssetByIdQuery extends AssetRequestContext {
   readonly includeDeleted?: boolean;
 }
 
+export interface AssetDetailActionSet {
+  readonly canInitiateUpload: boolean;
+  readonly canAuthorizeDownload: boolean;
+  readonly canResolvePreview: boolean;
+  readonly canArchive: boolean;
+  readonly canDelete: boolean;
+}
+
+export interface AssetLineageHook {
+  readonly sourceAssetId: string;
+  readonly sourceAssetVersionId?: string;
+  readonly relation?: string;
+}
+
+export interface AssetDetailMetadata {
+  readonly isOwnedByActor: boolean;
+  readonly uploadState: "ready" | "archived" | "deleted";
+  readonly previewAvailable: boolean;
+  readonly previewMimeTypeHint?: string;
+  readonly allowedActions: AssetDetailActionSet;
+  readonly links: {
+    readonly self: string;
+    readonly list: string;
+    readonly initiateUpload: string;
+    readonly authorizeDownload: string;
+    readonly resolvePreview: string;
+    readonly listGeneratedOutputsBySource: string;
+  };
+  readonly lineage: {
+    readonly sources: ReadonlyArray<AssetLineageHook>;
+  };
+}
+
 export interface ListAssetsQuery extends AssetRequestContext {
   readonly scope?: "private" | "workspace" | "all";
   readonly ownerUserId?: string;
@@ -191,6 +224,7 @@ export interface RegisterAssetResult {
 
 export interface GetAssetByIdResult {
   readonly asset: Asset;
+  readonly metadata: AssetDetailMetadata;
 }
 
 export interface ListAssetsResult {
@@ -384,6 +418,15 @@ export function validateListAssetsQuery(input: ListAssetsQuery): ListAssetsQuery
     sourceAssetVersionId: normalizeOptional(input.sourceAssetVersionId),
     limit: normalizePositiveInteger(input.limit, "limit", 1),
     offset: normalizePositiveInteger(input.offset, "offset", 0),
+  });
+}
+
+export function validateGetAssetByIdQuery(input: GetAssetByIdQuery): GetAssetByIdQuery {
+  const normalized = normalizeRequestContext(input);
+  return Object.freeze({
+    ...normalized,
+    assetId: normalizeRequired(input.assetId, "assetId"),
+    includeDeleted: input.includeDeleted ?? false,
   });
 }
 
