@@ -46,6 +46,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - `src/domain/nodes/NodeTrustDomain.ts`
 - `src/shared/workspaces/WorkspaceOwnership.ts`
 - `src/domain/workspaces/WorkspaceDomain.ts`
+- `src/domain/storage/StorageDomain.ts`
 - `src/domain/authorization/AuthorizationDomain.ts`
 - `src/domain/authorization/AuthorizationPermissionCatalog.ts`
 - `application/contracts/IdentityApplicationContracts.ts`
@@ -82,6 +83,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Secret master-key re-encryption operations baseline for controlled KEK migration, progress tracking, and restartable recovery: `docs/secret-master-key-reencryption-operations.md`
 - Node bootstrap identity/trust-material operations baseline: `docs/node-bootstrap-identity-operations.md`
 - Workspace tenancy domain/contracts baseline: `docs/architecture/workspace-foundation.md`
+- Managed storage domain/contracts baseline: `docs/architecture/storage-foundation.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
 - Authorization permission matrix and key catalog reference: `docs/architecture/authorization-permission-catalog.md`
 - Authorization workspace role-definition and baseline role-grant reference: `docs/architecture/authorization-role-reference.md`
