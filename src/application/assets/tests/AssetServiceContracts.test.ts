@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   AssetDownloadPurposes,
+  validateBeginAssetUploadRequest,
   validateAuthorizeAssetDownloadRequest,
   validateFinalizeAssetUploadRequest,
   validateListAssetsQuery,
@@ -44,6 +45,33 @@ describe("AssetServiceContracts", () => {
     expect(request.initialVersion.content.mimeType).toBe("image/png");
     expect(request.initialVersion.content.checksum.digest).toBe("a".repeat(64));
     expect(Object.isFrozen(request)).toBeTrue();
+  });
+
+  it("defaults register visibility when owner is omitted", () => {
+    const request = validateRegisterAssetRequest({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-a",
+      operationKey: "op:asset:register:default-visibility",
+      assetId: "asset-upload-default-001",
+      kind: "uploaded-file",
+      storageInstanceId: "workspace-storage-a",
+      initialVersion: {
+        versionId: "asset-upload-default-001:v1",
+        storageInstanceId: "workspace-storage-a",
+        objectKey: "workspace-a/input/asset-upload-default-001/v1",
+        area: "input",
+        content: {
+          mimeType: "image/png",
+          sizeBytes: 10,
+          checksum: {
+            algorithm: "sha256",
+            digest: "e".repeat(64),
+          },
+        },
+      },
+    });
+
+    expect(request.visibility).toBe("workspace");
   });
 
   it("rejects filesystem-like object keys in asset registration", () => {
@@ -170,5 +198,33 @@ describe("AssetServiceContracts", () => {
     expect(request.lineage[0]?.sourceAssetId).toBe("asset-upload-001");
     expect(request.lineage[0]?.sourceAssetVersionId).toBe("asset-upload-001:v2");
     expect(request.lineage[0]?.relation).toBe("derived-from");
+  });
+
+  it("validates begin upload request filename and defaults", () => {
+    const request = validateBeginAssetUploadRequest({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-a",
+      operationKey: "op:asset:begin-upload:1",
+      assetId: "asset-upload-001",
+      storageInstanceId: "workspace-storage-a",
+      fileName: "image.png",
+      mimeType: "IMAGE/PNG",
+      sizeBytes: 123,
+    });
+
+    expect(request.mimeType).toBe("image/png");
+    expect(request.area).toBe("input");
+    expect(request.expiresInSeconds).toBeUndefined();
+
+    expect(() => validateBeginAssetUploadRequest({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-a",
+      operationKey: "op:asset:begin-upload:2",
+      assetId: "asset-upload-001",
+      storageInstanceId: "workspace-storage-a",
+      fileName: "../image.png",
+      mimeType: "image/png",
+      sizeBytes: 123,
+    })).toThrow("fileName");
   });
 });

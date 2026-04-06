@@ -82,3 +82,34 @@ Transport payloads carry logical IDs and storage references only; infrastructure
 - Electron main process resolves those logical paths through an internal-only policy module (`electron/main/ModelFilePathPolicy.ts`) and rejects absolute/traversal/out-of-root inputs.
 - Infrastructure adapters (`DesktopBridgeFileStorage`) quarantine absolute path handling behind internal translation logic so application/model services can keep existing abstractions without exposing raw path contracts at UI/IPC boundaries.
 
+## Story 10.2.1 upload initiation implementation
+
+- Added concrete application orchestration for upload registration/initiation:
+  - `src/application/assets/use-cases/AssetUploadInitiationService.ts`
+- Extended service contracts/DTO adapters with upload-initiation request/result support:
+  - `src/application/assets/use-cases/AssetServiceContracts.ts`
+  - `src/shared/dto/assets/AssetTransportDtos.ts`
+- Added backend API + public transport contract:
+  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+- Added authenticated HTTP routes in authoritative transport:
+  - `POST /api/v1/assets/register`
+  - `POST /api/v1/assets/:assetId/uploads/initiate`
+  - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- Host wiring now composes asset upload initiation dependencies:
+  - `hosts/server/IdentityServerHost.ts`
+
+Enforced rules in this slice:
+
+- actor must have active workspace membership.
+- owner-intent validation blocks non-admin ownership delegation.
+- storage must be workspace-matching, active, writable, and policy-allowed for `use-for-assets`.
+- declared upload size is checked against storage policy `maxObjectBytes`.
+- API responses return logical ids + server-approved upload endpoints/session metadata, never raw filesystem paths.
+
+Coverage added:
+
+- `src/application/assets/tests/AssetUploadInitiationService.test.ts`
+- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+

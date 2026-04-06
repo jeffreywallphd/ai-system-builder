@@ -54,6 +54,7 @@ import { CertificateOperationsBackendApi } from "../../infrastructure/api/securi
 import { SecretMetadataBackendApi } from "../../infrastructure/api/security/SecretMetadataBackendApi";
 import { StorageManagementBackendApi } from "../../infrastructure/api/storage/StorageManagementBackendApi";
 import { WorkspaceAwareStoragePolicyEvaluationAdapter } from "../../infrastructure/api/storage/WorkspaceAwareStoragePolicyEvaluationAdapter";
+import { AssetManagementBackendApi } from "../../infrastructure/api/assets/AssetManagementBackendApi";
 import { StorageSyncDeploymentAvailabilities } from "../../src/infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
 import { SqliteWorkspacePersistenceAdapter } from "../../src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import { WorkspaceAuthorizationPolicyReadAdapter } from "../../src/infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
@@ -63,7 +64,9 @@ import { SqliteNodeTrustPersistenceAdapter } from "../../src/infrastructure/pers
 import { SqliteNodeTrustAuditRecorder } from "../../src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
 import { SqliteCertificateAuthorityPersistenceAdapter } from "../../src/infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
 import { SqliteStorageInstancePersistenceAdapter } from "../../src/infrastructure/persistence/storage/SqliteStorageInstancePersistenceAdapter";
+import { SqliteAssetPersistenceAdapter } from "../../src/infrastructure/persistence/assets/SqliteAssetPersistenceAdapter";
 import { StorageManagementService } from "../../src/application/storage/use-cases/StorageManagementService";
+import { AssetUploadInitiationService } from "../../src/application/assets/use-cases/AssetUploadInitiationService";
 import { StorageBackendProvisioningOrchestrator } from "../../src/infrastructure/storage/StorageBackendProvisioningOrchestrator";
 import { createStorageBackendAdapterRegistry } from "../../src/infrastructure/storage/StorageBackendAdapterRegistry";
 import { ServerManagedStorageSynchronizationAdapter } from "../../src/infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
@@ -278,6 +281,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const nodeTrustAuditRecorder = new SqliteNodeTrustAuditRecorder(path.resolve(options.databasePath));
   const certificateAuthorityRepository = new SqliteCertificateAuthorityPersistenceAdapter(path.resolve(options.databasePath));
   const storageInstanceRepository = new SqliteStorageInstancePersistenceAdapter(path.resolve(options.databasePath));
+  const assetRepository = new SqliteAssetPersistenceAdapter(path.resolve(options.databasePath));
   const env = options.env ?? process.env;
   const hostAddress = options.host ?? "127.0.0.1";
   const secureTransportConfig = resolveHostSecureTransportConfig({
@@ -761,11 +765,12 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const storageSynchronizationAdapter = new ServerManagedStorageSynchronizationAdapter({
     availability: resolveStorageSyncDeploymentAvailability(env),
   });
+  const workspaceAwareStoragePolicyEvaluationAdapter = new WorkspaceAwareStoragePolicyEvaluationAdapter({
+    workspaceAuthorizationReadRepository: workspaceRepository,
+  });
   const storageManagementService = new StorageManagementService({
     repository: storageInstanceRepository,
-    policyPort: new WorkspaceAwareStoragePolicyEvaluationAdapter({
-      workspaceAuthorizationReadRepository: workspaceRepository,
-    }),
+    policyPort: workspaceAwareStoragePolicyEvaluationAdapter,
     provisioningPort: storageProvisioningOrchestrator,
     capabilityPort: storageProvisioningOrchestrator,
   });
@@ -773,6 +778,15 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     storageManagementService,
     capabilityInspectionPort: storageProvisioningOrchestrator,
     synchronizationAdapter: storageSynchronizationAdapter,
+  });
+  const assetUploadInitiationService = new AssetUploadInitiationService({
+    repository: assetRepository,
+    workspaceAuthorizationReadRepository: workspaceRepository,
+    storageInstanceRepository,
+    storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
+  });
+  const assetManagementBackendApi = new AssetManagementBackendApi({
+    uploadInitiationService: assetUploadInitiationService,
   });
   const transportTrustStateResolver = new ServerManagedTransportTrustStateResolver({
     trustedDeviceManagementService: trustedDeviceManagementService,
@@ -842,6 +856,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     certificateOperationsBackendApi,
     secretMetadataBackendApi,
     storageManagementBackendApi,
+    assetManagementBackendApi,
     nodeTrustBackendApi,
     authorizationManagementBackendApi,
     workspaceBackendApi,
@@ -902,6 +917,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
         nodeTrustAuditRecorder.dispose();
         certificateAuthorityRepository.dispose();
         storageInstanceRepository.dispose();
+        assetRepository.dispose();
         secretService?.dispose();
         const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
         if (typeof disposablePublisher.dispose === "function") {
@@ -924,6 +940,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     nodeTrustAuditRecorder.dispose();
     certificateAuthorityRepository.dispose();
     storageInstanceRepository.dispose();
+    assetRepository.dispose();
     secretService?.dispose();
     throw error;
   }

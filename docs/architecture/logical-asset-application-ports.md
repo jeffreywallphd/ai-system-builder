@@ -95,3 +95,39 @@ Payloads remain API-safe and infrastructure-agnostic.
 - Electron main process path resolution for model files is isolated in `electron/main/ModelFilePathPolicy.ts` with explicit rejection of absolute, drive-prefixed, traversal, and out-of-root path input.
 - Absolute filesystem paths remain infrastructure-only details via `DesktopBridgeFileStorage` translation; UI/IPC/public bridge contracts no longer require raw path input/output for this asset-facing flow.
 
+## Story 10.2.1: authenticated asset registration and upload initiation
+
+- Added concrete upload-initiation orchestration in:
+  - `src/application/assets/use-cases/AssetUploadInitiationService.ts`
+- Added request/response contracts for upload initiation in:
+  - `src/application/assets/use-cases/AssetServiceContracts.ts`
+  - `src/shared/dto/assets/AssetTransportDtos.ts`
+- Added authoritative API adapter and SDK contracts:
+  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+- Added authenticated transport endpoints:
+  - `POST /api/v1/assets/register`
+  - `POST /api/v1/assets/:assetId/uploads/initiate`
+  - implemented in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- Host composition now wires asset upload-initiation services and persistence:
+  - `hosts/server/IdentityServerHost.ts`
+
+Behavioral posture in this story:
+
+- authenticated workspace membership is required for both registration and upload initiation.
+- ownership intent is enforced:
+  - non-admin actors cannot register assets for another owner user.
+  - private asset upload initiation requires owner or workspace administrator.
+- storage eligibility is enforced before asset registration/upload initiation:
+  - storage instance must exist in workspace.
+  - storage instance must be active and writable.
+  - storage policy evaluation (`use-for-assets`) must allow action.
+  - `maxObjectBytes` constraints are applied to declared upload size.
+- upload initiation responses return logical asset id + server-approved upload session metadata (`uploadSessionId`, logical `objectKey`, `uploadEndpoint`) instead of filesystem destinations.
+
+Added coverage:
+
+- `src/application/assets/tests/AssetUploadInitiationService.test.ts`
+- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+

@@ -2,6 +2,7 @@ import type { Asset, AssetLifecycleState, AssetVisibility } from "../../../domai
 
 export const AssetAuditEventTypes = Object.freeze({
   registered: "asset-registered",
+  uploadInitiated: "asset-upload-initiated",
   lookedUp: "asset-looked-up",
   listed: "asset-listed",
   uploadFinalized: "asset-upload-finalized",

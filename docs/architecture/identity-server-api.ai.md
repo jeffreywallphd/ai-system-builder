@@ -31,6 +31,9 @@
   - `GET /api/v1/security/certificates/:serialNumber`
   - `POST /api/v1/security/certificates/:serialNumber/revoke`
   - `POST /api/v1/security/certificates/:serialNumber/renew`
+- Authenticated asset upload initiation endpoints:
+  - `POST /api/v1/assets/register`
+  - `POST /api/v1/assets/:assetId/uploads/initiate`
 - Login success now issues and persists authenticated sessions and returns bearer session credentials.
 - Transport validation at the boundary (`zod`) with stable failure envelopes.
 - Deterministic translation from inner identity errors to public API error codes.
@@ -40,6 +43,7 @@
 
 - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `infrastructure/api/identity/IdentityAuthBackendApi.ts`
+- `infrastructure/api/assets/AssetManagementBackendApi.ts`
 - `infrastructure/api/identity/sdk/PublicIdentityAuthApiContract.ts`
 - `hosts/server/IdentityServerHost.ts`
 

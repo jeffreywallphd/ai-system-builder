@@ -1,5 +1,6 @@
 import type {
   ArchiveAssetRequest,
+  BeginAssetUploadRequest,
   AuthorizeAssetDownloadRequest,
   DeleteAssetRequest,
   FinalizeAssetUploadRequest,
@@ -11,6 +12,7 @@ import type {
 } from "../../../application/assets/use-cases/AssetServiceContracts";
 import {
   validateArchiveAssetRequest,
+  validateBeginAssetUploadRequest,
   validateAuthorizeAssetDownloadRequest,
   validateDeleteAssetRequest,
   validateFinalizeAssetUploadRequest,
@@ -44,6 +46,7 @@ export type ResolveAssetPreviewQueryDto = ResolveAssetPreviewQuery;
 export type RegisterGeneratedOutputRequestDto = RegisterGeneratedOutputRequest;
 export type ArchiveAssetRequestDto = ArchiveAssetRequest;
 export type DeleteAssetRequestDto = DeleteAssetRequest;
+export type BeginAssetUploadRequestDto = BeginAssetUploadRequest;
 
 export interface RegisterAssetResponseDto {
   readonly asset: AssetDetailDto;
@@ -72,6 +75,26 @@ export interface ResolveAssetPreviewResponseDto {
 
 export interface RegisterGeneratedOutputResponseDto {
   readonly asset: AssetDetailDto;
+}
+
+export interface BeginAssetUploadResponseDto {
+  readonly asset: AssetDetailDto;
+  readonly upload: {
+    readonly uploadSessionId: string;
+    readonly assetId: string;
+    readonly workspaceId: string;
+    readonly storageInstanceId: string;
+    readonly objectKey: string;
+    readonly area: Asset["versions"][number]["location"]["area"];
+    readonly uploadEndpoint: string;
+    readonly uploadMethod: "POST";
+    readonly expected: {
+      readonly fileName: string;
+      readonly mimeType: string;
+      readonly sizeBytes: number;
+    };
+    readonly expiresAt: string;
+  };
 }
 
 function toAssetDetailResponse(asset: Asset): AssetDetailDto {
@@ -112,6 +135,10 @@ export function toArchiveAssetRequest(value: ArchiveAssetRequestDto): ArchiveAss
 
 export function toDeleteAssetRequest(value: DeleteAssetRequestDto): DeleteAssetRequest {
   return validateDeleteAssetRequest(value);
+}
+
+export function toBeginAssetUploadRequest(value: BeginAssetUploadRequestDto): BeginAssetUploadRequest {
+  return validateBeginAssetUploadRequest(value);
 }
 
 export function toRegisterAssetResponseDto(asset: Asset): RegisterAssetResponseDto {
@@ -161,6 +188,16 @@ export function toResolveAssetPreviewResponseDto(
 export function toRegisterGeneratedOutputResponseDto(asset: Asset): RegisterGeneratedOutputResponseDto {
   return Object.freeze({
     asset: toAssetDetailResponse(asset),
+  });
+}
+
+export function toBeginAssetUploadResponseDto(
+  asset: Asset,
+  upload: BeginAssetUploadResponseDto["upload"],
+): BeginAssetUploadResponseDto {
+  return Object.freeze({
+    asset: toAssetDetailResponse(asset),
+    upload,
   });
 }
 
