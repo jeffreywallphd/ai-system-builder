@@ -561,6 +561,67 @@ describe("AssetUploadIngestionService", () => {
     expect(version?.content.originalFileName).toBe("file.bin");
   });
 
+  it("rejects invalid or mismatched upload content types", async () => {
+    const assetRepository = new InMemoryAssetRepository();
+    const uploadSessionRepository = new InMemoryUploadSessionRepository();
+    const objectPort = new InMemoryStorageObjectPort();
+    const storage = createStorage();
+    const encryption = createEncryptionDependencies(false);
+    await seedAsset(assetRepository);
+    await seedPendingSession(uploadSessionRepository, 11);
+
+    const service = new AssetUploadIngestionService({
+      repository: assetRepository,
+      uploadSessionRepository,
+      storageLogicalAccessResolutionService: new StubStorageLogicalAccessResolutionService({
+        ok: true,
+        value: {
+          intent: StorageLogicalAccessOperationIntents.writeObject,
+          storageInstance: storage,
+          objectPort,
+          occurredAt: "2026-04-06T12:00:00.000Z",
+        },
+      }),
+      ...encryption,
+      clock: {
+        now: () => new Date("2026-04-06T12:00:00.000Z"),
+      },
+    });
+
+    const invalidContentType = await service.ingestUploadContent({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      operationKey: "asset:upload:finalize:content-type-invalid",
+      uploadSessionId: "asset-upload-session:test-001",
+      contentType: "not-a-mime-type",
+      content: toContent(["hello world"]),
+    });
+    expect(invalidContentType.ok).toBeFalse();
+    if (invalidContentType.ok) {
+      return;
+    }
+    expect(invalidContentType.error.code).toBe("asset-invalid-request");
+
+    await seedPendingSession(uploadSessionRepository, 11);
+    const mismatchedContentType = await service.ingestUploadContent({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      operationKey: "asset:upload:finalize:content-type-mismatch",
+      uploadSessionId: "asset-upload-session:test-001",
+      contentType: "image/png",
+      content: toContent(["hello world"]),
+    });
+    expect(mismatchedContentType.ok).toBeFalse();
+    if (mismatchedContentType.ok) {
+      return;
+    }
+    expect(mismatchedContentType.error.code).toBe("asset-invalid-request");
+
+    const uploadSession = await uploadSessionRepository.findUploadSessionById("asset-upload-session:test-001");
+    expect(uploadSession?.status).toBe("incomplete");
+    expect(uploadSession?.incompleteReasonCode).toBe("upload-content-type-mismatch");
+  });
+
   it("encrypts ingested content when policy requires scoped-content encryption", async () => {
     const assetRepository = new InMemoryAssetRepository();
     const uploadSessionRepository = new InMemoryUploadSessionRepository();

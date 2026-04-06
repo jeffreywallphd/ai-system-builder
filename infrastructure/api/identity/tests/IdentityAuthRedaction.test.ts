@@ -53,4 +53,20 @@ describe("IdentityAuthRedaction", () => {
     expect(redacted.includes("loom_sess_secret-token")).toBeFalse();
     expect(redacted.includes("[REDACTED]")).toBeTrue();
   });
+
+  it("redacts asset path and file metadata keys used in transport logs", () => {
+    const redacted = redactSensitiveAuthPayload({
+      objectKey: "workspaces/workspace-alpha/assets/private.bin",
+      fileName: "private.bin",
+      path: "C:/workspace/private.bin",
+      storageInstanceId: "storage-alpha",
+      sizeBytes: 1024,
+    });
+    const serialized = JSON.stringify(redacted);
+    expect(serialized.includes("workspaces/workspace-alpha/assets/private.bin")).toBeFalse();
+    expect(serialized.includes("private.bin")).toBeFalse();
+    expect(serialized.includes("C:/workspace/private.bin")).toBeFalse();
+    expect(serialized.includes("storage-alpha")).toBeFalse();
+    expect(serialized.includes("1024")).toBeFalse();
+  });
 });

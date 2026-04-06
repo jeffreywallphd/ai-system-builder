@@ -405,3 +405,38 @@ Boundary posture:
 - Presentation code consumes logical identifiers and API-safe contracts only.
 - Raw filesystem path knowledge is not required in UI state for this flow.
 - Contracts and helpers are reusable for desktop and thin-client clients without duplicating workflow logic.
+
+## Story 10.3.5 operational safeguards and extension guidance
+
+This story hardens protected asset workflows so future sharing/encryption/preview work can extend the existing seams without redesign.
+
+Implemented safeguards:
+
+- stricter upload metadata validation hooks at application boundary:
+  - bounded `sizeBytes` checks for declared asset/upload content,
+  - stricter mime-type validation and normalization,
+  - upload-ingestion `contentType` compatibility checks against upload-session expectations.
+- normalized backend error mapping with non-leaky posture:
+  - service errors map to stable API error codes,
+  - transport-facing messages for non-validation errors are normalized to safe summaries,
+  - error `details` redact path/object-key/file-name/content/token-like keys recursively.
+- safer protected-download stream failure handling:
+  - stream-open failures now return internal-safe error payloads (not request-validation-style responses).
+- expanded transport log redaction for asset-sensitive fields:
+  - includes `objectKey`, `fileName`, `path`, and related metadata keys.
+
+Developer rules to preserve:
+
+- Keep raw filesystem paths infrastructure-only; never add path-based shortcuts to application/shared/UI/API contracts.
+- Resolve storage through authoritative logical-access + adapter seams, not direct filesystem utilities.
+- Keep preview/download protected:
+  - preview APIs return logical metadata,
+  - content access stays tokenized and server-mediated,
+  - avoid direct/public object URLs in asset metadata APIs.
+- Register generated outputs through generated-output use cases + lineage metadata, not ad hoc path writes.
+
+Planned extension alignment:
+
+- explicit sharing policy checks should reuse this sanitized error/audit posture.
+- publishable link flows should reuse opaque grant patterns with scoped TTLs and redacted logs.
+- scoped-content encryption can deepen through existing policy/key-resolution seams while preserving current client contracts.

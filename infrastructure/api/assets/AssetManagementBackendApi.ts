@@ -47,6 +47,7 @@ import {
   type DeleteAssetApiResponse,
 } from "./sdk/PublicAssetManagementApiContract";
 import type { AssetDiscoveryService } from "../../../src/application/assets/use-cases/AssetDiscoveryService";
+import { sanitizeAssetManagementApiError } from "./AssetManagementErrorSanitizer";
 
 export interface AssetManagementBackendApiDependencies {
   readonly uploadInitiationService: AssetUploadInitiationService;
@@ -515,13 +516,14 @@ export class AssetManagementBackendApi {
     message: string,
     details?: Readonly<Record<string, unknown>>,
   ): AssetManagementApiResponse<never> {
+    const sanitized = sanitizeAssetManagementApiError({
+      code,
+      message,
+      details,
+    });
     return Object.freeze({
       ok: false,
-      error: Object.freeze({
-        code,
-        message,
-        details,
-      }),
+      error: sanitized,
     });
   }
 }

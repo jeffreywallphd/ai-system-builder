@@ -265,6 +265,28 @@ describe("AssetServiceContracts", () => {
       mimeType: "image/png",
       sizeBytes: 123,
     })).toThrow("fileName");
+
+    expect(() => validateBeginAssetUploadRequest({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-a",
+      operationKey: "op:asset:begin-upload:3",
+      assetId: "asset-upload-001",
+      storageInstanceId: "workspace-storage-a",
+      fileName: "image.png",
+      mimeType: "not-a-mime-type",
+      sizeBytes: 123,
+    })).toThrow("mimeType");
+
+    expect(() => validateBeginAssetUploadRequest({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-a",
+      operationKey: "op:asset:begin-upload:4",
+      assetId: "asset-upload-001",
+      storageInstanceId: "workspace-storage-a",
+      fileName: "image.png",
+      mimeType: "image/png",
+      sizeBytes: (10 * 1024 * 1024 * 1024) + 1,
+    })).toThrow("sizeBytes");
   });
 
   it("normalizes get-by-id query contracts", () => {

@@ -460,3 +460,35 @@ Boundary posture in this story:
 - UI state remains logical-id based (`workspaceId`, `assetId`, `storageInstanceId`, `versionId`) and does not require raw filesystem path knowledge.
 - Download and preview actions are exposed as protected API actions; no object-key/path internals are required in presentation code.
 - Shared client-safe contracts are reusable across desktop and thin-client transport adapters.
+
+## Story 10.3.5: operational safeguards, non-leaky errors, and extension guidance
+
+Hardened protected asset flows with production safeguards across application validation, API mapping, and transport logging:
+
+- Added stricter request guardrails for upload-related content metadata:
+  - bounded declared size checks in asset service contracts (`sizeBytes` upper bounds),
+  - stricter media-type validation for declared/uploaded mime values,
+  - upload-ingestion content-type compatibility checks against upload-session expectations.
+- Normalized non-leaky backend error mapping:
+  - asset service errors are translated to API errors with stable code mapping and sanitized messages,
+  - API error `details` now redact path/object-key/file-name/content/token-like keys before transport responses.
+- Hardened streaming failure behavior:
+  - protected download stream failures now return internal-safe error payloads rather than request-validation-style errors.
+- Extended request/response logging safeguards:
+  - identity transport payload redaction now covers asset-sensitive keys (`objectKey`, `fileName`, `path`, related metadata) so operational logs avoid storage-location leakage.
+
+Developer extension rules for Feature 10 onward:
+
+- No raw-path contracts across application/shared/UI/API surfaces. Keep filesystem paths and backend roots infrastructure-private.
+- Use logical identifiers (`workspaceId`, `assetId`, `storageInstanceId`, logical `objectKey`) at boundaries and resolve physical storage only through storage access/adaptor services.
+- Keep preview and download flows protected:
+  - preview resolution returns logical metadata only,
+  - content retrieval remains tokenized and server-mediated,
+  - no direct/public object URL publication from asset metadata endpoints.
+- Register generated outputs through authoritative generated-output APIs and lineage metadata, never by writing ad hoc output paths and backfilling later.
+
+Forward-looking extension notes (future epics):
+
+- explicit sharing policy evaluation can extend the same sanitized error surface and logical-asset authorization seams.
+- publishable/share links should reuse opaque grant patterns with short-lived scope and redacted audit/log payload posture.
+- scoped content encryption can extend existing encryption policy/key-resolution seams without changing external asset contracts.

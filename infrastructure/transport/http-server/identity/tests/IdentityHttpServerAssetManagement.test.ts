@@ -256,6 +256,7 @@ class StubAssetGeneratedOutputRegistrationService {
 
 class StubAssetDownloadService {
   public denyAuthorization = false;
+  public failStreamOpen = false;
 
   public async authorizeAssetDownload() {
     if (this.denyAuthorization) {
@@ -293,6 +294,23 @@ class StubAssetDownloadService {
           code: "asset-access-denied" as const,
           message: "Invalid token.",
         },
+      };
+    }
+    if (this.failStreamOpen) {
+      return {
+        ok: true as const,
+        value: Object.freeze({
+          assetId: "asset-upload-001",
+          versionId: "asset-upload-001:v1",
+          mimeType: "image/png",
+          sizeBytes: 5,
+          contentDisposition: "attachment" as const,
+          contentDispositionFileName: "image.png",
+          stream: (async function* payload() {
+            throw new Error("stream failed for objectKey workspaces/workspace-alpha/assets/private.bin");
+            yield Buffer.from([]);
+          })(),
+        }),
       };
     }
 
@@ -723,6 +741,29 @@ describe("IdentityHttpServer asset management routes", () => {
     const body = await response.json();
     expect(body.ok).toBe(false);
     expect(body.error.code).toBe("forbidden");
+  });
+
+  it("fails download stream opens with internal non-leaky responses", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const downloadService = new StubAssetDownloadService();
+    downloadService.failStreamOpen = true;
+    const baseUrl = await startServer(service, new StubAssetUploadIngestionService(), downloadService);
+    const token = await registerAndLogin(baseUrl, "asset.http.owner.8b");
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/assets/asset-upload-001/downloads/content?workspaceId=workspace-alpha&contentToken=download-token-001`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("internal");
+    expect(body.error.message).toBe("Download content stream could not be completed.");
   });
 
   it("blocks download authorization when policy denies access", async () => {
