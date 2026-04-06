@@ -169,6 +169,17 @@ Behavior highlights:
 - peer identity checks are certificate-bound and include approval/trust/revocation posture;
 - no uncontrolled peer mesh transport path is introduced.
 
+## Story 7.3.4 additions (transport lifecycle and revocation response)
+
+- `NodeMutualTlsTransportAdapter` now emits lifecycle metadata with node-channel validation outcomes:
+  - certificate rotation awareness against prior serial/fingerprint bindings;
+  - reconnect directives that are explicit and policy-aware (deny on revoked/policy failures, bounded backoff guidance for transient failures).
+- `IdentityHttpServer` websocket channel handling now supports active-channel lifecycle monitoring:
+  - periodic trust/session revalidation while channel is active;
+  - revocation/trust-invalidation-triggered channel invalidation and shutdown;
+  - lifecycle event hooks for channel state transitions and reconnect guidance.
+- `SecureWebSocketChannelContext` now includes shared lifecycle/reconnect helpers used by transport adapters to avoid ad hoc reconnect behavior.
+
 ## Story 5.4.4 additions
 
 - New admin revocation endpoint:

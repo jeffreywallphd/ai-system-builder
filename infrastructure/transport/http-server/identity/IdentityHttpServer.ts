@@ -130,8 +130,19 @@ import type { HttpTransportTrustValidationResult } from "../../../../src/infrast
 import type { WebSocketTransportTrustValidationResult } from "../../../../src/infrastructure/transport/TransportTrustValidationAdapters";
 import {
   buildWebSocketChannelContext,
+  canTransitionWebSocketChannelLifecycleState,
+  hasWebSocketChannelCertificateBindingRotated,
   InMemoryWebSocketChannelRegistry,
   parseWebSocketChannelPurpose,
+  resolveWebSocketChannelReconnectDirective,
+  toWebSocketChannelCertificateBinding,
+  WebSocketChannelLifecycleInvalidationReasons,
+  WebSocketChannelLifecycleStates,
+  type WebSocketChannelCertificateBinding,
+  type WebSocketChannelLifecycleInvalidationReason,
+  type WebSocketChannelLifecycleState,
+  type WebSocketChannelReconnectDirective,
+  type WebSocketChannelReconnectPolicy,
   WebSocketChannelPurposes,
   type WebSocketChannelContext,
   type WebSocketChannelPurpose,
@@ -145,6 +156,7 @@ import {
 import { validateNodeMutualTlsTransport } from "./NodeMutualTlsTransportAdapter";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
+const DefaultWebSocketTrustRevalidationIntervalMs = 30_000;
 
 const RegisterRequestSchema: z.ZodType<RegisterLocalIdentityApiRequest> = z.object({
   username: z.string().min(1),
@@ -642,7 +654,25 @@ interface IdentityHttpServerWebSocketOptions {
   readonly supportedPurposes?: ReadonlyArray<WebSocketChannelPurpose>;
   readonly defaultPurpose?: WebSocketChannelPurpose;
   readonly channelRegistry?: WebSocketChannelRegistry;
+  readonly lifecycle?: IdentityHttpServerWebSocketLifecycleOptions;
   onChannelEstablished?(channel: WebSocketChannelContext, socket: Socket): Promise<void> | void;
+}
+
+interface IdentityHttpServerWebSocketLifecycleOptions {
+  readonly trustRevalidationIntervalMs?: number;
+  readonly reconnectPolicy?: WebSocketChannelReconnectPolicy;
+  resolveCertificateBinding?(channel: WebSocketChannelContext, socket: Socket): WebSocketChannelCertificateBinding | undefined;
+  onLifecycleEvent?(event: IdentityHttpServerWebSocketLifecycleEvent): Promise<void> | void;
+}
+
+interface IdentityHttpServerWebSocketLifecycleEvent {
+  readonly channelId: string;
+  readonly connectionId: string;
+  readonly state: WebSocketChannelLifecycleState;
+  readonly occurredAt: string;
+  readonly reason?: WebSocketChannelLifecycleInvalidationReason;
+  readonly reconnect?: WebSocketChannelReconnectDirective;
+  readonly details?: Readonly<Record<string, unknown>>;
 }
 
 export interface IdentityHttpServerOptions {
@@ -3891,6 +3921,10 @@ async function handleWebSocketUpgrade(input: {
       remotePeerType: transportRouting.remotePeerType,
     }),
   });
+  const initialCertificateBinding = toWebSocketChannelCertificateBinding({
+    serialNumber: transportState.peerCertificateSerialNumber,
+    fingerprintSha256: transportState.peerCertificateFingerprintSha256,
+  });
   input.channelRegistry.register(channelContext);
   input.socket.once("close", () => {
     input.channelRegistry.release(channelContext.channelId);
@@ -3917,7 +3951,284 @@ async function handleWebSocketUpgrade(input: {
     }),
   }));
 
+  startWebSocketChannelLifecycleMonitoring({
+    requestId,
+    channelContext,
+    socket: input.socket,
+    logger: input.logger,
+    backendApi: input.backendApi,
+    transportTrust: input.transportTrust,
+    transportState,
+    transportRouting,
+    sessionToken,
+    lifecycleOptions: input.webSocket.lifecycle,
+    channelRegistry: input.channelRegistry,
+    initialCertificateBinding,
+  });
+
   await input.webSocket.onChannelEstablished?.(channelContext, input.socket);
+}
+
+function startWebSocketChannelLifecycleMonitoring(input: {
+  readonly requestId: string;
+  readonly channelContext: WebSocketChannelContext;
+  readonly socket: Socket;
+  readonly logger: IdentityHttpServerLogger;
+  readonly backendApi: IdentityAuthBackendApi;
+  readonly transportTrust: IdentityHttpServerTransportTrustOptions | undefined;
+  readonly transportState: InboundHttpTransportConnectionState;
+  readonly transportRouting: ReturnType<typeof resolveTransportTrustRouting>;
+  readonly sessionToken: string;
+  readonly lifecycleOptions: IdentityHttpServerWebSocketLifecycleOptions | undefined;
+  readonly channelRegistry: WebSocketChannelRegistry;
+  readonly initialCertificateBinding: WebSocketChannelCertificateBinding | undefined;
+}): void {
+  const intervalMs = resolveWebSocketTrustRevalidationIntervalMs(input.lifecycleOptions, input.channelContext.transport.trustValidationEnforced);
+  if (!intervalMs) {
+    return;
+  }
+
+  let closed = false;
+  let currentState: WebSocketChannelLifecycleState = WebSocketChannelLifecycleStates.active;
+  let reconnectAttempt = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const baselineCertificateBinding =
+    input.initialCertificateBinding
+    ?? input.lifecycleOptions?.resolveCertificateBinding?.(input.channelContext, input.socket)
+    ?? resolveSocketPeerCertificateBinding(input.socket);
+
+  const scheduleNext = () => {
+    if (closed) {
+      return;
+    }
+    timer = setTimeout(() => {
+      void revalidate();
+    }, intervalMs);
+  };
+
+  const finalize = (reason: WebSocketChannelLifecycleInvalidationReason, reconnect: WebSocketChannelReconnectDirective) => {
+    if (closed) {
+      return;
+    }
+    transition(WebSocketChannelLifecycleStates.invalidated, reason, reconnect);
+    input.channelRegistry.release(input.channelContext.channelId);
+    input.socket.end();
+  };
+
+  const transition = (
+    next: WebSocketChannelLifecycleState,
+    reason?: WebSocketChannelLifecycleInvalidationReason,
+    reconnect?: WebSocketChannelReconnectDirective,
+    details?: Readonly<Record<string, unknown>>,
+  ) => {
+    if (!canTransitionWebSocketChannelLifecycleState(currentState, next)) {
+      return;
+    }
+    currentState = next;
+    emitWebSocketLifecycleEvent({
+      requestId: input.requestId,
+      logger: input.logger,
+      lifecycleOptions: input.lifecycleOptions,
+      channelContext: input.channelContext,
+      state: next,
+      reason,
+      reconnect,
+      details,
+    });
+  };
+
+  const revalidate = async () => {
+    if (closed) {
+      return;
+    }
+    transition(WebSocketChannelLifecycleStates.revalidating);
+
+    let resolvedSession: Awaited<ReturnType<IdentityAuthBackendApi["resolveAuthenticatedSession"]>> | undefined;
+    try {
+      resolvedSession = await input.backendApi.resolveAuthenticatedSession({
+        sessionToken: input.sessionToken,
+      });
+    } catch {
+      reconnectAttempt += 1;
+      const reconnect = resolveWebSocketChannelReconnectDirective({
+        attempt: reconnectAttempt,
+        reason: WebSocketChannelLifecycleInvalidationReasons.transientRevalidationFailure,
+        policy: input.lifecycleOptions?.reconnectPolicy,
+      });
+      transition(WebSocketChannelLifecycleStates.reconnectPending, WebSocketChannelLifecycleInvalidationReasons.transientRevalidationFailure, reconnect);
+      finalize(WebSocketChannelLifecycleInvalidationReasons.transientRevalidationFailure, reconnect);
+      return;
+    }
+
+    if (!resolvedSession.ok || !resolvedSession.data) {
+      reconnectAttempt += 1;
+      const reason = (
+        resolvedSession.error?.code === IdentityAuthApiErrorCodes.authenticationFailed
+        || resolvedSession.error?.code === IdentityAuthApiErrorCodes.forbidden
+        || resolvedSession.error?.code === IdentityAuthApiErrorCodes.notFound
+      )
+        ? WebSocketChannelLifecycleInvalidationReasons.revoked
+        : WebSocketChannelLifecycleInvalidationReasons.trustInvalidated;
+      const reconnect = resolveWebSocketChannelReconnectDirective({
+        attempt: reconnectAttempt,
+        reason,
+        policy: input.lifecycleOptions?.reconnectPolicy,
+      });
+      transition(WebSocketChannelLifecycleStates.reconnectPending, reason, reconnect, Object.freeze({
+        errorCode: resolvedSession.error?.code,
+      }));
+      finalize(reason, reconnect);
+      return;
+    }
+
+    if (input.transportTrust?.websocketValidator && input.channelContext.transport.trustValidationEnforced) {
+      const validation = await input.transportTrust.websocketValidator.validate(
+        buildWebSocketTransportTrustValidationRequest({
+          transportState: input.transportState,
+          requestId: input.requestId,
+          resolvedSession: resolvedSession.data,
+          routing: input.transportRouting,
+        }),
+      );
+      if (!validation.ok) {
+        reconnectAttempt += 1;
+        const reason = validation.closeCode === 4403
+          ? WebSocketChannelLifecycleInvalidationReasons.trustInvalidated
+          : WebSocketChannelLifecycleInvalidationReasons.transientRevalidationFailure;
+        const reconnect = resolveWebSocketChannelReconnectDirective({
+          attempt: reconnectAttempt,
+          reason,
+          policy: input.lifecycleOptions?.reconnectPolicy,
+        });
+        transition(WebSocketChannelLifecycleStates.reconnectPending, reason, reconnect, Object.freeze({
+          closeCode: validation.closeCode,
+          errorCode: validation.error.code,
+        }));
+        finalize(reason, reconnect);
+        return;
+      }
+    }
+
+    const currentCertificateBinding = input.lifecycleOptions?.resolveCertificateBinding?.(input.channelContext, input.socket)
+      ?? resolveSocketPeerCertificateBinding(input.socket);
+    if (hasWebSocketChannelCertificateBindingRotated(baselineCertificateBinding, currentCertificateBinding)) {
+      reconnectAttempt += 1;
+      const reconnect = resolveWebSocketChannelReconnectDirective({
+        attempt: reconnectAttempt,
+        reason: WebSocketChannelLifecycleInvalidationReasons.certificateRotated,
+        policy: input.lifecycleOptions?.reconnectPolicy,
+      });
+      transition(
+        WebSocketChannelLifecycleStates.reconnectPending,
+        WebSocketChannelLifecycleInvalidationReasons.certificateRotated,
+        reconnect,
+      );
+      finalize(WebSocketChannelLifecycleInvalidationReasons.certificateRotated, reconnect);
+      return;
+    }
+
+    reconnectAttempt = 0;
+    transition(WebSocketChannelLifecycleStates.active);
+    scheduleNext();
+  };
+
+  input.socket.once("close", () => {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    if (timer) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+    transition(WebSocketChannelLifecycleStates.closed, WebSocketChannelLifecycleInvalidationReasons.closedByPeer);
+  });
+
+  scheduleNext();
+}
+
+function resolveWebSocketTrustRevalidationIntervalMs(
+  lifecycleOptions: IdentityHttpServerWebSocketLifecycleOptions | undefined,
+  trustValidationEnforced: boolean,
+): number | undefined {
+  if (!trustValidationEnforced) {
+    return undefined;
+  }
+  const configured = lifecycleOptions?.trustRevalidationIntervalMs;
+  if (configured === undefined) {
+    return DefaultWebSocketTrustRevalidationIntervalMs;
+  }
+  if (!Number.isFinite(configured) || configured < 10) {
+    return undefined;
+  }
+  return Math.floor(configured);
+}
+
+function resolveSocketPeerCertificateBinding(socket: Socket): WebSocketChannelCertificateBinding | undefined {
+  const candidate = socket as Socket & {
+    getPeerCertificate?: () => {
+      readonly serialNumber?: string;
+      readonly fingerprint256?: string;
+    };
+  };
+  if (typeof candidate.getPeerCertificate !== "function") {
+    return undefined;
+  }
+
+  try {
+    const peerCertificate = candidate.getPeerCertificate();
+    return toWebSocketChannelCertificateBinding({
+      serialNumber: peerCertificate?.serialNumber,
+      fingerprintSha256: peerCertificate?.fingerprint256,
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+function emitWebSocketLifecycleEvent(input: {
+  readonly requestId: string;
+  readonly logger: IdentityHttpServerLogger;
+  readonly lifecycleOptions: IdentityHttpServerWebSocketLifecycleOptions | undefined;
+  readonly channelContext: WebSocketChannelContext;
+  readonly state: WebSocketChannelLifecycleState;
+  readonly reason?: WebSocketChannelLifecycleInvalidationReason;
+  readonly reconnect?: WebSocketChannelReconnectDirective;
+  readonly details?: Readonly<Record<string, unknown>>;
+}): void {
+  const event: IdentityHttpServerWebSocketLifecycleEvent = Object.freeze({
+    channelId: input.channelContext.channelId,
+    connectionId: input.channelContext.connectionId,
+    state: input.state,
+    occurredAt: new Date().toISOString(),
+    reason: input.reason,
+    reconnect: input.reconnect,
+    details: input.details,
+  });
+
+  const logEvent: IdentityHttpServerLogEvent = Object.freeze({
+    event: "identity-websocket.channel.lifecycle",
+    requestId: input.requestId,
+    statusCode: input.state === WebSocketChannelLifecycleStates.invalidated ? 4403 : 101,
+    details: Object.freeze({
+      channelId: event.channelId,
+      connectionId: event.connectionId,
+      state: event.state,
+      reason: event.reason,
+      reconnect: event.reconnect,
+      ...(event.details ?? {}),
+    }),
+  });
+
+  if (
+    input.state === WebSocketChannelLifecycleStates.invalidated
+    || input.state === WebSocketChannelLifecycleStates.reconnectPending
+  ) {
+    input.logger.warn(logEvent);
+  } else {
+    input.logger.info(logEvent);
+  }
+  void input.lifecycleOptions?.onLifecycleEvent?.(event);
 }
 
 async function handleRegister(
