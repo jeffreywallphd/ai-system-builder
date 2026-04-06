@@ -28,6 +28,7 @@ This note documents the Story 13.2.1 baseline for authoritative persistence boot
 - bootstrap metadata table creation
 - bootstrap migration ledger creation
 - deterministic migration hook execution with checksum tracking
+- migration replay resilience for additive-column drift (`ALTER TABLE ... ADD COLUMN` duplicate-column faults are treated as idempotent replays so host startup can recover from partially applied legacy schemas)
 
 This keeps migration-safe evolution explicit before domain-specific repository migrations run.
 

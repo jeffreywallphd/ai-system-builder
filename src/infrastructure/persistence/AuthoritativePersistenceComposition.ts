@@ -105,6 +105,40 @@ const VersionedMigrationSources = Object.freeze<ReadonlyArray<VersionedMigration
   }),
 ]);
 
+const AddColumnStatementPattern = /^\s*ALTER\s+TABLE\b[\s\S]*\bADD\s+COLUMN\b/i;
+const DuplicateColumnErrorPattern = /duplicate column name:/i;
+
+function splitSqlStatements(sql: string): ReadonlyArray<string> {
+  return sql
+    .split(";")
+    .map((statement) => statement.trim())
+    .filter((statement) => statement.length > 0);
+}
+
+function isIgnorableDuplicateAddColumnError(error: unknown, statement: string): boolean {
+  if (!AddColumnStatementPattern.test(statement)) {
+    return false;
+  }
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return DuplicateColumnErrorPattern.test(error.message);
+}
+
+function execVersionedMigrationSql(database: SqliteCompatDatabase, sql: string): void {
+  for (const statement of splitSqlStatements(sql)) {
+    try {
+      database.exec(`${statement};`);
+    } catch (error) {
+      // Drift-safe replay: ignore duplicate-column faults only for ALTER TABLE ... ADD COLUMN statements.
+      if (isIgnorableDuplicateAddColumnError(error, statement)) {
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 function createMigrationHookChecksum(input: {
   readonly domainId: string;
   readonly version: number;
@@ -142,7 +176,7 @@ function createVersionedMigrationHooks(source: VersionedMigrationSource): Readon
           return;
         }
 
-        database.exec(sql);
+        execVersionedMigrationSql(database, sql);
         database
           .prepare(`INSERT INTO ${source.migrationTableName} (version, applied_at) VALUES (?, ?)`)
           .run(version, new Date().toISOString());
