@@ -103,6 +103,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Managed storage backend extension rules and operational composition assumptions baseline: `docs/architecture/storage-feature-extension-guidance.md`
 - Host runtime composition-root and boundary contracts baseline (authoritative server, desktop, hybrid, web, worker): `docs/architecture/host-runtime-composition-boundaries.md`
 - Shared host bootstrap pipeline and startup context baseline (canonical startup sequence + host customization seams): `docs/architecture/host-bootstrap-pipeline.md`
+- Host-safe service registration and host-aware dependency composition rules baseline: `docs/architecture/host-service-registration-composition-rules.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
 - Authorization permission matrix and key catalog reference: `docs/architecture/authorization-permission-catalog.md`
 - Authorization workspace role-definition and baseline role-grant reference: `docs/architecture/authorization-role-reference.md`
