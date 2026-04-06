@@ -257,6 +257,19 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
 - Authoritative required host service coverage now includes explicit persistence bootstrap/repository/transaction/helper service registrations:
   - `src/infrastructure/config/HostServiceRegistrationCatalog.ts`
 
+## Story 13.4.3 integration and contributor extension baseline
+
+- New cross-domain authoritative persistence integration coverage now validates representative end-to-end flows through one composed persistent platform service surface:
+  - `src/infrastructure/persistence/tests/PersistentPlatformServices.integration.test.ts`
+- Covered representative flows:
+  - user/workspace persistence
+  - trusted-device + session persistence
+  - node enrollment metadata persistence
+  - storage instance lifecycle persistence
+  - run record + audit event persistence
+- Contributor extension guidance for repository additions, aggregate-boundary decisions, mapper/transaction wiring, and redaction-safe diagnostics:
+  - `docs/architecture/persistent-platform-service-extension-guidance.md`
+
 ## Mapper guidance for contributors
 
 - Keep mapper implementations in infrastructure, but drive them from shared DTO + schema contracts.

@@ -381,6 +381,20 @@ The goal is to keep repository implementation aligned to domain/application cont
 - Authoritative host service registration coverage now explicitly includes persistence bootstrap/repository/transaction/helper composition services:
   - `src/infrastructure/config/HostServiceRegistrationCatalog.ts`
 
+## Story 13.4.3 integration and contributor extension baseline
+
+- Cross-domain authoritative persistence integration coverage now validates representative end-to-end flows through one composed persistent platform service surface:
+  - `src/infrastructure/persistence/tests/PersistentPlatformServices.integration.test.ts`
+- Covered representative flows include:
+  - identity user persistence + workspace tenancy persistence
+  - trusted-device + session token persistence
+  - node enrollment metadata persistence
+  - storage instance creation and lifecycle persistence
+  - platform run creation/update persistence
+  - append-only platform audit event persistence
+- Contributor extension guidance for adding repositories, aggregate-boundary decisions, mapper/transaction wiring, and redaction-safe diagnostics now lives in:
+  - `docs/architecture/persistent-platform-service-extension-guidance.md`
+
 ## Mapper responsibility guidance (Story 13.1.3)
 
 - Mapper boundaries are adapter-local but contract-driven:
