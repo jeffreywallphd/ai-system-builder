@@ -89,3 +89,9 @@ Payloads remain API-safe and infrastructure-agnostic.
 - Shared contracts/DTOs avoid leaking backend-specific adapter concerns.
 - Future API handlers can integrate against stable logical asset interfaces without redesign.
 
+## Story 10.1.5: raw-path quarantine
+
+- Desktop renderer-facing model file bridge contracts now use logical model paths (relative to managed model roots) instead of raw absolute filesystem paths.
+- Electron main process path resolution for model files is isolated in `electron/main/ModelFilePathPolicy.ts` with explicit rejection of absolute, drive-prefixed, traversal, and out-of-root path input.
+- Absolute filesystem paths remain infrastructure-only details via `DesktopBridgeFileStorage` translation; UI/IPC/public bridge contracts no longer require raw path input/output for this asset-facing flow.
+

@@ -88,12 +88,13 @@ export interface DesktopWorkflowRunSummaryBridge {
 }
 
 export interface DesktopModelFileBridge {
-  exists(path: string): boolean;
-  stat(path: string): { readonly path: string; readonly kind: "file" | "directory"; readonly size?: number; readonly modifiedAt?: string };
-  read(path: string): Uint8Array;
+  // modelPath values are logical paths relative to the desktop managed-model root.
+  exists(modelPath: string): boolean;
+  stat(modelPath: string): { readonly path: string; readonly kind: "file" | "directory"; readonly size?: number; readonly modifiedAt?: string };
+  read(modelPath: string): Uint8Array;
   write(request: { readonly path: string; readonly content: Uint8Array; readonly overwrite?: boolean; readonly createDirectories?: boolean }): void;
-  delete(path: string): void;
-  list(path: string, options?: { readonly recursive?: boolean }): ReadonlyArray<{ readonly path: string; readonly kind: "file" | "directory"; readonly size?: number; readonly modifiedAt?: string }>;
+  delete(modelPath: string): void;
+  list(modelPath: string, options?: { readonly recursive?: boolean }): ReadonlyArray<{ readonly path: string; readonly kind: "file" | "directory"; readonly size?: number; readonly modifiedAt?: string }>;
   move(request: { readonly from: string; readonly to: string; readonly overwrite?: boolean }): void;
   copy(request: { readonly from: string; readonly to: string; readonly overwrite?: boolean }): void;
 }
