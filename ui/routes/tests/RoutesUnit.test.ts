@@ -27,6 +27,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('key: "workspace-thin-membership"');
     expect(source).toContain('key: "workspace-invitation-accept"');
     expect(source).toContain('key: "identity-admin"');
+    expect(source).toContain('key: "secrets-admin"');
     expect(source).toContain('key: "mcp"');
     expect(source).toContain('key: "services"');
     expect(source).toContain('key: "context"');
@@ -51,6 +52,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('workspaceThinMembership: "/settings/workspaces/thin"');
     expect(source).toContain('workspaceInvitationAccept: "/workspaces/:workspaceId/invitations/:invitationToken/accept"');
     expect(source).toContain('identityAdmin: "/settings/identity-admin"');
+    expect(source).toContain('secretsAdmin: "/settings/secrets"');
     expect(source).toContain('key: "agent-studio"');
     expect(source).toContain('key: "registry"');
     expect(source).toContain('key: "registry-asset-detail"');
@@ -97,6 +99,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.workspaceThinMembership");
     expect(source).toContain("path: ROUTE_PATHS.workspaceInvitationAccept");
     expect(source).toContain("path: ROUTE_PATHS.identityAdmin");
+    expect(source).toContain("path: ROUTE_PATHS.secretsAdmin");
     expect(source).toContain("path: ROUTE_PATHS.mcp");
     expect(source).toContain("path: ROUTE_PATHS.services");
     expect(source).toContain("path: ROUTE_PATHS.agentStudio");

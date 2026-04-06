@@ -30,6 +30,9 @@ validate command/query boundaries consistently.
   - reads one metadata record by id.
 - `POST /api/v1/security/secrets/{secretId}/disable`
   - disables a secret record and returns updated metadata.
+- `POST /api/v1/security/secrets/{secretId}/rotate`
+  - rotates secret material by submitting replacement plaintext.
+  - response returns updated metadata only, including the new active `currentVersionId`.
 
 No UI-facing plaintext retrieval endpoint is exposed.
 
@@ -37,7 +40,7 @@ No UI-facing plaintext retrieval endpoint is exposed.
 
 - Transport request validation is enforced with shared secret schema contracts reused by transport and API layers.
 - Validation failures return stable `invalid-request` API errors with typed validation details.
-- Command DTOs (create/disable) are distinct from query DTOs (metadata read/list projections).
+- Command DTOs (create/disable/rotate) are distinct from query DTOs (metadata read/list projections).
 - Query DTOs intentionally exclude plaintext and encrypted payload internals.
 - Route request logging uses redacted payload shaping for secret creation (`plaintextProvided` flag only).
 - Inactive secret records remain metadata-queryable for audit/lineage visibility while runtime plaintext retrieval is denied.
@@ -48,6 +51,7 @@ Use command DTOs only for mutation input:
 
 - `CreateSecretCommandDto`
 - `DisableSecretCommandDto`
+- `RotateSecretCommandDto`
 
 Use query DTOs only for metadata output:
 
@@ -87,7 +91,7 @@ Secret service outcomes are mapped to API contracts:
 
 Coverage verifies:
 
-- happy-path create/list/get/disable route behavior
-- denial behavior for unauthorized metadata read/disable
+- happy-path create/list/get/rotate/disable route behavior
+- denial behavior for unauthorized metadata read/rotate/disable
 - request validation failures for body and query parameters
 - backend API mapping and fail-closed workspace actor-context handling

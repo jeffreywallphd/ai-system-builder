@@ -50,6 +50,7 @@ async function startServer(): Promise<{
     getSecretMetadataUseCase: secretService.getSecretMetadataUseCase,
     listSecretsUseCase: secretService.listSecretsUseCase,
     disableSecretUseCase: secretService.disableSecretUseCase,
+    rotateSecretUseCase: secretService.rotateSecretUseCase,
   });
 
   const server = createIdentityHttpServer({
@@ -121,7 +122,7 @@ async function registerAndLoginTrusted(input: {
 }
 
 describe("IdentityHttpServer secret metadata routes", () => {
-  it("supports create/list/get/disable metadata-only secret APIs", async () => {
+  it("supports create/list/get/rotate/disable metadata-only secret APIs", async () => {
     const { baseUrl, harness } = await startServer();
     const owner = await registerAndLoginTrusted({
       baseUrl,
@@ -185,6 +186,27 @@ describe("IdentityHttpServer secret metadata routes", () => {
     const getBody = await getResponse.json();
     expect(getBody.ok).toBe(true);
     expect((getBody.data.secret as Record<string, unknown>).plaintext).toBeUndefined();
+
+    const rotateResponse = await fetch(
+      `${baseUrl}/api/v1/security/secrets/${encodeURIComponent("secret:user:metadata-http-openai")}/rotate`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${owner.sessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          operationKey: "op:secret:rotate:metadata-http-openai",
+          plaintext: "sk-live-rotated-never-returned",
+          expectedCurrentVersionId: createBody.data.secret.currentVersionId,
+        }),
+      },
+    );
+    expect(rotateResponse.status).toBe(200);
+    const rotateBody = await rotateResponse.json();
+    expect(rotateBody.ok).toBe(true);
+    expect(rotateBody.data.secret.currentVersionId).not.toBe(createBody.data.secret.currentVersionId);
+    expect((rotateBody.data.secret as Record<string, unknown>).plaintext).toBeUndefined();
 
     const disableResponse = await fetch(
       `${baseUrl}/api/v1/security/secrets/${encodeURIComponent("secret:user:metadata-http-openai")}/disable`,
@@ -291,6 +313,22 @@ describe("IdentityHttpServer secret metadata routes", () => {
       },
     );
     expect(deniedDisable.status).toBe(404);
+
+    const deniedRotate = await fetch(
+      `${baseUrl}/api/v1/security/secrets/${encodeURIComponent("secret:user:metadata-http-denied")}/rotate`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${viewer.sessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          operationKey: "op:secret:rotate:metadata-http-denied",
+          plaintext: "sk-live-hidden-rotated",
+        }),
+      },
+    );
+    expect(deniedRotate.status).toBe(404);
   });
 
   it("enforces request validation for secret metadata APIs", async () => {

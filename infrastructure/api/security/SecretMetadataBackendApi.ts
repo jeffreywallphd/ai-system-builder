@@ -5,6 +5,7 @@ import type { CreateSecretUseCase } from "../../../src/application/security/use-
 import type { DisableSecretUseCase } from "../../../src/application/security/use-cases/DisableSecretUseCase";
 import type { GetSecretMetadataUseCase } from "../../../src/application/security/use-cases/GetSecretMetadataUseCase";
 import type { ListSecretsUseCase } from "../../../src/application/security/use-cases/ListSecretsUseCase";
+import type { RotateSecretUseCase } from "../../../src/application/security/use-cases/RotateSecretUseCase";
 import { SecretServiceErrorCodes } from "../../../src/application/security/use-cases/SecretManagementServiceContracts";
 import type { IWorkspaceAuthorizationReadRepository } from "../../../src/application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import { toSecretMetadataQueryDto } from "../../../src/shared/dto/security/SecretTransportDtos";
@@ -14,6 +15,7 @@ import {
   parseDisableSecretMetadataCommand,
   parseGetSecretMetadataQuery,
   parseListSecretMetadataQuery,
+  parseRotateSecretMetadataCommand,
 } from "../../../src/shared/schemas/security/SecretApiSchemaContracts";
 import {
   SecretMetadataApiErrorCodes,
@@ -25,6 +27,8 @@ import {
   type GetSecretMetadataApiResponse,
   type ListSecretMetadataApiRequest,
   type ListSecretMetadataApiResponse,
+  type RotateSecretMetadataApiRequest,
+  type RotateSecretMetadataApiResponse,
   type SecretMetadataApiError,
   type SecretMetadataApiRecord,
   type SecretMetadataApiResponse,
@@ -35,6 +39,7 @@ interface SecretMetadataBackendApiDependencies {
   readonly getSecretMetadataUseCase: GetSecretMetadataUseCase;
   readonly listSecretsUseCase: ListSecretsUseCase;
   readonly disableSecretUseCase: DisableSecretUseCase;
+  readonly rotateSecretUseCase: RotateSecretUseCase;
   readonly workspaceAuthorizationReadRepository?: IWorkspaceAuthorizationReadRepository;
   readonly clock?: {
     now(): Date;
@@ -45,7 +50,7 @@ interface SecretMetadataBackendApiDependencies {
 type SecretMetadataObservabilityEvent =
   | {
     readonly event: "secret-metadata.request.succeeded";
-    readonly operation: "create-secret" | "list-secrets" | "get-secret" | "disable-secret";
+    readonly operation: "create-secret" | "list-secrets" | "get-secret" | "disable-secret" | "rotate-secret";
     readonly actorUserIdentityId?: string;
     readonly secretId?: string;
     readonly scope?: string;
@@ -54,7 +59,7 @@ type SecretMetadataObservabilityEvent =
   }
   | {
     readonly event: "secret-metadata.request.failed";
-    readonly operation: "create-secret" | "list-secrets" | "get-secret" | "disable-secret";
+    readonly operation: "create-secret" | "list-secrets" | "get-secret" | "disable-secret" | "rotate-secret";
     readonly actorUserIdentityId?: string;
     readonly code: SecretMetadataApiError["code"];
     readonly message: string;
@@ -364,6 +369,79 @@ export class SecretMetadataBackendApi {
       ok: true,
       data: Object.freeze({
         secret: toSecretMetadataApiRecord(outcome.value),
+      }),
+    });
+  }
+
+  public async rotateSecret(
+    request: RotateSecretMetadataApiRequest,
+  ): Promise<SecretMetadataApiResponse<RotateSecretMetadataApiResponse>> {
+    let parsedRequest: ReturnType<typeof parseRotateSecretMetadataCommand>;
+    try {
+      parsedRequest = parseRotateSecretMetadataCommand({
+        secretId: request.secretId,
+        plaintext: request.plaintext,
+        operationKey: request.operationKey,
+        expectedCurrentVersionId: request.expectedCurrentVersionId,
+        rotatedAt: request.rotatedAt,
+        actorWorkspaceId: request.actorWorkspaceId,
+      });
+    } catch (error) {
+      if (error instanceof SecretApiSchemaValidationError) {
+        return this.failedValidation("rotate-secret", error.issues, request.actorUserIdentityId, request.secretId);
+      }
+      throw error;
+    }
+
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed("rotate-secret", SecretMetadataApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+    }
+
+    const actorWorkspaceId = await this.resolveAuthorizedWorkspaceId(actorUserIdentityId, parsedRequest.actorWorkspaceId);
+    const actor = createActor({
+      actorUserIdentityId,
+      actorWorkspaceId,
+      grantedActions: [SecretAccessActions.rotate],
+      actorType: SecretActorTypes.serverAdmin,
+    });
+
+    const operationKey = normalizeOptional(parsedRequest.operationKey)
+      ?? `secret-metadata:rotate:${parsedRequest.secretId}:${randomUUID()}`;
+
+    const outcome = await this.dependencies.rotateSecretUseCase.execute({
+      actor,
+      operationKey,
+      secretId: parsedRequest.secretId,
+      plaintext: parsedRequest.plaintext,
+      expectedCurrentVersionId: parsedRequest.expectedCurrentVersionId,
+      rotatedAt: parsedRequest.rotatedAt,
+    });
+
+    if (!outcome.ok) {
+      return this.failedFromSecretServiceResult(
+        "rotate-secret",
+        outcome.error.code,
+        outcome.error.message,
+        actorUserIdentityId,
+        parsedRequest.secretId,
+      );
+    }
+
+    await this.emitObservability({
+      event: "secret-metadata.request.succeeded",
+      operation: "rotate-secret",
+      actorUserIdentityId,
+      secretId: outcome.value.secret.secretId,
+      scope: outcome.value.secret.scope,
+      workspaceId: outcome.value.secret.workspaceId,
+      userIdentityId: outcome.value.secret.userIdentityId,
+    });
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        secret: toSecretMetadataApiRecord(outcome.value.secret),
       }),
     });
   }

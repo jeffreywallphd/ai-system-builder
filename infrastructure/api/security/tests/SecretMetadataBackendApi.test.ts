@@ -148,6 +148,39 @@ describe("SecretMetadataBackendApi", () => {
     expect(response.error.code).toBe(SecretMetadataApiErrorCodes.notFound);
   });
 
+  it("rotates and returns metadata-only records", async () => {
+    const backend = createBackend({
+      rotateSecretUseCase: {
+        execute: async () => Object.freeze({
+          ok: true,
+          value: Object.freeze({
+            secret: createReference({
+              secretId: "secret:user:openai",
+              scope: SecretScopes.user,
+              userIdentityId: "user:alpha",
+            }),
+            currentVersionId: "secret:user:openai:v2",
+          }),
+        }),
+      },
+    });
+
+    const response = await backend.rotateSecret({
+      actorUserIdentityId: "user:alpha",
+      secretId: "secret:user:openai",
+      plaintext: "sk-live-rotated",
+      expectedCurrentVersionId: "secret:user:openai:v1",
+    });
+
+    expect(response.ok).toBeTrue();
+    if (!response.ok || !response.data) {
+      return;
+    }
+
+    expect(response.data.secret.secretId).toBe("secret:user:openai");
+    expect((response.data.secret as Record<string, unknown>).plaintext).toBeUndefined();
+  });
+
   it("returns stable validation errors for malformed create payloads", async () => {
     const backend = createBackend({});
 
@@ -191,6 +224,11 @@ function createBackend(overrides: Record<string, unknown>): SecretMetadataBacken
       },
     },
     disableSecretUseCase: {
+      execute: async () => {
+        throw new Error("not configured");
+      },
+    },
+    rotateSecretUseCase: {
       execute: async () => {
         throw new Error("not configured");
       },

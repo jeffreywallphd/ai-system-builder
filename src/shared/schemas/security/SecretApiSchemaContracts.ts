@@ -14,6 +14,7 @@ import type {
   DisableSecretCommandDto,
   GetSecretMetadataQueryDto,
   ListSecretMetadataQueryDto,
+  RotateSecretCommandDto,
 } from "../../dto/security/SecretTransportDtos";
 
 export interface SecretApiSchemaValidationIssue {
@@ -226,6 +227,15 @@ export const DisableSecretMetadataCommandSchema: z.ZodType<DisableSecretCommandD
   actorWorkspaceId: ScopeIdentifierSchema.optional(),
 }).strict();
 
+export const RotateSecretMetadataCommandSchema: z.ZodType<RotateSecretCommandDto> = z.object({
+  secretId: SecretIdSchema,
+  plaintext: z.string().min(1, "plaintext is required."),
+  operationKey: OptionalOperationKeySchema,
+  expectedCurrentVersionId: ScopeIdentifierSchema.optional(),
+  rotatedAt: z.string().datetime({ offset: true }).optional(),
+  actorWorkspaceId: ScopeIdentifierSchema.optional(),
+}).strict();
+
 function formatZodPath(path: ReadonlyArray<string | number>): string {
   if (path.length === 0) {
     return "payload";
@@ -269,4 +279,8 @@ export function parseGetSecretMetadataQuery(payload: unknown): GetSecretMetadata
 
 export function parseDisableSecretMetadataCommand(payload: unknown): DisableSecretCommandDto {
   return parseSchema("DisableSecretMetadataCommand", DisableSecretMetadataCommandSchema, payload);
+}
+
+export function parseRotateSecretMetadataCommand(payload: unknown): RotateSecretCommandDto {
+  return parseSchema("RotateSecretMetadataCommand", RotateSecretMetadataCommandSchema, payload);
 }

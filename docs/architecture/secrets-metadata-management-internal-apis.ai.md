@@ -25,6 +25,7 @@ Story 8.2.4 baseline for Feature 8 / Epic 8.2: expose internal server API surfac
 - `GET /api/v1/security/secrets` (list metadata)
 - `GET /api/v1/security/secrets/{secretId}` (detail metadata)
 - `POST /api/v1/security/secrets/{secretId}/disable` (disable)
+- `POST /api/v1/security/secrets/{secretId}/rotate` (rotate)
 - List metadata supports lifecycle filters: `includeDisabled`, `includeArchived`, `includeSoftDeleted`.
 
 No plaintext retrieval endpoint is added.
@@ -40,7 +41,7 @@ No plaintext retrieval endpoint is added.
 
 ## DTO safety summary
 
-- Command DTOs (`CreateSecretCommandDto`, `DisableSecretCommandDto`) are scoped to mutation inputs.
+- Command DTOs (`CreateSecretCommandDto`, `DisableSecretCommandDto`, `RotateSecretCommandDto`) are scoped to mutation inputs.
 - Query DTOs (`SecretMetadataQueryDto`) are metadata-only and exclude plaintext/encrypted material fields by contract.
 - Secret metadata record mapping in backend APIs now routes through shared safe DTO mapping helpers.
 
@@ -63,4 +64,4 @@ No plaintext retrieval endpoint is added.
 ## Test posture
 
 - backend API tests validate mapping and fail-closed actor context behavior.
-- HTTP server route tests validate happy path, denial path, and validation path for secret metadata endpoints.
+- HTTP server route tests validate happy path, denial path, and validation path for secret metadata endpoints, including rotate.

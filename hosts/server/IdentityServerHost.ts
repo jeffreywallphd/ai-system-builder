@@ -675,6 +675,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     getSecretMetadataUseCase: secretService.getSecretMetadataUseCase,
     listSecretsUseCase: secretService.listSecretsUseCase,
     disableSecretUseCase: secretService.disableSecretUseCase,
+    rotateSecretUseCase: secretService.rotateSecretUseCase,
     workspaceAuthorizationReadRepository: workspaceRepository,
   });
   const nodeTrustBackendApi = new NodeTrustBackendApi({
