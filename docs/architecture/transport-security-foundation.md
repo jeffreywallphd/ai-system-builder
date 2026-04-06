@@ -411,12 +411,12 @@ Story 7.2.3 adds desktop-side transport bootstrap behavior so desktop client cha
     - pinned trust-material registration metadata.
 - `electron/main/main.ts`
   - desktop host resolves `identityTransportTrust` from secure desktop storage/env-backed host configuration and injects it into preload bootstrap context.
-- `infrastructure/security/DesktopTrustedDeviceTransportBootstrap.ts`
+- `src/infrastructure/security/DesktopTrustedDeviceTransportBootstrap.ts`
   - central desktop trust-bootstrap resolver + ports:
     - bootstrap-context port (`IDesktopTrustedDeviceBootstrapPort`);
     - clock port (`IDesktopTrustedDeviceBootstrapClockPort`);
     - deterministic bootstrap state model (`ready` / `not-required` / `failed` with actionable reason codes).
-- `infrastructure/transport/http-client/DesktopTrustedDeviceIdentityAuthClient.ts`
+- `src/infrastructure/transport/http-client/DesktopTrustedDeviceIdentityAuthClient.ts`
   - desktop-aware auth client wrapper that:
     - blocks login when required trust bootstrap fails;
     - injects trusted-device binding into desktop login requests and requires trusted session issuance;
@@ -429,9 +429,9 @@ Story 7.2.3 adds desktop-side transport bootstrap behavior so desktop client cha
 
 ### Tests
 
-- `infrastructure/security/tests/DesktopTrustedDeviceTransportBootstrap.test.ts`
+- `src/infrastructure/security/tests/DesktopTrustedDeviceTransportBootstrap.test.ts`
   - covers required/optional bootstrap posture, missing registration, missing pin, expired pin, and ready-state resolution.
-- `infrastructure/transport/http-client/tests/DesktopTrustedDeviceIdentityAuthClient.test.ts`
+- `src/infrastructure/transport/http-client/tests/DesktopTrustedDeviceIdentityAuthClient.test.ts`
   - covers bootstrap-failure channel blocking, trust-context login injection, post-login trust-assurance gating, and non-required passthrough behavior.
 
 ## Story 7.2.4 thin-client secure session channels for browser and mobile
@@ -461,3 +461,4 @@ Story 7.2.4 formalizes thin-client browser/mobile channel behavior so thin-clien
   - covers no trust-bypass for thin-client loopback sessions, desktop-only bypass continuity, desktop/thin-client scenario routing, and authenticated transport channel-context logging.
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
   - covers thin-client websocket origin rejection and accepted thin-client websocket routing with valid origin.
+

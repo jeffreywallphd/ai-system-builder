@@ -1,4 +1,4 @@
-import type { DesktopBootstrapContext } from "../../electron/shared/DesktopContracts";
+import type { DesktopBootstrapContext } from "../../../electron/shared/DesktopContracts";
 
 export const DesktopTrustedDeviceBootstrapFailureReasons = Object.freeze({
   registrationMissing: "registration-missing",

@@ -37,7 +37,7 @@ import type {
   ValidateTrustedDevicePairingApiRequest,
   ValidateTrustedDevicePairingApiResponse,
 } from "../../src/infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
-import { DesktopTrustedDeviceIdentityAuthClient } from "../../infrastructure/transport/http-client/DesktopTrustedDeviceIdentityAuthClient";
+import { DesktopTrustedDeviceIdentityAuthClient } from "../../src/infrastructure/transport/http-client/DesktopTrustedDeviceIdentityAuthClient";
 import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
 import { HttpIdentityAuthClient, type IdentityAuthClient } from "../shared/identity/IdentityAuthClient";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
