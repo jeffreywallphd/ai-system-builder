@@ -79,6 +79,8 @@ HTTP mapping:
 - `404` not found
 - `500` internal
 
+Registration invalid-request responses now preserve specific actionable message text from policy/request validation outcomes (for example, credential policy failures) rather than collapsing to a generic registration-invalid message.
+
 ## Redaction guarantee
 
 Auth observability and redaction are centralized in:

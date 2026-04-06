@@ -279,6 +279,7 @@ All responses use one envelope:
 
 - success: `{ "ok": true, "data": ... }`
 - failure: `{ "ok": false, "error": { "code": "...", "message": "...", "validationErrors"?: [...] } }`
+- registration policy/input failures preserve specific actionable `error.message` text (for example, credential policy violations), while keeping the stable `invalid-request` code.
 
 Trusted-device responses are allowlist-projected and intentionally exclude:
 

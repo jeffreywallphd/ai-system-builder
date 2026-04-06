@@ -136,6 +136,22 @@ describe("IdentityAuthBackendApi", () => {
     expect(missing.error?.code).toBe("authentication-failed");
   });
 
+  it("returns a specific invalid-request message for registration input failures", async () => {
+    const harness = await createIdentityAuthTestHarness();
+
+    const response = await harness.backendApi.registerLocalAccount({
+      username: "weak.credential.user",
+      credential: {
+        candidate: "1",
+      },
+    });
+
+    expect(response.ok).toBeFalse();
+    expect(response.error?.code).toBe("invalid-request");
+    expect(response.error?.message).toContain("Credential policy validation failed.");
+    expect(response.error?.message).not.toBe("The registration request is invalid.");
+  });
+
   it("denies login when trusted-device issuance is required but trust binding is missing", async () => {
     const harness = await createIdentityAuthTestHarness();
 
