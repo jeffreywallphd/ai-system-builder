@@ -6,7 +6,10 @@ import type {
   StorageLifecycleState,
   StorageReplicationMode,
 } from "../../../domain/storage/StorageDomain";
-import type { StorageBackendCapabilitySnapshot } from "../ports/StorageCapabilityInspectionPort";
+import type {
+  StorageBackendCapabilitySnapshot,
+  StorageBackendHealthStatus,
+} from "../ports/StorageCapabilityInspectionPort";
 import type { StorageInstanceAccessSummary } from "../ports/StorageAccessSummaryPort";
 import type { StorageProvisioningReceipt } from "../ports/StorageProvisioningPort";
 
@@ -170,6 +173,24 @@ export interface GetStorageInstanceDetailsResult {
   readonly capabilities?: StorageBackendCapabilitySnapshot;
 }
 
+export interface InspectStorageInstanceStatusQuery {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly storageInstanceId: string;
+  readonly occurredAt?: string;
+}
+
+export interface InspectStorageInstanceStatusResult {
+  readonly storageInstance: StorageInstance;
+  readonly accessSummary?: StorageInstanceAccessSummary;
+  readonly capabilities?: StorageBackendCapabilitySnapshot;
+  readonly lifecycleState: StorageLifecycleState;
+  readonly operationalStatus: StorageBackendHealthStatus;
+  readonly lastCheckedAt: string;
+  readonly reasonCode: string;
+  readonly operationalNotes: ReadonlyArray<string>;
+}
+
 export interface IStorageManagementService {
   createStorageInstance(
     command: CreateStorageInstanceCommand,
@@ -189,6 +210,9 @@ export interface IStorageManagementService {
   getStorageInstanceDetails(
     query: GetStorageInstanceDetailsQuery,
   ): Promise<StorageManagementResult<GetStorageInstanceDetailsResult>>;
+  inspectStorageInstanceStatus(
+    query: InspectStorageInstanceStatusQuery,
+  ): Promise<StorageManagementResult<InspectStorageInstanceStatusResult>>;
 }
 
 export interface StorageManagementMutationUseCaseContracts {
@@ -213,4 +237,7 @@ export interface StorageManagementReadUseCaseContracts {
   getStorageInstanceDetails(
     query: GetStorageInstanceDetailsQuery,
   ): Promise<StorageManagementResult<GetStorageInstanceDetailsResult>>;
+  inspectStorageInstanceStatus(
+    query: InspectStorageInstanceStatusQuery,
+  ): Promise<StorageManagementResult<InspectStorageInstanceStatusResult>>;
 }

@@ -106,6 +106,29 @@ class StubStorageManagementService implements IStorageManagementService {
     return this.okResult(this.storageInstance);
   }
 
+  public async inspectStorageInstanceStatus(): Promise<StorageManagementResult<any>> {
+    return {
+      ok: true,
+      value: {
+        storageInstance: this.storageInstance,
+        accessSummary: this.accessSummary(),
+        capabilities: {
+          backendType: this.storageInstance.backendType,
+          supportsManagedLifecycle: true,
+          supportsAsyncReplication: false,
+          supportsSyncReplication: false,
+          supportsReadOnlyActive: true,
+          supportsCrossWorkspaceReads: false,
+        },
+        lifecycleState: this.storageInstance.lifecycleState,
+        operationalStatus: "healthy",
+        lastCheckedAt: "2026-04-06T12:40:00.000Z",
+        reasonCode: "binding-health-healthy",
+        operationalNotes: ["binding-health:healthy"],
+      },
+    };
+  }
+
   private okResult(storageInstance: StorageInstance): StorageManagementResult<any> {
     return {
       ok: true,
@@ -289,6 +312,8 @@ describe("IdentityHttpServer storage management routes", () => {
     expect(healthBody.ok).toBe(true);
     expect(healthBody.data.storage.storageInstanceId).toBe("storage-alpha");
     expect(healthBody.data.synchronizationStatus).toBe("disabled");
+    expect(healthBody.data.operationalStatus).toBe("healthy");
+    expect(healthBody.data.lastCheckedAt).toBe("2026-04-06T12:40:00.000Z");
   });
 
   it("maps policy violations and invalid query input to stable HTTP responses", async () => {

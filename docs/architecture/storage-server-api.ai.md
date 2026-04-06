@@ -38,3 +38,16 @@ Story 9.3.2 adds authoritative server-side adapters for managed storage instance
 - Host composition wires a workspace-aware policy adapter; transport handlers never bypass policy by writing directly to storage persistence.
 - Response projection uses shared DTO mappers with sensitive-reference redaction metadata.
 - Endpoints do not expose raw filesystem paths.
+
+## Story 9.3.4 inspection contract additions
+
+`GET /api/v1/storage/instances/:id/health` now returns typed inspection diagnostics for admin flows:
+
+- `lifecycleState`
+- `operationalStatus` (`healthy | unhealthy | inactive | unsupported`)
+- `lastCheckedAt`
+- `reasonCode`
+- `operationalNotes` (safe notes only)
+- capability flags and synchronization metadata
+
+Inspection is sourced from a dedicated application use case (`inspectStorageInstanceStatus`) rather than ad hoc endpoint logic, preserving policy enforcement and consistent status semantics.

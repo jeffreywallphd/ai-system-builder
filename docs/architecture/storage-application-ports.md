@@ -55,6 +55,22 @@ These contracts are backend-neutral and operate on `StorageInstance` metadata pl
 
 The intent is to ensure asset/upload/download services consume logical storage contracts rather than filesystem layout details.
 
+## Storage inspection contracts (Story 9.3.4)
+
+`StorageCapabilityInspectionPort` now exposes typed health metadata in addition to capability flags:
+
+- `health.status`: `healthy | unhealthy | inactive | unsupported`
+- `health.reasonCode`: stable machine-readable diagnostic reason
+- `health.checkedAt`: backend adapter inspection timestamp
+- `health.notes`: safe operational notes for admin diagnostics
+
+`StorageManagementService.inspectStorageInstanceStatus(...)` is the application-layer inspection use case that:
+
+- enforces workspace-aware policy checks (`get-details`) before inspection output
+- resolves instance-level capability + health snapshots
+- returns lifecycle-aware operational classification (`healthy | unhealthy | inactive | unsupported`)
+- returns explicit `lastCheckedAt`, `reasonCode`, and safe `operationalNotes` for API/admin projection
+
 ## Implemented service layer (Story 9.3.1)
 
 `StorageManagementService` implements the management contracts for:

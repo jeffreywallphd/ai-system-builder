@@ -20,6 +20,7 @@ Story 9.2.3 adds the managed shared/network-mounted storage backend adapter for 
 - `IStorageCapabilityInspectionPort` with:
   - backend-level capability posture for shared targets
   - instance-level target resolution and binding health notes
+  - typed health metadata (`status`, `reasonCode`, `checkedAt`) suitable for admin-safe inspection APIs
 
 ## Contract posture
 

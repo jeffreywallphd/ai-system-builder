@@ -22,6 +22,7 @@ Story 10.1.4 extends this slice with logical object read/write operations for ma
   - `replication-sync` (explicitly rejected for local backend)
 - `IStorageCapabilityInspectionPort` with:
   - backend capability snapshots
+  - typed backend/instance health metadata (`status`, `reasonCode`, `checkedAt`)
   - instance-level health notes for binding presence/path conflicts
 - `IStorageObjectPort` with:
   - logical key generation

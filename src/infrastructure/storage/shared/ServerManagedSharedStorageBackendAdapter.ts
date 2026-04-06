@@ -7,6 +7,7 @@ import type {
   StorageCapabilityInspectionRequest,
   StorageInstanceCapabilityInspectionRequest,
 } from "../../../application/storage/ports/StorageCapabilityInspectionPort";
+import { StorageBackendHealthStatuses } from "../../../application/storage/ports/StorageCapabilityInspectionPort";
 import type {
   IStorageProvisioningPort,
   StorageProvisioningReceipt,
@@ -255,6 +256,7 @@ export class ServerManagedSharedStorageBackendAdapter implements IStorageProvisi
   public async inspectStorageBackendCapabilities(
     input: StorageCapabilityInspectionRequest,
   ): Promise<StorageBackendCapabilitySnapshot> {
+    const checkedAt = input.occurredAt ?? new Date().toISOString();
     if (input.backendType !== StorageBackendTypes.networkShare) {
       return Object.freeze({
         backendType: input.backendType,
@@ -264,6 +266,11 @@ export class ServerManagedSharedStorageBackendAdapter implements IStorageProvisi
         supportsReadOnlyActive: false,
         supportsCrossWorkspaceReads: false,
         notes: Object.freeze([`backend-support:unsupported:${input.backendType}`]),
+        health: Object.freeze({
+          status: StorageBackendHealthStatuses.unsupported,
+          reasonCode: "backend-support-unsupported",
+          checkedAt,
+        }),
       });
     }
 
@@ -302,12 +309,19 @@ export class ServerManagedSharedStorageBackendAdapter implements IStorageProvisi
       maxObjectBytesLimit: maxObjectLimits.length > 0 ? Math.min(...maxObjectLimits) : undefined,
       minReplicationSyncIntervalSeconds: minReplicationIntervals.length > 0 ? Math.max(...minReplicationIntervals) : undefined,
       notes: Object.freeze(notes),
+      health: Object.freeze({
+        status: StorageBackendHealthStatuses.healthy,
+        reasonCode: "shared-targets-configured",
+        checkedAt,
+        notes: Object.freeze([...notes]),
+      }),
     });
   }
 
   public async inspectStorageInstanceCapabilities(
     input: StorageInstanceCapabilityInspectionRequest,
   ): Promise<StorageBackendCapabilitySnapshot> {
+    const checkedAt = input.occurredAt ?? new Date().toISOString();
     const backendCapabilities = await this.inspectStorageBackendCapabilities({
       backendType: input.storageInstance.backendType,
       workspaceId: input.storageInstance.ownership.workspaceId,
@@ -326,6 +340,12 @@ export class ServerManagedSharedStorageBackendAdapter implements IStorageProvisi
       return Object.freeze({
         ...backendCapabilities,
         notes: Object.freeze(notes),
+        health: Object.freeze({
+          status: StorageBackendHealthStatuses.unsupported,
+          reasonCode: targetResolution.reasonCode,
+          checkedAt,
+          notes: Object.freeze([...notes]),
+        }),
       });
     }
 
@@ -338,15 +358,25 @@ export class ServerManagedSharedStorageBackendAdapter implements IStorageProvisi
       notes.push(HealthNotes.targetWorkspaceRejected);
     }
 
+    let healthStatus = StorageBackendHealthStatuses.healthy;
+    let reasonCode = "binding-health-healthy";
     if (!this.filesystem.exists(binding.absolutePath)) {
       notes.push(HealthNotes.bindingMissing);
+      healthStatus = StorageBackendHealthStatuses.unhealthy;
+      reasonCode = "binding-missing";
     } else if (!this.filesystem.isDirectory(binding.absolutePath)) {
       notes.push(HealthNotes.bindingPathConflict);
+      healthStatus = StorageBackendHealthStatuses.unhealthy;
+      reasonCode = "binding-path-conflict";
     } else {
       if (!this.filesystem.canRead(binding.absolutePath)) {
         notes.push(HealthNotes.bindingPermissionDenied);
+        healthStatus = StorageBackendHealthStatuses.unhealthy;
+        reasonCode = "binding-permission-denied";
       } else if (this.requiresWriteAccess(input.storageInstance, target) && !this.filesystem.canWrite(binding.absolutePath)) {
         notes.push(HealthNotes.bindingPermissionDenied);
+        healthStatus = StorageBackendHealthStatuses.unhealthy;
+        reasonCode = "binding-permission-denied";
       } else {
         notes.push(HealthNotes.bindingHealthy);
       }
@@ -362,6 +392,12 @@ export class ServerManagedSharedStorageBackendAdapter implements IStorageProvisi
       maxObjectBytesLimit: target.compatibility.maxObjectBytesLimit,
       minReplicationSyncIntervalSeconds: target.compatibility.minReplicationSyncIntervalSeconds,
       notes: Object.freeze(notes),
+      health: Object.freeze({
+        status: healthStatus,
+        reasonCode,
+        checkedAt,
+        notes: Object.freeze([...notes]),
+      }),
     });
   }
 

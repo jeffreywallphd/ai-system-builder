@@ -7,6 +7,7 @@ import type {
   StorageCapabilityInspectionRequest,
   StorageInstanceCapabilityInspectionRequest,
 } from "../../../application/storage/ports/StorageCapabilityInspectionPort";
+import { StorageBackendHealthStatuses } from "../../../application/storage/ports/StorageCapabilityInspectionPort";
 import type {
   IStorageProvisioningPort,
   StorageProvisioningReceipt,
@@ -213,6 +214,7 @@ export class ServerManagedLocalStorageBackendAdapter implements IStorageProvisio
   public async inspectStorageBackendCapabilities(
     input: StorageCapabilityInspectionRequest,
   ): Promise<StorageBackendCapabilitySnapshot> {
+    const checkedAt = input.occurredAt ?? new Date().toISOString();
     if (input.backendType !== StorageBackendTypes.managedFilesystem) {
       return Object.freeze({
         backendType: input.backendType,
@@ -222,6 +224,11 @@ export class ServerManagedLocalStorageBackendAdapter implements IStorageProvisio
         supportsReadOnlyActive: false,
         supportsCrossWorkspaceReads: false,
         notes: Object.freeze([`backend-support:unsupported:${input.backendType}`]),
+        health: Object.freeze({
+          status: StorageBackendHealthStatuses.unsupported,
+          reasonCode: "backend-support-unsupported",
+          checkedAt,
+        }),
       });
     }
 
@@ -238,12 +245,23 @@ export class ServerManagedLocalStorageBackendAdapter implements IStorageProvisio
       supportsCrossWorkspaceReads: this.supportsCrossWorkspaceReads,
       maxObjectBytesLimit: this.maxObjectBytesLimit,
       notes: Object.freeze(notes),
+      health: Object.freeze({
+        status: notes.includes(HealthNotes.rootHealthy)
+          ? StorageBackendHealthStatuses.healthy
+          : StorageBackendHealthStatuses.unhealthy,
+        reasonCode: notes.includes(HealthNotes.rootHealthy)
+          ? "storage-root-healthy"
+          : "storage-root-missing",
+        checkedAt,
+        notes: Object.freeze([...notes]),
+      }),
     });
   }
 
   public async inspectStorageInstanceCapabilities(
     input: StorageInstanceCapabilityInspectionRequest,
   ): Promise<StorageBackendCapabilitySnapshot> {
+    const checkedAt = input.occurredAt ?? new Date().toISOString();
     const backendCapabilities = await this.inspectStorageBackendCapabilities({
       backendType: input.storageInstance.backendType,
       workspaceId: input.storageInstance.ownership.workspaceId,
@@ -256,18 +274,30 @@ export class ServerManagedLocalStorageBackendAdapter implements IStorageProvisio
 
     const notes = [...(backendCapabilities.notes ?? [])];
     const binding = this.resolveBinding(input.storageInstance);
+    let healthStatus = StorageBackendHealthStatuses.healthy;
+    let reasonCode = "binding-health-healthy";
     if (this.filesystem.isDirectory(binding.absolutePath)) {
       notes.push(HealthNotes.bindingHealthy);
     } else if (this.filesystem.exists(binding.absolutePath)) {
       notes.push(HealthNotes.bindingPathConflict);
+      healthStatus = StorageBackendHealthStatuses.unhealthy;
+      reasonCode = "binding-path-conflict";
     } else {
       notes.push(HealthNotes.bindingMissing);
+      healthStatus = StorageBackendHealthStatuses.unhealthy;
+      reasonCode = "binding-missing";
     }
     notes.push(`binding-reference:${binding.backendBindingReferenceId}`);
 
     return Object.freeze({
       ...backendCapabilities,
       notes: Object.freeze(notes),
+      health: Object.freeze({
+        status: healthStatus,
+        reasonCode,
+        checkedAt,
+        notes: Object.freeze([...notes]),
+      }),
     });
   }
 

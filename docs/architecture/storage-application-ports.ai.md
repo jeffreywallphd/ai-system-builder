@@ -79,6 +79,20 @@ This preserves authoritative server-managed storage access without exposing host
 - resolves backend object adapters through `IStorageObjectAccessResolverPort`
 - returns internal access plans without leaking physical path details
 
+## Story 9.3.4 extension: storage inspection use case
+
+Storage inspection is now explicit at the application layer:
+
+- `StorageCapabilityInspectionPort` includes typed backend health metadata (`status`, `reasonCode`, `checkedAt`, safe `notes`) in capability snapshots.
+- `StorageManagementService.inspectStorageInstanceStatus(...)` provides authoritative workspace-scoped inspection output with:
+  - storage lifecycle state
+  - capability flags
+  - typed operational status (`healthy | unhealthy | inactive | unsupported`)
+  - `lastCheckedAt` and stable `reasonCode`
+  - safe operational notes for admin diagnostics
+
+Classification is lifecycle-aware so unhealthy posture is distinguishable from inactive lifecycle posture and unsupported backend posture.
+
 ## Verified by tests
 
 `StorageManagementServiceContracts.test.ts` covers:

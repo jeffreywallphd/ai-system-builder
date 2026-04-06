@@ -1,5 +1,6 @@
 import type { StorageBackendCapabilitySnapshot } from "../../../../src/application/storage/ports/StorageCapabilityInspectionPort";
 import type { StorageProvisioningReceipt } from "../../../../src/application/storage/ports/StorageProvisioningPort";
+import type { StorageLifecycleState } from "../../../../src/domain/storage/StorageDomain";
 import type {
   CreateStorageInstanceRequestDto,
   CreateStorageInstanceResponseDto,
@@ -128,4 +129,9 @@ export interface GetStorageInstanceHealthApiResponse {
   readonly capabilities?: StorageBackendCapabilitySnapshot;
   readonly synchronization: StorageSynchronizationMetadataDto;
   readonly synchronizationStatus: StorageSyncStatus;
+  readonly lifecycleState: StorageLifecycleState;
+  readonly operationalStatus: "healthy" | "unhealthy" | "inactive" | "unsupported";
+  readonly lastCheckedAt: string;
+  readonly reasonCode: string;
+  readonly operationalNotes: ReadonlyArray<string>;
 }

@@ -150,6 +150,29 @@ class StubStorageManagementService implements IStorageManagementService {
     };
   }
 
+  public async inspectStorageInstanceStatus(): Promise<StorageManagementResult<{
+    readonly storageInstance: StorageInstance;
+    readonly accessSummary: ReturnType<StubStorageManagementService["accessSummary"]>;
+    readonly lifecycleState: StorageInstance["lifecycleState"];
+    readonly operationalStatus: "healthy" | "unhealthy" | "inactive" | "unsupported";
+    readonly lastCheckedAt: string;
+    readonly reasonCode: string;
+    readonly operationalNotes: ReadonlyArray<string>;
+  }>> {
+    return {
+      ok: true,
+      value: {
+        storageInstance: this.storageInstance,
+        accessSummary: this.accessSummary("user-owner"),
+        lifecycleState: this.storageInstance.lifecycleState,
+        operationalStatus: "healthy",
+        lastCheckedAt: "2026-04-06T12:15:00.000Z",
+        reasonCode: "binding-health-healthy",
+        operationalNotes: ["binding-health:healthy"],
+      },
+    };
+  }
+
   private accessSummary(actorUserIdentityId: string) {
     return Object.freeze({
       actorUserIdentityId,
@@ -269,5 +292,27 @@ describe("StorageManagementBackendApi", () => {
       return;
     }
     expect(response.error.code).toBe("forbidden");
+  });
+
+  it("returns typed storage health inspection metadata for admin-safe diagnostics", async () => {
+    const backendApi = new StorageManagementBackendApi({
+      storageManagementService: new StubStorageManagementService(),
+    });
+
+    const response = await backendApi.getStorageInstanceHealth({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      storageInstanceId: "storage-alpha",
+    });
+
+    expect(response.ok).toBeTrue();
+    if (!response.ok || !response.data) {
+      return;
+    }
+    expect(response.data.storage.storageInstanceId).toBe("storage-alpha");
+    expect(response.data.lifecycleState).toBe("active");
+    expect(response.data.operationalStatus).toBe("healthy");
+    expect(response.data.lastCheckedAt).toBe("2026-04-06T12:15:00.000Z");
+    expect(response.data.operationalNotes).toContain("binding-health:healthy");
   });
 });

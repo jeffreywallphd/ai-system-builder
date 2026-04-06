@@ -1,6 +1,7 @@
 import {
   StorageDomainError,
   StorageLifecycleTransitionError,
+  StorageLifecycleStates,
   StorageManagedActions,
   StoragePolicyRestrictedCapabilities,
   createStorageAttribution,
@@ -10,6 +11,7 @@ import {
   type StorageInstance,
 } from "../../../domain/storage/StorageDomain";
 import type { IStorageCapabilityInspectionPort, StorageBackendCapabilitySnapshot } from "../ports/StorageCapabilityInspectionPort";
+import { StorageBackendHealthStatuses } from "../ports/StorageCapabilityInspectionPort";
 import type { StorageInstanceAccessSummary } from "../ports/StorageAccessSummaryPort";
 import type { IStorageInstanceRepository } from "../ports/IStorageInstanceRepository";
 import {
@@ -42,6 +44,8 @@ import {
   type GetStorageInstanceDetailsQuery,
   type GetStorageInstanceDetailsResult,
   type IStorageManagementService,
+  type InspectStorageInstanceStatusQuery,
+  type InspectStorageInstanceStatusResult,
   type ListAccessibleStorageInstancesQuery,
   type ListAccessibleStorageInstancesResult,
   type StorageLifecycleMutationResult,
@@ -326,6 +330,54 @@ export class StorageManagementService implements IStorageManagementService {
       };
     } catch (error) {
       return this.failureFromError(error, "Storage detail query failed.");
+    }
+  }
+
+  public async inspectStorageInstanceStatus(
+    query: InspectStorageInstanceStatusQuery,
+  ): Promise<StorageManagementResult<InspectStorageInstanceStatusResult>> {
+    try {
+      const storageInstance = await this.requireStorageInstance(query.storageInstanceId, query.workspaceId);
+      const decision = await this.requireAllowedPolicyAction(
+        StoragePolicyActions.getDetails,
+        query.actorUserIdentityId,
+        query.workspaceId,
+        storageInstance,
+        query.occurredAt,
+      );
+      const occurredAt = query.occurredAt ?? new Date().toISOString();
+      const capabilities = await this.inspectCapabilitiesIfRequested(true, storageInstance);
+      const inspected = this.deriveOperationalInspection(storageInstance, capabilities, occurredAt);
+
+      await publishStorageManagementAuditEventBestEffort(this.dependencies.auditSink, {
+        type: StorageManagementAuditEventTypes.storageDetailQueried,
+        actorUserIdentityId: query.actorUserIdentityId,
+        workspaceId: query.workspaceId,
+        storageInstanceId: storageInstance.id,
+        occurredAt,
+        outcome: "success",
+      });
+
+      return {
+        ok: true,
+        value: Object.freeze({
+          storageInstance: this.normalizeStorageInstance(storageInstance),
+          accessSummary: await this.createAccessSummary(
+            storageInstance,
+            query.actorUserIdentityId,
+            StorageManagedActions.view,
+            decision,
+          ),
+          capabilities,
+          lifecycleState: storageInstance.lifecycleState,
+          operationalStatus: inspected.status,
+          lastCheckedAt: inspected.lastCheckedAt,
+          reasonCode: inspected.reasonCode,
+          operationalNotes: inspected.notes,
+        }),
+      };
+    } catch (error) {
+      return this.failureFromError(error, "Storage inspection failed.");
     }
   }
 
@@ -629,6 +681,81 @@ export class StorageManagementService implements IStorageManagementService {
     return Object.freeze({
       ...capabilities,
       notes: capabilities.notes ? Object.freeze([...capabilities.notes]) : undefined,
+      health: capabilities.health
+        ? Object.freeze({
+          ...capabilities.health,
+          notes: capabilities.health.notes ? Object.freeze([...capabilities.health.notes]) : undefined,
+        })
+        : undefined,
+    });
+  }
+
+  private deriveOperationalInspection(
+    storageInstance: StorageInstance,
+    capabilities: StorageBackendCapabilitySnapshot | undefined,
+    occurredAt: string,
+  ): {
+    readonly status: typeof StorageBackendHealthStatuses[keyof typeof StorageBackendHealthStatuses];
+    readonly reasonCode: string;
+    readonly lastCheckedAt: string;
+    readonly notes: ReadonlyArray<string>;
+  } {
+    const lifecycleState = storageInstance.lifecycleState;
+    const derivedAt = capabilities?.health?.checkedAt ?? occurredAt;
+    const capabilityHealth = capabilities?.health;
+    const noteSet = new Set<string>([
+      ...(capabilities?.notes ?? []),
+      ...(capabilityHealth?.notes ?? []),
+    ]);
+    const notes = Object.freeze([...noteSet]);
+
+    if (!capabilities || !capabilities.supportsManagedLifecycle) {
+      return Object.freeze({
+        status: StorageBackendHealthStatuses.unsupported,
+        reasonCode: capabilityHealth?.reasonCode ?? "storage-capability-inspection-unavailable",
+        lastCheckedAt: derivedAt,
+        notes,
+      });
+    }
+
+    if (lifecycleState === StorageLifecycleStates.failed || lifecycleState === StorageLifecycleStates.degraded) {
+      return Object.freeze({
+        status: StorageBackendHealthStatuses.unhealthy,
+        reasonCode: "storage-lifecycle-unhealthy",
+        lastCheckedAt: derivedAt,
+        notes,
+      });
+    }
+
+    if (
+      lifecycleState === StorageLifecycleStates.suspended
+      || lifecycleState === StorageLifecycleStates.archived
+      || lifecycleState === StorageLifecycleStates.deleting
+      || lifecycleState === StorageLifecycleStates.deleted
+      || lifecycleState === StorageLifecycleStates.provisioning
+    ) {
+      return Object.freeze({
+        status: StorageBackendHealthStatuses.inactive,
+        reasonCode: "storage-lifecycle-inactive",
+        lastCheckedAt: derivedAt,
+        notes,
+      });
+    }
+
+    if (capabilityHealth) {
+      return Object.freeze({
+        status: capabilityHealth.status,
+        reasonCode: capabilityHealth.reasonCode,
+        lastCheckedAt: capabilityHealth.checkedAt,
+        notes,
+      });
+    }
+
+    return Object.freeze({
+      status: StorageBackendHealthStatuses.healthy,
+      reasonCode: "storage-operational",
+      lastCheckedAt: derivedAt,
+      notes,
     });
   }
 
