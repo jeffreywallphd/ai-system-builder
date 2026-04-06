@@ -1,6 +1,6 @@
 # Storage Administration Screens
 
-This note documents Story 9.4.1, Story 9.4.2, Story 9.4.3, and Story 9.4.4 (Feature 9 / Epic 9.4): storage administration list/detail, create/edit workflows, operational readiness visibility, and lifecycle activation/deactivation guardrails.
+This note documents Story 9.4.1, Story 9.4.2, Story 9.4.3, Story 9.4.4, and Story 9.4.5 (Feature 9 / Epic 9.4): storage administration list/detail, create/edit workflows, operational readiness visibility, lifecycle activation/deactivation guardrails, and backend extension/operations standards.
 
 ## Scope
 
@@ -82,6 +82,33 @@ This note documents Story 9.4.1, Story 9.4.2, Story 9.4.3, and Story 9.4.4 (Feat
 - Edit flows are constrained to server-allowed metadata fields instead of raw policy/lifecycle mutation payloads.
 - Lifecycle controls are intentionally constrained by access summaries and lifecycle-state guardrails to prevent unsafe or unauthorized mutation paths.
 
+## Story 9.4.5 backend extension and operational standards
+
+Storage administration is part of a broader managed-storage platform contract. Contributors extending backend behavior must keep admin flows aligned to the canonical storage architecture seams.
+
+Extension standards:
+
+- backend behavior is introduced through typed adapters and registry composition (`StorageBackendAdapterRegistry`, `StorageBackendProvisioningOrchestrator`), not UI-specific branching.
+- domain lifecycle/policy invariants remain authoritative in `StorageDomain` and application services.
+- transport validation and API error mapping remain deterministic through shared schema contracts and `StorageManagementApiErrorCodes`.
+- UI lifecycle operations remain gated by `access.allowedActions` plus lifecycle transition semantics.
+- no endpoint or UI view introduces raw filesystem path exposure or backend internal binding secrets.
+
+Operational assumptions in current host composition:
+
+- `hosts/server/IdentityServerHost.ts` currently composes storage provisioning orchestration with an empty backend registry (`createStorageBackendAdapterRegistry([])`).
+- backend provisioning/capability paths therefore return unconfigured posture unless deployment composition explicitly registers backend adapters.
+- admin workflows remain valid for metadata/lifecycle management without requiring backend provisioning toggles.
+- sync posture is projected as a typed eligibility/state seam; it is not a distributed replication scheduler in this slice.
+
+Contributor workflow for new backends:
+
+1. Extend/confirm domain and policy invariants in `src/domain/storage/StorageDomain.ts`.
+2. Implement adapter contracts in `src/infrastructure/storage/*`.
+3. Register backend adapter(s) in host composition.
+4. Keep API and UI contracts stable by reusing shared storage DTO/schema contracts.
+5. Validate operational behavior through storage infrastructure/API/UI regression suites.
+
 ## Verification
 
 - `ui/shared/storage/tests/StorageAdministrationClient.test.ts`
@@ -93,3 +120,8 @@ This note documents Story 9.4.1, Story 9.4.2, Story 9.4.3, and Story 9.4.4 (Feat
 - route/page contract updates:
   - `ui/routes/tests/RoutesContracts.test.ts`
   - `ui/pages/tests/PagesContracts.test.ts`
+- storage backend/orchestration guardrails:
+  - `src/infrastructure/storage/tests/StorageBackendAdapterRegistry.test.ts`
+  - `src/infrastructure/storage/tests/StorageBackendProvisioningOrchestrator.test.ts`
+- architecture extension guidance:
+  - `docs/architecture/storage-feature-extension-guidance.md`

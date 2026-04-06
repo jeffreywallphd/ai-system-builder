@@ -6,6 +6,7 @@
 - Story 9.4.2 create/edit workflow implementation for managed storage instances.
 - Story 9.4.3 operational status/capability/sync posture presentation.
 - Story 9.4.4 lifecycle activation/deactivation controls with safety confirmations.
+- Story 9.4.5 backend extension guidance and operational standards.
 - Adds list/detail inspection plus create/edit administration workflows.
 
 ## Canonical files
@@ -52,6 +53,13 @@
 - Lifecycle, policy, and health semantics remain backend-authoritative.
 - Client/server validation posture stays aligned through shared storage transport schema parsers.
 
+## Story 9.4.5 operations posture
+
+- Storage backend extension now has a canonical contributor guide: `docs/architecture/storage-feature-extension-guidance.md`.
+- Host composition currently wires storage provisioning orchestration with an empty backend registry (`createStorageBackendAdapterRegistry([])` in `IdentityServerHost`), so provisioning/capability paths are intentionally unconfigured unless deployment composition registers adapters.
+- Admin workflows remain contract-safe under this posture because lifecycle/metadata flows are policy- and schema-governed even when backend provisioning toggles are off.
+- Regression expectation now explicitly includes storage backend registry/orchestrator test suites to guard extension safety.
+
 ## Tests
 
 - `ui/shared/storage/tests/StorageAdministrationClient.test.ts`
@@ -60,3 +68,5 @@
 - `ui/pages/tests/StorageAdministrationPage.test.tsx`
 - `ui/pages/tests/StorageAdministrationPage.presentation.test.ts`
 - `ui/web/storage/tests/StorageAdministrationRoutes.test.ts`
+- `src/infrastructure/storage/tests/StorageBackendAdapterRegistry.test.ts`
+- `src/infrastructure/storage/tests/StorageBackendProvisioningOrchestrator.test.ts`
