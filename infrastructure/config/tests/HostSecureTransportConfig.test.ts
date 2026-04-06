@@ -46,4 +46,22 @@ describe("HostSecureTransportConfig", () => {
     expect(config.trustMaterial.serverReferenceId).toBe("server:authoritative");
     expect(config.trustMaterial.privateKeyMaterialRef).toBe("trust:server:key:v1");
   });
+
+  it("supports runtime contexts where process is unavailable", () => {
+    const globalProcessOwner = globalThis as typeof globalThis & { process?: unknown };
+    const previousProcess = globalProcessOwner.process;
+
+    try {
+      delete globalProcessOwner.process;
+      const config = resolveHostSecureTransportConfig({
+        hostKind: HostSecureTransportKinds.web,
+      });
+
+      expect(config.allowInsecureLoopback).toBe(false);
+      expect(config.requireSecureHttp).toBe(true);
+      expect(config.enforceTransportTrustValidation).toBe(true);
+    } finally {
+      globalProcessOwner.process = previousProcess;
+    }
+  });
 });

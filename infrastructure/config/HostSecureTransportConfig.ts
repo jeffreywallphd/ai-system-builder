@@ -45,7 +45,7 @@ const TRANSPORT_KEYS = Object.freeze({
 export function resolveHostSecureTransportConfig(
   input: ResolveHostSecureTransportConfigInput,
 ): HostSecureTransportConfig {
-  const env = input.env ?? process.env;
+  const env = input.env ?? resolveRuntimeEnvironment();
   const hostAddress = normalizeOptional(input.hostAddress);
   const loopbackHost = !hostAddress || isLoopbackHost(hostAddress);
   const managedServerTlsEnabled = parseBoolean(env[MANAGED_TLS_KEYS.enabled]) ?? false;
@@ -70,6 +70,22 @@ export function resolveHostSecureTransportConfig(
       privateKeyMaterialRef: normalizeOptional(env[MANAGED_TLS_KEYS.privateKeyMaterialRef]),
     }),
   });
+}
+
+function resolveRuntimeEnvironment(): Readonly<Record<string, string | undefined>> {
+  if (typeof globalThis === "undefined") {
+    return Object.freeze({});
+  }
+
+  const processLike = (
+    globalThis as typeof globalThis & {
+      process?: {
+        env?: Record<string, string | undefined>;
+      };
+    }
+  ).process;
+
+  return processLike?.env ?? Object.freeze({});
 }
 
 export function assertSecureTransportEndpoint(
