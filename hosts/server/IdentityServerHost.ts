@@ -51,6 +51,7 @@ import { WorkspaceAdministrationBackendApi } from "../../infrastructure/api/work
 import { AuthorizationManagementBackendApi } from "../../infrastructure/api/authorization/AuthorizationManagementBackendApi";
 import { NodeTrustBackendApi } from "../../infrastructure/api/nodes/NodeTrustBackendApi";
 import { CertificateOperationsBackendApi } from "../../infrastructure/api/security/CertificateOperationsBackendApi";
+import { SecretMetadataBackendApi } from "../../infrastructure/api/security/SecretMetadataBackendApi";
 import { SqliteWorkspacePersistenceAdapter } from "../../src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import { WorkspaceAuthorizationPolicyReadAdapter } from "../../src/infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
 import { SqliteAuthorizationPersistenceAdapter } from "../../src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter";
@@ -669,6 +670,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     renewIssuedCertificateUseCase,
   });
+  const secretMetadataBackendApi = new SecretMetadataBackendApi({
+    createSecretUseCase: secretService.createSecretUseCase,
+    getSecretMetadataUseCase: secretService.getSecretMetadataUseCase,
+    listSecretsUseCase: secretService.listSecretsUseCase,
+    disableSecretUseCase: secretService.disableSecretUseCase,
+    workspaceAuthorizationReadRepository: workspaceRepository,
+  });
   const nodeTrustBackendApi = new NodeTrustBackendApi({
     registerNodeEnrollmentRequestUseCase: new RegisterNodeEnrollmentRequestUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
@@ -790,6 +798,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const server = createIdentityHttpServer({
     backendApi,
     certificateOperationsBackendApi,
+    secretMetadataBackendApi,
     nodeTrustBackendApi,
     authorizationManagementBackendApi,
     workspaceBackendApi,
