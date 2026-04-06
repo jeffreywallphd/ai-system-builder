@@ -440,3 +440,23 @@ Planned extension alignment:
 - explicit sharing policy checks should reuse this sanitized error/audit posture.
 - publishable link flows should reuse opaque grant patterns with scoped TTLs and redacted logs.
 - scoped-content encryption can deepen through existing policy/key-resolution seams while preserving current client contracts.
+
+## Story 11.3.3 authorized preview/worker decryption gates
+
+- `AssetDownloadService` now uses an explicit decryption-authorization decision for encrypted content operations instead of only implicit flag checks.
+- Decryption authorization is enforced in both retrieval phases:
+  - token/grant issuance (`authorizeAssetDownload`),
+  - stream open + decrypt (`openAuthorizedAssetDownloadStream`).
+- Purpose-scoped encrypted-content gating is explicit for:
+  - `inline-preview` requests,
+  - `worker-process` requests.
+- Grant resolution now performs an explicit actor/workspace/asset scope check before stream/decrypt execution, so decryption stays bound to the request context.
+- Rejected audit outcomes are emitted for decryption-gate denials and encryption-required violations with stable reason codes, keeping the seam ready for stronger audit and future signed/temporary access strategies.
+
+Coverage updates:
+
+- `src/application/assets/tests/AssetDownloadService.test.ts` now verifies:
+  - preview decryption deny posture,
+  - worker decryption deny posture,
+  - stream-open deny when policy changes after grant issuance,
+  - rejected decryption-gate audit event emission.

@@ -144,6 +144,26 @@ export class AssetDownloadService {
 
     const contentIsEncrypted = Boolean(targetVersion.content.encryption);
     if (!contentIsEncrypted && encryptionPolicy.value.contentEncryptionRequired) {
+      await this.publishAuditEvent({
+        type: "asset-download-authorized",
+        occurredAt,
+        workspaceId: request.workspaceId,
+        actorUserId: request.actorUserId,
+        correlationId: request.correlationId,
+        outcome: "rejected",
+        asset: {
+          assetId: asset.id,
+          kind: asset.kind,
+          visibility: asset.visibility,
+          lifecycleState: asset.lifecycle.state,
+          versionId: targetVersion.versionId,
+        },
+        details: Object.freeze({
+          reasonCode: "encrypted-content-required",
+          purpose: request.purpose,
+          storageInstanceId: targetVersion.location.storageInstance.storageInstanceId,
+        }),
+      });
       return this.failure(
         AssetServiceErrorCodes.policyViolation,
         "Asset content is not encrypted, but effective policy requires scoped-content encryption.",
@@ -155,18 +175,41 @@ export class AssetDownloadService {
       );
     }
 
-    if (!isPurposeAllowedByStoragePolicy(
-      plan.value.storageInstance,
-      request.purpose,
+    const decryptionAuthorization = evaluateDecryptionAuthorization({
+      storageInstance: plan.value.storageInstance,
+      purpose: request.purpose,
       contentIsEncrypted,
-      encryptionPolicy.value.allowPreviewDecryption,
-      encryptionPolicy.value.allowWorkerDecryption,
-    )) {
+      policyAllowPreviewDecryption: encryptionPolicy.value.allowPreviewDecryption,
+      policyAllowWorkerDecryption: encryptionPolicy.value.allowWorkerDecryption,
+    });
+    if (!decryptionAuthorization.allowed) {
+      await this.publishAuditEvent({
+        type: "asset-download-authorized",
+        occurredAt,
+        workspaceId: request.workspaceId,
+        actorUserId: request.actorUserId,
+        correlationId: request.correlationId,
+        outcome: "rejected",
+        asset: {
+          assetId: asset.id,
+          kind: asset.kind,
+          visibility: asset.visibility,
+          lifecycleState: asset.lifecycle.state,
+          versionId: targetVersion.versionId,
+        },
+        details: Object.freeze({
+          reasonCode: decryptionAuthorization.reasonCode,
+          purpose: request.purpose,
+          decryptionScope: decryptionAuthorization.scope,
+          storageInstanceId: plan.value.storageInstance.id,
+        }),
+      });
       return this.failure(
         AssetServiceErrorCodes.policyViolation,
-        "Storage security policy denies this download purpose.",
+        "Storage security policy denies decryption for this download purpose.",
         Object.freeze({
           purpose: request.purpose,
+          reasonCode: decryptionAuthorization.reasonCode,
           storageInstanceId: plan.value.storageInstance.id,
         }),
       );
@@ -299,6 +342,26 @@ export class AssetDownloadService {
         "Download authorization token is invalid or expired.",
       );
     }
+    if (!isDownloadGrantScopedToRequest(grant, request)) {
+      await this.publishAuditEvent({
+        type: "asset-download-opened",
+        occurredAt,
+        workspaceId: request.workspaceId,
+        actorUserId: request.actorUserId,
+        correlationId: request.correlationId,
+        outcome: "rejected",
+        asset: {
+          assetId: request.assetId,
+        },
+        details: Object.freeze({
+          reasonCode: "invalid-download-grant-scope",
+        }),
+      });
+      return this.failure(
+        AssetServiceErrorCodes.accessDenied,
+        "Download authorization token scope is invalid.",
+      );
+    }
 
     const asset = await this.dependencies.repository.findAssetById(grant.assetId);
     if (!asset || asset.ownership.workspaceId !== request.workspaceId) {
@@ -338,6 +401,26 @@ export class AssetDownloadService {
 
     const contentIsEncrypted = Boolean(targetVersion.content.encryption);
     if (!contentIsEncrypted && encryptionPolicy.value.contentEncryptionRequired) {
+      await this.publishAuditEvent({
+        type: "asset-download-opened",
+        occurredAt,
+        workspaceId: request.workspaceId,
+        actorUserId: request.actorUserId,
+        correlationId: request.correlationId,
+        outcome: "rejected",
+        asset: {
+          assetId: asset.id,
+          kind: asset.kind,
+          visibility: asset.visibility,
+          lifecycleState: asset.lifecycle.state,
+          versionId: targetVersion.versionId,
+        },
+        details: Object.freeze({
+          reasonCode: "encrypted-content-required",
+          purpose: grant.purpose,
+          storageInstanceId: targetVersion.location.storageInstance.storageInstanceId,
+        }),
+      });
       return this.failure(
         AssetServiceErrorCodes.policyViolation,
         "Asset content is not encrypted, but effective policy requires scoped-content encryption.",
@@ -349,18 +432,41 @@ export class AssetDownloadService {
       );
     }
 
-    if (!isPurposeAllowedByStoragePolicy(
-      plan.value.storageInstance,
-      grant.purpose,
+    const decryptionAuthorization = evaluateDecryptionAuthorization({
+      storageInstance: plan.value.storageInstance,
+      purpose: grant.purpose,
       contentIsEncrypted,
-      encryptionPolicy.value.allowPreviewDecryption,
-      encryptionPolicy.value.allowWorkerDecryption,
-    )) {
+      policyAllowPreviewDecryption: encryptionPolicy.value.allowPreviewDecryption,
+      policyAllowWorkerDecryption: encryptionPolicy.value.allowWorkerDecryption,
+    });
+    if (!decryptionAuthorization.allowed) {
+      await this.publishAuditEvent({
+        type: "asset-download-opened",
+        occurredAt,
+        workspaceId: request.workspaceId,
+        actorUserId: request.actorUserId,
+        correlationId: request.correlationId,
+        outcome: "rejected",
+        asset: {
+          assetId: asset.id,
+          kind: asset.kind,
+          visibility: asset.visibility,
+          lifecycleState: asset.lifecycle.state,
+          versionId: targetVersion.versionId,
+        },
+        details: Object.freeze({
+          reasonCode: decryptionAuthorization.reasonCode,
+          purpose: grant.purpose,
+          decryptionScope: decryptionAuthorization.scope,
+          storageInstanceId: plan.value.storageInstance.id,
+        }),
+      });
       return this.failure(
         AssetServiceErrorCodes.policyViolation,
-        "Storage security policy denies this download purpose.",
+        "Storage security policy denies decryption for this download purpose.",
         Object.freeze({
           purpose: grant.purpose,
+          reasonCode: decryptionAuthorization.reasonCode,
           storageInstanceId: plan.value.storageInstance.id,
         }),
       );
@@ -567,24 +673,76 @@ function isWorkerProcessAllowedKind(kind: Asset["kind"]): boolean {
     || kind === AssetKinds.preview;
 }
 
-function isPurposeAllowedByStoragePolicy(
-  storageInstance: { readonly policy: { readonly security: { readonly allowPreviewDecryption: boolean; readonly allowWorkerDecryption: boolean } } },
+function evaluateDecryptionAuthorization(input: {
+  readonly storageInstance: {
+    readonly policy: {
+      readonly security: {
+        readonly allowPreviewDecryption: boolean;
+        readonly allowWorkerDecryption: boolean;
+      };
+    };
+  };
   purpose: typeof AssetDownloadPurposes[keyof typeof AssetDownloadPurposes],
-  contentIsEncrypted: boolean,
-  policyAllowPreviewDecryption: boolean,
-  policyAllowWorkerDecryption: boolean,
-): boolean {
-  if (!contentIsEncrypted) {
-    return true;
+  readonly contentIsEncrypted: boolean;
+  readonly policyAllowPreviewDecryption: boolean;
+  readonly policyAllowWorkerDecryption: boolean;
+}): {
+    readonly allowed: boolean;
+    readonly scope: "not-required" | "download" | "inline-preview" | "worker-process";
+    readonly reasonCode?: "preview-decryption-not-allowed" | "worker-decryption-not-allowed";
+  } {
+  if (!input.contentIsEncrypted) {
+    return Object.freeze({
+      allowed: true,
+      scope: "not-required",
+    });
   }
 
-  if (purpose === AssetDownloadPurposes.inlinePreview) {
-    return storageInstance.policy.security.allowPreviewDecryption && policyAllowPreviewDecryption;
+  if (input.purpose === AssetDownloadPurposes.inlinePreview) {
+    if (
+      input.storageInstance.policy.security.allowPreviewDecryption
+      && input.policyAllowPreviewDecryption
+    ) {
+      return Object.freeze({
+        allowed: true,
+        scope: "inline-preview",
+      });
+    }
+    return Object.freeze({
+      allowed: false,
+      scope: "inline-preview",
+      reasonCode: "preview-decryption-not-allowed",
+    });
   }
-  if (purpose === AssetDownloadPurposes.workerProcess) {
-    return storageInstance.policy.security.allowWorkerDecryption && policyAllowWorkerDecryption;
+  if (input.purpose === AssetDownloadPurposes.workerProcess) {
+    if (
+      input.storageInstance.policy.security.allowWorkerDecryption
+      && input.policyAllowWorkerDecryption
+    ) {
+      return Object.freeze({
+        allowed: true,
+        scope: "worker-process",
+      });
+    }
+    return Object.freeze({
+      allowed: false,
+      scope: "worker-process",
+      reasonCode: "worker-decryption-not-allowed",
+    });
   }
-  return true;
+  return Object.freeze({
+    allowed: true,
+    scope: "download",
+  });
+}
+
+function isDownloadGrantScopedToRequest(
+  grant: NonNullable<Awaited<ReturnType<IAssetDownloadGrantPort["resolveDownloadGrant"]>>>,
+  request: OpenAuthorizedAssetDownloadStreamRequest,
+): boolean {
+  return grant.workspaceId === request.workspaceId
+    && grant.actorUserId === request.actorUserId
+    && grant.assetId === request.assetId;
 }
 
 function clampDownloadExpirySeconds(expiresInSeconds: number | undefined): number {
