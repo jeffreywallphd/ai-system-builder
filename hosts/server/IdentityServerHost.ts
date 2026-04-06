@@ -52,6 +52,9 @@ import { AuthorizationManagementBackendApi } from "../../infrastructure/api/auth
 import { NodeTrustBackendApi } from "../../infrastructure/api/nodes/NodeTrustBackendApi";
 import { CertificateOperationsBackendApi } from "../../infrastructure/api/security/CertificateOperationsBackendApi";
 import { SecretMetadataBackendApi } from "../../infrastructure/api/security/SecretMetadataBackendApi";
+import { StorageManagementBackendApi } from "../../infrastructure/api/storage/StorageManagementBackendApi";
+import { WorkspaceAwareStoragePolicyEvaluationAdapter } from "../../infrastructure/api/storage/WorkspaceAwareStoragePolicyEvaluationAdapter";
+import { StorageSyncDeploymentAvailabilities } from "../../src/infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
 import { SqliteWorkspacePersistenceAdapter } from "../../src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import { WorkspaceAuthorizationPolicyReadAdapter } from "../../src/infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
 import { SqliteAuthorizationPersistenceAdapter } from "../../src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter";
@@ -59,6 +62,11 @@ import { SqliteAuthorizationPolicyReadAdapter } from "../../src/infrastructure/p
 import { SqliteNodeTrustPersistenceAdapter } from "../../src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
 import { SqliteNodeTrustAuditRecorder } from "../../src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
 import { SqliteCertificateAuthorityPersistenceAdapter } from "../../src/infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
+import { SqliteStorageInstancePersistenceAdapter } from "../../src/infrastructure/persistence/storage/SqliteStorageInstancePersistenceAdapter";
+import { StorageManagementService } from "../../src/application/storage/use-cases/StorageManagementService";
+import { StorageBackendProvisioningOrchestrator } from "../../src/infrastructure/storage/StorageBackendProvisioningOrchestrator";
+import { createStorageBackendAdapterRegistry } from "../../src/infrastructure/storage/StorageBackendAdapterRegistry";
+import { ServerManagedStorageSynchronizationAdapter } from "../../src/infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
 import {
   assertCertificateAuthorityStartupSafe,
   ResolveCertificateAuthorityStartupStateUseCase,
@@ -269,6 +277,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const nodeTrustRepository = new SqliteNodeTrustPersistenceAdapter(path.resolve(options.databasePath));
   const nodeTrustAuditRecorder = new SqliteNodeTrustAuditRecorder(path.resolve(options.databasePath));
   const certificateAuthorityRepository = new SqliteCertificateAuthorityPersistenceAdapter(path.resolve(options.databasePath));
+  const storageInstanceRepository = new SqliteStorageInstancePersistenceAdapter(path.resolve(options.databasePath));
   const env = options.env ?? process.env;
   const hostAddress = options.host ?? "127.0.0.1";
   const secureTransportConfig = resolveHostSecureTransportConfig({
@@ -746,6 +755,25 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       auditSink: nodeTrustAuditRecorder,
     }),
   });
+  const storageProvisioningOrchestrator = new StorageBackendProvisioningOrchestrator(
+    createStorageBackendAdapterRegistry([]),
+  );
+  const storageSynchronizationAdapter = new ServerManagedStorageSynchronizationAdapter({
+    availability: resolveStorageSyncDeploymentAvailability(env),
+  });
+  const storageManagementService = new StorageManagementService({
+    repository: storageInstanceRepository,
+    policyPort: new WorkspaceAwareStoragePolicyEvaluationAdapter({
+      workspaceAuthorizationReadRepository: workspaceRepository,
+    }),
+    provisioningPort: storageProvisioningOrchestrator,
+    capabilityPort: storageProvisioningOrchestrator,
+  });
+  const storageManagementBackendApi = new StorageManagementBackendApi({
+    storageManagementService,
+    capabilityInspectionPort: storageProvisioningOrchestrator,
+    synchronizationAdapter: storageSynchronizationAdapter,
+  });
   const transportTrustStateResolver = new ServerManagedTransportTrustStateResolver({
     trustedDeviceManagementService: trustedDeviceManagementService,
     nodeTrustIdentityRepository: nodeTrustRepository,
@@ -813,6 +841,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     backendApi,
     certificateOperationsBackendApi,
     secretMetadataBackendApi,
+    storageManagementBackendApi,
     nodeTrustBackendApi,
     authorizationManagementBackendApi,
     workspaceBackendApi,
@@ -872,6 +901,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
         nodeTrustRepository.dispose();
         nodeTrustAuditRecorder.dispose();
         certificateAuthorityRepository.dispose();
+        storageInstanceRepository.dispose();
         secretService?.dispose();
         const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
         if (typeof disposablePublisher.dispose === "function") {
@@ -893,6 +923,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     nodeTrustRepository.dispose();
     nodeTrustAuditRecorder.dispose();
     certificateAuthorityRepository.dispose();
+    storageInstanceRepository.dispose();
     secretService?.dispose();
     throw error;
   }
@@ -960,6 +991,22 @@ function parseOptionalBoolean(value: string | undefined): boolean | undefined {
     return false;
   }
   return undefined;
+}
+
+function resolveStorageSyncDeploymentAvailability(
+  env: Readonly<Record<string, string | undefined>>,
+): typeof StorageSyncDeploymentAvailabilities[keyof typeof StorageSyncDeploymentAvailabilities] {
+  const configured = env.AI_LOOM_STORAGE_SYNC_DEPLOYMENT_AVAILABILITY?.trim().toLowerCase();
+  switch (configured) {
+    case StorageSyncDeploymentAvailabilities.active:
+      return StorageSyncDeploymentAvailabilities.active;
+    case StorageSyncDeploymentAvailabilities.configuredInactive:
+      return StorageSyncDeploymentAvailabilities.configuredInactive;
+    case StorageSyncDeploymentAvailabilities.unavailable:
+      return StorageSyncDeploymentAvailabilities.unavailable;
+    default:
+      return StorageSyncDeploymentAvailabilities.configuredInactive;
+  }
 }
 
 function resolveIdentityDevLoginRouteEnabled(env: Readonly<Record<string, string | undefined>>): boolean {

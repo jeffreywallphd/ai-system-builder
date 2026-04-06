@@ -15,6 +15,7 @@ import type { AuthorizationManagementBackendApi } from "../../../api/authorizati
 import type { NodeTrustBackendApi } from "../../../api/nodes/NodeTrustBackendApi";
 import type { CertificateOperationsBackendApi } from "../../../api/security/CertificateOperationsBackendApi";
 import type { SecretMetadataBackendApi } from "../../../api/security/SecretMetadataBackendApi";
+import type { StorageManagementBackendApi } from "../../../api/storage/StorageManagementBackendApi";
 import type { WorkspaceInvitationBackendApi } from "../../../api/workspaces/WorkspaceInvitationBackendApi";
 import type { WorkspaceAdministrationBackendApi } from "../../../api/workspaces/WorkspaceAdministrationBackendApi";
 import {
@@ -96,6 +97,16 @@ import {
   type RotateSecretMetadataApiRequest,
   type SecretMetadataApiResponse,
 } from "../../../api/security/sdk/PublicSecretMetadataApiContract";
+import {
+  StorageManagementApiErrorCodes,
+  type ActivateStorageInstanceApiRequest,
+  type DeactivateStorageInstanceApiRequest,
+  type GetStorageInstanceDetailApiRequest,
+  type GetStorageInstanceHealthApiRequest,
+  type ListStorageInstancesApiRequest,
+  type StorageManagementApiResponse,
+  type UpdateStorageInstanceMetadataApiRequest,
+} from "../../../api/storage/sdk/PublicStorageManagementApiContract";
 import { redactSensitiveAuthPayload, redactSensitiveText } from "../../../api/identity/IdentityAuthRedaction";
 import {
   NodeApprovalStatuses,
@@ -103,6 +114,12 @@ import {
   NodeRoleCapabilities,
   NodeTypes,
 } from "../../../../src/domain/nodes/NodeTrustDomain";
+import {
+  StorageAccessModes,
+  StorageAccessScopes,
+  StorageBackendTypes,
+  StorageLifecycleStates,
+} from "../../../../src/domain/storage/StorageDomain";
 import {
   CertificateRevocationReasons,
   CertificateStatuses,
@@ -135,6 +152,15 @@ import {
   ReEncryptSecretsCommandSchema,
   RotateSecretMetadataCommandSchema,
 } from "../../../../src/shared/schemas/security/SecretApiSchemaContracts";
+import {
+  StorageTransportSchemaValidationError,
+  parseCreateStorageInstanceRequestDto,
+  parseGetStorageInstanceDetailRequestDto,
+  parseListStorageInstancesRequestDto,
+  parseUpdateStorageInstanceRequestDto,
+  type CreateStorageInstanceRequestDtoPayload,
+  type UpdateStorageInstanceRequestDtoPayload,
+} from "../../../../src/shared/schemas/storage/StorageTransportSchemaContracts";
 import type { ValidateTransportConnectionTrustRequest } from "../../../../src/application/security/ports/TransportTrustValidationPorts";
 import { TransportConnectionDirections } from "../../../../src/application/security/ports/TransportTrustValidationPorts";
 import {
@@ -446,6 +472,52 @@ const NodeCapabilityValues = z.enum([
   NodeRoleCapabilities.storageAccess,
   NodeRoleCapabilities.previewWorker,
 ]);
+const StorageBackendTypeValues = z.enum([
+  StorageBackendTypes.managedFilesystem,
+  StorageBackendTypes.objectStorage,
+  StorageBackendTypes.networkShare,
+]);
+const StorageLifecycleStateValues = z.enum([
+  StorageLifecycleStates.provisioning,
+  StorageLifecycleStates.active,
+  StorageLifecycleStates.suspended,
+  StorageLifecycleStates.degraded,
+  StorageLifecycleStates.archived,
+  StorageLifecycleStates.deleting,
+  StorageLifecycleStates.deleted,
+  StorageLifecycleStates.failed,
+]);
+const StorageAccessModeValues = z.enum([
+  StorageAccessModes.readWrite,
+  StorageAccessModes.readOnly,
+  StorageAccessModes.appendOnly,
+]);
+const StorageAccessScopeValues = z.enum([
+  StorageAccessScopes.workspace,
+  StorageAccessScopes.workspaceMembers,
+  StorageAccessScopes.platformManaged,
+]);
+const ActivateStorageInstanceRequestSchema: z.ZodType<Pick<
+  ActivateStorageInstanceApiRequest,
+  "operationKey" | "correlationId" | "activatedAt" | "requestBackendActivation" | "includeCapabilities"
+>> = z.object({
+  operationKey: z.string().trim().min(1).optional(),
+  correlationId: z.string().trim().min(1).optional(),
+  activatedAt: z.string().datetime().optional(),
+  requestBackendActivation: z.boolean().optional(),
+  includeCapabilities: z.boolean().optional(),
+}).strict();
+const DeactivateStorageInstanceRequestSchema: z.ZodType<Pick<
+  DeactivateStorageInstanceApiRequest,
+  "operationKey" | "correlationId" | "targetLifecycleState" | "deactivatedAt" | "requestBackendDeactivation" | "includeCapabilities"
+>> = z.object({
+  operationKey: z.string().trim().min(1).optional(),
+  correlationId: z.string().trim().min(1).optional(),
+  targetLifecycleState: z.enum(["suspended", "archived"]).optional(),
+  deactivatedAt: z.string().datetime().optional(),
+  requestBackendDeactivation: z.boolean().optional(),
+  includeCapabilities: z.boolean().optional(),
+}).strict();
 const CertificateRevocationReasonValues = new Set<string>(Object.values(CertificateRevocationReasons));
 const CertificateStatusValues = new Set<string>(Object.values(CertificateStatuses));
 const CertificateSubjectReferenceKindValues = new Set<string>(Object.values(CertificateSubjectReferenceKinds));
@@ -714,6 +786,7 @@ export interface IdentityHttpServerOptions {
   readonly backendApi: IdentityAuthBackendApi;
   readonly certificateOperationsBackendApi?: CertificateOperationsBackendApi;
   readonly secretMetadataBackendApi?: SecretMetadataBackendApi;
+  readonly storageManagementBackendApi?: StorageManagementBackendApi;
   readonly authorizationManagementBackendApi?: AuthorizationManagementBackendApi;
   readonly nodeTrustBackendApi?: NodeTrustBackendApi;
   readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
@@ -3053,6 +3126,401 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapNodeTrustStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, rejectRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.storageManagementBackendApi
+        && request.method === "POST"
+        && path === "/api/v1/storage/instances"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            if (!workspaceId) {
+              const invalid = buildStorageManagementInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateStorageCreateRequest(
+              request,
+              context.principal.userIdentityId,
+              workspaceId,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.storageManagementBackendApi.createStorageInstance(parsedRequest.data);
+            const statusCode = mapStorageManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.storageManagementBackendApi
+        && request.method === "GET"
+        && path === "/api/v1/storage/instances"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            if (!workspaceId) {
+              const invalid = buildStorageManagementInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parseArrayEnum = <TValue extends string>(
+              key: string,
+              values: ReadonlyArray<string>,
+              schema: z.ZodType<ReadonlyArray<TValue>>,
+            ): { readonly ok: true; readonly data: ReadonlyArray<TValue> } | { readonly ok: false } => {
+              const validation = schema.safeParse(values);
+              if (validation.success) {
+                return { ok: true, data: validation.data };
+              }
+              const invalid = buildStorageManagementQueryValidationError(key, `${key} values are invalid.`);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return { ok: false };
+            };
+
+            const backendTypesValidation = parseArrayEnum("backendType", searchParams.getAll("backendType"), z.array(StorageBackendTypeValues));
+            if (!backendTypesValidation.ok) {
+              return;
+            }
+            const lifecycleStatesValidation = parseArrayEnum("lifecycleState", searchParams.getAll("lifecycleState"), z.array(StorageLifecycleStateValues));
+            if (!lifecycleStatesValidation.ok) {
+              return;
+            }
+            const accessModesValidation = parseArrayEnum("accessMode", searchParams.getAll("accessMode"), z.array(StorageAccessModeValues));
+            if (!accessModesValidation.ok) {
+              return;
+            }
+            const accessScopesValidation = parseArrayEnum("accessScope", searchParams.getAll("accessScope"), z.array(StorageAccessScopeValues));
+            if (!accessScopesValidation.ok) {
+              return;
+            }
+
+            const listRequestDto = {
+              actorUserIdentityId: context.principal.userIdentityId,
+              workspaceId,
+              backendTypes: backendTypesValidation.data.length > 0 ? backendTypesValidation.data : undefined,
+              lifecycleStates: lifecycleStatesValidation.data.length > 0 ? lifecycleStatesValidation.data : undefined,
+              accessModes: accessModesValidation.data.length > 0 ? accessModesValidation.data : undefined,
+              accessScopes: accessScopesValidation.data.length > 0 ? accessScopesValidation.data : undefined,
+              limit: parseOptionalInteger(searchParams.get("limit")),
+              offset: parseOptionalInteger(searchParams.get("offset")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            };
+
+            try {
+              parseListStorageInstancesRequestDto(listRequestDto);
+            } catch (error) {
+              if (error instanceof StorageTransportSchemaValidationError) {
+                const invalid = buildStorageManagementValidationErrors(error.issues);
+                writeJson(response, 400, invalid);
+                logResponse(logger, requestId, request, 400, Object.freeze({ query: Object.fromEntries(searchParams.entries()) }), invalid);
+                return;
+              }
+              throw error;
+            }
+
+            const listRequest: ListStorageInstancesApiRequest = Object.freeze({
+              ...listRequestDto,
+              includeCapabilities: parseOptionalBoolean(searchParams.get("includeCapabilities")),
+            });
+            const apiResponse = await options.storageManagementBackendApi.listStorageInstances(listRequest);
+            const statusCode = mapStorageManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              query: Object.fromEntries(searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.storageManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/storage/instances/")
+        && path.endsWith("/health")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/health");
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            if (!storageInstanceId || !workspaceId) {
+              const invalid = buildStorageManagementInvalidRequestResponse(
+                "workspaceId and storageInstanceId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const healthRequest: GetStorageInstanceHealthApiRequest = {
+              actorUserIdentityId: context.principal.userIdentityId,
+              workspaceId,
+              storageInstanceId,
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            };
+            try {
+              parseGetStorageInstanceDetailRequestDto(healthRequest);
+            } catch (error) {
+              if (error instanceof StorageTransportSchemaValidationError) {
+                const invalid = buildStorageManagementValidationErrors(error.issues);
+                writeJson(response, 400, invalid);
+                logResponse(logger, requestId, request, 400, healthRequest, invalid);
+                return;
+              }
+              throw error;
+            }
+
+            const apiResponse = await options.storageManagementBackendApi.getStorageInstanceHealth(healthRequest);
+            const statusCode = mapStorageManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, healthRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.storageManagementBackendApi
+        && request.method === "PATCH"
+        && path.startsWith("/api/v1/storage/instances/")
+        && path.endsWith("/metadata")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/metadata");
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            if (!storageInstanceId || !workspaceId) {
+              const invalid = buildStorageManagementInvalidRequestResponse(
+                "workspaceId and storageInstanceId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateStorageMetadataUpdateRequest(
+              request,
+              context.principal.userIdentityId,
+              workspaceId,
+              storageInstanceId,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.storageManagementBackendApi.updateStorageMetadata(parsedRequest.data);
+            const statusCode = mapStorageManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.storageManagementBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/storage/instances/")
+        && path.endsWith("/activate")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/activate");
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            if (!storageInstanceId || !workspaceId) {
+              const invalid = buildStorageManagementInvalidRequestResponse(
+                "workspaceId and storageInstanceId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateStorageLifecycleRequest(
+              request,
+              ActivateStorageInstanceRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const activateRequest: ActivateStorageInstanceApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              workspaceId,
+              storageInstanceId,
+              ...parsedRequest.data,
+            });
+            const apiResponse = await options.storageManagementBackendApi.activateStorageInstance(activateRequest);
+            const statusCode = mapStorageManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, activateRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.storageManagementBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/storage/instances/")
+        && path.endsWith("/deactivate")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/deactivate");
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            if (!storageInstanceId || !workspaceId) {
+              const invalid = buildStorageManagementInvalidRequestResponse(
+                "workspaceId and storageInstanceId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateStorageLifecycleRequest(
+              request,
+              DeactivateStorageInstanceRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const deactivateRequest: DeactivateStorageInstanceApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              workspaceId,
+              storageInstanceId,
+              ...parsedRequest.data,
+            });
+            const apiResponse = await options.storageManagementBackendApi.deactivateStorageInstance(deactivateRequest);
+            const statusCode = mapStorageManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, deactivateRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.storageManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/storage/instances/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/");
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            if (!storageInstanceId || !workspaceId) {
+              const invalid = buildStorageManagementInvalidRequestResponse(
+                "workspaceId and storageInstanceId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const detailRequestDto = {
+              actorUserIdentityId: context.principal.userIdentityId,
+              workspaceId,
+              storageInstanceId,
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            };
+            try {
+              parseGetStorageInstanceDetailRequestDto(detailRequestDto);
+            } catch (error) {
+              if (error instanceof StorageTransportSchemaValidationError) {
+                const invalid = buildStorageManagementValidationErrors(error.issues);
+                writeJson(response, 400, invalid);
+                logResponse(logger, requestId, request, 400, detailRequestDto, invalid);
+                return;
+              }
+              throw error;
+            }
+
+            const detailRequest: GetStorageInstanceDetailApiRequest = Object.freeze({
+              ...detailRequestDto,
+              includeCapabilities: parseOptionalBoolean(searchParams.get("includeCapabilities")),
+            });
+            const apiResponse = await options.storageManagementBackendApi.getStorageInstanceDetail(detailRequest);
+            const statusCode = mapStorageManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
           },
         );
         return;
@@ -6294,6 +6762,181 @@ async function parseAndValidateNodeTrustActionRequest<T>(
   }
 }
 
+async function parseAndValidateStorageCreateRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  workspaceId: string,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: CreateStorageInstanceRequestDtoPayload }
+  | { readonly ok: false; readonly statusCode: number; readonly body: StorageManagementApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildStorageManagementInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "storage-management-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  try {
+    const payload = Object.freeze({
+      ...parsedBody.value as Record<string, unknown>,
+      actorUserIdentityId,
+      workspaceId,
+    });
+    return { ok: true, data: parseCreateStorageInstanceRequestDto(payload) };
+  } catch (error) {
+    if (error instanceof StorageTransportSchemaValidationError) {
+      const body = buildStorageManagementValidationErrors(error.issues);
+      logger.warn(Object.freeze({
+        event: "storage-management-http.request.validation-failed",
+        requestId,
+        method: request.method,
+        path: request.url,
+        statusCode: 400,
+        details: {
+          request: redactSensitiveAuthPayload(parsedBody.value),
+          issues: body.error?.validationErrors,
+        },
+      }));
+      return { ok: false, statusCode: 400, body };
+    }
+
+    const body = buildStorageManagementInvalidRequestResponse("Request validation failed.");
+    logger.warn(Object.freeze({
+      event: "storage-management-http.request.validation-error",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+      details: {
+        request: redactSensitiveAuthPayload(parsedBody.value),
+      },
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+}
+
+async function parseAndValidateStorageMetadataUpdateRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  workspaceId: string,
+  storageInstanceId: string,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: UpdateStorageInstanceMetadataApiRequest }
+  | { readonly ok: false; readonly statusCode: number; readonly body: StorageManagementApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildStorageManagementInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "storage-management-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  try {
+    const payload = Object.freeze({
+      ...parsedBody.value as Record<string, unknown>,
+      actorUserIdentityId,
+      workspaceId,
+      storageInstanceId,
+    });
+    return { ok: true, data: parseUpdateStorageInstanceRequestDto(payload) };
+  } catch (error) {
+    if (error instanceof StorageTransportSchemaValidationError) {
+      const body = buildStorageManagementValidationErrors(error.issues);
+      logger.warn(Object.freeze({
+        event: "storage-management-http.request.validation-failed",
+        requestId,
+        method: request.method,
+        path: request.url,
+        statusCode: 400,
+        details: {
+          request: redactSensitiveAuthPayload(parsedBody.value),
+          issues: body.error?.validationErrors,
+        },
+      }));
+      return { ok: false, statusCode: 400, body };
+    }
+
+    const body = buildStorageManagementInvalidRequestResponse("Request validation failed.");
+    logger.warn(Object.freeze({
+      event: "storage-management-http.request.validation-error",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+      details: {
+        request: redactSensitiveAuthPayload(parsedBody.value),
+      },
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+}
+
+async function parseAndValidateStorageLifecycleRequest<T>(
+  request: IncomingMessage,
+  schema: z.ZodType<T>,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: T }
+  | { readonly ok: false; readonly statusCode: number; readonly body: StorageManagementApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildStorageManagementInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "storage-management-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  const validation = schema.safeParse(parsedBody.value);
+  if (!validation.success) {
+    const body = buildStorageManagementValidationErrors(validation.error.issues.map((issue) => Object.freeze({
+      path: issue.path.join("."),
+      code: issue.code,
+      message: issue.message,
+    })));
+    logger.warn(Object.freeze({
+      event: "storage-management-http.request.validation-failed",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+      details: {
+        request: redactSensitiveAuthPayload(parsedBody.value),
+        issues: body.error?.validationErrors,
+      },
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  return { ok: true, data: validation.data };
+}
+
 async function parseJsonBody(
   request: IncomingMessage,
   maxBodyBytes: number,
@@ -6473,6 +7116,33 @@ function mapSecretMetadataStatusCode(response: SecretMetadataApiResponse<unknown
     case SecretMetadataApiErrorCodes.notFound:
       return 404;
     case SecretMetadataApiErrorCodes.conflict:
+      return 409;
+    default:
+      return 500;
+  }
+}
+
+function mapStorageManagementStatusCode(response: StorageManagementApiResponse<unknown>): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error?.code) {
+    case StorageManagementApiErrorCodes.invalidRequest:
+      return 400;
+    case StorageManagementApiErrorCodes.authenticationFailed:
+      return 401;
+    case StorageManagementApiErrorCodes.forbidden:
+      return 403;
+    case StorageManagementApiErrorCodes.notFound:
+      return 404;
+    case StorageManagementApiErrorCodes.conflict:
+      return 409;
+    case StorageManagementApiErrorCodes.invalidState:
+      return 422;
+    case StorageManagementApiErrorCodes.capabilityUnsupported:
+      return 422;
+    case StorageManagementApiErrorCodes.provisioningFailed:
       return 409;
     default:
       return 500;
@@ -6739,6 +7409,16 @@ function buildSecretMetadataInvalidRequestResponse(message: string): SecretMetad
   });
 }
 
+function buildStorageManagementInvalidRequestResponse(message: string): StorageManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: StorageManagementApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
 function buildNodeTrustForbiddenResponse(message: string): NodeTrustApiResponse<never> {
   return Object.freeze({
     ok: false,
@@ -6799,6 +7479,41 @@ function buildNodeTrustQueryValidationError(path: string, message: string): Node
         code: "invalid_enum_value",
         message,
       })]),
+    },
+  });
+}
+
+function buildStorageManagementQueryValidationError(
+  path: string,
+  message: string,
+): StorageManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: StorageManagementApiErrorCodes.invalidRequest,
+      message: "Request validation failed.",
+      validationErrors: Object.freeze([Object.freeze({
+        path,
+        code: "invalid_enum_value",
+        message,
+      })]),
+    },
+  });
+}
+
+function buildStorageManagementValidationErrors(
+  issues: ReadonlyArray<{ readonly path: string; readonly code: string; readonly message: string }>,
+): StorageManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: StorageManagementApiErrorCodes.invalidRequest,
+      message: "Request validation failed.",
+      validationErrors: Object.freeze(issues.map((issue) => Object.freeze({
+        path: issue.path,
+        code: issue.code,
+        message: issue.message,
+      }))),
     },
   });
 }
