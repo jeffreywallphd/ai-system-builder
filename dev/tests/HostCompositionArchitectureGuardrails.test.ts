@@ -86,6 +86,35 @@ function toProjectRelative(filePath: string): string {
 }
 
 describe("Host composition architecture guardrails", () => {
+  it("avoids deprecated root architecture imports for authoritative host composition paths", async () => {
+    const filesToScan = [
+      path.resolve(projectRoot, "electron/main/main.ts"),
+      path.resolve(projectRoot, "infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts"),
+      path.resolve(projectRoot, "src/hosts/server/AuthoritativeServerCompositionRoot.ts"),
+      path.resolve(projectRoot, "src/hosts/server/AuthoritativeServerHostEntrypoint.ts"),
+    ] as const;
+
+    const forbiddenTokens = [
+      "../../hosts/server/IdentityServerHost",
+      "../../../hosts/server/IdentityServerHost",
+      "../../infrastructure/transport/http-server/identity/IdentityHttpServer",
+      "../../../infrastructure/transport/http-server/identity/IdentityHttpServer",
+    ] as const;
+
+    const violations: string[] = [];
+    for (const filePath of filesToScan) {
+      const source = await readFile(filePath, "utf8");
+      const relativePath = toProjectRelative(filePath);
+      for (const forbiddenToken of forbiddenTokens) {
+        if (source.includes(forbiddenToken)) {
+          violations.push(`${relativePath} must not reference deprecated import '${forbiddenToken}'.`);
+        }
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
   it("keeps canonical composition roots and entrypoints colocated under src/hosts", async () => {
     for (const entry of hostSourceExpectations) {
       const runtime = HostRuntimeCatalog[entry.kind];

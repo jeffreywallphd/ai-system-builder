@@ -4,6 +4,10 @@ AI Loom Studio is organized around a clean-architecture-style core for desktop-f
 
 This documentation describes the architecture **as implemented today**, not as an idealized target. Where the implementation appears to drift from the product's core intentions, each document includes a **TODO** section so the current state is transparent.
 
+## Canonical architecture root
+
+`src/` is the canonical root for actively maintained clean-architecture host/control-plane composition and migrated infrastructure slices. Root-level architecture trees (`application/`, `domain/`, `infrastructure/`) can still exist for legacy compatibility and tooling coverage, but new composition/runtime wiring should resolve through `src/` first.
+
 ## Core architectural intent
 
 At a high level, the system aims to provide:
@@ -303,6 +307,5 @@ The runtime is not a single path. The system currently supports multiple executi
 - Regression coverage now protects these guarantees through contract-focused suites in:
   - `application/system-studio/tests/ImageManipulationRunnableTemplateContract.regression.test.ts`,
   - existing completeness/readiness/smoke/failure-path suites under `application/system-studio/tests/*` and `infrastructure/api/studio-shell/tests/*`.
-
 
 
