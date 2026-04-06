@@ -84,6 +84,11 @@ describe("AssetTransportContracts", () => {
           relation: "derived-from",
         }],
       },
+      generatedOutputSource: {
+        producerType: "run",
+        runId: "execution-run-001",
+        systemId: "system-render",
+      },
     });
 
     expect(dto.contractVersion).toBe(AssetTransportContractVersions.v1);
@@ -92,6 +97,7 @@ describe("AssetTransportContracts", () => {
     expect(dto.uploadState).toBe("ready");
     expect(dto.allowedActions?.canInitiateUpload).toBeTrue();
     expect(dto.lineage?.sources[0]?.sourceAssetId).toBe("asset-source-001");
+    expect(dto.generatedOutputSource?.runId).toBe("execution-run-001");
     expect((dto as unknown as { path?: string }).path).toBeUndefined();
   });
 

@@ -69,6 +69,7 @@ import { SqliteAssetPersistenceAdapter } from "../../src/infrastructure/persiste
 import { SqliteAssetUploadSessionPersistenceAdapter } from "../../src/infrastructure/persistence/assets/SqliteAssetUploadSessionPersistenceAdapter";
 import { StorageManagementService } from "../../src/application/storage/use-cases/StorageManagementService";
 import { AssetUploadInitiationService } from "../../src/application/assets/use-cases/AssetUploadInitiationService";
+import { AssetGeneratedOutputRegistrationService } from "../../src/application/assets/use-cases/AssetGeneratedOutputRegistrationService";
 import { AssetUploadIngestionService } from "../../src/application/assets/use-cases/AssetUploadIngestionService";
 import { AssetDiscoveryService } from "../../src/application/assets/use-cases/AssetDiscoveryService";
 import { AssetDetailService } from "../../src/application/assets/use-cases/AssetDetailService";
@@ -819,6 +820,12 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     storageInstanceRepository,
     storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
   });
+  const assetGeneratedOutputRegistrationService = new AssetGeneratedOutputRegistrationService({
+    repository: assetRepository,
+    workspaceAuthorizationReadRepository: workspaceRepository,
+    storageInstanceRepository,
+    storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
+  });
   const storageLogicalAccessResolutionService = new StorageLogicalAccessResolutionService({
     repository: storageInstanceRepository,
     policyPort: workspaceAwareStoragePolicyEvaluationAdapter,
@@ -871,6 +878,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   });
   const assetManagementBackendApi = new AssetManagementBackendApi({
     uploadInitiationService: assetUploadInitiationService,
+    generatedOutputRegistrationService: assetGeneratedOutputRegistrationService,
     uploadIngestionService: assetUploadIngestionService,
     discoveryService: assetDiscoveryService,
     detailService: assetDetailService,

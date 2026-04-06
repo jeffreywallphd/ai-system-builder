@@ -21,6 +21,7 @@ Story 10.1.2 adds the storage-aware SQLite persistence foundation for logical as
 - Asset kind, visibility, sharing-policy references, and lifecycle markers.
 - Content descriptors (mime/size/checksum/original filename) per revision.
 - Lightweight lineage links for derived/generated output lookup.
+- Generated-output producer references (`run`/`system`) per generated asset.
 
 ## Adapter behavior
 
@@ -30,9 +31,12 @@ Story 10.1.2 adds the storage-aware SQLite persistence foundation for logical as
   - `createAsset`
   - `saveAsset`
   - `replaceAssetLineage`
+  - `replaceAssetGeneratedOutputSource`
+  - `getAssetGeneratedOutputSource`
 - Applies lazy SQLite migrations and guards unsupported schema versions.
 - Rejects stale saves when persisted records have newer `lastModifiedAt` metadata.
 - Supports lineage-aware listing via `sourceAssetId` and optional `sourceAssetVersionId` filters.
+- Persists generated-output producer metadata in `asset_generated_output_sources` for future orchestration-compatible linkage without exposing raw paths.
 
 ## Boundary posture
 

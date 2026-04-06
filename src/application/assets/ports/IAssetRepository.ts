@@ -24,6 +24,12 @@ export interface AssetSaveResult {
   readonly asset: Asset;
 }
 
+export interface GeneratedOutputSourceRecord {
+  readonly producerType: "run" | "system";
+  readonly runId?: string;
+  readonly systemId?: string;
+}
+
 export interface IAssetRepository {
   findAssetById(assetId: string): Promise<Asset | undefined>;
   listAssets(query: AssetListQuery): Promise<ReadonlyArray<Asset>>;
@@ -37,4 +43,11 @@ export interface IAssetRepository {
       readonly relation?: string;
     }>,
   ): Promise<void>;
+  replaceAssetGeneratedOutputSource?(
+    assetId: string,
+    source: GeneratedOutputSourceRecord,
+  ): Promise<void>;
+  getAssetGeneratedOutputSource?(
+    assetId: string,
+  ): Promise<GeneratedOutputSourceRecord | undefined>;
 }

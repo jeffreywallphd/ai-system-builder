@@ -3,6 +3,7 @@ import path from "node:path";
 import type {
   AssetListQuery,
   AssetSaveResult,
+  GeneratedOutputSourceRecord,
   IAssetRepository,
 } from "../../../application/assets/ports/IAssetRepository";
 import type { Asset } from "../../../domain/assets/AssetDomain";
@@ -213,6 +214,90 @@ export class SqliteAssetPersistenceAdapter implements IAssetRepository {
       sourceAssetVersionId: row.source_asset_version_id ?? undefined,
       relation: row.relation,
     })));
+  }
+
+  public async replaceAssetGeneratedOutputSource(
+    assetId: string,
+    source: GeneratedOutputSourceRecord,
+  ): Promise<void> {
+    const normalizedAssetId = normalizeAssetLookup(assetId);
+    if (!normalizedAssetId) {
+      throw new Error("Generated output source replacement requires asset id.");
+    }
+
+    const producerType = source.producerType;
+    if (producerType !== "run" && producerType !== "system") {
+      throw new Error("Generated output source producerType must be either 'run' or 'system'.");
+    }
+
+    const runId = normalizeAssetLookup(source.runId ?? "");
+    const systemId = normalizeAssetLookup(source.systemId ?? "");
+    if (producerType === "run" && !runId) {
+      throw new Error("Generated output source with producerType 'run' requires runId.");
+    }
+    if (producerType === "system" && !systemId) {
+      throw new Error("Generated output source with producerType 'system' requires systemId.");
+    }
+
+    const now = new Date().toISOString();
+    this.getDatabase().prepare(`
+      INSERT INTO asset_generated_output_sources (
+        asset_id,
+        producer_type,
+        run_id,
+        system_id,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(asset_id) DO UPDATE SET
+        producer_type = excluded.producer_type,
+        run_id = excluded.run_id,
+        system_id = excluded.system_id,
+        updated_at = excluded.updated_at
+    `).run(
+      normalizedAssetId,
+      producerType,
+      runId ?? null,
+      systemId ?? null,
+      now,
+      now,
+    );
+  }
+
+  public async getAssetGeneratedOutputSource(
+    assetId: string,
+  ): Promise<GeneratedOutputSourceRecord | undefined> {
+    const normalizedAssetId = normalizeAssetLookup(assetId);
+    if (!normalizedAssetId) {
+      return undefined;
+    }
+
+    const row = this.getDatabase().prepare(`
+      SELECT producer_type, run_id, system_id
+      FROM asset_generated_output_sources
+      WHERE asset_id = ?
+      LIMIT 1
+    `).get(normalizedAssetId) as
+      | { producer_type: "run" | "system"; run_id: string | null; system_id: string | null }
+      | undefined;
+
+    if (!row) {
+      return undefined;
+    }
+
+    if (row.producer_type === "run") {
+      return Object.freeze({
+        producerType: "run",
+        runId: row.run_id ?? undefined,
+        systemId: row.system_id ?? undefined,
+      });
+    }
+
+    return Object.freeze({
+      producerType: "system",
+      systemId: row.system_id ?? undefined,
+      runId: row.run_id ?? undefined,
+    });
   }
 
   public dispose(): void {

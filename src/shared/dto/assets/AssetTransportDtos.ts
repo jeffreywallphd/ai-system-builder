@@ -187,6 +187,11 @@ export function toGetAssetByIdResponseDto(
         readonly relation?: string;
       }>;
     };
+    readonly generatedOutputSource?: {
+      readonly producerType: "run" | "system";
+      readonly runId?: string;
+      readonly systemId?: string;
+    };
   },
 ): GetAssetByIdResponseDto {
   return Object.freeze({

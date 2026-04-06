@@ -112,6 +112,12 @@ export interface AssetLineageHook {
   readonly relation?: string;
 }
 
+export interface GeneratedOutputSourceReference {
+  readonly producerType: "run" | "system";
+  readonly runId?: string;
+  readonly systemId?: string;
+}
+
 export interface AssetDetailMetadata {
   readonly isOwnedByActor: boolean;
   readonly uploadState: "ready" | "archived" | "deleted";
@@ -129,6 +135,7 @@ export interface AssetDetailMetadata {
   readonly lineage: {
     readonly sources: ReadonlyArray<AssetLineageHook>;
   };
+  readonly generatedOutputSource?: GeneratedOutputSourceReference;
 }
 
 export interface ListAssetsQuery extends AssetRequestContext {
@@ -182,10 +189,11 @@ export interface ResolveAssetPreviewQuery extends AssetRequestContext {
 export interface RegisterGeneratedOutputRequest extends AssetMutationContext {
   readonly assetId: string;
   readonly ownerUserId?: string;
-  readonly visibility: AssetVisibility;
+  readonly visibility?: AssetVisibility;
   readonly sharingPolicyRef?: AssetSharingPolicyReference;
   readonly storageInstanceId: string;
   readonly outputVersion: AssetVersionCreationInput;
+  readonly source: GeneratedOutputSourceReference;
   readonly lineage: ReadonlyArray<{
     readonly sourceAssetId: string;
     readonly sourceAssetVersionId?: string;
@@ -382,6 +390,33 @@ function normalizeAssetVersionCreationInput(input: AssetVersionCreationInput): A
   });
 }
 
+function normalizeGeneratedOutputSourceReference(
+  source: GeneratedOutputSourceReference,
+): GeneratedOutputSourceReference {
+  const producerType = source.producerType;
+  if (producerType !== "run" && producerType !== "system") {
+    throw new AssetServiceContractError("source.producerType must be either 'run' or 'system'.");
+  }
+
+  if (producerType === "run") {
+    const runId = normalizeRequired(source.runId ?? "", "source.runId");
+    const systemId = normalizeOptional(source.systemId);
+    return Object.freeze({
+      producerType,
+      runId,
+      systemId,
+    });
+  }
+
+  const systemId = normalizeRequired(source.systemId ?? "", "source.systemId");
+  const runId = normalizeOptional(source.runId);
+  return Object.freeze({
+    producerType,
+    systemId,
+    runId,
+  });
+}
+
 function normalizeRequestContext<TValue extends AssetRequestContext>(value: TValue): TValue {
   return Object.freeze({
     ...value,
@@ -506,8 +541,11 @@ export function validateRegisterGeneratedOutputRequest(
   input: RegisterGeneratedOutputRequest,
 ): RegisterGeneratedOutputRequest {
   const normalized = normalizeMutationContext(input);
+  const ownerUserId = normalizeOptional(input.ownerUserId);
+  const visibility = input.visibility ?? (ownerUserId ? "private" : "workspace");
+  const lineageInput = Array.isArray(input.lineage) ? input.lineage : [];
   const lineage = Object.freeze(
-    input.lineage.map((entry) => Object.freeze({
+    lineageInput.map((entry) => Object.freeze({
       sourceAssetId: normalizeRequired(entry.sourceAssetId, "lineage.sourceAssetId"),
       sourceAssetVersionId: normalizeOptional(entry.sourceAssetVersionId),
       relation: normalizeOptional(entry.relation),
@@ -516,7 +554,8 @@ export function validateRegisterGeneratedOutputRequest(
   return Object.freeze({
     ...normalized,
     assetId: normalizeRequired(input.assetId, "assetId"),
-    ownerUserId: normalizeOptional(input.ownerUserId),
+    ownerUserId,
+    visibility,
     sharingPolicyRef: input.sharingPolicyRef
       ? Object.freeze({
         policyId: normalizeRequired(input.sharingPolicyRef.policyId, "sharingPolicyRef.policyId"),
@@ -525,6 +564,7 @@ export function validateRegisterGeneratedOutputRequest(
       : undefined,
     storageInstanceId: normalizeRequired(input.storageInstanceId, "storageInstanceId"),
     outputVersion: normalizeAssetVersionCreationInput(input.outputVersion),
+    source: normalizeGeneratedOutputSourceReference(input.source),
     lineage,
   });
 }

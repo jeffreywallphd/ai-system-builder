@@ -67,6 +67,18 @@ class InMemoryAssetRepository implements IAssetRepository {
       relation: "derived-from",
     })]);
   }
+
+  public async getAssetGeneratedOutputSource(): Promise<{
+    readonly producerType: "run";
+    readonly runId: string;
+    readonly systemId: string;
+  }> {
+    return Object.freeze({
+      producerType: "run",
+      runId: "execution-run-001",
+      systemId: "system-render",
+    });
+  }
 }
 
 class WorkspaceAuthorizationRepository implements IWorkspaceAuthorizationReadRepository {
@@ -182,6 +194,11 @@ describe("AssetDetailService", () => {
     expect(outcome.value.metadata.previewAvailable).toBeTrue();
     expect(outcome.value.metadata.allowedActions.canInitiateUpload).toBeTrue();
     expect(outcome.value.metadata.lineage.sources[0]?.sourceAssetId).toBe("asset-source-001");
+    expect(outcome.value.metadata.generatedOutputSource).toEqual({
+      producerType: "run",
+      runId: "execution-run-001",
+      systemId: "system-render",
+    });
   });
 
   it("returns safe not-found for non-owner private assets", async () => {

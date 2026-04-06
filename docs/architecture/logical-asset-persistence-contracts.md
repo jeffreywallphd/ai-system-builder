@@ -28,6 +28,7 @@ Schema includes:
 - canonical asset metadata in `asset_records`
 - immutable version metadata in `asset_versions`
 - lightweight lineage links in `asset_lineage_links`
+- generated-output producer linkage in `asset_generated_output_sources`
 
 `asset_records` captures:
 
@@ -50,9 +51,15 @@ Schema includes:
 - derived/generated/preview/transformation relationships between assets
 - optional source version specificity for output lineage queries
 
+`asset_generated_output_sources` captures:
+
+- generated-output producer type (`run` or `system`)
+- run/system reference identifiers needed for orchestration-compatible source linkage
+- durable per-asset producer metadata without introducing raw path coupling
+
 ## Migration and schema posture
 
-- Schema is versioned by `asset_repository_migrations` and currently pinned at version `1`.
+- Schema is versioned by `asset_repository_migrations` and currently pinned at version `3`.
 - Migration SQL is idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`).
 - Check constraints enforce visibility-sharing coherence, lifecycle marker coherence, and non-negative revision/content sizes.
 - Workspace and user retrieval paths are indexed (`workspace_id`, `owner_user_id`, `kind`, `visibility`, lifecycle, storage, lineage).
@@ -66,6 +73,9 @@ Schema includes:
 - list semantics scoped by workspace/owner/storage/kind/visibility/lifecycle and lineage filters (`listAssets`)
 - create and save mutation flows (`createAsset`, `saveAsset`)
 - lineage replacement for derived/output relationships (`replaceAssetLineage`)
+- generated-output producer source persistence and lookup:
+  - `replaceAssetGeneratedOutputSource`
+  - `getAssetGeneratedOutputSource`
 - stale-write conflict rejection when incoming `lastModifiedAt` is older than persisted state
 
 ## Domain mapping posture

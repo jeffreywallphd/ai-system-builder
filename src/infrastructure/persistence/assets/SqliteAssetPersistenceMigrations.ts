@@ -1,4 +1,4 @@
-export const ASSET_PERSISTENCE_SCHEMA_VERSION = 2;
+export const ASSET_PERSISTENCE_SCHEMA_VERSION = 3;
 
 export const ASSET_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -121,5 +121,25 @@ export const ASSET_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, strin
   [2, `
     ALTER TABLE asset_versions
       ADD COLUMN content_encryption_descriptor TEXT;
+  `],
+  [3, `
+    CREATE TABLE IF NOT EXISTS asset_generated_output_sources (
+      asset_id TEXT PRIMARY KEY,
+      producer_type TEXT NOT NULL CHECK (producer_type IN ('run', 'system')),
+      run_id TEXT,
+      system_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (asset_id) REFERENCES asset_records(asset_id) ON DELETE CASCADE,
+      CHECK (
+        (producer_type = 'run' AND run_id IS NOT NULL)
+        OR (producer_type = 'system' AND system_id IS NOT NULL)
+      )
+    );
+
+    CREATE INDEX IF NOT EXISTS asset_generated_output_sources_run_idx
+      ON asset_generated_output_sources(run_id);
+    CREATE INDEX IF NOT EXISTS asset_generated_output_sources_system_idx
+      ON asset_generated_output_sources(system_id);
   `],
 ]);
