@@ -57,6 +57,41 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
   - `src/application/identity/tests/IdentityRepositoryPortsContracts.test.ts`
   - `src/shared/dto/identity/tests/IdentityPersistenceDtos.test.ts`
 
+## Story 13.1.3 shared persistence DTO/schema/mapper additions
+
+- Common persistence metadata + mutation contracts:
+  - `src/shared/dto/persistence/PersistenceBoundaryDtos.ts`
+- Reusable mapper boundary contracts + replay parsing helper:
+  - `src/shared/dto/persistence/PersistenceMapperBoundary.ts`
+- New shared persistence DTO coverage for remaining core domains:
+  - workspaces: `src/shared/dto/workspaces/WorkspacePersistenceDtos.ts`
+  - storage: `src/shared/dto/storage/StoragePersistenceDtos.ts`
+  - platform runs + audit: `src/shared/dto/platform/PlatformPersistenceDtos.ts`
+- Shared persistence schema primitives + parse helper:
+  - `src/shared/schemas/persistence/PersistenceSchemaPrimitives.ts`
+- New schema contracts for migration/validation-ready persistence payloads:
+  - `src/shared/schemas/workspaces/WorkspacePersistenceSchemaContracts.ts`
+  - `src/shared/schemas/storage/StoragePersistenceSchemaContracts.ts`
+  - `src/shared/schemas/platform/PlatformPersistenceSchemaContracts.ts`
+- Added contract tests for new DTOs/schemas/mapper boundaries:
+  - `src/shared/dto/persistence/tests/PersistenceBoundaryDtos.test.ts`
+  - `src/shared/dto/persistence/tests/PersistenceMapperBoundary.test.ts`
+  - `src/shared/dto/workspaces/tests/WorkspacePersistenceDtos.test.ts`
+  - `src/shared/dto/storage/tests/StoragePersistenceDtos.test.ts`
+  - `src/shared/dto/platform/tests/PlatformPersistenceDtos.test.ts`
+  - `src/shared/schemas/persistence/tests/PersistenceSchemaPrimitives.test.ts`
+  - `src/shared/schemas/workspaces/tests/WorkspacePersistenceSchemaContracts.test.ts`
+  - `src/shared/schemas/storage/tests/StoragePersistenceSchemaContracts.test.ts`
+  - `src/shared/schemas/platform/tests/PlatformPersistenceSchemaContracts.test.ts`
+
+## Mapper guidance for contributors
+
+- Keep mapper implementations in infrastructure, but drive them from shared DTO + schema contracts.
+- Validate persistence payloads with shared schema parse helpers before returning cross-layer records.
+- Keep tenancy/audit/version metadata explicit on authoritative records; do not infer this from adapter context alone.
+- Represent sensitive fields explicitly through `PersistenceSensitiveFieldDescriptor` and avoid exposing plaintext secrets/tokens outside infrastructure.
+- Normalize idempotency operation keys and parse replay snapshots through shared mapper helpers instead of ad hoc JSON parsing.
+
 ## Ownership rules to preserve
 
 - Workspace owns tenancy/membership lifecycle.
