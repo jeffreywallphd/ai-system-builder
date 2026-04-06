@@ -17,7 +17,7 @@ import type {
   NodeInventoryDetailReadModel,
   NodeInventorySummaryReadModel,
 } from "../../src/application/nodes/use-cases/NodeInventoryReadModels";
-import { NodeTrustUseCaseErrorCodes } from "../../src/application/nodes/use-cases/NodeTrustUseCaseShared";
+import { NodeTrustUseCaseErrorCodes } from "../../../src/application/nodes/use-cases/NodeTrustUseCaseShared";
 import {
   toNodeInventoryDetailDto,
   toNodeInventorySummaryDto,
@@ -28,7 +28,7 @@ import {
   type NodeInternalInventorySummaryDto,
   type NodeInternalDetailDto,
   type NodeInternalEnrollmentDetailDto,
-} from "../../src/shared/contracts/nodes/NodeTrustApiContracts";
+} from "../../../src/shared/contracts/nodes/NodeTrustApiContracts";
 import type {
   NodeEnrollmentRequestPersistenceRecord,
   NodeIdentityPersistenceRecord,
