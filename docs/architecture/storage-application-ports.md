@@ -1,6 +1,7 @@
 # Storage Application Ports and Use-Case Contracts
 
 This note documents the storage application-layer seams and the concrete service implementation that now orchestrates managed storage lifecycle behavior.
+It now also documents Story 9.3.5 storage-management audit governance integration.
 
 ## Canonical artifacts
 
@@ -21,6 +22,9 @@ This note documents the storage application-layer seams and the concrete service
 - `src/application/storage/use-cases/StorageManagementServiceErrors.ts`
 - `src/application/storage/tests/StorageManagementServiceContracts.test.ts`
 - `src/application/storage/tests/StorageLogicalAccessResolutionService.test.ts`
+- `src/application/storage/tests/StorageObservabilityPorts.test.ts`
+- `src/infrastructure/persistence/storage/SqliteStorageManagementAuditRecorder.ts`
+- `src/infrastructure/persistence/storage/tests/SqliteStorageManagementAuditRecorder.test.ts`
 
 ## Scope and intent
 
@@ -107,6 +111,27 @@ Provisioning rejections that are not unsupported backend capabilities map to `st
 - No persistence row model leakage, transport DTO binding, or UI/controller business logic duplication.
 - Storage management audit events remain best-effort and non-blocking.
 
+## Storage audit governance events (Story 9.3.5)
+
+- Storage management audit event vocabulary now explicitly covers:
+  - `storage-created`
+  - `storage-metadata-updated`
+  - `storage-policy-updated`
+  - `storage-activated`
+  - `storage-deactivated`
+  - existing read/list events (`storage-detail-queried`, `storage-access-listed`)
+- Core mutation events include actor identity, workspace context, storage instance identity, and high-value mutation metadata:
+  - create: backend/access/policy summary fields only
+  - metadata update: changed metadata fields and changed policy-label keys
+  - policy update: previous/current policy summaries and changed label keys
+  - lifecycle transitions: previous/next lifecycle states and provisioning request/outcome summary
+- Sensitive payload data is redacted before sink delivery by `StorageObservabilityPorts` sanitization.
+- The durable query seam is `SqliteStorageManagementAuditRecorder` with:
+  - `listRecent(limit)`
+  - `listByWorkspaceId(workspaceId, limit)`
+  - `listByStorageInstanceId(storageInstanceId, limit)`
+- Server host composition now wires this recorder into `StorageManagementService` so storage management actions persist authoritative governance events by default.
+
 ## Test coverage
 
 `StorageManagementServiceContracts.test.ts` verifies:
@@ -117,3 +142,4 @@ Provisioning rejections that are not unsupported backend capabilities map to `st
 - invalid lifecycle transition responses
 - unsupported backend operation responses
 - provisioning rejection failure behavior without unintended persistence
+- storage mutation audit coverage including policy-update event emission and high-value metadata details

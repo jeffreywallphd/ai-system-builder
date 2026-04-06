@@ -70,17 +70,18 @@ describe("SqliteStorageInstancePersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM storage_instance_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(1);
+    expect(versionRow.version).toBe(2);
 
     const tables = database.prepare(`
       SELECT name
       FROM sqlite_master
       WHERE type = 'table'
-        AND name IN ('storage_instances', 'storage_instance_mutation_replays')
+        AND name IN ('storage_instances', 'storage_instance_mutation_replays', 'storage_management_audit_events')
       ORDER BY name ASC
     `).all() as Array<{ name: string }>;
 
     expect(tables.map((table) => table.name)).toEqual([
+      "storage_management_audit_events",
       "storage_instance_mutation_replays",
       "storage_instances",
     ]);

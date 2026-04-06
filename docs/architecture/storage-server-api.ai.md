@@ -3,6 +3,7 @@
 ## Purpose
 
 Story 9.3.2 adds authoritative server-side adapters for managed storage instance administration so clients consume one secure API surface for storage lifecycle operations.
+Story 9.3.5 extends this surface with durable storage-management audit governance integration at host composition.
 
 ## Canonical files
 
@@ -13,6 +14,7 @@ Story 9.3.2 adds authoritative server-side adapters for managed storage instance
 - `hosts/server/IdentityServerHost.ts`
 - `infrastructure/api/storage/tests/StorageManagementBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerStorageManagement.test.ts`
+- `hosts/server/tests/IdentityServerHost.test.ts`
 
 ## API behavior
 
@@ -38,6 +40,7 @@ Story 9.3.2 adds authoritative server-side adapters for managed storage instance
 - Host composition wires a workspace-aware policy adapter; transport handlers never bypass policy by writing directly to storage persistence.
 - Response projection uses shared DTO mappers with sensitive-reference redaction metadata.
 - Endpoints do not expose raw filesystem paths.
+- Host composition now also wires `SqliteStorageManagementAuditRecorder` as the `StorageManagementService` audit sink, so core storage mutation operations are durably recorded with redaction-safe payloads.
 
 ## Story 9.3.4 inspection contract additions
 
@@ -51,3 +54,9 @@ Story 9.3.2 adds authoritative server-side adapters for managed storage instance
 - capability flags and synchronization metadata
 
 Inspection is sourced from a dedicated application use case (`inspectStorageInstanceStatus`) rather than ad hoc endpoint logic, preserving policy enforcement and consistent status semantics.
+
+## Story 9.3.5 audit persistence posture
+
+- Storage API mutation routes continue to rely on application-layer orchestration for audit emission (no transport duplication).
+- Emitted audit payloads include actor/workspace/storage context and high-value mutation metadata, while sensitive connection/key locator values are redacted before sink delivery.
+- Queryability is currently provided via the existing persistence seam (`SqliteStorageManagementAuditRecorder`) using recency/workspace/storage-instance lookup methods.

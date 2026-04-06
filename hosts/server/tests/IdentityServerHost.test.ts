@@ -7,6 +7,7 @@ import { IdentityProviderAccountPolicyConfig } from "../../../infrastructure/con
 import { SqliteWorkspacePersistenceAdapter } from "../../../src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import { SqliteNodeTrustAuditRecorder } from "../../../src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
 import { SqliteNodeTrustPersistenceAdapter } from "../../../src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
+import { SqliteStorageManagementAuditRecorder } from "../../../src/infrastructure/persistence/storage/SqliteStorageManagementAuditRecorder";
 import {
   NodeApprovalStatuses,
   NodeRevocationStates,
@@ -535,6 +536,177 @@ describe("IdentityServerHost", () => {
       const acceptBody = await acceptResponse.json();
       expect(acceptBody.ok).toBe(true);
       expect(acceptBody.data.invitation.status).toBe("accepted");
+    } finally {
+      await host.close();
+      rmSync(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("persists queryable storage management audit events through host composition", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-storage-audit-host-test-"));
+    const databasePath = join(tempDirectory, "identity-storage-audit-host.sqlite");
+    const host = await startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+    });
+
+    try {
+      const ownerRegisterResponse = await fetch(`http://${host.address}/api/v1/identity/register`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          username: "storage.audit.owner.host",
+          email: "storage.audit.owner.host@example.com",
+          credential: { candidate: "StrongPass!2026" },
+        }),
+      });
+      expect(ownerRegisterResponse.status).toBe(200);
+      const ownerRegisterBody = await ownerRegisterResponse.json();
+
+      const ownerLoginResponse = await fetch(`http://${host.address}/api/v1/identity/login`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          providerSubject: "storage.audit.owner.host",
+          credential: { candidate: "StrongPass!2026" },
+        }),
+      });
+      expect(ownerLoginResponse.status).toBe(200);
+      const ownerLoginBody = await ownerLoginResponse.json();
+      const ownerToken = ownerLoginBody.data.sessionToken as string;
+
+      const workspaceRepository = new SqliteWorkspacePersistenceAdapter(databasePath);
+      const now = new Date("2026-04-05T14:00:00.000Z");
+      await workspaceRepository.saveWorkspace(createWorkspace({
+        id: "workspace:storage-audit",
+        slug: "host-workspace-storage-audit",
+        displayName: "Host Workspace Storage Audit",
+        ownerUserId: ownerRegisterBody.data.userIdentityId,
+        createdBy: ownerRegisterBody.data.userIdentityId,
+        visibility: WorkspaceVisibilities.team,
+        status: WorkspaceStatuses.active,
+        now,
+      }));
+      await workspaceRepository.saveMembership(createWorkspaceMembership({
+        id: "workspace-membership:storage-audit-owner",
+        workspaceId: "workspace:storage-audit",
+        userIdentityId: ownerRegisterBody.data.userIdentityId,
+        status: WorkspaceMembershipStatuses.active,
+        joinedAt: now.toISOString(),
+        createdBy: ownerRegisterBody.data.userIdentityId,
+        now,
+      }));
+      await workspaceRepository.saveRoleAssignment(createWorkspaceRoleAssignment({
+        id: "workspace-role-assignment:storage-audit-owner",
+        workspaceId: "workspace:storage-audit",
+        userIdentityId: ownerRegisterBody.data.userIdentityId,
+        role: WorkspaceRoles.owner,
+        status: WorkspaceRoleAssignmentStatuses.active,
+        assignedBy: ownerRegisterBody.data.userIdentityId,
+        assignedAt: now.toISOString(),
+      }));
+      workspaceRepository.dispose();
+
+      const createResponse = await fetch(
+        `http://${host.address}/api/v1/storage/instances?workspaceId=workspace%3Astorage-audit`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${ownerToken}`,
+          },
+          body: JSON.stringify({
+            storageInstanceId: "storage:host:audit:alpha",
+            backendType: "managed-filesystem",
+            display: {
+              displayName: "Storage Audit Host Alpha",
+            },
+            ownerUserIdentityId: ownerRegisterBody.data.userIdentityId,
+            access: {
+              mode: "read-write",
+              scope: "workspace-members",
+            },
+            policy: {
+              policyId: "policy-storage-host-audit",
+              labels: {
+                tier: "gold",
+              },
+              encryptionProfileId: "profile-storage-host-audit",
+              encryptionKeyReferenceId: "kms://workspace/storage-audit/key-alpha",
+              envelopeRequired: true,
+            },
+          }),
+        },
+      );
+      expect(createResponse.status).toBe(200);
+
+      const updateResponse = await fetch(
+        `http://${host.address}/api/v1/storage/instances/storage%3Ahost%3Aaudit%3Aalpha/metadata?workspaceId=workspace%3Astorage-audit`,
+        {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${ownerToken}`,
+          },
+          body: JSON.stringify({
+            display: {
+              displayName: "Storage Audit Host Alpha Updated",
+            },
+            policy: {
+              labels: {
+                tier: "platinum",
+              },
+            },
+          }),
+        },
+      );
+      expect(updateResponse.status).toBe(200);
+
+      const deactivateResponse = await fetch(
+        `http://${host.address}/api/v1/storage/instances/storage%3Ahost%3Aaudit%3Aalpha/deactivate?workspaceId=workspace%3Astorage-audit`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${ownerToken}`,
+          },
+          body: JSON.stringify({}),
+        },
+      );
+      expect(deactivateResponse.status).toBe(200);
+
+      const activateResponse = await fetch(
+        `http://${host.address}/api/v1/storage/instances/storage%3Ahost%3Aaudit%3Aalpha/activate?workspaceId=workspace%3Astorage-audit`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${ownerToken}`,
+          },
+          body: JSON.stringify({}),
+        },
+      );
+      expect(activateResponse.status).toBe(200);
+
+      const auditRecorder = new SqliteStorageManagementAuditRecorder(databasePath);
+      const storageEvents = auditRecorder.listByStorageInstanceId("storage:host:audit:alpha", 20);
+      expect(storageEvents.some((event) => event.type === "storage-created")).toBeTrue();
+      expect(storageEvents.some((event) => event.type === "storage-metadata-updated")).toBeTrue();
+      expect(storageEvents.some((event) => event.type === "storage-policy-updated")).toBeTrue();
+      expect(storageEvents.some((event) => event.type === "storage-deactivated")).toBeTrue();
+      expect(storageEvents.some((event) => event.type === "storage-activated")).toBeTrue();
+      const createdEvent = storageEvents.find((event) => event.type === "storage-created");
+      expect(createdEvent?.details).toEqual(expect.objectContaining({
+        hasEncryptionKeyReferenceId: true,
+      }));
+      expect((createdEvent?.details as Record<string, unknown>)?.encryptionKeyReferenceId).toBeUndefined();
+
+      const workspaceEvents = auditRecorder.listByWorkspaceId("workspace:storage-audit", 20);
+      expect(workspaceEvents.some((event) => event.storageInstanceId === "storage:host:audit:alpha")).toBeTrue();
+      auditRecorder.dispose();
     } finally {
       await host.close();
       rmSync(tempDirectory, { recursive: true, force: true });
