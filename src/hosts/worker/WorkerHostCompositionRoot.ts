@@ -26,6 +26,7 @@ import {
 } from "../../infrastructure/config/HostServiceRegistrationCatalog";
 import type { HostServiceRegistrationPlan } from "../../infrastructure/config/HostServiceRegistration";
 import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
+import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
 
 export interface WorkerCapabilitySelection {
   readonly enableNodeExecution?: boolean;
@@ -198,6 +199,15 @@ export function createWorkerCompositionRoot(
       }
 
       const lifecycle = createHostLifecycleCoordinator({ boot });
+      const runtimeMetadata = advertiseHostRuntimeMetadata({
+        host: boot.host,
+        advertisedCapabilities: enabledCapabilities,
+        metadata: Object.freeze({
+          compositionRootId: "composition-root:host:worker:runtime",
+          startupReason: boot.startupReason,
+          nodeRegistrationCapabilities: nodeRegistrationCapabilities.join(","),
+        }),
+      });
       let startedHost: WorkerRuntimeHost | undefined;
       await lifecycle.markComposing("compose-worker-host");
 
@@ -219,6 +229,7 @@ export function createWorkerCompositionRoot(
           [HostBootstrapStageIds.configuration]: (context) => {
             context.setArtifact("artifact:host:worker:host-options", context.hostConfiguration);
             context.setArtifact(WorkerEnabledCapabilitiesArtifactKey, enabledCapabilities);
+            context.setArtifact(HostRuntimeMetadataArtifactKey, runtimeMetadata);
           },
           [HostBootstrapStageIds.dependencies]: (context) => {
             const composePlan = input.bootstrap?.composeServiceRegistrationPlan
@@ -305,6 +316,7 @@ export function createWorkerCompositionRoot(
 
         return Object.freeze({
           host: boot.host,
+          runtimeMetadata,
           get phase() {
             return lifecycle.phase;
           },

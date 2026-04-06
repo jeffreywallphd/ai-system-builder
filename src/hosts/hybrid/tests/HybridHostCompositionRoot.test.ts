@@ -49,6 +49,9 @@ describe("HybridHostCompositionRoot", () => {
       HostCapabilityFlags.nodeExecution,
       HostCapabilityFlags.workerRuntime,
     ]);
+    expect(runtime.runtimeMetadata.hostId).toBe("host:hybrid:desktop-worker");
+    expect(runtime.runtimeMetadata.roleInspection.supportsNodeExecution).toBeTrue();
+    expect(runtime.runtimeMetadata.metadata.controlPlaneSource).toBe(HybridHostControlPlaneSources.remoteAuthoritativeServer);
     expect(runtime.readiness?.marker).toBe("hybrid-host:feature-registration-complete");
     expect(runtime.lifecycleEvents?.some((event) => event.type === "startup-completed")).toBeTrue();
     expect(runtime.transitionHistory.map((entry) => entry.to)).toEqual([

@@ -47,6 +47,9 @@ describe("WorkerHostCompositionRoot", () => {
       HostCapabilityFlags.nodeExecution,
       HostCapabilityFlags.workerRuntime,
     ]);
+    expect(runtime.runtimeMetadata.hostId).toBe("host:worker:runtime");
+    expect(runtime.runtimeMetadata.roleInspection.supportsNodeExecution).toBeTrue();
+    expect(runtime.runtimeMetadata.metadata.nodeRegistrationCapabilities).toBe("node-execution,worker-runtime");
     expect(runtime.readiness?.marker).toBe("worker-host:feature-registration-complete");
     expect(runtime.lifecycleEvents?.some((event) => event.type === "startup-completed")).toBeTrue();
     expect(runtime.transitionHistory.map((entry) => entry.to)).toEqual([

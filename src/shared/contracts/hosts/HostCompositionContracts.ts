@@ -1,7 +1,10 @@
 import type {
+  HostCapabilityCategory,
+  HostCapabilityDescriptor,
   HostCapabilityFlag,
   HostControlPlaneRole,
   HostRuntimeIdentity,
+  HostRuntimeRoleInspection,
   HostRuntimeKind,
   HostStartupDependencyBoundary,
   HostStartupDependencyBoundaryLayer,
@@ -14,6 +17,7 @@ import type {
   HostLifecyclePhase,
   HostLifecycleReadinessMarker,
   HostLifecycleTransition,
+  HostRuntimeMetadata,
 } from "../../../application/common/HostCompositionContracts";
 
 export class HostCompositionSharedContractError extends Error {
@@ -53,6 +57,36 @@ export interface HostRuntimeIdentityDto {
   readonly capabilities: ReadonlyArray<HostCapabilityFlag>;
   readonly responsibilities: ReadonlyArray<string>;
   readonly startupDependencies: ReadonlyArray<HostStartupDependencyBoundaryDto>;
+}
+
+export interface HostCapabilityDescriptorDto {
+  readonly capability: HostCapabilityFlag;
+  readonly category: HostCapabilityCategory;
+  readonly summary: string;
+}
+
+export interface HostRuntimeRoleInspectionDto {
+  readonly hostId: string;
+  readonly kind: HostRuntimeKind;
+  readonly controlPlaneRole: HostControlPlaneRole;
+  readonly isAuthoritativeControlPlane: boolean;
+  readonly isControlPlaneClient: boolean;
+  readonly isControlPlaneParticipant: boolean;
+  readonly supportsNodeExecution: boolean;
+  readonly supportsWorkerRuntime: boolean;
+  readonly supportsUserInterface: boolean;
+  readonly supportsTransportServing: boolean;
+  readonly supportsLocalPersistence: boolean;
+}
+
+export interface HostRuntimeMetadataDto {
+  readonly contractVersion: HostCompositionContractVersion;
+  readonly hostId: string;
+  readonly kind: HostRuntimeKind;
+  readonly controlPlaneRole: HostControlPlaneRole;
+  readonly roleInspection: HostRuntimeRoleInspectionDto;
+  readonly advertisedCapabilities: ReadonlyArray<HostCapabilityDescriptorDto>;
+  readonly metadata: Readonly<Record<string, string>>;
 }
 
 export interface HostBootConfigurationDto {
@@ -106,6 +140,30 @@ function toStartupDependencyDto(value: HostStartupDependencyBoundary): HostStart
   });
 }
 
+function toCapabilityDescriptorDto(value: HostCapabilityDescriptor): HostCapabilityDescriptorDto {
+  return Object.freeze({
+    capability: value.capability,
+    category: value.category,
+    summary: normalizeRequired(value.summary, "Host runtime capability summary"),
+  });
+}
+
+function toRuntimeRoleInspectionDto(value: HostRuntimeRoleInspection): HostRuntimeRoleInspectionDto {
+  return Object.freeze({
+    hostId: normalizeRequired(value.hostId, "Host runtime role inspection hostId"),
+    kind: value.kind,
+    controlPlaneRole: value.controlPlaneRole,
+    isAuthoritativeControlPlane: value.isAuthoritativeControlPlane,
+    isControlPlaneClient: value.isControlPlaneClient,
+    isControlPlaneParticipant: value.isControlPlaneParticipant,
+    supportsNodeExecution: value.supportsNodeExecution,
+    supportsWorkerRuntime: value.supportsWorkerRuntime,
+    supportsUserInterface: value.supportsUserInterface,
+    supportsTransportServing: value.supportsTransportServing,
+    supportsLocalPersistence: value.supportsLocalPersistence,
+  });
+}
+
 export function toHostRuntimeIdentityDto(value: HostRuntimeIdentity): HostRuntimeIdentityDto {
   return Object.freeze({
     contractVersion: HostCompositionContractVersions.v1,
@@ -130,6 +188,18 @@ export function toHostBootConfigurationDto(value: HostBootConfiguration): HostBo
     startedAt: new Date(normalizedStartedAt).toISOString(),
     startupReason: normalizeRequired(value.startupReason, "Host boot startupReason"),
     requiredDependencyIds: Object.freeze([...value.requiredDependencyIds]),
+  });
+}
+
+export function toHostRuntimeMetadataDto(value: HostRuntimeMetadata): HostRuntimeMetadataDto {
+  return Object.freeze({
+    contractVersion: HostCompositionContractVersions.v1,
+    hostId: normalizeRequired(value.hostId, "Host runtime metadata hostId"),
+    kind: value.kind,
+    controlPlaneRole: value.controlPlaneRole,
+    roleInspection: toRuntimeRoleInspectionDto(value.roleInspection),
+    advertisedCapabilities: Object.freeze(value.advertisedCapabilities.map(toCapabilityDescriptorDto)),
+    metadata: value.metadata ? Object.freeze({ ...value.metadata }) : Object.freeze({}),
   });
 }
 

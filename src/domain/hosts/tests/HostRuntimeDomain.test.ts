@@ -8,6 +8,8 @@ import {
   assertHostIdentitySupportsAuthoritativeControlPlane,
   createHostRuntimeIdentity,
   hasHostCapability,
+  inspectHostRuntimeRole,
+  resolveHostCapabilityDescriptors,
   resolveStartupDependenciesByBoundaryLayer,
 } from "../HostRuntimeDomain";
 
@@ -104,6 +106,35 @@ describe("HostRuntimeDomain", () => {
     expect(grouped[HostStartupDependencyBoundaryLayers.sharedContracts]).toHaveLength(1);
     expect(grouped[HostStartupDependencyBoundaryLayers.infrastructure]).toHaveLength(1);
     expect(grouped[HostStartupDependencyBoundaryLayers.host]).toHaveLength(0);
+  });
+
+  it("resolves capability descriptors and role inspection without brittle string checks", () => {
+    const host = createHostRuntimeIdentity({
+      hostId: "host:desktop:app-shell",
+      kind: HostRuntimeKinds.desktop,
+      controlPlaneRole: HostControlPlaneRoles.controlPlaneClient,
+      capabilities: [
+        HostCapabilityFlags.desktopShell,
+        HostCapabilityFlags.userInterfaceRendering,
+        HostCapabilityFlags.localPersistence,
+      ],
+      responsibilities: [
+        "compose desktop runtime",
+      ],
+    });
+
+    const descriptors = resolveHostCapabilityDescriptors(host.capabilities);
+    expect(descriptors.map((descriptor) => descriptor.capability)).toEqual([
+      HostCapabilityFlags.desktopShell,
+      HostCapabilityFlags.userInterfaceRendering,
+      HostCapabilityFlags.localPersistence,
+    ]);
+
+    const inspection = inspectHostRuntimeRole(host);
+    expect(inspection.isAuthoritativeControlPlane).toBeFalse();
+    expect(inspection.isControlPlaneClient).toBeTrue();
+    expect(inspection.supportsUserInterface).toBeTrue();
+    expect(inspection.supportsNodeExecution).toBeFalse();
   });
 });
 
