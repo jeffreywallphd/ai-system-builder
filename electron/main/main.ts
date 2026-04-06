@@ -97,6 +97,7 @@ import {
   type LaunchSystemRuntimeWindowReadModel,
 } from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
 import { createRendererContentSecurityPolicy } from "./RendererContentSecurityPolicy";
+import { resolveModelFileAbsolutePath, toLogicalModelPath } from "./ModelFilePathPolicy";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -185,17 +186,17 @@ function createRendererSearch(params: Record<string, string | undefined>): strin
   return serialized ? `?${serialized}` : undefined;
 }
 
-function toFileEntry(filePath: string) {
+function toFileEntry(modelsRootPath: string, filePath: string) {
   const stats = fs.statSync(filePath);
   return {
-    path: filePath,
+    path: toLogicalModelPath(modelsRootPath, filePath),
     kind: stats.isDirectory() ? "directory" as const : "file" as const,
     size: stats.isFile() ? stats.size : undefined,
     modifiedAt: stats.mtime.toISOString(),
   };
 }
 
-function listEntries(rootPath: string, recursive = false): ReadonlyArray<ReturnType<typeof toFileEntry>> {
+function listEntries(modelsRootPath: string, rootPath: string, recursive = false): ReadonlyArray<ReturnType<typeof toFileEntry>> {
   if (!fs.existsSync(rootPath)) {
     return [];
   }
@@ -204,7 +205,7 @@ function listEntries(rootPath: string, recursive = false): ReadonlyArray<ReturnT
   const walk = (currentPath: string) => {
     for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
       const entryPath = path.join(currentPath, entry.name);
-      results.push(toFileEntry(entryPath));
+      results.push(toFileEntry(modelsRootPath, entryPath));
       if (recursive && entry.isDirectory()) {
         walk(entryPath);
       }
@@ -959,44 +960,54 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     }
   });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
-    event.returnValue = fs.existsSync(targetPath);
+    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
+    event.returnValue = fs.existsSync(absolutePath);
   });
   ipcMain.on("ai-loom-desktop-model-files:stat", (event, targetPath: string) => {
-    event.returnValue = toFileEntry(targetPath);
+    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
+    event.returnValue = toFileEntry(storagePaths.modelsDirectory, absolutePath);
   });
   ipcMain.on("ai-loom-desktop-model-files:read", (event, targetPath: string) => {
-    event.returnValue = new Uint8Array(fs.readFileSync(targetPath));
+    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
+    event.returnValue = new Uint8Array(fs.readFileSync(absolutePath));
   });
   ipcMain.on("ai-loom-desktop-model-files:write", (_event, request: { path: string; content: Uint8Array; overwrite?: boolean; createDirectories?: boolean }) => {
-    if (!request.overwrite && fs.existsSync(request.path)) {
+    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.path);
+    if (!request.overwrite && fs.existsSync(absolutePath)) {
       throw new Error(`File '${request.path}' already exists.`);
     }
     if (request.createDirectories) {
-      fs.mkdirSync(path.dirname(request.path), { recursive: true });
+      fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
     }
-    fs.writeFileSync(request.path, Buffer.from(request.content));
+    fs.writeFileSync(absolutePath, Buffer.from(request.content));
   });
   ipcMain.on("ai-loom-desktop-model-files:delete", (_event, targetPath: string) => {
-    if (fs.existsSync(targetPath)) {
-      fs.rmSync(targetPath, { recursive: true, force: true });
+    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
+    if (fs.existsSync(absolutePath)) {
+      fs.rmSync(absolutePath, { recursive: true, force: true });
     }
   });
   ipcMain.on("ai-loom-desktop-model-files:list", (event, targetPath: string, options?: { recursive?: boolean }) => {
-    event.returnValue = listEntries(targetPath, options?.recursive === true);
+    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
+    event.returnValue = listEntries(storagePaths.modelsDirectory, absolutePath, options?.recursive === true);
   });
   ipcMain.on("ai-loom-desktop-model-files:move", (_event, request: { from: string; to: string; overwrite?: boolean }) => {
-    if (!request.overwrite && fs.existsSync(request.to)) {
+    const absoluteSourcePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.from);
+    const absoluteTargetPath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.to);
+    if (!request.overwrite && fs.existsSync(absoluteTargetPath)) {
       throw new Error(`File '${request.to}' already exists.`);
     }
-    fs.mkdirSync(path.dirname(request.to), { recursive: true });
-    fs.renameSync(request.from, request.to);
+    fs.mkdirSync(path.dirname(absoluteTargetPath), { recursive: true });
+    fs.renameSync(absoluteSourcePath, absoluteTargetPath);
   });
   ipcMain.on("ai-loom-desktop-model-files:copy", (_event, request: { from: string; to: string; overwrite?: boolean }) => {
-    if (!request.overwrite && fs.existsSync(request.to)) {
+    const absoluteSourcePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.from);
+    const absoluteTargetPath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.to);
+    if (!request.overwrite && fs.existsSync(absoluteTargetPath)) {
       throw new Error(`File '${request.to}' already exists.`);
     }
-    fs.mkdirSync(path.dirname(request.to), { recursive: true });
-    fs.copyFileSync(request.from, request.to);
+    fs.mkdirSync(path.dirname(absoluteTargetPath), { recursive: true });
+    fs.copyFileSync(absoluteSourcePath, absoluteTargetPath);
   });
 
   canonicalAssetSystemRepository = new SqliteAssetSystemRepository(path.join(storagePaths.assetsDirectory, "asset-system.sqlite"));

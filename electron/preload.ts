@@ -84,23 +84,23 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     },
   },
   modelFiles: {
-    exists(path: string) {
-      return ipcRenderer.sendSync("ai-loom-desktop-model-files:exists", path) as boolean;
+    exists(modelPath: string) {
+      return ipcRenderer.sendSync("ai-loom-desktop-model-files:exists", modelPath) as boolean;
     },
-    stat(path: string) {
-      return ipcRenderer.sendSync("ai-loom-desktop-model-files:stat", path) as { path: string; kind: "file" | "directory"; size?: number; modifiedAt?: string };
+    stat(modelPath: string) {
+      return ipcRenderer.sendSync("ai-loom-desktop-model-files:stat", modelPath) as { path: string; kind: "file" | "directory"; size?: number; modifiedAt?: string };
     },
-    read(path: string) {
-      return ipcRenderer.sendSync("ai-loom-desktop-model-files:read", path) as Uint8Array;
+    read(modelPath: string) {
+      return ipcRenderer.sendSync("ai-loom-desktop-model-files:read", modelPath) as Uint8Array;
     },
     write(request: { path: string; content: Uint8Array; overwrite?: boolean; createDirectories?: boolean }) {
       ipcRenderer.sendSync("ai-loom-desktop-model-files:write", request);
     },
-    delete(path: string) {
-      ipcRenderer.sendSync("ai-loom-desktop-model-files:delete", path);
+    delete(modelPath: string) {
+      ipcRenderer.sendSync("ai-loom-desktop-model-files:delete", modelPath);
     },
-    list(path: string, options?: { recursive?: boolean }) {
-      return ipcRenderer.sendSync("ai-loom-desktop-model-files:list", path, options) as ReadonlyArray<{ path: string; kind: "file" | "directory"; size?: number; modifiedAt?: string }>;
+    list(modelPath: string, options?: { recursive?: boolean }) {
+      return ipcRenderer.sendSync("ai-loom-desktop-model-files:list", modelPath, options) as ReadonlyArray<{ path: string; kind: "file" | "directory"; size?: number; modifiedAt?: string }>;
     },
     move(request: { from: string; to: string; overwrite?: boolean }) {
       ipcRenderer.sendSync("ai-loom-desktop-model-files:move", request);

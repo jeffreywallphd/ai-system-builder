@@ -29,7 +29,9 @@ export function createModelManagementDependencies(options: {
   readonly durableStorage?: Storage;
 }): ModelManagementDependencies {
   const fileStorage = options.desktopModelFileBridge
-    ? new DesktopBridgeFileStorage(options.desktopModelFileBridge)
+    ? new DesktopBridgeFileStorage(options.desktopModelFileBridge, {
+      rootDirectory: options.modelInstallDirectory,
+    })
     : undefined;
 
   if (!fileStorage) {

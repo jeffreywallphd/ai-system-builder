@@ -76,3 +76,9 @@ Transport payloads carry logical IDs and storage references only; infrastructure
 - Shared DTO/contracts do not include filesystem path APIs or backend-specific adapter objects.
 - Higher layers can integrate on logical asset ids, storage-instance refs, and scoped filters without redesign.
 
+## Story 10.1.5 path-quarantine update
+
+- Renderer-visible desktop model file operations now accept logical model paths relative to managed model roots, not raw absolute filesystem paths.
+- Electron main process resolves those logical paths through an internal-only policy module (`electron/main/ModelFilePathPolicy.ts`) and rejects absolute/traversal/out-of-root inputs.
+- Infrastructure adapters (`DesktopBridgeFileStorage`) quarantine absolute path handling behind internal translation logic so application/model services can keep existing abstractions without exposing raw path contracts at UI/IPC boundaries.
+
