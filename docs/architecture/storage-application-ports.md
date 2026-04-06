@@ -1,7 +1,6 @@
 # Storage Application Ports and Use-Case Contracts
 
-This note documents Story 9.1.2 (Feature 9 / Epic 9.1): application-layer contracts for managed storage instance orchestration.
-Story 9.1.5 extends this surface with storage access-summary contracts used by listing/detail/action flows.
+This note documents the storage application-layer seams and the concrete service implementation that now orchestrates managed storage lifecycle behavior.
 
 ## Canonical artifacts
 
@@ -13,32 +12,20 @@ Story 9.1.5 extends this surface with storage access-summary contracts used by l
 - `src/application/storage/ports/StorageObservabilityPorts.ts`
 - `src/application/storage/ports/StorageManagementPorts.ts`
 - `src/application/storage/use-cases/StorageManagementServiceContracts.ts`
+- `src/application/storage/use-cases/CreateStorageInstanceWithProvisioningUseCase.ts`
+- `src/application/storage/use-cases/StorageManagementService.ts`
+- `src/application/storage/use-cases/StorageManagementServiceErrors.ts`
 - `src/application/storage/tests/StorageManagementServiceContracts.test.ts`
 
 ## Scope and intent
 
-- Establish stable, explicit storage-application seams before persistence and backend adapters exist.
-- Keep managed-storage use cases backend-agnostic while preserving production-oriented contracts.
-- Ensure storage lifecycle and access orchestration remains application-owned and policy-driven.
+- Keep storage management orchestration centralized in the application layer.
+- Enforce workspace-aware policy checks and lifecycle transitions before any transport/controller code runs.
+- Preserve stable, backend-agnostic contracts while enabling backend provisioning and capability inspection.
 
-## Port responsibilities
+## Implemented service layer (Story 9.3.1)
 
-- `IStorageInstanceRepository`
-  - canonical persistence/query seam for `StorageInstance` records with explicit list filters and idempotent mutation context.
-- `IStorageProvisioningPort`
-  - backend-facing lifecycle/provisioning operation seam (`create`, `activate`, `deactivate`, `replication-sync`) with structured operation receipts.
-- `IStoragePolicyEvaluationPort`
-  - policy authorization seam for storage actions and access-filtered storage list resolution.
-- `StorageInstanceAccessSummary` (via `StorageAccessSummaryPort.ts`)
-  - storage-facing representation seam for effective action permissions, ownership/workspace context, and policy-restricted capabilities.
-- `IStorageCapabilityInspectionPort`
-  - backend capability introspection seam for storage backend/instance compatibility checks.
-- `StorageManagementAuditSink` (via `StorageObservabilityPorts.ts`)
-  - best-effort audit seam for storage creation, metadata updates, lifecycle operations, and read/query usage.
-
-## Use-case contracts
-
-`StorageManagementServiceContracts.ts` defines explicit command/query DTOs and result envelopes for:
+`StorageManagementService` implements the management contracts for:
 
 - create storage instance
 - update storage metadata
@@ -47,40 +34,38 @@ Story 9.1.5 extends this surface with storage access-summary contracts used by l
 - list accessible storage instances
 - get storage instance details
 
-Each operation returns a typed `StorageManagementResult<TValue>` with stable error codes:
+Core behavior:
 
-- `storage-invalid-request`
-- `storage-access-denied`
-- `storage-not-found`
-- `storage-conflict`
-- `storage-invalid-state`
-- `storage-policy-violation`
-- `storage-capability-unsupported`
-- `storage-provisioning-failed`
-- `storage-internal`
+- policy checks are enforced through `IStoragePolicyEvaluationPort` for every management action.
+- list visibility is constrained through `resolveAccessibleStorageInstanceIds(...)`.
+- lifecycle state changes are validated via domain transitions.
+- optional backend lifecycle operations route through `IStorageProvisioningPort`.
+- returned objects are normalized/frozen and include `accessSummary` data for authoritative UI/API consumption.
 
-Story 9.1.5 updates result contracts so storage management flows can optionally return `accessSummary` alongside storage data. This allows API/admin consumers to rely on authoritative storage access posture while keeping enforcement in policy ports.
+## Error handling
+
+Explicit service errors are introduced and mapped into the existing `StorageManagementResult<TValue>` envelope:
+
+- `StoragePolicyViolationError` -> `storage-policy-violation`
+- `StorageInstanceNotFoundError` -> `storage-not-found`
+- `StorageBackendOperationUnsupportedError` -> `storage-capability-unsupported`
+- `StorageInvalidLifecycleTransitionError` -> `storage-invalid-state`
+
+Provisioning rejections that are not unsupported backend capabilities map to `storage-provisioning-failed`.
 
 ## Boundary posture
 
-- Application contracts depend on domain storage contracts and application ports only.
-- No persistence row models, API transport DTOs, runtime filesystem paths, or backend SDK types are exposed.
-- Audit/event emission remains best-effort and non-blocking for business outcomes.
+- Service logic depends on domain + application ports only.
+- No persistence row model leakage, transport DTO binding, or UI/controller business logic duplication.
+- Storage management audit events remain best-effort and non-blocking.
 
 ## Test coverage
 
-`StorageManagementServiceContracts.test.ts` validates contract-level behavior with in-memory adapters:
+`StorageManagementServiceContracts.test.ts` verifies:
 
-- end-to-end create/update/activate/deactivate/list/detail orchestration using the new request/response contracts
-- policy-denied failure behavior mapping
-- best-effort audit sink failure handling
-- stability of error and provisioning constants
-
-## Follow-on implementation seam
-
-These contracts are ready for later stories to implement:
-
-- SQLite or other repository adapters for `IStorageInstanceRepository`
-- concrete managed-storage backend adapters for `IStorageProvisioningPort`
-- policy adapters bound to authorization systems for `IStoragePolicyEvaluationPort`
-- runtime/backend capability probes for `IStorageCapabilityInspectionPort`
+- successful end-to-end management orchestration through the service layer
+- policy violation responses
+- workspace-scoped not-found behavior
+- invalid lifecycle transition responses
+- unsupported backend operation responses
+- provisioning rejection failure behavior without unintended persistence
