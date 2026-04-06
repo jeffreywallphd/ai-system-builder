@@ -5,4 +5,5 @@ export * from "./AssetUploadInitiationService";
 export * from "./AssetUploadIngestionService";
 export * from "./AssetDownloadService";
 export * from "./AssetGeneratedOutputRegistrationService";
+export * from "./AssetPreviewService";
 

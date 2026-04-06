@@ -310,3 +310,32 @@ Coverage added/extended:
 - `src/infrastructure/persistence/assets/tests/SqliteAssetPersistenceAdapter.test.ts`
 - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+
+## Story 10.3.2 preview/thumbnail derivatives as protected resources
+
+- Added a dedicated protected preview lookup use case:
+  - `src/application/assets/use-cases/AssetPreviewService.ts`
+- Added authenticated preview resolution API/transport contract and route:
+  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - `GET /api/v1/assets/:assetId/preview`
+- Host composition now wires preview lookup as part of asset-management backend assembly:
+  - `hosts/server/IdentityServerHost.ts`
+
+Operational behavior in this story:
+
+- previews and thumbnails are resolved as logical derivative assets under authoritative server APIs (no public URL or raw filesystem path contracts).
+- parent-asset workspace membership, lifecycle, and visibility checks are enforced before preview metadata is returned.
+- derivative previews are selected from protected lineage-linked assets (`kind=preview|derived`); preferred mime ordering supports thumbnail-like selection (`preferredMimeType` query repetitions).
+- stricter preview visibility is respected automatically because preview assets pass the same visibility gate as other logical assets.
+- fallback behavior is explicit and bounded:
+  - if no derivative preview is available, the source asset version is returned only when its mime is preview-compatible;
+  - an optional preview-port seam can surface worker-produced previews while still revalidating through repository-backed logical assets.
+- preview content retrieval remains protected through existing tokenized download flows (`inline-preview`), preserving policy-gated storage access and decryption controls.
+
+Coverage added/extended:
+
+- `src/application/assets/tests/AssetPreviewService.test.ts`
+- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`

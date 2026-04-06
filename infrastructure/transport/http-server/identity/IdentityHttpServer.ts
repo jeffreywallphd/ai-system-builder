@@ -109,6 +109,7 @@ import {
   type OpenAuthorizedAssetDownloadStreamApiRequest,
   type RegisterAssetApiRequest,
   type RegisterGeneratedOutputApiRequest,
+  type ResolveAssetPreviewApiRequest,
 } from "../../../api/assets/sdk/PublicAssetManagementApiContract";
 import {
   StorageManagementApiErrorCodes,
@@ -3706,6 +3707,50 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             }
 
             const apiResponse = await options.assetManagementBackendApi.authorizeAssetDownload(parsedRequest.data);
+            const statusCode = mapAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.assetManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/assets/")
+        && path.endsWith("/preview")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            const assetId = decodePathTail(path, "/api/v1/assets/", "/preview");
+            if (!workspaceId || !assetId || assetId.includes("/")) {
+              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = parseAndValidateAssetPreviewRequest(
+              context.principal.userIdentityId,
+              workspaceId,
+              assetId,
+              searchParams,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              logResponse(logger, requestId, request, parsedRequest.statusCode, Object.freeze({ workspaceId, assetId }), parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.assetManagementBackendApi.resolveAssetPreview(parsedRequest.data);
             const statusCode = mapAssetManagementStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
@@ -7511,6 +7556,33 @@ function parseAndValidateAssetListRequest(
       sourceAssetVersionId: normalizeOptionalString(searchParams.get("sourceAssetVersionId")),
       limit: parseOptionalInteger(searchParams.get("limit")),
       offset: parseOptionalInteger(searchParams.get("offset")),
+    }),
+  };
+}
+
+function parseAndValidateAssetPreviewRequest(
+  actorUserIdentityId: string,
+  workspaceId: string,
+  assetId: string,
+  searchParams: URLSearchParams,
+):
+  | { readonly ok: true; readonly data: ResolveAssetPreviewApiRequest }
+  | { readonly ok: false; readonly statusCode: number; readonly body: AssetManagementApiResponse<never> } {
+  const preferredMimeTypes = searchParams
+    .getAll("preferredMimeType")
+    .map((value) => value.trim().toLowerCase())
+    .filter((value) => value.length > 0);
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      actorUserIdentityId,
+      workspaceId,
+      assetId,
+      versionId: normalizeOptionalString(searchParams.get("versionId")),
+      preferredMimeTypes: preferredMimeTypes.length > 0 ? Object.freeze(preferredMimeTypes) : undefined,
+      correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+      occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
     }),
   };
 }

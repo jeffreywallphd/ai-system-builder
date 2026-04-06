@@ -9,6 +9,7 @@ import {
   validateOpenAuthorizedAssetDownloadStreamRequest,
   validateRegisterAssetRequest,
   validateRegisterGeneratedOutputRequest,
+  validateResolveAssetPreviewQuery,
 } from "../use-cases/AssetServiceContracts";
 
 describe("AssetServiceContracts", () => {
@@ -278,5 +279,19 @@ describe("AssetServiceContracts", () => {
     expect(query.workspaceId).toBe("workspace-a");
     expect(query.assetId).toBe("asset-upload-001");
     expect(query.includeDeleted).toBeTrue();
+  });
+
+  it("normalizes preview resolution query contracts", () => {
+    const query = validateResolveAssetPreviewQuery({
+      actorUserId: " user-owner ",
+      workspaceId: " workspace-a ",
+      assetId: " asset-upload-001 ",
+      preferredMimeTypes: [" IMAGE/WEBP ", "image/png"],
+    });
+
+    expect(query.actorUserId).toBe("user-owner");
+    expect(query.workspaceId).toBe("workspace-a");
+    expect(query.assetId).toBe("asset-upload-001");
+    expect(query.preferredMimeTypes).toEqual(["image/webp", "image/png"]);
   });
 });

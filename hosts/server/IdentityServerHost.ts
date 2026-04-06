@@ -74,6 +74,7 @@ import { AssetUploadIngestionService } from "../../src/application/assets/use-ca
 import { AssetDiscoveryService } from "../../src/application/assets/use-cases/AssetDiscoveryService";
 import { AssetDetailService } from "../../src/application/assets/use-cases/AssetDetailService";
 import { AssetDownloadService } from "../../src/application/assets/use-cases/AssetDownloadService";
+import { AssetPreviewService } from "../../src/application/assets/use-cases/AssetPreviewService";
 import { StorageLogicalAccessResolutionService } from "../../src/application/storage/use-cases/StorageLogicalAccessResolutionService";
 import { EncryptionPolicyEvaluationService } from "../../src/application/security/use-cases/EncryptionPolicyEvaluationService";
 import { EncryptionKeyResolutionService } from "../../src/application/security/use-cases/EncryptionKeyResolutionService";
@@ -876,6 +877,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
     assetContentCipherPort,
   });
+  const assetPreviewService = new AssetPreviewService({
+    repository: assetRepository,
+    workspaceAuthorizationReadRepository: workspaceRepository,
+  });
   const assetManagementBackendApi = new AssetManagementBackendApi({
     uploadInitiationService: assetUploadInitiationService,
     generatedOutputRegistrationService: assetGeneratedOutputRegistrationService,
@@ -883,6 +888,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     discoveryService: assetDiscoveryService,
     detailService: assetDetailService,
     downloadService: assetDownloadService,
+    previewService: assetPreviewService,
   });
   const transportTrustStateResolver = new ServerManagedTransportTrustStateResolver({
     trustedDeviceManagementService: trustedDeviceManagementService,
