@@ -41,6 +41,12 @@
 - Identity server runtime start happens in `feature-registration` stage.
 - Existing lifecycle transition semantics are preserved (`composing -> starting -> ready -> stopping -> stopped`) with fail-safe failure transition handling.
 
+## Desktop host adoption
+- `src/hosts/desktop/DesktopHostCompositionRoot.ts` now composes startup through the shared pipeline.
+- Startup context is built from boot + deployment profile + environment.
+- Bootstrap `dependencies` now composes host-aware desktop service registration plans and `feature-registration` enforces desktop required-service coverage before runtime host start.
+- Desktop runtime start/stop is delegated through host-owned adapter callbacks while preserving lifecycle transition semantics (`composing -> starting -> ready -> stopping -> stopped`).
+
 ## Contributor guidance
 - Put reusable setup in canonical stages.
 - Keep host-specific startup in host customization stages.
@@ -51,3 +57,4 @@
 ## Test coverage
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
+- `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`

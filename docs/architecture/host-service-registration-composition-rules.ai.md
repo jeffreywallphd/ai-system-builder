@@ -17,12 +17,19 @@
   - canonical service definitions
   - host-specific service sets
   - authoritative required-service assertions
+  - desktop required-service assertions
 
 ## Authoritative server behavior
 - `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now:
   - composes host service registration in bootstrap `dependencies` stage
   - stores plan artifact in startup context
   - enforces authoritative control-plane required-service coverage before runtime host start
+
+## Desktop host behavior
+- `src/hosts/desktop/DesktopHostCompositionRoot.ts` now:
+  - composes host service registration in bootstrap `dependencies` stage
+  - stores plan artifact in startup context
+  - enforces desktop required-service coverage before runtime host start
 
 ## Contributor checklist for new services
 1. Add the service to `HostServiceRegistrationCatalog.ts`.
@@ -37,4 +44,5 @@
 ## Tests
 - `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
+- `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
 

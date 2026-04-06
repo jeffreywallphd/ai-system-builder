@@ -56,6 +56,15 @@ This keeps the common startup sequence stable while preserving host-level extens
 - preserves existing stop/failure semantics
 - composes host-aware service registration plans during `dependencies` and validates authoritative control-plane service coverage before `feature-registration`
 
+## Desktop host integration
+
+`src/hosts/desktop/DesktopHostCompositionRoot.ts` now also uses the shared bootstrap pipeline:
+
+- builds a startup context from desktop boot configuration + deployment profile + environment
+- composes host-aware desktop service registration plans during `dependencies`
+- validates required desktop service coverage before `feature-registration`
+- starts and stops desktop runtime through host-owned adapter callbacks while preserving deterministic lifecycle transitions
+
 ## Contributor startup-sequence guidance
 
 When extending host startup:
@@ -70,3 +79,4 @@ When extending host startup:
 
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
+- `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
