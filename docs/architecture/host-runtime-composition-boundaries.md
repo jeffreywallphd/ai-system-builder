@@ -80,6 +80,21 @@ Each catalog entry contains explicit responsibilities, capability flags, and sta
 
 `src/hosts/desktop/DesktopHostEntrypoint.ts` adds a dedicated executable host assembly entrypoint for desktop startup (`constructDesktopHostAssembly(...)` and `startDesktopHostAssembly(...)`).
 
+## Hybrid composition root and executable host assembly
+
+`src/hosts/hybrid/HybridHostCompositionRoot.ts` introduces a reusable hybrid composition root adapter that:
+
+- validates hybrid startup dependency boundary requirements
+- composes host-aware hybrid service registration plans and asserts hybrid required-service coverage before feature registration
+- enforces explicit capability-driven composition rules for desktop-facing plus node/runtime capability composition
+- rejects direct local authoritative control-plane ownership in hybrid composition to avoid collapsing server and client responsibilities
+- records deterministic host lifecycle transitions through startup and shutdown
+
+`src/hosts/hybrid/HybridHostEntrypoint.ts` adds a dedicated executable hybrid host assembly entrypoint (`constructHybridHostAssembly(...)` and `startHybridHostAssembly(...)`) with explicit assembly modes:
+
+- `hybrid-client`: hybrid runtime remains a control-plane client
+- `authoritative-server-host`: intentional delegation to authoritative server host assembly startup
+
 ## Unified bootstrap pipeline and startup context
 
 `src/hosts/bootstrap/HostBootstrapPipeline.ts` now provides a shared startup seam for all hosts:
@@ -134,6 +149,8 @@ The contracts now explicitly state that:
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostEntrypoint.test.ts`
+- `src/hosts/hybrid/tests/HybridHostCompositionRoot.test.ts`
+- `src/hosts/hybrid/tests/HybridHostEntrypoint.test.ts`
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
 - `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
 

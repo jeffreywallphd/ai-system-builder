@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   AuthoritativeServerHostRuntime,
   DesktopHostRuntime,
+  HybridHostRuntime,
   WorkerHostRuntime,
 } from "../../../hosts/HostRuntimeCatalog";
 import {
@@ -13,8 +14,10 @@ import {
   AuthoritativeControlPlaneRequiredServiceIds,
   assertAuthoritativeControlPlaneServiceCoverage,
   assertDesktopHostServiceCoverage,
+  assertHybridHostServiceCoverage,
   composeHostServiceRegistrationPlan,
   DesktopHostRequiredServiceIds,
+  HybridHostRequiredServiceIds,
 } from "../HostServiceRegistrationCatalog";
 
 describe("HostServiceRegistrationCatalog", () => {
@@ -56,6 +59,21 @@ describe("HostServiceRegistrationCatalog", () => {
     expect(() => assertDesktopHostServiceCoverage(plan)).not.toThrow();
     const selected = new Set(plan.selectedServices.map((service) => service.serviceId));
     for (const requiredServiceId of DesktopHostRequiredServiceIds) {
+      expect(selected.has(requiredServiceId)).toBeTrue();
+    }
+  });
+
+  it("asserts required hybrid host service coverage", () => {
+    const plan = composeHostServiceRegistrationPlan({
+      host: HybridHostRuntime,
+      requiredStartupDependencyIds: [
+        "dep:application:hybrid-orchestration-services",
+        "dep:infrastructure:hybrid-runtime-adapters",
+      ],
+    });
+    expect(() => assertHybridHostServiceCoverage(plan)).not.toThrow();
+    const selected = new Set(plan.selectedServices.map((service) => service.serviceId));
+    for (const requiredServiceId of HybridHostRequiredServiceIds) {
       expect(selected.has(requiredServiceId)).toBeTrue();
     }
   });
