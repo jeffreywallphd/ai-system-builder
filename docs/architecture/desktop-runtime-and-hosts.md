@@ -13,7 +13,7 @@ The architectural split is:
 
 ## Electron main-process responsibilities
 
-`electron/main/main.ts` is the main desktop composition point.
+`electron/main/main.ts` is the Electron main-process executable entrypoint and now delegates host startup to the dedicated desktop host assembly (`src/hosts/desktop/DesktopHostEntrypoint.ts` + `src/hosts/desktop/DesktopHostCompositionRoot.ts`).
 
 It is responsible for:
 - creating the `BrowserWindow`
@@ -25,6 +25,7 @@ It is responsible for:
 - registering IPC handlers for storage, workflow persistence, execution-run history, model-file operations, canonical asset reads, and thin agent-authoring backend operations
 
 This makes Electron the host-level boundary where local capabilities become available.
+Desktop startup orchestration is now explicit and stage-driven through the shared host bootstrap pipeline in the desktop composition root instead of ad hoc top-level startup flow.
 
 ## Preload bridge responsibilities
 

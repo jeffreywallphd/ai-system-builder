@@ -2,8 +2,10 @@
 
 ## Core fact
 Electron is the desktop host boundary; the renderer accesses desktop capabilities through preload bridge contracts.
+Desktop host startup is now routed through a dedicated desktop host assembly (`src/hosts/desktop/DesktopHostEntrypoint.ts` and `src/hosts/desktop/DesktopHostCompositionRoot.ts`).
 
 ## Main files
+- Desktop host assembly entrypoint/composition root: `src/hosts/desktop/DesktopHostEntrypoint.ts`, `src/hosts/desktop/DesktopHostCompositionRoot.ts`
 - Main process bootstrap: `electron/main/main.ts`
 - Preload bridge: `electron/preload.ts`
 - Preload build artifact: `.vite/build/preload.cjs` (CommonJS for Electron preload execution)

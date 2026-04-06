@@ -12,7 +12,9 @@ import {
 import {
   AuthoritativeControlPlaneRequiredServiceIds,
   assertAuthoritativeControlPlaneServiceCoverage,
+  assertDesktopHostServiceCoverage,
   composeHostServiceRegistrationPlan,
+  DesktopHostRequiredServiceIds,
 } from "../HostServiceRegistrationCatalog";
 
 describe("HostServiceRegistrationCatalog", () => {
@@ -44,6 +46,18 @@ describe("HostServiceRegistrationCatalog", () => {
       host: DesktopHostRuntime,
       includeServiceIds: ["svc:application:identity-control-plane"],
     })).toThrow(HostServiceRegistrationError);
+  });
+
+  it("asserts required desktop host service coverage", () => {
+    const plan = composeHostServiceRegistrationPlan({
+      host: DesktopHostRuntime,
+      requiredStartupDependencyIds: ["dep:application:desktop-runtime-services"],
+    });
+    expect(() => assertDesktopHostServiceCoverage(plan)).not.toThrow();
+    const selected = new Set(plan.selectedServices.map((service) => service.serviceId));
+    for (const requiredServiceId of DesktopHostRequiredServiceIds) {
+      expect(selected.has(requiredServiceId)).toBeTrue();
+    }
   });
 
   it("fails startup dependency validation when required dependency has no composed services", () => {

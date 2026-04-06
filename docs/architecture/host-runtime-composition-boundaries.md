@@ -69,6 +69,17 @@ Each catalog entry contains explicit responsibilities, capability flags, and sta
 - composes the production server startup path via `startIdentityServerHost`
 - records deterministic host lifecycle transitions through startup and shutdown
 
+## Desktop composition root and executable host assembly
+
+`src/hosts/desktop/DesktopHostCompositionRoot.ts` introduces a reusable desktop composition root adapter that:
+
+- validates desktop startup dependency boundary requirements
+- composes host-aware desktop service registration plans and asserts desktop required-service coverage before feature registration
+- records deterministic host lifecycle transitions through startup and shutdown
+- starts desktop runtime through host-owned adapters (window/bootstrap/IPC wiring) without introducing authoritative control-plane ownership
+
+`src/hosts/desktop/DesktopHostEntrypoint.ts` adds a dedicated executable host assembly entrypoint for desktop startup (`constructDesktopHostAssembly(...)` and `startDesktopHostAssembly(...)`).
+
 ## Unified bootstrap pipeline and startup context
 
 `src/hosts/bootstrap/HostBootstrapPipeline.ts` now provides a shared startup seam for all hosts:
@@ -121,6 +132,8 @@ The contracts now explicitly state that:
 - `src/shared/contracts/hosts/tests/HostCompositionContracts.test.ts`
 - `src/hosts/tests/HostRuntimeCatalog.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
+- `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
+- `src/hosts/desktop/tests/DesktopHostEntrypoint.test.ts`
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
 - `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
 

@@ -31,17 +31,21 @@ This note defines the host-aware service registration rules introduced for Story
 - canonical service registration inventory for server, desktop, hybrid, web, and worker host families
 - host-to-service registration maps for default composition
 - authoritative control-plane required-service assertions
+- desktop host required-service assertions
 
 The catalog composes deterministic service plans through:
 
 - `composeHostServiceRegistrationPlan(...)`
 - `assertAuthoritativeControlPlaneServiceCoverage(...)`
+- `assertDesktopHostServiceCoverage(...)`
 
-## Authoritative server integration
+## Host integration
 
 `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now composes service registration plans during the shared bootstrap `dependencies` stage and enforces authoritative required service coverage before `feature-registration`.
 
-This keeps control-plane service assembly explicit, host-aware, and deterministic in the composition root.
+`src/hosts/desktop/DesktopHostCompositionRoot.ts` now composes service registration plans during the shared bootstrap `dependencies` stage and enforces desktop required service coverage before `feature-registration`.
+
+This keeps host service assembly explicit, host-aware, and deterministic across authoritative and desktop composition roots.
 
 ## Contributor guidance: adding a new service registration safely
 
@@ -58,4 +62,5 @@ This keeps control-plane service assembly explicit, host-aware, and deterministi
 
 - `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
+- `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
 

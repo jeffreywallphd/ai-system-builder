@@ -128,6 +128,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For shared host startup pipeline contracts, startup-context model, and contributor startup-sequence guidance, read [`host-bootstrap-pipeline.md`](./host-bootstrap-pipeline.md).
 - For host-safe service registration rules, host-aware dependency composition, and authoritative control-plane service coverage requirements, read [`host-service-registration-composition-rules.md`](./host-service-registration-composition-rules.md).
 - For the executable authoritative server host assembly, startup entrypoint, and startup lifecycle expectations, read [`authoritative-server-host-assembly.md`](./authoritative-server-host-assembly.md).
+- For the executable desktop host assembly, startup entrypoint, and desktop-specific composition/lifecycle boundaries, read [`desktop-host-assembly.md`](./desktop-host-assembly.md).
 - For UI composition and state flow, read [`presentation-and-state.md`](./presentation-and-state.md).
 - For cross-studio asset selection contracts and capability rules, read [`asset-selector-framework.md`](./asset-selector-framework.md).
 - For canonical studio launch/return handoff contracts, read [`studio-handoff-contract.md`](./studio-handoff-contract.md).

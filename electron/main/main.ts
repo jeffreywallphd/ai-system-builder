@@ -98,6 +98,7 @@ import {
 } from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
 import { createRendererContentSecurityPolicy } from "./RendererContentSecurityPolicy";
 import { resolveModelFileAbsolutePath, toLogicalModelPath } from "./ModelFilePathPolicy";
+import { startDesktopHostAssembly, type DesktopHostRuntimeHandle } from "../../src/hosts/desktop/DesktopHostEntrypoint";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -151,6 +152,7 @@ let identityServerHost: IdentityServerHost | undefined;
 let studioShellRepository: SqliteStudioShellRepository | undefined;
 let workflowPersistenceRepository: SqliteWorkflowPersistenceRepository | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
+let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
 const runtimeWindowByReuseKey = new Map<string, BrowserWindow>();
 
 const DESKTOP_TRUST_STORAGE_KEYS = Object.freeze({
@@ -1254,10 +1256,37 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   }
 }
 
+async function disposeDesktopRuntimeResources(): Promise<void> {
+  await identityServerHost?.close();
+  await serviceSupervisor?.stop();
+  storageDatabase?.dispose();
+  executionRunRepository?.dispose();
+  workflowRunSummaryRepository?.dispose();
+  agentRepository?.dispose();
+  studioShellRepository?.dispose();
+  workflowPersistenceRepository?.dispose();
+}
+
 app.whenReady().then(async () => {
-  await bootstrapDesktopRuntime();
-  installRendererContentSecurityPolicy();
-  await createMainWindow();
+  desktopHostRuntime = await startDesktopHostAssembly({
+    startHost: async () => {
+      await bootstrapDesktopRuntime();
+      try {
+        installRendererContentSecurityPolicy();
+        await createMainWindow();
+      } catch (error) {
+        await disposeDesktopRuntimeResources();
+        throw error;
+      }
+      return Object.freeze({
+        close: disposeDesktopRuntimeResources,
+      });
+    },
+    boot: {
+      startupReason: "electron-main-desktop-host-startup",
+      environment: process.env,
+    },
+  });
 
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -1276,12 +1305,5 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", async () => {
-  await identityServerHost?.close();
-  await serviceSupervisor?.stop();
-  storageDatabase?.dispose();
-  executionRunRepository?.dispose();
-  workflowRunSummaryRepository?.dispose();
-  agentRepository?.dispose();
-  studioShellRepository?.dispose();
-  workflowPersistenceRepository?.dispose();
+  await desktopHostRuntime?.stop();
 });

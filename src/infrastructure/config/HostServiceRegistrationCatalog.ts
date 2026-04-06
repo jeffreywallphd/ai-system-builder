@@ -214,6 +214,14 @@ export const AuthoritativeControlPlaneRequiredServiceIds = Object.freeze([
   "svc:platform:encryption-and-secrets",
 ]);
 
+export const DesktopHostRequiredServiceIds = Object.freeze([
+  "svc:application:desktop-runtime-client",
+  "svc:infrastructure:desktop-runtime-adapters",
+  "svc:platform:ui-runtime-bridge",
+  "svc:platform:boot-lifecycle",
+  "svc:platform:observability",
+]);
+
 const ServiceRegistry = createHostServiceRegistry(ServiceRegistrations);
 
 export function resolveHostServiceRegistrationIds(host: Pick<HostRuntimeIdentity, "hostId">): ReadonlyArray<string> {
@@ -243,6 +251,17 @@ export function assertAuthoritativeControlPlaneServiceCoverage(plan: HostService
     if (!selected.has(requiredServiceId)) {
       throw new HostServiceRegistrationError(
         `Authoritative control-plane composition is missing required service '${requiredServiceId}'.`,
+      );
+    }
+  }
+}
+
+export function assertDesktopHostServiceCoverage(plan: HostServiceRegistrationPlan): void {
+  const selected = new Set(plan.selectedServices.map((service) => service.serviceId));
+  for (const requiredServiceId of DesktopHostRequiredServiceIds) {
+    if (!selected.has(requiredServiceId)) {
+      throw new HostServiceRegistrationError(
+        `Desktop host composition is missing required service '${requiredServiceId}'.`,
       );
     }
   }
