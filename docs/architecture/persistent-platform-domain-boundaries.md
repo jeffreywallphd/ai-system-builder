@@ -19,9 +19,9 @@ The goal is to keep repository implementation aligned to domain/application cont
   - identity user + provider link lifecycle
   - credential material history
 - Repository targets:
-  - `application/identity/ports/IIdentityPersistenceRepository`
-  - `application/identity/ports/IIdentityLookupRepository`
-  - `application/identity/ports/ICredentialMaterialRepository`
+  - `src/application/identity/ports/IIdentityPersistenceRepository`
+  - `src/application/identity/ports/IIdentityLookupRepository`
+  - `src/application/identity/ports/ICredentialMaterialRepository`
 - Authoritative write model:
   - identity aggregate records
 - Read models:
@@ -137,8 +137,8 @@ The goal is to keep repository implementation aligned to domain/application cont
   - authenticated identity session lifecycle
   - session token material validity
 - Repository targets:
-  - `application/identity/ports/IIdentitySessionRepository`
-  - `application/identity/ports/IIdentitySessionTokenMaterialRepository`
+  - `src/application/identity/ports/IIdentitySessionRepository`
+  - `src/application/identity/ports/IIdentitySessionTokenMaterialRepository`
 - Authoritative write model:
   - session status/expiry/revocation records
 - Read models:
@@ -171,9 +171,20 @@ The goal is to keep repository implementation aligned to domain/application cont
   - `src/domain/platform/PlatformPersistenceBoundaries.ts`
 - Application boundary ports for newly formalized targets:
   - `src/application/common/ports/PlatformPersistenceBoundaryPorts.ts`
+- Story 13.1.2 repository contract additions:
+  - `src/application/identity/ports/IIdentityLookupRepository.ts`
+  - `src/application/identity/ports/IIdentityPersistenceRepository.ts`
+  - `src/application/identity/ports/ICredentialMaterialRepository.ts`
+  - `src/application/identity/ports/IIdentitySessionRepository.ts`
+  - `src/application/identity/ports/IIdentitySessionTokenMaterialRepository.ts`
+  - `src/application/identity/ports/IdentityRepositoryPorts.ts`
+- Shared identity persistence DTO boundary for repository contracts:
+  - `src/shared/dto/identity/IdentityPersistenceDtos.ts`
 - Contract tests:
   - `src/domain/platform/tests/PlatformPersistenceBoundaries.test.ts`
   - `src/application/common/tests/PlatformPersistenceBoundaryPorts.test.ts`
+  - `src/application/identity/tests/IdentityRepositoryPortsContracts.test.ts`
+  - `src/shared/dto/identity/tests/IdentityPersistenceDtos.test.ts`
 
 ## Result
 

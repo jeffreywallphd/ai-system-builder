@@ -41,6 +41,22 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
   - `PlatformPersistenceMutationContext`
   - `normalizePlatformPersistenceOperationKey(...)`
 
+## Story 13.1.2 contract additions
+
+- Source-layer identity repository ports now exist for authoritative user/session persistence and query access:
+  - `src/application/identity/ports/IIdentityLookupRepository.ts`
+  - `src/application/identity/ports/IIdentityPersistenceRepository.ts`
+  - `src/application/identity/ports/ICredentialMaterialRepository.ts`
+  - `src/application/identity/ports/IIdentitySessionRepository.ts`
+  - `src/application/identity/ports/IIdentitySessionTokenMaterialRepository.ts`
+  - `src/application/identity/ports/IdentityRepositoryPorts.ts`
+- Query/write split is explicit for credential material, sessions, and session-token material via dedicated query/write sub-interfaces.
+- Shared identity persistence DTO contracts are now source-layer and reusable by adapters:
+  - `src/shared/dto/identity/IdentityPersistenceDtos.ts`
+- Contract tests added:
+  - `src/application/identity/tests/IdentityRepositoryPortsContracts.test.ts`
+  - `src/shared/dto/identity/tests/IdentityPersistenceDtos.test.ts`
+
 ## Ownership rules to preserve
 
 - Workspace owns tenancy/membership lifecycle.
