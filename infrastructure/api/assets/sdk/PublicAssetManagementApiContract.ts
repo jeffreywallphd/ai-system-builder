@@ -74,6 +74,52 @@ export interface RegisterAssetApiResponse {
   readonly asset: AssetDetailDto;
 }
 
+export interface RegisterGeneratedOutputApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly operationKey?: string;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+  readonly assetId: string;
+  readonly ownerUserId?: string;
+  readonly visibility?: "private" | "workspace" | "shared" | "published";
+  readonly sharingPolicyRef?: {
+    readonly policyId: string;
+    readonly policyVersion?: string;
+  };
+  readonly storageInstanceId: string;
+  readonly outputVersion: {
+    readonly versionId: string;
+    readonly storageInstanceId: string;
+    readonly objectKey: string;
+    readonly objectVersionId?: string;
+    readonly area: AssetStorageArea;
+    readonly content: {
+      readonly mimeType: string;
+      readonly sizeBytes: number;
+      readonly checksum: {
+        readonly algorithm: "sha256" | "sha512" | "md5";
+        readonly digest: string;
+      };
+      readonly originalFileName?: string;
+    };
+  };
+  readonly source: {
+    readonly producerType: "run" | "system";
+    readonly runId?: string;
+    readonly systemId?: string;
+  };
+  readonly lineage: ReadonlyArray<{
+    readonly sourceAssetId: string;
+    readonly sourceAssetVersionId?: string;
+    readonly relation?: string;
+  }>;
+}
+
+export interface RegisterGeneratedOutputApiResponse {
+  readonly asset: AssetDetailDto;
+}
+
 export interface InitiateAssetUploadApiRequest {
   readonly actorUserIdentityId: string;
   readonly workspaceId: string;

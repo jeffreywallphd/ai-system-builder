@@ -1,4 +1,5 @@
 import {
+  AssetKinds,
   AssetLifecycleStates,
   AssetVisibilities,
   type Asset,
@@ -14,6 +15,7 @@ import {
   AssetServiceErrorCodes,
   validateGetAssetByIdQuery,
   type AssetDetailMetadata,
+  type GeneratedOutputSourceReference,
   type AssetLineageHook,
   type AssetServiceResult,
   type GetAssetByIdQuery,
@@ -26,6 +28,10 @@ interface AssetLineageReadRepository {
     readonly sourceAssetVersionId?: string;
     readonly relation?: string;
   }>>;
+}
+
+interface AssetGeneratedOutputSourceReadRepository {
+  getAssetGeneratedOutputSource(assetId: string): Promise<GeneratedOutputSourceReference | undefined>;
 }
 
 export interface AssetDetailServiceDependencies {
@@ -125,6 +131,7 @@ export class AssetDetailService {
     const canMutateLifecycle = isOwnedByActor || isWorkspaceAdmin;
     const lifecycleState = asset.lifecycle.state;
     const lineage = await this.resolveAssetLineage(asset.id);
+    const generatedOutputSource = await this.resolveGeneratedOutputSource(asset);
 
     return Object.freeze({
       isOwnedByActor,
@@ -149,6 +156,7 @@ export class AssetDetailService {
       lineage: Object.freeze({
         sources: lineage,
       }),
+      generatedOutputSource,
     });
   }
 
@@ -171,6 +179,19 @@ export class AssetDetailService {
       sourceAssetVersionId: entry.sourceAssetVersionId,
       relation: entry.relation,
     })));
+  }
+
+  private async resolveGeneratedOutputSource(asset: Asset): Promise<GeneratedOutputSourceReference | undefined> {
+    if (asset.kind !== AssetKinds.generatedOutput) {
+      return undefined;
+    }
+
+    const sourceRepository = this.dependencies.repository as IAssetRepository & Partial<AssetGeneratedOutputSourceReadRepository>;
+    if (typeof sourceRepository.getAssetGeneratedOutputSource !== "function") {
+      return undefined;
+    }
+
+    return sourceRepository.getAssetGeneratedOutputSource(asset.id);
   }
 
   private async resolveWorkspaceAuthorization(

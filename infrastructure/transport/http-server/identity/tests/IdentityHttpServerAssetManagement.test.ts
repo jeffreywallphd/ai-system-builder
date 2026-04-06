@@ -9,6 +9,7 @@ import { AssetUploadIngestionService } from "../../../../../src/application/asse
 import { AssetDiscoveryService } from "../../../../../src/application/assets/use-cases/AssetDiscoveryService";
 import { AssetDetailService } from "../../../../../src/application/assets/use-cases/AssetDetailService";
 import { AssetDownloadService } from "../../../../../src/application/assets/use-cases/AssetDownloadService";
+import { AssetGeneratedOutputRegistrationService } from "../../../../../src/application/assets/use-cases/AssetGeneratedOutputRegistrationService";
 import {
   AssetKinds,
   AssetVisibilities,
@@ -207,6 +208,50 @@ class StubAssetUploadIngestionService {
   }
 }
 
+class StubAssetGeneratedOutputRegistrationService {
+  public async registerGeneratedOutput() {
+    const asset = createAsset({
+      id: "asset-generated-001",
+      kind: AssetKinds.generatedOutput,
+      ownership: createAssetOwnershipMetadata({
+        workspaceId: "workspace-alpha",
+        createdBy: "user-owner",
+        createdAt: "2026-04-06T12:00:00.000Z",
+      }),
+      visibility: AssetVisibilities.workspace,
+      storageBinding: createStorageInstanceRef({
+        storageInstanceId: "storage-alpha",
+      }),
+      initialVersion: createAssetVersion({
+        versionId: "asset-generated-001:v1",
+        revision: 1,
+        location: createAssetLocationRef({
+          storageInstance: { storageInstanceId: "storage-alpha" },
+          objectKey: "workspaces/workspace-alpha/assets/asset-generated-001/output/v1/output.json",
+          area: "output",
+        }),
+        content: createContentDescriptor({
+          mimeType: "application/json",
+          sizeBytes: 128,
+          checksum: {
+            algorithm: "sha256",
+            digest: "d".repeat(64),
+          },
+        }),
+        createdBy: "user-owner",
+        createdAt: "2026-04-06T12:00:00.000Z",
+      }),
+    });
+
+    return {
+      ok: true as const,
+      value: {
+        asset,
+      },
+    };
+  }
+}
+
 class StubAssetDownloadService {
   public denyAuthorization = false;
 
@@ -270,10 +315,12 @@ async function startServer(
   initiationService: StubAssetUploadInitiationService,
   ingestionService = new StubAssetUploadIngestionService(),
   downloadService = new StubAssetDownloadService(),
+  generatedOutputService = new StubAssetGeneratedOutputRegistrationService(),
 ): Promise<string> {
   const identityHarness = await createIdentityAuthTestHarness();
   const assetManagementBackendApi = new AssetManagementBackendApi({
     uploadInitiationService: initiationService as unknown as AssetUploadInitiationService,
+    generatedOutputRegistrationService: generatedOutputService as unknown as AssetGeneratedOutputRegistrationService,
     uploadIngestionService: ingestionService as unknown as AssetUploadIngestionService,
     discoveryService: initiationService as unknown as AssetDiscoveryService,
     detailService: initiationService as unknown as AssetDetailService,
@@ -394,6 +441,54 @@ describe("IdentityHttpServer asset management routes", () => {
     const ingestBody = await ingestResponse.json();
     expect(ingestBody.ok).toBe(true);
     expect(ingestBody.data.finalizedVersionId).toBe("asset-upload-001:v2");
+  });
+
+  it("registers generated outputs through authenticated asset routes", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const baseUrl = await startServer(service);
+    const token = await registerAndLogin(baseUrl, "asset.http.owner.generated");
+
+    const response = await fetch(`${baseUrl}/api/v1/assets/generated-outputs/register?workspaceId=workspace-alpha`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        assetId: "asset-generated-001",
+        storageInstanceId: "storage-alpha",
+        outputVersion: {
+          versionId: "asset-generated-001:v1",
+          storageInstanceId: "storage-alpha",
+          objectKey: "workspaces/workspace-alpha/assets/asset-generated-001/output/v1/output.json",
+          area: "output",
+          content: {
+            mimeType: "application/json",
+            sizeBytes: 128,
+            checksum: {
+              algorithm: "sha256",
+              digest: "d".repeat(64),
+            },
+          },
+        },
+        source: {
+          producerType: "run",
+          runId: "execution-run-001",
+        },
+        lineage: [
+          {
+            sourceAssetId: "asset-upload-001",
+            relation: "generated-from",
+          },
+        ],
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.asset.assetId).toBe("asset-generated-001");
+    expect(body.data.asset.kind).toBe("generated-output");
   });
 
   it("maps authorization failures to forbidden responses", async () => {

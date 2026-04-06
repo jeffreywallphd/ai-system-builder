@@ -97,17 +97,18 @@ describe("SqliteAssetPersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM asset_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(2);
+    expect(versionRow.version).toBe(3);
 
     const tables = database.prepare(`
       SELECT name
       FROM sqlite_master
       WHERE type = 'table'
-        AND name IN ('asset_records', 'asset_versions', 'asset_lineage_links')
+        AND name IN ('asset_records', 'asset_versions', 'asset_lineage_links', 'asset_generated_output_sources')
       ORDER BY name ASC
     `).all() as Array<{ name: string }>;
 
     expect(tables.map((table) => table.name)).toEqual([
+      "asset_generated_output_sources",
       "asset_lineage_links",
       "asset_records",
       "asset_versions",
@@ -197,6 +198,18 @@ describe("SqliteAssetPersistenceAdapter", () => {
     const lineage = await adapter.listAssetLineage("asset-derived");
     expect(lineage).toHaveLength(1);
     expect(lineage[0]?.sourceAssetId).toBe("asset-source");
+
+    await adapter.replaceAssetGeneratedOutputSource("asset-derived", {
+      producerType: "run",
+      runId: "execution-run-001",
+      systemId: "system-asset-render",
+    });
+    const source = await adapter.getAssetGeneratedOutputSource("asset-derived");
+    expect(source).toEqual({
+      producerType: "run",
+      runId: "execution-run-001",
+      systemId: "system-asset-render",
+    });
 
     adapter.dispose();
   });

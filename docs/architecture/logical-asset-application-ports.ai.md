@@ -276,3 +276,37 @@ Coverage added/extended for this story:
 - `src/infrastructure/security/encryption/tests/DeterministicScopeEncryptionKeyPort.test.ts`
 - `src/infrastructure/persistence/assets/tests/AssetPersistenceMapper.test.ts`
 - `src/infrastructure/persistence/assets/tests/SqliteAssetPersistenceAdapter.test.ts`
+
+## Story 10.3.1 generated outputs as first-class logical assets
+
+- Added a dedicated generated-output registration use case:
+  - `src/application/assets/use-cases/AssetGeneratedOutputRegistrationService.ts`
+- Extended asset service/detail/transport contracts for generated-output producer metadata:
+  - `source.producerType = "run" | "system"`
+  - run/system identifiers are validated at use-case boundary
+  - detail projection now includes optional `generatedOutputSource` metadata for generated-output assets
+- Extended backend API + public contract with generated-output registration operation:
+  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+- Added authenticated HTTP endpoint:
+  - `POST /api/v1/assets/generated-outputs/register`
+  - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- Host composition now wires generated-output registration dependencies:
+  - `hosts/server/IdentityServerHost.ts`
+
+Behavior in this story:
+
+- generated outputs now enter the asset system through authoritative server APIs and are persisted as `generated-output` assets.
+- generated-output ownership can be workspace-owned (no owner user) or user-owned, with admin guardrails on cross-user ownership assignment.
+- generated outputs remain retrievable by the same list/detail/download surfaces used for uploads.
+- raw output filesystem path contracts are not introduced.
+
+Coverage added/extended:
+
+- `src/application/assets/tests/AssetGeneratedOutputRegistrationService.test.ts`
+- `src/application/assets/tests/AssetServiceContracts.test.ts`
+- `src/application/assets/tests/AssetDetailService.test.ts`
+- `src/shared/contracts/assets/tests/AssetTransportContracts.test.ts`
+- `src/infrastructure/persistence/assets/tests/SqliteAssetPersistenceAdapter.test.ts`
+- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`

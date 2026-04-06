@@ -88,6 +88,11 @@ export interface AssetDetailDto extends AssetSummaryDto {
       readonly relation?: string;
     }>;
   };
+  readonly generatedOutputSource?: {
+    readonly producerType: "run" | "system";
+    readonly runId?: string;
+    readonly systemId?: string;
+  };
 }
 
 export interface AssetDownloadAuthorizationDto {
@@ -231,6 +236,11 @@ export function toAssetDetailDto(
         readonly relation?: string;
       }>;
     };
+    readonly generatedOutputSource?: {
+      readonly producerType: "run" | "system";
+      readonly runId?: string;
+      readonly systemId?: string;
+    };
   },
 ): AssetDetailDto {
   return Object.freeze({
@@ -274,6 +284,13 @@ export function toAssetDetailDto(
           sourceAssetVersionId: source.sourceAssetVersionId,
           relation: source.relation,
         }))),
+      })
+      : undefined,
+    generatedOutputSource: metadata?.generatedOutputSource
+      ? Object.freeze({
+        producerType: metadata.generatedOutputSource.producerType,
+        runId: metadata.generatedOutputSource.runId,
+        systemId: metadata.generatedOutputSource.systemId,
       })
       : undefined,
   });

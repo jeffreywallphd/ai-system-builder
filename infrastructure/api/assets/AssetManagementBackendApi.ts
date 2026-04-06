@@ -4,12 +4,14 @@ import type { AssetUploadInitiationService } from "../../../src/application/asse
 import type { AssetUploadIngestionService } from "../../../src/application/assets/use-cases/AssetUploadIngestionService";
 import type { AssetDetailService } from "../../../src/application/assets/use-cases/AssetDetailService";
 import type { AssetDownloadService } from "../../../src/application/assets/use-cases/AssetDownloadService";
+import type { AssetGeneratedOutputRegistrationService } from "../../../src/application/assets/use-cases/AssetGeneratedOutputRegistrationService";
 import { type AssetSummaryDto, toAssetDetailDto, toAssetSummaryDto } from "../../../src/shared/contracts/assets/AssetTransportContracts";
 import {
   toAuthorizeAssetDownloadRequest,
   toGetAssetByIdQuery,
   toListAssetsQuery,
   toBeginAssetUploadRequest,
+  toRegisterGeneratedOutputRequest,
   toRegisterAssetRequest,
   toAuthorizeAssetDownloadResponseDto,
 } from "../../../src/shared/dto/assets/AssetTransportDtos";
@@ -31,11 +33,14 @@ import {
   type ListAssetsApiResponse,
   type RegisterAssetApiRequest,
   type RegisterAssetApiResponse,
+  type RegisterGeneratedOutputApiRequest,
+  type RegisterGeneratedOutputApiResponse,
 } from "./sdk/PublicAssetManagementApiContract";
 import type { AssetDiscoveryService } from "../../../src/application/assets/use-cases/AssetDiscoveryService";
 
 export interface AssetManagementBackendApiDependencies {
   readonly uploadInitiationService: AssetUploadInitiationService;
+  readonly generatedOutputRegistrationService: AssetGeneratedOutputRegistrationService;
   readonly uploadIngestionService: AssetUploadIngestionService;
   readonly discoveryService: AssetDiscoveryService;
   readonly detailService: AssetDetailService;
@@ -77,6 +82,51 @@ export class AssetManagementBackendApi {
     }
 
     const outcome = await this.dependencies.uploadInitiationService.registerAsset(parsedRequest);
+    if (!outcome.ok) {
+      return this.failedFromServiceError(outcome.error.code, outcome.error.message, outcome.error.details);
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        asset: toAssetDetailDto(outcome.value.asset),
+      }),
+    });
+  }
+
+  public async registerGeneratedOutput(
+    request: RegisterGeneratedOutputApiRequest,
+  ): Promise<AssetManagementApiResponse<RegisterGeneratedOutputApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(AssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+    }
+
+    let parsedRequest: ReturnType<typeof toRegisterGeneratedOutputRequest>;
+    try {
+      parsedRequest = toRegisterGeneratedOutputRequest({
+        actorUserId: actorUserIdentityId,
+        workspaceId: request.workspaceId,
+        operationKey: request.operationKey ?? `asset:generated-output:register:${request.assetId}:${randomUUID()}`,
+        correlationId: request.correlationId,
+        occurredAt: request.occurredAt,
+        assetId: request.assetId,
+        ownerUserId: request.ownerUserId,
+        visibility: request.visibility,
+        sharingPolicyRef: request.sharingPolicyRef,
+        storageInstanceId: request.storageInstanceId,
+        outputVersion: request.outputVersion,
+        source: request.source,
+        lineage: request.lineage,
+      });
+    } catch (error) {
+      return this.failed(
+        AssetManagementApiErrorCodes.invalidRequest,
+        error instanceof Error ? error.message : "Request validation failed.",
+      );
+    }
+
+    const outcome = await this.dependencies.generatedOutputRegistrationService.registerGeneratedOutput(parsedRequest);
     if (!outcome.ok) {
       return this.failedFromServiceError(outcome.error.code, outcome.error.message, outcome.error.details);
     }

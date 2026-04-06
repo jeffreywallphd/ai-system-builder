@@ -198,7 +198,6 @@ describe("AssetServiceContracts", () => {
       workspaceId: "workspace-a",
       operationKey: "op:asset:output:1",
       assetId: "asset-output-001",
-      visibility: "workspace",
       storageInstanceId: "workspace-storage-a",
       outputVersion: {
         versionId: "asset-output-001:v1",
@@ -214,6 +213,11 @@ describe("AssetServiceContracts", () => {
           },
         },
       },
+      source: {
+        producerType: "run",
+        runId: " run-001 ",
+        systemId: " system-asset-render ",
+      },
       lineage: [
         {
           sourceAssetId: " asset-upload-001 ",
@@ -226,6 +230,12 @@ describe("AssetServiceContracts", () => {
     expect(request.lineage[0]?.sourceAssetId).toBe("asset-upload-001");
     expect(request.lineage[0]?.sourceAssetVersionId).toBe("asset-upload-001:v2");
     expect(request.lineage[0]?.relation).toBe("derived-from");
+    expect(request.visibility).toBe("workspace");
+    expect(request.source).toEqual({
+      producerType: "run",
+      runId: "run-001",
+      systemId: "system-asset-render",
+    });
   });
 
   it("validates begin upload request filename and defaults", () => {

@@ -108,6 +108,7 @@ import {
   type ListAssetsApiRequest,
   type OpenAuthorizedAssetDownloadStreamApiRequest,
   type RegisterAssetApiRequest,
+  type RegisterGeneratedOutputApiRequest,
 } from "../../../api/assets/sdk/PublicAssetManagementApiContract";
 import {
   StorageManagementApiErrorCodes,
@@ -3798,6 +3799,50 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
       if (
         options.assetManagementBackendApi
         && request.method === "POST"
+        && path === "/api/v1/assets/generated-outputs/register"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            if (!workspaceId) {
+              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateGeneratedOutputRegisterRequest(
+              request,
+              context.principal.userIdentityId,
+              workspaceId,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const registerRequest: RegisterGeneratedOutputApiRequest = parsedRequest.data;
+            const apiResponse = await options.assetManagementBackendApi.registerGeneratedOutput(registerRequest);
+            const statusCode = mapAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, registerRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.assetManagementBackendApi
+        && request.method === "POST"
         && path.startsWith("/api/v1/assets/")
         && path.endsWith("/uploads/initiate")
       ) {
@@ -7350,6 +7395,46 @@ async function parseAndValidateAssetRegisterRequest(
       actorUserIdentityId,
       workspaceId,
     }) as RegisterAssetApiRequest,
+  };
+}
+
+async function parseAndValidateGeneratedOutputRegisterRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  workspaceId: string,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: RegisterGeneratedOutputApiRequest }
+  | { readonly ok: false; readonly statusCode: number; readonly body: AssetManagementApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildAssetManagementInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "asset-management-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  const bodyRecord = asRecord(parsedBody.value);
+  if (!bodyRecord) {
+    const body = buildAssetManagementInvalidRequestResponse("Request body must be an object.");
+    return { ok: false, statusCode: 400, body };
+  }
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      ...bodyRecord,
+      actorUserIdentityId,
+      workspaceId,
+    }) as RegisterGeneratedOutputApiRequest,
   };
 }
 

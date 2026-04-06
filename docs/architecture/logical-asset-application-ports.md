@@ -303,3 +303,50 @@ Added/extended coverage:
 - `src/infrastructure/security/encryption/tests/DeterministicScopeEncryptionKeyPort.test.ts`
 - `src/infrastructure/persistence/assets/tests/AssetPersistenceMapper.test.ts`
 - `src/infrastructure/persistence/assets/tests/SqliteAssetPersistenceAdapter.test.ts`
+
+## Story 10.3.1: generated outputs as first-class logical assets
+
+Added authoritative generated-output registration across application/API/transport seams:
+
+- New generated-output registration use case:
+  - `src/application/assets/use-cases/AssetGeneratedOutputRegistrationService.ts`
+- Extended contracts and detail metadata for producer linkage:
+  - `src/application/assets/use-cases/AssetServiceContracts.ts`
+  - `src/application/assets/use-cases/AssetDetailService.ts`
+  - `src/shared/contracts/assets/AssetTransportContracts.ts`
+  - `src/shared/dto/assets/AssetTransportDtos.ts`
+- Extended backend API and public SDK contract:
+  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+- Added authenticated transport endpoint for generated output registration:
+  - `POST /api/v1/assets/generated-outputs/register`
+  - implemented in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- Host composition now wires generated-output registration dependencies:
+  - `hosts/server/IdentityServerHost.ts`
+
+Behavioral posture in this story:
+
+- generated outputs are created as `kind=generated-output` assets through a dedicated use case, not ad hoc output-file paths.
+- owner remains optional:
+  - when omitted, generated outputs are workspace-owned and default visibility is `workspace`.
+  - when provided, ownership delegation to another user requires workspace admin permissions.
+- producer references are now first-class generated-output metadata:
+  - `source.producerType = "run" | "system"`
+  - run/system identifiers are validated and persisted for orchestration-compatible lineage hooks.
+- generated-output lineage links are persisted alongside source metadata and remain discoverable by existing source-asset list filters.
+- generated outputs use the same retrieval surfaces as uploads:
+  - `GET /api/v1/assets`
+  - `GET /api/v1/assets/:assetId`
+  - download authorization/content endpoints
+  without exposing raw output filesystem paths.
+
+Added coverage:
+
+- `src/application/assets/tests/AssetGeneratedOutputRegistrationService.test.ts`
+- updated:
+  - `src/application/assets/tests/AssetServiceContracts.test.ts`
+  - `src/application/assets/tests/AssetDetailService.test.ts`
+  - `src/shared/contracts/assets/tests/AssetTransportContracts.test.ts`
+  - `src/infrastructure/persistence/assets/tests/SqliteAssetPersistenceAdapter.test.ts`
+  - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+  - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`

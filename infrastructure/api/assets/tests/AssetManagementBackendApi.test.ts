@@ -16,6 +16,7 @@ import { AssetUploadIngestionService } from "../../../../src/application/assets/
 import { AssetDiscoveryService } from "../../../../src/application/assets/use-cases/AssetDiscoveryService";
 import { AssetDetailService } from "../../../../src/application/assets/use-cases/AssetDetailService";
 import { AssetDownloadService } from "../../../../src/application/assets/use-cases/AssetDownloadService";
+import { AssetGeneratedOutputRegistrationService } from "../../../../src/application/assets/use-cases/AssetGeneratedOutputRegistrationService";
 
 class StubAssetUploadInitiationService {
   private readonly asset: Asset = createAsset({
@@ -143,6 +144,50 @@ class StubAssetUploadIngestionService {
   }
 }
 
+class StubAssetGeneratedOutputRegistrationService {
+  public async registerGeneratedOutput() {
+    const asset = createAsset({
+      id: "asset-generated-001",
+      kind: AssetKinds.generatedOutput,
+      ownership: createAssetOwnershipMetadata({
+        workspaceId: "workspace-alpha",
+        createdBy: "user-owner",
+        createdAt: "2026-04-06T12:00:00.000Z",
+      }),
+      visibility: AssetVisibilities.workspace,
+      storageBinding: createStorageInstanceRef({
+        storageInstanceId: "storage-alpha",
+      }),
+      initialVersion: createAssetVersion({
+        versionId: "asset-generated-001:v1",
+        revision: 1,
+        location: createAssetLocationRef({
+          storageInstance: { storageInstanceId: "storage-alpha" },
+          objectKey: "workspaces/workspace-alpha/assets/asset-generated-001/output/v1/output.json",
+          area: "output",
+        }),
+        content: createContentDescriptor({
+          mimeType: "application/json",
+          sizeBytes: 80,
+          checksum: {
+            algorithm: "sha256",
+            digest: "b".repeat(64),
+          },
+        }),
+        createdBy: "user-owner",
+        createdAt: "2026-04-06T12:00:00.000Z",
+      }),
+    });
+
+    return {
+      ok: true as const,
+      value: {
+        asset,
+      },
+    };
+  }
+}
+
 class StubAssetDiscoveryService {
   public async listAssets() {
     const asset = new StubAssetUploadInitiationService()["asset"];
@@ -261,6 +306,7 @@ describe("AssetManagementBackendApi", () => {
   it("returns register and initiate upload DTOs for successful requests", async () => {
     const backendApi = new AssetManagementBackendApi({
       uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
+      generatedOutputRegistrationService: new StubAssetGeneratedOutputRegistrationService() as unknown as AssetGeneratedOutputRegistrationService,
       uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
       discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
       detailService: new StubAssetDetailService() as unknown as AssetDetailService,
@@ -295,6 +341,38 @@ describe("AssetManagementBackendApi", () => {
       return;
     }
     expect(registered.data.asset.assetId).toBe("asset-upload-001");
+
+    const generated = await backendApi.registerGeneratedOutput({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-generated-001",
+      storageInstanceId: "storage-alpha",
+      outputVersion: {
+        versionId: "asset-generated-001:v1",
+        storageInstanceId: "storage-alpha",
+        objectKey: "workspaces/workspace-alpha/assets/asset-generated-001/output/v1/output.json",
+        area: "output",
+        content: {
+          mimeType: "application/json",
+          sizeBytes: 80,
+          checksum: {
+            algorithm: "sha256",
+            digest: "b".repeat(64),
+          },
+        },
+      },
+      source: {
+        producerType: "run",
+        runId: "execution-run-001",
+      },
+      lineage: [],
+    });
+    expect(generated.ok).toBeTrue();
+    if (!generated.ok || !generated.data) {
+      return;
+    }
+    expect(generated.data.asset.assetId).toBe("asset-generated-001");
+    expect(generated.data.asset.kind).toBe("generated-output");
 
     const initiated = await backendApi.initiateAssetUpload({
       actorUserIdentityId: "user-owner",
@@ -383,6 +461,7 @@ describe("AssetManagementBackendApi", () => {
   it("returns invalid-request for missing actor identity", async () => {
     const backendApi = new AssetManagementBackendApi({
       uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
+      generatedOutputRegistrationService: new StubAssetGeneratedOutputRegistrationService() as unknown as AssetGeneratedOutputRegistrationService,
       uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
       discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
       detailService: new StubAssetDetailService() as unknown as AssetDetailService,
@@ -422,6 +501,7 @@ describe("AssetManagementBackendApi", () => {
 
     const backendApi = new AssetManagementBackendApi({
       uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
+      generatedOutputRegistrationService: new StubAssetGeneratedOutputRegistrationService() as unknown as AssetGeneratedOutputRegistrationService,
       uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
       discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
       detailService: detailService as unknown as AssetDetailService,
@@ -446,6 +526,7 @@ describe("AssetManagementBackendApi", () => {
     downloadService.deny = true;
     const backendApi = new AssetManagementBackendApi({
       uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
+      generatedOutputRegistrationService: new StubAssetGeneratedOutputRegistrationService() as unknown as AssetGeneratedOutputRegistrationService,
       uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
       discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
       detailService: new StubAssetDetailService() as unknown as AssetDetailService,
