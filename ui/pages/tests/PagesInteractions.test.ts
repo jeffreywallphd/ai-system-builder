@@ -52,6 +52,7 @@ describe("ui/pages interactions", () => {
     expect(buildAutomate).toContain("BuildIntents.automateTask");
     expect(settings).toContain("Advanced runtime settings");
     expect(settings).toContain("Workspace administration");
+    expect(settings).toContain("Managed storage");
     expect(settings).toContain("Workspace memberships");
     expect(notFound).toContain("to={ROUTE_PATHS.home}");
   });

@@ -67,6 +67,9 @@ export default function SettingsPage(): JSX.Element {
           <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.authorizationReporting}>
             Authorization reporting
           </Link>
+          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.storageAdmin}>
+            Managed storage
+          </Link>
           <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.workspaceAdmin}>
             Workspace administration
           </Link>

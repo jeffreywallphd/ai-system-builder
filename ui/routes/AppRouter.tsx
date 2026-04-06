@@ -16,6 +16,7 @@ import SettingsPage from "../pages/SettingsPage";
 import AuthorizationSharingManagementPage from "../pages/AuthorizationSharingManagementPage";
 import AuthorizationSharingThinClientPage from "../pages/AuthorizationSharingThinClientPage";
 import AuthorizationReportingPage from "../pages/AuthorizationReportingPage";
+import StorageAdministrationPage from "../pages/StorageAdministrationPage";
 import WorkflowStudioPage from "../pages/WorkflowStudioPage";
 import ContextBundleStudioPage from "../pages/ContextBundleStudioPage";
 import DatasetPipelineStudioPage from "../pages/DatasetPipelineStudioPage";
@@ -142,6 +143,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.authorizationSharing, element: <AuthorizationSharingManagementPage /> },
           { path: ROUTE_PATHS.authorizationSharingThin, element: <AuthorizationSharingThinClientPage /> },
           { path: ROUTE_PATHS.authorizationReporting, element: <AuthorizationReportingPage /> },
+          { path: ROUTE_PATHS.storageAdmin, element: <StorageAdministrationPage /> },
           { path: ROUTE_PATHS.workspaceAdmin, element: <WorkspaceAdministrationPage /> },
           { path: ROUTE_PATHS.nodeEnrollmentReview, element: <NodeEnrollmentReviewPage /> },
           { path: ROUTE_PATHS.nodeInventory, element: <NodeInventoryPage /> },

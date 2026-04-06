@@ -38,6 +38,7 @@ describe("ui/routes contract adherence", () => {
     expect(source).toContain('authorizationSharing: "/settings/sharing"');
     expect(source).toContain('authorizationSharingThin: "/settings/sharing/thin"');
     expect(source).toContain('authorizationReporting: "/settings/sharing/reporting"');
+    expect(source).toContain('storageAdmin: "/settings/storage"');
     expect(source).toContain('workspaceAdmin: "/settings/workspaces"');
     expect(source).toContain('nodeEnrollmentReview: "/settings/node-enrollments"');
     expect(source).toContain('nodeInventory: "/settings/node-inventory"');
