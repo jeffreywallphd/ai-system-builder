@@ -20,7 +20,8 @@
     "service-supervisor": "node infrastructure/runtime/service-supervisor.js",
     "test": "bun test",
     "test:service-supervisor": "bun test infrastructure/runtime/tests/ServiceSupervisor.test.ts",
-    "dev:browser": "vite --mode browser"
+    "dev:browser": "vite --mode browser",
+    "start:authoritative-server": "bun run src/hosts/server/AuthoritativeServerHostEntrypoint.ts"
   },
   "dependencies": {
     "@huggingface/hub": "^2.6.1",
