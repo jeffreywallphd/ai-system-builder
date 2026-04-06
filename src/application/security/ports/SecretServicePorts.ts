@@ -87,6 +87,9 @@ export interface SecretAccessAuditEvent {
   readonly action: SecretAccessAction;
   readonly decision: "allowed" | "denied";
   readonly reason: SecretAccessDecisionReason;
+  readonly operationKey?: string;
+  readonly serviceIdentity?: string;
+  readonly justification?: string;
   readonly actorId: string;
   readonly actorType: SecretAccessActor["actorType"];
   readonly workspaceId?: string;

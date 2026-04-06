@@ -58,11 +58,19 @@ export interface GetSecretMetadataRequest {
 export interface RetrieveSecretPlaintextRequest {
   readonly actor: SecretAccessActor;
   readonly secretId: string;
+  readonly operationKey: string;
+  readonly runtimeContext: {
+    readonly serviceIdentity: string;
+    readonly scope: SecretScopeOwner;
+    readonly justification: string;
+  };
   readonly occurredAt?: string;
 }
 
 export interface RetrieveSecretPlaintextResult {
-  readonly secret: SecretReference;
+  readonly secretId: string;
+  readonly currentVersionId: string;
+  readonly scope: SecretScopeOwner;
   readonly plaintext: string;
 }
 

@@ -259,6 +259,15 @@ describe("Secret authorization policy and governance use cases", () => {
     const plaintext = await retrieveUseCase.execute({
       actor,
       secretId: record.secretId,
+      operationKey: "op:retrieve:human-runtime-denied",
+      runtimeContext: {
+        serviceIdentity: "runtime:workspace-alpha:orchestrator",
+        scope: {
+          scope: SecretScopes.workspace,
+          workspaceId: "workspace:alpha",
+        },
+        justification: "workspace runtime provider call",
+      },
     });
     expect(plaintext).toEqual({
       ok: false,
@@ -295,19 +304,32 @@ describe("Secret authorization policy and governance use cases", () => {
         grantedActions: [SecretAccessActions.retrievePlaintext],
       },
       secretId: record.secretId,
+      operationKey: "op:retrieve:workspace-beta-runtime",
+      runtimeContext: {
+        serviceIdentity: "runtime:workspace-beta:storage",
+        scope: {
+          scope: SecretScopes.workspace,
+          workspaceId: "workspace:beta",
+        },
+        justification: "runtime storage connector request signing",
+      },
     });
 
     expect(result).toEqual({
       ok: true,
       value: {
-        secret: expect.objectContaining({
-          secretId: record.secretId,
+        secretId: record.secretId,
+        currentVersionId: record.currentVersionId,
+        scope: {
           scope: SecretScopes.workspace,
-        }),
+          workspaceId: "workspace:beta",
+        },
         plaintext: "workspace-beta-token",
       },
     });
     expect(audit.events.at(-1)?.decision).toBe("allowed");
+    expect(audit.events.at(-1)?.operationKey).toBe("op:retrieve:workspace-beta-runtime");
+    expect(audit.events.at(-1)?.serviceIdentity).toBe("runtime:workspace-beta:storage");
   });
 
   it("enforces server-scope boundary for server runtime actors", async () => {
@@ -334,6 +356,14 @@ describe("Secret authorization policy and governance use cases", () => {
         grantedActions: [SecretAccessActions.retrievePlaintext],
       },
       secretId: record.secretId,
+      operationKey: "op:retrieve:server-runtime",
+      runtimeContext: {
+        serviceIdentity: "runtime:server:signing",
+        scope: {
+          scope: SecretScopes.server,
+        },
+        justification: "issue internal service signature",
+      },
     });
     expect(allowed.ok).toBeTrue();
 
@@ -345,6 +375,14 @@ describe("Secret authorization policy and governance use cases", () => {
         grantedActions: [SecretAccessActions.retrievePlaintext],
       },
       secretId: record.secretId,
+      operationKey: "op:retrieve:server-secret-human",
+      runtimeContext: {
+        serviceIdentity: "runtime:workspace-alpha:ui",
+        scope: {
+          scope: SecretScopes.server,
+        },
+        justification: "manual UI retrieval",
+      },
     });
     expect(denied).toEqual({
       ok: false,
@@ -353,7 +391,100 @@ describe("Secret authorization policy and governance use cases", () => {
         message: `Secret '${record.secretId}' was not found.`,
       },
     });
+    expect(audit.events.at(-1)?.reason).toBe("runtime-access-required");
+  });
+
+  it("returns non-leaky not-found when runtime scope reference does not match the secret owner", async () => {
+    const repository = new InMemorySecretRecordRepository();
+    const encryption = new InMemorySecretEncryptionPort();
+    const audit = new InMemorySecretAccessAuditPort();
+    const policy = new SecretAuthorizationPolicyEvaluator();
+
+    const record = createWorkspaceSecretRecord("workspace:alpha");
+    repository.seed(record);
+    encryption.seedPayload(record.versions[0]?.encryptedPayloadRef ?? "", "workspace-alpha-token");
+
+    const retrieveUseCase = new RetrieveSecretPlaintextForRuntimeUseCase({
+      secretRecordRepository: repository,
+      secretEncryptionPort: encryption,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+
+    const denied = await retrieveUseCase.execute({
+      actor: {
+        actorId: "system:runtime:workspace-alpha",
+        actorType: SecretActorTypes.workspaceService,
+        workspaceId: "workspace:alpha",
+        grantedActions: [SecretAccessActions.retrievePlaintext],
+      },
+      secretId: record.secretId,
+      operationKey: "op:retrieve:workspace-alpha-mismatched-scope",
+      runtimeContext: {
+        serviceIdentity: "runtime:workspace-alpha:storage",
+        scope: {
+          scope: SecretScopes.workspace,
+          workspaceId: "workspace:beta",
+        },
+        justification: "runtime data-plane request",
+      },
+    });
+
+    expect(denied).toEqual({
+      ok: false,
+      error: {
+        code: SecretServiceErrorCodes.notFound,
+        message: `Secret '${record.secretId}' was not found.`,
+      },
+    });
     expect(audit.events.at(-1)?.reason).toBe("scope-mismatch");
+    expect(audit.events.at(-1)?.operationKey).toBe("op:retrieve:workspace-alpha-mismatched-scope");
+  });
+
+  it("rejects runtime plaintext retrieval requests that omit audit justification context", async () => {
+    const repository = new InMemorySecretRecordRepository();
+    const encryption = new InMemorySecretEncryptionPort();
+    const audit = new InMemorySecretAccessAuditPort();
+    const policy = new SecretAuthorizationPolicyEvaluator();
+
+    const record = createWorkspaceSecretRecord("workspace:alpha");
+    repository.seed(record);
+    encryption.seedPayload(record.versions[0]?.encryptedPayloadRef ?? "", "workspace-alpha-token");
+
+    const retrieveUseCase = new RetrieveSecretPlaintextForRuntimeUseCase({
+      secretRecordRepository: repository,
+      secretEncryptionPort: encryption,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+
+    const invalid = await retrieveUseCase.execute({
+      actor: {
+        actorId: "system:runtime:workspace-alpha",
+        actorType: SecretActorTypes.workspaceService,
+        workspaceId: "workspace:alpha",
+        grantedActions: [SecretAccessActions.retrievePlaintext],
+      },
+      secretId: record.secretId,
+      operationKey: "op:retrieve:workspace-alpha-missing-justification",
+      runtimeContext: {
+        serviceIdentity: "runtime:workspace-alpha:storage",
+        scope: {
+          scope: SecretScopes.workspace,
+          workspaceId: "workspace:alpha",
+        },
+        justification: " ",
+      },
+    });
+
+    expect(invalid).toEqual({
+      ok: false,
+      error: {
+        code: SecretServiceErrorCodes.invalidRequest,
+        message: "runtimeContext.justification is required.",
+      },
+    });
+    expect(audit.events).toHaveLength(0);
   });
 
   it("returns non-leaky not-found for unauthorized rotate and delete operations", async () => {

@@ -394,7 +394,9 @@ class InMemorySecretManagementService implements ISecretManagementService {
     return {
       ok: true,
       value: {
-        secret: toSecretReference(record),
+        secretId: record.secretId,
+        currentVersionId: current.versionId,
+        scope: record.owner,
         plaintext: plaintext.plaintext,
       },
     };
@@ -705,6 +707,14 @@ describe("secret application contracts", () => {
     const plaintext = await service.retrieveSecretPlaintextForRuntime({
       actor: createServerAdminActor([SecretAccessActions.retrievePlaintext]),
       secretId: "secret:server:openai",
+      operationKey: "op:retrieve:1",
+      runtimeContext: {
+        serviceIdentity: "runtime:server:provider-gateway",
+        scope: {
+          scope: SecretScopes.server,
+        },
+        justification: "provider runtime invocation",
+      },
       occurredAt: "2026-04-05T12:02:00.000Z",
     });
     expect(plaintext.ok).toBeTrue();
@@ -725,14 +735,24 @@ describe("secret application contracts", () => {
     const afterRotate = await service.retrieveSecretPlaintextForRuntime({
       actor: createServerAdminActor([SecretAccessActions.retrievePlaintext]),
       secretId: "secret:server:openai",
+      operationKey: "op:retrieve:2",
+      runtimeContext: {
+        serviceIdentity: "runtime:server:provider-gateway",
+        scope: {
+          scope: SecretScopes.server,
+        },
+        justification: "provider runtime invocation",
+      },
       occurredAt: "2026-04-06T00:00:01.000Z",
     });
     expect(afterRotate).toEqual({
       ok: true,
       value: {
-        secret: expect.objectContaining({
-          secretId: "secret:server:openai",
-        }),
+        secretId: "secret:server:openai",
+        currentVersionId: "secret:server:openai:v2",
+        scope: {
+          scope: SecretScopes.server,
+        },
         plaintext: "sk-test-456",
       },
     });
@@ -752,6 +772,14 @@ describe("secret application contracts", () => {
     const deniedAfterDisable = await service.retrieveSecretPlaintextForRuntime({
       actor: createServerAdminActor([SecretAccessActions.retrievePlaintext]),
       secretId: "secret:server:openai",
+      operationKey: "op:retrieve:3",
+      runtimeContext: {
+        serviceIdentity: "runtime:server:provider-gateway",
+        scope: {
+          scope: SecretScopes.server,
+        },
+        justification: "provider runtime invocation",
+      },
       occurredAt: "2026-04-06T01:05:00.000Z",
     });
     expect(deniedAfterDisable).toEqual({
