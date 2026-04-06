@@ -9,6 +9,7 @@
 
 - `src/infrastructure/persistence/sqlite/SqlitePersistenceRuntime.ts`
 - `src/infrastructure/persistence/sqlite/SqliteTransactionCoordinator.ts`
+- `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 - `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 
 ## What the runtime bootstrap now does
@@ -21,8 +22,11 @@
 ## Host lifecycle wiring
 
 - Authoritative host `persistence` stage now initializes the shared SQLite persistence runtime before feature registration.
+- The persistence stage now also composes authoritative repository adapters/audit repositories/transaction-capable persistence services through `createAuthoritativePersistentPlatformServices(...)` and stores them as startup artifacts.
+- Runtime bootstrap now executes deterministic domain migration hooks from `createAuthoritativePersistenceMigrationHooks(...)` so bootstrap migration ledger and domain migration tables are aligned before host feature-registration.
+- Feature-registration startup now injects the composed persistent platform services into `startIdentityServerHost(...)` so runtime use cases consume startup-composed authoritative adapters.
 - Startup-failure cleanup now disposes persistence runtime resources.
-- Runtime stop cleanup now disposes persistence runtime resources alongside host shutdown.
+- Runtime stop cleanup now disposes composed persistent platform services and persistence runtime resources alongside host shutdown.
 
 ## Config keys
 

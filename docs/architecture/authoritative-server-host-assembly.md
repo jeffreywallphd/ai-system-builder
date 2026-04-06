@@ -17,6 +17,7 @@ The host assembly is responsible for runtime composition and startup orchestrati
 - Composition root: `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 - Dedicated entrypoint assembly: `src/hosts/server/AuthoritativeServerHostEntrypoint.ts`
 - Runtime host implementation composed by the root: `hosts/server/IdentityServerHost.ts`
+- Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 
 The entrypoint composes and starts the host through:
 1. `constructAuthoritativeServerHostAssembly(...)`
@@ -65,8 +66,11 @@ When run as a script, the entrypoint:
 
 During host composition:
 - the bootstrap `persistence` stage initializes the shared SQLite persistence runtime (`src/infrastructure/persistence/sqlite/SqlitePersistenceRuntime.ts`)
+- the bootstrap `persistence` stage composes authoritative persistent platform services (repository adapters, audit sinks, and platform run/audit persistence adapter) and stores them as startup artifacts
+- the bootstrap `feature-registration` stage injects startup-composed persistent platform services into `startIdentityServerHost(...)`
 - startup failure cleanup disposes persistence runtime resources
-- normal host shutdown also disposes persistence runtime resources after host transport shutdown
+- startup failure cleanup also disposes composed persistent platform services
+- normal host shutdown also disposes composed persistent platform services and persistence runtime resources after host transport shutdown
 
 Repository startup command:
 - `npm run start:authoritative-server`

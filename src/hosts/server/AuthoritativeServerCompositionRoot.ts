@@ -37,6 +37,11 @@ import {
   resolveSqlitePersistenceRuntimeConfiguration,
   type SqlitePersistenceRuntime,
 } from "../../infrastructure/persistence/sqlite/SqlitePersistenceRuntime";
+import {
+  createAuthoritativePersistenceMigrationHooks,
+  createAuthoritativePersistentPlatformServices,
+  type AuthoritativePersistentPlatformServices,
+} from "../../infrastructure/persistence/AuthoritativePersistenceComposition";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -66,6 +71,11 @@ export interface AuthoritativeServerCompositionRootOptions {
       readonly hostConfiguration: IdentityServerHostOptions;
       readonly environment: Readonly<Record<string, string | undefined>>;
     }) => SqlitePersistenceRuntime;
+    readonly composePersistentPlatformServices?: (input: {
+      readonly persistenceRuntime: SqlitePersistenceRuntime;
+      readonly hostConfiguration: IdentityServerHostOptions;
+      readonly environment: Readonly<Record<string, string | undefined>>;
+    }) => AuthoritativePersistentPlatformServices;
   };
 }
 
@@ -73,6 +83,8 @@ const StartedHostArtifactKey = "artifact:host:server:authoritative:runtime";
 export const AuthoritativeServerServiceRegistrationPlanArtifactKey =
   "artifact:host:server:authoritative:service-registration-plan";
 export const AuthoritativeServerPersistenceRuntimeArtifactKey = "artifact:host:server:authoritative:persistence-runtime";
+export const AuthoritativeServerPersistentPlatformServicesArtifactKey =
+  "artifact:host:server:authoritative:persistent-platform-services";
 
 function combineStartupLifecycleHooks(
   primary: HostStartupLifecycleHooks | undefined,
@@ -147,6 +159,7 @@ export function createAuthoritativeServerCompositionRoot(
       });
       let startedHost: IdentityServerHost | undefined;
       let persistenceRuntime: SqlitePersistenceRuntime | undefined;
+      let persistentPlatformServices: AuthoritativePersistentPlatformServices | undefined;
       await lifecycle.markComposing("compose-authoritative-server-host");
 
       try {
@@ -184,13 +197,28 @@ export function createAuthoritativeServerCompositionRoot(
                   databasePath: runtimeInput.hostConfiguration.databasePath,
                   environment: runtimeInput.environment,
                 }),
+                migrationHooks: createAuthoritativePersistenceMigrationHooks(),
               }))
             )({
               hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
               environment: context.environment,
             });
             await persistenceRuntime.start();
+            persistentPlatformServices = (
+              input.bootstrap?.composePersistentPlatformServices
+              ?? ((servicesInput) => createAuthoritativePersistentPlatformServices({
+                databasePath: servicesInput.persistenceRuntime.configuration.databasePath,
+              }))
+            )({
+              persistenceRuntime,
+              hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
+              environment: context.environment,
+            });
             context.setArtifact(AuthoritativeServerPersistenceRuntimeArtifactKey, persistenceRuntime);
+            context.setArtifact(
+              AuthoritativeServerPersistentPlatformServicesArtifactKey,
+              persistentPlatformServices,
+            );
           },
           [HostBootstrapStageIds.featureRegistration]: async (context) => {
             const plan = context.getArtifact<HostServiceRegistrationPlan>(
@@ -199,8 +227,19 @@ export function createAuthoritativeServerCompositionRoot(
             if (!plan) {
               throw new Error("Authoritative server startup requires a composed host service registration plan.");
             }
+            const composedPersistentServices = context.getArtifact<AuthoritativePersistentPlatformServices>(
+              AuthoritativeServerPersistentPlatformServicesArtifactKey,
+            );
+            if (!composedPersistentServices) {
+              throw new Error(
+                "Authoritative server startup requires composed persistent platform services before runtime feature registration.",
+              );
+            }
             (input.bootstrap?.assertServiceCoverage ?? assertAuthoritativeControlPlaneServiceCoverage)(plan);
-            const composedHost = await startHost(context.hostConfiguration as IdentityServerHostOptions);
+            const composedHost = await startHost({
+              ...(context.hostConfiguration as IdentityServerHostOptions),
+              persistentPlatformServices: composedPersistentServices,
+            });
             context.setArtifact(StartedHostArtifactKey, composedHost);
           },
         };
@@ -265,6 +304,7 @@ export function createAuthoritativeServerCompositionRoot(
               {
                 hookId: "close-persistence-runtime",
                 run: async () => {
+                  persistentPlatformServices?.dispose();
                   await activePersistenceRuntime?.dispose();
                 },
               },
@@ -308,6 +348,7 @@ export function createAuthoritativeServerCompositionRoot(
                 {
                   hookId: "close-persistence-runtime",
                   run: async () => {
+                    persistentPlatformServices?.dispose();
                     await persistenceRuntime?.dispose();
                   },
                 },
@@ -318,6 +359,7 @@ export function createAuthoritativeServerCompositionRoot(
           }
         } else {
           try {
+            persistentPlatformServices?.dispose();
             await persistenceRuntime?.dispose();
           } catch (cleanupError) {
             failure = cleanupError;

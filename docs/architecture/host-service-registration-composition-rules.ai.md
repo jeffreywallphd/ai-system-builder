@@ -25,6 +25,7 @@
   - composes host service registration in bootstrap `dependencies` stage
   - stores plan artifact in startup context
   - enforces authoritative control-plane required-service coverage before runtime host start
+  - composes explicit persistence-platform service coverage (`svc:platform:persistence-bootstrap-runtime`, `svc:infrastructure:authoritative-repository-adapters`, `svc:platform:transaction-coordination`, `svc:platform:persistence-shared-helpers`) as part of authoritative startup dependency validation
 
 ## Desktop host behavior
 - `src/hosts/desktop/DesktopHostCompositionRoot.ts` now:

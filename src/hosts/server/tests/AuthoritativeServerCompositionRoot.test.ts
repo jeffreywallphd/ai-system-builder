@@ -14,12 +14,16 @@ import { createAuthoritativeServerCompositionRoot } from "../AuthoritativeServer
 import { HostBootstrapStageIds } from "../../bootstrap/HostBootstrapPipeline";
 import type { HostServiceRegistrationPlan } from "../../../infrastructure/config/HostServiceRegistration";
 import { HostServiceRegistrationError } from "../../../infrastructure/config/HostServiceRegistration";
-import { AuthoritativeServerServiceRegistrationPlanArtifactKey } from "../AuthoritativeServerCompositionRoot";
+import {
+  AuthoritativeServerPersistentPlatformServicesArtifactKey,
+  AuthoritativeServerServiceRegistrationPlanArtifactKey,
+} from "../AuthoritativeServerCompositionRoot";
 import {
   HostDeploymentProfileIds,
   HostStartupEnvironmentKeys,
 } from "../../../infrastructure/config/HostStartupConfiguration";
 import type { SqlitePersistenceRuntime } from "../../../infrastructure/persistence/sqlite/SqlitePersistenceRuntime";
+import type { AuthoritativePersistentPlatformServices } from "../../../infrastructure/persistence/AuthoritativePersistenceComposition";
 
 describe("AuthoritativeServerCompositionRoot", () => {
   it("composes and stops authoritative server runtime with lifecycle transitions", async () => {
@@ -350,6 +354,101 @@ describe("AuthoritativeServerCompositionRoot", () => {
       "persistence-start",
       "host-close",
       "persistence-dispose",
+    ]);
+  });
+
+  it("composes persistent platform services during persistence stage and injects them into runtime host startup", async () => {
+    const calls: string[] = [];
+    let startedWithServices: AuthoritativePersistentPlatformServices | undefined;
+    const persistentServices = Object.freeze({
+      databasePath: "test.sqlite",
+      identityRepository: {} as never,
+      trustedDeviceRepository: {} as never,
+      workspaceRepository: {} as never,
+      authorizationRepository: {} as never,
+      nodeTrustRepository: {} as never,
+      nodeTrustAuditRecorder: {} as never,
+      certificateAuthorityRepository: {} as never,
+      secretRecordRepository: {} as never,
+      storageInstanceRepository: {} as never,
+      storageManagementAuditRecorder: {} as never,
+      assetRepository: {} as never,
+      assetAuditRecorder: {} as never,
+      assetUploadSessionRepository: {} as never,
+      platformPersistenceRepository: {} as never,
+      dispose: () => {
+        calls.push("persistent-services-dispose");
+      },
+    }) satisfies AuthoritativePersistentPlatformServices;
+
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+      },
+      startHost: async (options) => {
+        startedWithServices = options.persistentPlatformServices;
+        return {
+          port: 5700,
+          address: "127.0.0.1:5700",
+          secretService: {} as never,
+          platformSecretConsumers: {} as never,
+          close: async () => {
+            calls.push("host-close");
+          },
+        };
+      },
+      bootstrap: {
+        createPersistenceRuntime: () => Object.freeze({
+          configuration: Object.freeze({
+            databasePath: "test.sqlite",
+            pragmas: Object.freeze({
+              journalMode: "WAL",
+              foreignKeys: true,
+            }),
+          }),
+          start: async () => {
+            calls.push("persistence-start");
+            return Object.freeze({
+              databasePath: "test.sqlite",
+              migrationIdsApplied: Object.freeze([]),
+            });
+          },
+          getConnection: () => {
+            throw new Error("not used");
+          },
+          dispose: async () => {
+            calls.push("persistence-runtime-dispose");
+          },
+        }) satisfies SqlitePersistenceRuntime,
+        composePersistentPlatformServices: () => persistentServices,
+        stageHandlers: {
+          [HostBootstrapStageIds.persistence]: (context) => {
+            const artifact = context.getArtifact<AuthoritativePersistentPlatformServices>(
+              AuthoritativeServerPersistentPlatformServicesArtifactKey,
+            );
+            expect(artifact).toBe(persistentServices);
+          },
+        },
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-persistent-services-integration-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+    });
+
+    const runtime = await root.compose(boot);
+    expect(startedWithServices).toBe(persistentServices);
+    expect(calls).toEqual(["persistence-start"]);
+
+    await runtime.stop();
+    expect(calls).toEqual([
+      "persistence-start",
+      "host-close",
+      "persistent-services-dispose",
+      "persistence-runtime-dispose",
     ]);
   });
 });

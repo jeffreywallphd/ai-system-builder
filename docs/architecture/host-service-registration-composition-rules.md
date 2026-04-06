@@ -43,7 +43,7 @@ The catalog composes deterministic service plans through:
 
 ## Host integration
 
-`src/hosts/server/AuthoritativeServerCompositionRoot.ts` now composes service registration plans during the shared bootstrap `dependencies` stage and enforces authoritative required service coverage before `feature-registration`.
+`src/hosts/server/AuthoritativeServerCompositionRoot.ts` now composes service registration plans during the shared bootstrap `dependencies` stage and enforces authoritative required service coverage before `feature-registration`, including explicit persistence platform composition services (`svc:platform:persistence-bootstrap-runtime`, `svc:infrastructure:authoritative-repository-adapters`, `svc:platform:transaction-coordination`, `svc:platform:persistence-shared-helpers`).
 
 `src/hosts/desktop/DesktopHostCompositionRoot.ts` now composes service registration plans during the shared bootstrap `dependencies` stage and enforces desktop required service coverage before `feature-registration`.
 

@@ -68,6 +68,10 @@ import { SqliteStorageManagementAuditRecorder } from "../../src/infrastructure/p
 import { SqliteAssetPersistenceAdapter } from "../../src/infrastructure/persistence/assets/SqliteAssetPersistenceAdapter";
 import { SqliteAssetAuditRecorder } from "../../src/infrastructure/persistence/assets/SqliteAssetAuditRecorder";
 import { SqliteAssetUploadSessionPersistenceAdapter } from "../../src/infrastructure/persistence/assets/SqliteAssetUploadSessionPersistenceAdapter";
+import {
+  createAuthoritativePersistentPlatformServices,
+  type AuthoritativePersistentPlatformServices,
+} from "../../src/infrastructure/persistence/AuthoritativePersistenceComposition";
 import { StorageManagementService } from "../../src/application/storage/use-cases/StorageManagementService";
 import { AssetUploadInitiationService } from "../../src/application/assets/use-cases/AssetUploadInitiationService";
 import { AssetGeneratedOutputRegistrationService } from "../../src/application/assets/use-cases/AssetGeneratedOutputRegistrationService";
@@ -211,6 +215,7 @@ export interface IdentityServerHostOptions {
   readonly sessionPolicies?: IdentitySessionLifecyclePolicies;
   readonly eventPublisher?: IIdentityLifecycleEventPublisher;
   readonly providerAccountPolicies?: IdentityProviderAccountPolicyConfig;
+  readonly persistentPlatformServices?: AuthoritativePersistentPlatformServices;
 }
 
 export interface IdentityServerHost {
@@ -295,18 +300,24 @@ class DomainTransportConnectionPolicyEvaluator {
 }
 
 export async function startIdentityServerHost(options: IdentityServerHostOptions): Promise<IdentityServerHost> {
-  const repository = new SqliteIdentityPersistenceAdapter(path.resolve(options.databasePath));
-  const trustedDeviceRepository = new SqliteTrustedDevicePersistenceAdapter(path.resolve(options.databasePath));
-  const workspaceRepository = new SqliteWorkspacePersistenceAdapter(path.resolve(options.databasePath));
-  const authorizationRepository = new SqliteAuthorizationPersistenceAdapter(path.resolve(options.databasePath));
-  const nodeTrustRepository = new SqliteNodeTrustPersistenceAdapter(path.resolve(options.databasePath));
-  const nodeTrustAuditRecorder = new SqliteNodeTrustAuditRecorder(path.resolve(options.databasePath));
-  const certificateAuthorityRepository = new SqliteCertificateAuthorityPersistenceAdapter(path.resolve(options.databasePath));
-  const storageInstanceRepository = new SqliteStorageInstancePersistenceAdapter(path.resolve(options.databasePath));
-  const storageManagementAuditRecorder = new SqliteStorageManagementAuditRecorder(path.resolve(options.databasePath));
-  const assetRepository = new SqliteAssetPersistenceAdapter(path.resolve(options.databasePath));
-  const assetAuditRecorder = new SqliteAssetAuditRecorder(path.resolve(options.databasePath));
-  const assetUploadSessionRepository = new SqliteAssetUploadSessionPersistenceAdapter(path.resolve(options.databasePath));
+  const databasePath = path.resolve(options.databasePath);
+  const persistentPlatformServices = options.persistentPlatformServices
+    ?? createAuthoritativePersistentPlatformServices({
+      databasePath,
+    });
+  const ownsPersistentPlatformServices = !options.persistentPlatformServices;
+  const repository = persistentPlatformServices.identityRepository;
+  const trustedDeviceRepository = persistentPlatformServices.trustedDeviceRepository;
+  const workspaceRepository = persistentPlatformServices.workspaceRepository;
+  const authorizationRepository = persistentPlatformServices.authorizationRepository;
+  const nodeTrustRepository = persistentPlatformServices.nodeTrustRepository;
+  const nodeTrustAuditRecorder = persistentPlatformServices.nodeTrustAuditRecorder;
+  const certificateAuthorityRepository = persistentPlatformServices.certificateAuthorityRepository;
+  const storageInstanceRepository = persistentPlatformServices.storageInstanceRepository;
+  const storageManagementAuditRecorder = persistentPlatformServices.storageManagementAuditRecorder;
+  const assetRepository = persistentPlatformServices.assetRepository;
+  const assetAuditRecorder = persistentPlatformServices.assetAuditRecorder;
+  const assetUploadSessionRepository = persistentPlatformServices.assetUploadSessionRepository;
   const env = options.env ?? process.env;
   const hostAddress = options.host ?? "127.0.0.1";
   const secureTransportConfig = resolveHostSecureTransportConfig({
@@ -339,7 +350,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     const sessionPolicies = options.sessionPolicies
       ?? IdentitySessionPolicyConfig.fromEnv(env).policies;
     const sessionTrustPolicies = IdentitySessionTrustPolicyConfig.fromEnv(env).policies;
-    const eventPublisher = options.eventPublisher ?? new SqliteIdentityLifecycleEventPublisher(path.resolve(options.databasePath));
+    const eventPublisher = options.eventPublisher ?? new SqliteIdentityLifecycleEventPublisher(databasePath);
     const workspaceClock = new SystemWorkspaceClock();
     const workspaceIdGenerator = new RandomWorkspaceIdGenerator();
     const workspaceAuthorizationPolicyReadAdapter = new WorkspaceAuthorizationPolicyReadAdapter({
@@ -1036,46 +1047,28 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     address: `${addressInfo.address}:${addressInfo.port}`,
     secretService,
     platformSecretConsumers,
-    close: () => new Promise<void>((resolve, reject) => {
-      server.close((error) => {
-        repository.dispose();
-        trustedDeviceRepository.dispose();
-        workspaceRepository.dispose();
-        authorizationRepository.dispose();
-        nodeTrustRepository.dispose();
-        nodeTrustAuditRecorder.dispose();
-        certificateAuthorityRepository.dispose();
-      storageInstanceRepository.dispose();
-      storageManagementAuditRecorder.dispose();
-      assetRepository.dispose();
-      assetAuditRecorder.dispose();
-      assetUploadSessionRepository.dispose();
-        secretService?.dispose();
-        const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
-        if (typeof disposablePublisher.dispose === "function") {
-          disposablePublisher.dispose();
-        }
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
-      });
-    }),
-  });
+      close: () => new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (ownsPersistentPlatformServices) {
+            persistentPlatformServices.dispose();
+          }
+          secretService?.dispose();
+          const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
+          if (typeof disposablePublisher.dispose === "function") {
+            disposablePublisher.dispose();
+          }
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      }),
+    });
   } catch (error) {
-    repository.dispose();
-    trustedDeviceRepository.dispose();
-    workspaceRepository.dispose();
-    authorizationRepository.dispose();
-    nodeTrustRepository.dispose();
-    nodeTrustAuditRecorder.dispose();
-    certificateAuthorityRepository.dispose();
-    storageInstanceRepository.dispose();
-    storageManagementAuditRecorder.dispose();
-    assetRepository.dispose();
-    assetAuditRecorder.dispose();
-    assetUploadSessionRepository.dispose();
+    if (ownsPersistentPlatformServices) {
+      persistentPlatformServices.dispose();
+    }
     secretService?.dispose();
     throw error;
   }
