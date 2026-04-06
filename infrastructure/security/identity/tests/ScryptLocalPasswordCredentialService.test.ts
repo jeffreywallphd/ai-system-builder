@@ -27,4 +27,15 @@ describe("ScryptLocalPasswordCredentialService", () => {
 
     await expect(service.verifyPassword("wrong-password", material)).resolves.toBe(false);
   });
+
+  it("uses OpenSSL-safe scrypt memory defaults even when configured max memory is too low", async () => {
+    const service = new ScryptLocalPasswordCredentialService({
+      costFactor: 4096,
+      maxMemoryBytes: 1024,
+    });
+
+    const material = await service.hashPassword("Str0ng!Passphrase");
+
+    await expect(service.verifyPassword("Str0ng!Passphrase", material)).resolves.toBe(true);
+  });
 });

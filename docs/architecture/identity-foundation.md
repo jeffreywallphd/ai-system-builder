@@ -188,6 +188,8 @@ The service does not generate a password or perform hashing; it consumes already
 
 The use case intentionally keeps hashing behind the authenticator contract so secret-handling stays in infrastructure/security code while persistence still stores only hash material (`hashAlgorithm`, `hashValue`, optional salt/pepper metadata).
 
+`ScryptLocalPasswordCredentialService` now applies an OpenSSL-safe memory budget floor and headroom when deriving local-password hashes so dev/host runtimes do not fail with `MEMORY_LIMIT_EXCEEDED` when parameters are otherwise valid.
+
 ## Local Credential Verification Use Case
 
 `VerifyLocalPasswordCredentialUseCase.execute(...)` provides the password-verification seam used by login/auth flows:

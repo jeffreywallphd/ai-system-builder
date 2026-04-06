@@ -9,6 +9,9 @@ const scrypt = promisify(scryptCallback);
 const PHC_ID = "scrypt";
 const DERIVED_KEY_LENGTH = 64;
 const SALT_BYTES = 16;
+const SCRYPT_MEMORY_REQUIREMENT_MULTIPLIER = 128;
+const SCRYPT_MEMORY_HEADROOM_MULTIPLIER = 2;
+const SCRYPT_MEMORY_FLOOR_BYTES = 32 * 1024 * 1024;
 
 export interface ScryptLocalPasswordCredentialServiceOptions {
   readonly costFactor?: number;
@@ -33,7 +36,8 @@ export class ScryptLocalPasswordCredentialService implements ILocalPasswordCrede
     assertPowerOfTwo(this.costFactor, "costFactor");
     assertPositiveInteger(this.blockSize, "blockSize");
     assertPositiveInteger(this.parallelization, "parallelization");
-    this.maxMemoryBytes = options.maxMemoryBytes ?? 128 * this.costFactor * this.blockSize * this.parallelization;
+    this.maxMemoryBytes = options.maxMemoryBytes
+      ?? calculateRecommendedScryptMemoryBytes(this.costFactor, this.blockSize, this.parallelization);
     assertPositiveInteger(this.maxMemoryBytes, "maxMemoryBytes");
     this.pepperVersion = normalizeOptional(options.pepperVersion);
   }
@@ -98,7 +102,7 @@ export class ScryptLocalPasswordCredentialService implements ILocalPasswordCrede
   ): Promise<Buffer> {
     const dynamicMaxMemory = Math.max(
       this.maxMemoryBytes,
-      128 * costFactor * blockSize * parallelization,
+      calculateRecommendedScryptMemoryBytes(costFactor, blockSize, parallelization),
     );
     const derived = await scrypt(candidate, salt, keyLength, {
       N: costFactor,
@@ -182,4 +186,16 @@ function assertPowerOfTwo(value: number, field: string): void {
   if ((value & (value - 1)) !== 0) {
     throw new Error(`ScryptLocalPasswordCredentialService requires '${field}' to be a power of two.`);
   }
+}
+
+function calculateRequiredScryptMemoryBytes(costFactor: number, blockSize: number, parallelization: number): number {
+  return SCRYPT_MEMORY_REQUIREMENT_MULTIPLIER * costFactor * blockSize * parallelization;
+}
+
+function calculateRecommendedScryptMemoryBytes(costFactor: number, blockSize: number, parallelization: number): number {
+  const requiredBytes = calculateRequiredScryptMemoryBytes(costFactor, blockSize, parallelization);
+  return Math.max(
+    SCRYPT_MEMORY_FLOOR_BYTES,
+    requiredBytes * SCRYPT_MEMORY_HEADROOM_MULTIPLIER,
+  );
 }
