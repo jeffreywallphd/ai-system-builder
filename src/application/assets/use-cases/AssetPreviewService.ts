@@ -9,7 +9,10 @@ import {
   WorkspaceRoles,
 } from "../../../domain/workspaces/WorkspaceDomain";
 import type { IWorkspaceAuthorizationReadRepository } from "../../workspaces/ports/IWorkspaceAuthorizationReadRepository";
-import type { AssetAuditSink } from "../ports/AssetAuditPort";
+import {
+  publishAssetAuditEventBestEffort,
+  type AssetAuditSink,
+} from "../ports/AssetAuditPort";
 import type { IAssetPreviewPort } from "../ports/AssetPreviewPort";
 import type { IAssetRepository } from "../ports/IAssetRepository";
 import {
@@ -112,6 +115,7 @@ export class AssetPreviewService {
       workspaceId: query.workspaceId,
       actorUserId: query.actorUserId,
       correlationId: query.correlationId,
+      outcome: "success",
       asset: {
         assetId: sourceAsset.id,
         kind: sourceAsset.kind,
@@ -284,14 +288,7 @@ export class AssetPreviewService {
   }
 
   private async publishAuditEvent(event: Parameters<AssetAuditSink["recordAssetEvent"]>[0]): Promise<void> {
-    if (!this.dependencies.auditSink) {
-      return;
-    }
-    try {
-      await this.dependencies.auditSink.recordAssetEvent(event);
-    } catch {
-      // best effort
-    }
+    await publishAssetAuditEventBestEffort(this.dependencies.auditSink, event);
   }
 }
 

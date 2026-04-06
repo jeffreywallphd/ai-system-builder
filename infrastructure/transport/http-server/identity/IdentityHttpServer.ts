@@ -101,7 +101,9 @@ import {
 import {
   AssetManagementApiErrorCodes,
   type AssetManagementApiResponse,
+  type ArchiveAssetApiRequest,
   type AuthorizeAssetDownloadApiRequest,
+  type DeleteAssetApiRequest,
   type GetAssetDetailApiRequest,
   type IngestAssetUploadContentApiRequest,
   type InitiateAssetUploadApiRequest,
@@ -3881,6 +3883,86 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapAssetManagementStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, registerRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.assetManagementBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/assets/")
+        && path.endsWith("/archive")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            const assetId = decodePathTail(path, "/api/v1/assets/", "/archive");
+            if (!workspaceId || !assetId || assetId.includes("/")) {
+              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const archiveRequest: ArchiveAssetApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              workspaceId,
+              assetId,
+              operationKey: normalizeOptionalString(searchParams.get("operationKey")),
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            });
+            const apiResponse = await options.assetManagementBackendApi.archiveAsset(archiveRequest);
+            const statusCode = mapAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, archiveRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.assetManagementBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/assets/")
+        && path.endsWith("/delete")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            const assetId = decodePathTail(path, "/api/v1/assets/", "/delete");
+            if (!workspaceId || !assetId || assetId.includes("/")) {
+              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const deleteRequest: DeleteAssetApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              workspaceId,
+              assetId,
+              operationKey: normalizeOptionalString(searchParams.get("operationKey")),
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            });
+            const apiResponse = await options.assetManagementBackendApi.deleteAsset(deleteRequest);
+            const statusCode = mapAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, deleteRequest, apiResponse);
           },
         );
         return;

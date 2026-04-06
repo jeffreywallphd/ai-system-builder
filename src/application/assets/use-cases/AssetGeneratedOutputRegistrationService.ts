@@ -23,7 +23,10 @@ import {
   type IStoragePolicyEvaluationPort,
 } from "../../storage/ports/StoragePolicyEvaluationPort";
 import type { IWorkspaceAuthorizationReadRepository } from "../../workspaces/ports/IWorkspaceAuthorizationReadRepository";
-import type { AssetAuditSink } from "../ports/AssetAuditPort";
+import {
+  publishAssetAuditEventBestEffort,
+  type AssetAuditSink,
+} from "../ports/AssetAuditPort";
 import type { IAssetRepository } from "../ports/IAssetRepository";
 import {
   AssetServiceErrorCodes,
@@ -155,6 +158,7 @@ export class AssetGeneratedOutputRegistrationService {
         actorUserId: request.actorUserId,
         correlationId: request.correlationId,
         operationKey: request.operationKey,
+        outcome: "success",
         asset: {
           assetId: asset.id,
           kind: asset.kind,
@@ -291,14 +295,7 @@ export class AssetGeneratedOutputRegistrationService {
   }
 
   private async publishAuditEvent(event: Parameters<AssetAuditSink["recordAssetEvent"]>[0]): Promise<void> {
-    if (!this.dependencies.auditSink) {
-      return;
-    }
-    try {
-      await this.dependencies.auditSink.recordAssetEvent(event);
-    } catch {
-      // best effort
-    }
+    await publishAssetAuditEventBestEffort(this.dependencies.auditSink, event);
   }
 }
 

@@ -339,3 +339,40 @@ Coverage added/extended:
 - `src/application/assets/tests/AssetPreviewService.test.ts`
 - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+
+## Story 10.3.3 protected asset operation audit integration
+
+- Added shared best-effort asset audit publisher + sanitization helper:
+  - `src/application/assets/ports/AssetAuditPort.ts`
+- Updated protected asset services to emit structured audited outcomes and avoid path/content leakage in audit details:
+  - upload registration/initiation/finalization
+  - download authorization + protected stream-open
+  - preview resolution
+  - generated-output registration
+- Added lifecycle mutation use case for audited archive/delete operations:
+  - `src/application/assets/use-cases/AssetLifecycleService.ts`
+- Added authenticated lifecycle routes and backend methods:
+  - `POST /api/v1/assets/:assetId/archive`
+  - `POST /api/v1/assets/:assetId/delete`
+  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- Added SQLite-backed asset audit recorder + host wiring:
+  - `src/infrastructure/persistence/assets/SqliteAssetAuditRecorder.ts`
+  - `src/infrastructure/persistence/assets/SqliteAssetPersistenceMigrations.ts`
+  - `hosts/server/IdentityServerHost.ts`
+
+Audit posture in this story:
+
+- carries actor identity, workspace scope, asset identity, operation type, and coarse outcome metadata.
+- redacts path/token/content-like detail keys and trims nested audit metadata to avoid sensitive leakage.
+- remains best-effort so workflow success does not depend on audit persistence availability.
+
+Coverage added/extended:
+
+- `src/application/assets/tests/AssetAuditPort.test.ts`
+- `src/application/assets/tests/AssetLifecycleService.test.ts`
+- `src/infrastructure/persistence/assets/tests/SqliteAssetAuditRecorder.test.ts`
+- updated:
+  - `src/shared/contracts/assets/tests/AssetTransportContracts.test.ts`
+  - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+  - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`

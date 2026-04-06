@@ -35,6 +35,7 @@ import {
 } from "../../../domain/security/EncryptionAtRestPolicyDomain";
 import { DeterministicScopeEncryptionKeyPort } from "../../../infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
 import { AesGcmAssetContentCipherPort } from "../../../infrastructure/security/encryption/AesGcmAssetContentCipherPort";
+import type { AssetAuditEvent, AssetAuditSink } from "../ports/AssetAuditPort";
 
 class InMemoryAssetRepository implements IAssetRepository {
   public constructor(private readonly asset: Asset) {}
@@ -206,6 +207,14 @@ class InMemoryDownloadGrantPort implements IAssetDownloadGrantPort {
       return undefined;
     }
     return claim;
+  }
+}
+
+class RecordingAuditSink implements AssetAuditSink {
+  public readonly events: AssetAuditEvent[] = [];
+
+  public async recordAssetEvent(event: AssetAuditEvent): Promise<void> {
+    this.events.push(event);
   }
 }
 
@@ -522,6 +531,55 @@ describe("AssetDownloadService", () => {
       return;
     }
     expect(outcome.error.code).toBe("asset-policy-violation");
+  });
+
+  it("emits audit events for download authorization and stream-open outcomes", async () => {
+    const workspaceAuthorization = new WorkspaceAuthorizationRepository();
+    const grantPort = new InMemoryDownloadGrantPort();
+    const auditSink = new RecordingAuditSink();
+    const encryption = createEncryptionDependencies({
+      contentEncryptionRequired: false,
+    });
+    const service = new AssetDownloadService({
+      repository: new InMemoryAssetRepository(createTestAsset()),
+      workspaceAuthorizationReadRepository: workspaceAuthorization,
+      storageLogicalAccessResolutionService: new StubStorageLogicalAccessResolutionService(),
+      downloadGrantPort: grantPort,
+      encryptionPolicyEvaluationService: encryption.encryptionPolicyEvaluationService,
+      assetContentCipherPort: encryption.assetContentCipherPort,
+      auditSink,
+    });
+
+    const authorization = await service.authorizeAssetDownload({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-download-001",
+      purpose: AssetDownloadPurposes.download,
+    });
+    expect(authorization.ok).toBeTrue();
+    if (!authorization.ok) {
+      return;
+    }
+
+    const streamResult = await service.openAuthorizedAssetDownloadStream({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-download-001",
+      contentToken: authorization.value.contentToken,
+    });
+    expect(streamResult.ok).toBeTrue();
+
+    const failedStream = await service.openAuthorizedAssetDownloadStream({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-download-001",
+      contentToken: "invalid-token",
+    });
+    expect(failedStream.ok).toBeFalse();
+
+    expect(auditSink.events.some((event) => event.type === "asset-download-authorized" && event.outcome === "success")).toBeTrue();
+    expect(auditSink.events.some((event) => event.type === "asset-download-opened" && event.outcome === "success")).toBeTrue();
+    expect(auditSink.events.some((event) => event.type === "asset-download-opened" && event.outcome === "rejected")).toBeTrue();
   });
 });
 

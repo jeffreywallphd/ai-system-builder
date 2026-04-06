@@ -11,7 +11,10 @@ import {
 import { StorageLogicalAccessOperationIntents } from "../../storage/use-cases/StorageLogicalAccessResolutionServiceContracts";
 import type { IStorageLogicalAccessResolutionService } from "../../storage/use-cases/StorageLogicalAccessResolutionServiceContracts";
 import type { IWorkspaceAuthorizationReadRepository } from "../../workspaces/ports/IWorkspaceAuthorizationReadRepository";
-import type { AssetAuditSink } from "../ports/AssetAuditPort";
+import {
+  publishAssetAuditEventBestEffort,
+  type AssetAuditSink,
+} from "../ports/AssetAuditPort";
 import type { IAssetContentCipherPort } from "../ports/AssetContentCipherPort";
 import type { IAssetDownloadGrantPort } from "../ports/AssetDownloadGrantPort";
 import type { IAssetRepository } from "../ports/IAssetRepository";
@@ -69,6 +72,21 @@ export class AssetDownloadService {
       occurredAt,
     );
     if (!authorization.isAuthorized) {
+      await this.publishAuditEvent({
+        type: "asset-download-authorized",
+        occurredAt,
+        workspaceId: request.workspaceId,
+        actorUserId: request.actorUserId,
+        correlationId: request.correlationId,
+        outcome: "rejected",
+        asset: {
+          assetId: request.assetId,
+        },
+        details: Object.freeze({
+          reasonCode: AssetServiceErrorCodes.accessDenied,
+          purpose: request.purpose,
+        }),
+      });
       return this.failure(
         AssetServiceErrorCodes.accessDenied,
         "Asset download authorization requires active workspace membership.",
@@ -182,6 +200,7 @@ export class AssetDownloadService {
       workspaceId: request.workspaceId,
       actorUserId: request.actorUserId,
       correlationId: request.correlationId,
+      outcome: "success",
       asset: {
         assetId: asset.id,
         kind: asset.kind,
@@ -233,6 +252,20 @@ export class AssetDownloadService {
       occurredAt,
     );
     if (!authorization.isAuthorized) {
+      await this.publishAuditEvent({
+        type: "asset-download-opened",
+        occurredAt,
+        workspaceId: request.workspaceId,
+        actorUserId: request.actorUserId,
+        correlationId: request.correlationId,
+        outcome: "rejected",
+        asset: {
+          assetId: request.assetId,
+        },
+        details: Object.freeze({
+          reasonCode: AssetServiceErrorCodes.accessDenied,
+        }),
+      });
       return this.failure(
         AssetServiceErrorCodes.accessDenied,
         "Asset download requires active workspace membership.",
@@ -247,6 +280,20 @@ export class AssetDownloadService {
       occurredAt,
     });
     if (!grant) {
+      await this.publishAuditEvent({
+        type: "asset-download-opened",
+        occurredAt,
+        workspaceId: request.workspaceId,
+        actorUserId: request.actorUserId,
+        correlationId: request.correlationId,
+        outcome: "rejected",
+        asset: {
+          assetId: request.assetId,
+        },
+        details: Object.freeze({
+          reasonCode: "invalid-download-grant",
+        }),
+      });
       return this.failure(
         AssetServiceErrorCodes.accessDenied,
         "Download authorization token is invalid or expired.",
@@ -342,6 +389,25 @@ export class AssetDownloadService {
       const contentDisposition = grant.purpose === AssetDownloadPurposes.inlinePreview
         ? "inline"
         : "attachment";
+      await this.publishAuditEvent({
+        type: "asset-download-opened",
+        occurredAt,
+        workspaceId: request.workspaceId,
+        actorUserId: request.actorUserId,
+        correlationId: request.correlationId,
+        outcome: "success",
+        asset: {
+          assetId: asset.id,
+          kind: asset.kind,
+          visibility: asset.visibility,
+          lifecycleState: asset.lifecycle.state,
+          versionId: targetVersion.versionId,
+        },
+        details: Object.freeze({
+          purpose: grant.purpose,
+          contentDisposition,
+        }),
+      });
 
       return {
         ok: true,
@@ -477,14 +543,7 @@ export class AssetDownloadService {
   }
 
   private async publishAuditEvent(event: Parameters<AssetAuditSink["recordAssetEvent"]>[0]): Promise<void> {
-    if (!this.dependencies.auditSink) {
-      return;
-    }
-    try {
-      await this.dependencies.auditSink.recordAssetEvent(event);
-    } catch {
-      // best effort
-    }
+    await publishAssetAuditEventBestEffort(this.dependencies.auditSink, event);
   }
 }
 

@@ -13,6 +13,7 @@ import type { IStorageInstanceRepository } from "../../storage/ports/IStorageIns
 import type { IStoragePolicyEvaluationPort } from "../../storage/ports/StoragePolicyEvaluationPort";
 import type { Asset } from "../../../domain/assets/AssetDomain";
 import { AssetGeneratedOutputRegistrationService } from "../use-cases/AssetGeneratedOutputRegistrationService";
+import type { AssetAuditEvent, AssetAuditSink } from "../ports/AssetAuditPort";
 
 class InMemoryAssetRepository implements IAssetRepository {
   private readonly records = new Map<string, Asset>();
@@ -184,7 +185,15 @@ class StoragePolicyPort implements IStoragePolicyEvaluationPort {
   }
 }
 
-function buildService() {
+class RecordingAuditSink implements AssetAuditSink {
+  public readonly events: AssetAuditEvent[] = [];
+
+  public async recordAssetEvent(event: AssetAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
+function buildService(auditSink?: AssetAuditSink) {
   const repository = new InMemoryAssetRepository();
   const workspaceAuthorizationReadRepository = new WorkspaceAuthorizationRepository();
   const storageInstanceRepository = new StorageRepository();
@@ -194,6 +203,7 @@ function buildService() {
     workspaceAuthorizationReadRepository,
     storageInstanceRepository,
     storagePolicyEvaluationPort,
+    auditSink,
     clock: {
       now: () => new Date("2026-04-06T12:00:00.000Z"),
     },
@@ -332,5 +342,42 @@ describe("AssetGeneratedOutputRegistrationService", () => {
       return;
     }
     expect(denied.error.code).toBe("asset-access-denied");
+  });
+
+  it("emits audit events for generated output registration", async () => {
+    const auditSink = new RecordingAuditSink();
+    const { service } = buildService(auditSink);
+
+    const outcome = await service.registerGeneratedOutput({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      operationKey: "asset:output:register:4",
+      assetId: "asset-generated-004",
+      storageInstanceId: "storage-alpha",
+      outputVersion: {
+        versionId: "asset-generated-004:v1",
+        storageInstanceId: "storage-alpha",
+        objectKey: "workspaces/workspace-alpha/assets/asset-generated-004/output/v1/result.png",
+        area: "output",
+        content: {
+          mimeType: "image/png",
+          sizeBytes: 64,
+          checksum: {
+            algorithm: "sha256",
+            digest: "d".repeat(64),
+          },
+        },
+      },
+      source: {
+        producerType: "system",
+        systemId: "system-render",
+      },
+      lineage: [],
+    });
+
+    expect(outcome.ok).toBeTrue();
+    expect(auditSink.events).toHaveLength(1);
+    expect(auditSink.events[0]?.type).toBe("asset-generated-output-registered");
+    expect(auditSink.events[0]?.outcome).toBe("success");
   });
 });

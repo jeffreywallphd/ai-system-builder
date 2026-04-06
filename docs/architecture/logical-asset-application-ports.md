@@ -381,3 +381,47 @@ Added/extended coverage:
 - `src/application/assets/tests/AssetPreviewService.test.ts`
 - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+
+## Story 10.3.3: protected asset operation audit integration
+
+Added structured asset-audit integration for high-value protected asset operations through application seams and host composition:
+
+- Added best-effort publish + sanitization helper for asset audit events:
+  - `src/application/assets/ports/AssetAuditPort.ts`
+- Updated high-value asset services to emit structured outcomes (`success` / `rejected` / `already-applied`) and avoid raw path/content leakage:
+  - upload registration/initiation/finalization
+  - download authorization + protected stream-open
+  - preview resolution
+  - generated-output registration
+  - `src/application/assets/use-cases/AssetUploadInitiationService.ts`
+  - `src/application/assets/use-cases/AssetUploadIngestionService.ts`
+  - `src/application/assets/use-cases/AssetDownloadService.ts`
+  - `src/application/assets/use-cases/AssetPreviewService.ts`
+  - `src/application/assets/use-cases/AssetGeneratedOutputRegistrationService.ts`
+- Added asset lifecycle mutation use case so archive/delete actions emit authoritative audit events:
+  - `src/application/assets/use-cases/AssetLifecycleService.ts`
+- Added API/transport lifecycle operations:
+  - `POST /api/v1/assets/:assetId/archive`
+  - `POST /api/v1/assets/:assetId/delete`
+  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- Added persistent SQLite asset audit recorder and host wiring:
+  - `src/infrastructure/persistence/assets/SqliteAssetAuditRecorder.ts`
+  - `src/infrastructure/persistence/assets/SqliteAssetPersistenceMigrations.ts` (asset audit event table/indexes)
+  - `hosts/server/IdentityServerHost.ts`
+
+Audit payload posture in this story:
+
+- includes actor identity, workspace context, asset id, operation type, correlation/operation keys, and coarse outcome metadata.
+- excludes raw filesystem paths, logical object keys, secret/token/content-like details through publish-time sanitization.
+- preserves best-effort behavior: protected asset workflows continue when audit persistence fails.
+
+Added/extended coverage:
+
+- `src/application/assets/tests/AssetAuditPort.test.ts`
+- `src/application/assets/tests/AssetLifecycleService.test.ts`
+- `src/infrastructure/persistence/assets/tests/SqliteAssetAuditRecorder.test.ts`
+- updated:
+  - `src/shared/contracts/assets/tests/AssetTransportContracts.test.ts`
+  - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+  - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`

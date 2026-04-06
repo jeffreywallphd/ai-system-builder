@@ -271,3 +271,29 @@ export interface ResolveAssetPreviewApiRequest {
 export interface ResolveAssetPreviewApiResponse {
   readonly preview: AssetPreviewResolutionDto;
 }
+
+export interface ArchiveAssetApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly assetId: string;
+  readonly operationKey?: string;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+}
+
+export interface ArchiveAssetApiResponse {
+  readonly asset: AssetDetailDto;
+}
+
+export interface DeleteAssetApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly assetId: string;
+  readonly operationKey?: string;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+}
+
+export interface DeleteAssetApiResponse {
+  readonly asset: AssetDetailDto;
+}

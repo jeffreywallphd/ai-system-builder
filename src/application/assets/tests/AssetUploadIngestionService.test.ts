@@ -34,6 +34,7 @@ import {
 } from "../../storage/use-cases/StorageLogicalAccessResolutionServiceContracts";
 import type { IStorageObjectPort } from "../../storage/ports/StorageObjectPort";
 import { AssetUploadIngestionService } from "../use-cases/AssetUploadIngestionService";
+import type { AssetAuditEvent, AssetAuditSink } from "../ports/AssetAuditPort";
 import type { IEncryptionAtRestPolicyContextResolverPort } from "../../security/ports/EncryptionAtRestPolicyEvaluationPorts";
 import { EncryptionPolicyEvaluationService } from "../../security/use-cases/EncryptionPolicyEvaluationService";
 import { EncryptionKeyResolutionService } from "../../security/use-cases/EncryptionKeyResolutionService";
@@ -88,6 +89,14 @@ class InMemoryUploadSessionRepository implements IAssetUploadSessionRepository {
 
   public async saveUploadSession(session: AssetUploadSessionRecord): Promise<void> {
     this.records.set(session.uploadSessionId, session);
+  }
+}
+
+class RecordingAuditSink implements AssetAuditSink {
+  public readonly events: AssetAuditEvent[] = [];
+
+  public async recordAssetEvent(event: AssetAuditEvent): Promise<void> {
+    this.events.push(event);
   }
 }
 
@@ -603,5 +612,58 @@ describe("AssetUploadIngestionService", () => {
     const latestVersion = persisted?.versions[persisted.versions.length - 1];
     expect(latestVersion?.content.encryption?.format).toBe("asset-content/aes-256-gcm/v1");
     expect(latestVersion?.content.encryption?.keyReferenceId).toContain("kek:asset-content:test");
+  });
+
+  it("emits upload-finalized audit events for success and rejected outcomes", async () => {
+    const auditSink = new RecordingAuditSink();
+    const assetRepository = new InMemoryAssetRepository();
+    const uploadSessionRepository = new InMemoryUploadSessionRepository();
+    const objectPort = new InMemoryStorageObjectPort();
+    const storage = createStorage();
+    const encryption = createEncryptionDependencies(false);
+    await seedAsset(assetRepository);
+    await seedPendingSession(uploadSessionRepository, 11);
+
+    const service = new AssetUploadIngestionService({
+      repository: assetRepository,
+      uploadSessionRepository,
+      storageLogicalAccessResolutionService: new StubStorageLogicalAccessResolutionService({
+        ok: true,
+        value: {
+          intent: StorageLogicalAccessOperationIntents.writeObject,
+          storageInstance: storage,
+          objectPort,
+          occurredAt: "2026-04-06T12:00:00.000Z",
+        },
+      }),
+      ...encryption,
+      auditSink,
+      clock: {
+        now: () => new Date("2026-04-06T12:00:00.000Z"),
+      },
+    });
+
+    const successful = await service.ingestUploadContent({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      operationKey: "asset:upload:finalize:audit",
+      uploadSessionId: "asset-upload-session:test-001",
+      contentType: "application/octet-stream",
+      content: toContent(["hello world"]),
+    });
+    expect(successful.ok).toBeTrue();
+
+    const failed = await service.ingestUploadContent({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      operationKey: "asset:upload:finalize:audit-failed",
+      uploadSessionId: "asset-upload-session:test-001",
+      contentType: "application/octet-stream",
+      content: toContent(["hello world"]),
+    });
+    expect(failed.ok).toBeFalse();
+
+    expect(auditSink.events.some((event) => event.type === "asset-upload-finalized" && event.outcome === "success")).toBeTrue();
+    expect(auditSink.events.some((event) => event.type === "asset-upload-finalized" && event.outcome !== "success")).toBeTrue();
   });
 });

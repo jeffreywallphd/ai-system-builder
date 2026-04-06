@@ -126,6 +126,7 @@ export interface AssetAuditEventPayloadDto {
   readonly actorUserId: string;
   readonly correlationId?: string;
   readonly operationKey?: string;
+  readonly outcome?: "success" | "rejected" | "already-applied";
   readonly asset: {
     readonly assetId: string;
     readonly kind?: string;
@@ -336,6 +337,7 @@ export function toAssetAuditEventPayloadDto(event: AssetAuditEvent): AssetAuditE
     actorUserId: event.actorUserId,
     correlationId: event.correlationId,
     operationKey: event.operationKey,
+    outcome: event.outcome,
     asset: Object.freeze({
       assetId: event.asset.assetId,
       kind: event.asset.kind,
