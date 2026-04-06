@@ -41,7 +41,7 @@ import {
   resolveDesktopTrustedDeviceTransportBootstrap,
   type DesktopTrustedDeviceTransportBootstrapState,
 } from "../../security/DesktopTrustedDeviceTransportBootstrap";
-import type { IdentityAuthClient } from "../../../ui/shared/identity/IdentityAuthClient";
+import type { IdentityAuthClient } from "../../../../ui/shared/identity/IdentityAuthClient";
 
 export class DesktopTrustedDeviceIdentityAuthClient implements IdentityAuthClient {
   public constructor(
