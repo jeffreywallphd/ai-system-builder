@@ -12,6 +12,7 @@ import {
 } from "../../../../src/domain/assets/AssetDomain";
 import { AssetManagementBackendApi } from "../AssetManagementBackendApi";
 import { AssetUploadInitiationService } from "../../../../src/application/assets/use-cases/AssetUploadInitiationService";
+import { AssetUploadIngestionService } from "../../../../src/application/assets/use-cases/AssetUploadIngestionService";
 
 class StubAssetUploadInitiationService {
   private readonly asset: Asset = createAsset({
@@ -83,10 +84,67 @@ class StubAssetUploadInitiationService {
   }
 }
 
+class StubAssetUploadIngestionService {
+  private readonly asset: Asset = createAsset({
+    id: "asset-upload-001",
+    kind: AssetKinds.uploadedFile,
+    ownership: createAssetOwnershipMetadata({
+      workspaceId: "workspace-alpha",
+      ownerUserId: "user-owner",
+      createdBy: "user-owner",
+      createdAt: "2026-04-06T12:00:00.000Z",
+    }),
+    visibility: AssetVisibilities.private,
+    storageBinding: createStorageInstanceRef({
+      storageInstanceId: "storage-alpha",
+    }),
+    initialVersion: createAssetVersion({
+      versionId: "asset-upload-001:v1",
+      revision: 1,
+      location: createAssetLocationRef({
+        storageInstance: { storageInstanceId: "storage-alpha" },
+        objectKey: "workspaces/workspace-alpha/assets/asset-upload-001/input/v1/image.png",
+        area: "input",
+      }),
+      content: createContentDescriptor({
+        mimeType: "image/png",
+        sizeBytes: 128,
+        checksum: {
+          algorithm: "sha256",
+          digest: "a".repeat(64),
+        },
+      }),
+      createdBy: "user-owner",
+      createdAt: "2026-04-06T12:00:00.000Z",
+    }),
+  });
+
+  public async ingestUploadContent() {
+    return {
+      ok: true as const,
+      value: {
+        asset: this.asset,
+        uploadSessionId: "asset-upload-session:test-001",
+        finalizedVersionId: "asset-upload-001:v2",
+        content: {
+          mimeType: "application/octet-stream",
+          sizeBytes: 5,
+          checksum: {
+            algorithm: "sha256" as const,
+            digest: "a".repeat(64),
+          },
+          originalFileName: "file.bin",
+        },
+      },
+    };
+  }
+}
+
 describe("AssetManagementBackendApi", () => {
   it("returns register and initiate upload DTOs for successful requests", async () => {
     const backendApi = new AssetManagementBackendApi({
       uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
+      uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
     });
 
     const registered = await backendApi.registerAsset({
@@ -133,11 +191,27 @@ describe("AssetManagementBackendApi", () => {
     }
     expect(initiated.data.upload.uploadEndpoint).toContain("/api/v1/assets/upload-sessions/");
     expect(initiated.data.upload.uploadMethod).toBe("POST");
+
+    const ingested = await backendApi.ingestAssetUploadContent({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      uploadSessionId: "asset-upload-session:test-001",
+      contentType: "application/octet-stream",
+      content: (async function* payload() {
+        yield Buffer.from("hello", "utf8");
+      })(),
+    });
+    expect(ingested.ok).toBeTrue();
+    if (!ingested.ok || !ingested.data) {
+      return;
+    }
+    expect(ingested.data.finalizedVersionId).toBe("asset-upload-001:v2");
   });
 
   it("returns invalid-request for missing actor identity", async () => {
     const backendApi = new AssetManagementBackendApi({
       uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
+      uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
     });
 
     const response = await backendApi.initiateAssetUpload({

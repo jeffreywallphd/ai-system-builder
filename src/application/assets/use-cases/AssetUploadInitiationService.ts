@@ -26,6 +26,7 @@ import {
 } from "../../storage/ports/StoragePolicyEvaluationPort";
 import type { IWorkspaceAuthorizationReadRepository } from "../../workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import type { IAssetRepository } from "../ports/IAssetRepository";
+import type { IAssetUploadSessionRepository } from "../ports/IAssetUploadSessionRepository";
 import type { AssetAuditSink } from "../ports/AssetAuditPort";
 import {
   AssetServiceErrorCodes,
@@ -40,6 +41,7 @@ import {
 
 export interface AssetUploadInitiationServiceDependencies {
   readonly repository: IAssetRepository;
+  readonly uploadSessionRepository: IAssetUploadSessionRepository;
   readonly workspaceAuthorizationReadRepository: IWorkspaceAuthorizationReadRepository;
   readonly storageInstanceRepository: IStorageInstanceRepository;
   readonly storagePolicyEvaluationPort: IStoragePolicyEvaluationPort;
@@ -247,6 +249,24 @@ export class AssetUploadInitiationService {
         request.fileName,
         request.area ?? "input",
       );
+      await this.dependencies.uploadSessionRepository.createUploadSession(Object.freeze({
+        uploadSessionId: sessionId,
+        workspaceId: request.workspaceId,
+        assetId: request.assetId,
+        actorUserId: request.actorUserId,
+        storageInstanceId: request.storageInstanceId,
+        objectKey,
+        area: request.area ?? "input",
+        expected: Object.freeze({
+          fileName: request.fileName,
+          mimeType: request.mimeType,
+          sizeBytes: request.sizeBytes,
+        }),
+        status: "pending",
+        expiresAt,
+        createdAt: now,
+        updatedAt: now,
+      }));
 
       await this.publishAuditEvent({
         type: "asset-upload-initiated",

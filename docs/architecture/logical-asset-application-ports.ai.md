@@ -113,3 +113,29 @@ Coverage added:
 - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
 
+
+## Story 10.2.2 protected ingestion/finalization update
+
+- Added authoritative upload-session persistence contract and adapter:
+  - `src/application/assets/ports/IAssetUploadSessionRepository.ts`
+  - `src/infrastructure/persistence/assets/SqliteAssetUploadSessionPersistenceAdapter.ts`
+- Added stream-based ingestion/finalization use case:
+  - `src/application/assets/use-cases/AssetUploadIngestionService.ts`
+- Extended backend API and transport contracts with content ingestion support:
+  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+  - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+
+Operational behavior in this story:
+
+- Upload initiation now persists a pending upload-session record with server-authorized object key, expected content metadata, and expiration.
+- Upload content is ingested as a stream (`POST /api/v1/assets/upload-sessions/:uploadSessionId/content`) and written through resolved `IStorageObjectPort` adapters.
+- Finalization only updates asset metadata/version state after successful storage write and descriptor resolution (size/checksum/mime).
+- Oversized or interrupted uploads are marked `incomplete`; asset version metadata is not advanced.
+- Best-effort object cleanup is attempted when write/finalization fails.
+
+Coverage added for this story:
+
+- `src/application/assets/tests/AssetUploadIngestionService.test.ts`
+- `src/infrastructure/persistence/assets/tests/SqliteAssetUploadSessionPersistenceAdapter.test.ts`
+- extended API/transport tests for upload-session content routes.

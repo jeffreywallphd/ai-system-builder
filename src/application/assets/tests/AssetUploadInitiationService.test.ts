@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { IAssetRepository } from "../ports/IAssetRepository";
+import type { IAssetUploadSessionRepository } from "../ports/IAssetUploadSessionRepository";
 import {
   StorageAccessModes,
   StorageAccessScopes,
@@ -56,6 +57,28 @@ class InMemoryAssetRepository implements IAssetRepository {
 
   public async replaceAssetLineage(): Promise<void> {
     return;
+  }
+}
+
+class InMemoryAssetUploadSessionRepository implements IAssetUploadSessionRepository {
+  public readonly records = new Map<string, Parameters<IAssetUploadSessionRepository["createUploadSession"]>[0]>();
+
+  public async createUploadSession(
+    session: Parameters<IAssetUploadSessionRepository["createUploadSession"]>[0],
+  ): Promise<void> {
+    this.records.set(session.uploadSessionId, session);
+  }
+
+  public async findUploadSessionById(
+    uploadSessionId: string,
+  ): Promise<Awaited<ReturnType<IAssetUploadSessionRepository["findUploadSessionById"]>>> {
+    return this.records.get(uploadSessionId);
+  }
+
+  public async saveUploadSession(
+    session: Parameters<IAssetUploadSessionRepository["saveUploadSession"]>[0],
+  ): Promise<void> {
+    this.records.set(session.uploadSessionId, session);
   }
 }
 
@@ -177,11 +200,13 @@ class StoragePolicyPort implements IStoragePolicyEvaluationPort {
 
 function buildService() {
   const repository = new InMemoryAssetRepository();
+  const uploadSessionRepository = new InMemoryAssetUploadSessionRepository();
   const workspaceAuthorizationReadRepository = new WorkspaceAuthorizationRepository();
   const storageInstanceRepository = new StorageRepository();
   const storagePolicyEvaluationPort = new StoragePolicyPort();
   const service = new AssetUploadInitiationService({
     repository,
+    uploadSessionRepository,
     workspaceAuthorizationReadRepository,
     storageInstanceRepository,
     storagePolicyEvaluationPort,
@@ -196,6 +221,7 @@ function buildService() {
   return {
     service,
     repository,
+    uploadSessionRepository,
     workspaceAuthorizationReadRepository,
     storageInstanceRepository,
     storagePolicyEvaluationPort,
@@ -242,7 +268,7 @@ async function seedAsset(repository: InMemoryAssetRepository): Promise<Asset> {
 
 describe("AssetUploadInitiationService", () => {
   it("registers an asset and initiates upload for an authorized user", async () => {
-    const { service, repository } = buildService();
+    const { service, repository, uploadSessionRepository } = buildService();
 
     const registered = await service.registerAsset({
       actorUserId: "user-owner",
@@ -294,6 +320,9 @@ describe("AssetUploadInitiationService", () => {
     expect(initiated.value.upload.uploadSessionId).toContain("asset-upload-session:");
     expect(initiated.value.upload.uploadEndpoint).toContain("/api/v1/assets/upload-sessions/");
     expect(initiated.value.upload.objectKey).toContain("workspaces/workspace-alpha/assets/asset-upload-001/input");
+    const session = uploadSessionRepository.records.get(initiated.value.upload.uploadSessionId);
+    expect(session?.status).toBe("pending");
+    expect(session?.expected.sizeBytes).toBe(512);
   });
 
   it("rejects upload initiation when workspace membership is missing", async () => {

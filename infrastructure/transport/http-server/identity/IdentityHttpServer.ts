@@ -101,6 +101,7 @@ import {
 import {
   AssetManagementApiErrorCodes,
   type AssetManagementApiResponse,
+  type IngestAssetUploadContentApiRequest,
   type InitiateAssetUploadApiRequest,
   type RegisterAssetApiRequest,
 } from "../../../api/assets/sdk/PublicAssetManagementApiContract";
@@ -3624,6 +3625,65 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         );
         return;
       }
+      if (
+        options.assetManagementBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/assets/upload-sessions/")
+        && path.endsWith("/content")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            const uploadSessionId = decodePathTail(path, "/api/v1/assets/upload-sessions/", "/content");
+            if (!workspaceId || !uploadSessionId) {
+              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and uploadSessionId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const contentLength = parseOptionalInteger(
+              typeof request.headers["content-length"] === "string" ? request.headers["content-length"] : null,
+            );
+            if (typeof contentLength === "number" && contentLength > maxBodyBytes) {
+              const invalid = buildAssetManagementInvalidRequestResponse(
+                `Request body exceeds limit of ${maxBodyBytes} bytes.`,
+              );
+              writeJson(response, 413, invalid);
+              logResponse(logger, requestId, request, 413, Object.freeze({
+                workspaceId,
+                uploadSessionId,
+                contentLength,
+              }), invalid);
+              return;
+            }
+
+            const parsedRequest = parseAssetUploadContentRequest(
+              request,
+              context.principal.userIdentityId,
+              workspaceId,
+              uploadSessionId,
+            );
+
+            const apiResponse = await options.assetManagementBackendApi.ingestAssetUploadContent(parsedRequest);
+            const statusCode = mapAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, {
+              actorUserIdentityId: parsedRequest.actorUserIdentityId,
+              workspaceId: parsedRequest.workspaceId,
+              uploadSessionId: parsedRequest.uploadSessionId,
+              contentType: parsedRequest.contentType,
+            }, apiResponse);
+          },
+        );
+        return;
+      }
 
       if (
         options.authorizationManagementBackendApi
@@ -7116,6 +7176,31 @@ async function parseAndValidateAssetUploadInitiationRequest(
       assetId,
     }) as InitiateAssetUploadApiRequest,
   };
+}
+
+function parseAssetUploadContentRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  workspaceId: string,
+  uploadSessionId: string,
+): IngestAssetUploadContentApiRequest {
+  const contentType = typeof request.headers["content-type"] === "string"
+    ? request.headers["content-type"].trim()
+    : undefined;
+
+  return Object.freeze({
+    actorUserIdentityId,
+    workspaceId,
+    uploadSessionId,
+    contentType: contentType && contentType.length > 0 ? contentType : undefined,
+    content: toRequestBodyStream(request),
+  });
+}
+
+async function* toRequestBodyStream(request: IncomingMessage): AsyncIterable<Uint8Array> {
+  for await (const chunk of request) {
+    yield Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+  }
 }
 
 async function parseJsonBody(

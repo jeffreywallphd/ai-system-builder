@@ -51,3 +51,12 @@ Story 10.1.4 extends this slice with logical object read/write operations for ma
 
 `ServerManagedLocalStorageBackendAdapter.test.ts` covers success, idempotency, unsupported backend rejection, filesystem failure mapping, and binding-health capability inspection.
 `ServerManagedLocalStorageObjectAdapter.test.ts` covers logical key normalization/partitioning, write/read/stream/delete behavior, and stable application-safe error mapping.
+
+## Story 10.2.2 host-composition update
+
+- Identity server host now composes the local backend adapter registry with both provisioning and object adapters so asset upload ingestion can resolve managed `writeObject` operations through the storage abstraction.
+- Managed storage root path is now host-configurable via:
+  - `AI_LOOM_STORAGE_MANAGED_ROOT_PATH`
+  - default fallback: `{dirname(databasePath)}/runtime-assets/managed-storage`
+
+This keeps upload ingestion path-safe and adapter-mediated while avoiding raw filesystem path contracts in API/application layers.
