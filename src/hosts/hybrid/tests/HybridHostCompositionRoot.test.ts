@@ -19,6 +19,10 @@ import {
 } from "../HybridHostCompositionRoot";
 import type { HostServiceRegistrationPlan } from "../../../infrastructure/config/HostServiceRegistration";
 import { HostServiceRegistrationError } from "../../../infrastructure/config/HostServiceRegistration";
+import {
+  HostDeploymentProfileIds,
+  HostStartupEnvironmentKeys,
+} from "../../../infrastructure/config/HostStartupConfiguration";
 
 describe("HybridHostCompositionRoot", () => {
   it("composes and stops hybrid host runtime with lifecycle transitions", async () => {
@@ -233,5 +237,40 @@ describe("HybridHostCompositionRoot", () => {
 
     await expect(root.compose(boot)).rejects.toThrow(HostServiceRegistrationError);
     expect(started).toBeFalse();
+  });
+
+  it("resolves deployment profile through shared startup configuration", async () => {
+    let observedProfileId: string | undefined;
+    let observedEnvironmentName: string | undefined;
+    const root = createHybridCompositionRoot({
+      startHost: async () => ({
+        close: async () => {},
+      }),
+      bootstrap: {
+        stageHandlers: {
+          [HostBootstrapStageIds.configuration]: (context) => {
+            observedProfileId = context.deploymentProfile.profileId;
+            observedEnvironmentName = context.deploymentProfile.environmentName;
+          },
+        },
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: HybridHostRuntime,
+      mode: "cold-start",
+      startupReason: "hybrid-startup-config-resolution-test",
+      requiredDependencyIds: ["dep:application:hybrid-orchestration-services"],
+      environment: {
+        [HostStartupEnvironmentKeys.deploymentProfile]: HostDeploymentProfileIds.home,
+        [HostStartupEnvironmentKeys.environmentName]: "development",
+      },
+    });
+
+    const runtime = await root.compose(boot);
+    expect(observedProfileId).toBe(HostDeploymentProfileIds.home);
+    expect(observedEnvironmentName).toBe("development");
+    expect(runtime.enabledCapabilities).toContain(HostCapabilityFlags.nodeExecution);
+    await runtime.stop();
   });
 });

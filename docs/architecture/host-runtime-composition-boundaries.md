@@ -135,6 +135,20 @@ Each catalog entry contains explicit responsibilities, capability flags, and sta
 
 The authoritative server composition root now consumes this pipeline to keep host startup order explicit and reusable while preserving clean boundary ownership.
 
+## Shared deployment-profile-aware startup configuration (story 12.3.3)
+
+`src/infrastructure/config/HostStartupConfiguration.ts` now centralizes runtime startup configuration resolution for server, desktop, hybrid, web, and worker roots:
+
+- shared deployment profile contract constrained to `home`, `classroom`, and `organization`
+- shared environment keys for profile/environment/channel/region/capability resolution:
+  - `AI_LOOM_DEPLOYMENT_PROFILE`
+  - `AI_LOOM_ENVIRONMENT_NAME`
+  - `AI_LOOM_RELEASE_CHANNEL`
+  - `AI_LOOM_DEPLOYMENT_REGION`
+  - `AI_LOOM_ENABLED_CAPABILITIES`
+- centralized validation for startup environment name, release channel, and host-capability enablement boundaries
+- one `resolveHostStartupConfiguration(...)` path so deployment profile choices remain explicit and testable across all host assemblies without architecture forking
+
 ## Unified lifecycle coordination (story 12.3.1)
 
 Host lifecycle management is now shared through `src/hosts/lifecycle/HostLifecycleCoordinator.ts`.
@@ -227,4 +241,5 @@ The contracts now explicitly state that:
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
 - `src/hosts/lifecycle/tests/HostLifecycleCoordinator.test.ts`
 - `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
+- `src/infrastructure/config/tests/HostStartupConfiguration.test.ts`
 

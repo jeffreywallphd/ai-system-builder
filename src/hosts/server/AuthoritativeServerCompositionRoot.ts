@@ -10,7 +10,6 @@ import {
 import { AuthoritativeServerHostRuntime } from "../HostRuntimeCatalog";
 import {
   HostBootstrapStageIds,
-  createHostDeploymentProfile,
   createHostStartupContext,
   composeHostBootstrapPipeline,
   executeHostBootstrapPipeline,
@@ -19,11 +18,13 @@ import {
   type HostSpecificBootstrapStage,
   type HostStartupLifecycleHooks,
 } from "../bootstrap/HostBootstrapPipeline";
+import type { HostCapabilityFlag } from "../../domain/hosts/HostRuntimeDomain";
 import {
   assertAuthoritativeControlPlaneServiceCoverage,
   composeHostServiceRegistrationPlan,
 } from "../../infrastructure/config/HostServiceRegistrationCatalog";
 import type { HostServiceRegistrationPlan } from "../../infrastructure/config/HostServiceRegistration";
+import { resolveHostStartupConfiguration } from "../../infrastructure/config/HostStartupConfiguration";
 import {
   startIdentityServerHost,
   type IdentityServerHost,
@@ -50,6 +51,7 @@ export interface AuthoritativeServerCompositionRootOptions {
       readonly metadata?: Readonly<Record<string, string | undefined>>;
     };
     readonly environment?: Readonly<Record<string, string | undefined>>;
+    readonly enabledCapabilities?: ReadonlyArray<HostCapabilityFlag>;
     readonly stageHandlers?: HostBootstrapReusableStageHandlers;
     readonly hostSpecificStages?: ReadonlyArray<HostSpecificBootstrapStage>;
     readonly lifecycleHooks?: HostStartupLifecycleHooks;
@@ -137,16 +139,13 @@ export function createAuthoritativeServerCompositionRoot(
       await lifecycle.markComposing("compose-authoritative-server-host");
 
       try {
-        const environment = input.bootstrap?.environment ?? input.hostOptions.env ?? process.env;
-        const deploymentProfile = createHostDeploymentProfile({
-          profileId: input.bootstrap?.deploymentProfile?.profileId ?? "deployment:host:server:authoritative",
-          environmentName: input.bootstrap?.deploymentProfile?.environmentName
-            ?? environment.NODE_ENV
-            ?? "development",
-          releaseChannel: input.bootstrap?.deploymentProfile?.releaseChannel
-            ?? (environment.NODE_ENV === "production" ? "stable" : "development"),
-          region: input.bootstrap?.deploymentProfile?.region,
-          metadata: input.bootstrap?.deploymentProfile?.metadata,
+        const startupConfiguration = resolveHostStartupConfiguration({
+          boot,
+          startup: {
+            deploymentProfile: input.bootstrap?.deploymentProfile,
+            environment: input.bootstrap?.environment ?? input.hostOptions.env ?? process.env,
+            enabledCapabilities: input.bootstrap?.enabledCapabilities,
+          },
         });
 
         const defaultStageHandlers: HostBootstrapReusableStageHandlers = {
@@ -203,8 +202,9 @@ export function createAuthoritativeServerCompositionRoot(
 
         const context = createHostStartupContext({
           boot,
-          deploymentProfile,
-          environment,
+          deploymentProfile: startupConfiguration.deploymentProfile,
+          environment: startupConfiguration.environment,
+          enabledCapabilities: startupConfiguration.enabledCapabilities,
           hostConfiguration: input.hostOptions,
           lifecycleHooks,
         });

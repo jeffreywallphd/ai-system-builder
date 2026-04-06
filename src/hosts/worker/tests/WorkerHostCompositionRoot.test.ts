@@ -18,6 +18,10 @@ import {
 } from "../WorkerHostCompositionRoot";
 import type { HostServiceRegistrationPlan } from "../../../infrastructure/config/HostServiceRegistration";
 import { HostServiceRegistrationError } from "../../../infrastructure/config/HostServiceRegistration";
+import {
+  HostDeploymentProfileIds,
+  HostStartupEnvironmentKeys,
+} from "../../../infrastructure/config/HostStartupConfiguration";
 
 describe("WorkerHostCompositionRoot", () => {
   it("composes and stops worker host runtime with lifecycle transitions", async () => {
@@ -231,5 +235,40 @@ describe("WorkerHostCompositionRoot", () => {
         close: async () => {},
       }),
     })).toThrow(HostCompositionContractError);
+  });
+
+  it("resolves deployment profile through shared startup configuration", async () => {
+    let observedProfileId: string | undefined;
+    let observedEnvironmentName: string | undefined;
+    const root = createWorkerCompositionRoot({
+      startHost: async () => ({
+        close: async () => {},
+      }),
+      bootstrap: {
+        stageHandlers: {
+          [HostBootstrapStageIds.configuration]: (context) => {
+            observedProfileId = context.deploymentProfile.profileId;
+            observedEnvironmentName = context.deploymentProfile.environmentName;
+          },
+        },
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: WorkerHostRuntime,
+      mode: "cold-start",
+      startupReason: "worker-startup-config-resolution-test",
+      requiredDependencyIds: ["dep:application:worker-execution-services"],
+      environment: {
+        [HostStartupEnvironmentKeys.deploymentProfile]: HostDeploymentProfileIds.organization,
+        [HostStartupEnvironmentKeys.environmentName]: "production",
+      },
+    });
+
+    const runtime = await root.compose(boot);
+    expect(observedProfileId).toBe(HostDeploymentProfileIds.organization);
+    expect(observedEnvironmentName).toBe("production");
+    expect(runtime.enabledCapabilities).toContain(HostCapabilityFlags.nodeExecution);
+    await runtime.stop();
   });
 });

@@ -9,7 +9,6 @@ import {
 import { DesktopHostRuntime } from "../HostRuntimeCatalog";
 import {
   HostBootstrapStageIds,
-  createHostDeploymentProfile,
   createHostStartupContext,
   composeHostBootstrapPipeline,
   executeHostBootstrapPipeline,
@@ -23,8 +22,10 @@ import {
   composeHostServiceRegistrationPlan,
 } from "../../infrastructure/config/HostServiceRegistrationCatalog";
 import type { HostServiceRegistrationPlan } from "../../infrastructure/config/HostServiceRegistration";
+import { resolveHostStartupConfiguration } from "../../infrastructure/config/HostStartupConfiguration";
 import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
 import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
+import type { HostCapabilityFlag } from "../../domain/hosts/HostRuntimeDomain";
 
 export interface DesktopRuntimeHost {
   close(): Promise<void>;
@@ -49,6 +50,7 @@ export interface DesktopCompositionRootOptions {
       readonly metadata?: Readonly<Record<string, string | undefined>>;
     };
     readonly environment?: Readonly<Record<string, string | undefined>>;
+    readonly enabledCapabilities?: ReadonlyArray<HostCapabilityFlag>;
     readonly stageHandlers?: HostBootstrapReusableStageHandlers;
     readonly hostSpecificStages?: ReadonlyArray<HostSpecificBootstrapStage>;
     readonly lifecycleHooks?: HostStartupLifecycleHooks;
@@ -131,16 +133,13 @@ export function createDesktopCompositionRoot(
       await lifecycle.markComposing("compose-desktop-host");
 
       try {
-        const environment = input.bootstrap?.environment ?? boot.environment;
-        const deploymentProfile = createHostDeploymentProfile({
-          profileId: input.bootstrap?.deploymentProfile?.profileId ?? "deployment:host:desktop:app-shell",
-          environmentName: input.bootstrap?.deploymentProfile?.environmentName
-            ?? environment.NODE_ENV
-            ?? "development",
-          releaseChannel: input.bootstrap?.deploymentProfile?.releaseChannel
-            ?? (environment.NODE_ENV === "production" ? "stable" : "development"),
-          region: input.bootstrap?.deploymentProfile?.region,
-          metadata: input.bootstrap?.deploymentProfile?.metadata,
+        const startupConfiguration = resolveHostStartupConfiguration({
+          boot,
+          startup: {
+            deploymentProfile: input.bootstrap?.deploymentProfile,
+            environment: input.bootstrap?.environment,
+            enabledCapabilities: input.bootstrap?.enabledCapabilities,
+          },
         });
 
         const hostOptions = Object.freeze({ ...(input.hostOptions ?? {}) });
@@ -195,8 +194,9 @@ export function createDesktopCompositionRoot(
 
         const context = createHostStartupContext({
           boot,
-          deploymentProfile,
-          environment,
+          deploymentProfile: startupConfiguration.deploymentProfile,
+          environment: startupConfiguration.environment,
+          enabledCapabilities: startupConfiguration.enabledCapabilities,
           hostConfiguration: hostOptions,
           lifecycleHooks,
         });

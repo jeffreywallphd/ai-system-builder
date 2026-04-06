@@ -11,7 +11,6 @@ import { HostCapabilityFlags, type HostCapabilityFlag } from "../../domain/hosts
 import { WorkerHostRuntime } from "../HostRuntimeCatalog";
 import {
   HostBootstrapStageIds,
-  createHostDeploymentProfile,
   createHostStartupContext,
   composeHostBootstrapPipeline,
   executeHostBootstrapPipeline,
@@ -25,6 +24,7 @@ import {
   composeHostServiceRegistrationPlan,
 } from "../../infrastructure/config/HostServiceRegistrationCatalog";
 import type { HostServiceRegistrationPlan } from "../../infrastructure/config/HostServiceRegistration";
+import { resolveHostStartupConfiguration } from "../../infrastructure/config/HostStartupConfiguration";
 import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
 import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
 
@@ -212,16 +212,13 @@ export function createWorkerCompositionRoot(
       await lifecycle.markComposing("compose-worker-host");
 
       try {
-        const environment = input.bootstrap?.environment ?? boot.environment;
-        const deploymentProfile = createHostDeploymentProfile({
-          profileId: input.bootstrap?.deploymentProfile?.profileId ?? "deployment:host:worker:runtime",
-          environmentName: input.bootstrap?.deploymentProfile?.environmentName
-            ?? environment.NODE_ENV
-            ?? "development",
-          releaseChannel: input.bootstrap?.deploymentProfile?.releaseChannel
-            ?? (environment.NODE_ENV === "production" ? "stable" : "development"),
-          region: input.bootstrap?.deploymentProfile?.region,
-          metadata: input.bootstrap?.deploymentProfile?.metadata,
+        const startupConfiguration = resolveHostStartupConfiguration({
+          boot,
+          startup: {
+            deploymentProfile: input.bootstrap?.deploymentProfile,
+            environment: input.bootstrap?.environment,
+            enabledCapabilities,
+          },
         });
 
         const hostOptions = Object.freeze({ ...(input.hostOptions ?? {}) });
@@ -280,10 +277,10 @@ export function createWorkerCompositionRoot(
 
         const context = createHostStartupContext({
           boot,
-          deploymentProfile,
-          environment,
+          deploymentProfile: startupConfiguration.deploymentProfile,
+          environment: startupConfiguration.environment,
+          enabledCapabilities: startupConfiguration.enabledCapabilities,
           hostConfiguration: hostOptions,
-          enabledCapabilities,
           lifecycleHooks,
         });
         const stages = composeHostBootstrapPipeline({

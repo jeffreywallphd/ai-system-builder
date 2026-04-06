@@ -103,6 +103,21 @@
 - Host-specific startup customization is supported through stage overrides and appended host stages (`runAfterStageId`) without copying common boot code.
 - `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now runs authoritative server startup through this shared pipeline.
 
+## Shared deployment-profile-aware startup configuration (story 12.3.3)
+- Added `src/infrastructure/config/HostStartupConfiguration.ts` as a shared startup/config module consumed by all host composition roots.
+- Shared startup configuration now centralizes:
+  - deployment profile resolution (`home`, `classroom`, `organization`)
+  - environment and release-channel normalization
+  - region and enabled-capability resolution
+  - capability-boundary validation against host declarations
+- Shared environment keys:
+  - `AI_LOOM_DEPLOYMENT_PROFILE`
+  - `AI_LOOM_ENVIRONMENT_NAME`
+  - `AI_LOOM_RELEASE_CHANNEL`
+  - `AI_LOOM_DEPLOYMENT_REGION`
+  - `AI_LOOM_ENABLED_CAPABILITIES`
+- This keeps profile-aware startup behavior explicit and testable across server/desktop/hybrid/web/worker assemblies while preserving one runtime architecture.
+
 ## Unified lifecycle coordination (story 12.3.1)
 - Added `src/hosts/lifecycle/HostLifecycleCoordinator.ts` for shared lifecycle orchestration across all host composition roots.
 - Server, desktop, hybrid, web, and worker roots now use this shared coordinator for:
@@ -164,4 +179,5 @@ This keeps host runtime metadata consumable for future node trust, scheduling, a
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
 - `src/hosts/lifecycle/tests/HostLifecycleCoordinator.test.ts`
 - `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
+- `src/infrastructure/config/tests/HostStartupConfiguration.test.ts`
 
