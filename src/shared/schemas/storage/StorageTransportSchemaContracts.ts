@@ -15,6 +15,7 @@ import {
   StorageAccessPermissionEffects,
   StorageAccessSummarySources,
   StorageSensitiveRedactionReasons,
+  StorageSyncDeploymentAvailabilities,
   StorageSyncStatuses,
   StorageTransportContractVersions,
   StorageTransportFieldLimits,
@@ -196,6 +197,12 @@ const StorageSyncStatusSchema = z.enum([
   StorageSyncStatuses.degraded,
   StorageSyncStatuses.failed,
   StorageSyncStatuses.disabled,
+]);
+
+const StorageSyncDeploymentAvailabilitySchema = z.enum([
+  StorageSyncDeploymentAvailabilities.active,
+  StorageSyncDeploymentAvailabilities.configuredInactive,
+  StorageSyncDeploymentAvailabilities.unavailable,
 ]);
 
 const StorageEncryptionModeSchema = z.enum([
@@ -583,6 +590,32 @@ const StorageReplicationStatusSchema = StorageReplicationPolicySchema.extend({
   lastSyncAt: TimestampSchema.optional(),
   lastSyncStatus: StorageSyncStatusSchema,
   syncLagSeconds: z.number().int().min(0).optional(),
+  synchronization: z.object({
+    syncCapable: z.boolean(),
+    supportsReplicationSyncOperation: z.boolean(),
+    deploymentAvailability: StorageSyncDeploymentAvailabilitySchema,
+    reasonCode: IdentifierSchema.optional(),
+    evaluatedAt: TimestampSchema.optional(),
+  }).strict().superRefine((value, context) => {
+    if (
+      value.deploymentAvailability === StorageSyncDeploymentAvailabilities.unavailable
+      && value.syncCapable
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["syncCapable"],
+        message: "syncCapable must be false when deploymentAvailability='unavailable'.",
+      });
+    }
+
+    if (!value.syncCapable && value.supportsReplicationSyncOperation) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["supportsReplicationSyncOperation"],
+        message: "supportsReplicationSyncOperation cannot be true when syncCapable=false.",
+      });
+    }
+  }).optional(),
   extensions: z.record(z.string(), z.unknown()).optional(),
 }).strict();
 

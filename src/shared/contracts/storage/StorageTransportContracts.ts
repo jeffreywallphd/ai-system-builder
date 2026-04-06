@@ -60,6 +60,15 @@ export const StorageSyncStatuses = Object.freeze({
 
 export type StorageSyncStatus = typeof StorageSyncStatuses[keyof typeof StorageSyncStatuses];
 
+export const StorageSyncDeploymentAvailabilities = Object.freeze({
+  active: "active",
+  configuredInactive: "configured-inactive",
+  unavailable: "unavailable",
+});
+
+export type StorageSyncDeploymentAvailability =
+  typeof StorageSyncDeploymentAvailabilities[keyof typeof StorageSyncDeploymentAvailabilities];
+
 export const StorageSensitiveRedactionReasons = Object.freeze({
   securitySensitive: "security-sensitive",
   infrastructureInternal: "infrastructure-internal",
@@ -164,10 +173,19 @@ export interface StorageReplicationPolicyDto {
   readonly syncIntervalSeconds?: number;
 }
 
+export interface StorageSynchronizationMetadataDto {
+  readonly syncCapable: boolean;
+  readonly supportsReplicationSyncOperation: boolean;
+  readonly deploymentAvailability: StorageSyncDeploymentAvailability;
+  readonly reasonCode?: string;
+  readonly evaluatedAt?: string;
+}
+
 export interface StorageReplicationStatusDto extends StorageReplicationPolicyDto {
   readonly lastSyncAt?: string;
   readonly lastSyncStatus: StorageSyncStatus;
   readonly syncLagSeconds?: number;
+  readonly synchronization?: StorageSynchronizationMetadataDto;
   readonly extensions?: Readonly<Record<string, unknown>>;
 }
 

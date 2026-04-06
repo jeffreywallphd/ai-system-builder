@@ -9,7 +9,10 @@ import {
   StorageReplicationModes,
   createStorageInstance,
 } from "../../../../domain/storage/StorageDomain";
-import { toStorageInstanceDetailDto } from "../../../contracts/storage/StorageTransportContracts";
+import {
+  StorageSyncDeploymentAvailabilities,
+  toStorageInstanceDetailDto,
+} from "../../../contracts/storage/StorageTransportContracts";
 import {
   toCreateStorageInstanceResponseDto,
   toStorageInternalInstanceDetailDto,
@@ -65,6 +68,13 @@ describe("StorageTransportDtos", () => {
       description: "Authoritative managed storage for model artifacts.",
       replicationStatus: {
         lastSyncStatus: "healthy",
+        synchronization: {
+          syncCapable: true,
+          supportsReplicationSyncOperation: true,
+          deploymentAvailability: StorageSyncDeploymentAvailabilities.active,
+          reasonCode: "sync-operational",
+          evaluatedAt: "2026-04-06T10:05:00.000Z",
+        },
       },
       sensitive: {
         encryptionKeyReferenceId: "key-ref-should-not-leak",
@@ -99,6 +109,8 @@ describe("StorageTransportDtos", () => {
         reasonCode: undefined,
       },
     ]);
+    expect(detail.replication.synchronization?.syncCapable).toBeTrue();
+    expect(detail.replication.synchronization?.deploymentAvailability).toBe("active");
     expect((detail.policy as unknown as { encryptionKeyReferenceId?: string }).encryptionKeyReferenceId).toBeUndefined();
     expect((adminSafe as unknown as { sensitive?: unknown }).sensitive).toBeUndefined();
     expect(adminSafe.sensitiveRedaction?.redactedFields[0]?.field).toBe("encryptionKeyReferenceId");

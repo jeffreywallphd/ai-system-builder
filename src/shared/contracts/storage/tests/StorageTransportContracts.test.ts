@@ -7,6 +7,7 @@ import {
 } from "../../../../domain/storage/StorageDomain";
 import {
   StorageSensitiveRedactionReasons,
+  StorageSyncDeploymentAvailabilities,
   StorageTransportContractError,
   StorageTransportContractVersions,
   StorageTransportScopes,
@@ -109,6 +110,13 @@ describe("StorageTransportContracts", () => {
         replicaStorageInstanceId: "storage-managed-002",
         syncIntervalSeconds: 60,
         lastSyncStatus: StorageSyncStatuses.healthy,
+        synchronization: {
+          syncCapable: true,
+          supportsReplicationSyncOperation: true,
+          deploymentAvailability: StorageSyncDeploymentAvailabilities.active,
+          reasonCode: "sync-operational",
+          evaluatedAt: "2026-04-06T12:09:00.000Z",
+        },
       },
       sensitive: {
         backendCredentialReferenceId: "secret:backend",
@@ -130,6 +138,8 @@ describe("StorageTransportContracts", () => {
         strategy: "omitted",
       },
     ]);
+    expect(adminSafe.replication.synchronization?.syncCapable).toBeTrue();
+    expect(adminSafe.replication.synchronization?.deploymentAvailability).toBe("active");
     expect((adminSafe as unknown as { sensitive?: unknown }).sensitive).toBeUndefined();
   });
 

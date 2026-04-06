@@ -22,6 +22,7 @@ import type {
   StorageReplicationPolicyDto,
   StorageReplicationStatusDto,
   StorageSensitiveMetadataDto,
+  StorageSynchronizationMetadataDto,
   StorageSyncStatus,
 } from "../../contracts/storage/StorageTransportContracts";
 import {
@@ -141,6 +142,7 @@ export interface StorageDtoProjectionOptions {
     readonly lastSyncAt?: string;
     readonly lastSyncStatus?: StorageSyncStatus;
     readonly syncLagSeconds?: number;
+    readonly synchronization?: StorageSynchronizationMetadataDto;
   };
   readonly sensitive?: StorageSensitiveMetadataDto;
   readonly accessSummary?: Omit<StorageInstanceAccessSummary, "workspaceId" | "ownerUserIdentityId" | "mode" | "scope"> & {
@@ -277,6 +279,7 @@ function toStorageReplicationStatus(
     lastSyncAt: options?.replicationStatus?.lastSyncAt,
     lastSyncStatus: options?.replicationStatus?.lastSyncStatus ?? "pending",
     syncLagSeconds: options?.replicationStatus?.syncLagSeconds,
+    synchronization: options?.replicationStatus?.synchronization,
   });
 }
 
