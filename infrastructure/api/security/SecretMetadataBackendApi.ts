@@ -169,8 +169,8 @@ export class SecretMetadataBackendApi {
         kinds: request.kinds,
         tagAnyOf: request.tagAnyOf,
         includeDisabled: request.includeDisabled,
-        includeRevoked: request.includeRevoked,
-        includeDeleted: request.includeDeleted,
+        includeArchived: request.includeArchived,
+        includeSoftDeleted: request.includeSoftDeleted,
         limit: request.limit,
         offset: request.offset,
       });
@@ -199,8 +199,8 @@ export class SecretMetadataBackendApi {
       kinds: parsedRequest.kinds,
       tagAnyOf: parsedRequest.tagAnyOf,
       includeDisabled: parsedRequest.includeDisabled,
-      includeRevoked: parsedRequest.includeRevoked,
-      includeDeleted: parsedRequest.includeDeleted,
+      includeArchived: parsedRequest.includeArchived,
+      includeSoftDeleted: parsedRequest.includeSoftDeleted,
       limit: parsedRequest.limit,
       offset: parsedRequest.offset,
     });

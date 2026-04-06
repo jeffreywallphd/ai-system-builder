@@ -3,8 +3,11 @@ import {
   SecretAccessActions,
   SecretActorTypes,
   SecretKinds,
+  SecretRecordStates,
   SecretScopes,
+  archiveSecretRecord,
   createSecretRecord,
+  softDeleteSecretRecord,
   toSecretReference,
   type SecretAccessActor,
   type SecretRecord,
@@ -78,10 +81,10 @@ class InMemorySecretRecordRepository implements ISecretRecordPersistenceReposito
         if (!(query.includeDisabled ?? false) && record.state === "disabled") {
           return false;
         }
-        if (!(query.includeRevoked ?? false) && record.state === "revoked") {
+        if (!(query.includeArchived ?? false) && record.state === "archived") {
           return false;
         }
-        if (!(query.includeDeleted ?? false) && record.state === "deleted") {
+        if (!(query.includeSoftDeleted ?? false) && record.state === "soft-deleted") {
           return false;
         }
         return true;
@@ -112,8 +115,21 @@ class InMemorySecretRecordRepository implements ISecretRecordPersistenceReposito
     };
   }
 
-  public async deleteSecret(secretId: string, _mutation: SecretCreatePersistenceInput["mutation"]): Promise<SecretMutationResult> {
-    const changed = this.records.delete(secretId.trim());
+  public async deleteSecret(secretId: string, mutation: SecretCreatePersistenceInput["mutation"]): Promise<SecretMutationResult> {
+    const existing = this.records.get(secretId.trim());
+    if (!existing) {
+      return {
+        changed: false,
+        wasReplay: false,
+      };
+    }
+    const deleted = softDeleteSecretRecord({
+      record: existing,
+      softDeletedBy: mutation.actorId,
+      softDeletedAt: mutation.occurredAt,
+    });
+    this.records.set(secretId.trim(), deleted);
+    const changed = existing.state !== SecretRecordStates.softDeleted;
     return {
       changed,
       wasReplay: false,
@@ -774,6 +790,227 @@ describe("Secret authorization policy and governance use cases", () => {
       return;
     }
     expect(disabled.value.state).toBe("disabled");
+  });
+
+  it("supports archival and soft-delete visibility filters while denying runtime retrieval", async () => {
+    const repository = new InMemorySecretRecordRepository();
+    const encryption = new InMemorySecretEncryptionPort();
+    const audit = new InMemorySecretAccessAuditPort();
+    const policy = new SecretAuthorizationPolicyEvaluator();
+
+    const active = createSecretRecord({
+      secretId: "secret:workspace:alpha:active",
+      name: "integration.alpha.runtime-token.active",
+      owner: {
+        scope: SecretScopes.workspace,
+        workspaceId: "workspace:alpha",
+      },
+      kind: SecretKinds.accessToken,
+      createdBy: "user:workspace-owner",
+      createdAt: "2026-04-05T12:00:00.000Z",
+      metadata: {
+        tags: ["workspace", "runtime"],
+        labels: {
+          provider: "workspace-runtime",
+          usage: "service-runtime",
+        },
+      },
+      initialVersion: {
+        versionId: "secret:workspace:alpha:active:v1",
+        createdBy: "user:workspace-owner",
+        encryptedPayloadRef: "enc:secret:workspace:alpha:active:v1",
+        payloadDigestSha256: "sha256:workspace:alpha:active:v1",
+        payloadByteLength: 21,
+        keyEncryptionContext: {
+          keyId: "kek:workspace:default",
+          algorithm: "aes-256-gcm",
+          scope: SecretScopes.workspace,
+          workspaceId: "workspace:alpha",
+        },
+      },
+    });
+    const archived = archiveSecretRecord({
+      record: createSecretRecord({
+        secretId: "secret:workspace:alpha:archived",
+        name: "integration.alpha.runtime-token.archived",
+        owner: {
+          scope: SecretScopes.workspace,
+          workspaceId: "workspace:alpha",
+        },
+        kind: SecretKinds.accessToken,
+        createdBy: "user:workspace-owner",
+        createdAt: "2026-04-05T12:10:00.000Z",
+        metadata: {
+          tags: ["workspace", "runtime"],
+          labels: {
+            provider: "workspace-runtime",
+            usage: "service-runtime",
+          },
+        },
+        initialVersion: {
+          versionId: "secret:workspace:alpha:archived:v1",
+          createdBy: "user:workspace-owner",
+          encryptedPayloadRef: "enc:secret:workspace:alpha:archived:v1",
+          payloadDigestSha256: "sha256:workspace:alpha:archived:v1",
+          payloadByteLength: 30,
+          keyEncryptionContext: {
+            keyId: "kek:workspace:default",
+            algorithm: "aes-256-gcm",
+            scope: SecretScopes.workspace,
+            workspaceId: "workspace:alpha",
+          },
+        },
+      }),
+      archivedBy: "user:workspace-owner",
+      archivedAt: "2026-04-06T03:00:00.000Z",
+    });
+    const softDeleted = softDeleteSecretRecord({
+      record: archiveSecretRecord({
+        record: createSecretRecord({
+          secretId: "secret:workspace:alpha:soft-deleted",
+          name: "integration.alpha.runtime-token.soft-deleted",
+          owner: {
+            scope: SecretScopes.workspace,
+            workspaceId: "workspace:alpha",
+          },
+          kind: SecretKinds.accessToken,
+          createdBy: "user:workspace-owner",
+          createdAt: "2026-04-05T12:20:00.000Z",
+          metadata: {
+            tags: ["workspace", "runtime"],
+            labels: {
+              provider: "workspace-runtime",
+              usage: "service-runtime",
+            },
+          },
+          initialVersion: {
+            versionId: "secret:workspace:alpha:soft-deleted:v1",
+            createdBy: "user:workspace-owner",
+            encryptedPayloadRef: "enc:secret:workspace:alpha:soft-deleted:v1",
+            payloadDigestSha256: "sha256:workspace:alpha:soft-deleted:v1",
+            payloadByteLength: 34,
+            keyEncryptionContext: {
+              keyId: "kek:workspace:default",
+              algorithm: "aes-256-gcm",
+              scope: SecretScopes.workspace,
+              workspaceId: "workspace:alpha",
+            },
+          },
+        }),
+        archivedBy: "user:workspace-owner",
+        archivedAt: "2026-04-06T03:10:00.000Z",
+      }),
+      softDeletedBy: "user:workspace-owner",
+      softDeletedAt: "2026-04-06T03:20:00.000Z",
+    });
+    repository.seed(active);
+    repository.seed(archived);
+    repository.seed(softDeleted);
+    encryption.seedPayload(active.versions[0]?.encryptedPayloadRef ?? "", "workspace-alpha-token");
+    encryption.seedPayload(archived.versions[0]?.encryptedPayloadRef ?? "", "workspace-alpha-archived-token");
+    encryption.seedPayload(softDeleted.versions[0]?.encryptedPayloadRef ?? "", "workspace-alpha-soft-deleted-token");
+
+    const listUseCase = new ListSecretsUseCase({
+      secretRecordRepository: repository,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+    const metadataUseCase = new GetSecretMetadataUseCase({
+      secretRecordRepository: repository,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+    const retrieveUseCase = new RetrieveSecretPlaintextForRuntimeUseCase({
+      secretRecordRepository: repository,
+      secretEncryptionPort: encryption,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+
+    const actor: SecretAccessActor = {
+      actorId: "user:workspace-owner",
+      actorType: SecretActorTypes.workspaceMember,
+      workspaceId: "workspace:alpha",
+      grantedActions: [SecretAccessActions.list, SecretAccessActions.readMetadata, SecretAccessActions.retrievePlaintext],
+    };
+
+    const defaultList = await listUseCase.execute({
+      actor,
+      owner: {
+        scope: SecretScopes.workspace,
+        workspaceId: "workspace:alpha",
+      },
+    });
+    expect(defaultList.ok).toBeTrue();
+    if (!defaultList.ok) {
+      return;
+    }
+    expect(defaultList.value.items.map((item) => item.state)).toEqual(["active"]);
+
+    const includeArchived = await listUseCase.execute({
+      actor,
+      owner: {
+        scope: SecretScopes.workspace,
+        workspaceId: "workspace:alpha",
+      },
+      includeArchived: true,
+    });
+    expect(includeArchived.ok).toBeTrue();
+    if (!includeArchived.ok) {
+      return;
+    }
+    expect(includeArchived.value.items.some((item) => item.state === "archived")).toBeTrue();
+
+    const includeSoftDeleted = await listUseCase.execute({
+      actor,
+      owner: {
+        scope: SecretScopes.workspace,
+        workspaceId: "workspace:alpha",
+      },
+      includeArchived: true,
+      includeSoftDeleted: true,
+    });
+    expect(includeSoftDeleted.ok).toBeTrue();
+    if (!includeSoftDeleted.ok) {
+      return;
+    }
+    expect(includeSoftDeleted.value.items.some((item) => item.state === "soft-deleted")).toBeTrue();
+
+    const archivedMetadata = await metadataUseCase.execute({
+      actor,
+      secretId: archived.secretId,
+    });
+    expect(archivedMetadata.ok).toBeTrue();
+    if (!archivedMetadata.ok) {
+      return;
+    }
+    expect(archivedMetadata.value.state).toBe("archived");
+
+    const archivedRuntimeRetrieval = await retrieveUseCase.execute({
+      actor: {
+        actorId: "system:runtime:workspace-alpha",
+        actorType: SecretActorTypes.workspaceService,
+        workspaceId: "workspace:alpha",
+        grantedActions: [SecretAccessActions.retrievePlaintext],
+      },
+      secretId: archived.secretId,
+      operationKey: "op:retrieve:archived-runtime",
+      runtimeContext: {
+        serviceIdentity: "runtime:workspace-alpha:storage",
+        scope: {
+          scope: SecretScopes.workspace,
+          workspaceId: "workspace:alpha",
+        },
+        justification: "runtime retrieval should fail for archived secret",
+      },
+    });
+    expect(archivedRuntimeRetrieval).toEqual({
+      ok: false,
+      error: {
+        code: SecretServiceErrorCodes.notFound,
+        message: `Secret '${archived.secretId}' was not found.`,
+      },
+    });
   });
 });
 

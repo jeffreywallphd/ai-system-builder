@@ -98,11 +98,11 @@ export class SqliteSecretRecordPersistenceAdapter implements ISecretRecordPersis
     if (!(query.includeDisabled ?? false)) {
       clauses.push("status != 'disabled'");
     }
-    if (!(query.includeRevoked ?? false)) {
-      clauses.push("status != 'revoked'");
+    if (!(query.includeArchived ?? false)) {
+      clauses.push("status != 'archived'");
     }
-    if (!(query.includeDeleted ?? false)) {
-      clauses.push("status != 'deleted'");
+    if (!(query.includeSoftDeleted ?? false)) {
+      clauses.push("status != 'soft-deleted'");
     }
 
     const paging = this.toPagingClause(query.limit, query.offset);
@@ -174,17 +174,17 @@ export class SqliteSecretRecordPersistenceAdapter implements ISecretRecordPersis
       });
     }
 
-    const alreadyDeleted = existing.state === "deleted";
+    const alreadyDeleted = existing.state === "soft-deleted";
 
     this.getDatabase().transaction(() => {
       this.getDatabase().prepare(`
         UPDATE secret_records
         SET
-          status = 'deleted',
+          status = 'soft-deleted',
           updated_at = ?,
           last_modified_by = ?,
-          deleted_at = COALESCE(deleted_at, ?),
-          deleted_by = COALESCE(deleted_by, ?)
+          soft_deleted_at = COALESCE(soft_deleted_at, ?),
+          soft_deleted_by = COALESCE(soft_deleted_by, ?)
         WHERE secret_id = ?
       `).run(occurredAt, actorId, occurredAt, actorId, normalizedSecretId);
       this.persistMutationReplayRecord(operationKey, "delete-secret", Object.freeze({ changed: !alreadyDeleted }));
@@ -262,10 +262,10 @@ export class SqliteSecretRecordPersistenceAdapter implements ISecretRecordPersis
         last_modified_by,
         disabled_at,
         disabled_by,
-        revoked_at,
-        revoked_by,
-        deleted_at,
-        deleted_by
+        archived_at,
+        archived_by,
+        soft_deleted_at,
+        soft_deleted_by
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(secret_id) DO UPDATE SET
         scope_type = excluded.scope_type,
@@ -288,10 +288,10 @@ export class SqliteSecretRecordPersistenceAdapter implements ISecretRecordPersis
         last_modified_by = excluded.last_modified_by,
         disabled_at = excluded.disabled_at,
         disabled_by = excluded.disabled_by,
-        revoked_at = excluded.revoked_at,
-        revoked_by = excluded.revoked_by,
-        deleted_at = excluded.deleted_at,
-        deleted_by = excluded.deleted_by
+        archived_at = excluded.archived_at,
+        archived_by = excluded.archived_by,
+        soft_deleted_at = excluded.soft_deleted_at,
+        soft_deleted_by = excluded.soft_deleted_by
     `).run(...mapSecretRecordToRowValues(record));
   }
 

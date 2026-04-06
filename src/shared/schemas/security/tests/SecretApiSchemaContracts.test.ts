@@ -81,10 +81,13 @@ describe("SecretApiSchemaContracts", () => {
       actorWorkspaceId: "workspace:alpha",
       kinds: [SecretKinds.apiKey],
       includeDisabled: false,
+      includeArchived: true,
+      includeSoftDeleted: false,
       limit: 25,
       offset: 0,
     });
     expect(listParsed.owner.scope).toBe(SecretScopes.user);
+    expect(listParsed.includeArchived).toBeTrue();
 
     const getParsed = parseGetSecretMetadataQuery({
       secretId: "secret:user:openai",

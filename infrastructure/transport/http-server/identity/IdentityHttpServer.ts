@@ -1624,11 +1624,11 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const kinds = url.searchParams.getAll("kind").map((kind) => kind.trim()).filter(Boolean);
             const tagAnyOf = url.searchParams.getAll("tag").map((tag) => tag.trim()).filter(Boolean);
             const includeDisabledInput = url.searchParams.get("includeDisabled");
-            const includeRevokedInput = url.searchParams.get("includeRevoked");
-            const includeDeletedInput = url.searchParams.get("includeDeleted");
+            const includeArchivedInput = url.searchParams.get("includeArchived");
+            const includeSoftDeletedInput = url.searchParams.get("includeSoftDeleted");
             const includeDisabled = parseOptionalBoolean(includeDisabledInput);
-            const includeRevoked = parseOptionalBoolean(includeRevokedInput);
-            const includeDeleted = parseOptionalBoolean(includeDeletedInput);
+            const includeArchived = parseOptionalBoolean(includeArchivedInput);
+            const includeSoftDeleted = parseOptionalBoolean(includeSoftDeletedInput);
             const limitInput = url.searchParams.get("limit");
             const offsetInput = url.searchParams.get("offset");
             const limit = parseOptionalInteger(limitInput);
@@ -1639,14 +1639,14 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
               return;
             }
-            if (includeRevokedInput !== null && includeRevoked === undefined) {
-              const invalid = buildSecretMetadataInvalidRequestResponse("includeRevoked must be 'true' or 'false'.");
+            if (includeArchivedInput !== null && includeArchived === undefined) {
+              const invalid = buildSecretMetadataInvalidRequestResponse("includeArchived must be 'true' or 'false'.");
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
               return;
             }
-            if (includeDeletedInput !== null && includeDeleted === undefined) {
-              const invalid = buildSecretMetadataInvalidRequestResponse("includeDeleted must be 'true' or 'false'.");
+            if (includeSoftDeletedInput !== null && includeSoftDeleted === undefined) {
+              const invalid = buildSecretMetadataInvalidRequestResponse("includeSoftDeleted must be 'true' or 'false'.");
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
               return;
@@ -1674,8 +1674,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               kinds: kinds.length > 0 ? kinds : undefined,
               tagAnyOf: tagAnyOf.length > 0 ? tagAnyOf : undefined,
               includeDisabled: includeDisabledInput === null ? undefined : includeDisabled,
-              includeRevoked: includeRevokedInput === null ? undefined : includeRevoked,
-              includeDeleted: includeDeletedInput === null ? undefined : includeDeleted,
+              includeArchived: includeArchivedInput === null ? undefined : includeArchived,
+              includeSoftDeleted: includeSoftDeletedInput === null ? undefined : includeSoftDeleted,
               limit: limitInput === null ? undefined : limit,
               offset: offsetInput === null ? undefined : offset,
             });
@@ -1693,8 +1693,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               kinds: parsedQuery.data.kinds,
               tagAnyOf: parsedQuery.data.tagAnyOf,
               includeDisabled: parsedQuery.data.includeDisabled,
-              includeRevoked: parsedQuery.data.includeRevoked,
-              includeDeleted: parsedQuery.data.includeDeleted,
+              includeArchived: parsedQuery.data.includeArchived,
+              includeSoftDeleted: parsedQuery.data.includeSoftDeleted,
               limit: parsedQuery.data.limit,
               offset: parsedQuery.data.offset,
             });

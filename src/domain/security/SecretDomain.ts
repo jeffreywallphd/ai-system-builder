@@ -29,8 +29,8 @@ export type SecretKind = typeof SecretKinds[keyof typeof SecretKinds];
 export const SecretRecordStates = Object.freeze({
   active: "active",
   disabled: "disabled",
-  revoked: "revoked",
-  deleted: "deleted",
+  archived: "archived",
+  softDeleted: "soft-deleted",
 });
 
 export type SecretRecordState = typeof SecretRecordStates[keyof typeof SecretRecordStates];
@@ -38,7 +38,6 @@ export type SecretRecordState = typeof SecretRecordStates[keyof typeof SecretRec
 export const SecretVersionStates = Object.freeze({
   active: "active",
   superseded: "superseded",
-  revoked: "revoked",
 });
 
 export type SecretVersionState = typeof SecretVersionStates[keyof typeof SecretVersionStates];
@@ -104,10 +103,10 @@ export interface SecretRecord {
   readonly lastModifiedBy: string;
   readonly disabledAt?: string;
   readonly disabledBy?: string;
-  readonly revokedAt?: string;
-  readonly revokedBy?: string;
-  readonly deletedAt?: string;
-  readonly deletedBy?: string;
+  readonly archivedAt?: string;
+  readonly archivedBy?: string;
+  readonly softDeletedAt?: string;
+  readonly softDeletedBy?: string;
 }
 
 export interface SecretReference {
@@ -158,8 +157,8 @@ export const SecretAccessDecisionReasons = Object.freeze({
   missingPermission: "missing-permission",
   scopeMismatch: "scope-mismatch",
   recordDisabled: "record-disabled",
-  recordRevoked: "record-revoked",
-  recordDeleted: "record-deleted",
+  recordArchived: "record-archived",
+  recordSoftDeleted: "record-soft-deleted",
   plaintextRetrievalDisabled: "plaintext-retrieval-disabled",
   runtimeAccessRequired: "runtime-access-required",
   administrativeAccessRequired: "administrative-access-required",
@@ -565,8 +564,8 @@ export function disableSecretRecord(input: {
   readonly disabledBy: string;
   readonly disabledAt?: string | Date;
 }): SecretRecord {
-  if (input.record.state === SecretRecordStates.deleted) {
-    throw new SecretDomainError("Deleted secrets cannot be disabled.");
+  if (input.record.state === SecretRecordStates.softDeleted) {
+    throw new SecretDomainError("Soft-deleted secrets cannot be disabled.");
   }
 
   const disabledAt = normalizeTimestamp(input.disabledAt ?? new Date(), "Secret disable disabledAt");
@@ -585,55 +584,56 @@ export function disableSecretRecord(input: {
   });
 }
 
-export function revokeSecretRecord(input: {
+export function archiveSecretRecord(input: {
   readonly record: SecretRecord;
-  readonly revokedBy: string;
-  readonly revokedAt?: string | Date;
+  readonly archivedBy: string;
+  readonly archivedAt?: string | Date;
 }): SecretRecord {
-  if (input.record.state === SecretRecordStates.deleted) {
-    throw new SecretDomainError("Deleted secrets cannot be revoked.");
+  if (input.record.state === SecretRecordStates.softDeleted) {
+    throw new SecretDomainError("Soft-deleted secrets cannot be archived.");
   }
 
-  const revokedAt = normalizeTimestamp(input.revokedAt ?? new Date(), "Secret revoke revokedAt");
-  const versions = Object.freeze(input.record.versions.map((version) => Object.freeze({
-    ...version,
-    state: version.state === SecretVersionStates.active ? SecretVersionStates.revoked : version.state,
-  })));
+  const archivedAt = normalizeTimestamp(input.archivedAt ?? new Date(), "Secret archive archivedAt");
 
   return Object.freeze({
     ...input.record,
-    state: SecretRecordStates.revoked,
-    versions,
-    revokedAt,
-    revokedBy: normalizeRequired(input.revokedBy, "Secret revoke revokedBy"),
-    lastModifiedAt: revokedAt,
-    lastModifiedBy: normalizeRequired(input.revokedBy, "Secret revoke lastModifiedBy"),
+    state: SecretRecordStates.archived,
+    archivedAt,
+    archivedBy: normalizeRequired(input.archivedBy, "Secret archive archivedBy"),
+    lastModifiedAt: archivedAt,
+    lastModifiedBy: normalizeRequired(input.archivedBy, "Secret archive lastModifiedBy"),
     reference: Object.freeze({
       ...input.record.reference,
-      state: SecretRecordStates.revoked,
-      updatedAt: revokedAt,
+      state: SecretRecordStates.archived,
+      updatedAt: archivedAt,
     }),
   });
 }
 
-export function deleteSecretRecord(input: {
+export function softDeleteSecretRecord(input: {
   readonly record: SecretRecord;
-  readonly deletedBy: string;
-  readonly deletedAt?: string | Date;
+  readonly softDeletedBy: string;
+  readonly softDeletedAt?: string | Date;
 }): SecretRecord {
-  const deletedAt = normalizeTimestamp(input.deletedAt ?? new Date(), "Secret delete deletedAt");
+  if (input.record.state === SecretRecordStates.softDeleted) {
+    return input.record;
+  }
+  const softDeletedAt = normalizeTimestamp(
+    input.softDeletedAt ?? new Date(),
+    "Secret soft-delete softDeletedAt",
+  );
 
   return Object.freeze({
     ...input.record,
-    state: SecretRecordStates.deleted,
-    deletedAt,
-    deletedBy: normalizeRequired(input.deletedBy, "Secret delete deletedBy"),
-    lastModifiedAt: deletedAt,
-    lastModifiedBy: normalizeRequired(input.deletedBy, "Secret delete lastModifiedBy"),
+    state: SecretRecordStates.softDeleted,
+    softDeletedAt,
+    softDeletedBy: normalizeRequired(input.softDeletedBy, "Secret soft-delete softDeletedBy"),
+    lastModifiedAt: softDeletedAt,
+    lastModifiedBy: normalizeRequired(input.softDeletedBy, "Secret soft-delete lastModifiedBy"),
     reference: Object.freeze({
       ...input.record.reference,
-      state: SecretRecordStates.deleted,
-      updatedAt: deletedAt,
+      state: SecretRecordStates.softDeleted,
+      updatedAt: softDeletedAt,
     }),
   });
 }
@@ -699,7 +699,7 @@ export function evaluateSecretAccessDecision(input: {
     });
   }
 
-  if (input.record?.state === SecretRecordStates.disabled) {
+  if (action === SecretAccessActions.retrievePlaintext && input.record?.state === SecretRecordStates.disabled) {
     return Object.freeze({
       allowed: false,
       reason: SecretAccessDecisionReasons.recordDisabled,
@@ -712,10 +712,10 @@ export function evaluateSecretAccessDecision(input: {
     });
   }
 
-  if (input.record?.state === SecretRecordStates.revoked) {
+  if (action === SecretAccessActions.retrievePlaintext && input.record?.state === SecretRecordStates.archived) {
     return Object.freeze({
       allowed: false,
-      reason: SecretAccessDecisionReasons.recordRevoked,
+      reason: SecretAccessDecisionReasons.recordArchived,
       action,
       actorId: normalizeRequired(input.actor.actorId, "Secret access actorId"),
       secretId: input.record.secretId,
@@ -725,10 +725,10 @@ export function evaluateSecretAccessDecision(input: {
     });
   }
 
-  if (input.record?.state === SecretRecordStates.deleted) {
+  if (action === SecretAccessActions.retrievePlaintext && input.record?.state === SecretRecordStates.softDeleted) {
     return Object.freeze({
       allowed: false,
-      reason: SecretAccessDecisionReasons.recordDeleted,
+      reason: SecretAccessDecisionReasons.recordSoftDeleted,
       action,
       actorId: normalizeRequired(input.actor.actorId, "Secret access actorId"),
       secretId: input.record.secretId,

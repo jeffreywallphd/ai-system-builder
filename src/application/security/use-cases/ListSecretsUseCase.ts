@@ -117,8 +117,8 @@ export class ListSecretsUseCase {
       kinds: request.kinds,
       tagAnyOf: normalizedTags,
       includeDisabled: request.includeDisabled,
-      includeRevoked: request.includeRevoked,
-      includeDeleted: request.includeDeleted,
+      includeArchived: request.includeArchived,
+      includeSoftDeleted: request.includeSoftDeleted,
       limit: request.limit,
       offset: request.offset,
     });

@@ -1,8 +1,9 @@
 import {
   SecretAccessActions,
   SecretDomainError,
+  archiveSecretRecord,
+  softDeleteSecretRecord,
   type SecretScope,
-  deleteSecretRecord,
 } from "../../../domain/security/SecretDomain";
 import type {
   ISecretAccessAuditPort,
@@ -76,24 +77,24 @@ export class DeleteSecretUseCase {
       return invalidRequest("secretId is required.");
     }
 
-    const deletedAt = normalizeTimestamp(request.deletedAt, this.now);
-    if (!deletedAt) {
+    const softDeletedAt = normalizeTimestamp(request.softDeletedAt, this.now);
+    if (!softDeletedAt) {
       await this.emitOperation("rejected", {
         occurredAt: this.now().toISOString(),
         actorId,
         secretId,
         details: Object.freeze({
-          reason: "invalid-deletedAt",
+          reason: "invalid-softDeletedAt",
         }),
       });
-      return invalidRequest("deletedAt must be a valid timestamp when provided.");
+      return invalidRequest("softDeletedAt must be a valid timestamp when provided.");
     }
 
     try {
       const record = await this.dependencies.secretRecordRepository.findSecretById(secretId);
       if (!record) {
         await this.emitOperation("missing", {
-          occurredAt: deletedAt,
+          occurredAt: softDeletedAt,
           actorId,
           secretId,
           details: Object.freeze({
@@ -108,7 +109,7 @@ export class DeleteSecretUseCase {
         actor: request.actor,
         owner: record.owner,
         record,
-        occurredAt: deletedAt,
+        occurredAt: softDeletedAt,
       });
       await this.dependencies.secretAccessAuditPort.recordSecretAuditEvent(Object.freeze({
         eventKind: SecretAuditEventKinds.accessDecision,
@@ -145,25 +146,30 @@ export class DeleteSecretUseCase {
         return notFound(secretId);
       }
 
-      const deleted = deleteSecretRecord({
+      const archived = archiveSecretRecord({
         record,
-        deletedAt,
-        deletedBy: actorId,
+        archivedAt: softDeletedAt,
+        archivedBy: actorId,
+      });
+      const deleted = softDeleteSecretRecord({
+        record: archived,
+        softDeletedAt,
+        softDeletedBy: actorId,
       });
 
       await this.dependencies.secretRecordRepository.saveSecret(deleted, {
-        operationKey: `${operationKey}:mark-deleted`,
+        operationKey: `${operationKey}:mark-soft-deleted`,
         actorId,
-        occurredAt: deletedAt,
+        occurredAt: softDeletedAt,
       });
       await this.dependencies.secretRecordRepository.deleteSecret(secretId, {
         operationKey,
         actorId,
-        occurredAt: deletedAt,
+        occurredAt: softDeletedAt,
       });
 
       await this.emitOperation("succeeded", {
-        occurredAt: deletedAt,
+        occurredAt: softDeletedAt,
         actorId,
         secretId,
         scope: deleted.owner.scope,
@@ -179,7 +185,7 @@ export class DeleteSecretUseCase {
     } catch (error) {
       if (error instanceof SecretDomainError) {
         await this.emitOperation("rejected", {
-          occurredAt: deletedAt,
+          occurredAt: softDeletedAt,
           actorId,
           secretId,
           details: Object.freeze({
@@ -196,7 +202,7 @@ export class DeleteSecretUseCase {
       }
 
       await this.emitOperation("failed", {
-        occurredAt: deletedAt,
+        occurredAt: softDeletedAt,
         actorId,
         secretId,
         details: Object.freeze({
@@ -207,7 +213,7 @@ export class DeleteSecretUseCase {
         ok: false,
         error: Object.freeze({
           code: SecretServiceErrorCodes.internal,
-          message: "Secret delete operation failed due to an internal security error.",
+          message: "Secret soft-delete operation failed due to an internal security error.",
         }),
       };
     }

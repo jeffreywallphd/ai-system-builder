@@ -98,7 +98,7 @@ export interface DeleteSecretRequest {
   readonly actor: SecretAccessActor;
   readonly operationKey: string;
   readonly secretId: string;
-  readonly deletedAt?: string;
+  readonly softDeletedAt?: string;
 }
 
 export interface ListSecretsRequest {
@@ -107,8 +107,8 @@ export interface ListSecretsRequest {
   readonly kinds?: ReadonlyArray<SecretKind>;
   readonly tagAnyOf?: ReadonlyArray<string>;
   readonly includeDisabled?: boolean;
-  readonly includeRevoked?: boolean;
-  readonly includeDeleted?: boolean;
+  readonly includeArchived?: boolean;
+  readonly includeSoftDeleted?: boolean;
   readonly limit?: number;
   readonly offset?: number;
 }

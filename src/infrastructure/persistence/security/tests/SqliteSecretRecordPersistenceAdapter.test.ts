@@ -5,7 +5,8 @@ import path from "node:path";
 import {
   SecretKinds,
   SecretScopes,
-  deleteSecretRecord,
+  archiveSecretRecord,
+  softDeleteSecretRecord,
   disableSecretRecord,
   rotateSecretRecord,
   createSecretRecord,
@@ -204,6 +205,29 @@ describe("SqliteSecretRecordPersistenceAdapter", () => {
     expect(listedWithDisabled).toHaveLength(1);
     expect(listedWithDisabled[0]?.state).toBe("disabled");
 
+    const archivedRecord = archiveSecretRecord({
+      record: fetchedAfterRotate,
+      archivedBy: "user:security-admin",
+      archivedAt: "2026-04-06T01:30:00.000Z",
+    });
+    await adapter.saveSecret(archivedRecord, {
+      operationKey: "op:secret:archive:1",
+      actorId: "user:security-admin",
+      occurredAt: "2026-04-06T01:30:00.000Z",
+    });
+    const listedWithoutArchived = await adapter.listSecrets({
+      scope: SecretScopes.server,
+      includeDisabled: true,
+    });
+    const listedWithArchived = await adapter.listSecrets({
+      scope: SecretScopes.server,
+      includeDisabled: true,
+      includeArchived: true,
+    });
+    expect(listedWithoutArchived).toHaveLength(0);
+    expect(listedWithArchived).toHaveLength(1);
+    expect(listedWithArchived[0]?.state).toBe("archived");
+
     const softDeleted = await adapter.deleteSecret("secret:server:openai", {
       operationKey: "op:secret:delete:1",
       actorId: "user:security-admin",
@@ -225,26 +249,26 @@ describe("SqliteSecretRecordPersistenceAdapter", () => {
     });
 
     const fetchedAfterDelete = await adapter.findSecretById("secret:server:openai");
-    expect(fetchedAfterDelete?.state).toBe("deleted");
-    expect(fetchedAfterDelete?.deletedBy).toBe("user:security-admin");
+    expect(fetchedAfterDelete?.state).toBe("soft-deleted");
+    expect(fetchedAfterDelete?.softDeletedBy).toBe("user:security-admin");
 
     const listedWithoutDeleted = await adapter.listSecrets({
       scope: SecretScopes.server,
       includeDisabled: true,
-      includeDeleted: false,
+      includeSoftDeleted: false,
     });
     const listedWithDeleted = await adapter.listSecrets({
       scope: SecretScopes.server,
       includeDisabled: true,
-      includeDeleted: true,
+      includeSoftDeleted: true,
     });
     expect(listedWithoutDeleted).toHaveLength(0);
     expect(listedWithDeleted).toHaveLength(1);
 
-    const explicitlyDeletedRecord = deleteSecretRecord({
+    const explicitlyDeletedRecord = softDeleteSecretRecord({
       record: disabledRecord,
-      deletedBy: "user:security-admin",
-      deletedAt: "2026-04-06T02:05:00.000Z",
+      softDeletedBy: "user:security-admin",
+      softDeletedAt: "2026-04-06T02:05:00.000Z",
     });
     await adapter.saveSecret(explicitlyDeletedRecord, {
       operationKey: "op:secret:save-deleted:1",
@@ -252,7 +276,7 @@ describe("SqliteSecretRecordPersistenceAdapter", () => {
       occurredAt: "2026-04-06T02:05:00.000Z",
     });
     const afterExplicitDeletedSave = await adapter.findSecretById("secret:server:openai");
-    expect(afterExplicitDeletedSave?.deletedAt).toBe("2026-04-06T02:05:00.000Z");
+    expect(afterExplicitDeletedSave?.softDeletedAt).toBe("2026-04-06T02:05:00.000Z");
 
     adapter.dispose();
   });

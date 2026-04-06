@@ -38,10 +38,10 @@ export interface SecretRecordRow {
   readonly last_modified_by: string;
   readonly disabled_at: string | null;
   readonly disabled_by: string | null;
-  readonly revoked_at: string | null;
-  readonly revoked_by: string | null;
-  readonly deleted_at: string | null;
-  readonly deleted_by: string | null;
+  readonly archived_at: string | null;
+  readonly archived_by: string | null;
+  readonly soft_deleted_at: string | null;
+  readonly soft_deleted_by: string | null;
 }
 
 export interface SecretVersionRow {
@@ -118,10 +118,10 @@ export function mapSecretRecordRowAndVersionsToDomain(
     lastModifiedBy: recordRow.last_modified_by,
     disabledAt: normalizeLookup(recordRow.disabled_at),
     disabledBy: normalizeLookup(recordRow.disabled_by),
-    revokedAt: normalizeLookup(recordRow.revoked_at),
-    revokedBy: normalizeLookup(recordRow.revoked_by),
-    deletedAt: normalizeLookup(recordRow.deleted_at),
-    deletedBy: normalizeLookup(recordRow.deleted_by),
+    archivedAt: normalizeLookup(recordRow.archived_at),
+    archivedBy: normalizeLookup(recordRow.archived_by),
+    softDeletedAt: normalizeLookup(recordRow.soft_deleted_at),
+    softDeletedBy: normalizeLookup(recordRow.soft_deleted_by),
   });
 
   return record;
@@ -150,10 +150,10 @@ export function mapSecretRecordToRowValues(record: SecretRecord): ReadonlyArray<
     record.lastModifiedBy,
     record.disabledAt ?? null,
     record.disabledBy ?? null,
-    record.revokedAt ?? null,
-    record.revokedBy ?? null,
-    record.deletedAt ?? null,
-    record.deletedBy ?? null,
+    record.archivedAt ?? null,
+    record.archivedBy ?? null,
+    record.softDeletedAt ?? null,
+    record.softDeletedBy ?? null,
   ]);
 }
 

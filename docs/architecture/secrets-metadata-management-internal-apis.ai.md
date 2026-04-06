@@ -25,6 +25,7 @@ Story 8.2.4 baseline for Feature 8 / Epic 8.2: expose internal server API surfac
 - `GET /api/v1/security/secrets` (list metadata)
 - `GET /api/v1/security/secrets/{secretId}` (detail metadata)
 - `POST /api/v1/security/secrets/{secretId}/disable` (disable)
+- List metadata supports lifecycle filters: `includeDisabled`, `includeArchived`, `includeSoftDeleted`.
 
 No plaintext retrieval endpoint is added.
 
@@ -35,6 +36,7 @@ No plaintext retrieval endpoint is added.
 - Secret authorization + audit hooks execute through existing use-case policy/audit seams.
 - Workspace actor context is fail-closed when membership is not active.
 - API responses use metadata-only secret references and exclude plaintext.
+- Inactive records (`disabled`, `archived`, `soft-deleted`) are metadata-visible for governance while runtime plaintext retrieval remains blocked.
 
 ## DTO safety summary
 

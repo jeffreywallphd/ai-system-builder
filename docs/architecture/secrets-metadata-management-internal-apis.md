@@ -25,6 +25,7 @@ validate command/query boundaries consistently.
   - response returns metadata-only `secret` projection.
 - `GET /api/v1/security/secrets`
   - lists metadata by explicit owner scope (`scope`, optional `workspaceId`, optional `userIdentityId`).
+  - supports lifecycle visibility filters: `includeDisabled`, `includeArchived`, `includeSoftDeleted`.
 - `GET /api/v1/security/secrets/{secretId}`
   - reads one metadata record by id.
 - `POST /api/v1/security/secrets/{secretId}/disable`
@@ -39,6 +40,7 @@ No UI-facing plaintext retrieval endpoint is exposed.
 - Command DTOs (create/disable) are distinct from query DTOs (metadata read/list projections).
 - Query DTOs intentionally exclude plaintext and encrypted payload internals.
 - Route request logging uses redacted payload shaping for secret creation (`plaintextProvided` flag only).
+- Inactive secret records remain metadata-queryable for audit/lineage visibility while runtime plaintext retrieval is denied.
 
 ## Safe DTO usage pattern
 

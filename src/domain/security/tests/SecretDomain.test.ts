@@ -7,12 +7,13 @@ import {
   SecretRecordStates,
   SecretScopes,
   SecretVersionStates,
+  archiveSecretRecord,
   createSecretRecord,
   createSecretScopeOwner,
   disableSecretRecord,
   evaluateSecretAccessDecision,
-  revokeSecretRecord,
   rotateSecretRecord,
+  softDeleteSecretRecord,
 } from "../SecretDomain";
 
 describe("SecretDomain", () => {
@@ -175,13 +176,13 @@ describe("SecretDomain", () => {
     expect(rotated.versions[0]?.supersededByVersionId).toBe("version:2");
     expect(rotated.versions[1]?.previousVersionId).toBe("version:1");
 
-    const revoked = revokeSecretRecord({
+    const archived = archiveSecretRecord({
       record: rotated,
-      revokedBy: "user:owner",
-      revokedAt: "2026-06-01T00:00:00.000Z",
+      archivedBy: "user:owner",
+      archivedAt: "2026-06-01T00:00:00.000Z",
     });
-    expect(revoked.state).toBe(SecretRecordStates.revoked);
-    expect(revoked.versions[1]?.state).toBe(SecretVersionStates.revoked);
+    expect(archived.state).toBe(SecretRecordStates.archived);
+    expect(archived.archivedBy).toBe("user:owner");
 
     const disabled = disableSecretRecord({
       record: rotated,
@@ -189,6 +190,14 @@ describe("SecretDomain", () => {
       disabledAt: "2026-06-01T01:00:00.000Z",
     });
     expect(disabled.state).toBe(SecretRecordStates.disabled);
+
+    const softDeleted = softDeleteSecretRecord({
+      record: archived,
+      softDeletedBy: "user:owner",
+      softDeletedAt: "2026-06-01T02:00:00.000Z",
+    });
+    expect(softDeleted.state).toBe(SecretRecordStates.softDeleted);
+    expect(softDeleted.softDeletedBy).toBe("user:owner");
   });
 
   it("produces permission and state-aware secret access decisions", () => {

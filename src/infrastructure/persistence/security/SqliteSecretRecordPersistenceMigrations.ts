@@ -32,7 +32,7 @@ export const SECRET_RECORD_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [numbe
           'generic'
         )
       ),
-      status TEXT NOT NULL CHECK (status IN ('active', 'disabled', 'revoked', 'deleted')),
+      status TEXT NOT NULL CHECK (status IN ('active', 'disabled', 'archived', 'soft-deleted')),
       active_version_id TEXT,
       protection_policy_json TEXT NOT NULL,
       created_at TEXT NOT NULL,
@@ -41,10 +41,10 @@ export const SECRET_RECORD_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [numbe
       last_modified_by TEXT NOT NULL,
       disabled_at TEXT,
       disabled_by TEXT,
-      revoked_at TEXT,
-      revoked_by TEXT,
-      deleted_at TEXT,
-      deleted_by TEXT,
+      archived_at TEXT,
+      archived_by TEXT,
+      soft_deleted_at TEXT,
+      soft_deleted_by TEXT,
       CHECK (
         (scope_type = 'server' AND workspace_id IS NULL AND user_identity_id IS NULL)
         OR (scope_type = 'workspace' AND workspace_id IS NOT NULL AND user_identity_id IS NULL)
@@ -67,7 +67,7 @@ export const SECRET_RECORD_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [numbe
       version_id TEXT PRIMARY KEY,
       secret_id TEXT NOT NULL,
       version_number INTEGER NOT NULL CHECK (version_number >= 1),
-      state TEXT NOT NULL CHECK (state IN ('active', 'superseded', 'revoked')),
+      state TEXT NOT NULL CHECK (state IN ('active', 'superseded')),
       created_at TEXT NOT NULL,
       created_by TEXT NOT NULL,
       previous_version_id TEXT,
