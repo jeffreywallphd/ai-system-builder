@@ -97,7 +97,7 @@ describe("SqliteAssetPersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM asset_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(1);
+    expect(versionRow.version).toBe(2);
 
     const tables = database.prepare(`
       SELECT name
@@ -119,6 +119,13 @@ describe("SqliteAssetPersistenceAdapter", () => {
       WHERE name IN ('raw_path', 'filesystem_path', 'local_path')
     `).get() as { total?: number };
     expect(rawPathColumn.total).toBe(0);
+
+    const encryptionDescriptorColumn = database.prepare(`
+      SELECT COUNT(*) AS total
+      FROM pragma_table_info('asset_versions')
+      WHERE name = 'content_encryption_descriptor'
+    `).get() as { total?: number };
+    expect(encryptionDescriptorColumn.total).toBe(1);
 
     database.close();
   });

@@ -2,6 +2,7 @@ import type {
   Asset,
   AssetKind,
   AssetLifecycleState,
+  AssetContentEncryptionDescriptor,
   AssetSharingPolicyReference,
   AssetStorageArea,
   AssetVisibility,
@@ -68,6 +69,7 @@ export interface AssetVersionCreationInput {
       readonly digest: string;
     };
     readonly originalFileName?: string;
+    readonly encryption?: AssetContentEncryptionDescriptor;
   };
 }
 
@@ -375,6 +377,7 @@ function normalizeAssetVersionCreationInput(input: AssetVersionCreationInput): A
         digest: normalizeRequired(input.content.checksum.digest, "Asset content checksum digest").toLowerCase(),
       }),
       originalFileName: normalizeOptional(input.content.originalFileName),
+      encryption: input.content.encryption,
     }),
   });
 }

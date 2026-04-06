@@ -34,6 +34,18 @@ import {
 } from "../../storage/use-cases/StorageLogicalAccessResolutionServiceContracts";
 import type { IStorageObjectPort } from "../../storage/ports/StorageObjectPort";
 import { AssetUploadIngestionService } from "../use-cases/AssetUploadIngestionService";
+import type { IEncryptionAtRestPolicyContextResolverPort } from "../../security/ports/EncryptionAtRestPolicyEvaluationPorts";
+import { EncryptionPolicyEvaluationService } from "../../security/use-cases/EncryptionPolicyEvaluationService";
+import { EncryptionKeyResolutionService } from "../../security/use-cases/EncryptionKeyResolutionService";
+import {
+  createEncryptionAtRestPolicyDefinition,
+  EncryptionKeyScopes,
+  EncryptionModes,
+  EncryptionPolicyScopes,
+  ProtectedDataClasses,
+} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+import { DeterministicScopeEncryptionKeyPort } from "../../../infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
+import { AesGcmAssetContentCipherPort } from "../../../infrastructure/security/encryption/AesGcmAssetContentCipherPort";
 
 class InMemoryAssetRepository implements IAssetRepository {
   public readonly records = new Map<string, Asset>();
@@ -168,6 +180,78 @@ class StubStorageLogicalAccessResolutionService implements IStorageLogicalAccess
   }
 }
 
+function createEncryptionDependencies(contentEncryptionRequired: boolean) {
+  const policyResolver: IEncryptionAtRestPolicyContextResolverPort = {
+    async resolvePolicyContext() {
+      return Object.freeze({
+        platformPolicy: createEncryptionAtRestPolicyDefinition({
+          policyId: "policy:platform:test",
+          scope: EncryptionPolicyScopes.platform,
+          rules: Object.freeze([
+            Object.freeze({
+              dataClass: ProtectedDataClasses.secretMaterial,
+              encryptionMode: EncryptionModes.scopedContent,
+              keyScope: EncryptionKeyScopes.server,
+              decryption: Object.freeze({ allowPreview: false, allowWorker: false }),
+            }),
+            Object.freeze({
+              dataClass: ProtectedDataClasses.secretMetadata,
+              encryptionMode: EncryptionModes.metadataOnly,
+              keyScope: EncryptionKeyScopes.server,
+              decryption: Object.freeze({ allowPreview: false, allowWorker: false }),
+            }),
+            Object.freeze({
+              dataClass: ProtectedDataClasses.sensitiveMetadata,
+              encryptionMode: EncryptionModes.metadataOnly,
+              keyScope: EncryptionKeyScopes.server,
+              decryption: Object.freeze({ allowPreview: false, allowWorker: false }),
+            }),
+          ]),
+        }),
+        storageInstancePolicy: createEncryptionAtRestPolicyDefinition({
+          policyId: "policy:storage:test",
+          scope: EncryptionPolicyScopes.storageInstance,
+          workspaceId: "workspace-alpha",
+          storageInstanceId: "storage-alpha",
+          rules: Object.freeze([
+            Object.freeze({
+              dataClass: ProtectedDataClasses.assetContent,
+              encryptionMode: contentEncryptionRequired ? EncryptionModes.scopedContent : EncryptionModes.none,
+              keyScope: contentEncryptionRequired ? EncryptionKeyScopes.storageInstance : undefined,
+              decryption: Object.freeze({
+                allowPreview: contentEncryptionRequired,
+                allowWorker: contentEncryptionRequired,
+              }),
+            }),
+          ]),
+        }),
+      });
+    },
+  };
+
+  const keyPort = new DeterministicScopeEncryptionKeyPort({
+    encodedKey: Buffer.alloc(32, 7).toString("base64"),
+    keyPrefix: "kek:asset-content:test",
+  });
+
+  const encryptionPolicyEvaluationService = new EncryptionPolicyEvaluationService({
+    encryptionAtRestPolicyContextResolverPort: policyResolver,
+  });
+  const encryptionKeyResolutionService = new EncryptionKeyResolutionService({
+    encryptionPolicyEvaluationService,
+    encryptionKeyCatalogPort: keyPort,
+  });
+  const assetContentCipherPort = new AesGcmAssetContentCipherPort({
+    keyMaterialPort: keyPort,
+  });
+
+  return {
+    encryptionPolicyEvaluationService,
+    encryptionKeyResolutionService,
+    assetContentCipherPort,
+  };
+}
+
 function createStorage(): StorageInstance {
   return createStorageInstance({
     id: "storage-alpha",
@@ -267,6 +351,7 @@ describe("AssetUploadIngestionService", () => {
     const uploadSessionRepository = new InMemoryUploadSessionRepository();
     const objectPort = new InMemoryStorageObjectPort();
     const storage = createStorage();
+    const encryption = createEncryptionDependencies(false);
     await seedAsset(assetRepository);
     await seedPendingSession(uploadSessionRepository, 12);
 
@@ -282,6 +367,7 @@ describe("AssetUploadIngestionService", () => {
           occurredAt: "2026-04-06T12:00:00.000Z",
         },
       }),
+      ...encryption,
       clock: {
         now: () => new Date("2026-04-06T12:00:00.000Z"),
       },
@@ -319,6 +405,7 @@ describe("AssetUploadIngestionService", () => {
     const uploadSessionRepository = new InMemoryUploadSessionRepository();
     const objectPort = new InMemoryStorageObjectPort();
     const storage = createStorage();
+    const encryption = createEncryptionDependencies(false);
     await seedAsset(assetRepository);
     await seedPendingSession(uploadSessionRepository, 4);
 
@@ -334,6 +421,7 @@ describe("AssetUploadIngestionService", () => {
           occurredAt: "2026-04-06T12:00:00.000Z",
         },
       }),
+      ...encryption,
       clock: {
         now: () => new Date("2026-04-06T12:00:00.000Z"),
       },
@@ -367,6 +455,7 @@ describe("AssetUploadIngestionService", () => {
     const uploadSessionRepository = new InMemoryUploadSessionRepository();
     const objectPort = new InMemoryStorageObjectPort();
     const storage = createStorage();
+    const encryption = createEncryptionDependencies(false);
     await seedAsset(assetRepository);
     await seedPendingSession(uploadSessionRepository, 8);
 
@@ -382,6 +471,7 @@ describe("AssetUploadIngestionService", () => {
           occurredAt: "2026-04-06T12:00:00.000Z",
         },
       }),
+      ...encryption,
       clock: {
         now: () => new Date("2026-04-06T12:00:00.000Z"),
       },
@@ -415,6 +505,7 @@ describe("AssetUploadIngestionService", () => {
     const uploadSessionRepository = new InMemoryUploadSessionRepository();
     const objectPort = new InMemoryStorageObjectPort();
     const storage = createStorage();
+    const encryption = createEncryptionDependencies(false);
     await seedAsset(assetRepository);
     await seedPendingSession(uploadSessionRepository, 11);
 
@@ -430,6 +521,7 @@ describe("AssetUploadIngestionService", () => {
           occurredAt: "2026-04-06T12:00:00.000Z",
         },
       }),
+      ...encryption,
       clock: {
         now: () => new Date("2026-04-06T12:00:00.000Z"),
       },
@@ -458,5 +550,58 @@ describe("AssetUploadIngestionService", () => {
     expect(version?.content.checksum.algorithm).toBe("sha256");
     expect(version?.content.checksum.digest.length).toBe(64);
     expect(version?.content.originalFileName).toBe("file.bin");
+  });
+
+  it("encrypts ingested content when policy requires scoped-content encryption", async () => {
+    const assetRepository = new InMemoryAssetRepository();
+    const uploadSessionRepository = new InMemoryUploadSessionRepository();
+    const objectPort = new InMemoryStorageObjectPort();
+    const storage = createStorage();
+    const encryption = createEncryptionDependencies(true);
+    await seedAsset(assetRepository);
+    await seedPendingSession(uploadSessionRepository, 11);
+
+    const service = new AssetUploadIngestionService({
+      repository: assetRepository,
+      uploadSessionRepository,
+      storageLogicalAccessResolutionService: new StubStorageLogicalAccessResolutionService({
+        ok: true,
+        value: {
+          intent: StorageLogicalAccessOperationIntents.writeObject,
+          storageInstance: storage,
+          objectPort,
+          occurredAt: "2026-04-06T12:00:00.000Z",
+        },
+      }),
+      ...encryption,
+      clock: {
+        now: () => new Date("2026-04-06T12:00:00.000Z"),
+      },
+    });
+
+    const result = await service.ingestUploadContent({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      operationKey: "asset:upload:finalize:encrypted",
+      uploadSessionId: "asset-upload-session:test-001",
+      contentType: "application/octet-stream",
+      content: toContent(["hello world"]),
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      return;
+    }
+
+    const storedObject = objectPort.objects.get(
+      "workspaces/workspace-alpha/assets/asset-upload-001/input/asset-upload-session-test-001/file.bin",
+    );
+    expect(storedObject).toBeDefined();
+    expect(storedObject && Buffer.from(storedObject).toString("utf8")).not.toBe("hello world");
+
+    const persisted = await assetRepository.findAssetById("asset-upload-001");
+    const latestVersion = persisted?.versions[persisted.versions.length - 1];
+    expect(latestVersion?.content.encryption?.format).toBe("asset-content/aes-256-gcm/v1");
+    expect(latestVersion?.content.encryption?.keyReferenceId).toContain("kek:asset-content:test");
   });
 });

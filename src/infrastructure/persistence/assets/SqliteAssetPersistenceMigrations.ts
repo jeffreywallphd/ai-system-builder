@@ -1,4 +1,4 @@
-export const ASSET_PERSISTENCE_SCHEMA_VERSION = 1;
+export const ASSET_PERSISTENCE_SCHEMA_VERSION = 2;
 
 export const ASSET_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -117,5 +117,9 @@ export const ASSET_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, strin
       ON asset_lineage_links(source_asset_id, source_asset_version_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS asset_lineage_links_asset_idx
       ON asset_lineage_links(asset_id, created_at DESC);
+  `],
+  [2, `
+    ALTER TABLE asset_versions
+      ADD COLUMN content_encryption_descriptor TEXT;
   `],
 ]);

@@ -141,6 +141,7 @@ export class AssetUploadInitiationService {
             sizeBytes: request.initialVersion.content.sizeBytes,
             checksum: request.initialVersion.content.checksum,
             originalFileName: request.initialVersion.content.originalFileName,
+            encryption: request.initialVersion.content.encryption,
           }),
           createdBy: request.actorUserId,
           createdAt: occurredAt,

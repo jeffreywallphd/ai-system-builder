@@ -24,6 +24,17 @@ import {
 } from "../../../domain/storage/StorageDomain";
 import { AssetDownloadPurposes } from "../use-cases/AssetServiceContracts";
 import { AssetDownloadService } from "../use-cases/AssetDownloadService";
+import type { IEncryptionAtRestPolicyContextResolverPort } from "../../security/ports/EncryptionAtRestPolicyEvaluationPorts";
+import { EncryptionPolicyEvaluationService } from "../../security/use-cases/EncryptionPolicyEvaluationService";
+import {
+  createEncryptionAtRestPolicyDefinition,
+  EncryptionKeyScopes,
+  EncryptionModes,
+  EncryptionPolicyScopes,
+  ProtectedDataClasses,
+} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+import { DeterministicScopeEncryptionKeyPort } from "../../../infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
+import { AesGcmAssetContentCipherPort } from "../../../infrastructure/security/encryption/AesGcmAssetContentCipherPort";
 
 class InMemoryAssetRepository implements IAssetRepository {
   public constructor(private readonly asset: Asset) {}
@@ -94,6 +105,8 @@ class WorkspaceAuthorizationRepository implements IWorkspaceAuthorizationReadRep
 }
 
 class StubStorageLogicalAccessResolutionService implements IStorageLogicalAccessResolutionService {
+  public constructor(private readonly payload: Uint8Array = Buffer.from("hello", "utf8")) {}
+
   private readonly storageInstance = createStorageInstance({
     id: "storage-alpha",
     displayName: "Storage Alpha",
@@ -146,9 +159,9 @@ class StubStorageLogicalAccessResolutionService implements IStorageLogicalAccess
             sizeBytes: 5,
             lastModifiedAt: "2026-04-06T12:00:00.000Z",
           }),
-          openObjectReadStream: async function* () {
-            yield Buffer.from("hello", "utf8");
-          },
+          openObjectReadStream: async () => (async function* stream(payload: Uint8Array) {
+            yield payload;
+          })(this.payload),
           deleteObject: async () => ({
             objectKey: "object",
             deleted: true,
@@ -196,7 +209,79 @@ class InMemoryDownloadGrantPort implements IAssetDownloadGrantPort {
   }
 }
 
-function createTestAsset(): Asset {
+function createEncryptionDependencies(input?: {
+  readonly contentEncryptionRequired?: boolean;
+  readonly allowPreviewDecryption?: boolean;
+  readonly allowWorkerDecryption?: boolean;
+}) {
+  const contentEncryptionRequired = input?.contentEncryptionRequired ?? false;
+  const allowPreviewDecryption = input?.allowPreviewDecryption ?? false;
+  const allowWorkerDecryption = input?.allowWorkerDecryption ?? false;
+  const policyResolver: IEncryptionAtRestPolicyContextResolverPort = {
+    async resolvePolicyContext() {
+      return Object.freeze({
+        platformPolicy: createEncryptionAtRestPolicyDefinition({
+          policyId: "policy:platform:test",
+          scope: EncryptionPolicyScopes.platform,
+          rules: Object.freeze([
+            Object.freeze({
+              dataClass: ProtectedDataClasses.secretMaterial,
+              encryptionMode: EncryptionModes.scopedContent,
+              keyScope: EncryptionKeyScopes.server,
+              decryption: Object.freeze({ allowPreview: false, allowWorker: false }),
+            }),
+            Object.freeze({
+              dataClass: ProtectedDataClasses.secretMetadata,
+              encryptionMode: EncryptionModes.metadataOnly,
+              keyScope: EncryptionKeyScopes.server,
+              decryption: Object.freeze({ allowPreview: false, allowWorker: false }),
+            }),
+            Object.freeze({
+              dataClass: ProtectedDataClasses.sensitiveMetadata,
+              encryptionMode: EncryptionModes.metadataOnly,
+              keyScope: EncryptionKeyScopes.server,
+              decryption: Object.freeze({ allowPreview: false, allowWorker: false }),
+            }),
+          ]),
+        }),
+        storageInstancePolicy: createEncryptionAtRestPolicyDefinition({
+          policyId: "policy:storage:test",
+          scope: EncryptionPolicyScopes.storageInstance,
+          workspaceId: "workspace-alpha",
+          storageInstanceId: "storage-alpha",
+          rules: Object.freeze([
+            Object.freeze({
+              dataClass: ProtectedDataClasses.assetContent,
+              encryptionMode: contentEncryptionRequired ? EncryptionModes.scopedContent : EncryptionModes.none,
+              keyScope: contentEncryptionRequired ? EncryptionKeyScopes.storageInstance : undefined,
+              decryption: Object.freeze({
+                allowPreview: allowPreviewDecryption,
+                allowWorker: allowWorkerDecryption,
+              }),
+            }),
+          ]),
+        }),
+      });
+    },
+  };
+
+  const keyPort = new DeterministicScopeEncryptionKeyPort({
+    encodedKey: Buffer.alloc(32, 9).toString("base64"),
+    keyPrefix: "kek:asset-content:test",
+  });
+
+  return {
+    encryptionPolicyEvaluationService: new EncryptionPolicyEvaluationService({
+      encryptionAtRestPolicyContextResolverPort: policyResolver,
+    }),
+    assetContentCipherPort: new AesGcmAssetContentCipherPort({
+      keyMaterialPort: keyPort,
+    }),
+    keyPort,
+  };
+}
+
+function createTestAsset(input?: { readonly encryption?: NonNullable<ReturnType<typeof createContentDescriptor>["encryption"]> }): Asset {
   return createAsset({
     id: "asset-download-001",
     kind: AssetKinds.generatedOutput,
@@ -226,6 +311,7 @@ function createTestAsset(): Asset {
           digest: "a".repeat(64),
         },
         originalFileName: "file.png",
+        encryption: input?.encryption,
       }),
       createdBy: "user-owner",
       createdAt: "2026-04-06T12:00:00.000Z",
@@ -237,11 +323,16 @@ describe("AssetDownloadService", () => {
   it("authorizes download and opens a streaming response for the same actor", async () => {
     const workspaceAuthorization = new WorkspaceAuthorizationRepository();
     const grantPort = new InMemoryDownloadGrantPort();
+    const encryption = createEncryptionDependencies({
+      contentEncryptionRequired: false,
+    });
     const service = new AssetDownloadService({
       repository: new InMemoryAssetRepository(createTestAsset()),
       workspaceAuthorizationReadRepository: workspaceAuthorization,
       storageLogicalAccessResolutionService: new StubStorageLogicalAccessResolutionService(),
       downloadGrantPort: grantPort,
+      encryptionPolicyEvaluationService: encryption.encryptionPolicyEvaluationService,
+      assetContentCipherPort: encryption.assetContentCipherPort,
     });
 
     const authorization = await service.authorizeAssetDownload({
@@ -275,11 +366,16 @@ describe("AssetDownloadService", () => {
 
   it("returns not-found for private assets owned by another user", async () => {
     const workspaceAuthorization = new WorkspaceAuthorizationRepository();
+    const encryption = createEncryptionDependencies({
+      contentEncryptionRequired: false,
+    });
     const service = new AssetDownloadService({
       repository: new InMemoryAssetRepository(createTestAsset()),
       workspaceAuthorizationReadRepository: workspaceAuthorization,
       storageLogicalAccessResolutionService: new StubStorageLogicalAccessResolutionService(),
       downloadGrantPort: new InMemoryDownloadGrantPort(),
+      encryptionPolicyEvaluationService: encryption.encryptionPolicyEvaluationService,
+      assetContentCipherPort: encryption.assetContentCipherPort,
     });
 
     const outcome = await service.authorizeAssetDownload({
@@ -298,11 +394,16 @@ describe("AssetDownloadService", () => {
 
   it("blocks stream opening when content token is invalid", async () => {
     const workspaceAuthorization = new WorkspaceAuthorizationRepository();
+    const encryption = createEncryptionDependencies({
+      contentEncryptionRequired: false,
+    });
     const service = new AssetDownloadService({
       repository: new InMemoryAssetRepository(createTestAsset()),
       workspaceAuthorizationReadRepository: workspaceAuthorization,
       storageLogicalAccessResolutionService: new StubStorageLogicalAccessResolutionService(),
       downloadGrantPort: new InMemoryDownloadGrantPort(),
+      encryptionPolicyEvaluationService: encryption.encryptionPolicyEvaluationService,
+      assetContentCipherPort: encryption.assetContentCipherPort,
     });
 
     const outcome = await service.openAuthorizedAssetDownloadStream({
@@ -317,6 +418,110 @@ describe("AssetDownloadService", () => {
       return;
     }
     expect(outcome.error.code).toBe("asset-access-denied");
+  });
+
+  it("decrypts encrypted asset content for authorized downloads when policy allows", async () => {
+    const workspaceAuthorization = new WorkspaceAuthorizationRepository();
+    const grantPort = new InMemoryDownloadGrantPort();
+    const encryption = createEncryptionDependencies({
+      contentEncryptionRequired: true,
+      allowPreviewDecryption: true,
+      allowWorkerDecryption: true,
+    });
+    const activeKey = await encryption.keyPort.resolveActiveKeyForScope({
+      scopeOwner: {
+        scope: "storage-instance",
+        workspaceId: "workspace-alpha",
+        storageInstanceId: "storage-alpha",
+      },
+    });
+    if (!activeKey) {
+      throw new Error("expected deterministic key");
+    }
+
+    const encryptedSession = await encryption.assetContentCipherPort.beginEncryption({
+      plaintext: (async function* () {
+        yield Buffer.from("hello", "utf8");
+      })(),
+      key: activeKey,
+      aad: "asset-content-encryption/v1;workspace=workspace-alpha;storage=storage-alpha;asset=asset-download-001;version=asset-download-001:v1;area=output;object=workspaces/workspace-alpha/assets/asset-download-001/output/v1/file.png",
+      encryptedAt: "2026-04-06T12:00:00.000Z",
+    });
+    const encryptedChunks: Buffer[] = [];
+    for await (const chunk of encryptedSession.ciphertext) {
+      encryptedChunks.push(Buffer.from(chunk));
+    }
+    const encryptedResult = await encryptedSession.complete();
+    const encryptedBytes = Buffer.concat(encryptedChunks);
+
+    const service = new AssetDownloadService({
+      repository: new InMemoryAssetRepository(createTestAsset({
+        encryption: encryptedResult.descriptor,
+      })),
+      workspaceAuthorizationReadRepository: workspaceAuthorization,
+      storageLogicalAccessResolutionService: new StubStorageLogicalAccessResolutionService(encryptedBytes),
+      downloadGrantPort: grantPort,
+      encryptionPolicyEvaluationService: encryption.encryptionPolicyEvaluationService,
+      assetContentCipherPort: encryption.assetContentCipherPort,
+    });
+
+    const authorization = await service.authorizeAssetDownload({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-download-001",
+      purpose: AssetDownloadPurposes.download,
+    });
+    expect(authorization.ok).toBeTrue();
+    if (!authorization.ok) {
+      return;
+    }
+
+    const streamResult = await service.openAuthorizedAssetDownloadStream({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-download-001",
+      contentToken: authorization.value.contentToken,
+    });
+    expect(streamResult.ok).toBeTrue();
+    if (!streamResult.ok) {
+      return;
+    }
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of streamResult.value.stream) {
+      chunks.push(Buffer.from(chunk));
+    }
+    expect(Buffer.concat(chunks).toString("utf8")).toBe("hello");
+  });
+
+  it("denies download authorization when policy requires encryption but asset content is plaintext", async () => {
+    const workspaceAuthorization = new WorkspaceAuthorizationRepository();
+    const encryption = createEncryptionDependencies({
+      contentEncryptionRequired: true,
+      allowPreviewDecryption: true,
+      allowWorkerDecryption: true,
+    });
+    const service = new AssetDownloadService({
+      repository: new InMemoryAssetRepository(createTestAsset()),
+      workspaceAuthorizationReadRepository: workspaceAuthorization,
+      storageLogicalAccessResolutionService: new StubStorageLogicalAccessResolutionService(),
+      downloadGrantPort: new InMemoryDownloadGrantPort(),
+      encryptionPolicyEvaluationService: encryption.encryptionPolicyEvaluationService,
+      assetContentCipherPort: encryption.assetContentCipherPort,
+    });
+
+    const outcome = await service.authorizeAssetDownload({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-download-001",
+      purpose: AssetDownloadPurposes.download,
+    });
+
+    expect(outcome.ok).toBeFalse();
+    if (outcome.ok) {
+      return;
+    }
+    expect(outcome.error.code).toBe("asset-policy-violation");
   });
 });
 

@@ -281,3 +281,25 @@ Added coverage:
 - `src/infrastructure/security/assets/tests/EncryptedAssetDownloadGrantAdapter.test.ts`
 - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+
+## Story 11.3.2: policy-aware encryption enforcement during ingest and retrieval
+
+Added policy-aware encryption-at-rest enforcement for logical asset content paths:
+
+- Upload ingestion now evaluates effective encryption policy for `asset-content` before writes.
+- Scoped-content-required policies now encrypt bytes on ingest through server-managed AES-GCM content-cipher adapters.
+- Asset versions now persist optional encrypted-content descriptors for controlled decryption (`asset_versions.content_encryption_descriptor`) without exposing raw filesystem paths.
+- Download authorization and stream-open flows now enforce effective policy on retrieval:
+  - fail closed if policy requires encryption but content is plaintext,
+  - gate preview/worker decryption only when encrypted content is involved,
+  - decrypt encrypted streams server-side for authorized callers.
+- Host composition now wires workspace/storage-aware encryption policy context resolution plus scoped key resolution/material adapters for asset content operations.
+
+Added/extended coverage:
+
+- `src/application/assets/tests/AssetUploadIngestionService.test.ts`
+- `src/application/assets/tests/AssetDownloadService.test.ts`
+- `src/infrastructure/security/encryption/tests/AesGcmAssetContentCipherPort.test.ts`
+- `src/infrastructure/security/encryption/tests/DeterministicScopeEncryptionKeyPort.test.ts`
+- `src/infrastructure/persistence/assets/tests/AssetPersistenceMapper.test.ts`
+- `src/infrastructure/persistence/assets/tests/SqliteAssetPersistenceAdapter.test.ts`

@@ -1,5 +1,6 @@
 import {
   AssetDomainError,
+  AssetContentEncryptionFormats,
   AssetLifecycleStates,
   addAssetVersion,
   createAssetLocationRef,
@@ -17,6 +18,11 @@ import type { StorageInstance } from "../../../domain/storage/StorageDomain";
 import type { IAssetRepository } from "../ports/IAssetRepository";
 import type { IAssetUploadSessionRepository } from "../ports/IAssetUploadSessionRepository";
 import type { AssetAuditSink } from "../ports/AssetAuditPort";
+import type { IAssetContentCipherPort } from "../ports/AssetContentCipherPort";
+import type { IEncryptionKeyResolutionService } from "../../security/use-cases/EncryptionKeyResolutionServiceContracts";
+import { EncryptionMaterialClasses } from "../../security/use-cases/EncryptionKeyResolutionServiceContracts";
+import type { IEncryptionPolicyEvaluationService } from "../../security/use-cases/EncryptionPolicyEvaluationServiceContracts";
+import { ProtectedDataClasses } from "../../../domain/security/EncryptionAtRestPolicyDomain";
 import {
   AssetServiceErrorCodes,
   type AssetServiceResult,
@@ -52,6 +58,9 @@ export interface AssetUploadIngestionServiceDependencies {
   readonly repository: IAssetRepository;
   readonly uploadSessionRepository: IAssetUploadSessionRepository;
   readonly storageLogicalAccessResolutionService: IStorageLogicalAccessResolutionService;
+  readonly encryptionPolicyEvaluationService: IEncryptionPolicyEvaluationService;
+  readonly encryptionKeyResolutionService: IEncryptionKeyResolutionService;
+  readonly assetContentCipherPort: IAssetContentCipherPort;
   readonly auditSink?: AssetAuditSink;
   readonly clock?: {
     now(): Date;
@@ -129,33 +138,147 @@ export class AssetUploadIngestionService {
       storageInstance: accessPlan.value.storageInstance,
       objectKey: uploadSession.objectKey,
     } as const;
+    const finalizedVersionId = `${asset.id}:v${String(asset.versions.length + 1)}`;
+    const contentEncryptionDecision = await this.dependencies.encryptionPolicyEvaluationService.evaluateContentEncryptionRequirement({
+      dataClass: ProtectedDataClasses.assetContent,
+      workspaceId: input.workspaceId,
+      storageInstanceId: uploadSession.storageInstanceId,
+      occurredAt,
+    });
+    if (!contentEncryptionDecision.ok) {
+      await this.markUploadIncomplete(
+        uploadSession,
+        occurredAt,
+        contentEncryptionDecision.error.code,
+        contentEncryptionDecision.error.message,
+      );
+      return this.failureFromEncryptionPolicy(contentEncryptionDecision.error.code, contentEncryptionDecision.error.message);
+    }
 
     try {
+      let writeContent: AsyncIterable<Uint8Array> = this.enforceMaximumPayloadSize(
+        input.content,
+        uploadSession.expected.sizeBytes,
+      );
+      let encryptedDescriptor: {
+        readonly format: "asset-content/aes-256-gcm/v1";
+        readonly algorithm: "aes-256-gcm";
+        readonly keyReferenceId: string;
+        readonly keyId: string;
+        readonly keyVersion?: string;
+        readonly keyScope: "server" | "workspace" | "storage-instance";
+        readonly workspaceId?: string;
+        readonly storageInstanceId?: string;
+        readonly ivBase64: string;
+        readonly authTagBase64: string;
+        readonly aad: string;
+        readonly encryptedAt: string;
+      } | undefined;
+      let plaintextSizeBytes: number | undefined;
+      let plaintextChecksumDigest: string | undefined;
+      let encryptionCompletion:
+        | (() => Promise<{
+          readonly plaintextSizeBytes: number;
+          readonly plaintextChecksum: {
+            readonly algorithm: "sha256";
+            readonly digest: string;
+          };
+          readonly descriptor: {
+            readonly format: "asset-content/aes-256-gcm/v1";
+            readonly algorithm: "aes-256-gcm";
+            readonly keyReferenceId: string;
+            readonly keyId: string;
+            readonly keyVersion?: string;
+            readonly keyScope: "server" | "workspace" | "storage-instance";
+            readonly workspaceId?: string;
+            readonly storageInstanceId?: string;
+            readonly ivBase64: string;
+            readonly authTagBase64: string;
+            readonly aad: string;
+            readonly encryptedAt: string;
+          };
+        }>)
+        | undefined;
+
+      if (contentEncryptionDecision.value.required) {
+        const keyResolution = await this.dependencies.encryptionKeyResolutionService.resolveKeyForMaterial({
+          materialClass: EncryptionMaterialClasses.assetContent,
+          workspaceId: input.workspaceId,
+          storageInstanceId: uploadSession.storageInstanceId,
+          occurredAt,
+        });
+        if (!keyResolution.ok) {
+          await this.markUploadIncomplete(
+            uploadSession,
+            occurredAt,
+            keyResolution.error.code,
+            keyResolution.error.message,
+          );
+          return this.failureFromKeyResolution(keyResolution.error.code, keyResolution.error.message);
+        }
+
+        const encryptionSession = await this.dependencies.assetContentCipherPort.beginEncryption({
+          plaintext: writeContent,
+          key: keyResolution.value.key,
+          aad: buildAssetContentAad({
+            workspaceId: input.workspaceId,
+            storageInstanceId: uploadSession.storageInstanceId,
+            assetId: asset.id,
+            versionId: finalizedVersionId,
+            objectKey: uploadSession.objectKey,
+            area: uploadSession.area,
+          }),
+          encryptedAt: occurredAt,
+        });
+        writeContent = encryptionSession.ciphertext;
+        encryptionCompletion = encryptionSession.complete;
+      }
+
       const writeResult = await accessPlan.value.objectPort.writeObject({
         reference,
-        content: this.enforceMaximumPayloadSize(input.content, uploadSession.expected.sizeBytes),
+        content: writeContent,
         overwriteExisting: true,
       });
 
-      if (writeResult.sizeBytes !== uploadSession.expected.sizeBytes) {
+      if (encryptionCompletion) {
+        const encryptedOutcome = await encryptionCompletion();
+        encryptedDescriptor = {
+          format: AssetContentEncryptionFormats.aes256GcmV1,
+          algorithm: "aes-256-gcm",
+          keyReferenceId: encryptedOutcome.descriptor.keyReferenceId,
+          keyId: encryptedOutcome.descriptor.keyId,
+          keyVersion: encryptedOutcome.descriptor.keyVersion,
+          keyScope: encryptedOutcome.descriptor.keyScope,
+          workspaceId: encryptedOutcome.descriptor.workspaceId,
+          storageInstanceId: encryptedOutcome.descriptor.storageInstanceId,
+          ivBase64: encryptedOutcome.descriptor.ivBase64,
+          authTagBase64: encryptedOutcome.descriptor.authTagBase64,
+          aad: encryptedOutcome.descriptor.aad,
+          encryptedAt: encryptedOutcome.descriptor.encryptedAt,
+        };
+        plaintextSizeBytes = encryptedOutcome.plaintextSizeBytes;
+        plaintextChecksumDigest = encryptedOutcome.plaintextChecksum.digest;
+      }
+
+      const effectiveSizeBytes = plaintextSizeBytes ?? writeResult.sizeBytes;
+      if (effectiveSizeBytes !== uploadSession.expected.sizeBytes) {
         await this.cleanupObject(accessPlan.value.objectPort, reference);
         await this.markUploadIncomplete(
           uploadSession,
           occurredAt,
           "upload-size-mismatch",
-          `Upload size mismatch. Expected ${String(uploadSession.expected.sizeBytes)} bytes but received ${String(writeResult.sizeBytes)} bytes.`,
+          `Upload size mismatch. Expected ${String(uploadSession.expected.sizeBytes)} bytes but received ${String(effectiveSizeBytes)} bytes.`,
         );
         return this.failure(
           AssetServiceErrorCodes.invalidRequest,
           "Upload payload size did not match the expected upload session size.",
           Object.freeze({
             expectedSizeBytes: uploadSession.expected.sizeBytes,
-            actualSizeBytes: writeResult.sizeBytes,
+            actualSizeBytes: effectiveSizeBytes,
           }),
         );
       }
 
-      const finalizedVersionId = `${asset.id}:v${String(asset.versions.length + 1)}`;
       const finalizedMimeType = normalizeMimeType(input.contentType ?? uploadSession.expected.mimeType);
       const finalizedAsset = addAssetVersion(asset, {
         versionId: finalizedVersionId,
@@ -168,12 +291,13 @@ export class AssetUploadIngestionService {
         }),
         content: createContentDescriptor({
           mimeType: finalizedMimeType,
-          sizeBytes: writeResult.sizeBytes,
+          sizeBytes: effectiveSizeBytes,
           checksum: {
-            algorithm: writeResult.checksum.algorithm,
-            digest: writeResult.checksum.digest,
+            algorithm: "sha256",
+            digest: plaintextChecksumDigest ?? writeResult.checksum.digest,
           },
           originalFileName: uploadSession.expected.fileName,
+          encryption: encryptedDescriptor,
         }),
         actorUserId: input.actorUserId,
         occurredAt,
@@ -187,9 +311,9 @@ export class AssetUploadIngestionService {
         finalizedVersionId,
         finalizedContent: Object.freeze({
           mimeType: finalizedMimeType,
-          sizeBytes: writeResult.sizeBytes,
-          checksumAlgorithm: writeResult.checksum.algorithm,
-          checksumDigest: writeResult.checksum.digest,
+          sizeBytes: effectiveSizeBytes,
+          checksumAlgorithm: "sha256",
+          checksumDigest: plaintextChecksumDigest ?? writeResult.checksum.digest,
           originalFileName: uploadSession.expected.fileName,
         }),
         incompleteReasonCode: undefined,
@@ -214,9 +338,11 @@ export class AssetUploadIngestionService {
           uploadSessionId: uploadSession.uploadSessionId,
           storageInstanceId: uploadSession.storageInstanceId,
           objectKey: uploadSession.objectKey,
-          sizeBytes: writeResult.sizeBytes,
-          checksumAlgorithm: writeResult.checksum.algorithm,
-          checksumDigest: writeResult.checksum.digest,
+          sizeBytes: effectiveSizeBytes,
+          checksumAlgorithm: "sha256",
+          checksumDigest: plaintextChecksumDigest ?? writeResult.checksum.digest,
+          encryptedAtRest: Boolean(encryptedDescriptor),
+          encryptionKeyReferenceId: encryptedDescriptor?.keyReferenceId,
         },
       });
 
@@ -228,10 +354,10 @@ export class AssetUploadIngestionService {
           uploadSessionId: uploadSession.uploadSessionId,
           content: Object.freeze({
             mimeType: finalizedMimeType,
-            sizeBytes: writeResult.sizeBytes,
+            sizeBytes: effectiveSizeBytes,
             checksum: Object.freeze({
-              algorithm: writeResult.checksum.algorithm,
-              digest: writeResult.checksum.digest,
+              algorithm: "sha256",
+              digest: plaintextChecksumDigest ?? writeResult.checksum.digest,
             }),
             originalFileName: uploadSession.expected.fileName,
           }),
@@ -372,6 +498,40 @@ export class AssetUploadIngestionService {
     }
   }
 
+  private failureFromEncryptionPolicy(
+    code: string,
+    message: string,
+  ): AssetServiceResult<never> {
+    switch (code) {
+      case "encryption-policy-invalid-request":
+        return this.failure(AssetServiceErrorCodes.invalidRequest, message);
+      case "encryption-policy-violation":
+        return this.failure(AssetServiceErrorCodes.policyViolation, message);
+      case "encryption-policy-resolution-failed":
+        return this.failure(AssetServiceErrorCodes.invalidState, message);
+      default:
+        return this.failure(AssetServiceErrorCodes.internal, message);
+    }
+  }
+
+  private failureFromKeyResolution(
+    code: string,
+    message: string,
+  ): AssetServiceResult<never> {
+    switch (code) {
+      case "encryption-key-resolution-invalid-request":
+        return this.failure(AssetServiceErrorCodes.invalidRequest, message);
+      case "encryption-key-resolution-policy-violation":
+        return this.failure(AssetServiceErrorCodes.policyViolation, message);
+      case "encryption-key-resolution-key-unavailable":
+      case "encryption-key-resolution-not-found":
+        return this.failure(AssetServiceErrorCodes.invalidState, message);
+      case "encryption-key-resolution-failed":
+      default:
+        return this.failure(AssetServiceErrorCodes.internal, message);
+    }
+  }
+
   private async publishAuditEvent(event: Parameters<AssetAuditSink["recordAssetEvent"]>[0]): Promise<void> {
     if (!this.dependencies.auditSink) {
       return;
@@ -445,4 +605,23 @@ function resolveUploadFailureCode(error: unknown): string {
     return error.code;
   }
   return "upload-ingestion-failed";
+}
+
+function buildAssetContentAad(input: {
+  readonly workspaceId: string;
+  readonly storageInstanceId: string;
+  readonly assetId: string;
+  readonly versionId: string;
+  readonly objectKey: string;
+  readonly area: string;
+}): string {
+  return [
+    "asset-content-encryption/v1",
+    `workspace=${input.workspaceId}`,
+    `storage=${input.storageInstanceId}`,
+    `asset=${input.assetId}`,
+    `version=${input.versionId}`,
+    `area=${input.area}`,
+    `object=${input.objectKey}`,
+  ].join(";");
 }

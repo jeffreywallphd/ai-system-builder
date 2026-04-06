@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { createServer as createHttpsServer } from "node:https";
@@ -74,6 +74,8 @@ import { AssetDiscoveryService } from "../../src/application/assets/use-cases/As
 import { AssetDetailService } from "../../src/application/assets/use-cases/AssetDetailService";
 import { AssetDownloadService } from "../../src/application/assets/use-cases/AssetDownloadService";
 import { StorageLogicalAccessResolutionService } from "../../src/application/storage/use-cases/StorageLogicalAccessResolutionService";
+import { EncryptionPolicyEvaluationService } from "../../src/application/security/use-cases/EncryptionPolicyEvaluationService";
+import { EncryptionKeyResolutionService } from "../../src/application/security/use-cases/EncryptionKeyResolutionService";
 import { StorageBackendProvisioningOrchestrator } from "../../src/infrastructure/storage/StorageBackendProvisioningOrchestrator";
 import { createStorageBackendAdapterRegistry } from "../../src/infrastructure/storage/StorageBackendAdapterRegistry";
 import {
@@ -82,6 +84,9 @@ import {
 } from "../../src/infrastructure/storage/local";
 import { ServerManagedStorageSynchronizationAdapter } from "../../src/infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
 import { EncryptedAssetDownloadGrantAdapter } from "../../src/infrastructure/security/assets/EncryptedAssetDownloadGrantAdapter";
+import { AesGcmAssetContentCipherPort } from "../../src/infrastructure/security/encryption/AesGcmAssetContentCipherPort";
+import { DeterministicScopeEncryptionKeyPort } from "../../src/infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
+import { WorkspaceStorageEncryptionPolicyContextResolver } from "../../src/infrastructure/security/encryption/WorkspaceStorageEncryptionPolicyContextResolver";
 import {
   assertCertificateAuthorityStartupSafe,
   ResolveCertificateAuthorityStartupStateUseCase,
@@ -819,10 +824,31 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     policyPort: workspaceAwareStoragePolicyEvaluationAdapter,
     objectAccessResolver: storageBackendAdapterRegistry,
   });
+  const assetContentKeyPort = new DeterministicScopeEncryptionKeyPort({
+    encodedKey: resolveAssetContentEncryptionKey(env),
+    keyPrefix: normalizeOptional(env.AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY_PREFIX) ?? "kek:asset-content",
+  });
+  const assetEncryptionPolicyContextResolver = new WorkspaceStorageEncryptionPolicyContextResolver({
+    workspaceRepository,
+    storageInstanceRepository,
+  });
+  const assetEncryptionPolicyEvaluationService = new EncryptionPolicyEvaluationService({
+    encryptionAtRestPolicyContextResolverPort: assetEncryptionPolicyContextResolver,
+  });
+  const assetEncryptionKeyResolutionService = new EncryptionKeyResolutionService({
+    encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
+    encryptionKeyCatalogPort: assetContentKeyPort,
+  });
+  const assetContentCipherPort = new AesGcmAssetContentCipherPort({
+    keyMaterialPort: assetContentKeyPort,
+  });
   const assetUploadIngestionService = new AssetUploadIngestionService({
     repository: assetRepository,
     uploadSessionRepository: assetUploadSessionRepository,
     storageLogicalAccessResolutionService,
+    encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
+    encryptionKeyResolutionService: assetEncryptionKeyResolutionService,
+    assetContentCipherPort,
   });
   const assetDiscoveryService = new AssetDiscoveryService({
     repository: assetRepository,
@@ -840,6 +866,8 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     workspaceAuthorizationReadRepository: workspaceRepository,
     storageLogicalAccessResolutionService,
     downloadGrantPort: assetDownloadGrantAdapter,
+    encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
+    assetContentCipherPort,
   });
   const assetManagementBackendApi = new AssetManagementBackendApi({
     uploadInitiationService: assetUploadInitiationService,
@@ -1109,6 +1137,24 @@ function resolveAssetDownloadGrantSecret(
     return configured;
   }
   return `asset-download-grant:${randomUUID()}`;
+}
+
+function resolveAssetContentEncryptionKey(
+  env: Readonly<Record<string, string | undefined>>,
+): string {
+  const configured = env.AI_LOOM_ASSET_CONTENT_ENCRYPTION_KEY?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  const inheritedSecretKey = env.AI_LOOM_SECRET_MASTER_KEY?.trim();
+  if (inheritedSecretKey) {
+    return inheritedSecretKey;
+  }
+
+  return createHash("sha256")
+    .update(`asset-content:${randomUUID()}`)
+    .digest("base64");
 }
 
 function resolveIdentityDevLoginRouteEnabled(env: Readonly<Record<string, string | undefined>>): boolean {

@@ -292,10 +292,11 @@ export class SqliteAssetPersistenceAdapter implements IAssetRepository {
           checksum_algorithm,
           checksum_digest,
           original_file_name,
+          content_encryption_descriptor,
           created_by,
           created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
 
       for (const rowValues of mapAssetVersionToRowValues(asset)) {
         insertVersion.run(...rowValues);

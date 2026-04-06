@@ -3,6 +3,7 @@ export * from "./IAssetUploadSessionRepository";
 export * from "./AssetAuthorizationPort";
 export * from "./AssetDownloadGrantPort";
 export * from "./AssetContentPort";
+export * from "./AssetContentCipherPort";
 export * from "./AssetPreviewPort";
 export * from "./AssetMediaPort";
 export * from "./AssetAuditPort";

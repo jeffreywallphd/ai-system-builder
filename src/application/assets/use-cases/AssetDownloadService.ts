@@ -12,8 +12,11 @@ import { StorageLogicalAccessOperationIntents } from "../../storage/use-cases/St
 import type { IStorageLogicalAccessResolutionService } from "../../storage/use-cases/StorageLogicalAccessResolutionServiceContracts";
 import type { IWorkspaceAuthorizationReadRepository } from "../../workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import type { AssetAuditSink } from "../ports/AssetAuditPort";
+import type { IAssetContentCipherPort } from "../ports/AssetContentCipherPort";
 import type { IAssetDownloadGrantPort } from "../ports/AssetDownloadGrantPort";
 import type { IAssetRepository } from "../ports/IAssetRepository";
+import type { IEncryptionPolicyEvaluationService } from "../../security/use-cases/EncryptionPolicyEvaluationServiceContracts";
+import { ProtectedDataClasses } from "../../../domain/security/EncryptionAtRestPolicyDomain";
 import {
   AssetDownloadPurposes,
   AssetServiceErrorCodes,
@@ -31,6 +34,8 @@ export interface AssetDownloadServiceDependencies {
   readonly workspaceAuthorizationReadRepository: IWorkspaceAuthorizationReadRepository;
   readonly storageLogicalAccessResolutionService: IStorageLogicalAccessResolutionService;
   readonly downloadGrantPort: IAssetDownloadGrantPort;
+  readonly encryptionPolicyEvaluationService: IEncryptionPolicyEvaluationService;
+  readonly assetContentCipherPort: IAssetContentCipherPort;
   readonly auditSink?: AssetAuditSink;
   readonly clock?: {
     now(): Date;
@@ -110,7 +115,35 @@ export class AssetDownloadService {
       return this.failureFromLogicalAccessResolution(plan.error.code, plan.error.message, plan.error.details);
     }
 
-    if (!isPurposeAllowedByStoragePolicy(plan.value.storageInstance, request.purpose)) {
+    const encryptionPolicy = await this.resolveAssetContentPolicy({
+      workspaceId: request.workspaceId,
+      storageInstanceId: targetVersion.location.storageInstance.storageInstanceId,
+      occurredAt,
+    });
+    if (!encryptionPolicy.ok) {
+      return encryptionPolicy;
+    }
+
+    const contentIsEncrypted = Boolean(targetVersion.content.encryption);
+    if (!contentIsEncrypted && encryptionPolicy.value.contentEncryptionRequired) {
+      return this.failure(
+        AssetServiceErrorCodes.policyViolation,
+        "Asset content is not encrypted, but effective policy requires scoped-content encryption.",
+        Object.freeze({
+          assetId: asset.id,
+          versionId: targetVersion.versionId,
+          storageInstanceId: targetVersion.location.storageInstance.storageInstanceId,
+        }),
+      );
+    }
+
+    if (!isPurposeAllowedByStoragePolicy(
+      plan.value.storageInstance,
+      request.purpose,
+      contentIsEncrypted,
+      encryptionPolicy.value.allowPreviewDecryption,
+      encryptionPolicy.value.allowWorkerDecryption,
+    )) {
       return this.failure(
         AssetServiceErrorCodes.policyViolation,
         "Storage security policy denies this download purpose.",
@@ -246,7 +279,36 @@ export class AssetDownloadService {
     if (!plan.ok) {
       return this.failureFromLogicalAccessResolution(plan.error.code, plan.error.message, plan.error.details);
     }
-    if (!isPurposeAllowedByStoragePolicy(plan.value.storageInstance, grant.purpose)) {
+
+    const encryptionPolicy = await this.resolveAssetContentPolicy({
+      workspaceId: request.workspaceId,
+      storageInstanceId: targetVersion.location.storageInstance.storageInstanceId,
+      occurredAt,
+    });
+    if (!encryptionPolicy.ok) {
+      return encryptionPolicy;
+    }
+
+    const contentIsEncrypted = Boolean(targetVersion.content.encryption);
+    if (!contentIsEncrypted && encryptionPolicy.value.contentEncryptionRequired) {
+      return this.failure(
+        AssetServiceErrorCodes.policyViolation,
+        "Asset content is not encrypted, but effective policy requires scoped-content encryption.",
+        Object.freeze({
+          assetId: asset.id,
+          versionId: targetVersion.versionId,
+          storageInstanceId: targetVersion.location.storageInstance.storageInstanceId,
+        }),
+      );
+    }
+
+    if (!isPurposeAllowedByStoragePolicy(
+      plan.value.storageInstance,
+      grant.purpose,
+      contentIsEncrypted,
+      encryptionPolicy.value.allowPreviewDecryption,
+      encryptionPolicy.value.allowWorkerDecryption,
+    )) {
       return this.failure(
         AssetServiceErrorCodes.policyViolation,
         "Storage security policy denies this download purpose.",
@@ -258,10 +320,24 @@ export class AssetDownloadService {
     }
 
     try {
-      const stream = await plan.value.objectPort.openObjectReadStream({
+      const encryptedStream = await plan.value.objectPort.openObjectReadStream({
         storageInstance: plan.value.storageInstance,
         objectKey: grant.objectKey,
       });
+      const stream = targetVersion.content.encryption
+        ? await this.dependencies.assetContentCipherPort.beginDecryption({
+          ciphertext: encryptedStream,
+          descriptor: targetVersion.content.encryption,
+          aad: buildAssetContentAad({
+            workspaceId: request.workspaceId,
+            storageInstanceId: targetVersion.location.storageInstance.storageInstanceId,
+            assetId: asset.id,
+            versionId: targetVersion.versionId,
+            objectKey: targetVersion.location.objectKey,
+            area: targetVersion.location.area,
+          }),
+        })
+        : encryptedStream;
 
       const contentDisposition = grant.purpose === AssetDownloadPurposes.inlinePreview
         ? "inline"
@@ -321,6 +397,35 @@ export class AssetDownloadService {
     });
   }
 
+  private async resolveAssetContentPolicy(input: {
+    readonly workspaceId: string;
+    readonly storageInstanceId: string;
+    readonly occurredAt: string;
+  }): Promise<AssetServiceResult<{
+      readonly contentEncryptionRequired: boolean;
+      readonly allowPreviewDecryption: boolean;
+      readonly allowWorkerDecryption: boolean;
+    }>> {
+    const policy = await this.dependencies.encryptionPolicyEvaluationService.evaluateEffectivePolicy({
+      dataClass: ProtectedDataClasses.assetContent,
+      workspaceId: input.workspaceId,
+      storageInstanceId: input.storageInstanceId,
+      occurredAt: input.occurredAt,
+    });
+    if (!policy.ok) {
+      return this.failureFromEncryptionPolicy(policy.error.code, policy.error.message);
+    }
+
+    return {
+      ok: true,
+      value: Object.freeze({
+        contentEncryptionRequired: policy.value.contentEncryptionRequired,
+        allowPreviewDecryption: policy.value.allowPreviewDecryption,
+        allowWorkerDecryption: policy.value.allowWorkerDecryption,
+      }),
+    };
+  }
+
   private failureFromLogicalAccessResolution(
     code: string,
     message: string,
@@ -337,6 +442,22 @@ export class AssetDownloadService {
         return this.failure(AssetServiceErrorCodes.invalidState, message, details);
       default:
         return this.failure(AssetServiceErrorCodes.internal, message, details);
+    }
+  }
+
+  private failureFromEncryptionPolicy(
+    code: string,
+    message: string,
+  ): AssetServiceResult<never> {
+    switch (code) {
+      case "encryption-policy-invalid-request":
+        return this.failure(AssetServiceErrorCodes.invalidRequest, message);
+      case "encryption-policy-violation":
+        return this.failure(AssetServiceErrorCodes.policyViolation, message);
+      case "encryption-policy-resolution-failed":
+        return this.failure(AssetServiceErrorCodes.invalidState, message);
+      default:
+        return this.failure(AssetServiceErrorCodes.internal, message);
     }
   }
 
@@ -390,12 +511,19 @@ function isWorkerProcessAllowedKind(kind: Asset["kind"]): boolean {
 function isPurposeAllowedByStoragePolicy(
   storageInstance: { readonly policy: { readonly security: { readonly allowPreviewDecryption: boolean; readonly allowWorkerDecryption: boolean } } },
   purpose: typeof AssetDownloadPurposes[keyof typeof AssetDownloadPurposes],
+  contentIsEncrypted: boolean,
+  policyAllowPreviewDecryption: boolean,
+  policyAllowWorkerDecryption: boolean,
 ): boolean {
+  if (!contentIsEncrypted) {
+    return true;
+  }
+
   if (purpose === AssetDownloadPurposes.inlinePreview) {
-    return storageInstance.policy.security.allowPreviewDecryption;
+    return storageInstance.policy.security.allowPreviewDecryption && policyAllowPreviewDecryption;
   }
   if (purpose === AssetDownloadPurposes.workerProcess) {
-    return storageInstance.policy.security.allowWorkerDecryption;
+    return storageInstance.policy.security.allowWorkerDecryption && policyAllowWorkerDecryption;
   }
   return true;
 }
@@ -428,5 +556,24 @@ function resolveMimeTypeExtension(mimeType: string): string {
     default:
       return "";
   }
+}
+
+function buildAssetContentAad(input: {
+  readonly workspaceId: string;
+  readonly storageInstanceId: string;
+  readonly assetId: string;
+  readonly versionId: string;
+  readonly objectKey: string;
+  readonly area: string;
+}): string {
+  return [
+    "asset-content-encryption/v1",
+    `workspace=${input.workspaceId}`,
+    `storage=${input.storageInstanceId}`,
+    `asset=${input.assetId}`,
+    `version=${input.versionId}`,
+    `area=${input.area}`,
+    `object=${input.objectKey}`,
+  ].join(";");
 }
 

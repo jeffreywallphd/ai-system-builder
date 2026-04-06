@@ -1,4 +1,6 @@
 import {
+  AssetContentEncryptionFormats,
+  AssetContentEncryptionKeyScopes,
   AssetChecksumAlgorithms,
   AssetKinds,
   AssetLifecycleStates,
@@ -60,6 +62,7 @@ export interface AssetVersionRow {
   readonly checksum_algorithm: AssetChecksumAlgorithm;
   readonly checksum_digest: string;
   readonly original_file_name: string | null;
+  readonly content_encryption_descriptor: string | null;
   readonly created_by: string;
   readonly created_at: string;
 }
@@ -155,6 +158,7 @@ export function mapAssetVersionToRowValues(asset: Asset): ReadonlyArray<Readonly
       version.content.checksum.algorithm,
       version.content.checksum.digest,
       version.content.originalFileName ?? null,
+      version.content.encryption ? JSON.stringify(version.content.encryption) : null,
       version.createdBy,
       version.createdAt,
     ])));
@@ -206,6 +210,7 @@ function mapAssetVersionRowToDomain(row: AssetVersionRow) {
         digest: row.checksum_digest,
       },
       originalFileName: row.original_file_name ?? undefined,
+      encryption: parseContentEncryptionDescriptor(row.content_encryption_descriptor),
     },
     createdBy: row.created_by,
     createdAt: row.created_at,
@@ -252,4 +257,69 @@ function assertLineageRelation(value: string): AssetLineageRelation {
     return value as AssetLineageRelation;
   }
   throw new Error(`Persisted asset lineage relation '${value}' is invalid.`);
+}
+
+function parseContentEncryptionDescriptor(serialized: string | null): {
+  readonly format: "asset-content/aes-256-gcm/v1";
+  readonly algorithm: "aes-256-gcm";
+  readonly keyReferenceId: string;
+  readonly keyId: string;
+  readonly keyVersion?: string;
+  readonly keyScope: "server" | "workspace" | "storage-instance";
+  readonly workspaceId?: string;
+  readonly storageInstanceId?: string;
+  readonly ivBase64: string;
+  readonly authTagBase64: string;
+  readonly aad: string;
+  readonly encryptedAt: string;
+} | undefined {
+  if (!serialized) {
+    return undefined;
+  }
+
+  const parsed = JSON.parse(serialized) as Partial<{
+    readonly format: string;
+    readonly algorithm: string;
+    readonly keyReferenceId: string;
+    readonly keyId: string;
+    readonly keyVersion?: string;
+    readonly keyScope: string;
+    readonly workspaceId?: string;
+    readonly storageInstanceId?: string;
+    readonly ivBase64: string;
+    readonly authTagBase64: string;
+    readonly aad: string;
+    readonly encryptedAt: string;
+  }>;
+
+  if (parsed.format !== AssetContentEncryptionFormats.aes256GcmV1) {
+    throw new Error(`Persisted asset content encryption format '${String(parsed.format)}' is invalid.`);
+  }
+  if (parsed.algorithm !== "aes-256-gcm") {
+    throw new Error(`Persisted asset content encryption algorithm '${String(parsed.algorithm)}' is invalid.`);
+  }
+  if (!parsed.keyReferenceId?.trim() || !parsed.keyId?.trim()) {
+    throw new Error("Persisted asset content encryption key metadata is invalid.");
+  }
+  if (!Object.values(AssetContentEncryptionKeyScopes).includes(parsed.keyScope as "server")) {
+    throw new Error(`Persisted asset content encryption keyScope '${String(parsed.keyScope)}' is invalid.`);
+  }
+  if (!parsed.ivBase64?.trim() || !parsed.authTagBase64?.trim() || !parsed.aad?.trim() || !parsed.encryptedAt?.trim()) {
+    throw new Error("Persisted asset content encryption descriptor is incomplete.");
+  }
+
+  return Object.freeze({
+    format: AssetContentEncryptionFormats.aes256GcmV1,
+    algorithm: "aes-256-gcm",
+    keyReferenceId: parsed.keyReferenceId.trim(),
+    keyId: parsed.keyId.trim(),
+    keyVersion: parsed.keyVersion?.trim() || undefined,
+    keyScope: parsed.keyScope as "server" | "workspace" | "storage-instance",
+    workspaceId: parsed.workspaceId?.trim() || undefined,
+    storageInstanceId: parsed.storageInstanceId?.trim() || undefined,
+    ivBase64: parsed.ivBase64.trim(),
+    authTagBase64: parsed.authTagBase64.trim(),
+    aad: parsed.aad.trim(),
+    encryptedAt: parsed.encryptedAt.trim(),
+  });
 }
