@@ -157,6 +157,7 @@ class InMemorySecretEncryptionPort implements ISecretEncryptionPort {
   private sequence = 0;
   public activeKeyId = "kek:server:new";
   public throwOnPayloadRef?: string;
+  public throwMessage = "simulated decrypt failure";
 
   public seed(payloadRef: string, plaintext: string): void {
     this.payloadToPlaintext.set(payloadRef, plaintext);
@@ -190,7 +191,7 @@ class InMemorySecretEncryptionPort implements ISecretEncryptionPort {
     readonly version: SecretRecord["versions"][number];
   }): Promise<{ readonly plaintext: string }> {
     if (this.throwOnPayloadRef && input.version.encryptedPayloadRef === this.throwOnPayloadRef) {
-      throw new Error("simulated decrypt failure");
+      throw new Error(this.throwMessage);
     }
     const plaintext = this.payloadToPlaintext.get(input.version.encryptedPayloadRef);
     if (!plaintext) {
@@ -306,6 +307,43 @@ describe("ReEncryptSecretsUseCase", () => {
     expect(resumed.value.status).toBe("succeeded");
     expect(resumed.value.processedTargets).toBe(2);
     expect(resumed.value.remainingTargets).toBe(0);
+  });
+
+  it("never persists raw step exception text in operation error status", async () => {
+    const records = new InMemorySecretRecordRepository();
+    const operations = new InMemorySecretReEncryptionOperationRepository();
+    const encryption = new InMemorySecretEncryptionPort();
+    const useCase = new ReEncryptSecretsUseCase({
+      secretRecordRepository: records,
+      secretEncryptionPort: encryption,
+      secretAccessPolicyPort: new DomainBackedSecretAccessPolicyPort(),
+      secretAccessAuditPort: new InMemorySecretAccessAuditPort(),
+      reEncryptionOperationRepository: operations,
+    });
+
+    const first = createServerSecretRecord("secret:server:reencrypt-redaction-1", "enc:secret:server:reencrypt-redaction-1:v1");
+    const second = createServerSecretRecord("secret:server:reencrypt-redaction-2", "enc:secret:server:reencrypt-redaction-2:v1");
+    records.seed(first);
+    records.seed(second);
+    encryption.seed(first.versions[0]?.encryptedPayloadRef ?? "", "sk-redaction-first");
+    encryption.seed(second.versions[0]?.encryptedPayloadRef ?? "", "sk-redaction-second");
+    encryption.throwOnPayloadRef = second.versions[0]?.encryptedPayloadRef;
+    encryption.throwMessage = "failed while decrypting value sk-live-this-must-not-leak";
+
+    const result = await useCase.execute({
+      actor: createServerAdminActor([SecretAccessActions.reEncrypt]),
+      operationKey: "op:secret:re-encrypt:redaction",
+      occurredAt: "2026-04-06T18:00:00.000Z",
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.status).toBe("failed");
+    expect(result.value.lastErrorCode).toBe("re-encryption-step-failed");
+    expect(result.value.lastErrorMessage).toBe("Re-encryption step failed.");
+    expect(result.value.lastErrorMessage).not.toContain("sk-live-this-must-not-leak");
   });
 });
 

@@ -54,7 +54,7 @@ Operations are resumable by calling start endpoint again with the same `operatio
 ## Failure and recovery posture
 
 - Per-target metadata drift (missing secret/version or concurrent version change) is recorded as target failure and processing continues.
-- Decrypt/encrypt/persistence exceptions move the operation to `failed` with persisted partial progress and last-error metadata.
+- Decrypt/encrypt/persistence exceptions move the operation to `failed` with persisted partial progress and safe fixed last-error metadata (raw exception text is not persisted).
 - Recovery path:
   1. Correct key/configuration or persistence issue.
   2. Resume operation with the same `operationId` + `operationKey`.

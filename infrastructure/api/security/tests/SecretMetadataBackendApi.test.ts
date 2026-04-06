@@ -266,6 +266,35 @@ describe("SecretMetadataBackendApi", () => {
     expect(status.data.operation.remainingTargets).toBe(0);
   });
 
+  it("redacts opaque sensitive error tokens from re-encryption API errors", async () => {
+    const backend = createBackend({
+      reEncryptSecretsUseCase: {
+        execute: async () => Object.freeze({
+          ok: false,
+          error: Object.freeze({
+            code: SecretServiceErrorCodes.internal,
+            message: "aB93kLm0QwErTy12UiOp34AsDf56GhJkLmNo78Pq",
+          }),
+        }),
+        getStatus: async () => {
+          throw new Error("not configured");
+        },
+      },
+    });
+
+    const response = await backend.reEncryptSecrets({
+      actorUserIdentityId: "user:alpha",
+      operationKey: "op:secret:reencrypt:opaque-error",
+    });
+
+    expect(response.ok).toBeFalse();
+    if (response.ok || !response.error) {
+      return;
+    }
+    expect(response.error.code).toBe(SecretMetadataApiErrorCodes.internal);
+    expect(response.error.message).toBe("Secret metadata operation failed.");
+  });
+
   it("returns minimal secret service health view", async () => {
     const backend = createBackend({
       secretOperationalDiagnosticsProvider: {

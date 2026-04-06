@@ -31,3 +31,14 @@ Story 8.3.7 operational companion for Feature 8 / Epic 8.3: give contributors a 
 - `docs/architecture/secrets-service-consumption-adapters.md`
 - `docs/secret-bootstrap-and-migration-operations.md`
 - `docs/secret-health-and-operational-diagnostics.md`
+
+## Story 8.3.8 regression baseline
+
+Final production-readiness hardening now expects these regression seams to stay green:
+
+- `src/application/security/tests/ReEncryptSecretsUseCase.test.ts`
+  - ensures re-encryption failure status uses safe fixed messages and does not persist raw exception text.
+- `src/infrastructure/security/secrets/tests/SecretServiceGovernance.integration.test.ts`
+  - validates end-to-end lifecycle consistency across create/rotate/retrieve/re-encrypt/delete with audit redaction checks.
+- `infrastructure/api/security/tests/SecretMetadataBackendApi.test.ts`
+  - validates API error sanitization for opaque sensitive token-like values.
