@@ -243,3 +243,12 @@ The contracts now explicitly state that:
 - `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
 - `src/infrastructure/config/tests/HostStartupConfiguration.test.ts`
 
+## Runtime entrypoint adoption (story 12.4.1)
+
+The following active runtime entrypoints now delegate authoritative control-plane startup through the authoritative server host assembly entrypoint instead of direct server-host initialization:
+
+- `electron/main/main.ts`
+- `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts`
+
+This keeps startup control-plane composition on the explicit host framework path for desktop and browser-development runtime workflows.
+

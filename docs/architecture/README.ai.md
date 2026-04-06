@@ -109,6 +109,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Hybrid executable host assembly baseline (hybrid capability composition rules + authoritative delegation mode): `docs/architecture/hybrid-host-assembly.md`
 - Web executable host assembly baseline (thin-client delivery composition boundaries + startup entrypoint expectations): `docs/architecture/web-host-assembly.md`
 - Worker executable host assembly baseline (runtime execution composition boundaries + startup entrypoint expectations): `docs/architecture/worker-host-assembly.md`
+- Story 12.4.1 runtime-entrypoint migration notes (active entrypoints now delegating through host assemblies): `docs/architecture/entrypoint-host-composition-migration-12.4.1.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
 - Authorization permission matrix and key catalog reference: `docs/architecture/authorization-permission-catalog.md`
 - Authorization workspace role-definition and baseline role-grant reference: `docs/architecture/authorization-role-reference.md`

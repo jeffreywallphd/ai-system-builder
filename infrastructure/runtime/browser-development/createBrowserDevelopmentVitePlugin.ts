@@ -8,9 +8,10 @@ import {
   resolveHostSecureTransportConfig,
 } from "../../config/HostSecureTransportConfig";
 import {
-  startIdentityServerHost,
-  type IdentityServerHost,
-} from "../../../hosts/server/IdentityServerHost";
+  startAuthoritativeServerHostAssembly,
+  type AuthoritativeServerHostEntrypointOptions,
+  type AuthoritativeServerHostRuntimeHandle,
+} from "../../../src/hosts/server/AuthoritativeServerHostEntrypoint";
 import {
   resolveBrowserDevelopmentManagedRuntimeFromEnvironment,
 } from "./BrowserDevelopmentManagedRuntime";
@@ -22,6 +23,35 @@ const BROWSER_IDENTITY_DATABASE_PATH = path.resolve(
   "identity",
   "identity.sqlite",
 );
+const BrowserDevelopmentAuthoritativeStartupReason = "browser-development-vite-authoritative-host-startup";
+
+export interface BrowserDevelopmentAuthoritativeServerOptionsInput {
+  readonly databasePath: string;
+  readonly host: string;
+  readonly port?: number;
+  readonly environment?: Readonly<Record<string, string | undefined>>;
+}
+
+export function createBrowserDevelopmentAuthoritativeServerHostOptions(
+  input: BrowserDevelopmentAuthoritativeServerOptionsInput,
+): AuthoritativeServerHostEntrypointOptions {
+  const environment = input.environment ?? process.env;
+  return Object.freeze({
+    hostOptions: Object.freeze({
+      databasePath: input.databasePath,
+      host: input.host,
+      port: input.port,
+      cors: {
+        allowLoopbackOrigins: true,
+      },
+      env: environment,
+    }),
+    boot: Object.freeze({
+      startupReason: BrowserDevelopmentAuthoritativeStartupReason,
+      environment,
+    }),
+  });
+}
 
 export function createBrowserDevelopmentVitePlugin(): Plugin {
   const managedRuntime = resolveBrowserDevelopmentManagedRuntimeFromEnvironment();
@@ -32,13 +62,13 @@ export function createBrowserDevelopmentVitePlugin(): Plugin {
     hostAddress: identityHostAddress,
   });
   let identityApiBaseUrl: string | undefined;
-  let identityServerHost: IdentityServerHost | undefined;
+  let authoritativeServerRuntime: AuthoritativeServerHostRuntimeHandle | undefined;
   let cleanupRegistered = false;
 
   const stopAll = () => {
-    if (identityServerHost) {
-      void identityServerHost.close().catch(() => {});
-      identityServerHost = undefined;
+    if (authoritativeServerRuntime) {
+      void authoritativeServerRuntime.stop().catch(() => {});
+      authoritativeServerRuntime = undefined;
     }
     managedRuntime.stop();
   };
@@ -60,17 +90,17 @@ export function createBrowserDevelopmentVitePlugin(): Plugin {
     apply: "serve",
     async configureServer(server) {
       await managedRuntime.ensureStarted(server.config.logger);
-      if (!identityServerHost) {
-        identityServerHost = await startIdentityServerHost({
-          databasePath: BROWSER_IDENTITY_DATABASE_PATH,
-          host: identityHostAddress,
-          port: requestedIdentityHostPort,
-          cors: {
-            allowLoopbackOrigins: true,
-          },
-        });
+      if (!authoritativeServerRuntime) {
+        authoritativeServerRuntime = await startAuthoritativeServerHostAssembly(
+          createBrowserDevelopmentAuthoritativeServerHostOptions({
+            databasePath: BROWSER_IDENTITY_DATABASE_PATH,
+            host: identityHostAddress,
+            port: requestedIdentityHostPort,
+            environment: process.env,
+          }),
+        );
         identityApiBaseUrl = assertSecureTransportEndpoint(
-          `http://${identityHostAddress}:${identityServerHost.port}`,
+          `http://${authoritativeServerRuntime.address}`,
           identitySecureTransport,
         );
       }

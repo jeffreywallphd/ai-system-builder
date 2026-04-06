@@ -181,3 +181,9 @@ This keeps host runtime metadata consumable for future node trust, scheduling, a
 - `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
 - `src/infrastructure/config/tests/HostStartupConfiguration.test.ts`
 
+## Runtime entrypoint adoption (story 12.4.1)
+- Active desktop and browser-development startup paths now delegate authoritative control-plane startup through host assembly entrypoints instead of direct server-host startup:
+  - `electron/main/main.ts`
+  - `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts`
+- This keeps production/dev runtime entrypoints aligned with explicit host composition-root execution.
+
