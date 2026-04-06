@@ -41,6 +41,7 @@ import type {
   IdentityRepositoryPorts,
   IdentityWriteRepositoryPorts,
 } from "../ports/IdentityRepositoryPorts";
+import type { IPlatformTransactionManager } from "../../common/ports/PlatformTransactionPorts";
 
 class InMemoryIdentityRepositoryAdapter
   implements
@@ -487,11 +488,15 @@ describe("identity repository ports for authoritative persistence", () => {
       credentialMaterialRepository: adapter,
       sessionRepository: adapter,
       sessionTokenMaterialRepository: adapter,
+      transactionManager: {
+        runInTransaction: async <TValue>(operation: () => Promise<TValue>) => operation(),
+      } satisfies IPlatformTransactionManager,
     };
 
     expect(normalizeIdentityPersistenceOperationKey("  OP-Identity-Persist-001  ")).toBe("op-identity-persist-001");
     expect(allPorts.identityLookupRepository).toBe(adapter);
     expect(allPorts.sessionRepository).toBe(adapter);
     expect(allPorts.sessionTokenMaterialRepository).toBe(adapter);
+    expect(allPorts.transactionManager).toBeDefined();
   });
 });

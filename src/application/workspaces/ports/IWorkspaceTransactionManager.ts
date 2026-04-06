@@ -1,3 +1,3 @@
-export interface IWorkspaceTransactionManager {
-  runInTransaction<TValue>(operation: () => Promise<TValue>): Promise<TValue>;
-}
+import type { IPlatformTransactionManager } from "../../common/ports/PlatformTransactionPorts";
+
+export interface IWorkspaceTransactionManager extends IPlatformTransactionManager {}

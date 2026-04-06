@@ -248,4 +248,53 @@ describe("SqliteIdentityPersistenceAdapter", () => {
 
     adapter.dispose();
   });
+
+  it("rolls back grouped identity mutations when runInTransaction fails", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-identity-transaction-"));
+    createdRoots.push(root);
+
+    const adapter = new SqliteIdentityPersistenceAdapter(path.join(root, "identity.sqlite"));
+    const provider = await adapter.saveAuthProvider(createAuthProvider({
+      id: "provider:local-password",
+      kind: AuthProviderKinds.localPassword,
+      category: AuthProviderCategories.local,
+      displayName: "Local Password",
+    }));
+
+    await expect(adapter.runInTransaction(async () => {
+      await adapter.saveUserIdentity(createUserIdentity({
+        id: "user:rollback",
+        username: "rollback-user",
+        email: "rollback@example.com",
+        status: "active",
+        linkedProviders: [{
+          providerId: provider.id,
+          providerSubject: "rollback-user",
+          isPrimary: true,
+          linkedAt: "2026-04-04T12:00:00.000Z",
+        }],
+      }));
+
+      await adapter.saveCredentialMaterial({
+        id: "credential:rollback",
+        userIdentityId: "user:rollback",
+        providerId: provider.id,
+        providerSubject: "rollback-user",
+        hashAlgorithm: "argon2id",
+        hashValue: "hash:rollback",
+        status: IdentityCredentialMaterialStatuses.active,
+        createdAt: "2026-04-04T12:00:00.000Z",
+        updatedAt: "2026-04-04T12:00:00.000Z",
+      });
+
+      throw new Error("forced rollback");
+    })).rejects.toThrow("forced rollback");
+
+    expect(await adapter.findUserIdentityById("user:rollback")).toBeUndefined();
+    expect(await adapter.getActiveCredentialMaterial({
+      providerId: provider.id,
+      providerSubject: "rollback-user",
+    })).toBeUndefined();
+    adapter.dispose();
+  });
 });

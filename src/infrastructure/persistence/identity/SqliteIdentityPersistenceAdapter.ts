@@ -23,6 +23,7 @@ import type { IIdentityLookupRepository } from "../../../../application/identity
 import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
 import type { IIdentitySessionRepository } from "../../../../application/identity/ports/IIdentitySessionRepository";
 import type { IIdentitySessionTokenMaterialRepository } from "../../../../application/identity/ports/IIdentitySessionTokenMaterialRepository";
+import type { IPlatformTransactionManager } from "../../../application/common/ports/PlatformTransactionPorts";
 import type {
   AuthProvider,
   CredentialPolicy,
@@ -57,6 +58,7 @@ import {
   IDENTITY_PERSISTENCE_SCHEMA_VERSION,
 } from "./SqliteIdentityPersistenceMigrations";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
+import { SqliteTransactionCoordinator } from "../sqlite/SqliteTransactionCoordinator";
 
 export class SqliteIdentityPersistenceAdapter
   implements
@@ -64,11 +66,15 @@ export class SqliteIdentityPersistenceAdapter
     IIdentityPersistenceRepository,
     ICredentialMaterialRepository,
     IIdentitySessionRepository,
-    IIdentitySessionTokenMaterialRepository {
+    IIdentitySessionTokenMaterialRepository,
+    IPlatformTransactionManager {
   private database?: SqliteCompatDatabase;
   private initialized = false;
+  private readonly transactionCoordinator: SqliteTransactionCoordinator;
 
-  public constructor(private readonly databasePath: string) {}
+  public constructor(private readonly databasePath: string) {
+    this.transactionCoordinator = new SqliteTransactionCoordinator(() => this.getDatabase());
+  }
 
   public async saveUserIdentity(identity: UserIdentity): Promise<UserIdentity> {
     const database = this.getDatabase();
@@ -796,6 +802,10 @@ export class SqliteIdentityPersistenceAdapter
     `).run(normalizedInvalidatedAt, normalizedInvalidatedAt, normalizedSessionId);
 
     return this.getSessionTokenMaterialBySessionId(normalizedSessionId);
+  }
+
+  public async runInTransaction<TValue>(operation: () => Promise<TValue>): Promise<TValue> {
+    return this.transactionCoordinator.runInTransaction(operation);
   }
 
   public dispose(): void {

@@ -5,6 +5,7 @@ import type {
 } from "./ICredentialMaterialRepository";
 import type { IIdentityLookupRepository } from "./IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "./IIdentityPersistenceRepository";
+import type { IPlatformTransactionManager } from "../../common/ports/PlatformTransactionPorts";
 import type {
   IIdentitySessionQueryRepository,
   IIdentitySessionRepository,
@@ -35,4 +36,5 @@ export interface IdentityRepositoryPorts
   readonly credentialMaterialRepository: ICredentialMaterialRepository;
   readonly sessionRepository: IIdentitySessionRepository;
   readonly sessionTokenMaterialRepository: IIdentitySessionTokenMaterialRepository;
+  readonly transactionManager?: IPlatformTransactionManager;
 }

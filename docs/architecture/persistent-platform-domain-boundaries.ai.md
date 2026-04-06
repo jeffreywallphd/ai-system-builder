@@ -145,6 +145,24 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
   - `src/infrastructure/persistence/assets/tests/SqliteAssetPersistenceAdapter.test.ts`
   - `src/infrastructure/persistence/platform/tests/SqlitePlatformPersistenceAdapter.test.ts`
 
+## Story 13.2.4 transaction coordination baseline
+
+- New shared application transaction boundary contract:
+  - `src/application/common/ports/PlatformTransactionPorts.ts`
+- Identity repository composition now supports optional transaction manager injection:
+  - `src/application/identity/ports/IdentityRepositoryPorts.ts`
+- Register-local-account use case now supports grouped identity + credential persistence through a clean boundary:
+  - `src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`
+- Concrete SQLite transaction coordinator and adapter participation:
+  - `src/infrastructure/persistence/sqlite/SqliteTransactionCoordinator.ts`
+  - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
+  - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter.ts`
+- Added verification coverage:
+  - `src/application/common/tests/PlatformTransactionPorts.test.ts`
+  - `application/identity/tests/RegisterLocalAccountUseCase.test.ts`
+  - `src/infrastructure/persistence/sqlite/tests/SqliteTransactionCoordinator.test.ts`
+  - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
+
 ## Mapper guidance for contributors
 
 - Keep mapper implementations in infrastructure, but drive them from shared DTO + schema contracts.

@@ -30,6 +30,10 @@ import type { IIdentityLifecycleEventPublisher } from "../../../../application/i
 import { publishIdentityLifecycleEventBestEffort } from "../../../../application/identity/services/IdentityLifecycleEventPublishing";
 import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
 import { validateIdentityProvider } from "../../../../application/identity/services/IdentityProviderCatalog";
+import {
+  runInTransactionBoundary,
+  type IPlatformTransactionManager,
+} from "../../common/ports/PlatformTransactionPorts";
 
 export type RegisterLocalAccountErrorCode =
   | typeof IdentityErrorCodes.duplicateIdentity
@@ -66,6 +70,7 @@ interface RegisterLocalAccountDependencies {
   readonly lookupRepository: IIdentityLookupRepository;
   readonly persistenceRepository: IIdentityPersistenceRepository;
   readonly credentialMaterialRepository: ICredentialMaterialRepository;
+  readonly transactionManager?: IPlatformTransactionManager;
   readonly identityPolicyService: IdentityPolicyService;
   readonly credentialAuthenticator: IIdentityCredentialAuthenticator;
   readonly idGenerator: IIdentityIdGenerator;
@@ -232,19 +237,21 @@ export class RegisterLocalAccountUseCase {
       now,
     });
 
-    await this.dependencies.persistenceRepository.saveUserIdentity(userIdentity);
-    await this.dependencies.credentialMaterialRepository.saveCredentialMaterial({
-      id: credentialMaterialId,
-      userIdentityId,
-      providerId: providerResult.value.id,
-      providerSubject,
-      hashAlgorithm,
-      hashValue,
-      salt: this.normalizeOptional(hashedCredentialMaterial.salt),
-      pepperVersion: this.normalizeOptional(hashedCredentialMaterial.pepperVersion),
-      status: IdentityCredentialMaterialStatuses.active,
-      createdAt: nowIso,
-      updatedAt: nowIso,
+    await runInTransactionBoundary(this.dependencies.transactionManager, async () => {
+      await this.dependencies.persistenceRepository.saveUserIdentity(userIdentity);
+      await this.dependencies.credentialMaterialRepository.saveCredentialMaterial({
+        id: credentialMaterialId,
+        userIdentityId,
+        providerId: providerResult.value.id,
+        providerSubject,
+        hashAlgorithm,
+        hashValue,
+        salt: this.normalizeOptional(hashedCredentialMaterial.salt),
+        pepperVersion: this.normalizeOptional(hashedCredentialMaterial.pepperVersion),
+        status: IdentityCredentialMaterialStatuses.active,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      });
     });
 
     const result = identitySuccess(Object.freeze({
