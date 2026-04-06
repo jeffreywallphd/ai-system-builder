@@ -8,6 +8,10 @@ import type { ListSecretsUseCase } from "../../../src/application/security/use-c
 import type { RotateSecretUseCase } from "../../../src/application/security/use-cases/RotateSecretUseCase";
 import { SecretServiceErrorCodes } from "../../../src/application/security/use-cases/SecretManagementServiceContracts";
 import type { IWorkspaceAuthorizationReadRepository } from "../../../src/application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
+import type {
+  SecretServiceHealthViewDto,
+  SecretServiceOperationalDiagnosticsViewDto,
+} from "../../../src/shared/dto/security/SecretServiceOperationalDiagnosticsDtos";
 import { toSecretMetadataQueryDto } from "../../../src/shared/dto/security/SecretTransportDtos";
 import {
   SecretApiSchemaValidationError,
@@ -23,6 +27,10 @@ import {
   type CreateSecretMetadataApiResponse,
   type DisableSecretMetadataApiRequest,
   type DisableSecretMetadataApiResponse,
+  type GetSecretServiceDiagnosticsApiRequest,
+  type GetSecretServiceDiagnosticsApiResponse,
+  type GetSecretServiceHealthApiRequest,
+  type GetSecretServiceHealthApiResponse,
   type GetSecretMetadataApiRequest,
   type GetSecretMetadataApiResponse,
   type ListSecretMetadataApiRequest,
@@ -41,6 +49,9 @@ interface SecretMetadataBackendApiDependencies {
   readonly disableSecretUseCase: DisableSecretUseCase;
   readonly rotateSecretUseCase: RotateSecretUseCase;
   readonly workspaceAuthorizationReadRepository?: IWorkspaceAuthorizationReadRepository;
+  readonly secretOperationalDiagnosticsProvider?: {
+    collectDiagnostics(): Promise<SecretServiceOperationalDiagnosticsViewDto>;
+  };
   readonly clock?: {
     now(): Date;
   };
@@ -50,7 +61,14 @@ interface SecretMetadataBackendApiDependencies {
 type SecretMetadataObservabilityEvent =
   | {
     readonly event: "secret-metadata.request.succeeded";
-    readonly operation: "create-secret" | "list-secrets" | "get-secret" | "disable-secret" | "rotate-secret";
+    readonly operation:
+      | "create-secret"
+      | "list-secrets"
+      | "get-secret"
+      | "disable-secret"
+      | "rotate-secret"
+      | "get-secret-health"
+      | "get-secret-diagnostics";
     readonly actorUserIdentityId?: string;
     readonly secretId?: string;
     readonly scope?: string;
@@ -59,7 +77,14 @@ type SecretMetadataObservabilityEvent =
   }
   | {
     readonly event: "secret-metadata.request.failed";
-    readonly operation: "create-secret" | "list-secrets" | "get-secret" | "disable-secret" | "rotate-secret";
+    readonly operation:
+      | "create-secret"
+      | "list-secrets"
+      | "get-secret"
+      | "disable-secret"
+      | "rotate-secret"
+      | "get-secret-health"
+      | "get-secret-diagnostics";
     readonly actorUserIdentityId?: string;
     readonly code: SecretMetadataApiError["code"];
     readonly message: string;
@@ -446,6 +471,90 @@ export class SecretMetadataBackendApi {
     });
   }
 
+  public async getSecretServiceHealth(
+    request: GetSecretServiceHealthApiRequest,
+  ): Promise<SecretMetadataApiResponse<GetSecretServiceHealthApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed("get-secret-health", SecretMetadataApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+    }
+
+    if (!this.dependencies.secretOperationalDiagnosticsProvider) {
+      return this.failed(
+        "get-secret-health",
+        SecretMetadataApiErrorCodes.internal,
+        "Secret service diagnostics are unavailable.",
+        actorUserIdentityId,
+      );
+    }
+
+    try {
+      const diagnostics = await this.dependencies.secretOperationalDiagnosticsProvider.collectDiagnostics();
+      await this.emitObservability({
+        event: "secret-metadata.request.succeeded",
+        operation: "get-secret-health",
+        actorUserIdentityId,
+      });
+      return Object.freeze({
+        ok: true,
+        data: Object.freeze({
+          health: toHealthView(diagnostics),
+        }),
+      });
+    } catch (error) {
+      return this.failed(
+        "get-secret-health",
+        SecretMetadataApiErrorCodes.internal,
+        toSafeClientErrorMessage(error, "Failed to resolve secret service health."),
+        actorUserIdentityId,
+      );
+    }
+  }
+
+  public async getSecretServiceDiagnostics(
+    request: GetSecretServiceDiagnosticsApiRequest,
+  ): Promise<SecretMetadataApiResponse<GetSecretServiceDiagnosticsApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(
+        "get-secret-diagnostics",
+        SecretMetadataApiErrorCodes.invalidRequest,
+        "actorUserIdentityId is required.",
+      );
+    }
+
+    if (!this.dependencies.secretOperationalDiagnosticsProvider) {
+      return this.failed(
+        "get-secret-diagnostics",
+        SecretMetadataApiErrorCodes.internal,
+        "Secret service diagnostics are unavailable.",
+        actorUserIdentityId,
+      );
+    }
+
+    try {
+      const diagnostics = await this.dependencies.secretOperationalDiagnosticsProvider.collectDiagnostics();
+      await this.emitObservability({
+        event: "secret-metadata.request.succeeded",
+        operation: "get-secret-diagnostics",
+        actorUserIdentityId,
+      });
+      return Object.freeze({
+        ok: true,
+        data: Object.freeze({
+          diagnostics: sanitizeSecretServiceOperationalDiagnostics(diagnostics),
+        }),
+      });
+    } catch (error) {
+      return this.failed(
+        "get-secret-diagnostics",
+        SecretMetadataApiErrorCodes.internal,
+        toSafeClientErrorMessage(error, "Failed to resolve secret service diagnostics."),
+        actorUserIdentityId,
+      );
+    }
+  }
+
   private async resolveActorForOwner(input: {
     readonly actorUserIdentityId: string;
     readonly owner: SecretScopeOwner;
@@ -683,4 +792,40 @@ function normalizeRequired(value: string | undefined): string | undefined {
 function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
+function toHealthView(input: SecretServiceOperationalDiagnosticsViewDto): SecretServiceHealthViewDto {
+  return Object.freeze({
+    state: input.state,
+    checkedAt: input.checkedAt,
+    healthFlags: Object.freeze({
+      encryptionMaterialAvailable: input.healthFlags.encryptionMaterialAvailable,
+      repositoryReachable: input.healthFlags.repositoryReachable,
+      bootstrapSecretsHealthy: input.healthFlags.bootstrapSecretsHealthy,
+      runtimeDependenciesHealthy: input.healthFlags.runtimeDependenciesHealthy,
+    }),
+  });
+}
+
+function sanitizeSecretServiceOperationalDiagnostics(
+  input: SecretServiceOperationalDiagnosticsViewDto,
+): SecretServiceOperationalDiagnosticsViewDto {
+  return Object.freeze({
+    ...toHealthView(input),
+    diagnostics: Object.freeze(input.diagnostics.map((entry) => Object.freeze({
+      code: normalizeOptional(entry.code) ?? "secret-diagnostic",
+      severity: entry.severity,
+      message: toSafeClientErrorMessage(entry.message, "Secret service diagnostic emitted."),
+      secretId: normalizeOptional(entry.secretId),
+    }))),
+    bootstrap: Object.freeze({
+      requiredSecretIds: Object.freeze([...input.bootstrap.requiredSecretIds]),
+      diagnostics: Object.freeze(input.bootstrap.diagnostics.map((entry) => Object.freeze({
+        code: normalizeOptional(entry.code) ?? "secret-diagnostic",
+        severity: entry.severity,
+        message: toSafeClientErrorMessage(entry.message, "Secret service diagnostic emitted."),
+        secretId: normalizeOptional(entry.secretId),
+      }))),
+    }),
+  });
 }

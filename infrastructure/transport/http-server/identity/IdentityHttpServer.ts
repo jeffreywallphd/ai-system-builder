@@ -1554,6 +1554,60 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
       }
       if (
         options.secretMetadataBackendApi
+        && request.method === "GET"
+        && path === "/api/v1/security/secrets/health"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {},
+          async (context) => {
+            const apiResponse = await options.secretMetadataBackendApi.getSecretServiceHealth({
+              actorUserIdentityId: context.principal.userIdentityId,
+            });
+            const statusCode = mapSecretMetadataStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.secretMetadataBackendApi
+        && request.method === "GET"
+        && path === "/api/v1/security/secrets/diagnostics"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const apiResponse = await options.secretMetadataBackendApi.getSecretServiceDiagnostics({
+              actorUserIdentityId: context.principal.userIdentityId,
+            });
+            const statusCode = mapSecretMetadataStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.secretMetadataBackendApi
         && request.method === "POST"
         && path === "/api/v1/security/secrets"
       ) {
