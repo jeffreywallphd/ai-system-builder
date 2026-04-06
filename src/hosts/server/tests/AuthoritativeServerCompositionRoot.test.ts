@@ -44,6 +44,9 @@ describe("AuthoritativeServerCompositionRoot", () => {
     const runtime = await root.compose(boot);
     expect(runtime.port).toBe(4100);
     expect(runtime.phase).toBe("ready");
+    expect(runtime.runtimeMetadata.hostId).toBe("host:server:authoritative");
+    expect(runtime.runtimeMetadata.roleInspection.isAuthoritativeControlPlane).toBeTrue();
+    expect(runtime.runtimeMetadata.advertisedCapabilities.some((capability) => capability.capability === HostCapabilityFlags.controlPlaneAuthority)).toBeTrue();
     expect(runtime.readiness?.marker).toBe("authoritative-server:feature-registration-complete");
     expect(runtime.lifecycleEvents?.some((event) => event.type === "startup-completed")).toBeTrue();
     expect(runtime.transitionHistory.map((entry) => entry.to)).toEqual([

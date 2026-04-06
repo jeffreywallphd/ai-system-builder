@@ -35,6 +35,9 @@ describe("DesktopHostCompositionRoot", () => {
 
     const runtime = await root.compose(boot);
     expect(runtime.phase).toBe("ready");
+    expect(runtime.runtimeMetadata.hostId).toBe("host:desktop:app-shell");
+    expect(runtime.runtimeMetadata.roleInspection.isControlPlaneClient).toBeTrue();
+    expect(runtime.runtimeMetadata.advertisedCapabilities.some((capability) => capability.capability === HostCapabilityFlags.desktopShell)).toBeTrue();
     expect(runtime.readiness?.marker).toBe("desktop-host:feature-registration-complete");
     expect(runtime.lifecycleEvents?.some((event) => event.type === "startup-completed")).toBeTrue();
     expect(runtime.transitionHistory.map((entry) => entry.to)).toEqual([

@@ -26,6 +26,7 @@ import {
 } from "../../infrastructure/config/HostServiceRegistrationCatalog";
 import type { HostServiceRegistrationPlan } from "../../infrastructure/config/HostServiceRegistration";
 import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
+import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
 
 export const HybridHostControlPlaneSources = Object.freeze({
   remoteAuthoritativeServer: "remote-authoritative-server",
@@ -216,6 +217,15 @@ export function createHybridCompositionRoot(
       }
 
       const lifecycle = createHostLifecycleCoordinator({ boot });
+      const runtimeMetadata = advertiseHostRuntimeMetadata({
+        host: boot.host,
+        advertisedCapabilities: enabledCapabilities,
+        metadata: Object.freeze({
+          compositionRootId: "composition-root:host:hybrid:desktop-worker",
+          startupReason: boot.startupReason,
+          controlPlaneSource,
+        }),
+      });
       let startedHost: HybridRuntimeHost | undefined;
       await lifecycle.markComposing("compose-hybrid-host");
 
@@ -237,6 +247,7 @@ export function createHybridCompositionRoot(
           [HostBootstrapStageIds.configuration]: (context) => {
             context.setArtifact("artifact:host:hybrid:host-options", context.hostConfiguration);
             context.setArtifact(HybridEnabledCapabilitiesArtifactKey, enabledCapabilities);
+            context.setArtifact(HostRuntimeMetadataArtifactKey, runtimeMetadata);
           },
           [HostBootstrapStageIds.dependencies]: (context) => {
             const composePlan = input.bootstrap?.composeServiceRegistrationPlan
@@ -322,6 +333,7 @@ export function createHybridCompositionRoot(
 
         return Object.freeze({
           host: boot.host,
+          runtimeMetadata,
           get phase() {
             return lifecycle.phase;
           },

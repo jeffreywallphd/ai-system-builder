@@ -113,6 +113,23 @@
   - safe startup/shutdown failure propagation to `failed` lifecycle state
 - Lifecycle behavior is now standardized while host roots remain composition-only and business-logic free.
 
+## Host capability advertisement and runtime role inspection (story 12.3.2)
+- `src/domain/hosts/HostRuntimeDomain.ts` now includes shared capability descriptors and runtime role-inspection projection contracts.
+  - capability descriptors classify each host capability with explicit category + summary
+  - role inspection projects control-plane, execution, UI, transport, and persistence posture without brittle string checks
+- `src/application/common/HostCompositionContracts.ts` now includes `HostRuntimeMetadata` and `createHostRuntimeMetadata(...)` so metadata projection stays contract-owned and uniform.
+- `src/hosts/HostRuntimeMetadataCatalog.ts` now provides reusable host metadata advertisement/inspection APIs:
+  - `advertiseHostRuntimeMetadata(...)`
+  - `resolveHostRuntimeMetadataFromCatalog(...)`
+  - `listHostRuntimeMetadataCatalog(...)`
+  - shared startup artifact key (`artifact:host:runtime:metadata`) for bootstrap diagnostics/registration hooks
+- All host composition roots now advertise runtime metadata and expose it through runtime handles:
+  - server, desktop, hybrid, web, worker
+- Shared DTO projection now includes runtime metadata via `toHostRuntimeMetadataDto(...)` in:
+  - `src/shared/contracts/hosts/HostCompositionContracts.ts`
+
+This keeps host runtime metadata consumable for future node trust, scheduling, and admin/read-model surfaces while preserving host-boundary ownership.
+
 ## Host service registration and dependency composition rules (story 12.1.3)
 - Added host-aware service registration contracts in `src/infrastructure/config/HostServiceRegistration.ts` for:
   - registration kind + boundary layer enforcement
@@ -133,6 +150,7 @@
 - `src/domain/hosts/tests/HostRuntimeDomain.test.ts`
 - `src/application/common/tests/HostCompositionContracts.test.ts`
 - `src/shared/contracts/hosts/tests/HostCompositionContracts.test.ts`
+- `src/hosts/tests/HostRuntimeMetadataCatalog.test.ts`
 - `src/hosts/tests/HostRuntimeCatalog.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`

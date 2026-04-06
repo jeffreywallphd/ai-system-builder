@@ -24,6 +24,7 @@ import {
 } from "../../infrastructure/config/HostServiceRegistrationCatalog";
 import type { HostServiceRegistrationPlan } from "../../infrastructure/config/HostServiceRegistration";
 import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
+import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
 
 export interface DesktopRuntimeHost {
   close(): Promise<void>;
@@ -118,6 +119,14 @@ export function createDesktopCompositionRoot(
       }, boot);
 
       const lifecycle = createHostLifecycleCoordinator({ boot });
+      const runtimeMetadata = advertiseHostRuntimeMetadata({
+        host: boot.host,
+        metadata: Object.freeze({
+          compositionRootId: "composition-root:host:desktop:app-shell",
+          startupReason: boot.startupReason,
+          controlPlaneSource: "remote-authoritative-server",
+        }),
+      });
       let startedHost: DesktopRuntimeHost | undefined;
       await lifecycle.markComposing("compose-desktop-host");
 
@@ -138,6 +147,7 @@ export function createDesktopCompositionRoot(
         const defaultStageHandlers: HostBootstrapReusableStageHandlers = {
           [HostBootstrapStageIds.configuration]: (context) => {
             context.setArtifact("artifact:host:desktop:host-options", context.hostConfiguration);
+            context.setArtifact(HostRuntimeMetadataArtifactKey, runtimeMetadata);
           },
           [HostBootstrapStageIds.dependencies]: (context) => {
             const composePlan = input.bootstrap?.composeServiceRegistrationPlan
@@ -220,6 +230,7 @@ export function createDesktopCompositionRoot(
 
         return Object.freeze({
           host: boot.host,
+          runtimeMetadata,
           get phase() {
             return lifecycle.phase;
           },

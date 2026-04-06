@@ -9,6 +9,10 @@ import {
   HostRuntimeCatalog,
   resolveHostRuntimeFromCatalog,
 } from "../HostRuntimeCatalog";
+import {
+  listHostRuntimeMetadataCatalog,
+  resolveHostRuntimeMetadataFromCatalog,
+} from "../HostRuntimeMetadataCatalog";
 
 describe("HostRuntimeCatalog", () => {
   it("defines runtime entries for server, desktop, hybrid, web, and worker", () => {
@@ -45,6 +49,20 @@ describe("HostRuntimeCatalog", () => {
       expect(host.startupDependencies.length).toBeGreaterThan(0);
     }
     expect(AuthoritativeServerHostRuntime.responsibilities.join(" ")).toContain("authoritative");
+  });
+
+  it("advertises runtime metadata for all host kinds in a consistent format", () => {
+    const advertised = listHostRuntimeMetadataCatalog();
+    expect(advertised).toHaveLength(5);
+    for (const metadata of advertised) {
+      expect(metadata.hostId).toContain("host:");
+      expect(metadata.advertisedCapabilities.length).toBeGreaterThan(0);
+      expect(metadata.roleInspection.hostId).toBe(metadata.hostId);
+    }
+
+    const serverMetadata = resolveHostRuntimeMetadataFromCatalog(HostRuntimeKinds.server);
+    expect(serverMetadata.roleInspection.isAuthoritativeControlPlane).toBeTrue();
+    expect(serverMetadata.roleInspection.supportsNodeExecution).toBeFalse();
   });
 });
 

@@ -12,6 +12,7 @@ import {
   HostLifecyclePhases,
   assertExecutableHostBoundarySatisfiesBootConfiguration,
   assertHostCanRunAsControlPlane,
+  createHostRuntimeMetadata,
   createHostBootConfiguration,
   resolveHostCapabilityMatrix,
   transitionHostLifecyclePhase,
@@ -94,6 +95,20 @@ describe("HostCompositionContracts", () => {
     expect(HostLifecycleEventTypes.startupCompleted).toBe("startup-completed");
     expect(HostLifecycleEventTypes.readinessMarked).toBe("readiness-marked");
     expect(HostLifecycleEventTypes.shutdownRequested).toBe("shutdown-requested");
+  });
+
+  it("builds host runtime metadata with role inspection and capability descriptors", () => {
+    const metadata = createHostRuntimeMetadata({
+      host: authoritativeHost,
+      metadata: {
+        compositionRootId: "composition-root:host:server:authoritative",
+      },
+    });
+
+    expect(metadata.hostId).toBe(authoritativeHost.hostId);
+    expect(metadata.roleInspection.isAuthoritativeControlPlane).toBeTrue();
+    expect(metadata.advertisedCapabilities.some((capability) => capability.capability === HostCapabilityFlags.controlPlaneAuthority)).toBeTrue();
+    expect(metadata.metadata.compositionRootId).toBe("composition-root:host:server:authoritative");
   });
 });
 

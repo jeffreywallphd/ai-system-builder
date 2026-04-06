@@ -36,6 +36,9 @@ describe("WebHostCompositionRoot", () => {
     const runtime = await root.compose(boot);
     expect(runtime.phase).toBe("ready");
     expect(runtime.delivery.deliveryMode).toBe("thin-client");
+    expect(runtime.runtimeMetadata.hostId).toBe("host:web:thin-client");
+    expect(runtime.runtimeMetadata.roleInspection.supportsUserInterface).toBeTrue();
+    expect(runtime.runtimeMetadata.advertisedCapabilities.some((capability) => capability.capability === HostCapabilityFlags.browserRuntime)).toBeTrue();
     expect(runtime.readiness?.marker).toBe("web-host:feature-registration-complete");
     expect(runtime.lifecycleEvents?.some((event) => event.type === "startup-completed")).toBeTrue();
     expect(runtime.transitionHistory.map((entry) => entry.to)).toEqual([

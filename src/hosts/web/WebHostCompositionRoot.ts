@@ -24,6 +24,7 @@ import {
 } from "../../infrastructure/config/HostServiceRegistrationCatalog";
 import type { HostServiceRegistrationPlan } from "../../infrastructure/config/HostServiceRegistration";
 import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
+import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
 
 export interface WebHostDeliveryContext {
   readonly deliveryMode: "thin-client" | "static-shell";
@@ -146,6 +147,15 @@ export function createWebCompositionRoot(
       }, boot);
 
       const lifecycle = createHostLifecycleCoordinator({ boot });
+      const runtimeMetadata = advertiseHostRuntimeMetadata({
+        host: boot.host,
+        metadata: Object.freeze({
+          compositionRootId: "composition-root:host:web:thin-client",
+          startupReason: boot.startupReason,
+          deliveryMode: delivery.deliveryMode,
+          basePath: delivery.basePath,
+        }),
+      });
       let startedHost: WebRuntimeHost | undefined;
       await lifecycle.markComposing("compose-web-host");
 
@@ -167,6 +177,7 @@ export function createWebCompositionRoot(
           [HostBootstrapStageIds.configuration]: (context) => {
             context.setArtifact("artifact:host:web:host-options", context.hostConfiguration);
             context.setArtifact(WebHostDeliveryArtifactKey, delivery);
+            context.setArtifact(HostRuntimeMetadataArtifactKey, runtimeMetadata);
           },
           [HostBootstrapStageIds.dependencies]: (context) => {
             const composePlan = input.bootstrap?.composeServiceRegistrationPlan
@@ -249,6 +260,7 @@ export function createWebCompositionRoot(
 
         return Object.freeze({
           host: boot.host,
+          runtimeMetadata,
           get phase() {
             return lifecycle.phase;
           },

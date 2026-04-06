@@ -38,6 +38,23 @@ export const HostCapabilityFlags = Object.freeze({
 
 export type HostCapabilityFlag = typeof HostCapabilityFlags[keyof typeof HostCapabilityFlags];
 
+export const HostCapabilityCategories = Object.freeze({
+  controlPlane: "control-plane",
+  execution: "execution",
+  interface: "interface",
+  integration: "integration",
+  transport: "transport",
+  persistence: "persistence",
+});
+
+export type HostCapabilityCategory = typeof HostCapabilityCategories[keyof typeof HostCapabilityCategories];
+
+export interface HostCapabilityDescriptor {
+  readonly capability: HostCapabilityFlag;
+  readonly category: HostCapabilityCategory;
+  readonly summary: string;
+}
+
 export const HostStartupDependencyBoundaryLayers = Object.freeze({
   sharedContracts: "shared-contracts",
   domain: "domain",
@@ -64,6 +81,73 @@ export interface HostRuntimeIdentity {
   readonly responsibilities: ReadonlyArray<string>;
   readonly startupDependencies: ReadonlyArray<HostStartupDependencyBoundary>;
 }
+
+export interface HostRuntimeRoleInspection {
+  readonly hostId: string;
+  readonly kind: HostRuntimeKind;
+  readonly controlPlaneRole: HostControlPlaneRole;
+  readonly isAuthoritativeControlPlane: boolean;
+  readonly isControlPlaneClient: boolean;
+  readonly isControlPlaneParticipant: boolean;
+  readonly supportsNodeExecution: boolean;
+  readonly supportsWorkerRuntime: boolean;
+  readonly supportsUserInterface: boolean;
+  readonly supportsTransportServing: boolean;
+  readonly supportsLocalPersistence: boolean;
+}
+
+const HostCapabilityDescriptorCatalog: Readonly<Record<HostCapabilityFlag, HostCapabilityDescriptor>> = Object.freeze({
+  [HostCapabilityFlags.controlPlaneAuthority]: Object.freeze({
+    capability: HostCapabilityFlags.controlPlaneAuthority,
+    category: HostCapabilityCategories.controlPlane,
+    summary: "Host can own authoritative control-plane policy and orchestration responsibilities.",
+  }),
+  [HostCapabilityFlags.nodeExecution]: Object.freeze({
+    capability: HostCapabilityFlags.nodeExecution,
+    category: HostCapabilityCategories.execution,
+    summary: "Host can execute node workloads and runtime jobs.",
+  }),
+  [HostCapabilityFlags.userInterfaceRendering]: Object.freeze({
+    capability: HostCapabilityFlags.userInterfaceRendering,
+    category: HostCapabilityCategories.interface,
+    summary: "Host can render user-facing interface surfaces.",
+  }),
+  [HostCapabilityFlags.desktopShell]: Object.freeze({
+    capability: HostCapabilityFlags.desktopShell,
+    category: HostCapabilityCategories.interface,
+    summary: "Host can compose desktop shell/window runtime boundaries.",
+  }),
+  [HostCapabilityFlags.browserRuntime]: Object.freeze({
+    capability: HostCapabilityFlags.browserRuntime,
+    category: HostCapabilityCategories.interface,
+    summary: "Host can execute browser-based runtime composition.",
+  }),
+  [HostCapabilityFlags.workerRuntime]: Object.freeze({
+    capability: HostCapabilityFlags.workerRuntime,
+    category: HostCapabilityCategories.execution,
+    summary: "Host can compose and run worker runtime execution flows.",
+  }),
+  [HostCapabilityFlags.localPersistence]: Object.freeze({
+    capability: HostCapabilityFlags.localPersistence,
+    category: HostCapabilityCategories.persistence,
+    summary: "Host can own local persistence adapters and storage bootstrap wiring.",
+  }),
+  [HostCapabilityFlags.ipcBridge]: Object.freeze({
+    capability: HostCapabilityFlags.ipcBridge,
+    category: HostCapabilityCategories.integration,
+    summary: "Host can expose inter-process communication bridge boundaries.",
+  }),
+  [HostCapabilityFlags.httpServing]: Object.freeze({
+    capability: HostCapabilityFlags.httpServing,
+    category: HostCapabilityCategories.transport,
+    summary: "Host can serve HTTP transport endpoints.",
+  }),
+  [HostCapabilityFlags.transportTermination]: Object.freeze({
+    capability: HostCapabilityFlags.transportTermination,
+    category: HostCapabilityCategories.transport,
+    summary: "Host can terminate and secure runtime transport connections.",
+  }),
+});
 
 const HostIdentifierPattern = /^[a-z][a-z0-9:-]{2,126}$/;
 
@@ -220,6 +304,47 @@ export function assertHostIdentitySupportsAuthoritativeControlPlane(
       `Host '${host.hostId}' is missing control-plane-authority capability.`,
     );
   }
+}
+
+export function resolveHostCapabilityDescriptor(capability: HostCapabilityFlag): HostCapabilityDescriptor {
+  const descriptor = HostCapabilityDescriptorCatalog[capability];
+  if (!descriptor) {
+    throw new HostRuntimeDomainError(`Host capability '${String(capability)}' is missing a descriptor.`);
+  }
+  return descriptor;
+}
+
+export function resolveHostCapabilityDescriptors(
+  capabilities: ReadonlyArray<HostCapabilityFlag>,
+): ReadonlyArray<HostCapabilityDescriptor> {
+  const descriptors = new Map<HostCapabilityFlag, HostCapabilityDescriptor>();
+  for (const capability of capabilities) {
+    descriptors.set(capability, resolveHostCapabilityDescriptor(capability));
+  }
+  return Object.freeze([...descriptors.values()]);
+}
+
+export function inspectHostRuntimeRole(
+  host: Pick<HostRuntimeIdentity, "hostId" | "kind" | "controlPlaneRole" | "capabilities">,
+): HostRuntimeRoleInspection {
+  const isAuthoritativeControlPlane = host.controlPlaneRole === HostControlPlaneRoles.authoritativeServer
+    && hasHostCapability(host, HostCapabilityFlags.controlPlaneAuthority);
+  const isControlPlaneClient = host.controlPlaneRole === HostControlPlaneRoles.controlPlaneClient;
+
+  return Object.freeze({
+    hostId: host.hostId,
+    kind: host.kind,
+    controlPlaneRole: host.controlPlaneRole,
+    isAuthoritativeControlPlane,
+    isControlPlaneClient,
+    isControlPlaneParticipant: isAuthoritativeControlPlane || isControlPlaneClient,
+    supportsNodeExecution: hasHostCapability(host, HostCapabilityFlags.nodeExecution),
+    supportsWorkerRuntime: hasHostCapability(host, HostCapabilityFlags.workerRuntime),
+    supportsUserInterface: hasHostCapability(host, HostCapabilityFlags.userInterfaceRendering),
+    supportsTransportServing: hasHostCapability(host, HostCapabilityFlags.httpServing)
+      || hasHostCapability(host, HostCapabilityFlags.transportTermination),
+    supportsLocalPersistence: hasHostCapability(host, HostCapabilityFlags.localPersistence),
+  });
 }
 
 export function resolveStartupDependenciesByBoundaryLayer(

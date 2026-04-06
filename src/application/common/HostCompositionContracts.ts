@@ -1,12 +1,17 @@
 import {
+  type HostCapabilityDescriptor,
+  type HostCapabilityFlag,
   HostCapabilityFlags,
   HostControlPlaneRoles,
   HostRuntimeDomainError,
   type HostRuntimeIdentity,
+  type HostRuntimeRoleInspection,
   type HostStartupDependencyBoundary,
   type HostStartupDependencyBoundaryLayer,
   assertHostIdentitySupportsAuthoritativeControlPlane,
   hasHostCapability,
+  inspectHostRuntimeRole,
+  resolveHostCapabilityDescriptors,
 } from "../../domain/hosts/HostRuntimeDomain";
 
 export class HostCompositionContractError extends Error {
@@ -83,8 +88,18 @@ export interface HostLifecycleEvent {
   readonly metadata?: Readonly<Record<string, string>>;
 }
 
+export interface HostRuntimeMetadata {
+  readonly hostId: string;
+  readonly kind: HostRuntimeIdentity["kind"];
+  readonly controlPlaneRole: HostRuntimeIdentity["controlPlaneRole"];
+  readonly roleInspection: HostRuntimeRoleInspection;
+  readonly advertisedCapabilities: ReadonlyArray<HostCapabilityDescriptor>;
+  readonly metadata: Readonly<Record<string, string>>;
+}
+
 export interface HostRuntimeHandle {
   readonly host: HostRuntimeIdentity;
+  readonly runtimeMetadata: HostRuntimeMetadata;
   readonly phase: HostLifecyclePhase;
   readonly readiness?: HostLifecycleReadinessMarker;
   readonly lifecycleEvents?: ReadonlyArray<HostLifecycleEvent>;
@@ -245,6 +260,44 @@ export function resolveHostCapabilityMatrix(host: Pick<HostRuntimeIdentity, "con
     controlPlaneAuthority,
     nodeExecution,
     splitAuthorityFromExecution: controlPlaneAuthority !== nodeExecution,
+  });
+}
+
+function normalizeHostMetadata(input: Readonly<Record<string, string | undefined>>): Readonly<Record<string, string>> {
+  const normalized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(input)) {
+    const metadataKey = key.trim();
+    const metadataValue = value?.trim();
+    if (!metadataKey || !metadataValue) {
+      continue;
+    }
+    normalized[metadataKey] = metadataValue;
+  }
+  return Object.freeze(normalized);
+}
+
+export function createHostRuntimeMetadata(input: {
+  readonly host: HostRuntimeIdentity;
+  readonly advertisedCapabilities?: ReadonlyArray<HostCapabilityFlag>;
+  readonly metadata?: Readonly<Record<string, string | undefined>>;
+}): HostRuntimeMetadata {
+  const advertisedCapabilityFlags = input.advertisedCapabilities ?? input.host.capabilities;
+  const hostCapabilities = new Set(input.host.capabilities);
+  for (const capability of advertisedCapabilityFlags) {
+    if (!hostCapabilities.has(capability)) {
+      throw new HostCompositionContractError(
+        `Host runtime metadata capability '${capability}' is not declared by host '${input.host.hostId}'.`,
+      );
+    }
+  }
+
+  return Object.freeze({
+    hostId: input.host.hostId,
+    kind: input.host.kind,
+    controlPlaneRole: input.host.controlPlaneRole,
+    roleInspection: inspectHostRuntimeRole(input.host),
+    advertisedCapabilities: resolveHostCapabilityDescriptors(advertisedCapabilityFlags),
+    metadata: normalizeHostMetadata(input.metadata ?? {}),
   });
 }
 

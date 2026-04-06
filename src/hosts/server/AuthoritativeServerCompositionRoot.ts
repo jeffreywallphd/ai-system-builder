@@ -30,6 +30,7 @@ import {
   type IdentityServerHostOptions,
 } from "../../../hosts/server/IdentityServerHost";
 import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
+import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -122,6 +123,16 @@ export function createAuthoritativeServerCompositionRoot(
       }, boot);
 
       const lifecycle = createHostLifecycleCoordinator({ boot });
+      const runtimeMetadata = advertiseHostRuntimeMetadata({
+        host: boot.host,
+        metadata: Object.freeze({
+          compositionRootId: "composition-root:host:server:authoritative",
+          startupReason: boot.startupReason,
+          controlPlaneSource: "local-authoritative-server",
+          transportHost: input.hostOptions.host,
+          transportPort: input.hostOptions.port !== undefined ? String(input.hostOptions.port) : undefined,
+        }),
+      });
       let startedHost: IdentityServerHost | undefined;
       await lifecycle.markComposing("compose-authoritative-server-host");
 
@@ -144,6 +155,7 @@ export function createAuthoritativeServerCompositionRoot(
               "artifact:host:server:authoritative:host-options",
               context.hostConfiguration as IdentityServerHostOptions,
             );
+            context.setArtifact(HostRuntimeMetadataArtifactKey, runtimeMetadata);
           },
           [HostBootstrapStageIds.dependencies]: (context) => {
             const composePlan = input.bootstrap?.composeServiceRegistrationPlan
@@ -226,6 +238,7 @@ export function createAuthoritativeServerCompositionRoot(
 
         return Object.freeze({
           host: boot.host,
+          runtimeMetadata,
           get phase() {
             return lifecycle.phase;
           },
