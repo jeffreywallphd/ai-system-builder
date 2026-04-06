@@ -83,6 +83,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Encryption-at-rest policy foundation baseline for explicit policy vocabulary, inheritance/override contracts, and encrypted-material reference invariants: `docs/architecture/encryption-at-rest-policy-foundation.md`
 - Encryption-at-rest shared policy DTO/schema/contract baseline for workspace/storage policy exchange and descriptor validation seams: `docs/architecture/encryption-at-rest-policy-shared-contracts.md`
 - Encryption-at-rest application evaluation baseline for effective-policy service seams and reusable content/preview/worker decision contracts: `docs/architecture/encryption-at-rest-policy-application-evaluation-ports.md`
+- Encryption-at-rest key-resolution baseline for deterministic server/workspace/storage key-scope orchestration and rotation-ready key reference contracts: `docs/architecture/encryption-at-rest-key-resolution-and-scope-orchestration.md`
 - Secret master-key re-encryption operations baseline for controlled KEK migration, progress tracking, and restartable recovery: `docs/secret-master-key-reencryption-operations.md`
 - Node bootstrap identity/trust-material operations baseline: `docs/node-bootstrap-identity-operations.md`
 - Workspace tenancy domain/contracts baseline: `docs/architecture/workspace-foundation.md`
