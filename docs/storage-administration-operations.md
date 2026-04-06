@@ -1,6 +1,6 @@
 # Storage Administration Screens
 
-This note documents Story 9.4.1 and Story 9.4.2 (Feature 9 / Epic 9.4): storage administration list/detail plus create/edit workflows.
+This note documents Story 9.4.1, Story 9.4.2, and Story 9.4.3 (Feature 9 / Epic 9.4): storage administration list/detail, create/edit workflows, and operational readiness visibility.
 
 ## Scope
 
@@ -29,8 +29,25 @@ This note documents Story 9.4.1 and Story 9.4.2 (Feature 9 / Epic 9.4): storage 
   - workspace scope
   - lifecycle state
   - health summary
+  - sync posture
+  - availability summary
   - policy highlights
 - Detail panel projects lifecycle, policy, access restrictions, replication status, and health diagnostics.
+
+## Story 9.4.3 operational visibility behavior
+
+- Storage list and detail surfaces now classify readiness as:
+  - `healthy` (ready)
+  - `degraded` (limited)
+  - `inactive` (not usable)
+  - `unhealthy` / `unsupported` (blocked)
+- Classification is rendered from authoritative storage inspection data (`GET /health`) and lifecycle state without exposing backend internals.
+- Detail panel now separates:
+  - operational status (availability + usability explanation + reason code + notes)
+  - capability profile differences (managed lifecycle and replication/read posture support flags)
+  - synchronization posture (sync-capable vs non-sync-capable, deployment availability, sync status)
+- Sync-capable storage instances are explicitly distinguishable from non-sync-capable backends in list and detail.
+- Unusable status messaging explains why an instance is not ready (inactive, unsupported capability profile, or operational failure), with safe reason-code visibility for operators.
 
 ## Story 9.4.2 workflow behavior
 
@@ -56,6 +73,7 @@ This note documents Story 9.4.1 and Story 9.4.2 (Feature 9 / Epic 9.4): storage 
 - `ui/shared/storage/tests/StorageAdministrationClient.test.ts`
 - `ui/components/storage/tests/StorageInstanceWorkflowPanel.test.tsx`
 - `ui/pages/tests/StorageAdministrationPage.test.tsx`
+- `ui/pages/tests/StorageAdministrationPage.presentation.test.ts`
 - `ui/web/storage/tests/StorageAdministrationRoutes.test.ts`
 - route/page contract updates:
   - `ui/routes/tests/RoutesContracts.test.ts`
