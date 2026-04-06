@@ -356,6 +356,20 @@ The goal is to keep repository implementation aligned to domain/application cont
   - `src/infrastructure/logging/tests/PersistenceRedaction.test.ts`
   - `src/infrastructure/persistence/common/tests/SafeSqliteRepositoryBase.test.ts`
 
+## Story 13.4.1 application-use-case persistence wiring
+
+- Core application mutation use cases now route multi-record persistence through shared transaction boundaries instead of uncoordinated sequential writes:
+  - `src/application/identity/use-cases/ChangeLocalPasswordCredentialUseCase.ts`
+  - `src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase.ts`
+  - `src/application/nodes/use-cases/RejectNodeEnrollmentUseCase.ts`
+- Authoritative host wiring now injects transaction-capable repository adapters so runtime execution paths use the transactional boundary in production:
+  - `hosts/server/IdentityServerHost.ts`
+- Node trust SQLite persistence adapter now exposes the shared transaction-manager contract for use-case orchestration:
+  - `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter.ts`
+- Added verification coverage for transactional orchestration behavior:
+  - `application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
+  - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
+
 ## Mapper responsibility guidance (Story 13.1.3)
 
 - Mapper boundaries are adapter-local but contract-driven:

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { INodeEnrollmentRequestPersistenceRepository } from "../../../application/nodes/ports/INodeEnrollmentRequestPersistenceRepository";
 import type { INodeTrustIdentityPersistenceRepository } from "../../../application/nodes/ports/INodeTrustIdentityPersistenceRepository";
+import type { IPlatformTransactionManager } from "../../../application/common/ports/PlatformTransactionPorts";
 import { NodeEnrollmentRequestStatuses, NodeTrustStates } from "../../../domain/nodes/NodeTrustDomain";
 import {
   NodeTrustPersistenceQueryPresets,
@@ -44,6 +45,7 @@ import {
   resolvePersistenceMutationMetadata,
 } from "../common/PersistenceMutationMetadata";
 import { SafeSqliteRepositoryBase } from "../common/SafeSqliteRepositoryBase";
+import { SqliteTransactionCoordinator } from "../sqlite/SqliteTransactionCoordinator";
 
 const EnrollmentTerminalStatuses = Object.freeze([
   NodeEnrollmentRequestStatuses.approved,
@@ -54,12 +56,14 @@ const EnrollmentTerminalStatuses = Object.freeze([
 
 export class SqliteNodeTrustPersistenceAdapter
   extends SafeSqliteRepositoryBase
-  implements INodeTrustIdentityPersistenceRepository, INodeEnrollmentRequestPersistenceRepository {
+  implements INodeTrustIdentityPersistenceRepository, INodeEnrollmentRequestPersistenceRepository, IPlatformTransactionManager {
   private database?: SqliteCompatDatabase;
   private initialized = false;
+  private readonly transactionCoordinator: SqliteTransactionCoordinator;
 
   public constructor(private readonly databasePath: string) {
     super("Node trust");
+    this.transactionCoordinator = new SqliteTransactionCoordinator(() => this.getDatabase());
   }
 
   public async findNodeById(nodeId: string): Promise<NodeIdentityPersistenceRecord | undefined> {
@@ -748,6 +752,10 @@ export class SqliteNodeTrustPersistenceAdapter
     this.database?.close();
     this.database = undefined;
     this.initialized = false;
+  }
+
+  public async runInTransaction<TValue>(operation: () => Promise<TValue>): Promise<TValue> {
+    return this.transactionCoordinator.runInTransaction(operation);
   }
 
   private getDatabase(): SqliteCompatDatabase {

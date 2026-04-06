@@ -15,6 +15,10 @@ import type { INodeEnrollmentRequestPersistenceRepository } from "../ports/INode
 import type { INodeTrustIdentityPersistenceRepository } from "../ports/INodeTrustIdentityPersistenceRepository";
 import type { NodeTrustAuthorizationHook } from "../ports/NodeTrustAuthorizationPorts";
 import {
+  runInTransactionBoundary,
+  type IPlatformTransactionManager,
+} from "../../common/ports/PlatformTransactionPorts";
+import {
   NodeTrustAuditEventTypes,
   publishNodeTrustAuditEventBestEffort,
   type NodeTrustAuditSink,
@@ -55,6 +59,7 @@ export interface RejectNodeEnrollmentUseCaseResponse {
 interface RejectNodeEnrollmentUseCaseDependencies {
   readonly enrollmentRequestRepository: INodeEnrollmentRequestPersistenceRepository;
   readonly nodeRepository: INodeTrustIdentityPersistenceRepository;
+  readonly transactionManager?: IPlatformTransactionManager;
   readonly authorizationHook?: NodeTrustAuthorizationHook;
   readonly idGenerator?: NodeTrustUseCaseIdGenerator;
   readonly clock?: NodeTrustUseCaseClock;
@@ -111,41 +116,22 @@ export class RejectNodeEnrollmentUseCase {
       );
     }
 
-    let transitionTarget = enrollment;
-    if (enrollment.status === NodeEnrollmentRequestStatuses.submitted) {
-      const underReview = await this.dependencies.enrollmentRequestRepository.transitionEnrollmentRequestStatus({
-        requestId: enrollment.requestId,
-        toStatus: NodeEnrollmentRequestStatuses.underReview,
-        mutation: createNodeTrustMutationEnvelope({
-          actorUserIdentityId,
-          operationPrefix: "reject-node-enrollment-under-review",
-          idGenerator: this.idGenerator,
-          clock: this.clock,
-          expectedRevision: request.expectedEnrollmentRevision,
-          reason: request.reason,
-          correlationId: request.correlationId,
-          metadata: request.metadata,
-        }),
-      });
-      transitionTarget = underReview.record;
-    }
-
     try {
       transitionNodeEnrollmentRequestStatus(
         createNodeEnrollmentRequest({
-          requestId: transitionTarget.requestId,
-          nodeId: transitionTarget.nodeId,
-          nodeType: transitionTarget.nodeType,
-          displayName: transitionTarget.displayName,
-          capabilityProfile: transitionTarget.capabilityProfile,
-          deploymentTags: transitionTarget.deploymentTags,
-          certificateRef: transitionTarget.certificateRef,
-          status: transitionTarget.status,
-          requestedAt: transitionTarget.requestedAt,
-          reviewedAt: transitionTarget.reviewedAt,
-          reviewedByUserIdentityId: transitionTarget.reviewedByUserIdentityId,
-          decisionNote: transitionTarget.decisionNote,
-          updatedAt: transitionTarget.lastModifiedAt,
+          requestId: enrollment.requestId,
+          nodeId: enrollment.nodeId,
+          nodeType: enrollment.nodeType,
+          displayName: enrollment.displayName,
+          capabilityProfile: enrollment.capabilityProfile,
+          deploymentTags: enrollment.deploymentTags,
+          certificateRef: enrollment.certificateRef,
+          status: enrollment.status,
+          requestedAt: enrollment.requestedAt,
+          reviewedAt: enrollment.reviewedAt,
+          reviewedByUserIdentityId: enrollment.reviewedByUserIdentityId,
+          decisionNote: enrollment.decisionNote,
+          updatedAt: enrollment.lastModifiedAt,
         }),
         NodeEnrollmentRequestStatuses.rejected,
         {
@@ -163,20 +149,73 @@ export class RejectNodeEnrollmentUseCase {
     }
 
     const nowIso = this.clock.now().toISOString();
-    const nodeMutation = existingNode
-      ? isNodeTrustLifecycleRevoked(existingNode)
-        ? Object.freeze({
-          record: existingNode,
-          changed: false,
-          wasReplay: false,
-        })
-        : await this.dependencies.nodeRepository.updateNodeApproval({
-          nodeId: existingNode.nodeId,
-          approvalStatus: NodeApprovalStatuses.rejected,
-          trustState: NodeTrustStates.quarantined,
+    let transitionTarget = enrollment;
+    let nodeMutation: NodeTrustPersistenceMutationResult<NodeIdentityPersistenceRecord>;
+    let enrollmentMutation: NodeTrustPersistenceMutationResult<NodeEnrollmentRequestPersistenceRecord>;
+    await runInTransactionBoundary(this.dependencies.transactionManager, async () => {
+      if (enrollment.status === NodeEnrollmentRequestStatuses.submitted) {
+        const underReview = await this.dependencies.enrollmentRequestRepository.transitionEnrollmentRequestStatus({
+          requestId: enrollment.requestId,
+          toStatus: NodeEnrollmentRequestStatuses.underReview,
           mutation: createNodeTrustMutationEnvelope({
             actorUserIdentityId,
-            operationPrefix: "reject-node",
+            operationPrefix: "reject-node-enrollment-under-review",
+            idGenerator: this.idGenerator,
+            clock: this.clock,
+            expectedRevision: request.expectedEnrollmentRevision,
+            reason: request.reason,
+            correlationId: request.correlationId,
+            metadata: request.metadata,
+          }),
+        });
+        transitionTarget = underReview.record;
+      }
+
+      nodeMutation = existingNode
+        ? isNodeTrustLifecycleRevoked(existingNode)
+          ? Object.freeze({
+            record: existingNode,
+            changed: false,
+            wasReplay: false,
+          })
+          : await this.dependencies.nodeRepository.updateNodeApproval({
+            nodeId: existingNode.nodeId,
+            approvalStatus: NodeApprovalStatuses.rejected,
+            trustState: NodeTrustStates.quarantined,
+            mutation: createNodeTrustMutationEnvelope({
+              actorUserIdentityId,
+              operationPrefix: "reject-node",
+              idGenerator: this.idGenerator,
+              clock: this.clock,
+              expectedRevision: request.expectedNodeRevision,
+              reason: request.reason,
+              correlationId: request.correlationId,
+              metadata: request.metadata,
+            }),
+          })
+        : await this.dependencies.nodeRepository.registerNode({
+          record: {
+            nodeId: transitionTarget.nodeId,
+            nodeType: transitionTarget.nodeType,
+            displayName: transitionTarget.displayName,
+            capabilityProfile: transitionTarget.capabilityProfile,
+            approvalStatus: NodeApprovalStatuses.rejected,
+            trustState: NodeTrustStates.quarantined,
+            deploymentTags: transitionTarget.deploymentTags,
+            revocation: {
+              state: NodeRevocationStates.active,
+            },
+            enrolledAt: transitionTarget.requestedAt,
+            enrollmentRequestId: transitionTarget.requestId,
+            createdAt: nowIso,
+            createdBy: actorUserIdentityId,
+            lastModifiedAt: nowIso,
+            lastModifiedBy: actorUserIdentityId,
+            revision: 0,
+          },
+          mutation: createNodeTrustMutationEnvelope({
+            actorUserIdentityId,
+            operationPrefix: "register-rejected-node",
             idGenerator: this.idGenerator,
             clock: this.clock,
             expectedRevision: request.expectedNodeRevision,
@@ -184,55 +223,25 @@ export class RejectNodeEnrollmentUseCase {
             correlationId: request.correlationId,
             metadata: request.metadata,
           }),
-        })
-      : await this.dependencies.nodeRepository.registerNode({
-        record: {
-          nodeId: enrollment.nodeId,
-          nodeType: enrollment.nodeType,
-          displayName: enrollment.displayName,
-          capabilityProfile: enrollment.capabilityProfile,
-          approvalStatus: NodeApprovalStatuses.rejected,
-          trustState: NodeTrustStates.quarantined,
-          deploymentTags: enrollment.deploymentTags,
-          revocation: {
-            state: NodeRevocationStates.active,
-          },
-          enrolledAt: enrollment.requestedAt,
-          enrollmentRequestId: enrollment.requestId,
-          createdAt: nowIso,
-          createdBy: actorUserIdentityId,
-          lastModifiedAt: nowIso,
-          lastModifiedBy: actorUserIdentityId,
-          revision: 0,
-        },
+        });
+
+      enrollmentMutation = await this.dependencies.enrollmentRequestRepository.transitionEnrollmentRequestStatus({
+        requestId,
+        toStatus: NodeEnrollmentRequestStatuses.rejected,
+        reviewedAt: request.reviewedAt ?? nowIso,
+        reviewedByUserIdentityId: actorUserIdentityId,
+        decisionNote: normalizeOptional(request.decisionNote),
         mutation: createNodeTrustMutationEnvelope({
           actorUserIdentityId,
-          operationPrefix: "register-rejected-node",
+          operationPrefix: "reject-node-enrollment",
           idGenerator: this.idGenerator,
           clock: this.clock,
-          expectedRevision: request.expectedNodeRevision,
+          expectedRevision: request.expectedEnrollmentRevision,
           reason: request.reason,
           correlationId: request.correlationId,
           metadata: request.metadata,
         }),
       });
-
-    const enrollmentMutation = await this.dependencies.enrollmentRequestRepository.transitionEnrollmentRequestStatus({
-      requestId,
-      toStatus: NodeEnrollmentRequestStatuses.rejected,
-      reviewedAt: request.reviewedAt ?? nowIso,
-      reviewedByUserIdentityId: actorUserIdentityId,
-      decisionNote: normalizeOptional(request.decisionNote),
-      mutation: createNodeTrustMutationEnvelope({
-        actorUserIdentityId,
-        operationPrefix: "reject-node-enrollment",
-        idGenerator: this.idGenerator,
-        clock: this.clock,
-        expectedRevision: request.expectedEnrollmentRevision,
-        reason: request.reason,
-        correlationId: request.correlationId,
-        metadata: request.metadata,
-      }),
     });
 
     await publishNodeTrustAuditEventBestEffort(this.dependencies.auditSink, {
@@ -243,23 +252,23 @@ export class RejectNodeEnrollmentUseCase {
       enrollmentRequestId: requestId,
       outcome: "success",
       details: Object.freeze({
-        nodeType: nodeMutation.record.nodeType,
-        trustState: nodeMutation.record.trustState,
-        approvalStatus: nodeMutation.record.approvalStatus,
-        deploymentTags: nodeMutation.record.deploymentTags,
-        reviewedAt: enrollmentMutation.record.reviewedAt,
-        reviewedByUserIdentityId: enrollmentMutation.record.reviewedByUserIdentityId,
-        decisionNote: enrollmentMutation.record.decisionNote,
+        nodeType: nodeMutation!.record.nodeType,
+        trustState: nodeMutation!.record.trustState,
+        approvalStatus: nodeMutation!.record.approvalStatus,
+        deploymentTags: nodeMutation!.record.deploymentTags,
+        reviewedAt: enrollmentMutation!.record.reviewedAt,
+        reviewedByUserIdentityId: enrollmentMutation!.record.reviewedByUserIdentityId,
+        decisionNote: enrollmentMutation!.record.decisionNote,
       }),
     });
 
     return {
       ok: true,
       value: Object.freeze({
-        enrollmentRequest: enrollmentMutation.record,
-        node: nodeMutation.record,
-        enrollmentMutation,
-        nodeMutation,
+        enrollmentRequest: enrollmentMutation!.record,
+        node: nodeMutation!.record,
+        enrollmentMutation: enrollmentMutation!,
+        nodeMutation: nodeMutation!,
       }),
     };
   }

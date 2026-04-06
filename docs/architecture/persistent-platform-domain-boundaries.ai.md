@@ -231,6 +231,20 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
   - `src/infrastructure/logging/tests/PersistenceRedaction.test.ts`
   - `src/infrastructure/persistence/common/tests/SafeSqliteRepositoryBase.test.ts`
 
+## Story 13.4.1 application-use-case persistence wiring
+
+- Core mutation use cases now execute multi-record writes through shared transaction boundaries rather than uncoordinated sequential persistence:
+  - `src/application/identity/use-cases/ChangeLocalPasswordCredentialUseCase.ts`
+  - `src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase.ts`
+  - `src/application/nodes/use-cases/RejectNodeEnrollmentUseCase.ts`
+- Authoritative server runtime wiring now injects transaction-capable repository adapters so production flows use transactional orchestration:
+  - `hosts/server/IdentityServerHost.ts`
+- Node trust SQLite persistence adapter now exposes the shared transaction-manager contract for application-layer coordination:
+  - `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter.ts`
+- Transactional orchestration coverage additions:
+  - `application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
+  - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
+
 ## Mapper guidance for contributors
 
 - Keep mapper implementations in infrastructure, but drive them from shared DTO + schema contracts.
