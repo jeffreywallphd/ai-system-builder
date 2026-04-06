@@ -27,7 +27,10 @@ import {
 import type { IWorkspaceAuthorizationReadRepository } from "../../workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import type { IAssetRepository } from "../ports/IAssetRepository";
 import type { IAssetUploadSessionRepository } from "../ports/IAssetUploadSessionRepository";
-import type { AssetAuditSink } from "../ports/AssetAuditPort";
+import {
+  publishAssetAuditEventBestEffort,
+  type AssetAuditSink,
+} from "../ports/AssetAuditPort";
 import {
   AssetServiceErrorCodes,
   validateBeginAssetUploadRequest,
@@ -156,6 +159,7 @@ export class AssetUploadInitiationService {
         actorUserId: request.actorUserId,
         correlationId: request.correlationId,
         operationKey: request.operationKey,
+        outcome: "success",
         asset: {
           assetId: asset.id,
           kind: asset.kind,
@@ -276,6 +280,7 @@ export class AssetUploadInitiationService {
         actorUserId: request.actorUserId,
         correlationId: request.correlationId,
         operationKey: request.operationKey,
+        outcome: "success",
         asset: {
           assetId: asset.id,
           kind: asset.kind,
@@ -285,7 +290,6 @@ export class AssetUploadInitiationService {
         },
         details: {
           storageInstanceId: request.storageInstanceId,
-          objectKey,
           fileName: request.fileName,
           mimeType: request.mimeType,
           sizeBytes: request.sizeBytes,
@@ -429,14 +433,7 @@ export class AssetUploadInitiationService {
   }
 
   private async publishAuditEvent(event: Parameters<AssetAuditSink["recordAssetEvent"]>[0]): Promise<void> {
-    if (!this.dependencies.auditSink) {
-      return;
-    }
-    try {
-      await this.dependencies.auditSink.recordAssetEvent(event);
-    } catch {
-      // best effort
-    }
+    await publishAssetAuditEventBestEffort(this.dependencies.auditSink, event);
   }
 }
 

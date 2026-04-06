@@ -125,6 +125,7 @@ describe("AssetTransportContracts", () => {
       occurredAt: "2026-04-06T12:30:00.000Z",
       workspaceId: "workspace-a",
       actorUserId: "user-owner",
+      outcome: "success",
       asset: {
         assetId: "asset-contract-001",
         kind: "generated-output",
@@ -136,6 +137,7 @@ describe("AssetTransportContracts", () => {
 
     expect(dto.contractVersion).toBe(AssetTransportContractVersions.v1);
     expect(dto.type).toBe("asset-looked-up");
+    expect(dto.outcome).toBe("success");
     expect(dto.asset.assetId).toBe("asset-contract-001");
   });
 });

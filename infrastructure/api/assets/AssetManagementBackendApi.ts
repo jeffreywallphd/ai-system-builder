@@ -6,6 +6,7 @@ import type { AssetDetailService } from "../../../src/application/assets/use-cas
 import type { AssetDownloadService } from "../../../src/application/assets/use-cases/AssetDownloadService";
 import type { AssetGeneratedOutputRegistrationService } from "../../../src/application/assets/use-cases/AssetGeneratedOutputRegistrationService";
 import type { AssetPreviewService } from "../../../src/application/assets/use-cases/AssetPreviewService";
+import type { AssetLifecycleService } from "../../../src/application/assets/use-cases/AssetLifecycleService";
 import { type AssetSummaryDto, toAssetDetailDto, toAssetSummaryDto } from "../../../src/shared/contracts/assets/AssetTransportContracts";
 import {
   toAuthorizeAssetDownloadRequest,
@@ -40,6 +41,10 @@ import {
   type RegisterAssetApiResponse,
   type RegisterGeneratedOutputApiRequest,
   type RegisterGeneratedOutputApiResponse,
+  type ArchiveAssetApiRequest,
+  type ArchiveAssetApiResponse,
+  type DeleteAssetApiRequest,
+  type DeleteAssetApiResponse,
 } from "./sdk/PublicAssetManagementApiContract";
 import type { AssetDiscoveryService } from "../../../src/application/assets/use-cases/AssetDiscoveryService";
 
@@ -51,6 +56,7 @@ export interface AssetManagementBackendApiDependencies {
   readonly detailService: AssetDetailService;
   readonly downloadService: AssetDownloadService;
   readonly previewService: AssetPreviewService;
+  readonly lifecycleService: AssetLifecycleService;
 }
 
 export class AssetManagementBackendApi {
@@ -421,6 +427,62 @@ export class AssetManagementBackendApi {
     return Object.freeze({
       ok: true,
       data: toResolveAssetPreviewResponseDto(outcome.value),
+    });
+  }
+
+  public async archiveAsset(
+    request: ArchiveAssetApiRequest,
+  ): Promise<AssetManagementApiResponse<ArchiveAssetApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(AssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+    }
+
+    const outcome = await this.dependencies.lifecycleService.archiveAsset({
+      actorUserId: actorUserIdentityId,
+      workspaceId: request.workspaceId,
+      assetId: request.assetId,
+      operationKey: request.operationKey ?? `asset:archive:${request.assetId}:${randomUUID()}`,
+      correlationId: request.correlationId,
+      occurredAt: request.occurredAt,
+    });
+    if (!outcome.ok) {
+      return this.failedFromServiceError(outcome.error.code, outcome.error.message, outcome.error.details);
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        asset: toAssetDetailDto(outcome.value.asset),
+      }),
+    });
+  }
+
+  public async deleteAsset(
+    request: DeleteAssetApiRequest,
+  ): Promise<AssetManagementApiResponse<DeleteAssetApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(AssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+    }
+
+    const outcome = await this.dependencies.lifecycleService.deleteAsset({
+      actorUserId: actorUserIdentityId,
+      workspaceId: request.workspaceId,
+      assetId: request.assetId,
+      operationKey: request.operationKey ?? `asset:delete:${request.assetId}:${randomUUID()}`,
+      correlationId: request.correlationId,
+      occurredAt: request.occurredAt,
+    });
+    if (!outcome.ok) {
+      return this.failedFromServiceError(outcome.error.code, outcome.error.message, outcome.error.details);
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        asset: toAssetDetailDto(outcome.value.asset),
+      }),
     });
   }
 

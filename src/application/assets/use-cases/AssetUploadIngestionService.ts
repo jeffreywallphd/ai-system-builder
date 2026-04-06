@@ -17,7 +17,10 @@ import {
 import type { StorageInstance } from "../../../domain/storage/StorageDomain";
 import type { IAssetRepository } from "../ports/IAssetRepository";
 import type { IAssetUploadSessionRepository } from "../ports/IAssetUploadSessionRepository";
-import type { AssetAuditSink } from "../ports/AssetAuditPort";
+import {
+  publishAssetAuditEventBestEffort,
+  type AssetAuditSink,
+} from "../ports/AssetAuditPort";
 import type { IAssetContentCipherPort } from "../ports/AssetContentCipherPort";
 import type { IEncryptionKeyResolutionService } from "../../security/use-cases/EncryptionKeyResolutionServiceContracts";
 import { EncryptionMaterialClasses } from "../../security/use-cases/EncryptionKeyResolutionServiceContracts";
@@ -89,15 +92,51 @@ export class AssetUploadIngestionService {
     }
 
     if (uploadSession.actorUserId !== input.actorUserId) {
+      await this.publishRejectedAuditEvent({
+        occurredAt,
+        workspaceId: input.workspaceId,
+        actorUserId: input.actorUserId,
+        correlationId: input.correlationId,
+        operationKey: input.operationKey,
+        assetId: uploadSession.assetId,
+        uploadSessionId: uploadSession.uploadSessionId,
+        reasonCode: "upload-session-actor-mismatch",
+      });
       return this.failure(AssetServiceErrorCodes.accessDenied, "Upload session actor does not match authenticated actor.");
     }
 
     if (uploadSession.status !== "pending") {
+      await this.publishAuditEvent({
+        type: "asset-upload-finalized",
+        occurredAt,
+        workspaceId: input.workspaceId,
+        actorUserId: input.actorUserId,
+        correlationId: input.correlationId,
+        operationKey: input.operationKey,
+        outcome: "already-applied",
+        asset: {
+          assetId: uploadSession.assetId,
+        },
+        details: Object.freeze({
+          uploadSessionId: uploadSession.uploadSessionId,
+          reasonCode: "upload-session-not-pending",
+        }),
+      });
       return this.failure(AssetServiceErrorCodes.invalidState, "Upload session is not pending.");
     }
 
     if (new Date(uploadSession.expiresAt).getTime() < new Date(occurredAt).getTime()) {
       await this.markUploadIncomplete(uploadSession, occurredAt, "upload-session-expired", "Upload session has expired.");
+      await this.publishRejectedAuditEvent({
+        occurredAt,
+        workspaceId: input.workspaceId,
+        actorUserId: input.actorUserId,
+        correlationId: input.correlationId,
+        operationKey: input.operationKey,
+        assetId: uploadSession.assetId,
+        uploadSessionId: uploadSession.uploadSessionId,
+        reasonCode: "upload-session-expired",
+      });
       return this.failure(AssetServiceErrorCodes.invalidState, "Upload session has expired.");
     }
 
@@ -327,6 +366,7 @@ export class AssetUploadIngestionService {
         actorUserId: input.actorUserId,
         correlationId: input.correlationId,
         operationKey: input.operationKey,
+        outcome: "success",
         asset: {
           assetId: finalizedAsset.id,
           kind: finalizedAsset.kind,
@@ -337,12 +377,9 @@ export class AssetUploadIngestionService {
         details: {
           uploadSessionId: uploadSession.uploadSessionId,
           storageInstanceId: uploadSession.storageInstanceId,
-          objectKey: uploadSession.objectKey,
           sizeBytes: effectiveSizeBytes,
           checksumAlgorithm: "sha256",
-          checksumDigest: plaintextChecksumDigest ?? writeResult.checksum.digest,
           encryptedAtRest: Boolean(encryptedDescriptor),
-          encryptionKeyReferenceId: encryptedDescriptor?.keyReferenceId,
         },
       });
 
@@ -365,12 +402,23 @@ export class AssetUploadIngestionService {
       };
     } catch (error) {
       await this.cleanupObject(accessPlan.value.objectPort, reference);
+      const reasonCode = resolveUploadFailureCode(error);
       await this.markUploadIncomplete(
         uploadSession,
         occurredAt,
-        resolveUploadFailureCode(error),
+        reasonCode,
         error instanceof Error ? error.message : "Upload ingestion failed.",
       );
+      await this.publishRejectedAuditEvent({
+        occurredAt,
+        workspaceId: input.workspaceId,
+        actorUserId: input.actorUserId,
+        correlationId: input.correlationId,
+        operationKey: input.operationKey,
+        assetId: uploadSession.assetId,
+        uploadSessionId: uploadSession.uploadSessionId,
+        reasonCode,
+      });
 
       if (error instanceof UploadPayloadTooLargeError) {
         return this.failure(
@@ -533,14 +581,35 @@ export class AssetUploadIngestionService {
   }
 
   private async publishAuditEvent(event: Parameters<AssetAuditSink["recordAssetEvent"]>[0]): Promise<void> {
-    if (!this.dependencies.auditSink) {
-      return;
-    }
-    try {
-      await this.dependencies.auditSink.recordAssetEvent(event);
-    } catch {
-      // best effort
-    }
+    await publishAssetAuditEventBestEffort(this.dependencies.auditSink, event);
+  }
+
+  private async publishRejectedAuditEvent(input: {
+    readonly occurredAt: string;
+    readonly workspaceId: string;
+    readonly actorUserId: string;
+    readonly correlationId?: string;
+    readonly operationKey: string;
+    readonly assetId: string;
+    readonly uploadSessionId: string;
+    readonly reasonCode: string;
+  }): Promise<void> {
+    await this.publishAuditEvent({
+      type: "asset-upload-finalized",
+      occurredAt: input.occurredAt,
+      workspaceId: input.workspaceId,
+      actorUserId: input.actorUserId,
+      correlationId: input.correlationId,
+      operationKey: input.operationKey,
+      outcome: "rejected",
+      asset: {
+        assetId: input.assetId,
+      },
+      details: Object.freeze({
+        uploadSessionId: input.uploadSessionId,
+        reasonCode: input.reasonCode,
+      }),
+    });
   }
 
   private failure(

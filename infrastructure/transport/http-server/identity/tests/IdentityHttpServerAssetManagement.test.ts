@@ -11,6 +11,7 @@ import { AssetDetailService } from "../../../../../src/application/assets/use-ca
 import { AssetDownloadService } from "../../../../../src/application/assets/use-cases/AssetDownloadService";
 import { AssetGeneratedOutputRegistrationService } from "../../../../../src/application/assets/use-cases/AssetGeneratedOutputRegistrationService";
 import { AssetPreviewService } from "../../../../../src/application/assets/use-cases/AssetPreviewService";
+import { AssetLifecycleService } from "../../../../../src/application/assets/use-cases/AssetLifecycleService";
 import {
   AssetKinds,
   AssetVisibilities,
@@ -341,12 +342,33 @@ class StubAssetPreviewService {
   }
 }
 
+class StubAssetLifecycleService {
+  public async archiveAsset() {
+    return {
+      ok: true as const,
+      value: {
+        asset: new StubAssetUploadInitiationService()["asset"],
+      },
+    };
+  }
+
+  public async deleteAsset() {
+    return {
+      ok: true as const,
+      value: {
+        asset: new StubAssetUploadInitiationService()["asset"],
+      },
+    };
+  }
+}
+
 async function startServer(
   initiationService: StubAssetUploadInitiationService,
   ingestionService = new StubAssetUploadIngestionService(),
   downloadService = new StubAssetDownloadService(),
   generatedOutputService = new StubAssetGeneratedOutputRegistrationService(),
   previewService = new StubAssetPreviewService(),
+  lifecycleService = new StubAssetLifecycleService(),
 ): Promise<string> {
   const identityHarness = await createIdentityAuthTestHarness();
   const assetManagementBackendApi = new AssetManagementBackendApi({
@@ -357,6 +379,7 @@ async function startServer(
     detailService: initiationService as unknown as AssetDetailService,
     downloadService: downloadService as unknown as AssetDownloadService,
     previewService: previewService as unknown as AssetPreviewService,
+    lifecycleService: lifecycleService as unknown as AssetLifecycleService,
   });
 
   const server = createIdentityHttpServer({
@@ -778,5 +801,39 @@ describe("IdentityHttpServer asset management routes", () => {
     const body = await response.json();
     expect(body.ok).toBe(false);
     expect(body.error.code).toBe("not-found");
+  });
+
+  it("archives and deletes assets through authenticated lifecycle routes", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const baseUrl = await startServer(service);
+    const token = await registerAndLogin(baseUrl, "asset.http.owner.12");
+
+    const archiveResponse = await fetch(
+      `${baseUrl}/api/v1/assets/asset-upload-001/archive?workspaceId=workspace-alpha`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    expect(archiveResponse.status).toBe(200);
+    const archiveBody = await archiveResponse.json();
+    expect(archiveBody.ok).toBe(true);
+    expect(archiveBody.data.asset.assetId).toBe("asset-upload-001");
+
+    const deleteResponse = await fetch(
+      `${baseUrl}/api/v1/assets/asset-upload-001/delete?workspaceId=workspace-alpha`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    expect(deleteResponse.status).toBe(200);
+    const deleteBody = await deleteResponse.json();
+    expect(deleteBody.ok).toBe(true);
+    expect(deleteBody.data.asset.assetId).toBe("asset-upload-001");
   });
 });

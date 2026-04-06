@@ -18,6 +18,7 @@ import { AssetDetailService } from "../../../../src/application/assets/use-cases
 import { AssetDownloadService } from "../../../../src/application/assets/use-cases/AssetDownloadService";
 import { AssetGeneratedOutputRegistrationService } from "../../../../src/application/assets/use-cases/AssetGeneratedOutputRegistrationService";
 import { AssetPreviewService } from "../../../../src/application/assets/use-cases/AssetPreviewService";
+import { AssetLifecycleService } from "../../../../src/application/assets/use-cases/AssetLifecycleService";
 
 class StubAssetUploadInitiationService {
   private readonly asset: Asset = createAsset({
@@ -332,6 +333,28 @@ class StubAssetPreviewService {
   }
 }
 
+class StubAssetLifecycleService {
+  public async archiveAsset() {
+    const asset = new StubAssetUploadInitiationService()["asset"];
+    return {
+      ok: true as const,
+      value: {
+        asset,
+      },
+    };
+  }
+
+  public async deleteAsset() {
+    const asset = new StubAssetUploadInitiationService()["asset"];
+    return {
+      ok: true as const,
+      value: {
+        asset,
+      },
+    };
+  }
+}
+
 describe("AssetManagementBackendApi", () => {
   it("returns register and initiate upload DTOs for successful requests", async () => {
     const backendApi = new AssetManagementBackendApi({
@@ -342,6 +365,7 @@ describe("AssetManagementBackendApi", () => {
       detailService: new StubAssetDetailService() as unknown as AssetDetailService,
       downloadService: new StubAssetDownloadService() as unknown as AssetDownloadService,
       previewService: new StubAssetPreviewService() as unknown as AssetPreviewService,
+      lifecycleService: new StubAssetLifecycleService() as unknown as AssetLifecycleService,
     });
 
     const registered = await backendApi.registerAsset({
@@ -511,6 +535,7 @@ describe("AssetManagementBackendApi", () => {
       detailService: new StubAssetDetailService() as unknown as AssetDetailService,
       downloadService: new StubAssetDownloadService() as unknown as AssetDownloadService,
       previewService: new StubAssetPreviewService() as unknown as AssetPreviewService,
+      lifecycleService: new StubAssetLifecycleService() as unknown as AssetLifecycleService,
     });
 
     const response = await backendApi.initiateAssetUpload({
@@ -552,6 +577,7 @@ describe("AssetManagementBackendApi", () => {
       detailService: detailService as unknown as AssetDetailService,
       downloadService: new StubAssetDownloadService() as unknown as AssetDownloadService,
       previewService: new StubAssetPreviewService() as unknown as AssetPreviewService,
+      lifecycleService: new StubAssetLifecycleService() as unknown as AssetLifecycleService,
     });
 
     const response = await backendApi.getAssetDetail({
@@ -578,6 +604,7 @@ describe("AssetManagementBackendApi", () => {
       detailService: new StubAssetDetailService() as unknown as AssetDetailService,
       downloadService: downloadService as unknown as AssetDownloadService,
       previewService: new StubAssetPreviewService() as unknown as AssetPreviewService,
+      lifecycleService: new StubAssetLifecycleService() as unknown as AssetLifecycleService,
     });
 
     const response = await backendApi.authorizeAssetDownload({
@@ -605,6 +632,7 @@ describe("AssetManagementBackendApi", () => {
       detailService: new StubAssetDetailService() as unknown as AssetDetailService,
       downloadService: new StubAssetDownloadService() as unknown as AssetDownloadService,
       previewService: previewService as unknown as AssetPreviewService,
+      lifecycleService: new StubAssetLifecycleService() as unknown as AssetLifecycleService,
     });
 
     const response = await backendApi.resolveAssetPreview({
@@ -618,5 +646,40 @@ describe("AssetManagementBackendApi", () => {
       return;
     }
     expect(response.error.code).toBe("not-found");
+  });
+
+  it("returns archived and deleted asset DTOs for lifecycle mutations", async () => {
+    const backendApi = new AssetManagementBackendApi({
+      uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
+      generatedOutputRegistrationService: new StubAssetGeneratedOutputRegistrationService() as unknown as AssetGeneratedOutputRegistrationService,
+      uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
+      discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
+      detailService: new StubAssetDetailService() as unknown as AssetDetailService,
+      downloadService: new StubAssetDownloadService() as unknown as AssetDownloadService,
+      previewService: new StubAssetPreviewService() as unknown as AssetPreviewService,
+      lifecycleService: new StubAssetLifecycleService() as unknown as AssetLifecycleService,
+    });
+
+    const archived = await backendApi.archiveAsset({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-upload-001",
+    });
+    expect(archived.ok).toBeTrue();
+    if (!archived.ok || !archived.data) {
+      return;
+    }
+    expect(archived.data.asset.assetId).toBe("asset-upload-001");
+
+    const deleted = await backendApi.deleteAsset({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-upload-001",
+    });
+    expect(deleted.ok).toBeTrue();
+    if (!deleted.ok || !deleted.data) {
+      return;
+    }
+    expect(deleted.data.asset.assetId).toBe("asset-upload-001");
   });
 });

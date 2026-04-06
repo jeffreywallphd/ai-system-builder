@@ -66,6 +66,7 @@ import { SqliteCertificateAuthorityPersistenceAdapter } from "../../src/infrastr
 import { SqliteStorageInstancePersistenceAdapter } from "../../src/infrastructure/persistence/storage/SqliteStorageInstancePersistenceAdapter";
 import { SqliteStorageManagementAuditRecorder } from "../../src/infrastructure/persistence/storage/SqliteStorageManagementAuditRecorder";
 import { SqliteAssetPersistenceAdapter } from "../../src/infrastructure/persistence/assets/SqliteAssetPersistenceAdapter";
+import { SqliteAssetAuditRecorder } from "../../src/infrastructure/persistence/assets/SqliteAssetAuditRecorder";
 import { SqliteAssetUploadSessionPersistenceAdapter } from "../../src/infrastructure/persistence/assets/SqliteAssetUploadSessionPersistenceAdapter";
 import { StorageManagementService } from "../../src/application/storage/use-cases/StorageManagementService";
 import { AssetUploadInitiationService } from "../../src/application/assets/use-cases/AssetUploadInitiationService";
@@ -75,6 +76,7 @@ import { AssetDiscoveryService } from "../../src/application/assets/use-cases/As
 import { AssetDetailService } from "../../src/application/assets/use-cases/AssetDetailService";
 import { AssetDownloadService } from "../../src/application/assets/use-cases/AssetDownloadService";
 import { AssetPreviewService } from "../../src/application/assets/use-cases/AssetPreviewService";
+import { AssetLifecycleService } from "../../src/application/assets/use-cases/AssetLifecycleService";
 import { StorageLogicalAccessResolutionService } from "../../src/application/storage/use-cases/StorageLogicalAccessResolutionService";
 import { EncryptionPolicyEvaluationService } from "../../src/application/security/use-cases/EncryptionPolicyEvaluationService";
 import { EncryptionKeyResolutionService } from "../../src/application/security/use-cases/EncryptionKeyResolutionService";
@@ -302,6 +304,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const storageInstanceRepository = new SqliteStorageInstancePersistenceAdapter(path.resolve(options.databasePath));
   const storageManagementAuditRecorder = new SqliteStorageManagementAuditRecorder(path.resolve(options.databasePath));
   const assetRepository = new SqliteAssetPersistenceAdapter(path.resolve(options.databasePath));
+  const assetAuditRecorder = new SqliteAssetAuditRecorder(path.resolve(options.databasePath));
   const assetUploadSessionRepository = new SqliteAssetUploadSessionPersistenceAdapter(path.resolve(options.databasePath));
   const env = options.env ?? process.env;
   const hostAddress = options.host ?? "127.0.0.1";
@@ -820,12 +823,14 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     workspaceAuthorizationReadRepository: workspaceRepository,
     storageInstanceRepository,
     storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
+    auditSink: assetAuditRecorder,
   });
   const assetGeneratedOutputRegistrationService = new AssetGeneratedOutputRegistrationService({
     repository: assetRepository,
     workspaceAuthorizationReadRepository: workspaceRepository,
     storageInstanceRepository,
     storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
+    auditSink: assetAuditRecorder,
   });
   const storageLogicalAccessResolutionService = new StorageLogicalAccessResolutionService({
     repository: storageInstanceRepository,
@@ -857,14 +862,17 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
     encryptionKeyResolutionService: assetEncryptionKeyResolutionService,
     assetContentCipherPort,
+    auditSink: assetAuditRecorder,
   });
   const assetDiscoveryService = new AssetDiscoveryService({
     repository: assetRepository,
     workspaceAuthorizationReadRepository: workspaceRepository,
+    auditSink: assetAuditRecorder,
   });
   const assetDetailService = new AssetDetailService({
     repository: assetRepository,
     workspaceAuthorizationReadRepository: workspaceRepository,
+    auditSink: assetAuditRecorder,
   });
   const assetDownloadGrantAdapter = new EncryptedAssetDownloadGrantAdapter({
     secret: resolveAssetDownloadGrantSecret(env),
@@ -876,10 +884,17 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     downloadGrantPort: assetDownloadGrantAdapter,
     encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
     assetContentCipherPort,
+    auditSink: assetAuditRecorder,
   });
   const assetPreviewService = new AssetPreviewService({
     repository: assetRepository,
     workspaceAuthorizationReadRepository: workspaceRepository,
+    auditSink: assetAuditRecorder,
+  });
+  const assetLifecycleService = new AssetLifecycleService({
+    repository: assetRepository,
+    workspaceAuthorizationReadRepository: workspaceRepository,
+    auditSink: assetAuditRecorder,
   });
   const assetManagementBackendApi = new AssetManagementBackendApi({
     uploadInitiationService: assetUploadInitiationService,
@@ -889,6 +904,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     detailService: assetDetailService,
     downloadService: assetDownloadService,
     previewService: assetPreviewService,
+    lifecycleService: assetLifecycleService,
   });
   const transportTrustStateResolver = new ServerManagedTransportTrustStateResolver({
     trustedDeviceManagementService: trustedDeviceManagementService,
@@ -1018,10 +1034,11 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
         nodeTrustRepository.dispose();
         nodeTrustAuditRecorder.dispose();
         certificateAuthorityRepository.dispose();
-        storageInstanceRepository.dispose();
-        storageManagementAuditRecorder.dispose();
-        assetRepository.dispose();
-        assetUploadSessionRepository.dispose();
+      storageInstanceRepository.dispose();
+      storageManagementAuditRecorder.dispose();
+      assetRepository.dispose();
+      assetAuditRecorder.dispose();
+      assetUploadSessionRepository.dispose();
         secretService?.dispose();
         const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
         if (typeof disposablePublisher.dispose === "function") {
@@ -1046,6 +1063,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     storageInstanceRepository.dispose();
     storageManagementAuditRecorder.dispose();
     assetRepository.dispose();
+    assetAuditRecorder.dispose();
     assetUploadSessionRepository.dispose();
     secretService?.dispose();
     throw error;

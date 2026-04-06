@@ -14,6 +14,7 @@ import {
 } from "../../../domain/assets/AssetDomain";
 import type { IWorkspaceAuthorizationReadRepository } from "../../workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import { AssetPreviewService } from "../use-cases/AssetPreviewService";
+import type { AssetAuditEvent, AssetAuditSink } from "../ports/AssetAuditPort";
 
 class InMemoryAssetRepository implements IAssetRepository {
   public constructor(private readonly assets: ReadonlyArray<Asset>) {}
@@ -118,6 +119,14 @@ class StubAssetPreviewPort implements IAssetPreviewPort {
       objectKey: `workspaces/workspace-alpha/assets/${this.previewAssetId}/preview/v1/preview.webp`,
       generatedAt: "2026-04-06T12:00:00.000Z",
     });
+  }
+}
+
+class RecordingAuditSink implements AssetAuditSink {
+  public readonly events: AssetAuditEvent[] = [];
+
+  public async recordAssetEvent(event: AssetAuditEvent): Promise<void> {
+    this.events.push(event);
   }
 }
 
@@ -304,5 +313,40 @@ describe("AssetPreviewService", () => {
 
     expect(outcome.value.previewAssetId).toBe("worker-preview-asset-source-004");
     expect(outcome.value.previewMimeType).toBe("image/webp");
+  });
+
+  it("emits audit events for successful preview resolution", async () => {
+    const source = createAssetRecord({
+      id: "asset-source-005",
+      kind: AssetKinds.uploadedFile,
+      ownerUserId: "user-owner",
+      visibility: AssetVisibilities.private,
+      mimeType: "image/png",
+    });
+    const preview = createAssetRecord({
+      id: "preview-asset-source-005-thumb",
+      kind: AssetKinds.preview,
+      ownerUserId: "user-owner",
+      visibility: AssetVisibilities.private,
+      mimeType: "image/webp",
+    });
+    const auditSink = new RecordingAuditSink();
+    const service = new AssetPreviewService({
+      repository: new InMemoryAssetRepository([source, preview]),
+      workspaceAuthorizationReadRepository: new WorkspaceAuthorizationRepository(),
+      auditSink,
+    });
+
+    const outcome = await service.resolveAssetPreview({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-source-005",
+      preferredMimeTypes: ["image/webp"],
+    });
+
+    expect(outcome.ok).toBeTrue();
+    expect(auditSink.events).toHaveLength(1);
+    expect(auditSink.events[0]?.type).toBe("asset-preview-resolved");
+    expect(auditSink.events[0]?.outcome).toBe("success");
   });
 });

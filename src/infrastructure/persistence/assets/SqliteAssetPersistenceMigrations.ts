@@ -1,4 +1,4 @@
-export const ASSET_PERSISTENCE_SCHEMA_VERSION = 3;
+export const ASSET_PERSISTENCE_SCHEMA_VERSION = 4;
 
 export const ASSET_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -141,5 +141,27 @@ export const ASSET_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, strin
       ON asset_generated_output_sources(run_id);
     CREATE INDEX IF NOT EXISTS asset_generated_output_sources_system_idx
       ON asset_generated_output_sources(system_id);
+  `],
+  [4, `
+    CREATE TABLE IF NOT EXISTS asset_audit_events (
+      event_id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      occurred_at TEXT NOT NULL,
+      actor_user_id TEXT NOT NULL,
+      workspace_id TEXT NOT NULL,
+      correlation_id TEXT,
+      operation_key TEXT,
+      asset_id TEXT NOT NULL,
+      outcome TEXT,
+      event_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS asset_audit_events_occurred_idx
+      ON asset_audit_events(occurred_at DESC, event_id DESC);
+    CREATE INDEX IF NOT EXISTS asset_audit_events_workspace_idx
+      ON asset_audit_events(workspace_id, occurred_at DESC, event_id DESC);
+    CREATE INDEX IF NOT EXISTS asset_audit_events_asset_idx
+      ON asset_audit_events(asset_id, occurred_at DESC, event_id DESC);
   `],
 ]);
