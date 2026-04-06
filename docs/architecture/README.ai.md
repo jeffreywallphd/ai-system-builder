@@ -74,6 +74,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Secret envelope encryption baseline for DEK/KEK handling, payload-store isolation, and fail-closed decryption semantics: `docs/architecture/secrets-envelope-encryption.md`
 - Secret create + metadata-read use-case baseline for scope/key validation, encrypted-value persistence orchestration, and metadata redaction behavior: `docs/architecture/secrets-creation-and-metadata-use-cases.md`
 - Secret scope-resolution baseline for explicit scope-owner validation, policy-driven fallback, and deterministic duplicate-name behavior: `docs/architecture/secrets-scope-resolution-rules.md`
+- Secret rotation baseline for version activation preconditions, lineage-preserving supersession, and race-safe activation semantics: `docs/architecture/secrets-rotation-and-version-activation-workflows.md`
 - Secret authorization policy baseline for permission-checked operations, runtime-vs-human retrieval rules, and non-leaky deny behavior: `docs/architecture/secrets-authorization-policies.md`
 - Secret metadata API baseline for internal create/list/get/disable management routes and metadata-only response contracts: `docs/architecture/secrets-metadata-management-internal-apis.md`
 - Secret classification baseline for naming-prefix conventions, metadata-label requirements, and classification validation boundaries: `docs/architecture/secrets-classification-and-metadata-conventions.md`

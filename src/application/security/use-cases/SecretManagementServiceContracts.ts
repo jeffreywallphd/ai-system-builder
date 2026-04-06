@@ -79,6 +79,7 @@ export interface RotateSecretRequest {
   readonly operationKey: string;
   readonly secretId: string;
   readonly plaintext: string;
+  readonly expectedCurrentVersionId?: string;
   readonly rotatedAt?: string;
 }
 

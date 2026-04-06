@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type {
+  SecretConditionalSaveResult,
   ISecretRecordPersistenceRepository,
   SecretCreatePersistenceInput,
   SecretListQuery,
@@ -142,6 +143,63 @@ export class SqliteSecretRecordPersistenceAdapter implements ISecretRecordPersis
     mutation: SecretCreatePersistenceInput["mutation"],
   ): Promise<SecretMutationResult & { readonly record: SecretRecord }> {
     return this.persistRecordMutation("save-secret", record, mutation);
+  }
+
+  public async saveSecretWhenCurrentVersionMatches(
+    record: SecretRecord,
+    mutation: SecretCreatePersistenceInput["mutation"],
+    expectedCurrentVersionId: string | undefined,
+  ): Promise<SecretConditionalSaveResult> {
+    const operationKey = this.normalizeOperationKey(mutation.operationKey);
+    const replay = this.getMutationReplayRecord<SecretRecord>(operationKey);
+    if (replay) {
+      return Object.freeze({
+        changed: false,
+        wasReplay: true,
+        conditionMatched: true,
+        record: replay,
+      });
+    }
+
+    const normalizedSecretId = normalizeSecretLookup(record.secretId);
+    if (!normalizedSecretId) {
+      throw new Error("Secret record secretId is required.");
+    }
+
+    let conditionalResult: SecretConditionalSaveResult | undefined;
+    this.getDatabase().transaction(() => {
+      const existing = this.getPersistedRecordByIdInternal(normalizedSecretId);
+      if (!existing) {
+        throw new Error(`Secret '${normalizedSecretId}' was not found for conditional save.`);
+      }
+
+      if (!this.matchesCurrentVersion(existing.currentVersionId, expectedCurrentVersionId)) {
+        conditionalResult = Object.freeze({
+          changed: false,
+          wasReplay: false,
+          conditionMatched: false,
+          record: existing,
+        });
+        return;
+      }
+
+      const changed = JSON.stringify(existing) !== JSON.stringify(record);
+      this.upsertSecretRecord(record);
+      this.upsertSecretVersions(record);
+      this.persistMutationReplayRecord(operationKey, "save-secret", record);
+      conditionalResult = Object.freeze({
+        changed,
+        wasReplay: false,
+        conditionMatched: true,
+        record,
+      });
+    })();
+
+    if (!conditionalResult) {
+      throw new Error("Secret conditional save result was not produced.");
+    }
+
+    return conditionalResult;
   }
 
   public async deleteSecret(secretId: string, mutation: SecretCreatePersistenceInput["mutation"]): Promise<SecretMutationResult> {
@@ -493,5 +551,9 @@ export class SqliteSecretRecordPersistenceAdapter implements ISecretRecordPersis
   private resolveMutationTimestamp(candidate?: string): string {
     const normalized = candidate?.trim();
     return normalized && normalized.length > 0 ? normalized : new Date().toISOString();
+  }
+
+  private matchesCurrentVersion(actual: string | undefined, expected: string | undefined): boolean {
+    return (actual ?? undefined) === (expected ?? undefined);
   }
 }

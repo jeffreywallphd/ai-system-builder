@@ -176,6 +176,57 @@ describe("SqliteSecretRecordPersistenceAdapter", () => {
       throw new Error("Expected rotated secret to be persisted.");
     }
 
+    const conditionalRotateRecord = rotateSecretRecord({
+      record: fetchedAfterRotate,
+      rotatedBy: "user:rotation-admin",
+      rotatedAt: "2026-04-06T00:05:00.000Z",
+      nextVersion: {
+        versionId: "secret:server:openai:v3",
+        createdBy: "user:rotation-admin",
+        encryptedPayloadRef: "enc:secret:server:openai:v3",
+        payloadDigestSha256: "sha256:openai:v3",
+        payloadByteLength: 18,
+        keyEncryptionContext: {
+          keyId: "kek:server:default",
+          algorithm: "aes-256-gcm",
+          scope: SecretScopes.server,
+        },
+      },
+    });
+
+    const staleConditionalSave = await adapter.saveSecretWhenCurrentVersionMatches?.(
+      conditionalRotateRecord,
+      {
+        operationKey: "op:secret:rotate:stale-conditional",
+        actorId: "user:rotation-admin",
+        occurredAt: "2026-04-06T00:05:00.000Z",
+      },
+      "secret:server:openai:v1",
+    );
+    expect(staleConditionalSave?.conditionMatched).toBeFalse();
+    const unchangedAfterStaleConditional = await adapter.findSecretById("secret:server:openai");
+    expect(unchangedAfterStaleConditional?.currentVersionId).toBe("secret:server:openai:v2");
+    expect(unchangedAfterStaleConditional?.versions).toHaveLength(2);
+
+    const successfulConditionalSave = await adapter.saveSecretWhenCurrentVersionMatches?.(
+      conditionalRotateRecord,
+      {
+        operationKey: "op:secret:rotate:successful-conditional",
+        actorId: "user:rotation-admin",
+        occurredAt: "2026-04-06T00:05:00.000Z",
+      },
+      "secret:server:openai:v2",
+    );
+    expect(successfulConditionalSave?.conditionMatched).toBeTrue();
+    expect(successfulConditionalSave?.record.currentVersionId).toBe("secret:server:openai:v3");
+
+    const fetchedAfterConditionalRotate = await adapter.findSecretById("secret:server:openai");
+    expect(fetchedAfterConditionalRotate?.currentVersionId).toBe("secret:server:openai:v3");
+    expect(fetchedAfterConditionalRotate?.versions).toHaveLength(3);
+    if (!fetchedAfterConditionalRotate) {
+      throw new Error("Expected conditionally rotated secret to be persisted.");
+    }
+
     const listedActive = await adapter.listSecrets({
       scope: SecretScopes.server,
       tagAnyOf: ["openai"],
@@ -183,7 +234,7 @@ describe("SqliteSecretRecordPersistenceAdapter", () => {
     expect(listedActive).toHaveLength(1);
 
     const disabledRecord = disableSecretRecord({
-      record: fetchedAfterRotate,
+      record: fetchedAfterConditionalRotate,
       disabledBy: "user:security-admin",
       disabledAt: "2026-04-06T01:00:00.000Z",
     });
@@ -206,7 +257,7 @@ describe("SqliteSecretRecordPersistenceAdapter", () => {
     expect(listedWithDisabled[0]?.state).toBe("disabled");
 
     const archivedRecord = archiveSecretRecord({
-      record: fetchedAfterRotate,
+      record: fetchedAfterConditionalRotate,
       archivedBy: "user:security-admin",
       archivedAt: "2026-04-06T01:30:00.000Z",
     });

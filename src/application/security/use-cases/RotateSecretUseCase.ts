@@ -7,6 +7,7 @@ import {
 import type {
   ISecretAccessAuditPort,
   ISecretAccessPolicyPort,
+  SecretConditionalSaveResult,
   ISecretEncryptionPort,
   ISecretRecordPersistenceRepository,
 } from "../ports/SecretServicePorts";
@@ -119,6 +120,24 @@ export class RotateSecretUseCase {
         return notFound(secretId);
       }
 
+      const expectedCurrentVersionId = normalizeOptional(request.expectedCurrentVersionId) ?? record.currentVersionId;
+      if (normalizeOptional(request.expectedCurrentVersionId) !== undefined && expectedCurrentVersionId !== record.currentVersionId) {
+        await this.emitOperation("conflict", {
+          occurredAt: rotatedAt,
+          actorId,
+          secretId: record.secretId,
+          scope: record.owner.scope,
+          workspaceId: record.owner.workspaceId,
+          userIdentityId: record.owner.userIdentityId,
+          details: Object.freeze({
+            reason: "current-version-precondition-failed",
+            expectedCurrentVersionId,
+            actualCurrentVersionId: record.currentVersionId,
+          }),
+        });
+        return rotationConflict("Rotation precondition failed because the active version changed.");
+      }
+
       const decision = await this.dependencies.secretAccessPolicyPort.evaluateSecretAccess({
         action: SecretAccessActions.rotate,
         actor: request.actor,
@@ -183,11 +202,27 @@ export class RotateSecretUseCase {
         },
       });
 
-      const persisted = await this.dependencies.secretRecordRepository.saveSecret(rotatedRecord, {
+      const persisted = await this.persistRotatedRecord(rotatedRecord, {
         operationKey,
         actorId,
         occurredAt: rotatedAt,
-      });
+      }, expectedCurrentVersionId);
+      if (!persisted.conditionMatched) {
+        await this.emitOperation("conflict", {
+          occurredAt: rotatedAt,
+          actorId,
+          secretId: record.secretId,
+          scope: record.owner.scope,
+          workspaceId: record.owner.workspaceId,
+          userIdentityId: record.owner.userIdentityId,
+          details: Object.freeze({
+            reason: "concurrent-version-activation",
+            expectedCurrentVersionId,
+            actualCurrentVersionId: persisted.record.currentVersionId,
+          }),
+        });
+        return rotationConflict("Secret rotation conflicted with a concurrent version activation. Retry the operation.");
+      }
       await this.emitOperation("succeeded", {
         occurredAt: rotatedAt,
         actorId,
@@ -243,6 +278,26 @@ export class RotateSecretUseCase {
         }),
       };
     }
+  }
+
+  private async persistRotatedRecord(
+    record: Parameters<ISecretRecordPersistenceRepository["saveSecret"]>[0],
+    mutation: Parameters<ISecretRecordPersistenceRepository["saveSecret"]>[1],
+    expectedCurrentVersionId: string | undefined,
+  ): Promise<SecretConditionalSaveResult> {
+    if (this.dependencies.secretRecordRepository.saveSecretWhenCurrentVersionMatches) {
+      return this.dependencies.secretRecordRepository.saveSecretWhenCurrentVersionMatches(
+        record,
+        mutation,
+        expectedCurrentVersionId,
+      );
+    }
+
+    const saved = await this.dependencies.secretRecordRepository.saveSecret(record, mutation);
+    return Object.freeze({
+      ...saved,
+      conditionMatched: true,
+    });
   }
 
   private async emitOperation(
@@ -301,6 +356,11 @@ function normalizeRequired(value: string | undefined): string | undefined {
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
 
+function normalizeOptional(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
 function normalizeTimestamp(value: string | undefined, now: () => Date): string | undefined {
   if (!value) {
     return now().toISOString();
@@ -328,6 +388,16 @@ function notFound(secretId: string): SecretServiceResult<RotateSecretResult> {
     error: Object.freeze({
       code: SecretServiceErrorCodes.notFound,
       message: `Secret '${secretId}' was not found.`,
+    }),
+  };
+}
+
+function rotationConflict(message: string): SecretServiceResult<RotateSecretResult> {
+  return {
+    ok: false,
+    error: Object.freeze({
+      code: SecretServiceErrorCodes.conflict,
+      message,
     }),
   };
 }
