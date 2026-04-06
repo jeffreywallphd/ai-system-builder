@@ -36,6 +36,8 @@ describe("WebHostCompositionRoot", () => {
     const runtime = await root.compose(boot);
     expect(runtime.phase).toBe("ready");
     expect(runtime.delivery.deliveryMode).toBe("thin-client");
+    expect(runtime.readiness?.marker).toBe("web-host:feature-registration-complete");
+    expect(runtime.lifecycleEvents?.some((event) => event.type === "startup-completed")).toBeTrue();
     expect(runtime.transitionHistory.map((entry) => entry.to)).toEqual([
       "composing",
       "starting",
@@ -45,6 +47,7 @@ describe("WebHostCompositionRoot", () => {
     await runtime.stop();
     expect(closed).toBeTrue();
     expect(runtime.phase).toBe("stopped");
+    expect(runtime.lifecycleEvents?.some((event) => event.type === "shutdown-completed")).toBeTrue();
   });
 
   it("rejects non-web hosts for web composition root", async () => {

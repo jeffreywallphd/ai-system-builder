@@ -53,9 +53,41 @@ export interface HostLifecycleTransition {
   readonly reason: string;
 }
 
+export const HostLifecycleEventTypes = Object.freeze({
+  transitionRecorded: "transition-recorded",
+  startupCompleted: "startup-completed",
+  readinessMarked: "readiness-marked",
+  shutdownRequested: "shutdown-requested",
+  shutdownCompleted: "shutdown-completed",
+  startupFailed: "startup-failed",
+  cleanupCompleted: "cleanup-completed",
+  cleanupFailed: "cleanup-failed",
+});
+
+export type HostLifecycleEventType = typeof HostLifecycleEventTypes[keyof typeof HostLifecycleEventTypes];
+
+export interface HostLifecycleReadinessMarker {
+  readonly marker: string;
+  readonly markedAt: string;
+}
+
+export interface HostLifecycleEvent {
+  readonly hostId: string;
+  readonly phase: HostLifecyclePhase;
+  readonly type: HostLifecycleEventType;
+  readonly occurredAt: string;
+  readonly reason: string;
+  readonly transition?: HostLifecycleTransition;
+  readonly readiness?: HostLifecycleReadinessMarker;
+  readonly error?: unknown;
+  readonly metadata?: Readonly<Record<string, string>>;
+}
+
 export interface HostRuntimeHandle {
   readonly host: HostRuntimeIdentity;
   readonly phase: HostLifecyclePhase;
+  readonly readiness?: HostLifecycleReadinessMarker;
+  readonly lifecycleEvents?: ReadonlyArray<HostLifecycleEvent>;
   stop(): Promise<void>;
 }
 

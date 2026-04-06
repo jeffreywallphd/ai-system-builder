@@ -8,6 +8,7 @@ import {
 } from "../../../domain/hosts/HostRuntimeDomain";
 import {
   HostCompositionContractError,
+  HostLifecycleEventTypes,
   HostLifecyclePhases,
   assertExecutableHostBoundarySatisfiesBootConfiguration,
   assertHostCanRunAsControlPlane,
@@ -87,6 +88,12 @@ describe("HostCompositionContracts", () => {
     expect(matrix.controlPlaneAuthority).toBeTrue();
     expect(matrix.nodeExecution).toBeFalse();
     expect(matrix.splitAuthorityFromExecution).toBeTrue();
+  });
+
+  it("defines stable lifecycle event types and runtime handle lifecycle fields", () => {
+    expect(HostLifecycleEventTypes.startupCompleted).toBe("startup-completed");
+    expect(HostLifecycleEventTypes.readinessMarked).toBe("readiness-marked");
+    expect(HostLifecycleEventTypes.shutdownRequested).toBe("shutdown-requested");
   });
 });
 

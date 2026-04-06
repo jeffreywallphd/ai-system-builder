@@ -135,6 +135,20 @@ Each catalog entry contains explicit responsibilities, capability flags, and sta
 
 The authoritative server composition root now consumes this pipeline to keep host startup order explicit and reusable while preserving clean boundary ownership.
 
+## Unified lifecycle coordination (story 12.3.1)
+
+Host lifecycle management is now shared through `src/hosts/lifecycle/HostLifecycleCoordinator.ts`.
+
+Each host composition root (server, desktop, hybrid, web, worker) now uses this lifecycle coordinator to:
+
+- emit deterministic lifecycle transition events
+- mark explicit startup completion and readiness state
+- coordinate graceful shutdown with standardized shutdown hooks
+- execute cleanup hooks in deterministic order
+- propagate startup/shutdown failures while transitioning to `failed` safely
+
+This keeps runtime lifecycle behavior consistent across hosts without moving business logic into host lifecycle modules.
+
 ## Host-aware service registration and dependency composition rules (story 12.1.3)
 
 `src/infrastructure/config/HostServiceRegistration.ts` now defines reusable host service registration contracts and validation rules for:
@@ -179,5 +193,6 @@ The contracts now explicitly state that:
 - `src/hosts/worker/tests/WorkerHostCompositionRoot.test.ts`
 - `src/hosts/worker/tests/WorkerHostEntrypoint.test.ts`
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
+- `src/hosts/lifecycle/tests/HostLifecycleCoordinator.test.ts`
 - `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
 

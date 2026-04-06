@@ -2,7 +2,6 @@ import {
   HostLifecyclePhases,
   assertExecutableHostBoundarySatisfiesBootConfiguration,
   assertHostCanRunAsControlPlane,
-  transitionHostLifecyclePhase,
   type ExecutableHostCompositionRoot,
   type HostBootConfiguration,
   type HostLifecycleTransition,
@@ -30,6 +29,7 @@ import {
   type IdentityServerHost,
   type IdentityServerHostOptions,
 } from "../../../hosts/server/IdentityServerHost";
+import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -121,22 +121,9 @@ export function createAuthoritativeServerCompositionRoot(
         dependencyBoundary: AuthoritativeServerHostRuntime.startupDependencies,
       }, boot);
 
-      let phase = HostLifecyclePhases.configured;
-      const transitionHistory: HostLifecycleTransition[] = [];
+      const lifecycle = createHostLifecycleCoordinator({ boot });
       let startedHost: IdentityServerHost | undefined;
-      const recordTransition = (to: typeof HostLifecyclePhases[keyof typeof HostLifecyclePhases], reason: string) => {
-        const transition = transitionHostLifecyclePhase({
-          hostId: boot.host.hostId,
-          from: phase,
-          to,
-          occurredAt: boot.startedAt,
-          reason,
-        });
-        transitionHistory.push(transition);
-        phase = to;
-      };
-
-      recordTransition(HostLifecyclePhases.composing, "compose-authoritative-server-host");
+      await lifecycle.markComposing("compose-authoritative-server-host");
 
       try {
         const environment = input.bootstrap?.environment ?? input.hostOptions.env ?? process.env;
@@ -182,14 +169,22 @@ export function createAuthoritativeServerCompositionRoot(
         const stageHandlers = combineStageHandlers(defaultStageHandlers, input.bootstrap?.stageHandlers);
 
         const lifecycleHooks = combineStartupLifecycleHooks({
-          onStageStarting: (event) => {
-            if (event.stageId === HostBootstrapStageIds.featureRegistration && phase === HostLifecyclePhases.composing) {
-              recordTransition(HostLifecyclePhases.starting, "start-authoritative-server-host");
+          onStageStarting: async (event) => {
+            if (event.stageId === HostBootstrapStageIds.featureRegistration && lifecycle.phase === HostLifecyclePhases.composing) {
+              await lifecycle.markStarting("start-authoritative-server-host");
             }
           },
-          onPipelineCompleted: () => {
-            if (phase === HostLifecyclePhases.starting) {
-              recordTransition(HostLifecyclePhases.ready, "authoritative-server-ready");
+          onPipelineCompleted: async (event) => {
+            if (lifecycle.phase === HostLifecyclePhases.starting) {
+              await lifecycle.markStartupCompleted({
+                transitionReason: "authoritative-server-ready",
+                completionReason: "authoritative-server-startup-completed",
+                readinessMarker: "authoritative-server:feature-registration-complete",
+                metadata: Object.freeze({
+                  stageCount: String(event.executedStageIds.length),
+                  executedStageIds: event.executedStageIds.join(","),
+                }),
+              });
             }
           },
         }, input.bootstrap?.lifecycleHooks);
@@ -216,42 +211,57 @@ export function createAuthoritativeServerCompositionRoot(
         const activeHost = startedHost;
 
         const stop = async () => {
-          if (phase === HostLifecyclePhases.stopped || phase === HostLifecyclePhases.failed) {
-            return;
-          }
-          recordTransition(HostLifecyclePhases.stopping, "authoritative-server-stop-requested");
-          await activeHost.close();
-          recordTransition(HostLifecyclePhases.stopped, "authoritative-server-stopped");
+          await lifecycle.shutdown({
+            shutdownRequestedReason: "authoritative-server-stop-requested",
+            shutdownCompletedReason: "authoritative-server-stopped",
+            shutdownFailureReason: "authoritative-server-stop-failed",
+            cleanupHooks: [{
+              hookId: "close-runtime-host",
+              run: async () => {
+                await activeHost.close();
+              },
+            }],
+          });
         };
 
         return Object.freeze({
           host: boot.host,
           get phase() {
-            return phase;
+            return lifecycle.phase;
           },
           port: activeHost.port,
           address: activeHost.address,
+          get readiness() {
+            return lifecycle.readiness;
+          },
+          get lifecycleEvents() {
+            return lifecycle.lifecycleEvents;
+          },
           get transitionHistory() {
-            return Object.freeze([...transitionHistory]);
+            return lifecycle.transitionHistory as ReadonlyArray<HostLifecycleTransition>;
           },
           stop,
         });
       } catch (error) {
-        if (phase !== HostLifecyclePhases.failed && phase !== HostLifecyclePhases.stopped) {
-          const failedTransition = transitionHostLifecyclePhase({
-            hostId: boot.host.hostId,
-            from: phase,
-            to: HostLifecyclePhases.failed,
-            occurredAt: boot.startedAt,
-            reason: "authoritative-server-start-failed",
-          });
-          transitionHistory.push(failedTransition);
-          phase = HostLifecyclePhases.failed;
-        }
+        let failure: unknown = error;
         if (startedHost) {
-          await startedHost.close();
+          try {
+            await lifecycle.runStartupFailureCleanup({
+              cleanupReason: "authoritative-server-start-failure-cleanup",
+              cleanupFailureReason: "authoritative-server-start-failure-cleanup-failed",
+              cleanupHooks: [{
+                hookId: "close-runtime-host",
+                run: async () => {
+                  await startedHost?.close();
+                },
+              }],
+            });
+          } catch (cleanupError) {
+            failure = cleanupError;
+          }
         }
-        throw error;
+        await lifecycle.markStartupFailed("authoritative-server-start-failed", failure);
+        throw failure;
       }
     },
   });

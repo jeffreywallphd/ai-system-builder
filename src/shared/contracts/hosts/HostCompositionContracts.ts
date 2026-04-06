@@ -6,7 +6,15 @@ import type {
   HostStartupDependencyBoundary,
   HostStartupDependencyBoundaryLayer,
 } from "../../../domain/hosts/HostRuntimeDomain";
-import type { HostBootConfiguration, HostBootMode } from "../../../application/common/HostCompositionContracts";
+import type {
+  HostBootConfiguration,
+  HostBootMode,
+  HostLifecycleEvent,
+  HostLifecycleEventType,
+  HostLifecyclePhase,
+  HostLifecycleReadinessMarker,
+  HostLifecycleTransition,
+} from "../../../application/common/HostCompositionContracts";
 
 export class HostCompositionSharedContractError extends Error {
   constructor(message: string) {
@@ -56,6 +64,31 @@ export interface HostBootConfigurationDto {
   readonly requiredDependencyIds: ReadonlyArray<string>;
 }
 
+export interface HostLifecycleReadinessMarkerDto {
+  readonly marker: string;
+  readonly markedAt: string;
+}
+
+export interface HostLifecycleTransitionDto {
+  readonly hostId: string;
+  readonly from: HostLifecyclePhase;
+  readonly to: HostLifecyclePhase;
+  readonly occurredAt: string;
+  readonly reason: string;
+}
+
+export interface HostLifecycleEventDto {
+  readonly contractVersion: HostCompositionContractVersion;
+  readonly hostId: string;
+  readonly phase: HostLifecyclePhase;
+  readonly type: HostLifecycleEventType;
+  readonly occurredAt: string;
+  readonly reason: string;
+  readonly transition?: HostLifecycleTransitionDto;
+  readonly readiness?: HostLifecycleReadinessMarkerDto;
+  readonly metadata?: Readonly<Record<string, string>>;
+}
+
 function normalizeRequired(value: string, field: string): string {
   const normalized = value.trim();
   if (!normalized) {
@@ -97,6 +130,37 @@ export function toHostBootConfigurationDto(value: HostBootConfiguration): HostBo
     startedAt: new Date(normalizedStartedAt).toISOString(),
     startupReason: normalizeRequired(value.startupReason, "Host boot startupReason"),
     requiredDependencyIds: Object.freeze([...value.requiredDependencyIds]),
+  });
+}
+
+function toLifecycleTransitionDto(value: HostLifecycleTransition): HostLifecycleTransitionDto {
+  return Object.freeze({
+    hostId: normalizeRequired(value.hostId, "Host lifecycle transition hostId"),
+    from: value.from,
+    to: value.to,
+    occurredAt: new Date(normalizeRequired(value.occurredAt, "Host lifecycle transition occurredAt")).toISOString(),
+    reason: normalizeRequired(value.reason, "Host lifecycle transition reason"),
+  });
+}
+
+function toReadinessMarkerDto(value: HostLifecycleReadinessMarker): HostLifecycleReadinessMarkerDto {
+  return Object.freeze({
+    marker: normalizeRequired(value.marker, "Host lifecycle readiness marker"),
+    markedAt: new Date(normalizeRequired(value.markedAt, "Host lifecycle readiness markedAt")).toISOString(),
+  });
+}
+
+export function toHostLifecycleEventDto(value: HostLifecycleEvent): HostLifecycleEventDto {
+  return Object.freeze({
+    contractVersion: HostCompositionContractVersions.v1,
+    hostId: normalizeRequired(value.hostId, "Host lifecycle event hostId"),
+    phase: value.phase,
+    type: value.type,
+    occurredAt: new Date(normalizeRequired(value.occurredAt, "Host lifecycle event occurredAt")).toISOString(),
+    reason: normalizeRequired(value.reason, "Host lifecycle event reason"),
+    transition: value.transition ? toLifecycleTransitionDto(value.transition) : undefined,
+    readiness: value.readiness ? toReadinessMarkerDto(value.readiness) : undefined,
+    metadata: value.metadata ? Object.freeze({ ...value.metadata }) : undefined,
   });
 }
 

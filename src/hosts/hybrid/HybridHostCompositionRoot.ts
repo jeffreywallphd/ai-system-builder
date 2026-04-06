@@ -2,7 +2,6 @@ import {
   HostLifecyclePhases,
   HostCompositionContractError,
   assertExecutableHostBoundarySatisfiesBootConfiguration,
-  transitionHostLifecyclePhase,
   type ExecutableHostCompositionRoot,
   type HostBootConfiguration,
   type HostLifecycleTransition,
@@ -26,6 +25,7 @@ import {
   composeHostServiceRegistrationPlan,
 } from "../../infrastructure/config/HostServiceRegistrationCatalog";
 import type { HostServiceRegistrationPlan } from "../../infrastructure/config/HostServiceRegistration";
+import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
 
 export const HybridHostControlPlaneSources = Object.freeze({
   remoteAuthoritativeServer: "remote-authoritative-server",
@@ -215,22 +215,9 @@ export function createHybridCompositionRoot(
         }
       }
 
-      let phase = HostLifecyclePhases.configured;
-      const transitionHistory: HostLifecycleTransition[] = [];
+      const lifecycle = createHostLifecycleCoordinator({ boot });
       let startedHost: HybridRuntimeHost | undefined;
-      const recordTransition = (to: typeof HostLifecyclePhases[keyof typeof HostLifecyclePhases], reason: string) => {
-        const transition = transitionHostLifecyclePhase({
-          hostId: boot.host.hostId,
-          from: phase,
-          to,
-          occurredAt: boot.startedAt,
-          reason,
-        });
-        transitionHistory.push(transition);
-        phase = to;
-      };
-
-      recordTransition(HostLifecyclePhases.composing, "compose-hybrid-host");
+      await lifecycle.markComposing("compose-hybrid-host");
 
       try {
         const environment = input.bootstrap?.environment ?? boot.environment;
@@ -278,14 +265,22 @@ export function createHybridCompositionRoot(
         const stageHandlers = combineStageHandlers(defaultStageHandlers, input.bootstrap?.stageHandlers);
 
         const lifecycleHooks = combineStartupLifecycleHooks({
-          onStageStarting: (event) => {
-            if (event.stageId === HostBootstrapStageIds.featureRegistration && phase === HostLifecyclePhases.composing) {
-              recordTransition(HostLifecyclePhases.starting, "start-hybrid-host");
+          onStageStarting: async (event) => {
+            if (event.stageId === HostBootstrapStageIds.featureRegistration && lifecycle.phase === HostLifecyclePhases.composing) {
+              await lifecycle.markStarting("start-hybrid-host");
             }
           },
-          onPipelineCompleted: () => {
-            if (phase === HostLifecyclePhases.starting) {
-              recordTransition(HostLifecyclePhases.ready, "hybrid-host-ready");
+          onPipelineCompleted: async (event) => {
+            if (lifecycle.phase === HostLifecyclePhases.starting) {
+              await lifecycle.markStartupCompleted({
+                transitionReason: "hybrid-host-ready",
+                completionReason: "hybrid-host-startup-completed",
+                readinessMarker: "hybrid-host:feature-registration-complete",
+                metadata: Object.freeze({
+                  stageCount: String(event.executedStageIds.length),
+                  executedStageIds: event.executedStageIds.join(","),
+                }),
+              });
             }
           },
         }, input.bootstrap?.lifecycleHooks);
@@ -312,21 +307,32 @@ export function createHybridCompositionRoot(
         const activeHost = startedHost;
 
         const stop = async () => {
-          if (phase === HostLifecyclePhases.stopped || phase === HostLifecyclePhases.failed) {
-            return;
-          }
-          recordTransition(HostLifecyclePhases.stopping, "hybrid-host-stop-requested");
-          await activeHost.close();
-          recordTransition(HostLifecyclePhases.stopped, "hybrid-host-stopped");
+          await lifecycle.shutdown({
+            shutdownRequestedReason: "hybrid-host-stop-requested",
+            shutdownCompletedReason: "hybrid-host-stopped",
+            shutdownFailureReason: "hybrid-host-stop-failed",
+            cleanupHooks: [{
+              hookId: "close-runtime-host",
+              run: async () => {
+                await activeHost.close();
+              },
+            }],
+          });
         };
 
         return Object.freeze({
           host: boot.host,
           get phase() {
-            return phase;
+            return lifecycle.phase;
+          },
+          get readiness() {
+            return lifecycle.readiness;
+          },
+          get lifecycleEvents() {
+            return lifecycle.lifecycleEvents;
           },
           get transitionHistory() {
-            return Object.freeze([...transitionHistory]);
+            return lifecycle.transitionHistory as ReadonlyArray<HostLifecycleTransition>;
           },
           get enabledCapabilities() {
             return Object.freeze([...enabledCapabilities]);
@@ -335,21 +341,25 @@ export function createHybridCompositionRoot(
           stop,
         });
       } catch (error) {
-        if (phase !== HostLifecyclePhases.failed && phase !== HostLifecyclePhases.stopped) {
-          const failedTransition = transitionHostLifecyclePhase({
-            hostId: boot.host.hostId,
-            from: phase,
-            to: HostLifecyclePhases.failed,
-            occurredAt: boot.startedAt,
-            reason: "hybrid-host-start-failed",
-          });
-          transitionHistory.push(failedTransition);
-          phase = HostLifecyclePhases.failed;
-        }
+        let failure: unknown = error;
         if (startedHost) {
-          await startedHost.close();
+          try {
+            await lifecycle.runStartupFailureCleanup({
+              cleanupReason: "hybrid-host-start-failure-cleanup",
+              cleanupFailureReason: "hybrid-host-start-failure-cleanup-failed",
+              cleanupHooks: [{
+                hookId: "close-runtime-host",
+                run: async () => {
+                  await startedHost?.close();
+                },
+              }],
+            });
+          } catch (cleanupError) {
+            failure = cleanupError;
+          }
         }
-        throw error;
+        await lifecycle.markStartupFailed("hybrid-host-start-failed", failure);
+        throw failure;
       }
     },
   });

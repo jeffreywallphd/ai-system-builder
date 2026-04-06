@@ -11,6 +11,7 @@ import {
   HostCompositionContractScopes,
   HostCompositionContractVersions,
   toHostBootConfigurationDto,
+  toHostLifecycleEventDto,
   toHostRuntimeIdentityDto,
 } from "../HostCompositionContracts";
 
@@ -52,6 +53,28 @@ describe("HostCompositionContracts", () => {
     expect(hostDto.controlPlaneRole).toBe("authoritative-server");
     expect(bootDto.mode).toBe("cold-start");
     expect(bootDto.requiredDependencyIds).toEqual(["dep:shared:contracts"]);
+  });
+
+  it("projects lifecycle events to shared DTOs", () => {
+    const eventDto = toHostLifecycleEventDto({
+      hostId: "host:server:authoritative",
+      phase: "ready",
+      type: "startup-completed",
+      occurredAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+      reason: "startup-completed",
+      readiness: {
+        marker: "ready:feature-registration",
+        markedAt: new Date("2026-01-01T00:00:01.000Z").toISOString(),
+      },
+      metadata: Object.freeze({
+        stageCount: "6",
+      }),
+    });
+
+    expect(eventDto.contractVersion).toBe("host-composition/v1");
+    expect(eventDto.type).toBe("startup-completed");
+    expect(eventDto.readiness?.marker).toBe("ready:feature-registration");
+    expect(eventDto.metadata?.stageCount).toBe("6");
   });
 });
 

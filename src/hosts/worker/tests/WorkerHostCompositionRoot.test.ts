@@ -47,6 +47,8 @@ describe("WorkerHostCompositionRoot", () => {
       HostCapabilityFlags.nodeExecution,
       HostCapabilityFlags.workerRuntime,
     ]);
+    expect(runtime.readiness?.marker).toBe("worker-host:feature-registration-complete");
+    expect(runtime.lifecycleEvents?.some((event) => event.type === "startup-completed")).toBeTrue();
     expect(runtime.transitionHistory.map((entry) => entry.to)).toEqual([
       "composing",
       "starting",
@@ -56,6 +58,7 @@ describe("WorkerHostCompositionRoot", () => {
     await runtime.stop();
     expect(closed).toBeTrue();
     expect(runtime.phase).toBe("stopped");
+    expect(runtime.lifecycleEvents?.some((event) => event.type === "shutdown-completed")).toBeTrue();
   });
 
   it("rejects non-worker hosts for worker composition root", async () => {

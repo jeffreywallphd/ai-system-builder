@@ -44,6 +44,8 @@ describe("AuthoritativeServerCompositionRoot", () => {
     const runtime = await root.compose(boot);
     expect(runtime.port).toBe(4100);
     expect(runtime.phase).toBe("ready");
+    expect(runtime.readiness?.marker).toBe("authoritative-server:feature-registration-complete");
+    expect(runtime.lifecycleEvents?.some((event) => event.type === "startup-completed")).toBeTrue();
     expect(runtime.transitionHistory.map((entry) => entry.to)).toEqual([
       "composing",
       "starting",
@@ -53,6 +55,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
     await runtime.stop();
     expect(closed).toBeTrue();
     expect(runtime.phase).toBe("stopped");
+    expect(runtime.lifecycleEvents?.some((event) => event.type === "shutdown-completed")).toBeTrue();
   });
 
   it("rejects non-authoritative hosts for authoritative composition root", async () => {

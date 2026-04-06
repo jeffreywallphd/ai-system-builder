@@ -49,6 +49,8 @@ describe("HybridHostCompositionRoot", () => {
       HostCapabilityFlags.nodeExecution,
       HostCapabilityFlags.workerRuntime,
     ]);
+    expect(runtime.readiness?.marker).toBe("hybrid-host:feature-registration-complete");
+    expect(runtime.lifecycleEvents?.some((event) => event.type === "startup-completed")).toBeTrue();
     expect(runtime.transitionHistory.map((entry) => entry.to)).toEqual([
       "composing",
       "starting",
@@ -58,6 +60,7 @@ describe("HybridHostCompositionRoot", () => {
     await runtime.stop();
     expect(closed).toBeTrue();
     expect(runtime.phase).toBe("stopped");
+    expect(runtime.lifecycleEvents?.some((event) => event.type === "shutdown-completed")).toBeTrue();
   });
 
   it("rejects non-hybrid hosts for hybrid composition root", async () => {

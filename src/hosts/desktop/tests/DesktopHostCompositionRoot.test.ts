@@ -35,6 +35,8 @@ describe("DesktopHostCompositionRoot", () => {
 
     const runtime = await root.compose(boot);
     expect(runtime.phase).toBe("ready");
+    expect(runtime.readiness?.marker).toBe("desktop-host:feature-registration-complete");
+    expect(runtime.lifecycleEvents?.some((event) => event.type === "startup-completed")).toBeTrue();
     expect(runtime.transitionHistory.map((entry) => entry.to)).toEqual([
       "composing",
       "starting",
@@ -44,6 +46,7 @@ describe("DesktopHostCompositionRoot", () => {
     await runtime.stop();
     expect(closed).toBeTrue();
     expect(runtime.phase).toBe("stopped");
+    expect(runtime.lifecycleEvents?.some((event) => event.type === "shutdown-completed")).toBeTrue();
   });
 
   it("rejects non-desktop hosts for desktop composition root", async () => {

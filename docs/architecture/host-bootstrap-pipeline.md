@@ -95,6 +95,18 @@ This keeps the common startup sequence stable while preserving host-level extens
 - enforces explicit execution capability composition (`node-execution` + `worker-runtime`) before runtime startup
 - starts and stops worker runtime execution through host-owned adapter callbacks while preserving deterministic lifecycle transitions
 
+## Host lifecycle management and shutdown coordination (story 12.3.1)
+
+`src/hosts/lifecycle/HostLifecycleCoordinator.ts` now centralizes lifecycle orchestration behavior used by server, desktop, hybrid, web, and worker composition roots:
+
+- standardized startup transitions (`configured -> composing -> starting -> ready`) and explicit startup completion events
+- readiness markers recorded when feature-registration startup completes
+- consistent shutdown flow with explicit shutdown-requested/shutdown-completed events
+- sequential cleanup hook execution with deterministic `cleanup-completed` / `cleanup-failed` event emission
+- startup-failure cleanup hooks and consistent `failed` transition/error propagation semantics
+
+All host composition roots now delegate lifecycle phase management, readiness signaling, shutdown coordination, and cleanup sequencing to this shared coordinator while keeping host-specific runtime startup logic local to each root.
+
 ## Contributor startup-sequence guidance
 
 When extending host startup:
@@ -108,6 +120,7 @@ When extending host startup:
 ## Tests
 
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
+- `src/hosts/lifecycle/tests/HostLifecycleCoordinator.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
 - `src/hosts/hybrid/tests/HybridHostCompositionRoot.test.ts`
