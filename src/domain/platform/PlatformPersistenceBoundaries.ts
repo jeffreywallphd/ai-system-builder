@@ -67,9 +67,9 @@ export const CorePlatformAggregatePersistenceBoundaries: ReadonlyArray<PlatformA
     authorityScope: PlatformPersistenceAuthorityScopes.authoritativeServer,
     tenancyScope: PlatformPersistenceTenancyScopes.user,
     repositoryTargets: Object.freeze([
-      "application/identity/ports/IIdentityPersistenceRepository",
-      "application/identity/ports/IIdentityLookupRepository",
-      "application/identity/ports/ICredentialMaterialRepository",
+      "src/application/identity/ports/IIdentityPersistenceRepository",
+      "src/application/identity/ports/IIdentityLookupRepository",
+      "src/application/identity/ports/ICredentialMaterialRepository",
     ]),
     readModels: Object.freeze([
       Object.freeze({
@@ -287,8 +287,8 @@ export const CorePlatformAggregatePersistenceBoundaries: ReadonlyArray<PlatformA
     authorityScope: PlatformPersistenceAuthorityScopes.authoritativeServer,
     tenancyScope: PlatformPersistenceTenancyScopes.user,
     repositoryTargets: Object.freeze([
-      "application/identity/ports/IIdentitySessionRepository",
-      "application/identity/ports/IIdentitySessionTokenMaterialRepository",
+      "src/application/identity/ports/IIdentitySessionRepository",
+      "src/application/identity/ports/IIdentitySessionTokenMaterialRepository",
     ]),
     readModels: Object.freeze([
       Object.freeze({
