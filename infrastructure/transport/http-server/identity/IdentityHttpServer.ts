@@ -14,6 +14,7 @@ import type { IdentityAuthBackendApi } from "../../../api/identity/IdentityAuthB
 import type { AuthorizationManagementBackendApi } from "../../../api/authorization/AuthorizationManagementBackendApi";
 import type { NodeTrustBackendApi } from "../../../api/nodes/NodeTrustBackendApi";
 import type { CertificateOperationsBackendApi } from "../../../api/security/CertificateOperationsBackendApi";
+import type { SecretMetadataBackendApi } from "../../../api/security/SecretMetadataBackendApi";
 import type { WorkspaceInvitationBackendApi } from "../../../api/workspaces/WorkspaceInvitationBackendApi";
 import type { WorkspaceAdministrationBackendApi } from "../../../api/workspaces/WorkspaceAdministrationBackendApi";
 import {
@@ -84,6 +85,14 @@ import {
   type RenewIssuedCertificateApiRequest,
   type RevokeIssuedCertificateApiRequest,
 } from "../../../api/security/sdk/PublicCertificateOperationsApiContract";
+import {
+  SecretMetadataApiErrorCodes,
+  type CreateSecretMetadataApiRequest,
+  type DisableSecretMetadataApiRequest,
+  type GetSecretMetadataApiRequest,
+  type ListSecretMetadataApiRequest,
+  type SecretMetadataApiResponse,
+} from "../../../api/security/sdk/PublicSecretMetadataApiContract";
 import { redactSensitiveAuthPayload, redactSensitiveText } from "../../../api/identity/IdentityAuthRedaction";
 import {
   NodeApprovalStatuses,
@@ -97,6 +106,7 @@ import {
   CertificateSubjectReferenceKinds,
   CertificateUsageKinds,
 } from "../../../../src/domain/security/CertificateAuthorityDomain";
+import { SecretKinds, SecretScopes } from "../../../../src/domain/security/SecretDomain";
 import { CertificateTrustEvaluationStatuses } from "../../../../src/shared/dto/security/CertificateAuthorityDtos";
 import {
   parseApproveNodeEnrollmentActionRequestDto,
@@ -430,6 +440,49 @@ const CertificateStatusValues = new Set<string>(Object.values(CertificateStatuse
 const CertificateSubjectReferenceKindValues = new Set<string>(Object.values(CertificateSubjectReferenceKinds));
 const CertificateUsageValues = new Set<string>(Object.values(CertificateUsageKinds));
 const CertificateTrustStatusValues = new Set<string>(Object.values(CertificateTrustEvaluationStatuses));
+const SecretScopeValues = new Set<string>(Object.values(SecretScopes));
+const SecretKindValues = new Set<string>(Object.values(SecretKinds));
+const SecretScopeSchema = z.enum([SecretScopes.server, SecretScopes.workspace, SecretScopes.user]);
+const SecretKindSchema = z.enum([
+  SecretKinds.apiKey,
+  SecretKinds.accessToken,
+  SecretKinds.refreshToken,
+  SecretKinds.password,
+  SecretKinds.privateKey,
+  SecretKinds.certificate,
+  SecretKinds.connectionString,
+  SecretKinds.generic,
+]);
+
+const SecretOwnerSchema = z.object({
+  scope: SecretScopeSchema,
+  workspaceId: z.string().trim().min(1).optional(),
+  userIdentityId: z.string().trim().min(1).optional(),
+}).strict();
+
+const SecretMetadataRequestSchema = z.object({
+  displayName: z.string().trim().min(1).max(255).optional(),
+  description: z.string().trim().min(1).max(4000).optional(),
+  tags: z.array(z.string().trim().min(1).max(255)).max(64).optional(),
+  labels: z.record(z.string().trim().min(1).max(255)).optional(),
+}).strict();
+
+const CreateSecretMetadataRequestSchema = z.object({
+  operationKey: z.string().trim().min(1).max(255).optional(),
+  secretId: z.string().trim().min(1).max(255),
+  name: z.string().trim().min(1).max(127),
+  owner: SecretOwnerSchema,
+  kind: SecretKindSchema,
+  plaintext: z.string().min(1),
+  metadata: SecretMetadataRequestSchema.optional(),
+  createdAt: z.string().datetime().optional(),
+}).strict();
+
+const DisableSecretMetadataRequestSchema = z.object({
+  operationKey: z.string().trim().min(1).max(255).optional(),
+  disabledAt: z.string().datetime().optional(),
+  actorWorkspaceId: z.string().trim().min(1).optional(),
+}).strict();
 
 const RevokeIssuedCertificateRequestSchema = z.object({
   revocationReason: z.string().refine((value) => CertificateRevocationReasonValues.has(value), {
@@ -693,6 +746,7 @@ interface IdentityHttpServerWebSocketLifecycleEvent {
 export interface IdentityHttpServerOptions {
   readonly backendApi: IdentityAuthBackendApi;
   readonly certificateOperationsBackendApi?: CertificateOperationsBackendApi;
+  readonly secretMetadataBackendApi?: SecretMetadataBackendApi;
   readonly authorizationManagementBackendApi?: AuthorizationManagementBackendApi;
   readonly nodeTrustBackendApi?: NodeTrustBackendApi;
   readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
@@ -1531,6 +1585,249 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               ...parsedRequest.data,
               userIdentityId: context.principal.userIdentityId,
             }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.secretMetadataBackendApi
+        && request.method === "POST"
+        && path === "/api/v1/security/secrets"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const parsedRequest = await parseAndValidateSecretMetadataRequest(
+              request,
+              CreateSecretMetadataRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const createRequest: CreateSecretMetadataApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              ...parsedRequest.data,
+            });
+            const apiResponse = await options.secretMetadataBackendApi.createSecret(createRequest);
+            const statusCode = mapSecretMetadataStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              operationKey: createRequest.operationKey,
+              secretId: createRequest.secretId,
+              name: createRequest.name,
+              owner: createRequest.owner,
+              kind: createRequest.kind,
+              plaintextProvided: true,
+              metadataProvided: Boolean(createRequest.metadata),
+              createdAt: createRequest.createdAt,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.secretMetadataBackendApi
+        && request.method === "GET"
+        && path === "/api/v1/security/secrets"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const scope = normalizeOptionalString(url.searchParams.get("scope"));
+            const workspaceId = normalizeOptionalString(url.searchParams.get("workspaceId"));
+            const userIdentityId = normalizeOptionalString(url.searchParams.get("userIdentityId"));
+            const actorWorkspaceId = normalizeOptionalString(url.searchParams.get("actorWorkspaceId"));
+            const kinds = url.searchParams.getAll("kind");
+            const tagAnyOf = url.searchParams.getAll("tag");
+            const includeDisabledInput = url.searchParams.get("includeDisabled");
+            const includeRevokedInput = url.searchParams.get("includeRevoked");
+            const includeDeletedInput = url.searchParams.get("includeDeleted");
+            const includeDisabled = parseOptionalBoolean(includeDisabledInput);
+            const includeRevoked = parseOptionalBoolean(includeRevokedInput);
+            const includeDeleted = parseOptionalBoolean(includeDeletedInput);
+            const limitInput = url.searchParams.get("limit");
+            const offsetInput = url.searchParams.get("offset");
+            const limit = parseOptionalInteger(limitInput);
+            const offset = parseOptionalInteger(offsetInput);
+
+            if (!scope || !SecretScopeValues.has(scope)) {
+              const invalid = buildSecretMetadataQueryValidationError("scope", "scope must be one of: server, workspace, user.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            if (kinds.some((kind) => !SecretKindValues.has(kind))) {
+              const invalid = buildSecretMetadataQueryValidationError("kind", "kind values are invalid.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            if (includeDisabledInput !== null && includeDisabled === undefined) {
+              const invalid = buildSecretMetadataQueryValidationError("includeDisabled", "includeDisabled must be 'true' or 'false'.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            if (includeRevokedInput !== null && includeRevoked === undefined) {
+              const invalid = buildSecretMetadataQueryValidationError("includeRevoked", "includeRevoked must be 'true' or 'false'.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            if (includeDeletedInput !== null && includeDeleted === undefined) {
+              const invalid = buildSecretMetadataQueryValidationError("includeDeleted", "includeDeleted must be 'true' or 'false'.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            if (limitInput !== null && (limit === undefined || limit < 1)) {
+              const invalid = buildSecretMetadataQueryValidationError("limit", "limit must be an integer >= 1.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            if (offsetInput !== null && (offset === undefined || offset < 0)) {
+              const invalid = buildSecretMetadataQueryValidationError("offset", "offset must be an integer >= 0.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const listRequest: ListSecretMetadataApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              actorWorkspaceId,
+              owner: Object.freeze({
+                scope: scope as ListSecretMetadataApiRequest["owner"]["scope"],
+                workspaceId,
+                userIdentityId,
+              }),
+              kinds: kinds.length > 0
+                ? kinds as NonNullable<ListSecretMetadataApiRequest["kinds"]>
+                : undefined,
+              tagAnyOf: tagAnyOf.length > 0 ? Object.freeze(tagAnyOf.map((tag) => tag.trim()).filter(Boolean)) : undefined,
+              includeDisabled,
+              includeRevoked,
+              includeDeleted,
+              limit,
+              offset,
+            });
+
+            const apiResponse = await options.secretMetadataBackendApi.listSecrets(listRequest);
+            const statusCode = mapSecretMetadataStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, listRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.secretMetadataBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/security/secrets/")
+        && !path.endsWith("/disable")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const secretId = decodePathTail(path, "/api/v1/security/secrets/");
+            if (!secretId || secretId.includes("/")) {
+              const invalid = buildSecretMetadataInvalidRequestResponse("secretId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const getRequest: GetSecretMetadataApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              actorWorkspaceId: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("actorWorkspaceId")),
+              secretId,
+              occurredAt: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("occurredAt")),
+            });
+            const apiResponse = await options.secretMetadataBackendApi.getSecret(getRequest);
+            const statusCode = mapSecretMetadataStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, getRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.secretMetadataBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/security/secrets/")
+        && path.endsWith("/disable")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const secretId = decodePathTail(path, "/api/v1/security/secrets/", "/disable");
+            if (!secretId || secretId.includes("/")) {
+              const invalid = buildSecretMetadataInvalidRequestResponse("secretId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateSecretMetadataRequest(
+              request,
+              DisableSecretMetadataRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const disableRequest: DisableSecretMetadataApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              secretId,
+              ...parsedRequest.data,
+            });
+            const apiResponse = await options.secretMetadataBackendApi.disableSecret(disableRequest);
+            const statusCode = mapSecretMetadataStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, disableRequest, apiResponse);
           },
         );
         return;
@@ -5342,6 +5639,66 @@ async function parseAndValidateWorkspaceRequest<T>(
   return { ok: true, data: validation.data };
 }
 
+async function parseAndValidateSecretMetadataRequest<T>(
+  request: IncomingMessage,
+  schema: z.ZodType<T>,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: T }
+  | { readonly ok: false; readonly statusCode: number; readonly body: SecretMetadataApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = Object.freeze({
+      ok: false,
+      error: {
+        code: SecretMetadataApiErrorCodes.invalidRequest,
+        message: parsedBody.error,
+      },
+    });
+    logger.warn(Object.freeze({
+      event: "secret-metadata-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  const validation = schema.safeParse(parsedBody.value);
+  if (!validation.success) {
+    const body = Object.freeze({
+      ok: false,
+      error: {
+        code: SecretMetadataApiErrorCodes.invalidRequest,
+        message: "Request validation failed.",
+        validationErrors: Object.freeze(validation.error.issues.map((issue) => Object.freeze({
+          path: issue.path.join("."),
+          code: issue.code,
+          message: issue.message,
+        }))),
+      },
+    });
+    logger.warn(Object.freeze({
+      event: "secret-metadata-http.request.validation-failed",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+      details: {
+        request: redactSensitiveAuthPayload(parsedBody.value),
+        issues: body.error.validationErrors,
+      },
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  return { ok: true, data: validation.data };
+}
+
 async function parseAndValidateWorkspaceAdministrationRequest<T>(
   request: IncomingMessage,
   schema: z.ZodType<T>,
@@ -5887,6 +6244,27 @@ function mapCertificateOperationsStatusCode(response: CertificateOperationsApiRe
   }
 }
 
+function mapSecretMetadataStatusCode(response: SecretMetadataApiResponse<unknown>): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error?.code) {
+    case SecretMetadataApiErrorCodes.invalidRequest:
+      return 400;
+    case SecretMetadataApiErrorCodes.authenticationFailed:
+      return 401;
+    case SecretMetadataApiErrorCodes.forbidden:
+      return 403;
+    case SecretMetadataApiErrorCodes.notFound:
+      return 404;
+    case SecretMetadataApiErrorCodes.conflict:
+      return 409;
+    default:
+      return 500;
+  }
+}
+
 function parseOptionalInteger(value: string | null): number | undefined {
   if (!value) {
     return undefined;
@@ -6137,6 +6515,16 @@ function buildCertificateOperationsInvalidRequestResponse(message: string): Cert
   });
 }
 
+function buildSecretMetadataInvalidRequestResponse(message: string): SecretMetadataApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: SecretMetadataApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
 function buildNodeTrustForbiddenResponse(message: string): NodeTrustApiResponse<never> {
   return Object.freeze({
     ok: false,
@@ -6209,6 +6597,21 @@ function buildCertificateOperationsQueryValidationError(
     ok: false,
     error: {
       code: CertificateOperationsApiErrorCodes.invalidRequest,
+      message: "Request validation failed.",
+      validationErrors: Object.freeze([Object.freeze({
+        path,
+        code: "invalid_enum_value",
+        message,
+      })]),
+    },
+  });
+}
+
+function buildSecretMetadataQueryValidationError(path: string, message: string): SecretMetadataApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: SecretMetadataApiErrorCodes.invalidRequest,
       message: "Request validation failed.",
       validationErrors: Object.freeze([Object.freeze({
         path,
