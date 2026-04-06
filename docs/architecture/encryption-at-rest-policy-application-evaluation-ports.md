@@ -21,10 +21,12 @@ Out of scope in this slice:
 ## Canonical files
 
 - `src/application/security/ports/EncryptionAtRestPolicyEvaluationPorts.ts`
+- `src/application/security/ports/EncryptionEnforcementObservabilityPorts.ts`
 - `src/application/security/use-cases/EncryptionPolicyEvaluationServiceContracts.ts`
 - `src/application/security/use-cases/EncryptionPolicyEvaluationService.ts`
 - `src/application/security/tests/EncryptionPolicyEvaluationService.test.ts`
 - `src/application/security/tests/EncryptionPolicyEvaluationServiceContracts.test.ts`
+- `src/application/security/tests/EncryptionEnforcementObservabilityPorts.test.ts`
 
 ## Contract summary
 
@@ -57,3 +59,15 @@ When consuming encryption policy decisions in application services:
 2. Use `evaluateContentEncryptionRequirement(...)` for storage/object-write planning where only scoped-content requirement and key scope are needed.
 3. Use `evaluatePreviewDecryptionAllowance(...)` and `evaluateWorkerDecryptionAllowance(...)` for preview pipeline and worker execution gating.
 4. Treat non-`ok` outcomes as fail-closed security decisions; do not attempt permissive fallback behavior.
+
+## Story 11.3.4 observability and audit posture
+
+- `EncryptionPolicyEvaluationService` now emits best-effort structured enforcement diagnostics for:
+  - successful effective-policy evaluations
+  - rejected invalid requests
+  - denied policy-violation outcomes
+  - failed context-resolution/internal outcomes
+- Emission flows through `IEncryptionEnforcementObservabilityPort` so application use cases remain infrastructure-agnostic.
+- Diagnostic payloads are sanitized before publication:
+  - key identifiers/references, payload/body/content fields, raw cryptographic metadata, and path-like values are redacted;
+  - policy-level outcomes (`resolvedFrom`, `keyScope`, decryption allowances, reason codes) remain visible for operations.

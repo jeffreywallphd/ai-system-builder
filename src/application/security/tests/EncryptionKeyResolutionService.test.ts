@@ -19,6 +19,7 @@ import {
   EncryptionMaterialClasses,
 } from "../use-cases/EncryptionKeyResolutionServiceContracts";
 import { EncryptionKeyResolutionService } from "../use-cases/EncryptionKeyResolutionService";
+import type { IEncryptionEnforcementObservabilityPort } from "../ports/EncryptionEnforcementObservabilityPorts";
 
 class InMemoryEncryptionPolicyContextResolver {
   public constructor(
@@ -62,6 +63,16 @@ class InMemoryEncryptionKeyCatalogPort implements IEncryptionKeyCatalogPort {
     request: ResolveEncryptionKeyByReferenceRequest,
   ): Promise<EncryptionKeyDescriptor | undefined> {
     return this.keysByReference.get(request.keyReferenceId);
+  }
+}
+
+class CapturingEncryptionObservabilityPort implements IEncryptionEnforcementObservabilityPort {
+  public readonly events: Parameters<IEncryptionEnforcementObservabilityPort["recordEncryptionEnforcementEvent"]>[0][] = [];
+
+  public async recordEncryptionEnforcementEvent(
+    event: Parameters<IEncryptionEnforcementObservabilityPort["recordEncryptionEnforcementEvent"]>[0],
+  ): Promise<void> {
+    this.events.push(event);
   }
 }
 
@@ -228,6 +239,39 @@ describe("EncryptionKeyResolutionService", () => {
       },
     });
   });
+
+  it("emits diagnostics for key-scope success and missing-key failures", async () => {
+    const observabilityPort = new CapturingEncryptionObservabilityPort();
+    const service = createService({
+      platformAssetMode: EncryptionModes.none,
+      workspaceAssetMode: EncryptionModes.scopedContent,
+      keys: [createKey("key:workspace:alpha:v1", EncryptionKeyScopes.workspace, { workspaceId: "workspace:alpha" })],
+      observabilityPort,
+    });
+
+    const success = await service.resolveKeyForMaterial({
+      materialClass: EncryptionMaterialClasses.assetContent,
+      workspaceId: "workspace:alpha",
+      occurredAt: "2026-04-06T11:00:00.000Z",
+    });
+    expect(success.ok).toBeTrue();
+
+    const missing = await service.resolveKeyForMaterial({
+      materialClass: EncryptionMaterialClasses.assetContent,
+      workspaceId: "workspace:beta",
+      occurredAt: "2026-04-06T11:05:00.000Z",
+    });
+    expect(missing.ok).toBeFalse();
+
+    expect(observabilityPort.events.some((event) => (
+      event.event === "encryption-key.key-scope-resolved"
+      && event.outcome === "succeeded"
+    ))).toBeTrue();
+    expect(observabilityPort.events.some((event) => (
+      event.event === "encryption-key.key-scope-resolved"
+      && event.outcome === "missing"
+    ))).toBeTrue();
+  });
 });
 
 function createService(input: {
@@ -235,6 +279,7 @@ function createService(input: {
   readonly workspaceAssetMode?: typeof EncryptionModes[keyof typeof EncryptionModes];
   readonly storageAssetMode?: typeof EncryptionModes[keyof typeof EncryptionModes];
   readonly keys: ReadonlyArray<EncryptionKeyDescriptor>;
+  readonly observabilityPort?: IEncryptionEnforcementObservabilityPort;
 }) {
   const evaluationService = new EncryptionPolicyEvaluationService({
     encryptionAtRestPolicyContextResolverPort: new InMemoryEncryptionPolicyContextResolver({
@@ -251,6 +296,7 @@ function createService(input: {
   return new EncryptionKeyResolutionService({
     encryptionPolicyEvaluationService: evaluationService,
     encryptionKeyCatalogPort: new InMemoryEncryptionKeyCatalogPort(input.keys),
+    observabilityPort: input.observabilityPort,
   });
 }
 

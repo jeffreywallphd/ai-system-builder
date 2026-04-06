@@ -13,6 +13,7 @@ import type {
 } from "../ports/EncryptionAtRestPolicyEvaluationPorts";
 import { EncryptionPolicyEvaluationService } from "../use-cases/EncryptionPolicyEvaluationService";
 import { EncryptionPolicyEvaluationErrorCodes } from "../use-cases/EncryptionPolicyEvaluationServiceContracts";
+import type { IEncryptionEnforcementObservabilityPort } from "../ports/EncryptionEnforcementObservabilityPorts";
 
 class InMemoryEncryptionPolicyContextResolver implements IEncryptionAtRestPolicyContextResolverPort {
   public constructor(
@@ -39,6 +40,16 @@ class ThrowingEncryptionPolicyContextResolver implements IEncryptionAtRestPolicy
 
   public async resolvePolicyContext(): Promise<never> {
     throw this.error;
+  }
+}
+
+class CapturingEncryptionObservabilityPort implements IEncryptionEnforcementObservabilityPort {
+  public readonly events: Parameters<IEncryptionEnforcementObservabilityPort["recordEncryptionEnforcementEvent"]>[0][] = [];
+
+  public async recordEncryptionEnforcementEvent(
+    event: Parameters<IEncryptionEnforcementObservabilityPort["recordEncryptionEnforcementEvent"]>[0],
+  ): Promise<void> {
+    this.events.push(event);
   }
 }
 
@@ -182,6 +193,38 @@ describe("EncryptionPolicyEvaluationService", () => {
         details: undefined,
       },
     });
+  });
+
+  it("emits enforcement diagnostics for successful and failed policy evaluation", async () => {
+    const observabilityPort = new CapturingEncryptionObservabilityPort();
+    const service = new EncryptionPolicyEvaluationService({
+      encryptionAtRestPolicyContextResolverPort: new InMemoryEncryptionPolicyContextResolver({
+        platformPolicy: createPlatformPolicy(EncryptionModes.none),
+      }),
+      observabilityPort,
+    });
+
+    const success = await service.evaluateEffectivePolicy({
+      dataClass: ProtectedDataClasses.assetContent,
+      occurredAt: "2026-04-06T10:15:00.000Z",
+    });
+    expect(success.ok).toBeTrue();
+
+    const failed = await service.evaluateEffectivePolicy({
+      dataClass: ProtectedDataClasses.assetContent,
+      storageInstanceId: "storage-without-workspace",
+      occurredAt: "2026-04-06T10:15:00.000Z",
+    });
+    expect(failed.ok).toBeFalse();
+
+    expect(observabilityPort.events.some((event) => (
+      event.event === "encryption-policy.effective-policy-evaluated"
+      && event.outcome === "succeeded"
+    ))).toBeTrue();
+    expect(observabilityPort.events.some((event) => (
+      event.event === "encryption-policy.effective-policy-evaluated"
+      && event.outcome === "rejected"
+    ))).toBeTrue();
   });
 });
 

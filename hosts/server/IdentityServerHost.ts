@@ -107,6 +107,7 @@ import {
 } from "../../src/infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter";
 import { ServerManagedTransportTrustStateResolver } from "../../src/infrastructure/security/ServerManagedTransportTrustStateResolver";
 import { TransportSecurityObservabilityReporter } from "../../src/infrastructure/security/TransportSecurityObservabilityReporter";
+import { EncryptionEnforcementObservabilityReporter } from "../../src/infrastructure/security/EncryptionEnforcementObservabilityReporter";
 import { createFileSystemProtectedSecretStoreFromEnvironment } from "../../src/infrastructure/security/secrets/FileSystemProtectedSecretStore";
 import { composeServerSecretService, type ServerComposedSecretService } from "../../src/infrastructure/security/secrets/SecretServiceComposition";
 import { SecretServiceOperationalDiagnosticsProvider } from "../../src/infrastructure/security/secrets/SecretServiceOperationalDiagnostics";
@@ -845,12 +846,17 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     workspaceRepository,
     storageInstanceRepository,
   });
+  const encryptionObservabilityReporter = new EncryptionEnforcementObservabilityReporter({
+    logger: createEncryptionOperationalLogger(options.logger),
+  });
   const assetEncryptionPolicyEvaluationService = new EncryptionPolicyEvaluationService({
     encryptionAtRestPolicyContextResolverPort: assetEncryptionPolicyContextResolver,
+    observabilityPort: encryptionObservabilityReporter,
   });
   const assetEncryptionKeyResolutionService = new EncryptionKeyResolutionService({
     encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
     encryptionKeyCatalogPort: assetContentKeyPort,
+    observabilityPort: encryptionObservabilityReporter,
   });
   const assetContentCipherPort = new AesGcmAssetContentCipherPort({
     keyMaterialPort: assetContentKeyPort,
@@ -862,6 +868,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
     encryptionKeyResolutionService: assetEncryptionKeyResolutionService,
     assetContentCipherPort,
+    encryptionObservabilityPort: encryptionObservabilityReporter,
     auditSink: assetAuditRecorder,
   });
   const assetDiscoveryService = new AssetDiscoveryService({
@@ -884,6 +891,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     downloadGrantPort: assetDownloadGrantAdapter,
     encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
     assetContentCipherPort,
+    encryptionObservabilityPort: encryptionObservabilityReporter,
     auditSink: assetAuditRecorder,
   });
   const assetPreviewService = new AssetPreviewService({
@@ -1238,6 +1246,55 @@ function createSecretOperationalLogger(logger: IdentityHttpServerLogger | undefi
         requestId: resolveOptionalString(event.secretId) ?? resolveOptionalString(event.actorId),
         details: Object.freeze({
           secret: event,
+        }),
+      });
+    },
+  });
+}
+
+function createEncryptionOperationalLogger(logger: IdentityHttpServerLogger | undefined): {
+  info(event: Record<string, unknown>): void;
+  warn(event: Record<string, unknown>): void;
+  error(event: Record<string, unknown>): void;
+} | undefined {
+  if (!logger) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    info: (event: Record<string, unknown>) => {
+      logger.info({
+        event: "encryption.enforcement",
+        requestId: resolveOptionalString(event.operationKey)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.workspaceId)
+          ?? resolveOptionalString(event.event),
+        details: Object.freeze({
+          encryption: event,
+        }),
+      });
+    },
+    warn: (event: Record<string, unknown>) => {
+      logger.warn({
+        event: "encryption.enforcement",
+        requestId: resolveOptionalString(event.operationKey)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.workspaceId)
+          ?? resolveOptionalString(event.event),
+        details: Object.freeze({
+          encryption: event,
+        }),
+      });
+    },
+    error: (event: Record<string, unknown>) => {
+      logger.error({
+        event: "encryption.enforcement",
+        requestId: resolveOptionalString(event.operationKey)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.workspaceId)
+          ?? resolveOptionalString(event.event),
+        details: Object.freeze({
+          encryption: event,
         }),
       });
     },

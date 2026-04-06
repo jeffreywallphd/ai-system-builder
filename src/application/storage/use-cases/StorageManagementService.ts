@@ -876,9 +876,20 @@ export class StorageManagementService implements IStorageManagementService {
     previous: StorageInstance,
     current: StorageInstance,
   ): Readonly<Record<string, unknown>> {
+    const changedSecurityFields = this.computeChangedPolicyFields(
+      previous.policy.security as Readonly<Record<string, unknown>>,
+      current.policy.security as Readonly<Record<string, unknown>>,
+    );
+    const changedEncryptionFields = this.computeChangedPolicyFields(
+      previous.policy.encryption as Readonly<Record<string, unknown>>,
+      current.policy.encryption as Readonly<Record<string, unknown>>,
+    );
     return Object.freeze({
       policyId: current.policy.policyId,
       changedPolicyLabelKeys: this.computeChangedLabelKeys(previous.policy.labels, current.policy.labels),
+      encryptionPolicyChanged: changedSecurityFields.length > 0 || changedEncryptionFields.length > 0,
+      changedSecurityFields,
+      changedEncryptionFields,
       previousPolicySummary: this.toPolicyAuditSummary(previous),
       currentPolicySummary: this.toPolicyAuditSummary(current),
     });
@@ -887,6 +898,20 @@ export class StorageManagementService implements IStorageManagementService {
   private computeChangedLabelKeys(
     previous: Readonly<Record<string, string>>,
     current: Readonly<Record<string, string>>,
+  ): ReadonlyArray<string> {
+    const keys = new Set<string>([
+      ...Object.keys(previous),
+      ...Object.keys(current),
+    ]);
+
+    return Object.freeze([...keys]
+      .filter((key) => previous[key] !== current[key])
+      .sort((a, b) => a.localeCompare(b)));
+  }
+
+  private computeChangedPolicyFields(
+    previous: Readonly<Record<string, unknown>>,
+    current: Readonly<Record<string, unknown>>,
   ): ReadonlyArray<string> {
     const keys = new Set<string>([
       ...Object.keys(previous),

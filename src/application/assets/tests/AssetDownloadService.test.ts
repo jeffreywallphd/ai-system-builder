@@ -36,6 +36,7 @@ import {
 import { DeterministicScopeEncryptionKeyPort } from "../../../infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
 import { AesGcmAssetContentCipherPort } from "../../../infrastructure/security/encryption/AesGcmAssetContentCipherPort";
 import type { AssetAuditEvent, AssetAuditSink } from "../ports/AssetAuditPort";
+import type { IEncryptionEnforcementObservabilityPort } from "../../security/ports/EncryptionEnforcementObservabilityPorts";
 
 class InMemoryAssetRepository implements IAssetRepository {
   public constructor(private readonly asset: Asset) {}
@@ -214,6 +215,16 @@ class RecordingAuditSink implements AssetAuditSink {
   public readonly events: AssetAuditEvent[] = [];
 
   public async recordAssetEvent(event: AssetAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
+class RecordingEncryptionObservabilityPort implements IEncryptionEnforcementObservabilityPort {
+  public readonly events: Parameters<IEncryptionEnforcementObservabilityPort["recordEncryptionEnforcementEvent"]>[0][] = [];
+
+  public async recordEncryptionEnforcementEvent(
+    event: Parameters<IEncryptionEnforcementObservabilityPort["recordEncryptionEnforcementEvent"]>[0],
+  ): Promise<void> {
     this.events.push(event);
   }
 }
@@ -755,6 +766,54 @@ describe("AssetDownloadService", () => {
       && event.details?.reasonCode === "preview-decryption-not-allowed"
     ));
     expect(rejected).toBeDefined();
+  });
+
+  it("emits decryption grant/deny diagnostics for preview and worker access decisions", async () => {
+    const workspaceAuthorization = new WorkspaceAuthorizationRepository();
+    const encryptionObservabilityPort = new RecordingEncryptionObservabilityPort();
+    const encryption = createEncryptionDependencies({
+      contentEncryptionRequired: true,
+      allowPreviewDecryption: false,
+      allowWorkerDecryption: true,
+    });
+    const fixture = await createEncryptedAssetFixture(encryption);
+
+    const service = new AssetDownloadService({
+      repository: new InMemoryAssetRepository(fixture.asset),
+      workspaceAuthorizationReadRepository: workspaceAuthorization,
+      storageLogicalAccessResolutionService: new StubStorageLogicalAccessResolutionService(fixture.encryptedBytes),
+      downloadGrantPort: new InMemoryDownloadGrantPort(),
+      encryptionPolicyEvaluationService: encryption.encryptionPolicyEvaluationService,
+      assetContentCipherPort: encryption.assetContentCipherPort,
+      encryptionObservabilityPort,
+    });
+
+    const deniedPreview = await service.authorizeAssetDownload({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-download-001",
+      purpose: AssetDownloadPurposes.inlinePreview,
+    });
+    expect(deniedPreview.ok).toBeFalse();
+
+    const allowedWorker = await service.authorizeAssetDownload({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-download-001",
+      purpose: AssetDownloadPurposes.workerProcess,
+    });
+    expect(allowedWorker.ok).toBeTrue();
+
+    expect(encryptionObservabilityPort.events.some((event) => (
+      event.event === "asset-content.decryption-access-authorized"
+      && event.outcome === "denied"
+      && event.details?.reasonCode === "preview-decryption-not-allowed"
+    ))).toBeTrue();
+    expect(encryptionObservabilityPort.events.some((event) => (
+      event.event === "asset-content.decryption-access-authorized"
+      && event.outcome === "succeeded"
+      && event.details?.purpose === "worker-process"
+    ))).toBeTrue();
   });
 });
 

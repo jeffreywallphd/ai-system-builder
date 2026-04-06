@@ -1,6 +1,6 @@
 # Storage Administration Screens
 
-This note documents Story 9.4.1, Story 9.4.2, Story 9.4.3, Story 9.4.4, Story 9.4.5, and Story 11.3.1: storage administration list/detail, create/edit workflows, operational readiness visibility, lifecycle activation/deactivation guardrails, backend extension/operations standards, and encryption-at-rest policy field alignment.
+This note documents Story 9.4.1, Story 9.4.2, Story 9.4.3, Story 9.4.4, Story 9.4.5, Story 11.3.1, and Story 11.3.4: storage administration list/detail, create/edit workflows, operational readiness visibility, lifecycle activation/deactivation guardrails, backend extension/operations standards, encryption-at-rest policy field alignment, and encryption enforcement diagnostics.
 
 ## Scope
 
@@ -73,6 +73,20 @@ This note documents Story 9.4.1, Story 9.4.2, Story 9.4.3, Story 9.4.4, Story 9.
   - `policy.lifecycle.retentionExpiryAction`
   - `policy.lifecycle.purgeGracePeriodDays`
 - Metadata update flows now support policy updates beyond labels through authoritative application-layer policy mutation handling and existing domain validation guards.
+
+## Story 11.3.4 audit and diagnostics posture
+
+- Storage policy updates already emit `storage-policy-updated` audit events and now include explicit encryption-focused change diagnostics:
+  - `encryptionPolicyChanged`
+  - `changedSecurityFields`
+  - `changedEncryptionFields`
+- Policy audit payloads remain summary-only and continue to redact sensitive identifiers (for example key-reference ids and backend bindings).
+- Asset pipeline diagnostics now emit structured encryption enforcement events for:
+  - protected-write policy/key-scope decisions during upload ingestion
+  - decryption grant/deny decisions for inline preview and worker-process download paths
+- Encryption diagnostics visibility contract:
+  - visible: policy resolution source/scope, decryption decision outcome, reason codes, safe capability flags
+  - not visible: plaintext payloads, raw key material, raw key references/ids, object keys, file paths, tokens, AAD/nonce/auth-tag fields
 
 ## Story 9.4.4 lifecycle action behavior
 

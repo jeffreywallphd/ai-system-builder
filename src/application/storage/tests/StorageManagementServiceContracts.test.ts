@@ -413,6 +413,9 @@ describe("StorageManagementService", () => {
     expect(policyAudit?.details).toEqual(expect.objectContaining({
       policyId: "policy-alpha",
       changedPolicyLabelKeys: ["tier"],
+      encryptionPolicyChanged: true,
+      changedSecurityFields: ["allowWorkerDecryption", "encryptionMode"],
+      changedEncryptionFields: ["keyReferenceId"],
     }));
     const deactivatedAudit = auditSink.events.find((event) => event.type === StorageManagementAuditEventTypes.storageDeactivated);
     expect(deactivatedAudit?.details).toEqual(expect.objectContaining({
