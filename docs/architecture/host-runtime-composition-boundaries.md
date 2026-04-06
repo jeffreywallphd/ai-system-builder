@@ -69,6 +69,23 @@ Each catalog entry contains explicit responsibilities, capability flags, and sta
 - composes the production server startup path via `startIdentityServerHost`
 - records deterministic host lifecycle transitions through startup and shutdown
 
+## Unified bootstrap pipeline and startup context
+
+`src/hosts/bootstrap/HostBootstrapPipeline.ts` now provides a shared startup seam for all hosts:
+
+- canonical startup context model carrying boot config, deployment profile, environment data, enabled capabilities, lifecycle hooks, and stage artifacts
+- reusable canonical stage sequence:
+  - `configuration`
+  - `dependencies`
+  - `logging`
+  - `security`
+  - `persistence`
+  - `feature-registration`
+- deterministic stage execution history for startup-order verification
+- host-specific customization through stage overrides and `runAfterStageId` extensions without duplicating shared boot logic
+
+The authoritative server composition root now consumes this pipeline to keep host startup order explicit and reusable while preserving clean boundary ownership.
+
 ## Architectural boundary clarification
 
 The contracts now explicitly state that:
@@ -84,4 +101,5 @@ The contracts now explicitly state that:
 - `src/shared/contracts/hosts/tests/HostCompositionContracts.test.ts`
 - `src/hosts/tests/HostRuntimeCatalog.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
+- `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
 

@@ -11,6 +11,7 @@ import {
 } from "../../../application/common/HostCompositionContracts";
 import { AuthoritativeServerHostRuntime } from "../../HostRuntimeCatalog";
 import { createAuthoritativeServerCompositionRoot } from "../AuthoritativeServerCompositionRoot";
+import { HostBootstrapStageIds } from "../../bootstrap/HostBootstrapPipeline";
 
 describe("AuthoritativeServerCompositionRoot", () => {
   it("composes and stops authoritative server runtime with lifecycle transitions", async () => {
@@ -82,6 +83,69 @@ describe("AuthoritativeServerCompositionRoot", () => {
     });
 
     await expect(root.compose(boot)).rejects.toThrow(HostCompositionContractError);
+  });
+
+  it("supports host-specific bootstrap customization stages without replacing shared pipeline", async () => {
+    const observedStages: string[] = [];
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+      },
+      startHost: async () => ({
+        port: 5200,
+        address: "127.0.0.1:5200",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        close: async () => {},
+      }),
+      bootstrap: {
+        stageHandlers: {
+          [HostBootstrapStageIds.configuration]: () => {
+            observedStages.push(HostBootstrapStageIds.configuration);
+          },
+          [HostBootstrapStageIds.dependencies]: () => {
+            observedStages.push(HostBootstrapStageIds.dependencies);
+          },
+          [HostBootstrapStageIds.logging]: () => {
+            observedStages.push(HostBootstrapStageIds.logging);
+          },
+          [HostBootstrapStageIds.security]: () => {
+            observedStages.push(HostBootstrapStageIds.security);
+          },
+          [HostBootstrapStageIds.persistence]: () => {
+            observedStages.push(HostBootstrapStageIds.persistence);
+          },
+        },
+        hostSpecificStages: [{
+          stageId: "host:server:post-security-bootstrap",
+          description: "Host-specific stage after security baseline",
+          runAfterStageId: HostBootstrapStageIds.security,
+          run: () => {
+            observedStages.push("host:server:post-security-bootstrap");
+          },
+        }],
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-customization-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+    });
+
+    const runtime = await root.compose(boot);
+    expect(observedStages).toEqual([
+      "configuration",
+      "dependencies",
+      "logging",
+      "security",
+      "host:server:post-security-bootstrap",
+      "persistence",
+    ]);
+    expect(runtime.phase).toBe("ready");
+    await runtime.stop();
+    expect(runtime.phase).toBe("stopped");
   });
 });
 

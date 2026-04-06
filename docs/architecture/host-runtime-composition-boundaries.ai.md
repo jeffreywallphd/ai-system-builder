@@ -41,6 +41,25 @@
   - records deterministic lifecycle transitions (`configured -> composing -> starting -> ready -> stopping -> stopped`)
   - composes the existing production host startup path through `startIdentityServerHost`
 
+## Unified bootstrap pipeline and startup context (story 12.1.2)
+- Added `src/hosts/bootstrap/HostBootstrapPipeline.ts` as a shared host startup seam.
+- Startup context is now explicit and reusable across hosts:
+  - boot configuration
+  - deployment profile metadata
+  - environment map
+  - enabled capabilities
+  - lifecycle hooks
+  - stage artifact handoff helpers
+- Canonical startup sequence is now explicit and shared:
+  1. `configuration`
+  2. `dependencies`
+  3. `logging`
+  4. `security`
+  5. `persistence`
+  6. `feature-registration`
+- Host-specific startup customization is supported through stage overrides and appended host stages (`runAfterStageId`) without copying common boot code.
+- `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now runs authoritative server startup through this shared pipeline.
+
 ## Boundary rule now explicit
 - Control-plane authority and node execution are separate concerns by contract:
   - only `authoritative-server` role may carry `control-plane-authority`
@@ -53,4 +72,5 @@
 - `src/shared/contracts/hosts/tests/HostCompositionContracts.test.ts`
 - `src/hosts/tests/HostRuntimeCatalog.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
+- `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
 
