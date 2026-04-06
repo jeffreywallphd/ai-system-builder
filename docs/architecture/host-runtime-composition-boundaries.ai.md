@@ -103,6 +103,16 @@
 - Host-specific startup customization is supported through stage overrides and appended host stages (`runAfterStageId`) without copying common boot code.
 - `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now runs authoritative server startup through this shared pipeline.
 
+## Unified lifecycle coordination (story 12.3.1)
+- Added `src/hosts/lifecycle/HostLifecycleCoordinator.ts` for shared lifecycle orchestration across all host composition roots.
+- Server, desktop, hybrid, web, and worker roots now use this shared coordinator for:
+  - deterministic transition recording
+  - explicit startup-completed and readiness-marked lifecycle events
+  - graceful shutdown coordination with shutdown hooks
+  - cleanup sequencing and cleanup event capture
+  - safe startup/shutdown failure propagation to `failed` lifecycle state
+- Lifecycle behavior is now standardized while host roots remain composition-only and business-logic free.
+
 ## Host service registration and dependency composition rules (story 12.1.3)
 - Added host-aware service registration contracts in `src/infrastructure/config/HostServiceRegistration.ts` for:
   - registration kind + boundary layer enforcement
@@ -134,5 +144,6 @@
 - `src/hosts/worker/tests/WorkerHostCompositionRoot.test.ts`
 - `src/hosts/worker/tests/WorkerHostEntrypoint.test.ts`
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
+- `src/hosts/lifecycle/tests/HostLifecycleCoordinator.test.ts`
 - `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
 

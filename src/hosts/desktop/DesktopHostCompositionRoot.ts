@@ -1,7 +1,6 @@
 import {
   HostLifecyclePhases,
   assertExecutableHostBoundarySatisfiesBootConfiguration,
-  transitionHostLifecyclePhase,
   type ExecutableHostCompositionRoot,
   type HostBootConfiguration,
   type HostLifecycleTransition,
@@ -24,6 +23,7 @@ import {
   composeHostServiceRegistrationPlan,
 } from "../../infrastructure/config/HostServiceRegistrationCatalog";
 import type { HostServiceRegistrationPlan } from "../../infrastructure/config/HostServiceRegistration";
+import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
 
 export interface DesktopRuntimeHost {
   close(): Promise<void>;
@@ -117,22 +117,9 @@ export function createDesktopCompositionRoot(
         dependencyBoundary: DesktopHostRuntime.startupDependencies,
       }, boot);
 
-      let phase = HostLifecyclePhases.configured;
-      const transitionHistory: HostLifecycleTransition[] = [];
+      const lifecycle = createHostLifecycleCoordinator({ boot });
       let startedHost: DesktopRuntimeHost | undefined;
-      const recordTransition = (to: typeof HostLifecyclePhases[keyof typeof HostLifecyclePhases], reason: string) => {
-        const transition = transitionHostLifecyclePhase({
-          hostId: boot.host.hostId,
-          from: phase,
-          to,
-          occurredAt: boot.startedAt,
-          reason,
-        });
-        transitionHistory.push(transition);
-        phase = to;
-      };
-
-      recordTransition(HostLifecyclePhases.composing, "compose-desktop-host");
+      await lifecycle.markComposing("compose-desktop-host");
 
       try {
         const environment = input.bootstrap?.environment ?? boot.environment;
@@ -176,14 +163,22 @@ export function createDesktopCompositionRoot(
         const stageHandlers = combineStageHandlers(defaultStageHandlers, input.bootstrap?.stageHandlers);
 
         const lifecycleHooks = combineStartupLifecycleHooks({
-          onStageStarting: (event) => {
-            if (event.stageId === HostBootstrapStageIds.featureRegistration && phase === HostLifecyclePhases.composing) {
-              recordTransition(HostLifecyclePhases.starting, "start-desktop-host");
+          onStageStarting: async (event) => {
+            if (event.stageId === HostBootstrapStageIds.featureRegistration && lifecycle.phase === HostLifecyclePhases.composing) {
+              await lifecycle.markStarting("start-desktop-host");
             }
           },
-          onPipelineCompleted: () => {
-            if (phase === HostLifecyclePhases.starting) {
-              recordTransition(HostLifecyclePhases.ready, "desktop-host-ready");
+          onPipelineCompleted: async (event) => {
+            if (lifecycle.phase === HostLifecyclePhases.starting) {
+              await lifecycle.markStartupCompleted({
+                transitionReason: "desktop-host-ready",
+                completionReason: "desktop-host-startup-completed",
+                readinessMarker: "desktop-host:feature-registration-complete",
+                metadata: Object.freeze({
+                  stageCount: String(event.executedStageIds.length),
+                  executedStageIds: event.executedStageIds.join(","),
+                }),
+              });
             }
           },
         }, input.bootstrap?.lifecycleHooks);
@@ -210,40 +205,55 @@ export function createDesktopCompositionRoot(
         const activeHost = startedHost;
 
         const stop = async () => {
-          if (phase === HostLifecyclePhases.stopped || phase === HostLifecyclePhases.failed) {
-            return;
-          }
-          recordTransition(HostLifecyclePhases.stopping, "desktop-host-stop-requested");
-          await activeHost.close();
-          recordTransition(HostLifecyclePhases.stopped, "desktop-host-stopped");
+          await lifecycle.shutdown({
+            shutdownRequestedReason: "desktop-host-stop-requested",
+            shutdownCompletedReason: "desktop-host-stopped",
+            shutdownFailureReason: "desktop-host-stop-failed",
+            cleanupHooks: [{
+              hookId: "close-runtime-host",
+              run: async () => {
+                await activeHost.close();
+              },
+            }],
+          });
         };
 
         return Object.freeze({
           host: boot.host,
           get phase() {
-            return phase;
+            return lifecycle.phase;
+          },
+          get readiness() {
+            return lifecycle.readiness;
+          },
+          get lifecycleEvents() {
+            return lifecycle.lifecycleEvents;
           },
           get transitionHistory() {
-            return Object.freeze([...transitionHistory]);
+            return lifecycle.transitionHistory as ReadonlyArray<HostLifecycleTransition>;
           },
           stop,
         });
       } catch (error) {
-        if (phase !== HostLifecyclePhases.failed && phase !== HostLifecyclePhases.stopped) {
-          const failedTransition = transitionHostLifecyclePhase({
-            hostId: boot.host.hostId,
-            from: phase,
-            to: HostLifecyclePhases.failed,
-            occurredAt: boot.startedAt,
-            reason: "desktop-host-start-failed",
-          });
-          transitionHistory.push(failedTransition);
-          phase = HostLifecyclePhases.failed;
-        }
+        let failure: unknown = error;
         if (startedHost) {
-          await startedHost.close();
+          try {
+            await lifecycle.runStartupFailureCleanup({
+              cleanupReason: "desktop-host-start-failure-cleanup",
+              cleanupFailureReason: "desktop-host-start-failure-cleanup-failed",
+              cleanupHooks: [{
+                hookId: "close-runtime-host",
+                run: async () => {
+                  await startedHost?.close();
+                },
+              }],
+            });
+          } catch (cleanupError) {
+            failure = cleanupError;
+          }
         }
-        throw error;
+        await lifecycle.markStartupFailed("desktop-host-start-failed", failure);
+        throw failure;
       }
     },
   });

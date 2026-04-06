@@ -1,7 +1,6 @@
 import {
   HostLifecyclePhases,
   assertExecutableHostBoundarySatisfiesBootConfiguration,
-  transitionHostLifecyclePhase,
   type ExecutableHostCompositionRoot,
   type HostBootConfiguration,
   type HostLifecycleTransition,
@@ -24,6 +23,7 @@ import {
   composeHostServiceRegistrationPlan,
 } from "../../infrastructure/config/HostServiceRegistrationCatalog";
 import type { HostServiceRegistrationPlan } from "../../infrastructure/config/HostServiceRegistration";
+import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
 
 export interface WebHostDeliveryContext {
   readonly deliveryMode: "thin-client" | "static-shell";
@@ -145,22 +145,9 @@ export function createWebCompositionRoot(
         dependencyBoundary: WebHostRuntime.startupDependencies,
       }, boot);
 
-      let phase = HostLifecyclePhases.configured;
-      const transitionHistory: HostLifecycleTransition[] = [];
+      const lifecycle = createHostLifecycleCoordinator({ boot });
       let startedHost: WebRuntimeHost | undefined;
-      const recordTransition = (to: typeof HostLifecyclePhases[keyof typeof HostLifecyclePhases], reason: string) => {
-        const transition = transitionHostLifecyclePhase({
-          hostId: boot.host.hostId,
-          from: phase,
-          to,
-          occurredAt: boot.startedAt,
-          reason,
-        });
-        transitionHistory.push(transition);
-        phase = to;
-      };
-
-      recordTransition(HostLifecyclePhases.composing, "compose-web-host");
+      await lifecycle.markComposing("compose-web-host");
 
       try {
         const environment = input.bootstrap?.environment ?? boot.environment;
@@ -205,14 +192,22 @@ export function createWebCompositionRoot(
         const stageHandlers = combineStageHandlers(defaultStageHandlers, input.bootstrap?.stageHandlers);
 
         const lifecycleHooks = combineStartupLifecycleHooks({
-          onStageStarting: (event) => {
-            if (event.stageId === HostBootstrapStageIds.featureRegistration && phase === HostLifecyclePhases.composing) {
-              recordTransition(HostLifecyclePhases.starting, "start-web-host");
+          onStageStarting: async (event) => {
+            if (event.stageId === HostBootstrapStageIds.featureRegistration && lifecycle.phase === HostLifecyclePhases.composing) {
+              await lifecycle.markStarting("start-web-host");
             }
           },
-          onPipelineCompleted: () => {
-            if (phase === HostLifecyclePhases.starting) {
-              recordTransition(HostLifecyclePhases.ready, "web-host-ready");
+          onPipelineCompleted: async (event) => {
+            if (lifecycle.phase === HostLifecyclePhases.starting) {
+              await lifecycle.markStartupCompleted({
+                transitionReason: "web-host-ready",
+                completionReason: "web-host-startup-completed",
+                readinessMarker: "web-host:feature-registration-complete",
+                metadata: Object.freeze({
+                  stageCount: String(event.executedStageIds.length),
+                  executedStageIds: event.executedStageIds.join(","),
+                }),
+              });
             }
           },
         }, input.bootstrap?.lifecycleHooks);
@@ -239,41 +234,56 @@ export function createWebCompositionRoot(
         const activeHost = startedHost;
 
         const stop = async () => {
-          if (phase === HostLifecyclePhases.stopped || phase === HostLifecyclePhases.failed) {
-            return;
-          }
-          recordTransition(HostLifecyclePhases.stopping, "web-host-stop-requested");
-          await activeHost.close();
-          recordTransition(HostLifecyclePhases.stopped, "web-host-stopped");
+          await lifecycle.shutdown({
+            shutdownRequestedReason: "web-host-stop-requested",
+            shutdownCompletedReason: "web-host-stopped",
+            shutdownFailureReason: "web-host-stop-failed",
+            cleanupHooks: [{
+              hookId: "close-runtime-host",
+              run: async () => {
+                await activeHost.close();
+              },
+            }],
+          });
         };
 
         return Object.freeze({
           host: boot.host,
           get phase() {
-            return phase;
+            return lifecycle.phase;
+          },
+          get readiness() {
+            return lifecycle.readiness;
+          },
+          get lifecycleEvents() {
+            return lifecycle.lifecycleEvents;
           },
           get transitionHistory() {
-            return Object.freeze([...transitionHistory]);
+            return lifecycle.transitionHistory as ReadonlyArray<HostLifecycleTransition>;
           },
           delivery,
           stop,
         });
       } catch (error) {
-        if (phase !== HostLifecyclePhases.failed && phase !== HostLifecyclePhases.stopped) {
-          const failedTransition = transitionHostLifecyclePhase({
-            hostId: boot.host.hostId,
-            from: phase,
-            to: HostLifecyclePhases.failed,
-            occurredAt: boot.startedAt,
-            reason: "web-host-start-failed",
-          });
-          transitionHistory.push(failedTransition);
-          phase = HostLifecyclePhases.failed;
-        }
+        let failure: unknown = error;
         if (startedHost) {
-          await startedHost.close();
+          try {
+            await lifecycle.runStartupFailureCleanup({
+              cleanupReason: "web-host-start-failure-cleanup",
+              cleanupFailureReason: "web-host-start-failure-cleanup-failed",
+              cleanupHooks: [{
+                hookId: "close-runtime-host",
+                run: async () => {
+                  await startedHost?.close();
+                },
+              }],
+            });
+          } catch (cleanupError) {
+            failure = cleanupError;
+          }
         }
-        throw error;
+        await lifecycle.markStartupFailed("web-host-start-failed", failure);
+        throw failure;
       }
     },
   });
