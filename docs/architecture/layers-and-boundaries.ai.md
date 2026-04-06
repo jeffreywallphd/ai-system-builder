@@ -117,3 +117,8 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 - Added application secret ports in `src/application/security/ports/SecretServicePorts.ts` for persistence, encryption/decryption, access-policy resolution, and audit recording.
 - Added operation-facing service contracts in `src/application/security/use-cases/SecretManagementServiceContracts.ts` for create/read metadata/retrieve plaintext/rotate/disable/delete/list use-case boundaries.
 - The slice is contracts-only; no storage transport/UI implementation detail leaks into domain or application contracts.
+
+## Direction 8 boundary note: Secret host composition wiring (story 8.1.7)
+- Added host/runtime composition seam at `src/infrastructure/security/secrets/SecretServiceComposition.ts`.
+- Authoritative server wiring in `hosts/server/IdentityServerHost.ts` now composes secret repository, encryption port, access policy, observability, and audit hook collaborators without moving host bootstrap logic into domain/application layers.
+- Host startup fail-closed behavior now rejects partial secret master-key configuration while keeping composition explicit at the outer layer.

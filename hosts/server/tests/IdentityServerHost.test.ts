@@ -39,6 +39,7 @@ import {
   CertificateSubjectReferenceKinds,
   CertificateUsageKinds,
 } from "../../../src/domain/security/CertificateAuthorityDomain";
+import { SecretAccessActions, SecretActorTypes, SecretKinds, SecretScopes } from "../../../src/domain/security/SecretDomain";
 
 class InMemoryIdentityDefaultConfigurationRepository {
   public readonly providers = new Map<string, AuthProvider>();
@@ -170,6 +171,67 @@ describe("IdentityServerHost", () => {
       const registerBody = await register.json();
       expect(registerBody.ok).toBe(true);
       expect(registerBody.data.providerId).toBe("provider:local-password");
+    } finally {
+      await host.close();
+      rmSync(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("composes the secret service in authoritative host runtime", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-secret-service-host-test-"));
+    const databasePath = join(tempDirectory, "identity-secret-service-host.sqlite");
+    const encryptedPayloadDirectory = join(tempDirectory, "secret-envelopes");
+    const host = await startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+      env: {
+        AI_LOOM_SECRET_MASTER_KEY_ID: "kek:server:default",
+        AI_LOOM_SECRET_MASTER_KEY: Buffer.alloc(32, 17).toString("base64"),
+        AI_LOOM_SECRET_ENCRYPTED_PAYLOAD_DIRECTORY: encryptedPayloadDirectory,
+      },
+    });
+
+    try {
+      expect(host.secretService.status.configured).toBeTrue();
+      expect(host.secretService.status.payloadDirectory).toBe(encryptedPayloadDirectory);
+
+      const createSecretResult = await host.secretService.createSecretUseCase.execute({
+        actor: {
+          actorId: "user:server-admin",
+          actorType: SecretActorTypes.serverAdmin,
+          grantedActions: [SecretAccessActions.create],
+        },
+        operationKey: "op:host:secret:create:1",
+        secretId: "secret:server:openai",
+        name: "llm.openai.api_key",
+        owner: {
+          scope: SecretScopes.server,
+        },
+        kind: SecretKinds.apiKey,
+        plaintext: "sk-live-123",
+      });
+      expect(createSecretResult.ok).toBeTrue();
+      if (!createSecretResult.ok) {
+        return;
+      }
+
+      const metadataResult = await host.secretService.getSecretMetadataUseCase.execute({
+        actor: {
+          actorId: "user:server-admin",
+          actorType: SecretActorTypes.serverAdmin,
+          grantedActions: [SecretAccessActions.readMetadata],
+        },
+        secretId: "secret:server:openai",
+      });
+      expect(metadataResult.ok).toBeTrue();
+      if (!metadataResult.ok) {
+        return;
+      }
+      expect(metadataResult.value.secretId).toBe("secret:server:openai");
+      expect(metadataResult.value.currentVersionId).toBe("secret:server:openai:v1");
     } finally {
       await host.close();
       rmSync(tempDirectory, { recursive: true, force: true });
@@ -423,6 +485,24 @@ describe("IdentityServerHost", () => {
         AI_LOOM_INTERNAL_CA_ID: "ca:internal:root:v1",
       },
     })).rejects.toThrow("Internal CA startup validation failed");
+
+    rmSync(tempDirectory, { recursive: true, force: true });
+  });
+
+  it("fails closed when secret master key configuration is partially defined", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-secret-master-key-partial-"));
+    const databasePath = join(tempDirectory, "identity-secret-master-key-partial.sqlite");
+
+    await expect(startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+      env: {
+        AI_LOOM_SECRET_MASTER_KEY_ID: "kek:server:default",
+      },
+    })).rejects.toThrow("Secret encryption configuration is incomplete");
 
     rmSync(tempDirectory, { recursive: true, force: true });
   });

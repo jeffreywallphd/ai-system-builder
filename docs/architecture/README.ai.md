@@ -187,4 +187,9 @@ Use this file as the shortest reliable orientation before reading the human arch
   - `application/system-studio/tests/ImageManipulationRunnableTemplateContract.regression.test.ts`,
   - existing completeness/readiness/smoke/failure-path suites under `application/system-studio/tests/*` and `infrastructure/api/studio-shell/tests/*`.
 
+## Direction 8 update: secret host composition (story 8.1.7)
+
+- Authoritative server runtime now composes secret services through `src/infrastructure/security/secrets/SecretServiceComposition.ts` and host wiring in `hosts/server/IdentityServerHost.ts`.
+- Canonical architecture note for this slice: `docs/architecture/secrets-service-composition.md`.
+
 
