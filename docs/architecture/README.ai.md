@@ -85,6 +85,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Workspace tenancy domain/contracts baseline: `docs/architecture/workspace-foundation.md`
 - Managed storage domain/contracts baseline: `docs/architecture/storage-foundation.md`
 - Managed storage application ports/use-case contract baseline: `docs/architecture/storage-application-ports.md`
+- Managed storage persistence schema/repository baseline: `docs/architecture/storage-persistence-contracts.md`
 - Managed storage shared transport DTO + schema validation + redaction baseline: `docs/architecture/storage-transport-contracts.md`
 - Managed storage permission surface and access-summary semantics baseline: `docs/architecture/storage-access-semantics.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
