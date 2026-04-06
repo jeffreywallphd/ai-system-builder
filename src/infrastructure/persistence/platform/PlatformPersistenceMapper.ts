@@ -13,14 +13,17 @@ import {
   type PlatformRunStatus,
 } from "../../../shared/dto/platform/PlatformPersistenceDtos";
 import { parsePersistenceReplaySnapshot } from "../../../shared/dto/persistence/PersistenceMapperBoundary";
-import {
-  PersistenceTenancyScopes,
-  type PersistenceTenancyMetadata,
-} from "../../../shared/dto/persistence/PersistenceBoundaryDtos";
+import type { PersistenceTenancyMetadata } from "../../../shared/dto/persistence/PersistenceBoundaryDtos";
 import type {
   PlatformAuditEventRecord,
   PlatformRunRecord,
 } from "../../../application/common/ports/PlatformPersistenceBoundaryPorts";
+import {
+  createPersistenceTenancyMetadataFromLookup,
+  normalizePersistenceLookup,
+  parseOptionalPersistenceObjectJson,
+  toPersistenceTenancyScopeFields,
+} from "../common/PersistenceMapperUtilities";
 
 const PlatformRunSchemaVersion = 1;
 
@@ -69,8 +72,7 @@ export interface PlatformMutationReplayRow {
 }
 
 export function normalizePlatformLookup(value: string): string | undefined {
-  const normalized = value.trim();
-  return normalized.length > 0 ? normalized : undefined;
+  return normalizePersistenceLookup(value);
 }
 
 export function mapPlatformRunRowToRecord(row: PlatformRunRow): PlatformRunRecord {
@@ -83,7 +85,7 @@ export function mapPlatformRunRowToRecord(row: PlatformRunRow): PlatformRunRecor
     startedAt: normalizePlatformLookup(row.started_at ?? ""),
     completedAt: normalizePlatformLookup(row.completed_at ?? ""),
     terminalReason: normalizePlatformLookup(row.terminal_reason ?? ""),
-    metadata: parseOptionalObjectJson(row.metadata_json),
+    metadata: parseOptionalPersistenceObjectJson(row.metadata_json, "platform"),
     tenancy: toTenancyMetadata(row.workspace_id ?? undefined, row.user_identity_id ?? undefined),
     actorUserIdentityId: row.actor_id,
     correlationId: normalizePlatformLookup(row.correlation_id ?? ""),
@@ -134,7 +136,7 @@ export function mapPlatformAuditEventRowToRecord(row: PlatformAuditEventRow): Pl
     targetRef: normalizePlatformLookup(row.target_ref ?? ""),
     outcome: assertPlatformAuditOutcome(row.outcome),
     occurredAt: row.occurred_at,
-    details: parseOptionalObjectJson(row.details_json),
+    details: parseOptionalPersistenceObjectJson(row.details_json, "platform"),
     tenancy: toTenancyMetadata(row.workspace_id ?? undefined, row.user_identity_id ?? undefined),
     correlationId: normalizePlatformLookup(row.correlation_id ?? ""),
   }));
@@ -261,61 +263,20 @@ function toApplicationAuditRecord(record: PlatformAuditEventPersistenceRecord): 
 }
 
 function toTenancyMetadata(workspaceId?: string, userIdentityId?: string): PersistenceTenancyMetadata {
-  const normalizedWorkspaceId = normalizePlatformLookup(workspaceId ?? "");
-  const normalizedUserIdentityId = normalizePlatformLookup(userIdentityId ?? "");
-
-  if (normalizedWorkspaceId && normalizedUserIdentityId) {
-    return Object.freeze({
-      scope: PersistenceTenancyScopes.mixed,
-      workspaceId: normalizedWorkspaceId,
-      userIdentityId: normalizedUserIdentityId,
-    });
-  }
-
-  if (normalizedWorkspaceId) {
-    return Object.freeze({
-      scope: PersistenceTenancyScopes.workspace,
-      workspaceId: normalizedWorkspaceId,
-    });
-  }
-
-  if (normalizedUserIdentityId) {
-    return Object.freeze({
-      scope: PersistenceTenancyScopes.user,
-      userIdentityId: normalizedUserIdentityId,
-    });
-  }
-
-  return Object.freeze({
-    scope: PersistenceTenancyScopes.platform,
+  return createPersistenceTenancyMetadataFromLookup({
+    workspaceId,
+    userIdentityId,
   });
 }
 
 function toScopeFields(
   tenancy: PersistenceTenancyMetadata,
 ): { readonly workspaceId?: string; readonly userIdentityId?: string } {
+  const scope = toPersistenceTenancyScopeFields(tenancy);
   return Object.freeze({
-    workspaceId: tenancy.workspaceId ? normalizePlatformLookup(tenancy.workspaceId) : undefined,
-    userIdentityId: tenancy.userIdentityId ? normalizePlatformLookup(tenancy.userIdentityId) : undefined,
+    workspaceId: scope.workspaceId,
+    userIdentityId: scope.userIdentityId,
   });
-}
-
-function parseOptionalObjectJson(value: string | null): Readonly<Record<string, unknown>> | undefined {
-  const normalized = normalizePlatformLookup(value ?? "");
-  if (!normalized) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(normalized) as unknown;
-    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-      throw new Error("JSON payload must be an object.");
-    }
-    return Object.freeze({ ...(parsed as Record<string, unknown>) });
-  } catch (error) {
-    const details = error instanceof Error ? error.message : String(error);
-    throw new Error(`Persisted platform JSON payload is invalid: ${details}`);
-  }
 }
 
 function assertPlatformRunKind(value: string): PlatformRunKind {

@@ -26,6 +26,11 @@ import {
   type PlatformMutationReplayRow,
   type PlatformRunRow,
 } from "./PlatformPersistenceMapper";
+import { SafeSqliteRepositoryBase } from "../common/SafeSqliteRepositoryBase";
+import {
+  createSqliteWhereBuilder,
+} from "../common/SqliteQueryHelpers";
+import { applyTenancyScopeFilter } from "../common/PersistenceTenancyScopeQuery";
 import {
   PLATFORM_PERSISTENCE_MIGRATIONS,
   PLATFORM_PERSISTENCE_SCHEMA_VERSION,
@@ -34,11 +39,14 @@ import {
 type PlatformMutationKind = "create-run" | "save-run" | "append-audit-event";
 
 export class SqlitePlatformPersistenceAdapter
+  extends SafeSqliteRepositoryBase
   implements IPlatformRunRecordRepository, IPlatformAuditEventRepository {
   private database?: SqliteCompatDatabase;
   private initialized = false;
 
-  public constructor(private readonly databasePath: string) {}
+  public constructor(private readonly databasePath: string) {
+    super("Platform");
+  }
 
   public async findRunById(runId: string): Promise<PlatformRunRecord | undefined> {
     const normalizedRunId = normalizePlatformLookup(runId);
@@ -72,48 +80,26 @@ export class SqlitePlatformPersistenceAdapter
   }
 
   public async listRuns(query: PlatformRunListQuery): Promise<ReadonlyArray<PlatformRunRecord>> {
-    const clauses: string[] = [];
-    const params: unknown[] = [];
-
-    if (query.runKinds && query.runKinds.length > 0) {
-      clauses.push(`run_kind IN (${query.runKinds.map(() => "?").join(", ")})`);
-      params.push(...query.runKinds);
-    }
-
-    if (query.statuses && query.statuses.length > 0) {
-      clauses.push(`status IN (${query.statuses.map(() => "?").join(", ")})`);
-      params.push(...query.statuses);
-    }
-
-    const workspaceId = normalizePlatformLookup(query.workspaceId ?? "");
-    if (workspaceId) {
-      clauses.push("workspace_id = ?");
-      params.push(workspaceId);
-    }
-
-    const userIdentityId = normalizePlatformLookup(query.userIdentityId ?? "");
-    if (userIdentityId) {
-      clauses.push("user_identity_id = ?");
-      params.push(userIdentityId);
-    }
-
-    const sourceAggregateRef = normalizePlatformLookup(query.sourceAggregateRef ?? "");
-    if (sourceAggregateRef) {
-      clauses.push("source_aggregate_ref = ?");
-      params.push(sourceAggregateRef);
-    }
-
+    const whereBuilder = createSqliteWhereBuilder();
+    whereBuilder.addIn("run_kind", query.runKinds);
+    whereBuilder.addIn("status", query.statuses);
+    applyTenancyScopeFilter(whereBuilder, {
+      workspaceId: query.workspaceId,
+      userIdentityId: query.userIdentityId,
+    }, {
+      workspaceId: "workspace_id",
+      userIdentityId: "user_identity_id",
+    });
+    whereBuilder.addEquals("source_aggregate_ref", query.sourceAggregateRef);
     if (query.initiatedAfter) {
-      clauses.push("initiated_at >= ?");
-      params.push(query.initiatedAfter);
+      whereBuilder.add("initiated_at >= ?", query.initiatedAfter);
     }
-
     if (query.initiatedBefore) {
-      clauses.push("initiated_at <= ?");
-      params.push(query.initiatedBefore);
+      whereBuilder.add("initiated_at <= ?", query.initiatedBefore);
     }
+    const where = whereBuilder.build();
+    const paging = this.buildPagingClause(query.limit, query.offset);
 
-    const paging = this.toPagingClause(query.limit, query.offset);
     const rows = this.getDatabase().prepare(`
       SELECT
         run_id,
@@ -132,10 +118,10 @@ export class SqlitePlatformPersistenceAdapter
         revision,
         schema_version
       FROM platform_run_records
-      ${clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : ""}
+      ${where.sql}
       ORDER BY initiated_at DESC, run_id ASC
       ${paging.sql}
-    `).all(...params, ...paging.params) as PlatformRunRow[];
+    `).all(...where.params, ...paging.params) as PlatformRunRow[];
 
     return Object.freeze(rows.map((row) => mapPlatformRunRowToRecord(row)));
   }
@@ -234,49 +220,26 @@ export class SqlitePlatformPersistenceAdapter
   }
 
   public async listAuditEvents(query: PlatformAuditEventListQuery): Promise<ReadonlyArray<PlatformAuditEventRecord>> {
-    const clauses: string[] = [];
-    const params: unknown[] = [];
-
-    if (query.eventKinds && query.eventKinds.length > 0) {
-      clauses.push(`event_kind IN (${query.eventKinds.map(() => "?").join(", ")})`);
-      params.push(...query.eventKinds);
-    }
-
-    const workspaceId = normalizePlatformLookup(query.workspaceId ?? "");
-    if (workspaceId) {
-      clauses.push("workspace_id = ?");
-      params.push(workspaceId);
-    }
-
-    const userIdentityId = normalizePlatformLookup(query.userIdentityId ?? "");
-    if (userIdentityId) {
-      clauses.push("user_identity_id = ?");
-      params.push(userIdentityId);
-    }
-
-    const actorId = normalizePlatformLookup(query.actorId ?? "");
-    if (actorId) {
-      clauses.push("actor_id = ?");
-      params.push(actorId);
-    }
-
-    const targetRef = normalizePlatformLookup(query.targetRef ?? "");
-    if (targetRef) {
-      clauses.push("target_ref = ?");
-      params.push(targetRef);
-    }
-
+    const whereBuilder = createSqliteWhereBuilder();
+    whereBuilder.addIn("event_kind", query.eventKinds);
+    applyTenancyScopeFilter(whereBuilder, {
+      workspaceId: query.workspaceId,
+      userIdentityId: query.userIdentityId,
+    }, {
+      workspaceId: "workspace_id",
+      userIdentityId: "user_identity_id",
+    });
+    whereBuilder.addEquals("actor_id", query.actorId);
+    whereBuilder.addEquals("target_ref", query.targetRef);
     if (query.occurredAfter) {
-      clauses.push("occurred_at >= ?");
-      params.push(query.occurredAfter);
+      whereBuilder.add("occurred_at >= ?", query.occurredAfter);
     }
-
     if (query.occurredBefore) {
-      clauses.push("occurred_at <= ?");
-      params.push(query.occurredBefore);
+      whereBuilder.add("occurred_at <= ?", query.occurredBefore);
     }
+    const where = whereBuilder.build();
+    const paging = this.buildPagingClause(query.limit, query.offset);
 
-    const paging = this.toPagingClause(query.limit, query.offset);
     const rows = this.getDatabase().prepare(`
       SELECT
         event_id,
@@ -291,10 +254,10 @@ export class SqlitePlatformPersistenceAdapter
         correlation_id,
         details_json
       FROM platform_audit_events
-      ${clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : ""}
+      ${where.sql}
       ORDER BY occurred_at DESC, event_id ASC
       ${paging.sql}
-    `).all(...params, ...paging.params) as PlatformAuditEventRow[];
+    `).all(...where.params, ...paging.params) as PlatformAuditEventRow[];
 
     return Object.freeze(rows.map((row) => mapPlatformAuditEventRowToRecord(row)));
   }
@@ -576,44 +539,6 @@ export class SqlitePlatformPersistenceAdapter
     ));
   }
 
-  private toPagingClause(limit?: number, offset?: number): { readonly sql: string; readonly params: ReadonlyArray<number> } {
-    const normalizedLimit = Number.isInteger(limit) && (limit ?? 0) > 0 ? (limit as number) : undefined;
-    const normalizedOffset = Number.isInteger(offset) && (offset ?? -1) >= 0 ? (offset as number) : undefined;
-
-    if (normalizedLimit !== undefined && normalizedOffset !== undefined) {
-      return {
-        sql: "LIMIT ? OFFSET ?",
-        params: Object.freeze([normalizedLimit, normalizedOffset]),
-      };
-    }
-
-    if (normalizedLimit !== undefined) {
-      return {
-        sql: "LIMIT ?",
-        params: Object.freeze([normalizedLimit]),
-      };
-    }
-
-    if (normalizedOffset !== undefined) {
-      return {
-        sql: "LIMIT -1 OFFSET ?",
-        params: Object.freeze([normalizedOffset]),
-      };
-    }
-
-    return {
-      sql: "",
-      params: Object.freeze([]),
-    };
-  }
-
-  private resolveMutationTimestamp(candidate?: string): string {
-    const normalizedCandidate = candidate?.trim();
-    return normalizedCandidate && normalizedCandidate.length > 0
-      ? normalizedCandidate
-      : new Date().toISOString();
-  }
-
   private assertExpectedRevision(
     expectedRevision: number | undefined,
     persistedRevision: number | undefined,
@@ -631,16 +556,4 @@ export class SqlitePlatformPersistenceAdapter
     }
   }
 
-  private executeMutation(operation: string, mutation: () => { readonly changes: number }): { readonly changes: number } {
-    try {
-      return mutation();
-    } catch (error) {
-      throw this.toPersistenceError(operation, error);
-    }
-  }
-
-  private toPersistenceError(operation: string, error: unknown): Error {
-    const details = error instanceof Error ? error.message : String(error);
-    return new Error(`Platform persistence failed to ${operation}: ${details}`);
-  }
 }

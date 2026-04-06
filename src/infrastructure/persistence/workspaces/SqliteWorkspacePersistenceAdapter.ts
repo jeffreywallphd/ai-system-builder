@@ -27,6 +27,7 @@ import type {
 } from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import { SqliteTransactionCoordinator } from "../sqlite/SqliteTransactionCoordinator";
+import { SafeSqliteRepositoryBase } from "../common/SafeSqliteRepositoryBase";
 import {
   mapWorkspaceInvitationRowToDomain,
   mapWorkspaceInvitationToRowValues,
@@ -50,6 +51,7 @@ import {
 } from "./SqliteWorkspacePersistenceMigrations";
 
 export class SqliteWorkspacePersistenceAdapter
+  extends SafeSqliteRepositoryBase
   implements
     IWorkspaceRepository,
     IWorkspaceMembershipRepository,
@@ -62,6 +64,7 @@ export class SqliteWorkspacePersistenceAdapter
   private readonly transactionCoordinator: SqliteTransactionCoordinator;
 
   public constructor(private readonly databasePath: string) {
+    super("Workspace");
     this.transactionCoordinator = new SqliteTransactionCoordinator(() => this.getDatabase());
   }
 
@@ -165,7 +168,7 @@ export class SqliteWorkspacePersistenceAdapter
       params.push(memberUserIdentityId);
     }
 
-    const paging = this.toPagingClause(query.limit, query.offset);
+    const paging = this.buildPagingClause(query.limit, query.offset);
 
     const rows = this.getDatabase().prepare(`
       SELECT
@@ -344,7 +347,7 @@ export class SqliteWorkspacePersistenceAdapter
       params.push(...query.statuses);
     }
 
-    const paging = this.toPagingClause(query.limit, query.offset);
+    const paging = this.buildPagingClause(query.limit, query.offset);
 
     const rows = this.getDatabase().prepare(`
       SELECT
@@ -467,7 +470,7 @@ export class SqliteWorkspacePersistenceAdapter
       params.push(...query.statuses);
     }
 
-    const paging = this.toPagingClause(query.limit, query.offset);
+    const paging = this.buildPagingClause(query.limit, query.offset);
 
     const rows = this.getDatabase().prepare(`
       SELECT
@@ -705,7 +708,7 @@ export class SqliteWorkspacePersistenceAdapter
       params.push(query.expiresAfter);
     }
 
-    const paging = this.toPagingClause(query.limit, query.offset);
+    const paging = this.buildPagingClause(query.limit, query.offset);
 
     const rows = this.getDatabase().prepare(`
       SELECT
@@ -872,53 +875,6 @@ export class SqliteWorkspacePersistenceAdapter
       .get() as { version?: number } | undefined;
 
     return typeof row?.version === "number" ? row.version : 0;
-  }
-
-  private toPagingClause(limit?: number, offset?: number): { readonly sql: string; readonly params: ReadonlyArray<number> } {
-    const normalizedLimit = Number.isInteger(limit) && (limit ?? 0) > 0 ? (limit as number) : undefined;
-    const normalizedOffset = Number.isInteger(offset) && (offset ?? -1) >= 0 ? (offset as number) : undefined;
-
-    if (normalizedLimit !== undefined && normalizedOffset !== undefined) {
-      return {
-        sql: "LIMIT ? OFFSET ?",
-        params: Object.freeze([normalizedLimit, normalizedOffset]),
-      };
-    }
-
-    if (normalizedLimit !== undefined) {
-      return {
-        sql: "LIMIT ?",
-        params: Object.freeze([normalizedLimit]),
-      };
-    }
-
-    if (normalizedOffset !== undefined) {
-      return {
-        sql: "LIMIT -1 OFFSET ?",
-        params: Object.freeze([normalizedOffset]),
-      };
-    }
-
-    return {
-      sql: "",
-      params: Object.freeze([]),
-    };
-  }
-
-  private executeMutation(
-    operation: string,
-    mutation: () => { readonly changes: number },
-  ): { readonly changes: number } {
-    try {
-      return mutation();
-    } catch (error) {
-      throw this.toPersistenceError(operation, error);
-    }
-  }
-
-  private toPersistenceError(operation: string, error: unknown): Error {
-    const details = error instanceof Error ? error.message : String(error);
-    return new Error(`Workspace persistence failed to ${operation}: ${details}`);
   }
 
   private getRoleAssignmentMutationTimestamp(roleAssignment: WorkspaceRoleAssignment): string {

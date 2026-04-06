@@ -313,6 +313,31 @@ The goal is to keep repository implementation aligned to domain/application cont
   - `src/shared/persistence/tests/PersistenceTenancyMetadataFactory.test.ts`
   - `src/infrastructure/persistence/common/tests/PersistenceMutationMetadata.test.ts`
 
+## Story 13.3.2 reusable mapper/query/pagination/tenancy helpers
+
+- Shared persistence infrastructure utilities now include:
+  - mapper helper utilities for lookup normalization, optional JSON payload parsing, and tenancy metadata/scope projection:
+    - `src/infrastructure/persistence/common/PersistenceMapperUtilities.ts`
+  - SQL query helper utilities for reusable filter construction and paging clause generation:
+    - `src/infrastructure/persistence/common/SqliteQueryHelpers.ts`
+  - tenancy-scope query helper utilities for workspace/user/node scoped filtering:
+    - `src/infrastructure/persistence/common/PersistenceTenancyScopeQuery.ts`
+  - safe repository base abstraction for common mutation error wrapping, paging, and mutation timestamp fallback:
+    - `src/infrastructure/persistence/common/SafeSqliteRepositoryBase.ts`
+- SQLite persistence adapters now reuse the shared repository/query helpers to reduce duplicate repository concern code:
+  - `src/infrastructure/persistence/platform/SqlitePlatformPersistenceAdapter.ts`
+  - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter.ts`
+  - `src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter.ts`
+  - `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter.ts`
+  - `src/infrastructure/persistence/assets/SqliteAssetPersistenceAdapter.ts`
+- Platform mapper tenancy + JSON parsing now routes through shared persistence mapper helpers:
+  - `src/infrastructure/persistence/platform/PlatformPersistenceMapper.ts`
+- Added utility coverage:
+  - `src/infrastructure/persistence/common/tests/PersistenceMapperUtilities.test.ts`
+  - `src/infrastructure/persistence/common/tests/SqliteQueryHelpers.test.ts`
+  - `src/infrastructure/persistence/common/tests/PersistenceTenancyScopeQuery.test.ts`
+  - `src/infrastructure/persistence/common/tests/SafeSqliteRepositoryBase.test.ts`
+
 ## Mapper responsibility guidance (Story 13.1.3)
 
 - Mapper boundaries are adapter-local but contract-driven:
