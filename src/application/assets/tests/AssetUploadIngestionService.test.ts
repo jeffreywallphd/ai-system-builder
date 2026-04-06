@@ -42,7 +42,9 @@ class InMemoryAssetRepository implements IAssetRepository {
     return this.records.get(assetId);
   }
 
-  public async listAssets(): Promise<ReadonlyArray<Asset>> {
+  public async listAssets(
+    _query: Parameters<IAssetRepository["listAssets"]>[0],
+  ): Promise<ReadonlyArray<Asset>> {
     return Object.freeze([...this.records.values()]);
   }
 

@@ -97,7 +97,9 @@ export interface GetAssetByIdQuery extends AssetRequestContext {
 }
 
 export interface ListAssetsQuery extends AssetRequestContext {
+  readonly scope?: "private" | "workspace" | "all";
   readonly ownerUserId?: string;
+  readonly createdByUserId?: string;
   readonly storageInstanceId?: string;
   readonly assetKinds?: ReadonlyArray<AssetKind>;
   readonly visibilities?: ReadonlyArray<AssetVisibility>;
@@ -193,6 +195,12 @@ export interface GetAssetByIdResult {
 
 export interface ListAssetsResult {
   readonly items: ReadonlyArray<Asset>;
+  readonly pagination: {
+    readonly limit: number;
+    readonly offset: number;
+    readonly returned: number;
+    readonly hasMore: boolean;
+  };
 }
 
 export interface FinalizeAssetUploadResult {
@@ -362,9 +370,15 @@ export function validateRegisterAssetRequest(input: RegisterAssetRequest): Regis
 
 export function validateListAssetsQuery(input: ListAssetsQuery): ListAssetsQuery {
   const normalized = normalizeRequestContext(input);
+  const scope = normalizeOptional(input.scope) as ListAssetsQuery["scope"];
+  if (scope && scope !== "private" && scope !== "workspace" && scope !== "all") {
+    throw new AssetServiceContractError("scope must be one of: private, workspace, all.");
+  }
   return Object.freeze({
     ...normalized,
+    scope,
     ownerUserId: normalizeOptional(input.ownerUserId),
+    createdByUserId: normalizeOptional(input.createdByUserId),
     storageInstanceId: normalizeOptional(input.storageInstanceId),
     sourceAssetId: normalizeOptional(input.sourceAssetId),
     sourceAssetVersionId: normalizeOptional(input.sourceAssetVersionId),

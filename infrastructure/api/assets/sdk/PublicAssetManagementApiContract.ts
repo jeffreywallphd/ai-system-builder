@@ -1,5 +1,5 @@
 import type { AssetStorageArea } from "../../../../src/domain/assets/AssetDomain";
-import type { AssetDetailDto } from "../../../../src/shared/contracts/assets/AssetTransportContracts";
+import type { AssetDetailDto, AssetSummaryDto } from "../../../../src/shared/contracts/assets/AssetTransportContracts";
 
 export const AssetManagementApiErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -128,5 +128,33 @@ export interface IngestAssetUploadContentApiResponse {
       readonly digest: string;
     };
     readonly originalFileName?: string;
+  };
+}
+
+export interface ListAssetsApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+  readonly scope?: "private" | "workspace" | "all";
+  readonly ownerUserId?: string;
+  readonly createdByUserId?: string;
+  readonly storageInstanceId?: string;
+  readonly assetKinds?: ReadonlyArray<"uploaded-file" | "generated-output" | "preview" | "derived">;
+  readonly visibilities?: ReadonlyArray<"private" | "workspace" | "shared" | "published">;
+  readonly lifecycleStates?: ReadonlyArray<"active" | "archived" | "deleted">;
+  readonly sourceAssetId?: string;
+  readonly sourceAssetVersionId?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface ListAssetsApiResponse {
+  readonly items: ReadonlyArray<AssetSummaryDto>;
+  readonly pagination: {
+    readonly limit: number;
+    readonly offset: number;
+    readonly returned: number;
+    readonly hasMore: boolean;
   };
 }

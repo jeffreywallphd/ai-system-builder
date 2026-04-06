@@ -53,6 +53,12 @@ export class SqliteAssetPersistenceAdapter implements IAssetRepository {
       params.push(ownerUserId);
     }
 
+    const createdByUserId = normalizeAssetLookup(query.createdByUserId ?? "");
+    if (createdByUserId) {
+      clauses.push("a.created_by = ?");
+      params.push(createdByUserId);
+    }
+
     const storageInstanceId = normalizeAssetLookup(query.storageInstanceId ?? "");
     if (storageInstanceId) {
       clauses.push("a.storage_instance_id = ?");

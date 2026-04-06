@@ -70,6 +70,7 @@ import { SqliteAssetUploadSessionPersistenceAdapter } from "../../src/infrastruc
 import { StorageManagementService } from "../../src/application/storage/use-cases/StorageManagementService";
 import { AssetUploadInitiationService } from "../../src/application/assets/use-cases/AssetUploadInitiationService";
 import { AssetUploadIngestionService } from "../../src/application/assets/use-cases/AssetUploadIngestionService";
+import { AssetDiscoveryService } from "../../src/application/assets/use-cases/AssetDiscoveryService";
 import { StorageLogicalAccessResolutionService } from "../../src/application/storage/use-cases/StorageLogicalAccessResolutionService";
 import { StorageBackendProvisioningOrchestrator } from "../../src/infrastructure/storage/StorageBackendProvisioningOrchestrator";
 import { createStorageBackendAdapterRegistry } from "../../src/infrastructure/storage/StorageBackendAdapterRegistry";
@@ -820,9 +821,14 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     uploadSessionRepository: assetUploadSessionRepository,
     storageLogicalAccessResolutionService,
   });
+  const assetDiscoveryService = new AssetDiscoveryService({
+    repository: assetRepository,
+    workspaceAuthorizationReadRepository: workspaceRepository,
+  });
   const assetManagementBackendApi = new AssetManagementBackendApi({
     uploadInitiationService: assetUploadInitiationService,
     uploadIngestionService: assetUploadIngestionService,
+    discoveryService: assetDiscoveryService,
   });
   const transportTrustStateResolver = new ServerManagedTransportTrustStateResolver({
     trustedDeviceManagementService: trustedDeviceManagementService,

@@ -139,3 +139,42 @@ Coverage added for this story:
 - `src/application/assets/tests/AssetUploadIngestionService.test.ts`
 - `src/infrastructure/persistence/assets/tests/SqliteAssetUploadSessionPersistenceAdapter.test.ts`
 - extended API/transport tests for upload-session content routes.
+
+## Story 10.2.3 scoped discovery/listing update
+
+- Added authoritative scoped asset-discovery use case:
+  - `src/application/assets/use-cases/AssetDiscoveryService.ts`
+- Extended list-query contract surface for scope + creator filtering and pagination metadata:
+  - `src/application/assets/use-cases/AssetServiceContracts.ts`
+  - `src/application/assets/ports/IAssetRepository.ts`
+- Persistence list filtering now supports creator scoping:
+  - `src/infrastructure/persistence/assets/SqliteAssetPersistenceAdapter.ts`
+- Extended backend API and public SDK contract with listing endpoint payloads:
+  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+- Added authenticated transport route:
+  - `GET /api/v1/assets`
+  - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- Host composition now wires discovery dependencies:
+  - `hosts/server/IdentityServerHost.ts`
+
+Operational behavior in this story:
+
+- listing requires active workspace membership.
+- private assets are filtered to owner (or workspace admin) and do not leak into other users' listing responses.
+- workspace/shared/published visibility stays workspace-scoped for authorized members.
+- query filters now support:
+  - `scope` (`private` | `workspace` | `all`),
+  - `ownerUserId`,
+  - `createdByUserId`,
+  - `assetKinds`,
+  - `lifecycleStates` (status),
+  - lineage source filters,
+  - pagination (`limit`, `offset`) with returned `hasMore` metadata.
+- list DTO payloads remain presentation-safe and logical-id based (no raw backend path exposure).
+
+Coverage added for this story:
+
+- `src/application/assets/tests/AssetDiscoveryService.test.ts`
+- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`

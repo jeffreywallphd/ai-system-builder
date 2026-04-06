@@ -13,6 +13,7 @@ import {
 import { AssetManagementBackendApi } from "../AssetManagementBackendApi";
 import { AssetUploadInitiationService } from "../../../../src/application/assets/use-cases/AssetUploadInitiationService";
 import { AssetUploadIngestionService } from "../../../../src/application/assets/use-cases/AssetUploadIngestionService";
+import { AssetDiscoveryService } from "../../../../src/application/assets/use-cases/AssetDiscoveryService";
 
 class StubAssetUploadInitiationService {
   private readonly asset: Asset = createAsset({
@@ -140,11 +141,30 @@ class StubAssetUploadIngestionService {
   }
 }
 
+class StubAssetDiscoveryService {
+  public async listAssets() {
+    const asset = new StubAssetUploadInitiationService()["asset"];
+    return {
+      ok: true as const,
+      value: {
+        items: Object.freeze([asset]),
+        pagination: Object.freeze({
+          limit: 25,
+          offset: 0,
+          returned: 1,
+          hasMore: false,
+        }),
+      },
+    };
+  }
+}
+
 describe("AssetManagementBackendApi", () => {
   it("returns register and initiate upload DTOs for successful requests", async () => {
     const backendApi = new AssetManagementBackendApi({
       uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
       uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
+      discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
     });
 
     const registered = await backendApi.registerAsset({
@@ -206,12 +226,27 @@ describe("AssetManagementBackendApi", () => {
       return;
     }
     expect(ingested.data.finalizedVersionId).toBe("asset-upload-001:v2");
+
+    const listed = await backendApi.listAssets({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      scope: "all",
+      limit: 25,
+      offset: 0,
+    });
+    expect(listed.ok).toBeTrue();
+    if (!listed.ok || !listed.data) {
+      return;
+    }
+    expect(listed.data.items[0]?.assetId).toBe("asset-upload-001");
+    expect(listed.data.pagination.returned).toBe(1);
   });
 
   it("returns invalid-request for missing actor identity", async () => {
     const backendApi = new AssetManagementBackendApi({
       uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
       uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
+      discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
     });
 
     const response = await backendApi.initiateAssetUpload({
@@ -229,5 +264,15 @@ describe("AssetManagementBackendApi", () => {
       return;
     }
     expect(response.error.code).toBe("invalid-request");
+
+    const listResponse = await backendApi.listAssets({
+      actorUserIdentityId: " ",
+      workspaceId: "workspace-alpha",
+    });
+    expect(listResponse.ok).toBeFalse();
+    if (listResponse.ok || !listResponse.error) {
+      return;
+    }
+    expect(listResponse.error.code).toBe("invalid-request");
   });
 });

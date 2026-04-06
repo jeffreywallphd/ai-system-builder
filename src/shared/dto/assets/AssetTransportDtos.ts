@@ -58,6 +58,12 @@ export interface GetAssetByIdResponseDto {
 
 export interface ListAssetsResponseDto {
   readonly items: ReadonlyArray<AssetSummaryDto>;
+  readonly pagination: {
+    readonly limit: number;
+    readonly offset: number;
+    readonly returned: number;
+    readonly hasMore: boolean;
+  };
 }
 
 export interface FinalizeAssetUploadResponseDto {
@@ -153,9 +159,19 @@ export function toGetAssetByIdResponseDto(asset: Asset): GetAssetByIdResponseDto
   });
 }
 
-export function toListAssetsResponseDto(items: ReadonlyArray<Asset>): ListAssetsResponseDto {
+export function toListAssetsResponseDto(
+  items: ReadonlyArray<Asset>,
+  pagination?: ListAssetsResponseDto["pagination"],
+): ListAssetsResponseDto {
+  const returned = items.length;
   return Object.freeze({
     items: Object.freeze(items.map((item) => toAssetSummaryDto(item))),
+    pagination: Object.freeze({
+      limit: pagination?.limit ?? returned,
+      offset: pagination?.offset ?? 0,
+      returned,
+      hasMore: pagination?.hasMore ?? false,
+    }),
   });
 }
 
