@@ -14,59 +14,132 @@ import type {
   SecretAccessAuditEvent,
 } from "../ports/SecretServicePorts";
 import {
+  NoOpSecretObservabilityPort,
+  SecretOperationalOutcomes,
+  type ISecretObservabilityPort,
+} from "../ports/SecretObservabilityPorts";
+import {
   SecretServiceErrorCodes,
   type CreateSecretRequest,
   type CreateSecretResult,
   type SecretServiceResult,
 } from "./SecretManagementServiceContracts";
+import { toCreateSecretRequestDiagnosticDto, toSecretOwnerDiagnosticDto } from "../../../shared/dto/security/SecretServiceDtos";
 
 export interface CreateSecretUseCaseDependencies {
   readonly secretRecordRepository: ISecretRecordPersistenceRepository;
   readonly secretEncryptionPort: ISecretEncryptionPort;
   readonly secretAccessPolicyPort: ISecretAccessPolicyPort;
   readonly secretAccessAuditPort: ISecretAccessAuditPort;
+  readonly secretObservabilityPort?: ISecretObservabilityPort;
   readonly now?: () => Date;
 }
 
 export class CreateSecretUseCase {
   private readonly now: () => Date;
+  private readonly observabilityPort: ISecretObservabilityPort;
 
   public constructor(private readonly dependencies: CreateSecretUseCaseDependencies) {
     this.now = dependencies.now ?? (() => new Date());
+    this.observabilityPort = dependencies.secretObservabilityPort ?? new NoOpSecretObservabilityPort();
   }
 
   public async execute(request: CreateSecretRequest): Promise<SecretServiceResult<CreateSecretResult>> {
     const occurredAt = normalizeTimestamp(request.createdAt, this.now);
+    const diagnostics = toCreateSecretRequestDiagnosticDto(request);
     if (!occurredAt) {
+      await this.emitOperation("rejected", {
+        occurredAt: this.now().toISOString(),
+        actorId: diagnostics.actor.actorId,
+        secretId: diagnostics.secretId,
+        details: Object.freeze({
+          reason: "invalid-createdAt",
+          request: diagnostics,
+        }),
+      });
       return invalidRequest("createdAt must be a valid timestamp when provided.");
     }
 
     const actorId = normalizeRequired(request.actor?.actorId);
     if (!actorId) {
+      await this.emitOperation("rejected", {
+        occurredAt,
+        actorId: diagnostics.actor.actorId,
+        secretId: diagnostics.secretId,
+        details: Object.freeze({
+          reason: "missing-actorId",
+          request: diagnostics,
+        }),
+      });
       return invalidRequest("actor.actorId is required.");
     }
 
     const operationKey = normalizeRequired(request.operationKey);
     if (!operationKey) {
+      await this.emitOperation("rejected", {
+        occurredAt,
+        actorId,
+        secretId: diagnostics.secretId,
+        details: Object.freeze({
+          reason: "missing-operationKey",
+          request: diagnostics,
+        }),
+      });
       return invalidRequest("operationKey is required.");
     }
 
     const secretId = normalizeRequired(request.secretId);
     if (!secretId) {
+      await this.emitOperation("rejected", {
+        occurredAt,
+        actorId,
+        secretId: diagnostics.secretId,
+        details: Object.freeze({
+          reason: "missing-secretId",
+          request: diagnostics,
+        }),
+      });
       return invalidRequest("secretId is required.");
     }
 
     const name = normalizeRequired(request.name);
     if (!name) {
+      await this.emitOperation("rejected", {
+        occurredAt,
+        actorId,
+        secretId,
+        details: Object.freeze({
+          reason: "missing-name",
+          request: diagnostics,
+        }),
+      });
       return invalidRequest("name is required.");
     }
 
     const plaintext = normalizeRequired(request.plaintext);
     if (!plaintext) {
+      await this.emitOperation("rejected", {
+        occurredAt,
+        actorId,
+        secretId,
+        details: Object.freeze({
+          reason: "missing-plaintext",
+          request: diagnostics,
+        }),
+      });
       return invalidRequest("plaintext is required.");
     }
 
     if (!Object.values(SecretKinds).includes(request.kind)) {
+      await this.emitOperation("rejected", {
+        occurredAt,
+        actorId,
+        secretId,
+        details: Object.freeze({
+          reason: "invalid-kind",
+          request: diagnostics,
+        }),
+      });
       return invalidRequest(`Secret kind '${String(request.kind)}' is not allowed.`);
     }
 
@@ -74,6 +147,16 @@ export class CreateSecretUseCase {
     try {
       owner = createSecretScopeOwner(request.owner);
     } catch (error) {
+      await this.emitOperation("rejected", {
+        occurredAt,
+        actorId,
+        secretId,
+        details: Object.freeze({
+          reason: "invalid-owner",
+          owner: request.owner,
+          request: diagnostics,
+        }),
+      });
       return invalidRequest(toErrorMessage(error));
     }
 
@@ -94,6 +177,17 @@ export class CreateSecretUseCase {
     });
 
     if (!decision.allowed) {
+      await this.emitOperation("denied", {
+        occurredAt: decision.occurredAt,
+        actorId,
+        secretId,
+        scope: owner.scope,
+        workspaceId: owner.workspaceId,
+        userIdentityId: owner.userIdentityId,
+        details: Object.freeze({
+          reason: decision.reason,
+        }),
+      });
       return {
         ok: false,
         error: Object.freeze({
@@ -108,6 +202,17 @@ export class CreateSecretUseCase {
       owner,
     });
     if (existing) {
+      await this.emitOperation("conflict", {
+        occurredAt,
+        actorId,
+        secretId,
+        scope: owner.scope,
+        workspaceId: owner.workspaceId,
+        userIdentityId: owner.userIdentityId,
+        details: Object.freeze({
+          existingSecretId: existing.secretId,
+        }),
+      });
       return {
         ok: false,
         error: Object.freeze({
@@ -156,6 +261,17 @@ export class CreateSecretUseCase {
           occurredAt,
         },
       });
+      await this.emitOperation("succeeded", {
+        occurredAt,
+        actorId,
+        secretId,
+        scope: owner.scope,
+        workspaceId: owner.workspaceId,
+        userIdentityId: owner.userIdentityId,
+        details: Object.freeze({
+          owner: toSecretOwnerDiagnosticDto(owner),
+        }),
+      });
 
       return {
         ok: true,
@@ -165,16 +281,69 @@ export class CreateSecretUseCase {
       };
     } catch (error) {
       if (error instanceof SecretDomainError) {
+        await this.emitOperation("rejected", {
+          occurredAt,
+          actorId,
+          secretId,
+          scope: owner.scope,
+          workspaceId: owner.workspaceId,
+          userIdentityId: owner.userIdentityId,
+          details: Object.freeze({
+            reason: "domain-validation-failed",
+            request: diagnostics,
+          }),
+        });
         return invalidRequest(error.message);
       }
 
+      await this.emitOperation("failed", {
+        occurredAt,
+        actorId,
+        secretId,
+        scope: owner.scope,
+        workspaceId: owner.workspaceId,
+        userIdentityId: owner.userIdentityId,
+        details: Object.freeze({
+          reason: "internal-error",
+          request: diagnostics,
+        }),
+      });
       return {
         ok: false,
         error: Object.freeze({
           code: SecretServiceErrorCodes.internal,
-          message: toErrorMessage(error),
+          message: "Secret create operation failed due to an internal security error.",
         }),
       };
+    }
+  }
+
+  private async emitOperation(
+    outcome: keyof typeof SecretOperationalOutcomes,
+    input: {
+      readonly occurredAt: string;
+      readonly actorId?: string;
+      readonly secretId?: string;
+      readonly scope?: ReturnType<typeof createSecretScopeOwner>["scope"];
+      readonly workspaceId?: string;
+      readonly userIdentityId?: string;
+      readonly details?: Readonly<Record<string, unknown>>;
+    },
+  ): Promise<void> {
+    try {
+      await this.observabilityPort.recordSecretOperation(Object.freeze({
+        event: "secret.create",
+        outcome: SecretOperationalOutcomes[outcome],
+        occurredAt: input.occurredAt,
+        actorId: input.actorId,
+        secretId: input.secretId,
+        scope: input.scope,
+        workspaceId: input.workspaceId,
+        userIdentityId: input.userIdentityId,
+        details: input.details,
+      }));
+    } catch {
+      // Observability failures are intentionally non-fatal.
     }
   }
 }
