@@ -15,6 +15,7 @@ import { RetrieveSecretPlaintextForRuntimeUseCase } from "../../../application/s
 import { RotateSecretUseCase } from "../../../application/security/use-cases/RotateSecretUseCase";
 import { SecretAuthorizationPolicyEvaluator } from "../../../application/security/use-cases/SecretAuthorizationPolicyEvaluator";
 import { SecretScopeResolver } from "../../../application/security/use-cases/SecretScopeResolver";
+import { SecretRuntimeConsumptionAdapters } from "../../../application/security/services/SecretRuntimeConsumptionAdapters";
 import { SqliteSecretRecordPersistenceAdapter } from "../../persistence/security/SqliteSecretRecordPersistenceAdapter";
 import { SecretObservabilityReporter } from "../SecretObservabilityReporter";
 import { createEnvelopeSecretEncryptionPortFromEnvironment } from "./EnvelopeSecretEncryptionPort";
@@ -40,6 +41,7 @@ export interface ServerComposedSecretService {
   readonly deleteSecretUseCase: DeleteSecretUseCase;
   readonly listSecretsUseCase: ListSecretsUseCase;
   readonly secretScopeResolver: SecretScopeResolver;
+  readonly runtimeSecretConsumptionAdapters: SecretRuntimeConsumptionAdapters;
   readonly status: SecretServiceCompositionStatus;
   dispose(): void;
 }
@@ -67,6 +69,13 @@ export function composeServerSecretService(input: ComposeServerSecretServiceInpu
     payloadDirectory,
   });
   const secretEncryptionPort = encryptionConfiguration.port;
+  const retrieveSecretPlaintextForRuntimeUseCase = new RetrieveSecretPlaintextForRuntimeUseCase({
+    secretRecordRepository,
+    secretEncryptionPort,
+    secretAccessPolicyPort: accessPolicyPort,
+    secretAccessAuditPort: accessAuditPort,
+    secretObservabilityPort: observabilityPort,
+  });
   const status: SecretServiceCompositionStatus = Object.freeze({
     configured: encryptionConfiguration.configured,
     payloadDirectory,
@@ -87,13 +96,7 @@ export function composeServerSecretService(input: ComposeServerSecretServiceInpu
       secretAccessAuditPort: accessAuditPort,
       secretObservabilityPort: observabilityPort,
     }),
-    retrieveSecretPlaintextForRuntimeUseCase: new RetrieveSecretPlaintextForRuntimeUseCase({
-      secretRecordRepository,
-      secretEncryptionPort,
-      secretAccessPolicyPort: accessPolicyPort,
-      secretAccessAuditPort: accessAuditPort,
-      secretObservabilityPort: observabilityPort,
-    }),
+    retrieveSecretPlaintextForRuntimeUseCase,
     rotateSecretUseCase: new RotateSecretUseCase({
       secretRecordRepository,
       secretEncryptionPort,
@@ -123,6 +126,7 @@ export function composeServerSecretService(input: ComposeServerSecretServiceInpu
       secretRecordRepository,
       secretAccessPolicyPort: accessPolicyPort,
     }),
+    runtimeSecretConsumptionAdapters: new SecretRuntimeConsumptionAdapters(retrieveSecretPlaintextForRuntimeUseCase),
     status,
     dispose: () => {
       secretRecordRepository.dispose();

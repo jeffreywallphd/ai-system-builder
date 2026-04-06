@@ -21,6 +21,7 @@ Quick baseline for Story 8.1.7 (Feature 8 / Epic 8.1): compose secret services i
   - observability: `SecretObservabilityReporter`
   - audit: host-supplied callback hook
 - Composed service exposes formal application use cases (`CreateSecretUseCase`, `GetSecretMetadataUseCase`, `RetrieveSecretPlaintextForRuntimeUseCase`, `RotateSecretUseCase`, `DisableSecretUseCase`, `DeleteSecretUseCase`, `ListSecretsUseCase`, `SecretScopeResolver`) instead of leaving secret collaborators disconnected.
+- Composed service now also exposes runtime credential helpers through `runtimeSecretConsumptionAdapters` (see `docs/architecture/secrets-service-consumption-adapters.md`) so other runtime modules can consume secrets through formal retrieval seams.
 
 ## Audit hook contract update
 

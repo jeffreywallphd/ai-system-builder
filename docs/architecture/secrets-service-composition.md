@@ -26,6 +26,7 @@ This note documents Story 8.1.7 (Feature 8 / Epic 8.1): wire secret services int
   - `DeleteSecretUseCase`
   - `ListSecretsUseCase`
   - `SecretScopeResolver`
+- Composition now additionally exposes `runtimeSecretConsumptionAdapters` so runtime callers can use formal secret retrieval adapters instead of ad hoc credential access paths.
 
 ### Secret audit hook contract
 
