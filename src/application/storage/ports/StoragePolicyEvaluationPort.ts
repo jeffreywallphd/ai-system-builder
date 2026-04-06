@@ -2,9 +2,12 @@ import type { StorageInstance } from "../../../domain/storage/StorageDomain";
 
 export const StoragePolicyActions = Object.freeze({
   create: "create",
+  view: "view",
   updateMetadata: "update-metadata",
+  provision: "provision",
   activate: "activate",
   deactivate: "deactivate",
+  useForAssets: "use-for-assets",
   getDetails: "get-details",
   listAccessible: "list-accessible",
 });

@@ -4,6 +4,8 @@ import {
   StorageAccessScopes,
   StorageBackendTypes,
   StorageLifecycleStates,
+  StorageManagedActions,
+  StoragePolicyRestrictedCapabilities,
   StorageReplicationModes,
   createStorageInstance,
 } from "../../../../domain/storage/StorageDomain";
@@ -73,6 +75,30 @@ describe("StorageTransportDtos", () => {
     expect(detail.policy.hasEncryptionKeyReference).toBeTrue();
     expect(detail.policy.encryptionMode).toBe("customer-managed");
     expect(detail.policy.allowWorkerDecryption).toBeTrue();
+    expect(detail.access.allowedActions).toEqual([]);
+    expect(detail.access.effectivePermissions).toHaveLength(6);
+    expect(detail.access.policyRestrictedCapabilities).toEqual([
+      {
+        capability: StoragePolicyRestrictedCapabilities.mutableWrites,
+        restricted: false,
+        reasonCode: undefined,
+      },
+      {
+        capability: StoragePolicyRestrictedCapabilities.crossWorkspaceReads,
+        restricted: true,
+        reasonCode: "cross-workspace-reads-disabled",
+      },
+      {
+        capability: StoragePolicyRestrictedCapabilities.previewDecryption,
+        restricted: true,
+        reasonCode: "preview-decryption-disabled",
+      },
+      {
+        capability: StoragePolicyRestrictedCapabilities.workerDecryption,
+        restricted: false,
+        reasonCode: undefined,
+      },
+    ]);
     expect((detail.policy as unknown as { encryptionKeyReferenceId?: string }).encryptionKeyReferenceId).toBeUndefined();
     expect((adminSafe as unknown as { sensitive?: unknown }).sensitive).toBeUndefined();
     expect(adminSafe.sensitiveRedaction?.redactedFields[0]?.field).toBe("encryptionKeyReferenceId");
@@ -166,5 +192,62 @@ describe("StorageTransportDtos", () => {
     expect(response.storage.storageInstanceId).toBe("storage-managed-103");
     expect((response.storage as unknown as { sensitive?: unknown }).sensitive).toBeUndefined();
     expect(response.storage.sensitiveRedaction?.redactedFields[0]?.field).toBe("encryptionKeyReferenceId");
+  });
+
+  it("maps authorization-driven access summaries into storage detail DTOs", () => {
+    const instance = createStorageInstance({
+      id: "storage-managed-104",
+      displayName: "Asset Pipeline Storage",
+      backendType: StorageBackendTypes.objectStorage,
+      ownership: {
+        workspaceId: "workspace:delta",
+        ownerUserIdentityId: "user:owner-4",
+      },
+      access: {
+        mode: StorageAccessModes.readWrite,
+        scope: StorageAccessScopes.workspaceMembers,
+      },
+      policy: {
+        policyId: "policy:storage:104",
+        immutableWrites: true,
+        allowCrossWorkspaceReads: false,
+        labels: {},
+        encryption: {
+          profileId: "enc:profile:default",
+          envelopeRequired: true,
+        },
+      },
+      createdBy: "user:owner-4",
+      createdAt: "2026-04-06T08:30:00.000Z",
+      lastCorrelationId: "corr:storage:104",
+    });
+
+    const detail = toStorageInternalInstanceDetailDto(instance, {
+      accessSummary: {
+        actorUserIdentityId: "user:operator-4",
+        source: "authorization-policy",
+        effectivePermissions: [
+          { action: StorageManagedActions.view, effect: "allowed" },
+          { action: StorageManagedActions.updateMetadata, effect: "denied", reasonCode: "requires-admin" },
+          { action: StorageManagedActions.provision, effect: "allowed" },
+          { action: StorageManagedActions.activate, effect: "denied", reasonCode: "lifecycle-lock" },
+          { action: StorageManagedActions.deactivate, effect: "restricted", reasonCode: "policy-restricted" },
+          { action: StorageManagedActions.useForAssets, effect: "allowed" },
+        ],
+      },
+    });
+
+    expect(detail.access.source).toBe("authorization-policy");
+    expect(detail.access.isOwner).toBeFalse();
+    expect(detail.access.allowedActions).toEqual([
+      StorageManagedActions.view,
+      StorageManagedActions.provision,
+      StorageManagedActions.useForAssets,
+    ]);
+    expect(detail.access.effectivePermissions.find((item) => item.action === StorageManagedActions.activate)?.effect)
+      .toBe("denied");
+    expect(detail.access.policyRestrictedCapabilities.find(
+      (item) => item.capability === StoragePolicyRestrictedCapabilities.mutableWrites,
+    )?.restricted).toBeTrue();
   });
 });

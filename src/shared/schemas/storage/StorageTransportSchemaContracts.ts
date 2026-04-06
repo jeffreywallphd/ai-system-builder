@@ -6,10 +6,14 @@ import {
   StorageEncryptionKeyScopes,
   StorageEncryptionModes,
   StorageLifecycleStates,
+  StorageManagedActions,
+  StoragePolicyRestrictedCapabilities,
   StorageReplicationModes,
   StorageRetentionExpiryActions,
 } from "../../../domain/storage/StorageDomain";
 import {
+  StorageAccessPermissionEffects,
+  StorageAccessSummarySources,
   StorageSensitiveRedactionReasons,
   StorageSyncStatuses,
   StorageTransportContractVersions,
@@ -130,6 +134,36 @@ const StorageAccessScopeSchema = z.enum([
   StorageAccessScopes.workspace,
   StorageAccessScopes.workspaceMembers,
   StorageAccessScopes.platformManaged,
+]);
+
+const StorageManagedActionSchema = z.enum([
+  StorageManagedActions.view,
+  StorageManagedActions.updateMetadata,
+  StorageManagedActions.provision,
+  StorageManagedActions.activate,
+  StorageManagedActions.deactivate,
+  StorageManagedActions.useForAssets,
+]);
+
+const StoragePolicyRestrictedCapabilitySchema = z.enum([
+  StoragePolicyRestrictedCapabilities.mutableWrites,
+  StoragePolicyRestrictedCapabilities.crossWorkspaceReads,
+  StoragePolicyRestrictedCapabilities.previewDecryption,
+  StoragePolicyRestrictedCapabilities.workerDecryption,
+]);
+
+const StorageAccessPermissionEffectSchema = z.enum([
+  StorageAccessPermissionEffects.allowed,
+  StorageAccessPermissionEffects.denied,
+  StorageAccessPermissionEffects.restricted,
+  StorageAccessPermissionEffects.unknown,
+]);
+
+const StorageAccessSummarySourceSchema = z.enum([
+  StorageAccessSummarySources.authorizationPolicy,
+  StorageAccessSummarySources.ownershipDefault,
+  StorageAccessSummarySources.mixed,
+  StorageAccessSummarySources.unknown,
 ]);
 
 const StorageBackendTypeSchema = z.enum([
@@ -394,16 +428,48 @@ const StoragePolicyPartialUpdateSchema = z.object({
   }
 });
 
-const StorageAccessPermissionsSummarySchema = z.object({
+const StorageAccessEffectivePermissionSchema = z.object({
+  action: StorageManagedActionSchema,
+  effect: StorageAccessPermissionEffectSchema,
+  reasonCode: IdentifierSchema.optional(),
+  message: z.string().trim().min(1).max(512).optional(),
+}).strict();
+
+const StoragePolicyRestrictedCapabilitySummarySchema = z.object({
+  capability: StoragePolicyRestrictedCapabilitySchema,
+  restricted: z.boolean(),
+  reasonCode: IdentifierSchema.optional(),
+}).strict();
+
+const StorageAccessSummarySchema = z.object({
+  workspaceId: IdentifierSchema,
+  ownerUserIdentityId: IdentifierSchema,
+  actorUserIdentityId: IdentifierSchema.optional(),
   mode: StorageAccessModeSchema,
   scope: StorageAccessScopeSchema,
-  canRead: z.boolean(),
-  canWrite: z.boolean(),
-  canDelete: z.boolean(),
-  canManagePolicy: z.boolean(),
-  canManageLifecycle: z.boolean(),
+  isOwner: z.boolean(),
+  source: StorageAccessSummarySourceSchema,
+  effectivePermissions: z.array(StorageAccessEffectivePermissionSchema),
+  allowedActions: z.array(StorageManagedActionSchema),
+  policyRestrictedCapabilities: z.array(StoragePolicyRestrictedCapabilitySummarySchema),
   extensions: z.record(z.string(), z.unknown()).optional(),
-}).strict();
+}).strict().superRefine((value, context) => {
+  const allowedFromPermissions = new Set(
+    value.effectivePermissions
+      .filter((permission) => permission.effect === StorageAccessPermissionEffects.allowed)
+      .map((permission) => permission.action),
+  );
+
+  for (const action of value.allowedActions) {
+    if (!allowedFromPermissions.has(action)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["allowedActions"],
+        message: `allowedActions includes '${action}' without an allowed effectivePermissions entry.`,
+      });
+    }
+  }
+});
 
 const StoragePolicyMetadataSchema = z.object({
   policyId: IdentifierSchema,
@@ -545,7 +611,7 @@ export const StorageInstanceSummaryDtoSchema = z.object({
 
 export const StorageInstanceDetailDtoSchema = StorageInstanceSummaryDtoSchema.extend({
   ownerUserIdentityId: IdentifierSchema,
-  access: StorageAccessPermissionsSummarySchema,
+  access: StorageAccessSummarySchema,
   policy: StoragePolicyMetadataSchema,
   replication: StorageReplicationStatusSchema,
   sensitiveRedaction: StorageSensitiveRedactionSummarySchema.optional(),
@@ -558,11 +624,27 @@ export const StorageInstanceDetailDtoSchema = StorageInstanceSummaryDtoSchema.ex
     });
   }
 
-  if (value.access.mode === StorageAccessModes.readOnly && value.access.canWrite) {
+  if (value.ownerUserIdentityId !== value.access.ownerUserIdentityId) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ["access", "canWrite"],
-      message: "read-only access mode cannot advertise canWrite=true.",
+      path: ["access", "ownerUserIdentityId"],
+      message: "access.ownerUserIdentityId must match ownerUserIdentityId.",
+    });
+  }
+
+  if (value.workspaceId !== value.access.workspaceId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["access", "workspaceId"],
+      message: "access.workspaceId must match workspaceId.",
+    });
+  }
+
+  if (value.access.mode === StorageAccessModes.readOnly && value.access.allowedActions.includes(StorageManagedActions.updateMetadata)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["access", "allowedActions"],
+      message: "read-only access mode cannot include update-metadata in allowedActions.",
     });
   }
 });

@@ -1,12 +1,14 @@
 # Storage Application Ports and Use-Case Contracts
 
 This note documents Story 9.1.2 (Feature 9 / Epic 9.1): application-layer contracts for managed storage instance orchestration.
+Story 9.1.5 extends this surface with storage access-summary contracts used by listing/detail/action flows.
 
 ## Canonical artifacts
 
 - `src/application/storage/ports/IStorageInstanceRepository.ts`
 - `src/application/storage/ports/StorageProvisioningPort.ts`
 - `src/application/storage/ports/StoragePolicyEvaluationPort.ts`
+- `src/application/storage/ports/StorageAccessSummaryPort.ts`
 - `src/application/storage/ports/StorageCapabilityInspectionPort.ts`
 - `src/application/storage/ports/StorageObservabilityPorts.ts`
 - `src/application/storage/ports/StorageManagementPorts.ts`
@@ -27,6 +29,8 @@ This note documents Story 9.1.2 (Feature 9 / Epic 9.1): application-layer contra
   - backend-facing lifecycle/provisioning operation seam (`create`, `activate`, `deactivate`, `replication-sync`) with structured operation receipts.
 - `IStoragePolicyEvaluationPort`
   - policy authorization seam for storage actions and access-filtered storage list resolution.
+- `StorageInstanceAccessSummary` (via `StorageAccessSummaryPort.ts`)
+  - storage-facing representation seam for effective action permissions, ownership/workspace context, and policy-restricted capabilities.
 - `IStorageCapabilityInspectionPort`
   - backend capability introspection seam for storage backend/instance compatibility checks.
 - `StorageManagementAuditSink` (via `StorageObservabilityPorts.ts`)
@@ -54,6 +58,8 @@ Each operation returns a typed `StorageManagementResult<TValue>` with stable err
 - `storage-capability-unsupported`
 - `storage-provisioning-failed`
 - `storage-internal`
+
+Story 9.1.5 updates result contracts so storage management flows can optionally return `accessSummary` alongside storage data. This allows API/admin consumers to rely on authoritative storage access posture while keeping enforcement in policy ports.
 
 ## Boundary posture
 

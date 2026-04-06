@@ -4,6 +4,8 @@ import {
   StorageAccessScopes,
   StorageBackendTypes,
   StorageLifecycleStates,
+  StorageManagedActions,
+  StoragePolicyRestrictedCapabilities,
   StorageReplicationModes,
 } from "../../../../domain/storage/StorageDomain";
 import { StorageSyncStatuses } from "../../../contracts/storage/StorageTransportContracts";
@@ -192,13 +194,54 @@ describe("StorageTransportSchemaContracts", () => {
         },
         ownerUserIdentityId: "user:owner-1",
         access: {
+          workspaceId: "workspace:alpha",
+          ownerUserIdentityId: "user:owner-1",
+          actorUserIdentityId: "user:viewer-1",
           mode: StorageAccessModes.readOnly,
           scope: StorageAccessScopes.workspaceMembers,
-          canRead: true,
-          canWrite: false,
-          canDelete: true,
-          canManagePolicy: true,
-          canManageLifecycle: true,
+          isOwner: false,
+          source: "authorization-policy",
+          effectivePermissions: [
+            {
+              action: StorageManagedActions.view,
+              effect: "allowed",
+            },
+            {
+              action: StorageManagedActions.updateMetadata,
+              effect: "denied",
+              reasonCode: "read-only-mode",
+            },
+            {
+              action: StorageManagedActions.provision,
+              effect: "denied",
+              reasonCode: "requires-admin",
+            },
+            {
+              action: StorageManagedActions.activate,
+              effect: "denied",
+              reasonCode: "requires-admin",
+            },
+            {
+              action: StorageManagedActions.deactivate,
+              effect: "denied",
+              reasonCode: "requires-admin",
+            },
+            {
+              action: StorageManagedActions.useForAssets,
+              effect: "allowed",
+            },
+          ],
+          allowedActions: [
+            StorageManagedActions.view,
+            StorageManagedActions.useForAssets,
+          ],
+          policyRestrictedCapabilities: [
+            {
+              capability: StoragePolicyRestrictedCapabilities.previewDecryption,
+              restricted: true,
+              reasonCode: "preview-decryption-disabled",
+            },
+          ],
         },
         policy: {
           policyId: "policy:storage:204",
@@ -238,6 +281,58 @@ describe("StorageTransportSchemaContracts", () => {
         ...parsed.storage,
         sensitive: {
           encryptionKeyReferenceId: "leak",
+        },
+      },
+    })).toThrow(StorageTransportSchemaValidationError);
+  });
+
+  it("rejects access summaries where allowedActions do not match effective permissions", () => {
+    expect(() => parseGetStorageInstanceDetailResponseDto({
+      storage: {
+        storageInstanceId: "storage-managed-299",
+        workspaceId: "workspace:alpha",
+        backendType: StorageBackendTypes.objectStorage,
+        display: {
+          displayName: "Shared Outputs",
+        },
+        lifecycle: {
+          state: StorageLifecycleStates.active,
+          createdAt: "2026-04-06T12:00:00.000Z",
+          lastModifiedAt: "2026-04-06T12:10:00.000Z",
+        },
+        ownerUserIdentityId: "user:owner-1",
+        access: {
+          workspaceId: "workspace:alpha",
+          ownerUserIdentityId: "user:owner-1",
+          mode: StorageAccessModes.readWrite,
+          scope: StorageAccessScopes.workspaceMembers,
+          isOwner: false,
+          source: "authorization-policy",
+          effectivePermissions: [{
+            action: StorageManagedActions.view,
+            effect: "denied",
+          }],
+          allowedActions: [StorageManagedActions.view],
+          policyRestrictedCapabilities: [],
+        },
+        policy: {
+          policyId: "policy:storage:299",
+          immutableWrites: false,
+          allowCrossWorkspaceReads: false,
+          labels: {},
+          encryptionMode: "platform-managed",
+          contentEncryptionRequired: true,
+          keyScope: "workspace",
+          allowPreviewDecryption: false,
+          allowWorkerDecryption: false,
+          retentionExpiryAction: "none",
+          encryptionProfileId: "enc:profile:default",
+          envelopeRequired: true,
+          hasEncryptionKeyReference: false,
+        },
+        replication: {
+          mode: StorageReplicationModes.none,
+          lastSyncStatus: StorageSyncStatuses.disabled,
         },
       },
     })).toThrow(StorageTransportSchemaValidationError);

@@ -1,6 +1,7 @@
 # Storage Transport Contracts
 
 This note documents Story 9.1.3 (Feature 9 / Epic 9.1): shared storage transport contracts, DTOs, and validation rules for host/API/UI boundaries.
+Story 9.1.5 extends this transport surface with a structured storage access summary model.
 
 ## Canonical artifacts
 
@@ -40,6 +41,7 @@ This note documents Story 9.1.3 (Feature 9 / Epic 9.1): shared storage transport
   - preview and worker decryption allowances
   - retention-expiry hook metadata (`retentionExpiryAction`, optional `purgeGracePeriodDays`)
 - access metadata: mode/scope plus permission summary booleans for read/write/policy/lifecycle operations
+- access metadata (Story 9.1.5): ownership/workspace context, effective action permissions, allowed actions, and policy-restricted capabilities
 - replication/sync metadata: replication mode/config, sync health state, optional last-sync indicators
 
 ## Redaction and non-leakage posture
@@ -59,6 +61,10 @@ This note documents Story 9.1.3 (Feature 9 / Epic 9.1): shared storage transport
 - metadata label safety checks for redaction-safe keys
 - pagination bounds for list queries
 - admin-safe detail validation (for example, read-only access cannot advertise write capability)
+- access-summary coherence checks:
+  - `allowedActions` must align to effective permissions marked `allowed`
+  - access ownership/workspace metadata must match detail identity fields
+  - read-only access cannot advertise metadata update action as allowed
 - strict object schemas rejecting unknown payload keys
 - deterministic create-policy defaults at schema boundary for omitted security/lifecycle metadata fields
 

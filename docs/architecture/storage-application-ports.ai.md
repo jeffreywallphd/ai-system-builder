@@ -3,12 +3,14 @@
 ## Purpose
 
 Story 9.1.2 introduces the application-layer seams for managed storage instance orchestration so later persistence/API/runtime adapters implement stable contracts instead of ad hoc storage wiring.
+Story 9.1.5 adds a formal storage access-summary seam on top of these contracts.
 
 ## Canonical files
 
 - `src/application/storage/ports/IStorageInstanceRepository.ts`
 - `src/application/storage/ports/StorageProvisioningPort.ts`
 - `src/application/storage/ports/StoragePolicyEvaluationPort.ts`
+- `src/application/storage/ports/StorageAccessSummaryPort.ts`
 - `src/application/storage/ports/StorageCapabilityInspectionPort.ts`
 - `src/application/storage/ports/StorageObservabilityPorts.ts`
 - `src/application/storage/ports/StorageManagementPorts.ts`
@@ -20,6 +22,10 @@ Story 9.1.2 introduces the application-layer seams for managed storage instance 
 - Repository contract for storage instance reads/lists/idempotent mutations.
 - Provisioning port with typed operation request/receipt for create/activate/deactivate/sync.
 - Policy-evaluation port for per-action decisions and accessible-instance filtering.
+- Access-summary contract for storage-facing permission representation:
+  - effective permissions by canonical storage action
+  - ownership/workspace context
+  - policy-restricted capability summaries
 - Capability inspection port for backend/instance feature posture.
 - Audit sink seam for best-effort operational event emission.
 
@@ -33,6 +39,7 @@ Story 9.1.2 introduces the application-layer seams for managed storage instance 
 - `getStorageInstanceDetails(...)`
 
 All use cases share a typed `StorageManagementResult<T>` envelope with stable error-code taxonomy.
+Story 9.1.5 also allows optional `accessSummary` payloads in operation results so transport/API layers can project authoritative access posture without embedding authorization logic in UI contracts.
 
 ## Boundary posture
 
