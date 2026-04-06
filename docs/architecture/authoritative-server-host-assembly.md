@@ -63,6 +63,13 @@ When run as a script, the entrypoint:
 Repository startup command:
 - `npm run start:authoritative-server`
 
+## Entrypoint consumers
+
+In addition to the direct server script entrypoint above, runtime startup consumers now route through this same authoritative host assembly:
+
+- `electron/main/main.ts` (desktop host local control-plane startup)
+- `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` (browser-development local control-plane startup)
+
 ## Testing
 
 Host assembly coverage lives in:

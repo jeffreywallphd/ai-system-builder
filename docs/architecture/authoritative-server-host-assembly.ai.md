@@ -29,6 +29,10 @@
   - exits non-zero on startup failure
 - Repository command: `npm run start:authoritative-server`
 
+## Entrypoint consumers
+- `electron/main/main.ts` now delegates desktop local control-plane startup through `startAuthoritativeServerHostAssembly(...)`.
+- `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` now delegates browser-development local control-plane startup through `startAuthoritativeServerHostAssembly(...)`.
+
 ## Tests
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
