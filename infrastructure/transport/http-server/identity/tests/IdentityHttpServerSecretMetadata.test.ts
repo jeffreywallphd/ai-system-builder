@@ -122,6 +122,46 @@ async function registerAndLoginTrusted(input: {
 }
 
 describe("IdentityHttpServer secret metadata routes", () => {
+  it("exposes general health and trusted-only diagnostics endpoints", async () => {
+    const { baseUrl, harness } = await startServer();
+    const owner = await registerAndLoginTrusted({
+      baseUrl,
+      harness,
+      username: "secret.metadata.health.owner",
+      trustedDeviceId: "trusted-device:secret-metadata-health-owner",
+    });
+    const untrusted = await registerAndLogin(baseUrl, "secret.metadata.health.untrusted");
+
+    const healthResponse = await fetch(`${baseUrl}/api/v1/security/secrets/health`, {
+      headers: {
+        authorization: `Bearer ${untrusted.sessionToken}`,
+      },
+    });
+    expect(healthResponse.status).toBe(200);
+    const healthBody = await healthResponse.json();
+    expect(healthBody.ok).toBe(true);
+    expect(healthBody.data.health).toBeDefined();
+    expect((healthBody.data.health as Record<string, unknown>).bootstrap).toBeUndefined();
+
+    const deniedDiagnostics = await fetch(`${baseUrl}/api/v1/security/secrets/diagnostics`, {
+      headers: {
+        authorization: `Bearer ${untrusted.sessionToken}`,
+      },
+    });
+    expect(deniedDiagnostics.status).toBe(403);
+
+    const diagnosticsResponse = await fetch(`${baseUrl}/api/v1/security/secrets/diagnostics`, {
+      headers: {
+        authorization: `Bearer ${owner.sessionToken}`,
+      },
+    });
+    expect(diagnosticsResponse.status).toBe(200);
+    const diagnosticsBody = await diagnosticsResponse.json();
+    expect(diagnosticsBody.ok).toBe(true);
+    expect(diagnosticsBody.data.diagnostics.healthFlags.repositoryReachable).toBeTrue();
+    expect((diagnosticsBody.data.diagnostics as Record<string, unknown>).plaintext).toBeUndefined();
+  });
+
   it("supports create/list/get/rotate/disable metadata-only secret APIs", async () => {
     const { baseUrl, harness } = await startServer();
     const owner = await registerAndLoginTrusted({
@@ -375,3 +415,39 @@ describe("IdentityHttpServer secret metadata routes", () => {
     expect(invalidListBody.error.code).toBe("invalid-request");
   });
 });
+
+async function registerAndLogin(
+  baseUrl: string,
+  username: string,
+): Promise<{ readonly userIdentityId: string; readonly sessionToken: string }> {
+  const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      username,
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    }),
+  });
+  expect(registerResponse.status).toBe(200);
+  const registerBody = await registerResponse.json();
+
+  const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      providerSubject: username,
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    }),
+  });
+  expect(loginResponse.status).toBe(200);
+  const loginBody = await loginResponse.json();
+
+  return Object.freeze({
+    userIdentityId: registerBody.data.userIdentityId,
+    sessionToken: loginBody.data.sessionToken,
+  });
+}

@@ -1,6 +1,10 @@
 import type { SecretKind, SecretReference, SecretReferenceMetadata, SecretScope } from "../../../../src/domain/security/SecretDomain";
 import type { SecretClassificationId } from "../../../../src/shared/contracts/security/SecretClassificationContracts";
 import type { SecretRotationInstructionContract } from "../../../../src/shared/contracts/security/SecretTransportContracts";
+import type {
+  SecretServiceHealthViewDto,
+  SecretServiceOperationalDiagnosticsViewDto,
+} from "../../../../src/shared/dto/security/SecretServiceOperationalDiagnosticsDtos";
 
 export const SecretMetadataApiErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -121,4 +125,20 @@ export interface RotateSecretMetadataApiRequest {
 
 export interface RotateSecretMetadataApiResponse {
   readonly secret: SecretMetadataApiRecord;
+}
+
+export interface GetSecretServiceHealthApiRequest {
+  readonly actorUserIdentityId: string;
+}
+
+export interface GetSecretServiceHealthApiResponse {
+  readonly health: SecretServiceHealthViewDto;
+}
+
+export interface GetSecretServiceDiagnosticsApiRequest {
+  readonly actorUserIdentityId: string;
+}
+
+export interface GetSecretServiceDiagnosticsApiResponse {
+  readonly diagnostics: SecretServiceOperationalDiagnosticsViewDto;
 }

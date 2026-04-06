@@ -339,6 +339,64 @@ describe("IdentityServerHost", () => {
     }
   });
 
+  it("integrates secret health diagnostics endpoints into host runtime", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-secret-health-host-runtime-"));
+    const databasePath = join(tempDirectory, "secret-health-host-runtime.sqlite");
+    const host = await startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+    });
+
+    try {
+      const registerResponse = await fetch(`http://${host.address}/api/v1/identity/register`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          username: "secret.health.host.user",
+          credential: {
+            candidate: "StrongPass!2026",
+          },
+        }),
+      });
+      expect(registerResponse.status).toBe(200);
+
+      const loginResponse = await fetch(`http://${host.address}/api/v1/identity/login`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          providerSubject: "secret.health.host.user",
+          credential: {
+            candidate: "StrongPass!2026",
+          },
+        }),
+      });
+      expect(loginResponse.status).toBe(200);
+      const loginBody = await loginResponse.json();
+
+      const healthResponse = await fetch(`http://${host.address}/api/v1/security/secrets/health`, {
+        headers: {
+          authorization: `Bearer ${loginBody.data.sessionToken}`,
+        },
+      });
+      expect(healthResponse.status).toBe(200);
+      const healthBody = await healthResponse.json();
+      expect(healthBody.ok).toBe(true);
+      expect(healthBody.data.health.state).toBe("degraded");
+      expect(healthBody.data.health.healthFlags.encryptionMaterialAvailable).toBe(false);
+      expect((healthBody.data.health as Record<string, unknown>).bootstrap).toBeUndefined();
+    } finally {
+      await host.close();
+      rmSync(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("exposes workspace invitation issuance and onboarding routes on the runtime host", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-workspace-host-test-"));
     const databasePath = join(tempDirectory, "identity-workspace-host.sqlite");

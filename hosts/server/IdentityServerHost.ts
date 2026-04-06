@@ -77,6 +77,7 @@ import { ServerManagedTransportTrustStateResolver } from "../../src/infrastructu
 import { TransportSecurityObservabilityReporter } from "../../src/infrastructure/security/TransportSecurityObservabilityReporter";
 import { createFileSystemProtectedSecretStoreFromEnvironment } from "../../src/infrastructure/security/secrets/FileSystemProtectedSecretStore";
 import { composeServerSecretService, type ServerComposedSecretService } from "../../src/infrastructure/security/secrets/SecretServiceComposition";
+import { SecretServiceOperationalDiagnosticsProvider } from "../../src/infrastructure/security/secrets/SecretServiceOperationalDiagnostics";
 import { ServerPlatformSecretConsumers } from "../../src/infrastructure/security/secrets/ServerPlatformSecretConsumers";
 import { assertSystemSecretBootstrapSafe } from "../../src/infrastructure/security/secrets/SystemSecretBootstrapService";
 import type { ICertificateAuthorityIssuerPort } from "../../src/application/security/ports/ICertificateAuthorityIssuerPort";
@@ -684,6 +685,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     disableSecretUseCase: secretService.disableSecretUseCase,
     rotateSecretUseCase: secretService.rotateSecretUseCase,
     workspaceAuthorizationReadRepository: workspaceRepository,
+    secretOperationalDiagnosticsProvider: new SecretServiceOperationalDiagnosticsProvider({
+      env,
+      secretService,
+    }),
   });
   const nodeTrustBackendApi = new NodeTrustBackendApi({
     registerNodeEnrollmentRequestUseCase: new RegisterNodeEnrollmentRequestUseCase({

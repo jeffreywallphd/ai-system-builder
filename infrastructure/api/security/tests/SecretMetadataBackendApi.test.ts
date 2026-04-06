@@ -204,6 +204,93 @@ describe("SecretMetadataBackendApi", () => {
     expect(response.error.message).toBe("Request validation failed.");
     expect(response.error.validationErrors?.length).toBeGreaterThan(0);
   });
+
+  it("returns minimal secret service health view", async () => {
+    const backend = createBackend({
+      secretOperationalDiagnosticsProvider: {
+        collectDiagnostics: async () => Object.freeze({
+          state: "degraded",
+          checkedAt: "2026-04-06T12:10:00.000Z",
+          healthFlags: Object.freeze({
+            encryptionMaterialAvailable: false,
+            repositoryReachable: true,
+            bootstrapSecretsHealthy: false,
+            runtimeDependenciesHealthy: false,
+          }),
+          diagnostics: Object.freeze([Object.freeze({
+            code: "secret-encryption-unavailable",
+            severity: "warning",
+            message: "Secret encryption material is not configured.",
+          })]),
+          bootstrap: Object.freeze({
+            requiredSecretIds: Object.freeze(["secret:server:provider:openai"]),
+            diagnostics: Object.freeze([Object.freeze({
+              code: "required-secret-missing",
+              severity: "error",
+              message: "Required system secret is missing.",
+              secretId: "secret:server:provider:openai",
+            })]),
+          }),
+        }),
+      },
+    });
+
+    const response = await backend.getSecretServiceHealth({
+      actorUserIdentityId: "user:alpha",
+    });
+
+    expect(response.ok).toBeTrue();
+    if (!response.ok || !response.data) {
+      return;
+    }
+
+    expect(response.data.health.state).toBe("degraded");
+    expect((response.data.health as Record<string, unknown>).bootstrap).toBeUndefined();
+  });
+
+  it("returns detailed diagnostics without leaking secret material", async () => {
+    const backend = createBackend({
+      secretOperationalDiagnosticsProvider: {
+        collectDiagnostics: async () => Object.freeze({
+          state: "degraded",
+          checkedAt: "2026-04-06T12:15:00.000Z",
+          healthFlags: Object.freeze({
+            encryptionMaterialAvailable: false,
+            repositoryReachable: true,
+            bootstrapSecretsHealthy: false,
+            runtimeDependenciesHealthy: false,
+          }),
+          diagnostics: Object.freeze([Object.freeze({
+            code: "secret-encryption-unavailable",
+            severity: "warning",
+            message: "secret-store:/top-level/sensitive/path leaked",
+          })]),
+          bootstrap: Object.freeze({
+            requiredSecretIds: Object.freeze(["secret:server:provider:openai"]),
+            diagnostics: Object.freeze([Object.freeze({
+              code: "bootstrap-error",
+              severity: "error",
+              message: "secret-store:/sensitive/path leaked",
+              secretId: "secret:server:provider:openai",
+            })]),
+          }),
+        }),
+      },
+    });
+
+    const response = await backend.getSecretServiceDiagnostics({
+      actorUserIdentityId: "user:alpha",
+    });
+
+    expect(response.ok).toBeTrue();
+    if (!response.ok || !response.data) {
+      return;
+    }
+
+    expect(response.data.diagnostics.bootstrap.requiredSecretIds).toEqual(["secret:server:provider:openai"]);
+    expect(response.data.diagnostics.diagnostics[0]?.message).toBe("Secret service diagnostic emitted.");
+    expect(response.data.diagnostics.bootstrap.diagnostics[0]?.message).toBe("Secret service diagnostic emitted.");
+  });
 });
 
 function createBackend(overrides: Record<string, unknown>): SecretMetadataBackendApi {
