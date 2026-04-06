@@ -8,6 +8,7 @@
 ## Canonical files
 
 - `src/infrastructure/persistence/sqlite/SqlitePersistenceRuntime.ts`
+- `src/infrastructure/persistence/sqlite/SqliteTransactionCoordinator.ts`
 - `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 
 ## What the runtime bootstrap now does
@@ -33,3 +34,18 @@
   - `AI_LOOM_PERSISTENCE_SQLITE_FOREIGN_KEYS`
 
 Explicit host `databasePath` remains the first-precedence value for authoritative startup composition.
+
+## Story 13.2.4 transaction coordination additions
+
+- Shared transaction boundary contract + helper:
+  - `src/application/common/ports/PlatformTransactionPorts.ts`
+- SQLite unit-of-work style transaction coordinator:
+  - `src/infrastructure/persistence/sqlite/SqliteTransactionCoordinator.ts`
+- Coordinator behavior:
+  - explicit outer transaction lifecycle (`BEGIN IMMEDIATE` / `COMMIT` / rollback on failure)
+  - nested savepoint support for re-entrant transaction calls
+  - serialized outer transaction execution on a shared database connection
+- Adapter participation:
+  - `SqliteIdentityPersistenceAdapter` now exposes `runInTransaction(...)`
+  - `SqliteWorkspacePersistenceAdapter` now delegates transaction execution through the shared coordinator
+- Application use cases can now group multi-repository writes without leaking database transaction primitives into business logic by using `runInTransactionBoundary(...)`.

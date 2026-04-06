@@ -39,6 +39,12 @@ import type { ILocalPasswordCredentialService } from "../ports/ILocalPasswordCre
 import { IdentityPolicyService } from "../services/IdentityPolicyService";
 import { LocalPasswordIdentityAuthenticator } from "../services/LocalPasswordIdentityAuthenticator";
 import { RegisterLocalAccountUseCase } from "../../../src/application/identity/use-cases/RegisterLocalAccountUseCase";
+import type { IPlatformTransactionManager } from "../../../src/application/common/ports/PlatformTransactionPorts";
+
+interface IdentityRegistrationAdapterSnapshot {
+  readonly users: Map<string, UserIdentity>;
+  readonly credentialMaterial: Map<string, IdentityCredentialMaterialRecord>;
+}
 
 class InMemoryIdentityRegistrationAdapter
   implements IIdentityLookupRepository, IIdentityPersistenceRepository, ICredentialMaterialRepository, IIdentityClock, IIdentityIdGenerator {
@@ -47,6 +53,7 @@ class InMemoryIdentityRegistrationAdapter
   private readonly policies = new Map<string, CredentialPolicy>();
   private readonly credentialMaterial = new Map<string, IdentityCredentialMaterialRecord>();
   private sequence = 0;
+  public failCredentialSave = false;
 
   public now(): Date {
     return new Date("2026-04-04T12:00:00.000Z");
@@ -147,6 +154,9 @@ class InMemoryIdentityRegistrationAdapter
   }
 
   public async saveCredentialMaterial(record: IdentityCredentialMaterialRecord): Promise<IdentityCredentialMaterialRecord> {
+    if (this.failCredentialSave) {
+      throw new Error("credential persistence failure");
+    }
     this.credentialMaterial.set(record.id, record);
     return record;
   }
@@ -172,6 +182,41 @@ class InMemoryIdentityRegistrationAdapter
       updatedAt: supersededAt,
     });
     return identitySuccess({ changed: true });
+  }
+
+  public createSnapshot(): IdentityRegistrationAdapterSnapshot {
+    return Object.freeze({
+      users: new Map(this.users),
+      credentialMaterial: new Map(this.credentialMaterial),
+    });
+  }
+
+  public restoreSnapshot(snapshot: IdentityRegistrationAdapterSnapshot): void {
+    this.users.clear();
+    this.credentialMaterial.clear();
+    for (const [key, value] of snapshot.users.entries()) {
+      this.users.set(key, value);
+    }
+    for (const [key, value] of snapshot.credentialMaterial.entries()) {
+      this.credentialMaterial.set(key, value);
+    }
+  }
+}
+
+class InMemoryIdentityRegistrationTransactionManager implements IPlatformTransactionManager {
+  public callCount = 0;
+
+  public constructor(private readonly adapter: InMemoryIdentityRegistrationAdapter) {}
+
+  public async runInTransaction<TValue>(operation: () => Promise<TValue>): Promise<TValue> {
+    this.callCount += 1;
+    const snapshot = this.adapter.createSnapshot();
+    try {
+      return await operation();
+    } catch (error) {
+      this.adapter.restoreSnapshot(snapshot);
+      throw error;
+    }
   }
 }
 
@@ -211,11 +256,13 @@ function createUseCase(
   adapter: InMemoryIdentityRegistrationAdapter,
   passwordCredentialService: ILocalPasswordCredentialService = new StubPasswordCredentialService(),
   eventPublisher?: IIdentityLifecycleEventPublisher,
+  transactionManager?: IPlatformTransactionManager,
 ): RegisterLocalAccountUseCase {
   return new RegisterLocalAccountUseCase({
     lookupRepository: adapter,
     persistenceRepository: adapter,
     credentialMaterialRepository: adapter,
+    transactionManager,
     identityPolicyService: new IdentityPolicyService(adapter),
     credentialAuthenticator: new LocalPasswordIdentityAuthenticator(passwordCredentialService),
     idGenerator: adapter,
@@ -439,5 +486,40 @@ describe("RegisterLocalAccountUseCase", () => {
     });
 
     expect(result.ok).toBe(true);
+  });
+
+  it("routes grouped registration writes through the configured transaction manager", async () => {
+    const adapter = new InMemoryIdentityRegistrationAdapter();
+    await seedLocalProviderAndPolicy(adapter);
+    const transactionManager = new InMemoryIdentityRegistrationTransactionManager(adapter);
+    const useCase = createUseCase(adapter, new StubPasswordCredentialService(), undefined, transactionManager);
+
+    const result = await useCase.execute({
+      username: "transaction.user",
+      credential: {
+        candidate: "Str0ng!Passphrase",
+      },
+    });
+
+    expect(result.ok).toBeTrue();
+    expect(transactionManager.callCount).toBe(1);
+  });
+
+  it("rolls back registration writes when credential persistence fails inside the transaction boundary", async () => {
+    const adapter = new InMemoryIdentityRegistrationAdapter();
+    await seedLocalProviderAndPolicy(adapter);
+    adapter.failCredentialSave = true;
+    const transactionManager = new InMemoryIdentityRegistrationTransactionManager(adapter);
+    const useCase = createUseCase(adapter, new StubPasswordCredentialService(), undefined, transactionManager);
+
+    await expect(useCase.execute({
+      username: "rollback.user",
+      credential: {
+        candidate: "Str0ng!Passphrase",
+      },
+    })).rejects.toThrow("credential persistence failure");
+
+    expect(transactionManager.callCount).toBe(1);
+    expect(await adapter.countUserIdentities()).toBe(0);
   });
 });

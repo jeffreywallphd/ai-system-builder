@@ -26,6 +26,7 @@ import type {
   WorkspaceRoleAssignmentListQuery,
 } from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
+import { SqliteTransactionCoordinator } from "../sqlite/SqliteTransactionCoordinator";
 import {
   mapWorkspaceInvitationRowToDomain,
   mapWorkspaceInvitationToRowValues,
@@ -58,8 +59,11 @@ export class SqliteWorkspacePersistenceAdapter
     IWorkspaceTransactionManager {
   private database?: SqliteCompatDatabase;
   private initialized = false;
+  private readonly transactionCoordinator: SqliteTransactionCoordinator;
 
-  public constructor(private readonly databasePath: string) {}
+  public constructor(private readonly databasePath: string) {
+    this.transactionCoordinator = new SqliteTransactionCoordinator(() => this.getDatabase());
+  }
 
   public async findWorkspaceById(workspaceId: string): Promise<Workspace | undefined> {
     const normalizedWorkspaceId = normalizeLookup(workspaceId);
@@ -809,20 +813,7 @@ export class SqliteWorkspacePersistenceAdapter
   }
 
   public async runInTransaction<TValue>(operation: () => Promise<TValue>): Promise<TValue> {
-    const database = this.getDatabase();
-    database.exec("BEGIN IMMEDIATE TRANSACTION");
-    try {
-      const value = await operation();
-      database.exec("COMMIT");
-      return value;
-    } catch (error) {
-      try {
-        database.exec("ROLLBACK");
-      } catch {
-        // Ignore rollback failures because the original error is more actionable.
-      }
-      throw error;
-    }
+    return this.transactionCoordinator.runInTransaction(operation);
   }
 
   public dispose(): void {

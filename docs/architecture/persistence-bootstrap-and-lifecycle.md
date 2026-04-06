@@ -12,6 +12,8 @@ This note documents the Story 13.2.1 baseline for authoritative persistence boot
 
 - Runtime + config resolver:
   - `src/infrastructure/persistence/sqlite/SqlitePersistenceRuntime.ts`
+- Transaction coordination runtime seam:
+  - `src/infrastructure/persistence/sqlite/SqliteTransactionCoordinator.ts`
 - Authoritative host integration:
   - `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 
@@ -26,6 +28,20 @@ This note documents the Story 13.2.1 baseline for authoritative persistence boot
 - deterministic migration hook execution with checksum tracking
 
 This keeps migration-safe evolution explicit before domain-specific repository migrations run.
+
+## Story 13.2.4 transaction coordination baseline
+
+- Shared application transaction boundary contract and helper now live in:
+  - `src/application/common/ports/PlatformTransactionPorts.ts`
+- SQLite transaction coordination now provides unit-of-work style grouped mutation execution with:
+  - outer transaction boundaries (`BEGIN IMMEDIATE`, `COMMIT`, `ROLLBACK`)
+  - nested savepoint handling for re-entrant transaction scopes
+  - serialized outer transaction execution for a shared connection
+- Repository adapter participation now includes:
+  - `SqliteIdentityPersistenceAdapter.runInTransaction(...)`
+  - `SqliteWorkspacePersistenceAdapter.runInTransaction(...)`
+- Application use cases can opt into grouped multi-repository updates by injecting a transaction manager and calling `runInTransactionBoundary(...)` instead of handling low-level transaction primitives.
+- Rollback semantics are explicit and test-covered for failure cases where one persistence step in a grouped mutation fails.
 
 ## Lifecycle integration
 

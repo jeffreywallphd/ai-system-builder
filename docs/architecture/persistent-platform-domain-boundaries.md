@@ -267,6 +267,24 @@ The goal is to keep repository implementation aligned to domain/application cont
   - `src/infrastructure/persistence/assets/tests/SqliteAssetPersistenceAdapter.test.ts`
   - `src/infrastructure/persistence/platform/tests/SqlitePlatformPersistenceAdapter.test.ts`
 
+## Story 13.2.4 transaction coordination and unit-of-work support
+
+- Shared transaction boundary port for application-layer use cases:
+  - `src/application/common/ports/PlatformTransactionPorts.ts`
+- Identity repository bundle now supports optional transaction coordination injection:
+  - `src/application/identity/ports/IdentityRepositoryPorts.ts`
+- Register-local-account use case now groups identity + credential-material writes through the shared transaction boundary when configured:
+  - `src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`
+- Concrete adapter participation now includes common transaction coordination in:
+  - `src/infrastructure/persistence/sqlite/SqliteTransactionCoordinator.ts`
+  - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
+  - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter.ts`
+- Coverage additions:
+  - `src/application/common/tests/PlatformTransactionPorts.test.ts`
+  - `application/identity/tests/RegisterLocalAccountUseCase.test.ts`
+  - `src/infrastructure/persistence/sqlite/tests/SqliteTransactionCoordinator.test.ts`
+  - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
+
 ## Mapper responsibility guidance (Story 13.1.3)
 
 - Mapper boundaries are adapter-local but contract-driven:
