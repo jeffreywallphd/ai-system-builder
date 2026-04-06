@@ -50,9 +50,9 @@ Implemented capability areas:
 - `src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter.ts`
 - `infrastructure/transport/authorization/AuthorizationTransportPolicyGuard.ts`
 - `infrastructure/transport/authorization/AuthorizationTransportAdapters.ts`
-- `infrastructure/api/authorization/AuthorizationManagementBackendApi.ts`
-- `infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/authorization/AuthorizationManagementBackendApi.ts`
+- `src/infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 
 ### Desktop and thin-client management surfaces
 
@@ -178,8 +178,8 @@ Core test suites validating Feature 4 contracts and integration:
 - `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
 - `src/application/authorization/tests/AuthorizationAdministrationUseCases.test.ts`
 - `infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
-- `infrastructure/api/authorization/tests/AuthorizationManagementBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthorizationManagement.test.ts`
+- `src/infrastructure/api/authorization/tests/AuthorizationManagementBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthorizationManagement.test.ts`
 - `ui/shared/authorization/tests/AuthorizationManagementClient.test.ts`
 - `ui/web/authorization/tests/AuthorizationSharingRoutes.test.ts`
 - `ui/pages/tests/AuthorizationSharingManagementPage.test.tsx`

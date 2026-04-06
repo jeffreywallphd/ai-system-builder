@@ -7,13 +7,13 @@ Story 9.3.5 extends this surface with durable storage-management audit governanc
 
 ## Canonical files
 
-- `infrastructure/api/storage/sdk/PublicStorageManagementApiContract.ts`
-- `infrastructure/api/storage/StorageManagementBackendApi.ts`
-- `infrastructure/api/storage/WorkspaceAwareStoragePolicyEvaluationAdapter.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `hosts/server/IdentityServerHost.ts`
-- `infrastructure/api/storage/tests/StorageManagementBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerStorageManagement.test.ts`
+- `src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract.ts`
+- `src/infrastructure/api/storage/StorageManagementBackendApi.ts`
+- `src/infrastructure/api/storage/WorkspaceAwareStoragePolicyEvaluationAdapter.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/hosts/server/IdentityServerHost.ts`
+- `src/infrastructure/api/storage/tests/StorageManagementBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerStorageManagement.test.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
 
 ## API behavior

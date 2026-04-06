@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import AppRouter from "./routes/AppRouter";
 import { AppProviders } from "./composition/AppProviders";
 import { AppRuntimeConfig } from "../infrastructure/config/AppRuntimeConfig";
-import type { LoginLocalIdentityApiResponse } from "../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+import type { LoginLocalIdentityApiResponse } from "../src/infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { IdentitySessionUnauthenticatedReason, IdentitySessionBootstrapStatus, IdentityAuthSessionCoordinator } from "./shared/identity/IdentityAuthSessionCoordinator";
 import { IdentityAuthSessionStore } from "./shared/identity/IdentityAuthSessionStore";
 import { IdentityAuthService } from "./services/IdentityAuthService";

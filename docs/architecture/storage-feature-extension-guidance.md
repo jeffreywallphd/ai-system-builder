@@ -18,14 +18,14 @@ This note documents Story 9.4.5 (Feature 9 / Epic 9.4): contributor guidance and
 - `src/infrastructure/storage/shared/ServerManagedSharedStorageBackendAdapter.ts`
 - `src/infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter.ts`
 - `src/infrastructure/persistence/storage/SqliteStorageInstancePersistenceAdapter.ts`
-- `infrastructure/api/storage/StorageManagementBackendApi.ts`
-- `infrastructure/api/storage/sdk/PublicStorageManagementApiContract.ts`
+- `src/infrastructure/api/storage/StorageManagementBackendApi.ts`
+- `src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract.ts`
 - `ui/shared/storage/StorageAdministrationClient.ts`
 - `ui/services/StorageAdministrationService.ts`
 - `ui/components/storage/StorageInstanceWorkflowPanel.tsx`
 - `ui/pages/StorageAdministrationPage.tsx`
 - `ui/web/storage/StorageAdministrationRoutes.ts`
-- `hosts/server/IdentityServerHost.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 
 ## Extension objective
 
@@ -118,7 +118,7 @@ Rules:
 
 These behaviors are current implementation, not target-state placeholders:
 
-- `hosts/server/IdentityServerHost.ts` composes `StorageBackendProvisioningOrchestrator` with `createStorageBackendAdapterRegistry([])`.
+- `src/hosts/server/IdentityServerHost.ts` composes `StorageBackendProvisioningOrchestrator` with `createStorageBackendAdapterRegistry([])`.
 - In this host composition, backend provisioning/capability inspection requests resolve as unconfigured unless adapters are explicitly wired.
 - Admin UI supports provisioning toggles, but default create/lifecycle flows remain valid without backend activation/provisioning requests.
 - Synchronization posture remains a typed assessment seam via `ServerManagedStorageSynchronizationAdapter`; it is not a distributed replication engine.
@@ -172,8 +172,8 @@ Keep these suites green when extending storage backends or admin behavior:
   - `src/infrastructure/persistence/storage/tests/SqliteStorageInstancePersistenceAdapter.test.ts`
   - `src/infrastructure/persistence/storage/tests/SqliteStorageManagementAuditRecorder.test.ts`
 - API/transport/UI contracts:
-  - `infrastructure/api/storage/tests/StorageManagementBackendApi.test.ts`
-  - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerStorageManagement.test.ts`
+  - `src/infrastructure/api/storage/tests/StorageManagementBackendApi.test.ts`
+  - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerStorageManagement.test.ts`
   - `src/shared/contracts/storage/tests/StorageTransportContracts.test.ts`
   - `src/shared/schemas/storage/tests/StorageTransportSchemaContracts.test.ts`
   - `ui/shared/storage/tests/StorageAdministrationClient.test.ts`

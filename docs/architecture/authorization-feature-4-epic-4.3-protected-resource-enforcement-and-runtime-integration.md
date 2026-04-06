@@ -9,9 +9,9 @@ Story 4.3.1 adds reusable transport authorization adapters so request handlers c
 - `infrastructure/transport/authorization/index.ts`
 - `infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
 - `src/infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter.ts`
-- `infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
-- `infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
+- `src/infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
+- `src/infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
 - `ui/presenters/WorkspaceAdministrationCapabilitiesPresenter.ts`
 - `infrastructure/api/studio-shell/StudioShellBackendApi.ts`
 - `infrastructure/api/registry/RegistryBackendApi.ts`

@@ -55,9 +55,9 @@ Use this file as the shortest reliable orientation before reading the human arch
 - `application/identity/services/IdentityAuthenticatedSessionService.ts`
 - `application/identity/ports/ITrustedDeviceRepository.ts`
 - `application/identity/ports/ITrustedDeviceManagementService.ts`
-- `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `infrastructure/api/identity/IdentityAuthBackendApi.ts`
+- `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
 
 ## Identity session docs
 
@@ -228,7 +228,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 
 ## Direction 8 update: secret host composition (story 8.1.7)
 
-- Authoritative server runtime now composes secret services through `src/infrastructure/security/secrets/SecretServiceComposition.ts` and host wiring in `hosts/server/IdentityServerHost.ts`.
+- Authoritative server runtime now composes secret services through `src/infrastructure/security/secrets/SecretServiceComposition.ts` and host wiring in `src/hosts/server/IdentityServerHost.ts`.
 - Canonical architecture note for this slice: `docs/architecture/secrets-service-composition.md`.
 - Runtime-facing service-to-service secret consumption adapters now expose workspace/user/server credential retrieval through formal retrieval use cases in `src/application/security/services/SecretRuntimeConsumptionAdapters.ts`.
 - Canonical architecture note for this slice: `docs/architecture/secrets-service-consumption-adapters.md`.

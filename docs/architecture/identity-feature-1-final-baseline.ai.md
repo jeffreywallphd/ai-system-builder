@@ -17,9 +17,9 @@ Provide a concise implementation-truth handoff for downstream epics depending on
 
 ## Canonical runtime composition
 
-- `hosts/server/IdentityServerHost.ts`
-- `infrastructure/api/identity/IdentityAuthBackendApi.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/hosts/server/IdentityServerHost.ts`
+- `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 
 ## Canonical downstream seams
 

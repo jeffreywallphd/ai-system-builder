@@ -57,8 +57,8 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
 ## Story 5.2.2 additions
 
 - New server adapter files:
-  - `infrastructure/api/nodes/NodeTrustBackendApi.ts`
-  - `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+  - `src/infrastructure/api/nodes/NodeTrustBackendApi.ts`
+  - `src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
 - New HTTP routes in `IdentityHttpServer.ts`:
   - `POST /api/v1/nodes/enrollments` (bootstrap enrollment submission)
   - `GET /api/v1/nodes/enrollments/pending` (admin pending-review query)
@@ -71,8 +71,8 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
 ## Story 5.2.4 additions
 
 - Expanded server adapter surface:
-  - `infrastructure/api/nodes/NodeTrustBackendApi.ts`
-  - `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+  - `src/infrastructure/api/nodes/NodeTrustBackendApi.ts`
+  - `src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
 - Expanded HTTP routes in `IdentityHttpServer.ts`:
   - `GET /api/v1/nodes/enrollments/:requestId` (enrollment detail review)
   - `POST /api/v1/nodes/enrollments/:requestId/approve` (approval action)
@@ -85,8 +85,8 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
 ## Story 5.3.3 additions
 
 - Expanded server adapter surface:
-  - `infrastructure/api/nodes/NodeTrustBackendApi.ts`
-  - `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+  - `src/infrastructure/api/nodes/NodeTrustBackendApi.ts`
+  - `src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
 - Expanded HTTP routes in `IdentityHttpServer.ts`:
   - `POST /api/v1/nodes/:nodeId/heartbeat` (trusted-node heartbeat ingestion)
   - `GET /api/v1/nodes/trusted` (admin trusted-node inventory/presence query)
@@ -99,8 +99,8 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
 ## Story 5.3.4 additions
 
 - Expanded server adapter surface:
-  - `infrastructure/api/nodes/NodeTrustBackendApi.ts`
-  - `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+  - `src/infrastructure/api/nodes/NodeTrustBackendApi.ts`
+  - `src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
 - Expanded HTTP routes in `IdentityHttpServer.ts`:
   - `GET /api/v1/nodes/inventory`
   - `GET /api/v1/nodes/inventory/:nodeId`
@@ -189,8 +189,8 @@ Behavior highlights:
   - binds `nodeId` from route path and ignores spoofed payload values
   - returns admin-safe `NodeRevocationResponseDto`
 - Backend and contract surface expanded:
-  - `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
-  - `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+  - `src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+  - `src/infrastructure/api/nodes/NodeTrustBackendApi.ts`
 - Renderer wiring expanded:
   - `ui/shared/nodes/NodeInventoryClient.ts`
   - `ui/services/NodeInventoryService.ts`

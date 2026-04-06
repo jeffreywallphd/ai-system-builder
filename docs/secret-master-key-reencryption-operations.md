@@ -13,8 +13,8 @@ This runbook documents Story 8.3.6 (Feature 8 / Epic 8.3): controlled re-encrypt
 - `src/application/security/ports/SecretServicePorts.ts`
 - `src/infrastructure/persistence/security/SqliteSecretRecordPersistenceAdapter.ts`
 - `src/infrastructure/persistence/security/SqliteSecretRecordPersistenceMigrations.ts`
-- `infrastructure/api/security/SecretMetadataBackendApi.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/security/SecretMetadataBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 
 ## Operational prerequisites
 

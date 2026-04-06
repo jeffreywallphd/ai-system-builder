@@ -289,10 +289,10 @@ Protected-resource composition pattern is canonical:
 ## Story 3.3.4 invitation and onboarding API transport exposure
 
 - Added workspace invitation/onboarding public API contracts:
-  - `infrastructure/api/workspaces/sdk/PublicWorkspaceInvitationApiContract.ts`
-  - `infrastructure/api/workspaces/sdk/index.ts`
-- Added `WorkspaceInvitationBackendApi` (`infrastructure/api/workspaces/WorkspaceInvitationBackendApi.ts`) to map transport DTOs into workspace invitation issuance and authenticated onboarding use cases while exposing stable external error codes.
-- Extended authoritative HTTP server transport (`infrastructure/transport/http-server/identity/IdentityHttpServer.ts`) with authenticated workspace routes:
+  - `src/infrastructure/api/workspaces/sdk/PublicWorkspaceInvitationApiContract.ts`
+  - `src/infrastructure/api/workspaces/sdk/index.ts`
+- Added `WorkspaceInvitationBackendApi` (`src/infrastructure/api/workspaces/WorkspaceInvitationBackendApi.ts`) to map transport DTOs into workspace invitation issuance and authenticated onboarding use cases while exposing stable external error codes.
+- Extended authoritative HTTP server transport (`src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`) with authenticated workspace routes:
   - `POST /api/v1/workspaces/:workspaceId/invitations`
   - `POST /api/v1/workspaces/:workspaceId/onboarding/accept`
 - Route behavior is transport-safe and production-oriented:
@@ -301,22 +301,22 @@ Protected-resource composition pattern is canonical:
   - workspace admin authorization enforced through existing invitation issuance use-case policy (`owner`/`admin` + active membership),
   - stable external error envelope mapping (`invalid-request`, `forbidden`, `not-found`, `conflict`, `invalid-invite`, `internal`),
   - invitation token hash and persistence internals are not exposed in response payloads.
-- Host composition now wires workspace invitation APIs in runtime server bootstrap (`hosts/server/IdentityServerHost.ts`) using existing SQLite workspace persistence and workspace use cases.
+- Host composition now wires workspace invitation APIs in runtime server bootstrap (`src/hosts/server/IdentityServerHost.ts`) using existing SQLite workspace persistence and workspace use cases.
 - Added HTTP integration coverage for route behavior and contract shape in:
-  - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceInvitations.test.ts`
+  - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceInvitations.test.ts`
 
 ## Story 3.4.1 workspace administration backend endpoints and presenters
 
 - Added workspace administration API contracts for admin surfaces:
-  - `infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract.ts`
-  - updated `infrastructure/api/workspaces/sdk/index.ts`
-- Added `WorkspaceAdministrationBackendApi` (`infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`) as the transport-facing orchestration/presenter layer for workspace administration screens.
+  - `src/infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract.ts`
+  - updated `src/infrastructure/api/workspaces/sdk/index.ts`
+- Added `WorkspaceAdministrationBackendApi` (`src/infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`) as the transport-facing orchestration/presenter layer for workspace administration screens.
 - Backend API behavior now:
   - reuses existing application use cases/query service (no direct domain/persistence bypass),
   - exposes explicit response contracts for workspace list/admin-view/members/invitations/roles,
   - exposes admin mutation flows for workspace create/update/lifecycle, member add/status/remove, role assign/reassign/revoke, and invitation cancellation,
   - maps internal use-case/query errors into stable external error codes for UI clients.
-- Extended authoritative HTTP transport (`infrastructure/transport/http-server/identity/IdentityHttpServer.ts`) with authenticated workspace administration endpoints:
+- Extended authoritative HTTP transport (`src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`) with authenticated workspace administration endpoints:
   - `GET /api/v1/workspaces`
   - `POST /api/v1/workspaces`
   - `GET /api/v1/workspaces/:workspaceId/admin-view`
@@ -329,9 +329,9 @@ Protected-resource composition pattern is canonical:
   - `DELETE /api/v1/workspaces/:workspaceId/invitations/:invitationId`
   - `GET /api/v1/workspaces/:workspaceId/roles`
   - `POST /api/v1/workspaces/:workspaceId/roles/{assign|reassign|revoke}`
-- Host composition now wires the workspace administration backend at runtime in `hosts/server/IdentityServerHost.ts`.
+- Host composition now wires the workspace administration backend at runtime in `src/hosts/server/IdentityServerHost.ts`.
 - Added HTTP/host integration coverage updates for route behavior and response shape:
-  - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
+  - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
   - updated `hosts/server/tests/IdentityServerHost.test.ts`
 
 ## Story 3.4.2 desktop workspace administration pages

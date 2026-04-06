@@ -4,7 +4,7 @@ import type {
   IdentityAdminAccountSummaryApiResponse,
   IdentityAdminAccountStatus,
   TrustedDeviceSummaryApiResponse,
-} from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+} from "../../src/infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { IdentityAuthService } from "../services/IdentityAuthService";
 import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";

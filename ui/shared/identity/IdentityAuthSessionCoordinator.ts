@@ -1,4 +1,4 @@
-import { IdentityAuthApiErrorCodes } from "../../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+import { IdentityAuthApiErrorCodes } from "../../../src/infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import type { IdentityAuthService } from "../../services/IdentityAuthService";
 import { toPersistedIdentitySession, type IdentityAuthPersistedSession, type IdentityAuthSessionStore } from "./IdentityAuthSessionStore";
 

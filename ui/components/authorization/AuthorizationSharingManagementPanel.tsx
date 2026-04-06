@@ -3,7 +3,7 @@ import type {
   AuthorizationAccessStateApiResponse,
   AuthorizationManagementApiError,
   AuthorizationSharingGrantApiRecord,
-} from "../../../infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract";
+} from "../../../src/infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract";
 import { AuthorizationPermissionActionMatrix } from "../../../src/domain/authorization/AuthorizationPermissionCatalog";
 import type { AuthorizationResourceFamily } from "../../../src/domain/authorization/AuthorizationPermissionCatalog";
 import type { AuthorizationRoleKey, ResourceVisibility, SharingPolicyMode } from "../../../src/domain/authorization/AuthorizationDomain";

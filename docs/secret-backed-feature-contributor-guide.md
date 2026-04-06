@@ -99,7 +99,7 @@ Feature 8 now includes a production-readiness regression baseline that should re
   - verifies re-encryption progress, resume behavior, and redaction-safe failure status (`lastErrorMessage` does not leak raw adapter exception text).
 - `src/infrastructure/security/secrets/tests/SecretServiceGovernance.integration.test.ts`
   - verifies cross-layer lifecycle coverage: create, rotate, runtime retrieval, re-encrypt, delete/soft-delete visibility, and audit redaction.
-- `infrastructure/api/security/tests/SecretMetadataBackendApi.test.ts`
+- `src/infrastructure/api/security/tests/SecretMetadataBackendApi.test.ts`
   - verifies metadata/admin API error shaping keeps opaque sensitive tokens out of client-visible error messages.
 
 When extending Feature 8, update these tests (or add equivalent coverage) so lifecycle, redaction, and authorization posture remain stable.

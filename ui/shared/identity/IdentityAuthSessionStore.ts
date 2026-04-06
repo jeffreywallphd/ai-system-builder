@@ -1,4 +1,4 @@
-import type { LoginLocalIdentityApiResponse } from "../../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+import type { LoginLocalIdentityApiResponse } from "../../../src/infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 
 const IdentitySessionStorageKey = "ai-loom.identity.session.v1";
 

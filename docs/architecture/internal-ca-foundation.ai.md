@@ -64,8 +64,8 @@
 - `src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage.ts`
 - `src/infrastructure/security/ca/InternalCertificateAuthorityIssuer.ts`
 - `src/infrastructure/security/certificates/RuntimeTrustMaterialDistributionService.ts`
-- `hosts/server/IdentityServerHost.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/hosts/server/IdentityServerHost.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/application/security/tests/InitializeCertificateAuthorityUseCase.test.ts`
 - `src/application/security/tests/GetCertificateAuthorityStatusIntrospectionUseCase.test.ts`
 - `src/application/security/tests/IssueCertificateForSubjectUseCase.test.ts`
@@ -77,8 +77,8 @@
 - `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - `src/infrastructure/security/certificates/tests/RuntimeTrustMaterialDistributionService.test.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
-- `infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+- `src/infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
 - `src/shared/schemas/security/CertificateAuthoritySchemaContracts.ts`
 
@@ -416,7 +416,7 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - approved-node runtime trust retrieval trust-gating coverage: `src/application/nodes/tests/ResolveApprovedNodeRuntimeTrustMaterialUseCase.test.ts`
 - concrete issuer signing pipeline coverage: `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - host initialization seam coverage: `hosts/server/tests/IdentityServerHost.test.ts`
-- node backend + HTTP transport retrieval coverage: `infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts` and `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+- node backend + HTTP transport retrieval coverage: `src/infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts` and `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 
 ## Follow-on note
 

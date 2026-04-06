@@ -40,5 +40,5 @@ Final production-readiness hardening now expects these regression seams to stay 
   - ensures re-encryption failure status uses safe fixed messages and does not persist raw exception text.
 - `src/infrastructure/security/secrets/tests/SecretServiceGovernance.integration.test.ts`
   - validates end-to-end lifecycle consistency across create/rotate/retrieve/re-encrypt/delete with audit redaction checks.
-- `infrastructure/api/security/tests/SecretMetadataBackendApi.test.ts`
+- `src/infrastructure/api/security/tests/SecretMetadataBackendApi.test.ts`
   - validates API error sanitization for opaque sensitive token-like values.

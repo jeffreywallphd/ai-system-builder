@@ -29,7 +29,7 @@ import {
   startIdentityServerHost,
   type IdentityServerHost,
   type IdentityServerHostOptions,
-} from "../../../hosts/server/IdentityServerHost";
+} from "./IdentityServerHost";
 import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
 import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
 import {

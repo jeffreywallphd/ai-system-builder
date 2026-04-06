@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import type {
   GetStorageInstanceDetailApiResponse,
   GetStorageInstanceHealthApiResponse,
-} from "../../infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
+} from "../../src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
 import {
   StorageBackendTypes,
   StorageLifecycleStates,

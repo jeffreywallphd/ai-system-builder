@@ -1,7 +1,7 @@
 import type {
   AssetManagementApiResponse,
   AssetManagementApiError,
-} from "../../../infrastructure/api/assets/sdk/PublicAssetManagementApiContract";
+} from "../../../src/infrastructure/api/assets/sdk/PublicAssetManagementApiContract";
 import {
   AssetWorkflowClientContractVersions,
   buildAuthorizedAssetDownloadPath,

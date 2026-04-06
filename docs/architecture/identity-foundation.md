@@ -98,7 +98,7 @@ Application responsibilities:
 Filesystem adapter path:
 
 - `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
-- `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`
+- `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
 
 `src` adapter path (same contracts, mapper-separated):
 
@@ -223,10 +223,10 @@ Local identity registration/login is now exposed through an authoritative HTTP t
 
 Primary transport files:
 
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `infrastructure/api/identity/IdentityAuthBackendApi.ts`
-- `infrastructure/api/identity/sdk/PublicIdentityAuthApiContract.ts`
-- `hosts/server/IdentityServerHost.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
+- `src/infrastructure/api/identity/sdk/PublicIdentityAuthApiContract.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 
 Transport behavior:
 
@@ -372,7 +372,7 @@ Reliability posture:
 
 - lifecycle event publication is intentionally best effort
 - publisher failures are swallowed by design so registration/login/session/logout lifecycle behavior is not blocked by unavailable downstream audit/governance sinks
-- host runtime now composes a default SQLite-backed lifecycle event publisher (`infrastructure/filesystem/identity/SqliteIdentityLifecycleEventPublisher.ts`) so lifecycle audit records persist by default while preserving the publisher port abstraction
+- host runtime now composes a default SQLite-backed lifecycle event publisher (`src/infrastructure/persistence/identity/SqliteIdentityLifecycleEventPublisher.ts`) so lifecycle audit records persist by default while preserving the publisher port abstraction
 
 ## Sensitive-Data Redaction Hardening (Story 1.4.5)
 
@@ -380,8 +380,8 @@ Identity redaction and safe handling behavior is now centralized and safe-by-def
 
 Implementation points:
 
-- `infrastructure/api/identity/IdentityAuthRedaction.ts` centralizes recursive payload redaction plus freeform text/token redaction rules used by identity observability and HTTP server transport logs.
-- `infrastructure/api/identity/IdentityAuthResponseSerializers.ts` centralizes explicit allowlist response serialization for identity backend API payloads.
+- `src/infrastructure/api/identity/IdentityAuthRedaction.ts` centralizes recursive payload redaction plus freeform text/token redaction rules used by identity observability and HTTP server transport logs.
+- `src/infrastructure/api/identity/IdentityAuthResponseSerializers.ts` centralizes explicit allowlist response serialization for identity backend API payloads.
 - `ui/shared/identity/IdentityAuthSessionStore.ts` persists a minimized session shape (`IdentityAuthPersistedSession`) so token continuity fields remain available while recovery-sensitive/trust-seam metadata is excluded from local storage by default.
 
 Coverage posture:
@@ -495,7 +495,7 @@ Current authorization posture:
 Session lifecycle policy is now configurable through standard environment-backed config seams rather than hard-coded runtime behavior:
 
 - `infrastructure/config/IdentitySessionPolicyConfig.ts`
-- `hosts/server/IdentityServerHost.ts` (policy loading + injection into `IdentitySessionLifecycleService`)
+- `src/hosts/server/IdentityServerHost.ts` (policy loading + injection into `IdentitySessionLifecycleService`)
 
 Configurable per-channel policy controls:
 
@@ -593,7 +593,7 @@ Primary config seam:
 
 Host wiring:
 
-- `hosts/server/IdentityServerHost.ts` loads policy config from environment and applies it at identity startup:
+- `src/hosts/server/IdentityServerHost.ts` loads policy config from environment and applies it at identity startup:
   - local provider enablement (`active` or `disabled`)
   - startup bootstrap seeding of default local provider and credential policy
   - local registration feature toggle
@@ -638,13 +638,13 @@ Key tests for this foundation:
 - `application/identity/tests/RevokeIdentitySessionUseCase.test.ts`
 - `application/identity/tests/IdentityAuthenticatorAndProviderCatalog.test.ts`
 - `application/identity/tests/LocalIdentityAdministrationUseCases.test.ts`
-- `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`
+- `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
 - `infrastructure/security/identity/tests/ScryptLocalPasswordCredentialService.test.ts`
 - `infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`
-- `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
+- `src/infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
-- `infrastructure/api/identity/tests/IdentityAuthRedaction.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `src/infrastructure/api/identity/tests/IdentityAuthRedaction.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `ui/pages/tests/IdentityAdminPage.test.tsx`
 - `src/infrastructure/persistence/identity/tests/IdentityPersistenceMapper.test.ts`
 - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`

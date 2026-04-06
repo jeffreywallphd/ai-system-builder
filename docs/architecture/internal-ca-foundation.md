@@ -65,11 +65,11 @@ This note now also documents Story 6.3.1, Story 6.3.2, Story 6.3.3, Story 6.3.4,
 - `src/infrastructure/security/ca/tests/ProtectedCertificateAuthorityRootMaterialStorage.test.ts`
 - `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - `src/infrastructure/security/certificates/tests/RuntimeTrustMaterialDistributionService.test.ts`
-- `hosts/server/IdentityServerHost.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
-- `infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
 - `src/shared/dto/security/tests/CertificateAuthorityDtos.test.ts`
 - `src/shared/schemas/security/CertificateAuthoritySchemaContracts.ts`
@@ -413,7 +413,7 @@ Story 6.1.5 adds `InitializeCertificateAuthorityUseCase`, which is the applicati
 
 ### Host invocation seam
 
-- `initializeCertificateAuthorityForFirstSetup` is exposed from `hosts/server/IdentityServerHost.ts`
+- `initializeCertificateAuthorityForFirstSetup` is exposed from `src/hosts/server/IdentityServerHost.ts`
 - the host composition path constructs infrastructure adapters and invokes `InitializeCertificateAuthorityUseCase`, keeping initialization logic in the application layer
 
 ### Failure mode expectations

@@ -4,13 +4,13 @@ This note documents Story 9.3.2 and Story 9.3.5 (Feature 9 / Epic 9.3): authorit
 
 ## Canonical artifacts
 
-- `infrastructure/api/storage/sdk/PublicStorageManagementApiContract.ts`
-- `infrastructure/api/storage/StorageManagementBackendApi.ts`
-- `infrastructure/api/storage/WorkspaceAwareStoragePolicyEvaluationAdapter.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `hosts/server/IdentityServerHost.ts`
-- `infrastructure/api/storage/tests/StorageManagementBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerStorageManagement.test.ts`
+- `src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract.ts`
+- `src/infrastructure/api/storage/StorageManagementBackendApi.ts`
+- `src/infrastructure/api/storage/WorkspaceAwareStoragePolicyEvaluationAdapter.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/hosts/server/IdentityServerHost.ts`
+- `src/infrastructure/api/storage/tests/StorageManagementBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerStorageManagement.test.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
 
 ## Scope and intent

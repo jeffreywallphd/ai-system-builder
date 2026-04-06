@@ -13,7 +13,7 @@ import {
   type AuthoritativeServerCompositionRootOptions,
   type AuthoritativeServerHostRuntimeHandle,
 } from "./AuthoritativeServerCompositionRoot";
-import type { IdentityServerHost, IdentityServerHostOptions } from "../../../hosts/server/IdentityServerHost";
+import type { IdentityServerHost, IdentityServerHostOptions } from "./IdentityServerHost";
 
 export const AuthoritativeServerHostEnvironmentKeys = Object.freeze({
   databasePath: "AI_LOOM_SERVER_DATABASE_PATH",

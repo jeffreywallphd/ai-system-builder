@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { GetStorageInstanceHealthApiResponse } from "../../../infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
+import type { GetStorageInstanceHealthApiResponse } from "../../../src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
 import { StorageLifecycleStates, StorageReplicationModes } from "../../../src/domain/storage/StorageDomain";
 import { StorageSyncDeploymentAvailabilities, StorageSyncStatuses } from "../../../src/shared/contracts/storage/StorageTransportContracts";
 import { StorageAdministrationPagePresentation } from "../StorageAdministrationPage";
