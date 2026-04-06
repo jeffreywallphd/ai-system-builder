@@ -202,6 +202,7 @@ function createStubClient(overrides: {
 
   const client: IdentityAuthClient = {
     registerLocalAccount: async (_request: RegisterLocalIdentityApiRequest): Promise<IdentityAuthApiResponse<RegisterLocalIdentityApiResponse>> => ({ ok: false, error: { code: "internal", message: "not implemented" } }),
+    loginDevelopmentAccount: async (): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> => ({ ok: false, error: { code: "internal", message: "not implemented" } }),
     loginLocalAccount: async (request: LoginLocalIdentityApiRequest): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> => {
       loginRequests.push(request);
       return overrides.loginResponse ?? defaultLoginResponse;

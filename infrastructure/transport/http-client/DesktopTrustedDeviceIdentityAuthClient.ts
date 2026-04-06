@@ -55,6 +55,10 @@ export class DesktopTrustedDeviceIdentityAuthClient implements IdentityAuthClien
     return this.innerClient.registerLocalAccount(request);
   }
 
+  public loginDevelopmentAccount(): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
+    return this.innerClient.loginDevelopmentAccount();
+  }
+
   public async loginLocalAccount(
     request: LoginLocalIdentityApiRequest,
   ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {

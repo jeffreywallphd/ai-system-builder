@@ -46,6 +46,7 @@ import WorkspaceInvitationOnboardingPage from "../pages/WorkspaceInvitationOnboa
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
 import type { LoginLocalIdentityApiResponse } from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+import { DevLoginFeatureFlag } from "../features/DevLoginFeatureFlag";
 
 export interface AppRouterProps {
   readonly isAuthenticated?: boolean;
@@ -62,13 +63,14 @@ export default function AppRouter({
 }: AppRouterProps): JSX.Element {
   const handleAuthenticated = onAuthenticated ?? (() => undefined);
   const handleLogout = onLogout ?? (() => undefined);
+  const devLoginEnabled = useMemo(() => new DevLoginFeatureFlag().isEnabled(), []);
   const routes = useMemo<ReadonlyArray<RouteObject>>(
     () => [
       {
         path: ROUTE_PATHS.login,
         element: isAuthenticated
           ? <Navigate to={ROUTE_PATHS.home} replace />
-          : <LoginPage onAuthenticated={handleAuthenticated} authNotice={authNotice} />,
+          : <LoginPage onAuthenticated={handleAuthenticated} authNotice={authNotice} devLoginEnabled={devLoginEnabled} />,
       },
       {
         path: ROUTE_PATHS.register,
@@ -153,7 +155,7 @@ export default function AppRouter({
       },
       { path: ROUTE_PATHS.notFound, element: <NotFoundPage /> },
     ],
-    [authNotice, handleAuthenticated, handleLogout, isAuthenticated]
+    [authNotice, devLoginEnabled, handleAuthenticated, handleLogout, isAuthenticated]
   );
   const router = useMemo(() => createBrowserRouter([...routes]), [routes]);
 

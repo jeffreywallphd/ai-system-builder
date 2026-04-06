@@ -5,6 +5,7 @@
 - Authoritative HTTP endpoints for local identity registration and login:
   - `POST /api/v1/identity/register`
   - `POST /api/v1/identity/login`
+  - `POST /api/v1/identity/dev-login` (development-only fallback login route)
 - Authenticated session validation endpoint and guard:
   - `GET /api/v1/identity/session` with `Authorization: Bearer <session-token>`
 - Authenticated session termination and revocation endpoints:
@@ -55,6 +56,11 @@ Browser development host wiring now self-bootstraps identity transport for `dev:
 
 - `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` now starts `IdentityServerHost` during Vite serve bootstrap.
 - The plugin injects browser runtime bootstrap env (`window.aiLoomBrowserDevelopment.env.VITE_IDENTITY_API_BASE_URL`) so runtime config and the web identity endpoint resolver consume the managed identity API base URL without requiring manual `.env` setup.
+
+Development-login route policy:
+
+- `AI_LOOM_ENABLE_DEV_LOGIN=true|false` explicitly overrides development-login route exposure.
+- When unset, `IdentityServerHost` enables `POST /api/v1/identity/dev-login` only when `NODE_ENV` is not `production`.
 
 ## Public error contract
 

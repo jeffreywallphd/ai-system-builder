@@ -42,11 +42,13 @@ afterEach(async () => {
 async function startServer(
   logger: CapturingLogger,
   harnessOptions: Parameters<typeof createIdentityAuthTestHarness>[0] = {},
+  serverOptions: Partial<Parameters<typeof createIdentityHttpServer>[0]> = {},
 ): Promise<{ readonly baseUrl: string; readonly harness: Awaited<ReturnType<typeof createIdentityAuthTestHarness>> }> {
   const harness = await createIdentityAuthTestHarness(harnessOptions);
   const server = createIdentityHttpServer({
     backendApi: harness.backendApi,
     logger,
+    ...serverOptions,
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -67,6 +69,48 @@ async function startServer(
 }
 
 describe("IdentityHttpServer", () => {
+  it("supports development login route when explicitly enabled", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger, {}, {
+      development: {
+        enableDevLoginRoute: true,
+      },
+    });
+
+    const devLoginResponse = await fetch(`${baseUrl}/api/v1/identity/dev-login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+
+    expect(devLoginResponse.status).toBe(200);
+    const devLoginBody = await devLoginResponse.json();
+    expect(devLoginBody.ok).toBe(true);
+    expect(devLoginBody.data.username).toBe("dev.local.user");
+    expect(devLoginBody.data.sessionToken).toBeDefined();
+  });
+
+  it("does not expose development login route when disabled", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger, {}, {
+      development: {
+        enableDevLoginRoute: false,
+      },
+    });
+
+    const devLoginResponse = await fetch(`${baseUrl}/api/v1/identity/dev-login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+
+    expect(devLoginResponse.status).toBe(404);
+  });
+
   it("handles CORS preflight and emits CORS headers for API routes", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger);

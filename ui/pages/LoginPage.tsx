@@ -12,9 +12,10 @@ import { validateLoginForm } from "../shared/identity/IdentityAuthValidation";
 export interface LoginPageProps {
   readonly onAuthenticated: (session: LoginLocalIdentityApiResponse) => void;
   readonly authNotice?: "session-expired" | "session-invalid";
+  readonly devLoginEnabled?: boolean;
 }
 
-export default function LoginPage({ onAuthenticated, authNotice }: LoginPageProps): JSX.Element {
+export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled = false }: LoginPageProps): JSX.Element {
   const authService = useMemo(() => new IdentityAuthService(), []);
   const navigate = useNavigate();
   const location = useLocation();
@@ -60,6 +61,25 @@ export default function LoginPage({ onAuthenticated, authNotice }: LoginPageProp
       navigate(fromPath, { replace: true });
     } catch {
       setErrorMessage("Login request failed. Verify the identity API is reachable and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitDevLogin = async () => {
+    setErrorMessage(undefined);
+    setIsSubmitting(true);
+    try {
+      const response = await authService.loginDevelopmentAccount();
+      if (!response.ok || !response.data) {
+        setErrorMessage(renderApiError(response.error));
+        return;
+      }
+
+      onAuthenticated(response.data);
+      navigate(fromPath, { replace: true });
+    } catch {
+      setErrorMessage("Dev login request failed. Verify the identity API is reachable and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -127,6 +147,11 @@ export default function LoginPage({ onAuthenticated, authNotice }: LoginPageProp
             <Link className="ui-button ui-button--secondary" to={ROUTE_PATHS.register}>
               Create account
             </Link>
+            {devLoginEnabled ? (
+              <button className="ui-button ui-button--secondary" type="button" onClick={submitDevLogin} disabled={isSubmitting}>
+                Dev Login
+              </button>
+            ) : null}
           </div>
         </form>
       </div>
