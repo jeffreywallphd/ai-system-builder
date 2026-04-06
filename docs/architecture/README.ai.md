@@ -80,6 +80,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Secret metadata API baseline for internal create/list/get/disable management routes and metadata-only response contracts: `docs/architecture/secrets-metadata-management-internal-apis.md`
 - Secret-backed feature extension guardrails and contributor checklist: `docs/architecture/secrets-feature-extension-guidance.md`
 - Secret classification baseline for naming-prefix conventions, metadata-label requirements, and classification validation boundaries: `docs/architecture/secrets-classification-and-metadata-conventions.md`
+- Encryption-at-rest policy foundation baseline for explicit policy vocabulary, inheritance/override contracts, and encrypted-material reference invariants: `docs/architecture/encryption-at-rest-policy-foundation.md`
 - Secret master-key re-encryption operations baseline for controlled KEK migration, progress tracking, and restartable recovery: `docs/secret-master-key-reencryption-operations.md`
 - Node bootstrap identity/trust-material operations baseline: `docs/node-bootstrap-identity-operations.md`
 - Workspace tenancy domain/contracts baseline: `docs/architecture/workspace-foundation.md`
