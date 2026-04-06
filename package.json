@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "npm run dev:desktop",
     "dev:renderer": "vite --mode desktop",
-    "dev:desktop": "electron-forge start",
+    "dev:desktop:prepare": "node dev/prepare-electron-forge-dev.cjs",
+    "dev:desktop": "npm run dev:desktop:prepare && electron-forge start",
     "build": "npm run build:renderer",
     "build:renderer": "tsc --noEmit && vite build --mode desktop",
     "build:desktop": "electron-forge package",
