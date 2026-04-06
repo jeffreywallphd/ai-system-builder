@@ -162,6 +162,7 @@ Operational effect:
 - `RegisterLocalAccountUseCase` runs full local registration orchestration in the application layer.
 - It validates/normalizes profile + provider subject, checks deterministic uniqueness conflicts, enforces credential policy, validates provider/authenticator compatibility, hashes password candidates through `IIdentityCredentialAuthenticator`, and persists identity + credential material.
 - It depends only on identity application ports plus `IdentityPolicyService`, with structured operation results for duplicate/policy/provider/state failures.
+- `ScryptLocalPasswordCredentialService` now applies an OpenSSL-safe memory budget floor + headroom when deriving local-password hashes to prevent runtime `MEMORY_LIMIT_EXCEEDED` failures in dev and host environments.
 
 ## Local verification seam
 
