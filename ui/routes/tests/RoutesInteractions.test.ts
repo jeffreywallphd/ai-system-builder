@@ -48,6 +48,7 @@ describe("ui/routes interactions", () => {
     expect(appRouterSource).toContain("element: <ConfigProfileStudioPage />");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.mcp, element: <Navigate to={ROUTE_PATHS.explore} replace />");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.context, element: <Navigate to={ROUTE_PATHS.explore} replace />");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.assets, element: <AssetsPage />");
     expect(appRouterSource).toContain("element: <ContextWorkbenchPage />");
   });
 });

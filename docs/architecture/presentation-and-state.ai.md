@@ -1,4 +1,4 @@
-﻿# AI Companion: Presentation and State
+# AI Companion: Presentation and State
 
 ## Core fact
 The renderer uses manual composition plus class-based stores/services; it is not a thin React shell over a shared DI container.
@@ -910,3 +910,16 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - trust/presence/approval/enrollment/node-type/capability/deployment-tag/last-seen filter controls,
   - distinct operational-state rendering for `pending`, `active`, `offline`, and `revoked`,
   - explicit loading/empty/error states without placeholder data.
+
+## Story 10.3.4 asset workflow renderer seam update
+
+- Added shared asset workflow client/service seams:
+  - `ui/shared/assets/AssetWorkflowClient.ts`
+  - `ui/services/AssetWorkflowService.ts`
+- `/assets` now renders `ui/pages/AssetsPage.tsx` as a bounded logical-asset workflow surface (no redirect-only behavior).
+- The page consumes backend-authoritative contracts for:
+  - list/detail,
+  - upload initiation,
+  - download authorization,
+  - preview resolution.
+- Renderer state for this flow is logical and path-free (`workspaceId`, `assetId`, `storageInstanceId`, `versionId`) to preserve protected-asset boundary posture.

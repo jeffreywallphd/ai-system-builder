@@ -425,3 +425,38 @@ Added/extended coverage:
   - `src/shared/contracts/assets/tests/AssetTransportContracts.test.ts`
   - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
   - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+
+## Story 10.3.4: shared client-safe contracts and UI asset workflow integration
+
+Added shared client-safe workflow contracts and a representative UI-facing integration slice for logical assets:
+
+- New shared request/response and helper contracts for desktop/thin-client parity:
+  - `src/shared/contracts/assets/AssetWorkflowClientContracts.ts`
+- Added shared contract coverage:
+  - `src/shared/contracts/assets/tests/AssetWorkflowClientContracts.test.ts`
+
+New renderer integration seams:
+
+- Shared HTTP client adapter for protected asset workflows:
+  - `ui/shared/assets/AssetWorkflowClient.ts`
+- UI-facing service wrapper:
+  - `ui/services/AssetWorkflowService.ts`
+- Added tests:
+  - `ui/shared/assets/tests/AssetWorkflowClient.test.ts`
+  - `ui/services/tests/AssetWorkflowService.test.ts`
+
+Representative end-to-end UI-facing flow now uses logical asset APIs:
+
+- `/assets` route now renders `AssetsPage` directly (`ui/routes/AppRouter.tsx`).
+- `ui/pages/AssetsPage.tsx` now supports:
+  - scoped logical asset listing,
+  - protected asset detail retrieval,
+  - preview resolution,
+  - secure download authorization (tokenized content path generation),
+  - upload session initiation.
+
+Boundary posture in this story:
+
+- UI state remains logical-id based (`workspaceId`, `assetId`, `storageInstanceId`, `versionId`) and does not require raw filesystem path knowledge.
+- Download and preview actions are exposed as protected API actions; no object-key/path internals are required in presentation code.
+- Shared client-safe contracts are reusable across desktop and thin-client transport adapters.

@@ -17,7 +17,7 @@ describe("ui/pages unit coverage", () => {
     expect(workflows).toContain("New Workflow");
     expect(models).toContain("Download Models");
     expect(context).toContain("Context Engineering");
-    expect(assets).toContain("Browse generated and stored workflow assets");
+    expect(assets).toContain("Use protected logical asset APIs for listing");
     expect(mcp).toContain("Create new local MCP servers");
     expect(storageAdmin).toContain("Managed storage administration");
     expect(workspaceAdmin).toContain("Workspace administration");
