@@ -16,6 +16,7 @@ describe("ui/pages contract adherence", () => {
       "ui/pages/AuthorizationSharingManagementPage.tsx",
       "ui/pages/AuthorizationSharingThinClientPage.tsx",
       "ui/pages/AuthorizationReportingPage.tsx",
+      "ui/pages/StorageAdministrationPage.tsx",
       "ui/pages/WorkspaceAdministrationPage.tsx",
       "ui/pages/NodeEnrollmentReviewPage.tsx",
       "ui/pages/NodeInventoryPage.tsx",

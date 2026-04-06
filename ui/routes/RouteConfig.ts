@@ -57,6 +57,7 @@ export const ROUTE_PATHS = Object.freeze({
   authorizationSharing: "/settings/sharing",
   authorizationSharingThin: "/settings/sharing/thin",
   authorizationReporting: "/settings/sharing/reporting",
+  storageAdmin: "/settings/storage",
   workspaceAdmin: "/settings/workspaces",
   nodeEnrollmentReview: "/settings/node-enrollments",
   nodeInventory: "/settings/node-inventory",
@@ -337,6 +338,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "authorization-reporting",
     path: ROUTE_PATHS.authorizationReporting,
     title: "Authorization reporting",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "storage-admin",
+    path: ROUTE_PATHS.storageAdmin,
+    title: "Managed storage administration",
     showInNavigation: false,
   }),
   Object.freeze({
