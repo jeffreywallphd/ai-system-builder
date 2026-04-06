@@ -156,6 +156,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For protected logical asset domain entities, ownership/visibility/versioning invariants, and path-safe storage reference semantics, read [`logical-asset-domain-foundation.md`](./logical-asset-domain-foundation.md).
 - For protected logical asset application ports, use-case request/result contracts, and shared transport/event DTO boundaries, read [`logical-asset-application-ports.md`](./logical-asset-application-ports.md).
 - For managed storage application ports, lifecycle/policy/provisioning seams, and use-case command/query contracts, read [`storage-application-ports.md`](./storage-application-ports.md).
+- For logical storage-reference access planning, authorization mapping, and backend adapter resolution boundaries, read [`storage-logical-access-resolution.md`](./storage-logical-access-resolution.md).
 - For managed storage persistence schema, mapper/repository behavior, and migration semantics, read [`storage-persistence-contracts.md`](./storage-persistence-contracts.md).
 - For local server-managed storage backend provisioning/capability adapter behavior and operational assumptions, read [`storage-local-backend-adapter.md`](./storage-local-backend-adapter.md).
 - For shared mounted/network storage backend binding/validation behavior and target capability contracts, read [`storage-shared-backend-adapter.md`](./storage-shared-backend-adapter.md).

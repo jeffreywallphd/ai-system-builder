@@ -87,6 +87,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Protected logical asset domain/contracts baseline: `docs/architecture/logical-asset-domain-foundation.md`
 - Protected logical asset application ports/use-case + shared transport contract baseline: `docs/architecture/logical-asset-application-ports.md`
 - Managed storage application ports/use-case contract baseline: `docs/architecture/storage-application-ports.md`
+- Managed storage logical access resolution baseline for authorized logical-reference to backend-operation planning: `docs/architecture/storage-logical-access-resolution.md`
 - Managed storage persistence schema/repository baseline: `docs/architecture/storage-persistence-contracts.md`
 - Managed local server-backed storage adapter baseline: `docs/architecture/storage-local-backend-adapter.md`
 - Managed shared mounted/network storage adapter baseline: `docs/architecture/storage-shared-backend-adapter.md`

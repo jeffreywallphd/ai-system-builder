@@ -10,13 +10,17 @@ This note documents the storage application-layer seams and the concrete service
 - `src/application/storage/ports/StorageAccessSummaryPort.ts`
 - `src/application/storage/ports/StorageCapabilityInspectionPort.ts`
 - `src/application/storage/ports/StorageObjectPort.ts`
+- `src/application/storage/ports/StorageObjectAccessResolverPort.ts`
 - `src/application/storage/ports/StorageObservabilityPorts.ts`
 - `src/application/storage/ports/StorageManagementPorts.ts`
 - `src/application/storage/use-cases/StorageManagementServiceContracts.ts`
 - `src/application/storage/use-cases/CreateStorageInstanceWithProvisioningUseCase.ts`
 - `src/application/storage/use-cases/StorageManagementService.ts`
+- `src/application/storage/use-cases/StorageLogicalAccessResolutionServiceContracts.ts`
+- `src/application/storage/use-cases/StorageLogicalAccessResolutionService.ts`
 - `src/application/storage/use-cases/StorageManagementServiceErrors.ts`
 - `src/application/storage/tests/StorageManagementServiceContracts.test.ts`
+- `src/application/storage/tests/StorageLogicalAccessResolutionService.test.ts`
 
 ## Scope and intent
 
@@ -38,6 +42,18 @@ This note documents the storage application-layer seams and the concrete service
 - typed application-safe failures (`StorageObjectAccessError` + stable error codes)
 
 These contracts are backend-neutral and operate on `StorageInstance` metadata plus logical object keys, not caller-supplied filesystem paths.
+
+## Logical access resolution contracts (Story 9.3.3)
+
+`StorageLogicalAccessResolutionService` introduces a centralized server-side seam that resolves logical storage references and operation intents into authorized backend object-operation plans:
+
+- accepts `storage-instance://<id>` references (or explicit storage ids) and operation intents
+- validates workspace scope and storage existence through `IStorageInstanceRepository`
+- maps logical intents to canonical policy actions and enforces authorization via `IStoragePolicyEvaluationPort`
+- resolves backend object adapters through `IStorageObjectAccessResolverPort`
+- returns internal logical access plans (`storageInstance` + `objectPort`) without exposing physical storage paths
+
+The intent is to ensure asset/upload/download services consume logical storage contracts rather than filesystem layout details.
 
 ## Implemented service layer (Story 9.3.1)
 
