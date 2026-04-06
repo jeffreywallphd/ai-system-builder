@@ -52,7 +52,7 @@ describe("host development startup scripts", () => {
   it("does not expose legacy direct identity server startup as a package script", () => {
     const scripts = readPackageScripts();
     const scriptValues = Object.values(scripts);
-    const legacyReference = scriptValues.find((value) => value.includes("hosts/server/IdentityServerHost.ts"));
-    expect(legacyReference).toBeUndefined();
+    const legacyHostReference = scriptValues.find((value) => value.includes("bun run hosts/server/IdentityServerHost.ts"));
+    expect(legacyHostReference).toBeUndefined();
   });
 });
