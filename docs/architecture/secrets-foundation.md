@@ -47,8 +47,8 @@ Key invariant posture:
   - user scope: requires user id, optional workspace id
 - secret names are canonicalized and restricted to safe identifier patterns
 - reference metadata is redaction-safe by contract (sensitive label keys and PEM-like values rejected)
-- record lifecycle states are explicit (`active`, `disabled`, `revoked`, `deleted`)
-- version lineage is explicit (`previousVersionId`, supersession semantics, single active version)
+- record lifecycle states are explicit (`active`, `disabled`, `archived`, `soft-deleted`)
+- version lineage is explicit (`previousVersionId`, supersession semantics, single active version with `superseded` lineage)
 - key-encryption context scope must match secret owner scope/identifiers
 
 ## Access decision contract
@@ -57,7 +57,7 @@ Key invariant posture:
 
 - action permission check (`create`, `read-metadata`, `retrieve-plaintext`, `rotate`, `disable`, `delete`, `list`)
 - scope ownership checks against actor context
-- disabled/revoked/deleted state denial checks
+- runtime plaintext retrieval denial checks for inactive records (`disabled`, `archived`, `soft-deleted`)
 - policy-based runtime plaintext retrieval denial check
 - deterministic decision/audit result (`allowed`, reason code, event type, actor, scope, timestamp)
 

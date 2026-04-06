@@ -26,7 +26,7 @@
   - `user`: requires user id (workspace id optional).
 - Secret names are normalized/lowercase and pattern-validated.
 - Metadata labels are redaction-safe by contract (sensitive key names and PEM-like values rejected).
-- Secret record state is explicit (`active`, `disabled`, `revoked`, `deleted`).
+- Secret record state is explicit (`active`, `disabled`, `archived`, `soft-deleted`).
 - Secret version lineage is explicit and validated (`previousVersionId`, supersession, single active version).
 - Key-encryption context scope and owner identifiers must match the secret owner scope.
 

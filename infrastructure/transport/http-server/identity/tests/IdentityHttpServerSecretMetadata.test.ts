@@ -204,6 +204,33 @@ describe("IdentityHttpServer secret metadata routes", () => {
     expect(disableBody.ok).toBe(true);
     expect(disableBody.data.secret.state).toBe("disabled");
     expect((disableBody.data.secret as Record<string, unknown>).plaintext).toBeUndefined();
+
+    const listAfterDisableDefault = await fetch(
+      `${baseUrl}/api/v1/security/secrets?scope=user&userIdentityId=${encodeURIComponent(owner.userIdentityId)}`,
+      {
+        headers: {
+          authorization: `Bearer ${owner.sessionToken}`,
+        },
+      },
+    );
+    expect(listAfterDisableDefault.status).toBe(200);
+    const listAfterDisableDefaultBody = await listAfterDisableDefault.json();
+    expect(listAfterDisableDefaultBody.ok).toBe(true);
+    expect(listAfterDisableDefaultBody.data.items).toHaveLength(0);
+
+    const listAfterDisableIncluded = await fetch(
+      `${baseUrl}/api/v1/security/secrets?scope=user&userIdentityId=${encodeURIComponent(owner.userIdentityId)}&includeDisabled=true`,
+      {
+        headers: {
+          authorization: `Bearer ${owner.sessionToken}`,
+        },
+      },
+    );
+    expect(listAfterDisableIncluded.status).toBe(200);
+    const listAfterDisableIncludedBody = await listAfterDisableIncluded.json();
+    expect(listAfterDisableIncludedBody.ok).toBe(true);
+    expect(listAfterDisableIncludedBody.data.items).toHaveLength(1);
+    expect(listAfterDisableIncludedBody.data.items[0].state).toBe("disabled");
   });
 
   it("returns denial responses for unauthorized secret detail access", async () => {

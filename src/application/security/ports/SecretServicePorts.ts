@@ -16,8 +16,8 @@ export interface SecretListQuery {
   readonly workspaceId?: string;
   readonly userIdentityId?: string;
   readonly includeDisabled?: boolean;
-  readonly includeRevoked?: boolean;
-  readonly includeDeleted?: boolean;
+  readonly includeArchived?: boolean;
+  readonly includeSoftDeleted?: boolean;
   readonly kinds?: ReadonlyArray<SecretReference["kind"]>;
   readonly tagAnyOf?: ReadonlyArray<string>;
   readonly limit?: number;

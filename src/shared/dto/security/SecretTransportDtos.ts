@@ -50,8 +50,8 @@ export interface ListSecretMetadataQueryDto {
   readonly kinds?: ReadonlyArray<SecretKind>;
   readonly tagAnyOf?: ReadonlyArray<string>;
   readonly includeDisabled?: boolean;
-  readonly includeRevoked?: boolean;
-  readonly includeDeleted?: boolean;
+  readonly includeArchived?: boolean;
+  readonly includeSoftDeleted?: boolean;
   readonly limit?: number;
   readonly offset?: number;
 }

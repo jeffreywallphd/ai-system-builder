@@ -6,7 +6,7 @@ import {
   SecretRecordStates,
   SecretScopes,
   createSecretRecord,
-  deleteSecretRecord,
+  softDeleteSecretRecord,
   disableSecretRecord,
   evaluateSecretAccessDecision,
   rotateSecretRecord,
@@ -70,8 +70,8 @@ class InMemorySecretPersistenceRepository implements ISecretRecordPersistenceRep
 
   async listSecrets(query: SecretListQuery): Promise<readonly SecretReference[]> {
     const includeDisabled = query.includeDisabled ?? false;
-    const includeRevoked = query.includeRevoked ?? false;
-    const includeDeleted = query.includeDeleted ?? false;
+    const includeArchived = query.includeArchived ?? false;
+    const includeSoftDeleted = query.includeSoftDeleted ?? false;
     const filtered = [...this.records.values()].filter((record) => {
       if (query.scope && record.owner.scope !== query.scope) {
         return false;
@@ -88,10 +88,10 @@ class InMemorySecretPersistenceRepository implements ISecretRecordPersistenceRep
       if (!includeDisabled && record.state === SecretRecordStates.disabled) {
         return false;
       }
-      if (!includeRevoked && record.state === SecretRecordStates.revoked) {
+      if (!includeArchived && record.state === SecretRecordStates.archived) {
         return false;
       }
-      if (!includeDeleted && record.state === SecretRecordStates.deleted) {
+      if (!includeSoftDeleted && record.state === SecretRecordStates.softDeleted) {
         return false;
       }
       if (query.tagAnyOf && query.tagAnyOf.length > 0) {
@@ -152,7 +152,19 @@ class InMemorySecretPersistenceRepository implements ISecretRecordPersistenceRep
     if (replay) {
       return { changed: false, wasReplay: true };
     }
-    const changed = this.records.delete(secretId.trim());
+    const existing = this.records.get(secretId.trim());
+    if (!existing) {
+      const result = { changed: false, wasReplay: false } as const;
+      this.replayByOperation.set(mutation.operationKey, result);
+      return result;
+    }
+    const softDeleted = softDeleteSecretRecord({
+      record: existing,
+      softDeletedBy: mutation.actorId,
+      softDeletedAt: mutation.occurredAt,
+    });
+    this.records.set(secretId.trim(), softDeleted);
+    const changed = existing.state !== SecretRecordStates.softDeleted;
     const result = { changed, wasReplay: false } as const;
     this.replayByOperation.set(mutation.operationKey, result);
     return result;
@@ -533,7 +545,7 @@ class InMemorySecretManagementService implements ISecretManagementService {
       actor: request.actor,
       owner: record.owner,
       record,
-      occurredAt: request.deletedAt,
+      occurredAt: request.softDeletedAt,
     });
     if (!decision.allowed) {
       await this.emitAudit(request.actor, record.owner.scope, SecretAccessActions.delete, "denied", decision.reason, decision.occurredAt, record.secretId);
@@ -546,20 +558,20 @@ class InMemorySecretManagementService implements ISecretManagementService {
       };
     }
 
-    const deleted = deleteSecretRecord({
+    const deleted = softDeleteSecretRecord({
       record,
-      deletedBy: request.actor.actorId,
-      deletedAt: request.deletedAt,
+      softDeletedBy: request.actor.actorId,
+      softDeletedAt: request.softDeletedAt,
     });
     await this.repository.saveSecret(deleted, {
       operationKey: `${request.operationKey}:mark-deleted`,
       actorId: request.actor.actorId,
-      occurredAt: request.deletedAt,
+      occurredAt: request.softDeletedAt,
     });
     await this.repository.deleteSecret(request.secretId, {
       operationKey: request.operationKey,
       actorId: request.actor.actorId,
-      occurredAt: request.deletedAt,
+      occurredAt: request.softDeletedAt,
     });
 
     await this.emitAudit(request.actor, record.owner.scope, SecretAccessActions.delete, "allowed", "allowed", deleted.lastModifiedAt, record.secretId);
@@ -606,8 +618,8 @@ class InMemorySecretManagementService implements ISecretManagementService {
       kinds: request.kinds,
       tagAnyOf: request.tagAnyOf,
       includeDisabled: request.includeDisabled,
-      includeRevoked: request.includeRevoked,
-      includeDeleted: request.includeDeleted,
+      includeArchived: request.includeArchived,
+      includeSoftDeleted: request.includeSoftDeleted,
       limit: request.limit,
       offset: request.offset,
     });
@@ -810,7 +822,7 @@ describe("secret application contracts", () => {
       actor: createServerAdminActor([SecretAccessActions.delete]),
       operationKey: "op:delete:1",
       secretId: "secret:server:openai",
-      deletedAt: "2026-04-06T02:00:00.000Z",
+      softDeletedAt: "2026-04-06T02:00:00.000Z",
     });
     expect(deleted).toEqual({
       ok: true,
@@ -819,16 +831,15 @@ describe("secret application contracts", () => {
       },
     });
 
-    const missingAfterDelete = await service.getSecretMetadata({
+    const metadataAfterDelete = await service.getSecretMetadata({
       actor: createServerAdminActor([SecretAccessActions.readMetadata]),
       secretId: "secret:server:openai",
     });
-    expect(missingAfterDelete).toEqual({
-      ok: false,
-      error: expect.objectContaining({
-        code: SecretServiceErrorCodes.notFound,
-      }),
-    });
+    expect(metadataAfterDelete.ok).toBeTrue();
+    if (!metadataAfterDelete.ok) {
+      return;
+    }
+    expect(metadataAfterDelete.value.state).toBe(SecretRecordStates.softDeleted);
 
     expect(audit.events.length).toBeGreaterThanOrEqual(8);
     const deniedRetrieve = audit.events

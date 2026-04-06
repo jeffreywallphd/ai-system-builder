@@ -207,8 +207,8 @@ export const ListSecretMetadataQuerySchema: z.ZodType<ListSecretMetadataQueryDto
   kinds: z.array(SecretKindSchema).min(1).optional(),
   tagAnyOf: z.array(TagSchema).min(1).optional(),
   includeDisabled: z.boolean().optional(),
-  includeRevoked: z.boolean().optional(),
-  includeDeleted: z.boolean().optional(),
+  includeArchived: z.boolean().optional(),
+  includeSoftDeleted: z.boolean().optional(),
   limit: z.number().int().min(1, "limit must be an integer >= 1.").max(200, "limit must be <= 200.").optional(),
   offset: z.number().int().min(0, "offset must be an integer >= 0.").optional(),
 }).strict();
