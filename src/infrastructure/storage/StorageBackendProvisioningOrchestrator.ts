@@ -4,6 +4,7 @@ import type {
   StorageCapabilityInspectionRequest,
   StorageInstanceCapabilityInspectionRequest,
 } from "../../application/storage/ports/StorageCapabilityInspectionPort";
+import { StorageBackendHealthStatuses } from "../../application/storage/ports/StorageCapabilityInspectionPort";
 import {
   StorageProvisioningOperationStatuses,
   type IStorageProvisioningPort,
@@ -127,6 +128,7 @@ export class StorageBackendProvisioningOrchestrator implements IStorageProvision
   }
 
   private unavailableCapabilities(backendType: StorageBackendType, note: string): StorageBackendCapabilitySnapshot {
+    const checkedAt = new Date().toISOString();
     return Object.freeze({
       backendType,
       supportsManagedLifecycle: false,
@@ -137,6 +139,11 @@ export class StorageBackendProvisioningOrchestrator implements IStorageProvision
       notes: Object.freeze([
         `${StorageProvisioningOrchestrationReasonCodes.capabilityInspectionUnavailable}:${note}`,
       ]),
+      health: Object.freeze({
+        status: StorageBackendHealthStatuses.unsupported,
+        reasonCode: StorageProvisioningOrchestrationReasonCodes.capabilityInspectionUnavailable,
+        checkedAt,
+      }),
     });
   }
 

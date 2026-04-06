@@ -93,6 +93,14 @@ describe("StorageBackendProvisioningOrchestrator", () => {
     expect(receipt.accepted).toBeFalse();
     expect(receipt.status).toBe("rejected");
     expect(receipt.reasonCode).toBe(StorageProvisioningOrchestrationReasonCodes.backendNotConfigured);
+
+    const capabilities = await orchestrator.inspectStorageBackendCapabilities({
+      backendType: StorageBackendTypes.objectStorage,
+      workspaceId: "workspace-alpha",
+      occurredAt: "2026-04-06T12:05:00.000Z",
+    });
+    expect(capabilities.supportsManagedLifecycle).toBeFalse();
+    expect(capabilities.health?.status).toBe("unsupported");
   });
 
   it("maps backend adapter exceptions to rejected receipts", async () => {

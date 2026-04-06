@@ -51,3 +51,20 @@ All routes require authenticated sessions and workspace-scoped policy evaluation
 - Host composition wires a workspace-aware policy adapter; transport does not bypass policy by directly touching persistence.
 - No endpoint emits raw filesystem paths or backend binding internals.
 - Health/capability responses expose only contract-safe capability metadata and synchronization posture.
+
+## Storage inspection semantics (Story 9.3.4)
+
+`GET /api/v1/storage/instances/:storageInstanceId/health` now projects authoritative inspection diagnostics for admin consumption:
+
+- lifecycle state (`lifecycleState`)
+- typed operational classification (`operationalStatus`):
+  - `healthy`
+  - `unhealthy`
+  - `inactive`
+  - `unsupported`
+- explicit inspection timing (`lastCheckedAt`)
+- stable diagnosis reason (`reasonCode`)
+- safe operational notes (`operationalNotes`)
+- capability flags (`capabilities`) and synchronization metadata (`synchronization`, `synchronizationStatus`)
+
+The route is backed by an application inspection use case and preserves redaction posture by avoiding raw backend endpoint/path disclosure.

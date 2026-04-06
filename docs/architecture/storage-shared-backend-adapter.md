@@ -36,9 +36,9 @@ This note documents Story 9.2.3 (Feature 9 / Epic 9.2): a production-capable bac
     - `shared-replication-unsupported`
     - `shared-filesystem-failure`
 - `inspectStorageBackendCapabilities(...)`
-  - reports backend-level posture and configured target metadata for `network-share` support.
+  - reports backend-level posture, configured target metadata, and typed health metadata (`status`, `reasonCode`, `checkedAt`) for `network-share` support.
 - `inspectStorageInstanceCapabilities(...)`
-  - resolves instance target binding and reports target-specific capability posture plus health notes.
+  - resolves instance target binding and reports target-specific capability posture plus typed health metadata and safe health notes.
 
 ## Server-known shared target model
 

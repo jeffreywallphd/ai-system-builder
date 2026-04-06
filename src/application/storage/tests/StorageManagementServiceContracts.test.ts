@@ -175,6 +175,33 @@ class CapabilityPort implements IStorageCapabilityInspectionPort {
   }
 }
 
+class HealthAwareCapabilityPort implements IStorageCapabilityInspectionPort {
+  public nextSnapshot: StorageBackendCapabilitySnapshot = {
+    backendType: StorageBackendTypes.managedFilesystem,
+    supportsManagedLifecycle: true,
+    supportsAsyncReplication: false,
+    supportsSyncReplication: false,
+    supportsReadOnlyActive: true,
+    supportsCrossWorkspaceReads: false,
+    notes: Object.freeze(["binding-health:healthy"]),
+    health: {
+      status: "healthy",
+      reasonCode: "binding-health-healthy",
+      checkedAt: "2026-04-06T12:45:00.000Z",
+      notes: Object.freeze(["binding-health:healthy"]),
+    },
+  };
+
+  async inspectStorageBackendCapabilities(
+    input: Parameters<IStorageCapabilityInspectionPort["inspectStorageBackendCapabilities"]>[0],
+  ): Promise<StorageBackendCapabilitySnapshot> {
+    return {
+      ...this.nextSnapshot,
+      backendType: input.backendType,
+    };
+  }
+}
+
 class AuditSink implements StorageManagementAuditSink {
   public readonly events: StorageManagementAuditEvent[] = [];
 
@@ -560,5 +587,94 @@ describe("StorageManagementService", () => {
 
     const current = await repository.findStorageInstanceById("storage-suspended-two");
     expect(current?.lifecycleState).toBe(StorageLifecycleStates.suspended);
+  });
+
+  it("returns typed storage inspection status and distinguishes unhealthy/inactive/unsupported posture", async () => {
+    const repository = new InMemoryStorageInstanceRepository();
+    await repository.createStorageInstance(buildStorageInstance({
+      id: "storage-inspection",
+      lifecycleState: StorageLifecycleStates.active,
+    }), {
+      operationKey: "seed:storage-inspection",
+      actorUserIdentityId: "user-admin",
+      correlationId: "corr-seed-storage-inspection",
+    });
+
+    const capabilityPort = new HealthAwareCapabilityPort();
+    const service = new StorageManagementService({
+      repository,
+      policyPort: new PolicyPort(),
+      capabilityPort,
+    });
+
+    const healthy = await service.inspectStorageInstanceStatus({
+      actorUserIdentityId: "user-admin",
+      workspaceId: "workspace-alpha",
+      storageInstanceId: "storage-inspection",
+    });
+    expect(healthy.ok).toBeTrue();
+    if (!healthy.ok) {
+      return;
+    }
+    expect(healthy.value.operationalStatus).toBe("healthy");
+    expect(healthy.value.reasonCode).toBe("binding-health-healthy");
+    expect(healthy.value.lastCheckedAt).toBe("2026-04-06T12:45:00.000Z");
+    expect(healthy.value.operationalNotes).toContain("binding-health:healthy");
+
+    capabilityPort.nextSnapshot = {
+      ...capabilityPort.nextSnapshot,
+      health: {
+        status: "unhealthy",
+        reasonCode: "binding-health-missing",
+        checkedAt: "2026-04-06T12:46:00.000Z",
+        notes: Object.freeze(["binding-health:missing"]),
+      },
+      notes: Object.freeze(["binding-health:missing"]),
+    };
+    const unhealthy = await service.inspectStorageInstanceStatus({
+      actorUserIdentityId: "user-admin",
+      workspaceId: "workspace-alpha",
+      storageInstanceId: "storage-inspection",
+    });
+    expect(unhealthy.ok).toBeTrue();
+    if (!unhealthy.ok) {
+      return;
+    }
+    expect(unhealthy.value.operationalStatus).toBe("unhealthy");
+
+    await repository.saveStorageInstance(buildStorageInstance({
+      id: "storage-inspection",
+      lifecycleState: StorageLifecycleStates.suspended,
+    }), {
+      operationKey: "seed:storage-inspection:suspended",
+      actorUserIdentityId: "user-admin",
+      correlationId: "corr-seed-storage-inspection-suspended",
+    });
+    const inactive = await service.inspectStorageInstanceStatus({
+      actorUserIdentityId: "user-admin",
+      workspaceId: "workspace-alpha",
+      storageInstanceId: "storage-inspection",
+    });
+    expect(inactive.ok).toBeTrue();
+    if (!inactive.ok) {
+      return;
+    }
+    expect(inactive.value.operationalStatus).toBe("inactive");
+    expect(inactive.value.reasonCode).toBe("storage-lifecycle-inactive");
+
+    const unsupportedService = new StorageManagementService({
+      repository,
+      policyPort: new PolicyPort(),
+    });
+    const unsupported = await unsupportedService.inspectStorageInstanceStatus({
+      actorUserIdentityId: "user-admin",
+      workspaceId: "workspace-alpha",
+      storageInstanceId: "storage-inspection",
+    });
+    expect(unsupported.ok).toBeTrue();
+    if (!unsupported.ok) {
+      return;
+    }
+    expect(unsupported.value.operationalStatus).toBe("unsupported");
   });
 });

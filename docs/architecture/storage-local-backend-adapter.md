@@ -33,9 +33,9 @@ This note documents Story 9.2.2 (Feature 9 / Epic 9.2): the first concrete manag
     - `local-replication-unsupported`
     - `local-filesystem-failure`
 - `inspectStorageBackendCapabilities(...)`
-  - reports capability posture and root-health notes for the local managed backend.
+  - reports capability posture and typed backend health metadata (`status`, `reasonCode`, `checkedAt`) for the local managed backend.
 - `inspectStorageInstanceCapabilities(...)`
-  - reports instance binding-health posture (`healthy`, `missing`, `path-conflict`) plus binding reference metadata.
+  - reports instance binding-health posture (`healthy`, `missing`, `path-conflict`) plus binding reference metadata and typed health metadata for admin-safe diagnostics.
 
 `ServerManagedLocalStorageObjectAdapter` implements:
 

@@ -93,6 +93,8 @@ describe("ServerManagedLocalStorageBackendAdapter", () => {
     expect(capability.supportsManagedLifecycle).toBeTrue();
     expect(capability.notes).toContain("binding-health:healthy");
     expect(capability.notes).toContain("root-health:healthy");
+    expect(capability.health?.status).toBe("healthy");
+    expect(capability.health?.reasonCode).toBe("binding-health-healthy");
   });
 
   it("returns already-applied when managed local storage has already been provisioned", async () => {
@@ -182,6 +184,8 @@ describe("ServerManagedLocalStorageBackendAdapter", () => {
       storageInstance,
     });
     expect(beforeProvisioning.notes).toContain("binding-health:missing");
+    expect(beforeProvisioning.health?.status).toBe("unhealthy");
+    expect(beforeProvisioning.health?.reasonCode).toBe("binding-missing");
 
     await adapter.requestStorageProvisioning({
       operationKind: StorageProvisioningOperationKinds.create,
@@ -195,5 +199,6 @@ describe("ServerManagedLocalStorageBackendAdapter", () => {
     expect(afterProvisioning.notes).toContain("binding-health:healthy");
     expect(afterProvisioning.supportsSyncReplication).toBeFalse();
     expect(afterProvisioning.supportsAsyncReplication).toBeFalse();
+    expect(afterProvisioning.health?.status).toBe("healthy");
   });
 });

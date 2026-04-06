@@ -440,15 +440,37 @@ export class StorageManagementBackendApi {
   public async getStorageInstanceHealth(
     request: GetStorageInstanceHealthApiRequest,
   ): Promise<StorageManagementApiResponse<GetStorageInstanceHealthApiResponse>> {
-    const detail = await this.getStorageInstanceDetail({
-      ...request,
-      includeCapabilities: true,
-    });
-    if (!detail.ok || !detail.data) {
-      return detail;
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    const workspaceId = normalizeRequired(request.workspaceId);
+    const storageInstanceId = normalizeRequired(request.storageInstanceId);
+    if (!actorUserIdentityId || !workspaceId || !storageInstanceId) {
+      return this.failed(StorageManagementApiErrorCodes.invalidRequest, "actorUserIdentityId, workspaceId, and storageInstanceId are required.");
     }
 
-    const synchronization = detail.data.synchronization ?? Object.freeze({
+    const inspected = await this.dependencies.storageManagementService.inspectStorageInstanceStatus({
+      actorUserIdentityId,
+      workspaceId,
+      storageInstanceId,
+      occurredAt: request.occurredAt,
+    });
+    if (!inspected.ok) {
+      return this.failedFromManagementError(inspected.error.code, inspected.error.message, inspected.error.details);
+    }
+
+    const synchronization = this.evaluateSynchronizationState(
+      inspected.value.storageInstance,
+      inspected.value.capabilities,
+      request.occurredAt,
+    );
+    const dtoResponse = toGetStorageInstanceDetailResponseDto(
+      inspected.value.storageInstance,
+      this.toProjectionOptions(inspected.value.storageInstance, inspected.value.accessSummary, synchronization),
+    );
+    parseGetStorageInstanceDetailResponseDto(dtoResponse);
+
+    const synchronizationMetadata = synchronization
+      ? toStorageSynchronizationMetadataDto(synchronization)
+      : Object.freeze({
       syncCapable: false,
       supportsReplicationSyncOperation: false,
       deploymentAvailability: "unavailable" as const,
@@ -459,10 +481,15 @@ export class StorageManagementBackendApi {
     return Object.freeze({
       ok: true,
       data: Object.freeze({
-        storage: detail.data.storage,
-        capabilities: detail.data.capabilities,
-        synchronization,
-        synchronizationStatus: detail.data.synchronizationStatus ?? "disabled",
+        storage: dtoResponse.storage,
+        capabilities: inspected.value.capabilities,
+        synchronization: synchronizationMetadata,
+        synchronizationStatus: synchronization ? this.toStorageSyncStatus(synchronization) : "disabled",
+        lifecycleState: inspected.value.lifecycleState,
+        operationalStatus: inspected.value.operationalStatus,
+        lastCheckedAt: inspected.value.lastCheckedAt,
+        reasonCode: inspected.value.reasonCode,
+        operationalNotes: inspected.value.operationalNotes,
       }),
     });
   }

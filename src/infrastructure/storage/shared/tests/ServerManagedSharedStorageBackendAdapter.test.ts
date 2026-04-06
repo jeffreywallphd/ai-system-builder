@@ -116,6 +116,8 @@ describe("ServerManagedSharedStorageBackendAdapter", () => {
     expect(capability.supportsCrossWorkspaceReads).toBeTrue();
     expect(capability.notes).toContain("binding-health:healthy");
     expect(capability.notes).toContain("binding-target:studio-share");
+    expect(capability.health?.status).toBe("healthy");
+    expect(capability.health?.reasonCode).toBe("binding-health-healthy");
   });
 
   it("returns explicit validation error when shared target binding is unspecified", async () => {
@@ -368,6 +370,7 @@ describe("ServerManagedSharedStorageBackendAdapter", () => {
     });
     expect(unsupportedCapabilities.supportsManagedLifecycle).toBeFalse();
     expect(unsupportedCapabilities.notes).toContain("backend-support:unsupported:managed-filesystem");
+    expect(unsupportedCapabilities.health?.status).toBe("unsupported");
 
     const supportedCapabilities = await adapter.inspectStorageBackendCapabilities({
       backendType: StorageBackendTypes.networkShare,
