@@ -1,4 +1,6 @@
 import type { SecretKind, SecretReference, SecretReferenceMetadata, SecretScope } from "../../../../src/domain/security/SecretDomain";
+import type { SecretClassificationId } from "../../../../src/shared/contracts/security/SecretClassificationContracts";
+import type { SecretRotationInstructionContract } from "../../../../src/shared/contracts/security/SecretTransportContracts";
 
 export const SecretMetadataApiErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -58,6 +60,8 @@ export interface CreateSecretMetadataApiRequest {
   readonly kind: SecretKind;
   readonly plaintext: string;
   readonly metadata?: SecretReferenceMetadata;
+  readonly classificationId?: SecretClassificationId;
+  readonly rotationInstruction?: SecretRotationInstructionContract;
   readonly createdAt?: string;
 }
 

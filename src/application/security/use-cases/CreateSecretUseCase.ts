@@ -26,6 +26,10 @@ import {
 } from "./SecretManagementServiceContracts";
 import { toCreateSecretRequestDiagnosticDto, toSecretOwnerDiagnosticDto } from "../../../shared/dto/security/SecretServiceDtos";
 import { SecretClassificationContractError, assertSecretClassificationSupport } from "../../../shared/contracts/security/SecretClassificationContracts";
+import {
+  SecretApiSchemaValidationError,
+  parseCreateSecretMetadataCommand,
+} from "../../../shared/schemas/security/SecretApiSchemaContracts";
 
 export interface CreateSecretUseCaseDependencies {
   readonly secretRecordRepository: ISecretRecordPersistenceRepository;
@@ -48,6 +52,34 @@ export class CreateSecretUseCase {
   public async execute(request: CreateSecretRequest): Promise<SecretServiceResult<CreateSecretResult>> {
     const occurredAt = normalizeTimestamp(request.createdAt, this.now);
     const diagnostics = toCreateSecretRequestDiagnosticDto(request);
+    try {
+      parseCreateSecretMetadataCommand({
+        operationKey: request.operationKey,
+        secretId: request.secretId,
+        name: request.name,
+        owner: request.owner,
+        kind: request.kind,
+        plaintext: request.plaintext,
+        metadata: request.metadata,
+        createdAt: request.createdAt,
+      });
+    } catch (error) {
+      if (error instanceof SecretApiSchemaValidationError) {
+        await this.emitOperation("rejected", {
+          occurredAt: occurredAt ?? this.now().toISOString(),
+          actorId: diagnostics.actor.actorId,
+          secretId: diagnostics.secretId,
+          details: Object.freeze({
+            reason: "schema-validation-failed",
+            request: diagnostics,
+            issues: error.issues,
+          }),
+        });
+        return invalidRequest(error.issues[0]?.message ?? "Secret create request is invalid.");
+      }
+      throw error;
+    }
+
     if (!occurredAt) {
       await this.emitOperation("rejected", {
         occurredAt: this.now().toISOString(),
