@@ -111,6 +111,40 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
   - `src/infrastructure/persistence/workspaces/tests/SqliteWorkspacePersistenceAdapter.test.ts`
   - `src/infrastructure/persistence/authorization/tests/SqliteAuthorizationPersistenceAdapter.test.ts`
 
+## Story 13.2.3 concrete adapter slice for nodes/storage/assets/runs/audit
+
+- SQLite-backed concrete adapters now cover the next authoritative metadata slice under:
+  - `src/infrastructure/persistence/nodes/`
+  - `src/infrastructure/persistence/storage/`
+  - `src/infrastructure/persistence/assets/`
+  - `src/infrastructure/persistence/platform/`
+- Node persistence adapter coverage includes:
+  - approval status lifecycle, trust-state transitions, and revocation metadata
+  - capability profile persistence (`enabledCapabilities`, scheduler support, concurrency hints)
+  - enrollment request lifecycle and pending-review lookup patterns
+- Storage persistence adapter coverage includes:
+  - storage instance lifecycle state + backend metadata
+  - access policy metadata and encryption/security policy fields
+  - replay-safe mutation handling for create/save operations
+- Logical asset persistence adapter coverage includes:
+  - ownership/visibility metadata, lifecycle state, and version lineage
+  - logical source relationships (lineage links + generated-output source metadata)
+  - upload-session persistence for protected ingest flows
+- New cross-domain platform adapter coverage includes:
+  - `IPlatformRunRecordRepository` via `SqlitePlatformPersistenceAdapter`:
+    - run-kind/status/source references, workspace/user tenancy references, revisioned status timeline truth
+    - metadata persistence intended for orchestration/scheduling control-plane fields (without runtime-execution payload ownership)
+    - replay-safe create/save mutations and list-query filters for admin/orchestration views
+  - `IPlatformAuditEventRepository` via `SqlitePlatformPersistenceAdapter`:
+    - append-only audit-event persistence across identity/workspace/authorization/nodes/storage/assets/runs/security/secrets/sessions/system domains
+    - queryable filters for kind, actor, workspace, user, target, and time-window review flows
+    - replay-safe append semantics via normalized operation keys
+- Adapter verification coverage now includes:
+  - `src/infrastructure/persistence/nodes/tests/SqliteNodeTrustPersistenceAdapter.test.ts`
+  - `src/infrastructure/persistence/storage/tests/SqliteStorageInstancePersistenceAdapter.test.ts`
+  - `src/infrastructure/persistence/assets/tests/SqliteAssetPersistenceAdapter.test.ts`
+  - `src/infrastructure/persistence/platform/tests/SqlitePlatformPersistenceAdapter.test.ts`
+
 ## Mapper guidance for contributors
 
 - Keep mapper implementations in infrastructure, but drive them from shared DTO + schema contracts.
