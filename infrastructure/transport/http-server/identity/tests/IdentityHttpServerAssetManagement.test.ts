@@ -5,6 +5,7 @@ import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/Te
 import { createIdentityHttpServer } from "../IdentityHttpServer";
 import { AssetManagementBackendApi } from "../../../../api/assets/AssetManagementBackendApi";
 import { AssetUploadInitiationService } from "../../../../../src/application/assets/use-cases/AssetUploadInitiationService";
+import { AssetUploadIngestionService } from "../../../../../src/application/assets/use-cases/AssetUploadIngestionService";
 import {
   AssetKinds,
   AssetVisibilities,
@@ -32,7 +33,7 @@ afterEach(async () => {
 });
 
 class StubAssetUploadInitiationService {
-  private readonly asset: Asset = createAsset({
+  public readonly asset: Asset = createAsset({
     id: "asset-upload-001",
     kind: AssetKinds.uploadedFile,
     ownership: createAssetOwnershipMetadata({
@@ -112,10 +113,47 @@ class StubAssetUploadInitiationService {
   }
 }
 
-async function startServer(service: StubAssetUploadInitiationService): Promise<string> {
+class StubAssetUploadIngestionService {
+  public reject = false;
+
+  public async ingestUploadContent() {
+    if (this.reject) {
+      return {
+        ok: false as const,
+        error: {
+          code: "asset-invalid-state" as const,
+          message: "Upload rejected.",
+        },
+      };
+    }
+    return {
+      ok: true as const,
+      value: {
+        asset: new StubAssetUploadInitiationService()["asset"],
+        uploadSessionId: "asset-upload-session:test-001",
+        finalizedVersionId: "asset-upload-001:v2",
+        content: {
+          mimeType: "application/octet-stream",
+          sizeBytes: 5,
+          checksum: {
+            algorithm: "sha256" as const,
+            digest: "a".repeat(64),
+          },
+          originalFileName: "file.bin",
+        },
+      },
+    };
+  }
+}
+
+async function startServer(
+  initiationService: StubAssetUploadInitiationService,
+  ingestionService = new StubAssetUploadIngestionService(),
+): Promise<string> {
   const identityHarness = await createIdentityAuthTestHarness();
   const assetManagementBackendApi = new AssetManagementBackendApi({
-    uploadInitiationService: service as unknown as AssetUploadInitiationService,
+    uploadInitiationService: initiationService as unknown as AssetUploadInitiationService,
+    uploadIngestionService: ingestionService as unknown as AssetUploadIngestionService,
   });
 
   const server = createIdentityHttpServer({
@@ -219,6 +257,19 @@ describe("IdentityHttpServer asset management routes", () => {
     expect(initiateBody.ok).toBe(true);
     expect(initiateBody.data.upload.uploadMethod).toBe("POST");
     expect(initiateBody.data.upload.uploadEndpoint).toContain("/api/v1/assets/upload-sessions/");
+
+    const ingestResponse = await fetch(`${baseUrl}/api/v1/assets/upload-sessions/asset-upload-session%3Atest-001/content?workspaceId=workspace-alpha`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/octet-stream",
+      },
+      body: Buffer.from("hello", "utf8"),
+    });
+    expect(ingestResponse.status).toBe(200);
+    const ingestBody = await ingestResponse.json();
+    expect(ingestBody.ok).toBe(true);
+    expect(ingestBody.data.finalizedVersionId).toBe("asset-upload-001:v2");
   });
 
   it("maps authorization failures to forbidden responses", async () => {
@@ -246,5 +297,28 @@ describe("IdentityHttpServer asset management routes", () => {
     const body = await response.json();
     expect(body.ok).toBe(false);
     expect(body.error.code).toBe("forbidden");
+  });
+
+  it("maps ingestion failures to invalid-state responses", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const ingestion = new StubAssetUploadIngestionService();
+    ingestion.reject = true;
+
+    const baseUrl = await startServer(service, ingestion);
+    const token = await registerAndLogin(baseUrl, "asset.http.owner.3");
+
+    const response = await fetch(`${baseUrl}/api/v1/assets/upload-sessions/asset-upload-session%3Atest-001/content?workspaceId=workspace-alpha`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/octet-stream",
+      },
+      body: Buffer.from("hello", "utf8"),
+    });
+
+    expect(response.status).toBe(422);
+    const body = await response.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("invalid-state");
   });
 });

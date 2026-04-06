@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AssetServiceErrorCodes } from "../../../src/application/assets/use-cases/AssetServiceContracts";
 import type { AssetUploadInitiationService } from "../../../src/application/assets/use-cases/AssetUploadInitiationService";
+import type { AssetUploadIngestionService } from "../../../src/application/assets/use-cases/AssetUploadIngestionService";
 import { toAssetDetailDto } from "../../../src/shared/contracts/assets/AssetTransportContracts";
 import {
   toBeginAssetUploadRequest,
@@ -10,6 +11,8 @@ import {
   AssetManagementApiErrorCodes,
   type AssetManagementApiError,
   type AssetManagementApiResponse,
+  type IngestAssetUploadContentApiRequest,
+  type IngestAssetUploadContentApiResponse,
   type InitiateAssetUploadApiRequest,
   type InitiateAssetUploadApiResponse,
   type RegisterAssetApiRequest,
@@ -18,6 +21,7 @@ import {
 
 export interface AssetManagementBackendApiDependencies {
   readonly uploadInitiationService: AssetUploadInitiationService;
+  readonly uploadIngestionService: AssetUploadIngestionService;
 }
 
 export class AssetManagementBackendApi {
@@ -112,6 +116,44 @@ export class AssetManagementBackendApi {
     });
   }
 
+  public async ingestAssetUploadContent(
+    request: IngestAssetUploadContentApiRequest,
+  ): Promise<AssetManagementApiResponse<IngestAssetUploadContentApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(AssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+    }
+
+    const uploadSessionId = normalizeRequired(request.uploadSessionId);
+    if (!uploadSessionId) {
+      return this.failed(AssetManagementApiErrorCodes.invalidRequest, "uploadSessionId is required.");
+    }
+
+    const outcome = await this.dependencies.uploadIngestionService.ingestUploadContent({
+      actorUserId: actorUserIdentityId,
+      workspaceId: request.workspaceId,
+      operationKey: request.operationKey ?? `asset:upload:ingest:${uploadSessionId}:${randomUUID()}`,
+      correlationId: request.correlationId,
+      occurredAt: request.occurredAt,
+      uploadSessionId,
+      contentType: request.contentType,
+      content: request.content,
+    });
+    if (!outcome.ok) {
+      return this.failedFromServiceError(outcome.error.code, outcome.error.message, outcome.error.details);
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        asset: toAssetDetailDto(outcome.value.asset),
+        uploadSessionId: outcome.value.uploadSessionId,
+        finalizedVersionId: outcome.value.finalizedVersionId,
+        content: outcome.value.content,
+      }),
+    });
+  }
+
   private failedFromServiceError(
     code: typeof AssetServiceErrorCodes[keyof typeof AssetServiceErrorCodes],
     message: string,
@@ -121,12 +163,12 @@ export class AssetManagementBackendApi {
       case AssetServiceErrorCodes.invalidRequest:
         return this.failed(AssetManagementApiErrorCodes.invalidRequest, message, details);
       case AssetServiceErrorCodes.accessDenied:
-      case AssetServiceErrorCodes.policyViolation:
         return this.failed(AssetManagementApiErrorCodes.forbidden, message, details);
       case AssetServiceErrorCodes.notFound:
         return this.failed(AssetManagementApiErrorCodes.notFound, message, details);
       case AssetServiceErrorCodes.conflict:
         return this.failed(AssetManagementApiErrorCodes.conflict, message, details);
+      case AssetServiceErrorCodes.policyViolation:
       case AssetServiceErrorCodes.invalidState:
         return this.failed(AssetManagementApiErrorCodes.invalidState, message, details);
       default:

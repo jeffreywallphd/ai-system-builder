@@ -66,10 +66,17 @@ import { SqliteCertificateAuthorityPersistenceAdapter } from "../../src/infrastr
 import { SqliteStorageInstancePersistenceAdapter } from "../../src/infrastructure/persistence/storage/SqliteStorageInstancePersistenceAdapter";
 import { SqliteStorageManagementAuditRecorder } from "../../src/infrastructure/persistence/storage/SqliteStorageManagementAuditRecorder";
 import { SqliteAssetPersistenceAdapter } from "../../src/infrastructure/persistence/assets/SqliteAssetPersistenceAdapter";
+import { SqliteAssetUploadSessionPersistenceAdapter } from "../../src/infrastructure/persistence/assets/SqliteAssetUploadSessionPersistenceAdapter";
 import { StorageManagementService } from "../../src/application/storage/use-cases/StorageManagementService";
 import { AssetUploadInitiationService } from "../../src/application/assets/use-cases/AssetUploadInitiationService";
+import { AssetUploadIngestionService } from "../../src/application/assets/use-cases/AssetUploadIngestionService";
+import { StorageLogicalAccessResolutionService } from "../../src/application/storage/use-cases/StorageLogicalAccessResolutionService";
 import { StorageBackendProvisioningOrchestrator } from "../../src/infrastructure/storage/StorageBackendProvisioningOrchestrator";
 import { createStorageBackendAdapterRegistry } from "../../src/infrastructure/storage/StorageBackendAdapterRegistry";
+import {
+  ServerManagedLocalStorageBackendAdapter,
+  ServerManagedLocalStorageObjectAdapter,
+} from "../../src/infrastructure/storage/local";
 import { ServerManagedStorageSynchronizationAdapter } from "../../src/infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
 import {
   assertCertificateAuthorityStartupSafe,
@@ -284,6 +291,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const storageInstanceRepository = new SqliteStorageInstancePersistenceAdapter(path.resolve(options.databasePath));
   const storageManagementAuditRecorder = new SqliteStorageManagementAuditRecorder(path.resolve(options.databasePath));
   const assetRepository = new SqliteAssetPersistenceAdapter(path.resolve(options.databasePath));
+  const assetUploadSessionRepository = new SqliteAssetUploadSessionPersistenceAdapter(path.resolve(options.databasePath));
   const env = options.env ?? process.env;
   const hostAddress = options.host ?? "127.0.0.1";
   const secureTransportConfig = resolveHostSecureTransportConfig({
@@ -761,8 +769,21 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       auditSink: nodeTrustAuditRecorder,
     }),
   });
+  const managedStorageRootPath = resolveManagedStorageRootPath(path.resolve(options.databasePath), env);
+  const localStorageBackendAdapter = new ServerManagedLocalStorageBackendAdapter({
+    managedStorageRootPath,
+  });
+  const localStorageObjectAdapter = new ServerManagedLocalStorageObjectAdapter({
+    managedStorageRootPath,
+  });
+  const storageBackendAdapterRegistry = createStorageBackendAdapterRegistry([{
+    backendType: "managed-filesystem",
+    provisioningPort: localStorageBackendAdapter,
+    capabilityInspectionPort: localStorageBackendAdapter,
+    objectPort: localStorageObjectAdapter,
+  }]);
   const storageProvisioningOrchestrator = new StorageBackendProvisioningOrchestrator(
-    createStorageBackendAdapterRegistry([]),
+    storageBackendAdapterRegistry,
   );
   const storageSynchronizationAdapter = new ServerManagedStorageSynchronizationAdapter({
     availability: resolveStorageSyncDeploymentAvailability(env),
@@ -784,12 +805,24 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   });
   const assetUploadInitiationService = new AssetUploadInitiationService({
     repository: assetRepository,
+    uploadSessionRepository: assetUploadSessionRepository,
     workspaceAuthorizationReadRepository: workspaceRepository,
     storageInstanceRepository,
     storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
   });
+  const storageLogicalAccessResolutionService = new StorageLogicalAccessResolutionService({
+    repository: storageInstanceRepository,
+    policyPort: workspaceAwareStoragePolicyEvaluationAdapter,
+    objectAccessResolver: storageBackendAdapterRegistry,
+  });
+  const assetUploadIngestionService = new AssetUploadIngestionService({
+    repository: assetRepository,
+    uploadSessionRepository: assetUploadSessionRepository,
+    storageLogicalAccessResolutionService,
+  });
   const assetManagementBackendApi = new AssetManagementBackendApi({
     uploadInitiationService: assetUploadInitiationService,
+    uploadIngestionService: assetUploadIngestionService,
   });
   const transportTrustStateResolver = new ServerManagedTransportTrustStateResolver({
     trustedDeviceManagementService: trustedDeviceManagementService,
@@ -922,6 +955,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
         storageInstanceRepository.dispose();
         storageManagementAuditRecorder.dispose();
         assetRepository.dispose();
+        assetUploadSessionRepository.dispose();
         secretService?.dispose();
         const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
         if (typeof disposablePublisher.dispose === "function") {
@@ -946,6 +980,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     storageInstanceRepository.dispose();
     storageManagementAuditRecorder.dispose();
     assetRepository.dispose();
+    assetUploadSessionRepository.dispose();
     secretService?.dispose();
     throw error;
   }
@@ -1029,6 +1064,17 @@ function resolveStorageSyncDeploymentAvailability(
     default:
       return StorageSyncDeploymentAvailabilities.configuredInactive;
   }
+}
+
+function resolveManagedStorageRootPath(
+  databasePath: string,
+  env: Readonly<Record<string, string | undefined>>,
+): string {
+  const configured = env.AI_LOOM_STORAGE_MANAGED_ROOT_PATH?.trim();
+  if (configured) {
+    return path.resolve(configured);
+  }
+  return path.resolve(path.dirname(databasePath), "runtime-assets", "managed-storage");
 }
 
 function resolveIdentityDevLoginRouteEnabled(env: Readonly<Record<string, string | undefined>>): boolean {

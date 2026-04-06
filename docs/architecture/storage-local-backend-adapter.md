@@ -93,3 +93,13 @@ Client-facing transport contracts continue to exclude raw filesystem path fields
 - metadata and existence checks
 - safe delete behavior
 - application-safe error mapping for invalid keys, not-found reads, and unsupported backends
+
+## Story 10.2.2 host composition updates
+
+- Identity server host now wires local storage backend + object adapters into `StorageBackendAdapterRegistry` for managed-filesystem storage.
+- This enables upload-session content ingestion to resolve logical write operations through storage adapters (not ad hoc filesystem writes).
+- Managed storage root configuration is now available via:
+  - `AI_LOOM_STORAGE_MANAGED_ROOT_PATH`
+  - fallback default: `{dirname(databasePath)}/runtime-assets/managed-storage`
+
+Result: upload ingestion/finalization flows remain server-authoritative and path-safe while preserving storage adapter boundaries.

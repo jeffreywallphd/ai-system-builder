@@ -104,3 +104,29 @@ export interface InitiateAssetUploadApiResponse {
     readonly expiresAt: string;
   };
 }
+
+export interface IngestAssetUploadContentApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly operationKey?: string;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+  readonly uploadSessionId: string;
+  readonly contentType?: string;
+  readonly content: AsyncIterable<Uint8Array>;
+}
+
+export interface IngestAssetUploadContentApiResponse {
+  readonly asset: AssetDetailDto;
+  readonly uploadSessionId: string;
+  readonly finalizedVersionId: string;
+  readonly content: {
+    readonly mimeType: string;
+    readonly sizeBytes: number;
+    readonly checksum: {
+      readonly algorithm: "sha256";
+      readonly digest: string;
+    };
+    readonly originalFileName?: string;
+  };
+}
