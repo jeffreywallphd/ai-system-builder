@@ -109,6 +109,7 @@ type SecretMetadataObservabilityEvent =
 
 const SensitiveSecretErrorMessagePattern =
   /(plaintext|token|password|secret|api[_-]?key|private[_-]?key|BEGIN\s+[A-Z\s-]+|encryptedPayloadRef|payloadDigestSha256|secret-store:)/i;
+const OpaqueSecretTokenPattern = /^[A-Za-z0-9+/_=-]{20,}$/;
 
 export class SecretMetadataBackendApi {
   private readonly clock: { now(): Date };
@@ -951,7 +952,7 @@ function sanitizeObservabilityEvent(event: SecretMetadataObservabilityEvent): Se
 function toSafeClientErrorMessage(error: unknown, fallback: string): string {
   if (typeof error === "string") {
     const normalized = error.trim();
-    if (!normalized || SensitiveSecretErrorMessagePattern.test(normalized)) {
+    if (!normalized || SensitiveSecretErrorMessagePattern.test(normalized) || containsOpaqueSecretToken(normalized)) {
       return fallback;
     }
     return normalized;
@@ -959,13 +960,18 @@ function toSafeClientErrorMessage(error: unknown, fallback: string): string {
 
   if (error instanceof Error) {
     const normalized = error.message.trim();
-    if (!normalized || SensitiveSecretErrorMessagePattern.test(normalized)) {
+    if (!normalized || SensitiveSecretErrorMessagePattern.test(normalized) || containsOpaqueSecretToken(normalized)) {
       return fallback;
     }
     return normalized;
   }
 
   return fallback;
+}
+
+function containsOpaqueSecretToken(input: string): boolean {
+  const tokens = input.split(/[^A-Za-z0-9+/_=-]+/g).filter((token) => token.length > 0);
+  return tokens.some((token) => OpaqueSecretTokenPattern.test(token));
 }
 
 function normalizeRequired(value: string | undefined): string | undefined {

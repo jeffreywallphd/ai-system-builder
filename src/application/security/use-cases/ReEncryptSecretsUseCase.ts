@@ -676,9 +676,6 @@ function resolveReasonCode(
   return "operation-outcome";
 }
 
-function toSafeErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message.trim();
-  }
+function toSafeErrorMessage(_error: unknown, fallback: string): string {
   return fallback;
 }

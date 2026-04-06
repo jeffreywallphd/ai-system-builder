@@ -23,6 +23,7 @@ Story 8.3.6 baseline for Feature 8 / Epic 8.3: controlled, restartable re-encryp
 ## Safety posture
 
 - Failures are durable and visible: operation status transitions to `failed` with `lastErrorCode`/`lastErrorMessage`.
+- Re-encryption failure status keeps a safe fixed error message and does not persist raw adapter exception text.
 - Partial progress is retained and recoverable.
 - Optimistic revision checks prevent unsafe concurrent status mutation races.
 - Audit and observability events are emitted without exposing plaintext.

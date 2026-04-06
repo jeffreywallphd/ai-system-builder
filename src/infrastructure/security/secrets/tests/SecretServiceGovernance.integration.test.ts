@@ -289,4 +289,167 @@ describe("Secret service governance integration", () => {
       service.dispose();
     }
   });
+
+  it("covers full lifecycle regression including re-encryption and soft-delete visibility", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "ai-loom-secret-regression-int-"));
+    createdRoots.push(root);
+
+    const databasePath = path.join(root, "secret-regression.sqlite");
+    const payloadDirectory = path.join(root, "secret-envelopes");
+    const auditEvents: SecretAccessAuditEvent[] = [];
+    const service = composeServerSecretService({
+      databasePath,
+      env: {
+        AI_LOOM_SECRET_MASTER_KEY_ID: "kek:server:default",
+        AI_LOOM_SECRET_MASTER_KEY: Buffer.alloc(32, 41).toString("base64"),
+        AI_LOOM_SECRET_ENCRYPTED_PAYLOAD_DIRECTORY: payloadDirectory,
+      },
+      auditHook: (event) => {
+        auditEvents.push(event);
+      },
+    });
+
+    try {
+      const secretId = "secret:server:regression:openai";
+      const initialPlaintext = "regression-openai-token-v1";
+      const rotatedPlaintext = "regression-openai-token-v2";
+
+      const created = await service.createSecretUseCase.execute({
+        actor: {
+          actorId: "user:server-admin",
+          actorType: SecretActorTypes.serverAdmin,
+          grantedActions: [SecretAccessActions.create],
+        },
+        operationKey: "op:secret:regression:create",
+        secretId,
+        name: "provider.openai.regression-key",
+        owner: {
+          scope: SecretScopes.server,
+        },
+        kind: SecretKinds.apiKey,
+        plaintext: initialPlaintext,
+      });
+      expect(created.ok).toBeTrue();
+
+      const rotated = await service.rotateSecretUseCase.execute({
+        actor: {
+          actorId: "user:server-admin",
+          actorType: SecretActorTypes.serverAdmin,
+          grantedActions: [SecretAccessActions.rotate],
+        },
+        operationKey: "op:secret:regression:rotate",
+        secretId,
+        plaintext: rotatedPlaintext,
+      });
+      expect(rotated.ok).toBeTrue();
+
+      const reEncrypted = await service.reEncryptSecretsUseCase.execute({
+        actor: {
+          actorId: "user:server-admin",
+          actorType: SecretActorTypes.serverAdmin,
+          grantedActions: [SecretAccessActions.reEncrypt],
+        },
+        operationKey: "op:secret:regression:reencrypt",
+        occurredAt: "2026-04-06T19:00:00.000Z",
+      });
+      expect(reEncrypted.ok).toBeTrue();
+      if (!reEncrypted.ok) {
+        return;
+      }
+      expect(reEncrypted.value.status).toBe("succeeded");
+      expect(reEncrypted.value.totalTargets).toBeGreaterThanOrEqual(1);
+      expect(JSON.stringify(reEncrypted.value)).not.toContain(initialPlaintext);
+      expect(JSON.stringify(reEncrypted.value)).not.toContain(rotatedPlaintext);
+
+      const deleted = await service.deleteSecretUseCase.execute({
+        actor: {
+          actorId: "user:server-admin",
+          actorType: SecretActorTypes.serverAdmin,
+          grantedActions: [SecretAccessActions.delete],
+        },
+        operationKey: "op:secret:regression:delete",
+        secretId,
+      });
+      expect(deleted.ok).toBeTrue();
+
+      const defaultList = await service.listSecretsUseCase.execute({
+        actor: {
+          actorId: "user:server-admin",
+          actorType: SecretActorTypes.serverAdmin,
+          grantedActions: [SecretAccessActions.list],
+        },
+        owner: {
+          scope: SecretScopes.server,
+        },
+      });
+      expect(defaultList.ok).toBeTrue();
+      if (!defaultList.ok) {
+        return;
+      }
+      expect(defaultList.value.items.some((item) => item.secretId === secretId)).toBeFalse();
+
+      const includeSoftDeleted = await service.listSecretsUseCase.execute({
+        actor: {
+          actorId: "user:server-admin",
+          actorType: SecretActorTypes.serverAdmin,
+          grantedActions: [SecretAccessActions.list],
+        },
+        owner: {
+          scope: SecretScopes.server,
+        },
+        includeArchived: true,
+        includeSoftDeleted: true,
+      });
+      expect(includeSoftDeleted.ok).toBeTrue();
+      if (!includeSoftDeleted.ok) {
+        return;
+      }
+      const deletedRecord = includeSoftDeleted.value.items.find((item) => item.secretId === secretId);
+      expect(deletedRecord?.state).toBe("soft-deleted");
+
+      const runtimeDenied = await service.retrieveSecretPlaintextForRuntimeUseCase.execute({
+        actor: {
+          actorId: "system:runtime:server",
+          actorType: SecretActorTypes.serverRuntime,
+          grantedActions: [SecretAccessActions.retrievePlaintext],
+        },
+        secretId,
+        operationKey: "op:secret:regression:retrieve-after-delete",
+        runtimeContext: {
+          serviceIdentity: "runtime:server:regression",
+          scope: {
+            scope: SecretScopes.server,
+          },
+          justification: "verify deleted secrets are not retrievable",
+        },
+      });
+      expect(runtimeDenied).toEqual({
+        ok: false,
+        error: {
+          code: SecretServiceErrorCodes.notFound,
+          message: `Secret '${secretId}' was not found.`,
+        },
+      });
+
+      const serializedAudit = JSON.stringify(auditEvents);
+      expect(serializedAudit).not.toContain(initialPlaintext);
+      expect(serializedAudit).not.toContain(rotatedPlaintext);
+      expect(
+        auditEvents.some(
+          (event) => event.eventKind === "secret.operation"
+            && event.operation === SecretAccessActions.reEncrypt
+            && event.status === "succeeded",
+        ),
+      ).toBeTrue();
+      expect(
+        auditEvents.some(
+          (event) => event.eventKind === "secret.operation"
+            && event.operation === SecretAccessActions.delete
+            && event.status === "succeeded",
+        ),
+      ).toBeTrue();
+    } finally {
+      service.dispose();
+    }
+  });
 });
