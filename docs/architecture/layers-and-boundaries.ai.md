@@ -98,12 +98,12 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 - Added infrastructure security implementation `infrastructure/security/identity/ScryptLocalPasswordCredentialService.ts` using scrypt-based password derivation and timing-safe verification.
 
 ## Direction 6 boundary note: Authoritative identity server endpoints (story 1.2.6)
-- Added a thin infrastructure API adapter (`infrastructure/api/identity/IdentityAuthBackendApi.ts`) that maps inner identity results to stable public API error codes.
-- Added authoritative HTTP transport handlers in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts` for registration/login (`POST /api/v1/identity/register`, `POST /api/v1/identity/login`).
+- Added a thin infrastructure API adapter (`src/infrastructure/api/identity/IdentityAuthBackendApi.ts`) that maps inner identity results to stable public API error codes.
+- Added authoritative HTTP transport handlers in `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts` for registration/login (`POST /api/v1/identity/register`, `POST /api/v1/identity/login`).
 - Boundary posture is preserved:
   - request validation is transport-only (`zod`);
   - registration/login business rules remain in application use cases;
-  - host wiring is outer-layer only (`hosts/server/IdentityServerHost.ts`).
+  - host wiring is outer-layer only (`src/hosts/server/IdentityServerHost.ts`).
 - Transport logging now redacts credential-sensitive fields before emission, so credential material does not leak through infrastructure logs.
 
 ## Direction 8 boundary note: Secret domain and service contracts foundation (story 8.1.1)
@@ -120,7 +120,7 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 
 ## Direction 8 boundary note: Secret host composition wiring (story 8.1.7)
 - Added host/runtime composition seam at `src/infrastructure/security/secrets/SecretServiceComposition.ts`.
-- Authoritative server wiring in `hosts/server/IdentityServerHost.ts` now composes secret repository, encryption port, access policy, observability, and audit hook collaborators without moving host bootstrap logic into domain/application layers.
+- Authoritative server wiring in `src/hosts/server/IdentityServerHost.ts` now composes secret repository, encryption port, access policy, observability, and audit hook collaborators without moving host bootstrap logic into domain/application layers.
 - Host startup fail-closed behavior now rejects partial secret master-key configuration while keeping composition explicit at the outer layer.
 
 ## Direction 12 boundary note: Host runtime composition contracts (story 12.1.1)

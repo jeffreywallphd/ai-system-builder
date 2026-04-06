@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type {
   GetStorageInstanceDetailApiResponse,
   StorageManagementApiError,
-} from "../../../infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
+} from "../../../src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
 import {
   StorageAccessModes,
   StorageAccessScopes,

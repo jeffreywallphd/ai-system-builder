@@ -4,7 +4,7 @@ import type {
   ListPendingNodeEnrollmentsApiResponse,
   NodeTrustApiResponse,
   RejectNodeEnrollmentApiResponse,
-} from "../../../infrastructure/api/nodes/sdk/PublicNodeTrustApiContract";
+} from "../../../src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract";
 import { NodeEnrollmentRequestStatuses } from "../../../src/domain/nodes/NodeTrustDomain";
 import type {
   ApproveNodeEnrollmentActionRequestDto,

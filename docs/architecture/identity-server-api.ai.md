@@ -41,11 +41,11 @@
 
 ## Main files
 
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `infrastructure/api/identity/IdentityAuthBackendApi.ts`
-- `infrastructure/api/assets/AssetManagementBackendApi.ts`
-- `infrastructure/api/identity/sdk/PublicIdentityAuthApiContract.ts`
-- `hosts/server/IdentityServerHost.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
+- `src/infrastructure/api/assets/AssetManagementBackendApi.ts`
+- `src/infrastructure/api/identity/sdk/PublicIdentityAuthApiContract.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 
 Renderer client surface now uses the same endpoint contract:
 
@@ -95,9 +95,9 @@ Registration invalid-request responses now preserve specific actionable message 
 
 Auth observability and redaction are centralized in:
 
-- `infrastructure/api/identity/IdentityAuthObservability.ts`
-- `infrastructure/api/identity/IdentityAuthRedaction.ts`
-- `infrastructure/api/identity/IdentityAuthResponseSerializers.ts`
+- `src/infrastructure/api/identity/IdentityAuthObservability.ts`
+- `src/infrastructure/api/identity/IdentityAuthRedaction.ts`
+- `src/infrastructure/api/identity/IdentityAuthResponseSerializers.ts`
 
 `IdentityAuthBackendApi` emits structured auth/admin/trusted-device API completion events through this seam (success and failure), and the seam exposes `IdentityAuthAuditEventSink` for audit-service integration.
 
@@ -209,11 +209,11 @@ Persisted session records now intentionally exclude:
 
 ## Tests
 
-- `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
-- `infrastructure/api/identity/IdentityAuthObservability.ts`
-- `infrastructure/api/security/tests/CertificateOperationsBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerCertificateOperations.test.ts`
+- `src/infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
+- `src/infrastructure/api/identity/IdentityAuthObservability.ts`
+- `src/infrastructure/api/security/tests/CertificateOperationsBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerCertificateOperations.test.ts`
 - trusted-device transport lifecycle coverage in backend + HTTP integration tests (list/detail/revoke/rename + pairing initiate/validate/complete)
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
 - `ui/pages/tests/IdentityAdminPage.test.tsx`

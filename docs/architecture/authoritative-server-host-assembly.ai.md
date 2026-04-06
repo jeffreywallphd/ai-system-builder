@@ -7,7 +7,7 @@
 ## Main implementation seams
 - Composition root: `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 - Dedicated entrypoint: `src/hosts/server/AuthoritativeServerHostEntrypoint.ts`
-- Runtime host startup implementation: `hosts/server/IdentityServerHost.ts`
+- Runtime host startup implementation: `src/hosts/server/IdentityServerHost.ts`
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 
 ## Control-plane ownership

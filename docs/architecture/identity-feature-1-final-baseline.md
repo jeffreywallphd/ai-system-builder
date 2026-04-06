@@ -16,7 +16,7 @@ Feature 1 local identity/account lifecycle is implemented end-to-end for local-p
 
 Primary composition root:
 
-- `hosts/server/IdentityServerHost.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 
 ## Production capability map
 
@@ -41,7 +41,7 @@ Core services:
 
 - `application/identity/services/IdentitySessionLifecycleService.ts`
 - `application/identity/services/IdentityAuthenticatedSessionService.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 
 Session policy config:
 
@@ -69,7 +69,7 @@ Current behavior:
 
 SQLite adapters:
 
-- `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`
+- `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
 - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
 
 Current migration baseline:
@@ -80,9 +80,9 @@ Current migration baseline:
 
 Transport and API mapping:
 
-- `infrastructure/api/identity/IdentityAuthBackendApi.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `infrastructure/api/identity/sdk/PublicIdentityAuthApiContract.ts`
+- `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/identity/sdk/PublicIdentityAuthApiContract.ts`
 
 Implemented endpoints:
 
@@ -104,7 +104,7 @@ Provider/account policy config:
 
 Host applies startup defaults + policy toggles in:
 
-- `hosts/server/IdentityServerHost.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 
 Important toggles:
 
@@ -200,10 +200,10 @@ Application tests:
 
 Infrastructure/API tests:
 
-- `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
-- `infrastructure/api/identity/tests/IdentityAuthRedaction.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
-- `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`
+- `src/infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
+- `src/infrastructure/api/identity/tests/IdentityAuthRedaction.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
 
 UI tests covering identity API consumers:
 

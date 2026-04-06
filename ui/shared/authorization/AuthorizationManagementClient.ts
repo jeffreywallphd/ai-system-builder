@@ -5,7 +5,7 @@ import type {
   GrantAuthorizationSharingAccessApiResponse,
   RevokeAuthorizationSharingAccessApiResponse,
   UpdateAuthorizationVisibilityApiResponse,
-} from "../../../infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract";
+} from "../../../src/infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract";
 import type { AuthorizationResourceFamily } from "../../../src/domain/authorization/AuthorizationPermissionCatalog";
 import type {
   AuthorizationRoleKey,

@@ -23,8 +23,8 @@ Session trust integration note:
 - `application/identity/services/TrustedDevicePairingService.ts`
 - `application/identity/services/TrustedDeviceServiceMappers.ts`
 - `src/application/identity/use-cases/CompleteTrustedDevicePairingUseCase.ts`
-- `infrastructure/filesystem/identity/SqliteTrustedDeviceRepository.ts`
-- `infrastructure/filesystem/identity/TrustedDevicePersistenceMapper.ts`
+- `src/infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter.ts`
+- `src/infrastructure/persistence/identity/TrustedDevicePersistenceMapper.ts`
 - `src/infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter.ts`
 - `src/infrastructure/persistence/identity/TrustedDevicePersistenceMapper.ts`
 
@@ -131,7 +131,7 @@ Pairing service lifecycle contract (`ITrustedDevicePairingService`):
 - `application/identity/tests/IdentityPortsContracts.test.ts`
 - `src/infrastructure/persistence/identity/tests/TrustedDevicePersistenceMapper.test.ts`
 - `src/infrastructure/persistence/identity/tests/SqliteTrustedDevicePersistenceAdapter.test.ts`
-- `infrastructure/filesystem/identity/tests/SqliteTrustedDeviceRepository.test.ts`
+- `src/infrastructure/persistence/identity/tests/SqliteTrustedDevicePersistenceAdapter.test.ts`
 - `application/identity/tests/TrustedDevicePairingService.test.ts`
 - `application/identity/tests/CompleteTrustedDevicePairingUseCase.test.ts`
 - `infrastructure/filesystem/identity/tests/TrustedDevicePairingCompletionIntegration.test.ts`

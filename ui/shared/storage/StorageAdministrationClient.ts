@@ -7,7 +7,7 @@ import type {
   ListStorageInstancesApiResponse,
   StorageManagementApiResponse,
   UpdateStorageInstanceMetadataApiResponse,
-} from "../../../infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
+} from "../../../src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
 import type {
   StorageAccessMode,
   StorageAccessScope,

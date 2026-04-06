@@ -129,12 +129,12 @@ This safeguard is authoritative in backend use cases and does not rely on UI pro
 
 ## Primary implementation references
 
-- `infrastructure/api/authorization/AuthorizationManagementBackendApi.ts`
-- `infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/authorization/AuthorizationManagementBackendApi.ts`
+- `src/infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `ui/components/authorization/AuthorizationSharingManagementPanel.tsx`
 - `ui/pages/AuthorizationSharingManagementPage.tsx`
 - `ui/pages/AuthorizationSharingThinClientPage.tsx`
 - `ui/pages/AuthorizationReportingPage.tsx`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthorizationManagement.test.ts`
-- `infrastructure/api/authorization/tests/AuthorizationManagementBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthorizationManagement.test.ts`
+- `src/infrastructure/api/authorization/tests/AuthorizationManagementBackendApi.test.ts`

@@ -3,7 +3,7 @@ import type {
   ListNodeInventoryApiResponse,
   NodeTrustApiResponse,
   RevokeNodeTrustApiResponse,
-} from "../../../infrastructure/api/nodes/sdk/PublicNodeTrustApiContract";
+} from "../../../src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract";
 import type {
   NodeInventoryOperationalState,
   NodeInventoryPresenceState,

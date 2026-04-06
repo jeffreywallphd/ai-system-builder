@@ -5,7 +5,7 @@ import type {
   ListSecretMetadataApiResponse,
   RotateSecretMetadataApiResponse,
   SecretMetadataApiResponse,
-} from "../../../infrastructure/api/security/sdk/PublicSecretMetadataApiContract";
+} from "../../../src/infrastructure/api/security/sdk/PublicSecretMetadataApiContract";
 import type { SecretKind, SecretScope } from "../../../src/domain/security/SecretDomain";
 import type { SecretClassificationId } from "../../../src/shared/contracts/security/SecretClassificationContracts";
 import type { SecretRotationInstructionContract } from "../../../src/shared/contracts/security/SecretTransportContracts";

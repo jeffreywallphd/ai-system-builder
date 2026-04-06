@@ -158,8 +158,8 @@ This aligns with the session trust model (`deviceTrust` context with trusted dev
 ## Persistence and migrations (Story 2.1.3)
 
 Primary persistence artifacts:
-- `infrastructure/filesystem/identity/SqliteTrustedDeviceRepository.ts`
-- `infrastructure/filesystem/identity/TrustedDevicePersistenceMapper.ts`
+- `src/infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter.ts`
+- `src/infrastructure/persistence/identity/TrustedDevicePersistenceMapper.ts`
 - `src/infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter.ts`
 - `src/infrastructure/persistence/identity/TrustedDevicePersistenceMapper.ts`
 - `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts` (schema version 6, with session trust context columns)
@@ -187,7 +187,7 @@ Persistence guarantees now covered:
 - Persistence mapper and adapter coverage:
   - `src/infrastructure/persistence/identity/tests/TrustedDevicePersistenceMapper.test.ts`
   - `src/infrastructure/persistence/identity/tests/SqliteTrustedDevicePersistenceAdapter.test.ts`
-  - `infrastructure/filesystem/identity/tests/SqliteTrustedDeviceRepository.test.ts`
+  - `src/infrastructure/persistence/identity/tests/SqliteTrustedDevicePersistenceAdapter.test.ts`
 - Application/service and completion integration coverage (Story 2.2.2):
   - `application/identity/tests/TrustedDevicePairingService.test.ts`
   - `application/identity/tests/CompleteTrustedDevicePairingUseCase.test.ts`
@@ -205,4 +205,4 @@ Persistence guarantees now covered:
 - Pairing failure audit events are emitted for expiration and invalid-token paths where pairing validation/completion fails.
 - Event payloads identify actor and target context where available (for example user identity, trusted device id, pairing token/session ids, optional workspace, and timestamps).
 - Raw pairing secrets/artifact values are not emitted; audit payloads remain token-secret-safe.
-- `IdentityServerHost` now composes a default SQLite-backed lifecycle event publisher (`infrastructure/filesystem/identity/SqliteIdentityLifecycleEventPublisher.ts`) so trusted-device audit events are durably persisted without coupling trusted-device services to storage mechanics.
+- `IdentityServerHost` now composes a default SQLite-backed lifecycle event publisher (`src/infrastructure/persistence/identity/SqliteIdentityLifecycleEventPublisher.ts`) so trusted-device audit events are durably persisted without coupling trusted-device services to storage mechanics.

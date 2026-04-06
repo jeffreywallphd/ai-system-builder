@@ -5,12 +5,12 @@ This note documents Story 8.3.5 (Feature 8 / Epic 8.3): operational diagnostics 
 ## Canonical artifacts
 
 - `src/infrastructure/security/secrets/SecretServiceOperationalDiagnostics.ts`
-- `infrastructure/api/security/SecretMetadataBackendApi.ts`
-- `infrastructure/api/security/sdk/PublicSecretMetadataApiContract.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `hosts/server/IdentityServerHost.ts`
+- `src/infrastructure/api/security/SecretMetadataBackendApi.ts`
+- `src/infrastructure/api/security/sdk/PublicSecretMetadataApiContract.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 - `src/infrastructure/security/secrets/tests/SecretServiceOperationalDiagnostics.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerSecretMetadata.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerSecretMetadata.test.ts`
 
 ## Runtime endpoints
 

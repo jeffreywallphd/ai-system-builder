@@ -363,7 +363,7 @@ The goal is to keep repository implementation aligned to domain/application cont
   - `src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase.ts`
   - `src/application/nodes/use-cases/RejectNodeEnrollmentUseCase.ts`
 - Authoritative host wiring now injects transaction-capable repository adapters so runtime execution paths use the transactional boundary in production:
-  - `hosts/server/IdentityServerHost.ts`
+  - `src/hosts/server/IdentityServerHost.ts`
 - Node trust SQLite persistence adapter now exposes the shared transaction-manager contract for use-case orchestration:
   - `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter.ts`
 - Added verification coverage for transactional orchestration behavior:
@@ -377,7 +377,7 @@ The goal is to keep repository implementation aligned to domain/application cont
 - SQLite bootstrap now executes deterministic cross-domain migration hooks (`identity`, `workspaces`, `authorization`, `nodes`, `storage`, `assets`, `platform`, `security`, `secrets`) before runtime feature registration.
 - Feature-registration now injects startup-composed persistence services into authoritative runtime host startup:
   - `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
-  - `hosts/server/IdentityServerHost.ts`
+  - `src/hosts/server/IdentityServerHost.ts`
 - Authoritative host service registration coverage now explicitly includes persistence bootstrap/repository/transaction/helper composition services:
   - `src/infrastructure/config/HostServiceRegistrationCatalog.ts`
 

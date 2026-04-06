@@ -238,7 +238,7 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
   - `src/application/nodes/use-cases/ApproveNodeEnrollmentUseCase.ts`
   - `src/application/nodes/use-cases/RejectNodeEnrollmentUseCase.ts`
 - Authoritative server runtime wiring now injects transaction-capable repository adapters so production flows use transactional orchestration:
-  - `hosts/server/IdentityServerHost.ts`
+  - `src/hosts/server/IdentityServerHost.ts`
 - Node trust SQLite persistence adapter now exposes the shared transaction-manager contract for application-layer coordination:
   - `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter.ts`
 - Transactional orchestration coverage additions:
@@ -253,7 +253,7 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
   - `createAuthoritativePersistenceMigrationHooks(...)`
 - Feature registration now injects startup-composed persistent services directly into runtime host startup so authoritative delivery flows consume composition-root owned adapters:
   - `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
-  - `hosts/server/IdentityServerHost.ts`
+  - `src/hosts/server/IdentityServerHost.ts`
 - Authoritative required host service coverage now includes explicit persistence bootstrap/repository/transaction/helper service registrations:
   - `src/infrastructure/config/HostServiceRegistrationCatalog.ts`
 

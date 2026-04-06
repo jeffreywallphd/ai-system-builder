@@ -26,7 +26,7 @@ Story 7.1.1 + 7.1.2 baseline for Feature 7 / Epic 7.1: secure transport domain/a
 - `src/infrastructure/transport/tests/TransportTrustValidationAdapters.test.ts`
 - `src/infrastructure/transport/websocket/SecureWebSocketChannelContext.ts`
 - `src/infrastructure/transport/websocket/tests/SecureWebSocketChannelContext.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
 
 ## Story 7.3.1 node-to-server mutually authenticated transport adapter
 
@@ -34,27 +34,27 @@ Story 7.3.1 adds a dedicated node-to-server HTTP transport adapter path for cert
 
 ### Runtime adapter updates
 
-- `infrastructure/transport/http-server/identity/NodeMutualTlsTransportAdapter.ts`
+- `src/infrastructure/transport/http-server/identity/NodeMutualTlsTransportAdapter.ts`
   - centralizes node mTLS transport validation by composing:
     - `HttpTransportTrustValidationAdapter` (policy + mTLS/certificate trust gate),
     - node certificate identity resolution (`resolveNodeMutualTlsTransportIdentity(...)`) against trusted node records.
   - returns protocol-safe accepted/rejected outcomes with explicit status mapping.
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
   - adds `requireAuthenticatedNodeTransport(...)` for node-only endpoints (`/runtime-trust-material`, `/heartbeat`);
   - uses the node mTLS adapter whenever transport trust enforcement is configured;
   - keeps a legacy authenticated-session fallback only when transport trust is not configured in runtime composition.
 - `src/application/nodes/use-cases/ResolveNodeMutualTlsTransportIdentityUseCase.ts`
   - validates node lifecycle trust eligibility (`approved` + `trusted` + non-revoked + certificate-assigned),
   - validates presented certificate serial/fingerprint against node certificate binding metadata.
-- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `src/infrastructure/api/nodes/NodeTrustBackendApi.ts`
   - adds `resolveNodeMutualTlsTransportIdentity(...)` as the application-facing seam consumed by the transport adapter.
-- `hosts/server/IdentityServerHost.ts`
+- `src/hosts/server/IdentityServerHost.ts`
   - composes `ResolveNodeMutualTlsTransportIdentityUseCase` into `NodeTrustBackendApi`;
   - configures managed TLS server startup with client certificate requests (`requestCert: true`) for mTLS-capable channels.
 
 ### Test coverage updates
 
-- `infrastructure/transport/http-server/identity/tests/NodeMutualTlsTransportAdapter.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/NodeMutualTlsTransportAdapter.test.ts`
   - covers approved, revoked, and untrusted certificate channel outcomes.
 - `src/application/nodes/tests/ResolveNodeMutualTlsTransportIdentityUseCase.test.ts`
   - covers trusted match acceptance, revoked-node rejection, unknown-node rejection, and certificate mismatch rejection.
@@ -125,13 +125,13 @@ Story 7.3.4 extends secure channel behavior beyond initial handshake acceptance 
   - adds explicit websocket channel lifecycle vocabulary (`active`, `revalidating`, `reconnect-pending`, `invalidated`, `closed`);
   - adds reconnect directive + bounded backoff policy helpers;
   - adds certificate-binding normalization and rotation-detection helpers used by long-lived channels.
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
   - adds websocket lifecycle monitor hooks for accepted channels:
     - periodic trust/session revalidation for active channels;
     - revocation/trust-invalidation-triggered channel shutdown (fail closed);
     - certificate-rotation awareness with invalidation + reconnect guidance;
     - structured lifecycle event logging + optional lifecycle callback for host observers.
-- `infrastructure/transport/http-server/identity/NodeMutualTlsTransportAdapter.ts`
+- `src/infrastructure/transport/http-server/identity/NodeMutualTlsTransportAdapter.ts`
   - adds node-channel lifecycle metadata in adapter outcomes:
     - certificate rotation awareness against prior cert binding metadata;
     - explicit reconnect directives (deny on revoked/policy failures, bounded retry guidance for transient failures).
@@ -148,10 +148,10 @@ Story 7.3.4 extends secure channel behavior beyond initial handshake acceptance 
   - certificate rotation detection,
   - reconnect directive/backoff classification,
   - lifecycle transition safety.
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
   - revocation-triggered invalidation of accepted websocket channels,
   - rotation-triggered invalidation with lifecycle event reason assertions.
-- `infrastructure/transport/http-server/identity/tests/NodeMutualTlsTransportAdapter.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/NodeMutualTlsTransportAdapter.test.ts`
   - node mTLS lifecycle reconnect guidance and rotation-awareness behavior.
 
 ## Core contract model
@@ -224,12 +224,12 @@ Story 7.1.3 wires these transport contracts into runnable hosts through explicit
 
 - `infrastructure/config/HostSecureTransportConfig.ts` central host transport profile resolution (`server`, `desktop`, `hybrid`, `web`, `worker`) and secure endpoint assertions.
   - runtime env lookup is now browser-safe (`globalThis.process?.env`) so web compositions can resolve fail-closed defaults even when the Node `process` global is absent.
-- `hosts/server/IdentityServerHost.ts` composes:
+- `src/hosts/server/IdentityServerHost.ts` composes:
   - `ServerManagedTransportTrustStateResolver`
   - `ValidateTransportConnectionTrustUseCase`
   - `HttpTransportTrustValidationAdapter`
   and injects the resulting gate into `IdentityHttpServer`.
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts` now supports optional inbound authenticated-route transport trust validation with scenario/peer mapping, including node-path specific `node-to-control-plane` mapping.
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts` now supports optional inbound authenticated-route transport trust validation with scenario/peer mapping, including node-path specific `node-to-control-plane` mapping.
 - `electron/main/main.ts`, `ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`, `ui/web/identity/resolveWebIdentityApiBaseUrl.ts`, and `infrastructure/runtime/browser-development/BrowserDevelopmentManagedRuntime.ts` now consume shared host transport config for endpoint safety checks.
 
 Fail-closed additions:
@@ -282,12 +282,12 @@ Story 7.2.1 hardens the authoritative identity HTTP adapter so production API tr
 
 ### Runtime adapter updates
 
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
   - adds explicit secure transport adapter config (`requireHttps`, `allowInsecureLoopback`);
   - enforces secure transport for `/api/*` requests before business handlers run;
   - centralizes inbound channel-state extraction (scheme, mTLS/certificate presence, loopback detection, socket addresses);
   - injects authenticated request transport context (connection + trust-routing metadata) into guarded handlers.
-- `hosts/server/IdentityServerHost.ts`
+- `src/hosts/server/IdentityServerHost.ts`
   - composes secure transport options from `HostSecureTransportConfig` and injects them into the HTTP adapter.
 
 ### Rejection posture
@@ -297,7 +297,7 @@ Story 7.2.1 hardens the authoritative identity HTTP adapter so production API tr
 
 ### Tests
 
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerTransportTrust.test.ts` now covers:
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerTransportTrust.test.ts` now covers:
   - fail-closed insecure API rejection when HTTPS is required;
   - explicit loopback fallback allowance behavior;
   - authenticated-route access to normalized transport context via request logging payload.
@@ -308,7 +308,7 @@ Story 7.2.2 adds an upgrade gate for runtime websocket channels so accepted sock
 
 ### Runtime adapter updates
 
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
   - adds explicit websocket upgrade handling on `/ws` routes;
   - validates websocket handshake headers (`Upgrade`, `Connection`, `Sec-WebSocket-*`) before upgrade;
   - enforces secure websocket transport posture (`requireWss`, loopback policy);
@@ -316,7 +316,7 @@ Story 7.2.2 adds an upgrade gate for runtime websocket channels so accepted sock
   - routes websocket trust validation through `WebSocketTransportTrustValidationAdapter` when transport trust enforcement is active;
   - emits structured, auditable denial envelopes for handshake/auth/trust/purpose failures;
   - constructs session-bound websocket channel context with actor/session/device metadata, workspace scope, purpose, and capabilities.
-- `hosts/server/IdentityServerHost.ts`
+- `src/hosts/server/IdentityServerHost.ts`
   - composes `WebSocketTransportTrustValidationAdapter` and wires websocket trust validation into the identity server host composition.
 - `src/infrastructure/transport/websocket/SecureWebSocketChannelContext.ts`
   - defines websocket purpose/capability taxonomy for status, queue monitoring, run monitoring, and stream-control channels;
@@ -331,7 +331,7 @@ Story 7.2.2 adds an upgrade gate for runtime websocket channels so accepted sock
 
 ### Tests
 
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts` covers:
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts` covers:
   - secure websocket enforcement rejection;
   - missing-auth websocket upgrade rejection;
   - transport-trust websocket denial mapping;
@@ -391,7 +391,7 @@ Story 7.2.4 makes thin-client browser/mobile session channels explicit and secur
 
 ### Host transport behavior updates
 
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
   - transport-trust scenario now defaults from authenticated session channel (`desktop` -> desktop scenario, `thin-client` -> thin-client scenario);
   - insecure loopback trust-validation bypass is now desktop-scenario-only (thin-client requests do not bypass);
   - authenticated route context now includes normalized channel metadata (`transport.channel`) with thin-client browser/mobile details;
@@ -401,7 +401,7 @@ Story 7.2.4 makes thin-client browser/mobile session channels explicit and secur
 
 - `src/shared/contracts/security/tests/ThinClientTransportContracts.test.ts`
   - validates form-factor classification and origin policy mapping.
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerTransportTrust.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerTransportTrust.test.ts`
   - validates thin-client anti-bypass, desktop bypass continuity, scenario routing, and authenticated channel context propagation.
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
   - validates thin-client websocket origin rejection and thin-client accepted upgrade routing when origin policy passes.

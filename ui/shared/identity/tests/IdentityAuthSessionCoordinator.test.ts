@@ -4,7 +4,7 @@ import {
   type IdentityAuthApiErrorCode,
   type IdentityAuthApiResponse,
   type ResolveAuthenticatedSessionApiResponse,
-} from "../../../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+} from "../../../../src/infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { IdentityAuthSessionCoordinator, IdentitySessionBootstrapStatus, IdentitySessionUnauthenticatedReason } from "../IdentityAuthSessionCoordinator";
 import { IdentityAuthSessionStore } from "../IdentityAuthSessionStore";
 

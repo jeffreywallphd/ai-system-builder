@@ -232,7 +232,7 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - First-run admin initialization now lives in a dedicated application service (`application/identity/services/IdentityBootstrapService.ts`) rather than being folded into generic registration logic.
 - Bootstrap eligibility is enforced via an explicit application-port seam (`IIdentityLookupRepository.countUserIdentities()`), keeping bootstrap gating policy in application while storage detail remains in infrastructure adapters.
 - Provider/policy/user/material bootstrap orchestration stays application-owned and uses existing identity ports (`lookup`, `persistence`, `credential material`, `clock`, `id generation`) without introducing UI or transport coupling.
-- Infrastructure adapters (`src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`, `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`) now implement identity counting for deterministic first-run gating.
+- Infrastructure adapters (`src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`, `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`) now implement identity counting for deterministic first-run gating.
 
 ## Direction 6 boundary note: Identity architecture documentation (story 1.1.8)
 
@@ -250,15 +250,15 @@ If a change needs data from the outside world, prefer adding or using an **appli
 
 ## Direction 6 boundary note: Authoritative identity server endpoints (story 1.2.6)
 
-- Added a dedicated infrastructure API adapter for local identity auth (`infrastructure/api/identity/IdentityAuthBackendApi.ts`) that translates inner identity results to stable public API error contracts.
-- Added authoritative HTTP transport handlers in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts` for:
+- Added a dedicated infrastructure API adapter for local identity auth (`src/infrastructure/api/identity/IdentityAuthBackendApi.ts`) that translates inner identity results to stable public API error contracts.
+- Added authoritative HTTP transport handlers in `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts` for:
   - `POST /api/v1/identity/register`
   - `POST /api/v1/identity/login`
 - HTTP transport stays thin:
   - request schema validation at the boundary (`zod`),
   - deterministic status/error mapping from backend API contracts,
   - no domain/application rule duplication in transport.
-- Server host wiring now lives at outer layer in `hosts/server/IdentityServerHost.ts`, composing persistence/security/use-case dependencies without moving identity rules out of application/domain.
+- Server host wiring now lives at outer layer in `src/hosts/server/IdentityServerHost.ts`, composing persistence/security/use-case dependencies without moving identity rules out of application/domain.
 
 ## Direction 8 boundary note: Secret domain and service contracts foundation (story 8.1.1)
 
@@ -272,7 +272,7 @@ If a change needs data from the outside world, prefer adding or using an **appli
 ## Direction 8 boundary note: Secret host composition wiring (story 8.1.7)
 
 - Added host/runtime composition seam at `src/infrastructure/security/secrets/SecretServiceComposition.ts`.
-- Authoritative server wiring in `hosts/server/IdentityServerHost.ts` now composes secret repository, encryption port, access policy, observability, and audit hook collaborators without moving host bootstrap logic into domain/application layers.
+- Authoritative server wiring in `src/hosts/server/IdentityServerHost.ts` now composes secret repository, encryption port, access policy, observability, and audit hook collaborators without moving host bootstrap logic into domain/application layers.
 - Host startup fail-closed behavior now rejects partial secret master-key configuration while keeping composition explicit at the outer layer.
 
 ## Direction 12 boundary note: Host runtime composition contracts (story 12.1.1)
