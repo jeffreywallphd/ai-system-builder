@@ -5,15 +5,18 @@ import type { AssetUploadIngestionService } from "../../../src/application/asset
 import type { AssetDetailService } from "../../../src/application/assets/use-cases/AssetDetailService";
 import type { AssetDownloadService } from "../../../src/application/assets/use-cases/AssetDownloadService";
 import type { AssetGeneratedOutputRegistrationService } from "../../../src/application/assets/use-cases/AssetGeneratedOutputRegistrationService";
+import type { AssetPreviewService } from "../../../src/application/assets/use-cases/AssetPreviewService";
 import { type AssetSummaryDto, toAssetDetailDto, toAssetSummaryDto } from "../../../src/shared/contracts/assets/AssetTransportContracts";
 import {
   toAuthorizeAssetDownloadRequest,
   toGetAssetByIdQuery,
   toListAssetsQuery,
   toBeginAssetUploadRequest,
+  toResolveAssetPreviewQuery,
   toRegisterGeneratedOutputRequest,
   toRegisterAssetRequest,
   toAuthorizeAssetDownloadResponseDto,
+  toResolveAssetPreviewResponseDto,
 } from "../../../src/shared/dto/assets/AssetTransportDtos";
 import {
   AssetManagementApiErrorCodes,
@@ -25,6 +28,8 @@ import {
   type IngestAssetUploadContentApiResponse,
   type OpenAuthorizedAssetDownloadStreamApiRequest,
   type OpenAuthorizedAssetDownloadStreamApiResponse,
+  type ResolveAssetPreviewApiRequest,
+  type ResolveAssetPreviewApiResponse,
   type InitiateAssetUploadApiRequest,
   type InitiateAssetUploadApiResponse,
   type GetAssetDetailApiRequest,
@@ -45,6 +50,7 @@ export interface AssetManagementBackendApiDependencies {
   readonly discoveryService: AssetDiscoveryService;
   readonly detailService: AssetDetailService;
   readonly downloadService: AssetDownloadService;
+  readonly previewService: AssetPreviewService;
 }
 
 export class AssetManagementBackendApi {
@@ -378,6 +384,43 @@ export class AssetManagementBackendApi {
         contentDisposition: outcome.value.contentDisposition,
         contentDispositionFileName: outcome.value.contentDispositionFileName,
       }),
+    });
+  }
+
+  public async resolveAssetPreview(
+    request: ResolveAssetPreviewApiRequest,
+  ): Promise<AssetManagementApiResponse<ResolveAssetPreviewApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(AssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+    }
+
+    let parsedQuery: ReturnType<typeof toResolveAssetPreviewQuery>;
+    try {
+      parsedQuery = toResolveAssetPreviewQuery({
+        actorUserId: actorUserIdentityId,
+        workspaceId: request.workspaceId,
+        assetId: request.assetId,
+        versionId: request.versionId,
+        preferredMimeTypes: request.preferredMimeTypes,
+        correlationId: request.correlationId,
+        occurredAt: request.occurredAt,
+      });
+    } catch (error) {
+      return this.failed(
+        AssetManagementApiErrorCodes.invalidRequest,
+        error instanceof Error ? error.message : "Request validation failed.",
+      );
+    }
+
+    const outcome = await this.dependencies.previewService.resolveAssetPreview(parsedQuery);
+    if (!outcome.ok) {
+      return this.failedFromServiceError(outcome.error.code, outcome.error.message, outcome.error.details);
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: toResolveAssetPreviewResponseDto(outcome.value),
     });
   }
 

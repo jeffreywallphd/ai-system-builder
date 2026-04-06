@@ -350,3 +350,34 @@ Added coverage:
   - `src/infrastructure/persistence/assets/tests/SqliteAssetPersistenceAdapter.test.ts`
   - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
   - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+
+## Story 10.3.2: preview and thumbnail derivatives as protected resources
+
+Added protected preview-resolution orchestration across application/API/transport seams:
+
+- New application use case for authoritative preview resolution:
+  - `src/application/assets/use-cases/AssetPreviewService.ts`
+- Extended backend/public API contracts with preview-resolution operation:
+  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+- Added authenticated transport endpoint:
+  - `GET /api/v1/assets/:assetId/preview`
+  - implemented in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- Host composition now wires preview-resolution dependencies:
+  - `hosts/server/IdentityServerHost.ts`
+
+Behavioral posture in this story:
+
+- previews and thumbnails are resolved through protected logical-asset metadata, not public files or raw path contracts.
+- parent asset access checks (workspace membership, lifecycle, visibility) gate all preview resolution.
+- derivative candidates are resolved as lineage-linked logical assets (`kind=preview|derived`) and filtered by the same visibility rules as other assets.
+- optional `preferredMimeType` query values support deterministic preview/thumbnail selection (for example, preferring `image/webp` over `image/png`).
+- stricter derivative visibility policies are honored automatically because derivative assets are evaluated independently with the same authorization pattern.
+- when no derivative exists, source-version inline preview is only exposed for previewable mime types.
+- preview content still flows through protected tokenized download endpoints (`inline-preview`) to preserve storage/decryption policy enforcement.
+
+Added/extended coverage:
+
+- `src/application/assets/tests/AssetPreviewService.test.ts`
+- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`

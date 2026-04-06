@@ -17,6 +17,7 @@ import { AssetDiscoveryService } from "../../../../src/application/assets/use-ca
 import { AssetDetailService } from "../../../../src/application/assets/use-cases/AssetDetailService";
 import { AssetDownloadService } from "../../../../src/application/assets/use-cases/AssetDownloadService";
 import { AssetGeneratedOutputRegistrationService } from "../../../../src/application/assets/use-cases/AssetGeneratedOutputRegistrationService";
+import { AssetPreviewService } from "../../../../src/application/assets/use-cases/AssetPreviewService";
 
 class StubAssetUploadInitiationService {
   private readonly asset: Asset = createAsset({
@@ -302,6 +303,35 @@ class StubAssetDownloadService {
   }
 }
 
+class StubAssetPreviewService {
+  public deny = false;
+
+  public async resolveAssetPreview() {
+    if (this.deny) {
+      return {
+        ok: false as const,
+        error: {
+          code: "asset-not-found" as const,
+          message: "No preview available.",
+        },
+      };
+    }
+
+    return {
+      ok: true as const,
+      value: Object.freeze({
+        assetId: "asset-upload-001",
+        versionId: "asset-upload-001:v1",
+        previewAssetId: "preview-asset-upload-001-main",
+        previewVersionId: "preview-asset-upload-001-main:v1",
+        previewMimeType: "image/webp",
+        previewStorageInstanceId: "storage-alpha",
+        previewObjectKey: "workspaces/workspace-alpha/assets/preview-asset-upload-001-main/preview/v1/preview.webp",
+      }),
+    };
+  }
+}
+
 describe("AssetManagementBackendApi", () => {
   it("returns register and initiate upload DTOs for successful requests", async () => {
     const backendApi = new AssetManagementBackendApi({
@@ -311,6 +341,7 @@ describe("AssetManagementBackendApi", () => {
       discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
       detailService: new StubAssetDetailService() as unknown as AssetDetailService,
       downloadService: new StubAssetDownloadService() as unknown as AssetDownloadService,
+      previewService: new StubAssetPreviewService() as unknown as AssetPreviewService,
     });
 
     const registered = await backendApi.registerAsset({
@@ -456,6 +487,19 @@ describe("AssetManagementBackendApi", () => {
       return;
     }
     expect(opened.data.mimeType).toBe("image/png");
+
+    const preview = await backendApi.resolveAssetPreview({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-upload-001",
+      preferredMimeTypes: ["image/webp"],
+    });
+    expect(preview.ok).toBeTrue();
+    if (!preview.ok || !preview.data) {
+      return;
+    }
+    expect(preview.data.preview.previewAssetId).toBe("preview-asset-upload-001-main");
+    expect(preview.data.preview.previewMimeType).toBe("image/webp");
   });
 
   it("returns invalid-request for missing actor identity", async () => {
@@ -466,6 +510,7 @@ describe("AssetManagementBackendApi", () => {
       discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
       detailService: new StubAssetDetailService() as unknown as AssetDetailService,
       downloadService: new StubAssetDownloadService() as unknown as AssetDownloadService,
+      previewService: new StubAssetPreviewService() as unknown as AssetPreviewService,
     });
 
     const response = await backendApi.initiateAssetUpload({
@@ -506,6 +551,7 @@ describe("AssetManagementBackendApi", () => {
       discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
       detailService: detailService as unknown as AssetDetailService,
       downloadService: new StubAssetDownloadService() as unknown as AssetDownloadService,
+      previewService: new StubAssetPreviewService() as unknown as AssetPreviewService,
     });
 
     const response = await backendApi.getAssetDetail({
@@ -531,6 +577,7 @@ describe("AssetManagementBackendApi", () => {
       discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
       detailService: new StubAssetDetailService() as unknown as AssetDetailService,
       downloadService: downloadService as unknown as AssetDownloadService,
+      previewService: new StubAssetPreviewService() as unknown as AssetPreviewService,
     });
 
     const response = await backendApi.authorizeAssetDownload({
@@ -545,5 +592,31 @@ describe("AssetManagementBackendApi", () => {
       return;
     }
     expect(response.error.code).toBe("forbidden");
+  });
+
+  it("maps preview-not-found failures from service errors", async () => {
+    const previewService = new StubAssetPreviewService();
+    previewService.deny = true;
+    const backendApi = new AssetManagementBackendApi({
+      uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
+      generatedOutputRegistrationService: new StubAssetGeneratedOutputRegistrationService() as unknown as AssetGeneratedOutputRegistrationService,
+      uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
+      discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
+      detailService: new StubAssetDetailService() as unknown as AssetDetailService,
+      downloadService: new StubAssetDownloadService() as unknown as AssetDownloadService,
+      previewService: previewService as unknown as AssetPreviewService,
+    });
+
+    const response = await backendApi.resolveAssetPreview({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-upload-001",
+    });
+
+    expect(response.ok).toBeFalse();
+    if (response.ok || !response.error) {
+      return;
+    }
+    expect(response.error.code).toBe("not-found");
   });
 });

@@ -10,6 +10,7 @@ import { AssetDiscoveryService } from "../../../../../src/application/assets/use
 import { AssetDetailService } from "../../../../../src/application/assets/use-cases/AssetDetailService";
 import { AssetDownloadService } from "../../../../../src/application/assets/use-cases/AssetDownloadService";
 import { AssetGeneratedOutputRegistrationService } from "../../../../../src/application/assets/use-cases/AssetGeneratedOutputRegistrationService";
+import { AssetPreviewService } from "../../../../../src/application/assets/use-cases/AssetPreviewService";
 import {
   AssetKinds,
   AssetVisibilities,
@@ -311,11 +312,41 @@ class StubAssetDownloadService {
   }
 }
 
+class StubAssetPreviewService {
+  public deny = false;
+
+  public async resolveAssetPreview() {
+    if (this.deny) {
+      return {
+        ok: false as const,
+        error: {
+          code: "asset-not-found" as const,
+          message: "No preview found.",
+        },
+      };
+    }
+
+    return {
+      ok: true as const,
+      value: Object.freeze({
+        assetId: "asset-upload-001",
+        versionId: "asset-upload-001:v1",
+        previewAssetId: "preview-asset-upload-001-main",
+        previewVersionId: "preview-asset-upload-001-main:v1",
+        previewMimeType: "image/webp",
+        previewStorageInstanceId: "storage-alpha",
+        previewObjectKey: "workspaces/workspace-alpha/assets/preview-asset-upload-001-main/preview/v1/preview.webp",
+      }),
+    };
+  }
+}
+
 async function startServer(
   initiationService: StubAssetUploadInitiationService,
   ingestionService = new StubAssetUploadIngestionService(),
   downloadService = new StubAssetDownloadService(),
   generatedOutputService = new StubAssetGeneratedOutputRegistrationService(),
+  previewService = new StubAssetPreviewService(),
 ): Promise<string> {
   const identityHarness = await createIdentityAuthTestHarness();
   const assetManagementBackendApi = new AssetManagementBackendApi({
@@ -325,6 +356,7 @@ async function startServer(
     discoveryService: initiationService as unknown as AssetDiscoveryService,
     detailService: initiationService as unknown as AssetDetailService,
     downloadService: downloadService as unknown as AssetDownloadService,
+    previewService: previewService as unknown as AssetPreviewService,
   });
 
   const server = createIdentityHttpServer({
@@ -695,5 +727,56 @@ describe("IdentityHttpServer asset management routes", () => {
     const body = await response.json();
     expect(body.ok).toBe(false);
     expect(body.error.code).toBe("forbidden");
+  });
+
+  it("resolves protected preview metadata without exposing public URLs", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const baseUrl = await startServer(service);
+    const token = await registerAndLogin(baseUrl, "asset.http.owner.10");
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/assets/asset-upload-001/preview?workspaceId=workspace-alpha&preferredMimeType=image/webp`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.preview.previewAssetId).toBe("preview-asset-upload-001-main");
+    expect(body.data.preview.previewMimeType).toBe("image/webp");
+  });
+
+  it("maps missing preview resolution to not-found", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const previewService = new StubAssetPreviewService();
+    previewService.deny = true;
+    const baseUrl = await startServer(
+      service,
+      new StubAssetUploadIngestionService(),
+      new StubAssetDownloadService(),
+      new StubAssetGeneratedOutputRegistrationService(),
+      previewService,
+    );
+    const token = await registerAndLogin(baseUrl, "asset.http.owner.11");
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/assets/asset-upload-001/preview?workspaceId=workspace-alpha`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(404);
+    const body = await response.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("not-found");
   });
 });

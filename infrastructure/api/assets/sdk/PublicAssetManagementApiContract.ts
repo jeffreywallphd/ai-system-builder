@@ -2,6 +2,7 @@ import type { AssetStorageArea } from "../../../../src/domain/assets/AssetDomain
 import type {
   AssetDetailDto,
   AssetDownloadAuthorizationDto,
+  AssetPreviewResolutionDto,
   AssetSummaryDto,
 } from "../../../../src/shared/contracts/assets/AssetTransportContracts";
 
@@ -255,4 +256,18 @@ export interface OpenAuthorizedAssetDownloadStreamApiResponse {
   readonly sizeBytes: number;
   readonly contentDisposition: "attachment" | "inline";
   readonly contentDispositionFileName?: string;
+}
+
+export interface ResolveAssetPreviewApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly assetId: string;
+  readonly versionId?: string;
+  readonly preferredMimeTypes?: ReadonlyArray<string>;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+}
+
+export interface ResolveAssetPreviewApiResponse {
+  readonly preview: AssetPreviewResolutionDto;
 }
