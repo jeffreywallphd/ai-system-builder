@@ -19,6 +19,8 @@ import type {
   SecretListQuery,
   SecretMutationResult,
 } from "../ports/SecretServicePorts";
+import type { ISecretObservabilityPort, SecretOperationalLogEvent } from "../ports/SecretObservabilityPorts";
+import { SecretOperationalOutcomes } from "../ports/SecretObservabilityPorts";
 import { CreateSecretUseCase } from "../use-cases/CreateSecretUseCase";
 import { GetSecretMetadataUseCase } from "../use-cases/GetSecretMetadataUseCase";
 import { SecretServiceErrorCodes } from "../use-cases/SecretManagementServiceContracts";
@@ -127,16 +129,26 @@ class InMemorySecretAccessAuditPort implements ISecretAccessAuditPort {
   }
 }
 
+class InMemorySecretObservabilityPort implements ISecretObservabilityPort {
+  public readonly events: SecretOperationalLogEvent[] = [];
+
+  public async recordSecretOperation(event: SecretOperationalLogEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 describe("Secret create and metadata use cases", () => {
   it("creates a secret with encrypted material and returns metadata only", async () => {
     const repository = new InMemorySecretRecordRepository();
     const audit = new InMemorySecretAccessAuditPort();
+    const observability = new InMemorySecretObservabilityPort();
 
     const useCase = new CreateSecretUseCase({
       secretRecordRepository: repository,
       secretEncryptionPort: new InMemorySecretEncryptionPort(),
       secretAccessPolicyPort: new DomainBackedSecretAccessPolicyPort(),
       secretAccessAuditPort: audit,
+      secretObservabilityPort: observability,
     });
 
     const result = await useCase.execute({
@@ -177,6 +189,14 @@ describe("Secret create and metadata use cases", () => {
       actorId: "user:server-admin",
       occurredAt: "2026-04-05T12:00:00.000Z",
     });
+    expect(observability.events).toHaveLength(1);
+    expect(observability.events[0]).toMatchObject({
+      event: "secret.create",
+      outcome: SecretOperationalOutcomes.succeeded,
+      secretId: "secret:server:openai",
+      scope: SecretScopes.server,
+    });
+    expect(JSON.stringify(observability.events[0])).not.toContain("sk-production-123");
   });
 
   it("rejects duplicate secret key in the same scope", async () => {
@@ -208,6 +228,61 @@ describe("Secret create and metadata use cases", () => {
         code: SecretServiceErrorCodes.conflict,
       }),
     });
+  });
+
+  it("redacts plaintext from internal failures and observability payloads", async () => {
+    const plaintext = "sk-sensitive-live-value";
+    const repository = new InMemorySecretRecordRepository();
+    const audit = new InMemorySecretAccessAuditPort();
+    const observability = new InMemorySecretObservabilityPort();
+
+    const useCase = new CreateSecretUseCase({
+      secretRecordRepository: repository,
+      secretEncryptionPort: {
+        async encryptSecretPlaintext() {
+          throw new Error(`encryption failed for ${plaintext}`);
+        },
+        async decryptSecretPlaintext() {
+          return { plaintext: "not-used" };
+        },
+      },
+      secretAccessPolicyPort: new DomainBackedSecretAccessPolicyPort(),
+      secretAccessAuditPort: audit,
+      secretObservabilityPort: observability,
+    });
+
+    const result = await useCase.execute({
+      actor: createServerAdminActor([SecretAccessActions.create]),
+      operationKey: "op:secret:create:internal-failure",
+      secretId: "secret:server:internal-failure",
+      name: "llm.openai.api_key",
+      owner: {
+        scope: SecretScopes.server,
+      },
+      kind: SecretKinds.apiKey,
+      plaintext,
+      createdAt: "2026-04-05T14:00:00.000Z",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: SecretServiceErrorCodes.internal,
+        message: "Secret create operation failed due to an internal security error.",
+      },
+    });
+
+    expect(audit.events).toHaveLength(1);
+    expect(observability.events).toHaveLength(1);
+    expect(observability.events[0]).toMatchObject({
+      event: "secret.create",
+      outcome: SecretOperationalOutcomes.failed,
+      secretId: "secret:server:internal-failure",
+    });
+
+    const serializedObservability = JSON.stringify(observability.events[0]);
+    expect(serializedObservability).not.toContain(plaintext);
+    expect(serializedObservability).toContain("[REDACTED]");
   });
 
   it("rejects invalid scope owner input with clear application error", async () => {
@@ -243,11 +318,13 @@ describe("Secret create and metadata use cases", () => {
     const repository = new InMemorySecretRecordRepository();
     repository.seed(createServerSecretRecord());
     const audit = new InMemorySecretAccessAuditPort();
+    const observability = new InMemorySecretObservabilityPort();
 
     const useCase = new GetSecretMetadataUseCase({
       secretRecordRepository: repository,
       secretAccessPolicyPort: new DomainBackedSecretAccessPolicyPort(),
       secretAccessAuditPort: audit,
+      secretObservabilityPort: observability,
     });
 
     const result = await useCase.execute({
@@ -270,6 +347,13 @@ describe("Secret create and metadata use cases", () => {
       decision: "allowed",
       actorId: "user:server-admin",
       occurredAt: "2026-04-06T08:00:00.000Z",
+    });
+    expect(observability.events).toHaveLength(1);
+    expect(observability.events[0]).toMatchObject({
+      event: "secret.read-metadata",
+      outcome: SecretOperationalOutcomes.succeeded,
+      secretId: "secret:server:openai",
+      scope: SecretScopes.server,
     });
   });
 

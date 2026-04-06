@@ -161,7 +161,7 @@ function parseProtectedSecretKeysByScope(value: string | undefined): Readonly<Re
   }
 
   const keysByScope: Record<string, string> = {};
-  for (const entry of value.split(",")) {
+  for (const [index, entry] of value.split(",").entries()) {
     const candidate = entry.trim();
     if (!candidate) {
       continue;
@@ -170,7 +170,7 @@ function parseProtectedSecretKeysByScope(value: string | undefined): Readonly<Re
     const separator = candidate.indexOf(":");
     if (separator < 0) {
       throw new Error(
-        `Internal CA protected secrets key-scope entry '${candidate}' is invalid. Use '<scope>:<key>'.`,
+        `Internal CA protected secrets key-scope entry at position ${index} is invalid. Use '<scope>:<key>'.`,
       );
     }
 
@@ -178,7 +178,7 @@ function parseProtectedSecretKeysByScope(value: string | undefined): Readonly<Re
     const encodedKey = candidate.slice(separator + 1).trim();
     if (!scope || !encodedKey) {
       throw new Error(
-        `Internal CA protected secrets key-scope entry '${candidate}' is invalid. Use '<scope>:<key>'.`,
+        `Internal CA protected secrets key-scope entry at position ${index} is invalid. Use '<scope>:<key>'.`,
       );
     }
 

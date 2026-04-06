@@ -264,7 +264,7 @@ export function createSecretMasterKeyProviderFromEnvironment(
 
   const extraKeys = normalizeOptional(env.AI_LOOM_SECRET_MASTER_KEYS_BY_ID);
   if (extraKeys) {
-    for (const candidate of extraKeys.split(",")) {
+    for (const [index, candidate] of extraKeys.split(",").entries()) {
       const trimmed = candidate.trim();
       if (!trimmed) {
         continue;
@@ -273,7 +273,7 @@ export function createSecretMasterKeyProviderFromEnvironment(
       const separator = trimmed.lastIndexOf(":");
       if (separator < 0) {
         throw new SecretEnvelopeEncryptionError(
-          `AI_LOOM_SECRET_MASTER_KEYS_BY_ID entry '${trimmed}' is invalid. Use '<keyId[@keyVersion]>:<key>'.`,
+          `AI_LOOM_SECRET_MASTER_KEYS_BY_ID entry at position ${index} is invalid. Use '<keyId[@keyVersion]>:<key>'.`,
         );
       }
 
