@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Story 8.2.1 + Story 8.2.2 baseline for Feature 8 / Epic 8.2: enforce explicit authorization for all secret operations and runtime retrieval governance with scope-aware and actor-aware controls.
+Story 8.2.1 + Story 8.2.2 + Story 8.2.3 baseline for Feature 8 / Epic 8.2: enforce explicit authorization, runtime retrieval governance, and comprehensive secret-sensitive audit recording with scope-aware and actor-aware controls.
 
 ## Canonical files
 
@@ -16,6 +16,7 @@ Story 8.2.1 + Story 8.2.2 baseline for Feature 8 / Epic 8.2: enforce explicit au
 - `src/application/security/ports/SecretServicePorts.ts`
 - `src/infrastructure/security/secrets/SecretServiceComposition.ts`
 - `src/application/security/tests/SecretAuthorizationPolicyAndGovernanceUseCases.test.ts`
+- `src/application/security/tests/SecretCreateAndMetadataUseCases.test.ts`
 - `docs/architecture/secrets-authorization-policies.md`
 
 ## Behavior summary
@@ -49,6 +50,31 @@ Story 8.2.1 + Story 8.2.2 baseline for Feature 8 / Epic 8.2: enforce explicit au
 - Scope reference must match resolved secret owner; mismatch is denied with non-leaky `secret-not-found`.
 - Retrieval result is narrowed for runtime use only (`secretId`, `currentVersionId`, `scope`, `plaintext`) and no longer returns a general `SecretReference` projection.
 - Runtime retrieval audits now include operation/service/justification context for governance traceability.
+
+## Audit model additions (Story 8.2.3)
+
+- `ISecretAccessAuditPort` now records structured secret audit events via two event kinds:
+  - `secret.access-decision`
+  - `secret.operation`
+- Both event kinds use consistent queryable identity/context fields:
+  - `actor` (`actorId`, optional `actorType`, optional workspace/user ids)
+  - `target` (secret id and scope context where available)
+- Secret-sensitive use cases emit `secret.operation` events for:
+  - create
+  - read-metadata
+  - retrieve-plaintext
+  - rotate
+  - disable
+  - delete
+- Operation events include stable governance fields:
+  - `operation`, `status`, `reasonCode`, `occurredAt`
+  - optional `operationKey` and `serviceIdentity` for runtime/governance context
+
+## Audit safety posture
+
+- No plaintext/decrypted secret value is serialized in audit events.
+- Secret metadata payloads are not copied into operation audit records.
+- Permission-sensitive denials are encoded as safe reason codes (for example `scope-mismatch`, `runtime-access-required`) without exposing secret values.
 
 ## Test posture
 

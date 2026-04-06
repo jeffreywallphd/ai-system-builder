@@ -27,6 +27,13 @@ This note documents Story 8.1.7 (Feature 8 / Epic 8.1): wire secret services int
   - `ListSecretsUseCase`
   - `SecretScopeResolver`
 
+### Secret audit hook contract
+
+- Secret composition audit hook now receives structured secret audit events from two families:
+  - `secret.access-decision`
+  - `secret.operation`
+- Host logging can route both decision and operation events through one callback without plaintext exposure.
+
 ## Environment posture
 
 Secret envelope encryption in host composition uses:

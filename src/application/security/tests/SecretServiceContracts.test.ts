@@ -207,7 +207,7 @@ class DomainBackedSecretAccessPolicyPort implements ISecretAccessPolicyPort {
 class InMemorySecretAccessAuditPort implements ISecretAccessAuditPort {
   public readonly events: SecretAccessAuditEvent[] = [];
 
-  async recordSecretAccessDecision(event: SecretAccessAuditEvent): Promise<void> {
+  async recordSecretAuditEvent(event: SecretAccessAuditEvent): Promise<void> {
     this.events.push(event);
   }
 }
@@ -624,22 +624,27 @@ class InMemorySecretManagementService implements ISecretManagementService {
   private async emitAudit(
     actor: SecretAccessActor,
     scope: SecretRecord["owner"]["scope"],
-    action: SecretAccessAuditEvent["action"],
-    decision: SecretAccessAuditEvent["decision"],
-    reason: SecretAccessAuditEvent["reason"],
+    action: Extract<SecretAccessAuditEvent, { readonly eventKind: "secret.access-decision" }>["action"],
+    decision: Extract<SecretAccessAuditEvent, { readonly eventKind: "secret.access-decision" }>["decision"],
+    reason: Extract<SecretAccessAuditEvent, { readonly eventKind: "secret.access-decision" }>["reason"],
     occurredAt: string,
     secretId?: string,
   ): Promise<void> {
-    await this.auditPort.recordSecretAccessDecision({
-      secretId,
-      scope,
+    await this.auditPort.recordSecretAuditEvent({
+      eventKind: "secret.access-decision",
       action,
       decision,
       reason,
-      actorId: actor.actorId,
-      actorType: actor.actorType,
-      workspaceId: actor.workspaceId,
-      userIdentityId: actor.userIdentityId,
+      actor: {
+        actorId: actor.actorId,
+        actorType: actor.actorType,
+        workspaceId: actor.workspaceId,
+        userIdentityId: actor.userIdentityId,
+      },
+      target: {
+        secretId,
+        scope,
+      },
       occurredAt,
     });
   }
@@ -826,7 +831,10 @@ describe("secret application contracts", () => {
     });
 
     expect(audit.events.length).toBeGreaterThanOrEqual(8);
-    expect(audit.events.some((event) => event.action === SecretAccessActions.retrievePlaintext && event.decision === "denied")).toBeTrue();
+    const deniedRetrieve = audit.events
+      .filter((event): event is Extract<SecretAccessAuditEvent, { readonly eventKind: "secret.access-decision" }> => event.eventKind === "secret.access-decision")
+      .some((event) => event.action === SecretAccessActions.retrievePlaintext && event.decision === "denied");
+    expect(deniedRetrieve).toBeTrue();
   });
 
   it("returns access denied for scope-mismatched actor", async () => {
@@ -870,6 +878,9 @@ describe("secret application contracts", () => {
         code: SecretServiceErrorCodes.accessDenied,
       }),
     });
-    expect(audit.events.at(-1)?.reason).toBe("scope-mismatch");
+    const lastDecision = [...audit.events]
+      .reverse()
+      .find((event): event is Extract<SecretAccessAuditEvent, { readonly eventKind: "secret.access-decision" }> => event.eventKind === "secret.access-decision");
+    expect(lastDecision?.reason).toBe("scope-mismatch");
   });
 });

@@ -143,7 +143,7 @@ class CallbackSecretAccessAuditPort implements ISecretAccessAuditPort {
     private readonly hook?: (event: SecretAccessAuditEvent) => Promise<void> | void,
   ) {}
 
-  public async recordSecretAccessDecision(event: SecretAccessAuditEvent): Promise<void> {
+  public async recordSecretAuditEvent(event: SecretAccessAuditEvent): Promise<void> {
     if (!this.hook) {
       return;
     }

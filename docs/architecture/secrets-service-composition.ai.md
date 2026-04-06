@@ -22,6 +22,13 @@ Quick baseline for Story 8.1.7 (Feature 8 / Epic 8.1): compose secret services i
   - audit: host-supplied callback hook
 - Composed service exposes formal application use cases (`CreateSecretUseCase`, `GetSecretMetadataUseCase`, `RetrieveSecretPlaintextForRuntimeUseCase`, `RotateSecretUseCase`, `DisableSecretUseCase`, `DeleteSecretUseCase`, `ListSecretsUseCase`, `SecretScopeResolver`) instead of leaving secret collaborators disconnected.
 
+## Audit hook contract update
+
+- Secret service host audit hook now receives structured events for both:
+  - `secret.access-decision`
+  - `secret.operation`
+- This keeps audit integration centralized at composition while preserving redaction-safe, plaintext-free payload boundaries.
+
 ## Configuration posture
 
 - Required when enabling encryption:
