@@ -14,6 +14,8 @@ This note documents the Story 13.2.1 baseline for authoritative persistence boot
   - `src/infrastructure/persistence/sqlite/SqlitePersistenceRuntime.ts`
 - Transaction coordination runtime seam:
   - `src/infrastructure/persistence/sqlite/SqliteTransactionCoordinator.ts`
+- Authoritative persistence composition seam:
+  - `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 - Authoritative host integration:
   - `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 
@@ -48,8 +50,12 @@ This keeps migration-safe evolution explicit before domain-specific repository m
 Authoritative host composition now wires persistence into the shared host startup pipeline:
 
 - `persistence` stage initializes the runtime and runs bootstrap hooks.
+- `persistence` stage composes authoritative persistent platform services (repository adapters, audit sinks, and platform persistence adapter bundle) and stores them as startup artifacts.
+- SQLite bootstrap now runs deterministic domain migration hooks from `createAuthoritativePersistenceMigrationHooks(...)` before feature registration.
+- `feature-registration` stage injects composed persistent platform services into `startIdentityServerHost(...)` so runtime delivery flows use startup-composed authoritative adapters.
 - startup failure cleanup disposes persistence runtime resources.
-- runtime `stop()` shutdown cleanup disposes persistence runtime resources after host shutdown.
+- startup failure cleanup also disposes composed persistent platform services.
+- runtime `stop()` shutdown cleanup disposes composed persistent platform services and persistence runtime resources after host shutdown.
 
 The single authoritative server model remains unchanged: control-plane data writes are still owned by the authoritative host, and persistence concerns stay in infrastructure.
 

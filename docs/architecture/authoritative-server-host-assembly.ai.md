@@ -8,6 +8,7 @@
 - Composition root: `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 - Dedicated entrypoint: `src/hosts/server/AuthoritativeServerHostEntrypoint.ts`
 - Runtime host startup implementation: `hosts/server/IdentityServerHost.ts`
+- Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 
 ## Control-plane ownership
 - Authoritative server is the single runtime with control-plane authority.
@@ -32,8 +33,10 @@
   - exits non-zero on startup failure
 - Persistence lifecycle behavior:
   - `persistence` stage initializes `src/infrastructure/persistence/sqlite/SqlitePersistenceRuntime.ts`
+  - `persistence` stage composes authoritative persistent platform services (repository adapters, audit sinks, platform run/audit adapter) and stores them as startup artifacts
+  - `feature-registration` stage injects startup-composed persistence services into `startIdentityServerHost(...)`
   - startup failure cleanup disposes persistence runtime resources
-  - normal host stop also disposes persistence runtime resources
+  - normal host stop disposes persistent platform services and persistence runtime resources
 - Repository command: `npm run start:authoritative-server`
 
 ## Entrypoint consumers

@@ -370,6 +370,17 @@ The goal is to keep repository implementation aligned to domain/application cont
   - `application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
   - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
 
+## Story 13.4.2 host startup and service-composition persistence wiring
+
+- Authoritative host startup now composes persistent platform services in bootstrap `persistence` through:
+  - `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
+- SQLite bootstrap now executes deterministic cross-domain migration hooks (`identity`, `workspaces`, `authorization`, `nodes`, `storage`, `assets`, `platform`, `security`, `secrets`) before runtime feature registration.
+- Feature-registration now injects startup-composed persistence services into authoritative runtime host startup:
+  - `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
+  - `hosts/server/IdentityServerHost.ts`
+- Authoritative host service registration coverage now explicitly includes persistence bootstrap/repository/transaction/helper composition services:
+  - `src/infrastructure/config/HostServiceRegistrationCatalog.ts`
+
 ## Mapper responsibility guidance (Story 13.1.3)
 
 - Mapper boundaries are adapter-local but contract-driven:

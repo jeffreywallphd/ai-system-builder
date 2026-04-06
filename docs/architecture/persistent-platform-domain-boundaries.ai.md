@@ -245,6 +245,18 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
   - `application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
   - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
 
+## Story 13.4.2 host startup and service-composition persistence wiring
+
+- Authoritative host startup now composes persistent platform services during the bootstrap `persistence` stage through:
+  - `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
+- Shared runtime bootstrap now executes deterministic migration hooks for identity/workspaces/authorization/nodes/storage/assets/platform/security/secrets prior to feature registration:
+  - `createAuthoritativePersistenceMigrationHooks(...)`
+- Feature registration now injects startup-composed persistent services directly into runtime host startup so authoritative delivery flows consume composition-root owned adapters:
+  - `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
+  - `hosts/server/IdentityServerHost.ts`
+- Authoritative required host service coverage now includes explicit persistence bootstrap/repository/transaction/helper service registrations:
+  - `src/infrastructure/config/HostServiceRegistrationCatalog.ts`
+
 ## Mapper guidance for contributors
 
 - Keep mapper implementations in infrastructure, but drive them from shared DTO + schema contracts.
