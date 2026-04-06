@@ -75,10 +75,20 @@ export interface RegisterAssetRequest extends AssetMutationContext {
   readonly assetId: string;
   readonly kind: AssetKind;
   readonly ownerUserId?: string;
-  readonly visibility: AssetVisibility;
+  readonly visibility?: AssetVisibility;
   readonly sharingPolicyRef?: AssetSharingPolicyReference;
   readonly storageInstanceId: string;
   readonly initialVersion: AssetVersionCreationInput;
+}
+
+export interface BeginAssetUploadRequest extends AssetMutationContext {
+  readonly assetId: string;
+  readonly storageInstanceId: string;
+  readonly fileName: string;
+  readonly mimeType: string;
+  readonly sizeBytes: number;
+  readonly area?: AssetStorageArea;
+  readonly expiresInSeconds?: number;
 }
 
 export interface GetAssetByIdQuery extends AssetRequestContext {
@@ -194,6 +204,26 @@ export interface RegisterGeneratedOutputResult {
   readonly asset: Asset;
 }
 
+export interface BeginAssetUploadResult {
+  readonly asset: Asset;
+  readonly upload: {
+    readonly uploadSessionId: string;
+    readonly assetId: string;
+    readonly workspaceId: string;
+    readonly storageInstanceId: string;
+    readonly objectKey: string;
+    readonly area: AssetStorageArea;
+    readonly uploadEndpoint: string;
+    readonly uploadMethod: "POST";
+    readonly expected: {
+      readonly fileName: string;
+      readonly mimeType: string;
+      readonly sizeBytes: number;
+    };
+    readonly expiresAt: string;
+  };
+}
+
 function normalizeRequired(value: string, field: string): string {
   const normalized = value.trim();
   if (!normalized) {
@@ -237,6 +267,23 @@ function normalizeRequiredInteger(value: number, field: string, minimum: number)
     throw new AssetServiceContractError(`${field} must be an integer >= ${String(minimum)}.`);
   }
   return value;
+}
+
+function normalizeFileName(value: string): string {
+  const normalized = normalizeRequired(value, "fileName");
+  if (normalized.length > 255) {
+    throw new AssetServiceContractError("fileName must be 255 characters or fewer.");
+  }
+  if (normalized.includes("/") || normalized.includes("\\")) {
+    throw new AssetServiceContractError("fileName cannot include path separators.");
+  }
+  if (/[\u0000-\u001F\u007F]/.test(normalized)) {
+    throw new AssetServiceContractError("fileName cannot include control characters.");
+  }
+  if (normalized === "." || normalized === "..") {
+    throw new AssetServiceContractError("fileName cannot be '.' or '..'.");
+  }
+  return normalized;
 }
 
 function normalizeObjectKey(value: string): string {
@@ -295,10 +342,13 @@ function normalizeMutationContext<TValue extends AssetMutationContext>(value: TV
 
 export function validateRegisterAssetRequest(input: RegisterAssetRequest): RegisterAssetRequest {
   const normalized = normalizeMutationContext(input);
+  const ownerUserId = normalizeOptional(input.ownerUserId);
+  const visibility = input.visibility ?? (ownerUserId ? "private" : "workspace");
   return Object.freeze({
     ...normalized,
     assetId: normalizeRequired(input.assetId, "assetId"),
-    ownerUserId: normalizeOptional(input.ownerUserId),
+    ownerUserId,
+    visibility,
     storageInstanceId: normalizeRequired(input.storageInstanceId, "storageInstanceId"),
     sharingPolicyRef: input.sharingPolicyRef
       ? Object.freeze({
@@ -409,6 +459,20 @@ export function validateDeleteAssetRequest(input: DeleteAssetRequest): DeleteAss
   });
 }
 
+export function validateBeginAssetUploadRequest(input: BeginAssetUploadRequest): BeginAssetUploadRequest {
+  const normalized = normalizeMutationContext(input);
+  return Object.freeze({
+    ...normalized,
+    assetId: normalizeRequired(input.assetId, "assetId"),
+    storageInstanceId: normalizeRequired(input.storageInstanceId, "storageInstanceId"),
+    fileName: normalizeFileName(input.fileName),
+    mimeType: normalizeRequired(input.mimeType, "mimeType").toLowerCase(),
+    sizeBytes: normalizeRequiredInteger(input.sizeBytes, "sizeBytes", 0),
+    area: input.area ?? "input",
+    expiresInSeconds: normalizePositiveInteger(input.expiresInSeconds, "expiresInSeconds", 1),
+  });
+}
+
 export interface AssetLookupUseCaseContracts {
   getAssetById(query: GetAssetByIdQuery): Promise<AssetServiceResult<GetAssetByIdResult>>;
   listAssets(query: ListAssetsQuery): Promise<AssetServiceResult<ListAssetsResult>>;
@@ -422,6 +486,7 @@ export interface AssetLookupUseCaseContracts {
 
 export interface AssetMutationUseCaseContracts {
   registerAsset(request: RegisterAssetRequest): Promise<AssetServiceResult<RegisterAssetResult>>;
+  beginAssetUpload(request: BeginAssetUploadRequest): Promise<AssetServiceResult<BeginAssetUploadResult>>;
   finalizeAssetUpload(
     request: FinalizeAssetUploadRequest,
   ): Promise<AssetServiceResult<FinalizeAssetUploadResult>>;

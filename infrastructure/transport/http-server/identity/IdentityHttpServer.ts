@@ -16,6 +16,7 @@ import type { NodeTrustBackendApi } from "../../../api/nodes/NodeTrustBackendApi
 import type { CertificateOperationsBackendApi } from "../../../api/security/CertificateOperationsBackendApi";
 import type { SecretMetadataBackendApi } from "../../../api/security/SecretMetadataBackendApi";
 import type { StorageManagementBackendApi } from "../../../api/storage/StorageManagementBackendApi";
+import type { AssetManagementBackendApi } from "../../../api/assets/AssetManagementBackendApi";
 import type { WorkspaceInvitationBackendApi } from "../../../api/workspaces/WorkspaceInvitationBackendApi";
 import type { WorkspaceAdministrationBackendApi } from "../../../api/workspaces/WorkspaceAdministrationBackendApi";
 import {
@@ -97,6 +98,12 @@ import {
   type RotateSecretMetadataApiRequest,
   type SecretMetadataApiResponse,
 } from "../../../api/security/sdk/PublicSecretMetadataApiContract";
+import {
+  AssetManagementApiErrorCodes,
+  type AssetManagementApiResponse,
+  type InitiateAssetUploadApiRequest,
+  type RegisterAssetApiRequest,
+} from "../../../api/assets/sdk/PublicAssetManagementApiContract";
 import {
   StorageManagementApiErrorCodes,
   type ActivateStorageInstanceApiRequest,
@@ -787,6 +794,7 @@ export interface IdentityHttpServerOptions {
   readonly certificateOperationsBackendApi?: CertificateOperationsBackendApi;
   readonly secretMetadataBackendApi?: SecretMetadataBackendApi;
   readonly storageManagementBackendApi?: StorageManagementBackendApi;
+  readonly assetManagementBackendApi?: AssetManagementBackendApi;
   readonly authorizationManagementBackendApi?: AuthorizationManagementBackendApi;
   readonly nodeTrustBackendApi?: NodeTrustBackendApi;
   readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
@@ -3521,6 +3529,97 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapStorageManagementStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.assetManagementBackendApi
+        && request.method === "POST"
+        && path === "/api/v1/assets/register"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            if (!workspaceId) {
+              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateAssetRegisterRequest(
+              request,
+              context.principal.userIdentityId,
+              workspaceId,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const registerRequest: RegisterAssetApiRequest = parsedRequest.data;
+            const apiResponse = await options.assetManagementBackendApi.registerAsset(registerRequest);
+            const statusCode = mapAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, registerRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.assetManagementBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/assets/")
+        && path.endsWith("/uploads/initiate")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            const assetId = decodePathTail(path, "/api/v1/assets/", "/uploads/initiate");
+            if (!workspaceId || !assetId) {
+              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateAssetUploadInitiationRequest(
+              request,
+              context.principal.userIdentityId,
+              workspaceId,
+              assetId,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const initiateRequest: InitiateAssetUploadApiRequest = parsedRequest.data;
+            const apiResponse = await options.assetManagementBackendApi.initiateAssetUpload(initiateRequest);
+            const statusCode = mapAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, initiateRequest, apiResponse);
           },
         );
         return;
@@ -6937,6 +7036,88 @@ async function parseAndValidateStorageLifecycleRequest<T>(
   return { ok: true, data: validation.data };
 }
 
+async function parseAndValidateAssetRegisterRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  workspaceId: string,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: RegisterAssetApiRequest }
+  | { readonly ok: false; readonly statusCode: number; readonly body: AssetManagementApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildAssetManagementInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "asset-management-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  const bodyRecord = asRecord(parsedBody.value);
+  if (!bodyRecord) {
+    const body = buildAssetManagementInvalidRequestResponse("Request body must be an object.");
+    return { ok: false, statusCode: 400, body };
+  }
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      ...bodyRecord,
+      actorUserIdentityId,
+      workspaceId,
+    }) as RegisterAssetApiRequest,
+  };
+}
+
+async function parseAndValidateAssetUploadInitiationRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  workspaceId: string,
+  assetId: string,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: InitiateAssetUploadApiRequest }
+  | { readonly ok: false; readonly statusCode: number; readonly body: AssetManagementApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildAssetManagementInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "asset-management-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  const bodyRecord = asRecord(parsedBody.value);
+  if (!bodyRecord) {
+    const body = buildAssetManagementInvalidRequestResponse("Request body must be an object.");
+    return { ok: false, statusCode: 400, body };
+  }
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      ...bodyRecord,
+      actorUserIdentityId,
+      workspaceId,
+      assetId,
+    }) as InitiateAssetUploadApiRequest,
+  };
+}
+
 async function parseJsonBody(
   request: IncomingMessage,
   maxBodyBytes: number,
@@ -7144,6 +7325,29 @@ function mapStorageManagementStatusCode(response: StorageManagementApiResponse<u
       return 422;
     case StorageManagementApiErrorCodes.provisioningFailed:
       return 409;
+    default:
+      return 500;
+  }
+}
+
+function mapAssetManagementStatusCode(response: AssetManagementApiResponse<unknown>): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error?.code) {
+    case AssetManagementApiErrorCodes.invalidRequest:
+      return 400;
+    case AssetManagementApiErrorCodes.authenticationFailed:
+      return 401;
+    case AssetManagementApiErrorCodes.forbidden:
+      return 403;
+    case AssetManagementApiErrorCodes.notFound:
+      return 404;
+    case AssetManagementApiErrorCodes.conflict:
+      return 409;
+    case AssetManagementApiErrorCodes.invalidState:
+      return 422;
     default:
       return 500;
   }
@@ -7419,6 +7623,16 @@ function buildStorageManagementInvalidRequestResponse(message: string): StorageM
   });
 }
 
+function buildAssetManagementInvalidRequestResponse(message: string): AssetManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: AssetManagementApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
 function buildNodeTrustForbiddenResponse(message: string): NodeTrustApiResponse<never> {
   return Object.freeze({
     ok: false,
@@ -7549,6 +7763,13 @@ function buildSecretMetadataValidationErrors(issues: ReadonlyArray<z.ZodIssue>):
       }))),
     },
   });
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
 }
 
 function extractBearerToken(authorizationHeader: string | string[] | undefined): string | undefined {

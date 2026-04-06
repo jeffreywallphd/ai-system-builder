@@ -26,11 +26,14 @@ This note documents the authoritative HTTP server endpoints for local identity r
 - `GET /api/v1/security/certificates/:serialNumber` (authenticated, trusted session required)
 - `POST /api/v1/security/certificates/:serialNumber/revoke` (authenticated, trusted session required)
 - `POST /api/v1/security/certificates/:serialNumber/renew` (authenticated, trusted session required)
+- `POST /api/v1/assets/register` (authenticated)
+- `POST /api/v1/assets/:assetId/uploads/initiate` (authenticated)
 
 Implemented transport and host composition:
 
 - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `infrastructure/api/identity/IdentityAuthBackendApi.ts`
+- `infrastructure/api/assets/AssetManagementBackendApi.ts`
 - `hosts/server/IdentityServerHost.ts`
 
 UI entry points now consume this same HTTP surface through renderer identity adapters:

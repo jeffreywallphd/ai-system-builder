@@ -22,13 +22,16 @@ const ManagementActions = new Set<string>([
   StoragePolicyActions.provision,
   StoragePolicyActions.activate,
   StoragePolicyActions.deactivate,
-  StoragePolicyActions.useForAssets,
 ]);
 
 const ReadActions = new Set<string>([
   StoragePolicyActions.view,
   StoragePolicyActions.getDetails,
   StoragePolicyActions.listAccessible,
+]);
+
+const AssetUsageActions = new Set<string>([
+  StoragePolicyActions.useForAssets,
 ]);
 
 export class WorkspaceAwareStoragePolicyEvaluationAdapter implements IStoragePolicyEvaluationPort {
@@ -106,7 +109,7 @@ export class WorkspaceAwareStoragePolicyEvaluationAdapter implements IStoragePol
       );
     }
 
-    if (ReadActions.has(input.action) || ManagementActions.has(input.action)) {
+    if (ReadActions.has(input.action) || ManagementActions.has(input.action) || AssetUsageActions.has(input.action)) {
       return this.allowed("workspace-policy-allowed", occurredAt);
     }
 
