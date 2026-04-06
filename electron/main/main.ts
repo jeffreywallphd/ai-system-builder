@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, ipcMain, safeStorage } from "electron";
+import { app, BrowserWindow, ipcMain, safeStorage, session } from "electron";
 import { InitializeProductionStorageUseCase } from "../../application/runtime/InitializeProductionStorageUseCase";
 import { GetExecutionRunUseCase } from "../../application/execution/GetExecutionRunUseCase";
 import { resolveDesktopStoragePaths } from "../../infrastructure/desktop/DesktopAppPaths";
@@ -104,6 +104,44 @@ if (started) {
 const repoRoot = path.resolve(__dirname, "../..");
 const isPackaged = app.isPackaged;
 const rendererDevUrl = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:5174";
+const preloadScriptPath = fs.existsSync(path.join(__dirname, "preload.mjs"))
+  ? path.join(__dirname, "preload.mjs")
+  : path.join(__dirname, "../preload.mjs");
+
+const DEV_CSP_ALLOWLIST = Object.freeze([
+  "http://127.0.0.1:5174",
+  "ws://127.0.0.1:5174",
+  "http://localhost:5174",
+  "ws://localhost:5174",
+]);
+
+function createRendererContentSecurityPolicy(): string {
+  const scriptSources = ["'self'", "'unsafe-inline'", ...DEV_CSP_ALLOWLIST.filter((entry) => entry.startsWith("http://"))].join(" ");
+  const connectSources = ["'self'", ...DEV_CSP_ALLOWLIST].join(" ");
+  const imageSources = ["'self'", "data:", "blob:", ...DEV_CSP_ALLOWLIST.filter((entry) => entry.startsWith("http://"))].join(" ");
+  const mediaSources = ["'self'", "blob:", ...DEV_CSP_ALLOWLIST.filter((entry) => entry.startsWith("http://"))].join(" ");
+  return [
+    "default-src 'self'",
+    `script-src ${scriptSources}`,
+    `connect-src ${connectSources}`,
+    "style-src 'self' 'unsafe-inline'",
+    `img-src ${imageSources}`,
+    `media-src ${mediaSources}`,
+    "font-src 'self' data:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'none'",
+  ].join("; ");
+}
+
+function installRendererContentSecurityPolicy(): void {
+  const policy = createRendererContentSecurityPolicy();
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = details.responseHeaders ? { ...details.responseHeaders } : {};
+    responseHeaders["Content-Security-Policy"] = [policy];
+    callback({ responseHeaders });
+  });
+}
 
 let mainWindow: BrowserWindow | undefined;
 let storageDatabase: DesktopStorageDatabase | undefined;
@@ -340,7 +378,7 @@ async function createMainWindow(): Promise<void> {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      preload: path.join(__dirname, "../preload.mjs"),
+      preload: preloadScriptPath,
     },
   });
 
@@ -408,7 +446,7 @@ async function launchRuntimeWindowFromContract(
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      preload: path.join(__dirname, "../preload.mjs"),
+      preload: preloadScriptPath,
     },
   });
 
@@ -1201,6 +1239,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
+  installRendererContentSecurityPolicy();
   await bootstrapDesktopRuntime();
   await createMainWindow();
 

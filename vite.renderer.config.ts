@@ -1,8 +1,30 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+const REPOSITORY_ROOT = path.dirname(fileURLToPath(import.meta.url));
+
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: [
+      {
+        find: "./modelManagementDependencies",
+        replacement: path.resolve(
+          REPOSITORY_ROOT,
+          "ui/composition/modelManagementDependencies.browser.ts",
+        ),
+      },
+      {
+        find: "../../infrastructure/execution/createExecutionInfrastructure",
+        replacement: path.resolve(
+          REPOSITORY_ROOT,
+          "infrastructure/execution/createExecutionInfrastructure.browser.ts",
+        ),
+      },
+    ],
+  },
   build: {
     outDir: "dist",
   },
