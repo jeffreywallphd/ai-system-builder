@@ -413,14 +413,6 @@ const AuthorizationReassignRoleRequestSchema = AuthorizationRoleAssignmentReques
   operation: z.literal("reassign"),
   fromRoleKey: ManageableWorkspaceAuthorizationRoleKeySchema,
   toRoleKey: ManageableWorkspaceAuthorizationRoleKeySchema,
-}).superRefine((value, context) => {
-  if (value.fromRoleKey === value.toRoleKey) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["toRoleKey"],
-      message: "Role reassignment requires different fromRoleKey and toRoleKey values.",
-    });
-  }
 });
 
 const AuthorizationRevokeRoleRequestSchema = AuthorizationRoleAssignmentRequestBaseSchema.extend({
@@ -432,7 +424,19 @@ export const AuthorizationRoleAssignmentRequestSchema = z.discriminatedUnion("op
   AuthorizationAssignRoleRequestSchema,
   AuthorizationReassignRoleRequestSchema,
   AuthorizationRevokeRoleRequestSchema,
-]);
+]).superRefine((value, context) => {
+  if (value.operation !== "reassign") {
+    return;
+  }
+
+  if (value.fromRoleKey === value.toRoleKey) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["toRoleKey"],
+      message: "Role reassignment requires different fromRoleKey and toRoleKey values.",
+    });
+  }
+});
 
 export const AuthorizationResourcePolicyMetadataSchema = z
   .object({
