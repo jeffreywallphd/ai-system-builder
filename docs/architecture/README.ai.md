@@ -89,6 +89,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Managed local server-backed storage adapter baseline: `docs/architecture/storage-local-backend-adapter.md`
 - Managed shared mounted/network storage adapter baseline: `docs/architecture/storage-shared-backend-adapter.md`
 - Managed synchronized storage eligibility/state adapter baseline: `docs/architecture/storage-sync-backend-adapter.md`
+- Managed storage backend-selection + create provisioning orchestration baseline: `docs/architecture/storage-provisioning-orchestration.md`
 - Managed storage shared transport DTO + schema validation + redaction baseline: `docs/architecture/storage-transport-contracts.md`
 - Managed storage permission surface and access-summary semantics baseline: `docs/architecture/storage-access-semantics.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
