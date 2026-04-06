@@ -104,9 +104,7 @@ if (started) {
 const repoRoot = path.resolve(__dirname, "../..");
 const isPackaged = app.isPackaged;
 const rendererDevUrl = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:5174";
-const preloadScriptPath = fs.existsSync(path.join(__dirname, "preload.mjs"))
-  ? path.join(__dirname, "preload.mjs")
-  : path.join(__dirname, "../preload.mjs");
+const preloadScriptPath = resolvePreloadScriptPath();
 
 const DEV_CSP_ALLOWLIST = Object.freeze([
   "http://127.0.0.1:5174",
@@ -114,6 +112,20 @@ const DEV_CSP_ALLOWLIST = Object.freeze([
   "http://localhost:5174",
   "ws://localhost:5174",
 ]);
+
+function resolvePreloadScriptPath(): string {
+  const preloadCandidates = [
+    path.join(__dirname, "preload.cjs"),
+    path.join(__dirname, "../preload.cjs"),
+    path.join(__dirname, "preload.mjs"),
+    path.join(__dirname, "../preload.mjs"),
+  ];
+  const resolvedPath = preloadCandidates.find((candidate) => fs.existsSync(candidate));
+  if (!resolvedPath) {
+    return preloadCandidates[0];
+  }
+  return resolvedPath;
+}
 
 function createRendererContentSecurityPolicy(): string {
   const scriptSources = ["'self'", "'unsafe-inline'", ...DEV_CSP_ALLOWLIST.filter((entry) => entry.startsWith("http://"))].join(" ");

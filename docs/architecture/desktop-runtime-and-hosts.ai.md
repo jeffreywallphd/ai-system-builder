@@ -6,6 +6,7 @@ Electron is the desktop host boundary; the renderer accesses desktop capabilitie
 ## Main files
 - Main process bootstrap: `electron/main/main.ts`
 - Preload bridge: `electron/preload.ts`
+- Preload build artifact: `.vite/build/preload.cjs` (CommonJS for Electron preload execution)
 - Bridge contracts: `electron/shared/DesktopContracts.ts`
 - Desktop workflow persistence: `infrastructure/desktop/DesktopWorkflowPersistence.ts`
 - Desktop execution-run persistence: `infrastructure/filesystem/execution/SqliteExecutionRunRepository.ts`

@@ -39,6 +39,8 @@ This makes Electron the host-level boundary where local capabilities become avai
 - agent authoring/configuration operations (`create/update/get/list/delete/archive`, goal/policy/tool/memory/strategy configuration, and configuration validation)
 - studio-shell authoring operations (`initialize/snapshot/start-session/create-draft/update-draft/update-dependencies/transition-lifecycle/publish-version/validate-draft`)
 
+Electron preload execution uses a CommonJS preload bundle (`.vite/build/preload.cjs`) because preload scripts are loaded in a non-ESM context.
+
 Agent authoring backend responses now use a hardened projection envelope (`agent`, `taxonomy`, optional `contract`) so desktop transport keeps read semantics aligned with `CompositionTaxonomyClassifier`/`CompositionAssetContractResolver`.
 Phase 8.1 extends this desktop backend surface to a Studio-ready seam via `AgentStudioBackendApi`, adding runtime/session IPC operations (launch/trigger launch/session list/detail/run control/studio snapshot) on `ai-loom-desktop-agents:*` while keeping transport thin over existing application use cases.
 Direction 5 Studio Shell operations are exposed the same way on `ai-loom-desktop-studio-shell:*` and delegate to `StudioShellBackendApi` over the real SQLite studio-shell repository.
