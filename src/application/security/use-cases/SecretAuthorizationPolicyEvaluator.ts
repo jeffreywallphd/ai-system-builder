@@ -28,7 +28,6 @@ export class SecretAuthorizationPolicyEvaluator implements ISecretAccessPolicyPo
     if (
       input.action === SecretAccessActions.retrievePlaintext
       && !this.isRuntimeActor(input.actor.actorType)
-      && input.actor.actorType !== SecretActorTypes.serverAdmin
     ) {
       return Object.freeze({
         ...domainDecision,

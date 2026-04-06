@@ -1,4 +1,9 @@
-import { SecretAccessActions, toSecretReference } from "../../../domain/security/SecretDomain";
+import {
+  SecretAccessActions,
+  SecretActorTypes,
+  createSecretScopeOwner,
+  type SecretScopeOwner,
+} from "../../../domain/security/SecretDomain";
 import type {
   ISecretAccessAuditPort,
   ISecretAccessPolicyPort,
@@ -62,6 +67,94 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
       return invalidRequest("secretId is required.");
     }
 
+    const operationKey = normalizeRequired(request.operationKey);
+    if (!operationKey) {
+      await this.emitOperation("rejected", {
+        occurredAt: this.now().toISOString(),
+        actorId,
+        secretId,
+        details: Object.freeze({
+          reason: "missing-operationKey",
+        }),
+      });
+      return invalidRequest("operationKey is required.");
+    }
+
+    const serviceIdentity = normalizeRequired(request.runtimeContext?.serviceIdentity);
+    if (!serviceIdentity) {
+      await this.emitOperation("rejected", {
+        occurredAt: this.now().toISOString(),
+        actorId,
+        secretId,
+        details: Object.freeze({
+          reason: "missing-runtime-serviceIdentity",
+        }),
+      });
+      return invalidRequest("runtimeContext.serviceIdentity is required.");
+    }
+
+    const justification = normalizeRequired(request.runtimeContext?.justification);
+    if (!justification) {
+      await this.emitOperation("rejected", {
+        occurredAt: this.now().toISOString(),
+        actorId,
+        secretId,
+        details: Object.freeze({
+          reason: "missing-runtime-justification",
+        }),
+      });
+      return invalidRequest("runtimeContext.justification is required.");
+    }
+
+    let requestedScope: SecretScopeOwner;
+    try {
+      requestedScope = createSecretScopeOwner(request.runtimeContext.scope);
+    } catch (error) {
+      await this.emitOperation("rejected", {
+        occurredAt: this.now().toISOString(),
+        actorId,
+        secretId,
+        details: Object.freeze({
+          reason: "invalid-runtime-scope",
+          error: toErrorMessage(error),
+        }),
+      });
+      return invalidRequest("runtimeContext.scope is invalid.");
+    }
+
+    if (!isRuntimeActorType(request.actor.actorType)) {
+      const occurredAt = this.now().toISOString();
+      await this.dependencies.secretAccessAuditPort.recordSecretAccessDecision(Object.freeze({
+        secretId,
+        scope: requestedScope.scope,
+        action: SecretAccessActions.retrievePlaintext,
+        decision: "denied",
+        reason: "runtime-access-required",
+        operationKey,
+        serviceIdentity,
+        justification,
+        actorId,
+        actorType: request.actor.actorType,
+        workspaceId: request.actor.workspaceId,
+        userIdentityId: request.actor.userIdentityId,
+        occurredAt,
+      }));
+      await this.emitOperation("denied", {
+        occurredAt,
+        actorId,
+        secretId,
+        scope: requestedScope.scope,
+        workspaceId: requestedScope.workspaceId,
+        userIdentityId: requestedScope.userIdentityId,
+        details: Object.freeze({
+          reason: "runtime-access-required",
+          operationKey,
+          serviceIdentity,
+        }),
+      });
+      return notFound(secretId);
+    }
+
     const occurredAt = normalizeTimestamp(request.occurredAt, this.now);
     if (!occurredAt) {
       await this.emitOperation("rejected", {
@@ -89,10 +182,42 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
         return notFound(secretId);
       }
 
+      if (!isSameScopeOwner(record.owner, requestedScope)) {
+        await this.dependencies.secretAccessAuditPort.recordSecretAccessDecision(Object.freeze({
+          secretId: secretId,
+          scope: requestedScope.scope,
+          action: SecretAccessActions.retrievePlaintext,
+          decision: "denied",
+          reason: "scope-mismatch",
+          operationKey,
+          serviceIdentity,
+          justification,
+          actorId,
+          actorType: request.actor.actorType,
+          workspaceId: request.actor.workspaceId,
+          userIdentityId: request.actor.userIdentityId,
+          occurredAt,
+        }));
+        await this.emitOperation("denied", {
+          occurredAt,
+          actorId,
+          secretId,
+          scope: requestedScope.scope,
+          workspaceId: requestedScope.workspaceId,
+          userIdentityId: requestedScope.userIdentityId,
+          details: Object.freeze({
+            reason: "runtime-scope-reference-mismatch",
+            operationKey,
+            serviceIdentity,
+          }),
+        });
+        return notFound(secretId);
+      }
+
       const decision = await this.dependencies.secretAccessPolicyPort.evaluateSecretAccess({
         action: SecretAccessActions.retrievePlaintext,
         actor: request.actor,
-        owner: record.owner,
+        owner: requestedScope,
         record,
         occurredAt,
       });
@@ -103,6 +228,9 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
         action: SecretAccessActions.retrievePlaintext,
         decision: decision.allowed ? "allowed" : "denied",
         reason: decision.reason,
+        operationKey,
+        serviceIdentity,
+        justification,
         actorId,
         actorType: request.actor.actorType,
         workspaceId: request.actor.workspaceId,
@@ -120,6 +248,8 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
           userIdentityId: record.owner.userIdentityId,
           details: Object.freeze({
             reason: decision.reason,
+            operationKey,
+            serviceIdentity,
           }),
         });
         return notFound(secretId);
@@ -163,7 +293,9 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
       return {
         ok: true,
         value: Object.freeze({
-          secret: toSecretReference(record),
+          secretId: record.secretId,
+          currentVersionId: currentVersion.versionId,
+          scope: record.owner,
           plaintext: decrypted.plaintext,
         }),
       };
@@ -192,7 +324,7 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
       readonly occurredAt: string;
       readonly actorId?: string;
       readonly secretId?: string;
-      readonly scope?: ReturnType<typeof toSecretReference>["scope"];
+      readonly scope?: SecretScopeOwner["scope"];
       readonly workspaceId?: string;
       readonly userIdentityId?: string;
       readonly details?: Readonly<Record<string, unknown>>;
@@ -230,6 +362,23 @@ function normalizeTimestamp(value: string | undefined, now: () => Date): string 
     return undefined;
   }
   return parsed.toISOString();
+}
+
+function isRuntimeActorType(value: string): boolean {
+  return value === SecretActorTypes.serverRuntime || value === SecretActorTypes.workspaceService;
+}
+
+function isSameScopeOwner(left: SecretScopeOwner, right: SecretScopeOwner): boolean {
+  return left.scope === right.scope
+    && left.workspaceId === right.workspaceId
+    && left.userIdentityId === right.userIdentityId;
+}
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  return "unknown-error";
 }
 
 function invalidRequest(message: string): SecretServiceResult<RetrieveSecretPlaintextResult> {
