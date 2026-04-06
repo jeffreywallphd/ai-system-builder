@@ -23,7 +23,6 @@ import { RevokeIdentitySessionUseCase } from "../../src/application/identity/use
 import { ListLocalIdentityAccountsUseCase } from "../../src/application/identity/use-cases/ListLocalIdentityAccountsUseCase";
 import { GetLocalIdentityAccountStatusUseCase } from "../../src/application/identity/use-cases/GetLocalIdentityAccountStatusUseCase";
 import { SetLocalIdentityAccountStatusUseCase } from "../../src/application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
-import { SqliteIdentityRepository } from "../../infrastructure/filesystem/identity/SqliteIdentityRepository";
 import { ScryptLocalPasswordCredentialService } from "../../infrastructure/security/identity/ScryptLocalPasswordCredentialService";
 import { OpaqueIdentitySessionTokenService } from "../../infrastructure/security/identity/OpaqueIdentitySessionTokenService";
 import { IdentityAuthBackendApi } from "../../infrastructure/api/identity/IdentityAuthBackendApi";
@@ -34,7 +33,8 @@ import {
   HostSecureTransportKinds,
   resolveHostSecureTransportConfig,
 } from "../../infrastructure/config/HostSecureTransportConfig";
-import { SqliteTrustedDeviceRepository } from "../../infrastructure/filesystem/identity/SqliteTrustedDeviceRepository";
+import { SqliteIdentityPersistenceAdapter } from "../../src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter";
+import { SqliteTrustedDevicePersistenceAdapter } from "../../src/infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter";
 import { TrustedDeviceManagementService } from "../../application/identity/services/TrustedDeviceManagementService";
 import { TrustedDevicePairingService } from "../../application/identity/services/TrustedDevicePairingService";
 import { TrustedDeviceSessionTrustService } from "../../application/identity/services/TrustedDeviceSessionTrustService";
@@ -295,8 +295,8 @@ class DomainTransportConnectionPolicyEvaluator {
 }
 
 export async function startIdentityServerHost(options: IdentityServerHostOptions): Promise<IdentityServerHost> {
-  const repository = new SqliteIdentityRepository(path.resolve(options.databasePath));
-  const trustedDeviceRepository = new SqliteTrustedDeviceRepository(path.resolve(options.databasePath));
+  const repository = new SqliteIdentityPersistenceAdapter(path.resolve(options.databasePath));
+  const trustedDeviceRepository = new SqliteTrustedDevicePersistenceAdapter(path.resolve(options.databasePath));
   const workspaceRepository = new SqliteWorkspacePersistenceAdapter(path.resolve(options.databasePath));
   const authorizationRepository = new SqliteAuthorizationPersistenceAdapter(path.resolve(options.databasePath));
   const nodeTrustRepository = new SqliteNodeTrustPersistenceAdapter(path.resolve(options.databasePath));

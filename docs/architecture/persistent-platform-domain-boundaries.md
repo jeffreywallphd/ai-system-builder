@@ -214,6 +214,25 @@ The goal is to keep repository implementation aligned to domain/application cont
   - `src/shared/schemas/storage/tests/StoragePersistenceSchemaContracts.test.ts`
   - `src/shared/schemas/platform/tests/PlatformPersistenceSchemaContracts.test.ts`
 
+## Story 13.2.2 concrete identity/workspace/authorization adapter baseline
+
+- Concrete adapter modules for domain-authoritative persistence now live under:
+  - `src/infrastructure/persistence/identity/`
+  - `src/infrastructure/persistence/workspaces/`
+  - `src/infrastructure/persistence/authorization/`
+- Core adapter coverage includes:
+  - identity user + provider-link persistence and lookup
+  - credential material and session/session-token persistence
+  - trusted-device and pairing persistence for identity trust workflows
+  - workspace tenancy, membership, role assignment, and invitation persistence
+  - authorization role assignment, sharing grant, and resource policy metadata persistence
+- Authoritative host runtime wiring now uses concrete SQLite identity adapters from `src/infrastructure/persistence/identity` (not legacy filesystem identity adapters), keeping application ports backed by the migration-ready persistence path.
+- Adapter tests for this baseline live in:
+  - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
+  - `src/infrastructure/persistence/identity/tests/SqliteTrustedDevicePersistenceAdapter.test.ts`
+  - `src/infrastructure/persistence/workspaces/tests/SqliteWorkspacePersistenceAdapter.test.ts`
+  - `src/infrastructure/persistence/authorization/tests/SqliteAuthorizationPersistenceAdapter.test.ts`
+
 ## Mapper responsibility guidance (Story 13.1.3)
 
 - Mapper boundaries are adapter-local but contract-driven:
