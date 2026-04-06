@@ -376,3 +376,32 @@ Coverage added/extended:
   - `src/shared/contracts/assets/tests/AssetTransportContracts.test.ts`
   - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
   - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+
+## Story 10.3.4 shared client-safe contracts + UI integration
+
+Implemented a shared client-safe asset-workflow contract seam for desktop/thin-client parity and wired a representative UI flow to logical asset APIs.
+
+Canonical additions:
+
+- `src/shared/contracts/assets/AssetWorkflowClientContracts.ts`
+- `src/shared/contracts/assets/tests/AssetWorkflowClientContracts.test.ts`
+- `ui/shared/assets/AssetWorkflowClient.ts`
+- `ui/shared/assets/tests/AssetWorkflowClient.test.ts`
+- `ui/services/AssetWorkflowService.ts`
+- `ui/services/tests/AssetWorkflowService.test.ts`
+
+Representative UI-facing integration:
+
+- `/assets` now resolves to `AssetsPage` in `ui/routes/AppRouter.tsx`.
+- `ui/pages/AssetsPage.tsx` now executes protected logical asset workflows through shared client/service seams:
+  - list assets (workspace-scoped)
+  - load asset detail
+  - resolve preview
+  - authorize download / inline-preview (tokenized content path)
+  - initiate upload session
+
+Boundary posture:
+
+- Presentation code consumes logical identifiers and API-safe contracts only.
+- Raw filesystem path knowledge is not required in UI state for this flow.
+- Contracts and helpers are reusable for desktop and thin-client clients without duplicating workflow logic.

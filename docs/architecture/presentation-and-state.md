@@ -1,4 +1,4 @@
-﻿# Presentation and State
+# Presentation and State
 
 This document explains how the renderer is organized and how state, stores, services, and composition fit into the larger architecture.
 
@@ -1039,3 +1039,15 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - filter controls for trust/presence/approval/enrollment/node-type/capability/deployment-tag/last-seen range,
   - explicit pending/active/offline/revoked state labels via badge treatment in list/detail,
   - explicit loading, empty, and error states without placeholder node data.
+
+## Asset workflow UI integration update (story 10.3.4)
+
+- Added a shared renderer asset workflow transport seam in `ui/shared/assets/AssetWorkflowClient.ts` and a page-facing adapter in `ui/services/AssetWorkflowService.ts`.
+- `/assets` now renders a contract-driven logical asset workflow page (`ui/pages/AssetsPage.tsx`) instead of redirect-only behavior.
+- The page is intentionally bounded and backend-authoritative, covering:
+  - list/query,
+  - detail lookup,
+  - upload initiation,
+  - download authorization,
+  - preview resolution.
+- UI state remains logical-id focused and path-free for this workflow (`workspaceId`, `assetId`, `storageInstanceId`, `versionId`), aligned with protected asset governance boundaries.

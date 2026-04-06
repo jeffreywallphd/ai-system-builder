@@ -35,6 +35,7 @@ import BuildAutomatePage from "../pages/BuildAutomatePage";
 import RegistryPage from "../pages/RegistryPage";
 import AssetDetailPage from "../pages/AssetDetailPage";
 import RunPage from "../pages/RunPage";
+import AssetsPage from "../pages/AssetsPage";
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
 import IdentityAdminPage from "../pages/IdentityAdminPage";
@@ -117,7 +118,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.context, element: <Navigate to={ROUTE_PATHS.explore} replace /> },
           { path: ROUTE_PATHS.mcp, element: <Navigate to={ROUTE_PATHS.explore} replace /> },
           { path: ROUTE_PATHS.services, element: <Navigate to={ROUTE_PATHS.explore} replace /> },
-          { path: ROUTE_PATHS.assets, element: <Navigate to={ROUTE_PATHS.explore} replace /> },
+          { path: ROUTE_PATHS.assets, element: <AssetsPage /> },
           { path: ROUTE_PATHS.agentStudio, element: <Navigate to={ROUTE_PATHS.build} replace /> },
           { path: ROUTE_PATHS.studioShell, element: <Navigate to={ROUTE_PATHS.build} replace /> },
           { path: ROUTE_PATHS.registry, element: <RegistryPage /> },
