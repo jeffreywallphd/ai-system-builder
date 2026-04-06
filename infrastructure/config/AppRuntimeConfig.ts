@@ -138,6 +138,20 @@ export class AppRuntimeConfig {
   }
 
   private static readEnvVariable(key: string): string | undefined {
+    const browserDevBootstrap = (
+      globalThis as typeof globalThis & {
+        window?: {
+          aiLoomBrowserDevelopment?: {
+            env?: Record<string, string | undefined>;
+          };
+        };
+      }
+    ).window?.aiLoomBrowserDevelopment?.env;
+    const browserDevValue = browserDevBootstrap?.[key];
+    if (browserDevValue) {
+      return browserDevValue;
+    }
+
     const processLike = typeof globalThis !== "undefined"
       ? (globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } }).process
       : undefined;

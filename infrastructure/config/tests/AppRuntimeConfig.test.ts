@@ -71,4 +71,30 @@ describe("AppRuntimeConfig", () => {
     expect(config.isDevSyncEnabled).toBe(false);
     expect(config.modelInstallDirectory).toBe("/tmp/ai-loom/models");
   });
+
+  it("reads browser development runtime bootstrap env overrides", () => {
+    const globalWithWindow = (globalThis as typeof globalThis & {
+      window?: {
+        aiLoomBrowserDevelopment?: {
+          env?: Record<string, string | undefined>;
+        };
+      };
+    });
+    const previousWindow = globalWithWindow.window;
+
+    try {
+      globalWithWindow.window = {
+        aiLoomBrowserDevelopment: {
+          env: {
+            VITE_IDENTITY_API_BASE_URL: "http://127.0.0.1:8788",
+          },
+        },
+      };
+
+      const config = AppRuntimeConfig.forDevelopment();
+      expect(config.identityApiBaseUrl).toBe("http://127.0.0.1:8788");
+    } finally {
+      globalWithWindow.window = previousWindow;
+    }
+  });
 });

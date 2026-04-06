@@ -41,6 +41,11 @@ UI entry points now consume this same HTTP surface through renderer identity ada
 - admin UI surface: `ui/pages/IdentityAdminPage.tsx` (account list, status inspection, enable/disable actions)
 - trusted-device UI surface: `ui/pages/TrustedDevicesPage.tsx` (pairing initiation/validation/completion + trusted-device list/revocation flows)
 
+Browser development host wiring (`npm run dev:browser`) now self-bootstraps the identity server through the Vite runtime plugin:
+
+- `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` starts `IdentityServerHost` on browser-dev startup.
+- The plugin injects browser runtime bootstrap env (`window.aiLoomBrowserDevelopment.env.VITE_IDENTITY_API_BASE_URL`) so runtime config and web identity resolver use the managed identity base URL without requiring a manual `.env` override.
+
 ## Request contracts
 
 ### Register request
