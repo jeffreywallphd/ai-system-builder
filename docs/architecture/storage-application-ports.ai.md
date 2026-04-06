@@ -13,13 +13,17 @@ Story 9.3.1 now implements the authoritative storage management service layer th
 - `src/application/storage/ports/StorageAccessSummaryPort.ts`
 - `src/application/storage/ports/StorageCapabilityInspectionPort.ts`
 - `src/application/storage/ports/StorageObjectPort.ts`
+- `src/application/storage/ports/StorageObjectAccessResolverPort.ts`
 - `src/application/storage/ports/StorageObservabilityPorts.ts`
 - `src/application/storage/ports/StorageManagementPorts.ts`
 - `src/application/storage/use-cases/StorageManagementServiceContracts.ts`
 - `src/application/storage/use-cases/CreateStorageInstanceWithProvisioningUseCase.ts`
 - `src/application/storage/use-cases/StorageManagementService.ts`
+- `src/application/storage/use-cases/StorageLogicalAccessResolutionServiceContracts.ts`
+- `src/application/storage/use-cases/StorageLogicalAccessResolutionService.ts`
 - `src/application/storage/use-cases/StorageManagementServiceErrors.ts`
 - `src/application/storage/tests/StorageManagementServiceContracts.test.ts`
+- `src/application/storage/tests/StorageLogicalAccessResolutionService.test.ts`
 
 ## Service behavior (Story 9.3.1)
 
@@ -64,6 +68,16 @@ Rejected provisioning that is not an unsupported backend operation maps to `stor
 - adapter-safe failure mapping through `StorageObjectAccessError` and stable `StorageObjectErrorCodes`
 
 This preserves authoritative server-managed storage access without exposing host paths to application/UI layers.
+
+## Story 9.3.3 extension: logical storage access resolution
+
+`StorageLogicalAccessResolutionService` adds a reusable resolution seam for asset/object access flows:
+
+- validates logical storage identity (`storage-instance://...` or id)
+- enforces workspace-scoped existence and policy checks
+- maps intents to canonical policy actions (`view`, `use-for-assets`)
+- resolves backend object adapters through `IStorageObjectAccessResolverPort`
+- returns internal access plans without leaking physical path details
 
 ## Verified by tests
 

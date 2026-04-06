@@ -1,4 +1,6 @@
 import type { IStorageCapabilityInspectionPort } from "../../application/storage/ports/StorageCapabilityInspectionPort";
+import type { IStorageObjectAccessResolverPort } from "../../application/storage/ports/StorageObjectAccessResolverPort";
+import type { IStorageObjectPort } from "../../application/storage/ports/StorageObjectPort";
 import type { IStorageProvisioningPort } from "../../application/storage/ports/StorageProvisioningPort";
 import type { StorageBackendType } from "../../domain/storage/StorageDomain";
 
@@ -6,9 +8,10 @@ export interface StorageBackendAdapterRegistration {
   readonly backendType: StorageBackendType;
   readonly provisioningPort: IStorageProvisioningPort;
   readonly capabilityInspectionPort?: IStorageCapabilityInspectionPort;
+  readonly objectPort?: IStorageObjectPort;
 }
 
-export class StorageBackendAdapterRegistry {
+export class StorageBackendAdapterRegistry implements IStorageObjectAccessResolverPort {
   private readonly registrationsByBackendType: ReadonlyMap<StorageBackendType, StorageBackendAdapterRegistration>;
 
   public constructor(registrations: ReadonlyArray<StorageBackendAdapterRegistration>) {
@@ -21,6 +24,7 @@ export class StorageBackendAdapterRegistry {
         backendType: registration.backendType,
         provisioningPort: registration.provisioningPort,
         capabilityInspectionPort: registration.capabilityInspectionPort,
+        objectPort: registration.objectPort,
       }));
     }
 
@@ -33,6 +37,10 @@ export class StorageBackendAdapterRegistry {
 
   public getCapabilityInspectionPort(backendType: StorageBackendType): IStorageCapabilityInspectionPort | undefined {
     return this.registrationsByBackendType.get(backendType)?.capabilityInspectionPort;
+  }
+
+  public resolveStorageObjectPort(backendType: StorageBackendType): IStorageObjectPort | undefined {
+    return this.registrationsByBackendType.get(backendType)?.objectPort;
   }
 
   public listBackendTypes(): ReadonlyArray<StorageBackendType> {
