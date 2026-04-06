@@ -60,7 +60,28 @@
   - asserts required hybrid service coverage before feature registration starts host runtime
   - enforces explicit capability-driven composition rules for desktop-facing + node/runtime capabilities
   - rejects control-plane ownership blur by disallowing direct local authoritative source in hybrid composition root
-  - supports intentional authoritative execution by delegating to the authoritative server host assembly mode
+- supports intentional authoritative execution by delegating to the authoritative server host assembly mode
+- records deterministic lifecycle transitions (`configured -> composing -> starting -> ready -> stopping -> stopped`)
+
+## Web composition root + entrypoint (story 12.2.4)
+- `src/hosts/web/WebHostCompositionRoot.ts` now provides a reusable web composition root adapter.
+- `src/hosts/web/WebHostEntrypoint.ts` provides a dedicated executable web host assembly entrypoint.
+- Web adapter behavior:
+  - validates web startup dependency boundary coverage
+  - composes host-aware web service registration plans
+  - asserts required web service coverage before feature registration starts host runtime
+  - keeps thin-client delivery concerns explicit through host-owned delivery configuration composition
+  - records deterministic lifecycle transitions (`configured -> composing -> starting -> ready -> stopping -> stopped`)
+
+## Worker composition root + entrypoint (story 12.2.4)
+- `src/hosts/worker/WorkerHostCompositionRoot.ts` now provides a reusable worker composition root adapter.
+- `src/hosts/worker/WorkerHostEntrypoint.ts` provides a dedicated executable worker host assembly entrypoint.
+- Worker adapter behavior:
+  - validates worker startup dependency boundary coverage
+  - composes host-aware worker service registration plans
+  - asserts required worker service coverage before feature registration starts host runtime
+  - enforces explicit `node-execution` + `worker-runtime` capability composition
+  - carries explicit node-registration capability context for runtime startup to support future capability-based node registration
   - records deterministic lifecycle transitions (`configured -> composing -> starting -> ready -> stopping -> stopped`)
 
 ## Unified bootstrap pipeline and startup context (story 12.1.2)
@@ -108,6 +129,10 @@
 - `src/hosts/desktop/tests/DesktopHostEntrypoint.test.ts`
 - `src/hosts/hybrid/tests/HybridHostCompositionRoot.test.ts`
 - `src/hosts/hybrid/tests/HybridHostEntrypoint.test.ts`
+- `src/hosts/web/tests/WebHostCompositionRoot.test.ts`
+- `src/hosts/web/tests/WebHostEntrypoint.test.ts`
+- `src/hosts/worker/tests/WorkerHostCompositionRoot.test.ts`
+- `src/hosts/worker/tests/WorkerHostEntrypoint.test.ts`
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
 - `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
 

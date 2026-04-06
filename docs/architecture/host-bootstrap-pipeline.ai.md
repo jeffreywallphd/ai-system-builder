@@ -54,6 +54,19 @@
 - Hybrid startup enforces explicit capability composition rules for desktop-facing and node/runtime capabilities while keeping control-plane authority delegated to authoritative server host mode.
 - Hybrid runtime start/stop is delegated through host-owned adapter callbacks while preserving lifecycle transition semantics (`composing -> starting -> ready -> stopping -> stopped`).
 
+## Web host adoption
+- `src/hosts/web/WebHostCompositionRoot.ts` now composes startup through the shared pipeline.
+- Startup context is built from boot + deployment profile + environment.
+- Bootstrap `dependencies` now composes host-aware web service registration plans and `feature-registration` enforces web required-service coverage before runtime host start.
+- Web runtime start/stop is delegated through host-owned adapter callbacks while preserving lifecycle transition semantics (`composing -> starting -> ready -> stopping -> stopped`).
+
+## Worker host adoption
+- `src/hosts/worker/WorkerHostCompositionRoot.ts` now composes startup through the shared pipeline.
+- Startup context is built from boot + deployment profile + environment.
+- Bootstrap `dependencies` now composes host-aware worker service registration plans and `feature-registration` enforces worker required-service coverage before runtime host start.
+- Worker startup enforces explicit `node-execution` + `worker-runtime` capability composition and carries node-registration capability context for runtime startup.
+- Worker runtime start/stop is delegated through host-owned adapter callbacks while preserving lifecycle transition semantics (`composing -> starting -> ready -> stopping -> stopped`).
+
 ## Contributor guidance
 - Put reusable setup in canonical stages.
 - Keep host-specific startup in host customization stages.
@@ -66,3 +79,5 @@
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
 - `src/hosts/hybrid/tests/HybridHostCompositionRoot.test.ts`
+- `src/hosts/web/tests/WebHostCompositionRoot.test.ts`
+- `src/hosts/worker/tests/WorkerHostCompositionRoot.test.ts`

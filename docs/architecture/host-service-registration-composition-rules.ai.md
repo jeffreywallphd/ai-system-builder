@@ -38,6 +38,18 @@
   - stores plan artifact in startup context
   - enforces hybrid required-service coverage before runtime host start
 
+## Web host behavior
+- `src/hosts/web/WebHostCompositionRoot.ts` now:
+  - composes host service registration in bootstrap `dependencies` stage
+  - stores plan artifact in startup context
+  - enforces web required-service coverage before runtime host start
+
+## Worker host behavior
+- `src/hosts/worker/WorkerHostCompositionRoot.ts` now:
+  - composes host service registration in bootstrap `dependencies` stage
+  - stores plan artifact in startup context
+  - enforces worker required-service coverage before runtime host start
+
 ## Contributor checklist for new services
 1. Add the service to `HostServiceRegistrationCatalog.ts`.
 2. Use correct `kind`/`boundaryLayer` pairing.
@@ -53,4 +65,6 @@
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
 - `src/hosts/hybrid/tests/HybridHostCompositionRoot.test.ts`
+- `src/hosts/web/tests/WebHostCompositionRoot.test.ts`
+- `src/hosts/worker/tests/WorkerHostCompositionRoot.test.ts`
 

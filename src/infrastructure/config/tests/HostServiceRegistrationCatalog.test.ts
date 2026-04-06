@@ -3,6 +3,7 @@ import {
   AuthoritativeServerHostRuntime,
   DesktopHostRuntime,
   HybridHostRuntime,
+  WebHostRuntime,
   WorkerHostRuntime,
 } from "../../../hosts/HostRuntimeCatalog";
 import {
@@ -15,9 +16,13 @@ import {
   assertAuthoritativeControlPlaneServiceCoverage,
   assertDesktopHostServiceCoverage,
   assertHybridHostServiceCoverage,
+  assertWebHostServiceCoverage,
+  assertWorkerHostServiceCoverage,
   composeHostServiceRegistrationPlan,
   DesktopHostRequiredServiceIds,
   HybridHostRequiredServiceIds,
+  WebHostRequiredServiceIds,
+  WorkerHostRequiredServiceIds,
 } from "../HostServiceRegistrationCatalog";
 
 describe("HostServiceRegistrationCatalog", () => {
@@ -74,6 +79,30 @@ describe("HostServiceRegistrationCatalog", () => {
     expect(() => assertHybridHostServiceCoverage(plan)).not.toThrow();
     const selected = new Set(plan.selectedServices.map((service) => service.serviceId));
     for (const requiredServiceId of HybridHostRequiredServiceIds) {
+      expect(selected.has(requiredServiceId)).toBeTrue();
+    }
+  });
+
+  it("asserts required web host service coverage", () => {
+    const plan = composeHostServiceRegistrationPlan({
+      host: WebHostRuntime,
+      requiredStartupDependencyIds: ["dep:application:web-runtime-services"],
+    });
+    expect(() => assertWebHostServiceCoverage(plan)).not.toThrow();
+    const selected = new Set(plan.selectedServices.map((service) => service.serviceId));
+    for (const requiredServiceId of WebHostRequiredServiceIds) {
+      expect(selected.has(requiredServiceId)).toBeTrue();
+    }
+  });
+
+  it("asserts required worker host service coverage", () => {
+    const plan = composeHostServiceRegistrationPlan({
+      host: WorkerHostRuntime,
+      requiredStartupDependencyIds: ["dep:application:worker-execution-services"],
+    });
+    expect(() => assertWorkerHostServiceCoverage(plan)).not.toThrow();
+    const selected = new Set(plan.selectedServices.map((service) => service.serviceId));
+    for (const requiredServiceId of WorkerHostRequiredServiceIds) {
       expect(selected.has(requiredServiceId)).toBeTrue();
     }
   });

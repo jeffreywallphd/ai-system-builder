@@ -95,6 +95,29 @@ Each catalog entry contains explicit responsibilities, capability flags, and sta
 - `hybrid-client`: hybrid runtime remains a control-plane client
 - `authoritative-server-host`: intentional delegation to authoritative server host assembly startup
 
+## Web composition root and executable host assembly
+
+`src/hosts/web/WebHostCompositionRoot.ts` introduces a reusable web composition root adapter that:
+
+- validates web startup dependency boundary requirements
+- composes host-aware web service registration plans and asserts web required-service coverage before feature registration
+- keeps thin-client delivery concerns explicit through host-owned delivery configuration composition (for example delivery mode and base path)
+- records deterministic host lifecycle transitions through startup and shutdown
+
+`src/hosts/web/WebHostEntrypoint.ts` adds a dedicated executable web host assembly entrypoint (`constructWebHostAssembly(...)` and `startWebHostAssembly(...)`).
+
+## Worker composition root and executable host assembly
+
+`src/hosts/worker/WorkerHostCompositionRoot.ts` introduces a reusable worker composition root adapter that:
+
+- validates worker startup dependency boundary requirements
+- composes host-aware worker service registration plans and asserts worker required-service coverage before feature registration
+- enforces explicit worker execution capability composition (`node-execution` and `worker-runtime`) and rejects mismatched capability toggles
+- carries explicit node-registration capability context for runtime startup so future capability-based node registration can remain host-owned and deterministic
+- records deterministic host lifecycle transitions through startup and shutdown
+
+`src/hosts/worker/WorkerHostEntrypoint.ts` adds a dedicated executable worker host assembly entrypoint (`constructWorkerHostAssembly(...)` and `startWorkerHostAssembly(...)`).
+
 ## Unified bootstrap pipeline and startup context
 
 `src/hosts/bootstrap/HostBootstrapPipeline.ts` now provides a shared startup seam for all hosts:
@@ -151,6 +174,10 @@ The contracts now explicitly state that:
 - `src/hosts/desktop/tests/DesktopHostEntrypoint.test.ts`
 - `src/hosts/hybrid/tests/HybridHostCompositionRoot.test.ts`
 - `src/hosts/hybrid/tests/HybridHostEntrypoint.test.ts`
+- `src/hosts/web/tests/WebHostCompositionRoot.test.ts`
+- `src/hosts/web/tests/WebHostEntrypoint.test.ts`
+- `src/hosts/worker/tests/WorkerHostCompositionRoot.test.ts`
+- `src/hosts/worker/tests/WorkerHostEntrypoint.test.ts`
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
 - `src/infrastructure/config/tests/HostServiceRegistrationCatalog.test.ts`
 
