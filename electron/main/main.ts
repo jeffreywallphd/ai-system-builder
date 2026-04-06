@@ -96,6 +96,7 @@ import {
   SystemRuntimeWindowLaunchQueryParam,
   type LaunchSystemRuntimeWindowReadModel,
 } from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
+import { createRendererContentSecurityPolicy } from "./RendererContentSecurityPolicy";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -105,13 +106,6 @@ const repoRoot = path.resolve(__dirname, "../..");
 const isPackaged = app.isPackaged;
 const rendererDevUrl = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:5174";
 const preloadScriptPath = resolvePreloadScriptPath();
-
-const DEV_CSP_ALLOWLIST = Object.freeze([
-  "http://127.0.0.1:5174",
-  "ws://127.0.0.1:5174",
-  "http://localhost:5174",
-  "ws://localhost:5174",
-]);
 
 function resolvePreloadScriptPath(): string {
   const preloadCandidates = [
@@ -127,27 +121,11 @@ function resolvePreloadScriptPath(): string {
   return resolvedPath;
 }
 
-function createRendererContentSecurityPolicy(): string {
-  const scriptSources = ["'self'", "'unsafe-inline'", ...DEV_CSP_ALLOWLIST.filter((entry) => entry.startsWith("http://"))].join(" ");
-  const connectSources = ["'self'", ...DEV_CSP_ALLOWLIST].join(" ");
-  const imageSources = ["'self'", "data:", "blob:", ...DEV_CSP_ALLOWLIST.filter((entry) => entry.startsWith("http://"))].join(" ");
-  const mediaSources = ["'self'", "blob:", ...DEV_CSP_ALLOWLIST.filter((entry) => entry.startsWith("http://"))].join(" ");
-  return [
-    "default-src 'self'",
-    `script-src ${scriptSources}`,
-    `connect-src ${connectSources}`,
-    "style-src 'self' 'unsafe-inline'",
-    `img-src ${imageSources}`,
-    `media-src ${mediaSources}`,
-    "font-src 'self' data:",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "frame-ancestors 'none'",
-  ].join("; ");
-}
-
 function installRendererContentSecurityPolicy(): void {
-  const policy = createRendererContentSecurityPolicy();
+  const policy = createRendererContentSecurityPolicy({
+    rendererDevUrl,
+    runtimeConfig: bootstrapContext?.runtimeConfig,
+  });
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders = details.responseHeaders ? { ...details.responseHeaders } : {};
     responseHeaders["Content-Security-Policy"] = [policy];
@@ -1251,8 +1229,8 @@ async function bootstrapDesktopRuntime(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
-  installRendererContentSecurityPolicy();
   await bootstrapDesktopRuntime();
+  installRendererContentSecurityPolicy();
   await createMainWindow();
 
   app.on("activate", async () => {
