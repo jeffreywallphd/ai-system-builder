@@ -259,3 +259,12 @@ If a change needs data from the outside world, prefer adding or using an **appli
   - deterministic status/error mapping from backend API contracts,
   - no domain/application rule duplication in transport.
 - Server host wiring now lives at outer layer in `hosts/server/IdentityServerHost.ts`, composing persistence/security/use-case dependencies without moving identity rules out of application/domain.
+
+## Direction 8 boundary note: Secret domain and service contracts foundation (story 8.1.1)
+
+- Added `src/domain/security/SecretDomain.ts` as the inner-layer source of truth for secret scope ownership (`server`, `workspace`, `user`), lifecycle states, version lineage, and key-encryption-context ownership alignment.
+- Added redaction-safe metadata and naming invariants directly in the domain contracts so secret references remain safe for logs/read models by default.
+- Added permission-checked and auditable access-decision contracts in the domain (`evaluateSecretAccessDecision(...)`) so later retrieval/administration flows can compose deterministic allow/deny semantics.
+- Added application-layer secret ports in `src/application/security/ports/SecretServicePorts.ts` for persistence, encryption/decryption, access-policy evaluation, and audit recording.
+- Added operation-facing service contracts in `src/application/security/use-cases/SecretManagementServiceContracts.ts` for create/read metadata/retrieve plaintext/rotate/disable/delete/list behavior.
+- The slice is intentionally contracts-only: no storage, host transport, or UI implementation detail was introduced into domain/application boundaries.

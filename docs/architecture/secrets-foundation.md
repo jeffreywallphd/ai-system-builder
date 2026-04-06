@@ -1,0 +1,98 @@
+# Secret and Key Management Foundation
+
+This note captures the Story 8.1.1 foundation for Feature 8 / Epic 8.1.
+
+## Scope
+
+Implemented in this slice:
+
+- canonical secret domain contracts in `src/domain/security/SecretDomain.ts`
+- scope ownership model for server, workspace, and user secrets
+- domain invariants for secret naming, redaction-safe metadata, lifecycle states, and version lineage
+- key-encryption context contracts aligned to secret ownership scope
+- permission-checked and auditable secret access-decision contracts
+- application security ports for secret persistence, encryption/decryption, access policy evaluation, and audit hooks
+- application service contracts for create/read metadata/retrieve plaintext/rotate/disable/delete/list operations
+
+Out of scope in this slice:
+
+- storage adapters, SQL schema, or migration implementation
+- KMS provider integrations and key lifecycle infrastructure
+- UI handlers and transport adapters
+
+## Canonical files
+
+- `src/domain/security/SecretDomain.ts`
+- `src/domain/security/tests/SecretDomain.test.ts`
+- `src/application/security/ports/SecretServicePorts.ts`
+- `src/application/security/use-cases/SecretManagementServiceContracts.ts`
+- `src/application/security/tests/SecretServiceContracts.test.ts`
+
+## Domain contracts
+
+`SecretDomain.ts` introduces first-class secret entities and policies:
+
+- `SecretRecord`, `SecretReference`, and `SecretVersion`
+- `SecretScope` (`server`, `workspace`, `user`) and `SecretScopeOwner`
+- `SecretKind`
+- `SecretProtectionPolicy`
+- `KeyEncryptionContext`
+- `SecretAccessDecision`
+
+Key invariant posture:
+
+- scope ownership combinations are explicit and validated:
+  - server scope: no workspace/user owner identifiers
+  - workspace scope: requires workspace id, no user id
+  - user scope: requires user id, optional workspace id
+- secret names are canonicalized and restricted to safe identifier patterns
+- reference metadata is redaction-safe by contract (sensitive label keys and PEM-like values rejected)
+- record lifecycle states are explicit (`active`, `disabled`, `revoked`, `deleted`)
+- version lineage is explicit (`previousVersionId`, supersession semantics, single active version)
+- key-encryption context scope must match secret owner scope/identifiers
+
+## Access decision contract
+
+`evaluateSecretAccessDecision(...)` provides a reusable domain decision contract for permission and state checks:
+
+- action permission check (`create`, `read-metadata`, `retrieve-plaintext`, `rotate`, `disable`, `delete`, `list`)
+- scope ownership checks against actor context
+- disabled/revoked/deleted state denial checks
+- policy-based runtime plaintext retrieval denial check
+- deterministic decision/audit result (`allowed`, reason code, event type, actor, scope, timestamp)
+
+This is the inner-layer seam for permission-checked and auditable secret retrieval behavior in later stories.
+
+## Application contracts
+
+`SecretServicePorts.ts` defines infrastructure-facing boundaries:
+
+- `ISecretRecordPersistenceRepository`
+- `ISecretEncryptionPort`
+- `ISecretAccessPolicyPort`
+- `ISecretAccessAuditPort`
+
+`SecretManagementServiceContracts.ts` defines use-case/service-facing contracts:
+
+- typed operation requests/results/errors
+- `ISecretManagementService` with operations for:
+  - create
+  - read metadata
+  - retrieve plaintext for authorized runtime use
+  - rotate
+  - disable
+  - delete
+  - list
+
+These contracts establish stable extension points for persistence adapters, authorization integration, audit sinks, and UI/runtime integration work in subsequent stories.
+
+## Boundary posture
+
+- domain layer contains business semantics and invariants only
+- application contracts depend on domain types and abstract ports only
+- no storage, transport, UI, or host runtime behavior is introduced in domain contracts
+
+## Tests
+
+- `src/domain/security/tests/SecretDomain.test.ts` validates scope, naming, metadata safety, lifecycle, lineage, and access-decision invariants
+- `src/application/security/tests/SecretServiceContracts.test.ts` validates contract-level operation semantics over in-memory adapters for all required operation categories

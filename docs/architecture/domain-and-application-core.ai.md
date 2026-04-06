@@ -1787,3 +1787,18 @@ Explicitly later than this scope:
   - `docs/architecture/identity-foundation.ai.md` (companion quick-reference).
 - Captures implemented domain concepts, persistence schema, port/adapter seams, bootstrap assumptions, and provider extension path.
 - Explicitly documents that local identity is separate from device/runtime/tool trust layers.
+
+## Direction 8 note: Secret domain and application contracts foundation (story 8.1.1)
+- Added canonical secret inner-layer contracts in `src/domain/security/SecretDomain.ts`:
+  - explicit scope ownership (`server`, `workspace`, `user`) + allowed owner combinations,
+  - lifecycle states (`active`, `disabled`, `revoked`, `deleted`),
+  - version lineage + rotation semantics,
+  - key-encryption-context scope alignment,
+  - redaction-safe metadata constraints for secret references.
+- Added deterministic permission/audit decision contracts (`SecretAccessDecision` + `evaluateSecretAccessDecision(...)`) in the same domain seam so retrieval paths can be permission-checked and auditable by contract.
+- Added application boundaries for later infrastructure/UI slices:
+  - `src/application/security/ports/SecretServicePorts.ts` (persistence/encryption/access-policy/audit ports),
+  - `src/application/security/use-cases/SecretManagementServiceContracts.ts` (create/read metadata/retrieve plaintext/rotate/disable/delete/list service contracts).
+- Added focused contract/invariant tests in:
+  - `src/domain/security/tests/SecretDomain.test.ts`,
+  - `src/application/security/tests/SecretServiceContracts.test.ts`.
