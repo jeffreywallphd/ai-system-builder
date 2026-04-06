@@ -2,8 +2,8 @@
 
 ## Purpose
 
-Story 9.1.2 introduces the application-layer seams for managed storage instance orchestration so later persistence/API/runtime adapters implement stable contracts instead of ad hoc storage wiring.
-Story 9.1.5 adds a formal storage access-summary seam on top of these contracts.
+Story 9.1.2 established the storage application seams and typed contracts.
+Story 9.3.1 now implements the authoritative storage management service layer that executes those contracts with centralized lifecycle orchestration, policy enforcement, and backend operation handling.
 
 ## Canonical files
 
@@ -15,38 +15,49 @@ Story 9.1.5 adds a formal storage access-summary seam on top of these contracts.
 - `src/application/storage/ports/StorageObservabilityPorts.ts`
 - `src/application/storage/ports/StorageManagementPorts.ts`
 - `src/application/storage/use-cases/StorageManagementServiceContracts.ts`
+- `src/application/storage/use-cases/CreateStorageInstanceWithProvisioningUseCase.ts`
+- `src/application/storage/use-cases/StorageManagementService.ts`
+- `src/application/storage/use-cases/StorageManagementServiceErrors.ts`
 - `src/application/storage/tests/StorageManagementServiceContracts.test.ts`
 
-## Contract summary
+## Service behavior (Story 9.3.1)
 
-- Repository contract for storage instance reads/lists/idempotent mutations.
-- Provisioning port with typed operation request/receipt for create/activate/deactivate/sync.
-- Policy-evaluation port for per-action decisions and accessible-instance filtering.
-- Access-summary contract for storage-facing permission representation:
-  - effective permissions by canonical storage action
-  - ownership/workspace context
-  - policy-restricted capability summaries
-- Capability inspection port for backend/instance feature posture.
-- Audit sink seam for best-effort operational event emission.
+- `StorageManagementService` is the application-layer orchestrator for:
+  - create
+  - metadata update
+  - activate
+  - deactivate
+  - list accessible instances
+  - get details
+- Workspace-aware access checks are always applied through `IStoragePolicyEvaluationPort` and list filtering is constrained via `resolveAccessibleStorageInstanceIds(...)`.
+- Lifecycle transitions are validated via domain transition rules before persistence commits.
+- Backend activation/deactivation requests are optional and routed through `IStorageProvisioningPort` when requested.
+- Operation outputs are normalized/frozen and include storage access summaries that are safe for API/UI projection.
 
-## Use-case surface
+## Error model
 
-- `createStorageInstance(...)`
-- `updateStorageMetadata(...)`
-- `activateStorageInstance(...)`
-- `deactivateStorageInstance(...)`
-- `listAccessibleStorageInstances(...)`
-- `getStorageInstanceDetails(...)`
+`StorageManagementServiceErrors.ts` introduces explicit service errors that map to the stable result envelope taxonomy:
 
-All use cases share a typed `StorageManagementResult<T>` envelope with stable error-code taxonomy.
-Story 9.1.5 also allows optional `accessSummary` payloads in operation results so transport/API layers can project authoritative access posture without embedding authorization logic in UI contracts.
+- `StoragePolicyViolationError` -> `storage-policy-violation`
+- `StorageInstanceNotFoundError` -> `storage-not-found`
+- `StorageBackendOperationUnsupportedError` -> `storage-capability-unsupported`
+- `StorageInvalidLifecycleTransitionError` -> `storage-invalid-state`
+
+Rejected provisioning that is not an unsupported backend operation maps to `storage-provisioning-failed`.
 
 ## Boundary posture
 
-- Depends only on domain storage contracts + application ports.
-- No transport DTO leakage, persistence rows, or backend implementation types in the use-case contracts.
-- Audit delivery is non-blocking (`publishStorageManagementAuditEventBestEffort(...)`).
+- The service depends only on domain storage + storage application ports.
+- No transport DTOs, controller logic, or UI state logic is embedded.
+- Audit emission remains best-effort and non-blocking.
 
 ## Verified by tests
 
-`StorageManagementServiceContracts.test.ts` demonstrates the contracts are practical and compilable through in-memory implementations, including success flows, policy denials, and best-effort audit failure handling.
+`StorageManagementServiceContracts.test.ts` covers:
+
+- successful end-to-end management flow through the service layer
+- policy violation handling
+- workspace-scoped not-found behavior
+- invalid lifecycle transition handling
+- unsupported backend operation handling
+- rejected provisioning failure handling without persisting unintended transitions
