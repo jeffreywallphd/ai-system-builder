@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { HttpIdentityAuthClient } from "../IdentityAuthClient";
 
 describe("HttpIdentityAuthClient", () => {
-  it("calls register/login/session/logout/revoke/credential/admin/trusted-device identity API endpoints", async () => {
+  it("calls register/dev-login/login/session/logout/revoke/credential/admin/trusted-device identity API endpoints", async () => {
     const requests: ReadonlyArray<{ method: string; url: string; body: string; authorization?: string }> = [];
     (globalThis as typeof globalThis & {
       fetch: (input: string, init?: RequestInit) => Promise<Response>;
@@ -25,6 +25,7 @@ describe("HttpIdentityAuthClient", () => {
       username: "alice",
       credential: { candidate: "password-1" },
     });
+    await client.loginDevelopmentAccount();
     await client.loginLocalAccount({
       providerSubject: "alice",
       credential: { candidate: "password-1" },
@@ -116,6 +117,7 @@ describe("HttpIdentityAuthClient", () => {
     expect(requests.map((entry) => entry.method)).toEqual([
       "POST",
       "POST",
+      "POST",
       "GET",
       "POST",
       "POST",
@@ -135,6 +137,7 @@ describe("HttpIdentityAuthClient", () => {
     ]);
     expect(requests.map((entry) => entry.url)).toEqual([
       "http://127.0.0.1:8788/api/v1/identity/register",
+      "http://127.0.0.1:8788/api/v1/identity/dev-login",
       "http://127.0.0.1:8788/api/v1/identity/login",
       "http://127.0.0.1:8788/api/v1/identity/session",
       "http://127.0.0.1:8788/api/v1/identity/logout",
@@ -153,21 +156,21 @@ describe("HttpIdentityAuthClient", () => {
       "http://127.0.0.1:8788/api/v1/identity/trusted-devices/pairing/validate",
       "http://127.0.0.1:8788/api/v1/identity/trusted-devices/pairing/complete",
     ]);
-    expect(requests[2]?.authorization).toBe("Bearer token-0");
-    expect(requests[3]?.authorization).toBe("Bearer token-1");
-    expect(requests[4]?.authorization).toBe("Bearer token-2");
-    expect(requests[5]?.authorization).toBe("Bearer token-2b");
-    expect(requests[6]?.authorization).toBe("Bearer token-3");
-    expect(requests[7]?.authorization).toBe("Bearer token-4");
-    expect(requests[8]?.authorization).toBe("Bearer token-5");
-    expect(requests[9]?.authorization).toBe("Bearer token-5b");
-    expect(requests[10]?.authorization).toBe("Bearer token-5c");
-    expect(requests[11]?.authorization).toBe("Bearer token-6");
-    expect(requests[12]?.authorization).toBe("Bearer token-7");
-    expect(requests[13]?.authorization).toBe("Bearer token-8");
-    expect(requests[14]?.authorization).toBe("Bearer token-9");
-    expect(requests[15]?.authorization).toBe("Bearer token-10");
-    expect(requests[16]?.authorization).toBe("Bearer token-11");
-    expect(requests[17]?.authorization).toBe("Bearer token-12");
+    expect(requests[3]?.authorization).toBe("Bearer token-0");
+    expect(requests[4]?.authorization).toBe("Bearer token-1");
+    expect(requests[5]?.authorization).toBe("Bearer token-2");
+    expect(requests[6]?.authorization).toBe("Bearer token-2b");
+    expect(requests[7]?.authorization).toBe("Bearer token-3");
+    expect(requests[8]?.authorization).toBe("Bearer token-4");
+    expect(requests[9]?.authorization).toBe("Bearer token-5");
+    expect(requests[10]?.authorization).toBe("Bearer token-5b");
+    expect(requests[11]?.authorization).toBe("Bearer token-5c");
+    expect(requests[12]?.authorization).toBe("Bearer token-6");
+    expect(requests[13]?.authorization).toBe("Bearer token-7");
+    expect(requests[14]?.authorization).toBe("Bearer token-8");
+    expect(requests[15]?.authorization).toBe("Bearer token-9");
+    expect(requests[16]?.authorization).toBe("Bearer token-10");
+    expect(requests[17]?.authorization).toBe("Bearer token-11");
+    expect(requests[18]?.authorization).toBe("Bearer token-12");
   });
 });

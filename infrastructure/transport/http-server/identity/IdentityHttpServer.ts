@@ -159,6 +159,9 @@ const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 const DefaultWebSocketTrustRevalidationIntervalMs = 30_000;
 const DEFAULT_API_CORS_ALLOWED_METHODS = Object.freeze(["GET", "POST", "OPTIONS"]);
 const DEFAULT_API_CORS_ALLOWED_HEADERS = Object.freeze(["content-type", "authorization"]);
+const DEV_LOGIN_DEFAULT_PROVIDER_ID = "provider:local-password";
+const DEV_LOGIN_DEFAULT_USERNAME = "dev.local.user";
+const DEV_LOGIN_DEFAULT_PASSWORD = "DevOnlyPass!2026";
 
 const RegisterRequestSchema: z.ZodType<RegisterLocalIdentityApiRequest> = z.object({
   username: z.string().min(1),
@@ -701,6 +704,9 @@ export interface IdentityHttpServerOptions {
   readonly cors?: IdentityHttpServerCorsOptions;
   readonly transportTrust?: IdentityHttpServerTransportTrustOptions;
   readonly webSocket?: IdentityHttpServerWebSocketOptions;
+  readonly development?: {
+    readonly enableDevLoginRoute?: boolean;
+  };
 }
 
 export type IdentityHttpServerInstance = Server | HttpsServer;
@@ -840,6 +846,10 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
       }
       if (request.method === "POST" && path === "/api/v1/identity/login") {
         await handleLogin(request, response, requestId, options.backendApi, logger, maxBodyBytes);
+        return;
+      }
+      if (request.method === "POST" && path === "/api/v1/identity/dev-login" && options.development?.enableDevLoginRoute) {
+        await handleDevLogin(request, response, requestId, options.backendApi, logger);
         return;
       }
       if (request.method === "GET" && path === "/api/v1/identity/session") {
@@ -4546,6 +4556,45 @@ async function handleLogin(
   const statusCode = mapStatusCode(apiResponse);
   writeJson(response, statusCode, apiResponse);
   logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+}
+
+async function handleDevLogin(
+  request: IncomingMessage,
+  response: ServerResponse,
+  requestId: string,
+  backendApi: IdentityAuthBackendApi,
+  logger: IdentityHttpServerLogger,
+): Promise<void> {
+  const registerResponse = await backendApi.registerLocalAccount({
+    username: DEV_LOGIN_DEFAULT_USERNAME,
+    providerId: DEV_LOGIN_DEFAULT_PROVIDER_ID,
+    providerSubject: DEV_LOGIN_DEFAULT_USERNAME,
+    credential: {
+      candidate: DEV_LOGIN_DEFAULT_PASSWORD,
+    },
+  });
+
+  if (!registerResponse.ok && registerResponse.error?.code !== IdentityAuthApiErrorCodes.conflict) {
+    const statusCode = mapStatusCode(registerResponse);
+    writeJson(response, statusCode, registerResponse);
+    logResponse(logger, requestId, request, statusCode, Object.freeze({
+      providerSubject: DEV_LOGIN_DEFAULT_USERNAME,
+    }), registerResponse);
+    return;
+  }
+
+  const loginResponse = await backendApi.loginLocalAccount({
+    providerId: DEV_LOGIN_DEFAULT_PROVIDER_ID,
+    providerSubject: DEV_LOGIN_DEFAULT_USERNAME,
+    credential: {
+      candidate: DEV_LOGIN_DEFAULT_PASSWORD,
+    },
+  });
+  const statusCode = mapStatusCode(loginResponse);
+  writeJson(response, statusCode, loginResponse);
+  logResponse(logger, requestId, request, statusCode, Object.freeze({
+    providerSubject: DEV_LOGIN_DEFAULT_USERNAME,
+  }), loginResponse);
 }
 
 function shouldBypassTransportTrustValidation(

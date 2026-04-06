@@ -40,6 +40,7 @@ export interface IdentityAuthClient {
   registerLocalAccount(
     request: RegisterLocalIdentityApiRequest,
   ): Promise<IdentityAuthApiResponse<RegisterLocalIdentityApiResponse>>;
+  loginDevelopmentAccount(): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>>;
   loginLocalAccount(
     request: LoginLocalIdentityApiRequest,
   ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>>;
@@ -119,6 +120,10 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     request: RegisterLocalIdentityApiRequest,
   ): Promise<IdentityAuthApiResponse<RegisterLocalIdentityApiResponse>> {
     return this.post("/api/v1/identity/register", request);
+  }
+
+  public async loginDevelopmentAccount(): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
+    return this.post("/api/v1/identity/dev-login", {});
   }
 
   public async loginLocalAccount(

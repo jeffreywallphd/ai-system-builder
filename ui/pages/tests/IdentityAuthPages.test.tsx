@@ -13,6 +13,7 @@ describe("Identity auth pages", () => {
       React.createElement(MemoryRouter, undefined, React.createElement(LoginPage, {
         onAuthenticated: () => undefined,
         authNotice: "session-expired",
+        devLoginEnabled: true,
       })),
     );
     const registerHtml = renderToStaticMarkup(
@@ -28,6 +29,7 @@ describe("Identity auth pages", () => {
     expect(loginHtml).toContain("Sign in to AI Loom Studio");
     expect(loginHtml).toContain("Username");
     expect(loginHtml).toContain("Password");
+    expect(loginHtml).toContain("Dev Login");
     expect(loginHtml).toContain("Your session expired. Sign in again to continue.");
     expect(registerHtml).toContain("Create a local AI Loom account");
     expect(registerHtml).toContain("Confirm password");

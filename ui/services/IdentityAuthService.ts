@@ -61,6 +61,10 @@ export class IdentityAuthService {
     return this.client.loginLocalAccount(request);
   }
 
+  public loginDevelopmentAccount(): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
+    return this.client.loginDevelopmentAccount();
+  }
+
   public resolveAuthenticatedSession(
     request: ResolveAuthenticatedSessionApiRequest,
   ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>> {

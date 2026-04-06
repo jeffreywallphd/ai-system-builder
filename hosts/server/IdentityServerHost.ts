@@ -771,6 +771,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     certificateAuthorityRepository,
     env,
   });
+  const enableDevLoginRoute = resolveIdentityDevLoginRouteEnabled(env);
   if (secureTransportConfig.requireSecureHttp && !managedTlsMaterial) {
     throw new Error(
       "Identity server secure transport configuration requires HTTPS startup, but managed TLS material is unavailable.",
@@ -803,6 +804,9 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       : undefined,
     webSocket: Object.freeze({
       channelPathPrefix: "/ws",
+    }),
+    development: Object.freeze({
+      enableDevLoginRoute,
     }),
   });
 
@@ -914,6 +918,16 @@ function parseOptionalBoolean(value: string | undefined): boolean | undefined {
     return false;
   }
   return undefined;
+}
+
+function resolveIdentityDevLoginRouteEnabled(env: Readonly<Record<string, string | undefined>>): boolean {
+  const explicit = parseOptionalBoolean(env.AI_LOOM_ENABLE_DEV_LOGIN);
+  if (typeof explicit === "boolean") {
+    return explicit;
+  }
+
+  const nodeEnv = env.NODE_ENV?.trim().toLowerCase();
+  return nodeEnv !== "production";
 }
 
 function normalizeOptional(value: string | undefined): string | undefined {

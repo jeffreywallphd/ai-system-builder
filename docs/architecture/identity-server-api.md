@@ -6,6 +6,7 @@ This note documents the authoritative HTTP server endpoints for local identity r
 
 - `POST /api/v1/identity/register`
 - `POST /api/v1/identity/login`
+- `POST /api/v1/identity/dev-login` (development-only, enabled when `NODE_ENV` is not `production` unless overridden)
 - `GET /api/v1/identity/session` (authenticated)
 - `POST /api/v1/identity/credential/change` (authenticated)
 - `POST /api/v1/identity/logout` (authenticated)
@@ -45,6 +46,11 @@ Browser development host wiring (`npm run dev:browser`) now self-bootstraps the 
 
 - `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` starts `IdentityServerHost` on browser-dev startup.
 - The plugin injects browser runtime bootstrap env (`window.aiLoomBrowserDevelopment.env.VITE_IDENTITY_API_BASE_URL`) so runtime config and web identity resolver use the managed identity base URL without requiring a manual `.env` override.
+
+Development-login route guard:
+
+- `AI_LOOM_ENABLE_DEV_LOGIN=true|false` explicitly enables or disables `POST /api/v1/identity/dev-login`.
+- When unset, the route is enabled for non-production runtime (`NODE_ENV !== production`) and disabled in production.
 
 ## Request contracts
 
