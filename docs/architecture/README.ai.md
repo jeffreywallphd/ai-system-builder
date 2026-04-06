@@ -95,6 +95,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Managed storage backend-selection + create provisioning orchestration baseline: `docs/architecture/storage-provisioning-orchestration.md`
 - Managed storage shared transport DTO + schema validation + redaction baseline: `docs/architecture/storage-transport-contracts.md`
 - Managed storage permission surface and access-summary semantics baseline: `docs/architecture/storage-access-semantics.md`
+- Managed storage backend extension rules and operational composition assumptions baseline: `docs/architecture/storage-feature-extension-guidance.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
 - Authorization permission matrix and key catalog reference: `docs/architecture/authorization-permission-catalog.md`
 - Authorization workspace role-definition and baseline role-grant reference: `docs/architecture/authorization-role-reference.md`
