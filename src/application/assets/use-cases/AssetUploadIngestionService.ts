@@ -27,6 +27,10 @@ import { EncryptionMaterialClasses } from "../../security/use-cases/EncryptionKe
 import type { IEncryptionPolicyEvaluationService } from "../../security/use-cases/EncryptionPolicyEvaluationServiceContracts";
 import { ProtectedDataClasses } from "../../../domain/security/EncryptionAtRestPolicyDomain";
 import {
+  publishEncryptionEnforcementEventBestEffort,
+  type IEncryptionEnforcementObservabilityPort,
+} from "../../security/ports/EncryptionEnforcementObservabilityPorts";
+import {
   AssetServiceErrorCodes,
   type AssetServiceResult,
 } from "./AssetServiceContracts";
@@ -64,6 +68,7 @@ export interface AssetUploadIngestionServiceDependencies {
   readonly encryptionPolicyEvaluationService: IEncryptionPolicyEvaluationService;
   readonly encryptionKeyResolutionService: IEncryptionKeyResolutionService;
   readonly assetContentCipherPort: IAssetContentCipherPort;
+  readonly encryptionObservabilityPort?: IEncryptionEnforcementObservabilityPort;
   readonly auditSink?: AssetAuditSink;
   readonly clock?: {
     now(): Date;
@@ -198,6 +203,21 @@ export class AssetUploadIngestionService {
       occurredAt,
     });
     if (!contentEncryptionDecision.ok) {
+      await this.publishEncryptionEvent({
+        event: "asset-content.protected-write-evaluated",
+        outcome: contentEncryptionDecision.error.code === "encryption-policy-violation" ? "denied" : "failed",
+        occurredAt,
+        actorUserId: input.actorUserId,
+        workspaceId: input.workspaceId,
+        storageInstanceId: uploadSession.storageInstanceId,
+        dataClass: ProtectedDataClasses.assetContent,
+        correlationId: input.correlationId,
+        operationKey: input.operationKey,
+        details: Object.freeze({
+          errorCode: contentEncryptionDecision.error.code,
+          reasonCode: "policy-evaluation-failed",
+        }),
+      });
       await this.markUploadIncomplete(
         uploadSession,
         occurredAt,
@@ -206,6 +226,22 @@ export class AssetUploadIngestionService {
       );
       return this.failureFromEncryptionPolicy(contentEncryptionDecision.error.code, contentEncryptionDecision.error.message);
     }
+    await this.publishEncryptionEvent({
+      event: "asset-content.protected-write-evaluated",
+      outcome: "succeeded",
+      occurredAt,
+      actorUserId: input.actorUserId,
+      workspaceId: input.workspaceId,
+      storageInstanceId: uploadSession.storageInstanceId,
+      dataClass: ProtectedDataClasses.assetContent,
+      correlationId: input.correlationId,
+      operationKey: input.operationKey,
+      details: Object.freeze({
+        contentEncryptionRequired: contentEncryptionDecision.value.required,
+        keyScope: contentEncryptionDecision.value.keyScope,
+        policyResolvedFrom: contentEncryptionDecision.value.resolvedFrom,
+      }),
+    });
 
     try {
       let writeContent: AsyncIterable<Uint8Array> = this.enforceMaximumPayloadSize(
@@ -260,6 +296,21 @@ export class AssetUploadIngestionService {
           occurredAt,
         });
         if (!keyResolution.ok) {
+          await this.publishEncryptionEvent({
+            event: "asset-content.protected-write-key-scope-resolved",
+            outcome: keyResolution.error.code === "encryption-key-resolution-policy-violation" ? "denied" : "failed",
+            occurredAt,
+            actorUserId: input.actorUserId,
+            workspaceId: input.workspaceId,
+            storageInstanceId: uploadSession.storageInstanceId,
+            dataClass: ProtectedDataClasses.assetContent,
+            correlationId: input.correlationId,
+            operationKey: input.operationKey,
+            details: Object.freeze({
+              errorCode: keyResolution.error.code,
+              reasonCode: "key-resolution-failed",
+            }),
+          });
           await this.markUploadIncomplete(
             uploadSession,
             occurredAt,
@@ -268,6 +319,22 @@ export class AssetUploadIngestionService {
           );
           return this.failureFromKeyResolution(keyResolution.error.code, keyResolution.error.message);
         }
+        await this.publishEncryptionEvent({
+          event: "asset-content.protected-write-key-scope-resolved",
+          outcome: "succeeded",
+          occurredAt,
+          actorUserId: input.actorUserId,
+          workspaceId: input.workspaceId,
+          storageInstanceId: uploadSession.storageInstanceId,
+          dataClass: ProtectedDataClasses.assetContent,
+          correlationId: input.correlationId,
+          operationKey: input.operationKey,
+          details: Object.freeze({
+            keyScope: keyResolution.value.keyScope,
+            policyResolvedFrom: keyResolution.value.policyResolvedFrom,
+            scopeOwnerScope: keyResolution.value.scopeOwner.scope,
+          }),
+        });
 
         const encryptionSession = await this.dependencies.assetContentCipherPort.beginEncryption({
           plaintext: writeContent,
@@ -396,6 +463,25 @@ export class AssetUploadIngestionService {
         },
       });
 
+      await this.publishEncryptionEvent({
+        event: "asset-content.protected-write-completed",
+        outcome: "succeeded",
+        occurredAt,
+        actorUserId: input.actorUserId,
+        workspaceId: input.workspaceId,
+        storageInstanceId: uploadSession.storageInstanceId,
+        dataClass: ProtectedDataClasses.assetContent,
+        correlationId: input.correlationId,
+        operationKey: input.operationKey,
+        details: Object.freeze({
+          encryptedAtRest: Boolean(encryptedDescriptor),
+          contentEncryptionRequired: contentEncryptionDecision.value.required,
+          descriptorKeyScope: encryptedDescriptor?.keyScope,
+          contentSizeBytes: effectiveSizeBytes,
+          checksumAlgorithm: "sha256",
+        }),
+      });
+
       return {
         ok: true,
         value: Object.freeze({
@@ -431,6 +517,21 @@ export class AssetUploadIngestionService {
         assetId: uploadSession.assetId,
         uploadSessionId: uploadSession.uploadSessionId,
         reasonCode,
+      });
+      await this.publishEncryptionEvent({
+        event: "asset-content.protected-write-completed",
+        outcome: "failed",
+        occurredAt,
+        actorUserId: input.actorUserId,
+        workspaceId: input.workspaceId,
+        storageInstanceId: uploadSession.storageInstanceId,
+        dataClass: ProtectedDataClasses.assetContent,
+        correlationId: input.correlationId,
+        operationKey: input.operationKey,
+        details: Object.freeze({
+          reasonCode,
+          contentEncryptionRequired: contentEncryptionDecision.value.required,
+        }),
       });
 
       if (error instanceof UploadPayloadTooLargeError) {
@@ -623,6 +724,12 @@ export class AssetUploadIngestionService {
         reasonCode: input.reasonCode,
       }),
     });
+  }
+
+  private async publishEncryptionEvent(
+    event: Parameters<typeof publishEncryptionEnforcementEventBestEffort>[1],
+  ): Promise<void> {
+    await publishEncryptionEnforcementEventBestEffort(this.dependencies.encryptionObservabilityPort, event);
   }
 
   private failure(

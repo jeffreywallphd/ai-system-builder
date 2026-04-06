@@ -17,10 +17,15 @@ import {
   type ResolvedEncryptionKeyForMaterial,
   type ResolveStoredEncryptionKeyReference,
 } from "./EncryptionKeyResolutionServiceContracts";
+import {
+  publishEncryptionEnforcementEventBestEffort,
+  type IEncryptionEnforcementObservabilityPort,
+} from "../ports/EncryptionEnforcementObservabilityPorts";
 
 export interface EncryptionKeyResolutionServiceDependencies {
   readonly encryptionPolicyEvaluationService: IEncryptionPolicyEvaluationService;
   readonly encryptionKeyCatalogPort: IEncryptionKeyCatalogPort;
+  readonly observabilityPort?: IEncryptionEnforcementObservabilityPort;
 }
 
 export class EncryptionKeyResolutionService implements IEncryptionKeyResolutionService {
@@ -31,6 +36,18 @@ export class EncryptionKeyResolutionService implements IEncryptionKeyResolutionS
   ): Promise<EncryptionKeyResolutionServiceResult<ResolvedEncryptionKeyForMaterial>> {
     const normalized = normalizeResolveRequest(request);
     if (!normalized.ok) {
+      await this.publishObservabilityEvent({
+        event: "encryption-key.key-scope-resolved",
+        outcome: "rejected",
+        occurredAt: request?.occurredAt ?? new Date().toISOString(),
+        workspaceId: request?.workspaceId,
+        storageInstanceId: request?.storageInstanceId,
+        details: Object.freeze({
+          errorCode: normalized.error.code,
+          materialClass: request?.materialClass,
+          reasonCode: "invalid-request",
+        }),
+      });
       return normalized;
     }
 
@@ -43,10 +60,40 @@ export class EncryptionKeyResolutionService implements IEncryptionKeyResolutionS
     });
 
     if (!contentDecision.ok) {
+      await this.publishObservabilityEvent({
+        event: "encryption-key.key-scope-resolved",
+        outcome: contentDecision.error.code === EncryptionPolicyEvaluationErrorCodes.policyViolation
+          ? "denied"
+          : "failed",
+        occurredAt: normalized.value.occurredAt ?? new Date().toISOString(),
+        workspaceId: normalized.value.workspaceId,
+        storageInstanceId: normalized.value.storageInstanceId,
+        dataClass: policyDataClass,
+        details: Object.freeze({
+          errorCode: contentDecision.error.code,
+          materialClass: normalized.value.materialClass,
+          reasonCode: "policy-evaluation-failed",
+        }),
+      });
       return this.mapPolicyFailure(contentDecision.error.code, contentDecision.error.message);
     }
 
     if (!contentDecision.value.required || !contentDecision.value.keyScope) {
+      await this.publishObservabilityEvent({
+        event: "encryption-key.key-scope-resolved",
+        outcome: "denied",
+        occurredAt: normalized.value.occurredAt ?? new Date().toISOString(),
+        workspaceId: normalized.value.workspaceId,
+        storageInstanceId: normalized.value.storageInstanceId,
+        dataClass: policyDataClass,
+        details: Object.freeze({
+          materialClass: normalized.value.materialClass,
+          policyDataClass,
+          required: contentDecision.value.required,
+          keyScope: contentDecision.value.keyScope,
+          reasonCode: "material-not-scoped-content",
+        }),
+      });
       return failure(
         "policyViolation",
         `Material class '${normalized.value.materialClass}' does not resolve to scoped-content key encryption.`,
@@ -59,6 +106,19 @@ export class EncryptionKeyResolutionService implements IEncryptionKeyResolutionS
 
     const scopeOwner = toScopeOwner(contentDecision.value.keyScope, normalized.value);
     if (!scopeOwner) {
+      await this.publishObservabilityEvent({
+        event: "encryption-key.key-scope-resolved",
+        outcome: "rejected",
+        occurredAt: normalized.value.occurredAt ?? new Date().toISOString(),
+        workspaceId: normalized.value.workspaceId,
+        storageInstanceId: normalized.value.storageInstanceId,
+        dataClass: policyDataClass,
+        details: Object.freeze({
+          materialClass: normalized.value.materialClass,
+          keyScope: contentDecision.value.keyScope,
+          reasonCode: "invalid-scope-owner",
+        }),
+      });
       return failure(
         "invalidRequest",
         `Unable to derive key scope owner for '${contentDecision.value.keyScope}'.`,
@@ -71,6 +131,20 @@ export class EncryptionKeyResolutionService implements IEncryptionKeyResolutionS
         occurredAt: normalized.value.occurredAt,
       });
       if (!key) {
+        await this.publishObservabilityEvent({
+          event: "encryption-key.key-scope-resolved",
+          outcome: "missing",
+          occurredAt: normalized.value.occurredAt ?? new Date().toISOString(),
+          workspaceId: normalized.value.workspaceId,
+          storageInstanceId: normalized.value.storageInstanceId,
+          dataClass: policyDataClass,
+          details: Object.freeze({
+            materialClass: normalized.value.materialClass,
+            keyScope: contentDecision.value.keyScope,
+            scopeOwnerScope: scopeOwner.scope,
+            reasonCode: "active-key-missing",
+          }),
+        });
         return failure(
           "keyUnavailable",
           `No active encryption key is configured for scope '${contentDecision.value.keyScope}'.`,
@@ -79,6 +153,23 @@ export class EncryptionKeyResolutionService implements IEncryptionKeyResolutionS
           }),
         );
       }
+
+      await this.publishObservabilityEvent({
+        event: "encryption-key.key-scope-resolved",
+        outcome: "succeeded",
+        occurredAt: normalized.value.occurredAt ?? new Date().toISOString(),
+        workspaceId: normalized.value.workspaceId,
+        storageInstanceId: normalized.value.storageInstanceId,
+        dataClass: policyDataClass,
+        details: Object.freeze({
+          materialClass: normalized.value.materialClass,
+          keyScope: contentDecision.value.keyScope,
+          scopeOwnerScope: scopeOwner.scope,
+          policyResolvedFrom: contentDecision.value.resolvedFrom,
+          keyLifecycleState: key.lifecycleState,
+          hasKeyVersion: Boolean(key.keyVersion),
+        }),
+      });
 
       return {
         ok: true,
@@ -92,6 +183,19 @@ export class EncryptionKeyResolutionService implements IEncryptionKeyResolutionS
         }),
       };
     } catch (error) {
+      await this.publishObservabilityEvent({
+        event: "encryption-key.key-scope-resolved",
+        outcome: "failed",
+        occurredAt: normalized.value.occurredAt ?? new Date().toISOString(),
+        workspaceId: normalized.value.workspaceId,
+        storageInstanceId: normalized.value.storageInstanceId,
+        dataClass: policyDataClass,
+        details: Object.freeze({
+          materialClass: normalized.value.materialClass,
+          keyScope: contentDecision.value.keyScope,
+          reasonCode: "catalog-resolution-failed",
+        }),
+      });
       return failure(
         "resolutionFailed",
         toErrorMessage(error, "Encryption key catalog resolution failed."),
@@ -104,6 +208,15 @@ export class EncryptionKeyResolutionService implements IEncryptionKeyResolutionS
   ): Promise<EncryptionKeyResolutionServiceResult<ResolveStoredEncryptionKeyReference>> {
     const keyReferenceId = normalizeOptional(request?.keyReferenceId);
     if (!keyReferenceId) {
+      await this.publishObservabilityEvent({
+        event: "encryption-key.stored-reference-resolved",
+        outcome: "rejected",
+        occurredAt: new Date().toISOString(),
+        details: Object.freeze({
+          errorCode: EncryptionKeyResolutionErrorCodes.invalidRequest,
+          reasonCode: "missing-key-reference-id",
+        }),
+      });
       return failure("invalidRequest", "keyReferenceId is required.");
     }
 
@@ -112,11 +225,30 @@ export class EncryptionKeyResolutionService implements IEncryptionKeyResolutionS
         keyReferenceId,
       });
       if (!key) {
+        await this.publishObservabilityEvent({
+          event: "encryption-key.stored-reference-resolved",
+          outcome: "missing",
+          occurredAt: new Date().toISOString(),
+          details: Object.freeze({
+            reasonCode: "key-reference-not-found",
+          }),
+        });
         return failure(
           "notFound",
           `Encryption key reference '${keyReferenceId}' was not found.`,
         );
       }
+
+      await this.publishObservabilityEvent({
+        event: "encryption-key.stored-reference-resolved",
+        outcome: "succeeded",
+        occurredAt: new Date().toISOString(),
+        details: Object.freeze({
+          scopeOwnerScope: key.scopeOwner.scope,
+          keyLifecycleState: key.lifecycleState,
+          hasKeyVersion: Boolean(key.keyVersion),
+        }),
+      });
 
       return {
         ok: true,
@@ -125,6 +257,14 @@ export class EncryptionKeyResolutionService implements IEncryptionKeyResolutionS
         }),
       };
     } catch (error) {
+      await this.publishObservabilityEvent({
+        event: "encryption-key.stored-reference-resolved",
+        outcome: "failed",
+        occurredAt: new Date().toISOString(),
+        details: Object.freeze({
+          reasonCode: "key-reference-resolution-failed",
+        }),
+      });
       return failure(
         "resolutionFailed",
         toErrorMessage(error, "Stored key reference resolution failed."),
@@ -149,6 +289,12 @@ export class EncryptionKeyResolutionService implements IEncryptionKeyResolutionS
       return failure("internal", message);
     }
     return failure("resolutionFailed", message);
+  }
+
+  private async publishObservabilityEvent(
+    event: Parameters<typeof publishEncryptionEnforcementEventBestEffort>[1],
+  ): Promise<void> {
+    await publishEncryptionEnforcementEventBestEffort(this.dependencies.observabilityPort, event);
   }
 }
 

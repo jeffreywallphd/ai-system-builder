@@ -47,6 +47,7 @@ import {
 } from "../../../domain/security/EncryptionAtRestPolicyDomain";
 import { DeterministicScopeEncryptionKeyPort } from "../../../infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
 import { AesGcmAssetContentCipherPort } from "../../../infrastructure/security/encryption/AesGcmAssetContentCipherPort";
+import type { IEncryptionEnforcementObservabilityPort } from "../../security/ports/EncryptionEnforcementObservabilityPorts";
 
 class InMemoryAssetRepository implements IAssetRepository {
   public readonly records = new Map<string, Asset>();
@@ -96,6 +97,16 @@ class RecordingAuditSink implements AssetAuditSink {
   public readonly events: AssetAuditEvent[] = [];
 
   public async recordAssetEvent(event: AssetAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
+class RecordingEncryptionObservabilityPort implements IEncryptionEnforcementObservabilityPort {
+  public readonly events: Parameters<IEncryptionEnforcementObservabilityPort["recordEncryptionEnforcementEvent"]>[0][] = [];
+
+  public async recordEncryptionEnforcementEvent(
+    event: Parameters<IEncryptionEnforcementObservabilityPort["recordEncryptionEnforcementEvent"]>[0],
+  ): Promise<void> {
     this.events.push(event);
   }
 }
@@ -726,5 +737,59 @@ describe("AssetUploadIngestionService", () => {
 
     expect(auditSink.events.some((event) => event.type === "asset-upload-finalized" && event.outcome === "success")).toBeTrue();
     expect(auditSink.events.some((event) => event.type === "asset-upload-finalized" && event.outcome !== "success")).toBeTrue();
+  });
+
+  it("emits encryption enforcement diagnostics for protected-write policy and key-scope outcomes", async () => {
+    const encryptionObservabilityPort = new RecordingEncryptionObservabilityPort();
+    const assetRepository = new InMemoryAssetRepository();
+    const uploadSessionRepository = new InMemoryUploadSessionRepository();
+    const objectPort = new InMemoryStorageObjectPort();
+    const storage = createStorage();
+    const encryption = createEncryptionDependencies(true);
+    await seedAsset(assetRepository);
+    await seedPendingSession(uploadSessionRepository, 11);
+
+    const service = new AssetUploadIngestionService({
+      repository: assetRepository,
+      uploadSessionRepository,
+      storageLogicalAccessResolutionService: new StubStorageLogicalAccessResolutionService({
+        ok: true,
+        value: {
+          intent: StorageLogicalAccessOperationIntents.writeObject,
+          storageInstance: storage,
+          objectPort,
+          occurredAt: "2026-04-06T12:00:00.000Z",
+        },
+      }),
+      ...encryption,
+      encryptionObservabilityPort,
+      clock: {
+        now: () => new Date("2026-04-06T12:00:00.000Z"),
+      },
+    });
+
+    const result = await service.ingestUploadContent({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      operationKey: "asset:upload:finalize:encryption-observability",
+      uploadSessionId: "asset-upload-session:test-001",
+      contentType: "application/octet-stream",
+      content: toContent(["hello world"]),
+      correlationId: "corr-upload-encryption-observability",
+    });
+
+    expect(result.ok).toBeTrue();
+    expect(encryptionObservabilityPort.events.some((event) => (
+      event.event === "asset-content.protected-write-evaluated"
+      && event.outcome === "succeeded"
+    ))).toBeTrue();
+    expect(encryptionObservabilityPort.events.some((event) => (
+      event.event === "asset-content.protected-write-key-scope-resolved"
+      && event.outcome === "succeeded"
+    ))).toBeTrue();
+    expect(encryptionObservabilityPort.events.some((event) => (
+      event.event === "asset-content.protected-write-completed"
+      && event.outcome === "succeeded"
+    ))).toBeTrue();
   });
 });

@@ -7,12 +7,15 @@ Story 11.2.1 baseline for Feature 11 / Epic 11.2: centralize policy-scoped encry
 ## Canonical files
 
 - `src/application/security/ports/EncryptionKeyResolutionPorts.ts`
+- `src/application/security/ports/EncryptionEnforcementObservabilityPorts.ts`
 - `src/application/security/use-cases/EncryptionKeyResolutionServiceContracts.ts`
 - `src/application/security/use-cases/EncryptionKeyResolutionService.ts`
 - `src/application/security/tests/EncryptionKeyResolutionService.test.ts`
 - `src/application/security/tests/EncryptionKeyResolutionServiceContracts.test.ts`
 - `src/infrastructure/security/encryption/StaticEncryptionKeyCatalogPort.ts`
 - `src/infrastructure/security/encryption/tests/StaticEncryptionKeyCatalogPort.test.ts`
+- `src/infrastructure/security/EncryptionEnforcementObservabilityReporter.ts`
+- `src/infrastructure/security/tests/EncryptionEnforcementObservabilityReporter.test.ts`
 - `docs/architecture/encryption-at-rest-key-resolution-and-scope-orchestration.md`
 
 ## What was added
@@ -34,4 +37,9 @@ Story 11.2.1 baseline for Feature 11 / Epic 11.2: centralize policy-scoped encry
 - `signing-material` is resolved as `secret-material` policy class, preserving always-encrypted invariants.
 - missing active keys fail as explicit `key-unavailable`, not fallback.
 - key references are separated from encrypted payload records to support future key rotation and replay-safe re-encryption workflows.
+
+## Story 11.3.4 diagnostics note
+
+- Key-resolution flows now emit structured encryption-enforcement diagnostics for key-scope decisions and stored-key-reference lookups.
+- Diagnostic sanitization keeps scope/policy outcomes visible while redacting key-reference/material and path/payload-like fields.
 

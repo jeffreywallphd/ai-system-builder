@@ -8,6 +8,7 @@
 - Story 9.4.4 lifecycle activation/deactivation controls with safety confirmations.
 - Story 9.4.5 backend extension guidance and operational standards.
 - Story 11.3.1 policy-field alignment for encryption-at-rest administration inputs.
+- Story 11.3.4 encryption policy enforcement audit + diagnostics additions.
 - Adds list/detail inspection plus create/edit administration workflows.
 
 ## Canonical files
@@ -79,3 +80,12 @@
 - `ui/web/storage/tests/StorageAdministrationRoutes.test.ts`
 - `src/infrastructure/storage/tests/StorageBackendAdapterRegistry.test.ts`
 - `src/infrastructure/storage/tests/StorageBackendProvisioningOrchestrator.test.ts`
+
+## Story 11.3.4 operator note
+
+- Storage policy mutation audit events now include encryption-policy diff summaries (`changedSecurityFields`, `changedEncryptionFields`, `encryptionPolicyChanged`) for troubleshooting policy posture changes.
+- Runtime encryption enforcement diagnostics now cover:
+  - protected writes in asset upload ingestion
+  - preview/worker decryption grant/deny decisions in asset download flows
+  - policy and key-scope resolution outcomes in encryption services
+- Redaction contract remains strict: no plaintext/payload content, no raw key material, no raw key references, and no unsafe object/file path details in diagnostics.

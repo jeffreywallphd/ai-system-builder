@@ -21,6 +21,10 @@ import type { IAssetRepository } from "../ports/IAssetRepository";
 import type { IEncryptionPolicyEvaluationService } from "../../security/use-cases/EncryptionPolicyEvaluationServiceContracts";
 import { ProtectedDataClasses } from "../../../domain/security/EncryptionAtRestPolicyDomain";
 import {
+  publishEncryptionEnforcementEventBestEffort,
+  type IEncryptionEnforcementObservabilityPort,
+} from "../../security/ports/EncryptionEnforcementObservabilityPorts";
+import {
   AssetDownloadPurposes,
   AssetServiceErrorCodes,
   validateAuthorizeAssetDownloadRequest,
@@ -39,6 +43,7 @@ export interface AssetDownloadServiceDependencies {
   readonly downloadGrantPort: IAssetDownloadGrantPort;
   readonly encryptionPolicyEvaluationService: IEncryptionPolicyEvaluationService;
   readonly assetContentCipherPort: IAssetContentCipherPort;
+  readonly encryptionObservabilityPort?: IEncryptionEnforcementObservabilityPort;
   readonly auditSink?: AssetAuditSink;
   readonly clock?: {
     now(): Date;
@@ -144,6 +149,22 @@ export class AssetDownloadService {
 
     const contentIsEncrypted = Boolean(targetVersion.content.encryption);
     if (!contentIsEncrypted && encryptionPolicy.value.contentEncryptionRequired) {
+      await this.publishEncryptionEvent({
+        event: "asset-content.decryption-access-authorized",
+        outcome: "denied",
+        occurredAt,
+        actorUserId: request.actorUserId,
+        workspaceId: request.workspaceId,
+        storageInstanceId: targetVersion.location.storageInstance.storageInstanceId,
+        dataClass: ProtectedDataClasses.assetContent,
+        correlationId: request.correlationId,
+        details: Object.freeze({
+          purpose: request.purpose,
+          contentIsEncrypted,
+          contentEncryptionRequired: encryptionPolicy.value.contentEncryptionRequired,
+          reasonCode: "encrypted-content-required",
+        }),
+      });
       await this.publishAuditEvent({
         type: "asset-download-authorized",
         occurredAt,
@@ -183,6 +204,27 @@ export class AssetDownloadService {
       policyAllowWorkerDecryption: encryptionPolicy.value.allowWorkerDecryption,
     });
     if (!decryptionAuthorization.allowed) {
+      await this.publishEncryptionEvent({
+        event: "asset-content.decryption-access-authorized",
+        outcome: "denied",
+        occurredAt,
+        actorUserId: request.actorUserId,
+        workspaceId: request.workspaceId,
+        storageInstanceId: plan.value.storageInstance.id,
+        dataClass: ProtectedDataClasses.assetContent,
+        correlationId: request.correlationId,
+        details: Object.freeze({
+          purpose: request.purpose,
+          contentIsEncrypted,
+          contentEncryptionRequired: encryptionPolicy.value.contentEncryptionRequired,
+          storageAllowsPreviewDecryption: plan.value.storageInstance.policy.security.allowPreviewDecryption,
+          storageAllowsWorkerDecryption: plan.value.storageInstance.policy.security.allowWorkerDecryption,
+          policyAllowsPreviewDecryption: encryptionPolicy.value.allowPreviewDecryption,
+          policyAllowsWorkerDecryption: encryptionPolicy.value.allowWorkerDecryption,
+          decryptionScope: decryptionAuthorization.scope,
+          reasonCode: decryptionAuthorization.reasonCode,
+        }),
+      });
       await this.publishAuditEvent({
         type: "asset-download-authorized",
         occurredAt,
@@ -214,6 +256,22 @@ export class AssetDownloadService {
         }),
       );
     }
+    await this.publishEncryptionEvent({
+      event: "asset-content.decryption-access-authorized",
+      outcome: "succeeded",
+      occurredAt,
+      actorUserId: request.actorUserId,
+      workspaceId: request.workspaceId,
+      storageInstanceId: plan.value.storageInstance.id,
+      dataClass: ProtectedDataClasses.assetContent,
+      correlationId: request.correlationId,
+      details: Object.freeze({
+        purpose: request.purpose,
+        contentIsEncrypted,
+        contentEncryptionRequired: encryptionPolicy.value.contentEncryptionRequired,
+        decryptionScope: decryptionAuthorization.scope,
+      }),
+    });
 
     const expiresInSeconds = clampDownloadExpirySeconds(request.expiresInSeconds);
     const contentDispositionFileName = request.fileNameHint
@@ -401,6 +459,22 @@ export class AssetDownloadService {
 
     const contentIsEncrypted = Boolean(targetVersion.content.encryption);
     if (!contentIsEncrypted && encryptionPolicy.value.contentEncryptionRequired) {
+      await this.publishEncryptionEvent({
+        event: "asset-content.decryption-access-opened",
+        outcome: "denied",
+        occurredAt,
+        actorUserId: request.actorUserId,
+        workspaceId: request.workspaceId,
+        storageInstanceId: targetVersion.location.storageInstance.storageInstanceId,
+        dataClass: ProtectedDataClasses.assetContent,
+        correlationId: request.correlationId,
+        details: Object.freeze({
+          purpose: grant.purpose,
+          contentIsEncrypted,
+          contentEncryptionRequired: encryptionPolicy.value.contentEncryptionRequired,
+          reasonCode: "encrypted-content-required",
+        }),
+      });
       await this.publishAuditEvent({
         type: "asset-download-opened",
         occurredAt,
@@ -440,6 +514,27 @@ export class AssetDownloadService {
       policyAllowWorkerDecryption: encryptionPolicy.value.allowWorkerDecryption,
     });
     if (!decryptionAuthorization.allowed) {
+      await this.publishEncryptionEvent({
+        event: "asset-content.decryption-access-opened",
+        outcome: "denied",
+        occurredAt,
+        actorUserId: request.actorUserId,
+        workspaceId: request.workspaceId,
+        storageInstanceId: plan.value.storageInstance.id,
+        dataClass: ProtectedDataClasses.assetContent,
+        correlationId: request.correlationId,
+        details: Object.freeze({
+          purpose: grant.purpose,
+          contentIsEncrypted,
+          contentEncryptionRequired: encryptionPolicy.value.contentEncryptionRequired,
+          storageAllowsPreviewDecryption: plan.value.storageInstance.policy.security.allowPreviewDecryption,
+          storageAllowsWorkerDecryption: plan.value.storageInstance.policy.security.allowWorkerDecryption,
+          policyAllowsPreviewDecryption: encryptionPolicy.value.allowPreviewDecryption,
+          policyAllowsWorkerDecryption: encryptionPolicy.value.allowWorkerDecryption,
+          decryptionScope: decryptionAuthorization.scope,
+          reasonCode: decryptionAuthorization.reasonCode,
+        }),
+      });
       await this.publishAuditEvent({
         type: "asset-download-opened",
         occurredAt,
@@ -514,6 +609,23 @@ export class AssetDownloadService {
           contentDisposition,
         }),
       });
+      await this.publishEncryptionEvent({
+        event: "asset-content.decryption-access-opened",
+        outcome: "succeeded",
+        occurredAt,
+        actorUserId: request.actorUserId,
+        workspaceId: request.workspaceId,
+        storageInstanceId: plan.value.storageInstance.id,
+        dataClass: ProtectedDataClasses.assetContent,
+        correlationId: request.correlationId,
+        details: Object.freeze({
+          purpose: grant.purpose,
+          contentIsEncrypted,
+          contentEncryptionRequired: encryptionPolicy.value.contentEncryptionRequired,
+          decryptionScope: decryptionAuthorization.scope,
+          contentDisposition,
+        }),
+      });
 
       return {
         ok: true,
@@ -530,6 +642,20 @@ export class AssetDownloadService {
         }),
       };
     } catch (error) {
+      await this.publishEncryptionEvent({
+        event: "asset-content.decryption-access-opened",
+        outcome: "failed",
+        occurredAt,
+        actorUserId: request.actorUserId,
+        workspaceId: request.workspaceId,
+        storageInstanceId: grant.storageInstanceId,
+        dataClass: ProtectedDataClasses.assetContent,
+        correlationId: request.correlationId,
+        details: Object.freeze({
+          purpose: grant.purpose,
+          reasonCode: "content-stream-unavailable",
+        }),
+      });
       return this.failure(
         AssetServiceErrorCodes.contentUnavailable,
         "Asset content stream is unavailable.",
@@ -650,6 +776,12 @@ export class AssetDownloadService {
 
   private async publishAuditEvent(event: Parameters<AssetAuditSink["recordAssetEvent"]>[0]): Promise<void> {
     await publishAssetAuditEventBestEffort(this.dependencies.auditSink, event);
+  }
+
+  private async publishEncryptionEvent(
+    event: Parameters<typeof publishEncryptionEnforcementEventBestEffort>[1],
+  ): Promise<void> {
+    await publishEncryptionEnforcementEventBestEffort(this.dependencies.encryptionObservabilityPort, event);
   }
 }
 
