@@ -70,6 +70,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Internal CA domain/contracts baseline for CA roots, issued certificates, rotation metadata, and trust material seams: `docs/architecture/internal-ca-foundation.md`
 - Transport security domain/application contract baseline for fail-closed HTTPS/WSS/TLS policy and trust validation seams: `docs/architecture/transport-security-foundation.md`
 - Secret and key management domain/application contract baseline for scope-owned secrets, version lineage, and auditable access-decision seams: `docs/architecture/secrets-foundation.md`
+- Secret repository persistence baseline for SQLite schema, scope/key indexes, version-material separation, and adapter replay semantics: `docs/architecture/secrets-persistence-contracts.md`
 - Node bootstrap identity/trust-material operations baseline: `docs/node-bootstrap-identity-operations.md`
 - Workspace tenancy domain/contracts baseline: `docs/architecture/workspace-foundation.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
