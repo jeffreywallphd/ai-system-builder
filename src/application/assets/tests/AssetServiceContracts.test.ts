@@ -6,6 +6,7 @@ import {
   validateFinalizeAssetUploadRequest,
   validateGetAssetByIdQuery,
   validateListAssetsQuery,
+  validateOpenAuthorizedAssetDownloadStreamRequest,
   validateRegisterAssetRequest,
   validateRegisterGeneratedOutputRequest,
 } from "../use-cases/AssetServiceContracts";
@@ -161,10 +162,12 @@ describe("AssetServiceContracts", () => {
       workspaceId: "workspace-a",
       assetId: "asset-upload-001",
       purpose: AssetDownloadPurposes.download,
+      fileNameHint: " image.png ",
       expiresInSeconds: 60,
     });
 
     expect(request.expiresInSeconds).toBe(60);
+    expect(request.fileNameHint).toBe("image.png");
 
     expect(() => validateAuthorizeAssetDownloadRequest({
       actorUserId: "user-owner",
@@ -173,6 +176,20 @@ describe("AssetServiceContracts", () => {
       purpose: AssetDownloadPurposes.download,
       expiresInSeconds: 0,
     })).toThrow("expiresInSeconds");
+  });
+
+  it("validates authorized stream-open requests", () => {
+    const request = validateOpenAuthorizedAssetDownloadStreamRequest({
+      actorUserId: " user-owner ",
+      workspaceId: " workspace-a ",
+      assetId: " asset-upload-001 ",
+      contentToken: " token-123 ",
+    });
+
+    expect(request.actorUserId).toBe("user-owner");
+    expect(request.workspaceId).toBe("workspace-a");
+    expect(request.assetId).toBe("asset-upload-001");
+    expect(request.contentToken).toBe("token-123");
   });
 
   it("normalizes generated output lineage inputs", () => {

@@ -15,6 +15,7 @@ import { AssetUploadInitiationService } from "../../../../src/application/assets
 import { AssetUploadIngestionService } from "../../../../src/application/assets/use-cases/AssetUploadIngestionService";
 import { AssetDiscoveryService } from "../../../../src/application/assets/use-cases/AssetDiscoveryService";
 import { AssetDetailService } from "../../../../src/application/assets/use-cases/AssetDetailService";
+import { AssetDownloadService } from "../../../../src/application/assets/use-cases/AssetDownloadService";
 
 class StubAssetUploadInitiationService {
   private readonly asset: Asset = createAsset({
@@ -208,6 +209,54 @@ class StubAssetDetailService {
   }
 }
 
+class StubAssetDownloadService {
+  public deny = false;
+
+  public async authorizeAssetDownload() {
+    if (this.deny) {
+      return {
+        ok: false as const,
+        error: {
+          code: "asset-access-denied" as const,
+          message: "Download denied.",
+        },
+      };
+    }
+    return {
+      ok: true as const,
+      value: Object.freeze({
+        assetId: "asset-upload-001",
+        versionId: "asset-upload-001:v1",
+        workspaceId: "workspace-alpha",
+        storageInstanceId: "storage-alpha",
+        objectKey: "workspaces/workspace-alpha/assets/asset-upload-001/input/v1/image.png",
+        mimeType: "image/png",
+        sizeBytes: 128,
+        contentToken: "content-token-001",
+        expiresAt: "2026-04-06T12:15:00.000Z",
+        contentDispositionFileName: "image.png",
+      }),
+    };
+  }
+
+  public async openAuthorizedAssetDownloadStream() {
+    return {
+      ok: true as const,
+      value: Object.freeze({
+        assetId: "asset-upload-001",
+        versionId: "asset-upload-001:v1",
+        mimeType: "image/png",
+        sizeBytes: 5,
+        contentDisposition: "attachment" as const,
+        contentDispositionFileName: "image.png",
+        stream: (async function* chunks() {
+          yield Buffer.from("hello", "utf8");
+        })(),
+      }),
+    };
+  }
+}
+
 describe("AssetManagementBackendApi", () => {
   it("returns register and initiate upload DTOs for successful requests", async () => {
     const backendApi = new AssetManagementBackendApi({
@@ -215,6 +264,7 @@ describe("AssetManagementBackendApi", () => {
       uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
       discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
       detailService: new StubAssetDetailService() as unknown as AssetDetailService,
+      downloadService: new StubAssetDownloadService() as unknown as AssetDownloadService,
     });
 
     const registered = await backendApi.registerAsset({
@@ -303,6 +353,31 @@ describe("AssetManagementBackendApi", () => {
     expect(detail.data.asset.assetId).toBe("asset-upload-001");
     expect(detail.data.asset.uploadState).toBe("ready");
     expect(detail.data.asset.allowedActions?.canInitiateUpload).toBeTrue();
+
+    const downloadAuthorization = await backendApi.authorizeAssetDownload({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-upload-001",
+      purpose: "download",
+    });
+    expect(downloadAuthorization.ok).toBeTrue();
+    if (!downloadAuthorization.ok || !downloadAuthorization.data) {
+      return;
+    }
+    expect(downloadAuthorization.data.authorization.contentToken).toBe("content-token-001");
+    expect((downloadAuthorization.data.authorization as Record<string, unknown>).objectKey).toBeUndefined();
+
+    const opened = await backendApi.openAuthorizedAssetDownloadStream({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-upload-001",
+      contentToken: "content-token-001",
+    });
+    expect(opened.ok).toBeTrue();
+    if (!opened.ok || !opened.data) {
+      return;
+    }
+    expect(opened.data.mimeType).toBe("image/png");
   });
 
   it("returns invalid-request for missing actor identity", async () => {
@@ -311,6 +386,7 @@ describe("AssetManagementBackendApi", () => {
       uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
       discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
       detailService: new StubAssetDetailService() as unknown as AssetDetailService,
+      downloadService: new StubAssetDownloadService() as unknown as AssetDownloadService,
     });
 
     const response = await backendApi.initiateAssetUpload({
@@ -349,6 +425,7 @@ describe("AssetManagementBackendApi", () => {
       uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
       discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
       detailService: detailService as unknown as AssetDetailService,
+      downloadService: new StubAssetDownloadService() as unknown as AssetDownloadService,
     });
 
     const response = await backendApi.getAssetDetail({
@@ -362,5 +439,30 @@ describe("AssetManagementBackendApi", () => {
       return;
     }
     expect(response.error.code).toBe("not-found");
+  });
+
+  it("maps download authorization deny errors to forbidden", async () => {
+    const downloadService = new StubAssetDownloadService();
+    downloadService.deny = true;
+    const backendApi = new AssetManagementBackendApi({
+      uploadInitiationService: new StubAssetUploadInitiationService() as unknown as AssetUploadInitiationService,
+      uploadIngestionService: new StubAssetUploadIngestionService() as unknown as AssetUploadIngestionService,
+      discoveryService: new StubAssetDiscoveryService() as unknown as AssetDiscoveryService,
+      detailService: new StubAssetDetailService() as unknown as AssetDetailService,
+      downloadService: downloadService as unknown as AssetDownloadService,
+    });
+
+    const response = await backendApi.authorizeAssetDownload({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "asset-upload-001",
+      purpose: "download",
+    });
+
+    expect(response.ok).toBeFalse();
+    if (response.ok || !response.error) {
+      return;
+    }
+    expect(response.error.code).toBe("forbidden");
   });
 });

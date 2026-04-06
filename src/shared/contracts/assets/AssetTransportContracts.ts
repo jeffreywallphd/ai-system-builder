@@ -95,9 +95,6 @@ export interface AssetDownloadAuthorizationDto {
   readonly assetId: string;
   readonly versionId: string;
   readonly workspaceId: string;
-  readonly storageInstanceId: string;
-  readonly objectKey: string;
-  readonly objectVersionId?: string;
   readonly mimeType: string;
   readonly sizeBytes: number;
   readonly contentToken: string;
@@ -290,9 +287,6 @@ export function toAssetDownloadAuthorizationDto(
     assetId: normalizeRequired(authorization.assetId, "assetId"),
     versionId: normalizeRequired(authorization.versionId, "versionId"),
     workspaceId: normalizeRequired(authorization.workspaceId, "workspaceId"),
-    storageInstanceId: normalizeRequired(authorization.storageInstanceId, "storageInstanceId"),
-    objectKey: assertPathSafeObjectKey(authorization.objectKey, "objectKey"),
-    objectVersionId: authorization.objectVersionId?.trim() || undefined,
     mimeType: normalizeRequired(authorization.mimeType, "mimeType").toLowerCase(),
     sizeBytes: authorization.sizeBytes,
     contentToken: normalizeRequired(authorization.contentToken, "contentToken"),

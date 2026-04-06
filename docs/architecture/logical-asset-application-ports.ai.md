@@ -219,3 +219,40 @@ Coverage added for this story:
 - `src/shared/dto/assets/tests/AssetTransportDtos.test.ts`
 - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+
+## Story 10.2.5 secure download authorization + content streaming
+
+- Added an authoritative protected download orchestration use case:
+  - `src/application/assets/use-cases/AssetDownloadService.ts`
+- Added explicit download-grant port contract for opaque token issuance/resolution:
+  - `src/application/assets/ports/AssetDownloadGrantPort.ts`
+- Added encrypted grant adapter for server-issued opaque content tokens:
+  - `src/infrastructure/security/assets/EncryptedAssetDownloadGrantAdapter.ts`
+- Extended backend API + SDK contracts with download authorization and stream-open operations:
+  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+- Added authenticated transport endpoints:
+  - `POST /api/v1/assets/:assetId/downloads/authorize`
+  - `GET /api/v1/assets/:assetId/downloads/content`
+  - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- Host composition now wires download grants and service dependencies:
+  - `hosts/server/IdentityServerHost.ts`
+
+Operational behavior in this story:
+
+- Download authorization requires active workspace membership plus asset visibility checks.
+- Private assets remain owner/admin constrained; unauthorized reads return clean deny/not-found behavior.
+- Storage logical access and policy checks gate both authorization and stream-open paths.
+- Purpose-specific restrictions are enforced:
+  - `inline-preview` requires preview-compatible mime types and storage preview decryption allowance.
+  - `worker-process` requires worker-capable asset kinds and storage worker decryption allowance.
+- Content is streamed from managed storage through server handlers (`AsyncIterable`), avoiding eager in-memory buffering for large files.
+- Download responses set defensive headers (`Content-Disposition`, `X-Content-Type-Options`, `Cache-Control`) and keep object/storage internals off transport payloads.
+- Download authorization payloads now expose opaque content tokens and metadata only (no logical object keys).
+
+Coverage added for this story:
+
+- `src/application/assets/tests/AssetDownloadService.test.ts`
+- `src/infrastructure/security/assets/tests/EncryptedAssetDownloadGrantAdapter.test.ts`
+- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`

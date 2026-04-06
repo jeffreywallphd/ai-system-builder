@@ -8,6 +8,7 @@ import { AssetUploadInitiationService } from "../../../../../src/application/ass
 import { AssetUploadIngestionService } from "../../../../../src/application/assets/use-cases/AssetUploadIngestionService";
 import { AssetDiscoveryService } from "../../../../../src/application/assets/use-cases/AssetDiscoveryService";
 import { AssetDetailService } from "../../../../../src/application/assets/use-cases/AssetDetailService";
+import { AssetDownloadService } from "../../../../../src/application/assets/use-cases/AssetDownloadService";
 import {
   AssetKinds,
   AssetVisibilities,
@@ -206,9 +207,69 @@ class StubAssetUploadIngestionService {
   }
 }
 
+class StubAssetDownloadService {
+  public denyAuthorization = false;
+
+  public async authorizeAssetDownload() {
+    if (this.denyAuthorization) {
+      return {
+        ok: false as const,
+        error: {
+          code: "asset-access-denied" as const,
+          message: "Download denied.",
+        },
+      };
+    }
+
+    return {
+      ok: true as const,
+      value: Object.freeze({
+        assetId: "asset-upload-001",
+        versionId: "asset-upload-001:v1",
+        workspaceId: "workspace-alpha",
+        storageInstanceId: "storage-alpha",
+        objectKey: "workspaces/workspace-alpha/assets/asset-upload-001/input/v1/image.png",
+        mimeType: "image/png",
+        sizeBytes: 5,
+        contentToken: "download-token-001",
+        expiresAt: "2026-04-06T12:30:00.000Z",
+        contentDispositionFileName: "image.png",
+      }),
+    };
+  }
+
+  public async openAuthorizedAssetDownloadStream(input: { readonly contentToken: string }) {
+    if (input.contentToken !== "download-token-001") {
+      return {
+        ok: false as const,
+        error: {
+          code: "asset-access-denied" as const,
+          message: "Invalid token.",
+        },
+      };
+    }
+
+    return {
+      ok: true as const,
+      value: Object.freeze({
+        assetId: "asset-upload-001",
+        versionId: "asset-upload-001:v1",
+        mimeType: "image/png",
+        sizeBytes: 5,
+        contentDisposition: "attachment" as const,
+        contentDispositionFileName: "image.png",
+        stream: (async function* payload() {
+          yield Buffer.from("hello", "utf8");
+        })(),
+      }),
+    };
+  }
+}
+
 async function startServer(
   initiationService: StubAssetUploadInitiationService,
   ingestionService = new StubAssetUploadIngestionService(),
+  downloadService = new StubAssetDownloadService(),
 ): Promise<string> {
   const identityHarness = await createIdentityAuthTestHarness();
   const assetManagementBackendApi = new AssetManagementBackendApi({
@@ -216,6 +277,7 @@ async function startServer(
     uploadIngestionService: ingestionService as unknown as AssetUploadIngestionService,
     discoveryService: initiationService as unknown as AssetDiscoveryService,
     detailService: initiationService as unknown as AssetDetailService,
+    downloadService: downloadService as unknown as AssetDownloadService,
   });
 
   const server = createIdentityHttpServer({
@@ -450,5 +512,93 @@ describe("IdentityHttpServer asset management routes", () => {
     const body = await response.json();
     expect(body.ok).toBe(false);
     expect(body.error.code).toBe("not-found");
+  });
+
+  it("authorizes and streams asset downloads through protected endpoints", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const baseUrl = await startServer(service);
+    const token = await registerAndLogin(baseUrl, "asset.http.owner.7");
+
+    const authorizeResponse = await fetch(
+      `${baseUrl}/api/v1/assets/asset-upload-001/downloads/authorize?workspaceId=workspace-alpha`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          purpose: "download",
+        }),
+      },
+    );
+    expect(authorizeResponse.status).toBe(200);
+    const authorizeBody = await authorizeResponse.json();
+    expect(authorizeBody.ok).toBe(true);
+    expect(authorizeBody.data.authorization.contentToken).toBe("download-token-001");
+    expect(authorizeBody.data.authorization.objectKey).toBeUndefined();
+
+    const downloadResponse = await fetch(
+      `${baseUrl}/api/v1/assets/asset-upload-001/downloads/content?workspaceId=workspace-alpha&contentToken=download-token-001`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    expect(downloadResponse.status).toBe(200);
+    expect(downloadResponse.headers.get("content-type")).toBe("image/png");
+    expect(downloadResponse.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(downloadResponse.headers.get("cache-control")).toBe("private, no-store");
+    const payload = await downloadResponse.text();
+    expect(payload).toBe("hello");
+  });
+
+  it("blocks unauthorized tokenized download streams", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const baseUrl = await startServer(service);
+    const token = await registerAndLogin(baseUrl, "asset.http.owner.8");
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/assets/asset-upload-001/downloads/content?workspaceId=workspace-alpha&contentToken=invalid-token`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("forbidden");
+  });
+
+  it("blocks download authorization when policy denies access", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const downloadService = new StubAssetDownloadService();
+    downloadService.denyAuthorization = true;
+    const baseUrl = await startServer(service, new StubAssetUploadIngestionService(), downloadService);
+    const token = await registerAndLogin(baseUrl, "asset.http.owner.9");
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/assets/asset-upload-001/downloads/authorize?workspaceId=workspace-alpha`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          purpose: "download",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("forbidden");
   });
 });
