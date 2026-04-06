@@ -190,6 +190,14 @@ const ServiceRegistrations = Object.freeze<ReadonlyArray<HostServiceRegistration
     description: "Host lifecycle orchestration and startup coordination services.",
     kind: HostComposableServiceKinds.platformService,
     boundaryLayer: "host",
+    startupDependencyIds: [
+      "dep:shared:host-contracts",
+      "dep:host:server-bootstrap",
+      "dep:host:desktop-bootstrap",
+      "dep:host:hybrid-bootstrap",
+      "dep:host:web-bootstrap",
+      "dep:host:worker-bootstrap",
+    ],
   }),
   Object.freeze({
     serviceId: "svc:platform:ui-runtime-bridge",
@@ -373,4 +381,3 @@ export function assertWorkerHostServiceCoverage(plan: HostServiceRegistrationPla
     }
   }
 }
-
