@@ -12,6 +12,7 @@ Story 9.3.1 now implements the authoritative storage management service layer th
 - `src/application/storage/ports/StoragePolicyEvaluationPort.ts`
 - `src/application/storage/ports/StorageAccessSummaryPort.ts`
 - `src/application/storage/ports/StorageCapabilityInspectionPort.ts`
+- `src/application/storage/ports/StorageObjectPort.ts`
 - `src/application/storage/ports/StorageObservabilityPorts.ts`
 - `src/application/storage/ports/StorageManagementPorts.ts`
 - `src/application/storage/use-cases/StorageManagementServiceContracts.ts`
@@ -50,6 +51,19 @@ Rejected provisioning that is not an unsupported backend operation maps to `stor
 - The service depends only on domain storage + storage application ports.
 - No transport DTOs, controller logic, or UI state logic is embedded.
 - Audit emission remains best-effort and non-blocking.
+
+## Story 10.1.4 extension: logical object operations
+
+`StorageObjectPort` now defines backend-agnostic managed storage content contracts for:
+
+- logical key generation using storage metadata and logical segments
+- write operations from buffer or async stream content
+- existence checks and metadata reads
+- read-stream retrieval
+- safe delete behavior for absent objects
+- adapter-safe failure mapping through `StorageObjectAccessError` and stable `StorageObjectErrorCodes`
+
+This preserves authoritative server-managed storage access without exposing host paths to application/UI layers.
 
 ## Verified by tests
 
