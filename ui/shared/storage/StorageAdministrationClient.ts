@@ -1,17 +1,81 @@
 import type {
+  CreateStorageInstanceApiResponse,
   GetStorageInstanceDetailApiResponse,
   GetStorageInstanceHealthApiResponse,
   ListStorageInstancesApiResponse,
   StorageManagementApiResponse,
+  UpdateStorageInstanceMetadataApiResponse,
 } from "../../../infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
 import type {
   StorageAccessMode,
   StorageAccessScope,
   StorageBackendType,
+  StorageEncryptionKeyScope,
+  StorageEncryptionMode,
   StorageLifecycleState,
+  StorageReplicationMode,
+  StorageRetentionExpiryAction,
 } from "../../../src/domain/storage/StorageDomain";
 
 export interface StorageAdministrationClient {
+  createStorageInstance(
+    request: {
+      readonly workspaceId: string;
+      readonly storageInstanceId: string;
+      readonly backendType: StorageBackendType;
+      readonly display: {
+        readonly displayName: string;
+      };
+      readonly ownerUserIdentityId: string;
+      readonly access: {
+        readonly mode: StorageAccessMode;
+        readonly scope: StorageAccessScope;
+      };
+      readonly replication?: {
+        readonly mode: StorageReplicationMode;
+        readonly replicaStorageInstanceId?: string;
+        readonly syncIntervalSeconds?: number;
+      };
+      readonly policy: {
+        readonly policyId: string;
+        readonly maxObjectBytes?: number;
+        readonly retentionDays?: number;
+        readonly immutableWrites?: boolean;
+        readonly allowCrossWorkspaceReads?: boolean;
+        readonly labels?: Readonly<Record<string, string>>;
+        readonly encryptionMode?: StorageEncryptionMode;
+        readonly contentEncryptionRequired?: boolean;
+        readonly keyScope?: StorageEncryptionKeyScope;
+        readonly allowPreviewDecryption?: boolean;
+        readonly allowWorkerDecryption?: boolean;
+        readonly retentionExpiryAction?: StorageRetentionExpiryAction;
+        readonly purgeGracePeriodDays?: number;
+        readonly encryptionProfileId: string;
+        readonly encryptionKeyReferenceId?: string;
+        readonly envelopeRequired: boolean;
+      };
+      readonly createdAt?: string;
+      readonly lifecycleState?: StorageLifecycleState;
+      readonly requestBackendProvisioning?: boolean;
+      readonly includeCapabilities?: boolean;
+    },
+    sessionToken: string,
+  ): Promise<StorageManagementApiResponse<CreateStorageInstanceApiResponse>>;
+  updateStorageMetadata(
+    request: {
+      readonly workspaceId: string;
+      readonly storageInstanceId: string;
+      readonly display?: {
+        readonly displayName?: string;
+      };
+      readonly policy?: {
+        readonly labels?: Readonly<Record<string, string>>;
+      };
+      readonly occurredAt?: string;
+      readonly includeCapabilities?: boolean;
+    },
+    sessionToken: string,
+  ): Promise<StorageManagementApiResponse<UpdateStorageInstanceMetadataApiResponse>>;
   listStorageInstances(
     request: {
       readonly workspaceId: string;
@@ -79,6 +143,96 @@ export class HttpStorageAdministrationClient implements StorageAdministrationCli
     return this.get(`/api/v1/storage/instances${toQuerySuffix(query)}`, sessionToken);
   }
 
+  public async createStorageInstance(
+    request: {
+      readonly workspaceId: string;
+      readonly storageInstanceId: string;
+      readonly backendType: StorageBackendType;
+      readonly display: {
+        readonly displayName: string;
+      };
+      readonly ownerUserIdentityId: string;
+      readonly access: {
+        readonly mode: StorageAccessMode;
+        readonly scope: StorageAccessScope;
+      };
+      readonly replication?: {
+        readonly mode: StorageReplicationMode;
+        readonly replicaStorageInstanceId?: string;
+        readonly syncIntervalSeconds?: number;
+      };
+      readonly policy: {
+        readonly policyId: string;
+        readonly maxObjectBytes?: number;
+        readonly retentionDays?: number;
+        readonly immutableWrites?: boolean;
+        readonly allowCrossWorkspaceReads?: boolean;
+        readonly labels?: Readonly<Record<string, string>>;
+        readonly encryptionMode?: StorageEncryptionMode;
+        readonly contentEncryptionRequired?: boolean;
+        readonly keyScope?: StorageEncryptionKeyScope;
+        readonly allowPreviewDecryption?: boolean;
+        readonly allowWorkerDecryption?: boolean;
+        readonly retentionExpiryAction?: StorageRetentionExpiryAction;
+        readonly purgeGracePeriodDays?: number;
+        readonly encryptionProfileId: string;
+        readonly encryptionKeyReferenceId?: string;
+        readonly envelopeRequired: boolean;
+      };
+      readonly createdAt?: string;
+      readonly lifecycleState?: StorageLifecycleState;
+      readonly requestBackendProvisioning?: boolean;
+      readonly includeCapabilities?: boolean;
+    },
+    sessionToken: string,
+  ): Promise<StorageManagementApiResponse<CreateStorageInstanceApiResponse>> {
+    const query = new URLSearchParams();
+    query.set("workspaceId", request.workspaceId);
+    return this.post(
+      `/api/v1/storage/instances${toQuerySuffix(query)}`,
+      {
+        storageInstanceId: request.storageInstanceId,
+        backendType: request.backendType,
+        display: request.display,
+        ownerUserIdentityId: request.ownerUserIdentityId,
+        access: request.access,
+        replication: request.replication,
+        policy: request.policy,
+        createdAt: request.createdAt,
+        lifecycleState: request.lifecycleState,
+      },
+      sessionToken,
+    );
+  }
+
+  public async updateStorageMetadata(
+    request: {
+      readonly workspaceId: string;
+      readonly storageInstanceId: string;
+      readonly display?: {
+        readonly displayName?: string;
+      };
+      readonly policy?: {
+        readonly labels?: Readonly<Record<string, string>>;
+      };
+      readonly occurredAt?: string;
+      readonly includeCapabilities?: boolean;
+    },
+    sessionToken: string,
+  ): Promise<StorageManagementApiResponse<UpdateStorageInstanceMetadataApiResponse>> {
+    const query = new URLSearchParams();
+    query.set("workspaceId", request.workspaceId);
+    return this.patch(
+      `/api/v1/storage/instances/${encodeURIComponent(request.storageInstanceId)}/metadata${toQuerySuffix(query)}`,
+      {
+        display: request.display,
+        policy: request.policy,
+        occurredAt: request.occurredAt,
+      },
+      sessionToken,
+    );
+  }
+
   public async getStorageInstanceDetail(
     request: {
       readonly workspaceId: string;
@@ -119,10 +273,19 @@ export class HttpStorageAdministrationClient implements StorageAdministrationCli
     return this.request<TResponse>("GET", path, sessionToken);
   }
 
+  private async post<TResponse>(path: string, body: unknown, sessionToken: string): Promise<TResponse> {
+    return this.request<TResponse>("POST", path, sessionToken, body);
+  }
+
+  private async patch<TResponse>(path: string, body: unknown, sessionToken: string): Promise<TResponse> {
+    return this.request<TResponse>("PATCH", path, sessionToken, body);
+  }
+
   private async request<TResponse>(
-    method: "GET",
+    method: "GET" | "POST" | "PATCH",
     path: string,
     sessionToken: string,
+    body?: unknown,
   ): Promise<TResponse> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method,
@@ -130,6 +293,7 @@ export class HttpStorageAdministrationClient implements StorageAdministrationCli
         "content-type": "application/json",
         authorization: `Bearer ${sessionToken}`,
       },
+      body: method === "GET" ? undefined : JSON.stringify(body ?? {}),
     });
     return await response.json() as TResponse;
   }

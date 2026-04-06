@@ -11,6 +11,7 @@ import {
   type StorageLifecycleState,
 } from "../../src/domain/storage/StorageDomain";
 import type { StorageInstanceSummaryDto } from "../../src/shared/contracts/storage/StorageTransportContracts";
+import StorageInstanceWorkflowPanel from "../components/storage/StorageInstanceWorkflowPanel";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { StorageAdministrationService } from "../services/StorageAdministrationService";
 import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
@@ -279,6 +280,16 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
 
       {errorMessage ? <p className="ui-storage-admin-page__alert ui-storage-admin-page__alert--error" role="alert">{errorMessage}</p> : null}
       {detailErrorMessage ? <p className="ui-storage-admin-page__alert ui-storage-admin-page__alert--error" role="alert">{detailErrorMessage}</p> : null}
+
+      <StorageInstanceWorkflowPanel
+        workspaceId={workspaceId}
+        onWorkspaceIdChange={setWorkspaceId}
+        actorUserIdentityId={session.userIdentityId}
+        sessionToken={sessionToken}
+        service={service}
+        selectedStorage={selectedDetail}
+        onMutationComplete={(preferredStorageId) => refresh(preferredStorageId, filters)}
+      />
 
       <section className="ui-card">
         <div className="ui-card__header">

@@ -1179,7 +1179,33 @@ body {
   color: var(--color-danger);
 }
 
+.ui-storage-admin-page__alert--success {
+  color: var(--color-success);
+}
+
+.ui-storage-admin-page__validation-list {
+  margin: 0;
+  padding-left: var(--space-lg);
+  color: var(--color-danger);
+}
+
 .ui-storage-admin-page__filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-sm);
+}
+
+.ui-storage-admin-page__forms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-sm);
+}
+
+.ui-storage-admin-page__field--full {
+  grid-column: 1 / -1;
+}
+
+.ui-storage-admin-page__checkbox-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-sm);

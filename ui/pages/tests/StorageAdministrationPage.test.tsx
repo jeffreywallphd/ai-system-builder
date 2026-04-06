@@ -45,6 +45,7 @@ describe("StorageAdministrationPage", () => {
     );
 
     expect(html).toContain("Managed storage administration");
+    expect(html).toContain("Create and edit workflows");
     expect(html).toContain("List query");
     expect(html).toContain("Storage instances");
     expect(html).toContain("Storage detail");
