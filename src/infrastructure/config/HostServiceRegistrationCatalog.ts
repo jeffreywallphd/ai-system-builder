@@ -231,6 +231,20 @@ export const HybridHostRequiredServiceIds = Object.freeze([
   "svc:platform:observability",
 ]);
 
+export const WebHostRequiredServiceIds = Object.freeze([
+  "svc:application:web-runtime-client",
+  "svc:platform:ui-runtime-bridge",
+  "svc:platform:boot-lifecycle",
+  "svc:platform:observability",
+]);
+
+export const WorkerHostRequiredServiceIds = Object.freeze([
+  "svc:application:worker-execution",
+  "svc:platform:execution-runtime",
+  "svc:platform:boot-lifecycle",
+  "svc:platform:observability",
+]);
+
 const ServiceRegistry = createHostServiceRegistry(ServiceRegistrations);
 
 export function resolveHostServiceRegistrationIds(host: Pick<HostRuntimeIdentity, "hostId">): ReadonlyArray<string> {
@@ -282,6 +296,28 @@ export function assertHybridHostServiceCoverage(plan: HostServiceRegistrationPla
     if (!selected.has(requiredServiceId)) {
       throw new HostServiceRegistrationError(
         `Hybrid host composition is missing required service '${requiredServiceId}'.`,
+      );
+    }
+  }
+}
+
+export function assertWebHostServiceCoverage(plan: HostServiceRegistrationPlan): void {
+  const selected = new Set(plan.selectedServices.map((service) => service.serviceId));
+  for (const requiredServiceId of WebHostRequiredServiceIds) {
+    if (!selected.has(requiredServiceId)) {
+      throw new HostServiceRegistrationError(
+        `Web host composition is missing required service '${requiredServiceId}'.`,
+      );
+    }
+  }
+}
+
+export function assertWorkerHostServiceCoverage(plan: HostServiceRegistrationPlan): void {
+  const selected = new Set(plan.selectedServices.map((service) => service.serviceId));
+  for (const requiredServiceId of WorkerHostRequiredServiceIds) {
+    if (!selected.has(requiredServiceId)) {
+      throw new HostServiceRegistrationError(
+        `Worker host composition is missing required service '${requiredServiceId}'.`,
       );
     }
   }

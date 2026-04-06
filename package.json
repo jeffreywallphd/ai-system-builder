@@ -22,7 +22,9 @@
     "test:service-supervisor": "bun test infrastructure/runtime/tests/ServiceSupervisor.test.ts",
     "dev:browser": "vite --mode browser",
     "start:authoritative-server": "bun run src/hosts/server/AuthoritativeServerHostEntrypoint.ts",
-    "start:hybrid-host": "bun run src/hosts/hybrid/HybridHostEntrypoint.ts"
+    "start:hybrid-host": "bun run src/hosts/hybrid/HybridHostEntrypoint.ts",
+    "start:web-host": "bun run src/hosts/web/WebHostEntrypoint.ts",
+    "start:worker-host": "bun run src/hosts/worker/WorkerHostEntrypoint.ts"
   },
   "dependencies": {
     "@huggingface/hub": "^2.6.1",

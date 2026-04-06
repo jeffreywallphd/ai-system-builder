@@ -49,6 +49,10 @@ The catalog composes deterministic service plans through:
 
 `src/hosts/hybrid/HybridHostCompositionRoot.ts` now composes service registration plans during the shared bootstrap `dependencies` stage and enforces hybrid required service coverage before `feature-registration`.
 
+`src/hosts/web/WebHostCompositionRoot.ts` now composes service registration plans during the shared bootstrap `dependencies` stage and enforces web required service coverage before `feature-registration`.
+
+`src/hosts/worker/WorkerHostCompositionRoot.ts` now composes service registration plans during the shared bootstrap `dependencies` stage and enforces worker required service coverage before `feature-registration`.
+
 This keeps host service assembly explicit, host-aware, and deterministic across authoritative, desktop, and hybrid composition roots.
 
 ## Contributor guidance: adding a new service registration safely
@@ -68,4 +72,6 @@ This keeps host service assembly explicit, host-aware, and deterministic across 
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
 - `src/hosts/hybrid/tests/HybridHostCompositionRoot.test.ts`
+- `src/hosts/web/tests/WebHostCompositionRoot.test.ts`
+- `src/hosts/worker/tests/WorkerHostCompositionRoot.test.ts`
 

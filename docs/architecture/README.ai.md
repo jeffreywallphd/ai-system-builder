@@ -107,6 +107,8 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Authoritative server executable host assembly baseline (dedicated startup entrypoint + runtime lifecycle expectations): `docs/architecture/authoritative-server-host-assembly.md`
 - Desktop executable host assembly baseline (dedicated startup entrypoint + desktop runtime lifecycle expectations): `docs/architecture/desktop-host-assembly.md`
 - Hybrid executable host assembly baseline (hybrid capability composition rules + authoritative delegation mode): `docs/architecture/hybrid-host-assembly.md`
+- Web executable host assembly baseline (thin-client delivery composition boundaries + startup entrypoint expectations): `docs/architecture/web-host-assembly.md`
+- Worker executable host assembly baseline (runtime execution composition boundaries + startup entrypoint expectations): `docs/architecture/worker-host-assembly.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
 - Authorization permission matrix and key catalog reference: `docs/architecture/authorization-permission-catalog.md`
 - Authorization workspace role-definition and baseline role-grant reference: `docs/architecture/authorization-role-reference.md`

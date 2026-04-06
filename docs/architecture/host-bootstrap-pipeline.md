@@ -76,6 +76,25 @@ This keeps the common startup sequence stable while preserving host-level extens
 - rejects direct local authoritative ownership in hybrid composition root and keeps intentional authoritative execution delegated through authoritative server host assembly mode
 - starts and stops hybrid runtime through host-owned adapter callbacks while preserving deterministic lifecycle transitions
 
+## Web host integration
+
+`src/hosts/web/WebHostCompositionRoot.ts` now also uses the shared bootstrap pipeline:
+
+- builds a startup context from web boot configuration + deployment profile + environment
+- composes host-aware web service registration plans during `dependencies`
+- validates required web service coverage before `feature-registration`
+- starts and stops thin-client web runtime composition through host-owned adapter callbacks while preserving deterministic lifecycle transitions
+
+## Worker host integration
+
+`src/hosts/worker/WorkerHostCompositionRoot.ts` now also uses the shared bootstrap pipeline:
+
+- builds a startup context from worker boot configuration + deployment profile + environment
+- composes host-aware worker service registration plans during `dependencies`
+- validates required worker service coverage before `feature-registration`
+- enforces explicit execution capability composition (`node-execution` + `worker-runtime`) before runtime startup
+- starts and stops worker runtime execution through host-owned adapter callbacks while preserving deterministic lifecycle transitions
+
 ## Contributor startup-sequence guidance
 
 When extending host startup:
@@ -92,3 +111,5 @@ When extending host startup:
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
 - `src/hosts/hybrid/tests/HybridHostCompositionRoot.test.ts`
+- `src/hosts/web/tests/WebHostCompositionRoot.test.ts`
+- `src/hosts/worker/tests/WorkerHostCompositionRoot.test.ts`
