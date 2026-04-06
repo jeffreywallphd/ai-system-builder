@@ -1,9 +1,16 @@
 import { describe, expect, it } from "bun:test";
 import {
   buildWebSocketChannelContext,
+  canTransitionWebSocketChannelLifecycleState,
+  DefaultWebSocketChannelReconnectPolicy,
+  hasWebSocketChannelCertificateBindingRotated,
   InMemoryWebSocketChannelRegistry,
   parseWebSocketChannelPurpose,
+  resolveWebSocketChannelReconnectDirective,
   resolveWebSocketChannelCapabilities,
+  toWebSocketChannelCertificateBinding,
+  WebSocketChannelLifecycleInvalidationReasons,
+  WebSocketChannelLifecycleStates,
   WebSocketChannelPurposes,
 } from "../SecureWebSocketChannelContext";
 
@@ -71,5 +78,49 @@ describe("SecureWebSocketChannelContext", () => {
     registry.release(context.channelId);
     expect(registry.get(context.channelId)).toBeUndefined();
     expect(registry.list()).toHaveLength(0);
+  });
+
+  it("detects certificate rotation when serial or fingerprint changes", () => {
+    const initial = toWebSocketChannelCertificateBinding({
+      serialNumber: "aa11",
+      fingerprintSha256: "aa:bb:cc",
+    });
+    const rotated = toWebSocketChannelCertificateBinding({
+      serialNumber: "bb22",
+      fingerprintSha256: "dd-ee-ff",
+    });
+
+    expect(initial?.serialNumber).toBe("AA11");
+    expect(initial?.fingerprintSha256).toBe("AABBCC");
+    expect(hasWebSocketChannelCertificateBindingRotated(initial, rotated)).toBeTrue();
+    expect(hasWebSocketChannelCertificateBindingRotated(initial, initial)).toBeFalse();
+  });
+
+  it("refuses reconnect when trust is revoked and applies backoff for rotation", () => {
+    const revoked = resolveWebSocketChannelReconnectDirective({
+      attempt: 1,
+      reason: WebSocketChannelLifecycleInvalidationReasons.revoked,
+    });
+    expect(revoked.allowed).toBeFalse();
+
+    const rotated = resolveWebSocketChannelReconnectDirective({
+      attempt: 3,
+      reason: WebSocketChannelLifecycleInvalidationReasons.certificateRotated,
+    });
+    expect(rotated.allowed).toBeTrue();
+    expect(rotated.maxAttempts).toBe(DefaultWebSocketChannelReconnectPolicy.maxAttempts);
+    expect(rotated.nextDelayMs).toBe(1000);
+  });
+
+  it("enforces safe lifecycle state transitions", () => {
+    expect(canTransitionWebSocketChannelLifecycleState(
+      WebSocketChannelLifecycleStates.active,
+      WebSocketChannelLifecycleStates.revalidating,
+    )).toBeTrue();
+
+    expect(canTransitionWebSocketChannelLifecycleState(
+      WebSocketChannelLifecycleStates.invalidated,
+      WebSocketChannelLifecycleStates.active,
+    )).toBeFalse();
   });
 });

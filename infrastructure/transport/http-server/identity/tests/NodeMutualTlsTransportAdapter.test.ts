@@ -41,6 +41,7 @@ describe("NodeMutualTlsTransportAdapter", () => {
     }
     expect(result.node.nodeId).toBe("node:trusted:adapter-1");
     expect(result.trust.actorType).toBe("node-identity");
+    expect(result.lifecycle.reconnect.allowed).toBeTrue();
   });
 
   it("rejects revoked node transport identities returned by node resolver", async () => {
@@ -77,6 +78,7 @@ describe("NodeMutualTlsTransportAdapter", () => {
     if (!result.ok) {
       expect(result.statusCode).toBe(409);
       expect(result.body.error?.code).toBe("conflict");
+      expect(result.lifecycle.reconnect.allowed).toBeFalse();
     }
   });
 
@@ -117,6 +119,52 @@ describe("NodeMutualTlsTransportAdapter", () => {
     if (!result.ok) {
       expect(result.statusCode).toBe(403);
       expect(result.body.error?.code).toBe("forbidden");
+      expect(result.lifecycle.reconnect.allowed).toBeFalse();
+    }
+  });
+
+  it("flags certificate rotation and returns retry guidance for transient failures", async () => {
+    const result = await validateNodeMutualTlsTransport({
+      requestId: "node-tls-rotation-retry",
+      nodeId: "node:trusted:adapter-3",
+      reconnectAttempt: 2,
+      previousPeerCertificateSerialNumber: "AA11",
+      previousPeerCertificateFingerprintSha256: "AABB",
+      transportState: Object.freeze({
+        channelType: TransportChannelTypes.https,
+        encryptedTransportEstablished: true,
+        mutualTlsEstablished: true,
+        peerCertificatePresented: true,
+        peerCertificateSerialNumber: "BB22",
+        peerCertificateFingerprintSha256: "CCDD",
+      }),
+      ports: Object.freeze({
+        trustValidator: {
+          validate: async () => Object.freeze({
+            ok: false,
+            statusCode: 500,
+            body: Object.freeze({
+              ok: false,
+              error: Object.freeze({
+                code: "internal",
+                message: "unexpected",
+              }),
+            }),
+          }),
+        },
+        nodeIdentityResolver: {
+          resolveNodeMutualTlsTransportIdentity: async () => {
+            throw new Error("nodeIdentityResolver should not be called when transport trust fails.");
+          },
+        },
+      }),
+    });
+
+    expect(result.ok).toBeFalse();
+    if (!result.ok) {
+      expect(result.lifecycle.certificateRotated).toBeTrue();
+      expect(result.lifecycle.reconnect.allowed).toBeTrue();
+      expect(result.lifecycle.reconnect.nextDelayMs).toBe(1000);
     }
   });
 });

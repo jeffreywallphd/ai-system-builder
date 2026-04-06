@@ -115,6 +115,45 @@ Story 7.3.3 adds a dedicated node-peer channel seam so direct node-to-node commu
 - `src/infrastructure/transport/tests/NodePeerCertificateIdentityResolver.test.ts`
 - `src/infrastructure/transport/tests/NodePeerTransportValidationAdapter.test.ts`
 
+## Story 7.3.4 transport lifecycle resilience and trust-invalidated channel handling
+
+Story 7.3.4 extends secure channel behavior beyond initial handshake acceptance so long-lived channels are continuously trust-aware and fail closed when trust state changes.
+
+### Runtime lifecycle additions
+
+- `src/infrastructure/transport/websocket/SecureWebSocketChannelContext.ts`
+  - adds explicit websocket channel lifecycle vocabulary (`active`, `revalidating`, `reconnect-pending`, `invalidated`, `closed`);
+  - adds reconnect directive + bounded backoff policy helpers;
+  - adds certificate-binding normalization and rotation-detection helpers used by long-lived channels.
+- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - adds websocket lifecycle monitor hooks for accepted channels:
+    - periodic trust/session revalidation for active channels;
+    - revocation/trust-invalidation-triggered channel shutdown (fail closed);
+    - certificate-rotation awareness with invalidation + reconnect guidance;
+    - structured lifecycle event logging + optional lifecycle callback for host observers.
+- `infrastructure/transport/http-server/identity/NodeMutualTlsTransportAdapter.ts`
+  - adds node-channel lifecycle metadata in adapter outcomes:
+    - certificate rotation awareness against prior cert binding metadata;
+    - explicit reconnect directives (deny on revoked/policy failures, bounded retry guidance for transient failures).
+
+### Lifecycle posture
+
+- Long-lived websocket channels are no longer treated as permanently trusted after upgrade; trust is revalidated on an interval when transport trust enforcement is active.
+- Revoked/invalidated trust closes active channels instead of silently allowing stale channels to remain active.
+- Reconnect behavior is explicit and policy-aware via reconnect directives (allowed/denied + bounded delay guidance).
+
+### Test coverage
+
+- `src/infrastructure/transport/websocket/tests/SecureWebSocketChannelContext.test.ts`
+  - certificate rotation detection,
+  - reconnect directive/backoff classification,
+  - lifecycle transition safety.
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
+  - revocation-triggered invalidation of accepted websocket channels,
+  - rotation-triggered invalidation with lifecycle event reason assertions.
+- `infrastructure/transport/http-server/identity/tests/NodeMutualTlsTransportAdapter.test.ts`
+  - node mTLS lifecycle reconnect guidance and rotation-awareness behavior.
+
 ## Core contract model
 
 - Scenarios:

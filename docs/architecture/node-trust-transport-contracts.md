@@ -288,6 +288,17 @@ Constraints for this seam:
 - peer trust is certificate identity + trust lifecycle based, never raw network/LAN location based;
 - capability exposure is explicit per approved operation class.
 
+## Story 7.3.4 transport lifecycle resilience and trust-invalidated channel handling
+
+- `NodeMutualTlsTransportAdapter` now emits lifecycle metadata alongside node-channel validation outcomes:
+  - certificate rotation awareness against prior serial/fingerprint bindings;
+  - reconnect directives that are explicit and policy-aware (deny on revoked/policy failures, bounded backoff guidance for transient failures).
+- `IdentityHttpServer` websocket channel handling now supports active-channel lifecycle monitoring:
+  - periodic trust/session revalidation while channel is active;
+  - revocation/trust-invalidation-triggered channel invalidation and shutdown;
+  - lifecycle event hooks for channel state transitions and reconnect guidance.
+- `SecureWebSocketChannelContext` now provides shared lifecycle/reconnect helpers so transport adapters avoid ad hoc reconnect behavior.
+
 ## Story 5.4.4 admin revocation and trust-state management transport/UI hooks
 
 Story 5.4.4 adds concrete admin-facing revocation transport and renderer wiring on top of node inventory/detail.

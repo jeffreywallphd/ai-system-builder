@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import type { AddressInfo } from "node:net";
-import { connect } from "node:net";
+import { connect, type Socket } from "node:net";
 import type { Server } from "node:http";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
 import {
@@ -46,6 +46,17 @@ async function startServer(input: {
   readonly logger?: IdentityHttpServerLogger;
   readonly validateHttp: (request: ValidateTransportConnectionTrustRequest) => Promise<HttpTransportTrustValidationResult>;
   readonly validateWebSocket: (request: ValidateTransportConnectionTrustRequest) => Promise<WebSocketTransportTrustValidationResult>;
+  readonly webSocketLifecycle?: {
+    readonly trustRevalidationIntervalMs?: number;
+    readonly resolveCertificateBinding?: (
+      channel: WebSocketChannelContext,
+    ) => {
+      readonly serialNumber?: string;
+      readonly fingerprintSha256?: string;
+    } | undefined;
+    readonly onLifecycleEvent?: (event: { readonly state: string; readonly reason?: string }) => void | Promise<void>;
+  };
+  readonly keepSocketOpen?: boolean;
   readonly onChannelEstablished?: (channel: WebSocketChannelContext) => Promise<void> | void;
 }): Promise<{ readonly baseUrl: string; readonly port: number }> {
   const harness = await createIdentityAuthTestHarness();
@@ -65,9 +76,27 @@ async function startServer(input: {
     },
     webSocket: {
       channelPathPrefix: "/ws",
+      lifecycle: input.webSocketLifecycle
+        ? {
+          trustRevalidationIntervalMs: input.webSocketLifecycle.trustRevalidationIntervalMs,
+          resolveCertificateBinding: input.webSocketLifecycle.resolveCertificateBinding
+            ? (channel) => input.webSocketLifecycle?.resolveCertificateBinding?.(channel)
+            : undefined,
+          onLifecycleEvent: input.webSocketLifecycle.onLifecycleEvent
+            ? async (event) => {
+              await input.webSocketLifecycle?.onLifecycleEvent?.(Object.freeze({
+                state: event.state,
+                reason: event.reason,
+              }));
+            }
+            : undefined,
+        }
+        : undefined,
       onChannelEstablished: async (channel, socket) => {
         await input.onChannelEstablished?.(channel);
-        socket.end();
+        if (!input.keepSocketOpen) {
+          socket.end();
+        }
       },
     },
   });
@@ -124,6 +153,32 @@ async function registerAndLogin(
   return loginBody.data.sessionToken;
 }
 
+async function resolveSessionId(baseUrl: string, sessionToken: string): Promise<string> {
+  const response = await fetch(`${baseUrl}/api/v1/identity/session`, {
+    headers: {
+      authorization: `Bearer ${sessionToken}`,
+    },
+  });
+  expect(response.status).toBe(200);
+  const body = await response.json() as { readonly data: { readonly session: { readonly sessionId: string } } };
+  return body.data.session.sessionId;
+}
+
+async function revokeSession(baseUrl: string, sessionToken: string, sessionId: string): Promise<void> {
+  const response = await fetch(`${baseUrl}/api/v1/identity/session/revoke`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${sessionToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      sessionId,
+      reason: "security",
+    }),
+  });
+  expect(response.status).toBe(200);
+}
+
 async function sendWebSocketUpgradeRequest(input: {
   readonly port: number;
   readonly path: string;
@@ -175,6 +230,67 @@ async function sendWebSocketUpgradeRequest(input: {
         "",
       ];
       socket.write(requestLines.join("\r\n"));
+    });
+  });
+}
+
+async function openWebSocketUpgradeSocket(input: {
+  readonly port: number;
+  readonly path: string;
+  readonly authorization?: string;
+  readonly headers?: Readonly<Record<string, string>>;
+}): Promise<{ readonly socket: Socket; readonly response: string }> {
+  return await new Promise<{ readonly socket: Socket; readonly response: string }>((resolve, reject) => {
+    const socket = connect({ host: "127.0.0.1", port: input.port });
+    const chunks: Buffer[] = [];
+    let settled = false;
+
+    socket.once("error", (error) => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
+    });
+
+    socket.on("data", (chunk) => {
+      chunks.push(Buffer.from(chunk));
+      const response = Buffer.concat(chunks).toString("utf8");
+      if (!settled && response.includes("\r\n\r\n")) {
+        settled = true;
+        resolve(Object.freeze({ socket, response }));
+      }
+    });
+
+    socket.once("connect", () => {
+      const dynamicHeaders = Object.entries(input.headers ?? {}).map(([key, value]) => `${key}: ${value}`);
+      const requestLines = [
+        `GET ${input.path} HTTP/1.1`,
+        "Host: 127.0.0.1",
+        "Connection: Upgrade",
+        "Upgrade: websocket",
+        "Sec-WebSocket-Version: 13",
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
+        ...(input.authorization ? [`Authorization: Bearer ${input.authorization}`] : []),
+        ...dynamicHeaders,
+        "",
+        "",
+      ];
+      socket.write(requestLines.join("\r\n"));
+    });
+  });
+}
+
+async function waitForSocketClose(socket: Socket, timeoutMs = 2_000): Promise<void> {
+  if (socket.destroyed) {
+    return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error(`Timed out waiting for socket close after ${timeoutMs}ms.`));
+    }, timeoutMs);
+    socket.once("close", () => {
+      clearTimeout(timeout);
+      resolve();
     });
   });
 }
@@ -415,5 +531,84 @@ describe("IdentityHttpServer websocket transport trust", () => {
     expect(capturedChannel?.actor.accessChannel).toBe("desktop");
     expect(capturedChannel?.capabilities).toContain("queue:read");
     expect(capturedChannel?.transport.trustValidationEnforced).toBe(true);
+  });
+
+  it("invalidates long-lived websocket channels after session revocation", async () => {
+    const events: Array<{ readonly state: string; readonly reason?: string }> = [];
+    const { baseUrl, port } = await startServer({
+      allowInsecureLoopback: false,
+      keepSocketOpen: true,
+      webSocketLifecycle: {
+        trustRevalidationIntervalMs: 50,
+        onLifecycleEvent: (event) => {
+          events.push(event);
+        },
+      },
+      validateHttp: async () => ({
+        ok: true,
+        decision: {} as never,
+      }),
+      validateWebSocket: async () => ({
+        ok: true,
+        decision: {} as never,
+      }),
+      onChannelEstablished: () => {},
+    });
+    const token = await registerAndLogin(baseUrl);
+    const sessionId = await resolveSessionId(baseUrl, token);
+
+    const { socket, response } = await openWebSocketUpgradeSocket({
+      port,
+      path: "/ws?purpose=status",
+      authorization: token,
+    });
+    expect(parseUpgradeResponse(response).statusCode).toBe(101);
+
+    await revokeSession(baseUrl, token, sessionId);
+    await waitForSocketClose(socket);
+    expect(events.some((event) => event.state === "invalidated" && event.reason === "revoked")).toBeTrue();
+    socket.destroy();
+  });
+
+  it("invalidates channel when lifecycle detects certificate rotation", async () => {
+    let callCount = 0;
+    const events: Array<{ readonly state: string; readonly reason?: string }> = [];
+    const { baseUrl, port } = await startServer({
+      allowInsecureLoopback: false,
+      keepSocketOpen: true,
+      webSocketLifecycle: {
+        trustRevalidationIntervalMs: 50,
+        resolveCertificateBinding: () => {
+          callCount += 1;
+          return callCount > 1
+            ? Object.freeze({ serialNumber: "BB22", fingerprintSha256: "FFEE" })
+            : Object.freeze({ serialNumber: "AA11", fingerprintSha256: "AABB" });
+        },
+        onLifecycleEvent: (event) => {
+          events.push(event);
+        },
+      },
+      validateHttp: async () => ({
+        ok: true,
+        decision: {} as never,
+      }),
+      validateWebSocket: async () => ({
+        ok: true,
+        decision: {} as never,
+      }),
+    });
+    const token = await registerAndLogin(baseUrl);
+
+    const { socket, response } = await openWebSocketUpgradeSocket({
+      port,
+      path: "/ws?purpose=status",
+      authorization: token,
+    });
+    expect(parseUpgradeResponse(response).statusCode).toBe(101);
+
+    await waitForSocketClose(socket);
+    expect(callCount).toBeGreaterThan(1);
+    expect(events.some((event) => event.state === "invalidated" && event.reason === "certificate-rotated")).toBeTrue();
+    socket.destroy();
   });
 });
