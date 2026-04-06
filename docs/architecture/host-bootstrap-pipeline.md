@@ -23,6 +23,20 @@ This note documents the shared host bootstrap framework introduced for Story 12.
 - `lifecycleHooks`: optional stage and pipeline lifecycle hooks
 - artifact helpers (`setArtifact`, `getArtifact`, `listArtifactKeys`) for stage handoff
 
+### Shared startup configuration resolution
+
+`src/infrastructure/config/HostStartupConfiguration.ts` now centralizes deployment-profile-aware startup resolution and validation for all host composition roots:
+
+- canonical deployment profile ids: `home`, `classroom`, `organization`
+- shared environment keys:
+  - `AI_LOOM_DEPLOYMENT_PROFILE`
+  - `AI_LOOM_ENVIRONMENT_NAME`
+  - `AI_LOOM_RELEASE_CHANNEL`
+  - `AI_LOOM_DEPLOYMENT_REGION`
+  - `AI_LOOM_ENABLED_CAPABILITIES`
+- explicit normalization and validation for profile id, environment name, release channel, and enabled capabilities
+- one resolver (`resolveHostStartupConfiguration(...)`) consumed by server, desktop, hybrid, web, and worker roots so profile/environment/capability decisions stay explicit and testable rather than scattered across host-specific environment checks
+
 ### Unified bootstrap pipeline stages
 
 Canonical stage ids are fixed and shared across hosts:
@@ -126,3 +140,4 @@ When extending host startup:
 - `src/hosts/hybrid/tests/HybridHostCompositionRoot.test.ts`
 - `src/hosts/web/tests/WebHostCompositionRoot.test.ts`
 - `src/hosts/worker/tests/WorkerHostCompositionRoot.test.ts`
+- `src/infrastructure/config/tests/HostStartupConfiguration.test.ts`

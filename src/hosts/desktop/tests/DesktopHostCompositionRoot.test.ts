@@ -14,6 +14,10 @@ import { HostBootstrapStageIds } from "../../bootstrap/HostBootstrapPipeline";
 import { createDesktopCompositionRoot, DesktopServiceRegistrationPlanArtifactKey } from "../DesktopHostCompositionRoot";
 import type { HostServiceRegistrationPlan } from "../../../infrastructure/config/HostServiceRegistration";
 import { HostServiceRegistrationError } from "../../../infrastructure/config/HostServiceRegistration";
+import {
+  HostDeploymentProfileIds,
+  HostStartupEnvironmentKeys,
+} from "../../../infrastructure/config/HostStartupConfiguration";
 
 describe("DesktopHostCompositionRoot", () => {
   it("composes and stops desktop host runtime with lifecycle transitions", async () => {
@@ -195,5 +199,42 @@ describe("DesktopHostCompositionRoot", () => {
 
     await expect(root.compose(boot)).rejects.toThrow(HostServiceRegistrationError);
     expect(started).toBeFalse();
+  });
+
+  it("resolves deployment profile and enabled capabilities through shared startup configuration", async () => {
+    let observedProfileId: string | undefined;
+    let observedEnvironmentName: string | undefined;
+    let observedCapabilities: ReadonlyArray<string> | undefined;
+    const root = createDesktopCompositionRoot({
+      startHost: async () => ({
+        close: async () => {},
+      }),
+      bootstrap: {
+        stageHandlers: {
+          [HostBootstrapStageIds.configuration]: (context) => {
+            observedProfileId = context.deploymentProfile.profileId;
+            observedEnvironmentName = context.deploymentProfile.environmentName;
+            observedCapabilities = context.enabledCapabilities;
+          },
+        },
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: DesktopHostRuntime,
+      mode: "cold-start",
+      startupReason: "desktop-startup-config-resolution-test",
+      requiredDependencyIds: ["dep:application:desktop-runtime-services"],
+      environment: {
+        [HostStartupEnvironmentKeys.deploymentProfile]: HostDeploymentProfileIds.classroom,
+        [HostStartupEnvironmentKeys.environmentName]: "test",
+      },
+    });
+
+    const runtime = await root.compose(boot);
+    expect(observedProfileId).toBe(HostDeploymentProfileIds.classroom);
+    expect(observedEnvironmentName).toBe("test");
+    expect(observedCapabilities).toContain(HostCapabilityFlags.desktopShell);
+    await runtime.stop();
   });
 });

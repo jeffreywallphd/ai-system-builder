@@ -16,6 +16,21 @@
   - lifecycle hooks
   - stage artifact handoff helpers (`setArtifact` / `getArtifact`)
 
+## Shared startup configuration resolution
+- Implemented in `src/infrastructure/config/HostStartupConfiguration.ts`.
+- All host composition roots now resolve deployment profile, environment, and enabled capabilities through one shared resolver (`resolveHostStartupConfiguration(...)`).
+- Canonical deployment profiles are constrained to:
+  - `home`
+  - `classroom`
+  - `organization`
+- Shared environment keys now drive profile-aware startup configuration:
+  - `AI_LOOM_DEPLOYMENT_PROFILE`
+  - `AI_LOOM_ENVIRONMENT_NAME`
+  - `AI_LOOM_RELEASE_CHANNEL`
+  - `AI_LOOM_DEPLOYMENT_REGION`
+  - `AI_LOOM_ENABLED_CAPABILITIES`
+- Validation for profile id, environment name, release channel, and enabled capabilities is centralized and reusable.
+
 ## Unified bootstrap stage contract
 - Canonical stage order is fixed:
   1. `configuration`
@@ -92,3 +107,4 @@
 - `src/hosts/hybrid/tests/HybridHostCompositionRoot.test.ts`
 - `src/hosts/web/tests/WebHostCompositionRoot.test.ts`
 - `src/hosts/worker/tests/WorkerHostCompositionRoot.test.ts`
+- `src/infrastructure/config/tests/HostStartupConfiguration.test.ts`

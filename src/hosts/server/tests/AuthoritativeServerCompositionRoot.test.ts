@@ -15,6 +15,10 @@ import { HostBootstrapStageIds } from "../../bootstrap/HostBootstrapPipeline";
 import type { HostServiceRegistrationPlan } from "../../../infrastructure/config/HostServiceRegistration";
 import { HostServiceRegistrationError } from "../../../infrastructure/config/HostServiceRegistration";
 import { AuthoritativeServerServiceRegistrationPlanArtifactKey } from "../AuthoritativeServerCompositionRoot";
+import {
+  HostDeploymentProfileIds,
+  HostStartupEnvironmentKeys,
+} from "../../../infrastructure/config/HostStartupConfiguration";
 
 describe("AuthoritativeServerCompositionRoot", () => {
   it("composes and stops authoritative server runtime with lifecycle transitions", async () => {
@@ -235,6 +239,50 @@ describe("AuthoritativeServerCompositionRoot", () => {
 
     await expect(root.compose(boot)).rejects.toThrow(HostServiceRegistrationError);
     expect(started).toBeFalse();
+  });
+
+  it("resolves deployment profile and enabled capabilities through shared startup configuration", async () => {
+    let observedProfileId: string | undefined;
+    let observedEnvironmentName: string | undefined;
+    let observedCapabilities: ReadonlyArray<string> | undefined;
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+      },
+      startHost: async () => ({
+        port: 5500,
+        address: "127.0.0.1:5500",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        close: async () => {},
+      }),
+      bootstrap: {
+        stageHandlers: {
+          [HostBootstrapStageIds.configuration]: (context) => {
+            observedProfileId = context.deploymentProfile.profileId;
+            observedEnvironmentName = context.deploymentProfile.environmentName;
+            observedCapabilities = context.enabledCapabilities;
+          },
+        },
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-startup-config-resolution-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+      environment: {
+        [HostStartupEnvironmentKeys.deploymentProfile]: HostDeploymentProfileIds.organization,
+        [HostStartupEnvironmentKeys.environmentName]: "production",
+      },
+    });
+
+    const runtime = await root.compose(boot);
+    expect(observedProfileId).toBe(HostDeploymentProfileIds.organization);
+    expect(observedEnvironmentName).toBe("production");
+    expect(observedCapabilities).toContain(HostCapabilityFlags.controlPlaneAuthority);
+    await runtime.stop();
   });
 });
 
