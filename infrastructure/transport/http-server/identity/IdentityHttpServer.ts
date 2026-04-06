@@ -101,6 +101,7 @@ import {
 import {
   AssetManagementApiErrorCodes,
   type AssetManagementApiResponse,
+  type GetAssetDetailApiRequest,
   type IngestAssetUploadContentApiRequest,
   type InitiateAssetUploadApiRequest,
   type ListAssetsApiRequest,
@@ -3573,6 +3574,45 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapAssetManagementStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, listRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.assetManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/assets/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            const assetId = decodePathTail(path, "/api/v1/assets/");
+            if (!workspaceId || !assetId || assetId.includes("/")) {
+              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const detailRequest: GetAssetDetailApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              workspaceId,
+              assetId,
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+              includeDeleted: parseOptionalBoolean(searchParams.get("includeDeleted")),
+            });
+            const apiResponse = await options.assetManagementBackendApi.getAssetDetail(detailRequest);
+            const statusCode = mapAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
           },
         );
         return;

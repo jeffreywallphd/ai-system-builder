@@ -200,3 +200,45 @@ Added coverage:
 - `src/application/assets/tests/AssetDiscoveryService.test.ts`
 - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+
+## Story 10.2.4: protected asset detail lookup and metadata retrieval
+
+Added authoritative secure detail retrieval across application, API, transport, and host composition:
+
+- New detail lookup use case:
+  - `src/application/assets/use-cases/AssetDetailService.ts`
+- Extended get-by-id contract validation:
+  - `src/application/assets/use-cases/AssetServiceContracts.ts`
+  - `src/shared/dto/assets/AssetTransportDtos.ts`
+- Extended detail transport projection with policy-aware operational metadata:
+  - ownership context
+  - upload state
+  - preview availability
+  - allowed actions
+  - server operation links
+  - lineage source hooks
+  - implemented in `src/shared/contracts/assets/AssetTransportContracts.ts`
+- Extended API contracts and backend:
+  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+- Added authenticated transport endpoint:
+  - `GET /api/v1/assets/:assetId`
+  - implemented in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- Host wiring now composes asset detail service:
+  - `hosts/server/IdentityServerHost.ts`
+
+Behavioral posture in this story:
+
+- detail retrieval requires active workspace membership.
+- private asset details are owner/admin-only and non-authorized lookups return safe `not-found`.
+- deleted assets remain hidden by default unless `includeDeleted=true`.
+- detail responses remain list-consistent and logical-id based; no raw storage filesystem data is exposed.
+
+Added coverage:
+
+- `src/application/assets/tests/AssetDetailService.test.ts`
+- `src/application/assets/tests/AssetServiceContracts.test.ts`
+- `src/shared/contracts/assets/tests/AssetTransportContracts.test.ts`
+- `src/shared/dto/assets/tests/AssetTransportDtos.test.ts`
+- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`

@@ -71,6 +71,7 @@ import { StorageManagementService } from "../../src/application/storage/use-case
 import { AssetUploadInitiationService } from "../../src/application/assets/use-cases/AssetUploadInitiationService";
 import { AssetUploadIngestionService } from "../../src/application/assets/use-cases/AssetUploadIngestionService";
 import { AssetDiscoveryService } from "../../src/application/assets/use-cases/AssetDiscoveryService";
+import { AssetDetailService } from "../../src/application/assets/use-cases/AssetDetailService";
 import { StorageLogicalAccessResolutionService } from "../../src/application/storage/use-cases/StorageLogicalAccessResolutionService";
 import { StorageBackendProvisioningOrchestrator } from "../../src/infrastructure/storage/StorageBackendProvisioningOrchestrator";
 import { createStorageBackendAdapterRegistry } from "../../src/infrastructure/storage/StorageBackendAdapterRegistry";
@@ -825,10 +826,15 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     repository: assetRepository,
     workspaceAuthorizationReadRepository: workspaceRepository,
   });
+  const assetDetailService = new AssetDetailService({
+    repository: assetRepository,
+    workspaceAuthorizationReadRepository: workspaceRepository,
+  });
   const assetManagementBackendApi = new AssetManagementBackendApi({
     uploadInitiationService: assetUploadInitiationService,
     uploadIngestionService: assetUploadIngestionService,
     discoveryService: assetDiscoveryService,
+    detailService: assetDetailService,
   });
   const transportTrustStateResolver = new ServerManagedTransportTrustStateResolver({
     trustedDeviceManagementService: trustedDeviceManagementService,

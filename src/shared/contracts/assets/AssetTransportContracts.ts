@@ -58,6 +58,36 @@ export interface AssetDetailDto extends AssetSummaryDto {
   readonly archivedBy?: string;
   readonly deletedAt?: string;
   readonly deletedBy?: string;
+  readonly ownershipContext?: {
+    readonly isOwnedByActor: boolean;
+  };
+  readonly uploadState?: "ready" | "archived" | "deleted";
+  readonly preview?: {
+    readonly available: boolean;
+    readonly mimeTypeHint?: string;
+  };
+  readonly allowedActions?: {
+    readonly canInitiateUpload: boolean;
+    readonly canAuthorizeDownload: boolean;
+    readonly canResolvePreview: boolean;
+    readonly canArchive: boolean;
+    readonly canDelete: boolean;
+  };
+  readonly links?: {
+    readonly self: string;
+    readonly list: string;
+    readonly initiateUpload: string;
+    readonly authorizeDownload: string;
+    readonly resolvePreview: string;
+    readonly listGeneratedOutputsBySource: string;
+  };
+  readonly lineage?: {
+    readonly sources: ReadonlyArray<{
+      readonly sourceAssetId: string;
+      readonly sourceAssetVersionId?: string;
+      readonly relation?: string;
+    }>;
+  };
 }
 
 export interface AssetDownloadAuthorizationDto {
@@ -175,7 +205,37 @@ export function toAssetSummaryDto(asset: Asset): AssetSummaryDto {
   });
 }
 
-export function toAssetDetailDto(asset: Asset): AssetDetailDto {
+export function toAssetDetailDto(
+  asset: Asset,
+  metadata?: {
+    readonly isOwnedByActor: boolean;
+    readonly uploadState: "ready" | "archived" | "deleted";
+    readonly previewAvailable: boolean;
+    readonly previewMimeTypeHint?: string;
+    readonly allowedActions: {
+      readonly canInitiateUpload: boolean;
+      readonly canAuthorizeDownload: boolean;
+      readonly canResolvePreview: boolean;
+      readonly canArchive: boolean;
+      readonly canDelete: boolean;
+    };
+    readonly links: {
+      readonly self: string;
+      readonly list: string;
+      readonly initiateUpload: string;
+      readonly authorizeDownload: string;
+      readonly resolvePreview: string;
+      readonly listGeneratedOutputsBySource: string;
+    };
+    readonly lineage: {
+      readonly sources: ReadonlyArray<{
+        readonly sourceAssetId: string;
+        readonly sourceAssetVersionId?: string;
+        readonly relation?: string;
+      }>;
+    };
+  },
+): AssetDetailDto {
   return Object.freeze({
     ...toAssetSummaryDto(asset),
     versions: Object.freeze(asset.versions.map((version) => toAssetVersionSummaryDto(version))),
@@ -183,6 +243,42 @@ export function toAssetDetailDto(asset: Asset): AssetDetailDto {
     archivedBy: asset.lifecycle.archivedBy,
     deletedAt: asset.lifecycle.deletedAt,
     deletedBy: asset.lifecycle.deletedBy,
+    ownershipContext: metadata
+      ? Object.freeze({
+        isOwnedByActor: metadata.isOwnedByActor,
+      })
+      : undefined,
+    uploadState: metadata?.uploadState,
+    preview: metadata
+      ? Object.freeze({
+        available: metadata.previewAvailable,
+        mimeTypeHint: metadata.previewMimeTypeHint,
+      })
+      : undefined,
+    allowedActions: metadata ? Object.freeze({
+      canInitiateUpload: metadata.allowedActions.canInitiateUpload,
+      canAuthorizeDownload: metadata.allowedActions.canAuthorizeDownload,
+      canResolvePreview: metadata.allowedActions.canResolvePreview,
+      canArchive: metadata.allowedActions.canArchive,
+      canDelete: metadata.allowedActions.canDelete,
+    }) : undefined,
+    links: metadata ? Object.freeze({
+      self: metadata.links.self,
+      list: metadata.links.list,
+      initiateUpload: metadata.links.initiateUpload,
+      authorizeDownload: metadata.links.authorizeDownload,
+      resolvePreview: metadata.links.resolvePreview,
+      listGeneratedOutputsBySource: metadata.links.listGeneratedOutputsBySource,
+    }) : undefined,
+    lineage: metadata
+      ? Object.freeze({
+        sources: Object.freeze(metadata.lineage.sources.map((source) => Object.freeze({
+          sourceAssetId: source.sourceAssetId,
+          sourceAssetVersionId: source.sourceAssetVersionId,
+          relation: source.relation,
+        }))),
+      })
+      : undefined,
   });
 }
 

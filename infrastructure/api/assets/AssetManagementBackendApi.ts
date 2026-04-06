@@ -2,8 +2,10 @@ import { randomUUID } from "node:crypto";
 import { AssetServiceErrorCodes } from "../../../src/application/assets/use-cases/AssetServiceContracts";
 import type { AssetUploadInitiationService } from "../../../src/application/assets/use-cases/AssetUploadInitiationService";
 import type { AssetUploadIngestionService } from "../../../src/application/assets/use-cases/AssetUploadIngestionService";
+import type { AssetDetailService } from "../../../src/application/assets/use-cases/AssetDetailService";
 import { type AssetSummaryDto, toAssetDetailDto, toAssetSummaryDto } from "../../../src/shared/contracts/assets/AssetTransportContracts";
 import {
+  toGetAssetByIdQuery,
   toListAssetsQuery,
   toBeginAssetUploadRequest,
   toRegisterAssetRequest,
@@ -16,6 +18,8 @@ import {
   type IngestAssetUploadContentApiResponse,
   type InitiateAssetUploadApiRequest,
   type InitiateAssetUploadApiResponse,
+  type GetAssetDetailApiRequest,
+  type GetAssetDetailApiResponse,
   type ListAssetsApiRequest,
   type ListAssetsApiResponse,
   type RegisterAssetApiRequest,
@@ -27,6 +31,7 @@ export interface AssetManagementBackendApiDependencies {
   readonly uploadInitiationService: AssetUploadInitiationService;
   readonly uploadIngestionService: AssetUploadIngestionService;
   readonly discoveryService: AssetDiscoveryService;
+  readonly detailService: AssetDetailService;
 }
 
 export class AssetManagementBackendApi {
@@ -203,6 +208,44 @@ export class AssetManagementBackendApi {
       data: Object.freeze({
         items: Object.freeze(outcome.value.items.map((item): AssetSummaryDto => toAssetSummaryDto(item))),
         pagination: outcome.value.pagination,
+      }),
+    });
+  }
+
+  public async getAssetDetail(
+    request: GetAssetDetailApiRequest,
+  ): Promise<AssetManagementApiResponse<GetAssetDetailApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(AssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+    }
+
+    let parsedQuery: ReturnType<typeof toGetAssetByIdQuery>;
+    try {
+      parsedQuery = toGetAssetByIdQuery({
+        actorUserId: actorUserIdentityId,
+        workspaceId: request.workspaceId,
+        assetId: request.assetId,
+        correlationId: request.correlationId,
+        occurredAt: request.occurredAt,
+        includeDeleted: request.includeDeleted,
+      });
+    } catch (error) {
+      return this.failed(
+        AssetManagementApiErrorCodes.invalidRequest,
+        error instanceof Error ? error.message : "Request validation failed.",
+      );
+    }
+
+    const outcome = await this.dependencies.detailService.getAssetById(parsedQuery);
+    if (!outcome.ok) {
+      return this.failedFromServiceError(outcome.error.code, outcome.error.message, outcome.error.details);
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        asset: toAssetDetailDto(outcome.value.asset, outcome.value.metadata),
       }),
     });
   }

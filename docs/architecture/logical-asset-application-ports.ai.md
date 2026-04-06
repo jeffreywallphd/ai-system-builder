@@ -178,3 +178,44 @@ Coverage added for this story:
 - `src/application/assets/tests/AssetDiscoveryService.test.ts`
 - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+
+## Story 10.2.4 protected asset detail lookup + metadata retrieval
+
+- Added an authoritative asset detail lookup use case:
+  - `src/application/assets/use-cases/AssetDetailService.ts`
+- Extended service-contract validation with normalized get-by-id query parsing:
+  - `src/application/assets/use-cases/AssetServiceContracts.ts`
+  - `src/shared/dto/assets/AssetTransportDtos.ts`
+- Extended shared detail DTO projection with policy-aware operational metadata fields:
+  - ownership context (`isOwnedByActor`)
+  - upload state (`ready` | `archived` | `deleted`)
+  - preview availability/mime hint
+  - allowed action set
+  - server route links for self/list/upload/download/preview/generated-output-source discovery
+  - lineage source hooks
+  - implemented in `src/shared/contracts/assets/AssetTransportContracts.ts`
+- Extended backend API + transport contract with dedicated detail retrieval endpoint payloads:
+  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+- Added authenticated transport endpoint:
+  - `GET /api/v1/assets/:assetId`
+  - implemented in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- Host composition now wires the detail service into asset management backend API:
+  - `hosts/server/IdentityServerHost.ts`
+
+Operational behavior in this story:
+
+- detail lookup requires active workspace membership.
+- cross-workspace and unauthorized private-asset lookups return safe `not-found` behavior.
+- deleted assets are hidden by default unless `includeDeleted=true`.
+- detail responses preserve list-summary consistency and include logical/server-safe metadata only.
+- raw storage/object filesystem internals remain infrastructure-only.
+
+Coverage added for this story:
+
+- `src/application/assets/tests/AssetDetailService.test.ts`
+- `src/application/assets/tests/AssetServiceContracts.test.ts`
+- `src/shared/contracts/assets/tests/AssetTransportContracts.test.ts`
+- `src/shared/dto/assets/tests/AssetTransportDtos.test.ts`
+- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
