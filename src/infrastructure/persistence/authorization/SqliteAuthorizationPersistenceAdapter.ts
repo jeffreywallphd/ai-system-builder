@@ -45,6 +45,7 @@ import {
   resolvePersistenceMutationCreatedAt,
   resolvePersistenceMutationMetadata,
 } from "../common/PersistenceMutationMetadata";
+import { SafeSqliteRepositoryBase } from "../common/SafeSqliteRepositoryBase";
 
 export interface SqliteAuthorizationPersistenceAdapterCacheOptions {
   readonly enabled?: boolean;
@@ -58,6 +59,7 @@ export interface SqliteAuthorizationPersistenceAdapterOptions {
 const DefaultCacheMaxEntriesPerStore = 512;
 
 export class SqliteAuthorizationPersistenceAdapter
+  extends SafeSqliteRepositoryBase
   implements
     IAuthorizationRoleAssignmentPersistenceRepository,
     IAuthorizationSharingGrantPersistenceRepository,
@@ -75,6 +77,7 @@ export class SqliteAuthorizationPersistenceAdapter
     private readonly databasePath: string,
     options?: SqliteAuthorizationPersistenceAdapterOptions,
   ) {
+    super("Authorization");
     this.cacheEnabled = options?.cache?.enabled ?? true;
     const requestedMaxEntries = options?.cache?.maxEntriesPerStore;
     this.maxCacheEntriesPerStore = Number.isInteger(requestedMaxEntries) && (requestedMaxEntries as number) > 0
@@ -192,7 +195,7 @@ export class SqliteAuthorizationPersistenceAdapter
       params.push(asOf);
     }
 
-    const paging = this.toPagingClause(query.limit, query.offset);
+    const paging = this.buildPagingClause(query.limit, query.offset);
 
     const rows = this.getDatabase().prepare(`
       SELECT
@@ -442,7 +445,7 @@ export class SqliteAuthorizationPersistenceAdapter
       params.push(asOf);
     }
 
-    const paging = this.toPagingClause(query.limit, query.offset);
+    const paging = this.buildPagingClause(query.limit, query.offset);
 
     const rows = this.getDatabase().prepare(`
       SELECT
@@ -666,7 +669,7 @@ export class SqliteAuthorizationPersistenceAdapter
       params.push(asOf);
     }
 
-    const paging = this.toPagingClause(query.limit, query.offset);
+    const paging = this.buildPagingClause(query.limit, query.offset);
 
     const rows = this.getDatabase().prepare(`
       SELECT
@@ -1008,53 +1011,6 @@ export class SqliteAuthorizationPersistenceAdapter
       JSON.stringify(record),
       resolvePersistenceMutationCreatedAt(undefined),
     ));
-  }
-
-  private toPagingClause(limit?: number, offset?: number): { readonly sql: string; readonly params: ReadonlyArray<number> } {
-    const normalizedLimit = Number.isInteger(limit) && (limit ?? 0) > 0 ? (limit as number) : undefined;
-    const normalizedOffset = Number.isInteger(offset) && (offset ?? -1) >= 0 ? (offset as number) : undefined;
-
-    if (normalizedLimit !== undefined && normalizedOffset !== undefined) {
-      return {
-        sql: "LIMIT ? OFFSET ?",
-        params: Object.freeze([normalizedLimit, normalizedOffset]),
-      };
-    }
-
-    if (normalizedLimit !== undefined) {
-      return {
-        sql: "LIMIT ?",
-        params: Object.freeze([normalizedLimit]),
-      };
-    }
-
-    if (normalizedOffset !== undefined) {
-      return {
-        sql: "LIMIT -1 OFFSET ?",
-        params: Object.freeze([normalizedOffset]),
-      };
-    }
-
-    return {
-      sql: "",
-      params: Object.freeze([]),
-    };
-  }
-
-  private executeMutation(
-    operation: string,
-    mutation: () => { readonly changes: number },
-  ): { readonly changes: number } {
-    try {
-      return mutation();
-    } catch (error) {
-      throw this.toPersistenceError(operation, error);
-    }
-  }
-
-  private toPersistenceError(operation: string, error: unknown): Error {
-    const details = error instanceof Error ? error.message : String(error);
-    return new Error(`Authorization persistence failed to ${operation}: ${details}`);
   }
 
   private readFromCache<T>(cache: Map<string, T>, key: string): T | undefined {

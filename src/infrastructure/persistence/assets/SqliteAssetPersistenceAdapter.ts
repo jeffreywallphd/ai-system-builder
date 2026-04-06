@@ -22,12 +22,15 @@ import {
   ASSET_PERSISTENCE_MIGRATIONS,
   ASSET_PERSISTENCE_SCHEMA_VERSION,
 } from "./SqliteAssetPersistenceMigrations";
+import { SafeSqliteRepositoryBase } from "../common/SafeSqliteRepositoryBase";
 
-export class SqliteAssetPersistenceAdapter implements IAssetRepository {
+export class SqliteAssetPersistenceAdapter extends SafeSqliteRepositoryBase implements IAssetRepository {
   private database?: SqliteCompatDatabase;
   private initialized = false;
 
-  public constructor(private readonly databasePath: string) {}
+  public constructor(private readonly databasePath: string) {
+    super("Asset");
+  }
 
   public async findAssetById(assetId: string): Promise<Asset | undefined> {
     const normalizedAssetId = normalizeAssetLookup(assetId);
@@ -98,7 +101,7 @@ export class SqliteAssetPersistenceAdapter implements IAssetRepository {
       }
     }
 
-    const paging = this.toPagingClause(query.limit, query.offset);
+    const paging = this.buildPagingClause(query.limit, query.offset);
     const rows = this.getDatabase().prepare(`
       SELECT a.*
       FROM asset_records a
@@ -459,34 +462,4 @@ export class SqliteAssetPersistenceAdapter implements IAssetRepository {
     return typeof row?.version === "number" ? row.version : 0;
   }
 
-  private toPagingClause(limit?: number, offset?: number): { readonly sql: string; readonly params: ReadonlyArray<number> } {
-    const normalizedLimit = Number.isInteger(limit) && (limit ?? 0) > 0 ? (limit as number) : undefined;
-    const normalizedOffset = Number.isInteger(offset) && (offset ?? -1) >= 0 ? (offset as number) : undefined;
-
-    if (normalizedLimit !== undefined && normalizedOffset !== undefined) {
-      return {
-        sql: "LIMIT ? OFFSET ?",
-        params: Object.freeze([normalizedLimit, normalizedOffset]),
-      };
-    }
-
-    if (normalizedLimit !== undefined) {
-      return {
-        sql: "LIMIT ?",
-        params: Object.freeze([normalizedLimit]),
-      };
-    }
-
-    if (normalizedOffset !== undefined) {
-      return {
-        sql: "LIMIT -1 OFFSET ?",
-        params: Object.freeze([normalizedOffset]),
-      };
-    }
-
-    return {
-      sql: "",
-      params: Object.freeze([]),
-    };
-  }
 }

@@ -188,6 +188,31 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
   - `src/shared/persistence/tests/PersistenceTenancyMetadataFactory.test.ts`
   - `src/infrastructure/persistence/common/tests/PersistenceMutationMetadata.test.ts`
 
+## Story 13.3.2 reusable persistence mapper/query helper utilities
+
+- New shared infrastructure persistence helpers now provide:
+  - lookup normalization + optional JSON payload parsing + tenancy metadata projection:
+    - `src/infrastructure/persistence/common/PersistenceMapperUtilities.ts`
+  - reusable SQL query filter + paging construction:
+    - `src/infrastructure/persistence/common/SqliteQueryHelpers.ts`
+  - tenancy-scope filter composition helpers:
+    - `src/infrastructure/persistence/common/PersistenceTenancyScopeQuery.ts`
+  - common safe repository base behavior for mutation error wrapping, paging, and timestamp fallback:
+    - `src/infrastructure/persistence/common/SafeSqliteRepositoryBase.ts`
+- Concrete adapters now consume shared repository/query helpers to reduce duplicated persistence concern logic:
+  - `src/infrastructure/persistence/platform/SqlitePlatformPersistenceAdapter.ts`
+  - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter.ts`
+  - `src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter.ts`
+  - `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter.ts`
+  - `src/infrastructure/persistence/assets/SqliteAssetPersistenceAdapter.ts`
+- Platform persistence mapper now reuses shared mapper helper utilities for tenancy conversion + JSON object parsing:
+  - `src/infrastructure/persistence/platform/PlatformPersistenceMapper.ts`
+- Added utility coverage:
+  - `src/infrastructure/persistence/common/tests/PersistenceMapperUtilities.test.ts`
+  - `src/infrastructure/persistence/common/tests/SqliteQueryHelpers.test.ts`
+  - `src/infrastructure/persistence/common/tests/PersistenceTenancyScopeQuery.test.ts`
+  - `src/infrastructure/persistence/common/tests/SafeSqliteRepositoryBase.test.ts`
+
 ## Mapper guidance for contributors
 
 - Keep mapper implementations in infrastructure, but drive them from shared DTO + schema contracts.
