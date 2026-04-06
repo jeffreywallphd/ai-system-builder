@@ -128,6 +128,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For shared host startup pipeline contracts, startup-context model, and contributor startup-sequence guidance, read [`host-bootstrap-pipeline.md`](./host-bootstrap-pipeline.md).
 - For host-safe service registration rules, host-aware dependency composition, and authoritative control-plane service coverage requirements, read [`host-service-registration-composition-rules.md`](./host-service-registration-composition-rules.md).
 - For the executable authoritative server host assembly, startup entrypoint, and startup lifecycle expectations, read [`authoritative-server-host-assembly.md`](./authoritative-server-host-assembly.md).
+- For shared SQLite persistence bootstrap/runtime configuration, lifecycle cleanup behavior, and migration-hook coordination in authoritative startup, read [`persistence-bootstrap-and-lifecycle.md`](./persistence-bootstrap-and-lifecycle.md).
 - For the executable desktop host assembly, startup entrypoint, and desktop-specific composition/lifecycle boundaries, read [`desktop-host-assembly.md`](./desktop-host-assembly.md).
 - For the executable hybrid host assembly, capability-composition rules, and authoritative delegation mode, read [`hybrid-host-assembly.md`](./hybrid-host-assembly.md).
 - For the executable web host assembly, thin-client delivery composition boundaries, and startup entrypoint expectations, read [`web-host-assembly.md`](./web-host-assembly.md).

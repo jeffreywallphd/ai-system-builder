@@ -32,6 +32,11 @@ import {
 } from "../../../hosts/server/IdentityServerHost";
 import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
 import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
+import {
+  createSqlitePersistenceRuntime,
+  resolveSqlitePersistenceRuntimeConfiguration,
+  type SqlitePersistenceRuntime,
+} from "../../infrastructure/persistence/sqlite/SqlitePersistenceRuntime";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -57,12 +62,17 @@ export interface AuthoritativeServerCompositionRootOptions {
     readonly lifecycleHooks?: HostStartupLifecycleHooks;
     readonly composeServiceRegistrationPlan?: (boot: HostBootConfiguration) => HostServiceRegistrationPlan;
     readonly assertServiceCoverage?: (plan: HostServiceRegistrationPlan) => void;
+    readonly createPersistenceRuntime?: (input: {
+      readonly hostConfiguration: IdentityServerHostOptions;
+      readonly environment: Readonly<Record<string, string | undefined>>;
+    }) => SqlitePersistenceRuntime;
   };
 }
 
 const StartedHostArtifactKey = "artifact:host:server:authoritative:runtime";
 export const AuthoritativeServerServiceRegistrationPlanArtifactKey =
   "artifact:host:server:authoritative:service-registration-plan";
+export const AuthoritativeServerPersistenceRuntimeArtifactKey = "artifact:host:server:authoritative:persistence-runtime";
 
 function combineStartupLifecycleHooks(
   primary: HostStartupLifecycleHooks | undefined,
@@ -136,6 +146,7 @@ export function createAuthoritativeServerCompositionRoot(
         }),
       });
       let startedHost: IdentityServerHost | undefined;
+      let persistenceRuntime: SqlitePersistenceRuntime | undefined;
       await lifecycle.markComposing("compose-authoritative-server-host");
 
       try {
@@ -164,6 +175,22 @@ export function createAuthoritativeServerCompositionRoot(
               }));
             const plan = composePlan(context.boot);
             context.setArtifact(AuthoritativeServerServiceRegistrationPlanArtifactKey, plan);
+          },
+          [HostBootstrapStageIds.persistence]: async (context) => {
+            persistenceRuntime = (
+              input.bootstrap?.createPersistenceRuntime
+              ?? ((runtimeInput) => createSqlitePersistenceRuntime({
+                configuration: resolveSqlitePersistenceRuntimeConfiguration({
+                  databasePath: runtimeInput.hostConfiguration.databasePath,
+                  environment: runtimeInput.environment,
+                }),
+              }))
+            )({
+              hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
+              environment: context.environment,
+            });
+            await persistenceRuntime.start();
+            context.setArtifact(AuthoritativeServerPersistenceRuntimeArtifactKey, persistenceRuntime);
           },
           [HostBootstrapStageIds.featureRegistration]: async (context) => {
             const plan = context.getArtifact<HostServiceRegistrationPlan>(
@@ -221,18 +248,27 @@ export function createAuthoritativeServerCompositionRoot(
           throw new Error("Authoritative server bootstrap did not produce a runtime host artifact.");
         }
         const activeHost = startedHost;
+        const activePersistenceRuntime = persistenceRuntime;
 
         const stop = async () => {
           await lifecycle.shutdown({
             shutdownRequestedReason: "authoritative-server-stop-requested",
             shutdownCompletedReason: "authoritative-server-stopped",
             shutdownFailureReason: "authoritative-server-stop-failed",
-            cleanupHooks: [{
-              hookId: "close-runtime-host",
-              run: async () => {
-                await activeHost.close();
+            cleanupHooks: [
+              {
+                hookId: "close-runtime-host",
+                run: async () => {
+                  await activeHost.close();
+                },
               },
-            }],
+              {
+                hookId: "close-persistence-runtime",
+                run: async () => {
+                  await activePersistenceRuntime?.dispose();
+                },
+              },
+            ],
           });
         };
 
@@ -262,13 +298,27 @@ export function createAuthoritativeServerCompositionRoot(
             await lifecycle.runStartupFailureCleanup({
               cleanupReason: "authoritative-server-start-failure-cleanup",
               cleanupFailureReason: "authoritative-server-start-failure-cleanup-failed",
-              cleanupHooks: [{
-                hookId: "close-runtime-host",
-                run: async () => {
-                  await startedHost?.close();
+              cleanupHooks: [
+                {
+                  hookId: "close-runtime-host",
+                  run: async () => {
+                    await startedHost?.close();
+                  },
                 },
-              }],
+                {
+                  hookId: "close-persistence-runtime",
+                  run: async () => {
+                    await persistenceRuntime?.dispose();
+                  },
+                },
+              ],
             });
+          } catch (cleanupError) {
+            failure = cleanupError;
+          }
+        } else {
+          try {
+            await persistenceRuntime?.dispose();
           } catch (cleanupError) {
             failure = cleanupError;
           }
