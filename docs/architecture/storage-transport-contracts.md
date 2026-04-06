@@ -34,7 +34,11 @@ This note documents Story 9.1.3 (Feature 9 / Epic 9.1): shared storage transport
 
 - backend and lifecycle posture: backend type, lifecycle state, creation/update timestamps
 - display metadata: display name, description, tags, labels, visual metadata extensions
-- policy metadata: policy id, retention/size constraints, label metadata, encryption posture (without leaking key references)
+- policy metadata: policy id, retention/size constraints, label metadata, encryption posture (without leaking key references), and explicit security/lifecycle policy controls:
+  - encryption mode and key scope
+  - content encryption requirement
+  - preview and worker decryption allowances
+  - retention-expiry hook metadata (`retentionExpiryAction`, optional `purgeGracePeriodDays`)
 - access metadata: mode/scope plus permission summary booleans for read/write/policy/lifecycle operations
 - replication/sync metadata: replication mode/config, sync health state, optional last-sync indicators
 
@@ -50,11 +54,13 @@ This note documents Story 9.1.3 (Feature 9 / Epic 9.1): shared storage transport
 `StorageTransportSchemaContracts.ts` provides strict zod validation for request/response payloads with typed parse failures:
 
 - replication coherence checks (`none` vs `async-mirror` vs `sync-mirror`)
+- policy metadata contradiction checks (for example no-encryption mode cannot require content encryption, retention-expiry hooks must match retention settings)
 - required-field and identifier-format validation
 - metadata label safety checks for redaction-safe keys
 - pagination bounds for list queries
 - admin-safe detail validation (for example, read-only access cannot advertise write capability)
 - strict object schemas rejecting unknown payload keys
+- deterministic create-policy defaults at schema boundary for omitted security/lifecycle metadata fields
 
 Validation parse helpers expose typed failures through `StorageTransportSchemaValidationError`.
 

@@ -42,6 +42,16 @@ describe("StorageDomain", () => {
           keyReferenceId: "kek:workspace-1",
           envelopeRequired: true,
         },
+        security: {
+          encryptionMode: "customer-managed",
+          contentEncryptionRequired: true,
+          keyScope: "workspace",
+          allowPreviewDecryption: false,
+          allowWorkerDecryption: true,
+        },
+        lifecycle: {
+          retentionExpiryAction: "archive",
+        },
       },
       lifecycleState: StorageLifecycleStates.active,
       createdBy: "user-owner",
@@ -53,6 +63,8 @@ describe("StorageDomain", () => {
     expect(instance.lifecycleState).toBe(StorageLifecycleStates.active);
     expect(instance.policy.retentionDays).toBe(30);
     expect(instance.policy.encryption.profileId).toBe("encryption-profile:workspace-default");
+    expect(instance.policy.security.encryptionMode).toBe("customer-managed");
+    expect(instance.policy.lifecycle.retentionExpiryAction).toBe("archive");
   });
 
   it("enforces replication policy invariants", () => {
@@ -245,5 +257,101 @@ describe("StorageDomain", () => {
     expect(updated.policy.immutableWrites).toBeTrue();
     expect(updated.lastModifiedBy).toBe("user-admin");
     expect(updated.lastCorrelationId).toBe("audit.storage.policy.1");
+  });
+
+  it("applies deterministic storage policy metadata defaults", () => {
+    const instance = createStorageInstance({
+      id: "storage-policy-defaults-1",
+      displayName: "Policy Defaults Storage",
+      backendType: StorageBackendTypes.managedFilesystem,
+      ownership: {
+        workspaceId: "workspace-6",
+        ownerUserIdentityId: "user-owner",
+      },
+      access: {
+        mode: StorageAccessModes.readWrite,
+        scope: StorageAccessScopes.workspace,
+      },
+      policy: {
+        policyId: "storage-policy-6",
+        encryption: {
+          profileId: "encryption-profile:workspace-default",
+          envelopeRequired: true,
+        },
+      },
+      createdBy: "user-owner",
+      createdAt: "2026-04-06T12:00:00.000Z",
+      lastCorrelationId: "audit.storage.create.6",
+    });
+
+    expect(instance.policy.security.encryptionMode).toBe("platform-managed");
+    expect(instance.policy.security.contentEncryptionRequired).toBeTrue();
+    expect(instance.policy.security.keyScope).toBe("workspace");
+    expect(instance.policy.security.allowPreviewDecryption).toBeFalse();
+    expect(instance.policy.security.allowWorkerDecryption).toBeFalse();
+    expect(instance.policy.lifecycle.retentionExpiryAction).toBe("none");
+    expect(instance.policy.lifecycle.purgeGracePeriodDays).toBeUndefined();
+  });
+
+  it("rejects contradictory storage policy metadata combinations", () => {
+    expect(() => createStorageInstance({
+      id: "storage-policy-invalid-1",
+      displayName: "Invalid Storage Policy",
+      backendType: StorageBackendTypes.objectStorage,
+      ownership: {
+        workspaceId: "workspace-7",
+        ownerUserIdentityId: "user-owner",
+      },
+      access: {
+        mode: StorageAccessModes.readWrite,
+        scope: StorageAccessScopes.workspaceMembers,
+      },
+      policy: {
+        policyId: "storage-policy-7",
+        retentionDays: 30,
+        encryption: {
+          profileId: "encryption-profile:workspace-default",
+          envelopeRequired: true,
+        },
+        security: {
+          encryptionMode: "none",
+          contentEncryptionRequired: true,
+          keyScope: "workspace",
+          allowPreviewDecryption: false,
+          allowWorkerDecryption: false,
+        },
+      },
+      createdBy: "user-owner",
+      createdAt: "2026-04-06T12:00:00.000Z",
+      lastCorrelationId: "audit.storage.create.7",
+    })).toThrow(StorageDomainError);
+
+    expect(() => createStorageInstance({
+      id: "storage-policy-invalid-2",
+      displayName: "Invalid Lifecycle Hook",
+      backendType: StorageBackendTypes.objectStorage,
+      ownership: {
+        workspaceId: "workspace-7",
+        ownerUserIdentityId: "user-owner",
+      },
+      access: {
+        mode: StorageAccessModes.readWrite,
+        scope: StorageAccessScopes.workspaceMembers,
+      },
+      policy: {
+        policyId: "storage-policy-8",
+        encryption: {
+          profileId: "encryption-profile:workspace-default",
+          envelopeRequired: true,
+        },
+        lifecycle: {
+          retentionExpiryAction: "delete",
+          purgeGracePeriodDays: 3,
+        },
+      },
+      createdBy: "user-owner",
+      createdAt: "2026-04-06T12:00:00.000Z",
+      lastCorrelationId: "audit.storage.create.8",
+    })).toThrow(StorageDomainError);
   });
 });

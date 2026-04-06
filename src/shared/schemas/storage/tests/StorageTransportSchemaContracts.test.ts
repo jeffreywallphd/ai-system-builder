@@ -52,6 +52,12 @@ describe("StorageTransportSchemaContracts", () => {
         labels: {
           role: "outputs",
         },
+        encryptionMode: "platform-managed",
+        contentEncryptionRequired: true,
+        keyScope: "workspace",
+        allowPreviewDecryption: false,
+        allowWorkerDecryption: false,
+        retentionExpiryAction: "archive",
         encryptionProfileId: "enc:profile:default",
         envelopeRequired: true,
       },
@@ -61,6 +67,7 @@ describe("StorageTransportSchemaContracts", () => {
 
     expect(parsed.storageInstanceId).toBe("storage-managed-201");
     expect(parsed.display.tags).toEqual(["outputs", "publish"]);
+    expect(parsed.policy.retentionExpiryAction).toBe("archive");
   });
 
   it("rejects malformed replication payloads for create", () => {
@@ -85,6 +92,12 @@ describe("StorageTransportSchemaContracts", () => {
         immutableWrites: false,
         allowCrossWorkspaceReads: false,
         labels: {},
+        encryptionMode: "platform-managed",
+        contentEncryptionRequired: true,
+        keyScope: "workspace",
+        allowPreviewDecryption: false,
+        allowWorkerDecryption: false,
+        retentionExpiryAction: "none",
         encryptionProfileId: "enc:profile:default",
         envelopeRequired: true,
       },
@@ -113,6 +126,12 @@ describe("StorageTransportSchemaContracts", () => {
         immutableWrites: false,
         allowCrossWorkspaceReads: false,
         labels: {},
+        encryptionMode: "platform-managed",
+        contentEncryptionRequired: true,
+        keyScope: "workspace",
+        allowPreviewDecryption: false,
+        allowWorkerDecryption: false,
+        retentionExpiryAction: "none",
         encryptionProfileId: "enc:profile:default",
         envelopeRequired: true,
       },
@@ -186,9 +205,15 @@ describe("StorageTransportSchemaContracts", () => {
           immutableWrites: false,
           allowCrossWorkspaceReads: false,
           labels: {},
+          encryptionMode: "platform-managed",
+          contentEncryptionRequired: true,
+          keyScope: "workspace",
+          allowPreviewDecryption: false,
+          allowWorkerDecryption: false,
+          retentionExpiryAction: "none",
           encryptionProfileId: "enc:profile:default",
           envelopeRequired: true,
-          hasEncryptionKeyReference: true,
+          hasEncryptionKeyReference: false,
         },
         replication: {
           mode: StorageReplicationModes.none,
@@ -205,7 +230,7 @@ describe("StorageTransportSchemaContracts", () => {
       },
     });
 
-    expect(parsed.storage.policy.hasEncryptionKeyReference).toBeTrue();
+    expect(parsed.storage.policy.hasEncryptionKeyReference).toBeFalse();
     expect(parsed.storage.sensitiveRedaction?.redactedFields[0]?.field).toBe("encryptionKeyReferenceId");
 
     expect(() => parseCreateStorageInstanceResponseDto({
@@ -214,6 +239,90 @@ describe("StorageTransportSchemaContracts", () => {
         sensitive: {
           encryptionKeyReferenceId: "leak",
         },
+      },
+    })).toThrow(StorageTransportSchemaValidationError);
+  });
+
+  it("applies deterministic defaults for create policy metadata", () => {
+    const parsed = parseCreateStorageInstanceRequestDto({
+      actorUserIdentityId: "user:storage-admin-2",
+      workspaceId: "workspace:alpha",
+      storageInstanceId: "storage-managed-205",
+      backendType: StorageBackendTypes.objectStorage,
+      display: {
+        displayName: "Defaulted Policy",
+      },
+      ownerUserIdentityId: "user:owner-2",
+      access: {
+        mode: StorageAccessModes.readWrite,
+        scope: StorageAccessScopes.workspaceMembers,
+      },
+      policy: {
+        policyId: "policy:storage:205",
+        immutableWrites: false,
+        allowCrossWorkspaceReads: false,
+        labels: {},
+        encryptionProfileId: "enc:profile:default",
+        envelopeRequired: true,
+      },
+    });
+
+    expect(parsed.policy.encryptionMode).toBe("platform-managed");
+    expect(parsed.policy.contentEncryptionRequired).toBeTrue();
+    expect(parsed.policy.keyScope).toBe("workspace");
+    expect(parsed.policy.allowPreviewDecryption).toBeFalse();
+    expect(parsed.policy.allowWorkerDecryption).toBeFalse();
+    expect(parsed.policy.retentionExpiryAction).toBe("none");
+  });
+
+  it("rejects contradictory create policy metadata combinations", () => {
+    expect(() => parseCreateStorageInstanceRequestDto({
+      actorUserIdentityId: "user:storage-admin-2",
+      workspaceId: "workspace:alpha",
+      storageInstanceId: "storage-managed-206",
+      backendType: StorageBackendTypes.objectStorage,
+      display: {
+        displayName: "Contradictory Policy",
+      },
+      ownerUserIdentityId: "user:owner-2",
+      access: {
+        mode: StorageAccessModes.readWrite,
+        scope: StorageAccessScopes.workspaceMembers,
+      },
+      policy: {
+        policyId: "policy:storage:206",
+        immutableWrites: false,
+        allowCrossWorkspaceReads: false,
+        labels: {},
+        encryptionMode: "none",
+        contentEncryptionRequired: true,
+        encryptionProfileId: "enc:profile:default",
+        envelopeRequired: false,
+      },
+    })).toThrow(StorageTransportSchemaValidationError);
+
+    expect(() => parseCreateStorageInstanceRequestDto({
+      actorUserIdentityId: "user:storage-admin-2",
+      workspaceId: "workspace:alpha",
+      storageInstanceId: "storage-managed-207",
+      backendType: StorageBackendTypes.objectStorage,
+      display: {
+        displayName: "Retention Hook Without Retention",
+      },
+      ownerUserIdentityId: "user:owner-2",
+      access: {
+        mode: StorageAccessModes.readWrite,
+        scope: StorageAccessScopes.workspaceMembers,
+      },
+      policy: {
+        policyId: "policy:storage:207",
+        immutableWrites: false,
+        allowCrossWorkspaceReads: false,
+        labels: {},
+        retentionExpiryAction: "delete",
+        purgeGracePeriodDays: 2,
+        encryptionProfileId: "enc:profile:default",
+        envelopeRequired: true,
       },
     })).toThrow(StorageTransportSchemaValidationError);
   });

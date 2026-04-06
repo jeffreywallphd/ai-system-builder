@@ -19,7 +19,7 @@ Story 9.1.3 adds shared storage transport DTOs + schema validation so storage cr
   - backend type
   - display metadata
   - lifecycle metadata
-  - policy metadata
+  - policy metadata (including explicit security + lifecycle hooks)
   - access permission summary
   - replication + sync metadata
 - create/update/list/detail command/query DTOs and response DTOs
@@ -38,10 +38,12 @@ Story 9.1.3 adds shared storage transport DTOs + schema validation so storage cr
 - Strict zod schemas reject malformed/incomplete payloads.
 - Key rules include:
   - replication mode/config coherence
+  - policy contradiction checks for encryption/decryption posture and retention hooks
   - identifier and timestamp format checks
   - metadata label safety enforcement
   - list pagination bounds
   - strict unknown-key rejection
+- create-policy parsing applies deterministic defaults for omitted security/lifecycle policy metadata fields.
 - Parse helpers throw `StorageTransportSchemaValidationError` with typed issue metadata.
 
 ## Compatibility posture

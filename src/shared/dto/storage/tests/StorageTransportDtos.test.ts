@@ -45,6 +45,13 @@ describe("StorageTransportDtos", () => {
           keyReferenceId: "key-ref-should-not-leak",
           envelopeRequired: true,
         },
+        security: {
+          encryptionMode: "customer-managed",
+          contentEncryptionRequired: true,
+          keyScope: "workspace",
+          allowPreviewDecryption: false,
+          allowWorkerDecryption: true,
+        },
       },
       lifecycleState: StorageLifecycleStates.active,
       createdBy: "user:owner-1",
@@ -64,6 +71,8 @@ describe("StorageTransportDtos", () => {
     const adminSafe = toStorageInstanceDetailDto(detail);
 
     expect(detail.policy.hasEncryptionKeyReference).toBeTrue();
+    expect(detail.policy.encryptionMode).toBe("customer-managed");
+    expect(detail.policy.allowWorkerDecryption).toBeTrue();
     expect((detail.policy as unknown as { encryptionKeyReferenceId?: string }).encryptionKeyReferenceId).toBeUndefined();
     expect((adminSafe as unknown as { sensitive?: unknown }).sensitive).toBeUndefined();
     expect(adminSafe.sensitiveRedaction?.redactedFields[0]?.field).toBe("encryptionKeyReferenceId");
@@ -135,6 +144,13 @@ describe("StorageTransportDtos", () => {
           profileId: "enc:profile:default",
           keyReferenceId: "key-ref-internal",
           envelopeRequired: true,
+        },
+        security: {
+          encryptionMode: "customer-managed",
+          contentEncryptionRequired: true,
+          keyScope: "workspace",
+          allowPreviewDecryption: false,
+          allowWorkerDecryption: false,
         },
       },
       createdBy: "user:owner-3",

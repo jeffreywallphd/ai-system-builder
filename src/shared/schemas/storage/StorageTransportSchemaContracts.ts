@@ -3,8 +3,11 @@ import {
   StorageAccessModes,
   StorageAccessScopes,
   StorageBackendTypes,
+  StorageEncryptionKeyScopes,
+  StorageEncryptionModes,
   StorageLifecycleStates,
   StorageReplicationModes,
+  StorageRetentionExpiryActions,
 } from "../../../domain/storage/StorageDomain";
 import {
   StorageSensitiveRedactionReasons,
@@ -161,6 +164,24 @@ const StorageSyncStatusSchema = z.enum([
   StorageSyncStatuses.disabled,
 ]);
 
+const StorageEncryptionModeSchema = z.enum([
+  StorageEncryptionModes.none,
+  StorageEncryptionModes.platformManaged,
+  StorageEncryptionModes.customerManaged,
+]);
+
+const StorageEncryptionKeyScopeSchema = z.enum([
+  StorageEncryptionKeyScopes.workspace,
+  StorageEncryptionKeyScopes.storageInstance,
+  StorageEncryptionKeyScopes.platform,
+]);
+
+const StorageRetentionExpiryActionSchema = z.enum([
+  StorageRetentionExpiryActions.none,
+  StorageRetentionExpiryActions.archive,
+  StorageRetentionExpiryActions.delete,
+]);
+
 const StorageReplicationPolicySchema = z.object({
   mode: StorageReplicationModeSchema,
   replicaStorageInstanceId: StorageInstanceIdSchema.optional(),
@@ -209,10 +230,97 @@ const StoragePolicyInputSchema = z.object({
   immutableWrites: z.boolean().optional(),
   allowCrossWorkspaceReads: z.boolean().optional(),
   labels: z.record(MetadataLabelKeySchema, MetadataLabelValueSchema).optional(),
+  encryptionMode: StorageEncryptionModeSchema.default(StorageEncryptionModes.platformManaged),
+  contentEncryptionRequired: z.boolean().default(true),
+  keyScope: StorageEncryptionKeyScopeSchema.default(StorageEncryptionKeyScopes.workspace),
+  allowPreviewDecryption: z.boolean().default(false),
+  allowWorkerDecryption: z.boolean().default(false),
+  retentionExpiryAction: StorageRetentionExpiryActionSchema.default(StorageRetentionExpiryActions.none),
+  purgeGracePeriodDays: z.number().int().positive().optional(),
   encryptionProfileId: IdentifierSchema,
   encryptionKeyReferenceId: IdentifierSchema.optional(),
   envelopeRequired: z.boolean(),
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (value.encryptionMode === StorageEncryptionModes.none) {
+    if (value.contentEncryptionRequired) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["contentEncryptionRequired"],
+        message: "encryptionMode='none' cannot require content encryption.",
+      });
+    }
+    if (value.envelopeRequired) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["envelopeRequired"],
+        message: "encryptionMode='none' cannot require envelope encryption.",
+      });
+    }
+    if (value.encryptionKeyReferenceId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["encryptionKeyReferenceId"],
+        message: "encryptionMode='none' cannot define encryptionKeyReferenceId.",
+      });
+    }
+    if (value.allowPreviewDecryption || value.allowWorkerDecryption) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["allowPreviewDecryption"],
+        message: "encryptionMode='none' cannot allow preview or worker decryption.",
+      });
+    }
+  } else if (!value.contentEncryptionRequired) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["contentEncryptionRequired"],
+      message: "Managed encryption modes require contentEncryptionRequired=true.",
+    });
+  }
+
+  if (value.encryptionMode === StorageEncryptionModes.customerManaged && !value.encryptionKeyReferenceId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["encryptionKeyReferenceId"],
+      message: "customer-managed encryption requires encryptionKeyReferenceId.",
+    });
+  }
+
+  if (value.encryptionMode === StorageEncryptionModes.platformManaged && value.encryptionKeyReferenceId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["encryptionKeyReferenceId"],
+      message: "platform-managed encryption cannot include encryptionKeyReferenceId.",
+    });
+  }
+
+  if (
+    value.keyScope === StorageEncryptionKeyScopes.platform
+    && value.encryptionMode === StorageEncryptionModes.customerManaged
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["keyScope"],
+      message: "customer-managed encryption cannot use keyScope='platform'.",
+    });
+  }
+
+  if (value.retentionExpiryAction !== StorageRetentionExpiryActions.none && value.retentionDays === undefined) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["retentionExpiryAction"],
+      message: "retentionExpiryAction requires retentionDays.",
+    });
+  }
+
+  if (value.purgeGracePeriodDays !== undefined && value.retentionExpiryAction !== StorageRetentionExpiryActions.delete) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["purgeGracePeriodDays"],
+      message: "purgeGracePeriodDays is valid only when retentionExpiryAction='delete'.",
+    });
+  }
+});
 
 const StoragePolicyPartialUpdateSchema = z.object({
   maxObjectBytes: z.number().int().positive().optional(),
@@ -220,10 +328,71 @@ const StoragePolicyPartialUpdateSchema = z.object({
   immutableWrites: z.boolean().optional(),
   allowCrossWorkspaceReads: z.boolean().optional(),
   labels: z.record(MetadataLabelKeySchema, MetadataLabelValueSchema).optional(),
+  encryptionMode: StorageEncryptionModeSchema.optional(),
+  contentEncryptionRequired: z.boolean().optional(),
+  keyScope: StorageEncryptionKeyScopeSchema.optional(),
+  allowPreviewDecryption: z.boolean().optional(),
+  allowWorkerDecryption: z.boolean().optional(),
+  retentionExpiryAction: StorageRetentionExpiryActionSchema.optional(),
+  purgeGracePeriodDays: z.number().int().positive().optional(),
   encryptionProfileId: IdentifierSchema.optional(),
   encryptionKeyReferenceId: IdentifierSchema.optional(),
   envelopeRequired: z.boolean().optional(),
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (value.encryptionMode === StorageEncryptionModes.none && value.contentEncryptionRequired === true) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["contentEncryptionRequired"],
+      message: "encryptionMode='none' cannot require content encryption.",
+    });
+  }
+
+  if (
+    value.encryptionMode === StorageEncryptionModes.none
+    && (value.allowPreviewDecryption === true || value.allowWorkerDecryption === true)
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["allowPreviewDecryption"],
+      message: "encryptionMode='none' cannot allow preview or worker decryption.",
+    });
+  }
+
+  if (
+    value.encryptionMode === StorageEncryptionModes.customerManaged
+    && value.encryptionKeyReferenceId !== undefined
+    && value.encryptionKeyReferenceId.trim().length < 1
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["encryptionKeyReferenceId"],
+      message: "customer-managed encryption requires a non-empty encryptionKeyReferenceId when provided.",
+    });
+  }
+
+  if (
+    value.keyScope === StorageEncryptionKeyScopes.platform
+    && value.encryptionMode === StorageEncryptionModes.customerManaged
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["keyScope"],
+      message: "customer-managed encryption cannot use keyScope='platform'.",
+    });
+  }
+
+  if (
+    value.purgeGracePeriodDays !== undefined
+    && value.retentionExpiryAction !== undefined
+    && value.retentionExpiryAction !== StorageRetentionExpiryActions.delete
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["purgeGracePeriodDays"],
+      message: "purgeGracePeriodDays is valid only when retentionExpiryAction='delete'.",
+    });
+  }
+});
 
 const StorageAccessPermissionsSummarySchema = z.object({
   mode: StorageAccessModeSchema,
@@ -243,11 +412,98 @@ const StoragePolicyMetadataSchema = z.object({
   immutableWrites: z.boolean(),
   allowCrossWorkspaceReads: z.boolean(),
   labels: z.record(MetadataLabelKeySchema, MetadataLabelValueSchema),
+  encryptionMode: StorageEncryptionModeSchema,
+  contentEncryptionRequired: z.boolean(),
+  keyScope: StorageEncryptionKeyScopeSchema,
+  allowPreviewDecryption: z.boolean(),
+  allowWorkerDecryption: z.boolean(),
+  retentionExpiryAction: StorageRetentionExpiryActionSchema,
+  purgeGracePeriodDays: z.number().int().positive().optional(),
   encryptionProfileId: IdentifierSchema,
   envelopeRequired: z.boolean(),
   hasEncryptionKeyReference: z.boolean(),
   extensions: z.record(z.string(), z.unknown()).optional(),
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (value.encryptionMode === StorageEncryptionModes.none) {
+    if (value.contentEncryptionRequired) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["contentEncryptionRequired"],
+        message: "encryptionMode='none' cannot require content encryption.",
+      });
+    }
+    if (value.envelopeRequired) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["envelopeRequired"],
+        message: "encryptionMode='none' cannot require envelope encryption.",
+      });
+    }
+    if (value.hasEncryptionKeyReference) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["hasEncryptionKeyReference"],
+        message: "encryptionMode='none' cannot include encryption key references.",
+      });
+    }
+    if (value.allowPreviewDecryption || value.allowWorkerDecryption) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["allowPreviewDecryption"],
+        message: "encryptionMode='none' cannot allow preview or worker decryption.",
+      });
+    }
+  } else if (!value.contentEncryptionRequired) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["contentEncryptionRequired"],
+      message: "Managed encryption modes require contentEncryptionRequired=true.",
+    });
+  }
+
+  if (value.encryptionMode === StorageEncryptionModes.customerManaged && !value.hasEncryptionKeyReference) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["hasEncryptionKeyReference"],
+      message: "customer-managed encryption requires hasEncryptionKeyReference=true.",
+    });
+  }
+
+  if (value.encryptionMode === StorageEncryptionModes.platformManaged && value.hasEncryptionKeyReference) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["hasEncryptionKeyReference"],
+      message: "platform-managed encryption cannot include key references.",
+    });
+  }
+
+  if (
+    value.keyScope === StorageEncryptionKeyScopes.platform
+    && value.encryptionMode === StorageEncryptionModes.customerManaged
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["keyScope"],
+      message: "customer-managed encryption cannot use keyScope='platform'.",
+    });
+  }
+
+  if (value.retentionExpiryAction !== StorageRetentionExpiryActions.none && value.retentionDays === undefined) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["retentionExpiryAction"],
+      message: "retentionExpiryAction requires retentionDays.",
+    });
+  }
+
+  if (value.purgeGracePeriodDays !== undefined && value.retentionExpiryAction !== StorageRetentionExpiryActions.delete) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["purgeGracePeriodDays"],
+      message: "purgeGracePeriodDays is valid only when retentionExpiryAction='delete'.",
+    });
+  }
+});
 
 const StorageLifecycleMetadataSchema = z.object({
   state: StorageLifecycleStateSchema,
