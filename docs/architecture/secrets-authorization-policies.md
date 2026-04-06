@@ -15,6 +15,7 @@ This note documents Story 8.2.1, Story 8.2.2, and Story 8.2.3 (Feature 8 / Epic 
 - `src/infrastructure/security/secrets/SecretServiceComposition.ts`
 - `src/application/security/tests/SecretAuthorizationPolicyAndGovernanceUseCases.test.ts`
 - `src/application/security/tests/SecretCreateAndMetadataUseCases.test.ts`
+- `src/infrastructure/security/secrets/tests/SecretServiceGovernance.integration.test.ts`
 
 ## Permission model
 
@@ -125,3 +126,10 @@ Each operation event includes:
 - runtime retrieval denies scope-reference mismatch with non-leaky `not-found`
 - unauthorized rotate/delete return non-leaky `not-found`
 - workspace and user boundary behavior for list and disable operations
+
+`SecretServiceGovernance.integration.test.ts` verifies a high-fidelity composed-service lifecycle:
+
+- create, list metadata, get metadata, runtime plaintext retrieval, rotate, and disable
+- denied cross-scope list and runtime retrieval enforcement
+- encrypted payload-at-rest behavior (plaintext absent from payload files)
+- plaintext redaction in metadata and audit event outputs across the lifecycle
