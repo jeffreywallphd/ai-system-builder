@@ -1,46 +1,46 @@
-import type { Workspace, WorkspaceRole } from "../../src/domain/workspaces/WorkspaceDomain";
-import { WorkspaceRoleAssignmentStatuses, WorkspaceRoles } from "../../src/domain/workspaces/WorkspaceDomain";
+import type { Workspace, WorkspaceRole } from "../../../src/domain/workspaces/WorkspaceDomain";
+import { WorkspaceRoleAssignmentStatuses, WorkspaceRoles } from "../../../src/domain/workspaces/WorkspaceDomain";
 import {
   CreateWorkspaceUseCase,
   type WorkspaceCreationErrorCode,
-} from "../../src/application/workspaces/use-cases/CreateWorkspaceUseCase";
+} from "../../../src/application/workspaces/use-cases/CreateWorkspaceUseCase";
 import {
   UpdateWorkspaceUseCase,
   type WorkspaceUpdateErrorCode,
-} from "../../src/application/workspaces/use-cases/UpdateWorkspaceUseCase";
+} from "../../../src/application/workspaces/use-cases/UpdateWorkspaceUseCase";
 import {
   TransitionWorkspaceLifecycleUseCase,
   type WorkspaceLifecycleTransitionErrorCode,
-} from "../../src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase";
+} from "../../../src/application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase";
 import {
   AddWorkspaceMemberUseCase,
   type WorkspaceMembershipAdditionErrorCode,
-} from "../../src/application/workspaces/use-cases/AddWorkspaceMemberUseCase";
+} from "../../../src/application/workspaces/use-cases/AddWorkspaceMemberUseCase";
 import {
   ChangeWorkspaceMembershipStatusUseCase,
   type WorkspaceMembershipStatusChangeErrorCode,
-} from "../../src/application/workspaces/use-cases/ChangeWorkspaceMembershipStatusUseCase";
+} from "../../../src/application/workspaces/use-cases/ChangeWorkspaceMembershipStatusUseCase";
 import {
   RemoveWorkspaceMemberUseCase,
   type WorkspaceMembershipRemovalErrorCode,
-} from "../../src/application/workspaces/use-cases/RemoveWorkspaceMemberUseCase";
+} from "../../../src/application/workspaces/use-cases/RemoveWorkspaceMemberUseCase";
 import {
   AssignWorkspaceRoleUseCase,
   type WorkspaceRoleAssignmentErrorCode,
-} from "../../src/application/workspaces/use-cases/AssignWorkspaceRoleUseCase";
+} from "../../../src/application/workspaces/use-cases/AssignWorkspaceRoleUseCase";
 import {
   ReassignWorkspaceRoleUseCase,
   type WorkspaceRoleReassignmentErrorCode,
-} from "../../src/application/workspaces/use-cases/ReassignWorkspaceRoleUseCase";
+} from "../../../src/application/workspaces/use-cases/ReassignWorkspaceRoleUseCase";
 import {
   RevokeWorkspaceRoleUseCase,
   type WorkspaceRoleRevocationErrorCode,
-} from "../../src/application/workspaces/use-cases/RevokeWorkspaceRoleUseCase";
+} from "../../../src/application/workspaces/use-cases/RevokeWorkspaceRoleUseCase";
 import {
   ResolveWorkspaceInvitationLifecycleUseCase,
   WorkspaceInvitationLifecycleActions,
   type WorkspaceInvitationLifecycleErrorCode,
-} from "../../src/application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase";
+} from "../../../src/application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase";
 import {
   WorkspaceAdministrationQueryService,
   type WorkspaceAdministrationQueryErrorCode,
@@ -51,12 +51,12 @@ import {
   type WorkspaceMembershipStatusSummary,
   type WorkspaceRoleAssignmentItemDto,
   type WorkspaceRoleSummary,
-} from "../../src/application/workspaces/use-cases/WorkspaceAdministrationQueryService";
-import type { IWorkspaceAuthorizationReadRepository } from "../../src/application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
-import type { IWorkspaceInvitationRepository } from "../../src/application/workspaces/ports/IWorkspaceInvitationRepository";
-import type { IWorkspaceMembershipRepository } from "../../src/application/workspaces/ports/IWorkspaceMembershipRepository";
-import type { IWorkspaceRepository } from "../../src/application/workspaces/ports/IWorkspaceRepository";
-import type { IWorkspaceRoleAssignmentRepository } from "../../src/application/workspaces/ports/IWorkspaceRoleAssignmentRepository";
+} from "../../../src/application/workspaces/use-cases/WorkspaceAdministrationQueryService";
+import type { IWorkspaceAuthorizationReadRepository } from "../../../src/application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
+import type { IWorkspaceInvitationRepository } from "../../../src/application/workspaces/ports/IWorkspaceInvitationRepository";
+import type { IWorkspaceMembershipRepository } from "../../../src/application/workspaces/ports/IWorkspaceMembershipRepository";
+import type { IWorkspaceRepository } from "../../../src/application/workspaces/ports/IWorkspaceRepository";
+import type { IWorkspaceRoleAssignmentRepository } from "../../../src/application/workspaces/ports/IWorkspaceRoleAssignmentRepository";
 import {
   WorkspaceAdministrationApiErrorCodes,
   type AddWorkspaceAdministrationMemberApiRequest,
@@ -97,8 +97,8 @@ import {
   type WorkspaceMembershipApiRecord,
   type WorkspaceRoleAssignmentApiRecord,
 } from "./sdk/PublicWorkspaceAdministrationApiContract";
-import { AuthorizationPolicyEvaluationTargetKinds } from "../../src/application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
-import type { IAuthorizationPolicyDecisionEvaluator } from "../../src/application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
+import { AuthorizationPolicyEvaluationTargetKinds } from "../../../src/application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import type { IAuthorizationPolicyDecisionEvaluator } from "../../../src/application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
 
 interface WorkspaceAdministrationBackendApiDependencies {
   readonly workspaceQueryService: WorkspaceAdministrationQueryService;
@@ -1028,3 +1028,4 @@ function toRoleAudit(
     metadata,
   });
 }
+

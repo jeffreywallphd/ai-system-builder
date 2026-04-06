@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "npm run dev:desktop",
     "dev:renderer": "vite --mode desktop",
-    "dev:desktop": "concurrently -k \"npm:dev:renderer\" \"wait-on tcp:5174 && electron-forge start\"",
+    "dev:desktop": "electron-forge start",
     "build": "npm run build:renderer",
     "build:renderer": "tsc --noEmit && vite build --mode desktop",
     "build:desktop": "electron-forge package",
