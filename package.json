@@ -8,6 +8,11 @@
   },
   "scripts": {
     "dev": "npm run dev:desktop",
+    "dev:host:authoritative-server": "npm run start:authoritative-server",
+    "dev:host:hybrid": "npm run start:hybrid-host",
+    "dev:host:web": "npm run start:web-host",
+    "dev:host:worker": "npm run start:worker-host",
+    "dev:host:control-plane-worker": "concurrently -k -n authoritative,worker \"npm run dev:host:authoritative-server\" \"npm run dev:host:worker\"",
     "dev:renderer": "vite --mode desktop",
     "dev:desktop:prepare": "node dev/prepare-electron-forge-dev.cjs",
     "dev:desktop": "npm run dev:desktop:prepare && electron-forge start",

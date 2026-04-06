@@ -29,7 +29,10 @@ import {
   applyIdentityStartupConfiguration,
   initializeCertificateAuthorityForFirstSetup,
   startIdentityServerHost,
+  type IdentityServerHost,
+  type IdentityServerHostOptions,
 } from "../IdentityServerHost";
+import { startAuthoritativeServerHostAssembly } from "../../../src/hosts/server/AuthoritativeServerHostEntrypoint";
 import type { InitializeInternalCertificateAuthorityInput, InitializeInternalCertificateAuthorityResult } from "../../../src/application/security/ports/ICertificateAuthorityIssuerPort";
 import { SqliteCertificateAuthorityPersistenceAdapter } from "../../../src/infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
 import { InternalCertificateAuthorityIssuer } from "../../../src/infrastructure/security/ca/InternalCertificateAuthorityIssuer";
@@ -79,6 +82,36 @@ class StubCertificateAuthorityIssuerPort {
   public async revokeCertificateMaterial(): Promise<never> {
     throw new Error("not implemented in host test");
   }
+}
+
+async function startAuthoritativeServerHostForTest(
+  options: IdentityServerHostOptions,
+): Promise<IdentityServerHost> {
+  let startedHost: IdentityServerHost | undefined;
+  const runtime = await startAuthoritativeServerHostAssembly({
+    hostOptions: options,
+    startHost: async (resolvedOptions) => {
+      const host = await startIdentityServerHost(resolvedOptions);
+      startedHost = host;
+      return host;
+    },
+    boot: {
+      startupReason: "identity-server-host-test-entrypoint-startup",
+      environment: options.env,
+    },
+  });
+
+  if (!startedHost) {
+    await runtime.stop();
+    throw new Error("Authoritative server host test startup did not return a runtime host.");
+  }
+
+  return Object.freeze({
+    ...startedHost,
+    close: async () => {
+      await runtime.stop();
+    },
+  });
 }
 
 describe("IdentityServerHost", () => {
@@ -133,7 +166,7 @@ describe("IdentityServerHost", () => {
   it("boots the runtime host with seeded local provider/policy and serves lifecycle endpoints", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-host-test-"));
     const databasePath = join(tempDirectory, "identity-host.sqlite");
-    const host = await startIdentityServerHost({
+    const host = await startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -182,7 +215,7 @@ describe("IdentityServerHost", () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-secret-service-host-test-"));
     const databasePath = join(tempDirectory, "identity-secret-service-host.sqlite");
     const encryptedPayloadDirectory = join(tempDirectory, "secret-envelopes");
-    const host = await startIdentityServerHost({
+    const host = await startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -269,7 +302,7 @@ describe("IdentityServerHost", () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-required-system-secret-missing-"));
     const databasePath = join(tempDirectory, "required-system-secret-missing.sqlite");
 
-    await expect(startIdentityServerHost({
+    await expect(startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -290,7 +323,7 @@ describe("IdentityServerHost", () => {
   it("bootstraps required system secrets from legacy environment values during startup", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-required-system-secret-migration-"));
     const databasePath = join(tempDirectory, "required-system-secret-migration.sqlite");
-    const host = await startIdentityServerHost({
+    const host = await startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -343,7 +376,7 @@ describe("IdentityServerHost", () => {
   it("integrates secret health diagnostics endpoints into host runtime", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-secret-health-host-runtime-"));
     const databasePath = join(tempDirectory, "secret-health-host-runtime.sqlite");
-    const host = await startIdentityServerHost({
+    const host = await startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -401,7 +434,7 @@ describe("IdentityServerHost", () => {
   it("exposes workspace invitation issuance and onboarding routes on the runtime host", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-workspace-host-test-"));
     const databasePath = join(tempDirectory, "identity-workspace-host.sqlite");
-    const host = await startIdentityServerHost({
+    const host = await startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -545,7 +578,7 @@ describe("IdentityServerHost", () => {
   it("persists queryable storage management audit events through host composition", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-storage-audit-host-test-"));
     const databasePath = join(tempDirectory, "identity-storage-audit-host.sqlite");
-    const host = await startIdentityServerHost({
+    const host = await startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -716,7 +749,7 @@ describe("IdentityServerHost", () => {
   it("exposes node enrollment submission and pending-review routes on the runtime host", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-node-host-test-"));
     const databasePath = join(tempDirectory, "identity-node-host.sqlite");
-    const host = await startIdentityServerHost({
+    const host = await startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -806,7 +839,7 @@ describe("IdentityServerHost", () => {
   it("fails closed when internal CA bootstrap configuration is partially defined", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-ca-startup-invalid-"));
     const databasePath = join(tempDirectory, "identity-ca-startup-invalid.sqlite");
-    await expect(startIdentityServerHost({
+    await expect(startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -824,7 +857,7 @@ describe("IdentityServerHost", () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-secret-master-key-partial-"));
     const databasePath = join(tempDirectory, "identity-secret-master-key-partial.sqlite");
 
-    await expect(startIdentityServerHost({
+    await expect(startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -841,7 +874,7 @@ describe("IdentityServerHost", () => {
   it("fails closed when protected CA secret refs are configured but protected storage is unavailable", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-ca-protected-secret-unavailable-"));
     const databasePath = join(tempDirectory, "identity-ca-protected-secret-unavailable.sqlite");
-    await expect(startIdentityServerHost({
+    await expect(startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -864,7 +897,7 @@ describe("IdentityServerHost", () => {
     const databasePath = join(tempDirectory, "identity-managed-tls-missing-runtime-package.sqlite");
     const protectedSecretsDirectory = join(tempDirectory, "protected-secrets");
 
-    await expect(startIdentityServerHost({
+    await expect(startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -885,7 +918,7 @@ describe("IdentityServerHost", () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-non-loopback-insecure-"));
     const databasePath = join(tempDirectory, "identity-non-loopback-insecure.sqlite");
 
-    await expect(startIdentityServerHost({
+    await expect(startAuthoritativeServerHostForTest({
       databasePath,
       host: "0.0.0.0",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -900,7 +933,7 @@ describe("IdentityServerHost", () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-loopback-http-disabled-"));
     const databasePath = join(tempDirectory, "identity-loopback-http-disabled.sqlite");
 
-    await expect(startIdentityServerHost({
+    await expect(startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -924,7 +957,7 @@ describe("IdentityServerHost", () => {
       certificateStatus: "revoked",
     });
 
-    await expect(startIdentityServerHost({
+    await expect(startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -948,7 +981,7 @@ describe("IdentityServerHost", () => {
 
     const missingPrivateKeyRef = "trust:server:key:missing";
     try {
-      await startIdentityServerHost({
+      await startAuthoritativeServerHostForTest({
         databasePath,
         host: "127.0.0.1",
         providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -979,7 +1012,7 @@ describe("IdentityServerHost", () => {
       certificateStatus: "issued",
     });
 
-    const host = await startIdentityServerHost({
+    const host = await startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
@@ -1006,7 +1039,7 @@ describe("IdentityServerHost", () => {
       nodeId,
     });
 
-    const host = await startIdentityServerHost({
+    const host = await startAuthoritativeServerHostForTest({
       databasePath,
       host: "127.0.0.1",
       providerAccountPolicies: new IdentityProviderAccountPolicyConfig({

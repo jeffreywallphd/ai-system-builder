@@ -133,6 +133,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For the executable web host assembly, thin-client delivery composition boundaries, and startup entrypoint expectations, read [`web-host-assembly.md`](./web-host-assembly.md).
 - For the executable worker host assembly, runtime execution composition boundaries, and startup entrypoint expectations, read [`worker-host-assembly.md`](./worker-host-assembly.md).
 - For Story 12.4.1 runtime-entrypoint migration notes that move active startup paths onto host assemblies, read [`entrypoint-host-composition-migration-12.4.1.md`](./entrypoint-host-composition-migration-12.4.1.md).
+- For Story 12.4.2 development/test startup migration notes covering local scripts and harness startup through host assemblies, read [`development-host-startup-model-12.4.2.md`](./development-host-startup-model-12.4.2.md).
 - For UI composition and state flow, read [`presentation-and-state.md`](./presentation-and-state.md).
 - For cross-studio asset selection contracts and capability rules, read [`asset-selector-framework.md`](./asset-selector-framework.md).
 - For canonical studio launch/return handoff contracts, read [`studio-handoff-contract.md`](./studio-handoff-contract.md).
