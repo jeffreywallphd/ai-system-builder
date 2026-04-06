@@ -144,6 +144,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For explicit scope-owner validation and deterministic policy-driven secret key resolution behavior, read [`secrets-scope-resolution-rules.md`](./secrets-scope-resolution-rules.md).
 - For authoritative server runtime secret-service composition, host dependency wiring, and startup configuration posture, read [`secrets-service-composition.md`](./secrets-service-composition.md).
 - For runtime service-to-service secret credential consumption adapters and formal retrieval dependency patterns, read [`secrets-service-consumption-adapters.md`](./secrets-service-consumption-adapters.md).
+- For contributor extension rules that keep new secret-backed modules on formal retrieval/audit/redaction paths, read [`secrets-feature-extension-guidance.md`](./secrets-feature-extension-guidance.md).
 - For secret rotation versioning, activation preconditions, and race-safe activation semantics, read [`secrets-rotation-and-version-activation-workflows.md`](./secrets-rotation-and-version-activation-workflows.md).
 - For secret operation authorization governance, runtime-vs-human access rules, and non-leaky denial posture, read [`secrets-authorization-policies.md`](./secrets-authorization-policies.md).
 - For internal secret metadata management API contracts, request-validation behavior, and metadata-only response posture, read [`secrets-metadata-management-internal-apis.md`](./secrets-metadata-management-internal-apis.md).
@@ -270,5 +271,6 @@ The runtime is not a single path. The system currently supports multiple executi
 - Regression coverage now protects these guarantees through contract-focused suites in:
   - `application/system-studio/tests/ImageManipulationRunnableTemplateContract.regression.test.ts`,
   - existing completeness/readiness/smoke/failure-path suites under `application/system-studio/tests/*` and `infrastructure/api/studio-shell/tests/*`.
+
 
 
