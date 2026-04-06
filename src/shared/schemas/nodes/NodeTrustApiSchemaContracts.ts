@@ -213,12 +213,17 @@ export const NodeLastSeenDtoSchema = z.object({
   observedBy: NodeTrustApiIdentifierSchema.optional(),
 }).strict();
 
-export const NodeRevocationDtoSchema = z.object({
+const NodeRevocationDtoObjectSchema = z.object({
   state: NodeRevocationStateSchema,
   reason: NodeRevocationReasonSchema.optional(),
   revokedAt: NodeTrustApiTimestampSchema.optional(),
   note: z.string().trim().max(2000).optional(),
-}).strict().superRefine((value, context) => {
+}).strict();
+
+function refineNodeRevocationDto(
+  value: z.infer<typeof NodeRevocationDtoObjectSchema>,
+  context: z.RefinementCtx,
+): void {
   if (value.state === NodeRevocationStates.revoked) {
     if (!value.reason) {
       context.addIssue({
@@ -235,11 +240,13 @@ export const NodeRevocationDtoSchema = z.object({
       });
     }
   }
-});
+}
 
-export const NodeInternalRevocationDtoSchema = NodeRevocationDtoSchema.extend({
+export const NodeRevocationDtoSchema = NodeRevocationDtoObjectSchema.superRefine(refineNodeRevocationDto);
+
+export const NodeInternalRevocationDtoSchema = NodeRevocationDtoObjectSchema.extend({
   revokedByUserIdentityId: NodeTrustApiIdentifierSchema.optional(),
-}).strict();
+}).strict().superRefine(refineNodeRevocationDto);
 
 export const NodeEnrollmentSubmissionRequestDtoSchema = z.object({
   actorUserIdentityId: NodeTrustApiIdentifierSchema,
@@ -345,7 +352,7 @@ export const NodeInternalEnrollmentDetailDtoSchema = NodeEnrollmentDetailDtoSche
   revision: z.number().int().nonnegative(),
 }).strict();
 
-export const NodeDetailDtoSchema = z.object({
+const NodeDetailDtoObjectSchema = z.object({
   nodeId: NodeTrustApiIdentifierSchema,
   nodeType: NodeTypeSchema,
   displayName: z.string().trim().min(1).max(120),
@@ -359,7 +366,12 @@ export const NodeDetailDtoSchema = z.object({
   enrolledAt: NodeTrustApiTimestampSchema,
   approvedAt: NodeTrustApiTimestampSchema.optional(),
   revokedAt: NodeTrustApiTimestampSchema.optional(),
-}).strict().superRefine((value, context) => {
+}).strict();
+
+function refineNodeDetailDto(
+  value: z.infer<typeof NodeDetailDtoObjectSchema>,
+  context: z.RefinementCtx,
+): void {
   if (value.trustState === NodeTrustStates.trusted && !value.certificate?.certificateRef) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
@@ -375,9 +387,11 @@ export const NodeDetailDtoSchema = z.object({
       message: "Revoked node trust state requires revocation.state='revoked'.",
     });
   }
-});
+}
 
-export const NodeInternalDetailDtoSchema = NodeDetailDtoSchema.extend({
+export const NodeDetailDtoSchema = NodeDetailDtoObjectSchema.superRefine(refineNodeDetailDto);
+
+export const NodeInternalDetailDtoSchema = NodeDetailDtoObjectSchema.extend({
   certificate: NodeInternalCertificateAssignmentDtoSchema.optional(),
   revocation: NodeInternalRevocationDtoSchema,
   enrollmentRequestId: NodeTrustApiIdentifierSchema.optional(),
@@ -386,7 +400,7 @@ export const NodeInternalDetailDtoSchema = NodeDetailDtoSchema.extend({
   lastModifiedAt: NodeTrustApiTimestampSchema,
   lastModifiedBy: NodeTrustApiIdentifierSchema,
   revision: z.number().int().nonnegative(),
-}).strict();
+}).strict().superRefine(refineNodeDetailDto);
 
 export const NodeEnrollmentSubmissionResponseDtoSchema = z.object({
   enrollment: NodeEnrollmentDetailDtoSchema,
