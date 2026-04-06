@@ -39,6 +39,10 @@ import {
   NODE_TRUST_PERSISTENCE_MIGRATIONS,
   NODE_TRUST_PERSISTENCE_SCHEMA_VERSION,
 } from "./SqliteNodeTrustPersistenceMigrations";
+import {
+  resolvePersistenceMutationCreatedAt,
+  resolvePersistenceMutationMetadata,
+} from "../common/PersistenceMutationMetadata";
 
 const EnrollmentTerminalStatuses = Object.freeze([
   NodeEnrollmentRequestStatuses.approved,
@@ -251,21 +255,28 @@ export class SqliteNodeTrustPersistenceAdapter
     const candidate = Object.freeze({
       ...input.record,
     });
-    const changedAt = this.resolveMutationTimestamp(input.mutation.context.occurredAt);
     let persistedRecord: NodeIdentityPersistenceRecord | undefined;
     let changed = false;
 
     this.getDatabase().transaction(() => {
       const existing = this.getNodeByIdInternal(candidate.nodeId);
-      this.assertExpectedRevision(input.mutation.expectedRevision, existing?.revision, "Node");
+      const metadata = resolvePersistenceMutationMetadata({
+        existing,
+        createdAt: candidate.createdAt,
+        createdBy: candidate.createdBy,
+        actorId: input.mutation.context.actorUserIdentityId,
+        expectedRevision: input.mutation.expectedRevision,
+        occurredAt: input.mutation.context.occurredAt,
+        entityName: "Node",
+      });
 
       persistedRecord = Object.freeze({
         ...candidate,
-        createdAt: existing?.createdAt ?? candidate.createdAt,
-        createdBy: existing?.createdBy ?? candidate.createdBy,
-        lastModifiedAt: changedAt,
-        lastModifiedBy: input.mutation.context.actorUserIdentityId,
-        revision: existing ? existing.revision + 1 : 1,
+        createdAt: metadata.createdAt,
+        createdBy: metadata.createdBy,
+        lastModifiedAt: metadata.lastModifiedAt,
+        lastModifiedBy: metadata.lastModifiedBy,
+        revision: metadata.revision,
       });
 
       changed = !existing || JSON.stringify(existing) !== JSON.stringify(persistedRecord);
@@ -613,21 +624,28 @@ export class SqliteNodeTrustPersistenceAdapter
     }
 
     const candidate = parseNodeEnrollmentRequestPersistenceRecord(input.record);
-    const changedAt = this.resolveMutationTimestamp(input.mutation.context.occurredAt);
     let persistedRecord: NodeEnrollmentRequestPersistenceRecord | undefined;
     let changed = false;
 
     this.getDatabase().transaction(() => {
       const existing = this.getEnrollmentRequestByIdInternal(candidate.requestId);
-      this.assertExpectedRevision(input.mutation.expectedRevision, existing?.revision, "Enrollment request");
+      const metadata = resolvePersistenceMutationMetadata({
+        existing,
+        createdAt: candidate.createdAt,
+        createdBy: candidate.createdBy,
+        actorId: input.mutation.context.actorUserIdentityId,
+        expectedRevision: input.mutation.expectedRevision,
+        occurredAt: input.mutation.context.occurredAt,
+        entityName: "Enrollment request",
+      });
 
       persistedRecord = parseNodeEnrollmentRequestPersistenceRecord({
         ...candidate,
-        createdAt: existing?.createdAt ?? candidate.createdAt,
-        createdBy: existing?.createdBy ?? candidate.createdBy,
-        lastModifiedAt: changedAt,
-        lastModifiedBy: input.mutation.context.actorUserIdentityId,
-        revision: existing ? existing.revision + 1 : 1,
+        createdAt: metadata.createdAt,
+        createdBy: metadata.createdBy,
+        lastModifiedAt: metadata.lastModifiedAt,
+        lastModifiedBy: metadata.lastModifiedBy,
+        revision: metadata.revision,
       });
 
       changed = !existing || JSON.stringify(existing) !== JSON.stringify(persistedRecord);
@@ -881,7 +899,7 @@ export class SqliteNodeTrustPersistenceAdapter
           record_snapshot_json,
           created_at
         ) VALUES (?, ?, ?, ?)
-      `).run(operationKey, mutationKind, JSON.stringify(record), new Date().toISOString()));
+      `).run(operationKey, mutationKind, JSON.stringify(record), resolvePersistenceMutationCreatedAt(undefined)));
   }
 
   private replaceNodeCapabilityLookupRows(record: NodeIdentityPersistenceRecord): void {
@@ -941,30 +959,6 @@ export class SqliteNodeTrustPersistenceAdapter
       sql: "",
       params: Object.freeze([]),
     };
-  }
-
-  private resolveMutationTimestamp(candidate?: string): string {
-    const normalizedCandidate = candidate?.trim();
-    return normalizedCandidate && normalizedCandidate.length > 0
-      ? normalizedCandidate
-      : new Date().toISOString();
-  }
-
-  private assertExpectedRevision(
-    expectedRevision: number | undefined,
-    persistedRevision: number | undefined,
-    entityName: string,
-  ): void {
-    if (typeof expectedRevision !== "number") {
-      return;
-    }
-
-    const currentRevision = persistedRevision ?? 0;
-    if (expectedRevision !== currentRevision) {
-      throw new Error(
-        `${entityName} expectedRevision '${expectedRevision}' did not match persisted revision '${currentRevision}'.`,
-      );
-    }
   }
 
   private executeMutation(operation: string, mutation: () => { readonly changes: number }): { readonly changes: number } {

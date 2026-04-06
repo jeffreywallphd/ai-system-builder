@@ -285,6 +285,34 @@ The goal is to keep repository implementation aligned to domain/application cont
   - `src/infrastructure/persistence/sqlite/tests/SqliteTransactionCoordinator.test.ts`
   - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
 
+## Story 13.3.1 shared identifier/timestamp/versioning infrastructure
+
+- Shared persistence infrastructure contracts now include canonical helpers for:
+  - stable identifier token normalization and scoped id generation
+  - canonical UTC timestamp resolution for mutation metadata
+  - optimistic-concurrency revision checks and increment behavior
+  - workspace/user/node/platform tenancy metadata factory functions
+- New shared modules:
+  - `src/shared/persistence/PersistenceIdentifiers.ts`
+  - `src/shared/persistence/PersistenceTimestamps.ts`
+  - `src/shared/persistence/PersistenceVersioning.ts`
+  - `src/shared/persistence/PersistenceTenancyMetadataFactory.ts`
+- New infrastructure mutation metadata seam for repository adapters:
+  - `src/infrastructure/persistence/common/PersistenceMutationMetadata.ts`
+- Concrete adapter integration now uses the shared mutation metadata conventions in:
+  - `src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter.ts`
+  - `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter.ts`
+- Operation-key normalization now routes through one shared persistence normalizer for:
+  - identity persistence DTOs
+  - authorization persistence DTOs
+  - node trust persistence DTOs
+- Added verification coverage:
+  - `src/shared/persistence/tests/PersistenceIdentifiers.test.ts`
+  - `src/shared/persistence/tests/PersistenceTimestamps.test.ts`
+  - `src/shared/persistence/tests/PersistenceVersioning.test.ts`
+  - `src/shared/persistence/tests/PersistenceTenancyMetadataFactory.test.ts`
+  - `src/infrastructure/persistence/common/tests/PersistenceMutationMetadata.test.ts`
+
 ## Mapper responsibility guidance (Story 13.1.3)
 
 - Mapper boundaries are adapter-local but contract-driven:

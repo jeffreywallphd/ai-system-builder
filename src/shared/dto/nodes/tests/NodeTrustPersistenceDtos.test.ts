@@ -31,6 +31,6 @@ describe("NodeTrustPersistenceDtos", () => {
     expect(() => normalizeNodeTrustMutationOperationKey("   ")).toThrow(
       "Node trust persistence mutation operationKey is required.",
     );
-    expect(normalizeNodeTrustMutationOperationKey("op-node-101")).toBe("op-node-101");
+    expect(normalizeNodeTrustMutationOperationKey("  OP-NODE-101  ")).toBe("op-node-101");
   });
 });
