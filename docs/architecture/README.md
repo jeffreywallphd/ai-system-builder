@@ -155,6 +155,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For managed storage domain entities, lifecycle/access/replication/policy invariants, and audit attribution contracts, read [`storage-foundation.md`](./storage-foundation.md).
 - For managed storage application ports, lifecycle/policy/provisioning seams, and use-case command/query contracts, read [`storage-application-ports.md`](./storage-application-ports.md).
 - For managed storage persistence schema, mapper/repository behavior, and migration semantics, read [`storage-persistence-contracts.md`](./storage-persistence-contracts.md).
+- For local server-managed storage backend provisioning/capability adapter behavior and operational assumptions, read [`storage-local-backend-adapter.md`](./storage-local-backend-adapter.md).
 - For shared storage transport DTOs, schema validation contracts, and sensitive redaction projection rules, read [`storage-transport-contracts.md`](./storage-transport-contracts.md).
 - For storage permission surfaces, action-level access summaries, and policy-restricted capability semantics, read [`storage-access-semantics.md`](./storage-access-semantics.md).
 - For authorization domain contracts covering RBAC, visibility, sharing, actor/resource policy context, and policy-decision models, read [`authorization-foundation.md`](./authorization-foundation.md).
