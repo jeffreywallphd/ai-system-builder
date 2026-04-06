@@ -106,7 +106,6 @@ import {
   CertificateSubjectReferenceKinds,
   CertificateUsageKinds,
 } from "../../../../src/domain/security/CertificateAuthorityDomain";
-import { SecretKinds, SecretScopes } from "../../../../src/domain/security/SecretDomain";
 import { CertificateTrustEvaluationStatuses } from "../../../../src/shared/dto/security/CertificateAuthorityDtos";
 import {
   parseApproveNodeEnrollmentActionRequestDto,
@@ -124,6 +123,12 @@ import {
   type RejectNodeEnrollmentActionRequestDtoPayload,
   type RevokeNodeTrustActionRequestDtoPayload,
 } from "../../../../src/shared/schemas/nodes/NodeTrustApiSchemaContracts";
+import {
+  CreateSecretMetadataCommandSchema,
+  DisableSecretMetadataCommandSchema,
+  GetSecretMetadataQuerySchema,
+  ListSecretMetadataQuerySchema,
+} from "../../../../src/shared/schemas/security/SecretApiSchemaContracts";
 import type { ValidateTransportConnectionTrustRequest } from "../../../../src/application/security/ports/TransportTrustValidationPorts";
 import { TransportConnectionDirections } from "../../../../src/application/security/ports/TransportTrustValidationPorts";
 import {
@@ -440,50 +445,6 @@ const CertificateStatusValues = new Set<string>(Object.values(CertificateStatuse
 const CertificateSubjectReferenceKindValues = new Set<string>(Object.values(CertificateSubjectReferenceKinds));
 const CertificateUsageValues = new Set<string>(Object.values(CertificateUsageKinds));
 const CertificateTrustStatusValues = new Set<string>(Object.values(CertificateTrustEvaluationStatuses));
-const SecretScopeValues = new Set<string>(Object.values(SecretScopes));
-const SecretKindValues = new Set<string>(Object.values(SecretKinds));
-const SecretScopeSchema = z.enum([SecretScopes.server, SecretScopes.workspace, SecretScopes.user]);
-const SecretKindSchema = z.enum([
-  SecretKinds.apiKey,
-  SecretKinds.accessToken,
-  SecretKinds.refreshToken,
-  SecretKinds.password,
-  SecretKinds.privateKey,
-  SecretKinds.certificate,
-  SecretKinds.connectionString,
-  SecretKinds.generic,
-]);
-
-const SecretOwnerSchema = z.object({
-  scope: SecretScopeSchema,
-  workspaceId: z.string().trim().min(1).optional(),
-  userIdentityId: z.string().trim().min(1).optional(),
-}).strict();
-
-const SecretMetadataRequestSchema = z.object({
-  displayName: z.string().trim().min(1).max(255).optional(),
-  description: z.string().trim().min(1).max(4000).optional(),
-  tags: z.array(z.string().trim().min(1).max(255)).max(64).optional(),
-  labels: z.record(z.string().trim().min(1).max(255)).optional(),
-}).strict();
-
-const CreateSecretMetadataRequestSchema = z.object({
-  operationKey: z.string().trim().min(1).max(255).optional(),
-  secretId: z.string().trim().min(1).max(255),
-  name: z.string().trim().min(1).max(127),
-  owner: SecretOwnerSchema,
-  kind: SecretKindSchema,
-  plaintext: z.string().min(1),
-  metadata: SecretMetadataRequestSchema.optional(),
-  createdAt: z.string().datetime().optional(),
-}).strict();
-
-const DisableSecretMetadataRequestSchema = z.object({
-  operationKey: z.string().trim().min(1).max(255).optional(),
-  disabledAt: z.string().datetime().optional(),
-  actorWorkspaceId: z.string().trim().min(1).optional(),
-}).strict();
-
 const RevokeIssuedCertificateRequestSchema = z.object({
   revocationReason: z.string().refine((value) => CertificateRevocationReasonValues.has(value), {
     message: "revocationReason is invalid.",
@@ -1607,7 +1568,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           async (context) => {
             const parsedRequest = await parseAndValidateSecretMetadataRequest(
               request,
-              CreateSecretMetadataRequestSchema,
+              CreateSecretMetadataCommandSchema,
               requestId,
               logger,
               maxBodyBytes,
@@ -1660,8 +1621,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const workspaceId = normalizeOptionalString(url.searchParams.get("workspaceId"));
             const userIdentityId = normalizeOptionalString(url.searchParams.get("userIdentityId"));
             const actorWorkspaceId = normalizeOptionalString(url.searchParams.get("actorWorkspaceId"));
-            const kinds = url.searchParams.getAll("kind");
-            const tagAnyOf = url.searchParams.getAll("tag");
+            const kinds = url.searchParams.getAll("kind").map((kind) => kind.trim()).filter(Boolean);
+            const tagAnyOf = url.searchParams.getAll("tag").map((tag) => tag.trim()).filter(Boolean);
             const includeDisabledInput = url.searchParams.get("includeDisabled");
             const includeRevokedInput = url.searchParams.get("includeRevoked");
             const includeDeletedInput = url.searchParams.get("includeDeleted");
@@ -1672,45 +1633,54 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const offsetInput = url.searchParams.get("offset");
             const limit = parseOptionalInteger(limitInput);
             const offset = parseOptionalInteger(offsetInput);
-
-            if (!scope || !SecretScopeValues.has(scope)) {
-              const invalid = buildSecretMetadataQueryValidationError("scope", "scope must be one of: server, workspace, user.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-            if (kinds.some((kind) => !SecretKindValues.has(kind))) {
-              const invalid = buildSecretMetadataQueryValidationError("kind", "kind values are invalid.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
             if (includeDisabledInput !== null && includeDisabled === undefined) {
-              const invalid = buildSecretMetadataQueryValidationError("includeDisabled", "includeDisabled must be 'true' or 'false'.");
+              const invalid = buildSecretMetadataInvalidRequestResponse("includeDisabled must be 'true' or 'false'.");
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
               return;
             }
             if (includeRevokedInput !== null && includeRevoked === undefined) {
-              const invalid = buildSecretMetadataQueryValidationError("includeRevoked", "includeRevoked must be 'true' or 'false'.");
+              const invalid = buildSecretMetadataInvalidRequestResponse("includeRevoked must be 'true' or 'false'.");
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
               return;
             }
             if (includeDeletedInput !== null && includeDeleted === undefined) {
-              const invalid = buildSecretMetadataQueryValidationError("includeDeleted", "includeDeleted must be 'true' or 'false'.");
+              const invalid = buildSecretMetadataInvalidRequestResponse("includeDeleted must be 'true' or 'false'.");
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
               return;
             }
-            if (limitInput !== null && (limit === undefined || limit < 1)) {
-              const invalid = buildSecretMetadataQueryValidationError("limit", "limit must be an integer >= 1.");
+            if (limitInput !== null && limit === undefined) {
+              const invalid = buildSecretMetadataInvalidRequestResponse("limit must be an integer >= 1.");
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
               return;
             }
-            if (offsetInput !== null && (offset === undefined || offset < 0)) {
-              const invalid = buildSecretMetadataQueryValidationError("offset", "offset must be an integer >= 0.");
+            if (offsetInput !== null && offset === undefined) {
+              const invalid = buildSecretMetadataInvalidRequestResponse("offset must be an integer >= 0.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedQuery = ListSecretMetadataQuerySchema.safeParse({
+              owner: {
+                scope,
+                workspaceId,
+                userIdentityId,
+              },
+              actorWorkspaceId,
+              kinds: kinds.length > 0 ? kinds : undefined,
+              tagAnyOf: tagAnyOf.length > 0 ? tagAnyOf : undefined,
+              includeDisabled: includeDisabledInput === null ? undefined : includeDisabled,
+              includeRevoked: includeRevokedInput === null ? undefined : includeRevoked,
+              includeDeleted: includeDeletedInput === null ? undefined : includeDeleted,
+              limit: limitInput === null ? undefined : limit,
+              offset: offsetInput === null ? undefined : offset,
+            });
+            if (!parsedQuery.success) {
+              const invalid = buildSecretMetadataValidationErrors(parsedQuery.error.issues);
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
               return;
@@ -1718,21 +1688,15 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
 
             const listRequest: ListSecretMetadataApiRequest = Object.freeze({
               actorUserIdentityId: context.principal.userIdentityId,
-              actorWorkspaceId,
-              owner: Object.freeze({
-                scope: scope as ListSecretMetadataApiRequest["owner"]["scope"],
-                workspaceId,
-                userIdentityId,
-              }),
-              kinds: kinds.length > 0
-                ? kinds as NonNullable<ListSecretMetadataApiRequest["kinds"]>
-                : undefined,
-              tagAnyOf: tagAnyOf.length > 0 ? Object.freeze(tagAnyOf.map((tag) => tag.trim()).filter(Boolean)) : undefined,
-              includeDisabled,
-              includeRevoked,
-              includeDeleted,
-              limit,
-              offset,
+              actorWorkspaceId: parsedQuery.data.actorWorkspaceId,
+              owner: parsedQuery.data.owner,
+              kinds: parsedQuery.data.kinds,
+              tagAnyOf: parsedQuery.data.tagAnyOf,
+              includeDisabled: parsedQuery.data.includeDisabled,
+              includeRevoked: parsedQuery.data.includeRevoked,
+              includeDeleted: parsedQuery.data.includeDeleted,
+              limit: parsedQuery.data.limit,
+              offset: parsedQuery.data.offset,
             });
 
             const apiResponse = await options.secretMetadataBackendApi.listSecrets(listRequest);
@@ -1768,11 +1732,23 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               return;
             }
 
+            const parsedQuery = GetSecretMetadataQuerySchema.safeParse({
+              secretId,
+              actorWorkspaceId: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("actorWorkspaceId")),
+              occurredAt: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("occurredAt")),
+            });
+            if (!parsedQuery.success) {
+              const invalid = buildSecretMetadataValidationErrors(parsedQuery.error.issues);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
             const getRequest: GetSecretMetadataApiRequest = Object.freeze({
               actorUserIdentityId: context.principal.userIdentityId,
-              actorWorkspaceId: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("actorWorkspaceId")),
-              secretId,
-              occurredAt: normalizeOptionalString(new URL(request.url ?? "/", "http://localhost").searchParams.get("occurredAt")),
+              actorWorkspaceId: parsedQuery.data.actorWorkspaceId,
+              secretId: parsedQuery.data.secretId,
+              occurredAt: parsedQuery.data.occurredAt,
             });
             const apiResponse = await options.secretMetadataBackendApi.getSecret(getRequest);
             const statusCode = mapSecretMetadataStatusCode(apiResponse);
@@ -1807,22 +1783,31 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               return;
             }
 
-            const parsedRequest = await parseAndValidateSecretMetadataRequest(
-              request,
-              DisableSecretMetadataRequestSchema,
-              requestId,
-              logger,
-              maxBodyBytes,
-            );
-            if (!parsedRequest.ok) {
-              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+            const parsedBody = await parseJsonBody(request, maxBodyBytes);
+            if (!parsedBody.ok) {
+              const invalid = buildSecretMetadataInvalidRequestResponse(parsedBody.error);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = DisableSecretMetadataCommandSchema.safeParse({
+              ...(parsedBody.value as Record<string, unknown>),
+              secretId,
+            });
+            if (!parsedRequest.success) {
+              const invalid = buildSecretMetadataValidationErrors(parsedRequest.error.issues);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
               return;
             }
 
             const disableRequest: DisableSecretMetadataApiRequest = Object.freeze({
               actorUserIdentityId: context.principal.userIdentityId,
-              secretId,
-              ...parsedRequest.data,
+              secretId: parsedRequest.data.secretId,
+              operationKey: parsedRequest.data.operationKey,
+              disabledAt: parsedRequest.data.disabledAt,
+              actorWorkspaceId: parsedRequest.data.actorWorkspaceId,
             });
             const apiResponse = await options.secretMetadataBackendApi.disableSecret(disableRequest);
             const statusCode = mapSecretMetadataStatusCode(apiResponse);
@@ -6607,17 +6592,17 @@ function buildCertificateOperationsQueryValidationError(
   });
 }
 
-function buildSecretMetadataQueryValidationError(path: string, message: string): SecretMetadataApiResponse<never> {
+function buildSecretMetadataValidationErrors(issues: ReadonlyArray<z.ZodIssue>): SecretMetadataApiResponse<never> {
   return Object.freeze({
     ok: false,
     error: {
       code: SecretMetadataApiErrorCodes.invalidRequest,
       message: "Request validation failed.",
-      validationErrors: Object.freeze([Object.freeze({
-        path,
-        code: "invalid_enum_value",
-        message,
-      })]),
+      validationErrors: Object.freeze(issues.map((issue) => Object.freeze({
+        path: issue.path.length > 0 ? issue.path.join(".") : "payload",
+        code: issue.code,
+        message: issue.message,
+      }))),
     },
   });
 }

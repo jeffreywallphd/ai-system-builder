@@ -7,6 +7,14 @@ import type { GetSecretMetadataUseCase } from "../../../src/application/security
 import type { ListSecretsUseCase } from "../../../src/application/security/use-cases/ListSecretsUseCase";
 import { SecretServiceErrorCodes } from "../../../src/application/security/use-cases/SecretManagementServiceContracts";
 import type { IWorkspaceAuthorizationReadRepository } from "../../../src/application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
+import { toSecretMetadataQueryDto } from "../../../src/shared/dto/security/SecretTransportDtos";
+import {
+  SecretApiSchemaValidationError,
+  parseCreateSecretMetadataCommand,
+  parseDisableSecretMetadataCommand,
+  parseGetSecretMetadataQuery,
+  parseListSecretMetadataQuery,
+} from "../../../src/shared/schemas/security/SecretApiSchemaContracts";
 import {
   SecretMetadataApiErrorCodes,
   type CreateSecretMetadataApiRequest,
@@ -71,6 +79,27 @@ export class SecretMetadataBackendApi {
   public async createSecret(
     request: CreateSecretMetadataApiRequest,
   ): Promise<SecretMetadataApiResponse<CreateSecretMetadataApiResponse>> {
+    let parsedRequest: ReturnType<typeof parseCreateSecretMetadataCommand>;
+    try {
+      parsedRequest = parseCreateSecretMetadataCommand({
+        operationKey: request.operationKey,
+        secretId: request.secretId,
+        name: request.name,
+        owner: request.owner,
+        kind: request.kind,
+        plaintext: request.plaintext,
+        metadata: request.metadata,
+        classificationId: request.classificationId,
+        rotationInstruction: request.rotationInstruction,
+        createdAt: request.createdAt,
+      });
+    } catch (error) {
+      if (error instanceof SecretApiSchemaValidationError) {
+        return this.failedValidation("create-secret", error.issues, request.actorUserIdentityId);
+      }
+      throw error;
+    }
+
     const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
     if (!actorUserIdentityId) {
       return this.failed("create-secret", SecretMetadataApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
@@ -78,24 +107,24 @@ export class SecretMetadataBackendApi {
 
     const actor = await this.resolveActorForOwner({
       actorUserIdentityId,
-      owner: request.owner,
+      owner: parsedRequest.owner,
       grantedActions: [SecretAccessActions.create],
-      actorWorkspaceId: request.owner.workspaceId,
+      actorWorkspaceId: parsedRequest.owner.workspaceId,
     });
 
-    const operationKey = normalizeOptional(request.operationKey)
-      ?? `secret-metadata:create:${request.secretId}:${randomUUID()}`;
+    const operationKey = normalizeOptional(parsedRequest.operationKey)
+      ?? `secret-metadata:create:${parsedRequest.secretId}:${randomUUID()}`;
 
     const outcome = await this.dependencies.createSecretUseCase.execute({
       actor,
       operationKey,
-      secretId: request.secretId,
-      name: request.name,
-      owner: request.owner,
-      kind: request.kind,
-      plaintext: request.plaintext,
-      metadata: request.metadata,
-      createdAt: request.createdAt,
+      secretId: parsedRequest.secretId,
+      name: parsedRequest.name,
+      owner: parsedRequest.owner,
+      kind: parsedRequest.kind,
+      plaintext: parsedRequest.plaintext,
+      metadata: parsedRequest.metadata,
+      createdAt: parsedRequest.createdAt,
     });
 
     if (!outcome.ok) {
@@ -104,10 +133,10 @@ export class SecretMetadataBackendApi {
         outcome.error.code,
         outcome.error.message,
         actorUserIdentityId,
-        request.secretId,
-        request.owner.scope,
-        request.owner.workspaceId,
-        request.owner.userIdentityId,
+        parsedRequest.secretId,
+        parsedRequest.owner.scope,
+        parsedRequest.owner.workspaceId,
+        parsedRequest.owner.userIdentityId,
       );
     }
 
@@ -132,6 +161,26 @@ export class SecretMetadataBackendApi {
   public async listSecrets(
     request: ListSecretMetadataApiRequest,
   ): Promise<SecretMetadataApiResponse<ListSecretMetadataApiResponse>> {
+    let parsedRequest: ReturnType<typeof parseListSecretMetadataQuery>;
+    try {
+      parsedRequest = parseListSecretMetadataQuery({
+        owner: request.owner,
+        actorWorkspaceId: request.actorWorkspaceId,
+        kinds: request.kinds,
+        tagAnyOf: request.tagAnyOf,
+        includeDisabled: request.includeDisabled,
+        includeRevoked: request.includeRevoked,
+        includeDeleted: request.includeDeleted,
+        limit: request.limit,
+        offset: request.offset,
+      });
+    } catch (error) {
+      if (error instanceof SecretApiSchemaValidationError) {
+        return this.failedValidation("list-secrets", error.issues, request.actorUserIdentityId);
+      }
+      throw error;
+    }
+
     const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
     if (!actorUserIdentityId) {
       return this.failed("list-secrets", SecretMetadataApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
@@ -139,21 +188,21 @@ export class SecretMetadataBackendApi {
 
     const actor = await this.resolveActorForOwner({
       actorUserIdentityId,
-      owner: request.owner,
+      owner: parsedRequest.owner,
       grantedActions: [SecretAccessActions.list],
-      actorWorkspaceId: request.actorWorkspaceId ?? request.owner.workspaceId,
+      actorWorkspaceId: parsedRequest.actorWorkspaceId ?? parsedRequest.owner.workspaceId,
     });
 
     const outcome = await this.dependencies.listSecretsUseCase.execute({
       actor,
-      owner: request.owner,
-      kinds: request.kinds,
-      tagAnyOf: request.tagAnyOf,
-      includeDisabled: request.includeDisabled,
-      includeRevoked: request.includeRevoked,
-      includeDeleted: request.includeDeleted,
-      limit: request.limit,
-      offset: request.offset,
+      owner: parsedRequest.owner,
+      kinds: parsedRequest.kinds,
+      tagAnyOf: parsedRequest.tagAnyOf,
+      includeDisabled: parsedRequest.includeDisabled,
+      includeRevoked: parsedRequest.includeRevoked,
+      includeDeleted: parsedRequest.includeDeleted,
+      limit: parsedRequest.limit,
+      offset: parsedRequest.offset,
     });
 
     if (!outcome.ok) {
@@ -163,9 +212,9 @@ export class SecretMetadataBackendApi {
         outcome.error.message,
         actorUserIdentityId,
         undefined,
-        request.owner.scope,
-        request.owner.workspaceId,
-        request.owner.userIdentityId,
+        parsedRequest.owner.scope,
+        parsedRequest.owner.workspaceId,
+        parsedRequest.owner.userIdentityId,
       );
     }
 
@@ -173,9 +222,9 @@ export class SecretMetadataBackendApi {
       event: "secret-metadata.request.succeeded",
       operation: "list-secrets",
       actorUserIdentityId,
-      scope: request.owner.scope,
-      workspaceId: request.owner.workspaceId,
-      userIdentityId: request.owner.userIdentityId,
+      scope: parsedRequest.owner.scope,
+      workspaceId: parsedRequest.owner.workspaceId,
+      userIdentityId: parsedRequest.owner.userIdentityId,
     });
 
     return Object.freeze({
@@ -189,12 +238,26 @@ export class SecretMetadataBackendApi {
   public async getSecret(
     request: GetSecretMetadataApiRequest,
   ): Promise<SecretMetadataApiResponse<GetSecretMetadataApiResponse>> {
+    let parsedRequest: ReturnType<typeof parseGetSecretMetadataQuery>;
+    try {
+      parsedRequest = parseGetSecretMetadataQuery({
+        secretId: request.secretId,
+        actorWorkspaceId: request.actorWorkspaceId,
+        occurredAt: request.occurredAt,
+      });
+    } catch (error) {
+      if (error instanceof SecretApiSchemaValidationError) {
+        return this.failedValidation("get-secret", error.issues, request.actorUserIdentityId, request.secretId);
+      }
+      throw error;
+    }
+
     const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
     if (!actorUserIdentityId) {
       return this.failed("get-secret", SecretMetadataApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
     }
 
-    const actorWorkspaceId = await this.resolveAuthorizedWorkspaceId(actorUserIdentityId, request.actorWorkspaceId);
+    const actorWorkspaceId = await this.resolveAuthorizedWorkspaceId(actorUserIdentityId, parsedRequest.actorWorkspaceId);
     const actor = createActor({
       actorUserIdentityId,
       actorWorkspaceId,
@@ -204,8 +267,8 @@ export class SecretMetadataBackendApi {
 
     const outcome = await this.dependencies.getSecretMetadataUseCase.execute({
       actor,
-      secretId: request.secretId,
-      occurredAt: request.occurredAt,
+      secretId: parsedRequest.secretId,
+      occurredAt: parsedRequest.occurredAt,
     });
 
     if (!outcome.ok) {
@@ -214,7 +277,7 @@ export class SecretMetadataBackendApi {
         outcome.error.code,
         outcome.error.message,
         actorUserIdentityId,
-        request.secretId,
+        parsedRequest.secretId,
       );
     }
 
@@ -239,12 +302,27 @@ export class SecretMetadataBackendApi {
   public async disableSecret(
     request: DisableSecretMetadataApiRequest,
   ): Promise<SecretMetadataApiResponse<DisableSecretMetadataApiResponse>> {
+    let parsedRequest: ReturnType<typeof parseDisableSecretMetadataCommand>;
+    try {
+      parsedRequest = parseDisableSecretMetadataCommand({
+        secretId: request.secretId,
+        operationKey: request.operationKey,
+        disabledAt: request.disabledAt,
+        actorWorkspaceId: request.actorWorkspaceId,
+      });
+    } catch (error) {
+      if (error instanceof SecretApiSchemaValidationError) {
+        return this.failedValidation("disable-secret", error.issues, request.actorUserIdentityId, request.secretId);
+      }
+      throw error;
+    }
+
     const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
     if (!actorUserIdentityId) {
       return this.failed("disable-secret", SecretMetadataApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
     }
 
-    const actorWorkspaceId = await this.resolveAuthorizedWorkspaceId(actorUserIdentityId, request.actorWorkspaceId);
+    const actorWorkspaceId = await this.resolveAuthorizedWorkspaceId(actorUserIdentityId, parsedRequest.actorWorkspaceId);
     const actor = createActor({
       actorUserIdentityId,
       actorWorkspaceId,
@@ -252,14 +330,14 @@ export class SecretMetadataBackendApi {
       actorType: SecretActorTypes.serverAdmin,
     });
 
-    const operationKey = normalizeOptional(request.operationKey)
-      ?? `secret-metadata:disable:${request.secretId}:${randomUUID()}`;
+    const operationKey = normalizeOptional(parsedRequest.operationKey)
+      ?? `secret-metadata:disable:${parsedRequest.secretId}:${randomUUID()}`;
 
     const outcome = await this.dependencies.disableSecretUseCase.execute({
       actor,
       operationKey,
-      secretId: request.secretId,
-      disabledAt: request.disabledAt,
+      secretId: parsedRequest.secretId,
+      disabledAt: parsedRequest.disabledAt,
     });
 
     if (!outcome.ok) {
@@ -268,7 +346,7 @@ export class SecretMetadataBackendApi {
         outcome.error.code,
         outcome.error.message,
         actorUserIdentityId,
-        request.secretId,
+        parsedRequest.secretId,
       );
     }
 
@@ -403,6 +481,35 @@ export class SecretMetadataBackendApi {
     });
   }
 
+  private failedValidation(
+    operation: SecretMetadataObservabilityEvent["operation"],
+    issues: ReadonlyArray<{ readonly path: string; readonly code: string; readonly message: string }>,
+    actorUserIdentityId?: string,
+    secretId?: string,
+  ): SecretMetadataApiResponse<never> {
+    void this.emitObservability({
+      event: "secret-metadata.request.failed",
+      operation,
+      actorUserIdentityId,
+      code: SecretMetadataApiErrorCodes.invalidRequest,
+      message: "Request validation failed.",
+      secretId,
+    });
+
+    return Object.freeze({
+      ok: false,
+      error: Object.freeze({
+        code: SecretMetadataApiErrorCodes.invalidRequest,
+        message: "Request validation failed.",
+        validationErrors: Object.freeze(issues.map((issue) => Object.freeze({
+          path: issue.path,
+          code: issue.code,
+          message: issue.message,
+        }))),
+      }),
+    });
+  }
+
   private async emitObservability(event: SecretMetadataObservabilityEvent): Promise<void> {
     if (!this.dependencies.observabilityHook) {
       return;
@@ -432,17 +539,18 @@ function createActor(input: {
 }
 
 function toSecretMetadataApiRecord(reference: SecretReference): SecretMetadataApiRecord {
+  const dto = toSecretMetadataQueryDto(reference);
   return Object.freeze({
-    secretId: reference.secretId,
-    name: reference.name,
-    scope: reference.scope,
-    workspaceId: reference.workspaceId,
-    userIdentityId: reference.userIdentityId,
-    kind: reference.kind,
-    state: reference.state,
-    currentVersionId: reference.currentVersionId,
-    metadata: reference.metadata,
-    updatedAt: reference.updatedAt,
+    secretId: dto.secretId,
+    name: dto.name,
+    scope: dto.scope,
+    workspaceId: dto.workspaceId,
+    userIdentityId: dto.userIdentityId,
+    kind: dto.kind,
+    state: dto.state,
+    currentVersionId: dto.currentVersionId,
+    metadata: dto.metadata,
+    updatedAt: dto.updatedAt,
   });
 }
 

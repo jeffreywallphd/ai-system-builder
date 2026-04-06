@@ -147,6 +147,30 @@ describe("SecretMetadataBackendApi", () => {
 
     expect(response.error.code).toBe(SecretMetadataApiErrorCodes.notFound);
   });
+
+  it("returns stable validation errors for malformed create payloads", async () => {
+    const backend = createBackend({});
+
+    const response = await backend.createSecret({
+      actorUserIdentityId: "user:alpha",
+      secretId: " ",
+      name: " ",
+      owner: {
+        scope: SecretScopes.server,
+      },
+      kind: SecretKinds.apiKey,
+      plaintext: "",
+    });
+
+    expect(response.ok).toBeFalse();
+    if (response.ok || !response.error) {
+      return;
+    }
+
+    expect(response.error.code).toBe(SecretMetadataApiErrorCodes.invalidRequest);
+    expect(response.error.message).toBe("Request validation failed.");
+    expect(response.error.validationErrors?.length).toBeGreaterThan(0);
+  });
 });
 
 function createBackend(overrides: Record<string, unknown>): SecretMetadataBackendApi {
