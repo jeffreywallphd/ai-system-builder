@@ -159,6 +159,15 @@ export interface IdentityServerHostOptions {
   readonly databasePath: string;
   readonly port?: number;
   readonly host?: string;
+  readonly cors?: {
+    readonly enabled?: boolean;
+    readonly allowedOrigins?: ReadonlyArray<string>;
+    readonly allowLoopbackOrigins?: boolean;
+    readonly allowNullOrigin?: boolean;
+    readonly allowedMethods?: ReadonlyArray<string>;
+    readonly allowedHeaders?: ReadonlyArray<string>;
+    readonly maxAgeSeconds?: number;
+  };
   readonly logger?: IdentityHttpServerLogger;
   readonly env?: Readonly<Record<string, string | undefined>>;
   readonly sessionPolicies?: IdentitySessionLifecyclePolicies;
@@ -775,6 +784,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     authorizationManagementBackendApi,
     workspaceBackendApi,
     workspaceAdministrationBackendApi,
+    cors: options.cors,
     logger: options.logger,
     secureTransport: Object.freeze({
       requireHttps: secureTransportConfig.requireSecureHttp,

@@ -67,6 +67,68 @@ async function startServer(
 }
 
 describe("IdentityHttpServer", () => {
+  it("handles CORS preflight and emits CORS headers for API routes", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+    const origin = "http://127.0.0.1:5174";
+
+    const preflight = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "OPTIONS",
+      headers: {
+        origin,
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type, authorization",
+      },
+    });
+
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("access-control-allow-origin")).toBe(origin);
+    expect(preflight.headers.get("access-control-allow-methods")).toContain("POST");
+    expect(preflight.headers.get("access-control-allow-headers")).toContain("content-type");
+    expect(preflight.headers.get("vary")).toContain("Origin");
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        origin,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "cors.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+
+    expect(registerResponse.status).toBe(200);
+    expect(registerResponse.headers.get("access-control-allow-origin")).toBe(origin);
+  });
+
+  it("rejects disallowed cross-origin API requests", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+
+    const disallowedOriginRequest = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        origin: "https://example.com",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "blocked.cors.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+
+    expect(disallowedOriginRequest.status).toBe(403);
+    const body = await disallowedOriginRequest.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("forbidden");
+  });
+
   it("exposes end-to-end register and login endpoints", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger);

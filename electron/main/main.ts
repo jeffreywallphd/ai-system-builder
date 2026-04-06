@@ -322,6 +322,15 @@ function normalizeOptional(value: string | undefined): string | undefined {
   return normalized ? normalized : undefined;
 }
 
+function normalizeHttpOrigin(value: string): string | undefined {
+  try {
+    const origin = new URL(value).origin;
+    return origin === "null" ? undefined : origin;
+  } catch {
+    return undefined;
+  }
+}
+
 function createDesktopAgentRunner(params: {
   readonly assetSystemRepository: SqliteAssetSystemRepository;
   readonly sessionRepository: SqliteAgentExecutionSessionRepository;
@@ -505,8 +514,14 @@ async function bootstrapDesktopRuntime(): Promise<void> {
         serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
         serviceSupervisorPort: 8790,
       });
+  const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
   identityServerHost = await startIdentityServerHost({
     databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
+    cors: {
+      allowedOrigins: rendererOrigin ? [rendererOrigin] : [],
+      allowLoopbackOrigins: true,
+      allowNullOrigin: isPackaged,
+    },
   });
   const identityApiBaseUrl = assertSecureTransportEndpoint(
     `http://127.0.0.1:${identityServerHost.port}`,

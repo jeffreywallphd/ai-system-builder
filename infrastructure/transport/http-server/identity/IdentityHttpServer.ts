@@ -157,6 +157,8 @@ import { validateNodeMutualTlsTransport } from "./NodeMutualTlsTransportAdapter"
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 const DefaultWebSocketTrustRevalidationIntervalMs = 30_000;
+const DEFAULT_API_CORS_ALLOWED_METHODS = Object.freeze(["GET", "POST", "OPTIONS"]);
+const DEFAULT_API_CORS_ALLOWED_HEADERS = Object.freeze(["content-type", "authorization"]);
 
 const RegisterRequestSchema: z.ZodType<RegisterLocalIdentityApiRequest> = z.object({
   username: z.string().min(1),
@@ -649,6 +651,16 @@ interface IdentityHttpServerSecureTransportOptions {
   readonly allowInsecureLoopback: boolean;
 }
 
+interface IdentityHttpServerCorsOptions {
+  readonly enabled?: boolean;
+  readonly allowedOrigins?: ReadonlyArray<string>;
+  readonly allowLoopbackOrigins?: boolean;
+  readonly allowNullOrigin?: boolean;
+  readonly allowedMethods?: ReadonlyArray<string>;
+  readonly allowedHeaders?: ReadonlyArray<string>;
+  readonly maxAgeSeconds?: number;
+}
+
 interface IdentityHttpServerWebSocketOptions {
   readonly channelPathPrefix?: string;
   readonly supportedPurposes?: ReadonlyArray<WebSocketChannelPurpose>;
@@ -686,6 +698,7 @@ export interface IdentityHttpServerOptions {
   readonly maxBodyBytes?: number;
   readonly serverFactory?: IdentityHttpServerFactory;
   readonly secureTransport?: IdentityHttpServerSecureTransportOptions;
+  readonly cors?: IdentityHttpServerCorsOptions;
   readonly transportTrust?: IdentityHttpServerTransportTrustOptions;
   readonly webSocket?: IdentityHttpServerWebSocketOptions;
 }
@@ -760,6 +773,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
   const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
   const serverFactory = options.serverFactory ?? ((requestListener: RequestListener) => createHttpServer(requestListener));
   const channelRegistry = options.webSocket?.channelRegistry ?? new InMemoryWebSocketChannelRegistry();
+  const corsPolicy = resolveApiCorsPolicy(options.cors);
 
   const server = serverFactory(async (request, response) => {
     const requestId = randomUUID();
@@ -773,6 +787,38 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
     }));
 
     try {
+      if (path.startsWith("/api/")) {
+        const corsEvaluation = evaluateApiCorsRequest({
+          request,
+          response,
+          path,
+          corsPolicy,
+        });
+        if (!corsEvaluation.ok) {
+          const forbidden = buildForbiddenResponse(corsEvaluation.message);
+          writeJson(response, 403, forbidden);
+          logResponse(logger, requestId, request, 403, Object.freeze({
+            transport: transportState,
+            cors: Object.freeze({
+              reason: corsEvaluation.reason,
+              origin: corsEvaluation.origin,
+            }),
+          }), forbidden);
+          return;
+        }
+        if (corsEvaluation.preflight) {
+          writeNoContent(response, 204);
+          logger.info(Object.freeze({
+            event: "identity-http.cors.preflight.accepted",
+            requestId,
+            method: request.method,
+            path,
+            statusCode: 204,
+          }));
+          return;
+        }
+      }
+
       if (path.startsWith("/api/")) {
         const secureTransportDecision = enforceApiSecureTransport({
           request,
@@ -4880,6 +4926,179 @@ function mapWebSocketCloseCodeToStatusCode(closeCode: number): number {
   return 500;
 }
 
+interface ApiCorsPolicy {
+  readonly enabled: boolean;
+  readonly allowedOrigins: ReadonlySet<string>;
+  readonly allowLoopbackOrigins: boolean;
+  readonly allowNullOrigin: boolean;
+  readonly allowedMethods: ReadonlyArray<string>;
+  readonly allowedHeaders: ReadonlyArray<string>;
+  readonly maxAgeSeconds: number;
+}
+
+function resolveApiCorsPolicy(options: IdentityHttpServerCorsOptions | undefined): ApiCorsPolicy {
+  const normalizedAllowedOrigins = (options?.allowedOrigins ?? [])
+    .map((origin) => normalizeCorsOrigin(origin))
+    .filter((origin): origin is string => Boolean(origin));
+  const allowedMethods = normalizeCorsTokenList(options?.allowedMethods, DEFAULT_API_CORS_ALLOWED_METHODS);
+  const allowedHeaders = normalizeCorsTokenList(options?.allowedHeaders, DEFAULT_API_CORS_ALLOWED_HEADERS);
+  const maxAgeSeconds = normalizeCorsMaxAge(options?.maxAgeSeconds);
+  return Object.freeze({
+    enabled: options?.enabled ?? true,
+    allowedOrigins: new Set(normalizedAllowedOrigins),
+    allowLoopbackOrigins: options?.allowLoopbackOrigins ?? true,
+    allowNullOrigin: options?.allowNullOrigin ?? false,
+    allowedMethods,
+    allowedHeaders,
+    maxAgeSeconds,
+  });
+}
+
+function evaluateApiCorsRequest(input: {
+  readonly request: IncomingMessage;
+  readonly response: ServerResponse;
+  readonly path: string;
+  readonly corsPolicy: ApiCorsPolicy;
+}): {
+  readonly ok: true;
+  readonly preflight: boolean;
+} | {
+  readonly ok: false;
+  readonly reason: "origin-invalid" | "origin-not-allowed";
+  readonly message: string;
+  readonly origin?: string;
+} {
+  const origin = normalizeOptionalHeader(input.request.headers.origin);
+  const requestedMethod = normalizeOptionalHeader(input.request.headers["access-control-request-method"]);
+  const isPreflight = input.request.method === "OPTIONS" && Boolean(requestedMethod);
+
+  if (!input.corsPolicy.enabled || !origin) {
+    if (input.request.method === "OPTIONS" && input.path.startsWith("/api/")) {
+      return {
+        ok: true,
+        preflight: true,
+      };
+    }
+    return {
+      ok: true,
+      preflight: false,
+    };
+  }
+
+  if (!isCorsOriginAllowed(origin, input.corsPolicy)) {
+    return {
+      ok: false,
+      reason: normalizeCorsOrigin(origin) ? "origin-not-allowed" : "origin-invalid",
+      message: "Cross-origin request origin is not allowed.",
+      origin,
+    };
+  }
+
+  setCorsResponseHeaders(input.response, input.request, origin, input.corsPolicy, isPreflight);
+  if (isPreflight) {
+    return {
+      ok: true,
+      preflight: true,
+    };
+  }
+
+  return {
+    ok: true,
+    preflight: false,
+  };
+}
+
+function setCorsResponseHeaders(
+  response: ServerResponse,
+  request: IncomingMessage,
+  origin: string,
+  corsPolicy: ApiCorsPolicy,
+  includePreflightHeaders: boolean,
+): void {
+  response.setHeader("access-control-allow-origin", origin);
+  response.setHeader("vary", "Origin");
+
+  if (!includePreflightHeaders) {
+    return;
+  }
+
+  const requestedHeaders = normalizeCorsTokenList(
+    normalizeOptionalHeader(request.headers["access-control-request-headers"])?.split(","),
+    corsPolicy.allowedHeaders,
+  );
+  response.setHeader("access-control-allow-methods", corsPolicy.allowedMethods.join(", "));
+  response.setHeader("access-control-allow-headers", requestedHeaders.join(", "));
+  response.setHeader("access-control-max-age", String(corsPolicy.maxAgeSeconds));
+}
+
+function isCorsOriginAllowed(origin: string, corsPolicy: ApiCorsPolicy): boolean {
+  const normalizedOrigin = normalizeCorsOrigin(origin);
+  if (!normalizedOrigin) {
+    return false;
+  }
+  if (normalizedOrigin === "null") {
+    return corsPolicy.allowNullOrigin;
+  }
+  if (corsPolicy.allowedOrigins.has(normalizedOrigin)) {
+    return true;
+  }
+
+  if (!corsPolicy.allowLoopbackOrigins) {
+    return false;
+  }
+
+  const parsedOrigin = safeParseUrl(normalizedOrigin);
+  if (!parsedOrigin) {
+    return false;
+  }
+
+  const protocol = parsedOrigin.protocol.toLowerCase();
+  if (protocol !== "http:" && protocol !== "https:") {
+    return false;
+  }
+  return isLoopbackHostValue(parsedOrigin.hostname.trim().toLowerCase());
+}
+
+function normalizeCorsOrigin(origin: string | undefined): string | undefined {
+  const normalized = origin?.trim();
+  if (!normalized) {
+    return undefined;
+  }
+  if (normalized === "null") {
+    return "null";
+  }
+  const parsed = safeParseUrl(normalized);
+  return parsed?.origin;
+}
+
+function normalizeCorsTokenList(
+  values: ReadonlyArray<string> | undefined,
+  fallback: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+  const normalized = (values ?? [])
+    .map((value) => value.trim().toLowerCase())
+    .filter((value) => value.length > 0);
+  if (normalized.length === 0) {
+    return fallback;
+  }
+  return [...new Set(normalized)];
+}
+
+function normalizeCorsMaxAge(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    return 600;
+  }
+  return value;
+}
+
+function safeParseUrl(value: string): URL | undefined {
+  try {
+    return new URL(value);
+  } catch {
+    return undefined;
+  }
+}
+
 function normalizeOptionalHeader(value: string | string[] | undefined): string | undefined {
   if (!value) {
     return undefined;
@@ -6023,6 +6242,11 @@ function writeJson(response: ServerResponse, statusCode: number, payload: unknow
   response.statusCode = statusCode;
   response.setHeader("content-type", "application/json; charset=utf-8");
   response.end(JSON.stringify(payload));
+}
+
+function writeNoContent(response: ServerResponse, statusCode: number): void {
+  response.statusCode = statusCode;
+  response.end();
 }
 
 function normalizeSessionAssuranceLevel(
