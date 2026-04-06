@@ -206,12 +206,19 @@ describe("IdentityServerHost", () => {
         },
         operationKey: "op:host:secret:create:1",
         secretId: "secret:server:openai",
-        name: "llm.openai.api_key",
+        name: "provider.openai.api-key",
         owner: {
           scope: SecretScopes.server,
         },
         kind: SecretKinds.apiKey,
         plaintext: "sk-live-123",
+        metadata: {
+          tags: ["openai"],
+          labels: {
+            provider: "openai",
+            usage: "model-inference",
+          },
+        },
       });
       expect(createSecretResult.ok).toBeTrue();
       if (!createSecretResult.ok) {

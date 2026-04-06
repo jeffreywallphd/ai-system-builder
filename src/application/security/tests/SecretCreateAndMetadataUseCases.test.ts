@@ -155,7 +155,7 @@ describe("Secret create and metadata use cases", () => {
       actor: createServerAdminActor([SecretAccessActions.create]),
       operationKey: "op:secret:create:server-openai",
       secretId: "secret:server:openai",
-      name: "llm.openai.api_key",
+      name: "provider.openai.api-key",
       owner: {
         scope: SecretScopes.server,
       },
@@ -164,7 +164,9 @@ describe("Secret create and metadata use cases", () => {
       metadata: {
         tags: ["openai", "prod"],
         labels: {
-          service: "openai",
+          provider: "openai",
+          usage: "model-inference",
+          environment: "prod",
         },
       },
       createdAt: "2026-04-05T12:00:00.000Z",
@@ -214,12 +216,19 @@ describe("Secret create and metadata use cases", () => {
       actor: createServerAdminActor([SecretAccessActions.create]),
       operationKey: "op:secret:create:duplicate",
       secretId: "secret:server:openai-duplicate",
-      name: "llm.openai.api_key",
+      name: "provider.openai.api-key",
       owner: {
         scope: SecretScopes.server,
       },
       kind: SecretKinds.apiKey,
       plaintext: "sk-production-456",
+      metadata: {
+        tags: ["openai", "prod"],
+        labels: {
+          provider: "openai",
+          usage: "model-inference",
+        },
+      },
     });
 
     expect(result).toEqual({
@@ -255,12 +264,19 @@ describe("Secret create and metadata use cases", () => {
       actor: createServerAdminActor([SecretAccessActions.create]),
       operationKey: "op:secret:create:internal-failure",
       secretId: "secret:server:internal-failure",
-      name: "llm.openai.api_key",
+      name: "provider.openai.api-key",
       owner: {
         scope: SecretScopes.server,
       },
       kind: SecretKinds.apiKey,
       plaintext,
+      metadata: {
+        tags: ["openai"],
+        labels: {
+          provider: "openai",
+          usage: "model-inference",
+        },
+      },
       createdAt: "2026-04-05T14:00:00.000Z",
     });
 
@@ -297,7 +313,7 @@ describe("Secret create and metadata use cases", () => {
       actor: createServerAdminActor([SecretAccessActions.create]),
       operationKey: "op:secret:create:invalid-scope",
       secretId: "secret:workspace:invalid",
-      name: "workspace.invalid.secret",
+      name: "provider.workspace.invalid",
       owner: {
         scope: SecretScopes.workspace,
       },
@@ -310,6 +326,43 @@ describe("Secret create and metadata use cases", () => {
       error: {
         code: SecretServiceErrorCodes.invalidRequest,
         message: "Workspace-scoped secrets require workspaceId.",
+      },
+    });
+  });
+
+  it("rejects create requests that do not match seeded secret classification conventions", async () => {
+    const useCase = new CreateSecretUseCase({
+      secretRecordRepository: new InMemorySecretRecordRepository(),
+      secretEncryptionPort: new InMemorySecretEncryptionPort(),
+      secretAccessPolicyPort: new DomainBackedSecretAccessPolicyPort(),
+      secretAccessAuditPort: new InMemorySecretAccessAuditPort(),
+    });
+
+    const result = await useCase.execute({
+      actor: createServerAdminActor([SecretAccessActions.create]),
+      operationKey: "op:secret:create:unsupported-classification",
+      secretId: "secret:server:unsupported-classification",
+      name: "llm.openai.api_key",
+      owner: {
+        scope: SecretScopes.server,
+      },
+      kind: SecretKinds.apiKey,
+      plaintext: "sk-production-789",
+      metadata: {
+        tags: ["openai"],
+        labels: {
+          provider: "openai",
+          usage: "model-inference",
+        },
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: SecretServiceErrorCodes.invalidRequest,
+        message:
+          "Secret name 'llm.openai.api_key' must use a supported classification prefix (provider., personal., storage., signing., integration.).",
       },
     });
   });
@@ -393,7 +446,7 @@ describe("Secret create and metadata use cases", () => {
       actor: createServerAdminActor([SecretAccessActions.create]),
       operationKey: "op:secret:create:invalid-ts",
       secretId: "secret:server:invalid-ts",
-      name: "llm.invalid.timestamp",
+      name: "provider.invalid.timestamp",
       owner: {
         scope: SecretScopes.server,
       },
@@ -448,7 +501,7 @@ function createServerAdminActor(
 function createServerSecretRecord(): SecretRecord {
   return createSecretRecord({
     secretId: "secret:server:openai",
-    name: "llm.openai.api_key",
+    name: "provider.openai.api-key",
     owner: {
       scope: SecretScopes.server,
     },
@@ -458,7 +511,8 @@ function createServerSecretRecord(): SecretRecord {
       description: "Primary OpenAI production key.",
       tags: ["openai", "prod"],
       labels: {
-        service: "openai",
+        provider: "openai",
+        usage: "model-inference",
       },
     },
     createdAt: "2026-04-05T12:00:00.000Z",
