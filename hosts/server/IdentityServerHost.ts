@@ -77,6 +77,7 @@ import { ServerManagedTransportTrustStateResolver } from "../../src/infrastructu
 import { TransportSecurityObservabilityReporter } from "../../src/infrastructure/security/TransportSecurityObservabilityReporter";
 import { createFileSystemProtectedSecretStoreFromEnvironment } from "../../src/infrastructure/security/secrets/FileSystemProtectedSecretStore";
 import { composeServerSecretService, type ServerComposedSecretService } from "../../src/infrastructure/security/secrets/SecretServiceComposition";
+import { assertSystemSecretBootstrapSafe } from "../../src/infrastructure/security/secrets/SystemSecretBootstrapService";
 import type { ICertificateAuthorityIssuerPort } from "../../src/application/security/ports/ICertificateAuthorityIssuerPort";
 import { ProtectedCertificateAuthorityRootMaterialStorage } from "../../src/infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
 import { RuntimeTrustMaterialDistributionService } from "../../src/infrastructure/security/certificates/RuntimeTrustMaterialDistributionService";
@@ -280,6 +281,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       env,
       observabilityLogger: createSecretOperationalLogger(options.logger),
       auditHook: createSecretAccessAuditHook(options.logger),
+    });
+    await assertSystemSecretBootstrapSafe({
+      env,
+      secretService,
     });
     const providerAccountPolicies = options.providerAccountPolicies
       ?? IdentityProviderAccountPolicyConfig.fromEnv(env);

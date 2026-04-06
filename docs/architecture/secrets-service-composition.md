@@ -5,6 +5,7 @@ This note documents Story 8.1.7 (Feature 8 / Epic 8.1): wire secret services int
 ## Canonical artifacts
 
 - `src/infrastructure/security/secrets/SecretServiceComposition.ts`
+- `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts`
 - `hosts/server/IdentityServerHost.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
 
@@ -54,6 +55,8 @@ Default encrypted payload directory (when not configured) is:
 - If neither master-key id nor key is configured, host composes the secret service in a disabled encryption posture (service resolves; encryption operations are unavailable until configured).
 - If only one of the required key settings is provided, host startup fails closed with explicit configuration error.
 - Invalid key material during configured startup also fails host startup.
+- Required system secrets (when declared by `AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS`) are now validated at startup and fail closed when missing/unusable.
+- Legacy environment secret values can be migrated into required secret records during startup (default enabled via `AI_LOOM_SECRET_BOOTSTRAP_MIGRATE_LEGACY_ENV`).
 
 ## Runtime smoke coverage
 
@@ -62,3 +65,5 @@ Default encrypted payload directory (when not configured) is:
 - authoritative host startup composes and exposes secret service runtime collaborators
 - composed secret create/metadata use cases execute successfully under configured master-key settings
 - host fails closed on partial secret master-key configuration
+- host fails closed when required system secrets are missing
+- host can migrate required system secrets from supported legacy environment values

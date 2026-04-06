@@ -264,6 +264,66 @@ describe("IdentityServerHost", () => {
     }
   });
 
+  it("fails closed when required system secrets are missing at startup", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-required-system-secret-missing-"));
+    const databasePath = join(tempDirectory, "required-system-secret-missing.sqlite");
+
+    await expect(startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+      env: {
+        AI_LOOM_SECRET_MASTER_KEY_ID: "kek:server:default",
+        AI_LOOM_SECRET_MASTER_KEY: Buffer.alloc(32, 31).toString("base64"),
+        AI_LOOM_SECRET_ENCRYPTED_PAYLOAD_DIRECTORY: join(tempDirectory, "secret-envelopes"),
+        AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS: "secret:server:provider:openai",
+        AI_LOOM_SECRET_BOOTSTRAP_MIGRATE_LEGACY_ENV: "false",
+      },
+    })).rejects.toThrow("System secret bootstrap validation failed.");
+
+    rmSync(tempDirectory, { recursive: true, force: true });
+  });
+
+  it("bootstraps required system secrets from legacy environment values during startup", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-required-system-secret-migration-"));
+    const databasePath = join(tempDirectory, "required-system-secret-migration.sqlite");
+    const host = await startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+      env: {
+        AI_LOOM_SECRET_MASTER_KEY_ID: "kek:server:default",
+        AI_LOOM_SECRET_MASTER_KEY: Buffer.alloc(32, 32).toString("base64"),
+        AI_LOOM_SECRET_ENCRYPTED_PAYLOAD_DIRECTORY: join(tempDirectory, "secret-envelopes"),
+        AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS: "secret:server:provider:openai",
+        OPENAI_API_KEY: "sk-live-migrated-via-startup",
+      },
+    });
+
+    try {
+      const metadata = await host.secretService.getSecretMetadataUseCase.execute({
+        actor: {
+          actorId: "user:server-admin",
+          actorType: SecretActorTypes.serverAdmin,
+          grantedActions: [SecretAccessActions.readMetadata],
+        },
+        secretId: "secret:server:provider:openai",
+      });
+      expect(metadata.ok).toBeTrue();
+      if (!metadata.ok) {
+        return;
+      }
+      expect(metadata.value.name).toBe("provider.openai.api-key");
+    } finally {
+      await host.close();
+      rmSync(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("exposes workspace invitation issuance and onboarding routes on the runtime host", async () => {
     const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-workspace-host-test-"));
     const databasePath = join(tempDirectory, "identity-workspace-host.sqlite");
