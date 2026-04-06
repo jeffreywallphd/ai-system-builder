@@ -111,6 +111,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Worker executable host assembly baseline (runtime execution composition boundaries + startup entrypoint expectations): `docs/architecture/worker-host-assembly.md`
 - Story 12.4.1 runtime-entrypoint migration notes (active entrypoints now delegating through host assemblies): `docs/architecture/entrypoint-host-composition-migration-12.4.1.md`
 - Story 12.4.2 development/test startup migration notes (local scripts and harnesses now running through host assemblies): `docs/architecture/development-host-startup-model-12.4.2.md`
+- Story 12.4.3 host extension guardrails (architecture tests + contributor host/layer workflow): `docs/architecture/host-composition-extension-guardrails-12.4.3.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
 - Authorization permission matrix and key catalog reference: `docs/architecture/authorization-permission-catalog.md`
 - Authorization workspace role-definition and baseline role-grant reference: `docs/architecture/authorization-role-reference.md`
