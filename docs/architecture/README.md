@@ -125,6 +125,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For execution, tools, MCP, and runtime selection, read [`workflow-execution-and-tools.md`](./workflow-execution-and-tools.md).
 - For host/runtime composition and desktop delivery, read [`desktop-runtime-and-hosts.md`](./desktop-runtime-and-hosts.md).
 - For explicit host runtime kinds, authoritative control-plane role contracts, and composition-root boundary expectations, read [`host-runtime-composition-boundaries.md`](./host-runtime-composition-boundaries.md).
+- For shared host startup pipeline contracts, startup-context model, and contributor startup-sequence guidance, read [`host-bootstrap-pipeline.md`](./host-bootstrap-pipeline.md).
 - For UI composition and state flow, read [`presentation-and-state.md`](./presentation-and-state.md).
 - For cross-studio asset selection contracts and capability rules, read [`asset-selector-framework.md`](./asset-selector-framework.md).
 - For canonical studio launch/return handoff contracts, read [`studio-handoff-contract.md`](./studio-handoff-contract.md).
