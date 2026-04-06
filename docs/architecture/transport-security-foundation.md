@@ -287,6 +287,7 @@ Story 7.1.3 adds explicit host-level transport composition and environment-aware
 ### Runtime behavior updates
 
 - Hosts resolve one shared secure transport config (`HostSecureTransportConfig`) instead of ad hoc endpoint/tls toggles.
+- `HostSecureTransportConfig` resolves runtime env from a browser-safe `globalThis.process?.env` probe so web runtime composition does not depend on Node globals.
 - Identity server host now composes `ValidateTransportConnectionTrustUseCase` + `HttpTransportTrustValidationAdapter` in the composition root and injects that gate into `IdentityHttpServer`.
 - Authenticated HTTP routes now run inbound transport-trust validation through shared contracts, with explicit node-to-control-plane mapping for node runtime trust-material and heartbeat routes.
 - Non-loopback authoritative server startup fails closed unless HTTPS transport material is available.

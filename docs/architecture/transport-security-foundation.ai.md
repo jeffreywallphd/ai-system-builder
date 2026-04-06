@@ -223,6 +223,7 @@ User trust is not treated as node trust.
 Story 7.1.3 wires these transport contracts into runnable hosts through explicit composition-root config:
 
 - `infrastructure/config/HostSecureTransportConfig.ts` central host transport profile resolution (`server`, `desktop`, `hybrid`, `web`, `worker`) and secure endpoint assertions.
+  - runtime env lookup is now browser-safe (`globalThis.process?.env`) so web compositions can resolve fail-closed defaults even when the Node `process` global is absent.
 - `hosts/server/IdentityServerHost.ts` composes:
   - `ServerManagedTransportTrustStateResolver`
   - `ValidateTransportConnectionTrustUseCase`
