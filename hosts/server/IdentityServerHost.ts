@@ -72,6 +72,7 @@ import { AssetUploadInitiationService } from "../../src/application/assets/use-c
 import { AssetUploadIngestionService } from "../../src/application/assets/use-cases/AssetUploadIngestionService";
 import { AssetDiscoveryService } from "../../src/application/assets/use-cases/AssetDiscoveryService";
 import { AssetDetailService } from "../../src/application/assets/use-cases/AssetDetailService";
+import { AssetDownloadService } from "../../src/application/assets/use-cases/AssetDownloadService";
 import { StorageLogicalAccessResolutionService } from "../../src/application/storage/use-cases/StorageLogicalAccessResolutionService";
 import { StorageBackendProvisioningOrchestrator } from "../../src/infrastructure/storage/StorageBackendProvisioningOrchestrator";
 import { createStorageBackendAdapterRegistry } from "../../src/infrastructure/storage/StorageBackendAdapterRegistry";
@@ -80,6 +81,7 @@ import {
   ServerManagedLocalStorageObjectAdapter,
 } from "../../src/infrastructure/storage/local";
 import { ServerManagedStorageSynchronizationAdapter } from "../../src/infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
+import { EncryptedAssetDownloadGrantAdapter } from "../../src/infrastructure/security/assets/EncryptedAssetDownloadGrantAdapter";
 import {
   assertCertificateAuthorityStartupSafe,
   ResolveCertificateAuthorityStartupStateUseCase,
@@ -830,11 +832,21 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     repository: assetRepository,
     workspaceAuthorizationReadRepository: workspaceRepository,
   });
+  const assetDownloadGrantAdapter = new EncryptedAssetDownloadGrantAdapter({
+    secret: resolveAssetDownloadGrantSecret(env),
+  });
+  const assetDownloadService = new AssetDownloadService({
+    repository: assetRepository,
+    workspaceAuthorizationReadRepository: workspaceRepository,
+    storageLogicalAccessResolutionService,
+    downloadGrantPort: assetDownloadGrantAdapter,
+  });
   const assetManagementBackendApi = new AssetManagementBackendApi({
     uploadInitiationService: assetUploadInitiationService,
     uploadIngestionService: assetUploadIngestionService,
     discoveryService: assetDiscoveryService,
     detailService: assetDetailService,
+    downloadService: assetDownloadService,
   });
   const transportTrustStateResolver = new ServerManagedTransportTrustStateResolver({
     trustedDeviceManagementService: trustedDeviceManagementService,
@@ -1087,6 +1099,16 @@ function resolveManagedStorageRootPath(
     return path.resolve(configured);
   }
   return path.resolve(path.dirname(databasePath), "runtime-assets", "managed-storage");
+}
+
+function resolveAssetDownloadGrantSecret(
+  env: Readonly<Record<string, string | undefined>>,
+): string {
+  const configured = env.AI_LOOM_ASSET_DOWNLOAD_GRANT_SECRET?.trim();
+  if (configured) {
+    return configured;
+  }
+  return `asset-download-grant:${randomUUID()}`;
 }
 
 function resolveIdentityDevLoginRouteEnabled(env: Readonly<Record<string, string | undefined>>): boolean {

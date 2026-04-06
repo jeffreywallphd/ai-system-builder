@@ -242,3 +242,42 @@ Added coverage:
 - `src/shared/dto/assets/tests/AssetTransportDtos.test.ts`
 - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+
+## Story 10.2.5: secure download authorization and protected content streaming
+
+Added authoritative protected download authorization and server-streamed retrieval across application, API, transport, and host seams:
+
+- New download orchestration use case:
+  - `src/application/assets/use-cases/AssetDownloadService.ts`
+- New opaque grant contract for protected content read tokens:
+  - `src/application/assets/ports/AssetDownloadGrantPort.ts`
+- New encrypted token adapter for grant issuance/resolution:
+  - `src/infrastructure/security/assets/EncryptedAssetDownloadGrantAdapter.ts`
+- Extended API contracts and backend:
+  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+- Added authenticated transport endpoints:
+  - `POST /api/v1/assets/:assetId/downloads/authorize`
+  - `GET /api/v1/assets/:assetId/downloads/content`
+  - implemented in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- Host wiring now composes download grant and streaming dependencies:
+  - `hosts/server/IdentityServerHost.ts`
+
+Behavioral posture in this story:
+
+- download authorization requires active workspace membership and visibility-aware asset access checks.
+- private assets remain owner/admin constrained; disallowed reads are blocked with clean, non-leaky behavior.
+- storage logical-access/policy enforcement gates both authorization and stream-open flows.
+- protected-purpose restrictions apply:
+  - `inline-preview` requires preview-compatible mime types and storage preview decryption allowance.
+  - `worker-process` requires worker-eligible asset kinds and storage worker decryption allowance.
+- content retrieval is streamed from managed storage through server handlers (no eager full-file buffering).
+- stream responses set safe headers (`Content-Disposition`, `X-Content-Type-Options`, `Cache-Control`).
+- download authorization payloads expose only opaque tokenized metadata, not object keys or path internals.
+
+Added coverage:
+
+- `src/application/assets/tests/AssetDownloadService.test.ts`
+- `src/infrastructure/security/assets/tests/EncryptedAssetDownloadGrantAdapter.test.ts`
+- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`

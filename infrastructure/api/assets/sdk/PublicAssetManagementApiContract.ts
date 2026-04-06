@@ -1,5 +1,9 @@
 import type { AssetStorageArea } from "../../../../src/domain/assets/AssetDomain";
-import type { AssetDetailDto, AssetSummaryDto } from "../../../../src/shared/contracts/assets/AssetTransportContracts";
+import type {
+  AssetDetailDto,
+  AssetDownloadAuthorizationDto,
+  AssetSummaryDto,
+} from "../../../../src/shared/contracts/assets/AssetTransportContracts";
 
 export const AssetManagementApiErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -170,4 +174,39 @@ export interface GetAssetDetailApiRequest {
 
 export interface GetAssetDetailApiResponse {
   readonly asset: AssetDetailDto;
+}
+
+export interface AuthorizeAssetDownloadApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly assetId: string;
+  readonly versionId?: string;
+  readonly purpose: "download" | "inline-preview" | "worker-process";
+  readonly fileNameHint?: string;
+  readonly expiresInSeconds?: number;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+}
+
+export interface AuthorizeAssetDownloadApiResponse {
+  readonly authorization: AssetDownloadAuthorizationDto;
+}
+
+export interface OpenAuthorizedAssetDownloadStreamApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly assetId: string;
+  readonly contentToken: string;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+}
+
+export interface OpenAuthorizedAssetDownloadStreamApiResponse {
+  readonly assetId: string;
+  readonly versionId: string;
+  readonly stream: AsyncIterable<Uint8Array>;
+  readonly mimeType: string;
+  readonly sizeBytes: number;
+  readonly contentDisposition: "attachment" | "inline";
+  readonly contentDispositionFileName?: string;
 }

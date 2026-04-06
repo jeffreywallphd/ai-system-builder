@@ -11,7 +11,6 @@ import {
   createStorageInstanceRef,
 } from "../../../../domain/assets/AssetDomain";
 import {
-  AssetTransportContractError,
   AssetTransportContractVersions,
   toAssetAuditEventPayloadDto,
   toAssetDetailDto,
@@ -96,18 +95,22 @@ describe("AssetTransportContracts", () => {
     expect((dto as unknown as { path?: string }).path).toBeUndefined();
   });
 
-  it("rejects filesystem-like object keys when projecting download authorization", () => {
-    expect(() => toAssetDownloadAuthorizationDto({
+  it("projects opaque download authorization payloads without storage path leakage", () => {
+    const dto = toAssetDownloadAuthorizationDto({
       assetId: "asset-contract-001",
       versionId: "asset-contract-001:v1",
       workspaceId: "workspace-a",
       storageInstanceId: "workspace-assets",
-      objectKey: "C:/temp/asset-contract-001.png",
+      objectKey: "workspaces/workspace-a/assets/asset-contract-001/output/v1/file.png",
       mimeType: "image/png",
       sizeBytes: 1,
       contentToken: "token-1",
       expiresAt: "2026-04-06T13:00:00.000Z",
-    })).toThrow(AssetTransportContractError);
+    });
+
+    expect((dto as Record<string, unknown>).storageInstanceId).toBeUndefined();
+    expect((dto as Record<string, unknown>).objectKey).toBeUndefined();
+    expect((dto as Record<string, unknown>).objectVersionId).toBeUndefined();
   });
 
   it("projects audit events as stable event payload DTOs", () => {

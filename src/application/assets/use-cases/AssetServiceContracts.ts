@@ -166,6 +166,11 @@ export interface AuthorizeAssetDownloadRequest extends AssetRequestContext {
   readonly expiresInSeconds?: number;
 }
 
+export interface OpenAuthorizedAssetDownloadStreamRequest extends AssetRequestContext {
+  readonly assetId: string;
+  readonly contentToken: string;
+}
+
 export interface ResolveAssetPreviewQuery extends AssetRequestContext {
   readonly assetId: string;
   readonly versionId?: string;
@@ -206,6 +211,16 @@ export interface AssetDownloadAuthorization {
   readonly contentToken: string;
   readonly expiresAt: string;
   readonly contentDispositionFileName?: string;
+}
+
+export interface OpenAuthorizedAssetDownloadStreamResult {
+  readonly assetId: string;
+  readonly versionId: string;
+  readonly mimeType: string;
+  readonly sizeBytes: number;
+  readonly contentDisposition: "attachment" | "inline";
+  readonly contentDispositionFileName?: string;
+  readonly stream: AsyncIterable<Uint8Array>;
 }
 
 export interface AssetPreviewResolution {
@@ -453,8 +468,19 @@ export function validateAuthorizeAssetDownloadRequest(
     assetId: normalizeRequired(input.assetId, "assetId"),
     versionId: normalizeOptional(input.versionId),
     purpose: input.purpose,
-    fileNameHint: normalizeOptional(input.fileNameHint),
+    fileNameHint: input.fileNameHint !== undefined ? normalizeFileName(input.fileNameHint) : undefined,
     expiresInSeconds,
+  });
+}
+
+export function validateOpenAuthorizedAssetDownloadStreamRequest(
+  input: OpenAuthorizedAssetDownloadStreamRequest,
+): OpenAuthorizedAssetDownloadStreamRequest {
+  const normalized = normalizeRequestContext(input);
+  return Object.freeze({
+    ...normalized,
+    assetId: normalizeRequired(input.assetId, "assetId"),
+    contentToken: normalizeRequired(input.contentToken, "contentToken"),
   });
 }
 
@@ -536,6 +562,9 @@ export interface AssetLookupUseCaseContracts {
   authorizeAssetDownload(
     request: AuthorizeAssetDownloadRequest,
   ): Promise<AssetServiceResult<AssetDownloadAuthorization>>;
+  openAuthorizedAssetDownloadStream(
+    request: OpenAuthorizedAssetDownloadStreamRequest,
+  ): Promise<AssetServiceResult<OpenAuthorizedAssetDownloadStreamResult>>;
   resolveAssetPreview(
     query: ResolveAssetPreviewQuery,
   ): Promise<AssetServiceResult<AssetPreviewResolution>>;

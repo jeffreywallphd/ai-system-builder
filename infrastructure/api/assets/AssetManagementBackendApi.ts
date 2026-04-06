@@ -3,19 +3,26 @@ import { AssetServiceErrorCodes } from "../../../src/application/assets/use-case
 import type { AssetUploadInitiationService } from "../../../src/application/assets/use-cases/AssetUploadInitiationService";
 import type { AssetUploadIngestionService } from "../../../src/application/assets/use-cases/AssetUploadIngestionService";
 import type { AssetDetailService } from "../../../src/application/assets/use-cases/AssetDetailService";
+import type { AssetDownloadService } from "../../../src/application/assets/use-cases/AssetDownloadService";
 import { type AssetSummaryDto, toAssetDetailDto, toAssetSummaryDto } from "../../../src/shared/contracts/assets/AssetTransportContracts";
 import {
+  toAuthorizeAssetDownloadRequest,
   toGetAssetByIdQuery,
   toListAssetsQuery,
   toBeginAssetUploadRequest,
   toRegisterAssetRequest,
+  toAuthorizeAssetDownloadResponseDto,
 } from "../../../src/shared/dto/assets/AssetTransportDtos";
 import {
   AssetManagementApiErrorCodes,
   type AssetManagementApiError,
+  type AuthorizeAssetDownloadApiRequest,
+  type AuthorizeAssetDownloadApiResponse,
   type AssetManagementApiResponse,
   type IngestAssetUploadContentApiRequest,
   type IngestAssetUploadContentApiResponse,
+  type OpenAuthorizedAssetDownloadStreamApiRequest,
+  type OpenAuthorizedAssetDownloadStreamApiResponse,
   type InitiateAssetUploadApiRequest,
   type InitiateAssetUploadApiResponse,
   type GetAssetDetailApiRequest,
@@ -32,6 +39,7 @@ export interface AssetManagementBackendApiDependencies {
   readonly uploadIngestionService: AssetUploadIngestionService;
   readonly discoveryService: AssetDiscoveryService;
   readonly detailService: AssetDetailService;
+  readonly downloadService: AssetDownloadService;
 }
 
 export class AssetManagementBackendApi {
@@ -250,6 +258,79 @@ export class AssetManagementBackendApi {
     });
   }
 
+  public async authorizeAssetDownload(
+    request: AuthorizeAssetDownloadApiRequest,
+  ): Promise<AssetManagementApiResponse<AuthorizeAssetDownloadApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(AssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+    }
+
+    let parsedRequest: ReturnType<typeof toAuthorizeAssetDownloadRequest>;
+    try {
+      parsedRequest = toAuthorizeAssetDownloadRequest({
+        actorUserId: actorUserIdentityId,
+        workspaceId: request.workspaceId,
+        assetId: request.assetId,
+        versionId: request.versionId,
+        purpose: request.purpose,
+        fileNameHint: request.fileNameHint,
+        expiresInSeconds: request.expiresInSeconds,
+        correlationId: request.correlationId,
+        occurredAt: request.occurredAt,
+      });
+    } catch (error) {
+      return this.failed(
+        AssetManagementApiErrorCodes.invalidRequest,
+        error instanceof Error ? error.message : "Request validation failed.",
+      );
+    }
+
+    const outcome = await this.dependencies.downloadService.authorizeAssetDownload(parsedRequest);
+    if (!outcome.ok) {
+      return this.failedFromServiceError(outcome.error.code, outcome.error.message, outcome.error.details);
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: toAuthorizeAssetDownloadResponseDto(outcome.value),
+    });
+  }
+
+  public async openAuthorizedAssetDownloadStream(
+    request: OpenAuthorizedAssetDownloadStreamApiRequest,
+  ): Promise<AssetManagementApiResponse<OpenAuthorizedAssetDownloadStreamApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(AssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+    }
+
+    const outcome = await this.dependencies.downloadService.openAuthorizedAssetDownloadStream({
+      actorUserId: actorUserIdentityId,
+      workspaceId: request.workspaceId,
+      assetId: request.assetId,
+      contentToken: request.contentToken,
+      correlationId: request.correlationId,
+      occurredAt: request.occurredAt,
+    });
+    if (!outcome.ok) {
+      return this.failedFromServiceError(outcome.error.code, outcome.error.message, outcome.error.details);
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        assetId: outcome.value.assetId,
+        versionId: outcome.value.versionId,
+        stream: outcome.value.stream,
+        mimeType: outcome.value.mimeType,
+        sizeBytes: outcome.value.sizeBytes,
+        contentDisposition: outcome.value.contentDisposition,
+        contentDispositionFileName: outcome.value.contentDispositionFileName,
+      }),
+    });
+  }
+
   private failedFromServiceError(
     code: typeof AssetServiceErrorCodes[keyof typeof AssetServiceErrorCodes],
     message: string,
@@ -267,6 +348,8 @@ export class AssetManagementBackendApi {
       case AssetServiceErrorCodes.policyViolation:
       case AssetServiceErrorCodes.invalidState:
         return this.failed(AssetManagementApiErrorCodes.invalidState, message, details);
+      case AssetServiceErrorCodes.contentUnavailable:
+        return this.failed(AssetManagementApiErrorCodes.notFound, message, details);
       default:
         return this.failed(AssetManagementApiErrorCodes.internal, message, details);
     }
