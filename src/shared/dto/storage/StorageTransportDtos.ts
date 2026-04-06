@@ -38,6 +38,13 @@ export interface CreateStorageInstanceRequestDto {
     readonly immutableWrites?: boolean;
     readonly allowCrossWorkspaceReads?: boolean;
     readonly labels?: Readonly<Record<string, string>>;
+    readonly encryptionMode?: StorageInstance["policy"]["security"]["encryptionMode"];
+    readonly contentEncryptionRequired?: boolean;
+    readonly keyScope?: StorageInstance["policy"]["security"]["keyScope"];
+    readonly allowPreviewDecryption?: boolean;
+    readonly allowWorkerDecryption?: boolean;
+    readonly retentionExpiryAction?: StorageInstance["policy"]["lifecycle"]["retentionExpiryAction"];
+    readonly purgeGracePeriodDays?: number;
     readonly encryptionProfileId: string;
     readonly encryptionKeyReferenceId?: string;
     readonly envelopeRequired: boolean;
@@ -61,6 +68,13 @@ export interface UpdateStorageInstanceRequestDto {
     readonly immutableWrites?: boolean;
     readonly allowCrossWorkspaceReads?: boolean;
     readonly labels?: Readonly<Record<string, string>>;
+    readonly encryptionMode?: StorageInstance["policy"]["security"]["encryptionMode"];
+    readonly contentEncryptionRequired?: boolean;
+    readonly keyScope?: StorageInstance["policy"]["security"]["keyScope"];
+    readonly allowPreviewDecryption?: boolean;
+    readonly allowWorkerDecryption?: boolean;
+    readonly retentionExpiryAction?: StorageInstance["policy"]["lifecycle"]["retentionExpiryAction"];
+    readonly purgeGracePeriodDays?: number;
     readonly encryptionProfileId?: string;
     readonly encryptionKeyReferenceId?: string;
     readonly envelopeRequired?: boolean;
@@ -142,6 +156,13 @@ function toStoragePolicyMetadata(instance: StorageInstance): StoragePolicyMetada
     immutableWrites: instance.policy.immutableWrites,
     allowCrossWorkspaceReads: instance.policy.allowCrossWorkspaceReads,
     labels: instance.policy.labels,
+    encryptionMode: instance.policy.security.encryptionMode,
+    contentEncryptionRequired: instance.policy.security.contentEncryptionRequired,
+    keyScope: instance.policy.security.keyScope,
+    allowPreviewDecryption: instance.policy.security.allowPreviewDecryption,
+    allowWorkerDecryption: instance.policy.security.allowWorkerDecryption,
+    retentionExpiryAction: instance.policy.lifecycle.retentionExpiryAction,
+    purgeGracePeriodDays: instance.policy.lifecycle.purgeGracePeriodDays,
     encryptionProfileId: instance.policy.encryption.profileId,
     envelopeRequired: instance.policy.encryption.envelopeRequired,
     hasEncryptionKeyReference: Boolean(instance.policy.encryption.keyReferenceId),

@@ -2,8 +2,11 @@ import type {
   StorageAccessMode,
   StorageAccessScope,
   StorageBackendType,
+  StorageEncryptionKeyScope,
+  StorageEncryptionMode,
   StorageLifecycleState,
   StorageReplicationMode,
+  StorageRetentionExpiryAction,
 } from "../../../domain/storage/StorageDomain";
 
 export class StorageTransportContractError extends Error {
@@ -80,6 +83,13 @@ export interface StoragePolicyMetadataDto {
   readonly immutableWrites: boolean;
   readonly allowCrossWorkspaceReads: boolean;
   readonly labels: Readonly<Record<string, string>>;
+  readonly encryptionMode: StorageEncryptionMode;
+  readonly contentEncryptionRequired: boolean;
+  readonly keyScope: StorageEncryptionKeyScope;
+  readonly allowPreviewDecryption: boolean;
+  readonly allowWorkerDecryption: boolean;
+  readonly retentionExpiryAction: StorageRetentionExpiryAction;
+  readonly purgeGracePeriodDays?: number;
   readonly encryptionProfileId: string;
   readonly envelopeRequired: boolean;
   readonly hasEncryptionKeyReference: boolean;

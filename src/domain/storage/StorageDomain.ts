@@ -57,6 +57,31 @@ export const StorageReplicationModes = Object.freeze({
 
 export type StorageReplicationMode = typeof StorageReplicationModes[keyof typeof StorageReplicationModes];
 
+export const StorageEncryptionModes = Object.freeze({
+  none: "none",
+  platformManaged: "platform-managed",
+  customerManaged: "customer-managed",
+});
+
+export type StorageEncryptionMode = typeof StorageEncryptionModes[keyof typeof StorageEncryptionModes];
+
+export const StorageEncryptionKeyScopes = Object.freeze({
+  workspace: "workspace",
+  storageInstance: "storage-instance",
+  platform: "platform",
+});
+
+export type StorageEncryptionKeyScope = typeof StorageEncryptionKeyScopes[keyof typeof StorageEncryptionKeyScopes];
+
+export const StorageRetentionExpiryActions = Object.freeze({
+  none: "none",
+  archive: "archive",
+  delete: "delete",
+});
+
+export type StorageRetentionExpiryAction =
+  typeof StorageRetentionExpiryActions[keyof typeof StorageRetentionExpiryActions];
+
 export interface StorageOwnership {
   readonly workspaceId: string;
   readonly ownerUserIdentityId: string;
@@ -80,6 +105,19 @@ export interface StorageReplicationPolicy {
   readonly syncIntervalSeconds?: number;
 }
 
+export interface StoragePolicySecuritySettings {
+  readonly encryptionMode: StorageEncryptionMode;
+  readonly contentEncryptionRequired: boolean;
+  readonly keyScope: StorageEncryptionKeyScope;
+  readonly allowPreviewDecryption: boolean;
+  readonly allowWorkerDecryption: boolean;
+}
+
+export interface StoragePolicyLifecycleSettings {
+  readonly retentionExpiryAction: StorageRetentionExpiryAction;
+  readonly purgeGracePeriodDays?: number;
+}
+
 export interface StoragePolicy {
   readonly policyId: string;
   readonly maxObjectBytes?: number;
@@ -88,6 +126,8 @@ export interface StoragePolicy {
   readonly allowCrossWorkspaceReads: boolean;
   readonly labels: Readonly<Record<string, string>>;
   readonly encryption: StorageEncryptionPostureReference;
+  readonly security: StoragePolicySecuritySettings;
+  readonly lifecycle: StoragePolicyLifecycleSettings;
 }
 
 export interface StorageAccessPolicy {
@@ -283,6 +323,136 @@ function normalizeEncryptionPosture(
   });
 }
 
+function normalizeEncryptionMode(value?: StorageEncryptionMode): StorageEncryptionMode {
+  const resolved = value ?? StorageEncryptionModes.platformManaged;
+  if (!Object.values(StorageEncryptionModes).includes(resolved)) {
+    throw new StorageDomainError(`Storage policy encryptionMode '${String(value)}' is invalid.`);
+  }
+  return resolved;
+}
+
+function normalizeEncryptionKeyScope(value?: StorageEncryptionKeyScope): StorageEncryptionKeyScope {
+  const resolved = value ?? StorageEncryptionKeyScopes.workspace;
+  if (!Object.values(StorageEncryptionKeyScopes).includes(resolved)) {
+    throw new StorageDomainError(`Storage policy keyScope '${String(value)}' is invalid.`);
+  }
+  return resolved;
+}
+
+function normalizeRetentionExpiryAction(value?: StorageRetentionExpiryAction): StorageRetentionExpiryAction {
+  const resolved = value ?? StorageRetentionExpiryActions.none;
+  if (!Object.values(StorageRetentionExpiryActions).includes(resolved)) {
+    throw new StorageDomainError(`Storage policy retentionExpiryAction '${String(value)}' is invalid.`);
+  }
+  return resolved;
+}
+
+function normalizeStoragePolicySecurity(
+  input: {
+    readonly encryptionMode?: StorageEncryptionMode;
+    readonly contentEncryptionRequired?: boolean;
+    readonly keyScope?: StorageEncryptionKeyScope;
+    readonly allowPreviewDecryption?: boolean;
+    readonly allowWorkerDecryption?: boolean;
+  } | undefined,
+  encryption: StorageEncryptionPostureReference,
+): StoragePolicySecuritySettings {
+  const encryptionMode = normalizeEncryptionMode(input?.encryptionMode);
+  const contentEncryptionRequired = input?.contentEncryptionRequired ?? true;
+  const keyScope = normalizeEncryptionKeyScope(input?.keyScope);
+  const allowPreviewDecryption = input?.allowPreviewDecryption ?? false;
+  const allowWorkerDecryption = input?.allowWorkerDecryption ?? false;
+
+  if (encryptionMode === StorageEncryptionModes.none) {
+    if (contentEncryptionRequired) {
+      throw new StorageDomainError(
+        "Storage policy encryptionMode 'none' cannot require content encryption.",
+      );
+    }
+    if (encryption.envelopeRequired) {
+      throw new StorageDomainError("Storage policy encryptionMode 'none' cannot require envelope encryption.");
+    }
+    if (encryption.keyReferenceId) {
+      throw new StorageDomainError("Storage policy encryptionMode 'none' cannot define encryption key references.");
+    }
+    if (allowPreviewDecryption || allowWorkerDecryption) {
+      throw new StorageDomainError("Storage policy encryptionMode 'none' cannot allow preview or worker decryption.");
+    }
+  } else {
+    if (!contentEncryptionRequired) {
+      throw new StorageDomainError(
+        `Storage policy encryptionMode '${encryptionMode}' requires contentEncryptionRequired=true.`,
+      );
+    }
+  }
+
+  if (encryptionMode === StorageEncryptionModes.customerManaged && !encryption.keyReferenceId) {
+    throw new StorageDomainError(
+      "Storage policy encryptionMode 'customer-managed' requires encryption keyReferenceId.",
+    );
+  }
+
+  if (encryptionMode === StorageEncryptionModes.platformManaged && encryption.keyReferenceId) {
+    throw new StorageDomainError(
+      "Storage policy encryptionMode 'platform-managed' cannot define encryption keyReferenceId.",
+    );
+  }
+
+  if (keyScope === StorageEncryptionKeyScopes.platform && encryptionMode === StorageEncryptionModes.customerManaged) {
+    throw new StorageDomainError("Storage policy customer-managed encryption cannot use platform key scope.");
+  }
+
+  if (!contentEncryptionRequired && (allowPreviewDecryption || allowWorkerDecryption)) {
+    throw new StorageDomainError(
+      "Storage policy cannot allow decryption when contentEncryptionRequired=false.",
+    );
+  }
+
+  return Object.freeze({
+    encryptionMode,
+    contentEncryptionRequired,
+    keyScope,
+    allowPreviewDecryption,
+    allowWorkerDecryption,
+  });
+}
+
+function normalizeStoragePolicyLifecycle(
+  input: {
+    readonly retentionExpiryAction?: StorageRetentionExpiryAction;
+    readonly purgeGracePeriodDays?: number;
+  } | undefined,
+  retentionDays?: number,
+): StoragePolicyLifecycleSettings {
+  const retentionExpiryAction = normalizeRetentionExpiryAction(input?.retentionExpiryAction);
+  const purgeGracePeriodDays = input?.purgeGracePeriodDays;
+
+  if (retentionExpiryAction !== StorageRetentionExpiryActions.none && retentionDays === undefined) {
+    throw new StorageDomainError(
+      `Storage policy retentionExpiryAction '${retentionExpiryAction}' requires retentionDays.`,
+    );
+  }
+
+  if (purgeGracePeriodDays !== undefined) {
+    if (!Number.isInteger(purgeGracePeriodDays) || purgeGracePeriodDays < 1) {
+      throw new StorageDomainError(
+        "Storage policy lifecycle purgeGracePeriodDays must be an integer >= 1 when provided.",
+      );
+    }
+
+    if (retentionExpiryAction !== StorageRetentionExpiryActions.delete) {
+      throw new StorageDomainError(
+        "Storage policy lifecycle purgeGracePeriodDays is only valid when retentionExpiryAction='delete'.",
+      );
+    }
+  }
+
+  return Object.freeze({
+    retentionExpiryAction,
+    purgeGracePeriodDays,
+  });
+}
+
 function normalizeLabels(
   labels?: Readonly<Record<string, string>>,
 ): Readonly<Record<string, string>> {
@@ -316,6 +486,17 @@ export function createStoragePolicy(input: {
   readonly allowCrossWorkspaceReads?: boolean;
   readonly labels?: Readonly<Record<string, string>>;
   readonly encryption: StorageEncryptionPostureReference;
+  readonly security?: {
+    readonly encryptionMode?: StorageEncryptionMode;
+    readonly contentEncryptionRequired?: boolean;
+    readonly keyScope?: StorageEncryptionKeyScope;
+    readonly allowPreviewDecryption?: boolean;
+    readonly allowWorkerDecryption?: boolean;
+  };
+  readonly lifecycle?: {
+    readonly retentionExpiryAction?: StorageRetentionExpiryAction;
+    readonly purgeGracePeriodDays?: number;
+  };
   readonly lifecycleState?: StorageLifecycleState;
 }): StoragePolicy {
   if (input.maxObjectBytes !== undefined) {
@@ -331,6 +512,9 @@ export function createStoragePolicy(input: {
   }
 
   const lifecycleState = normalizeLifecycleState(input.lifecycleState);
+  const encryption = normalizeEncryptionPosture(input.encryption, lifecycleState);
+  const security = normalizeStoragePolicySecurity(input.security, encryption);
+  const lifecycle = normalizeStoragePolicyLifecycle(input.lifecycle, input.retentionDays);
 
   return Object.freeze({
     policyId: normalizeRequired(input.policyId, "Storage policy policyId"),
@@ -339,7 +523,9 @@ export function createStoragePolicy(input: {
     immutableWrites: input.immutableWrites ?? false,
     allowCrossWorkspaceReads: input.allowCrossWorkspaceReads ?? false,
     labels: normalizeLabels(input.labels),
-    encryption: normalizeEncryptionPosture(input.encryption, lifecycleState),
+    encryption,
+    security,
+    lifecycle,
   });
 }
 
@@ -514,6 +700,17 @@ export function updateStoragePolicy(
     readonly allowCrossWorkspaceReads?: boolean;
     readonly labels?: Readonly<Record<string, string>>;
     readonly encryption?: StorageEncryptionPostureReference;
+    readonly security?: {
+      readonly encryptionMode?: StorageEncryptionMode;
+      readonly contentEncryptionRequired?: boolean;
+      readonly keyScope?: StorageEncryptionKeyScope;
+      readonly allowPreviewDecryption?: boolean;
+      readonly allowWorkerDecryption?: boolean;
+    };
+    readonly lifecycle?: {
+      readonly retentionExpiryAction?: StorageRetentionExpiryAction;
+      readonly purgeGracePeriodDays?: number;
+    };
   },
   attribution: StorageAttribution,
 ): StorageInstance {
@@ -526,6 +723,17 @@ export function updateStoragePolicy(
     allowCrossWorkspaceReads: input.allowCrossWorkspaceReads ?? instance.policy.allowCrossWorkspaceReads,
     labels: input.labels ?? instance.policy.labels,
     encryption: input.encryption ?? instance.policy.encryption,
+    security: {
+      encryptionMode: input.security?.encryptionMode ?? instance.policy.security.encryptionMode,
+      contentEncryptionRequired: input.security?.contentEncryptionRequired ?? instance.policy.security.contentEncryptionRequired,
+      keyScope: input.security?.keyScope ?? instance.policy.security.keyScope,
+      allowPreviewDecryption: input.security?.allowPreviewDecryption ?? instance.policy.security.allowPreviewDecryption,
+      allowWorkerDecryption: input.security?.allowWorkerDecryption ?? instance.policy.security.allowWorkerDecryption,
+    },
+    lifecycle: {
+      retentionExpiryAction: input.lifecycle?.retentionExpiryAction ?? instance.policy.lifecycle.retentionExpiryAction,
+      purgeGracePeriodDays: input.lifecycle?.purgeGracePeriodDays ?? instance.policy.lifecycle.purgeGracePeriodDays,
+    },
     lifecycleState: instance.lifecycleState,
   });
 

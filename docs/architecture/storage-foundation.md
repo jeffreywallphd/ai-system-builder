@@ -4,7 +4,7 @@ This note documents Story 9.1.1 for Feature 9 / Epic 9.1: the initial managed-st
 
 ## Scope
 
-Implemented in this story:
+Implemented in this story set (9.1.1 + 9.1.4):
 
 - managed storage domain model in `src/domain/storage/StorageDomain.ts`
 - first-class `StorageInstance` entity with workspace ownership, lifecycle, access, replication, policy, and attribution contracts
@@ -13,6 +13,9 @@ Implemented in this story:
   - `StorageAccessMode`
   - `StorageLifecycleState`
   - `StorageReplicationMode`
+  - `StorageEncryptionMode`
+  - `StorageEncryptionKeyScope`
+  - `StorageRetentionExpiryAction`
 - domain factories and mutation APIs for safe construction and updates:
   - `createStorageInstance(...)`
   - `createStoragePolicy(...)`
@@ -52,6 +55,8 @@ Canonical fields include:
 - access contract: `access.mode`, `access.scope`
 - replication contract: `replication.mode`, optional replica reference and sync cadence
 - policy contract: `policyId`, retention/size constraints, metadata labels, encryption posture reference
+  - security policy metadata (encryption mode, key scope, content-encryption requirement, preview/worker decryption allowances)
+  - lifecycle policy hooks (retention expiry action + optional purge grace period)
 - audit attribution: `createdBy`, `createdAt`, `lastModifiedBy`, `lastModifiedAt`, `lastCorrelationId`
 
 ### StoragePolicy
@@ -62,6 +67,15 @@ Storage policy remains a domain contract and carries:
 - immutability/cross-workspace read posture flags
 - normalized label metadata
 - encryption posture references (`profileId`, optional key reference, envelope requirement)
+- explicit security metadata:
+  - `security.encryptionMode`
+  - `security.contentEncryptionRequired`
+  - `security.keyScope`
+  - `security.allowPreviewDecryption`
+  - `security.allowWorkerDecryption`
+- lifecycle/retention hook metadata:
+  - `lifecycle.retentionExpiryAction`
+  - `lifecycle.purgeGracePeriodDays`
 
 ### Lifecycle and activity
 
@@ -92,8 +106,21 @@ Transition rules are controlled by `StorageLifecycleTransitions` and enforced by
   - `async-mirror` requires replica id and sync interval
   - `sync-mirror` requires replica id and forbids sync interval
 - policy numeric constraints require positive integer values when present
+- deterministic policy defaults are applied when omitted:
+  - `security.encryptionMode = platform-managed`
+  - `security.contentEncryptionRequired = true`
+  - `security.keyScope = workspace`
+  - `security.allowPreviewDecryption = false`
+  - `security.allowWorkerDecryption = false`
+  - `lifecycle.retentionExpiryAction = none`
 - active read-only storage must be replication-backed
 - deleted storage cannot retain non-`none` replication mode
+- contradictory security/lifecycle policy combinations are rejected:
+  - `encryptionMode=none` cannot require content encryption, envelope encryption, key references, or preview/worker decryption
+  - `encryptionMode=customer-managed` requires key reference
+  - `encryptionMode=platform-managed` cannot carry key reference
+  - `retentionExpiryAction` other than `none` requires `retentionDays`
+  - `purgeGracePeriodDays` is valid only when `retentionExpiryAction=delete`
 - invalid lifecycle transitions raise explicit transition errors
 
 ## Boundary posture
