@@ -318,6 +318,21 @@ describe("IdentityServerHost", () => {
         return;
       }
       expect(metadata.value.name).toBe("provider.openai.api-key");
+
+      const providerCredential = await host.platformSecretConsumers.resolveServerProviderCredential({
+        providerId: "openai",
+        secretId: "secret:server:provider:openai",
+        operationKey: "op:host:platform-consumer:provider-openai",
+        serviceIdentity: "runtime:server:workflow-provider-client",
+      });
+      expect(providerCredential).toEqual({
+        ok: true,
+        value: {
+          secretId: "secret:server:provider:openai",
+          currentVersionId: "secret:server:provider:openai:v1",
+          credential: "sk-live-migrated-via-startup",
+        },
+      });
     } finally {
       await host.close();
       rmSync(tempDirectory, { recursive: true, force: true });
