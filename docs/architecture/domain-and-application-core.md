@@ -1818,3 +1818,19 @@ This slice intentionally keeps identity/credential/session concerns separate so 
   - extension path for future external providers,
   - separation between local identity lifecycle and non-identity trust layers (device/runtime/tool trust).
 - Architecture index docs now link to this note so identity foundation guidance is discoverable with the rest of the architecture set.
+
+## Direction 8 note: Secret domain and application contracts foundation (story 8.1.1)
+
+- Added canonical secret domain contracts in `src/domain/security/SecretDomain.ts` for:
+  - scope ownership (`server`, `workspace`, `user`) with validated ownership combinations,
+  - secret lifecycle (`active`, `disabled`, `revoked`, `deleted`),
+  - secret version lineage and rotation semantics,
+  - key-encryption context alignment to scope ownership,
+  - redaction-safe secret reference metadata constraints.
+- Added permission-checked and auditable secret access decision contracts in the same domain seam (`SecretAccessDecision`, action/reason vocabularies, and `evaluateSecretAccessDecision(...)`).
+- Added application-layer secret service boundaries in:
+  - `src/application/security/ports/SecretServicePorts.ts` (persistence, encryption, access policy, audit ports),
+  - `src/application/security/use-cases/SecretManagementServiceContracts.ts` (create/read metadata/retrieve plaintext/rotate/disable/delete/list contracts).
+- Added foundation tests in:
+  - `src/domain/security/tests/SecretDomain.test.ts`,
+  - `src/application/security/tests/SecretServiceContracts.test.ts`.

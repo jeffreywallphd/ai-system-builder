@@ -105,3 +105,15 @@ The architecture is mostly clean, but not all write actions are modeled as appli
   - registration/login business rules remain in application use cases;
   - host wiring is outer-layer only (`hosts/server/IdentityServerHost.ts`).
 - Transport logging now redacts credential-sensitive fields before emission, so credential material does not leak through infrastructure logs.
+
+## Direction 8 boundary note: Secret domain and service contracts foundation (story 8.1.1)
+- Added `src/domain/security/SecretDomain.ts` as the canonical inner-layer secret seam:
+  - scope ownership (`server`, `workspace`, `user`) with allowed-combination checks,
+  - lifecycle state semantics (`active`, `disabled`, `revoked`, `deleted`),
+  - version-lineage + rotation invariants,
+  - key-encryption-context owner/scope alignment,
+  - redaction-safe metadata constraints for secret references.
+- Added domain permission/audit decision contracts (`evaluateSecretAccessDecision(...)`) so retrieval paths are permission-checked and auditable by contract.
+- Added application secret ports in `src/application/security/ports/SecretServicePorts.ts` for persistence, encryption/decryption, access-policy resolution, and audit recording.
+- Added operation-facing service contracts in `src/application/security/use-cases/SecretManagementServiceContracts.ts` for create/read metadata/retrieve plaintext/rotate/disable/delete/list use-case boundaries.
+- The slice is contracts-only; no storage transport/UI implementation detail leaks into domain or application contracts.
