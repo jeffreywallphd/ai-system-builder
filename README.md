@@ -33,6 +33,16 @@ The desktop dev command now runs a preflight cleanup that clears stale `.vite` b
 npm run dev:browser
 ```
 
+### Host-based local startup modes
+
+All local startup paths now run through host composition entrypoint assemblies.
+
+- Authoritative server host only: `npm run dev:host:authoritative-server`
+- Hybrid host only: `npm run dev:host:hybrid`
+- Web host only: `npm run dev:host:web`
+- Worker host only: `npm run dev:host:worker`
+- Combined local control-plane + worker hosts: `npm run dev:host:control-plane-worker`
+
 This starts:
 
 - the Vite renderer on `http://127.0.0.1:5174`

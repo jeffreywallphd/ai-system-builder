@@ -1,0 +1,32 @@
+# AI Companion: Development and Test Startup Host Migration (Story 12.4.2)
+
+## Scope completed
+- Align local development scripts and test harness startup with host entrypoint assemblies.
+
+## Development startup updates
+- Added explicit host-based local dev aliases in `package.json`:
+  - `dev:host:authoritative-server`
+  - `dev:host:hybrid`
+  - `dev:host:web`
+  - `dev:host:worker`
+  - `dev:host:control-plane-worker`
+- These aliases delegate to executable host entrypoints:
+  - `start:authoritative-server`
+  - `start:hybrid-host`
+  - `start:web-host`
+  - `start:worker-host`
+- Combined control-plane + worker local mode now runs both host assemblies concurrently.
+
+## Test harness updates
+- Server integration harness in `hosts/server/tests/IdentityServerHost.test.ts` now boots through `startAuthoritativeServerHostAssembly(...)`.
+- Added a host-entrypoint-backed test helper (`startAuthoritativeServerHostForTest(...)`) so tests keep existing host assertions while startup path is host-based.
+
+## Startup script guardrails
+- Added `dev/tests/HostDevelopmentStartupScripts.test.ts` to enforce:
+  - default dev path remains `dev:desktop`
+  - host startup scripts target host entrypoint assemblies
+  - host aliases and combined mode are present
+  - no package script defaults to direct `IdentityServerHost.ts` startup
+
+## Developer documentation updates
+- Updated `README.md` with a host-based local startup modes section and command list for individual and combined host runs.
