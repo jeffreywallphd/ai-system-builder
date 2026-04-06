@@ -14,6 +14,7 @@ Quick baseline for Story 8.1.4 (Feature 8 / Epic 8.1): implement create-secret a
 ## Behavior summary
 
 - Create flow validates required fields, scope owner invariants, timestamp shape, and allowed `SecretKinds`.
+- Create flow enforces seeded classification conventions for name prefix, allowed kind/scope combinations, and required metadata labels.
 - Create flow checks uniqueness of secret key name within the requested scope owner.
 - Plaintext is encrypted via `ISecretEncryptionPort` before persistence.
 - Metadata retrieval uses `SecretReference` projection only; plaintext and encrypted-material internals never appear in response payloads.
@@ -23,6 +24,7 @@ Quick baseline for Story 8.1.4 (Feature 8 / Epic 8.1): implement create-secret a
 
 - validation failures: `secret-invalid-request`
 - duplicate key in scope: `secret-conflict`
+- unsupported/invalid classification conventions: `secret-invalid-request`
 - authorization denial: `secret-access-denied`
 - missing record (metadata read): `secret-not-found`
 - unexpected processing faults: `secret-internal`

@@ -11,6 +11,7 @@ This note documents Story 8.1.4 (Feature 8 / Epic 8.1): application use cases fo
 ## Scope and intent
 
 - Provide a production-safe create workflow that validates request shape, scope ownership, actor attribution, and allowed secret kinds.
+- Enforce seeded secret classification conventions (name prefix, allowed kind/scope combinations, required metadata labels) before persistence.
 - Enforce unique secret key (`name`) per ownership scope before persistence.
 - Encrypt incoming plaintext through `ISecretEncryptionPort` and persist only encrypted material references/digests in version metadata.
 - Provide metadata retrieval that returns `SecretReference` only and never plaintext or encrypted payload internals.
@@ -24,6 +25,8 @@ Create use case validates and rejects with `secret-invalid-request` when:
 - `createdAt` is provided but not a valid timestamp.
 - `owner` violates scope rules (server/workspace/user ownership contract).
 - `kind` is not one of the domain-supported `SecretKinds`.
+- `name` does not match a supported classification prefix (`provider.`, `personal.`, `storage.`, `signing.`, `integration.`).
+- classification conventions are violated for kind/scope or required metadata labels.
 
 Create use case rejects duplicate key-per-scope with `secret-conflict` when a record already exists for the same normalized name + scope owner.
 

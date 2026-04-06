@@ -143,6 +143,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For create-secret and metadata-only retrieval application orchestration, key uniqueness validation, and metadata redaction behavior, read [`secrets-creation-and-metadata-use-cases.md`](./secrets-creation-and-metadata-use-cases.md).
 - For explicit scope-owner validation and deterministic policy-driven secret key resolution behavior, read [`secrets-scope-resolution-rules.md`](./secrets-scope-resolution-rules.md).
 - For authoritative server runtime secret-service composition, host dependency wiring, and startup configuration posture, read [`secrets-service-composition.md`](./secrets-service-composition.md).
+- For seeded secret classifications, naming-prefix conventions, metadata-label requirements, and classification validation boundaries, read [`secrets-classification-and-metadata-conventions.md`](./secrets-classification-and-metadata-conventions.md).
 - For node-local bootstrap identity/trust-material operations and enrollment payload bootstrap metadata, read [`../node-bootstrap-identity-operations.md`](../node-bootstrap-identity-operations.md).
 - For workspace tenancy domain aggregates, membership/role/invitation invariants, and reusable ownership metadata patterns, read [`workspace-foundation.md`](./workspace-foundation.md).
 - For authorization domain contracts covering RBAC, visibility, sharing, actor/resource policy context, and policy-decision models, read [`authorization-foundation.md`](./authorization-foundation.md).

@@ -25,6 +25,7 @@ import {
   type SecretServiceResult,
 } from "./SecretManagementServiceContracts";
 import { toCreateSecretRequestDiagnosticDto, toSecretOwnerDiagnosticDto } from "../../../shared/dto/security/SecretServiceDtos";
+import { SecretClassificationContractError, assertSecretClassificationSupport } from "../../../shared/contracts/security/SecretClassificationContracts";
 
 export interface CreateSecretUseCaseDependencies {
   readonly secretRecordRepository: ISecretRecordPersistenceRepository;
@@ -158,6 +159,32 @@ export class CreateSecretUseCase {
         }),
       });
       return invalidRequest(toErrorMessage(error));
+    }
+
+    try {
+      assertSecretClassificationSupport({
+        name,
+        kind: request.kind,
+        owner,
+        metadata: request.metadata,
+      });
+    } catch (error) {
+      if (!(error instanceof SecretClassificationContractError)) {
+        throw error;
+      }
+      await this.emitOperation("rejected", {
+        occurredAt,
+        actorId,
+        secretId,
+        scope: owner.scope,
+        workspaceId: owner.workspaceId,
+        userIdentityId: owner.userIdentityId,
+        details: Object.freeze({
+          reason: "invalid-classification-conventions",
+          request: diagnostics,
+        }),
+      });
+      return invalidRequest(error.message);
     }
 
     const decision = await this.dependencies.secretAccessPolicyPort.evaluateSecretAccess({
