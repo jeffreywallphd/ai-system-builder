@@ -1,6 +1,6 @@
 # Secrets Authorization Policies
 
-This note documents Story 8.2.1 and Story 8.2.2 (Feature 8 / Epic 8.2): policy-aware authorization and runtime retrieval governance for secret operations.
+This note documents Story 8.2.1, Story 8.2.2, and Story 8.2.3 (Feature 8 / Epic 8.2): policy-aware authorization, runtime retrieval governance, and comprehensive audit recording for secret-sensitive operations.
 
 ## Canonical files
 
@@ -14,6 +14,7 @@ This note documents Story 8.2.1 and Story 8.2.2 (Feature 8 / Epic 8.2): policy-a
 - `src/application/security/ports/SecretServicePorts.ts`
 - `src/infrastructure/security/secrets/SecretServiceComposition.ts`
 - `src/application/security/tests/SecretAuthorizationPolicyAndGovernanceUseCases.test.ts`
+- `src/application/security/tests/SecretCreateAndMetadataUseCases.test.ts`
 
 ## Permission model
 
@@ -72,6 +73,41 @@ To reduce secret existence leakage beyond metadata rules:
 
 All decisions still emit audit events with action, scope, actor attribution, allow/deny result, and reason code.
 Runtime retrieval audit events now additionally capture `operationKey`, `serviceIdentity`, and `justification` context.
+
+## Secret operation audit model (Story 8.2.3)
+
+Secret audit emissions now include two structured event families through `ISecretAccessAuditPort`:
+
+- `secret.access-decision`
+- `secret.operation`
+
+Both families share normalized actor and target structures so events remain queryable across operations:
+
+- `actor`: `actorId`, optional `actorType`, optional `workspaceId`, optional `userIdentityId`
+- `target`: optional `secretId`, optional `scope`, optional `workspaceId`, optional `userIdentityId`
+
+`secret.operation` events are emitted for secret-sensitive use cases:
+
+- `create`
+- `read-metadata`
+- `retrieve-plaintext`
+- `rotate`
+- `disable`
+- `delete`
+
+Each operation event includes:
+
+- `operation`
+- `status` (`succeeded`, `denied`, `rejected`, `failed`, `conflict`, `missing`)
+- `reasonCode`
+- `occurredAt`
+- optional governance context (`operationKey`, `serviceIdentity`) where relevant
+
+### Safety posture for audit payloads
+
+- Secret plaintext is never included in `secret.access-decision` or `secret.operation` payloads.
+- Secret metadata labels/tags are not copied into operation audit records.
+- Permission-sensitive failures (for example `scope-mismatch`, `runtime-access-required`, and other deny reasons) are emitted as stable reason codes without secret value material.
 
 ## Composition and boundaries
 

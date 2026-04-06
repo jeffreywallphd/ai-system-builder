@@ -11,8 +11,8 @@ import type {
   ISecretAccessPolicyPort,
   ISecretEncryptionPort,
   ISecretRecordPersistenceRepository,
-  SecretAccessAuditEvent,
 } from "../ports/SecretServicePorts";
+import { SecretAuditEventKinds } from "../ports/SecretServicePorts";
 import {
   NoOpSecretObservabilityPort,
   SecretOperationalOutcomes,
@@ -194,9 +194,13 @@ export class CreateSecretUseCase {
       occurredAt,
     });
 
-    await emitAuditEvent(this.dependencies.secretAccessAuditPort, request, {
-      secretId,
-      scope: owner.scope,
+    await emitAccessDecisionAuditEvent(this.dependencies.secretAccessAuditPort, request, {
+      target: Object.freeze({
+        secretId,
+        scope: owner.scope,
+        workspaceId: owner.workspaceId,
+        userIdentityId: owner.userIdentityId,
+      }),
       action: SecretAccessActions.create,
       decision: decision.allowed ? "allowed" : "denied",
       reason: decision.reason,
@@ -357,6 +361,27 @@ export class CreateSecretUseCase {
       readonly details?: Readonly<Record<string, unknown>>;
     },
   ): Promise<void> {
+    const reasonCode = resolveReasonCode(outcome, input.details);
+    try {
+      await this.dependencies.secretAccessAuditPort.recordSecretAuditEvent(Object.freeze({
+        eventKind: SecretAuditEventKinds.operation,
+        operation: SecretAccessActions.create,
+        status: SecretOperationalOutcomes[outcome],
+        reasonCode,
+        actor: Object.freeze({
+          actorId: input.actorId ?? "unknown",
+        }),
+        target: Object.freeze({
+          secretId: input.secretId,
+          scope: input.scope,
+          workspaceId: input.workspaceId,
+          userIdentityId: input.userIdentityId,
+        }),
+        occurredAt: input.occurredAt,
+      }));
+    } catch {
+      // Audit failures are intentionally non-fatal.
+    }
     try {
       await this.observabilityPort.recordSecretOperation(Object.freeze({
         event: "secret.create",
@@ -375,17 +400,34 @@ export class CreateSecretUseCase {
   }
 }
 
-async function emitAuditEvent(
+async function emitAccessDecisionAuditEvent(
   auditPort: ISecretAccessAuditPort,
   request: CreateSecretRequest,
-  input: Omit<SecretAccessAuditEvent, "actorId" | "actorType" | "workspaceId" | "userIdentityId">,
+  input: {
+    readonly target: {
+      readonly secretId?: string;
+      readonly scope?: ReturnType<typeof createSecretScopeOwner>["scope"];
+      readonly workspaceId?: string;
+      readonly userIdentityId?: string;
+    };
+    readonly action: typeof SecretAccessActions[keyof typeof SecretAccessActions];
+    readonly decision: "allowed" | "denied";
+    readonly reason: string;
+    readonly operationKey?: string;
+    readonly serviceIdentity?: string;
+    readonly justification?: string;
+    readonly occurredAt: string;
+  },
 ): Promise<void> {
-  await auditPort.recordSecretAccessDecision(Object.freeze({
+  await auditPort.recordSecretAuditEvent(Object.freeze({
+    eventKind: SecretAuditEventKinds.accessDecision,
     ...input,
-    actorId: request.actor.actorId,
-    actorType: request.actor.actorType,
-    workspaceId: request.actor.workspaceId,
-    userIdentityId: request.actor.userIdentityId,
+    actor: Object.freeze({
+      actorId: request.actor.actorId,
+      actorType: request.actor.actorType,
+      workspaceId: request.actor.workspaceId,
+      userIdentityId: request.actor.userIdentityId,
+    }),
   }));
 }
 
@@ -425,4 +467,24 @@ function invalidRequest(message: string): SecretServiceResult<CreateSecretResult
       message,
     }),
   };
+}
+
+function resolveReasonCode(
+  outcome: keyof typeof SecretOperationalOutcomes,
+  details: Readonly<Record<string, unknown>> | undefined,
+): string {
+  const detailReason = details?.reason;
+  if (typeof detailReason === "string" && detailReason.trim()) {
+    return detailReason.trim();
+  }
+  if (outcome === "succeeded") {
+    return "operation-succeeded";
+  }
+  if (outcome === "conflict") {
+    return "secret-name-conflict";
+  }
+  if (outcome === "missing") {
+    return "secret-not-found";
+  }
+  return "operation-outcome";
 }

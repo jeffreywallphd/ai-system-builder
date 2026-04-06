@@ -10,6 +10,7 @@ import type {
   ISecretAccessPolicyPort,
   ISecretRecordPersistenceRepository,
 } from "../ports/SecretServicePorts";
+import { SecretAuditEventKinds } from "../ports/SecretServicePorts";
 import {
   NoOpSecretObservabilityPort,
   SecretOperationalOutcomes,
@@ -69,15 +70,22 @@ export class ListSecretsUseCase {
       owner,
       occurredAt,
     });
-    await this.dependencies.secretAccessAuditPort.recordSecretAccessDecision(Object.freeze({
-      scope: owner.scope,
+    await this.dependencies.secretAccessAuditPort.recordSecretAuditEvent(Object.freeze({
+      eventKind: SecretAuditEventKinds.accessDecision,
       action: SecretAccessActions.list,
       decision: decision.allowed ? "allowed" : "denied",
       reason: decision.reason,
-      actorId,
-      actorType: request.actor.actorType,
-      workspaceId: request.actor.workspaceId,
-      userIdentityId: request.actor.userIdentityId,
+      actor: Object.freeze({
+        actorId,
+        actorType: request.actor.actorType,
+        workspaceId: request.actor.workspaceId,
+        userIdentityId: request.actor.userIdentityId,
+      }),
+      target: Object.freeze({
+        scope: owner.scope,
+        workspaceId: owner.workspaceId,
+        userIdentityId: owner.userIdentityId,
+      }),
       occurredAt: decision.occurredAt,
     }));
 

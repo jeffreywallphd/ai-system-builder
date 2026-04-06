@@ -4,6 +4,7 @@ import type {
   ISecretAccessPolicyPort,
   ISecretRecordPersistenceRepository,
 } from "../ports/SecretServicePorts";
+import { SecretAuditEventKinds } from "../ports/SecretServicePorts";
 import {
   NoOpSecretObservabilityPort,
   SecretOperationalOutcomes,
@@ -105,16 +106,23 @@ export class GetSecretMetadataUseCase {
         occurredAt,
       });
 
-      await this.dependencies.secretAccessAuditPort.recordSecretAccessDecision(Object.freeze({
-        secretId: record.secretId,
-        scope: record.owner.scope,
+      await this.dependencies.secretAccessAuditPort.recordSecretAuditEvent(Object.freeze({
+        eventKind: SecretAuditEventKinds.accessDecision,
         action: SecretAccessActions.readMetadata,
         decision: decision.allowed ? "allowed" : "denied",
         reason: decision.reason,
-        actorId,
-        actorType: request.actor.actorType,
-        workspaceId: request.actor.workspaceId,
-        userIdentityId: request.actor.userIdentityId,
+        actor: Object.freeze({
+          actorId,
+          actorType: request.actor.actorType,
+          workspaceId: request.actor.workspaceId,
+          userIdentityId: request.actor.userIdentityId,
+        }),
+        target: Object.freeze({
+          secretId: record.secretId,
+          scope: record.owner.scope,
+          workspaceId: record.owner.workspaceId,
+          userIdentityId: record.owner.userIdentityId,
+        }),
         occurredAt: decision.occurredAt,
       }));
 
@@ -183,6 +191,27 @@ export class GetSecretMetadataUseCase {
       readonly details?: Readonly<Record<string, unknown>>;
     },
   ): Promise<void> {
+    const reasonCode = resolveReasonCode(outcome, input.details);
+    try {
+      await this.dependencies.secretAccessAuditPort.recordSecretAuditEvent(Object.freeze({
+        eventKind: SecretAuditEventKinds.operation,
+        operation: SecretAccessActions.readMetadata,
+        status: SecretOperationalOutcomes[outcome],
+        reasonCode,
+        actor: Object.freeze({
+          actorId: input.actorId ?? "unknown",
+        }),
+        target: Object.freeze({
+          secretId: input.secretId,
+          scope: input.scope,
+          workspaceId: input.workspaceId,
+          userIdentityId: input.userIdentityId,
+        }),
+        occurredAt: input.occurredAt,
+      }));
+    } catch {
+      // Audit failures are intentionally non-fatal.
+    }
     try {
       await this.observabilityPort.recordSecretOperation(Object.freeze({
         event: "secret.read-metadata",
@@ -222,4 +251,21 @@ function invalidRequest(message: string): SecretServiceResult<ReturnType<typeof 
       message,
     }),
   };
+}
+
+function resolveReasonCode(
+  outcome: keyof typeof SecretOperationalOutcomes,
+  details: Readonly<Record<string, unknown>> | undefined,
+): string {
+  const detailReason = details?.reason;
+  if (typeof detailReason === "string" && detailReason.trim()) {
+    return detailReason.trim();
+  }
+  if (outcome === "succeeded") {
+    return "operation-succeeded";
+  }
+  if (outcome === "missing") {
+    return "secret-not-found";
+  }
+  return "operation-outcome";
 }

@@ -168,12 +168,156 @@ class InMemorySecretEncryptionPort implements ISecretEncryptionPort {
 class InMemorySecretAccessAuditPort implements ISecretAccessAuditPort {
   public readonly events: SecretAccessAuditEvent[] = [];
 
-  public async recordSecretAccessDecision(event: SecretAccessAuditEvent): Promise<void> {
+  public async recordSecretAuditEvent(event: SecretAccessAuditEvent): Promise<void> {
     this.events.push(event);
   }
 }
 
 describe("Secret authorization policy and governance use cases", () => {
+  it("records structured operation audit events for all secret-sensitive operations", async () => {
+    const repository = new InMemorySecretRecordRepository();
+    const encryption = new InMemorySecretEncryptionPort();
+    const audit = new InMemorySecretAccessAuditPort();
+    const policy = new SecretAuthorizationPolicyEvaluator();
+
+    const secretId = "secret:server:audited-flow";
+    const createUseCase = new CreateSecretUseCase({
+      secretRecordRepository: repository,
+      secretEncryptionPort: encryption,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+    const metadataUseCase = new GetSecretMetadataUseCase({
+      secretRecordRepository: repository,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+    const retrieveUseCase = new RetrieveSecretPlaintextForRuntimeUseCase({
+      secretRecordRepository: repository,
+      secretEncryptionPort: encryption,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+    const rotateUseCase = new RotateSecretUseCase({
+      secretRecordRepository: repository,
+      secretEncryptionPort: encryption,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+    const disableUseCase = new DisableSecretUseCase({
+      secretRecordRepository: repository,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+    const deleteUseCase = new DeleteSecretUseCase({
+      secretRecordRepository: repository,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+
+    const createResult = await createUseCase.execute({
+      actor: {
+        actorId: "user:server-admin",
+        actorType: SecretActorTypes.serverAdmin,
+        grantedActions: [SecretAccessActions.create],
+      },
+      operationKey: "op:create:audited-flow",
+      secretId,
+      name: "provider.openai.audit-flow",
+      owner: {
+        scope: SecretScopes.server,
+      },
+      kind: SecretKinds.apiKey,
+      plaintext: "sk-audit-create",
+      metadata: {
+        tags: ["openai", "audit"],
+        labels: {
+          provider: "openai",
+          usage: "model-inference",
+        },
+      },
+    });
+    expect(createResult.ok).toBeTrue();
+
+    const metadataResult = await metadataUseCase.execute({
+      actor: {
+        actorId: "user:server-admin",
+        actorType: SecretActorTypes.serverAdmin,
+        grantedActions: [SecretAccessActions.readMetadata],
+      },
+      secretId,
+    });
+    expect(metadataResult.ok).toBeTrue();
+
+    const retrieveResult = await retrieveUseCase.execute({
+      actor: {
+        actorId: "system:runtime:server",
+        actorType: SecretActorTypes.serverRuntime,
+        grantedActions: [SecretAccessActions.retrievePlaintext],
+      },
+      secretId,
+      operationKey: "op:retrieve:audited-flow",
+      runtimeContext: {
+        serviceIdentity: "runtime:server:audited-flow",
+        scope: {
+          scope: SecretScopes.server,
+        },
+        justification: "runtime operation audit verification",
+      },
+    });
+    expect(retrieveResult.ok).toBeTrue();
+
+    const rotateResult = await rotateUseCase.execute({
+      actor: {
+        actorId: "user:server-admin",
+        actorType: SecretActorTypes.serverAdmin,
+        grantedActions: [SecretAccessActions.rotate],
+      },
+      operationKey: "op:rotate:audited-flow",
+      secretId,
+      plaintext: "sk-audit-rotate",
+    });
+    expect(rotateResult.ok).toBeTrue();
+
+    const disableResult = await disableUseCase.execute({
+      actor: {
+        actorId: "user:server-admin",
+        actorType: SecretActorTypes.serverAdmin,
+        grantedActions: [SecretAccessActions.disable],
+      },
+      operationKey: "op:disable:audited-flow",
+      secretId,
+    });
+    expect(disableResult.ok).toBeTrue();
+
+    const deleteResult = await deleteUseCase.execute({
+      actor: {
+        actorId: "user:server-admin",
+        actorType: SecretActorTypes.serverAdmin,
+        grantedActions: [SecretAccessActions.delete],
+      },
+      operationKey: "op:delete:audited-flow",
+      secretId,
+    });
+    expect(deleteResult.ok).toBeTrue();
+
+    const operationEvents = audit.events.filter(
+      (event): event is Extract<SecretAccessAuditEvent, { readonly eventKind: "secret.operation" }> =>
+        event.eventKind === "secret.operation",
+    );
+    expect(operationEvents.length).toBeGreaterThanOrEqual(6);
+    expect(operationEvents.filter((event) => event.status === "succeeded").map((event) => event.operation)).toEqual([
+      SecretAccessActions.create,
+      SecretAccessActions.readMetadata,
+      SecretAccessActions.retrievePlaintext,
+      SecretAccessActions.rotate,
+      SecretAccessActions.disable,
+      SecretAccessActions.delete,
+    ]);
+    expect(JSON.stringify(operationEvents)).not.toContain("sk-audit-create");
+    expect(JSON.stringify(operationEvents)).not.toContain("sk-audit-rotate");
+  });
+
   it("denies runtime actors for administrative secret mutations", async () => {
     const repository = new InMemorySecretRecordRepository();
     const encryption = new InMemorySecretEncryptionPort();
@@ -218,7 +362,8 @@ describe("Secret authorization policy and governance use cases", () => {
         code: SecretServiceErrorCodes.accessDenied,
       }),
     });
-    expect(audit.events.at(-1)?.reason).toBe("administrative-access-required");
+    const accessEvent = [...audit.events].reverse().find((event) => event.eventKind === "secret.access-decision");
+    expect(accessEvent && "reason" in accessEvent ? accessEvent.reason : undefined).toBe("administrative-access-required");
   });
 
   it("treats plaintext retrieval as stricter than metadata visibility for human actors", async () => {
@@ -276,7 +421,8 @@ describe("Secret authorization policy and governance use cases", () => {
         message: `Secret '${record.secretId}' was not found.`,
       },
     });
-    expect(audit.events.at(-1)?.reason).toBe("runtime-access-required");
+    const runtimeDenied = [...audit.events].reverse().find((event) => event.eventKind === "secret.access-decision");
+    expect(runtimeDenied && "reason" in runtimeDenied ? runtimeDenied.reason : undefined).toBe("runtime-access-required");
   });
 
   it("allows system runtime plaintext retrieval within scope boundaries", async () => {
@@ -327,9 +473,10 @@ describe("Secret authorization policy and governance use cases", () => {
         plaintext: "workspace-beta-token",
       },
     });
-    expect(audit.events.at(-1)?.decision).toBe("allowed");
-    expect(audit.events.at(-1)?.operationKey).toBe("op:retrieve:workspace-beta-runtime");
-    expect(audit.events.at(-1)?.serviceIdentity).toBe("runtime:workspace-beta:storage");
+    const runtimeAllowed = [...audit.events].reverse().find((event) => event.eventKind === "secret.access-decision");
+    expect(runtimeAllowed && "decision" in runtimeAllowed ? runtimeAllowed.decision : undefined).toBe("allowed");
+    expect(runtimeAllowed && "operationKey" in runtimeAllowed ? runtimeAllowed.operationKey : undefined).toBe("op:retrieve:workspace-beta-runtime");
+    expect(runtimeAllowed && "serviceIdentity" in runtimeAllowed ? runtimeAllowed.serviceIdentity : undefined).toBe("runtime:workspace-beta:storage");
   });
 
   it("enforces server-scope boundary for server runtime actors", async () => {
@@ -391,7 +538,8 @@ describe("Secret authorization policy and governance use cases", () => {
         message: `Secret '${record.secretId}' was not found.`,
       },
     });
-    expect(audit.events.at(-1)?.reason).toBe("runtime-access-required");
+    const serverDenied = [...audit.events].reverse().find((event) => event.eventKind === "secret.access-decision");
+    expect(serverDenied && "reason" in serverDenied ? serverDenied.reason : undefined).toBe("runtime-access-required");
   });
 
   it("returns non-leaky not-found when runtime scope reference does not match the secret owner", async () => {
@@ -437,8 +585,9 @@ describe("Secret authorization policy and governance use cases", () => {
         message: `Secret '${record.secretId}' was not found.`,
       },
     });
-    expect(audit.events.at(-1)?.reason).toBe("scope-mismatch");
-    expect(audit.events.at(-1)?.operationKey).toBe("op:retrieve:workspace-alpha-mismatched-scope");
+    const mismatchDenied = [...audit.events].reverse().find((event) => event.eventKind === "secret.access-decision");
+    expect(mismatchDenied && "reason" in mismatchDenied ? mismatchDenied.reason : undefined).toBe("scope-mismatch");
+    expect(mismatchDenied && "operationKey" in mismatchDenied ? mismatchDenied.operationKey : undefined).toBe("op:retrieve:workspace-alpha-mismatched-scope");
   });
 
   it("rejects runtime plaintext retrieval requests that omit audit justification context", async () => {
@@ -540,7 +689,10 @@ describe("Secret authorization policy and governance use cases", () => {
         message: `Secret '${record.secretId}' was not found.`,
       },
     });
-    expect(audit.events.map((event) => event.reason)).toEqual(["scope-mismatch", "scope-mismatch"]);
+    const reasons = audit.events
+      .filter((event): event is Extract<SecretAccessAuditEvent, { readonly eventKind: "secret.access-decision" }> => event.eventKind === "secret.access-decision")
+      .map((event) => event.reason);
+    expect(reasons).toEqual(["scope-mismatch", "scope-mismatch"]);
   });
 
   it("enforces workspace and user boundaries for list and disable operations", async () => {

@@ -992,31 +992,44 @@ function createSecretOperationalLogger(logger: IdentityHttpServerLogger | undefi
 
 function createSecretAccessAuditHook(
   logger: IdentityHttpServerLogger | undefined,
-): ((event: {
-  readonly secretId?: string;
-  readonly action: string;
-  readonly decision: string;
-  readonly reason: string;
-  readonly actorId: string;
-  readonly occurredAt: string;
-}) => void) | undefined {
+): ((event: Record<string, unknown>) => void) | undefined {
   if (!logger) {
     return undefined;
   }
 
   return (event) => {
-    const level = event.decision === "denied" ? "warn" : "info";
+    const eventKind = resolveOptionalString(event.eventKind) ?? "secret.audit";
+    const actor = (typeof event.actor === "object" && event.actor) ? event.actor as Record<string, unknown> : undefined;
+    const target = (typeof event.target === "object" && event.target) ? event.target as Record<string, unknown> : undefined;
+    const status = resolveOptionalString(event.status);
+    const decision = resolveOptionalString(event.decision);
+    const level = decision === "denied" || status === "denied" || status === "failed" ? "warn" : "info";
+    const requestId = resolveOptionalString(target?.secretId)
+      ?? resolveOptionalString(actor?.actorId)
+      ?? resolveOptionalString(event.operation)
+      ?? eventKind;
     logger[level]({
-      event: "secret.access",
-      requestId: event.secretId ?? event.actorId,
+      event: eventKind,
+      requestId,
       details: Object.freeze({
         secret: Object.freeze({
-          secretId: event.secretId,
-          action: event.action,
-          decision: event.decision,
-          reason: event.reason,
-          actorId: event.actorId,
-          occurredAt: event.occurredAt,
+          operation: resolveOptionalString(event.operation),
+          action: resolveOptionalString(event.action),
+          status,
+          decision,
+          reasonCode: resolveOptionalString(event.reasonCode),
+          reason: resolveOptionalString(event.reason),
+          operationKey: resolveOptionalString(event.operationKey),
+          serviceIdentity: resolveOptionalString(event.serviceIdentity),
+          actorId: resolveOptionalString(actor?.actorId),
+          actorType: resolveOptionalString(actor?.actorType),
+          actorWorkspaceId: resolveOptionalString(actor?.workspaceId),
+          actorUserIdentityId: resolveOptionalString(actor?.userIdentityId),
+          secretId: resolveOptionalString(target?.secretId),
+          scope: resolveOptionalString(target?.scope),
+          targetWorkspaceId: resolveOptionalString(target?.workspaceId),
+          targetUserIdentityId: resolveOptionalString(target?.userIdentityId),
+          occurredAt: resolveOptionalString(event.occurredAt),
         }),
       }),
     });

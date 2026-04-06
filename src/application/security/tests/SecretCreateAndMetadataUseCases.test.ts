@@ -124,7 +124,7 @@ class DomainBackedSecretAccessPolicyPort implements ISecretAccessPolicyPort {
 class InMemorySecretAccessAuditPort implements ISecretAccessAuditPort {
   public readonly events: SecretAccessAuditEvent[] = [];
 
-  public async recordSecretAccessDecision(event: SecretAccessAuditEvent): Promise<void> {
+  public async recordSecretAuditEvent(event: SecretAccessAuditEvent): Promise<void> {
     this.events.push(event);
   }
 }
@@ -184,11 +184,15 @@ describe("Secret create and metadata use cases", () => {
 
     const persisted = await repository.findSecretById("secret:server:openai");
     expect(persisted?.versions[0]?.encryptedPayloadRef).toContain("enc:secret:server:openai");
-    expect(audit.events).toHaveLength(1);
-    expect(audit.events[0]).toMatchObject({
+    expect(audit.events.some((event) => event.eventKind === "secret.operation")).toBeTrue();
+    const accessDecision = audit.events.find((event) => event.eventKind === "secret.access-decision");
+    expect(accessDecision).toMatchObject({
+      eventKind: "secret.access-decision",
       action: SecretAccessActions.create,
       decision: "allowed",
-      actorId: "user:server-admin",
+      actor: {
+        actorId: "user:server-admin",
+      },
       occurredAt: "2026-04-05T12:00:00.000Z",
     });
     expect(observability.events).toHaveLength(1);
@@ -288,7 +292,7 @@ describe("Secret create and metadata use cases", () => {
       },
     });
 
-    expect(audit.events).toHaveLength(1);
+    expect(audit.events.length).toBeGreaterThanOrEqual(1);
     expect(observability.events).toHaveLength(1);
     expect(observability.events[0]).toMatchObject({
       event: "secret.create",
@@ -299,6 +303,8 @@ describe("Secret create and metadata use cases", () => {
     const serializedObservability = JSON.stringify(observability.events[0]);
     expect(serializedObservability).not.toContain(plaintext);
     expect(serializedObservability).toContain("[REDACTED]");
+    const serializedAudit = JSON.stringify(audit.events);
+    expect(serializedAudit).not.toContain(plaintext);
   });
 
   it("rejects invalid scope owner input with clear application error", async () => {
@@ -394,11 +400,14 @@ describe("Secret create and metadata use cases", () => {
     expect(result.value.secretId).toBe("secret:server:openai");
     expect(JSON.stringify(result.value)).not.toContain("sk-openai-live");
     expect(JSON.stringify(result.value)).not.toContain("payloadDigestSha256");
-    expect(audit.events).toHaveLength(1);
-    expect(audit.events[0]).toMatchObject({
+    const metadataAccessDecision = audit.events.find((event) => event.eventKind === "secret.access-decision");
+    expect(metadataAccessDecision).toMatchObject({
+      eventKind: "secret.access-decision",
       action: SecretAccessActions.readMetadata,
       decision: "allowed",
-      actorId: "user:server-admin",
+      actor: {
+        actorId: "user:server-admin",
+      },
       occurredAt: "2026-04-06T08:00:00.000Z",
     });
     expect(observability.events).toHaveLength(1);

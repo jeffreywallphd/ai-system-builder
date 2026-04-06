@@ -10,6 +10,7 @@ import type {
   ISecretEncryptionPort,
   ISecretRecordPersistenceRepository,
 } from "../ports/SecretServicePorts";
+import { SecretAuditEventKinds } from "../ports/SecretServicePorts";
 import {
   NoOpSecretObservabilityPort,
   SecretOperationalOutcomes,
@@ -86,6 +87,7 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
         occurredAt: this.now().toISOString(),
         actorId,
         secretId,
+        operationKey,
         details: Object.freeze({
           reason: "missing-runtime-serviceIdentity",
         }),
@@ -99,6 +101,8 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
         occurredAt: this.now().toISOString(),
         actorId,
         secretId,
+        operationKey,
+        serviceIdentity,
         details: Object.freeze({
           reason: "missing-runtime-justification",
         }),
@@ -114,6 +118,8 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
         occurredAt: this.now().toISOString(),
         actorId,
         secretId,
+        operationKey,
+        serviceIdentity,
         details: Object.freeze({
           reason: "invalid-runtime-scope",
           error: toErrorMessage(error),
@@ -124,19 +130,26 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
 
     if (!isRuntimeActorType(request.actor.actorType)) {
       const occurredAt = this.now().toISOString();
-      await this.dependencies.secretAccessAuditPort.recordSecretAccessDecision(Object.freeze({
-        secretId,
-        scope: requestedScope.scope,
+      await this.dependencies.secretAccessAuditPort.recordSecretAuditEvent(Object.freeze({
+        eventKind: SecretAuditEventKinds.accessDecision,
         action: SecretAccessActions.retrievePlaintext,
         decision: "denied",
         reason: "runtime-access-required",
         operationKey,
         serviceIdentity,
         justification,
-        actorId,
-        actorType: request.actor.actorType,
-        workspaceId: request.actor.workspaceId,
-        userIdentityId: request.actor.userIdentityId,
+        actor: Object.freeze({
+          actorId,
+          actorType: request.actor.actorType,
+          workspaceId: request.actor.workspaceId,
+          userIdentityId: request.actor.userIdentityId,
+        }),
+        target: Object.freeze({
+          secretId,
+          scope: requestedScope.scope,
+          workspaceId: requestedScope.workspaceId,
+          userIdentityId: requestedScope.userIdentityId,
+        }),
         occurredAt,
       }));
       await this.emitOperation("denied", {
@@ -146,6 +159,8 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
         scope: requestedScope.scope,
         workspaceId: requestedScope.workspaceId,
         userIdentityId: requestedScope.userIdentityId,
+        operationKey,
+        serviceIdentity,
         details: Object.freeze({
           reason: "runtime-access-required",
           operationKey,
@@ -161,6 +176,8 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
         occurredAt: this.now().toISOString(),
         actorId,
         secretId,
+        operationKey,
+        serviceIdentity,
         details: Object.freeze({
           reason: "invalid-occurredAt",
         }),
@@ -183,19 +200,26 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
       }
 
       if (!isSameScopeOwner(record.owner, requestedScope)) {
-        await this.dependencies.secretAccessAuditPort.recordSecretAccessDecision(Object.freeze({
-          secretId: secretId,
-          scope: requestedScope.scope,
+        await this.dependencies.secretAccessAuditPort.recordSecretAuditEvent(Object.freeze({
+          eventKind: SecretAuditEventKinds.accessDecision,
           action: SecretAccessActions.retrievePlaintext,
           decision: "denied",
           reason: "scope-mismatch",
           operationKey,
           serviceIdentity,
           justification,
-          actorId,
-          actorType: request.actor.actorType,
-          workspaceId: request.actor.workspaceId,
-          userIdentityId: request.actor.userIdentityId,
+          actor: Object.freeze({
+            actorId,
+            actorType: request.actor.actorType,
+            workspaceId: request.actor.workspaceId,
+            userIdentityId: request.actor.userIdentityId,
+          }),
+          target: Object.freeze({
+            secretId,
+            scope: requestedScope.scope,
+            workspaceId: requestedScope.workspaceId,
+            userIdentityId: requestedScope.userIdentityId,
+          }),
           occurredAt,
         }));
         await this.emitOperation("denied", {
@@ -222,19 +246,26 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
         occurredAt,
       });
 
-      await this.dependencies.secretAccessAuditPort.recordSecretAccessDecision(Object.freeze({
-        secretId: record.secretId,
-        scope: record.owner.scope,
+      await this.dependencies.secretAccessAuditPort.recordSecretAuditEvent(Object.freeze({
+        eventKind: SecretAuditEventKinds.accessDecision,
         action: SecretAccessActions.retrievePlaintext,
         decision: decision.allowed ? "allowed" : "denied",
         reason: decision.reason,
         operationKey,
         serviceIdentity,
         justification,
-        actorId,
-        actorType: request.actor.actorType,
-        workspaceId: request.actor.workspaceId,
-        userIdentityId: request.actor.userIdentityId,
+        actor: Object.freeze({
+          actorId,
+          actorType: request.actor.actorType,
+          workspaceId: request.actor.workspaceId,
+          userIdentityId: request.actor.userIdentityId,
+        }),
+        target: Object.freeze({
+          secretId: record.secretId,
+          scope: record.owner.scope,
+          workspaceId: record.owner.workspaceId,
+          userIdentityId: record.owner.userIdentityId,
+        }),
         occurredAt: decision.occurredAt,
       }));
 
@@ -246,6 +277,8 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
           scope: record.owner.scope,
           workspaceId: record.owner.workspaceId,
           userIdentityId: record.owner.userIdentityId,
+          operationKey,
+          serviceIdentity,
           details: Object.freeze({
             reason: decision.reason,
             operationKey,
@@ -264,6 +297,8 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
           scope: record.owner.scope,
           workspaceId: record.owner.workspaceId,
           userIdentityId: record.owner.userIdentityId,
+          operationKey,
+          serviceIdentity,
           details: Object.freeze({
             reason: "missing-current-version",
           }),
@@ -289,6 +324,8 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
         scope: record.owner.scope,
         workspaceId: record.owner.workspaceId,
         userIdentityId: record.owner.userIdentityId,
+        operationKey,
+        serviceIdentity,
       });
       return {
         ok: true,
@@ -304,6 +341,8 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
         occurredAt,
         actorId,
         secretId,
+        operationKey,
+        serviceIdentity,
         details: Object.freeze({
           reason: "internal-error",
         }),
@@ -327,9 +366,34 @@ export class RetrieveSecretPlaintextForRuntimeUseCase {
       readonly scope?: SecretScopeOwner["scope"];
       readonly workspaceId?: string;
       readonly userIdentityId?: string;
+      readonly operationKey?: string;
+      readonly serviceIdentity?: string;
       readonly details?: Readonly<Record<string, unknown>>;
     },
   ): Promise<void> {
+    const reasonCode = resolveReasonCode(outcome, input.details);
+    try {
+      await this.dependencies.secretAccessAuditPort.recordSecretAuditEvent(Object.freeze({
+        eventKind: SecretAuditEventKinds.operation,
+        operation: SecretAccessActions.retrievePlaintext,
+        status: SecretOperationalOutcomes[outcome],
+        reasonCode,
+        operationKey: input.operationKey,
+        serviceIdentity: input.serviceIdentity,
+        actor: Object.freeze({
+          actorId: input.actorId ?? "unknown",
+        }),
+        target: Object.freeze({
+          secretId: input.secretId,
+          scope: input.scope,
+          workspaceId: input.workspaceId,
+          userIdentityId: input.userIdentityId,
+        }),
+        occurredAt: input.occurredAt,
+      }));
+    } catch {
+      // Audit failures are intentionally non-fatal.
+    }
     try {
       await this.observabilityPort.recordSecretOperation(Object.freeze({
         event: "secret.retrieve-plaintext",
@@ -399,4 +463,21 @@ function notFound(secretId: string): SecretServiceResult<RetrieveSecretPlaintext
       message: `Secret '${secretId}' was not found.`,
     }),
   };
+}
+
+function resolveReasonCode(
+  outcome: keyof typeof SecretOperationalOutcomes,
+  details: Readonly<Record<string, unknown>> | undefined,
+): string {
+  const detailReason = details?.reason;
+  if (typeof detailReason === "string" && detailReason.trim()) {
+    return detailReason.trim();
+  }
+  if (outcome === "succeeded") {
+    return "operation-succeeded";
+  }
+  if (outcome === "missing") {
+    return "secret-not-found";
+  }
+  return "operation-outcome";
 }
