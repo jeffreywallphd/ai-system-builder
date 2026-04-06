@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import { AssetServiceErrorCodes } from "../../../src/application/assets/use-cases/AssetServiceContracts";
 import type { AssetUploadInitiationService } from "../../../src/application/assets/use-cases/AssetUploadInitiationService";
 import type { AssetUploadIngestionService } from "../../../src/application/assets/use-cases/AssetUploadIngestionService";
-import { toAssetDetailDto } from "../../../src/shared/contracts/assets/AssetTransportContracts";
+import { type AssetSummaryDto, toAssetDetailDto, toAssetSummaryDto } from "../../../src/shared/contracts/assets/AssetTransportContracts";
 import {
+  toListAssetsQuery,
   toBeginAssetUploadRequest,
   toRegisterAssetRequest,
 } from "../../../src/shared/dto/assets/AssetTransportDtos";
@@ -15,13 +16,17 @@ import {
   type IngestAssetUploadContentApiResponse,
   type InitiateAssetUploadApiRequest,
   type InitiateAssetUploadApiResponse,
+  type ListAssetsApiRequest,
+  type ListAssetsApiResponse,
   type RegisterAssetApiRequest,
   type RegisterAssetApiResponse,
 } from "./sdk/PublicAssetManagementApiContract";
+import type { AssetDiscoveryService } from "../../../src/application/assets/use-cases/AssetDiscoveryService";
 
 export interface AssetManagementBackendApiDependencies {
   readonly uploadInitiationService: AssetUploadInitiationService;
   readonly uploadIngestionService: AssetUploadIngestionService;
+  readonly discoveryService: AssetDiscoveryService;
 }
 
 export class AssetManagementBackendApi {
@@ -150,6 +155,54 @@ export class AssetManagementBackendApi {
         uploadSessionId: outcome.value.uploadSessionId,
         finalizedVersionId: outcome.value.finalizedVersionId,
         content: outcome.value.content,
+      }),
+    });
+  }
+
+  public async listAssets(
+    request: ListAssetsApiRequest,
+  ): Promise<AssetManagementApiResponse<ListAssetsApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(AssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+    }
+
+    let parsedQuery: ReturnType<typeof toListAssetsQuery>;
+    try {
+      parsedQuery = toListAssetsQuery({
+        actorUserId: actorUserIdentityId,
+        workspaceId: request.workspaceId,
+        correlationId: request.correlationId,
+        occurredAt: request.occurredAt,
+        scope: request.scope,
+        ownerUserId: request.ownerUserId,
+        createdByUserId: request.createdByUserId,
+        storageInstanceId: request.storageInstanceId,
+        assetKinds: request.assetKinds,
+        visibilities: request.visibilities,
+        lifecycleStates: request.lifecycleStates,
+        sourceAssetId: request.sourceAssetId,
+        sourceAssetVersionId: request.sourceAssetVersionId,
+        limit: request.limit,
+        offset: request.offset,
+      });
+    } catch (error) {
+      return this.failed(
+        AssetManagementApiErrorCodes.invalidRequest,
+        error instanceof Error ? error.message : "Request validation failed.",
+      );
+    }
+
+    const outcome = await this.dependencies.discoveryService.listAssets(parsedQuery);
+    if (!outcome.ok) {
+      return this.failedFromServiceError(outcome.error.code, outcome.error.message, outcome.error.details);
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        items: Object.freeze(outcome.value.items.map((item): AssetSummaryDto => toAssetSummaryDto(item))),
+        pagination: outcome.value.pagination,
       }),
     });
   }

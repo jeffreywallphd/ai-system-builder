@@ -104,10 +104,14 @@ describe("AssetServiceContracts", () => {
     const query = validateListAssetsQuery({
       actorUserId: "user-owner",
       workspaceId: "workspace-a",
+      scope: "all",
+      createdByUserId: " user-owner ",
       limit: 20,
       offset: 0,
     });
 
+    expect(query.scope).toBe("all");
+    expect(query.createdByUserId).toBe("user-owner");
     expect(query.limit).toBe(20);
     expect(query.offset).toBe(0);
 
@@ -116,6 +120,12 @@ describe("AssetServiceContracts", () => {
       workspaceId: "workspace-a",
       limit: 0,
     })).toThrow("limit");
+
+    expect(() => validateListAssetsQuery({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-a",
+      scope: "invalid" as "private",
+    })).toThrow("scope");
   });
 
   it("defaults finalize upload requests to set current version", () => {

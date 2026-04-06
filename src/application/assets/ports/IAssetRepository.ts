@@ -8,6 +8,7 @@ import type {
 export interface AssetListQuery {
   readonly workspaceId?: string;
   readonly ownerUserId?: string;
+  readonly createdByUserId?: string;
   readonly storageInstanceId?: string;
   readonly assetKinds?: ReadonlyArray<AssetKind>;
   readonly visibilities?: ReadonlyArray<AssetVisibility>;

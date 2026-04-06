@@ -103,6 +103,7 @@ import {
   type AssetManagementApiResponse,
   type IngestAssetUploadContentApiRequest,
   type InitiateAssetUploadApiRequest,
+  type ListAssetsApiRequest,
   type RegisterAssetApiRequest,
 } from "../../../api/assets/sdk/PublicAssetManagementApiContract";
 import {
@@ -3530,6 +3531,48 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapStorageManagementStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.assetManagementBackendApi
+        && request.method === "GET"
+        && path === "/api/v1/assets"
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
+            if (!workspaceId) {
+              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = parseAndValidateAssetListRequest(
+              context.principal.userIdentityId,
+              workspaceId,
+              searchParams,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              logResponse(logger, requestId, request, parsedRequest.statusCode, Object.freeze({ workspaceId }), parsedRequest.body);
+              return;
+            }
+
+            const listRequest = parsedRequest.data;
+            const apiResponse = await options.assetManagementBackendApi.listAssets(listRequest);
+            const statusCode = mapAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, listRequest, apiResponse);
           },
         );
         return;
@@ -7136,6 +7179,83 @@ async function parseAndValidateAssetRegisterRequest(
   };
 }
 
+function parseAndValidateAssetListRequest(
+  actorUserIdentityId: string,
+  workspaceId: string,
+  searchParams: URLSearchParams,
+):
+  | { readonly ok: true; readonly data: ListAssetsApiRequest }
+  | { readonly ok: false; readonly statusCode: number; readonly body: AssetManagementApiResponse<never> } {
+  const assetKinds = parseOptionalCsvEnumList(
+    searchParams.get("assetKinds"),
+    ["uploaded-file", "generated-output", "preview", "derived"] as const,
+  );
+  if (!assetKinds.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildAssetManagementInvalidRequestResponse("assetKinds includes unsupported values."),
+    };
+  }
+
+  const visibilities = parseOptionalCsvEnumList(
+    searchParams.get("visibilities"),
+    ["private", "workspace", "shared", "published"] as const,
+  );
+  if (!visibilities.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildAssetManagementInvalidRequestResponse("visibilities includes unsupported values."),
+    };
+  }
+
+  const lifecycleStates = parseOptionalCsvEnumList(
+    searchParams.get("lifecycleStates"),
+    ["active", "archived", "deleted"] as const,
+  );
+  if (!lifecycleStates.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildAssetManagementInvalidRequestResponse("lifecycleStates includes unsupported values."),
+    };
+  }
+
+  const scope = parseOptionalEnum(
+    searchParams.get("scope"),
+    ["private", "workspace", "all"] as const,
+  );
+  if (searchParams.get("scope") && !scope) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildAssetManagementInvalidRequestResponse("scope must be one of: private, workspace, all."),
+    };
+  }
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      actorUserIdentityId,
+      workspaceId,
+      correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+      occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+      scope,
+      ownerUserId: normalizeOptionalString(searchParams.get("ownerUserId")),
+      createdByUserId: normalizeOptionalString(searchParams.get("createdByUserId")),
+      storageInstanceId: normalizeOptionalString(searchParams.get("storageInstanceId")),
+      assetKinds: assetKinds.value,
+      visibilities: visibilities.value,
+      lifecycleStates: lifecycleStates.value,
+      sourceAssetId: normalizeOptionalString(searchParams.get("sourceAssetId")),
+      sourceAssetVersionId: normalizeOptionalString(searchParams.get("sourceAssetVersionId")),
+      limit: parseOptionalInteger(searchParams.get("limit")),
+      offset: parseOptionalInteger(searchParams.get("offset")),
+    }),
+  };
+}
+
 async function parseAndValidateAssetUploadInitiationRequest(
   request: IncomingMessage,
   actorUserIdentityId: string,
@@ -7472,6 +7592,37 @@ function parseOptionalEnum<TValue extends string>(
     return undefined;
   }
   return enumeration.includes(value as TValue) ? (value as TValue) : undefined;
+}
+
+function parseOptionalCsvEnumList<TValue extends string>(
+  value: string | null,
+  enumeration: ReadonlyArray<TValue>,
+): { readonly ok: true; readonly value?: ReadonlyArray<TValue> } | { readonly ok: false } {
+  if (!value) {
+    return { ok: true, value: undefined };
+  }
+
+  const values = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+  if (values.length < 1) {
+    return { ok: true, value: undefined };
+  }
+
+  const normalized: TValue[] = [];
+  for (const candidate of values) {
+    if (!enumeration.includes(candidate as TValue)) {
+      return { ok: false };
+    }
+    normalized.push(candidate as TValue);
+  }
+
+  return {
+    ok: true,
+    value: Object.freeze(normalized),
+  };
 }
 
 function normalizeOptionalString(value: string | null): string | undefined {

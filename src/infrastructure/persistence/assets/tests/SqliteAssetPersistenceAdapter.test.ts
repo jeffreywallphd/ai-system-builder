@@ -175,6 +175,7 @@ describe("SqliteAssetPersistenceAdapter", () => {
       ownerUserId: "user-owner",
       assetKinds: [AssetKinds.derived],
       visibilities: [AssetVisibilities.private],
+      createdByUserId: "user-owner",
     });
     expect(byWorkspaceAndOwner).toHaveLength(1);
     expect(byWorkspaceAndOwner[0]?.id).toBe("asset-derived");

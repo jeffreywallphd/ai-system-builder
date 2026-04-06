@@ -6,6 +6,7 @@ import { createIdentityHttpServer } from "../IdentityHttpServer";
 import { AssetManagementBackendApi } from "../../../../api/assets/AssetManagementBackendApi";
 import { AssetUploadInitiationService } from "../../../../../src/application/assets/use-cases/AssetUploadInitiationService";
 import { AssetUploadIngestionService } from "../../../../../src/application/assets/use-cases/AssetUploadIngestionService";
+import { AssetDiscoveryService } from "../../../../../src/application/assets/use-cases/AssetDiscoveryService";
 import {
   AssetKinds,
   AssetVisibilities,
@@ -111,6 +112,21 @@ class StubAssetUploadInitiationService {
       },
     };
   }
+
+  public async listAssets() {
+    return {
+      ok: true as const,
+      value: {
+        items: Object.freeze([this.asset]),
+        pagination: Object.freeze({
+          limit: 25,
+          offset: 0,
+          returned: 1,
+          hasMore: false,
+        }),
+      },
+    };
+  }
 }
 
 class StubAssetUploadIngestionService {
@@ -154,6 +170,7 @@ async function startServer(
   const assetManagementBackendApi = new AssetManagementBackendApi({
     uploadInitiationService: initiationService as unknown as AssetUploadInitiationService,
     uploadIngestionService: ingestionService as unknown as AssetUploadIngestionService,
+    discoveryService: initiationService as unknown as AssetDiscoveryService,
   });
 
   const server = createIdentityHttpServer({
@@ -320,5 +337,28 @@ describe("IdentityHttpServer asset management routes", () => {
     const body = await response.json();
     expect(body.ok).toBe(false);
     expect(body.error.code).toBe("invalid-state");
+  });
+
+  it("supports authenticated scoped asset listing", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const baseUrl = await startServer(service);
+    const token = await registerAndLogin(baseUrl, "asset.http.owner.4");
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/assets?workspaceId=workspace-alpha&scope=all&limit=10&offset=0`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.items).toHaveLength(1);
+    expect(body.data.items[0]?.assetId).toBe("asset-upload-001");
+    expect(body.data.pagination.returned).toBe(1);
   });
 });
