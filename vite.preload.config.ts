@@ -6,8 +6,8 @@ export default defineConfig({
     outDir: ".vite/build",
     lib: {
       entry: "electron/preload.ts",
-      formats: ["es"],
-      fileName: () => "preload.mjs",
+      formats: ["cjs"],
+      fileName: () => "preload.cjs",
     },
     rollupOptions: {
       external: [
