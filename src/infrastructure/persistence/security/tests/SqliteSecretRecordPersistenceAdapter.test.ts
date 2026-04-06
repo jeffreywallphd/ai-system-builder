@@ -79,7 +79,7 @@ describe("SqliteSecretRecordPersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM secret_record_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(1);
+    expect(versionRow.version).toBe(2);
 
     const tables = database.prepare(`
       SELECT name
@@ -89,13 +89,15 @@ describe("SqliteSecretRecordPersistenceAdapter", () => {
           'secret_records',
           'secret_versions',
           'secret_version_material',
-          'secret_record_mutation_replays'
+          'secret_record_mutation_replays',
+          'secret_reencryption_operations'
         )
       ORDER BY name ASC
     `).all() as Array<{ name: string }>;
 
     expect(tables.map((table) => table.name)).toEqual([
       "secret_record_mutation_replays",
+      "secret_reencryption_operations",
       "secret_records",
       "secret_version_material",
       "secret_versions",
@@ -329,6 +331,59 @@ describe("SqliteSecretRecordPersistenceAdapter", () => {
     const afterExplicitDeletedSave = await adapter.findSecretById("secret:server:openai");
     expect(afterExplicitDeletedSave?.softDeletedAt).toBe("2026-04-06T02:05:00.000Z");
 
+    adapter.dispose();
+  });
+
+  it("persists and updates secret re-encryption operation state with optimistic concurrency", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-secret-reencrypt-op-"));
+    createdRoots.push(root);
+    const adapter = new SqliteSecretRecordPersistenceAdapter(path.join(root, "secrets.sqlite"));
+
+    const created = await adapter.createReEncryptionOperation({
+      operationId: "secret-reencrypt:op-1",
+      operationKey: "op:secret:reencrypt:1",
+      state: "running",
+      targets: Object.freeze([Object.freeze({
+        secretId: "secret:server:openai",
+        versionId: "secret:server:openai:v1",
+      })]),
+      currentIndex: 0,
+      succeededCount: 0,
+      failedCount: 0,
+      failures: Object.freeze([]),
+      startedBy: "user:admin",
+      startedAt: "2026-04-06T03:00:00.000Z",
+      updatedAt: "2026-04-06T03:00:00.000Z",
+      completedAt: undefined,
+      lastErrorCode: undefined,
+      lastErrorMessage: undefined,
+    });
+    expect(created.revision).toBe(1);
+
+    const saved = await adapter.saveReEncryptionOperation({
+      ...created,
+      currentIndex: 1,
+      succeededCount: 1,
+      state: "succeeded",
+      updatedAt: "2026-04-06T03:01:00.000Z",
+      completedAt: "2026-04-06T03:01:00.000Z",
+    }, 1);
+    expect(saved.updated).toBeTrue();
+    expect(saved.record.revision).toBe(2);
+    expect(saved.record.state).toBe("succeeded");
+    expect(saved.record.currentIndex).toBe(1);
+
+    const stale = await adapter.saveReEncryptionOperation({
+      ...saved.record,
+      state: "failed",
+      updatedAt: "2026-04-06T03:02:00.000Z",
+    }, 1);
+    expect(stale.updated).toBeFalse();
+    expect(stale.record.state).toBe("succeeded");
+
+    const found = await adapter.findReEncryptionOperationByOperationKey("op:secret:reencrypt:1");
+    expect(found?.operationId).toBe("secret-reencrypt:op-1");
+    expect(await adapter.findLatestRunningReEncryptionOperation()).toBeUndefined();
     adapter.dispose();
   });
 });

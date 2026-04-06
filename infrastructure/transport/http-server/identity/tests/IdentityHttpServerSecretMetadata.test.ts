@@ -51,6 +51,7 @@ async function startServer(): Promise<{
     listSecretsUseCase: secretService.listSecretsUseCase,
     disableSecretUseCase: secretService.disableSecretUseCase,
     rotateSecretUseCase: secretService.rotateSecretUseCase,
+    reEncryptSecretsUseCase: secretService.reEncryptSecretsUseCase,
   });
 
   const server = createIdentityHttpServer({
@@ -293,6 +294,64 @@ describe("IdentityHttpServer secret metadata routes", () => {
     expect(listAfterDisableIncludedBody.ok).toBe(true);
     expect(listAfterDisableIncludedBody.data.items).toHaveLength(1);
     expect(listAfterDisableIncludedBody.data.items[0].state).toBe("disabled");
+  });
+
+  it("supports trusted administrative re-encryption workflow endpoints", async () => {
+    const { baseUrl, harness } = await startServer();
+    const owner = await registerAndLoginTrusted({
+      baseUrl,
+      harness,
+      username: "secret.metadata.owner.reencrypt",
+      trustedDeviceId: "trusted-device:secret-metadata-owner-reencrypt",
+    });
+
+    const createResponse = await fetch(`${baseUrl}/api/v1/security/secrets`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${owner.sessionToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        secretId: "secret:user:metadata-http-reencrypt",
+        name: "personal.openai.reencrypt",
+        owner: {
+          scope: "user",
+          userIdentityId: owner.userIdentityId,
+        },
+        kind: "api-key",
+        plaintext: "sk-live-before-reencrypt",
+      }),
+    });
+    expect(createResponse.status).toBe(200);
+
+    const startResponse = await fetch(`${baseUrl}/api/v1/security/secrets/maintenance/re-encryption`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${owner.sessionToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        operationKey: "op:secret:http:reencrypt:1",
+        maxTargetsPerInvocation: 50,
+      }),
+    });
+    expect(startResponse.status).toBe(200);
+    const startBody = await startResponse.json();
+    expect(startBody.ok).toBe(true);
+    expect(["running", "succeeded"]).toContain(startBody.data.operation.status);
+
+    const statusResponse = await fetch(
+      `${baseUrl}/api/v1/security/secrets/maintenance/re-encryption/${encodeURIComponent(startBody.data.operation.operationId)}`,
+      {
+        headers: {
+          authorization: `Bearer ${owner.sessionToken}`,
+        },
+      },
+    );
+    expect(statusResponse.status).toBe(200);
+    const statusBody = await statusResponse.json();
+    expect(statusBody.ok).toBe(true);
+    expect(statusBody.data.operation.operationId).toBe(startBody.data.operation.operationId);
   });
 
   it("returns denial responses for unauthorized secret detail access", async () => {

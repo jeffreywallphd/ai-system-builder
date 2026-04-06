@@ -15,6 +15,12 @@ import {
   type SecretVersion,
   type SecretVersionState,
 } from "../../../domain/security/SecretDomain";
+import {
+  SecretReEncryptionOperationStates,
+  type SecretReEncryptionFailure,
+  type SecretReEncryptionOperationRecord,
+  type SecretReEncryptionTarget,
+} from "../../../application/security/ports/SecretServicePorts";
 
 export interface SecretRecordRow {
   readonly secret_id: string;
@@ -64,6 +70,24 @@ export interface SecretMutationReplayRow {
   readonly mutation_kind: "create-secret" | "save-secret" | "delete-secret";
   readonly mutation_snapshot_json: string;
   readonly created_at: string;
+}
+
+export interface SecretReEncryptionOperationRow {
+  readonly operation_id: string;
+  readonly operation_key: string;
+  readonly status: SecretReEncryptionOperationRecord["state"];
+  readonly targets_json: string;
+  readonly current_index: number;
+  readonly succeeded_count: number;
+  readonly failed_count: number;
+  readonly failures_json: string;
+  readonly started_by: string;
+  readonly started_at: string;
+  readonly updated_at: string;
+  readonly completed_at: string | null;
+  readonly last_error_code: string | null;
+  readonly last_error_message: string | null;
+  readonly revision: number;
 }
 
 export function mapSecretRecordRowAndVersionsToDomain(
@@ -216,6 +240,53 @@ export function parseSecretMutationReplayRecord<TRecord>(row: SecretMutationRepl
   }
 }
 
+export function mapSecretReEncryptionOperationToRowValues(
+  operation: Omit<SecretReEncryptionOperationRecord, "revision">,
+): ReadonlyArray<unknown> {
+  return Object.freeze([
+    operation.operationId,
+    operation.operationKey,
+    operation.state,
+    JSON.stringify(operation.targets),
+    operation.currentIndex,
+    operation.succeededCount,
+    operation.failedCount,
+    JSON.stringify(operation.failures),
+    operation.startedBy,
+    operation.startedAt,
+    operation.updatedAt,
+    operation.completedAt ?? null,
+    operation.lastErrorCode ?? null,
+    operation.lastErrorMessage ?? null,
+    1,
+  ]);
+}
+
+export function mapSecretReEncryptionOperationRowToDomain(
+  row: SecretReEncryptionOperationRow,
+): SecretReEncryptionOperationRecord {
+  if (!Object.values(SecretReEncryptionOperationStates).includes(row.status)) {
+    throw new Error(`Persisted secret re-encryption operation status '${row.status}' is invalid.`);
+  }
+  return Object.freeze({
+    operationId: row.operation_id,
+    operationKey: row.operation_key,
+    state: row.status,
+    targets: parseReEncryptionTargets(row.targets_json),
+    currentIndex: row.current_index,
+    succeededCount: row.succeeded_count,
+    failedCount: row.failed_count,
+    failures: parseReEncryptionFailures(row.failures_json),
+    startedBy: row.started_by,
+    startedAt: row.started_at,
+    updatedAt: row.updated_at,
+    completedAt: normalizeLookup(row.completed_at),
+    lastErrorCode: normalizeLookup(row.last_error_code),
+    lastErrorMessage: normalizeLookup(row.last_error_message),
+    revision: row.revision,
+  });
+}
+
 export function normalizeSecretLookup(value: string): string | undefined {
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : undefined;
@@ -365,6 +436,82 @@ function parseStringMap(value: string): Readonly<Record<string, string>> {
     return Object.freeze(Object.fromEntries(entries));
   } catch {
     return Object.freeze({});
+  }
+}
+
+function parseReEncryptionTargets(value: string): ReadonlyArray<SecretReEncryptionTarget> {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      return Object.freeze([]);
+    }
+    const targets = parsed
+      .map((entry) => {
+        if (!entry || typeof entry !== "object") {
+          return undefined;
+        }
+        const candidate = entry as Record<string, unknown>;
+        if (typeof candidate.secretId !== "string" || typeof candidate.versionId !== "string") {
+          return undefined;
+        }
+        const secretId = candidate.secretId.trim();
+        const versionId = candidate.versionId.trim();
+        if (!secretId || !versionId) {
+          return undefined;
+        }
+        return Object.freeze({
+          secretId,
+          versionId,
+        });
+      })
+      .filter((entry): entry is SecretReEncryptionTarget => Boolean(entry));
+    return Object.freeze(targets);
+  } catch {
+    return Object.freeze([]);
+  }
+}
+
+function parseReEncryptionFailures(value: string): ReadonlyArray<SecretReEncryptionFailure> {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      return Object.freeze([]);
+    }
+    const failures = parsed
+      .map((entry) => {
+        if (!entry || typeof entry !== "object") {
+          return undefined;
+        }
+        const candidate = entry as Record<string, unknown>;
+        if (
+          typeof candidate.secretId !== "string"
+          || typeof candidate.versionId !== "string"
+          || typeof candidate.reasonCode !== "string"
+          || typeof candidate.message !== "string"
+          || typeof candidate.occurredAt !== "string"
+        ) {
+          return undefined;
+        }
+        const secretId = candidate.secretId.trim();
+        const versionId = candidate.versionId.trim();
+        const reasonCode = candidate.reasonCode.trim();
+        const message = candidate.message.trim();
+        const occurredAt = candidate.occurredAt.trim();
+        if (!secretId || !versionId || !reasonCode || !message || !occurredAt) {
+          return undefined;
+        }
+        return Object.freeze({
+          secretId,
+          versionId,
+          reasonCode,
+          message,
+          occurredAt,
+        });
+      })
+      .filter((entry): entry is SecretReEncryptionFailure => Boolean(entry));
+    return Object.freeze(failures);
+  } catch {
+    return Object.freeze([]);
   }
 }
 

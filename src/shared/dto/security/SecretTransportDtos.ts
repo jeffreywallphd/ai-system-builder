@@ -47,6 +47,18 @@ export interface RotateSecretCommandDto {
   readonly actorWorkspaceId?: string;
 }
 
+export interface ReEncryptSecretsCommandDto {
+  readonly operationKey?: string;
+  readonly operationId?: string;
+  readonly maxTargetsPerInvocation?: number;
+  readonly occurredAt?: string;
+}
+
+export interface GetSecretReEncryptionStatusQueryDto {
+  readonly operationId: string;
+  readonly occurredAt?: string;
+}
+
 export interface GetSecretMetadataQueryDto {
   readonly secretId: string;
   readonly actorWorkspaceId?: string;

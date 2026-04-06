@@ -16,8 +16,10 @@ Implemented in this slice:
 Out of scope in this slice:
 
 - external KMS integrations (cloud provider-managed KEKs/HSM)
-- key rotation orchestration jobs and policy automation
+- key rotation policy automation (automated scheduling)
 - transport/API handlers for secret management flows
+
+Story 8.3.6 adds controlled administrative re-encryption operations for master-key changes; see `docs/secret-master-key-reencryption-operations.md`.
 
 ## Canonical artifacts
 

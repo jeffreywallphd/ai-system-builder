@@ -127,6 +127,7 @@ export const SecretAccessActions = Object.freeze({
   readMetadata: "read-metadata",
   retrievePlaintext: "retrieve-plaintext",
   rotate: "rotate",
+  reEncrypt: "re-encrypt",
   disable: "disable",
   delete: "delete",
   list: "list",

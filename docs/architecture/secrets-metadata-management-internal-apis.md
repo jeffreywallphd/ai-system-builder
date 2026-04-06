@@ -3,6 +3,7 @@
 This note documents Story 8.2.4 (Feature 8 / Epic 8.2): internal server API endpoints for secret metadata management.
 Story 8.2.6 extends this with shared safe DTO/schema contracts so secret-facing transports and application use-cases
 validate command/query boundaries consistently.
+Story 8.3.6 extends this with trusted administrative master-key re-encryption workflow endpoints.
 
 ## Canonical artifacts
 
@@ -33,6 +34,11 @@ validate command/query boundaries consistently.
 - `POST /api/v1/security/secrets/{secretId}/rotate`
   - rotates secret material by submitting replacement plaintext.
   - response returns updated metadata only, including the new active `currentVersionId`.
+- `POST /api/v1/security/secrets/maintenance/re-encryption`
+  - starts or resumes a controlled active-version re-encryption operation.
+  - supports optional `operationId` resume, bounded per-invocation batch size, and operation-key idempotency.
+- `GET /api/v1/security/secrets/maintenance/re-encryption/{operationId}`
+  - returns persisted re-encryption operation status and progress counters.
 
 No UI-facing plaintext retrieval endpoint is exposed.
 
@@ -52,10 +58,12 @@ Use command DTOs only for mutation input:
 - `CreateSecretCommandDto`
 - `DisableSecretCommandDto`
 - `RotateSecretCommandDto`
+- `ReEncryptSecretsCommandDto`
 
 Use query DTOs only for metadata output:
 
 - `SecretMetadataQueryDto`
+- `GetSecretReEncryptionStatusQueryDto`
 
 Do not expose, serialize, or render plaintext fields in query DTOs. Metadata projections must stay limited to
 identifier/scope/classification/state/labels/tags timestamps.
@@ -95,3 +103,4 @@ Coverage verifies:
 - denial behavior for unauthorized metadata read/rotate/disable
 - request validation failures for body and query parameters
 - backend API mapping and fail-closed workspace actor-context handling
+- trusted re-encryption operation start/status route behavior

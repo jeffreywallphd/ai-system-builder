@@ -1,4 +1,4 @@
-export const SECRET_RECORD_PERSISTENCE_SCHEMA_VERSION = 1;
+export const SECRET_RECORD_PERSISTENCE_SCHEMA_VERSION = 2;
 
 export const SECRET_RECORD_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -104,5 +104,27 @@ export const SECRET_RECORD_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [numbe
       mutation_snapshot_json TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+  `],
+  [2, `
+    CREATE TABLE IF NOT EXISTS secret_reencryption_operations (
+      operation_id TEXT PRIMARY KEY,
+      operation_key TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')),
+      targets_json TEXT NOT NULL,
+      current_index INTEGER NOT NULL CHECK (current_index >= 0),
+      succeeded_count INTEGER NOT NULL CHECK (succeeded_count >= 0),
+      failed_count INTEGER NOT NULL CHECK (failed_count >= 0),
+      failures_json TEXT NOT NULL,
+      started_by TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      completed_at TEXT,
+      last_error_code TEXT,
+      last_error_message TEXT,
+      revision INTEGER NOT NULL CHECK (revision >= 1)
+    );
+
+    CREATE INDEX IF NOT EXISTS secret_reencryption_operations_status_idx
+      ON secret_reencryption_operations(status, updated_at DESC);
   `],
 ]);

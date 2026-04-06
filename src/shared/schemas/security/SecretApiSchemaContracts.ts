@@ -13,7 +13,9 @@ import type {
   CreateSecretCommandDto,
   DisableSecretCommandDto,
   GetSecretMetadataQueryDto,
+  GetSecretReEncryptionStatusQueryDto,
   ListSecretMetadataQueryDto,
+  ReEncryptSecretsCommandDto,
   RotateSecretCommandDto,
 } from "../../dto/security/SecretTransportDtos";
 
@@ -236,6 +238,18 @@ export const RotateSecretMetadataCommandSchema: z.ZodType<RotateSecretCommandDto
   actorWorkspaceId: ScopeIdentifierSchema.optional(),
 }).strict();
 
+export const ReEncryptSecretsCommandSchema: z.ZodType<ReEncryptSecretsCommandDto> = z.object({
+  operationKey: OptionalOperationKeySchema,
+  operationId: ScopeIdentifierSchema.optional(),
+  maxTargetsPerInvocation: z.number().int().min(1, "maxTargetsPerInvocation must be >= 1.").max(500, "maxTargetsPerInvocation must be <= 500.").optional(),
+  occurredAt: z.string().datetime({ offset: true }).optional(),
+}).strict();
+
+export const GetSecretReEncryptionStatusQuerySchema: z.ZodType<GetSecretReEncryptionStatusQueryDto> = z.object({
+  operationId: ScopeIdentifierSchema,
+  occurredAt: z.string().datetime({ offset: true }).optional(),
+}).strict();
+
 function formatZodPath(path: ReadonlyArray<string | number>): string {
   if (path.length === 0) {
     return "payload";
@@ -283,4 +297,12 @@ export function parseDisableSecretMetadataCommand(payload: unknown): DisableSecr
 
 export function parseRotateSecretMetadataCommand(payload: unknown): RotateSecretCommandDto {
   return parseSchema("RotateSecretMetadataCommand", RotateSecretMetadataCommandSchema, payload);
+}
+
+export function parseReEncryptSecretsCommand(payload: unknown): ReEncryptSecretsCommandDto {
+  return parseSchema("ReEncryptSecretsCommand", ReEncryptSecretsCommandSchema, payload);
+}
+
+export function parseGetSecretReEncryptionStatusQuery(payload: unknown): GetSecretReEncryptionStatusQueryDto {
+  return parseSchema("GetSecretReEncryptionStatusQuery", GetSecretReEncryptionStatusQuerySchema, payload);
 }

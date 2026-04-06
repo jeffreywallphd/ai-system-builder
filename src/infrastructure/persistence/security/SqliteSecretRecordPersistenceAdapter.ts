@@ -3,6 +3,8 @@ import path from "node:path";
 import type {
   SecretConditionalSaveResult,
   ISecretRecordPersistenceRepository,
+  ISecretReEncryptionOperationRepository,
+  SecretReEncryptionOperationRecord,
   SecretCreatePersistenceInput,
   SecretListQuery,
   SecretMutationResult,
@@ -12,6 +14,8 @@ import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/S
 import {
   mapSecretRecordRowAndVersionsToDomain,
   mapSecretRecordRowToReference,
+  mapSecretReEncryptionOperationRowToDomain,
+  mapSecretReEncryptionOperationToRowValues,
   mapSecretRecordToRowValues,
   mapSecretVersionMaterialToRowValues,
   mapSecretVersionToRowValues,
@@ -19,6 +23,7 @@ import {
   parseSecretMutationReplayRecord,
   toScopeId,
   type SecretMutationReplayRow,
+  type SecretReEncryptionOperationRow,
   type SecretRecordRow,
   type SecretVersionRow,
 } from "./SecretRecordPersistenceMapper";
@@ -29,7 +34,7 @@ import {
 
 type SecretMutationKind = "create-secret" | "save-secret" | "delete-secret";
 
-export class SqliteSecretRecordPersistenceAdapter implements ISecretRecordPersistenceRepository {
+export class SqliteSecretRecordPersistenceAdapter implements ISecretRecordPersistenceRepository, ISecretReEncryptionOperationRepository {
   private database?: SqliteCompatDatabase;
   private initialized = false;
 
@@ -251,6 +256,141 @@ export class SqliteSecretRecordPersistenceAdapter implements ISecretRecordPersis
     return Object.freeze({
       changed: !alreadyDeleted,
       wasReplay: false,
+    });
+  }
+
+  public async findReEncryptionOperationById(operationId: string): Promise<SecretReEncryptionOperationRecord | undefined> {
+    const normalized = normalizeSecretLookup(operationId);
+    if (!normalized) {
+      return undefined;
+    }
+
+    const row = this.getDatabase().prepare(`
+      SELECT *
+      FROM secret_reencryption_operations
+      WHERE operation_id = ?
+      LIMIT 1
+    `).get(normalized) as SecretReEncryptionOperationRow | undefined;
+    return row ? mapSecretReEncryptionOperationRowToDomain(row) : undefined;
+  }
+
+  public async findReEncryptionOperationByOperationKey(
+    operationKey: string,
+  ): Promise<SecretReEncryptionOperationRecord | undefined> {
+    const normalized = normalizeSecretLookup(operationKey);
+    if (!normalized) {
+      return undefined;
+    }
+
+    const row = this.getDatabase().prepare(`
+      SELECT *
+      FROM secret_reencryption_operations
+      WHERE operation_key = ?
+      LIMIT 1
+    `).get(normalized) as SecretReEncryptionOperationRow | undefined;
+    return row ? mapSecretReEncryptionOperationRowToDomain(row) : undefined;
+  }
+
+  public async findLatestRunningReEncryptionOperation(): Promise<SecretReEncryptionOperationRecord | undefined> {
+    const row = this.getDatabase().prepare(`
+      SELECT *
+      FROM secret_reencryption_operations
+      WHERE status = 'running'
+      ORDER BY updated_at DESC, operation_id ASC
+      LIMIT 1
+    `).get() as SecretReEncryptionOperationRow | undefined;
+    return row ? mapSecretReEncryptionOperationRowToDomain(row) : undefined;
+  }
+
+  public async createReEncryptionOperation(
+    operation: Omit<SecretReEncryptionOperationRecord, "revision">,
+  ): Promise<SecretReEncryptionOperationRecord> {
+    this.getDatabase().prepare(`
+      INSERT INTO secret_reencryption_operations (
+        operation_id,
+        operation_key,
+        status,
+        targets_json,
+        current_index,
+        succeeded_count,
+        failed_count,
+        failures_json,
+        started_by,
+        started_at,
+        updated_at,
+        completed_at,
+        last_error_code,
+        last_error_message,
+        revision
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(...mapSecretReEncryptionOperationToRowValues(operation));
+
+    const persisted = await this.findReEncryptionOperationById(operation.operationId);
+    if (!persisted) {
+      throw new Error("Secret re-encryption operation insert did not persist.");
+    }
+    return persisted;
+  }
+
+  public async saveReEncryptionOperation(
+    operation: SecretReEncryptionOperationRecord,
+    expectedRevision: number,
+  ): Promise<{ readonly updated: boolean; readonly record: SecretReEncryptionOperationRecord }> {
+    const normalizedOperationId = normalizeSecretLookup(operation.operationId);
+    if (!normalizedOperationId) {
+      throw new Error("Secret re-encryption operationId is required.");
+    }
+    if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
+      throw new Error("Secret re-encryption expectedRevision must be an integer >= 1.");
+    }
+
+    const nextRevision = expectedRevision + 1;
+    const result = this.getDatabase().prepare(`
+      UPDATE secret_reencryption_operations
+      SET
+        operation_key = ?,
+        status = ?,
+        targets_json = ?,
+        current_index = ?,
+        succeeded_count = ?,
+        failed_count = ?,
+        failures_json = ?,
+        started_by = ?,
+        started_at = ?,
+        updated_at = ?,
+        completed_at = ?,
+        last_error_code = ?,
+        last_error_message = ?,
+        revision = ?
+      WHERE operation_id = ?
+        AND revision = ?
+    `).run(
+      operation.operationKey,
+      operation.state,
+      JSON.stringify(operation.targets),
+      operation.currentIndex,
+      operation.succeededCount,
+      operation.failedCount,
+      JSON.stringify(operation.failures),
+      operation.startedBy,
+      operation.startedAt,
+      operation.updatedAt,
+      operation.completedAt ?? null,
+      operation.lastErrorCode ?? null,
+      operation.lastErrorMessage ?? null,
+      nextRevision,
+      normalizedOperationId,
+      expectedRevision,
+    ) as { changes?: number };
+
+    const updated = (result.changes ?? 0) > 0;
+    const current = await this.findReEncryptionOperationById(normalizedOperationId);
+    if (!current) {
+      throw new Error("Secret re-encryption operation disappeared during save.");
+    }
+    return Object.freeze({
+      updated,
+      record: current,
     });
   }
 

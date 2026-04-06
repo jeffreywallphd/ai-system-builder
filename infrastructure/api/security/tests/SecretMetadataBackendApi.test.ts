@@ -205,6 +205,67 @@ describe("SecretMetadataBackendApi", () => {
     expect(response.error.validationErrors?.length).toBeGreaterThan(0);
   });
 
+  it("starts secret re-encryption and exposes operation status metadata", async () => {
+    const backend = createBackend({
+      reEncryptSecretsUseCase: {
+        execute: async () => Object.freeze({
+          ok: true,
+          value: Object.freeze({
+            operationId: "secret-reencrypt:op-1",
+            status: "running",
+            startedAt: "2026-04-06T12:20:00.000Z",
+            updatedAt: "2026-04-06T12:20:01.000Z",
+            totalTargets: 3,
+            processedTargets: 1,
+            succeededTargets: 1,
+            failedTargets: 0,
+            remainingTargets: 2,
+            failures: Object.freeze([]),
+          }),
+        }),
+        getStatus: async () => Object.freeze({
+          ok: true,
+          value: Object.freeze({
+            operationId: "secret-reencrypt:op-1",
+            status: "succeeded",
+            startedAt: "2026-04-06T12:20:00.000Z",
+            updatedAt: "2026-04-06T12:21:00.000Z",
+            completedAt: "2026-04-06T12:21:00.000Z",
+            totalTargets: 3,
+            processedTargets: 3,
+            succeededTargets: 3,
+            failedTargets: 0,
+            remainingTargets: 0,
+            failures: Object.freeze([]),
+          }),
+        }),
+      },
+    });
+
+    const start = await backend.reEncryptSecrets({
+      actorUserIdentityId: "user:alpha",
+      operationKey: "op:secret:reencrypt:start",
+      maxTargetsPerInvocation: 2,
+    });
+    expect(start.ok).toBeTrue();
+    if (!start.ok || !start.data) {
+      return;
+    }
+    expect(start.data.operation.operationId).toBe("secret-reencrypt:op-1");
+    expect(start.data.operation.status).toBe("running");
+
+    const status = await backend.getSecretReEncryptionStatus({
+      actorUserIdentityId: "user:alpha",
+      operationId: "secret-reencrypt:op-1",
+    });
+    expect(status.ok).toBeTrue();
+    if (!status.ok || !status.data) {
+      return;
+    }
+    expect(status.data.operation.status).toBe("succeeded");
+    expect(status.data.operation.remainingTargets).toBe(0);
+  });
+
   it("returns minimal secret service health view", async () => {
     const backend = createBackend({
       secretOperationalDiagnosticsProvider: {
@@ -317,6 +378,14 @@ function createBackend(overrides: Record<string, unknown>): SecretMetadataBacken
     },
     rotateSecretUseCase: {
       execute: async () => {
+        throw new Error("not configured");
+      },
+    },
+    reEncryptSecretsUseCase: {
+      execute: async () => {
+        throw new Error("not configured");
+      },
+      getStatus: async () => {
         throw new Error("not configured");
       },
     },

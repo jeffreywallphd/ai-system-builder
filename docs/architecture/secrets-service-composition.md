@@ -23,6 +23,7 @@ This note documents Story 8.1.7 (Feature 8 / Epic 8.1): wire secret services int
   - `GetSecretMetadataUseCase`
   - `RetrieveSecretPlaintextForRuntimeUseCase`
   - `RotateSecretUseCase`
+  - `ReEncryptSecretsUseCase`
   - `DisableSecretUseCase`
   - `DeleteSecretUseCase`
   - `ListSecretsUseCase`

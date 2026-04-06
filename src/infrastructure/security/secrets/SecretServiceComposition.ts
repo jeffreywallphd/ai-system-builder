@@ -12,6 +12,7 @@ import { DisableSecretUseCase } from "../../../application/security/use-cases/Di
 import { GetSecretMetadataUseCase } from "../../../application/security/use-cases/GetSecretMetadataUseCase";
 import { ListSecretsUseCase } from "../../../application/security/use-cases/ListSecretsUseCase";
 import { RetrieveSecretPlaintextForRuntimeUseCase } from "../../../application/security/use-cases/RetrieveSecretPlaintextForRuntimeUseCase";
+import { ReEncryptSecretsUseCase } from "../../../application/security/use-cases/ReEncryptSecretsUseCase";
 import { RotateSecretUseCase } from "../../../application/security/use-cases/RotateSecretUseCase";
 import { SecretAuthorizationPolicyEvaluator } from "../../../application/security/use-cases/SecretAuthorizationPolicyEvaluator";
 import { SecretScopeResolver } from "../../../application/security/use-cases/SecretScopeResolver";
@@ -37,6 +38,7 @@ export interface ServerComposedSecretService {
   readonly getSecretMetadataUseCase: GetSecretMetadataUseCase;
   readonly retrieveSecretPlaintextForRuntimeUseCase: RetrieveSecretPlaintextForRuntimeUseCase;
   readonly rotateSecretUseCase: RotateSecretUseCase;
+  readonly reEncryptSecretsUseCase: ReEncryptSecretsUseCase;
   readonly disableSecretUseCase: DisableSecretUseCase;
   readonly deleteSecretUseCase: DeleteSecretUseCase;
   readonly listSecretsUseCase: ListSecretsUseCase;
@@ -102,6 +104,14 @@ export function composeServerSecretService(input: ComposeServerSecretServiceInpu
       secretEncryptionPort,
       secretAccessPolicyPort: accessPolicyPort,
       secretAccessAuditPort: accessAuditPort,
+      secretObservabilityPort: observabilityPort,
+    }),
+    reEncryptSecretsUseCase: new ReEncryptSecretsUseCase({
+      secretRecordRepository,
+      secretEncryptionPort,
+      secretAccessPolicyPort: accessPolicyPort,
+      secretAccessAuditPort: accessAuditPort,
+      reEncryptionOperationRepository: secretRecordRepository,
       secretObservabilityPort: observabilityPort,
     }),
     disableSecretUseCase: new DisableSecretUseCase({
