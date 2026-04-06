@@ -84,6 +84,33 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
   - `src/shared/schemas/storage/tests/StoragePersistenceSchemaContracts.test.ts`
   - `src/shared/schemas/platform/tests/PlatformPersistenceSchemaContracts.test.ts`
 
+## Story 13.2.2 concrete adapter baseline for identity/workspaces/authorization
+
+- Concrete persistence adapters now exist for the first major authoritative storage slice under:
+  - `src/infrastructure/persistence/identity/`
+  - `src/infrastructure/persistence/workspaces/`
+  - `src/infrastructure/persistence/authorization/`
+- Identity adapter coverage includes:
+  - user identity + provider-link persistence/lookup
+  - credential material persistence/query
+  - session + session-token persistence/query
+  - trusted-device and pairing lifecycle persistence
+- Workspace adapter coverage includes:
+  - workspace tenancy records
+  - workspace membership and role-assignment lifecycle records
+  - invitation lifecycle records
+  - workspace authorization snapshot read support
+- Authorization adapter coverage includes:
+  - role assignment persistence + replay-safe mutation handling
+  - sharing grant persistence + subject/resource keyed lookup
+  - resource policy metadata persistence + soft-delete lifecycle handling
+- Authoritative server host wiring now uses SQLite identity persistence adapters from `src/infrastructure/persistence/identity` so application identity ports are backed by the migration-ready adapter path.
+- Adapter verification coverage is in:
+  - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
+  - `src/infrastructure/persistence/identity/tests/SqliteTrustedDevicePersistenceAdapter.test.ts`
+  - `src/infrastructure/persistence/workspaces/tests/SqliteWorkspacePersistenceAdapter.test.ts`
+  - `src/infrastructure/persistence/authorization/tests/SqliteAuthorizationPersistenceAdapter.test.ts`
+
 ## Mapper guidance for contributors
 
 - Keep mapper implementations in infrastructure, but drive them from shared DTO + schema contracts.

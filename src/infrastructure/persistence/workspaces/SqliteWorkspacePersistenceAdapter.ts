@@ -209,7 +209,7 @@ export class SqliteWorkspacePersistenceAdapter
           last_modified_by,
           created_at,
           last_modified_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(workspace_id) DO UPDATE SET
           slug = excluded.slug,
           display_name = excluded.display_name,
