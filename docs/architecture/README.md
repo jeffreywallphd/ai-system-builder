@@ -140,6 +140,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For secret and key management domain/application contracts, scope ownership invariants, and auditable access-decision seams, read [`secrets-foundation.md`](./secrets-foundation.md).
 - For secret repository SQLite schema, secret-version material separation, and idempotent persistence adapter behavior, read [`secrets-persistence-contracts.md`](./secrets-persistence-contracts.md).
 - For envelope encryption design, master-key handling seams, and encrypted payload operational assumptions, read [`secrets-envelope-encryption.md`](./secrets-envelope-encryption.md).
+- For create-secret and metadata-only retrieval application orchestration, key uniqueness validation, and metadata redaction behavior, read [`secrets-creation-and-metadata-use-cases.md`](./secrets-creation-and-metadata-use-cases.md).
 - For node-local bootstrap identity/trust-material operations and enrollment payload bootstrap metadata, read [`../node-bootstrap-identity-operations.md`](../node-bootstrap-identity-operations.md).
 - For workspace tenancy domain aggregates, membership/role/invitation invariants, and reusable ownership metadata patterns, read [`workspace-foundation.md`](./workspace-foundation.md).
 - For authorization domain contracts covering RBAC, visibility, sharing, actor/resource policy context, and policy-decision models, read [`authorization-foundation.md`](./authorization-foundation.md).
