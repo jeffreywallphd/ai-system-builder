@@ -1,6 +1,6 @@
 # Storage Administration Screens
 
-This note documents Story 9.4.1, Story 9.4.2, and Story 9.4.3 (Feature 9 / Epic 9.4): storage administration list/detail, create/edit workflows, and operational readiness visibility.
+This note documents Story 9.4.1, Story 9.4.2, Story 9.4.3, and Story 9.4.4 (Feature 9 / Epic 9.4): storage administration list/detail, create/edit workflows, operational readiness visibility, and lifecycle activation/deactivation guardrails.
 
 ## Scope
 
@@ -61,17 +61,32 @@ This note documents Story 9.4.1, Story 9.4.2, and Story 9.4.3 (Feature 9 / Epic 
 - Destructive/state-changing mutations use explicit user confirmation prompts before request dispatch.
 - Workflow state is contract-driven and refreshes authoritative list/detail views after mutation success.
 
+## Story 9.4.4 lifecycle action behavior
+
+- Admin UI now includes explicit lifecycle mutation controls for selected storage instances:
+  - `Activate storage` (transitions eligible instances toward `active`)
+  - `Deactivate storage` (currently requests transition to `suspended`)
+- Lifecycle action availability is derived from both:
+  - authoritative access summary actions (`storage.access.allowedActions`)
+  - lifecycle transition guardrails (only lifecycle states that can validly activate/deactivate show controls)
+- Unauthorized or inapplicable lifecycle actions are not offered in the workflow panel.
+- Lifecycle actions require explicit user confirmation with impact messaging before mutation dispatch.
+- Lifecycle mutation failures surface server-authoritative feedback, including conflict/invalid-state guidance that instructs operators to refresh and retry from the latest state.
+- After lifecycle mutation success, list/detail/health projections are refreshed through the existing mutation completion refresh seam.
+
 ## Guardrails
 
 - UI does not reconstruct lifecycle/policy/health semantics outside backend contracts.
 - No raw filesystem or backend path material is rendered.
 - Health and policy summaries remain user-facing and concise while preserving backend reason codes in detail views.
 - Edit flows are constrained to server-allowed metadata fields instead of raw policy/lifecycle mutation payloads.
+- Lifecycle controls are intentionally constrained by access summaries and lifecycle-state guardrails to prevent unsafe or unauthorized mutation paths.
 
 ## Verification
 
 - `ui/shared/storage/tests/StorageAdministrationClient.test.ts`
 - `ui/components/storage/tests/StorageInstanceWorkflowPanel.test.tsx`
+- `ui/services/tests/StorageAdministrationService.test.ts`
 - `ui/pages/tests/StorageAdministrationPage.test.tsx`
 - `ui/pages/tests/StorageAdministrationPage.presentation.test.ts`
 - `ui/web/storage/tests/StorageAdministrationRoutes.test.ts`

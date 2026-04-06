@@ -24,6 +24,14 @@ export class StorageAdministrationService {
     this.client.updateStorageMetadata(request, sessionToken)
   );
 
+  public activateStorageInstance: StorageAdministrationClient["activateStorageInstance"] = (request, sessionToken) => (
+    this.client.activateStorageInstance(request, sessionToken)
+  );
+
+  public deactivateStorageInstance: StorageAdministrationClient["deactivateStorageInstance"] = (request, sessionToken) => (
+    this.client.deactivateStorageInstance(request, sessionToken)
+  );
+
   public getStorageInstanceDetail: StorageAdministrationClient["getStorageInstanceDetail"] = (request, sessionToken) => (
     this.client.getStorageInstanceDetail(request, sessionToken)
   );

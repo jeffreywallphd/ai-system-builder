@@ -9,6 +9,8 @@ import {
   StorageBackendTypes,
   StorageEncryptionKeyScopes,
   StorageEncryptionModes,
+  StorageLifecycleStates,
+  StorageManagedActions,
   type StorageAccessMode,
   type StorageAccessScope,
   type StorageBackendType,
@@ -53,6 +55,7 @@ export default function StorageInstanceWorkflowPanel(props: StorageInstanceWorkf
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editLabelsText, setEditLabelsText] = useState("");
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [isSubmittingLifecycleAction, setIsSubmittingLifecycleAction] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState<string>();
   const [statusMessage, setStatusMessage] = useState<string>();
@@ -75,6 +78,10 @@ export default function StorageInstanceWorkflowPanel(props: StorageInstanceWorkf
   const canSubmitCreate = useMemo(
     () => !isSubmittingCreate && props.workspaceId.trim().length > 0,
     [isSubmittingCreate, props.workspaceId],
+  );
+  const lifecycleActionAvailability = useMemo(
+    () => evaluateLifecycleActionAvailability(props.selectedStorage),
+    [props.selectedStorage],
   );
 
   const clearNotices = (): void => {
@@ -239,6 +246,55 @@ export default function StorageInstanceWorkflowPanel(props: StorageInstanceWorkf
     }
   };
 
+  const submitLifecycleAction = async (action: "activate" | "deactivate"): Promise<void> => {
+    if (!props.selectedStorage) {
+      setErrorMessage("Select a storage instance before running lifecycle actions.");
+      return;
+    }
+
+    clearNotices();
+    const confirmation = createLifecycleActionConfirmation(props.selectedStorage, action);
+    if (!confirmAction(confirmation)) {
+      return;
+    }
+
+    setIsSubmittingLifecycleAction(true);
+    try {
+      const response = action === "activate"
+        ? await props.service.activateStorageInstance({
+          workspaceId: props.workspaceId.trim(),
+          storageInstanceId: props.selectedStorage.storageInstanceId,
+          includeCapabilities: true,
+        }, props.sessionToken)
+        : await props.service.deactivateStorageInstance({
+          workspaceId: props.workspaceId.trim(),
+          storageInstanceId: props.selectedStorage.storageInstanceId,
+          targetLifecycleState: "suspended",
+          includeCapabilities: true,
+        }, props.sessionToken);
+
+      if (!response.ok || !response.data) {
+        setErrorMessage(formatLifecycleMutationError(action, response.error));
+        setValidationMessages(Object.freeze(
+          (response.error?.validationErrors ?? Object.freeze([]))
+            .map((entry) => `${entry.path}: ${entry.message}`),
+        ));
+        return;
+      }
+
+      const transitionedState = response.data.storage.lifecycle.state;
+      setStatusMessage(
+        `${action === "activate" ? "Activated" : "Deactivated"} '${response.data.storage.storageInstanceId}' `
+        + `(state: ${transitionedState}).`,
+      );
+      await props.onMutationComplete(response.data.storage.storageInstanceId);
+    } catch {
+      setErrorMessage(`Unable to ${action} storage instance.`);
+    } finally {
+      setIsSubmittingLifecycleAction(false);
+    }
+  };
+
   return (
     <section className="ui-card">
       <div className="ui-card__header">
@@ -286,6 +342,48 @@ export default function StorageInstanceWorkflowPanel(props: StorageInstanceWorkf
             {isSubmittingEdit ? "Saving..." : "Save selected metadata"}
           </button>
         </div>
+
+        <div className="ui-stack ui-stack--2xs">
+          <strong>Lifecycle actions</strong>
+          {!props.selectedStorage ? (
+            <p className="ui-text-secondary">Select a storage instance to review activation and deactivation actions.</p>
+          ) : (
+            <>
+              <p className="ui-text-secondary ui-text-small">
+                Current state: <strong>{props.selectedStorage.lifecycle.state}</strong>.
+                Activation makes storage available for managed workloads.
+                Deactivation suspends workload usage until reactivated.
+              </p>
+              <div className="ui-page__actions">
+                {lifecycleActionAvailability.canActivate ? (
+                  <button
+                    type="button"
+                    className="ui-button ui-button--primary ui-button--sm"
+                    disabled={isSubmittingLifecycleAction}
+                    onClick={() => { void submitLifecycleAction("activate"); }}
+                  >
+                    {isSubmittingLifecycleAction ? "Applying..." : "Activate storage"}
+                  </button>
+                ) : null}
+                {lifecycleActionAvailability.canDeactivate ? (
+                  <button
+                    type="button"
+                    className="ui-button ui-button--secondary ui-button--sm"
+                    disabled={isSubmittingLifecycleAction}
+                    onClick={() => { void submitLifecycleAction("deactivate"); }}
+                  >
+                    {isSubmittingLifecycleAction ? "Applying..." : "Deactivate storage"}
+                  </button>
+                ) : null}
+              </div>
+              {!lifecycleActionAvailability.canActivate && !lifecycleActionAvailability.canDeactivate ? (
+                <p className="ui-text-secondary ui-text-small">
+                  Lifecycle actions are unavailable for the selected storage because current access permissions and lifecycle rules do not allow activation or deactivation.
+                </p>
+              ) : null}
+            </>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -330,7 +428,75 @@ function applyApiError(
   setValidationMessages(Object.freeze((error?.validationErrors ?? Object.freeze([])).map((entry) => `${entry.path}: ${entry.message}`)));
 }
 
+type LifecycleActionAvailability = {
+  readonly canActivate: boolean;
+  readonly canDeactivate: boolean;
+};
+
+function evaluateLifecycleActionAvailability(
+  storage: GetStorageInstanceDetailApiResponse["storage"] | undefined,
+): LifecycleActionAvailability {
+  if (!storage) {
+    return Object.freeze({ canActivate: false, canDeactivate: false });
+  }
+
+  const allowedActions = new Set(storage.access.allowedActions);
+  const lifecycleState = storage.lifecycle.state;
+  const canActivate = allowedActions.has(StorageManagedActions.activate)
+    && lifecycleCanActivate(lifecycleState);
+  const canDeactivate = allowedActions.has(StorageManagedActions.deactivate)
+    && lifecycleCanDeactivate(lifecycleState);
+  return Object.freeze({ canActivate, canDeactivate });
+}
+
+function lifecycleCanActivate(state: GetStorageInstanceDetailApiResponse["storage"]["lifecycle"]["state"]): boolean {
+  return state === StorageLifecycleStates.suspended
+    || state === StorageLifecycleStates.degraded
+    || state === StorageLifecycleStates.archived
+    || state === StorageLifecycleStates.provisioning;
+}
+
+function lifecycleCanDeactivate(state: GetStorageInstanceDetailApiResponse["storage"]["lifecycle"]["state"]): boolean {
+  return state === StorageLifecycleStates.active || state === StorageLifecycleStates.degraded;
+}
+
+function createLifecycleActionConfirmation(
+  storage: GetStorageInstanceDetailApiResponse["storage"],
+  action: "activate" | "deactivate",
+): string {
+  if (action === "activate") {
+    return `Activate storage '${storage.display.displayName}' (${storage.storageInstanceId})? `
+      + "This enables managed workloads and storage access checks for the instance.";
+  }
+  return `Deactivate storage '${storage.display.displayName}' (${storage.storageInstanceId}) to suspended state? `
+    + "Managed workloads depending on this storage may stop until it is reactivated.";
+}
+
+function formatLifecycleMutationError(
+  action: "activate" | "deactivate",
+  error: StorageManagementApiError | undefined,
+): string {
+  if (!error) {
+    return `Unable to ${action} storage instance.`;
+  }
+  if (error.code === "forbidden") {
+    return `You are not authorized to ${action} this storage instance.`;
+  }
+  if (error.code === "not-found") {
+    return "Storage instance was not found. Refresh to review the latest list.";
+  }
+  if (error.code === "conflict" || error.code === "invalid-state") {
+    return `Cannot ${action} storage instance because server lifecycle validation rejected the transition. Refresh and retry from the latest state.`;
+  }
+  return error.message || `Unable to ${action} storage instance.`;
+}
+
 function confirmAction(message: string): boolean {
   const fn = (globalThis as typeof globalThis & { readonly confirm?: (prompt: string) => boolean }).confirm;
   return typeof fn === "function" ? fn(message) : true;
 }
+
+export const StorageInstanceWorkflowPanelPresentation = Object.freeze({
+  evaluateLifecycleActionAvailability,
+  createLifecycleActionConfirmation,
+});
