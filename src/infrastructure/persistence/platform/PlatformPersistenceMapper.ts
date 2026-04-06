@@ -3,8 +3,6 @@ import {
   PlatformAuditOutcomes,
   PlatformRunKinds,
   PlatformRunStatuses,
-  parsePlatformAuditEventPersistenceRecord,
-  parsePlatformRunPersistenceRecord,
   type PlatformAuditEventKind,
   type PlatformAuditEventPersistenceRecord,
   type PlatformAuditOutcome,
@@ -12,6 +10,10 @@ import {
   type PlatformRunPersistenceRecord,
   type PlatformRunStatus,
 } from "../../../shared/dto/platform/PlatformPersistenceDtos";
+import {
+  parsePlatformAuditEventPersistenceRecord,
+  parsePlatformRunPersistenceRecord,
+} from "../../../shared/schemas/platform/PlatformPersistenceSchemaContracts";
 import { parsePersistenceReplaySnapshot } from "../../../shared/dto/persistence/PersistenceMapperBoundary";
 import type { PersistenceTenancyMetadata } from "../../../shared/dto/persistence/PersistenceBoundaryDtos";
 import type {
