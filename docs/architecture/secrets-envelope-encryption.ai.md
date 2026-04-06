@@ -45,3 +45,7 @@ Quick baseline for Story 8.1.3 (Feature 8 / Epic 8.1): protect secret plaintext 
 - Tampered ciphertext fails authentication/decrypt.
 - Wrong or missing key material fails with explicit errors.
 - Persisted payload artifacts do not contain plaintext values.
+
+## Follow-on linkage
+
+- Story 8.3.6 introduces restartable administrative re-encryption workflows for KEK/master-key changes: `docs/secret-master-key-reencryption-operations.md`.

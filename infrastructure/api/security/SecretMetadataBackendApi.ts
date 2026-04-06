@@ -5,6 +5,7 @@ import type { CreateSecretUseCase } from "../../../src/application/security/use-
 import type { DisableSecretUseCase } from "../../../src/application/security/use-cases/DisableSecretUseCase";
 import type { GetSecretMetadataUseCase } from "../../../src/application/security/use-cases/GetSecretMetadataUseCase";
 import type { ListSecretsUseCase } from "../../../src/application/security/use-cases/ListSecretsUseCase";
+import type { ReEncryptSecretsUseCase } from "../../../src/application/security/use-cases/ReEncryptSecretsUseCase";
 import type { RotateSecretUseCase } from "../../../src/application/security/use-cases/RotateSecretUseCase";
 import { SecretServiceErrorCodes } from "../../../src/application/security/use-cases/SecretManagementServiceContracts";
 import type { IWorkspaceAuthorizationReadRepository } from "../../../src/application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
@@ -17,8 +18,10 @@ import {
   SecretApiSchemaValidationError,
   parseCreateSecretMetadataCommand,
   parseDisableSecretMetadataCommand,
+  parseGetSecretReEncryptionStatusQuery,
   parseGetSecretMetadataQuery,
   parseListSecretMetadataQuery,
+  parseReEncryptSecretsCommand,
   parseRotateSecretMetadataCommand,
 } from "../../../src/shared/schemas/security/SecretApiSchemaContracts";
 import {
@@ -33,13 +36,18 @@ import {
   type GetSecretServiceHealthApiResponse,
   type GetSecretMetadataApiRequest,
   type GetSecretMetadataApiResponse,
+  type GetSecretReEncryptionStatusApiRequest,
+  type GetSecretReEncryptionStatusApiResponse,
   type ListSecretMetadataApiRequest,
   type ListSecretMetadataApiResponse,
+  type ReEncryptSecretsMetadataApiRequest,
+  type ReEncryptSecretsMetadataApiResponse,
   type RotateSecretMetadataApiRequest,
   type RotateSecretMetadataApiResponse,
   type SecretMetadataApiError,
   type SecretMetadataApiRecord,
   type SecretMetadataApiResponse,
+  type SecretReEncryptionOperationApiRecord,
 } from "./sdk/PublicSecretMetadataApiContract";
 
 interface SecretMetadataBackendApiDependencies {
@@ -48,6 +56,7 @@ interface SecretMetadataBackendApiDependencies {
   readonly listSecretsUseCase: ListSecretsUseCase;
   readonly disableSecretUseCase: DisableSecretUseCase;
   readonly rotateSecretUseCase: RotateSecretUseCase;
+  readonly reEncryptSecretsUseCase: ReEncryptSecretsUseCase;
   readonly workspaceAuthorizationReadRepository?: IWorkspaceAuthorizationReadRepository;
   readonly secretOperationalDiagnosticsProvider?: {
     collectDiagnostics(): Promise<SecretServiceOperationalDiagnosticsViewDto>;
@@ -67,6 +76,8 @@ type SecretMetadataObservabilityEvent =
       | "get-secret"
       | "disable-secret"
       | "rotate-secret"
+      | "re-encrypt-secrets"
+      | "get-re-encryption-status"
       | "get-secret-health"
       | "get-secret-diagnostics";
     readonly actorUserIdentityId?: string;
@@ -83,6 +94,8 @@ type SecretMetadataObservabilityEvent =
       | "get-secret"
       | "disable-secret"
       | "rotate-secret"
+      | "re-encrypt-secrets"
+      | "get-re-encryption-status"
       | "get-secret-health"
       | "get-secret-diagnostics";
     readonly actorUserIdentityId?: string;
@@ -471,6 +484,129 @@ export class SecretMetadataBackendApi {
     });
   }
 
+  public async reEncryptSecrets(
+    request: ReEncryptSecretsMetadataApiRequest,
+  ): Promise<SecretMetadataApiResponse<ReEncryptSecretsMetadataApiResponse>> {
+    let parsedRequest: ReturnType<typeof parseReEncryptSecretsCommand>;
+    try {
+      parsedRequest = parseReEncryptSecretsCommand({
+        operationKey: request.operationKey,
+        operationId: request.operationId,
+        maxTargetsPerInvocation: request.maxTargetsPerInvocation,
+        occurredAt: request.occurredAt,
+      });
+    } catch (error) {
+      if (error instanceof SecretApiSchemaValidationError) {
+        return this.failedValidation("re-encrypt-secrets", error.issues, request.actorUserIdentityId);
+      }
+      throw error;
+    }
+
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(
+        "re-encrypt-secrets",
+        SecretMetadataApiErrorCodes.invalidRequest,
+        "actorUserIdentityId is required.",
+      );
+    }
+
+    const actor = createActor({
+      actorUserIdentityId,
+      grantedActions: [SecretAccessActions.reEncrypt],
+      actorType: SecretActorTypes.serverAdmin,
+    });
+    const operationKey = normalizeOptional(parsedRequest.operationKey)
+      ?? `secret-metadata:re-encrypt:${randomUUID()}`;
+
+    const outcome = await this.dependencies.reEncryptSecretsUseCase.execute({
+      actor,
+      operationKey,
+      operationId: parsedRequest.operationId,
+      maxTargetsPerInvocation: parsedRequest.maxTargetsPerInvocation,
+      occurredAt: parsedRequest.occurredAt,
+    });
+    if (!outcome.ok) {
+      return this.failedFromSecretServiceResult(
+        "re-encrypt-secrets",
+        outcome.error.code,
+        outcome.error.message,
+        actorUserIdentityId,
+      );
+    }
+
+    await this.emitObservability({
+      event: "secret-metadata.request.succeeded",
+      operation: "re-encrypt-secrets",
+      actorUserIdentityId,
+    });
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        operation: toSecretReEncryptionOperationApiRecord(outcome.value),
+      }),
+    });
+  }
+
+  public async getSecretReEncryptionStatus(
+    request: GetSecretReEncryptionStatusApiRequest,
+  ): Promise<SecretMetadataApiResponse<GetSecretReEncryptionStatusApiResponse>> {
+    let parsedRequest: ReturnType<typeof parseGetSecretReEncryptionStatusQuery>;
+    try {
+      parsedRequest = parseGetSecretReEncryptionStatusQuery({
+        operationId: request.operationId,
+        occurredAt: request.occurredAt,
+      });
+    } catch (error) {
+      if (error instanceof SecretApiSchemaValidationError) {
+        return this.failedValidation("get-re-encryption-status", error.issues, request.actorUserIdentityId);
+      }
+      throw error;
+    }
+
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(
+        "get-re-encryption-status",
+        SecretMetadataApiErrorCodes.invalidRequest,
+        "actorUserIdentityId is required.",
+      );
+    }
+
+    const actor = createActor({
+      actorUserIdentityId,
+      grantedActions: [SecretAccessActions.reEncrypt],
+      actorType: SecretActorTypes.serverAdmin,
+    });
+    const outcome = await this.dependencies.reEncryptSecretsUseCase.getStatus({
+      actor,
+      operationId: parsedRequest.operationId,
+      occurredAt: parsedRequest.occurredAt,
+    });
+    if (!outcome.ok) {
+      return this.failedFromSecretServiceResult(
+        "get-re-encryption-status",
+        outcome.error.code,
+        outcome.error.message,
+        actorUserIdentityId,
+      );
+    }
+
+    await this.emitObservability({
+      event: "secret-metadata.request.succeeded",
+      operation: "get-re-encryption-status",
+      actorUserIdentityId,
+    });
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        operation: toSecretReEncryptionOperationApiRecord(outcome.value),
+      }),
+    });
+  }
+
   public async getSecretServiceHealth(
     request: GetSecretServiceHealthApiRequest,
   ): Promise<SecretMetadataApiResponse<GetSecretServiceHealthApiResponse>> {
@@ -738,6 +874,54 @@ function toSecretMetadataApiRecord(reference: SecretReference): SecretMetadataAp
     currentVersionId: dto.currentVersionId,
     metadata: dto.metadata,
     updatedAt: dto.updatedAt,
+  });
+}
+
+function toSecretReEncryptionOperationApiRecord(
+  operation: {
+    readonly operationId: string;
+    readonly status: "running" | "succeeded" | "failed";
+    readonly startedAt: string;
+    readonly updatedAt: string;
+    readonly completedAt?: string;
+    readonly totalTargets: number;
+    readonly processedTargets: number;
+    readonly succeededTargets: number;
+    readonly failedTargets: number;
+    readonly remainingTargets: number;
+    readonly failures: ReadonlyArray<{
+      readonly secretId: string;
+      readonly versionId: string;
+      readonly reasonCode: string;
+      readonly message: string;
+      readonly occurredAt: string;
+    }>;
+    readonly lastErrorCode?: string;
+    readonly lastErrorMessage?: string;
+  },
+): SecretReEncryptionOperationApiRecord {
+  return Object.freeze({
+    operationId: operation.operationId,
+    status: operation.status,
+    startedAt: operation.startedAt,
+    updatedAt: operation.updatedAt,
+    completedAt: operation.completedAt,
+    totalTargets: operation.totalTargets,
+    processedTargets: operation.processedTargets,
+    succeededTargets: operation.succeededTargets,
+    failedTargets: operation.failedTargets,
+    remainingTargets: operation.remainingTargets,
+    failures: Object.freeze(operation.failures.map((failure) => Object.freeze({
+      secretId: failure.secretId,
+      versionId: failure.versionId,
+      reasonCode: failure.reasonCode,
+      message: toSafeClientErrorMessage(failure.message, "Secret re-encryption step failed."),
+      occurredAt: failure.occurredAt,
+    }))),
+    lastErrorCode: normalizeOptional(operation.lastErrorCode),
+    lastErrorMessage: operation.lastErrorMessage
+      ? toSafeClientErrorMessage(operation.lastErrorMessage, "Secret re-encryption failed.")
+      : undefined,
   });
 }
 

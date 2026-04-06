@@ -78,6 +78,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Secret authorization policy baseline for permission-checked operations, runtime-vs-human retrieval rules, and non-leaky deny behavior: `docs/architecture/secrets-authorization-policies.md`
 - Secret metadata API baseline for internal create/list/get/disable management routes and metadata-only response contracts: `docs/architecture/secrets-metadata-management-internal-apis.md`
 - Secret classification baseline for naming-prefix conventions, metadata-label requirements, and classification validation boundaries: `docs/architecture/secrets-classification-and-metadata-conventions.md`
+- Secret master-key re-encryption operations baseline for controlled KEK migration, progress tracking, and restartable recovery: `docs/secret-master-key-reencryption-operations.md`
 - Node bootstrap identity/trust-material operations baseline: `docs/node-bootstrap-identity-operations.md`
 - Workspace tenancy domain/contracts baseline: `docs/architecture/workspace-foundation.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`

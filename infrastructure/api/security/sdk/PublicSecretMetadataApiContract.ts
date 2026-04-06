@@ -127,6 +127,50 @@ export interface RotateSecretMetadataApiResponse {
   readonly secret: SecretMetadataApiRecord;
 }
 
+export interface ReEncryptSecretsMetadataApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly operationKey?: string;
+  readonly operationId?: string;
+  readonly maxTargetsPerInvocation?: number;
+  readonly occurredAt?: string;
+}
+
+export interface SecretReEncryptionOperationApiRecord {
+  readonly operationId: string;
+  readonly status: "running" | "succeeded" | "failed";
+  readonly startedAt: string;
+  readonly updatedAt: string;
+  readonly completedAt?: string;
+  readonly totalTargets: number;
+  readonly processedTargets: number;
+  readonly succeededTargets: number;
+  readonly failedTargets: number;
+  readonly remainingTargets: number;
+  readonly failures: ReadonlyArray<{
+    readonly secretId: string;
+    readonly versionId: string;
+    readonly reasonCode: string;
+    readonly message: string;
+    readonly occurredAt: string;
+  }>;
+  readonly lastErrorCode?: string;
+  readonly lastErrorMessage?: string;
+}
+
+export interface ReEncryptSecretsMetadataApiResponse {
+  readonly operation: SecretReEncryptionOperationApiRecord;
+}
+
+export interface GetSecretReEncryptionStatusApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly operationId: string;
+  readonly occurredAt?: string;
+}
+
+export interface GetSecretReEncryptionStatusApiResponse {
+  readonly operation: SecretReEncryptionOperationApiRecord;
+}
+
 export interface GetSecretServiceHealthApiRequest {
   readonly actorUserIdentityId: string;
 }

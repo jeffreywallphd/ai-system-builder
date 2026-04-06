@@ -60,6 +60,59 @@ export interface ISecretRecordPersistenceRepository {
   deleteSecret(secretId: string, mutation: SecretCreatePersistenceInput["mutation"]): Promise<SecretMutationResult>;
 }
 
+export const SecretReEncryptionOperationStates = Object.freeze({
+  running: "running",
+  succeeded: "succeeded",
+  failed: "failed",
+});
+
+export type SecretReEncryptionOperationState =
+  typeof SecretReEncryptionOperationStates[keyof typeof SecretReEncryptionOperationStates];
+
+export interface SecretReEncryptionTarget {
+  readonly secretId: string;
+  readonly versionId: string;
+}
+
+export interface SecretReEncryptionFailure {
+  readonly secretId: string;
+  readonly versionId: string;
+  readonly reasonCode: string;
+  readonly message: string;
+  readonly occurredAt: string;
+}
+
+export interface SecretReEncryptionOperationRecord {
+  readonly operationId: string;
+  readonly operationKey: string;
+  readonly state: SecretReEncryptionOperationState;
+  readonly targets: ReadonlyArray<SecretReEncryptionTarget>;
+  readonly currentIndex: number;
+  readonly succeededCount: number;
+  readonly failedCount: number;
+  readonly failures: ReadonlyArray<SecretReEncryptionFailure>;
+  readonly startedBy: string;
+  readonly startedAt: string;
+  readonly updatedAt: string;
+  readonly completedAt?: string;
+  readonly lastErrorCode?: string;
+  readonly lastErrorMessage?: string;
+  readonly revision: number;
+}
+
+export interface ISecretReEncryptionOperationRepository {
+  findReEncryptionOperationById(operationId: string): Promise<SecretReEncryptionOperationRecord | undefined>;
+  findReEncryptionOperationByOperationKey(operationKey: string): Promise<SecretReEncryptionOperationRecord | undefined>;
+  findLatestRunningReEncryptionOperation(): Promise<SecretReEncryptionOperationRecord | undefined>;
+  createReEncryptionOperation(
+    operation: Omit<SecretReEncryptionOperationRecord, "revision">,
+  ): Promise<SecretReEncryptionOperationRecord>;
+  saveReEncryptionOperation(
+    operation: SecretReEncryptionOperationRecord,
+    expectedRevision: number,
+  ): Promise<{ readonly updated: boolean; readonly record: SecretReEncryptionOperationRecord }>;
+}
+
 export interface SecretEncryptedMaterial {
   readonly encryptedPayloadRef: string;
   readonly payloadDigestSha256: string;

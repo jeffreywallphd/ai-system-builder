@@ -3,6 +3,7 @@
 ## Purpose
 
 Story 8.2.4 baseline for Feature 8 / Epic 8.2: expose internal server API surfaces for secret metadata management without plaintext response exposure.
+Story 8.3.6 extends this with trusted administrative master-key re-encryption endpoints.
 
 ## Canonical files
 
@@ -26,6 +27,8 @@ Story 8.2.4 baseline for Feature 8 / Epic 8.2: expose internal server API surfac
 - `GET /api/v1/security/secrets/{secretId}` (detail metadata)
 - `POST /api/v1/security/secrets/{secretId}/disable` (disable)
 - `POST /api/v1/security/secrets/{secretId}/rotate` (rotate)
+- `POST /api/v1/security/secrets/maintenance/re-encryption` (start/resume re-encryption operation)
+- `GET /api/v1/security/secrets/maintenance/re-encryption/{operationId}` (operation status/progress)
 - List metadata supports lifecycle filters: `includeDisabled`, `includeArchived`, `includeSoftDeleted`.
 
 No plaintext retrieval endpoint is added.
@@ -41,8 +44,8 @@ No plaintext retrieval endpoint is added.
 
 ## DTO safety summary
 
-- Command DTOs (`CreateSecretCommandDto`, `DisableSecretCommandDto`, `RotateSecretCommandDto`) are scoped to mutation inputs.
-- Query DTOs (`SecretMetadataQueryDto`) are metadata-only and exclude plaintext/encrypted material fields by contract.
+- Command DTOs (`CreateSecretCommandDto`, `DisableSecretCommandDto`, `RotateSecretCommandDto`, `ReEncryptSecretsCommandDto`) are scoped to mutation inputs.
+- Query DTOs (`SecretMetadataQueryDto`, `GetSecretReEncryptionStatusQueryDto`) are metadata-only and exclude plaintext/encrypted material fields by contract.
 - Secret metadata record mapping in backend APIs now routes through shared safe DTO mapping helpers.
 
 ## Validation coverage summary
@@ -64,4 +67,4 @@ No plaintext retrieval endpoint is added.
 ## Test posture
 
 - backend API tests validate mapping and fail-closed actor context behavior.
-- HTTP server route tests validate happy path, denial path, and validation path for secret metadata endpoints, including rotate.
+- HTTP server route tests validate happy path, denial path, and validation path for secret metadata endpoints, including rotate and re-encryption status flows.

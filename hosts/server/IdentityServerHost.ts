@@ -684,6 +684,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     listSecretsUseCase: secretService.listSecretsUseCase,
     disableSecretUseCase: secretService.disableSecretUseCase,
     rotateSecretUseCase: secretService.rotateSecretUseCase,
+    reEncryptSecretsUseCase: secretService.reEncryptSecretsUseCase,
     workspaceAuthorizationReadRepository: workspaceRepository,
     secretOperationalDiagnosticsProvider: new SecretServiceOperationalDiagnosticsProvider({
       env,

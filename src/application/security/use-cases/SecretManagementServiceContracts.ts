@@ -88,6 +88,51 @@ export interface RotateSecretResult {
   readonly currentVersionId: string;
 }
 
+export const SecretReEncryptionOperationStatuses = Object.freeze({
+  running: "running",
+  succeeded: "succeeded",
+  failed: "failed",
+});
+
+export type SecretReEncryptionOperationStatus =
+  typeof SecretReEncryptionOperationStatuses[keyof typeof SecretReEncryptionOperationStatuses];
+
+export interface ReEncryptSecretsRequest {
+  readonly actor: SecretAccessActor;
+  readonly operationKey: string;
+  readonly operationId?: string;
+  readonly maxTargetsPerInvocation?: number;
+  readonly occurredAt?: string;
+}
+
+export interface ReEncryptSecretsResult {
+  readonly operationId: string;
+  readonly status: SecretReEncryptionOperationStatus;
+  readonly startedAt: string;
+  readonly updatedAt: string;
+  readonly completedAt?: string;
+  readonly totalTargets: number;
+  readonly processedTargets: number;
+  readonly succeededTargets: number;
+  readonly failedTargets: number;
+  readonly remainingTargets: number;
+  readonly failures: ReadonlyArray<{
+    readonly secretId: string;
+    readonly versionId: string;
+    readonly reasonCode: string;
+    readonly message: string;
+    readonly occurredAt: string;
+  }>;
+  readonly lastErrorCode?: string;
+  readonly lastErrorMessage?: string;
+}
+
+export interface GetSecretReEncryptionStatusRequest {
+  readonly actor: SecretAccessActor;
+  readonly operationId: string;
+  readonly occurredAt?: string;
+}
+
 export interface DisableSecretRequest {
   readonly actor: SecretAccessActor;
   readonly operationKey: string;
@@ -125,6 +170,10 @@ export interface ISecretManagementService {
     request: RetrieveSecretPlaintextRequest,
   ): Promise<SecretServiceResult<RetrieveSecretPlaintextResult>>;
   rotateSecret(request: RotateSecretRequest): Promise<SecretServiceResult<RotateSecretResult>>;
+  reEncryptSecrets(request: ReEncryptSecretsRequest): Promise<SecretServiceResult<ReEncryptSecretsResult>>;
+  getSecretReEncryptionStatus(
+    request: GetSecretReEncryptionStatusRequest,
+  ): Promise<SecretServiceResult<ReEncryptSecretsResult>>;
   disableSecret(request: DisableSecretRequest): Promise<SecretServiceResult<SecretReference>>;
   deleteSecret(request: DeleteSecretRequest): Promise<SecretServiceResult<{ readonly secretId: string }>>;
   listSecrets(request: ListSecretsRequest): Promise<SecretServiceResult<ListSecretsResult>>;
@@ -138,6 +187,7 @@ export interface SecretLookupUseCaseContracts {
 export interface SecretMutationUseCaseContracts {
   createSecret(request: CreateSecretRequest): Promise<SecretServiceResult<CreateSecretResult>>;
   rotateSecret(request: RotateSecretRequest): Promise<SecretServiceResult<RotateSecretResult>>;
+  reEncryptSecrets(request: ReEncryptSecretsRequest): Promise<SecretServiceResult<ReEncryptSecretsResult>>;
   disableSecret(request: DisableSecretRequest): Promise<SecretServiceResult<SecretReference>>;
   deleteSecret(request: DeleteSecretRequest): Promise<SecretServiceResult<{ readonly secretId: string }>>;
 }
