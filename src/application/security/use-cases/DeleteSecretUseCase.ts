@@ -1,0 +1,215 @@
+import {
+  SecretAccessActions,
+  SecretDomainError,
+  type SecretScope,
+  deleteSecretRecord,
+} from "../../../domain/security/SecretDomain";
+import type {
+  ISecretAccessAuditPort,
+  ISecretAccessPolicyPort,
+  ISecretRecordPersistenceRepository,
+} from "../ports/SecretServicePorts";
+import {
+  NoOpSecretObservabilityPort,
+  SecretOperationalOutcomes,
+  type ISecretObservabilityPort,
+} from "../ports/SecretObservabilityPorts";
+import {
+  SecretServiceErrorCodes,
+  type DeleteSecretRequest,
+  type SecretServiceResult,
+} from "./SecretManagementServiceContracts";
+
+export interface DeleteSecretUseCaseDependencies {
+  readonly secretRecordRepository: ISecretRecordPersistenceRepository;
+  readonly secretAccessPolicyPort: ISecretAccessPolicyPort;
+  readonly secretAccessAuditPort: ISecretAccessAuditPort;
+  readonly secretObservabilityPort?: ISecretObservabilityPort;
+  readonly now?: () => Date;
+}
+
+export class DeleteSecretUseCase {
+  private readonly now: () => Date;
+  private readonly observabilityPort: ISecretObservabilityPort;
+
+  public constructor(private readonly dependencies: DeleteSecretUseCaseDependencies) {
+    this.now = dependencies.now ?? (() => new Date());
+    this.observabilityPort = dependencies.secretObservabilityPort ?? new NoOpSecretObservabilityPort();
+  }
+
+  public async execute(request: DeleteSecretRequest): Promise<SecretServiceResult<{ readonly secretId: string }>> {
+    const actorId = normalizeRequired(request.actor?.actorId);
+    if (!actorId) {
+      return invalidRequest("actor.actorId is required.");
+    }
+
+    const operationKey = normalizeRequired(request.operationKey);
+    if (!operationKey) {
+      return invalidRequest("operationKey is required.");
+    }
+
+    const secretId = normalizeRequired(request.secretId);
+    if (!secretId) {
+      return invalidRequest("secretId is required.");
+    }
+
+    const deletedAt = normalizeTimestamp(request.deletedAt, this.now);
+    if (!deletedAt) {
+      return invalidRequest("deletedAt must be a valid timestamp when provided.");
+    }
+
+    try {
+      const record = await this.dependencies.secretRecordRepository.findSecretById(secretId);
+      if (!record) {
+        return notFound(secretId);
+      }
+
+      const decision = await this.dependencies.secretAccessPolicyPort.evaluateSecretAccess({
+        action: SecretAccessActions.delete,
+        actor: request.actor,
+        owner: record.owner,
+        record,
+        occurredAt: deletedAt,
+      });
+      await this.dependencies.secretAccessAuditPort.recordSecretAccessDecision(Object.freeze({
+        secretId: record.secretId,
+        scope: record.owner.scope,
+        action: SecretAccessActions.delete,
+        decision: decision.allowed ? "allowed" : "denied",
+        reason: decision.reason,
+        actorId,
+        actorType: request.actor.actorType,
+        workspaceId: request.actor.workspaceId,
+        userIdentityId: request.actor.userIdentityId,
+        occurredAt: decision.occurredAt,
+      }));
+
+      if (!decision.allowed) {
+        return notFound(secretId);
+      }
+
+      const deleted = deleteSecretRecord({
+        record,
+        deletedAt,
+        deletedBy: actorId,
+      });
+
+      await this.dependencies.secretRecordRepository.saveSecret(deleted, {
+        operationKey: `${operationKey}:mark-deleted`,
+        actorId,
+        occurredAt: deletedAt,
+      });
+      await this.dependencies.secretRecordRepository.deleteSecret(secretId, {
+        operationKey,
+        actorId,
+        occurredAt: deletedAt,
+      });
+
+      await this.emitOperation("succeeded", {
+        occurredAt: deletedAt,
+        actorId,
+        secretId,
+        scope: deleted.owner.scope,
+        workspaceId: deleted.owner.workspaceId,
+        userIdentityId: deleted.owner.userIdentityId,
+      });
+      return {
+        ok: true,
+        value: Object.freeze({
+          secretId,
+        }),
+      };
+    } catch (error) {
+      if (error instanceof SecretDomainError) {
+        return {
+          ok: false,
+          error: Object.freeze({
+            code: SecretServiceErrorCodes.invalidState,
+            message: error.message,
+          }),
+        };
+      }
+
+      await this.emitOperation("failed", {
+        occurredAt: deletedAt,
+        actorId,
+        secretId,
+        details: Object.freeze({
+          reason: "internal-error",
+        }),
+      });
+      return {
+        ok: false,
+        error: Object.freeze({
+          code: SecretServiceErrorCodes.internal,
+          message: "Secret delete operation failed due to an internal security error.",
+        }),
+      };
+    }
+  }
+
+  private async emitOperation(
+    outcome: keyof typeof SecretOperationalOutcomes,
+    input: {
+      readonly occurredAt: string;
+      readonly actorId?: string;
+      readonly secretId?: string;
+      readonly scope?: SecretScope;
+      readonly workspaceId?: string;
+      readonly userIdentityId?: string;
+      readonly details?: Readonly<Record<string, unknown>>;
+    },
+  ): Promise<void> {
+    try {
+      await this.observabilityPort.recordSecretOperation(Object.freeze({
+        event: "secret.delete",
+        outcome: SecretOperationalOutcomes[outcome],
+        occurredAt: input.occurredAt,
+        actorId: input.actorId,
+        secretId: input.secretId,
+        scope: input.scope,
+        workspaceId: input.workspaceId,
+        userIdentityId: input.userIdentityId,
+        details: input.details,
+      }));
+    } catch {
+      // Observability failures are intentionally non-fatal.
+    }
+  }
+}
+
+function normalizeRequired(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
+function normalizeTimestamp(value: string | undefined, now: () => Date): string | undefined {
+  if (!value) {
+    return now().toISOString();
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined;
+  }
+  return parsed.toISOString();
+}
+
+function invalidRequest(message: string): SecretServiceResult<{ readonly secretId: string }> {
+  return {
+    ok: false,
+    error: Object.freeze({
+      code: SecretServiceErrorCodes.invalidRequest,
+      message,
+    }),
+  };
+}
+
+function notFound(secretId: string): SecretServiceResult<{ readonly secretId: string }> {
+  return {
+    ok: false,
+    error: Object.freeze({
+      code: SecretServiceErrorCodes.notFound,
+      message: `Secret '${secretId}' was not found.`,
+    }),
+  };
+}

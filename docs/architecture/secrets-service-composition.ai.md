@@ -20,7 +20,7 @@ Quick baseline for Story 8.1.7 (Feature 8 / Epic 8.1): compose secret services i
   - policy: domain-backed secret access decision adapter
   - observability: `SecretObservabilityReporter`
   - audit: host-supplied callback hook
-- Composed service exposes formal application use cases (`CreateSecretUseCase`, `GetSecretMetadataUseCase`, `SecretScopeResolver`) instead of leaving secret collaborators disconnected.
+- Composed service exposes formal application use cases (`CreateSecretUseCase`, `GetSecretMetadataUseCase`, `RetrieveSecretPlaintextForRuntimeUseCase`, `RotateSecretUseCase`, `DisableSecretUseCase`, `DeleteSecretUseCase`, `ListSecretsUseCase`, `SecretScopeResolver`) instead of leaving secret collaborators disconnected.
 
 ## Configuration posture
 

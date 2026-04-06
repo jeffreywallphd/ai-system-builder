@@ -1,0 +1,597 @@
+import { describe, expect, it } from "bun:test";
+import {
+  SecretAccessActions,
+  SecretActorTypes,
+  SecretKinds,
+  SecretScopes,
+  createSecretRecord,
+  toSecretReference,
+  type SecretAccessActor,
+  type SecretRecord,
+} from "../../../domain/security/SecretDomain";
+import type {
+  ISecretAccessAuditPort,
+  ISecretEncryptionPort,
+  ISecretRecordPersistenceRepository,
+  SecretAccessAuditEvent,
+  SecretCreatePersistenceInput,
+  SecretListQuery,
+  SecretMutationResult,
+} from "../ports/SecretServicePorts";
+import { DisableSecretUseCase } from "../use-cases/DisableSecretUseCase";
+import { CreateSecretUseCase } from "../use-cases/CreateSecretUseCase";
+import { GetSecretMetadataUseCase } from "../use-cases/GetSecretMetadataUseCase";
+import { ListSecretsUseCase } from "../use-cases/ListSecretsUseCase";
+import { RetrieveSecretPlaintextForRuntimeUseCase } from "../use-cases/RetrieveSecretPlaintextForRuntimeUseCase";
+import { RotateSecretUseCase } from "../use-cases/RotateSecretUseCase";
+import { SecretAuthorizationPolicyEvaluator } from "../use-cases/SecretAuthorizationPolicyEvaluator";
+import { SecretServiceErrorCodes } from "../use-cases/SecretManagementServiceContracts";
+import { DeleteSecretUseCase } from "../use-cases/DeleteSecretUseCase";
+
+class InMemorySecretRecordRepository implements ISecretRecordPersistenceRepository {
+  private readonly records = new Map<string, SecretRecord>();
+
+  public async findSecretById(secretId: string): Promise<SecretRecord | undefined> {
+    return this.records.get(secretId.trim());
+  }
+
+  public async findSecretByNameAndScope(input: {
+    readonly name: string;
+    readonly owner: SecretRecord["owner"];
+  }): Promise<SecretRecord | undefined> {
+    const normalizedName = input.name.trim().toLowerCase();
+    for (const record of this.records.values()) {
+      if (
+        record.reference.name === normalizedName
+        && record.owner.scope === input.owner.scope
+        && record.owner.workspaceId === input.owner.workspaceId
+        && record.owner.userIdentityId === input.owner.userIdentityId
+      ) {
+        return record;
+      }
+    }
+    return undefined;
+  }
+
+  public async listSecrets(query: SecretListQuery): Promise<ReadonlyArray<ReturnType<typeof toSecretReference>>> {
+    return [...this.records.values()]
+      .filter((record) => {
+        if (query.scope && record.owner.scope !== query.scope) {
+          return false;
+        }
+        if (query.workspaceId && record.owner.workspaceId !== query.workspaceId) {
+          return false;
+        }
+        if (query.userIdentityId && record.owner.userIdentityId !== query.userIdentityId) {
+          return false;
+        }
+        if (query.kinds?.length && !query.kinds.includes(record.kind)) {
+          return false;
+        }
+        if (query.tagAnyOf?.length) {
+          const tags = new Set(record.reference.metadata.tags.map((tag) => tag.toLowerCase()));
+          const matches = query.tagAnyOf.some((tag) => tags.has(tag.toLowerCase()));
+          if (!matches) {
+            return false;
+          }
+        }
+        if (!(query.includeDisabled ?? false) && record.state === "disabled") {
+          return false;
+        }
+        if (!(query.includeRevoked ?? false) && record.state === "revoked") {
+          return false;
+        }
+        if (!(query.includeDeleted ?? false) && record.state === "deleted") {
+          return false;
+        }
+        return true;
+      })
+      .map((record) => toSecretReference(record));
+  }
+
+  public async createSecret(
+    input: SecretCreatePersistenceInput,
+  ): Promise<SecretMutationResult & { readonly record: SecretRecord }> {
+    this.records.set(input.record.secretId, input.record);
+    return {
+      changed: true,
+      wasReplay: false,
+      record: input.record,
+    };
+  }
+
+  public async saveSecret(
+    record: SecretRecord,
+    _mutation: SecretCreatePersistenceInput["mutation"],
+  ): Promise<SecretMutationResult & { readonly record: SecretRecord }> {
+    this.records.set(record.secretId, record);
+    return {
+      changed: true,
+      wasReplay: false,
+      record,
+    };
+  }
+
+  public async deleteSecret(secretId: string, _mutation: SecretCreatePersistenceInput["mutation"]): Promise<SecretMutationResult> {
+    const changed = this.records.delete(secretId.trim());
+    return {
+      changed,
+      wasReplay: false,
+    };
+  }
+
+  public seed(record: SecretRecord): void {
+    this.records.set(record.secretId, record);
+  }
+}
+
+class InMemorySecretEncryptionPort implements ISecretEncryptionPort {
+  private readonly plaintextByPayloadRef = new Map<string, string>();
+
+  public seedPayload(payloadRef: string, plaintext: string): void {
+    this.plaintextByPayloadRef.set(payloadRef, plaintext);
+  }
+
+  public async encryptSecretPlaintext(input: {
+    readonly secretId: string;
+    readonly owner: SecretRecord["owner"];
+    readonly plaintext: string;
+    readonly existingContext?: SecretRecord["versions"][number]["keyEncryptionContext"];
+  }) {
+    const encryptedPayloadRef = `enc:${input.secretId}:v${this.plaintextByPayloadRef.size + 1}`;
+    this.plaintextByPayloadRef.set(encryptedPayloadRef, input.plaintext);
+    return {
+      encryptedPayloadRef,
+      payloadDigestSha256: `sha256:${input.secretId}:${input.plaintext.length}`,
+      payloadByteLength: input.plaintext.length,
+      keyEncryptionContext: input.existingContext ?? {
+        keyId: `kek:${input.owner.scope}:default`,
+        algorithm: "aes-256-gcm",
+        scope: input.owner.scope,
+        workspaceId: input.owner.workspaceId,
+        userIdentityId: input.owner.userIdentityId,
+      },
+    };
+  }
+
+  public async decryptSecretPlaintext(input: {
+    readonly version: SecretRecord["versions"][number];
+  }): Promise<{ readonly plaintext: string }> {
+    const plaintext = this.plaintextByPayloadRef.get(input.version.encryptedPayloadRef);
+    if (plaintext === undefined) {
+      throw new Error("missing plaintext payload");
+    }
+    return { plaintext };
+  }
+}
+
+class InMemorySecretAccessAuditPort implements ISecretAccessAuditPort {
+  public readonly events: SecretAccessAuditEvent[] = [];
+
+  public async recordSecretAccessDecision(event: SecretAccessAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
+describe("Secret authorization policy and governance use cases", () => {
+  it("denies runtime actors for administrative secret mutations", async () => {
+    const repository = new InMemorySecretRecordRepository();
+    const encryption = new InMemorySecretEncryptionPort();
+    const audit = new InMemorySecretAccessAuditPort();
+    const policy = new SecretAuthorizationPolicyEvaluator();
+
+    const createUseCase = new CreateSecretUseCase({
+      secretRecordRepository: repository,
+      secretEncryptionPort: encryption,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+
+    const result = await createUseCase.execute({
+      actor: {
+        actorId: "system:runtime:workspace-alpha",
+        actorType: SecretActorTypes.workspaceService,
+        workspaceId: "workspace:alpha",
+        grantedActions: [SecretAccessActions.create],
+      },
+      operationKey: "op:create:runtime-denied",
+      secretId: "secret:workspace:runtime-denied",
+      name: "integration.runtime.denied-token",
+      owner: {
+        scope: SecretScopes.workspace,
+        workspaceId: "workspace:alpha",
+      },
+      kind: SecretKinds.accessToken,
+      plaintext: "runtime-token",
+      metadata: {
+        tags: ["integration"],
+        labels: {
+          integration: "workspace-runtime",
+          pairing: "runtime-session",
+        },
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: SecretServiceErrorCodes.accessDenied,
+      }),
+    });
+    expect(audit.events.at(-1)?.reason).toBe("administrative-access-required");
+  });
+
+  it("treats plaintext retrieval as stricter than metadata visibility for human actors", async () => {
+    const repository = new InMemorySecretRecordRepository();
+    const encryption = new InMemorySecretEncryptionPort();
+    const audit = new InMemorySecretAccessAuditPort();
+    const policy = new SecretAuthorizationPolicyEvaluator();
+
+    const record = createWorkspaceSecretRecord("workspace:alpha");
+    repository.seed(record);
+    encryption.seedPayload(record.versions[0]?.encryptedPayloadRef ?? "", "workspace-alpha-token");
+
+    const metadataUseCase = new GetSecretMetadataUseCase({
+      secretRecordRepository: repository,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+    const retrieveUseCase = new RetrieveSecretPlaintextForRuntimeUseCase({
+      secretRecordRepository: repository,
+      secretEncryptionPort: encryption,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+
+    const actor: SecretAccessActor = {
+      actorId: "user:workspace-member",
+      actorType: SecretActorTypes.workspaceMember,
+      workspaceId: "workspace:alpha",
+      grantedActions: [SecretAccessActions.readMetadata, SecretAccessActions.retrievePlaintext],
+    };
+
+    const metadata = await metadataUseCase.execute({
+      actor,
+      secretId: record.secretId,
+    });
+    expect(metadata.ok).toBeTrue();
+
+    const plaintext = await retrieveUseCase.execute({
+      actor,
+      secretId: record.secretId,
+    });
+    expect(plaintext).toEqual({
+      ok: false,
+      error: {
+        code: SecretServiceErrorCodes.notFound,
+        message: `Secret '${record.secretId}' was not found.`,
+      },
+    });
+    expect(audit.events.at(-1)?.reason).toBe("runtime-access-required");
+  });
+
+  it("allows system runtime plaintext retrieval within scope boundaries", async () => {
+    const repository = new InMemorySecretRecordRepository();
+    const encryption = new InMemorySecretEncryptionPort();
+    const audit = new InMemorySecretAccessAuditPort();
+    const policy = new SecretAuthorizationPolicyEvaluator();
+
+    const record = createWorkspaceSecretRecord("workspace:beta");
+    repository.seed(record);
+    encryption.seedPayload(record.versions[0]?.encryptedPayloadRef ?? "", "workspace-beta-token");
+
+    const retrieveUseCase = new RetrieveSecretPlaintextForRuntimeUseCase({
+      secretRecordRepository: repository,
+      secretEncryptionPort: encryption,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+
+    const result = await retrieveUseCase.execute({
+      actor: {
+        actorId: "system:runtime:workspace-beta",
+        actorType: SecretActorTypes.workspaceService,
+        workspaceId: "workspace:beta",
+        grantedActions: [SecretAccessActions.retrievePlaintext],
+      },
+      secretId: record.secretId,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        secret: expect.objectContaining({
+          secretId: record.secretId,
+          scope: SecretScopes.workspace,
+        }),
+        plaintext: "workspace-beta-token",
+      },
+    });
+    expect(audit.events.at(-1)?.decision).toBe("allowed");
+  });
+
+  it("enforces server-scope boundary for server runtime actors", async () => {
+    const repository = new InMemorySecretRecordRepository();
+    const encryption = new InMemorySecretEncryptionPort();
+    const audit = new InMemorySecretAccessAuditPort();
+    const policy = new SecretAuthorizationPolicyEvaluator();
+
+    const record = createServerSecretRecord();
+    repository.seed(record);
+    encryption.seedPayload(record.versions[0]?.encryptedPayloadRef ?? "", "server-secret");
+
+    const retrieveUseCase = new RetrieveSecretPlaintextForRuntimeUseCase({
+      secretRecordRepository: repository,
+      secretEncryptionPort: encryption,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+
+    const allowed = await retrieveUseCase.execute({
+      actor: {
+        actorId: "system:runtime:server",
+        actorType: SecretActorTypes.serverRuntime,
+        grantedActions: [SecretAccessActions.retrievePlaintext],
+      },
+      secretId: record.secretId,
+    });
+    expect(allowed.ok).toBeTrue();
+
+    const denied = await retrieveUseCase.execute({
+      actor: {
+        actorId: "user:workspace-admin",
+        actorType: SecretActorTypes.workspaceMember,
+        workspaceId: "workspace:alpha",
+        grantedActions: [SecretAccessActions.retrievePlaintext],
+      },
+      secretId: record.secretId,
+    });
+    expect(denied).toEqual({
+      ok: false,
+      error: {
+        code: SecretServiceErrorCodes.notFound,
+        message: `Secret '${record.secretId}' was not found.`,
+      },
+    });
+    expect(audit.events.at(-1)?.reason).toBe("scope-mismatch");
+  });
+
+  it("returns non-leaky not-found for unauthorized rotate and delete operations", async () => {
+    const repository = new InMemorySecretRecordRepository();
+    const encryption = new InMemorySecretEncryptionPort();
+    const audit = new InMemorySecretAccessAuditPort();
+    const policy = new SecretAuthorizationPolicyEvaluator();
+    const record = createWorkspaceSecretRecord("workspace:alpha");
+    repository.seed(record);
+
+    const rotateUseCase = new RotateSecretUseCase({
+      secretRecordRepository: repository,
+      secretEncryptionPort: encryption,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+    const deleteUseCase = new DeleteSecretUseCase({
+      secretRecordRepository: repository,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+
+    const actor: SecretAccessActor = {
+      actorId: "user:workspace-gamma-admin",
+      actorType: SecretActorTypes.workspaceMember,
+      workspaceId: "workspace:gamma",
+      grantedActions: [SecretAccessActions.rotate, SecretAccessActions.delete],
+    };
+
+    const rotate = await rotateUseCase.execute({
+      actor,
+      operationKey: "op:rotate:unauthorized",
+      secretId: record.secretId,
+      plaintext: "new-value",
+    });
+    expect(rotate).toEqual({
+      ok: false,
+      error: {
+        code: SecretServiceErrorCodes.notFound,
+        message: `Secret '${record.secretId}' was not found.`,
+      },
+    });
+
+    const deleted = await deleteUseCase.execute({
+      actor,
+      operationKey: "op:delete:unauthorized",
+      secretId: record.secretId,
+    });
+    expect(deleted).toEqual({
+      ok: false,
+      error: {
+        code: SecretServiceErrorCodes.notFound,
+        message: `Secret '${record.secretId}' was not found.`,
+      },
+    });
+    expect(audit.events.map((event) => event.reason)).toEqual(["scope-mismatch", "scope-mismatch"]);
+  });
+
+  it("enforces workspace and user boundaries for list and disable operations", async () => {
+    const repository = new InMemorySecretRecordRepository();
+    const audit = new InMemorySecretAccessAuditPort();
+    const policy = new SecretAuthorizationPolicyEvaluator();
+
+    const workspaceRecord = createWorkspaceSecretRecord("workspace:alpha");
+    const userRecord = createUserSecretRecord("user:alice", "workspace:alpha");
+    repository.seed(workspaceRecord);
+    repository.seed(userRecord);
+
+    const listUseCase = new ListSecretsUseCase({
+      secretRecordRepository: repository,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+    const disableUseCase = new DisableSecretUseCase({
+      secretRecordRepository: repository,
+      secretAccessPolicyPort: policy,
+      secretAccessAuditPort: audit,
+    });
+
+    const deniedList = await listUseCase.execute({
+      actor: {
+        actorId: "user:workspace-other",
+        actorType: SecretActorTypes.workspaceMember,
+        workspaceId: "workspace:other",
+        grantedActions: [SecretAccessActions.list],
+      },
+      owner: {
+        scope: SecretScopes.workspace,
+        workspaceId: "workspace:alpha",
+      },
+    });
+    expect(deniedList).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: SecretServiceErrorCodes.accessDenied,
+      }),
+    });
+
+    const userList = await listUseCase.execute({
+      actor: {
+        actorId: "user:alice",
+        actorType: SecretActorTypes.user,
+        workspaceId: "workspace:alpha",
+        userIdentityId: "user:alice",
+        grantedActions: [SecretAccessActions.list],
+      },
+      owner: {
+        scope: SecretScopes.user,
+        workspaceId: "workspace:alpha",
+        userIdentityId: "user:alice",
+      },
+    });
+
+    expect(userList.ok).toBeTrue();
+    if (!userList.ok) {
+      return;
+    }
+    expect(userList.value.items).toHaveLength(1);
+    expect(userList.value.items[0]?.secretId).toBe(userRecord.secretId);
+
+    const disabled = await disableUseCase.execute({
+      actor: {
+        actorId: "user:alice",
+        actorType: SecretActorTypes.user,
+        workspaceId: "workspace:alpha",
+        userIdentityId: "user:alice",
+        grantedActions: [SecretAccessActions.disable],
+      },
+      operationKey: "op:disable:user-secret",
+      secretId: userRecord.secretId,
+    });
+
+    expect(disabled.ok).toBeTrue();
+    if (!disabled.ok) {
+      return;
+    }
+    expect(disabled.value.state).toBe("disabled");
+  });
+});
+
+function createWorkspaceSecretRecord(workspaceId: string): SecretRecord {
+  return createSecretRecord({
+    secretId: `secret:workspace:${workspaceId}`,
+    name: `integration.${workspaceId.replace("workspace:", "")}.api-token`,
+    owner: {
+      scope: SecretScopes.workspace,
+      workspaceId,
+    },
+    kind: SecretKinds.accessToken,
+    createdBy: "user:workspace-owner",
+    createdAt: "2026-04-05T12:00:00.000Z",
+    metadata: {
+      tags: ["workspace", "runtime"],
+      labels: {
+        provider: "workspace-runtime",
+        usage: "service-runtime",
+      },
+    },
+    initialVersion: {
+      versionId: `secret:workspace:${workspaceId}:v1`,
+      createdBy: "user:workspace-owner",
+      encryptedPayloadRef: `enc:secret:workspace:${workspaceId}:v1`,
+      payloadDigestSha256: `sha256:workspace:${workspaceId}:v1`,
+      payloadByteLength: 21,
+      keyEncryptionContext: {
+        keyId: "kek:workspace:default",
+        algorithm: "aes-256-gcm",
+        scope: SecretScopes.workspace,
+        workspaceId,
+      },
+    },
+  });
+}
+
+function createUserSecretRecord(userIdentityId: string, workspaceId: string): SecretRecord {
+  return createSecretRecord({
+    secretId: `secret:user:${userIdentityId}`,
+    name: "personal.openai.api-key",
+    owner: {
+      scope: SecretScopes.user,
+      workspaceId,
+      userIdentityId,
+    },
+    kind: SecretKinds.apiKey,
+    createdBy: userIdentityId,
+    createdAt: "2026-04-05T12:00:00.000Z",
+    metadata: {
+      tags: ["personal", "openai"],
+      labels: {
+        provider: "openai",
+        usage: "model-inference",
+      },
+    },
+    initialVersion: {
+      versionId: `secret:user:${userIdentityId}:v1`,
+      createdBy: userIdentityId,
+      encryptedPayloadRef: `enc:secret:user:${userIdentityId}:v1`,
+      payloadDigestSha256: `sha256:user:${userIdentityId}:v1`,
+      payloadByteLength: 18,
+      keyEncryptionContext: {
+        keyId: "kek:user:default",
+        algorithm: "aes-256-gcm",
+        scope: SecretScopes.user,
+        workspaceId,
+        userIdentityId,
+      },
+    },
+  });
+}
+
+function createServerSecretRecord(): SecretRecord {
+  return createSecretRecord({
+    secretId: "secret:server:openai",
+    name: "provider.openai.api-key",
+    owner: {
+      scope: SecretScopes.server,
+    },
+    kind: SecretKinds.apiKey,
+    createdBy: "user:server-admin",
+    createdAt: "2026-04-05T12:00:00.000Z",
+    metadata: {
+      tags: ["server", "openai"],
+      labels: {
+        provider: "openai",
+        usage: "model-inference",
+      },
+    },
+    initialVersion: {
+      versionId: "secret:server:openai:v1",
+      createdBy: "user:server-admin",
+      encryptedPayloadRef: "enc:secret:server:openai:v1",
+      payloadDigestSha256: "sha256:secret:server:openai:v1",
+      payloadByteLength: 14,
+      keyEncryptionContext: {
+        keyId: "kek:server:default",
+        algorithm: "aes-256-gcm",
+        scope: SecretScopes.server,
+      },
+    },
+  });
+}

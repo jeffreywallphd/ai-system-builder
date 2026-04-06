@@ -20,6 +20,11 @@ This note documents Story 8.1.7 (Feature 8 / Epic 8.1): wire secret services int
 - The composed service exposes application-level use cases:
   - `CreateSecretUseCase`
   - `GetSecretMetadataUseCase`
+  - `RetrieveSecretPlaintextForRuntimeUseCase`
+  - `RotateSecretUseCase`
+  - `DisableSecretUseCase`
+  - `DeleteSecretUseCase`
+  - `ListSecretsUseCase`
   - `SecretScopeResolver`
 
 ## Environment posture

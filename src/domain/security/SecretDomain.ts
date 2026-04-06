@@ -161,6 +161,9 @@ export const SecretAccessDecisionReasons = Object.freeze({
   recordRevoked: "record-revoked",
   recordDeleted: "record-deleted",
   plaintextRetrievalDisabled: "plaintext-retrieval-disabled",
+  runtimeAccessRequired: "runtime-access-required",
+  administrativeAccessRequired: "administrative-access-required",
+  actorTypeNotAllowed: "actor-type-not-allowed",
 });
 
 export type SecretAccessDecisionReason =
