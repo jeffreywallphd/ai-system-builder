@@ -79,11 +79,43 @@ export interface ContentChecksum {
   readonly digest: string;
 }
 
+export const AssetContentEncryptionKeyScopes = Object.freeze({
+  server: "server",
+  workspace: "workspace",
+  storageInstance: "storage-instance",
+});
+
+export type AssetContentEncryptionKeyScope =
+  typeof AssetContentEncryptionKeyScopes[keyof typeof AssetContentEncryptionKeyScopes];
+
+export const AssetContentEncryptionFormats = Object.freeze({
+  aes256GcmV1: "asset-content/aes-256-gcm/v1",
+});
+
+export type AssetContentEncryptionFormat =
+  typeof AssetContentEncryptionFormats[keyof typeof AssetContentEncryptionFormats];
+
+export interface AssetContentEncryptionDescriptor {
+  readonly format: AssetContentEncryptionFormat;
+  readonly algorithm: "aes-256-gcm";
+  readonly keyReferenceId: string;
+  readonly keyId: string;
+  readonly keyVersion?: string;
+  readonly keyScope: AssetContentEncryptionKeyScope;
+  readonly workspaceId?: string;
+  readonly storageInstanceId?: string;
+  readonly ivBase64: string;
+  readonly authTagBase64: string;
+  readonly aad: string;
+  readonly encryptedAt: string;
+}
+
 export interface ContentDescriptor {
   readonly mimeType: string;
   readonly sizeBytes: number;
   readonly checksum: ContentChecksum;
   readonly originalFileName?: string;
+  readonly encryption?: AssetContentEncryptionDescriptor;
 }
 
 export interface AssetOwnershipMetadata {
@@ -309,6 +341,70 @@ function normalizeRevision(value: number): number {
   return value;
 }
 
+function normalizeAssetContentEncryptionKeyScope(value: AssetContentEncryptionKeyScope): AssetContentEncryptionKeyScope {
+  if (!Object.values(AssetContentEncryptionKeyScopes).includes(value)) {
+    throw new AssetDomainError(`Asset content encryption keyScope '${String(value)}' is invalid.`);
+  }
+  return value;
+}
+
+function normalizeAssetContentEncryptionFormat(value: AssetContentEncryptionFormat): AssetContentEncryptionFormat {
+  if (!Object.values(AssetContentEncryptionFormats).includes(value)) {
+    throw new AssetDomainError(`Asset content encryption format '${String(value)}' is invalid.`);
+  }
+  return value;
+}
+
+function normalizeBase64(value: string, field: string): string {
+  const normalized = normalizeRequired(value, field);
+  if (!/^[a-zA-Z0-9+/]+={0,2}$/.test(normalized)) {
+    throw new AssetDomainError(`${field} must be valid base64.`);
+  }
+  return normalized;
+}
+
+function normalizeAssetContentEncryptionDescriptor(
+  value: AssetContentEncryptionDescriptor | undefined,
+): AssetContentEncryptionDescriptor | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const scope = normalizeAssetContentEncryptionKeyScope(value.keyScope);
+  const workspaceId = normalizeOptional(value.workspaceId);
+  const storageInstanceId = normalizeOptional(value.storageInstanceId);
+
+  if (scope === AssetContentEncryptionKeyScopes.server) {
+    if (workspaceId || storageInstanceId) {
+      throw new AssetDomainError("Server-scope content encryption descriptors cannot define workspaceId or storageInstanceId.");
+    }
+  } else if (scope === AssetContentEncryptionKeyScopes.workspace) {
+    if (!workspaceId) {
+      throw new AssetDomainError("Workspace-scope content encryption descriptors require workspaceId.");
+    }
+    if (storageInstanceId) {
+      throw new AssetDomainError("Workspace-scope content encryption descriptors cannot define storageInstanceId.");
+    }
+  } else if (!workspaceId || !storageInstanceId) {
+    throw new AssetDomainError("Storage-instance-scope content encryption descriptors require workspaceId and storageInstanceId.");
+  }
+
+  return Object.freeze({
+    format: normalizeAssetContentEncryptionFormat(value.format),
+    algorithm: value.algorithm,
+    keyReferenceId: normalizeRequired(value.keyReferenceId, "Asset content encryption keyReferenceId"),
+    keyId: normalizeRequired(value.keyId, "Asset content encryption keyId"),
+    keyVersion: normalizeOptional(value.keyVersion),
+    keyScope: scope,
+    workspaceId,
+    storageInstanceId,
+    ivBase64: normalizeBase64(value.ivBase64, "Asset content encryption ivBase64"),
+    authTagBase64: normalizeBase64(value.authTagBase64, "Asset content encryption authTagBase64"),
+    aad: normalizeRequired(value.aad, "Asset content encryption aad"),
+    encryptedAt: normalizeTimestamp(value.encryptedAt, "Asset content encryption encryptedAt"),
+  });
+}
+
 function normalizeOwnershipMetadata(input: AssetOwnershipMetadata): AssetOwnershipMetadata {
   const createdAt = normalizeTimestamp(input.createdAt, "Asset ownership createdAt");
   const lastModifiedAt = normalizeTimestamp(input.lastModifiedAt, "Asset ownership lastModifiedAt");
@@ -362,6 +458,7 @@ function normalizeContentDescriptor(input: ContentDescriptor): ContentDescriptor
       digest: normalizeChecksumDigest(input.checksum.digest),
     }),
     originalFileName: normalizeOptional(input.originalFileName),
+    encryption: normalizeAssetContentEncryptionDescriptor(input.encryption),
   });
 }
 
@@ -559,6 +656,7 @@ export function createContentDescriptor(input: {
     readonly digest: string;
   };
   readonly originalFileName?: string;
+  readonly encryption?: AssetContentEncryptionDescriptor;
 }): ContentDescriptor {
   return normalizeContentDescriptor({
     mimeType: input.mimeType,
@@ -568,6 +666,7 @@ export function createContentDescriptor(input: {
       digest: input.checksum.digest,
     },
     originalFileName: input.originalFileName,
+    encryption: input.encryption,
   });
 }
 

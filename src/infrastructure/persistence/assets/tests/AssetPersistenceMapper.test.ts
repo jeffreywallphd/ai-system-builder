@@ -60,6 +60,7 @@ describe("AssetPersistenceMapper", () => {
         checksum_algorithm: "sha256",
         checksum_digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         original_file_name: "input.png",
+        content_encryption_descriptor: null,
         created_by: "user-owner",
         created_at: "2026-04-06T12:00:00.000Z",
       },
@@ -122,5 +123,67 @@ describe("AssetPersistenceMapper", () => {
     expect(normalizeAssetLookup("  asset-beta ")).toBe("asset-beta");
     expect(normalizeAssetLookup("   ")).toBeUndefined();
     expect(normalizeLineageRelation(undefined)).toBe(AssetLineageRelations.derivedFrom);
+  });
+
+  it("rehydrates encrypted content descriptors from persisted version rows", () => {
+    const assetRow: AssetRecordRow = {
+      asset_id: "asset-encrypted",
+      workspace_id: "workspace-alpha",
+      owner_user_id: "user-owner",
+      storage_instance_id: "storage-alpha",
+      storage_uri: "storage-instance://storage-alpha",
+      kind: AssetKinds.uploadedFile,
+      visibility: AssetVisibilities.private,
+      sharing_policy_id: null,
+      sharing_policy_version: null,
+      lifecycle_state: "active",
+      archived_at: null,
+      archived_by: null,
+      deleted_at: null,
+      deleted_by: null,
+      display_name: "input.png",
+      current_version_id: "ver-1",
+      created_by: "user-owner",
+      created_at: "2026-04-06T12:00:00.000Z",
+      last_modified_by: "user-owner",
+      last_modified_at: "2026-04-06T12:00:00.000Z",
+    };
+
+    const versionRows: AssetVersionRow[] = [
+      {
+        asset_id: "asset-encrypted",
+        version_id: "ver-1",
+        revision: 1,
+        storage_instance_id: "storage-alpha",
+        storage_uri: "storage-instance://storage-alpha",
+        object_key: "workspace-alpha/input/input.png",
+        object_version_id: null,
+        storage_area: "input",
+        mime_type: "image/png",
+        size_bytes: 1024,
+        checksum_algorithm: "sha256",
+        checksum_digest: "a".repeat(64),
+        original_file_name: "input.png",
+        content_encryption_descriptor: JSON.stringify({
+          format: "asset-content/aes-256-gcm/v1",
+          algorithm: "aes-256-gcm",
+          keyReferenceId: "kek:asset-content:workspace:workspace-alpha:v1",
+          keyId: "kek:asset-content:workspace:workspace-alpha",
+          keyVersion: "v1",
+          keyScope: "workspace",
+          workspaceId: "workspace-alpha",
+          ivBase64: Buffer.from("123456789012", "utf8").toString("base64"),
+          authTagBase64: Buffer.alloc(16, 1).toString("base64"),
+          aad: "asset-content-encryption/v1;workspace=workspace-alpha",
+          encryptedAt: "2026-04-06T12:00:00.000Z",
+        }),
+        created_by: "user-owner",
+        created_at: "2026-04-06T12:00:00.000Z",
+      },
+    ];
+
+    const mapped = mapAssetRowsToDomain(assetRow, versionRows);
+    expect(mapped.versions[0]?.content.encryption?.format).toBe("asset-content/aes-256-gcm/v1");
+    expect(mapped.versions[0]?.content.encryption?.keyReferenceId).toBe("kek:asset-content:workspace:workspace-alpha:v1");
   });
 });
