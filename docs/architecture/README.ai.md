@@ -194,5 +194,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 
 - Authoritative server runtime now composes secret services through `src/infrastructure/security/secrets/SecretServiceComposition.ts` and host wiring in `hosts/server/IdentityServerHost.ts`.
 - Canonical architecture note for this slice: `docs/architecture/secrets-service-composition.md`.
+- Runtime-facing service-to-service secret consumption adapters now expose workspace/user/server credential retrieval through formal retrieval use cases in `src/application/security/services/SecretRuntimeConsumptionAdapters.ts`.
+- Canonical architecture note for this slice: `docs/architecture/secrets-service-consumption-adapters.md`.
 
 

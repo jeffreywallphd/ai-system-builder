@@ -239,6 +239,25 @@ describe("IdentityServerHost", () => {
       }
       expect(metadataResult.value.secretId).toBe("secret:server:openai");
       expect(metadataResult.value.currentVersionId).toBe("secret:server:openai:v1");
+
+      const runtimeCredentialResult = await host.secretService.runtimeSecretConsumptionAdapters.resolveServerSigningCredential({
+        secretId: "secret:server:openai",
+        operationKey: "op:host:secret:retrieve:1",
+        serviceIdentity: "runtime:server:identity-token-service",
+        signingPurpose: "host-runtime-secret-consumption-test",
+      });
+      expect(runtimeCredentialResult).toEqual({
+        ok: true,
+        value: {
+          secretId: "secret:server:openai",
+          currentVersionId: "secret:server:openai:v1",
+          scope: {
+            scope: SecretScopes.server,
+          },
+          plaintext: "sk-live-123",
+          credential: "sk-live-123",
+        },
+      });
     } finally {
       await host.close();
       rmSync(tempDirectory, { recursive: true, force: true });
