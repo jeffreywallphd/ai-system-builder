@@ -3,6 +3,7 @@
 ## Purpose
 
 Story 9.1.3 adds shared storage transport DTOs + schema validation so storage create/update/list/detail flows have stable host/API/UI contracts.
+Story 9.1.5 extends the detail access model from UI booleans to an authorization-seam access summary.
 
 ## Canonical files
 
@@ -20,7 +21,7 @@ Story 9.1.3 adds shared storage transport DTOs + schema validation so storage cr
   - display metadata
   - lifecycle metadata
   - policy metadata (including explicit security + lifecycle hooks)
-  - access permission summary
+  - access summary with ownership/workspace context, effective action permissions, allowed actions, and policy-restricted capabilities
   - replication + sync metadata
 - create/update/list/detail command/query DTOs and response DTOs
 - internal-vs-admin-safe projection seam for sensitive storage references
@@ -43,6 +44,7 @@ Story 9.1.3 adds shared storage transport DTOs + schema validation so storage cr
   - metadata label safety enforcement
   - list pagination bounds
   - strict unknown-key rejection
+  - access-summary consistency checks (allowed actions must map to allowed effective permissions, and ownership/workspace context must match detail payload identity)
 - create-policy parsing applies deterministic defaults for omitted security/lifecycle policy metadata fields.
 - Parse helpers throw `StorageTransportSchemaValidationError` with typed issue metadata.
 

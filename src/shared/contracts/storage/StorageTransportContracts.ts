@@ -5,6 +5,8 @@ import type {
   StorageEncryptionKeyScope,
   StorageEncryptionMode,
   StorageLifecycleState,
+  StorageManagedAction,
+  StoragePolicyRestrictedCapability,
   StorageReplicationMode,
   StorageRetentionExpiryAction,
 } from "../../../domain/storage/StorageDomain";
@@ -101,14 +103,50 @@ export interface StorageAccessPolicyDto {
   readonly scope: StorageAccessScope;
 }
 
-export interface StorageAccessPermissionsSummaryDto {
+export const StorageAccessPermissionEffects = Object.freeze({
+  allowed: "allowed",
+  denied: "denied",
+  restricted: "restricted",
+  unknown: "unknown",
+});
+
+export type StorageAccessPermissionEffect =
+  typeof StorageAccessPermissionEffects[keyof typeof StorageAccessPermissionEffects];
+
+export const StorageAccessSummarySources = Object.freeze({
+  authorizationPolicy: "authorization-policy",
+  ownershipDefault: "ownership-default",
+  mixed: "mixed",
+  unknown: "unknown",
+});
+
+export type StorageAccessSummarySource =
+  typeof StorageAccessSummarySources[keyof typeof StorageAccessSummarySources];
+
+export interface StorageAccessEffectivePermissionDto {
+  readonly action: StorageManagedAction;
+  readonly effect: StorageAccessPermissionEffect;
+  readonly reasonCode?: string;
+  readonly message?: string;
+}
+
+export interface StoragePolicyRestrictedCapabilityDto {
+  readonly capability: StoragePolicyRestrictedCapability;
+  readonly restricted: boolean;
+  readonly reasonCode?: string;
+}
+
+export interface StorageAccessSummaryDto {
+  readonly workspaceId: string;
+  readonly ownerUserIdentityId: string;
+  readonly actorUserIdentityId?: string;
   readonly mode: StorageAccessMode;
   readonly scope: StorageAccessScope;
-  readonly canRead: boolean;
-  readonly canWrite: boolean;
-  readonly canDelete: boolean;
-  readonly canManagePolicy: boolean;
-  readonly canManageLifecycle: boolean;
+  readonly isOwner: boolean;
+  readonly source: StorageAccessSummarySource;
+  readonly effectivePermissions: ReadonlyArray<StorageAccessEffectivePermissionDto>;
+  readonly allowedActions: ReadonlyArray<StorageManagedAction>;
+  readonly policyRestrictedCapabilities: ReadonlyArray<StoragePolicyRestrictedCapabilityDto>;
   readonly extensions?: Readonly<Record<string, unknown>>;
 }
 
@@ -166,7 +204,7 @@ export interface StorageInstanceSummaryDto extends StorageInternalInstanceSummar
 
 export interface StorageInternalInstanceDetailDto extends StorageInternalInstanceSummaryDto {
   readonly ownerUserIdentityId: string;
-  readonly access: StorageAccessPermissionsSummaryDto;
+  readonly access: StorageAccessSummaryDto;
   readonly policy: StoragePolicyMetadataDto;
   readonly replication: StorageReplicationStatusDto;
   readonly sensitive?: StorageSensitiveMetadataDto;
@@ -174,7 +212,7 @@ export interface StorageInternalInstanceDetailDto extends StorageInternalInstanc
 
 export interface StorageInstanceDetailDto extends StorageInternalInstanceSummaryDto {
   readonly ownerUserIdentityId: string;
-  readonly access: StorageAccessPermissionsSummaryDto;
+  readonly access: StorageAccessSummaryDto;
   readonly policy: StoragePolicyMetadataDto;
   readonly replication: StorageReplicationStatusDto;
   readonly sensitiveRedaction?: StorageSensitiveRedactionSummaryDto;

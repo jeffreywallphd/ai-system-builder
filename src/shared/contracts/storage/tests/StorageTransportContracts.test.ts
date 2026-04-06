@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { StorageBackendTypes, StorageLifecycleStates } from "../../../../domain/storage/StorageDomain";
+import {
+  StorageBackendTypes,
+  StorageLifecycleStates,
+  StorageManagedActions,
+  StoragePolicyRestrictedCapabilities,
+} from "../../../../domain/storage/StorageDomain";
 import {
   StorageSensitiveRedactionReasons,
   StorageTransportContractError,
@@ -33,13 +38,54 @@ describe("StorageTransportContracts", () => {
       },
       ownerUserIdentityId: "user:owner-1",
       access: {
+        workspaceId: "workspace:alpha",
+        ownerUserIdentityId: "user:owner-1",
+        actorUserIdentityId: "user:owner-1",
         mode: "read-write",
         scope: "workspace-members",
-        canRead: true,
-        canWrite: true,
-        canDelete: true,
-        canManagePolicy: true,
-        canManageLifecycle: true,
+        isOwner: true,
+        source: "authorization-policy",
+        effectivePermissions: [
+          {
+            action: StorageManagedActions.view,
+            effect: "allowed",
+          },
+          {
+            action: StorageManagedActions.updateMetadata,
+            effect: "allowed",
+          },
+          {
+            action: StorageManagedActions.provision,
+            effect: "allowed",
+          },
+          {
+            action: StorageManagedActions.activate,
+            effect: "allowed",
+          },
+          {
+            action: StorageManagedActions.deactivate,
+            effect: "allowed",
+          },
+          {
+            action: StorageManagedActions.useForAssets,
+            effect: "allowed",
+          },
+        ],
+        allowedActions: [
+          StorageManagedActions.view,
+          StorageManagedActions.updateMetadata,
+          StorageManagedActions.provision,
+          StorageManagedActions.activate,
+          StorageManagedActions.deactivate,
+          StorageManagedActions.useForAssets,
+        ],
+        policyRestrictedCapabilities: [
+          {
+            capability: StoragePolicyRestrictedCapabilities.previewDecryption,
+            restricted: true,
+            reasonCode: "preview-decryption-disabled",
+          },
+        ],
       },
       policy: {
         policyId: "policy:storage:1",
@@ -121,13 +167,18 @@ describe("StorageTransportContracts", () => {
       },
       ownerUserIdentityId: "user:owner-1",
       access: {
+        workspaceId: "workspace:alpha",
+        ownerUserIdentityId: "user:owner-1",
         mode: "read-only",
         scope: "workspace-members",
-        canRead: true,
-        canWrite: false,
-        canDelete: false,
-        canManagePolicy: false,
-        canManageLifecycle: false,
+        isOwner: false,
+        source: "unknown",
+        effectivePermissions: [{
+          action: StorageManagedActions.view,
+          effect: "allowed",
+        }],
+        allowedActions: [StorageManagedActions.view],
+        policyRestrictedCapabilities: [],
       },
       policy: {
         policyId: "policy:storage:2",

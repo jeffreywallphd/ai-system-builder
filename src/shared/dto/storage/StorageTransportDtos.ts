@@ -1,6 +1,18 @@
-import { StorageAccessModes, StorageLifecycleStates, type StorageInstance } from "../../../domain/storage/StorageDomain";
+import {
+  StorageManagedActions,
+  StoragePolicyRestrictedCapabilities,
+  type StorageInstance,
+} from "../../../domain/storage/StorageDomain";
 import type {
-  StorageAccessPermissionsSummaryDto,
+  StorageAccessEffectivePermissionSummary,
+  StorageAccessSummarySource,
+  StorageInstanceAccessSummary,
+  StoragePolicyRestrictedCapabilitySummary,
+} from "../../../application/storage/ports/StorageAccessSummaryPort";
+import type {
+  StorageAccessPermissionEffect,
+  StorageAccessSummaryDto,
+  StorageAccessSummarySource as StorageAccessSummarySourceDto,
   StorageDisplayMetadataDto,
   StorageInstanceDetailDto,
   StorageInstanceSummaryDto,
@@ -131,20 +143,105 @@ export interface StorageDtoProjectionOptions {
     readonly syncLagSeconds?: number;
   };
   readonly sensitive?: StorageSensitiveMetadataDto;
+  readonly accessSummary?: Omit<StorageInstanceAccessSummary, "workspaceId" | "ownerUserIdentityId" | "mode" | "scope"> & {
+    readonly effectivePermissions?: ReadonlyArray<StorageAccessEffectivePermissionSummary>;
+    readonly policyRestrictedCapabilities?: ReadonlyArray<StoragePolicyRestrictedCapabilitySummary>;
+    readonly source?: StorageAccessSummarySource;
+  };
 }
 
-function toStoragePermissions(instance: StorageInstance): StorageAccessPermissionsSummaryDto {
-  const canWrite = instance.access.mode !== StorageAccessModes.readOnly;
-  const lifecycleMutable = instance.lifecycleState !== StorageLifecycleStates.deleted;
+interface PermissionResolutionSeed {
+  readonly effect: StorageAccessPermissionEffect;
+  readonly reasonCode?: string;
+  readonly message?: string;
+}
+
+const DefaultPermissionSeeds = Object.freeze({
+  [StorageManagedActions.view]: Object.freeze({ effect: "unknown" as const }),
+  [StorageManagedActions.updateMetadata]: Object.freeze({ effect: "unknown" as const }),
+  [StorageManagedActions.provision]: Object.freeze({ effect: "unknown" as const }),
+  [StorageManagedActions.activate]: Object.freeze({ effect: "unknown" as const }),
+  [StorageManagedActions.deactivate]: Object.freeze({ effect: "unknown" as const }),
+  [StorageManagedActions.useForAssets]: Object.freeze({ effect: "unknown" as const }),
+});
+
+function toStorageAccessSummary(instance: StorageInstance, options?: StorageDtoProjectionOptions): StorageAccessSummaryDto {
+  const providedPermissions = options?.accessSummary?.effectivePermissions ?? [];
+  const permissionByAction = new Map<StorageAccessEffectivePermissionSummary["action"], PermissionResolutionSeed>();
+  for (const permission of providedPermissions) {
+    permissionByAction.set(permission.action, {
+      effect: permission.effect,
+      reasonCode: permission.reasonCode,
+      message: permission.message,
+    });
+  }
+
+  const effectivePermissions = Object.values(StorageManagedActions).map((action) => {
+    const resolved = permissionByAction.get(action) ?? DefaultPermissionSeeds[action];
+    return Object.freeze({
+      action,
+      effect: resolved.effect,
+      reasonCode: resolved.reasonCode,
+      message: resolved.message,
+    });
+  });
+  const allowedActions = effectivePermissions
+    .filter((permission) => permission.effect === "allowed")
+    .map((permission) => permission.action);
+
+  const providedCapabilities = new Map<StoragePolicyRestrictedCapabilitySummary["capability"], StoragePolicyRestrictedCapabilitySummary>();
+  for (const capability of options?.accessSummary?.policyRestrictedCapabilities ?? []) {
+    providedCapabilities.set(capability.capability, capability);
+  }
+
+  const policyRestrictedCapabilities = Object.freeze([
+    Object.freeze(
+      providedCapabilities.get(StoragePolicyRestrictedCapabilities.mutableWrites) ?? {
+        capability: StoragePolicyRestrictedCapabilities.mutableWrites,
+        restricted: instance.policy.immutableWrites,
+        reasonCode: instance.policy.immutableWrites ? "immutable-writes-enforced" : undefined,
+      },
+    ),
+    Object.freeze(
+      providedCapabilities.get(StoragePolicyRestrictedCapabilities.crossWorkspaceReads) ?? {
+        capability: StoragePolicyRestrictedCapabilities.crossWorkspaceReads,
+        restricted: !instance.policy.allowCrossWorkspaceReads,
+        reasonCode: !instance.policy.allowCrossWorkspaceReads ? "cross-workspace-reads-disabled" : undefined,
+      },
+    ),
+    Object.freeze(
+      providedCapabilities.get(StoragePolicyRestrictedCapabilities.previewDecryption) ?? {
+        capability: StoragePolicyRestrictedCapabilities.previewDecryption,
+        restricted: !instance.policy.security.allowPreviewDecryption,
+        reasonCode: !instance.policy.security.allowPreviewDecryption ? "preview-decryption-disabled" : undefined,
+      },
+    ),
+    Object.freeze(
+      providedCapabilities.get(StoragePolicyRestrictedCapabilities.workerDecryption) ?? {
+        capability: StoragePolicyRestrictedCapabilities.workerDecryption,
+        restricted: !instance.policy.security.allowWorkerDecryption,
+        reasonCode: !instance.policy.security.allowWorkerDecryption ? "worker-decryption-disabled" : undefined,
+      },
+    ),
+  ]);
+
+  const actorUserIdentityId = options?.accessSummary?.actorUserIdentityId;
+  const isOwner = actorUserIdentityId
+    ? actorUserIdentityId === instance.ownership.ownerUserIdentityId
+    : options?.accessSummary?.isOwner ?? false;
+  const source: StorageAccessSummarySourceDto = options?.accessSummary?.source ?? "unknown";
 
   return Object.freeze({
+    workspaceId: instance.ownership.workspaceId,
+    ownerUserIdentityId: instance.ownership.ownerUserIdentityId,
+    actorUserIdentityId,
     mode: instance.access.mode,
     scope: instance.access.scope,
-    canRead: true,
-    canWrite,
-    canDelete: lifecycleMutable,
-    canManagePolicy: lifecycleMutable,
-    canManageLifecycle: lifecycleMutable,
+    isOwner,
+    source,
+    effectivePermissions,
+    allowedActions,
+    policyRestrictedCapabilities,
   });
 }
 
@@ -222,7 +319,7 @@ export function toStorageInternalInstanceDetailDto(
   return Object.freeze({
     ...toStorageInternalInstanceSummaryDto(instance, options),
     ownerUserIdentityId: instance.ownership.ownerUserIdentityId,
-    access: toStoragePermissions(instance),
+    access: toStorageAccessSummary(instance, options),
     policy: toStoragePolicyMetadata(instance),
     replication: toStorageReplicationStatus(instance, options),
     sensitive: options?.sensitive,

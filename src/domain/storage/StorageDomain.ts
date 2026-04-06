@@ -82,6 +82,27 @@ export const StorageRetentionExpiryActions = Object.freeze({
 export type StorageRetentionExpiryAction =
   typeof StorageRetentionExpiryActions[keyof typeof StorageRetentionExpiryActions];
 
+export const StorageManagedActions = Object.freeze({
+  view: "view",
+  updateMetadata: "update-metadata",
+  provision: "provision",
+  activate: "activate",
+  deactivate: "deactivate",
+  useForAssets: "use-for-assets",
+});
+
+export type StorageManagedAction = typeof StorageManagedActions[keyof typeof StorageManagedActions];
+
+export const StoragePolicyRestrictedCapabilities = Object.freeze({
+  mutableWrites: "mutable-writes",
+  crossWorkspaceReads: "cross-workspace-reads",
+  previewDecryption: "preview-decryption",
+  workerDecryption: "worker-decryption",
+});
+
+export type StoragePolicyRestrictedCapability =
+  typeof StoragePolicyRestrictedCapabilities[keyof typeof StoragePolicyRestrictedCapabilities];
+
 export interface StorageOwnership {
   readonly workspaceId: string;
   readonly ownerUserIdentityId: string;

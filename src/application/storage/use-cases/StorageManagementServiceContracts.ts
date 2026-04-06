@@ -7,6 +7,7 @@ import type {
   StorageReplicationMode,
 } from "../../../domain/storage/StorageDomain";
 import type { StorageBackendCapabilitySnapshot } from "../ports/StorageCapabilityInspectionPort";
+import type { StorageInstanceAccessSummary } from "../ports/StorageAccessSummaryPort";
 import type { StorageProvisioningReceipt } from "../ports/StorageProvisioningPort";
 
 export const StorageManagementErrorCodes = Object.freeze({
@@ -79,6 +80,7 @@ export interface CreateStorageInstanceCommand {
 
 export interface CreateStorageInstanceResult {
   readonly storageInstance: StorageInstance;
+  readonly accessSummary?: StorageInstanceAccessSummary;
   readonly provisioning?: StorageProvisioningReceipt;
   readonly capabilities?: StorageBackendCapabilitySnapshot;
 }
@@ -97,6 +99,7 @@ export interface UpdateStorageMetadataCommand {
 
 export interface UpdateStorageMetadataResult {
   readonly storageInstance: StorageInstance;
+  readonly accessSummary?: StorageInstanceAccessSummary;
   readonly capabilities?: StorageBackendCapabilitySnapshot;
 }
 
@@ -125,6 +128,7 @@ export interface DeactivateStorageInstanceCommand {
 
 export interface StorageLifecycleMutationResult {
   readonly storageInstance: StorageInstance;
+  readonly accessSummary?: StorageInstanceAccessSummary;
   readonly provisioning?: StorageProvisioningReceipt;
   readonly capabilities?: StorageBackendCapabilitySnapshot;
 }
@@ -144,6 +148,7 @@ export interface ListAccessibleStorageInstancesQuery {
 
 export interface AccessibleStorageInstanceItem {
   readonly storageInstance: StorageInstance;
+  readonly accessSummary?: StorageInstanceAccessSummary;
   readonly capabilities?: StorageBackendCapabilitySnapshot;
 }
 
@@ -161,6 +166,7 @@ export interface GetStorageInstanceDetailsQuery {
 
 export interface GetStorageInstanceDetailsResult {
   readonly storageInstance: StorageInstance;
+  readonly accessSummary?: StorageInstanceAccessSummary;
   readonly capabilities?: StorageBackendCapabilitySnapshot;
 }
 
