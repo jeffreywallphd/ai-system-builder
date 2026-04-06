@@ -7,6 +7,7 @@ Quick baseline for Story 8.1.7 (Feature 8 / Epic 8.1): compose secret services i
 ## Canonical files
 
 - `src/infrastructure/security/secrets/SecretServiceComposition.ts`
+- `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts`
 - `hosts/server/IdentityServerHost.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
 - `.env.example`
@@ -46,6 +47,8 @@ Quick baseline for Story 8.1.7 (Feature 8 / Epic 8.1): compose secret services i
 - Partial master-key configuration fails startup.
 - Fully configured key material composes encryption service and allows secret create/metadata flows.
 - Missing key configuration keeps service composition resolvable while reporting encryption unavailable status.
+- Declared required system secrets (`AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS`) must be present and runtime-retrievable at startup; otherwise startup fails closed.
+- Startup can migrate supported legacy environment secret values into required system secret records (enabled by default; controlled by `AI_LOOM_SECRET_BOOTSTRAP_MIGRATE_LEGACY_ENV`).
 
 ## Test posture
 
@@ -53,3 +56,5 @@ Host runtime tests now cover:
 
 - successful secret-service composition and use-case execution in authoritative server runtime
 - fail-closed startup on partial master-key configuration
+- fail-closed startup when required system secrets are missing
+- successful startup when required system secrets are migrated from supported legacy env values
