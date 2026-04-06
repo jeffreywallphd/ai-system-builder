@@ -5,8 +5,10 @@ This note documents Story 9.2.2 (Feature 9 / Epic 9.2): the first concrete manag
 ## Canonical artifacts
 
 - `src/infrastructure/storage/local/ServerManagedLocalStorageBackendAdapter.ts`
+- `src/infrastructure/storage/local/ServerManagedLocalStorageObjectAdapter.ts`
 - `src/infrastructure/storage/local/index.ts`
 - `src/infrastructure/storage/local/tests/ServerManagedLocalStorageBackendAdapter.test.ts`
+- `src/infrastructure/storage/local/tests/ServerManagedLocalStorageObjectAdapter.test.ts`
 
 ## Scope and intent
 
@@ -14,6 +16,7 @@ This note documents Story 9.2.2 (Feature 9 / Epic 9.2): the first concrete manag
 - Satisfy `IStorageProvisioningPort` and `IStorageCapabilityInspectionPort` with explicit, typed outcomes.
 - Keep storage provisioning server-mediated and deterministic.
 - Preserve backend abstraction seams for additional backend adapters.
+- Implement logical object read/write/delete operations through managed storage contracts.
 
 ## Adapter behavior
 
@@ -33,6 +36,19 @@ This note documents Story 9.2.2 (Feature 9 / Epic 9.2): the first concrete manag
   - reports capability posture and root-health notes for the local managed backend.
 - `inspectStorageInstanceCapabilities(...)`
   - reports instance binding-health posture (`healthy`, `missing`, `path-conflict`) plus binding reference metadata.
+
+`ServerManagedLocalStorageObjectAdapter` implements:
+
+- `createObjectKey(...)`
+  - normalizes namespace/path segments + filenames and applies digest/time partition segments for deterministic logical keys.
+- `writeObject(...)`
+  - accepts buffer or async stream content, enforces storage policy size limits, and writes via server-managed directories only.
+- `objectExists(...)`, `readObjectMetadata(...)`, `openObjectReadStream(...)`
+  - provides logical key-based existence checks, metadata inspection, and stream reads.
+- `deleteObject(...)`
+  - safe delete semantics where missing objects return `deleted=false`.
+- adapter-safe failure mapping
+  - maps backend failures into `StorageObjectAccessError` with stable `storage-object-*` codes.
 
 ## Server-managed configuration model
 
@@ -58,6 +74,7 @@ Client-facing transport contracts continue to exclude raw filesystem path fields
 - Replication sync is intentionally unsupported in this backend slice.
 - Deactivation is lifecycle-only and does not delete local binding directories.
 - Capability notes are metadata-oriented and avoid surfacing raw host filesystem paths through application contracts.
+- Object operations are keyed by `StorageInstance` metadata + logical `objectKey`; callers never provide absolute/relative host paths.
 
 ## Test coverage
 
@@ -68,3 +85,11 @@ Client-facing transport contracts continue to exclude raw filesystem path fields
 - unsupported backend rejection
 - explicit filesystem failure mapping
 - capability health inspection for missing vs provisioned bindings
+
+`ServerManagedLocalStorageObjectAdapter.test.ts` validates:
+
+- logical key generation with filename normalization and partitioning
+- write/read flows for buffer and async stream content
+- metadata and existence checks
+- safe delete behavior
+- application-safe error mapping for invalid keys, not-found reads, and unsupported backends

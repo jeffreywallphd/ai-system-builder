@@ -9,6 +9,7 @@ This note documents the storage application-layer seams and the concrete service
 - `src/application/storage/ports/StoragePolicyEvaluationPort.ts`
 - `src/application/storage/ports/StorageAccessSummaryPort.ts`
 - `src/application/storage/ports/StorageCapabilityInspectionPort.ts`
+- `src/application/storage/ports/StorageObjectPort.ts`
 - `src/application/storage/ports/StorageObservabilityPorts.ts`
 - `src/application/storage/ports/StorageManagementPorts.ts`
 - `src/application/storage/use-cases/StorageManagementServiceContracts.ts`
@@ -22,6 +23,21 @@ This note documents the storage application-layer seams and the concrete service
 - Keep storage management orchestration centralized in the application layer.
 - Enforce workspace-aware policy checks and lifecycle transitions before any transport/controller code runs.
 - Preserve stable, backend-agnostic contracts while enabling backend provisioning and capability inspection.
+- Provide backend-agnostic logical object read/write contracts for asset content flows.
+
+## Logical object access contracts (Story 10.1.4)
+
+`StorageObjectPort` defines authoritative managed-storage content-operation seams for:
+
+- logical key generation from storage metadata and logical segments
+- object writes accepting buffer or async-stream content
+- object existence checks
+- object metadata reads
+- object read streaming
+- safe delete behavior for absent objects
+- typed application-safe failures (`StorageObjectAccessError` + stable error codes)
+
+These contracts are backend-neutral and operate on `StorageInstance` metadata plus logical object keys, not caller-supplied filesystem paths.
 
 ## Implemented service layer (Story 9.3.1)
 

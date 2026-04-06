@@ -5,3 +5,4 @@ export * from "./StorageAccessSummaryPort";
 export * from "./StorageCapabilityInspectionPort";
 export * from "./StorageObservabilityPorts";
 export * from "./StorageManagementPorts";
+export * from "./StorageObjectPort";
