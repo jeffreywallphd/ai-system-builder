@@ -1,4 +1,4 @@
-export const WORKSPACE_PERSISTENCE_SCHEMA_VERSION = 2;
+export const WORKSPACE_PERSISTENCE_SCHEMA_VERSION = 3;
 
 export const WORKSPACE_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -15,6 +15,16 @@ export const WORKSPACE_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, s
       status TEXT NOT NULL CHECK (status IN ('provisioning', 'active', 'suspended', 'archived')),
       owner_user_id TEXT NOT NULL,
       visibility TEXT NOT NULL CHECK (visibility IN ('private', 'team', 'public')),
+      encryption_mode TEXT NOT NULL DEFAULT 'platform-managed'
+        CHECK (encryption_mode IN ('none', 'platform-managed', 'customer-managed')),
+      content_encryption_required INTEGER NOT NULL DEFAULT 1
+        CHECK (content_encryption_required IN (0, 1)),
+      key_scope TEXT NOT NULL DEFAULT 'workspace'
+        CHECK (key_scope IN ('workspace', 'storage-instance', 'platform')),
+      allow_preview_decryption INTEGER NOT NULL DEFAULT 0
+        CHECK (allow_preview_decryption IN (0, 1)),
+      allow_worker_decryption INTEGER NOT NULL DEFAULT 0
+        CHECK (allow_worker_decryption IN (0, 1)),
       created_by TEXT NOT NULL,
       last_modified_by TEXT NOT NULL,
       created_at TEXT NOT NULL,
@@ -187,5 +197,26 @@ export const WORKSPACE_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, s
     CREATE INDEX IF NOT EXISTS workspace_invitations_workspace_token_hash_idx
       ON workspace_invitations(workspace_id, invitation_token_hash)
       WHERE invitation_token_hash IS NOT NULL;
+  `],
+  [3, `
+    ALTER TABLE workspace_records
+      ADD COLUMN encryption_mode TEXT NOT NULL DEFAULT 'platform-managed'
+        CHECK (encryption_mode IN ('none', 'platform-managed', 'customer-managed'));
+
+    ALTER TABLE workspace_records
+      ADD COLUMN content_encryption_required INTEGER NOT NULL DEFAULT 1
+        CHECK (content_encryption_required IN (0, 1));
+
+    ALTER TABLE workspace_records
+      ADD COLUMN key_scope TEXT NOT NULL DEFAULT 'workspace'
+        CHECK (key_scope IN ('workspace', 'storage-instance', 'platform'));
+
+    ALTER TABLE workspace_records
+      ADD COLUMN allow_preview_decryption INTEGER NOT NULL DEFAULT 0
+        CHECK (allow_preview_decryption IN (0, 1));
+
+    ALTER TABLE workspace_records
+      ADD COLUMN allow_worker_decryption INTEGER NOT NULL DEFAULT 0
+        CHECK (allow_worker_decryption IN (0, 1));
   `],
 ]);

@@ -152,7 +152,20 @@ export class StorageManagementService implements IStorageManagementService {
       const policyUpdated = updateStoragePolicy(
         current,
         {
-          labels: command.labels ?? current.policy.labels,
+          maxObjectBytes: command.policy?.maxObjectBytes,
+          retentionDays: command.policy?.retentionDays,
+          immutableWrites: command.policy?.immutableWrites,
+          allowCrossWorkspaceReads: command.policy?.allowCrossWorkspaceReads,
+          labels: command.policy?.labels ?? command.labels ?? current.policy.labels,
+          encryption: command.policy?.encryption
+            ? {
+              profileId: command.policy.encryption.profileId ?? current.policy.encryption.profileId,
+              keyReferenceId: command.policy.encryption.keyReferenceId ?? current.policy.encryption.keyReferenceId,
+              envelopeRequired: command.policy.encryption.envelopeRequired ?? current.policy.encryption.envelopeRequired,
+            }
+            : undefined,
+          security: command.policy?.security,
+          lifecycle: command.policy?.lifecycle,
         },
         attribution,
       );

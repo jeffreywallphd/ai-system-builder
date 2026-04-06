@@ -10,6 +10,7 @@ import type {
   WorkspaceStatus,
 } from "../../../domain/workspaces/WorkspaceDomain";
 import {
+  type WorkspaceEncryptionPolicy,
   WorkspaceInvitationStatuses,
   WorkspaceMembershipStatuses,
   WorkspaceRoleAssignmentStatuses,
@@ -90,6 +91,7 @@ export interface WorkspaceListItemDto {
   readonly displayName: string;
   readonly description?: string;
   readonly status: WorkspaceStatus;
+  readonly encryptionPolicy: WorkspaceEncryptionPolicy;
   readonly ownerUserIdentityId: string;
   readonly visibility: WorkspaceVisibility;
   readonly createdAt: string;
@@ -527,6 +529,7 @@ export class WorkspaceAdministrationQueryService {
       displayName: workspace.displayName,
       description: workspace.description,
       status: workspace.status,
+      encryptionPolicy: workspace.encryptionPolicy,
       ownerUserIdentityId: workspace.ownership.ownerUserId,
       visibility: workspace.ownership.visibility,
       createdAt: workspace.ownership.createdAt,

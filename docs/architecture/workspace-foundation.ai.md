@@ -413,3 +413,24 @@ Protected-resource composition pattern is canonical:
   - `docs/architecture/workspace-administration-audit-hooks.md`
   - `docs/workspace-administration-operations.md`
 
+## Story 11.3.1 workspace encryption-policy administration baseline
+
+- Workspace tenancy contracts now include explicit encryption-policy metadata on the `Workspace` aggregate:
+  - `encryptionMode` (`none | platform-managed | customer-managed`)
+  - `contentEncryptionRequired`
+  - `keyScope` (`workspace | storage-instance | platform`)
+  - `allowPreviewDecryption`
+  - `allowWorkerDecryption`
+- Workspace domain construction and update flows (`createWorkspace(...)`, `updateWorkspaceDetails(...)`) now normalize and validate this policy with secure defaults:
+  - default mode is `platform-managed`
+  - content encryption required defaults to `true`
+  - preview/worker decryption default to `false`
+  - contradictory combinations (for example `none` mode with required encryption/decryption allowances, or customer-managed with platform key scope) are rejected.
+- Workspace administration mutation/query seams now surface policy metadata as first-class fields:
+  - create/update use-case inputs accept `encryptionPolicy` fragments
+  - workspace list/admin read DTOs expose workspace encryption-policy state
+  - audit metadata now captures when workspace encryption policy is mutated.
+- Workspace persistence is now aligned to this model:
+  - `workspace_records` includes `encryption_mode`, `content_encryption_required`, `key_scope`, `allow_preview_decryption`, `allow_worker_decryption`
+  - migration version is bumped to include additive schema evolution for existing databases.
+

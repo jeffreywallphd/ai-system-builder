@@ -225,6 +225,11 @@ describe("Workspace lifecycle use cases", () => {
       displayName: "Team Alpha Renamed",
       description: "Updated metadata",
       visibility: WorkspaceVisibilities.private,
+      encryptionPolicy: {
+        encryptionMode: "customer-managed",
+        keyScope: "workspace",
+        allowWorkerDecryption: true,
+      },
     });
 
     expect(result.ok).toBe(true);
@@ -236,6 +241,13 @@ describe("Workspace lifecycle use cases", () => {
     expect(result.value.workspace.displayName).toBe("Team Alpha Renamed");
     expect(result.value.workspace.description).toBe("Updated metadata");
     expect(result.value.workspace.ownership.visibility).toBe(WorkspaceVisibilities.private);
+    expect(result.value.workspace.encryptionPolicy).toEqual({
+      encryptionMode: "customer-managed",
+      contentEncryptionRequired: true,
+      keyScope: "workspace",
+      allowPreviewDecryption: false,
+      allowWorkerDecryption: true,
+    });
     expect(result.value.workspace.slug).toBe("team-alpha");
     expect(result.value.workspace.ownership.ownerUserId).toBe("user:owner");
   });

@@ -1,5 +1,7 @@
 import {
   WorkspaceInvitationStatuses,
+  WorkspaceEncryptionKeyScopes,
+  WorkspaceEncryptionModes,
   WorkspaceMembershipStatuses,
   WorkspaceRoleAssignmentStatuses,
   WorkspaceRoles,
@@ -7,6 +9,8 @@ import {
   type Workspace,
   type WorkspaceInvitation,
   type WorkspaceInvitationStatus,
+  type WorkspaceEncryptionKeyScope,
+  type WorkspaceEncryptionMode,
   type WorkspaceMembership,
   type WorkspaceMembershipStatus,
   type WorkspaceRole,
@@ -28,6 +32,11 @@ export interface WorkspaceRow {
   readonly status: WorkspaceStatus;
   readonly owner_user_id: string;
   readonly visibility: WorkspaceVisibility;
+  readonly encryption_mode: WorkspaceEncryptionMode;
+  readonly content_encryption_required: number;
+  readonly key_scope: WorkspaceEncryptionKeyScope;
+  readonly allow_preview_decryption: number;
+  readonly allow_worker_decryption: number;
   readonly created_by: string;
   readonly last_modified_by: string;
   readonly created_at: string;
@@ -98,6 +107,13 @@ export function mapWorkspaceRowToDomain(row: WorkspaceRow): Workspace {
       createdAt: row.created_at,
       lastModifiedAt: row.last_modified_at,
     }),
+    encryptionPolicy: Object.freeze({
+      encryptionMode: assertWorkspaceEncryptionMode(row.encryption_mode),
+      contentEncryptionRequired: toBoolean(row.content_encryption_required),
+      keyScope: assertWorkspaceEncryptionKeyScope(row.key_scope),
+      allowPreviewDecryption: toBoolean(row.allow_preview_decryption),
+      allowWorkerDecryption: toBoolean(row.allow_worker_decryption),
+    }),
   });
 }
 
@@ -164,6 +180,11 @@ export function mapWorkspaceToRowValues(workspace: Workspace): ReadonlyArray<unk
     workspace.status,
     workspace.ownership.ownerUserId,
     workspace.ownership.visibility,
+    workspace.encryptionPolicy.encryptionMode,
+    toSqliteBoolean(workspace.encryptionPolicy.contentEncryptionRequired),
+    workspace.encryptionPolicy.keyScope,
+    toSqliteBoolean(workspace.encryptionPolicy.allowPreviewDecryption),
+    toSqliteBoolean(workspace.encryptionPolicy.allowWorkerDecryption),
     workspace.ownership.createdBy,
     workspace.ownership.lastModifiedBy,
     workspace.ownership.createdAt,
@@ -277,6 +298,14 @@ function parseOnboardingMetadataJson(value: string | null): Readonly<Record<stri
   }
 }
 
+function toSqliteBoolean(value: boolean): number {
+  return value ? 1 : 0;
+}
+
+function toBoolean(value: number): boolean {
+  return value === 1;
+}
+
 function assertWorkspaceStatus(value: string): WorkspaceStatus {
   if (Object.values(WorkspaceStatuses).includes(value as WorkspaceStatus)) {
     return value as WorkspaceStatus;
@@ -289,6 +318,20 @@ function assertWorkspaceVisibility(value: string): WorkspaceVisibility {
     return value as WorkspaceVisibility;
   }
   throw new Error(`Persisted workspace visibility '${value}' is invalid.`);
+}
+
+function assertWorkspaceEncryptionMode(value: string): WorkspaceEncryptionMode {
+  if (Object.values(WorkspaceEncryptionModes).includes(value as WorkspaceEncryptionMode)) {
+    return value as WorkspaceEncryptionMode;
+  }
+  throw new Error(`Persisted workspace encryption mode '${value}' is invalid.`);
+}
+
+function assertWorkspaceEncryptionKeyScope(value: string): WorkspaceEncryptionKeyScope {
+  if (Object.values(WorkspaceEncryptionKeyScopes).includes(value as WorkspaceEncryptionKeyScope)) {
+    return value as WorkspaceEncryptionKeyScope;
+  }
+  throw new Error(`Persisted workspace key scope '${value}' is invalid.`);
 }
 
 function assertWorkspaceMembershipStatus(value: string): WorkspaceMembershipStatus {

@@ -91,6 +91,19 @@ Rejected provisioning that is not an unsupported backend operation maps to `stor
 
 This preserves authoritative server-managed storage access without exposing host paths to application/UI layers.
 
+## Story 11.3.1 extension: policy-aware storage administration contracts
+
+Storage administration mutation contracts now expose encryption-policy and lifecycle-policy fields directly so downstream enforcement stories can consume authoritative policy state without transport-contract redesign:
+
+- `CreateStorageInstanceCommand.policy` now accepts:
+  - `security` (`encryptionMode`, `contentEncryptionRequired`, `keyScope`, `allowPreviewDecryption`, `allowWorkerDecryption`)
+  - `lifecycle` (`retentionExpiryAction`, optional `purgeGracePeriodDays`)
+- `UpdateStorageMetadataCommand` now accepts optional `policy` updates for:
+  - core policy posture (`maxObjectBytes`, `retentionDays`, `immutableWrites`, `allowCrossWorkspaceReads`, labels)
+  - encryption posture (`profileId`, `keyReferenceId`, `envelopeRequired`)
+  - security/lifecycle policy fragments (same fields as create).
+- `StorageManagementService.updateStorageMetadata(...)` now routes these fields through `updateStoragePolicy(...)`, preserving domain-level validation and rejection of invalid combinations.
+
 ## Story 9.3.3 extension: logical storage access resolution
 
 `StorageLogicalAccessResolutionService` adds a reusable resolution seam for asset/object access flows:

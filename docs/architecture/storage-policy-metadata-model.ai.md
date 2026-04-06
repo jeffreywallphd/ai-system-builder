@@ -46,3 +46,7 @@ Domain and schema layers reject contradictory policy combinations, including:
 ## Why this matters
 
 This gives later storage features a stable policy foundation that is explicit, secure-by-default, and forward-extensible without requiring a policy-schema rewrite.
+
+## Story 11.3.1 alignment note
+
+Story 11.3.1 keeps this model authoritative by exposing the same typed `security` policy fields through storage administration create/update application contracts and persistence-backed instance records, so encryption enforcement stories can consume policy state without introducing alternate policy shapes.

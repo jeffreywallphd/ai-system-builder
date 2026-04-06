@@ -1,6 +1,6 @@
 # Storage Administration Screens
 
-This note documents Story 9.4.1, Story 9.4.2, Story 9.4.3, Story 9.4.4, and Story 9.4.5 (Feature 9 / Epic 9.4): storage administration list/detail, create/edit workflows, operational readiness visibility, lifecycle activation/deactivation guardrails, and backend extension/operations standards.
+This note documents Story 9.4.1, Story 9.4.2, Story 9.4.3, Story 9.4.4, Story 9.4.5, and Story 11.3.1: storage administration list/detail, create/edit workflows, operational readiness visibility, lifecycle activation/deactivation guardrails, backend extension/operations standards, and encryption-at-rest policy field alignment.
 
 ## Scope
 
@@ -60,6 +60,19 @@ This note documents Story 9.4.1, Story 9.4.2, Story 9.4.3, Story 9.4.4, and Stor
 - Validation errors from both client schema checks and server API responses are rendered with field-path messaging.
 - Destructive/state-changing mutations use explicit user confirmation prompts before request dispatch.
 - Workflow state is contract-driven and refreshes authoritative list/detail views after mutation success.
+
+## Story 11.3.1 policy-field administration alignment
+
+- Storage create/update administration contracts now include explicit policy fragments for encryption-at-rest posture:
+  - `policy.security.encryptionMode`
+  - `policy.security.contentEncryptionRequired`
+  - `policy.security.keyScope`
+  - `policy.security.allowPreviewDecryption`
+  - `policy.security.allowWorkerDecryption`
+- Lifecycle policy metadata can also be carried in create/update contracts:
+  - `policy.lifecycle.retentionExpiryAction`
+  - `policy.lifecycle.purgeGracePeriodDays`
+- Metadata update flows now support policy updates beyond labels through authoritative application-layer policy mutation handling and existing domain validation guards.
 
 ## Story 9.4.4 lifecycle action behavior
 

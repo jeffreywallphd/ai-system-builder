@@ -287,6 +287,17 @@ export class CreateStorageInstanceWithProvisioningUseCase {
       encryptionProfileId: command.policy.encryption.profileId,
       envelopeRequired: command.policy.encryption.envelopeRequired,
       hasEncryptionKeyReferenceId: Boolean(command.policy.encryption.keyReferenceId),
+      security: Object.freeze({
+        encryptionMode: command.policy.security?.encryptionMode ?? "platform-managed",
+        contentEncryptionRequired: command.policy.security?.contentEncryptionRequired ?? true,
+        keyScope: command.policy.security?.keyScope ?? "workspace",
+        allowPreviewDecryption: command.policy.security?.allowPreviewDecryption ?? false,
+        allowWorkerDecryption: command.policy.security?.allowWorkerDecryption ?? false,
+      }),
+      lifecycle: Object.freeze({
+        retentionExpiryAction: command.policy.lifecycle?.retentionExpiryAction ?? "none",
+        purgeGracePeriodDays: command.policy.lifecycle?.purgeGracePeriodDays,
+      }),
       requestedLifecycleState: command.requestBackendProvisioning
         ? StorageLifecycleStates.provisioning
         : (command.lifecycleState ?? StorageLifecycleStates.active),

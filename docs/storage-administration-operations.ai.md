@@ -7,6 +7,7 @@
 - Story 9.4.3 operational status/capability/sync posture presentation.
 - Story 9.4.4 lifecycle activation/deactivation controls with safety confirmations.
 - Story 9.4.5 backend extension guidance and operational standards.
+- Story 11.3.1 policy-field alignment for encryption-at-rest administration inputs.
 - Adds list/detail inspection plus create/edit administration workflows.
 
 ## Canonical files
@@ -39,6 +40,14 @@
   - synchronization posture clarity (sync-capable vs not, deployment availability, sync status)
 - Create workflow captures backend/access/policy metadata and validates via shared storage schema contracts before submit.
 - Edit workflow updates allowed metadata/policy-label fields only and validates via shared storage schema contracts.
+- Story 11.3.1 extends create/edit policy payload handling to include explicit security/lifecycle policy fragments:
+  - `policy.security.encryptionMode`
+  - `policy.security.contentEncryptionRequired`
+  - `policy.security.keyScope`
+  - `policy.security.allowPreviewDecryption`
+  - `policy.security.allowWorkerDecryption`
+  - `policy.lifecycle.retentionExpiryAction`
+  - `policy.lifecycle.purgeGracePeriodDays`
 - Mutation flows apply confirmation prompts and render API validation feedback with path-level detail.
 - Story 9.4.4 adds lifecycle controls for selected storage details:
   - activate and deactivate actions are surfaced only when both access summaries and lifecycle state rules allow them

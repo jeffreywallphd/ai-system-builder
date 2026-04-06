@@ -57,6 +57,43 @@ describe("WorkspaceDomain", () => {
     expect(workspace.ownership.workspaceId).toBe("workspace-1");
     expect(workspace.ownership.createdBy).toBe("user-owner");
     expect(workspace.ownership.lastModifiedBy).toBe("user-owner");
+    expect(workspace.encryptionPolicy).toEqual({
+      encryptionMode: "platform-managed",
+      contentEncryptionRequired: true,
+      keyScope: "workspace",
+      allowPreviewDecryption: false,
+      allowWorkerDecryption: false,
+    });
+  });
+
+  it("rejects invalid workspace encryption policy combinations", () => {
+    expect(() => createWorkspace({
+      id: "workspace-encryption-invalid",
+      slug: "workspace-encryption-invalid",
+      displayName: "Workspace Encryption Invalid",
+      ownerUserId: "user-owner",
+      createdBy: "user-owner",
+      encryptionPolicy: {
+        encryptionMode: "none",
+        contentEncryptionRequired: true,
+      },
+    })).toThrow("cannot require content encryption");
+
+    const workspace = createWorkspace({
+      id: "workspace-encryption-valid",
+      slug: "workspace-encryption-valid",
+      displayName: "Workspace Encryption Valid",
+      ownerUserId: "user-owner",
+      createdBy: "user-owner",
+    });
+
+    expect(() => updateWorkspaceDetails(workspace, {
+      actorUserId: "user-owner",
+      encryptionPolicy: {
+        encryptionMode: "customer-managed",
+        keyScope: "platform",
+      },
+    })).toThrow("cannot use platform key scope");
   });
 
   it("enforces workspace lifecycle transitions and archived visibility invariants", () => {

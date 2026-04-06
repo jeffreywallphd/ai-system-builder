@@ -110,8 +110,16 @@ describe("CreateStorageInstanceWithProvisioningUseCase", () => {
       },
       policy: {
         policyId: "policy-managed-local",
+        security: {
+          encryptionMode: "customer-managed",
+          contentEncryptionRequired: true,
+          keyScope: "workspace",
+          allowPreviewDecryption: false,
+          allowWorkerDecryption: true,
+        },
         encryption: {
           profileId: "profile-default",
+          keyReferenceId: "kms://workspace-alpha/storage-local",
           envelopeRequired: true,
         },
       },
@@ -126,6 +134,8 @@ describe("CreateStorageInstanceWithProvisioningUseCase", () => {
     }
     expect(localCreated.value.provisioning?.accepted).toBeTrue();
     expect(localCreated.value.storageInstance.lifecycleState).toBe(StorageLifecycleStates.active);
+    expect(localCreated.value.storageInstance.policy.security.encryptionMode).toBe("customer-managed");
+    expect(localCreated.value.storageInstance.policy.security.allowWorkerDecryption).toBe(true);
     expect(localCreated.value.capabilities?.backendType).toBe(StorageBackendTypes.managedFilesystem);
 
     const sharedCreated = await useCase.execute({
