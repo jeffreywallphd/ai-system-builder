@@ -1,6 +1,6 @@
 # Storage Administration Screens
 
-This note documents Story 9.4.1 (Feature 9 / Epic 9.4): initial production UI for managed storage instance listing and detail inspection.
+This note documents Story 9.4.1 and Story 9.4.2 (Feature 9 / Epic 9.4): storage administration list/detail plus create/edit workflows.
 
 ## Scope
 
@@ -11,6 +11,7 @@ This note documents Story 9.4.1 (Feature 9 / Epic 9.4): initial production UI fo
 ## UI surfaces
 
 - Page: `ui/pages/StorageAdministrationPage.tsx`
+- Workflow panel: `ui/components/storage/StorageInstanceWorkflowPanel.tsx`
 - Service: `ui/services/StorageAdministrationService.ts`
 - HTTP client: `ui/shared/storage/StorageAdministrationClient.ts`
 - Thin-client/admin-lite route helper: `ui/web/storage/StorageAdministrationRoutes.ts`
@@ -31,15 +32,29 @@ This note documents Story 9.4.1 (Feature 9 / Epic 9.4): initial production UI fo
   - policy highlights
 - Detail panel projects lifecycle, policy, access restrictions, replication status, and health diagnostics.
 
+## Story 9.4.2 workflow behavior
+
+- Admin UI now supports create and edit workflows directly on `/settings/storage`.
+- Create workflow supports backend type selection, access mode/scope, and policy metadata inputs aligned to transport/domain schema contracts.
+- Edit workflow supports metadata-safe updates (`display.displayName`) and allowed policy metadata updates (`policy.labels`) via metadata route.
+- Create and edit requests use shared storage request schemas client-side before submit:
+  - `parseCreateStorageInstanceRequestDto(...)`
+  - `parseUpdateStorageInstanceRequestDto(...)`
+- Validation errors from both client schema checks and server API responses are rendered with field-path messaging.
+- Destructive/state-changing mutations use explicit user confirmation prompts before request dispatch.
+- Workflow state is contract-driven and refreshes authoritative list/detail views after mutation success.
+
 ## Guardrails
 
 - UI does not reconstruct lifecycle/policy/health semantics outside backend contracts.
 - No raw filesystem or backend path material is rendered.
 - Health and policy summaries remain user-facing and concise while preserving backend reason codes in detail views.
+- Edit flows are constrained to server-allowed metadata fields instead of raw policy/lifecycle mutation payloads.
 
 ## Verification
 
 - `ui/shared/storage/tests/StorageAdministrationClient.test.ts`
+- `ui/components/storage/tests/StorageInstanceWorkflowPanel.test.tsx`
 - `ui/pages/tests/StorageAdministrationPage.test.tsx`
 - `ui/web/storage/tests/StorageAdministrationRoutes.test.ts`
 - route/page contract updates:

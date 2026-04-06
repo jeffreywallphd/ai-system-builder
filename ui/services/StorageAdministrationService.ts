@@ -16,6 +16,14 @@ export class StorageAdministrationService {
     this.client.listStorageInstances(request, sessionToken)
   );
 
+  public createStorageInstance: StorageAdministrationClient["createStorageInstance"] = (request, sessionToken) => (
+    this.client.createStorageInstance(request, sessionToken)
+  );
+
+  public updateStorageMetadata: StorageAdministrationClient["updateStorageMetadata"] = (request, sessionToken) => (
+    this.client.updateStorageMetadata(request, sessionToken)
+  );
+
   public getStorageInstanceDetail: StorageAdministrationClient["getStorageInstanceDetail"] = (request, sessionToken) => (
     this.client.getStorageInstanceDetail(request, sessionToken)
   );
