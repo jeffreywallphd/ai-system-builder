@@ -187,7 +187,20 @@ export class StorageManagementService implements IStorageManagementService {
         correlationId: command.correlationId,
         occurredAt: saved.storageInstance.lastModifiedAt,
         outcome: saved.wasReplay ? "already-applied" : "success",
+        details: this.buildStorageMetadataAuditDetails(current, saved.storageInstance),
       });
+      if (this.didStoragePolicyChange(current, saved.storageInstance)) {
+        await publishStorageManagementAuditEventBestEffort(this.dependencies.auditSink, {
+          type: StorageManagementAuditEventTypes.storagePolicyUpdated,
+          actorUserIdentityId: command.actorUserIdentityId,
+          workspaceId: command.workspaceId,
+          storageInstanceId: saved.storageInstance.id,
+          correlationId: command.correlationId,
+          occurredAt: saved.storageInstance.lastModifiedAt,
+          outcome: saved.wasReplay ? "already-applied" : "success",
+          details: this.buildStoragePolicyAuditDetails(current, saved.storageInstance),
+        });
+      }
 
       return {
         ok: true,
@@ -445,6 +458,13 @@ export class StorageManagementService implements IStorageManagementService {
         correlationId: command.correlationId,
         occurredAt: saved.storageInstance.lastModifiedAt,
         outcome: saved.wasReplay ? "already-applied" : "success",
+        details: Object.freeze({
+          previousLifecycleState: current.lifecycleState,
+          nextLifecycleState: saved.storageInstance.lifecycleState,
+          requestedBackendProvisioning: shouldRequestProvisioning,
+          provisioningStatus: provisioning?.status,
+          provisioningReasonCode: provisioning?.reasonCode,
+        }),
       });
 
       return {
@@ -812,5 +832,82 @@ export class StorageManagementService implements IStorageManagementService {
         message,
       },
     };
+  }
+
+  private didStoragePolicyChange(previous: StorageInstance, current: StorageInstance): boolean {
+    return JSON.stringify(previous.policy) !== JSON.stringify(current.policy);
+  }
+
+  private buildStorageMetadataAuditDetails(
+    previous: StorageInstance,
+    current: StorageInstance,
+  ): Readonly<Record<string, unknown>> {
+    const changedMetadataFields: string[] = [];
+    if (previous.displayName !== current.displayName) {
+      changedMetadataFields.push("displayName");
+    }
+    if (JSON.stringify(previous.policy.labels) !== JSON.stringify(current.policy.labels)) {
+      changedMetadataFields.push("policy.labels");
+    }
+
+    return Object.freeze({
+      changedMetadataFields: Object.freeze(changedMetadataFields),
+      previousDisplayName: previous.displayName,
+      currentDisplayName: current.displayName,
+      changedPolicyLabelKeys: this.computeChangedLabelKeys(previous.policy.labels, current.policy.labels),
+      policyChanged: this.didStoragePolicyChange(previous, current),
+    });
+  }
+
+  private buildStoragePolicyAuditDetails(
+    previous: StorageInstance,
+    current: StorageInstance,
+  ): Readonly<Record<string, unknown>> {
+    return Object.freeze({
+      policyId: current.policy.policyId,
+      changedPolicyLabelKeys: this.computeChangedLabelKeys(previous.policy.labels, current.policy.labels),
+      previousPolicySummary: this.toPolicyAuditSummary(previous),
+      currentPolicySummary: this.toPolicyAuditSummary(current),
+    });
+  }
+
+  private computeChangedLabelKeys(
+    previous: Readonly<Record<string, string>>,
+    current: Readonly<Record<string, string>>,
+  ): ReadonlyArray<string> {
+    const keys = new Set<string>([
+      ...Object.keys(previous),
+      ...Object.keys(current),
+    ]);
+
+    return Object.freeze([...keys]
+      .filter((key) => previous[key] !== current[key])
+      .sort((a, b) => a.localeCompare(b)));
+  }
+
+  private toPolicyAuditSummary(storageInstance: StorageInstance): Readonly<Record<string, unknown>> {
+    const policy = storageInstance.policy;
+    return Object.freeze({
+      policyId: policy.policyId,
+      labelKeys: Object.freeze(Object.keys(policy.labels).sort()),
+      maxObjectBytes: policy.maxObjectBytes,
+      retentionDays: policy.retentionDays,
+      immutableWrites: policy.immutableWrites,
+      allowCrossWorkspaceReads: policy.allowCrossWorkspaceReads,
+      encryptionProfileId: policy.encryption.profileId,
+      envelopeRequired: policy.encryption.envelopeRequired,
+      hasEncryptionKeyReferenceId: Boolean(policy.encryption.keyReferenceId),
+      security: Object.freeze({
+        encryptionMode: policy.security.encryptionMode,
+        contentEncryptionRequired: policy.security.contentEncryptionRequired,
+        keyScope: policy.security.keyScope,
+        allowPreviewDecryption: policy.security.allowPreviewDecryption,
+        allowWorkerDecryption: policy.security.allowWorkerDecryption,
+      }),
+      lifecycle: Object.freeze({
+        retentionExpiryAction: policy.lifecycle.retentionExpiryAction,
+        purgeGracePeriodDays: policy.lifecycle.purgeGracePeriodDays,
+      }),
+    });
   }
 }

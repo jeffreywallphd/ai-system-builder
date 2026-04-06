@@ -64,6 +64,7 @@ import { SqliteNodeTrustPersistenceAdapter } from "../../src/infrastructure/pers
 import { SqliteNodeTrustAuditRecorder } from "../../src/infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
 import { SqliteCertificateAuthorityPersistenceAdapter } from "../../src/infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
 import { SqliteStorageInstancePersistenceAdapter } from "../../src/infrastructure/persistence/storage/SqliteStorageInstancePersistenceAdapter";
+import { SqliteStorageManagementAuditRecorder } from "../../src/infrastructure/persistence/storage/SqliteStorageManagementAuditRecorder";
 import { SqliteAssetPersistenceAdapter } from "../../src/infrastructure/persistence/assets/SqliteAssetPersistenceAdapter";
 import { StorageManagementService } from "../../src/application/storage/use-cases/StorageManagementService";
 import { AssetUploadInitiationService } from "../../src/application/assets/use-cases/AssetUploadInitiationService";
@@ -281,6 +282,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const nodeTrustAuditRecorder = new SqliteNodeTrustAuditRecorder(path.resolve(options.databasePath));
   const certificateAuthorityRepository = new SqliteCertificateAuthorityPersistenceAdapter(path.resolve(options.databasePath));
   const storageInstanceRepository = new SqliteStorageInstancePersistenceAdapter(path.resolve(options.databasePath));
+  const storageManagementAuditRecorder = new SqliteStorageManagementAuditRecorder(path.resolve(options.databasePath));
   const assetRepository = new SqliteAssetPersistenceAdapter(path.resolve(options.databasePath));
   const env = options.env ?? process.env;
   const hostAddress = options.host ?? "127.0.0.1";
@@ -773,6 +775,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     policyPort: workspaceAwareStoragePolicyEvaluationAdapter,
     provisioningPort: storageProvisioningOrchestrator,
     capabilityPort: storageProvisioningOrchestrator,
+    auditSink: storageManagementAuditRecorder,
   });
   const storageManagementBackendApi = new StorageManagementBackendApi({
     storageManagementService,
@@ -917,6 +920,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
         nodeTrustAuditRecorder.dispose();
         certificateAuthorityRepository.dispose();
         storageInstanceRepository.dispose();
+        storageManagementAuditRecorder.dispose();
         assetRepository.dispose();
         secretService?.dispose();
         const disposablePublisher = eventPublisher as Partial<{ dispose: () => void }>;
@@ -940,6 +944,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     nodeTrustAuditRecorder.dispose();
     certificateAuthorityRepository.dispose();
     storageInstanceRepository.dispose();
+    storageManagementAuditRecorder.dispose();
     assetRepository.dispose();
     secretService?.dispose();
     throw error;

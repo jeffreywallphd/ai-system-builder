@@ -374,11 +374,32 @@ describe("StorageManagementService", () => {
     expect(auditSink.events.map((event) => event.type)).toEqual([
       StorageManagementAuditEventTypes.storageCreated,
       StorageManagementAuditEventTypes.storageMetadataUpdated,
+      StorageManagementAuditEventTypes.storagePolicyUpdated,
       StorageManagementAuditEventTypes.storageAccessListed,
       StorageManagementAuditEventTypes.storageDetailQueried,
       StorageManagementAuditEventTypes.storageDeactivated,
       StorageManagementAuditEventTypes.storageActivated,
     ]);
+    const metadataAudit = auditSink.events.find((event) => event.type === StorageManagementAuditEventTypes.storageMetadataUpdated);
+    expect(metadataAudit?.details).toEqual(expect.objectContaining({
+      changedMetadataFields: ["displayName", "policy.labels"],
+      previousDisplayName: "Workspace Alpha Storage",
+      currentDisplayName: "Workspace Alpha Primary",
+      changedPolicyLabelKeys: ["tier"],
+      policyChanged: true,
+    }));
+    const policyAudit = auditSink.events.find((event) => event.type === StorageManagementAuditEventTypes.storagePolicyUpdated);
+    expect(policyAudit?.details).toEqual(expect.objectContaining({
+      policyId: "policy-alpha",
+      changedPolicyLabelKeys: ["tier"],
+    }));
+    const deactivatedAudit = auditSink.events.find((event) => event.type === StorageManagementAuditEventTypes.storageDeactivated);
+    expect(deactivatedAudit?.details).toEqual(expect.objectContaining({
+      previousLifecycleState: StorageLifecycleStates.active,
+      nextLifecycleState: StorageLifecycleStates.suspended,
+      requestedBackendProvisioning: true,
+      provisioningStatus: StorageProvisioningOperationStatuses.accepted,
+    }));
   });
 
   it("returns policy-violation for denied policy actions", async () => {

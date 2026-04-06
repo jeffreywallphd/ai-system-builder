@@ -1,4 +1,4 @@
-export const STORAGE_INSTANCE_PERSISTENCE_SCHEMA_VERSION = 1;
+export const STORAGE_INSTANCE_PERSISTENCE_SCHEMA_VERSION = 2;
 
 export const STORAGE_INSTANCE_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -97,5 +97,28 @@ export const STORAGE_INSTANCE_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [nu
 
     CREATE INDEX IF NOT EXISTS storage_instance_mutation_replays_storage_idx
       ON storage_instance_mutation_replays(storage_instance_id, created_at DESC);
+  `],
+  [2, `
+    CREATE TABLE IF NOT EXISTS storage_management_audit_events (
+      event_id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      occurred_at TEXT NOT NULL,
+      actor_user_identity_id TEXT NOT NULL,
+      workspace_id TEXT NOT NULL,
+      storage_instance_id TEXT,
+      correlation_id TEXT,
+      outcome TEXT,
+      event_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS storage_management_audit_events_recent_idx
+      ON storage_management_audit_events(occurred_at DESC, event_id DESC);
+    CREATE INDEX IF NOT EXISTS storage_management_audit_events_workspace_idx
+      ON storage_management_audit_events(workspace_id, occurred_at DESC, event_id DESC);
+    CREATE INDEX IF NOT EXISTS storage_management_audit_events_storage_idx
+      ON storage_management_audit_events(storage_instance_id, occurred_at DESC, event_id DESC);
+    CREATE INDEX IF NOT EXISTS storage_management_audit_events_type_idx
+      ON storage_management_audit_events(event_type, occurred_at DESC, event_id DESC);
   `],
 ]);

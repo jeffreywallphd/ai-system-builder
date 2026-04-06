@@ -47,6 +47,7 @@ export class CreateStorageInstanceWithProvisioningUseCase {
     command: CreateStorageInstanceCommand,
   ): Promise<StorageManagementResult<CreateStorageInstanceResult>> {
     const occurredAt = command.createdAt ?? new Date().toISOString();
+    const auditContext = this.buildCreateAuditContext(command);
     const policyDecision = await this.dependencies.policyPort.evaluateStorageAction({
       action: StoragePolicyActions.create,
       actorUserIdentityId: command.actorUserIdentityId,
@@ -55,6 +56,7 @@ export class CreateStorageInstanceWithProvisioningUseCase {
     });
     if (!policyDecision.allowed) {
       await this.publishAudit(command, undefined, "rejected", {
+        ...auditContext,
         reasonCode: policyDecision.reasonCode,
       });
       return this.failure(
@@ -129,6 +131,7 @@ export class CreateStorageInstanceWithProvisioningUseCase {
 
         if (provisioning && !provisioning.accepted) {
           await this.publishAudit(command, created.storageInstance.id, "rejected", {
+            ...auditContext,
             reasonCode: provisioning.reasonCode,
             provisioningStatus: provisioning.status,
           });
@@ -147,10 +150,14 @@ export class CreateStorageInstanceWithProvisioningUseCase {
           command,
           created.storageInstance.id,
           created.wasReplay ? "already-applied" : "success",
-          provisioning ? {
-            provisioningStatus: provisioning.status,
-            provisioningReasonCode: provisioning.reasonCode,
-          } : undefined,
+          {
+            ...auditContext,
+            createdLifecycleState: created.storageInstance.lifecycleState,
+            ...(provisioning ? {
+              provisioningStatus: provisioning.status,
+              provisioningReasonCode: provisioning.reasonCode,
+            } : {}),
+          },
         );
 
         return {
@@ -266,6 +273,25 @@ export class CreateStorageInstanceWithProvisioningUseCase {
         details,
       },
     };
+  }
+
+  private buildCreateAuditContext(command: CreateStorageInstanceCommand): Readonly<Record<string, unknown>> {
+    return Object.freeze({
+      backendType: command.backendType,
+      ownerUserIdentityId: command.ownerUserIdentityId,
+      accessMode: command.access.mode,
+      accessScope: command.access.scope,
+      replicationMode: command.replication?.mode ?? "none",
+      policyId: command.policy.policyId,
+      policyLabelKeys: Object.freeze(Object.keys(command.policy.labels ?? {}).sort()),
+      encryptionProfileId: command.policy.encryption.profileId,
+      envelopeRequired: command.policy.encryption.envelopeRequired,
+      hasEncryptionKeyReferenceId: Boolean(command.policy.encryption.keyReferenceId),
+      requestedLifecycleState: command.requestBackendProvisioning
+        ? StorageLifecycleStates.provisioning
+        : (command.lifecycleState ?? StorageLifecycleStates.active),
+      requestedBackendProvisioning: command.requestBackendProvisioning ?? false,
+    });
   }
 }
 

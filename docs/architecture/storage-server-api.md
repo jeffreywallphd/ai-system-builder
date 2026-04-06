@@ -1,6 +1,6 @@
 # Storage Server API
 
-This note documents Story 9.3.2 (Feature 9 / Epic 9.3): authoritative HTTP/API adapters for managed storage instance administration.
+This note documents Story 9.3.2 and Story 9.3.5 (Feature 9 / Epic 9.3): authoritative HTTP/API adapters for managed storage instance administration and durable storage audit governance integration.
 
 ## Canonical artifacts
 
@@ -11,6 +11,7 @@ This note documents Story 9.3.2 (Feature 9 / Epic 9.3): authoritative HTTP/API a
 - `hosts/server/IdentityServerHost.ts`
 - `infrastructure/api/storage/tests/StorageManagementBackendApi.test.ts`
 - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerStorageManagement.test.ts`
+- `hosts/server/tests/IdentityServerHost.test.ts`
 
 ## Scope and intent
 
@@ -51,6 +52,7 @@ All routes require authenticated sessions and workspace-scoped policy evaluation
 - Host composition wires a workspace-aware policy adapter; transport does not bypass policy by directly touching persistence.
 - No endpoint emits raw filesystem paths or backend binding internals.
 - Health/capability responses expose only contract-safe capability metadata and synchronization posture.
+- Host composition now wires `SqliteStorageManagementAuditRecorder` as the default storage management audit sink so core mutation actions persist governance events.
 
 ## Storage inspection semantics (Story 9.3.4)
 
@@ -68,3 +70,10 @@ All routes require authenticated sessions and workspace-scoped policy evaluation
 - capability flags (`capabilities`) and synchronization metadata (`synchronization`, `synchronizationStatus`)
 
 The route is backed by an application inspection use case and preserves redaction posture by avoiding raw backend endpoint/path disclosure.
+
+## Storage audit integration (Story 9.3.5)
+
+- Storage mutation routes continue to rely on application-layer audit emission rather than transport duplication.
+- Audit payloads include actor identity, workspace context, storage instance identity, action type, and compact high-value mutation metadata.
+- Sensitive audit fields are redacted before sink delivery by storage observability sanitization.
+- Storage audit activity is queryable through the persistence seam (`SqliteStorageManagementAuditRecorder`) using recency/workspace/storage-instance lookup methods.
