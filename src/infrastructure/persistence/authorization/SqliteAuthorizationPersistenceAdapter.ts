@@ -41,6 +41,10 @@ import {
   AUTHORIZATION_PERSISTENCE_MIGRATIONS,
   AUTHORIZATION_PERSISTENCE_SCHEMA_VERSION,
 } from "./SqliteAuthorizationPersistenceMigrations";
+import {
+  resolvePersistenceMutationCreatedAt,
+  resolvePersistenceMutationMetadata,
+} from "../common/PersistenceMutationMetadata";
 
 export interface SqliteAuthorizationPersistenceAdapterCacheOptions {
   readonly enabled?: boolean;
@@ -234,24 +238,27 @@ export class SqliteAuthorizationPersistenceAdapter
       });
     }
 
-    const changedAt = this.resolveMutationTimestamp(input.mutation.context.occurredAt);
     let persistedRecord: AuthorizationRoleAssignmentPersistenceRecord | undefined;
 
     this.getDatabase().transaction(() => {
       const existing = this.getRoleAssignmentByIdInternal(input.record.id);
-      this.assertExpectedRevision(
-        input.mutation.expectedRevision,
-        existing?.revision,
-        "Role assignment",
-      );
+      const metadata = resolvePersistenceMutationMetadata({
+        existing,
+        createdAt: input.record.createdAt,
+        createdBy: input.record.createdBy,
+        actorId: input.mutation.context.actorUserIdentityId,
+        expectedRevision: input.mutation.expectedRevision,
+        occurredAt: input.mutation.context.occurredAt,
+        entityName: "Role assignment",
+      });
 
       persistedRecord = Object.freeze({
         ...input.record,
-        createdAt: existing?.createdAt ?? input.record.createdAt,
-        createdBy: existing?.createdBy ?? input.record.createdBy,
-        lastModifiedAt: changedAt,
-        lastModifiedBy: input.mutation.context.actorUserIdentityId,
-        revision: existing ? existing.revision + 1 : 1,
+        createdAt: metadata.createdAt,
+        createdBy: metadata.createdBy,
+        lastModifiedAt: metadata.lastModifiedAt,
+        lastModifiedBy: metadata.lastModifiedBy,
+        revision: metadata.revision,
       });
 
       this.executeMutation("upsert role assignment", () => this.getDatabase().prepare(`
@@ -320,7 +327,7 @@ export class SqliteAuthorizationPersistenceAdapter
       throw new Error(`Role assignment '${input.roleAssignmentId}' was not found.`);
     }
 
-    const revokedAt = this.resolveMutationTimestamp(input.revokedAt ?? input.mutation.context.occurredAt);
+    const revokedAt = resolvePersistenceMutationCreatedAt(input.revokedAt ?? input.mutation.context.occurredAt);
     return this.upsertRoleAssignment({
       mutation: input.mutation,
       record: {
@@ -483,25 +490,28 @@ export class SqliteAuthorizationPersistenceAdapter
       });
     }
 
-    const changedAt = this.resolveMutationTimestamp(input.mutation.context.occurredAt);
     let persistedRecord: AuthorizationSharingGrantPersistenceRecord | undefined;
 
     this.getDatabase().transaction(() => {
       const existing = this.getSharingGrantByIdInternal(input.record.id);
-      this.assertExpectedRevision(
-        input.mutation.expectedRevision,
-        existing?.revision,
-        "Sharing grant",
-      );
+      const metadata = resolvePersistenceMutationMetadata({
+        existing,
+        createdAt: input.record.createdAt,
+        createdBy: input.record.createdBy,
+        actorId: input.mutation.context.actorUserIdentityId,
+        expectedRevision: input.mutation.expectedRevision,
+        occurredAt: input.mutation.context.occurredAt,
+        entityName: "Sharing grant",
+      });
 
       persistedRecord = Object.freeze({
         ...input.record,
         permissionKeys: Object.freeze([...new Set(input.record.permissionKeys)]),
-        createdAt: existing?.createdAt ?? input.record.createdAt,
-        createdBy: existing?.createdBy ?? input.record.createdBy,
-        lastModifiedAt: changedAt,
-        lastModifiedBy: input.mutation.context.actorUserIdentityId,
-        revision: existing ? existing.revision + 1 : 1,
+        createdAt: metadata.createdAt,
+        createdBy: metadata.createdBy,
+        lastModifiedAt: metadata.lastModifiedAt,
+        lastModifiedBy: metadata.lastModifiedBy,
+        revision: metadata.revision,
       });
 
       this.executeMutation("upsert sharing grant", () => this.getDatabase().prepare(`
@@ -574,7 +584,7 @@ export class SqliteAuthorizationPersistenceAdapter
       throw new Error(`Sharing grant '${input.sharingGrantId}' was not found.`);
     }
 
-    const revokedAt = this.resolveMutationTimestamp(input.revokedAt ?? input.mutation.context.occurredAt);
+    const revokedAt = resolvePersistenceMutationCreatedAt(input.revokedAt ?? input.mutation.context.occurredAt);
     return this.upsertSharingGrant({
       mutation: input.mutation,
       record: {
@@ -702,24 +712,27 @@ export class SqliteAuthorizationPersistenceAdapter
       });
     }
 
-    const changedAt = this.resolveMutationTimestamp(input.mutation.context.occurredAt);
     let persistedRecord: AuthorizationResourcePolicyMetadataPersistenceRecord | undefined;
 
     this.getDatabase().transaction(() => {
       const existing = this.getResourcePolicyMetadataRecordByResourceInternal(input.record);
-      this.assertExpectedRevision(
-        input.mutation.expectedRevision,
-        existing?.revision,
-        "Resource policy metadata",
-      );
+      const metadata = resolvePersistenceMutationMetadata({
+        existing,
+        createdAt: input.record.createdAt,
+        createdBy: input.record.createdBy,
+        actorId: input.mutation.context.actorUserIdentityId,
+        expectedRevision: input.mutation.expectedRevision,
+        occurredAt: input.mutation.context.occurredAt,
+        entityName: "Resource policy metadata",
+      });
 
       persistedRecord = Object.freeze({
         ...input.record,
-        createdAt: existing?.createdAt ?? input.record.createdAt,
-        createdBy: existing?.createdBy ?? input.record.createdBy,
-        lastModifiedAt: changedAt,
-        lastModifiedBy: input.mutation.context.actorUserIdentityId,
-        revision: existing ? existing.revision + 1 : 1,
+        createdAt: metadata.createdAt,
+        createdBy: metadata.createdBy,
+        lastModifiedAt: metadata.lastModifiedAt,
+        lastModifiedBy: metadata.lastModifiedBy,
+        revision: metadata.revision,
       });
 
       this.executeMutation("upsert resource policy metadata", () => this.getDatabase().prepare(`
@@ -788,7 +801,7 @@ export class SqliteAuthorizationPersistenceAdapter
       throw new Error(`Resource policy metadata '${toAuthorizationResourceLookupKey(input.resource)}' was not found.`);
     }
 
-    const deletedAt = this.resolveMutationTimestamp(input.deletedAt ?? input.mutation.context.occurredAt);
+    const deletedAt = resolvePersistenceMutationCreatedAt(input.deletedAt ?? input.mutation.context.occurredAt);
     return this.upsertResourcePolicyMetadata({
       mutation: input.mutation,
       record: {
@@ -993,7 +1006,7 @@ export class SqliteAuthorizationPersistenceAdapter
       operationKey,
       mutationKind,
       JSON.stringify(record),
-      new Date().toISOString(),
+      resolvePersistenceMutationCreatedAt(undefined),
     ));
   }
 
@@ -1026,30 +1039,6 @@ export class SqliteAuthorizationPersistenceAdapter
       sql: "",
       params: Object.freeze([]),
     };
-  }
-
-  private resolveMutationTimestamp(candidate?: string): string {
-    const normalizedCandidate = candidate?.trim();
-    return normalizedCandidate && normalizedCandidate.length > 0
-      ? normalizedCandidate
-      : new Date().toISOString();
-  }
-
-  private assertExpectedRevision(
-    expectedRevision: number | undefined,
-    persistedRevision: number | undefined,
-    entityName: string,
-  ): void {
-    if (typeof expectedRevision !== "number") {
-      return;
-    }
-
-    const currentRevision = persistedRevision ?? 0;
-    if (expectedRevision !== currentRevision) {
-      throw new Error(
-        `${entityName} expectedRevision '${expectedRevision}' did not match persisted revision '${currentRevision}'.`,
-      );
-    }
   }
 
   private executeMutation(

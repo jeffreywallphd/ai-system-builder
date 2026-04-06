@@ -9,6 +9,7 @@ import type {
 import type { AuthorizationRoleKey } from "../../../domain/authorization/AuthorizationDomain";
 import type { PermissionKey } from "../../../domain/authorization/AuthorizationDomain";
 import type { AuthorizationResourceFamily } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+import { normalizePersistenceOperationKey } from "../persistence/PersistenceBoundaryDtos";
 
 export interface AuthorizationPersistenceAuditStamp {
   readonly createdAt: string;
@@ -191,9 +192,9 @@ export function toAuthorizationSharingSubjectLookupKey(subject: SharingSubject):
 }
 
 export function normalizeAuthorizationMutationOperationKey(operationKey: string): string {
-  const normalized = operationKey.trim();
-  if (!normalized) {
+  try {
+    return normalizePersistenceOperationKey(operationKey);
+  } catch {
     throw new Error("Authorization persistence mutation operationKey is required.");
   }
-  return normalized;
 }

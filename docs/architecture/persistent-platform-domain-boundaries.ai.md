@@ -163,6 +163,31 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
   - `src/infrastructure/persistence/sqlite/tests/SqliteTransactionCoordinator.test.ts`
   - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
 
+## Story 13.3.1 shared identifier/timestamp/versioning baseline
+
+- Shared persistence infrastructure now provides reusable helpers for:
+  - stable identifier token normalization + scoped id generation,
+  - canonical UTC mutation timestamp resolution,
+  - optimistic-concurrency revision checks + increment behavior,
+  - workspace/user/node/platform tenancy metadata factory creation.
+- New shared modules:
+  - `src/shared/persistence/PersistenceIdentifiers.ts`
+  - `src/shared/persistence/PersistenceTimestamps.ts`
+  - `src/shared/persistence/PersistenceVersioning.ts`
+  - `src/shared/persistence/PersistenceTenancyMetadataFactory.ts`
+- New adapter-facing infrastructure seam:
+  - `src/infrastructure/persistence/common/PersistenceMutationMetadata.ts`
+- Concrete adapter integration now uses shared mutation metadata conventions in:
+  - `src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter.ts`
+  - `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter.ts`
+- Domain-specific mutation operation-key normalizers for identity/authorization/node trust now route through one shared persistence normalizer.
+- Added contract and behavior coverage:
+  - `src/shared/persistence/tests/PersistenceIdentifiers.test.ts`
+  - `src/shared/persistence/tests/PersistenceTimestamps.test.ts`
+  - `src/shared/persistence/tests/PersistenceVersioning.test.ts`
+  - `src/shared/persistence/tests/PersistenceTenancyMetadataFactory.test.ts`
+  - `src/infrastructure/persistence/common/tests/PersistenceMutationMetadata.test.ts`
+
 ## Mapper guidance for contributors
 
 - Keep mapper implementations in infrastructure, but drive them from shared DTO + schema contracts.

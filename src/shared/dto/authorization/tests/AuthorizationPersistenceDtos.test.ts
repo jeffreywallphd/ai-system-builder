@@ -40,6 +40,6 @@ describe("AuthorizationPersistenceDtos", () => {
     expect(() => normalizeAuthorizationMutationOperationKey("   ")).toThrow(
       "Authorization persistence mutation operationKey is required.",
     );
-    expect(normalizeAuthorizationMutationOperationKey("op-101")).toBe("op-101");
+    expect(normalizeAuthorizationMutationOperationKey("  OP-101  ")).toBe("op-101");
   });
 });

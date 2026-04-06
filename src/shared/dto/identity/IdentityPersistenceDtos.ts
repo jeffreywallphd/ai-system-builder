@@ -2,6 +2,7 @@ import type {
   IdentitySessionStatus,
   UserIdentityStatus,
 } from "../../../domain/identity/IdentityDomain";
+import { normalizePersistenceOperationKey } from "../persistence/PersistenceBoundaryDtos";
 
 export const IdentityPrincipalLookupKinds = Object.freeze({
   username: "username",
@@ -101,7 +102,7 @@ export interface IdentityPersistenceMutationContext {
 }
 
 export function normalizeIdentityPersistenceOperationKey(operationKey: string): string {
-  return operationKey.trim().toLowerCase();
+  return normalizePersistenceOperationKey(operationKey);
 }
 
 export interface IdentityPersistenceMutationResult<TRecord> {

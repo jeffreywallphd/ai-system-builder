@@ -12,6 +12,7 @@ import {
   NodeEnrollmentRequestStatuses,
   NodeTrustStates,
 } from "../../../domain/nodes/NodeTrustDomain";
+import { normalizePersistenceOperationKey } from "../persistence/PersistenceBoundaryDtos";
 
 export interface NodeTrustPersistenceAuditStamp {
   readonly createdAt: string;
@@ -212,9 +213,9 @@ export function toNodeTrustStateLookupKey(trustState: NodeTrustState): string {
 }
 
 export function normalizeNodeTrustMutationOperationKey(operationKey: string): string {
-  const normalized = operationKey.trim();
-  if (!normalized) {
+  try {
+    return normalizePersistenceOperationKey(operationKey);
+  } catch {
     throw new Error("Node trust persistence mutation operationKey is required.");
   }
-  return normalized;
 }
