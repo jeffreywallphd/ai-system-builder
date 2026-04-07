@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ContextualRecommendationsPanel from "../components/navigation/ContextualRecommendationsPanel";
 import RecentAndFavoritesPanel from "../components/navigation/RecentAndFavoritesPanel";
 import { ContextualRecommendationService, ContextualRecommendationSurfaces } from "../routes/ContextualRecommendations";
@@ -12,9 +12,14 @@ import { RunContextKinds, RunInterfaceService } from "../routes/RunInterface";
 import { PersistedWorkflowEntryService, type PersistedWorkflowEntry } from "../routes/PersistedWorkflowEntryService";
 import { RuntimeOperationsService } from "../services/RuntimeOperationsService";
 import type { RuntimeQueueItem } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
+import {
+  RuntimeRealtimeSubscriptionService,
+  type RuntimeRealtimeConnectionStateSnapshot,
+} from "@shared/runtime/RuntimeRealtimeSubscriptionService";
 
 interface RunPageProps {
   readonly runtimeOperationsService?: RuntimeOperationsService;
+  readonly runtimeRealtimeSubscriptionService?: RuntimeRealtimeSubscriptionService;
 }
 
 export default function RunPage(props: RunPageProps): JSX.Element {
@@ -25,6 +30,10 @@ export default function RunPage(props: RunPageProps): JSX.Element {
   const runtimeOperationsService = useMemo(
     () => props.runtimeOperationsService ?? new RuntimeOperationsService(),
     [props.runtimeOperationsService],
+  );
+  const runtimeRealtimeSubscriptionService = useMemo(
+    () => props.runtimeRealtimeSubscriptionService ?? new RuntimeRealtimeSubscriptionService(),
+    [props.runtimeRealtimeSubscriptionService],
   );
   const recommendationService = useMemo(() => new ContextualRecommendationService(), []);
   const recentAndFavoritesService = useMemo(() => new RecentAndFavoritesService(), []);
@@ -53,6 +62,10 @@ export default function RunPage(props: RunPageProps): JSX.Element {
   const [runtimeQueueItems, setRuntimeQueueItems] = useState<ReadonlyArray<RuntimeQueueItem>>([]);
   const [runtimeQueueError, setRuntimeQueueError] = useState<string | undefined>();
   const [isRuntimeQueueLoading, setIsRuntimeQueueLoading] = useState(false);
+  const [runtimeRealtimeConnectionState, setRuntimeRealtimeConnectionState] = useState<RuntimeRealtimeConnectionStateSnapshot>({
+    state: "connecting",
+    stale: false,
+  });
   const [runtimeExecutionId, setRuntimeExecutionId] = useState("");
   const [runtimeExecutionState, setRuntimeExecutionState] = useState<{
     readonly executionId?: string;
@@ -122,7 +135,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
     };
   }, [persistedWorkflowEntryService]);
 
-  const refreshRuntimeQueue = (): Promise<void> => {
+  const refreshRuntimeQueue = useCallback((): Promise<void> => {
     setIsRuntimeQueueLoading(true);
     return runtimeOperationsService.listQueueItems({ limit: 20, statuses: ["queued", "running"] }).then((response) => {
       if (!response.ok || !response.data) {
@@ -135,13 +148,9 @@ export default function RunPage(props: RunPageProps): JSX.Element {
     }).finally(() => {
       setIsRuntimeQueueLoading(false);
     });
-  };
-
-  useEffect(() => {
-    void refreshRuntimeQueue();
   }, [runtimeOperationsService]);
 
-  const inspectRuntimeExecution = async (executionId: string): Promise<void> => {
+  const inspectRuntimeExecution = useCallback(async (executionId: string): Promise<void> => {
     const summary = await runtimeOperationsService.inspectRun({
       executionId,
       diagnosticsLimit: 20,
@@ -165,7 +174,74 @@ export default function RunPage(props: RunPageProps): JSX.Element {
       outputContractIds: summary.data.outputContractIds,
     }));
     setRuntimeExecutionError(undefined);
-  };
+  }, [runtimeOperationsService]);
+
+  useEffect(() => {
+    void refreshRuntimeQueue();
+  }, [refreshRuntimeQueue]);
+
+  useEffect(() => {
+    const selectedExecutionId = runtimeExecutionId.trim() || runtimeExecutionState?.executionId;
+    const subscription = runtimeRealtimeSubscriptionService.subscribeOperationalUpdates({
+      executionId: selectedExecutionId,
+      onQueueMovementEvent: () => {
+        void refreshRuntimeQueue();
+      },
+      onRunStatusEvent: (payload) => {
+        const selectedId = runtimeExecutionId.trim() || runtimeExecutionState?.executionId;
+        if (!selectedId || selectedId !== payload.executionId) {
+          return;
+        }
+        setRuntimeExecutionState((current) => Object.freeze({
+          executionId: payload.executionId,
+          status: payload.status,
+          progressLabel: payload.progress
+            ? `${payload.progress.completedNodeCount}/${payload.progress.totalNodeCount} nodes`
+            : current?.progressLabel ?? "-",
+          diagnosticsCount: current?.diagnosticsCount,
+          traceEventCount: current?.traceEventCount,
+          traceLogCount: current?.traceLogCount,
+          outputFieldCount: current?.outputFieldCount,
+          outputContractIds: current?.outputContractIds,
+        }));
+      },
+      onRuntimeConnectivityEvent: (payload) => {
+        setRuntimeRealtimeConnectionState((current) => Object.freeze({
+          state: payload.state === "connected"
+            ? "connected"
+            : payload.state === "reconnecting"
+              ? "reconnecting"
+              : payload.state === "degraded"
+                ? "degraded"
+                : "disconnected",
+          stale: payload.state !== "connected",
+          detail: payload.reason ?? current.detail,
+        }));
+      },
+      onConnectionStateChanged: (state) => {
+        setRuntimeRealtimeConnectionState(state);
+      },
+      onError: (message) => {
+        setRuntimeQueueError(message);
+      },
+      fallbackRefresh: async () => {
+        await refreshRuntimeQueue();
+        const currentExecutionId = runtimeExecutionId.trim() || runtimeExecutionState?.executionId;
+        if (currentExecutionId) {
+          await inspectRuntimeExecution(currentExecutionId);
+        }
+      },
+    });
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [
+    inspectRuntimeExecution,
+    refreshRuntimeQueue,
+    runtimeExecutionId,
+    runtimeExecutionState?.executionId,
+    runtimeRealtimeSubscriptionService,
+  ]);
 
   const launchRuntimeExecution = async (): Promise<void> => {
     const normalizedSystemId = runtimeLaunchSystemId.trim();
@@ -296,7 +372,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
 
       <div className="ui-card" data-testid="run-runtime-operations-panel">
         <div className="ui-card__body ui-stack ui-stack--sm">
-          <h2>Thin-client runtime operations</h2>
+          <h2>Desktop and thin-client runtime operations</h2>
           <p className="ui-text-secondary">Queue review, allowed run launch, output inspection, and approved parameter adjustments through shared authoritative runtime APIs.</p>
           <div className="ui-stack ui-stack--xs">
             <h3 style={{ margin: 0 }}>Launch allowed run</h3>
@@ -362,6 +438,11 @@ export default function RunPage(props: RunPageProps): JSX.Element {
             ) : null}
           </div>
           <h3 style={{ margin: 0 }}>Queue review and run controls</h3>
+          <p className="ui-text-small ui-text-secondary">
+            Realtime channel: <strong>{runtimeRealtimeConnectionState.state}</strong>
+            {runtimeRealtimeConnectionState.stale ? " (stale data fallback active)" : ""}
+            {runtimeRealtimeConnectionState.detail ? ` - ${runtimeRealtimeConnectionState.detail}` : ""}
+          </p>
           <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
             <button className="ui-button ui-button--ghost ui-button--small" onClick={() => void refreshRuntimeQueue()}>
               {isRuntimeQueueLoading ? "Refreshing queue..." : "Refresh queue"}
