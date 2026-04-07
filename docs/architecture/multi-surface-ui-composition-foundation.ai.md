@@ -55,3 +55,7 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
 - Shared shell primitives + responsive region layouts are now documented in docs/architecture/multi-surface-ui-shell-primitives.md and implemented in src/ui/shared/components/shell/* with desktop/thin wrappers in src/ui/desktop/shell/* and src/ui/web/shell/*.
 - New admin/operational pages should compose these primitives for header/regions/status/empty/guard containers rather than ad hoc shell structures.
 
+## Story 15.1.3 update
+- Shared route/navigation metadata and surface gating are now documented in docs/architecture/multi-surface-ui-navigation-metadata.md.
+- Desktop admin, desktop operational, thin-client operational, and admin-lite route availability and navigation projections now derive from src/ui/routes/SurfaceRouteMetadataCatalog.ts plus shared contracts in src/ui/shared/navigation/SurfaceNavigationMetadata.ts.
+

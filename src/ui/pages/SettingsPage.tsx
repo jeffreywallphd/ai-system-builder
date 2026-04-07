@@ -6,7 +6,8 @@ import type { UiSettingsState } from "../settings/UiSettingsStore";
 import type { McpStoreState } from "../state/McpStore";
 import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 import McpRuntimeStatusPanel from "../components/execution/McpRuntimeStatusPanel";
-import { ROUTE_PATHS } from "../routes/RouteConfig";
+import { listSettingsShortcutRouteMetadata } from "../routes/SurfaceRouteMetadataCatalog";
+import { UiSurfaceKeys } from "../shared/navigation/SurfaceNavigationMetadata";
 
 export default function SettingsPage(): JSX.Element {
   const { settingsStore, mcpStore, runtimeConsoleStore } = useUiDependencies();
@@ -38,6 +39,10 @@ export default function SettingsPage(): JSX.Element {
   }, [state.isAutoSaving, state.lastSavedAt, state.saveError]);
 
   const isAdvancedExpanded = (sectionId: string): boolean => expandedAdvancedSections.includes(sectionId);
+  const settingsShortcutRoutes = useMemo(
+    () => listSettingsShortcutRouteMetadata({ surface: UiSurfaceKeys.desktopAdmin }),
+    [],
+  );
 
   const toggleAdvancedSection = (sectionId: string): void => {
     setExpandedAdvancedSections((current) => (
@@ -58,39 +63,11 @@ export default function SettingsPage(): JSX.Element {
           </p>
         </div>
         <div className="ui-page__actions">
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.authorizationSharing}>
-            Sharing and visibility
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.authorizationSharingThin}>
-            Sharing access review
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.authorizationReporting}>
-            Authorization reporting
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.storageAdmin}>
-            Managed storage
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.workspaceAdmin}>
-            Workspace administration
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.nodeEnrollmentReview}>
-            Node enrollment review
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.nodeInventory}>
-            Trusted node inventory
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.workspaceThinMembership}>
-            Workspace memberships
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.trustedDevices}>
-            Trusted devices
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.identityAdmin}>
-            Identity administration
-          </Link>
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.secretsAdmin}>
-            Secret metadata management
-          </Link>
+          {settingsShortcutRoutes.map((route) => (
+            <Link key={route.key} className="ui-button ui-button--secondary ui-button--sm" to={route.path}>
+              {route.title}
+            </Link>
+          ))}
         </div>
       </div>
 

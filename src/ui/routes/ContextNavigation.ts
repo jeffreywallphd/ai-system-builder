@@ -2,6 +2,7 @@ import { BuildIntents, type BuildIntent } from "./BuildIntentModels";
 import { ROUTE_PATHS } from "./RouteConfig";
 import { ShellRouteResolver } from "./IntentNavigationShell";
 import { UxStudioEntryLabelResolver } from "../taxonomy/UxTaxonomySuppression";
+import { resolveRouteSurfaceMetadataByPath } from "./SurfaceRouteMetadataCatalog";
 
 export interface BreadcrumbItem {
   readonly key: string;
@@ -106,17 +107,14 @@ export class BreadcrumbResolver {
   }
 
   private resolveRouteMetadata(pathname: string, shellKey?: string): RouteContextMetadata {
-    if (pathname === ROUTE_PATHS.explore || pathname === ROUTE_PATHS.registry) {
-      return Object.freeze({ routeKey: "explore", title: "Explore", shellSection: "explore" });
-    }
-    if (pathname.startsWith("/studio-shell/registry/assets/")) {
+    const routeMetadata = resolveRouteSurfaceMetadataByPath(pathname);
+    if (routeMetadata?.key === "registry-asset-detail") {
       return Object.freeze({ routeKey: "explore-detail", title: "Explore", shellSection: "explore" });
     }
-    if (pathname === ROUTE_PATHS.run || pathname.startsWith("/tools")) {
-      return Object.freeze({ routeKey: "run", title: "Run", shellSection: "run" });
-    }
-    if (pathname === ROUTE_PATHS.build || pathname.startsWith("/studio-shell") || pathname.startsWith("/agent-studio") || pathname.startsWith("/workflows")) {
-      return Object.freeze({ routeKey: "build", title: "Build", shellSection: "build" });
+    if (routeMetadata?.navigation.shellSection) {
+      const routeKey = routeMetadata.navigation.shellSection;
+      const title = routeKey === "build" ? "Build" : routeKey === "explore" ? "Explore" : "Run";
+      return Object.freeze({ routeKey, title, shellSection: routeKey });
     }
 
     if (shellKey === "explore") {

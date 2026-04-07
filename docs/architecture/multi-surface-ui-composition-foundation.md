@@ -131,3 +131,9 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
 - Shared shell primitives and responsive region layout vocabulary now live in docs/architecture/multi-surface-ui-shell-primitives.md with implementation in src/ui/shared/components/shell/*, src/ui/desktop/shell/*, and src/ui/web/shell/*.
 - New admin and operational pages should compose app frame, header, region layout, status, empty-state, and permission guard surfaces from those primitives instead of bespoke page shell markup.
 
+## Story 15.1.3 update
+
+- Canonical shared navigation metadata, route grouping, and surface capability gating now live in docs/architecture/multi-surface-ui-navigation-metadata.md.
+- Route grouping and navigation projections for desktop admin, desktop operational, thin-client operational, and admin-lite surfaces are defined centrally in src/ui/routes/SurfaceRouteMetadataCatalog.ts and consumed by shell/context/menu/settings surfaces.
+- Contributors should add route access/surface rules in metadata first and avoid scattering route gating logic across page components.
+
