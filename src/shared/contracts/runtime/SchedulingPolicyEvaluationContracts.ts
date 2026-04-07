@@ -64,6 +64,26 @@ export interface SchedulingCandidateReasoningSummary {
   readonly exclusionReasons: ReadonlyArray<SchedulingPolicyReason>;
 }
 
+export interface SchedulingReasonCodeSummaryEntry {
+  readonly code: string;
+  readonly count: number;
+  readonly sampleMessage: string;
+}
+
+export interface SchedulingExclusionReasonSample {
+  readonly runId: string;
+  readonly nodeId: string;
+  readonly reasonCodes: ReadonlyArray<string>;
+}
+
+export interface SchedulingDecisionReasonSummary {
+  readonly decisionReasonCodes: ReadonlyArray<string>;
+  readonly decisionReasonCatalog: ReadonlyArray<SchedulingReasonCodeSummaryEntry>;
+  readonly exclusionReasonCodes: ReadonlyArray<string>;
+  readonly exclusionReasonCatalog: ReadonlyArray<SchedulingReasonCodeSummaryEntry>;
+  readonly exclusionSamples: ReadonlyArray<SchedulingExclusionReasonSample>;
+}
+
 export interface SchedulingQueueEvaluationSummary {
   readonly queueLeaseCount: number;
   readonly runCount: number;
@@ -105,6 +125,7 @@ export interface SchedulingPolicyEvaluationResult {
   readonly selected: SchedulingPolicyDecision["selected"];
   readonly summary: SchedulingQueueEvaluationSummary;
   readonly queueEvaluation: ReadonlyArray<SchedulingCandidateReasoningSummary>;
+  readonly reasonSummary: SchedulingDecisionReasonSummary;
   readonly reasons: ReadonlyArray<SchedulingPolicyReason>;
 }
 
@@ -151,6 +172,71 @@ function toPriorityMetadata(scorecard: SchedulingCandidateScorecard): Scheduling
     priorityBand: scorecard.priorityBand,
     rolePriorityScore: scorecard.rolePriorityScore,
     queueAgeSeconds: scorecard.queueAgeSeconds,
+  });
+}
+
+function sanitizeReasonMessage(message: string): string {
+  const normalized = message.trim().replace(/\s+/g, " ");
+  if (normalized.length <= 256) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, 253)}...`;
+}
+
+function toReasonCodeCatalog(
+  reasons: ReadonlyArray<SchedulingPolicyReason>,
+): ReadonlyArray<SchedulingReasonCodeSummaryEntry> {
+  const tally = new Map<string, { count: number; sampleMessage: string }>();
+  for (const reason of reasons) {
+    const existing = tally.get(reason.code);
+    if (existing) {
+      existing.count += 1;
+      continue;
+    }
+
+    tally.set(reason.code, {
+      count: 1,
+      sampleMessage: sanitizeReasonMessage(reason.message),
+    });
+  }
+
+  return Object.freeze(
+    [...tally.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([code, value]) => Object.freeze({
+        code,
+        count: value.count,
+        sampleMessage: value.sampleMessage,
+      })),
+  );
+}
+
+export function toSchedulingDecisionReasonSummary(input: {
+  readonly decision: SchedulingPolicyDecision;
+}): SchedulingDecisionReasonSummary {
+  const decisionReasonCodes = Object.freeze([...new Set(input.decision.reasons.map((reason) => reason.code))]);
+  const exclusionReasons = input.decision.evaluatedCandidates
+    .filter((candidate) => !candidate.eligible)
+    .flatMap((candidate) => candidate.denialReasons);
+  const exclusionReasonCodes = Object.freeze([...new Set(exclusionReasons.map((reason) => reason.code))]);
+  const exclusionSamples = Object.freeze(
+    input.decision.evaluatedCandidates
+      .filter((candidate) => !candidate.eligible)
+      .slice(0, 32)
+      .map((candidate) => Object.freeze({
+        runId: candidate.runId,
+        nodeId: candidate.nodeId,
+        reasonCodes: Object.freeze([...new Set(candidate.denialReasons.map((reason) => reason.code))]),
+      })),
+  );
+
+  return Object.freeze({
+    decisionReasonCodes,
+    decisionReasonCatalog: toReasonCodeCatalog(input.decision.reasons),
+    exclusionReasonCodes,
+    exclusionReasonCatalog: toReasonCodeCatalog(exclusionReasons),
+    exclusionSamples,
   });
 }
 
@@ -231,6 +317,9 @@ export function toSchedulingPolicyEvaluationResult(input: {
       evaluatedCandidates: input.decision.evaluatedCandidates,
     }),
     queueEvaluation,
+    reasonSummary: toSchedulingDecisionReasonSummary({
+      decision: input.decision,
+    }),
     reasons: Object.freeze([...input.decision.reasons]),
   });
 }

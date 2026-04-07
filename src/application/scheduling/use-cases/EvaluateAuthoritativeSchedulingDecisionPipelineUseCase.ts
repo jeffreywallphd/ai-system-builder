@@ -4,10 +4,13 @@ import type {
   IAuthoritativeSchedulingPolicyEvaluator,
   SchedulingDecisionBundle,
 } from "@application/scheduling/AuthoritativeSchedulingDecisionPipeline";
+import type { ISchedulingDecisionOutcomeRecorder } from "@application/scheduling/ports/SchedulingDecisionOutcomeCapturePorts";
+import { toSchedulingDecisionOutcomeCaptureRecord } from "./SchedulingDecisionOutcomeCapture";
 
 interface EvaluateAuthoritativeSchedulingDecisionPipelineUseCaseDependencies {
   readonly inputAssembler: IAuthoritativeSchedulingInputAssembler;
   readonly policyEvaluator: IAuthoritativeSchedulingPolicyEvaluator;
+  readonly outcomeRecorder?: ISchedulingDecisionOutcomeRecorder;
   readonly now?: () => Date;
 }
 
@@ -39,7 +42,17 @@ export class EvaluateAuthoritativeSchedulingDecisionPipelineUseCase
       nodeScope: normalizeNodeScope(input.nodeScope),
     });
 
-    return this.dependencies.policyEvaluator.evaluate(snapshot);
+    const decisionBundle = await this.dependencies.policyEvaluator.evaluate(snapshot);
+    if (this.dependencies.outcomeRecorder) {
+      await this.dependencies.outcomeRecorder.recordDecisionOutcome(
+        toSchedulingDecisionOutcomeCaptureRecord({
+          bundle: decisionBundle,
+          recordedAt: this.now().toISOString(),
+        }),
+      );
+    }
+
+    return decisionBundle;
   }
 }
 

@@ -12,6 +12,7 @@ import {
   SchedulingPolicyEvaluationContractVersions,
   SchedulingPolicyEvaluationReasonCodes,
   type SchedulingAssignmentIntent,
+  type SchedulingDecisionReasonSummary,
   type SchedulingCandidateReasoningSummary,
   type SchedulingDecisionBundle,
   type SchedulingEvaluationSnapshot,
@@ -259,6 +260,26 @@ const SchedulingQueueEvaluationSummarySchema: z.ZodType<SchedulingQueueEvaluatio
   }
 });
 
+const SchedulingReasonCodeSummaryEntrySchema = z.object({
+  code: z.string().trim().min(1).max(128),
+  count: z.number().int().min(1),
+  sampleMessage: z.string().trim().min(1).max(256),
+}).strict();
+
+const SchedulingExclusionReasonSampleSchema = z.object({
+  runId: IdentifierSchema,
+  nodeId: IdentifierSchema,
+  reasonCodes: z.array(z.string().trim().min(1).max(128)).max(64),
+}).strict();
+
+const SchedulingDecisionReasonSummarySchema: z.ZodType<SchedulingDecisionReasonSummary> = z.object({
+  decisionReasonCodes: z.array(z.string().trim().min(1).max(128)).max(128),
+  decisionReasonCatalog: z.array(SchedulingReasonCodeSummaryEntrySchema).max(128),
+  exclusionReasonCodes: z.array(z.string().trim().min(1).max(128)).max(128),
+  exclusionReasonCatalog: z.array(SchedulingReasonCodeSummaryEntrySchema).max(128),
+  exclusionSamples: z.array(SchedulingExclusionReasonSampleSchema).max(32),
+}).strict();
+
 const SchedulingPolicySnapshotMetadataSchema = z.object({
   contractVersion: z.literal(SchedulingPolicyEvaluationContractVersions.v1),
   decisionId: IdentifierSchema,
@@ -278,6 +299,7 @@ const SchedulingPolicyEvaluationResultSchema: z.ZodType<SchedulingPolicyEvaluati
   }).strict().optional(),
   summary: SchedulingQueueEvaluationSummarySchema,
   queueEvaluation: z.array(SchedulingCandidateReasoningSummarySchema),
+  reasonSummary: SchedulingDecisionReasonSummarySchema,
   reasons: z.array(SchedulingPolicyReasonSchema),
 }).strict().superRefine((value, context) => {
   if (value.outcome !== SchedulingDecisionOutcomes.assignmentRecommended && value.selected) {
