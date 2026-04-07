@@ -6,6 +6,7 @@ export interface RunOrchestrationObservabilityLogEvent {
   readonly event: string;
   readonly operation:
     | "submission"
+    | "scheduling.governance-event"
     | "mutation.cancel"
     | "mutation.retry"
     | "mutation.scheduling-admin.reevaluate-deferred"

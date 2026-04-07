@@ -46,6 +46,9 @@ describe("RunOrchestrationObservability", () => {
             rawPrompt: "do not leak this",
           }),
         }),
+        backendDetails: Object.freeze({
+          unsafeBackendResponse: "hidden",
+        }),
       }),
     });
 
@@ -56,6 +59,7 @@ describe("RunOrchestrationObservability", () => {
     expect(serialized).not.toContain("top-secret-token");
     expect(serialized).not.toContain("C:\\\\Users\\\\private\\\\workspace\\\\secret.db");
     expect(serialized).not.toContain("do not leak this");
+    expect(serialized).not.toContain("hidden");
     expect(serialized).toContain("[REDACTED]");
   });
 

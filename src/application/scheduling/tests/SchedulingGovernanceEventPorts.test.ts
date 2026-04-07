@@ -29,6 +29,10 @@ describe("SchedulingGovernanceEventPorts", () => {
         reasonCodes: Object.freeze(["role-priority-preempted"]),
         claimToken: "claim:secret",
         prompt: "sensitive",
+        rawPath: "C:\\unsafe\\path",
+        backendDetails: Object.freeze({
+          backendResponse: "sensitive-payload",
+        }),
         metadata: Object.freeze({
           nestedToken: "nested-secret",
           priorityBand: "high",
@@ -44,6 +48,8 @@ describe("SchedulingGovernanceEventPorts", () => {
     const details = sink.event?.details as Record<string, unknown> | undefined;
     expect(details?.claimToken).toBeUndefined();
     expect(details?.prompt).toBeUndefined();
+    expect(details?.rawPath).toBeUndefined();
+    expect(details?.backendDetails).toBeUndefined();
     expect((details?.metadata as Record<string, unknown> | undefined)?.nestedToken).toBeUndefined();
     expect((details?.metadata as Record<string, unknown> | undefined)?.priorityBand).toBe("high");
   });
