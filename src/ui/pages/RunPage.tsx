@@ -13,12 +13,19 @@ import { PersistedWorkflowEntryService, type PersistedWorkflowEntry } from "../r
 import { RuntimeOperationsService } from "../services/RuntimeOperationsService";
 import type { RuntimeQueueItem } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 
-export default function RunPage(): JSX.Element {
+interface RunPageProps {
+  readonly runtimeOperationsService?: RuntimeOperationsService;
+}
+
+export default function RunPage(props: RunPageProps): JSX.Element {
   const location = useLocation();
   const { executionHistoryService } = useUiDependencies();
   const service = useMemo(() => new RunInterfaceService(), []);
   const persistedWorkflowEntryService = useMemo(() => new PersistedWorkflowEntryService(), []);
-  const runtimeOperationsService = useMemo(() => new RuntimeOperationsService(), []);
+  const runtimeOperationsService = useMemo(
+    () => props.runtimeOperationsService ?? new RuntimeOperationsService(),
+    [props.runtimeOperationsService],
+  );
   const recommendationService = useMemo(() => new ContextualRecommendationService(), []);
   const recentAndFavoritesService = useMemo(() => new RecentAndFavoritesService(), []);
   const presentation = useMemo(() => service.resolvePresentation(location.search), [location.search, service]);
@@ -48,13 +55,29 @@ export default function RunPage(): JSX.Element {
   const [isRuntimeQueueLoading, setIsRuntimeQueueLoading] = useState(false);
   const [runtimeExecutionId, setRuntimeExecutionId] = useState("");
   const [runtimeExecutionState, setRuntimeExecutionState] = useState<{
+    readonly executionId?: string;
     readonly status?: string;
     readonly progressLabel?: string;
     readonly diagnosticsCount?: number;
     readonly traceEventCount?: number;
     readonly traceLogCount?: number;
+    readonly outputFieldCount?: number;
+    readonly outputContractIds?: ReadonlyArray<string>;
   }>();
   const [runtimeExecutionError, setRuntimeExecutionError] = useState<string | undefined>();
+  const [runtimeLaunchSystemId, setRuntimeLaunchSystemId] = useState("");
+  const [runtimeLaunchVersionId, setRuntimeLaunchVersionId] = useState("");
+  const [runtimeLaunchTrigger, setRuntimeLaunchTrigger] = useState<"manual" | "api">("manual");
+  const [runtimeLaunchInputPayload, setRuntimeLaunchInputPayload] = useState("{\n  \"message\": \"Hello from thin-client run operations\"\n}");
+  const [runtimeLaunchApprovedParameters, setRuntimeLaunchApprovedParameters] = useState("{\n  \"maxRuntimeSeconds\": 120,\n  \"maxOutputAssets\": 5\n}");
+  const [runtimeLaunchError, setRuntimeLaunchError] = useState<string | undefined>();
+  const [runtimeLaunchResult, setRuntimeLaunchResult] = useState<{
+    readonly executionId: string;
+    readonly status: string;
+    readonly systemId: string;
+    readonly versionId: string;
+  }>();
+  const [isRuntimeLaunchPending, setIsRuntimeLaunchPending] = useState(false);
 
   useEffect(() => {
     recentAndFavoritesService.recordRecentRunContext({ request: presentation.request, launchPath: presentation.launchPath });
@@ -119,32 +142,80 @@ export default function RunPage(): JSX.Element {
   }, [runtimeOperationsService]);
 
   const inspectRuntimeExecution = async (executionId: string): Promise<void> => {
-    const normalizedExecutionId = executionId.trim();
-    if (!normalizedExecutionId) {
-      setRuntimeExecutionError("Execution id is required.");
+    const summary = await runtimeOperationsService.inspectRun({
+      executionId,
+      diagnosticsLimit: 20,
+      eventLimit: 20,
+      logLimit: 20,
+    });
+    if (!summary.ok || !summary.data) {
       setRuntimeExecutionState(undefined);
-      return;
-    }
-
-    const [status, result, trace] = await Promise.all([
-      runtimeOperationsService.getRunStatus(normalizedExecutionId),
-      runtimeOperationsService.getRunResult({ executionId: normalizedExecutionId, diagnosticsLimit: 20 }),
-      runtimeOperationsService.getRunTrace({ executionId: normalizedExecutionId, eventLimit: 20, logLimit: 20 }),
-    ]);
-    if (!status.ok || !status.data) {
-      setRuntimeExecutionState(undefined);
-      setRuntimeExecutionError(status.error?.message ?? "Failed to load runtime status.");
+      setRuntimeExecutionError(summary.error?.message ?? "Failed to load runtime status.");
       return;
     }
 
     setRuntimeExecutionState(Object.freeze({
-      status: status.data.status,
-      progressLabel: `${status.data.progress.completedNodeCount}/${status.data.progress.totalNodeCount} nodes`,
-      diagnosticsCount: result.ok ? result.data?.diagnostics.length : undefined,
-      traceEventCount: trace.ok ? trace.data?.trace.events.length : undefined,
-      traceLogCount: trace.ok ? trace.data?.trace.logs.length : undefined,
+      executionId: summary.data.executionId,
+      status: summary.data.status,
+      progressLabel: summary.data.progressLabel,
+      diagnosticsCount: summary.data.diagnosticsCount,
+      traceEventCount: summary.data.traceEventCount,
+      traceLogCount: summary.data.traceLogCount,
+      outputFieldCount: summary.data.outputFieldCount,
+      outputContractIds: summary.data.outputContractIds,
     }));
     setRuntimeExecutionError(undefined);
+  };
+
+  const launchRuntimeExecution = async (): Promise<void> => {
+    const normalizedSystemId = runtimeLaunchSystemId.trim();
+    const normalizedVersionId = runtimeLaunchVersionId.trim();
+    if (!normalizedSystemId || !normalizedVersionId) {
+      setRuntimeLaunchError("System id and version id are required.");
+      setRuntimeLaunchResult(undefined);
+      return;
+    }
+
+    const parsedInputPayload = parseOptionalJson(runtimeLaunchInputPayload);
+    if (!parsedInputPayload.ok) {
+      setRuntimeLaunchError(parsedInputPayload.error);
+      setRuntimeLaunchResult(undefined);
+      return;
+    }
+
+    const parsedApprovedParameters = parseOptionalRecordJson(runtimeLaunchApprovedParameters);
+    if (!parsedApprovedParameters.ok) {
+      setRuntimeLaunchError(parsedApprovedParameters.error);
+      setRuntimeLaunchResult(undefined);
+      return;
+    }
+
+    setIsRuntimeLaunchPending(true);
+    const response = await runtimeOperationsService.startRun({
+      systemId: normalizedSystemId,
+      versionId: normalizedVersionId,
+      async: true,
+      trigger: runtimeLaunchTrigger,
+      inputPayload: parsedInputPayload.value,
+      approvedParameters: parsedApprovedParameters.value,
+    });
+    setIsRuntimeLaunchPending(false);
+    if (!response.ok || !response.data) {
+      setRuntimeLaunchError(response.error?.message ?? "Failed to launch runtime execution.");
+      setRuntimeLaunchResult(undefined);
+      return;
+    }
+
+    setRuntimeLaunchError(undefined);
+    setRuntimeLaunchResult(Object.freeze({
+      executionId: response.data.executionId,
+      status: response.data.status,
+      systemId: response.data.systemId,
+      versionId: response.data.versionId,
+    }));
+    setRuntimeExecutionId(response.data.executionId);
+    await inspectRuntimeExecution(response.data.executionId);
+    await refreshRuntimeQueue();
   };
 
   return (
@@ -225,8 +296,72 @@ export default function RunPage(): JSX.Element {
 
       <div className="ui-card" data-testid="run-runtime-operations-panel">
         <div className="ui-card__body ui-stack ui-stack--sm">
-          <h2>Runtime queue and run monitoring</h2>
-          <p className="ui-text-secondary">Desktop operational run visibility and control routed through authoritative runtime APIs.</p>
+          <h2>Thin-client runtime operations</h2>
+          <p className="ui-text-secondary">Queue review, allowed run launch, output inspection, and approved parameter adjustments through shared authoritative runtime APIs.</p>
+          <div className="ui-stack ui-stack--xs">
+            <h3 style={{ margin: 0 }}>Launch allowed run</h3>
+            <div className="ui-row ui-row--wrap" style={{ gap: "0.75rem" }}>
+              <label className="ui-field" style={{ minWidth: "18rem", flex: "1 1 18rem" }}>
+                <span className="ui-field__label">System id</span>
+                <input
+                  className="ui-input"
+                  value={runtimeLaunchSystemId}
+                  onChange={(event) => setRuntimeLaunchSystemId(event.target.value)}
+                  placeholder="system:demo"
+                />
+              </label>
+              <label className="ui-field" style={{ minWidth: "18rem", flex: "1 1 18rem" }}>
+                <span className="ui-field__label">Version id</span>
+                <input
+                  className="ui-input"
+                  value={runtimeLaunchVersionId}
+                  onChange={(event) => setRuntimeLaunchVersionId(event.target.value)}
+                  placeholder="system:demo:v1"
+                />
+              </label>
+              <label className="ui-field" style={{ minWidth: "10rem" }}>
+                <span className="ui-field__label">Trigger</span>
+                <select
+                  className="ui-input"
+                  value={runtimeLaunchTrigger}
+                  onChange={(event) => setRuntimeLaunchTrigger(event.target.value === "api" ? "api" : "manual")}
+                >
+                  <option value="manual">manual</option>
+                  <option value="api">api</option>
+                </select>
+              </label>
+            </div>
+            <label className="ui-field">
+              <span className="ui-field__label">Approved parameters (JSON object)</span>
+              <textarea
+                className="ui-input"
+                value={runtimeLaunchApprovedParameters}
+                onChange={(event) => setRuntimeLaunchApprovedParameters(event.target.value)}
+                rows={4}
+              />
+            </label>
+            <label className="ui-field">
+              <span className="ui-field__label">Input payload (JSON)</span>
+              <textarea
+                className="ui-input"
+                value={runtimeLaunchInputPayload}
+                onChange={(event) => setRuntimeLaunchInputPayload(event.target.value)}
+                rows={4}
+              />
+            </label>
+            <div className="ui-row ui-row--wrap">
+              <button className="ui-button ui-button--secondary ui-button--small" onClick={() => void launchRuntimeExecution()}>
+                {isRuntimeLaunchPending ? "Launching..." : "Launch allowed run"}
+              </button>
+            </div>
+            {runtimeLaunchError ? <p role="alert">{runtimeLaunchError}</p> : null}
+            {runtimeLaunchResult ? (
+              <p className="ui-text-small">
+                Launched execution <strong>{runtimeLaunchResult.executionId}</strong> ({runtimeLaunchResult.status}) for {runtimeLaunchResult.systemId}@{runtimeLaunchResult.versionId}.
+              </p>
+            ) : null}
+          </div>
+          <h3 style={{ margin: 0 }}>Queue review and run controls</h3>
           <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
             <button className="ui-button ui-button--ghost ui-button--small" onClick={() => void refreshRuntimeQueue()}>
               {isRuntimeQueueLoading ? "Refreshing queue..." : "Refresh queue"}
@@ -261,7 +396,7 @@ export default function RunPage(): JSX.Element {
                         onClick={() => {
                           void runtimeOperationsService.cancelRun({
                             executionId: item.executionId,
-                            reason: "User cancelled from desktop operational panel.",
+                            reason: "User cancelled from thin-client operational panel.",
                           }).then((response) => {
                             if (!response.ok) {
                               setRuntimeQueueError(response.error?.message ?? "Failed to cancel runtime execution.");
@@ -278,7 +413,7 @@ export default function RunPage(): JSX.Element {
                         onClick={() => {
                           void runtimeOperationsService.dequeueQueueItem({
                             queueItemId: item.queueItemId,
-                            reason: "User dequeued from desktop operational panel.",
+                            reason: "User dequeued from thin-client operational panel.",
                           }).then((response) => {
                             if (!response.ok) {
                               setRuntimeQueueError(response.error?.message ?? "Failed to dequeue runtime item.");
@@ -317,10 +452,13 @@ export default function RunPage(): JSX.Element {
             {runtimeExecutionError ? <p role="alert">{runtimeExecutionError}</p> : null}
             {runtimeExecutionState ? (
               <div className="ui-stack ui-stack--2xs ui-text-small">
+                <span>Execution id: {runtimeExecutionState.executionId ?? runtimeExecutionId}</span>
                 <span>Status: {runtimeExecutionState.status}</span>
                 <span>Progress: {runtimeExecutionState.progressLabel}</span>
                 <span>Diagnostics: {runtimeExecutionState.diagnosticsCount ?? "-"}</span>
                 <span>Trace events/logs: {runtimeExecutionState.traceEventCount ?? "-"} / {runtimeExecutionState.traceLogCount ?? "-"}</span>
+                <span>Output fields: {runtimeExecutionState.outputFieldCount ?? "-"}</span>
+                <span>Output contracts: {runtimeExecutionState.outputContractIds?.join(", ") || "-"}</span>
               </div>
             ) : null}
           </div>
@@ -336,5 +474,33 @@ export default function RunPage(): JSX.Element {
       />
     </section>
   );
+}
+
+function parseOptionalJson(raw: string): { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: string } {
+  const normalized = raw.trim();
+  if (!normalized) {
+    return { ok: true, value: undefined };
+  }
+  try {
+    return { ok: true, value: JSON.parse(normalized) };
+  } catch {
+    return { ok: false, error: "Input payload must be valid JSON." };
+  }
+}
+
+function parseOptionalRecordJson(raw: string): { readonly ok: true; readonly value: Readonly<Record<string, unknown>> | undefined } | { readonly ok: false; readonly error: string } {
+  const normalized = raw.trim();
+  if (!normalized) {
+    return { ok: true, value: undefined };
+  }
+  try {
+    const parsed = JSON.parse(normalized) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { ok: false, error: "Approved parameters must be a JSON object." };
+    }
+    return { ok: true, value: Object.freeze({ ...(parsed as Record<string, unknown>) }) };
+  } catch {
+    return { ok: false, error: "Approved parameters must be valid JSON." };
+  }
 }
 

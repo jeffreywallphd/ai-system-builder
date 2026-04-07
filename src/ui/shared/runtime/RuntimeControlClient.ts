@@ -22,6 +22,12 @@ import {
   parseRuntimeDequeueResponse,
 } from "@shared/schemas/runtime/SystemRuntimeTransportSchemaContracts";
 import {
+  appendSharedApiListQueryConventions,
+  appendSharedApiQueryList,
+  appendSharedApiQueryValue,
+  toSharedApiQuerySuffix,
+} from "@shared/contracts/api/SharedApiQueryConventions";
+import {
   SharedApiClient,
   parseSharedApiEnvelope,
   type SharedApiEnvelope,
@@ -119,16 +125,12 @@ export class HttpRuntimeControlClient implements RuntimeControlClient {
   ): Promise<RuntimeSdkResponse<RuntimeSdkExecutionResultResponse>> {
     const { workspaceId, executionId, nodeResultLimit, diagnosticsLimit } = request;
     const query = new URLSearchParams();
-    query.set("workspaceId", workspaceId);
-    if (nodeResultLimit !== undefined) {
-      query.set("nodeResultLimit", nodeResultLimit.toString());
-    }
-    if (diagnosticsLimit !== undefined) {
-      query.set("diagnosticsLimit", diagnosticsLimit.toString());
-    }
+    appendSharedApiListQueryConventions(query, { workspaceId });
+    appendSharedApiQueryValue(query, "nodeResultLimit", nodeResultLimit?.toString());
+    appendSharedApiQueryValue(query, "diagnosticsLimit", diagnosticsLimit?.toString());
     return await this.sharedApiClient.requestJson({
       method: "GET",
-      path: `${SystemRuntimeTransportRoutes.getRunResult.replace(":executionId", encodeURIComponent(executionId))}?${query.toString()}`,
+      path: `${SystemRuntimeTransportRoutes.getRunResult.replace(":executionId", encodeURIComponent(executionId))}${toSharedApiQuerySuffix(query)}`,
       sessionToken,
       parseResponse: (payload) => parseSharedApiEnvelope(payload) as SharedApiEnvelope<RuntimeSdkExecutionResultResponse>,
     }) as RuntimeSdkResponse<RuntimeSdkExecutionResultResponse>;
@@ -140,16 +142,12 @@ export class HttpRuntimeControlClient implements RuntimeControlClient {
   ): Promise<RuntimeSdkResponse<RuntimeSdkExecutionTraceResponse>> {
     const { workspaceId, executionId, eventLimit, logLimit } = request;
     const query = new URLSearchParams();
-    query.set("workspaceId", workspaceId);
-    if (eventLimit !== undefined) {
-      query.set("eventLimit", eventLimit.toString());
-    }
-    if (logLimit !== undefined) {
-      query.set("logLimit", logLimit.toString());
-    }
+    appendSharedApiListQueryConventions(query, { workspaceId });
+    appendSharedApiQueryValue(query, "eventLimit", eventLimit?.toString());
+    appendSharedApiQueryValue(query, "logLimit", logLimit?.toString());
     return await this.sharedApiClient.requestJson({
       method: "GET",
-      path: `${SystemRuntimeTransportRoutes.getRunTrace.replace(":executionId", encodeURIComponent(executionId))}?${query.toString()}`,
+      path: `${SystemRuntimeTransportRoutes.getRunTrace.replace(":executionId", encodeURIComponent(executionId))}${toSharedApiQuerySuffix(query)}`,
       sessionToken,
       parseResponse: (payload) => parseSharedApiEnvelope(payload) as SharedApiEnvelope<RuntimeSdkExecutionTraceResponse>,
     }) as RuntimeSdkResponse<RuntimeSdkExecutionTraceResponse>;
@@ -160,25 +158,19 @@ export class HttpRuntimeControlClient implements RuntimeControlClient {
     sessionToken: string,
   ): Promise<RuntimeSdkResponse<RuntimeQueueListResponse>> {
     const query = new URLSearchParams();
-    query.set("workspaceId", request.workspaceId);
-    if (request.systemId) {
-      query.set("systemId", request.systemId);
-    }
-    if (request.tenantId) {
-      query.set("tenantId", request.tenantId);
-    }
-    if (request.limit !== undefined) {
-      query.set("limit", request.limit.toString());
-    }
-    if (request.offset !== undefined) {
-      query.set("offset", request.offset.toString());
-    }
-    for (const status of request.statuses ?? []) {
-      query.append("status", status);
-    }
+    appendSharedApiListQueryConventions(query, {
+      workspaceId: request.workspaceId,
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
+    });
+    appendSharedApiQueryValue(query, "systemId", request.systemId);
+    appendSharedApiQueryValue(query, "tenantId", request.tenantId);
+    appendSharedApiQueryList(query, "status", request.statuses);
     return await this.sharedApiClient.requestJson({
       method: "GET",
-      path: `${SystemRuntimeTransportRoutes.listQueueItems}?${query.toString()}`,
+      path: `${SystemRuntimeTransportRoutes.listQueueItems}${toSharedApiQuerySuffix(query)}`,
       sessionToken,
       parseResponse: (payload) => parseRuntimeQueueListResponse(payload) as SharedApiEnvelope<RuntimeQueueListResponse>,
     }) as RuntimeSdkResponse<RuntimeQueueListResponse>;

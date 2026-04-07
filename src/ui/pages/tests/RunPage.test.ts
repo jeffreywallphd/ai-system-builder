@@ -13,10 +13,13 @@ describe("RunPage", () => {
     expect(source).toContain("View run history");
     expect(source).toContain('data-testid="run-persisted-workflow-list"');
     expect(source).toContain("RuntimeOperationsService");
-    expect(source).toContain("Runtime queue and run monitoring");
+    expect(source).toContain("Thin-client runtime operations");
+    expect(source).toContain("Launch allowed run");
+    expect(source).toContain("approved parameter adjustments");
     expect(source).toContain('data-testid="run-runtime-operations-panel"');
     expect(source).toContain("runtimeOperationsService.listQueueItems");
-    expect(source).toContain("runtimeOperationsService.getRunStatus");
+    expect(source).toContain("runtimeOperationsService.inspectRun");
+    expect(source).toContain("runtimeOperationsService.startRun");
     expect(source).toContain("runtimeOperationsService.cancelRun");
     expect(source).toContain("runtimeOperationsService.dequeueQueueItem");
   });

@@ -133,3 +133,24 @@ These can remain implementation details as long as protected business actions fl
   - validates session/workspace scoped runtime operations and shared unauthorized error handling
 - `src/ui/pages/tests/RunPage.test.ts`
   - validates Run surface wiring for queue visibility and runtime control actions through `RuntimeOperationsService`
+
+## Story 14.3.4 migration note: thin-client operational runtime surfaces converge on shared APIs
+
+- Thin-client operational run controls on `src/ui/pages/RunPage.tsx` now consume shared runtime service contracts for:
+  - queue review (`listQueueItems`),
+  - run inspection (`inspectRun` using shared status/result/trace reads),
+  - approved mutation actions (`cancelRun`, `dequeueQueueItem`),
+  - allowed launch flow (`startRun`) with approved-parameter metadata.
+- Thin-client launch and inspection UX now follows canonical list/detail/mutation semantics:
+  - list: queue read with shared status filters and pagination defaults,
+  - detail: execution inspection projection backed by shared status/result/trace contracts,
+  - mutation: start/cancel/dequeue routed through authoritative runtime routes with unified error envelopes.
+- Runtime shared client query construction now aligns with shared list-query helper conventions in `src/shared/contracts/api/SharedApiQueryConventions.ts` for queue/result/trace reads.
+- Page-level operational business semantics are now centralized in `RuntimeOperationsService`; the page renders thin-client inputs and result states without owning runtime transport decisions.
+
+### Story 14.3.4 tests
+
+- `src/ui/services/tests/RuntimeOperationsService.test.ts`
+  - validates thin-client run launch, queue review, and inspection calls use workspace/session-scoped shared runtime client contracts.
+- `src/ui/pages/tests/RunPage.test.ts`
+  - validates thin-client operational screen wiring includes allowed launch, approved-parameter handling entry points, queue review, and shared inspection/mutation calls.
