@@ -12,7 +12,9 @@ import type {
   IRunOrchestrationQueuePersistenceRepository,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import {
+  RunExecutionOutcomeKinds,
   RunLifecycleStates,
+  transitionCanonicalRunRecord,
   type CanonicalRunRecord,
 } from "@domain/runs/RunDomain";
 import type { RunDetail } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
@@ -40,6 +42,7 @@ export interface HandleRunDispatchResultResult {
   readonly fromState: string;
   readonly toState: string;
   readonly dispatchAttemptResult: AuthoritativeRunDispatchAttemptResult;
+  readonly queueAction: DispatchOutcomeQueueAction;
 }
 
 interface HandleRunDispatchResultUseCaseDependencies {
@@ -53,6 +56,15 @@ interface HandleRunDispatchResultUseCaseDependencies {
     nextId(prefix: string): string;
   };
 }
+
+export const DispatchOutcomeQueueActions = Object.freeze({
+  runningReservationReleased: "running-reservation-released",
+  failedStartRequeued: "failed-start-requeued",
+  terminalFinalized: "terminal-finalized",
+});
+
+export type DispatchOutcomeQueueAction =
+  typeof DispatchOutcomeQueueActions[keyof typeof DispatchOutcomeQueueActions];
 
 function normalizeRequired(value: string | undefined, label: string): string {
   const normalized = value?.trim();
@@ -98,6 +110,85 @@ function toDispatchAttemptResult(
       internalMessage: outcome.failure.internalMessage,
       retryable: outcome.failure.retryable,
       details: outcome.failure.details,
+    }),
+  });
+}
+
+function shouldRequeueAfterFailedStart(input: {
+  readonly run: CanonicalRunRecord;
+  readonly outcome: RunDispatchOutcome;
+  readonly queueRepository: IRunOrchestrationQueuePersistenceRepository;
+}): boolean {
+  if (input.outcome.status !== "failed-to-start") {
+    return false;
+  }
+  if (input.outcome.failure.retryable !== true) {
+    return false;
+  }
+  if (!input.queueRepository.requeueAssignedRunForRecovery) {
+    return false;
+  }
+  return input.run.retry.attempt < input.run.retry.maxAttempts;
+}
+
+function transitionDispatchingRunToRequeuedState(input: {
+  readonly run: CanonicalRunRecord;
+  readonly command: CanonicalRunExecutionCommand;
+  readonly failedAt: string;
+}): CanonicalRunRecord {
+  const retryPending = transitionCanonicalRunRecord(input.run, {
+    toState: RunLifecycleStates.retryPending,
+    occurredAt: input.failedAt,
+    assignment: Object.freeze({
+      status: "released",
+      assignedNodeId: input.command.assignment.nodeId,
+      assignedAt: input.command.preparedAt,
+      releasedAt: input.failedAt,
+      releaseReason: "execution-failed",
+    }),
+    execution: Object.freeze({
+      ...input.run.execution,
+      adapterKind: input.command.backend.kind,
+      adapterRunId: undefined,
+      startedAt: undefined,
+      finishedAt: undefined,
+      outcome: RunExecutionOutcomeKinds.none,
+      errorCode: undefined,
+      errorMessage: undefined,
+    }),
+    retry: Object.freeze({
+      ...input.run.retry,
+      queuedAt: input.failedAt,
+    }),
+  });
+
+  return transitionCanonicalRunRecord(retryPending, {
+    toState: RunLifecycleStates.queued,
+    occurredAt: input.failedAt,
+    queue: retryPending.queue
+      ? Object.freeze({
+        ...retryPending.queue,
+        dequeuedAt: undefined,
+        position: null,
+        positionAsOf: input.failedAt,
+      })
+      : undefined,
+    assignment: Object.freeze({
+      status: "unassigned",
+    }),
+    execution: Object.freeze({
+      ...retryPending.execution,
+      adapterKind: input.command.backend.kind,
+      adapterRunId: undefined,
+      startedAt: undefined,
+      finishedAt: undefined,
+      outcome: RunExecutionOutcomeKinds.none,
+      errorCode: undefined,
+      errorMessage: undefined,
+    }),
+    retry: Object.freeze({
+      ...retryPending.retry,
+      queuedAt: undefined,
     }),
   });
 }
@@ -184,20 +275,70 @@ export class HandleRunDispatchResultUseCase {
       }
 
       const activeRun = mapPlatformRunRecordToCanonicalRun(activePersistedRun);
-      const finalRun = transitionDispatchingRunToOutcome({
+      const requeueAfterFailedStart = shouldRequeueAfterFailedStart({
         run: activeRun,
-        command: request.command,
         outcome: request.outcome,
+        queueRepository: this.dependencies.queueRepository,
       });
-      const finalized = await this.finalizationUseCase.execute({
-        run: finalRun,
-        runRecord: activePersistedRun,
-        occurredAt: finalRun.updatedAt,
-        internalDiagnostics: request.outcome.status === "failed-to-start"
-          ? request.outcome.failure.details
-          : undefined,
-      });
-      const finalRecord = finalized.runRecord;
+
+      let finalRun: CanonicalRunRecord;
+      let finalRecord = activePersistedRun;
+      let queueAction: DispatchOutcomeQueueAction;
+      if (requeueAfterFailedStart && request.outcome.status === "failed-to-start") {
+        finalRun = transitionDispatchingRunToRequeuedState({
+          run: activeRun,
+          command: request.command,
+          failedAt: request.outcome.failedAt,
+        });
+        const requeued = await this.dependencies.queueRepository.requeueAssignedRunForRecovery?.({
+          runId,
+          requeuedAt: request.outcome.failedAt,
+          eligibilityMarker: "ready",
+        });
+        if (!requeued) {
+          finalRun = transitionDispatchingRunToOutcome({
+            run: activeRun,
+            command: request.command,
+            outcome: request.outcome,
+          });
+          const finalized = await this.finalizationUseCase.execute({
+            run: finalRun,
+            runRecord: activePersistedRun,
+            occurredAt: finalRun.updatedAt,
+            internalDiagnostics: request.outcome.failure.details,
+          });
+          finalRecord = finalized.runRecord;
+          queueAction = DispatchOutcomeQueueActions.terminalFinalized;
+        } else {
+          finalRecord = updatePlatformRunRecordCanonicalState(activePersistedRun, finalRun);
+          queueAction = DispatchOutcomeQueueActions.failedStartRequeued;
+        }
+      } else {
+        finalRun = transitionDispatchingRunToOutcome({
+          run: activeRun,
+          command: request.command,
+          outcome: request.outcome,
+        });
+        if (request.outcome.status === "accepted") {
+          await this.dependencies.queueRepository.finalizeRunQueueEntry({
+            runId,
+            finalizedAt: finalRun.updatedAt,
+            lifecycleState: finalRun.state,
+          });
+          finalRecord = updatePlatformRunRecordCanonicalState(activePersistedRun, finalRun);
+          queueAction = DispatchOutcomeQueueActions.runningReservationReleased;
+        } else {
+          const finalized = await this.finalizationUseCase.execute({
+            run: finalRun,
+            runRecord: activePersistedRun,
+            occurredAt: finalRun.updatedAt,
+            internalDiagnostics: request.outcome.failure.details,
+          });
+          finalRecord = finalized.runRecord;
+          queueAction = DispatchOutcomeQueueActions.terminalFinalized;
+        }
+      }
+
       const savedFinal = await this.dependencies.runRepository.saveRun({
         ...finalRecord,
         runId: activePersistedRun.runId,
@@ -222,6 +363,7 @@ export class HandleRunDispatchResultUseCase {
         toState: finalRun.state,
         dispatchAttemptId,
         outcome: request.outcome.status,
+        queueAction,
       });
 
       result = Object.freeze({
@@ -229,6 +371,7 @@ export class HandleRunDispatchResultUseCase {
         fromState: currentRun.state,
         toState: finalRun.state,
         dispatchAttemptResult,
+        queueAction,
       });
     });
 
@@ -266,6 +409,7 @@ export class HandleRunDispatchResultUseCase {
     readonly toState: string;
     readonly dispatchAttemptId: string;
     readonly outcome: RunDispatchOutcome["status"];
+    readonly queueAction?: DispatchOutcomeQueueAction;
   }): Promise<void> {
     const event: PlatformAuditEventRecord = Object.freeze({
       eventId: input.eventId,
@@ -284,6 +428,7 @@ export class HandleRunDispatchResultUseCase {
         toState: input.toState,
         dispatchAttemptId: input.dispatchAttemptId,
         dispatchOutcome: input.outcome,
+        dispatchQueueAction: input.queueAction,
       }),
     });
 

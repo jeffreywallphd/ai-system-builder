@@ -31,7 +31,10 @@ Define the authoritative application workflow that handles backend dispatch outc
 1. Always handle dispatch outcome through `HandleRunDispatchResultUseCase`:
    - ensure assigned runs are first transitioned to `dispatching`,
    - persist dispatch attempt result metadata,
-   - transition to `running` for accepted dispatch or to `failed` for failed-to-start dispatch.
+   - apply dispatch-outcome queue-settlement policy:
+     - accepted dispatch transitions to `running` and releases reservation claim ownership,
+     - retryable failed-to-start outcomes may be requeued for scheduler re-evaluation when retry budget remains,
+     - remaining failed-to-start outcomes finalize to terminal `failed`.
 1. Emit lifecycle audit events for each authoritative state transition.
 
 Dispatch errors are persisted before being rethrown so orchestration visibility remains authoritative.
@@ -59,10 +62,11 @@ Accepted results persist receipt metadata (dispatch id, backend run id, accepted
 ## Lifecycle progression rules
 
 - `assigned -> dispatching` when dispatch processing begins.
-- `dispatching -> running` for accepted backend dispatch.
-- `dispatching -> failed` for backend failed-to-start outcomes.
+- `dispatching -> running` for accepted backend dispatch, with queue reservation settlement.
+- `dispatching -> queued` (via retry-pending progression) for retryable failed-to-start outcomes when guarded requeue conditions are met.
+- `dispatching -> failed` for backend failed-to-start outcomes that are not requeue-eligible.
 
-Failed starts are therefore distinguishable from in-progress (`running`) and terminal-success (`completed`) runs.
+Failed starts are therefore distinguishable between scheduler-requeueable and terminal-failed outcomes, while accepted dispatch still progresses deterministically to in-progress (`running`) state.
 
 ## Test coverage highlights
 

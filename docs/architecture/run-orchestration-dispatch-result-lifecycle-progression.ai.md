@@ -18,12 +18,13 @@ Story 16.2.5 adds authoritative handling for backend dispatch outcomes so assign
 - Human doc: `docs/architecture/run-orchestration-dispatch-result-lifecycle-progression.md`
 
 ## Core behavior
-- Dispatch success/failure handling is now authoritative and persisted.
+- Dispatch success/failure handling is now authoritative, persisted, and queue-settlement aware.
 - Backend dispatch execution always routes outcome handling through `HandleRunDispatchResultUseCase`.
 - Dispatch lifecycle now progresses:
   - `assigned -> dispatching`,
-  - `dispatching -> running` on accepted receipts,
-  - `dispatching -> failed` on failed-to-start outcomes.
+  - `dispatching -> running` on accepted receipts with reservation release,
+  - `dispatching -> queued` (via retry-pending progression) for retryable failed-to-start requeue,
+  - `dispatching -> failed` on non-requeue failed-to-start outcomes.
 
 ## Attempt metadata persistence
 - Dispatch attempts now store optional `dispatchResult` metadata.

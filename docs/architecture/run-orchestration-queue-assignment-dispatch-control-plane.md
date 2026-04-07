@@ -65,8 +65,8 @@ sequenceDiagram
       Scheduler->>DispatchUC: execute(runId, dispatchAttemptId)
       DispatchUC->>DispatchPort: dispatch(canonical execution command)
       DispatchUC->>UpdateUC: handle dispatch outcome via HandleRunDispatchResultUseCase
-      UpdateUC->>RunRepo: saveRun(state=running|failed)
-      UpdateUC->>FinalizeUC: finalize for failed-to-start
+      UpdateUC->>RunRepo: saveRun(state=running|queued|failed)
+      UpdateUC->>FinalizeUC: finalize only when failed-to-start is terminal
     end
 
     Note over UpdateUC: Node emits lifecycle/progress/heartbeat updates
@@ -93,8 +93,9 @@ sequenceDiagram
    - application constructs canonical command
    - infrastructure adapters map command to backend payloads
 5. Dispatch result handling is mandatory and authoritative:
-   - accepted dispatch transitions run to `running`
-   - failed-to-start transitions run to `failed` and finalizes queue/assignment state
+   - accepted dispatch transitions run to `running` and releases active scheduling reservation claim ownership
+   - retryable failed-to-start outcomes may requeue to `queued` (via retry-pending progression) for scheduler re-evaluation
+   - non-requeue failed-to-start outcomes transition run to `failed` and finalize queue/assignment state
 
 ## Progress ingestion and finalization model
 
