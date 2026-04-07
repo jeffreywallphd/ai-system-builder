@@ -340,6 +340,41 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
       requiredCapabilities: Object.freeze(["secret-metadata.manage"]),
     }),
   }),
+  "governance-review": Object.freeze({
+    group: UiRouteGroupKeys.administration,
+    navigation: Object.freeze({
+      showInSettingsNavigation: true,
+      showInCommandPalette: true,
+      commandPaletteOrder: 70,
+      commandPaletteLabel: "Governance review",
+      commandPaletteDescription: "Open desktop governance event review.",
+      commandPaletteKeywords: Object.freeze(["go", "open", "governance", "audit", "security", "events"]),
+    }),
+    access: Object.freeze({
+      eligibleSurfaces: Object.freeze([
+        UiSurfaceKeys.desktopAdmin,
+        UiSurfaceKeys.desktopOperational,
+      ]),
+      requiredRoles: Object.freeze(["owner", "admin"]),
+      requiredCapabilities: Object.freeze(["log.read"]),
+      workspaceContext: WorkspaceContextRequirement.required,
+    }),
+  }),
+  "governance-review-thin": Object.freeze({
+    group: UiRouteGroupKeys.administration,
+    navigation: Object.freeze({
+      showInSettingsNavigation: true,
+    }),
+    access: Object.freeze({
+      eligibleSurfaces: Object.freeze([
+        UiSurfaceKeys.thinClientOperational,
+        UiSurfaceKeys.adminLite,
+      ]),
+      requiredRoles: Object.freeze(["owner", "admin", "member"]),
+      requiredCapabilities: Object.freeze(["system.read"]),
+      workspaceContext: WorkspaceContextRequirement.required,
+    }),
+  }),
 });
 
 function inferDefaultGroup(path: string): AppSurfaceRouteMetadata["group"] {

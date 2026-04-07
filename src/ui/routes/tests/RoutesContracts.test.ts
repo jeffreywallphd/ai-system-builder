@@ -47,6 +47,8 @@ describe("ui/routes contract adherence", () => {
     expect(source).toContain('nodeInventory: "/settings/node-inventory"');
     expect(source).toContain('identityAdmin: "/settings/identity-admin"');
     expect(source).toContain('secretsAdmin: "/settings/secrets"');
+    expect(source).toContain('governanceReview: "/settings/governance-review"');
+    expect(source).toContain('governanceReviewThin: "/settings/governance-review/thin"');
     expect(source).toContain('notFound: "*"');
   });
 });

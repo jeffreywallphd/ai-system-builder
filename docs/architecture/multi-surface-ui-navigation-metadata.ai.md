@@ -34,3 +34,12 @@ Story 15.1.3 centralizes navigation grouping, surface eligibility, and route acc
 - Route access now enforces metadata with strict session context in `AppRouter.tsx` via `SurfaceProtectedRoute`.
 - Admin-lite navigation scope is now intentionally lightweight; full desktop administration flows stay desktop-first.
 - Command palette and settings shortcuts now consume strict session-derived availability context so unauthorized users cannot discover protected admin destinations through shortcut UIs.
+
+## Story 15.3.6 update
+- Added governance review route keys:
+  - `governance-review` -> `/settings/governance-review`
+  - `governance-review-thin` -> `/settings/governance-review/thin`
+- Metadata access policy:
+  - desktop governance review: `owner|admin` + `log.read` + required workspace context
+  - thin governance review: `owner|admin|member` + `system.read` + required workspace context
+- Strict route gating in `AppRouter.tsx` now covers governance review routes to block unauthorized direct-route access.

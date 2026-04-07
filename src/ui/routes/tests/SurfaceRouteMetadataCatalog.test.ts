@@ -34,8 +34,10 @@ describe("Surface route metadata catalog", () => {
     expect(routes.some((route) => route.key === "authorization-sharing-thin")).toBeTrue();
     expect(routes.some((route) => route.key === "workspace-thin-membership")).toBeTrue();
     expect(routes.some((route) => route.key === "trusted-devices")).toBeTrue();
+    expect(routes.some((route) => route.key === "governance-review-thin")).toBeTrue();
     expect(routes.some((route) => route.key === "workspace-admin")).toBeFalse();
     expect(routes.some((route) => route.key === "identity-admin")).toBeFalse();
+    expect(routes.some((route) => route.key === "governance-review")).toBeFalse();
     expect(routes.some((route) => route.key === "security-policy")).toBeFalse();
     expect(routes.some((route) => route.key === "secrets-admin")).toBeFalse();
   });
@@ -45,19 +47,29 @@ describe("Surface route metadata catalog", () => {
       surface: UiSurfaceKeys.desktopAdmin,
       strict: true,
       roleKeys: Object.freeze(["admin"]),
-      capabilityKeys: Object.freeze(["system.manage"]),
+      capabilityKeys: Object.freeze(["system.manage", "log.read"]),
       hasWorkspaceContext: true,
     });
 
     expect(routes.some((route) => route.key === "security-policy")).toBeTrue();
+    expect(routes.some((route) => route.key === "governance-review")).toBeTrue();
   });
 
   it("derives command palette entries from centralized route metadata", () => {
     const entries = listCommandPaletteRouteEntries({ surface: UiSurfaceKeys.desktopOperational });
 
-    expect(entries.map((entry) => entry.label)).toEqual(["Build", "Run", "Explore", "Data", "Manage", "Identity admin"]);
+    expect(entries.map((entry) => entry.label)).toEqual([
+      "Build",
+      "Run",
+      "Explore",
+      "Data",
+      "Manage",
+      "Identity admin",
+      "Governance review",
+    ]);
     expect(entries.map((entry) => entry.launchPath)).toContain(ROUTE_PATHS.datasetStudio);
     expect(entries.map((entry) => entry.launchPath)).toContain(ROUTE_PATHS.identityAdmin);
+    expect(entries.map((entry) => entry.launchPath)).toContain(ROUTE_PATHS.governanceReview);
   });
 
   it("derives primary navigation for desktop operational and excludes admin-only items", () => {

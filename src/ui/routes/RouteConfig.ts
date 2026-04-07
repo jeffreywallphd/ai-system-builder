@@ -69,6 +69,8 @@ export const ROUTE_PATHS = Object.freeze({
   identityAdmin: "/settings/identity-admin",
   trustedDevices: "/settings/trusted-devices",
   secretsAdmin: "/settings/secrets",
+  governanceReview: "/settings/governance-review",
+  governanceReviewThin: "/settings/governance-review/thin",
   notFound: "*",
 });
 
@@ -413,6 +415,18 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "secrets-admin",
     path: ROUTE_PATHS.secretsAdmin,
     title: "Secret metadata management",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "governance-review",
+    path: ROUTE_PATHS.governanceReview,
+    title: "Governance review",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "governance-review-thin",
+    path: ROUTE_PATHS.governanceReviewThin,
+    title: "Governance review (thin)",
     showInNavigation: false,
   }),
 ]);

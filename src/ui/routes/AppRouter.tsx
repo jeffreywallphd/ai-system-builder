@@ -47,6 +47,7 @@ import NodeInventoryPage from "../pages/NodeInventoryPage";
 import WorkspaceMembershipThinClientPage from "../pages/WorkspaceMembershipThinClientPage";
 import WorkspaceInvitationOnboardingPage from "../pages/WorkspaceInvitationOnboardingPage";
 import SecretMetadataManagementPage from "../pages/SecretMetadataManagementPage";
+import GovernanceAuditReviewPage from "../pages/GovernanceAuditReviewPage";
 import DesktopAdministrationShellPage from "../pages/DesktopAdministrationShellPage";
 import AdminLiteEntryPage from "../pages/AdminLiteEntryPage";
 import ProtectedRoute from "./ProtectedRoute";
@@ -262,6 +263,22 @@ export default function AppRouter({
             element: (
               <SurfaceProtectedRoute path={ROUTE_PATHS.secretsAdmin}>
                 <SecretMetadataManagementPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.governanceReview,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.governanceReview}>
+                <GovernanceAuditReviewPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.governanceReviewThin,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.governanceReviewThin}>
+                <GovernanceAuditReviewPage thin />
               </SurfaceProtectedRoute>
             ),
           },
