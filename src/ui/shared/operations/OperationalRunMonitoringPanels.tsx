@@ -4,6 +4,7 @@ import type { RuntimeQueueItem } from "@shared/contracts/runtime/SystemRuntimeTr
 import type { RuntimeRealtimeConnectionStateSnapshot } from "@shared/runtime/RuntimeRealtimeSubscriptionService";
 import {
   SurfaceActionButtonStrip,
+  SurfaceActionList,
   SurfaceActionMenu,
   createSurfaceActionContext,
   type SurfaceActionDescriptor,
@@ -178,18 +179,32 @@ export function OperationalRunListPanel({
                         <td data-label="Updated">{formatOperationalTimestamp(row.recentRun?.updatedAt ?? row.queueItem?.startedAt ?? row.queueItem?.enqueuedAt)}</td>
                         <td data-label="Actions">
                           <SurfaceResponsiveActionMenuContainer responsiveProfile={responsiveProfile}>
-                            <SurfaceActionMenu
-                              triggerLabel="Row actions"
-                              actions={createRunListRowActions({
-                                row,
-                                onInspectRun,
-                                onCancelRun,
-                                onDequeue,
-                              })}
-                              context={rowActionContext}
-                              scope="row"
-                              responsiveProfile={responsiveProfile}
-                            />
+                            {responsiveProfile.actionMenuLayout === "sheet" ? (
+                              <SurfaceActionList
+                                actions={createRunListRowActions({
+                                  row,
+                                  onInspectRun,
+                                  onCancelRun,
+                                  onDequeue,
+                                })}
+                                context={rowActionContext}
+                                scope="row"
+                                responsiveProfile={responsiveProfile}
+                              />
+                            ) : (
+                              <SurfaceActionMenu
+                                triggerLabel="Row actions"
+                                actions={createRunListRowActions({
+                                  row,
+                                  onInspectRun,
+                                  onCancelRun,
+                                  onDequeue,
+                                })}
+                                context={rowActionContext}
+                                scope="row"
+                                responsiveProfile={responsiveProfile}
+                              />
+                            )}
                           </SurfaceResponsiveActionMenuContainer>
                         </td>
                       </tr>

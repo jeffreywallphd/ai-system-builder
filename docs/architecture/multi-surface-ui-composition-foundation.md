@@ -209,3 +209,20 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
   - queue visibility controls and approved-run launch actions expose mobile-sticky control wrappers in shared operational styles,
   - result review adds explicit stepwise mobile guidance while preserving desktop/tablet shared component reuse.
 - Narrow-surface readability hardening (execution/system/asset identifier truncation wrappers) is implemented in shared operational components and styles so desktop and thin-client surfaces inherit one maintainable behavior seam.
+
+## Story 15.2.8 update
+
+- Cross-surface operational flow hardening now includes representative regression coverage in `src/ui/shared/tests/OperationalSurfaceFlowRegression.test.tsx` that exercises dashboard visibility, run monitoring, queue visibility/detail, approved run initiation, result review, and realtime connectivity rendering within one shared composition contract.
+- Operational dashboard queue actions are now permission-aware and descriptor-driven through shared action seams (`SurfaceActionMenu` / `SurfaceActionList`) in `src/ui/shared/operations/OperationalWorkspaceDashboard.tsx`, aligning dashboard controls with run/queue panel action governance across desktop and thin-client surfaces.
+- Run-list row actions now follow shared responsive action-menu conventions on thin/mobile surfaces (sheet/list mode) in `src/ui/shared/operations/OperationalRunMonitoringPanels.tsx`, removing prior desktop-biased menu-only behavior.
+- Implemented production operational screen set for this epic pass is explicit and shared-first:
+  - workspace operational dashboard,
+  - run list and run detail/status monitoring,
+  - queue visibility and queue detail,
+  - approved run initiation,
+  - result/output review with protected asset actions,
+  - realtime connectivity banner/status indicators.
+- Intentionally deferred for later stories (explicit, not accidental):
+  - browser-level end-to-end automation of these flows against a live backend/runtime,
+  - expanded longitudinal analytics/reporting UX beyond current operational monitoring scope,
+  - deeper workspace-admin authoring surfaces not required for thin operational control in Epic 15.2.

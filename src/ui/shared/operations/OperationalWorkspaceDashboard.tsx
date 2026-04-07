@@ -2,7 +2,18 @@ import type { ExecutionRunProjection } from "@application/execution/ExecutionRun
 import type { RuntimeQueueItem } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 import type { RuntimeRealtimeConnectionStateSnapshot } from "@shared/runtime/RuntimeRealtimeSubscriptionService";
 import type { OperationalWorkspaceDashboardModel, OperationalWorkspaceRecentOutputSummary } from "../../presenters/OperationalWorkspaceDashboardPresenter";
-import { SurfaceResponsiveStatusCardGroup } from "../components/shell";
+import {
+  SurfaceActionButtonStrip,
+  SurfaceActionList,
+  SurfaceActionMenu,
+  createSurfaceActionContext,
+  type SurfaceActionDescriptor,
+  type SurfaceActionSurface,
+} from "../actions";
+import {
+  SurfaceResponsiveActionMenuContainer,
+  SurfaceResponsiveStatusCardGroup,
+} from "../components/shell";
 import type { SurfaceResponsiveProfile } from "../responsive";
 import { OperationalRealtimeStatusPill } from "./OperationalRealtimeIndicators";
 
@@ -17,6 +28,8 @@ export interface OperationalWorkspaceDashboardProps {
   readonly recentOutputsError?: string;
   readonly realtimeConnectionState: RuntimeRealtimeConnectionStateSnapshot;
   readonly responsiveProfile: SurfaceResponsiveProfile;
+  readonly actorPermissionIds: ReadonlyArray<string>;
+  readonly surface: SurfaceActionSurface;
   readonly onRefreshQueue: () => void;
   readonly onInspectRun: (executionId: string) => void;
   readonly onCancelRun: (executionId: string) => void;
@@ -35,12 +48,35 @@ export default function OperationalWorkspaceDashboard({
   recentOutputsError,
   realtimeConnectionState,
   responsiveProfile,
+  actorPermissionIds,
+  surface,
   onRefreshQueue,
   onInspectRun,
   onCancelRun,
   onDequeue,
   onOpenNodeInventory,
 }: OperationalWorkspaceDashboardProps): JSX.Element {
+  const pageActionContext = createSurfaceActionContext({
+    actorPermissionIds,
+    surface,
+    surfaceCapabilities: Object.freeze(["inline-actions"]),
+  });
+  const queueRefreshAction = Object.freeze([
+    {
+      id: "operational-dashboard-refresh-queue",
+      label: isQueueLoading ? "Refreshing queue..." : "Refresh queue",
+      scope: "page",
+      tone: "secondary",
+      requiredPermissions: Object.freeze(["runtime.queue.refresh"]),
+      availability: () => (isQueueLoading
+        ? Object.freeze({ disabled: true, disabledReason: "Queue refresh is already in progress." })
+        : Object.freeze({})),
+      onInvoke: () => {
+        onRefreshQueue();
+      },
+    } satisfies SurfaceActionDescriptor,
+  ]);
+
   return (
     <div className="ui-operational-dashboard ui-stack ui-stack--md" data-testid="operational-workspace-dashboard">
       <SurfaceResponsiveStatusCardGroup responsiveProfile={responsiveProfile}>
@@ -137,15 +173,13 @@ export default function OperationalWorkspaceDashboard({
             </p>
           </div>
           <div className="ui-card__body ui-stack ui-stack--sm">
-            <div className="ui-page__actions">
-              <button
-                type="button"
-                className="ui-button ui-button--ghost ui-button--small"
-                onClick={onRefreshQueue}
-              >
-                {isQueueLoading ? "Refreshing queue..." : "Refresh queue"}
-              </button>
-            </div>
+            <SurfaceActionButtonStrip
+              actions={queueRefreshAction}
+              context={pageActionContext}
+              scope="page"
+              responsiveProfile={responsiveProfile}
+              className="ui-page__actions"
+            />
             {queueError ? <p role="alert">{queueError}</p> : null}
             {queueItems.length === 0 ? (
               <p className="ui-text-secondary">No queued or running executions are visible for this workspace.</p>
@@ -158,17 +192,44 @@ export default function OperationalWorkspaceDashboard({
                       <span className="ui-badge ui-badge--neutral">{item.status}</span>
                     </div>
                     <p className="ui-text-small ui-text-secondary ui-operational-truncate" title={item.systemId}>{item.systemId}</p>
-                    <div className="ui-page__actions">
-                      <button type="button" className="ui-button ui-button--ghost ui-button--small" onClick={() => onInspectRun(item.executionId)}>
-                        Inspect
-                      </button>
-                      <button type="button" className="ui-button ui-button--ghost ui-button--small" onClick={() => onCancelRun(item.executionId)}>
-                        Cancel
-                      </button>
-                      <button type="button" className="ui-button ui-button--ghost ui-button--small" onClick={() => onDequeue(item.queueItemId)}>
-                        Dequeue
-                      </button>
-                    </div>
+                    <SurfaceResponsiveActionMenuContainer responsiveProfile={responsiveProfile}>
+                      {responsiveProfile.actionMenuLayout === "sheet" ? (
+                        <SurfaceActionList
+                          actions={createDashboardQueueItemActions({
+                            queueItem: item,
+                            onInspectRun,
+                            onCancelRun,
+                            onDequeue,
+                          })}
+                          context={createSurfaceActionContext({
+                            actorPermissionIds,
+                            surface,
+                            surfaceCapabilities: Object.freeze(["inline-actions", "menu-actions"]),
+                            resource: item,
+                          })}
+                          scope="row"
+                          responsiveProfile={responsiveProfile}
+                        />
+                      ) : (
+                        <SurfaceActionMenu
+                          triggerLabel="Queue item actions"
+                          actions={createDashboardQueueItemActions({
+                            queueItem: item,
+                            onInspectRun,
+                            onCancelRun,
+                            onDequeue,
+                          })}
+                          context={createSurfaceActionContext({
+                            actorPermissionIds,
+                            surface,
+                            surfaceCapabilities: Object.freeze(["inline-actions", "menu-actions"]),
+                            resource: item,
+                          })}
+                          scope="row"
+                          responsiveProfile={responsiveProfile}
+                        />
+                      )}
+                    </SurfaceResponsiveActionMenuContainer>
                   </article>
                 ))}
               </div>
@@ -256,6 +317,57 @@ export default function OperationalWorkspaceDashboard({
       </div>
     </div>
   );
+}
+
+function createDashboardQueueItemActions(input: {
+  readonly queueItem: RuntimeQueueItem;
+  readonly onInspectRun: (executionId: string) => void;
+  readonly onCancelRun: (executionId: string) => void;
+  readonly onDequeue: (queueItemId: string) => void;
+}): ReadonlyArray<SurfaceActionDescriptor<RuntimeQueueItem>> {
+  const { queueItem, onInspectRun, onCancelRun, onDequeue } = input;
+  return Object.freeze([
+    {
+      id: `operational-dashboard-inspect:${queueItem.queueItemId}`,
+      label: "Inspect run",
+      scope: "row",
+      tone: "secondary",
+      requiredPermissions: Object.freeze(["runtime.run.inspect"]),
+      onInvoke: () => {
+        onInspectRun(queueItem.executionId);
+      },
+    } satisfies SurfaceActionDescriptor<RuntimeQueueItem>,
+    {
+      id: `operational-dashboard-cancel:${queueItem.queueItemId}`,
+      label: "Cancel run",
+      scope: "row",
+      tone: "danger",
+      requiredPermissions: Object.freeze(["runtime.run.cancel"]),
+      availability: () => (
+        queueItem.status === "queued" || queueItem.status === "running"
+          ? Object.freeze({})
+          : Object.freeze({ disabled: true, disabledReason: "Only active queue items can be cancelled." })
+      ),
+      onInvoke: () => {
+        onCancelRun(queueItem.executionId);
+      },
+    } satisfies SurfaceActionDescriptor<RuntimeQueueItem>,
+    {
+      id: `operational-dashboard-dequeue:${queueItem.queueItemId}`,
+      label: "Dequeue",
+      scope: "row",
+      tone: "secondary",
+      requiredPermissions: Object.freeze(["runtime.queue.manage"]),
+      availability: () => (
+        queueItem.status === "queued"
+          ? Object.freeze({})
+          : Object.freeze({ disabled: true, disabledReason: "Only queued items can be dequeued." })
+      ),
+      onInvoke: () => {
+        onDequeue(queueItem.queueItemId);
+      },
+    } satisfies SurfaceActionDescriptor<RuntimeQueueItem>,
+  ]);
 }
 
 function statusToneToBadgeTone(
