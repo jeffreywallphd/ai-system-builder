@@ -20,6 +20,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/run-orchestration-scheduling-architecture-extension-guidance.md`
 - `docs/architecture/run-orchestration-scheduling-authoritative-queue-selection-and-assignment-integration.md`
 - `docs/architecture/run-orchestration-scheduling-reservation-aware-node-arbitration-and-placement-holds.md`
+- `docs/architecture/run-orchestration-scheduling-deterministic-candidate-arbitration.md`
 - `docs/architecture/run-orchestration-node-claim-dispatch-preparation.md`
 - `docs/architecture/run-orchestration-execution-command-dispatch-seams.md`
 - `docs/architecture/run-orchestration-dispatch-result-lifecycle-progression.md`
