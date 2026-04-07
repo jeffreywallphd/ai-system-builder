@@ -19,6 +19,7 @@ import type {
   IAuditLedgerRepository,
 } from "../AuditApplicationContracts";
 import type { CanonicalAuditEvent } from "@domain/audit/AuditDomain";
+import type { IAuditLedgerWriteObservabilityPort } from "./AuditLedgerObservabilityPorts";
 
 export const AuthoritativeAuditEventSources = Object.freeze({
   identity: "identity",
@@ -88,6 +89,7 @@ export interface AuthoritativeAuditRecordingPort {
 
 export interface AuthoritativeAuditRecordingServiceDependencies {
   readonly repository: IAuditLedgerRepository;
+  readonly observabilityPort?: IAuditLedgerWriteObservabilityPort;
   readonly publicationPort?: {
     publishAuthoritativeAuditEvent(input: {
       readonly source: AuthoritativeAuditEventSource;

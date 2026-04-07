@@ -13,6 +13,7 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
 - `docs/architecture/audit-taxonomy-capture-boundaries-and-extension-rules.md`
 - `docs/architecture/audit-durable-ledger-persistence-and-repositories.md`
 - `docs/architecture/audit-ledger-persistence-query-and-access-control-architecture.md`
+- `docs/architecture/audit-observability-failure-handling-and-redaction-safeguards.md`
 
 ## Required implementation path
 
@@ -75,6 +76,8 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
 - Treat `adminOnlyDetails` as restricted but still sanitized; it is not a raw dump sink.
 - If protected data is present, ensure `hasProtectedData` and redaction reasons are correctly represented.
 - Reuse existing normalized references instead of custom raw resource refs.
+- Reuse centralized audit operational redaction (`src/application/audit/shared/AuditOperationalSignalRedaction.ts`) for audit diagnostics/log payloads instead of ad hoc masking.
+- Keep audit write/read observability emission at application/host boundaries (`AuthoritativeAuditRecordingService`, `AuditLedgerBackendApi`, `AuditLedgerObservability`), not in domain models.
 
 ## Data/content that must never be recorded
 

@@ -18,6 +18,7 @@ import {
   type AuditLedgerQueryReadScope,
 } from "@application/audit/use-cases/AuditLedgerQueryService";
 import { AuditLedgerBackendApi } from "../AuditLedgerBackendApi";
+import { AuditLedgerObservability, type AuditLedgerObservabilityLogEvent, type AuditLedgerObservabilityLogger } from "../AuditLedgerObservability";
 
 class InMemoryAuditLedgerRepository implements IAuditLedgerRepository {
   public constructor(private readonly events: ReadonlyArray<CanonicalAuditEvent>) {}
@@ -52,6 +53,30 @@ class StaticAuthorizer implements AuditLedgerQueryAuthorizer {
       allowed: true as const,
       scope: this.scope,
     };
+  }
+}
+
+class ThrowingListAuditLedgerRepository extends InMemoryAuditLedgerRepository {
+  public override async listAuditEvents(_query: AuditLedgerQuery): Promise<ReadonlyArray<CanonicalAuditEvent>> {
+    throw new Error("database token=abc123 path=C:\\secret\\audit.db");
+  }
+}
+
+class RecordingAuditLedgerObservabilityLogger implements AuditLedgerObservabilityLogger {
+  public readonly infoEvents: AuditLedgerObservabilityLogEvent[] = [];
+  public readonly warnEvents: AuditLedgerObservabilityLogEvent[] = [];
+  public readonly errorEvents: AuditLedgerObservabilityLogEvent[] = [];
+
+  public info(event: AuditLedgerObservabilityLogEvent): void {
+    this.infoEvents.push(event);
+  }
+
+  public warn(event: AuditLedgerObservabilityLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  public error(event: AuditLedgerObservabilityLogEvent): void {
+    this.errorEvents.push(event);
   }
 }
 
@@ -230,6 +255,47 @@ describe("AuditLedgerBackendApi", () => {
     expect(response.ok).toBeTrue();
     expect(response.data?.event.visibility).toBe("admin");
     expect(response.data?.event.explanatory.roleSensitivity).toBe("workspace-admin");
+  });
+
+  it("maps internal query failures to stable internal error and emits observability diagnostics", async () => {
+    const repository = new ThrowingListAuditLedgerRepository([
+      createAuditEvent("audit:event:1"),
+    ]);
+
+    const logger = new RecordingAuditLedgerObservabilityLogger();
+    const api = new AuditLedgerBackendApi({
+      auditLedgerQueryService: new AuditLedgerQueryService({
+        repository,
+        authorizer: new StaticAuthorizer({
+          workspaceIds: ["workspace-alpha"],
+          detailVisibility: "admin",
+          canReadProtectedData: true,
+        }),
+      }),
+      observability: new AuditLedgerObservability({ logger }),
+    });
+
+    const response = await api.listAuditEvents({
+      actorUserIdentityId: "user:admin",
+      workspaceId: "workspace-alpha",
+      query: {
+        pagination: {
+          limit: 10,
+          offset: 0,
+        },
+      },
+    });
+
+    expect(response.ok).toBeFalse();
+    expect(response.error?.code).toBe("internal");
+    expect(response.error?.message).toBe("Audit ledger query failed.");
+    expect(logger.errorEvents.length + logger.warnEvents.length).toBeGreaterThanOrEqual(1);
+    const serialized = JSON.stringify({
+      error: logger.errorEvents,
+      warn: logger.warnEvents,
+    });
+    expect(serialized).not.toContain("abc123");
+    expect(serialized).not.toContain("C:\\secret\\audit.db");
   });
 });
 

@@ -71,6 +71,7 @@ import { WorkspaceInvitationBackendApi } from "@infrastructure/api/workspaces/Wo
 import { WorkspaceAdministrationBackendApi } from "@infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
 import { AuthorizationManagementBackendApi } from "@infrastructure/api/authorization/AuthorizationManagementBackendApi";
 import { AuditLedgerBackendApi } from "@infrastructure/api/audit/AuditLedgerBackendApi";
+import { AuditLedgerObservability } from "@infrastructure/api/audit/AuditLedgerObservability";
 import { NodeTrustBackendApi } from "@infrastructure/api/nodes/NodeTrustBackendApi";
 import { CertificateOperationsBackendApi } from "@infrastructure/api/security/CertificateOperationsBackendApi";
 import { SecretMetadataBackendApi } from "@infrastructure/api/security/SecretMetadataBackendApi";
@@ -370,8 +371,12 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   let secretService: ServerComposedSecretService | undefined;
   try {
     const auditRetentionLifecycleConfig = resolveAuditRetentionLifecycleConfig({ env });
+    const auditLedgerObservability = new AuditLedgerObservability({
+      logger: createAuditLedgerOperationalLogger(options.logger),
+    });
     const authoritativeAuditRecorder = new AuthoritativeAuditRecordingService({
       repository: persistentPlatformServices.auditLedgerRepository,
+      observabilityPort: auditLedgerObservability,
       retentionLifecycleDefaults: {
         policyKey: auditRetentionLifecycleConfig.defaultPolicyKey,
         policyVersion: auditRetentionLifecycleConfig.defaultPolicyVersion,
@@ -1064,6 +1069,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
         clock: workspaceClock,
       }),
     }),
+    observability: auditLedgerObservability,
   });
   const authoritativeRunMutationBackendApi = new AuthoritativeRunMutationBackendApi({
     requestAuthoritativeRunCancellationUseCase: new RequestAuthoritativeRunCancellationUseCase({
@@ -1496,6 +1502,55 @@ function createRunOrchestrationOperationalLogger(logger: IdentityHttpServerLogge
           ?? resolveOptionalString(event.workspaceId),
         details: Object.freeze({
           orchestration: event,
+        }),
+      });
+    },
+  });
+}
+
+function createAuditLedgerOperationalLogger(logger: IdentityHttpServerLogger | undefined): {
+  info(event: Record<string, unknown>): void;
+  warn(event: Record<string, unknown>): void;
+  error(event: Record<string, unknown>): void;
+} | undefined {
+  if (!logger) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    info: (event: Record<string, unknown>) => {
+      logger.info({
+        event: resolveOptionalString(event.event) ?? "audit-ledger.operation",
+        requestId: resolveOptionalString(event.requestId)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.eventId)
+          ?? resolveOptionalString(event.workspaceId),
+        details: Object.freeze({
+          auditLedger: event,
+        }),
+      });
+    },
+    warn: (event: Record<string, unknown>) => {
+      logger.warn({
+        event: resolveOptionalString(event.event) ?? "audit-ledger.operation",
+        requestId: resolveOptionalString(event.requestId)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.eventId)
+          ?? resolveOptionalString(event.workspaceId),
+        details: Object.freeze({
+          auditLedger: event,
+        }),
+      });
+    },
+    error: (event: Record<string, unknown>) => {
+      logger.error({
+        event: resolveOptionalString(event.event) ?? "audit-ledger.operation",
+        requestId: resolveOptionalString(event.requestId)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.eventId)
+          ?? resolveOptionalString(event.workspaceId),
+        details: Object.freeze({
+          auditLedger: event,
         }),
       });
     },

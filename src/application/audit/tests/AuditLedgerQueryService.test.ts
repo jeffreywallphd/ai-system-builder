@@ -79,6 +79,19 @@ class StaticAuthorizer implements AuditLedgerQueryAuthorizer {
   }
 }
 
+class ThrowingAuthorizer implements AuditLedgerQueryAuthorizer {
+  public async authorizeAuditLedgerRead(_input: {
+    readonly requesterId: string;
+    readonly query: AuditLedgerListQueryDto;
+  }): Promise<{
+    readonly allowed: boolean;
+    readonly scope?: AuditLedgerQueryReadScope;
+    readonly reason?: string;
+  }> {
+    throw new Error("authorization failed token=raw-token path=C:\\private\\auth.sqlite");
+  }
+}
+
 function createEvent(eventId: string, occurredAt: string): CanonicalAuditEvent {
   return createEventWithOverrides({
     eventId,
@@ -449,5 +462,28 @@ describe("AuditLedgerQueryService", () => {
       return;
     }
     expect(outcome.error.code).toBe(AuditLedgerQueryErrorCodes.notFound);
+  });
+
+  it("returns explicit query-failed outcome when authorizer throws", async () => {
+    const repository = new InMemoryAuditLedgerRepository([]);
+    const service = new AuditLedgerQueryService({
+      repository,
+      authorizer: new ThrowingAuthorizer(),
+    });
+
+    const outcome = await service.listAuditEvents({
+      requesterId: "user:auditor",
+      query: {},
+    });
+
+    expect(outcome.ok).toBeFalse();
+    if (outcome.ok) {
+      return;
+    }
+    expect(outcome.error.code).toBe(AuditLedgerQueryErrorCodes.queryFailed);
+    expect(outcome.error.message).toBe("Audit ledger query failed.");
+    const serialized = JSON.stringify(outcome.error.details);
+    expect(serialized).not.toContain("raw-token");
+    expect(serialized).not.toContain("C:\\private\\auth.sqlite");
   });
 });

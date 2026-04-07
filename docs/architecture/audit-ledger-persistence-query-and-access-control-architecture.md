@@ -16,6 +16,7 @@ Use this architecture note together with:
 
 - `docs/architecture/audit-authoritative-recording-service-and-ports.md`
 - `docs/architecture/audit-durable-ledger-persistence-and-repositories.md`
+- `docs/architecture/audit-observability-failure-handling-and-redaction-safeguards.md`
 - `docs/audit-governance-contributor-guide.md`
 
 ## Canonical write path (authoritative append workflow)

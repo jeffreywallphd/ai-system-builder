@@ -23,8 +23,15 @@ import {
   type NormalizedAuthoritativeAuditActionContext,
   normalizeAuthoritativeAuditReferences,
 } from "../shared/AuditReferenceNormalization";
+import {
+  publishAuditLedgerWriteObservabilityBestEffort,
+} from "../ports/AuditLedgerObservabilityPorts";
+import {
+  redactAuditOperationalErrorMessage,
+  redactAuditOperationalString,
+} from "../shared/AuditOperationalSignalRedaction";
 
-const SensitiveAuditDetailKeyPattern = /(secret|token|password|credential|private[-_]?key|public[-_]?key|trust[-_]?material|attestation|pem|csr|raw|body|payload|content|bytes|blob|path|uri|url|connection[-_]?string|database[-_]?url|access[-_]?key|api[-_]?key|authorization)/i;
+const SensitiveAuditDetailKeyPattern = /(secret|token|password|credential|private[-_]?key|public[-_]?key|trust[-_]?material|attestation|pem|csr|raw|body|payload|content|bytes|blob|path|uri|url|connection[-_]?string|database[-_]?url|access[-_]?key|api[-_]?key|authorization|prompt|completion|transcript|message|instruction)/i;
 const PersonalDataAuditDetailKeyPattern = /(email|phone|ssn|address|first[-_]?name|last[-_]?name|personal|pii|birth|dob)/i;
 const InternalDiagnosticAuditDetailKeyPattern = /(stack|trace|diagnostic|internal[-_]?only|internal[-_]?error)/i;
 const MaxAuditStringLength = 1024;
@@ -149,12 +156,62 @@ export class AuthoritativeAuditRecordingService implements AuthoritativeAuditRec
         : undefined,
     });
 
-    const appendResult = await this.dependencies.repository.appendAuditEvent(event, {
+    let appendResult: AuditLedgerAppendResult;
+    try {
+      appendResult = await this.dependencies.repository.appendAuditEvent(event, {
+        operationKey,
+        actorId: event.actor.actorId,
+        occurredAt: event.occurredAt,
+        correlationId: event.correlationId,
+      });
+    } catch (error) {
+      await publishAuditLedgerWriteObservabilityBestEffort(this.dependencies.observabilityPort, Object.freeze({
+        event: "audit-ledger.write.failed",
+        source,
+        outcome: "failure",
+        severity: "error",
+        occurredAt: this.now().toISOString(),
+        operationKey,
+        action: event.action,
+        eventType: event.eventType,
+        eventId: event.eventId,
+        actorId: event.actor.actorId,
+        workspaceId: event.scope.workspaceId,
+        correlationId: event.correlationId,
+        requestId: event.requestId,
+        details: Object.freeze({
+          message: redactAuditOperationalErrorMessage(error),
+          phase: "append",
+        }),
+      }));
+      throw new AuditDomainError("Authoritative audit append failed.");
+    }
+
+    await publishAuditLedgerWriteObservabilityBestEffort(this.dependencies.observabilityPort, Object.freeze({
+      event: "audit-ledger.write.completed",
+      source,
+      outcome: "success",
+      severity: appendResult.wasReplay ? "warn" : "info",
+      occurredAt: this.now().toISOString(),
       operationKey,
+      action: event.action,
+      eventType: event.eventType,
+      eventId: event.eventId,
       actorId: event.actor.actorId,
-      occurredAt: event.occurredAt,
+      workspaceId: event.scope.workspaceId,
       correlationId: event.correlationId,
-    });
+      requestId: event.requestId,
+      details: Object.freeze({
+        changed: appendResult.changed,
+        wasReplay: appendResult.wasReplay,
+        source,
+      }),
+      counters: Object.freeze({
+        sequence: appendResult.sequence,
+        hasProtectedData: event.payload.hasProtectedData ? 1 : 0,
+        redactionReasonCount: event.payload.redactionReasons.length,
+      }),
+    }));
 
     if (appendResult.changed) {
       try {
@@ -307,7 +364,9 @@ function sanitizeAuditUnknown(
   }
 
   if (typeof value === "string") {
-    const normalized = value.trim();
+    const normalized = redactAuditOperationalString(value, {
+      maxStringLength: MaxAuditStringLength,
+    });
     const limited = normalized.length > MaxAuditStringLength
       ? `${normalized.slice(0, MaxAuditStringLength)}...`
       : normalized;

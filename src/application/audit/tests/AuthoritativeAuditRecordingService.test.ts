@@ -20,6 +20,7 @@ import {
   AuthoritativeAuditRecordingService,
   toCanonicalAuthoritativeAuditEvent,
 } from "../use-cases/AuthoritativeAuditRecordingService";
+import type { AuditLedgerWriteObservabilityEvent, IAuditLedgerWriteObservabilityPort } from "../ports/AuditLedgerObservabilityPorts";
 
 class InMemoryAuditLedgerRepository implements IAuditLedgerRepository {
   public readonly events: CanonicalAuditEvent[] = [];
@@ -66,6 +67,23 @@ class ReplayAuditLedgerRepository extends InMemoryAuditLedgerRepository {
       sequence: this.events.length,
       event,
     };
+  }
+}
+
+class ThrowingAuditLedgerRepository extends InMemoryAuditLedgerRepository {
+  public override async appendAuditEvent(
+    _event: CanonicalAuditEvent,
+    _context: AuditLedgerAppendContext,
+  ): Promise<AuditLedgerAppendResult> {
+    throw new Error("append failed token=secret-token path=C:\\secure\\ledger.db");
+  }
+}
+
+class RecordingAuditWriteObservabilityPort implements IAuditLedgerWriteObservabilityPort {
+  public readonly events: AuditLedgerWriteObservabilityEvent[] = [];
+
+  public async recordAuditLedgerWrite(event: AuditLedgerWriteObservabilityEvent): Promise<void> {
+    this.events.push(event);
   }
 }
 
@@ -372,5 +390,55 @@ describe("AuthoritativeAuditRecordingService", () => {
       source: AuthoritativeAuditEventSources.policy,
       eventId: "audit:policy:event-publish-1",
     });
+  });
+
+  it("emits structured write observability for successful authoritative appends", async () => {
+    const repository = new InMemoryAuditLedgerRepository();
+    const observabilityPort = new RecordingAuditWriteObservabilityPort();
+    const service = new AuthoritativeAuditRecordingService({
+      repository,
+      observabilityPort,
+      now: () => new Date("2026-04-07T16:35:00.000Z"),
+      idGenerator: () => "event-observe-1",
+    });
+
+    await service.recordPolicyEvent(buildInput({
+      operationKey: "policy:updated:observability:1",
+      eventType: "policy-updated",
+      action: "policy.updated",
+    }));
+
+    expect(observabilityPort.events).toHaveLength(1);
+    expect(observabilityPort.events[0]?.event).toBe("audit-ledger.write.completed");
+    expect(observabilityPort.events[0]?.source).toBe(AuthoritativeAuditEventSources.policy);
+    expect(observabilityPort.events[0]?.correlationId).toBeUndefined();
+    expect(observabilityPort.events[0]?.details).toEqual({
+      changed: true,
+      wasReplay: false,
+      source: AuthoritativeAuditEventSources.policy,
+    });
+  });
+
+  it("handles append failures explicitly and emits redacted failure diagnostics", async () => {
+    const repository = new ThrowingAuditLedgerRepository();
+    const observabilityPort = new RecordingAuditWriteObservabilityPort();
+    const service = new AuthoritativeAuditRecordingService({
+      repository,
+      observabilityPort,
+      now: () => new Date("2026-04-07T16:36:00.000Z"),
+      idGenerator: () => "event-observe-2",
+    });
+
+    await expect(service.recordPolicyEvent(buildInput({
+      operationKey: "policy:updated:append-failure:1",
+      eventType: "policy-updated",
+      action: "policy.updated",
+    }))).rejects.toThrow("Authoritative audit append failed.");
+
+    expect(observabilityPort.events).toHaveLength(1);
+    expect(observabilityPort.events[0]?.event).toBe("audit-ledger.write.failed");
+    const serialized = JSON.stringify(observabilityPort.events[0]);
+    expect(serialized).not.toContain("secret-token");
+    expect(serialized).not.toContain("C:\\secure\\ledger.db");
   });
 });
