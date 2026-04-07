@@ -14,6 +14,10 @@ import type {
   ListIdentityAdminAccountsApiResponse,
   ListIdentityAdminTrustedDevicesApiRequest,
   ListIdentityAdminTrustedDevicesApiResponse,
+  ListIdentityAdminSessionsApiRequest,
+  ListIdentityAdminSessionsApiResponse,
+  ListIdentitySessionsApiRequest,
+  ListIdentitySessionsApiResponse,
   ListTrustedDevicesApiRequest,
   ListTrustedDevicesApiResponse,
   LoginLocalIdentityApiRequest,
@@ -24,6 +28,8 @@ import type {
   ResolveAuthenticatedSessionApiResponse,
   RevokeIdentityAdminTrustedDeviceApiRequest,
   RevokeIdentityAdminTrustedDeviceApiResponse,
+  RevokeIdentityAdminSessionApiRequest,
+  RevokeIdentityAdminSessionApiResponse,
   RevokeIdentitySessionApiRequest,
   RevokeIdentitySessionApiResponse,
   RevokeTrustedDeviceApiRequest,
@@ -47,12 +53,15 @@ export const IdentityTransportRoutes = Object.freeze({
   register: "/api/v1/identity/register",
   login: "/api/v1/identity/login",
   resolveSession: "/api/v1/identity/session",
+  listSessions: "/api/v1/identity/sessions",
   resolveSessionActorContext: "/api/v1/identity/session/context",
   logout: "/api/v1/identity/logout",
   revokeSession: "/api/v1/identity/session/revoke",
   listAdminAccounts: "/api/v1/identity/admin/accounts",
   getAdminAccountStatus: "/api/v1/identity/admin/accounts/:userIdentityId",
   setAdminAccountStatus: "/api/v1/identity/admin/accounts/:userIdentityId/status",
+  listAdminSessions: "/api/v1/identity/admin/sessions",
+  revokeAdminSession: "/api/v1/identity/admin/sessions/:sessionId/revoke",
   listAdminTrustedDevices: "/api/v1/identity/admin/trusted-devices",
   revokeAdminTrustedDevice: "/api/v1/identity/admin/trusted-devices/:trustedDeviceId/revoke",
   changeCredential: "/api/v1/identity/credential/change",
@@ -76,6 +85,10 @@ export interface IdentitySessionTransportContract {
   };
   readonly resolveAuthenticatedSession: {
     readonly response: IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>;
+  };
+  readonly listIdentitySessions: {
+    readonly request: ListIdentitySessionsApiRequest;
+    readonly response: IdentityAuthApiResponse<ListIdentitySessionsApiResponse>;
   };
   readonly resolveSessionActorContext: {
     readonly response: IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>;
@@ -147,6 +160,14 @@ export interface IdentityAdminLiteTransportContract {
   readonly setIdentityAdminAccountStatus: {
     readonly request: SetIdentityAdminAccountStatusApiRequest;
     readonly response: IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>;
+  };
+  readonly listIdentityAdminSessions: {
+    readonly request: ListIdentityAdminSessionsApiRequest;
+    readonly response: IdentityAuthApiResponse<ListIdentityAdminSessionsApiResponse>;
+  };
+  readonly revokeIdentityAdminSession: {
+    readonly request: RevokeIdentityAdminSessionApiRequest;
+    readonly response: IdentityAuthApiResponse<RevokeIdentityAdminSessionApiResponse>;
   };
   readonly listIdentityAdminTrustedDevices: {
     readonly request: ListIdentityAdminTrustedDevicesApiRequest;

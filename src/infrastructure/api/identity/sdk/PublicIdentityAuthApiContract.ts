@@ -162,6 +162,67 @@ export interface RevokeIdentitySessionApiResponse {
   readonly revocationReason: IdentitySessionRevocationReason;
 }
 
+export interface IdentitySessionSummaryApiResponse {
+  readonly sessionId: string;
+  readonly userIdentityId: string;
+  readonly providerId: string;
+  readonly providerSubject: string;
+  readonly status: "active" | "rotated" | "expired" | "revoked";
+  readonly issuedAt: string;
+  readonly expiresAt: string;
+  readonly accessChannel?: "desktop" | "thin-client";
+  readonly deviceId?: string;
+  readonly trust?: {
+    readonly trustedDeviceId?: string;
+    readonly sessionAssuranceLevel?: IdentitySessionAssuranceLevel;
+    readonly trustState?: IdentitySessionDeviceTrustState;
+    readonly trustEvaluatedAt?: string;
+    readonly issuedOnTrustedDevice?: boolean;
+    readonly invalidationReasons?: ReadonlyArray<IdentitySessionTrustInvalidationReason>;
+  };
+  readonly revocation?: {
+    readonly reason: IdentitySessionRevocationReason;
+    readonly revokedAt: string;
+  };
+}
+
+export interface ListIdentitySessionsApiRequest {
+  readonly includeStatuses?: ReadonlyArray<IdentitySessionSummaryApiResponse["status"]>;
+  readonly includeAccessChannels?: ReadonlyArray<"desktop" | "thin-client">;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface ListIdentitySessionsApiResponse {
+  readonly sessions: ReadonlyArray<IdentitySessionSummaryApiResponse>;
+}
+
+export interface ListIdentityAdminSessionsApiRequest {
+  readonly context: IdentityAdminActionContextApiRequest;
+  readonly userIdentityId: string;
+  readonly includeStatuses?: ReadonlyArray<IdentitySessionSummaryApiResponse["status"]>;
+  readonly includeAccessChannels?: ReadonlyArray<"desktop" | "thin-client">;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface ListIdentityAdminSessionsApiResponse {
+  readonly sessions: ReadonlyArray<IdentitySessionSummaryApiResponse>;
+}
+
+export interface RevokeIdentityAdminSessionApiRequest {
+  readonly context: IdentityAdminActionContextApiRequest;
+  readonly sessionId: string;
+  readonly reason?: IdentitySessionRevocationReason;
+}
+
+export interface RevokeIdentityAdminSessionApiResponse {
+  readonly sessionId: string;
+  readonly userIdentityId: string;
+  readonly revokedAt: string;
+  readonly revocationReason: IdentitySessionRevocationReason;
+}
+
 export const ChangeLocalPasswordCredentialVerificationModes = Object.freeze({
   currentCredential: "current-credential",
   resetAssertion: "reset-assertion",

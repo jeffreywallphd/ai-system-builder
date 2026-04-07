@@ -12,8 +12,12 @@ import type {
   InitiateTrustedDevicePairingApiResponse,
   ListIdentityAdminAccountsApiRequest,
   ListIdentityAdminAccountsApiResponse,
+  ListIdentityAdminSessionsApiRequest,
+  ListIdentityAdminSessionsApiResponse,
   ListIdentityAdminTrustedDevicesApiRequest,
   ListIdentityAdminTrustedDevicesApiResponse,
+  ListIdentitySessionsApiRequest,
+  ListIdentitySessionsApiResponse,
   ListTrustedDevicesApiRequest,
   ListTrustedDevicesApiResponse,
   LoginLocalIdentityApiRequest,
@@ -23,6 +27,8 @@ import type {
   RevokeTrustedDeviceApiResponse,
   RevokeIdentityAdminTrustedDeviceApiRequest,
   RevokeIdentityAdminTrustedDeviceApiResponse,
+  RevokeIdentityAdminSessionApiRequest,
+  RevokeIdentityAdminSessionApiResponse,
   RevokeIdentitySessionApiRequest,
   RevokeIdentitySessionApiResponse,
   ResolveAuthenticatedSessionApiResponse,
@@ -56,6 +62,10 @@ export interface IdentityAuthClient {
   resolveAuthenticatedSession(
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>>;
+  listIdentitySessions(
+    request: ListIdentitySessionsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentitySessionsApiResponse>>;
   resolveSessionActorContext(
     request: ResolveSessionActorContextApiRequest,
   ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>>;
@@ -78,6 +88,14 @@ export interface IdentityAuthClient {
     request: SetIdentityAdminAccountStatusApiRequest,
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>>;
+  listIdentityAdminSessions(
+    request: ListIdentityAdminSessionsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminSessionsApiResponse>>;
+  revokeIdentityAdminSession(
+    request: RevokeIdentityAdminSessionApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentityAdminSessionApiResponse>>;
   listIdentityAdminTrustedDevices(
     request: ListIdentityAdminTrustedDevicesApiRequest,
     sessionToken: string,
@@ -155,6 +173,23 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     return this.get("/api/v1/identity/session", sessionToken);
   }
 
+  public async listIdentitySessions(
+    request: ListIdentitySessionsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentitySessionsApiResponse>> {
+    const query = new URLSearchParams();
+    appendSharedApiQueryList(query, "status", request.includeStatuses);
+    appendSharedApiQueryList(query, "accessChannel", request.includeAccessChannels);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
+    });
+    const suffix = toSharedApiQuerySuffix(query);
+    return this.get(`/api/v1/identity/sessions${suffix}`, sessionToken);
+  }
+
   public async resolveSessionActorContext(
     request: ResolveSessionActorContextApiRequest,
   ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>> {
@@ -213,6 +248,37 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
       {
         action: request.action,
         providerId: request.providerId,
+      },
+      sessionToken,
+    );
+  }
+
+  public async listIdentityAdminSessions(
+    request: ListIdentityAdminSessionsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminSessionsApiResponse>> {
+    const query = new URLSearchParams();
+    query.set("userIdentityId", request.userIdentityId);
+    appendSharedApiQueryList(query, "status", request.includeStatuses);
+    appendSharedApiQueryList(query, "accessChannel", request.includeAccessChannels);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
+    });
+    const suffix = toSharedApiQuerySuffix(query);
+    return this.get(`/api/v1/identity/admin/sessions${suffix}`, sessionToken);
+  }
+
+  public async revokeIdentityAdminSession(
+    request: RevokeIdentityAdminSessionApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentityAdminSessionApiResponse>> {
+    return this.post(
+      `/api/v1/identity/admin/sessions/${encodeURIComponent(request.sessionId)}/revoke`,
+      {
+        reason: request.reason,
       },
       sessionToken,
     );

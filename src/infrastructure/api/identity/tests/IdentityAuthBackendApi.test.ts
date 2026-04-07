@@ -498,6 +498,102 @@ describe("IdentityAuthBackendApi", () => {
     expect(resolveDisabledSession.error?.code).toBe("authentication-failed");
   });
 
+  it("lists self sessions and allows admin session oversight/revocation", async () => {
+    const harness = await createIdentityAuthTestHarness({
+      trustedDeviceAdministration: {
+        bootstrapAdminUserIdentityIds: ["user-identity:1"],
+      },
+    });
+
+    const adminRegister = await harness.backendApi.registerLocalAccount({
+      username: "session.admin.backend",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(adminRegister.ok).toBeTrue();
+    if (!adminRegister.ok || !adminRegister.data) {
+      throw new Error("Expected admin registration.");
+    }
+
+    const memberRegister = await harness.backendApi.registerLocalAccount({
+      username: "session.member.backend",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(memberRegister.ok).toBeTrue();
+    if (!memberRegister.ok || !memberRegister.data) {
+      throw new Error("Expected member registration.");
+    }
+
+    const memberDesktopLogin = await harness.backendApi.loginLocalAccount({
+      providerSubject: "session.member.backend",
+      accessChannel: "desktop",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(memberDesktopLogin.ok).toBeTrue();
+
+    const memberThinLogin = await harness.backendApi.loginLocalAccount({
+      providerSubject: "session.member.backend",
+      accessChannel: "thin-client",
+      credential: {
+        candidate: "StrongPass!2026",
+      },
+    });
+    expect(memberThinLogin.ok).toBeTrue();
+    if (!memberThinLogin.ok || !memberThinLogin.data) {
+      throw new Error("Expected member thin login payload.");
+    }
+
+    const selfSessions = await harness.backendApi.listIdentitySessions({
+      userIdentityId: memberRegister.data.userIdentityId,
+      includeStatuses: ["active"],
+      includeAccessChannels: ["desktop"],
+    });
+    expect(selfSessions.ok).toBeTrue();
+    expect(selfSessions.data?.sessions.length).toBe(1);
+    expect(selfSessions.data?.sessions[0]?.accessChannel).toBe("desktop");
+
+    const deniedAdminList = await harness.backendApi.listIdentityAdminSessions({
+      context: {
+        actorUserIdentityId: memberRegister.data.userIdentityId,
+      },
+      userIdentityId: adminRegister.data.userIdentityId,
+      includeStatuses: ["active"],
+    });
+    expect(deniedAdminList.ok).toBeFalse();
+    expect(deniedAdminList.error?.code).toBe("forbidden");
+
+    const adminList = await harness.backendApi.listIdentityAdminSessions({
+      context: {
+        actorUserIdentityId: adminRegister.data.userIdentityId,
+      },
+      userIdentityId: memberRegister.data.userIdentityId,
+      includeStatuses: ["active"],
+    });
+    expect(adminList.ok).toBeTrue();
+    expect(adminList.data?.sessions.some((session) => session.sessionId === memberThinLogin.data.sessionId)).toBeTrue();
+
+    const adminRevoke = await harness.backendApi.revokeIdentityAdminSession({
+      context: {
+        actorUserIdentityId: adminRegister.data.userIdentityId,
+      },
+      sessionId: memberThinLogin.data.sessionId,
+      reason: "admin",
+    });
+    expect(adminRevoke.ok).toBeTrue();
+    expect(adminRevoke.data?.revocationReason).toBe("admin");
+
+    const resolveAfterAdminRevoke = await harness.backendApi.resolveAuthenticatedSession({
+      sessionToken: memberThinLogin.data.sessionToken,
+    });
+    expect(resolveAfterAdminRevoke.ok).toBeFalse();
+    expect(resolveAfterAdminRevoke.error?.code).toBe("authentication-failed");
+  });
+
   it("supports trusted-device management and pairing backend flows", async () => {
     const harness = await createIdentityAuthTestHarness();
 

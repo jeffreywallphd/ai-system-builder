@@ -102,3 +102,11 @@
   min-width: 120px;
   min-height: 90px;
 }
+
+.ui-trust-oversight__table-row--selected {
+  background: color-mix(in srgb, var(--color-accent-primary) 12%, transparent);
+}
+
+.ui-trust-oversight__current-badge {
+  margin-left: var(--space-2xs);
+}

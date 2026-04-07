@@ -285,9 +285,11 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
       eligibleSurfaces: Object.freeze([
         UiSurfaceKeys.desktopAdmin,
         UiSurfaceKeys.desktopOperational,
+        UiSurfaceKeys.thinClientOperational,
+        UiSurfaceKeys.adminLite,
       ]),
-      requiredRoles: Object.freeze(["owner", "admin"]),
-      requiredCapabilities: Object.freeze(["system.manage"]),
+      requiredRoles: Object.freeze(["owner", "admin", "member"]),
+      requiredCapabilities: Object.freeze(["system.read"]),
     }),
   }),
   "identity-admin": Object.freeze({

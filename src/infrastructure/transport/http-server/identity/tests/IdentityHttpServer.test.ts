@@ -1054,6 +1054,73 @@ describe("IdentityHttpServer", () => {
     expect(sessionAfterDisable.status).toBe(401);
   });
 
+  it("lists active sessions for the authenticated account with status/access-channel filters", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "session.list.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+
+    const desktopLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "session.list.user",
+        accessChannel: "desktop",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(desktopLoginResponse.status).toBe(200);
+
+    const thinLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "session.list.user",
+        accessChannel: "thin-client",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(thinLoginResponse.status).toBe(200);
+    const thinLoginBody = await thinLoginResponse.json();
+
+    const sessionsResponse = await fetch(
+      `${baseUrl}/api/v1/identity/sessions?status=active&accessChannel=desktop`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${thinLoginBody.data.sessionToken}`,
+        },
+      },
+    );
+    expect(sessionsResponse.status).toBe(200);
+    const sessionsBody = await sessionsResponse.json();
+    expect(sessionsBody.ok).toBe(true);
+    expect(Array.isArray(sessionsBody.data.sessions)).toBeTrue();
+    expect(sessionsBody.data.sessions.length).toBe(1);
+    expect(sessionsBody.data.sessions[0].accessChannel).toBe("desktop");
+    expect(sessionsBody.data.sessions[0].status).toBe("active");
+  });
+
   it("enforces admin authorization for trusted-device oversight endpoints", async () => {
     const logger = new CapturingLogger();
     const { baseUrl, harness } = await startServer(logger, {
@@ -1180,6 +1247,128 @@ describe("IdentityHttpServer", () => {
     const adminRevokeBody = await adminRevokeResponse.json();
     expect(adminRevokeBody.ok).toBe(true);
     expect(adminRevokeBody.data.revoked).toBe(true);
+  });
+
+  it("supports admin session oversight listing and admin revocation", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger, {
+      trustedDeviceAdministration: {
+        bootstrapAdminUserIdentityIds: ["user-identity:1"],
+      },
+    });
+
+    const adminRegisterResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "session.admin.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(adminRegisterResponse.status).toBe(200);
+    const adminRegisterBody = await adminRegisterResponse.json();
+
+    const memberRegisterResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "session.member.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(memberRegisterResponse.status).toBe(200);
+    const memberRegisterBody = await memberRegisterResponse.json();
+
+    const memberLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "session.member.user",
+        accessChannel: "thin-client",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(memberLoginResponse.status).toBe(200);
+    const memberLoginBody = await memberLoginResponse.json();
+
+    const forbiddenResponse = await fetch(
+      `${baseUrl}/api/v1/identity/admin/sessions?userIdentityId=${encodeURIComponent(adminRegisterBody.data.userIdentityId)}`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${memberLoginBody.data.sessionToken}`,
+        },
+      },
+    );
+    expect(forbiddenResponse.status).toBe(403);
+
+    const adminLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "session.admin.user",
+        accessChannel: "desktop",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(adminLoginResponse.status).toBe(200);
+    const adminLoginBody = await adminLoginResponse.json();
+
+    const listResponse = await fetch(
+      `${baseUrl}/api/v1/identity/admin/sessions?userIdentityId=${encodeURIComponent(memberRegisterBody.data.userIdentityId)}&status=active`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${adminLoginBody.data.sessionToken}`,
+        },
+      },
+    );
+    expect(listResponse.status).toBe(200);
+    const listBody = await listResponse.json();
+    expect(listBody.ok).toBe(true);
+    expect(listBody.data.sessions.some((session: { sessionId: string }) => session.sessionId === memberLoginBody.data.sessionId)).toBeTrue();
+
+    const revokeResponse = await fetch(
+      `${baseUrl}/api/v1/identity/admin/sessions/${encodeURIComponent(memberLoginBody.data.sessionId)}/revoke`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${adminLoginBody.data.sessionToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          reason: "admin",
+        }),
+      },
+    );
+    expect(revokeResponse.status).toBe(200);
+    const revokeBody = await revokeResponse.json();
+    expect(revokeBody.ok).toBe(true);
+    expect(revokeBody.data.revocationReason).toBe("admin");
+
+    const invalidAfterAdminRevoke = await fetch(`${baseUrl}/api/v1/identity/session`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${memberLoginBody.data.sessionToken}`,
+      },
+    });
+    expect(invalidAfterAdminRevoke.status).toBe(401);
   });
 
   it("hardens the full local identity lifecycle journey across endpoints", async () => {
