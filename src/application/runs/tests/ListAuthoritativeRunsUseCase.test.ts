@@ -94,7 +94,7 @@ function createRun(input: {
     }),
     orchestration: Object.freeze({
       initialLifecycleState: input.state,
-      initialQueueState: "pending-queue-admission",
+      initialQueueState: "queued",
       intent: Object.freeze({
         kind: "queue-admission-requested",
         queueId: "queue:default",

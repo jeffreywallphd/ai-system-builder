@@ -9,7 +9,10 @@ import type {
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type { IPlatformTransactionManager } from "@application/common/ports/PlatformTransactionPorts";
 import type {
+  AuthoritativeRunQueueEntryRecord,
+  AuthoritativeRunQueueMutationResult,
   IAuthoritativeRunPersistenceRepository,
+  IRunOrchestrationQueuePersistenceRepository,
   IRunOrchestrationIntentRepository,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import type { CanonicalRunSubmissionCommand } from "../use-cases/RunSubmissionValidationContracts";
@@ -88,6 +91,57 @@ class InMemoryAuditRepository implements IRunOrchestrationIntentRepository {
   }
 }
 
+class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceRepository {
+  public readonly entries = new Map<string, AuthoritativeRunQueueEntryRecord>();
+
+  public async getQueueEntryByRunId(runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined> {
+    return this.entries.get(runId);
+  }
+
+  public async enqueueRunForAssignment(
+    record: Omit<AuthoritativeRunQueueEntryRecord, "claimToken" | "claimedBy" | "claimedAt" | "claimExpiresAt" | "dequeuedAt" | "revision">,
+    _mutation: PlatformPersistenceMutationContext,
+  ): Promise<AuthoritativeRunQueueMutationResult> {
+    const persisted: AuthoritativeRunQueueEntryRecord = Object.freeze({
+      ...record,
+      revision: 1,
+    });
+    this.entries.set(record.runId, persisted);
+    return Object.freeze({
+      changed: true,
+      record: persisted,
+    });
+  }
+
+  public async listAssignmentReadyRuns(_query: {
+    readonly asOf: string;
+    readonly queueId?: string;
+    readonly workspaceId?: string;
+    readonly limit?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    return Object.freeze([...this.entries.values()]);
+  }
+
+  public async claimAssignmentReadyRuns(_input: {
+    readonly asOf: string;
+    readonly reservationOwner: string;
+    readonly reservationTtlSeconds: number;
+    readonly limit: number;
+    readonly queueId?: string;
+    readonly workspaceId?: string;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    return Object.freeze([]);
+  }
+
+  public async releaseRunClaim(_input: {
+    readonly runId: string;
+    readonly claimToken: string;
+    readonly releasedAt: string;
+  }): Promise<boolean> {
+    return false;
+  }
+}
+
 class SpyTransactionManager implements IPlatformTransactionManager {
   public calls = 0;
 
@@ -142,10 +196,12 @@ function createCommand(): CanonicalRunSubmissionCommand {
 describe("CreateAuthoritativeRunUseCase", () => {
   it("persists accepted runs with canonical metadata and supports authoritative reads", async () => {
     const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
     const auditRepository = new InMemoryAuditRepository();
     const runSubmissionAuditSink = new InMemoryRunSubmissionAuditSink();
     const useCase = new CreateAuthoritativeRunUseCase({
       runRepository,
+      queueRepository,
       orchestrationIntentRepository: auditRepository,
       auditSink: runSubmissionAuditSink,
       idGenerator: {
@@ -158,7 +214,7 @@ describe("CreateAuthoritativeRunUseCase", () => {
     });
 
     expect(result.run.runId).toBe("run:idem-123");
-    expect(result.run.state).toBe("submitted");
+    expect(result.run.state).toBe("queued");
     expect(result.persistedRunRevision).toBe(1);
     expect(result.orchestrationIntentEventId).toBe("audit:test");
     expect(runSubmissionAuditSink.events.map((event) => event.type)).toEqual([
@@ -172,13 +228,15 @@ describe("CreateAuthoritativeRunUseCase", () => {
     expect((runSubmissionAuditSink.events[1]?.details as { fromState?: string; toState?: string } | undefined)?.fromState)
       .toBe("none");
     expect((runSubmissionAuditSink.events[1]?.details as { fromState?: string; toState?: string } | undefined)?.toState)
-      .toBe("submitted");
+      .toBe("queued");
 
     const persisted = await runRepository.findRunById("run:idem-123");
     expect(persisted).toBeDefined();
     expect(persisted?.status).toBe("pending");
     expect(persisted?.workspaceId).toBe("workspace-alpha");
     expect((persisted?.metadata as { orchestration?: { intent?: { queueId?: string } } })?.orchestration?.intent?.queueId)
+      .toBe("queue:critical");
+    expect((persisted?.metadata as { canonicalRun?: { queue?: { queueId?: string } } })?.canonicalRun?.queue?.queueId)
       .toBe("queue:critical");
     expect((persisted?.metadata as { submissionSnapshot?: { parameters?: Record<string, unknown> } })?.submissionSnapshot?.parameters?.seed)
       .toBe(7);
@@ -189,14 +247,16 @@ describe("CreateAuthoritativeRunUseCase", () => {
       workspaceId: "workspace-alpha",
     });
     expect(loaded).toBeDefined();
-    expect(loaded?.state).toBe("submitted");
+    expect(loaded?.state).toBe("queued");
     expect(loaded?.executionOutcome).toBe("none");
+    expect(await queueRepository.getQueueEntryByRunId("run:idem-123")).toBeDefined();
   });
 
   it("executes run creation inside the transaction boundary when a manager is configured", async () => {
     const transactionManager = new SpyTransactionManager();
     const useCase = new CreateAuthoritativeRunUseCase({
       runRepository: new InMemoryRunRepository(),
+      queueRepository: new InMemoryQueueRepository(),
       orchestrationIntentRepository: new InMemoryAuditRepository(),
       transactionManager,
       idGenerator: {
@@ -215,6 +275,7 @@ describe("CreateAuthoritativeRunUseCase", () => {
     const runRepository = new InMemoryRunRepository();
     const useCase = new CreateAuthoritativeRunUseCase({
       runRepository,
+      queueRepository: new InMemoryQueueRepository(),
       orchestrationIntentRepository: new InMemoryAuditRepository(),
       auditSink: {
         async recordRunSubmissionEvent(): Promise<void> {

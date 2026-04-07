@@ -955,6 +955,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     createAuthoritativeRunUseCase: new CreateAuthoritativeRunUseCase({
       runRepository: persistentPlatformServices.platformPersistenceRepository,
+      queueRepository: persistentPlatformServices.platformPersistenceRepository,
       orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
       auditSink: runSubmissionAuditSink,
       transactionManager: persistentPlatformServices.platformPersistenceRepository,

@@ -35,7 +35,7 @@ export interface RunAuthoritativeMetadata {
   };
   readonly orchestration: {
     readonly initialLifecycleState: RunLifecycleState;
-    readonly initialQueueState: "pending-queue-admission";
+    readonly initialQueueState: "queued";
     readonly intent: {
       readonly kind: "queue-admission-requested";
       readonly queueId: string;
@@ -167,7 +167,7 @@ export function createRunAuthoritativeMetadata(
     }),
     orchestration: Object.freeze({
       initialLifecycleState: run.state,
-      initialQueueState: "pending-queue-admission",
+      initialQueueState: "queued",
       intent: Object.freeze({
         kind: "queue-admission-requested",
         queueId,
