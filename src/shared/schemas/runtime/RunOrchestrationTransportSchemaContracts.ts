@@ -103,12 +103,42 @@ const RunFailureSummarySchema = z.object({
   message: z.string().trim().min(1).max(2000),
   retryable: z.boolean(),
   occurredAt: TimestampSchema.optional(),
+  diagnostics: z.object({
+    visibility: z.literal("admin"),
+    latestDispatchFailure: z.object({
+      attemptId: IdentifierSchema,
+      recordedAt: TimestampSchema,
+      nodeId: IdentifierSchema,
+      safeCode: z.string().trim().min(1).max(256),
+      safeMessage: z.string().trim().min(1).max(2000),
+      internalCode: z.string().trim().min(1).max(256).optional(),
+      retryable: z.boolean().optional(),
+      detailKeys: z.array(z.string().trim().min(1).max(256)).max(256).optional(),
+    }).strict().optional(),
+    latestExecutionTelemetry: z.object({
+      updatedAt: TimestampSchema.optional(),
+      senderNodeId: IdentifierSchema.optional(),
+      senderBackendKind: IdentifierSchema.optional(),
+      senderBackendRunId: IdentifierSchema.optional(),
+      diagnosticKeys: z.array(z.string().trim().min(1).max(256)).max(256).optional(),
+      finalizationDiagnosticKeys: z.array(z.string().trim().min(1).max(256)).max(256).optional(),
+      registrationDiagnosticKeys: z.array(z.string().trim().min(1).max(256)).max(256).optional(),
+    }).strict().optional(),
+  }).strict().optional(),
 }).strict();
 
 const RunStatusTimelineEntrySchema = z.object({
   occurredAt: TimestampSchema,
   state: RunLifecycleStateSchema,
   source: z.enum(["run-state", "audit"]),
+  kind: z.enum([
+    "submission",
+    "lifecycle-transition",
+    "dispatch-attempt",
+    "progress",
+    "cancellation",
+    "retry",
+  ]).optional(),
   message: z.string().trim().min(1).max(1024).optional(),
 }).strict();
 
