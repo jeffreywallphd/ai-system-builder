@@ -26,6 +26,7 @@ import {
   type OperationalWorkspaceRecentOutputSummary,
 } from "../presenters/OperationalWorkspaceDashboardPresenter";
 import {
+  OperationalApprovedRunLaunchPanel,
   OperationalQueueDetailPanel,
   OperationalQueueVisibilityPanel,
   OperationalRunDetailStatusPanel,
@@ -35,6 +36,7 @@ import {
   resolveQueueVisibilityStatuses,
   type OperationalQueueFilters,
 } from "../shared/operations";
+import type { OperationalApprovedRunLaunchValidatedInput } from "../shared/operations";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import RunDesktopOperationalDashboardPage from "./RunDesktopOperationalDashboardPage";
 import RunThinClientOperationalDashboardPage from "./RunThinClientOperationalDashboardPage";
@@ -145,20 +147,6 @@ export default function RunPage(props: RunPageProps): JSX.Element {
   const [selectedRunDetail, setSelectedRunDetail] = useState<ExecutionRunDetailProjection | undefined>();
   const [isRunDetailLoading, setIsRunDetailLoading] = useState(false);
   const [runtimeExecutionError, setRuntimeExecutionError] = useState<string | undefined>();
-
-  const [runtimeLaunchSystemId, setRuntimeLaunchSystemId] = useState("");
-  const [runtimeLaunchVersionId, setRuntimeLaunchVersionId] = useState("");
-  const [runtimeLaunchTrigger, setRuntimeLaunchTrigger] = useState<"manual" | "api">("manual");
-  const [runtimeLaunchInputPayload, setRuntimeLaunchInputPayload] = useState("{\n  \"message\": \"Hello from operational dashboard\"\n}");
-  const [runtimeLaunchApprovedParameters, setRuntimeLaunchApprovedParameters] = useState("{\n  \"maxRuntimeSeconds\": 120,\n  \"maxOutputAssets\": 5\n}");
-  const [runtimeLaunchError, setRuntimeLaunchError] = useState<string | undefined>();
-  const [runtimeLaunchResult, setRuntimeLaunchResult] = useState<{
-    readonly executionId: string;
-    readonly status: string;
-    readonly systemId: string;
-    readonly versionId: string;
-  }>();
-  const [isRuntimeLaunchPending, setIsRuntimeLaunchPending] = useState(false);
 
   const refreshRuntimeQueue = useCallback(async (): Promise<void> => {
     setIsRuntimeQueueLoading(true);
@@ -391,68 +379,14 @@ export default function RunPage(props: RunPageProps): JSX.Element {
     runtimeRealtimeSubscriptionService,
   ]);
 
-  const launchRuntimeExecution = useCallback(async (): Promise<void> => {
-    const normalizedSystemId = runtimeLaunchSystemId.trim();
-    const normalizedVersionId = runtimeLaunchVersionId.trim();
-    if (!normalizedSystemId || !normalizedVersionId) {
-      setRuntimeLaunchError("System id and version id are required.");
-      setRuntimeLaunchResult(undefined);
-      return;
-    }
-
-    const parsedInputPayload = parseOptionalJson(runtimeLaunchInputPayload);
-    if (!parsedInputPayload.ok) {
-      setRuntimeLaunchError(parsedInputPayload.error);
-      setRuntimeLaunchResult(undefined);
-      return;
-    }
-
-    const parsedApprovedParameters = parseOptionalRecordJson(runtimeLaunchApprovedParameters);
-    if (!parsedApprovedParameters.ok) {
-      setRuntimeLaunchError(parsedApprovedParameters.error);
-      setRuntimeLaunchResult(undefined);
-      return;
-    }
-
-    setIsRuntimeLaunchPending(true);
-    const response = await runtimeOperationsService.startRun({
-      systemId: normalizedSystemId,
-      versionId: normalizedVersionId,
-      async: true,
-      trigger: runtimeLaunchTrigger,
-      inputPayload: parsedInputPayload.value,
-      approvedParameters: parsedApprovedParameters.value,
-    });
-    setIsRuntimeLaunchPending(false);
-
-    if (!response.ok || !response.data) {
-      setRuntimeLaunchError(response.error?.message ?? "Failed to launch runtime execution.");
-      setRuntimeLaunchResult(undefined);
-      return;
-    }
-
-    setRuntimeLaunchError(undefined);
-    setRuntimeLaunchResult(Object.freeze({
-      executionId: response.data.executionId,
-      status: response.data.status,
-      systemId: response.data.systemId,
-      versionId: response.data.versionId,
-    }));
-    setRuntimeExecutionId(response.data.executionId);
-    await inspectRuntimeExecution(response.data.executionId);
-    await refreshRuntimeQueue();
-    await loadHistory();
-  }, [
-    inspectRuntimeExecution,
-    loadHistory,
-    refreshRuntimeQueue,
-    runtimeLaunchApprovedParameters,
-    runtimeLaunchInputPayload,
-    runtimeLaunchSystemId,
-    runtimeLaunchTrigger,
-    runtimeLaunchVersionId,
-    runtimeOperationsService,
-  ]);
+  const launchApprovedRun = useCallback(async (input: OperationalApprovedRunLaunchValidatedInput) => runtimeOperationsService.startRun({
+    systemId: input.systemId,
+    versionId: input.versionId,
+    async: true,
+    trigger: input.trigger,
+    inputPayload: input.inputPayload,
+    approvedParameters: input.approvedParameters,
+  }), [runtimeOperationsService]);
 
   const dashboardModel = useMemo(() => buildOperationalWorkspaceDashboardModel({
     queueItems: runtimeQueueItems,
@@ -669,53 +603,18 @@ export default function RunPage(props: RunPageProps): JSX.Element {
 
   const detail = (
     <div className="ui-stack ui-stack--sm" data-testid="run-dashboard-controls">
-      <section className="ui-card">
-        <div className="ui-card__header">
-          <h2 className="ui-card__title">Approved run initiation</h2>
-          <p className="ui-card__subtitle">Launch approved runtime executions for the active workspace using authoritative runtime contracts.</p>
-        </div>
-        <div className="ui-card__body ui-stack ui-stack--sm">
-          <label className="ui-field">
-            <span className="ui-field__label">System id</span>
-            <input className="ui-input" value={runtimeLaunchSystemId} onChange={(event) => setRuntimeLaunchSystemId(event.target.value)} />
-          </label>
-          <label className="ui-field">
-            <span className="ui-field__label">Version id</span>
-            <input className="ui-input" value={runtimeLaunchVersionId} onChange={(event) => setRuntimeLaunchVersionId(event.target.value)} />
-          </label>
-          <label className="ui-field">
-            <span className="ui-field__label">Trigger</span>
-            <select
-              className="ui-select"
-              value={runtimeLaunchTrigger}
-              onChange={(event) => setRuntimeLaunchTrigger(event.target.value === "api" ? "api" : "manual")}
-            >
-              <option value="manual">manual</option>
-              <option value="api">api</option>
-            </select>
-          </label>
-          <label className="ui-field">
-            <span className="ui-field__label">Approved parameters (JSON object)</span>
-            <textarea className="ui-input" rows={4} value={runtimeLaunchApprovedParameters} onChange={(event) => setRuntimeLaunchApprovedParameters(event.target.value)} />
-          </label>
-          <label className="ui-field">
-            <span className="ui-field__label">Input payload (JSON)</span>
-            <textarea className="ui-input" rows={4} value={runtimeLaunchInputPayload} onChange={(event) => setRuntimeLaunchInputPayload(event.target.value)} />
-          </label>
-          <div className="ui-page__actions">
-            <button type="button" className="ui-button ui-button--secondary ui-button--small" onClick={() => void launchRuntimeExecution()}>
-              {isRuntimeLaunchPending ? "Launching..." : "Launch allowed run"}
-            </button>
-            <Link className="ui-button ui-button--ghost ui-button--small" to={ROUTE_PATHS.systemStudio}>Open system runner</Link>
-          </div>
-          {runtimeLaunchError ? <p role="alert">{runtimeLaunchError}</p> : null}
-          {runtimeLaunchResult ? (
-            <p className="ui-text-small">
-              Launched <strong>{runtimeLaunchResult.executionId}</strong> ({runtimeLaunchResult.status}) from {runtimeLaunchResult.systemId}@{runtimeLaunchResult.versionId}.
-            </p>
-          ) : null}
-        </div>
-      </section>
+      <OperationalApprovedRunLaunchPanel
+        responsiveProfile={responsiveProfile}
+        surface={isDesktopSurface ? "desktop" : "thin-client"}
+        onSubmit={launchApprovedRun}
+        onRunAccepted={(data) => {
+          setRuntimeExecutionId(data.executionId);
+          void inspectRuntimeExecution(data.executionId);
+          void refreshRuntimeQueue();
+          void loadHistory();
+        }}
+        openSystemRunnerPath={ROUTE_PATHS.systemStudio}
+      />
 
       <section className="ui-card">
         <div className="ui-card__header">
@@ -827,32 +726,4 @@ export default function RunPage(props: RunPageProps): JSX.Element {
       detail={detail}
     />
   );
-}
-
-function parseOptionalJson(raw: string): { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: string } {
-  const normalized = raw.trim();
-  if (!normalized) {
-    return { ok: true, value: undefined };
-  }
-  try {
-    return { ok: true, value: JSON.parse(normalized) };
-  } catch {
-    return { ok: false, error: "Input payload must be valid JSON." };
-  }
-}
-
-function parseOptionalRecordJson(raw: string): { readonly ok: true; readonly value: Readonly<Record<string, unknown>> | undefined } | { readonly ok: false; readonly error: string } {
-  const normalized = raw.trim();
-  if (!normalized) {
-    return { ok: true, value: undefined };
-  }
-  try {
-    const parsed = JSON.parse(normalized) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return { ok: false, error: "Approved parameters must be a JSON object." };
-    }
-    return { ok: true, value: Object.freeze({ ...(parsed as Record<string, unknown>) }) };
-  } catch {
-    return { ok: false, error: "Approved parameters must be valid JSON." };
-  }
 }
