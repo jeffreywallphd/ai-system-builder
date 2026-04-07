@@ -7,6 +7,7 @@ Story 15.3.6 admin-facing audit/governance review surfaces for prioritized secur
 For canonical audit taxonomy/capture extension guidance, also reference:
 
 - `docs/architecture/audit-taxonomy-capture-boundaries-and-extension-rules.md`
+- `docs/architecture/audit-ledger-persistence-query-and-access-control-architecture.md`
 - `docs/audit-governance-contributor-guide.md`
 
 ## Canonical files
