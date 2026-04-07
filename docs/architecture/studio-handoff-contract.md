@@ -5,15 +5,15 @@ Defines the canonical launch-and-return contract for cross-studio create/select 
 
 ## Canonical location
 - Contract model + validation + query serialization:
-  - `ui/routes/StudioHandoffContract.ts`
+  - `src/ui/routes/StudioHandoffContract.ts`
 - Shared return payload resolution:
-  - `ui/routes/StudioReturnPayloadResolution.ts`
+  - `src/ui/routes/StudioReturnPayloadResolution.ts`
 - Workflow-origin launch-context adapter:
-  - `ui/studio-shell/workflow/WorkflowStudioLaunchContext.ts`
+  - `src/ui/studio-shell/workflow/WorkflowStudioLaunchContext.ts`
 - Workflow return restoration adapter:
-  - `ui/studio-shell/workflow/WorkflowStudioReturnRestorationService.ts`
+  - `src/ui/studio-shell/workflow/WorkflowStudioReturnRestorationService.ts`
 - Route-level launch/parse integration:
-  - `ui/routes/InlineAssetCreation.ts`
+  - `src/ui/routes/InlineAssetCreation.ts`
 
 ## Contract shape
 Top-level fields:
@@ -127,7 +127,7 @@ Included Workflow-origin context:
   - `cancelled` for `cancelled`/`no-selection`/`abandoned` outcomes (non-destructive by contract).
   - `recovered` when stale/invalid returns are safely ignored.
 - Dataset and agent launch/return status updates remain correlated through existing handoff identifiers (`launchHandoffId`, selector target metadata, selector session id) to respect multi-session safety rules.
-- Cross-studio regression coverage now explicitly validates dataset and agent launch -> return -> apply -> resume behavior (including cancel/no-selection and stale-correlation safety) in `ui/studio-shell/asset-selector/tests/AssetSelectorFramework.integration.test.ts`.
+- Cross-studio regression coverage now explicitly validates dataset and agent launch -> return -> apply -> resume behavior (including cancel/no-selection and stale-correlation safety) in `src/ui/studio-shell/asset-selector/tests/AssetSelectorFramework.integration.test.ts`.
 
 ## Compatibility note
 `InlineAssetCreation` still supports legacy selector query params (`selectorLaunch`, `selectorSessionId`, etc.).  
@@ -136,7 +136,7 @@ When those are absent, it now falls back to the canonical `studioHandoff` contra
 
 
 ## Stories 5.2.1 / 5.2.2 image vertical-slice contracts and normalized identity resolution
-- Added a canonical image-slice handoff contract model in `domain/studio-handoff/ImageStudioHandoffContract.ts` that standardizes cross-studio Data Studio -> Workflow Studio -> System Studio payloads for:
+- Added a canonical image-slice handoff contract model in `src/domain/studio-handoff/ImageStudioHandoffContract.ts` that standardizes cross-studio Data Studio -> Workflow Studio -> System Studio payloads for:
   - asset references and versioned references,
   - dataset instance references,
   - workflow references and system bindings,
@@ -144,15 +144,15 @@ When those are absent, it now falls back to the canonical `studioHandoff` contra
   - event payload structures,
   - lineage/trace identifiers (`handoffId`, `traceId`),
   - persisted cross-studio relationship records.
-- Added an application-layer resolver seam in `application/studio-handoff/ImageStudioReferenceResolver.ts` so image slice flows use one normalized identity-resolution path rather than studio-specific ad hoc resolution logic.
+- Added an application-layer resolver seam in `src/application/studio-handoff/ImageStudioReferenceResolver.ts` so image slice flows use one normalized identity-resolution path rather than studio-specific ad hoc resolution logic.
 - Resolver outcomes are explicit and inspectable for broken/missing/ambiguous/incompatible reference states:
   - `missing`
   - `broken`
   - `ambiguous`
   - `incompatible`
 - Added focused contract/resolution coverage:
-  - `domain/studio-handoff/tests/ImageStudioHandoffContract.test.ts`
-  - `application/studio-handoff/tests/ImageStudioReferenceResolver.test.ts`
+  - `src/domain/studio-handoff/tests/ImageStudioHandoffContract.test.ts`
+  - `src/application/studio-handoff/tests/ImageStudioReferenceResolver.test.ts`
 
 ## Stories 5.2.3 / 5.2.4 image input/output handoff integration
 - Workflow execution context assembly now accepts canonical image handoff payloads in workflow metadata (`metadata.imageStudioHandoff`) and validates shape through `createImageCrossStudioHandoffContract` before resolving inputs.

@@ -22,8 +22,8 @@ This operational guide consolidates Story 5.4.5 (Feature 5 / Epic 5.4): bootstra
 - `src/application/nodes/use-cases/ListNodeInventoryUseCase.ts`
 - `src/application/nodes/use-cases/GetNodeInventoryDetailUseCase.ts`
 - `src/application/nodes/use-cases/RevokeNodeTrustUseCase.ts`
-- `ui/pages/NodeEnrollmentReviewPage.tsx`
-- `ui/pages/NodeInventoryPage.tsx`
+- `src/ui/pages/NodeEnrollmentReviewPage.tsx`
+- `src/ui/pages/NodeInventoryPage.tsx`
 
 ## End-to-end lifecycle
 

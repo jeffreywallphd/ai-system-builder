@@ -6,13 +6,13 @@ UI-facing admin review and decision flow for pending node enrollment requests (S
 
 ## Canonical files
 
-- `ui/pages/NodeEnrollmentReviewPage.tsx`
-- `ui/services/NodeEnrollmentReviewService.ts`
-- `ui/shared/nodes/NodeEnrollmentReviewClient.ts`
-- `ui/routes/RouteConfig.ts`
-- `ui/routes/AppRouter.tsx`
-- `ui/pages/SettingsPage.tsx`
-- `ui/styles/app.css`
+- `src/ui/pages/NodeEnrollmentReviewPage.tsx`
+- `src/ui/services/NodeEnrollmentReviewService.ts`
+- `src/ui/shared/nodes/NodeEnrollmentReviewClient.ts`
+- `src/ui/routes/RouteConfig.ts`
+- `src/ui/routes/AppRouter.tsx`
+- `src/ui/pages/SettingsPage.tsx`
+- `src/ui/styles/app.css`
 
 ## UX contract
 
@@ -43,6 +43,6 @@ UI-facing admin review and decision flow for pending node enrollment requests (S
 
 ## Tests in this slice
 
-- `ui/shared/nodes/tests/NodeEnrollmentReviewClient.test.ts`
-- `ui/pages/tests/NodeEnrollmentReviewPage.test.tsx`
+- `src/ui/shared/nodes/tests/NodeEnrollmentReviewClient.test.ts`
+- `src/ui/pages/tests/NodeEnrollmentReviewPage.test.tsx`
 - route/settings/service contract assertions updated to include new node-enrollment review entry points

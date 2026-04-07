@@ -16,7 +16,7 @@ Story 13.4.3 baseline for Feature 13 / Epic 13.4: keep authoritative persistent 
 
 ## Extension rules
 
-- Define aggregate/repository boundaries in domain/application ports first.
+- Define aggregate/repository boundaries in src/domain/application ports first.
 - Implement adapters + mappers in `src/infrastructure/persistence/<domain>/`.
 - Register migration hooks in `createAuthoritativePersistenceMigrationHooks(...)`.
 - Compose adapters in `createAuthoritativePersistentPlatformServices(...)`.

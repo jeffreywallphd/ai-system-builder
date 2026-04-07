@@ -33,8 +33,8 @@ Primary files:
 
 - `src/domain/identity/IdentityDomain.ts`
 - `src/domain/identity/IdentityPolicy.ts`
-- `application/identity/services/IdentitySessionLifecycleService.ts`
-- `application/identity/services/IdentityAuthenticatedSessionService.ts`
+- `src/application/identity/services/IdentitySessionLifecycleService.ts`
+- `src/application/identity/services/IdentityAuthenticatedSessionService.ts`
 
 Core concepts:
 
@@ -59,30 +59,30 @@ Key invariants enforced in domain code:
 
 Primary files:
 
-- `application/contracts/IdentityApplicationContracts.ts`
-- `application/contracts/IdentityLifecycleEventContracts.ts`
-- `application/identity/ports/IIdentityLookupRepository.ts`
-- `application/identity/ports/IIdentityPersistenceRepository.ts`
-- `application/identity/ports/ICredentialMaterialRepository.ts`
-- `application/identity/ports/IIdentitySessionRepository.ts`
-- `application/identity/ports/IIdentitySessionTokenMaterialRepository.ts`
-- `application/identity/ports/IIdentitySessionTokenService.ts`
-- `application/identity/ports/IIdentityClock.ts`
-- `application/identity/ports/IIdentityIdGenerator.ts`
-- `application/identity/ports/IIdentityCredentialAuthenticator.ts`
-- `application/identity/ports/IIdentityCredentialResetVerifier.ts`
-- `application/identity/ports/IIdentityLifecycleEventPublisher.ts`
-- `application/identity/ports/ILocalPasswordCredentialService.ts`
-- `application/identity/services/IdentityPolicyService.ts`
-- `application/identity/services/IdentityProviderCatalog.ts`
-- `application/identity/services/IdentityLifecycleEventPublishing.ts`
-- `application/identity/services/LocalPasswordIdentityAuthenticator.ts`
-- `application/identity/services/IdentityBootstrapService.ts`
+- `src/application/contracts/IdentityApplicationContracts.ts`
+- `src/application/contracts/IdentityLifecycleEventContracts.ts`
+- `src/application/identity/ports/IIdentityLookupRepository.ts`
+- `src/application/identity/ports/IIdentityPersistenceRepository.ts`
+- `src/application/identity/ports/ICredentialMaterialRepository.ts`
+- `src/application/identity/ports/IIdentitySessionRepository.ts`
+- `src/application/identity/ports/IIdentitySessionTokenMaterialRepository.ts`
+- `src/application/identity/ports/IIdentitySessionTokenService.ts`
+- `src/application/identity/ports/IIdentityClock.ts`
+- `src/application/identity/ports/IIdentityIdGenerator.ts`
+- `src/application/identity/ports/IIdentityCredentialAuthenticator.ts`
+- `src/application/identity/ports/IIdentityCredentialResetVerifier.ts`
+- `src/application/identity/ports/IIdentityLifecycleEventPublisher.ts`
+- `src/application/identity/ports/ILocalPasswordCredentialService.ts`
+- `src/application/identity/services/IdentityPolicyService.ts`
+- `src/application/identity/services/IdentityProviderCatalog.ts`
+- `src/application/identity/services/IdentityLifecycleEventPublishing.ts`
+- `src/application/identity/services/LocalPasswordIdentityAuthenticator.ts`
+- `src/application/identity/services/IdentityBootstrapService.ts`
 - `src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`
 - `src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`
 - `src/application/identity/use-cases/LoginLocalAccountUseCase.ts`
 - `src/application/identity/use-cases/ChangeLocalPasswordCredentialUseCase.ts`
-- `infrastructure/security/identity/OpaqueIdentitySessionTokenService.ts`
+- `src/infrastructure/security/identity/OpaqueIdentitySessionTokenService.ts`
 
 Application responsibilities:
 
@@ -97,7 +97,7 @@ Application responsibilities:
 
 Filesystem adapter path:
 
-- `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
+- `src/infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
 - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
 
 `src` adapter path (same contracts, mapper-separated):
@@ -160,7 +160,7 @@ Canonical error codes include:
 - `identity-invalid-state`
 - `identity-not-found`
 
-This keeps failure mapping deterministic across domain/application/infrastructure seams.
+This keeps failure mapping deterministic across src/domain, src/application, and src/infrastructure seams.
 
 ## Bootstrap Assumptions
 
@@ -186,7 +186,7 @@ The service does not generate a password or perform hashing; it consumes already
 - persists `UserIdentity` and active credential material using application ports only
 - returns typed operation results for success and structured failure paths
 
-The use case intentionally keeps hashing behind the authenticator contract so secret-handling stays in infrastructure/security code while persistence still stores only hash material (`hashAlgorithm`, `hashValue`, optional salt/pepper metadata).
+The use case intentionally keeps hashing behind the authenticator contract so secret-handling stays in src/infrastructure/security code while persistence still stores only hash material (`hashAlgorithm`, `hashValue`, optional salt/pepper metadata).
 
 `ScryptLocalPasswordCredentialService` now applies an OpenSSL-safe memory budget floor and headroom when deriving local-password hashes so dev/host runtimes do not fail with `MEMORY_LIMIT_EXCEEDED` when parameters are otherwise valid.
 
@@ -256,7 +256,7 @@ Credential change now supports verification modes:
 - `current-credential` (implemented now): verifies the current credential material before rotation
 - `reset-assertion` (extension seam): delegated to `IIdentityCredentialResetVerifier`
 
-The reset verifier contract (`application/identity/ports/IIdentityCredentialResetVerifier.ts`) is intentionally transport/token agnostic and allows future reset-token or administrator-assisted reset workflows to authorize credential replacement without adding speculative token issuance systems in this slice.
+The reset verifier contract (`src/application/identity/ports/IIdentityCredentialResetVerifier.ts`) is intentionally transport/token agnostic and allows future reset-token or administrator-assisted reset workflows to authorize credential replacement without adding speculative token issuance systems in this slice.
 
 If `reset-assertion` is requested without a configured verifier, the use case deterministically fails with `identity-invalid-request`.
 
@@ -283,7 +283,7 @@ Recommended extension path:
 
 Auth provider abstraction is now explicit in application services so local auth is one provider path inside a broader provider model:
 
-- `application/identity/services/IdentityProviderCatalog.ts` now defines provider descriptors with:
+- `src/application/identity/services/IdentityProviderCatalog.ts` now defines provider descriptors with:
   - provider category/kind mapping
   - authenticator capability metadata (`supportedAuthenticators`, usernameless sign-in support)
   - provider-specific credential handling seams (`materialMode`, credential-policy support, credential-material-record support)
@@ -330,10 +330,10 @@ Identity administration capabilities are now exposed through authoritative serve
   - `GET /api/v1/identity/admin/accounts/:userIdentityId`
   - `POST /api/v1/identity/admin/accounts/:userIdentityId/status`
 - renderer API/client seams:
-  - `ui/shared/identity/IdentityAuthClient.ts`
-  - `ui/services/IdentityAuthService.ts`
+  - `src/ui/shared/identity/IdentityAuthClient.ts`
+  - `src/ui/services/IdentityAuthService.ts`
 - renderer admin page:
-  - `ui/pages/IdentityAdminPage.tsx`
+  - `src/ui/pages/IdentityAdminPage.tsx`
 
 Renderer behavior in this slice:
 
@@ -347,9 +347,9 @@ Identity lifecycle event hooks are now formalized so audit/governance features c
 
 Contracts and ports:
 
-- event contract definitions: `application/contracts/IdentityLifecycleEventContracts.ts`
-- emission port seam: `application/identity/ports/IIdentityLifecycleEventPublisher.ts`
-- best-effort emission helper: `application/identity/services/IdentityLifecycleEventPublishing.ts`
+- event contract definitions: `src/application/contracts/IdentityLifecycleEventContracts.ts`
+- emission port seam: `src/application/identity/ports/IIdentityLifecycleEventPublisher.ts`
+- best-effort emission helper: `src/application/identity/services/IdentityLifecycleEventPublishing.ts`
 
 Current emission points:
 
@@ -382,7 +382,7 @@ Implementation points:
 
 - `src/infrastructure/api/identity/IdentityAuthRedaction.ts` centralizes recursive payload redaction plus freeform text/token redaction rules used by identity observability and HTTP server transport logs.
 - `src/infrastructure/api/identity/IdentityAuthResponseSerializers.ts` centralizes explicit allowlist response serialization for identity backend API payloads.
-- `ui/shared/identity/IdentityAuthSessionStore.ts` persists a minimized session shape (`IdentityAuthPersistedSession`) so token continuity fields remain available while recovery-sensitive/trust-seam metadata is excluded from local storage by default.
+- `src/ui/shared/identity/IdentityAuthSessionStore.ts` persists a minimized session shape (`IdentityAuthPersistedSession`) so token continuity fields remain available while recovery-sensitive/trust-seam metadata is excluded from local storage by default.
 
 Coverage posture:
 
@@ -404,14 +404,14 @@ Identity does not currently represent device trust posture or runtime trust post
 Specifically:
 
 - `Session.client` fields (`accessChannel`, `userAgent`, `ipAddress`, `deviceId`, `trustedDeviceBindingId`, `trustMarker`) are informational/session-context metadata, not a trust decision model.
-- MCP/runtime trust policy code lives in separate trust modules (for example `domain/mcp/McpToolTrust.ts`) and is not coupled into identity domain logic.
+- MCP/runtime trust policy code lives in separate trust modules (for example `src/domain/mcp/McpToolTrust.ts`) and is not coupled into identity domain logic.
 - No identity rule depends on device-attestation state, runtime sandbox trust state, or tool trust decisions.
 
 ## Session Lifecycle Policy Service (Story 1.3.1)
 
 Session lifecycle orchestration is now centralized in:
 
-- `application/identity/services/IdentitySessionLifecycleService.ts`
+- `src/application/identity/services/IdentitySessionLifecycleService.ts`
 
 This service defines and applies production session rules for:
 
@@ -458,7 +458,7 @@ Authenticated session validation for protected APIs is now implemented through t
 
 - `IdentityHttpServer` provides bearer-token guard handling for authenticated routes in the HTTP transport layer.
 - `IdentityAuthBackendApi.resolveAuthenticatedSession(...)` composes session-token validation with principal lookup using application ports (`IdentityAuthenticatedSessionService` + `IIdentityLookupRepository`).
-- Guard success passes authenticated context (principal + session metadata) to downstream route handlers without leaking transport concerns into application/domain logic.
+- Guard success passes authenticated context (principal + session metadata) to downstream route handlers without leaking transport concerns into src/application/domain logic.
 - Guard failures normalize missing, invalid, expired, and revoked sessions to stable client behavior (`401` + `authentication-failed`).
 
 Current protected route:
@@ -494,7 +494,7 @@ Current authorization posture:
 
 Session lifecycle policy is now configurable through standard environment-backed config seams rather than hard-coded runtime behavior:
 
-- `infrastructure/config/IdentitySessionPolicyConfig.ts`
+- `src/infrastructure/config/IdentitySessionPolicyConfig.ts`
 - `src/hosts/server/IdentityServerHost.ts` (policy loading + injection into `IdentitySessionLifecycleService`)
 
 Configurable per-channel policy controls:
@@ -556,14 +556,14 @@ Renderer auth/session state now uses authenticated-session behavior as the sourc
 
 Primary renderer files:
 
-- `ui/App.tsx`
-- `ui/routes/AppRouter.tsx`
-- `ui/pages/LoginPage.tsx`
-- `ui/shared/identity/IdentityAuthSessionCoordinator.ts`
-- `ui/shared/identity/IdentityAuthSessionStore.ts`
-- `ui/shared/identity/IdentityAuthEnvironment.ts`
-- `ui/shared/identity/IdentityAuthClient.ts`
-- `ui/services/IdentityAuthService.ts`
+- `src/ui/App.tsx`
+- `src/ui/routes/AppRouter.tsx`
+- `src/ui/pages/LoginPage.tsx`
+- `src/ui/shared/identity/IdentityAuthSessionCoordinator.ts`
+- `src/ui/shared/identity/IdentityAuthSessionStore.ts`
+- `src/ui/shared/identity/IdentityAuthEnvironment.ts`
+- `src/ui/shared/identity/IdentityAuthClient.ts`
+- `src/ui/services/IdentityAuthService.ts`
 
 Implemented behavior:
 
@@ -589,7 +589,7 @@ Identity provider/account decisions are now configurable through explicit, valid
 
 Primary config seam:
 
-- `infrastructure/config/IdentityProviderAccountPolicyConfig.ts`
+- `src/infrastructure/config/IdentityProviderAccountPolicyConfig.ts`
 
 Host wiring:
 
@@ -622,30 +622,30 @@ Key tests for this foundation:
 
 - `src/domain/identity/tests/IdentityDomain.test.ts`
 - `src/domain/identity/tests/IdentityPolicy.test.ts`
-- `application/contracts/tests/IdentityApplicationContracts.test.ts`
-- `application/identity/tests/IdentityPortsContracts.test.ts`
-- `application/identity/tests/IdentityPolicyService.test.ts`
-- `application/identity/tests/IdentityBootstrapService.test.ts`
-- `application/identity/tests/RegisterLocalAccountUseCase.test.ts`
-- `application/identity/tests/VerifyLocalPasswordCredentialUseCase.test.ts`
-- `application/identity/tests/LoginLocalAccountUseCase.test.ts`
-- `application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
-- `application/identity/tests/IdentitySessionLifecycleService.test.ts`
-- `application/identity/tests/IdentityAuthenticatedSessionService.test.ts`
-- `infrastructure/config/tests/IdentitySessionPolicyConfig.test.ts`
-- `infrastructure/config/tests/IdentityProviderAccountPolicyConfig.test.ts`
-- `application/identity/tests/LogoutIdentitySessionUseCase.test.ts`
-- `application/identity/tests/RevokeIdentitySessionUseCase.test.ts`
-- `application/identity/tests/IdentityAuthenticatorAndProviderCatalog.test.ts`
-- `application/identity/tests/LocalIdentityAdministrationUseCases.test.ts`
+- `src/application/contracts/tests/IdentityApplicationContracts.test.ts`
+- `src/application/identity/tests/IdentityPortsContracts.test.ts`
+- `src/application/identity/tests/IdentityPolicyService.test.ts`
+- `src/application/identity/tests/IdentityBootstrapService.test.ts`
+- `src/application/identity/tests/RegisterLocalAccountUseCase.test.ts`
+- `src/application/identity/tests/VerifyLocalPasswordCredentialUseCase.test.ts`
+- `src/application/identity/tests/LoginLocalAccountUseCase.test.ts`
+- `src/application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
+- `src/application/identity/tests/IdentitySessionLifecycleService.test.ts`
+- `src/application/identity/tests/IdentityAuthenticatedSessionService.test.ts`
+- `src/infrastructure/config/tests/IdentitySessionPolicyConfig.test.ts`
+- `src/infrastructure/config/tests/IdentityProviderAccountPolicyConfig.test.ts`
+- `src/application/identity/tests/LogoutIdentitySessionUseCase.test.ts`
+- `src/application/identity/tests/RevokeIdentitySessionUseCase.test.ts`
+- `src/application/identity/tests/IdentityAuthenticatorAndProviderCatalog.test.ts`
+- `src/application/identity/tests/LocalIdentityAdministrationUseCases.test.ts`
 - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
-- `infrastructure/security/identity/tests/ScryptLocalPasswordCredentialService.test.ts`
-- `infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`
+- `src/infrastructure/security/identity/tests/ScryptLocalPasswordCredentialService.test.ts`
+- `src/infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`
 - `src/infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
-- `hosts/server/tests/IdentityServerHost.test.ts`
+- `src/hosts/server/tests/IdentityServerHost.test.ts`
 - `src/infrastructure/api/identity/tests/IdentityAuthRedaction.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
-- `ui/pages/tests/IdentityAdminPage.test.tsx`
+- `src/ui/pages/tests/IdentityAdminPage.test.tsx`
 - `src/infrastructure/persistence/identity/tests/IdentityPersistenceMapper.test.ts`
 - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
 

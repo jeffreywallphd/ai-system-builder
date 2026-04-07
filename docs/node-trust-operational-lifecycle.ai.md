@@ -16,8 +16,8 @@ Story 5.4.5 operational baseline for the full node trust lifecycle with hardened
 - `src/application/nodes/use-cases/ListNodeInventoryUseCase.ts`
 - `src/application/nodes/use-cases/GetNodeInventoryDetailUseCase.ts`
 - `src/application/nodes/use-cases/RevokeNodeTrustUseCase.ts`
-- `ui/pages/NodeEnrollmentReviewPage.tsx`
-- `ui/pages/NodeInventoryPage.tsx`
+- `src/ui/pages/NodeEnrollmentReviewPage.tsx`
+- `src/ui/pages/NodeInventoryPage.tsx`
 
 ## Lifecycle sequence
 

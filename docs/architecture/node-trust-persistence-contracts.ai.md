@@ -60,7 +60,7 @@ Quick baseline for Story 5.1.2 and Story 5.1.3 node-trust persistence contracts 
 
 ## Boundary notes
 
-- No infrastructure/SQL details are exposed in application/domain layers.
+- No src/infrastructure/SQL details are exposed in src/application/domain layers.
 - Node trust persistence is split into two ports:
   - node identity trust mutations/queries
   - enrollment request mutations/queries

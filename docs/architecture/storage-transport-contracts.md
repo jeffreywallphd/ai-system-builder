@@ -87,4 +87,4 @@ Validation parse helpers expose typed failures through `StorageTransportSchemaVa
 
 - Shared storage transport contracts depend on domain enums only; no persistence or SDK types are exposed.
 - Storage transport payloads are suitable for HTTP, IPC, and UI state adapters.
-- Internal and admin-safe DTO projections are explicit to prevent accidental exposure of infrastructure/security-sensitive fields.
+- Internal and admin-safe DTO projections are explicit to prevent accidental exposure of src/infrastructure/security-sensitive fields.

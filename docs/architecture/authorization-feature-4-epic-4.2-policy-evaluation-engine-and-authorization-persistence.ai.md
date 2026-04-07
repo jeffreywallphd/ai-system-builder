@@ -267,7 +267,7 @@ Mutation gate examples:
 ## High-risk sharing and visibility safeguards (Story 4.4.5)
 
 - Authorization administration mutations now include server-side safeguards for irreversible or high-risk access changes:
-  - broadening visibility exposure (`private -> shared/workspace`, `shared -> workspace`, any transition to `published`),
+  - broadening visibility exposure (`private -> src/shared/workspace`, `shared -> workspace`, any transition to `published`),
   - enabling resource resharing (`allowResharing: false -> true`),
   - creating or widening broad-subject sharing grants (`workspace`, `workspace-role`, `public`),
   - adding elevated sharing permission actions (for example `.manage`, `.share`, `.update`, `.delete`, `.execute`, `.publish`),

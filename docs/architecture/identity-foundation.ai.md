@@ -17,15 +17,15 @@
 
 - `src/domain/identity/IdentityDomain.ts`
 - `src/domain/identity/IdentityPolicy.ts`
-- `application/identity/services/IdentitySessionLifecycleService.ts`
-- `application/identity/services/IdentityAuthenticatedSessionService.ts`
-- `application/contracts/IdentityApplicationContracts.ts`
-- `application/contracts/IdentityLifecycleEventContracts.ts`
-- `application/identity/ports/*`
-- `application/identity/services/IdentityPolicyService.ts`
-- `application/identity/ports/IIdentityLifecycleEventPublisher.ts`
-- `application/identity/services/IdentityLifecycleEventPublishing.ts`
-- `application/identity/services/IdentityBootstrapService.ts`
+- `src/application/identity/services/IdentitySessionLifecycleService.ts`
+- `src/application/identity/services/IdentityAuthenticatedSessionService.ts`
+- `src/application/contracts/IdentityApplicationContracts.ts`
+- `src/application/contracts/IdentityLifecycleEventContracts.ts`
+- `src/application/identity/ports/*`
+- `src/application/identity/services/IdentityPolicyService.ts`
+- `src/application/identity/ports/IIdentityLifecycleEventPublisher.ts`
+- `src/application/identity/services/IdentityLifecycleEventPublishing.ts`
+- `src/application/identity/services/IdentityBootstrapService.ts`
 - `src/application/identity/use-cases/RegisterLocalAccountUseCase.ts`
 - `src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase.ts`
 - `src/application/identity/use-cases/LoginLocalAccountUseCase.ts`
@@ -38,16 +38,16 @@
 - `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/hosts/server/IdentityServerHost.ts`
-- `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
+- `src/infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
 - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
 - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
-- `application/identity/ports/IIdentityCredentialAuthenticator.ts`
-- `application/identity/ports/IIdentityCredentialResetVerifier.ts`
-- `application/identity/services/IdentityProviderCatalog.ts`
-- `application/identity/services/LocalPasswordIdentityAuthenticator.ts`
-- `application/identity/ports/ILocalPasswordCredentialService.ts`
-- `infrastructure/security/identity/ScryptLocalPasswordCredentialService.ts`
-- `infrastructure/security/identity/OpaqueIdentitySessionTokenService.ts`
+- `src/application/identity/ports/IIdentityCredentialAuthenticator.ts`
+- `src/application/identity/ports/IIdentityCredentialResetVerifier.ts`
+- `src/application/identity/services/IdentityProviderCatalog.ts`
+- `src/application/identity/services/LocalPasswordIdentityAuthenticator.ts`
+- `src/application/identity/ports/ILocalPasswordCredentialService.ts`
+- `src/infrastructure/security/identity/ScryptLocalPasswordCredentialService.ts`
+- `src/infrastructure/security/identity/OpaqueIdentitySessionTokenService.ts`
 
 ## Persistence shape
 
@@ -66,7 +66,7 @@
 
 ## Provider abstraction formalization (story 1.4.1)
 
-- `application/identity/services/IdentityProviderCatalog.ts` now acts as the explicit provider abstraction surface:
+- `src/application/identity/services/IdentityProviderCatalog.ts` now acts as the explicit provider abstraction surface:
   - descriptor map per provider kind/category
   - capability metadata (`supportedAuthenticators`, usernameless sign-in support)
   - credential-handling metadata (`materialMode`, credential-policy support, credential-material-record support)
@@ -102,10 +102,10 @@
   - `GET /api/v1/identity/admin/accounts/:userIdentityId`
   - `POST /api/v1/identity/admin/accounts/:userIdentityId/status`
 - Renderer identity client/service seams now include those contracts:
-  - `ui/shared/identity/IdentityAuthClient.ts`
-  - `ui/services/IdentityAuthService.ts`
+  - `src/ui/shared/identity/IdentityAuthClient.ts`
+  - `src/ui/services/IdentityAuthService.ts`
 - Renderer administration UI now lives in:
-  - `ui/pages/IdentityAdminPage.tsx`
+  - `src/ui/pages/IdentityAdminPage.tsx`
 - Current renderer behavior:
   - authenticated account listing + status inspection use real backend endpoints
   - enable/disable actions update persisted backend state and refresh list/status views
@@ -114,11 +114,11 @@
 ## Identity lifecycle event hooks (story 1.4.4)
 
 - Identity lifecycle event contracts are now formalized in:
-  - `application/contracts/IdentityLifecycleEventContracts.ts`
+  - `src/application/contracts/IdentityLifecycleEventContracts.ts`
 - The event publisher seam is an application port:
-  - `application/identity/ports/IIdentityLifecycleEventPublisher.ts`
+  - `src/application/identity/ports/IIdentityLifecycleEventPublisher.ts`
 - Emission is best-effort by design through:
-  - `application/identity/services/IdentityLifecycleEventPublishing.ts`
+  - `src/application/identity/services/IdentityLifecycleEventPublishing.ts`
   - emission failures are intentionally swallowed so identity behavior does not hard depend on unfinished audit infrastructure.
 - Current local identity lifecycle emission points:
   - `RegisterLocalAccountUseCase`: `identity.local-account.registered`
@@ -148,7 +148,7 @@ Primary hardening seams:
   - freeform string redaction for bearer/session token patterns in error/log text
 - `src/infrastructure/api/identity/IdentityAuthResponseSerializers.ts`
   - explicit allowlist mapping for identity API response payloads (including admin list/get/status outputs)
-- `ui/shared/identity/IdentityAuthSessionStore.ts`
+- `src/ui/shared/identity/IdentityAuthSessionStore.ts`
   - narrowed persisted session allowlist shape (`IdentityAuthPersistedSession`) for local runtime continuity without persisting non-required sensitive/trust metadata
 
 Operational effect:
@@ -198,7 +198,7 @@ Operational effect:
 ## Reset-ready verification seam
 
 - Credential change verification is mode-based: `current-credential` (implemented) and `reset-assertion` (extension seam).
-- `reset-assertion` is delegated to `application/identity/ports/IIdentityCredentialResetVerifier.ts`, which is intentionally token/workflow agnostic so reset-token and administrator-assisted flows can plug in later without changing the credential-change core.
+- `reset-assertion` is delegated to `src/application/identity/ports/IIdentityCredentialResetVerifier.ts`, which is intentionally token/workflow agnostic so reset-token and administrator-assisted flows can plug in later without changing the credential-change core.
 - If no reset verifier is configured, reset mode fails deterministically with `identity-invalid-request`.
 
 ## Boundary clarity: identity vs trust
@@ -243,10 +243,10 @@ Operational effect:
 
 ## Session logout/revocation model (story 1.3.4)
 
-- Logout is now an explicit application/API flow that revokes the bearer-authenticated current session:
+- Logout is now an explicit src/application/API flow that revokes the bearer-authenticated current session:
   - `LogoutIdentitySessionUseCase`
   - `POST /api/v1/identity/logout`
-- Targeted revocation is now an explicit application/API flow for authenticated principals:
+- Targeted revocation is now an explicit src/application/API flow for authenticated principals:
   - `RevokeIdentitySessionUseCase`
   - `POST /api/v1/identity/session/revoke`
 - `IdentityAuthenticatedSessionService.revokeAuthenticatedSessionById(...)` now supports system-driven revocation seams by session id.
@@ -257,7 +257,7 @@ Operational effect:
 
 ## Session policy configuration and expiry controls (story 1.3.5)
 
-- Session policy is now environment-configurable through `infrastructure/config/IdentitySessionPolicyConfig.ts` and injected by `src/hosts/server/IdentityServerHost.ts` into `IdentitySessionLifecycleService`.
+- Session policy is now environment-configurable through `src/infrastructure/config/IdentitySessionPolicyConfig.ts` and injected by `src/hosts/server/IdentityServerHost.ts` into `IdentitySessionLifecycleService`.
 - Per-channel controls now include:
   - absolute TTL (`ttlMinutes`)
   - refresh allowance (`allowRefresh`)
@@ -286,7 +286,7 @@ Operational effect:
   - `client_trusted_device_binding_id`
   - `client_trust_marker`
 - `IdentityAuthenticatedSessionService` now exposes an optional validation extension hook:
-  - `application/identity/ports/IIdentitySessionTrustEvaluator.ts`
+  - `src/application/identity/ports/IIdentitySessionTrustEvaluator.ts`
   - the evaluator can participate in bearer-token session validation and deny sessions with existing invalid-session-state outcomes
 - No trust evaluator is wired by default in this slice, so existing local-session behavior remains unchanged.
 - Authenticated-session resolution contracts now surface device/trust seam fields (`deviceId`, `trustedDeviceBindingId`, `trustMarker`) so later trusted-device policy work can compose on existing principal/session resolution flows.
@@ -294,7 +294,7 @@ Operational effect:
 ## Client session-state exposure (story 1.3.7)
 
 - Renderer auth state is now derived from real session validation (`GET /api/v1/identity/session`) rather than local presence-only assumptions.
-- `ui/App.tsx` performs authenticated bootstrap checks before mounting authenticated providers and refreshes session validity on visibility return.
+- `src/ui/App.tsx` performs authenticated bootstrap checks before mounting authenticated providers and refreshes session validity on visibility return.
 - Session persistence now follows platform conventions through a shared store seam:
   - desktop prefers preload desktop storage bridge (`window.aiLoomDesktop.storage`)
   - thin-client/web uses browser local storage
@@ -304,7 +304,7 @@ Operational effect:
 ## Provider/account policy runtime configuration (story 1.4.6)
 
 - Provider/account policy configuration is now centralized in:
-  - `infrastructure/config/IdentityProviderAccountPolicyConfig.ts`
+  - `src/infrastructure/config/IdentityProviderAccountPolicyConfig.ts`
 - `src/hosts/server/IdentityServerHost.ts` now composes this config from environment and applies startup seeding/feature toggles:
   - local provider status enablement (`active` vs `disabled`)
   - startup bootstrap seeding for local provider + credential policy defaults

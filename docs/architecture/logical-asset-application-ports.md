@@ -184,7 +184,7 @@ Behavioral posture in this story:
 
 - listing requires active workspace membership.
 - private assets are only returned to the asset owner (or workspace administrator).
-- workspace/shared/published assets are listable to authorized workspace members.
+- workspace/src/shared/published assets are listable to authorized workspace members.
 - scope-aware queries are supported for:
   - `scope` (`private` | `workspace` | `all`)
   - `ownerUserId`
@@ -306,7 +306,7 @@ Added/extended coverage:
 
 ## Story 10.3.1: generated outputs as first-class logical assets
 
-Added authoritative generated-output registration across application/API/transport seams:
+Added authoritative generated-output registration across src/application/API/transport seams:
 
 - New generated-output registration use case:
   - `src/application/assets/use-cases/AssetGeneratedOutputRegistrationService.ts`
@@ -353,7 +353,7 @@ Added coverage:
 
 ## Story 10.3.2: preview and thumbnail derivatives as protected resources
 
-Added protected preview-resolution orchestration across application/API/transport seams:
+Added protected preview-resolution orchestration across src/application/API/transport seams:
 
 - New application use case for authoritative preview resolution:
   - `src/application/assets/use-cases/AssetPreviewService.ts`
@@ -438,17 +438,17 @@ Added shared client-safe workflow contracts and a representative UI-facing integ
 New renderer integration seams:
 
 - Shared HTTP client adapter for protected asset workflows:
-  - `ui/shared/assets/AssetWorkflowClient.ts`
+  - `src/ui/shared/assets/AssetWorkflowClient.ts`
 - UI-facing service wrapper:
-  - `ui/services/AssetWorkflowService.ts`
+  - `src/ui/services/AssetWorkflowService.ts`
 - Added tests:
-  - `ui/shared/assets/tests/AssetWorkflowClient.test.ts`
-  - `ui/services/tests/AssetWorkflowService.test.ts`
+  - `src/ui/shared/assets/tests/AssetWorkflowClient.test.ts`
+  - `src/ui/services/tests/AssetWorkflowService.test.ts`
 
 Representative end-to-end UI-facing flow now uses logical asset APIs:
 
-- `/assets` route now renders `AssetsPage` directly (`ui/routes/AppRouter.tsx`).
-- `ui/pages/AssetsPage.tsx` now supports:
+- `/assets` route now renders `AssetsPage` directly (`src/ui/routes/AppRouter.tsx`).
+- `src/ui/pages/AssetsPage.tsx` now supports:
   - scoped logical asset listing,
   - protected asset detail retrieval,
   - preview resolution,
@@ -479,7 +479,7 @@ Hardened protected asset flows with production safeguards across application val
 
 Developer extension rules for Feature 10 onward:
 
-- No raw-path contracts across application/shared/UI/API surfaces. Keep filesystem paths and backend roots infrastructure-private.
+- No raw-path contracts across src/application, src/shared, UI, and API surfaces. Keep filesystem paths and backend roots infrastructure-private.
 - Use logical identifiers (`workspaceId`, `assetId`, `storageInstanceId`, logical `objectKey`) at boundaries and resolve physical storage only through storage access/adaptor services.
 - Keep preview and download flows protected:
   - preview resolution returns logical metadata only,

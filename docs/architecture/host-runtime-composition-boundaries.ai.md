@@ -18,7 +18,7 @@
   - executable composition-root contract boundary
   - required startup dependency checks against declared boundary
 - Shared contract projection:
-  - `src/shared/contracts/hosts/HostCompositionContracts.ts`
+  - `src/shared/contracts/src/hosts/HostCompositionContracts.ts`
   - stable DTO projection for host identity and boot configuration
 
 ## Canonical host runtime catalog
@@ -141,7 +141,7 @@
 - All host composition roots now advertise runtime metadata and expose it through runtime handles:
   - server, desktop, hybrid, web, worker
 - Shared DTO projection now includes runtime metadata via `toHostRuntimeMetadataDto(...)` in:
-  - `src/shared/contracts/hosts/HostCompositionContracts.ts`
+  - `src/shared/contracts/src/hosts/HostCompositionContracts.ts`
 
 This keeps host runtime metadata consumable for future node trust, scheduling, and admin/read-model surfaces while preserving host-boundary ownership.
 
@@ -164,7 +164,7 @@ This keeps host runtime metadata consumable for future node trust, scheduling, a
 ## Tests
 - `src/domain/hosts/tests/HostRuntimeDomain.test.ts`
 - `src/application/common/tests/HostCompositionContracts.test.ts`
-- `src/shared/contracts/hosts/tests/HostCompositionContracts.test.ts`
+- `src/shared/contracts/src/hosts/tests/HostCompositionContracts.test.ts`
 - `src/hosts/tests/HostRuntimeMetadataCatalog.test.ts`
 - `src/hosts/tests/HostRuntimeCatalog.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
@@ -184,6 +184,6 @@ This keeps host runtime metadata consumable for future node trust, scheduling, a
 ## Runtime entrypoint adoption (story 12.4.1)
 - Active desktop and browser-development startup paths now delegate authoritative control-plane startup through host assembly entrypoints instead of direct server-host startup:
   - `electron/main/main.ts`
-  - `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts`
+  - `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts`
 - This keeps production/dev runtime entrypoints aligned with explicit host composition-root execution.
 

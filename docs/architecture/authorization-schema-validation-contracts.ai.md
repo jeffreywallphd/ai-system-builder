@@ -43,5 +43,5 @@ Schema-level refinements mirror previously defined authorization contracts/invar
 ## Boundary guidance
 
 - Use schemas in HTTP/IPC/UI boundary adapters.
-- Keep business-state/lifecycle enforcement in domain/application use cases.
+- Keep business-state/lifecycle enforcement in src/domain/application use cases.
 - Treat schema validation as malformed-payload protection, not replacement for aggregate invariants.

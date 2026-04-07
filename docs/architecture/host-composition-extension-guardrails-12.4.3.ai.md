@@ -17,7 +17,7 @@
     - shared bootstrap pipeline + startup context
     - host service registration plan composition
     - host-specific required-service coverage assertion
-  - host composition roots do not import `ui/` directly
+  - host composition roots do not import `src/ui/` directly
   - host entrypoints continue defaulting required dependency ids from host runtime catalog startup dependencies
   - host runtime startup dependency boundaries continue covering `shared-contracts`, `application`, and `host` layers with consistent dependency-id prefixes
 
@@ -54,16 +54,16 @@
 6. Add/update required-service assertions for host families when behavior is baseline-critical.
 
 ## Layer placement guide for future host work
-- `domain/`
+- `src/domain/`
   - Put invariants, domain vocabulary, and pure business rules.
   - Do not put startup wiring, IO, or host process concerns here.
-- `application/`
+- `src/application/`
   - Put use-case orchestration and port contracts.
   - Put host-agnostic composition contracts used by all hosts.
-- `infrastructure/`
+- `src/infrastructure/`
   - Put concrete adapters and service registration catalogs.
-  - Keep adapter details here; do not leak adapter-specific concerns into domain/application.
-- `ui/`
+  - Keep adapter details here; do not leak adapter-specific concerns into src/domain/application.
+- `src/ui/`
   - Put rendering, state, page/presenter/service UI coordination.
   - Do not import UI directly into host composition roots.
 - `src/hosts/`

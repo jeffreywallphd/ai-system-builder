@@ -12,8 +12,8 @@ Story 9.4.5 baseline for Feature 9 / Epic 9.4: define extension-safe rules and o
 - `src/infrastructure/storage/StorageBackendAdapterRegistry.ts`
 - `src/infrastructure/storage/StorageBackendProvisioningOrchestrator.ts`
 - `src/infrastructure/api/storage/StorageManagementBackendApi.ts`
-- `ui/components/storage/StorageInstanceWorkflowPanel.tsx`
-- `ui/pages/StorageAdministrationPage.tsx`
+- `src/ui/components/storage/StorageInstanceWorkflowPanel.tsx`
+- `src/ui/pages/StorageAdministrationPage.tsx`
 - `src/hosts/server/IdentityServerHost.ts`
 - `docs/architecture/storage-feature-extension-guidance.md`
 
@@ -41,5 +41,5 @@ Story 9.4.5 baseline for Feature 9 / Epic 9.4: define extension-safe rules and o
 - `src/infrastructure/storage/tests/StorageBackendProvisioningOrchestrator.test.ts`
 - `src/infrastructure/api/storage/tests/StorageManagementBackendApi.test.ts`
 - `src/shared/schemas/storage/tests/StorageTransportSchemaContracts.test.ts`
-- `ui/components/storage/tests/StorageInstanceWorkflowPanel.test.tsx`
-- `ui/pages/tests/StorageAdministrationPage.test.tsx`
+- `src/ui/components/storage/tests/StorageInstanceWorkflowPanel.test.tsx`
+- `src/ui/pages/tests/StorageAdministrationPage.test.tsx`

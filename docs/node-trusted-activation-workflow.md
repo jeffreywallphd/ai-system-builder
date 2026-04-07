@@ -28,12 +28,12 @@ This note documents Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.
 - `src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
-- `ui/shared/nodes/NodeInventoryClient.ts`
-- `ui/services/NodeInventoryService.ts`
-- `ui/pages/NodeInventoryPage.tsx`
-- `ui/pages/tests/NodeInventoryPage.test.tsx`
-- `ui/shared/nodes/tests/NodeInventoryClient.test.ts`
-- `ui/pages/NodeEnrollmentReviewPage.tsx`
+- `src/ui/shared/nodes/NodeInventoryClient.ts`
+- `src/ui/services/NodeInventoryService.ts`
+- `src/ui/pages/NodeInventoryPage.tsx`
+- `src/ui/pages/tests/NodeInventoryPage.test.tsx`
+- `src/ui/shared/nodes/tests/NodeInventoryClient.test.ts`
+- `src/ui/pages/NodeEnrollmentReviewPage.tsx`
 
 ## Lifecycle model
 
@@ -183,5 +183,5 @@ Operational notes:
 - lifecycle test coverage for approve -> activate trusted transition
 - idempotent repeat activation behavior
 - unapproved activation rejection behavior
-- capability profile validation and invalid-combination rejection coverage in domain/schema tests
+- capability profile validation and invalid-combination rejection coverage in src/domain/schema tests
 - approval flow coverage for updating existing-node capability profiles from approved enrollment metadata

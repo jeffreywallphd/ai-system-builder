@@ -3,7 +3,7 @@
 ## Intent
 
 - Define the production worker host assembly as an explicit executable boundary for runtime/background execution.
-- Keep worker startup and execution capability composition in host code while application/domain orchestration remains in inner layers.
+- Keep worker startup and execution capability composition in host code while src/application/domain orchestration remains in inner layers.
 
 ## Main implementation seams
 

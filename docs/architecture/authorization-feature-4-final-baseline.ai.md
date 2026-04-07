@@ -19,8 +19,8 @@ Provide a durable implementation-truth handoff for the production authorization,
 - Domain/contracts: `src/domain/authorization/*`, `src/shared/contracts/authorization/*`, `src/shared/schemas/authorization/*`
 - Application: `src/application/authorization/use-cases/*`
 - Persistence: `src/infrastructure/persistence/authorization/*`
-- Transport/API: `infrastructure/transport/authorization/*`, `src/infrastructure/api/authorization/*`, `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- UI: `ui/components/authorization/*`, `ui/pages/AuthorizationSharingManagementPage.tsx`, `ui/pages/AuthorizationSharingThinClientPage.tsx`, `ui/pages/AuthorizationReportingPage.tsx`
+- Transport/API: `src/infrastructure/transport/authorization/*`, `src/infrastructure/api/authorization/*`, `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- UI: `src/ui/components/authorization/*`, `src/ui/pages/AuthorizationSharingManagementPage.tsx`, `src/ui/pages/AuthorizationSharingThinClientPage.tsx`, `src/ui/pages/AuthorizationReportingPage.tsx`
 
 ## Operationally important contracts
 

@@ -33,19 +33,19 @@ Core use cases in `src/application/identity/use-cases/`:
 
 Core services:
 
-- `application/identity/services/IdentityPolicyService.ts`
-- `application/identity/services/IdentityProviderCatalog.ts`
-- `application/identity/services/LocalPasswordIdentityAuthenticator.ts`
+- `src/application/identity/services/IdentityPolicyService.ts`
+- `src/application/identity/services/IdentityProviderCatalog.ts`
+- `src/application/identity/services/LocalPasswordIdentityAuthenticator.ts`
 
 ### 2. Session lifecycle and guard
 
-- `application/identity/services/IdentitySessionLifecycleService.ts`
-- `application/identity/services/IdentityAuthenticatedSessionService.ts`
+- `src/application/identity/services/IdentitySessionLifecycleService.ts`
+- `src/application/identity/services/IdentityAuthenticatedSessionService.ts`
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 
 Session policy config:
 
-- `infrastructure/config/IdentitySessionPolicyConfig.ts`
+- `src/infrastructure/config/IdentitySessionPolicyConfig.ts`
 
 ### 3. Administration readiness
 
@@ -100,7 +100,7 @@ Implemented endpoints:
 
 Provider/account policy config:
 
-- `infrastructure/config/IdentityProviderAccountPolicyConfig.ts`
+- `src/infrastructure/config/IdentityProviderAccountPolicyConfig.ts`
 
 Host applies startup defaults + policy toggles in:
 
@@ -148,7 +148,7 @@ Admin API status-set(action=disable)
 Already implemented seams:
 
 - login/session client fields: `trustedDeviceBindingId`, `trustMarker`
-- trust evaluator port: `application/identity/ports/IIdentitySessionTrustEvaluator.ts`
+- trust evaluator port: `src/application/identity/ports/IIdentitySessionTrustEvaluator.ts`
 
 Downstream work required:
 
@@ -196,7 +196,7 @@ Downstream work required:
 
 Application tests:
 
-- `application/identity/tests/*.test.ts`
+- `src/application/identity/tests/*.test.ts`
 
 Infrastructure/API tests:
 
@@ -207,8 +207,8 @@ Infrastructure/API tests:
 
 UI tests covering identity API consumers:
 
-- `ui/shared/identity/tests/IdentityAuthClient.test.ts`
-- `ui/pages/tests/IdentityAdminPage.test.tsx`
+- `src/ui/shared/identity/tests/IdentityAuthClient.test.ts`
+- `src/ui/pages/tests/IdentityAdminPage.test.tsx`
 
 ## Companion docs
 

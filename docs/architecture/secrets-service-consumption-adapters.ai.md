@@ -12,7 +12,7 @@ Story 8.2.5 baseline for Feature 8 / Epic 8.2 and Story 8.3.4 integration for Fe
 - `src/infrastructure/security/secrets/tests/ServerPlatformSecretConsumers.test.ts`
 - `src/application/security/tests/SecretRuntimeConsumptionAdapters.test.ts`
 - `src/infrastructure/security/secrets/SecretServiceComposition.ts`
-- `hosts/server/tests/IdentityServerHost.test.ts`
+- `src/hosts/server/tests/IdentityServerHost.test.ts`
 - `docs/architecture/secrets-service-consumption-adapters.md`
 
 ## Adapter contract summary

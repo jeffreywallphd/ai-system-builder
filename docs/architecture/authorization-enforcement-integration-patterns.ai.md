@@ -8,17 +8,17 @@ Goal: prevent bypasses and keep all policy checks centralized.
 
 ## Canonical integration files
 
-- `infrastructure/transport/authorization/AuthorizationTransportPolicyGuard.ts`
-- `infrastructure/transport/authorization/AuthorizationTransportAdapters.ts`
-- `infrastructure/api/registry/RegistryBackendApi.ts`
-- `infrastructure/api/studio-shell/StudioShellBackendApi.ts`
-- `infrastructure/api/system-runtime/SystemRuntimeBackendApi.ts`
-- `infrastructure/api/system-runtime/RuntimeRequestRouter.ts`
+- `src/infrastructure/transport/authorization/AuthorizationTransportPolicyGuard.ts`
+- `src/infrastructure/transport/authorization/AuthorizationTransportAdapters.ts`
+- `src/infrastructure/api/registry/RegistryBackendApi.ts`
+- `src/infrastructure/api/studio-shell/StudioShellBackendApi.ts`
+- `src/infrastructure/api/system-runtime/SystemRuntimeBackendApi.ts`
+- `src/infrastructure/api/system-runtime/RuntimeRequestRouter.ts`
 - `src/infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
 - `src/infrastructure/api/authorization/AuthorizationManagementBackendApi.ts`
 - `src/application/authorization/use-cases/AuthorizationResponseRedaction.ts`
 - `src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter.ts`
-- `ui/presenters/WorkspaceAdministrationCapabilitiesPresenter.ts`
+- `src/ui/presenters/WorkspaceAdministrationCapabilitiesPresenter.ts`
 
 ## Required enforcement patterns
 
@@ -93,10 +93,10 @@ Async flows (`startExecutionAsync`, `pollExecution`) must preserve delegated sco
 
 ## Test templates to copy
 
-- `infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
-- `infrastructure/api/studio-shell/tests/OperationalRunAuthorization.test.ts`
-- `infrastructure/api/system-runtime/tests/SystemRuntimeOperationalAuthorization.test.ts`
-- `infrastructure/api/studio-shell/tests/ReferenceImageOutputAuthorization.test.ts`
+- `src/infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
+- `src/infrastructure/api/studio-shell/tests/OperationalRunAuthorization.test.ts`
+- `src/infrastructure/api/system-runtime/tests/SystemRuntimeOperationalAuthorization.test.ts`
+- `src/infrastructure/api/studio-shell/tests/ReferenceImageOutputAuthorization.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthorizationManagement.test.ts`
 
@@ -107,7 +107,7 @@ Use these seams when adding new admin/user sharing capabilities:
 - backend API composition: `AuthorizationManagementBackendApi`
 - HTTP routing and request validation: `IdentityHttpServer` authorization management handlers
 - renderer service/client seams: `AuthorizationManagementService`, `HttpAuthorizationManagementClient`
-- desktop/thin-client route builders: `ui/web/authorization/AuthorizationSharingRoutes.ts`
+- desktop/thin-client route builders: `src/ui/web/authorization/AuthorizationSharingRoutes.ts`
 - shared management panel composition: `AuthorizationSharingManagementPanel`
 - reporting surface: `AuthorizationReportingPage`
 

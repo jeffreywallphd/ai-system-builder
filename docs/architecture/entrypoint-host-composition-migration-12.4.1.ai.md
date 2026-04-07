@@ -8,7 +8,7 @@
   - replaced direct `startIdentityServerHost(...)` startup with `startAuthoritativeServerHostAssembly(...)`
   - local identity API endpoint derivation now uses authoritative runtime handle address
   - runtime shutdown now stops authoritative host runtime through host assembly lifecycle
-- `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts`
+- `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts`
   - replaced direct `startIdentityServerHost(...)` startup with `startAuthoritativeServerHostAssembly(...)`
   - added `createBrowserDevelopmentAuthoritativeServerHostOptions(...)` as a thin entrypoint bridge
   - shutdown now stops authoritative host runtime handle
@@ -22,4 +22,4 @@
 
 ## Validation
 - Added focused test coverage for browser-development entrypoint option bridging:
-  - `infrastructure/runtime/tests/BrowserDevelopmentHostEntrypointBridge.test.ts`
+  - `src/infrastructure/runtime/tests/BrowserDevelopmentHostEntrypointBridge.test.ts`

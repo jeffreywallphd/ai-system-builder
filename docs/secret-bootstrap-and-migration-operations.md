@@ -7,7 +7,7 @@ This note documents Story 8.3.3 (Feature 8 / Epic 8.3): bootstrap required syste
 - `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts`
 - `src/hosts/server/IdentityServerHost.ts`
 - `src/infrastructure/security/secrets/tests/SystemSecretBootstrapService.test.ts`
-- `hosts/server/tests/IdentityServerHost.test.ts`
+- `src/hosts/server/tests/IdentityServerHost.test.ts`
 - `.env.example`
 
 ## Startup behavior

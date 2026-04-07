@@ -43,4 +43,4 @@ Service contract:
 
 - `ISecretManagementService` for create/read metadata/retrieve plaintext/rotate/disable/delete/list.
 
-The slice is contracts-only and keeps infrastructure/UI concerns out of domain/application boundaries.
+The slice is contracts-only and keeps src/infrastructure/UI concerns out of src/domain/application boundaries.

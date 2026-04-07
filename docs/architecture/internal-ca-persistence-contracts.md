@@ -50,7 +50,7 @@ Not persisted in plaintext:
 Story 6.1.4 implementation note:
 
 - `storage_locator` entries may reference protected internal secret storage via `secret-store:<ID>` locators.
-- locator targets are resolved through protected storage adapters, not direct filesystem payload reads in application/host logic.
+- locator targets are resolved through protected storage adapters, not direct filesystem payload reads in src/application/host logic.
 
 ## Repository seam expectations
 

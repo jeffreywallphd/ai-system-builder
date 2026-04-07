@@ -96,7 +96,7 @@
 - Put reusable setup in canonical stages.
 - Keep host-specific startup in host customization stages.
 - Use startup-context artifacts for stage handoff.
-- Do not move domain/application business logic into host startup code.
+- Do not move src/domain/application business logic into host startup code.
 - Keep stage-order tests and customization tests updated with changes.
 
 ## Test coverage

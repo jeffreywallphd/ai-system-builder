@@ -6,16 +6,16 @@ Renderer user-facing flow for trusted-device pairing and management.
 
 ## Canonical files
 
-- `ui/pages/TrustedDevicesPage.tsx`
-- `ui/pages/IdentityAdminPage.tsx`
-- `ui/services/IdentityAuthService.ts`
-- `ui/shared/identity/IdentityAuthClient.ts`
+- `src/ui/pages/TrustedDevicesPage.tsx`
+- `src/ui/pages/IdentityAdminPage.tsx`
+- `src/ui/services/IdentityAuthService.ts`
+- `src/ui/shared/identity/IdentityAuthClient.ts`
 - `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/application/identity/use-cases/TrustedDeviceAdministrativeAuthorization.ts`
-- `ui/routes/AppRouter.tsx`
-- `ui/routes/RouteConfig.ts`
-- `ui/styles/app.css`
+- `src/ui/routes/AppRouter.tsx`
+- `src/ui/routes/RouteConfig.ts`
+- `src/ui/styles/app.css`
 
 ## UX contract
 
@@ -52,8 +52,8 @@ Renderer user-facing flow for trusted-device pairing and management.
 
 ## Tests
 
-- `ui/shared/identity/tests/IdentityAuthClient.test.ts`
-- `ui/pages/tests/TrustedDevicesPage.test.tsx`
+- `src/ui/shared/identity/tests/IdentityAuthClient.test.ts`
+- `src/ui/pages/tests/TrustedDevicesPage.test.tsx`
 - `src/infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
-- `application/identity/tests/TrustedDeviceAdministrativeAuthorization.test.ts`
+- `src/application/identity/tests/TrustedDeviceAdministrativeAuthorization.test.ts`

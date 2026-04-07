@@ -18,7 +18,7 @@ Added `dev/tests/HostCompositionArchitectureGuardrails.test.ts` to enforce host 
   - shared bootstrap pipeline and startup context composition
   - host service registration plan composition
   - host-specific service coverage assertion
-- host composition roots do not import `ui/` directly
+- host composition roots do not import `src/ui/` directly
 - host entrypoints continue defaulting required dependency ids from host runtime startup dependency declarations
 - startup dependency boundaries continue explicit `shared-contracts` + `application` + `host` coverage with consistent dependency-id prefixing
 
@@ -53,10 +53,10 @@ These tests are designed to fail when future host additions bypass the establish
 
 Use this quick rule when adding host-related logic:
 
-- `domain/`: business invariants and domain language only.
-- `application/`: use-case orchestration and host-agnostic ports/contracts.
-- `infrastructure/`: concrete adapters and host service registration catalog.
-- `ui/`: rendering/state/presenter logic only; never compose hosts here.
+- `src/domain/`: business invariants and domain language only.
+- `src/application/`: use-case orchestration and host-agnostic ports/contracts.
+- `src/infrastructure/`: concrete adapters and host service registration catalog.
+- `src/ui/`: rendering/state/presenter logic only; never compose hosts here.
 - `src/hosts/`: executable host assembly and runtime composition wiring only.
 
 When in doubt, keep business behavior in `domain`/`application` and keep `src/hosts` focused on composition, bootstrapping, and lifecycle orchestration.

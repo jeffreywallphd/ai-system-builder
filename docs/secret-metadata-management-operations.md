@@ -36,7 +36,7 @@ This runbook documents the initial administrative and user-facing secret metadat
 
 ## Verification artifacts
 
-- `ui/pages/SecretMetadataManagementPage.tsx`
-- `ui/pages/tests/SecretMetadataManagementPage.test.tsx`
-- `ui/shared/security/SecretMetadataManagementClient.ts`
-- `ui/shared/security/tests/SecretMetadataManagementClient.test.ts`
+- `src/ui/pages/SecretMetadataManagementPage.tsx`
+- `src/ui/pages/tests/SecretMetadataManagementPage.test.tsx`
+- `src/ui/shared/security/SecretMetadataManagementClient.ts`
+- `src/ui/shared/security/tests/SecretMetadataManagementClient.test.ts`

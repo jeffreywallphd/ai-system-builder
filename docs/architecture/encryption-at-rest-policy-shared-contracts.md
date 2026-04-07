@@ -59,7 +59,7 @@ Keep in shared contracts/schemas:
 - boundary-level validation and issue formatting
 - projection helpers for domain-to-contract mapping
 
-Keep in application/infrastructure (future slices):
+Keep in src/application/infrastructure (future slices):
 
 - authorization for policy mutation operations
 - persistence orchestration, optimistic concurrency, and auditing

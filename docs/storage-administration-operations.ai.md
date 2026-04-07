@@ -13,11 +13,11 @@
 
 ## Canonical files
 
-- `ui/pages/StorageAdministrationPage.tsx`
-- `ui/components/storage/StorageInstanceWorkflowPanel.tsx`
-- `ui/services/StorageAdministrationService.ts`
-- `ui/shared/storage/StorageAdministrationClient.ts`
-- `ui/web/storage/StorageAdministrationRoutes.ts`
+- `src/ui/pages/StorageAdministrationPage.tsx`
+- `src/ui/components/storage/StorageInstanceWorkflowPanel.tsx`
+- `src/ui/services/StorageAdministrationService.ts`
+- `src/ui/shared/storage/StorageAdministrationClient.ts`
+- `src/ui/web/storage/StorageAdministrationRoutes.ts`
 
 ## Behavior summary
 
@@ -72,12 +72,12 @@
 
 ## Tests
 
-- `ui/shared/storage/tests/StorageAdministrationClient.test.ts`
-- `ui/components/storage/tests/StorageInstanceWorkflowPanel.test.tsx`
-- `ui/services/tests/StorageAdministrationService.test.ts`
-- `ui/pages/tests/StorageAdministrationPage.test.tsx`
-- `ui/pages/tests/StorageAdministrationPage.presentation.test.ts`
-- `ui/web/storage/tests/StorageAdministrationRoutes.test.ts`
+- `src/ui/shared/storage/tests/StorageAdministrationClient.test.ts`
+- `src/ui/components/storage/tests/StorageInstanceWorkflowPanel.test.tsx`
+- `src/ui/services/tests/StorageAdministrationService.test.ts`
+- `src/ui/pages/tests/StorageAdministrationPage.test.tsx`
+- `src/ui/pages/tests/StorageAdministrationPage.presentation.test.ts`
+- `src/ui/web/storage/tests/StorageAdministrationRoutes.test.ts`
 - `src/infrastructure/storage/tests/StorageBackendAdapterRegistry.test.ts`
 - `src/infrastructure/storage/tests/StorageBackendProvisioningOrchestrator.test.ts`
 

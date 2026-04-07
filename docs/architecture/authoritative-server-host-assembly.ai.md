@@ -2,7 +2,7 @@
 
 ## Purpose
 - Define the production authoritative server host assembly as the executable control-plane boundary.
-- Keep host code focused on composition/startup while business logic remains in application/domain layers.
+- Keep host code focused on composition/startup while business logic remains in src/application/domain layers.
 
 ## Main implementation seams
 - Composition root: `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
@@ -41,7 +41,7 @@
 
 ## Entrypoint consumers
 - `electron/main/main.ts` now delegates desktop local control-plane startup through `startAuthoritativeServerHostAssembly(...)`.
-- `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` now delegates browser-development local control-plane startup through `startAuthoritativeServerHostAssembly(...)`.
+- `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` now delegates browser-development local control-plane startup through `startAuthoritativeServerHostAssembly(...)`.
 
 ## Tests
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`

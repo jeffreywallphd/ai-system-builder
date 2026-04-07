@@ -66,7 +66,7 @@ This note now also documents Story 6.3.1, Story 6.3.2, Story 6.3.3, Story 6.3.4,
 - `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - `src/infrastructure/security/certificates/tests/RuntimeTrustMaterialDistributionService.test.ts`
 - `src/hosts/server/IdentityServerHost.ts`
-- `hosts/server/tests/IdentityServerHost.test.ts`
+- `src/hosts/server/tests/IdentityServerHost.test.ts`
 - `src/infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
@@ -515,7 +515,7 @@ The application layer exposes explicit ports only:
   - `CertificateAuthorityPersistencePorts`
   - `CertificateAuthorityCryptoPorts`
 
-These seams let CA workflows implement bootstrapping, issuance, lookup, revocation, and rotation without importing infrastructure into domain/application code.
+These seams let CA workflows implement bootstrapping, issuance, lookup, revocation, and rotation without importing infrastructure into src/domain/application code.
 
 Story 6.2.1 and Story 6.2.2 add `IssueCertificateForSubjectUseCase` in the application layer to:
 

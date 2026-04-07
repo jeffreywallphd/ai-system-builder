@@ -15,7 +15,7 @@ This note documents the shared host bootstrap framework introduced for Story 12.
 
 `src/hosts/bootstrap/HostBootstrapPipeline.ts` now defines `HostStartupContext` with:
 
-- `boot`: validated host boot configuration from `application/common/HostCompositionContracts.ts`
+- `boot`: validated host boot configuration from `src/application/common/HostCompositionContracts.ts`
 - `deploymentProfile`: profile id, environment name, release channel, region, metadata
 - `environment`: normalized environment map for startup decisions
 - `enabledCapabilities`: host-scoped capability set for startup gating
@@ -128,7 +128,7 @@ When extending host startup:
 1. Add reusable behavior to canonical stage handlers first.
 2. Use host-specific stages only for runtime-specific wiring.
 3. Pass cross-stage results through startup-context artifacts; do not leak global mutable state.
-4. Keep domain/application business rules in inner layers; startup stages should only orchestrate composition and adapter initialization.
+4. Keep src/domain/application business rules in inner layers; startup stages should only orchestrate composition and adapter initialization.
 5. Add/adjust tests that assert stage order and customization behavior.
 
 ## Tests

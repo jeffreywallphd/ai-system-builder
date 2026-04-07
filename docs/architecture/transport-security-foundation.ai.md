@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Story 7.1.1 + 7.1.2 baseline for Feature 7 / Epic 7.1: secure transport domain/application contracts plus centralized trust-state validation for HTTPS/WSS/TLS connection acceptance decisions.
+Story 7.1.1 + 7.1.2 baseline for Feature 7 / Epic 7.1: secure transport src/domain/application contracts plus centralized trust-state validation for HTTPS/WSS/TLS connection acceptance decisions.
 
 ## Canonical files
 
@@ -222,7 +222,7 @@ User trust is not treated as node trust.
 
 Story 7.1.3 wires these transport contracts into runnable hosts through explicit composition-root config:
 
-- `infrastructure/config/HostSecureTransportConfig.ts` central host transport profile resolution (`server`, `desktop`, `hybrid`, `web`, `worker`) and secure endpoint assertions.
+- `src/infrastructure/config/HostSecureTransportConfig.ts` central host transport profile resolution (`server`, `desktop`, `hybrid`, `web`, `worker`) and secure endpoint assertions.
   - runtime env lookup is now browser-safe (`globalThis.process?.env`) so web compositions can resolve fail-closed defaults even when the Node `process` global is absent.
 - `src/hosts/server/IdentityServerHost.ts` composes:
   - `ServerManagedTransportTrustStateResolver`
@@ -230,7 +230,7 @@ Story 7.1.3 wires these transport contracts into runnable hosts through explicit
   - `HttpTransportTrustValidationAdapter`
   and injects the resulting gate into `IdentityHttpServer`.
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts` now supports optional inbound authenticated-route transport trust validation with scenario/peer mapping, including node-path specific `node-to-control-plane` mapping.
-- `electron/main/main.ts`, `ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`, `ui/web/identity/resolveWebIdentityApiBaseUrl.ts`, and `infrastructure/runtime/browser-development/BrowserDevelopmentManagedRuntime.ts` now consume shared host transport config for endpoint safety checks.
+- `electron/main/main.ts`, `src/ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`, `src/ui/web/identity/resolveWebIdentityApiBaseUrl.ts`, and `src/infrastructure/runtime/browser-development/BrowserDevelopmentManagedRuntime.ts` now consume shared host transport config for endpoint safety checks.
 
 Fail-closed additions:
 
@@ -348,7 +348,7 @@ Story 7.2.3 adds desktop-side transport bootstrap behavior so desktop client cha
 
 ### Runtime additions
 
-- `electron/shared/DesktopContracts.ts`
+- `electron/src/shared/DesktopContracts.ts`
   - desktop bootstrap context now includes `identityTransportTrust` with:
     - trust enforcement posture (`required` / `optional`);
     - trusted-device registration binding metadata;

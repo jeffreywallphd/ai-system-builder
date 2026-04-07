@@ -80,7 +80,7 @@ Transport payloads carry logical IDs and storage references only; infrastructure
 
 - Renderer-visible desktop model file operations now accept logical model paths relative to managed model roots, not raw absolute filesystem paths.
 - Electron main process resolves those logical paths through an internal-only policy module (`electron/main/ModelFilePathPolicy.ts`) and rejects absolute/traversal/out-of-root inputs.
-- Infrastructure adapters (`DesktopBridgeFileStorage`) quarantine absolute path handling behind internal translation logic so application/model services can keep existing abstractions without exposing raw path contracts at UI/IPC boundaries.
+- Infrastructure adapters (`DesktopBridgeFileStorage`) quarantine absolute path handling behind internal translation logic so src/application/model services can keep existing abstractions without exposing raw path contracts at UI/IPC boundaries.
 
 ## Story 10.2.1 upload initiation implementation
 
@@ -162,7 +162,7 @@ Operational behavior in this story:
 
 - listing requires active workspace membership.
 - private assets are filtered to owner (or workspace admin) and do not leak into other users' listing responses.
-- workspace/shared/published visibility stays workspace-scoped for authorized members.
+- workspace/src/shared/published visibility stays workspace-scoped for authorized members.
 - query filters now support:
   - `scope` (`private` | `workspace` | `all`),
   - `ownerUserId`,
@@ -385,15 +385,15 @@ Canonical additions:
 
 - `src/shared/contracts/assets/AssetWorkflowClientContracts.ts`
 - `src/shared/contracts/assets/tests/AssetWorkflowClientContracts.test.ts`
-- `ui/shared/assets/AssetWorkflowClient.ts`
-- `ui/shared/assets/tests/AssetWorkflowClient.test.ts`
-- `ui/services/AssetWorkflowService.ts`
-- `ui/services/tests/AssetWorkflowService.test.ts`
+- `src/ui/shared/assets/AssetWorkflowClient.ts`
+- `src/ui/shared/assets/tests/AssetWorkflowClient.test.ts`
+- `src/ui/services/AssetWorkflowService.ts`
+- `src/ui/services/tests/AssetWorkflowService.test.ts`
 
 Representative UI-facing integration:
 
-- `/assets` now resolves to `AssetsPage` in `ui/routes/AppRouter.tsx`.
-- `ui/pages/AssetsPage.tsx` now executes protected logical asset workflows through shared client/service seams:
+- `/assets` now resolves to `AssetsPage` in `src/ui/routes/AppRouter.tsx`.
+- `src/ui/pages/AssetsPage.tsx` now executes protected logical asset workflows through shared client/service seams:
   - list assets (workspace-scoped)
   - load asset detail
   - resolve preview
@@ -427,7 +427,7 @@ Implemented safeguards:
 
 Developer rules to preserve:
 
-- Keep raw filesystem paths infrastructure-only; never add path-based shortcuts to application/shared/UI/API contracts.
+- Keep raw filesystem paths infrastructure-only; never add path-based shortcuts to src/application, src/shared, UI, and API contracts.
 - Resolve storage through authoritative logical-access + adapter seams, not direct filesystem utilities.
 - Keep preview/download protected:
   - preview APIs return logical metadata,

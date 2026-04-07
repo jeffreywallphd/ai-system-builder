@@ -57,15 +57,15 @@ Primary domain operations:
 
 ### Application contracts and ports
 
-- Shared contracts: `application/contracts/IdentityApplicationContracts.ts`
-- Repository port: `application/identity/ports/ITrustedDeviceRepository.ts`
-- Service port: `application/identity/ports/ITrustedDeviceManagementService.ts`
-- Pairing repository port: `application/identity/ports/ITrustedDevicePairingRepository.ts`
-- Pairing service port: `application/identity/ports/ITrustedDevicePairingService.ts`
+- Shared contracts: `src/application/contracts/IdentityApplicationContracts.ts`
+- Repository port: `src/application/identity/ports/ITrustedDeviceRepository.ts`
+- Service port: `src/application/identity/ports/ITrustedDeviceManagementService.ts`
+- Pairing repository port: `src/application/identity/ports/ITrustedDevicePairingRepository.ts`
+- Pairing service port: `src/application/identity/ports/ITrustedDevicePairingService.ts`
 - Application implementations:
-  - `application/identity/services/TrustedDeviceManagementService.ts`
-  - `application/identity/services/TrustedDevicePairingService.ts`
-  - `application/identity/services/TrustedDeviceServiceMappers.ts`
+  - `src/application/identity/services/TrustedDeviceManagementService.ts`
+  - `src/application/identity/services/TrustedDevicePairingService.ts`
+  - `src/application/identity/services/TrustedDeviceServiceMappers.ts`
   - `src/application/identity/use-cases/CompleteTrustedDevicePairingUseCase.ts`
 
 Trusted-device contract coverage now includes:
@@ -153,7 +153,7 @@ This aligns with the session trust model (`deviceTrust` context with trusted dev
 - Domain remains framework/storage agnostic.
 - Application layer declares ports and shared contracts only.
 - Infrastructure now provides SQLite-backed adapters for trusted-device and pairing repository ports.
-- No persistence-specific concerns leak into domain/application trusted-device artifacts.
+- No persistence-specific concerns leak into src/domain/application trusted-device artifacts.
 
 ## Persistence and migrations (Story 2.1.3)
 
@@ -162,7 +162,7 @@ Primary persistence artifacts:
 - `src/infrastructure/persistence/identity/TrustedDevicePersistenceMapper.ts`
 - `src/infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter.ts`
 - `src/infrastructure/persistence/identity/TrustedDevicePersistenceMapper.ts`
-- `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts` (schema version 6, with session trust context columns)
+- `src/infrastructure/filesystem/identity/SqliteIdentityMigrations.ts` (schema version 6, with session trust context columns)
 - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceMigrations.ts` (schema version 6, with session trust context columns)
 
 New SQLite tables:
@@ -182,16 +182,16 @@ Persistence guarantees now covered:
   - `src/domain/identity/tests/TrustedDeviceDomain.test.ts`
   - `src/domain/identity/tests/TrustedDevicePairingDomain.test.ts`
 - Application contract and port compile/lifecycle coverage:
-  - `application/contracts/tests/IdentityApplicationContracts.test.ts`
-  - `application/identity/tests/IdentityPortsContracts.test.ts`
+  - `src/application/contracts/tests/IdentityApplicationContracts.test.ts`
+  - `src/application/identity/tests/IdentityPortsContracts.test.ts`
 - Persistence mapper and adapter coverage:
   - `src/infrastructure/persistence/identity/tests/TrustedDevicePersistenceMapper.test.ts`
   - `src/infrastructure/persistence/identity/tests/SqliteTrustedDevicePersistenceAdapter.test.ts`
   - `src/infrastructure/persistence/identity/tests/SqliteTrustedDevicePersistenceAdapter.test.ts`
 - Application/service and completion integration coverage (Story 2.2.2):
-  - `application/identity/tests/TrustedDevicePairingService.test.ts`
-  - `application/identity/tests/CompleteTrustedDevicePairingUseCase.test.ts`
-  - `infrastructure/filesystem/identity/tests/TrustedDevicePairingCompletionIntegration.test.ts`
+  - `src/application/identity/tests/TrustedDevicePairingService.test.ts`
+  - `src/application/identity/tests/CompleteTrustedDevicePairingUseCase.test.ts`
+  - `src/infrastructure/filesystem/identity/tests/TrustedDevicePairingCompletionIntegration.test.ts`
 
 ## Audit coverage update (Story 2.3.4)
 

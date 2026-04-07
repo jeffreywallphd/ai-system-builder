@@ -7,19 +7,19 @@ Provide the implementation-aligned baseline for session lifecycle, issuance, val
 ## Core files
 
 - `src/domain/identity/IdentityDomain.ts`
-- `application/identity/services/IdentitySessionLifecycleService.ts`
-- `application/identity/services/IdentityAuthenticatedSessionService.ts`
+- `src/application/identity/services/IdentitySessionLifecycleService.ts`
+- `src/application/identity/services/IdentityAuthenticatedSessionService.ts`
 - `src/application/identity/use-cases/LogoutIdentitySessionUseCase.ts`
 - `src/application/identity/use-cases/RevokeIdentitySessionUseCase.ts`
-- `infrastructure/config/IdentitySessionPolicyConfig.ts`
-- `infrastructure/security/identity/OpaqueIdentitySessionTokenService.ts`
-- `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
+- `src/infrastructure/config/IdentitySessionPolicyConfig.ts`
+- `src/infrastructure/security/identity/OpaqueIdentitySessionTokenService.ts`
+- `src/infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
 - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
 - `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/hosts/server/IdentityServerHost.ts`
-- `ui/shared/identity/IdentityAuthSessionCoordinator.ts`
-- `ui/shared/identity/IdentityAuthSessionStore.ts`
+- `src/ui/shared/identity/IdentityAuthSessionCoordinator.ts`
+- `src/ui/shared/identity/IdentityAuthSessionStore.ts`
 
 ## Session subsystem boundaries
 
@@ -110,14 +110,14 @@ Validation rules:
 
 ## Primary tests
 
-- `application/identity/tests/IdentitySessionLifecycleService.test.ts`
-- `application/identity/tests/IdentityAuthenticatedSessionService.test.ts`
-- `application/identity/tests/LogoutIdentitySessionUseCase.test.ts`
-- `application/identity/tests/RevokeIdentitySessionUseCase.test.ts`
-- `infrastructure/config/tests/IdentitySessionPolicyConfig.test.ts`
-- `infrastructure/config/tests/IdentitySessionTrustPolicyConfig.test.ts`
-- `infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`
+- `src/application/identity/tests/IdentitySessionLifecycleService.test.ts`
+- `src/application/identity/tests/IdentityAuthenticatedSessionService.test.ts`
+- `src/application/identity/tests/LogoutIdentitySessionUseCase.test.ts`
+- `src/application/identity/tests/RevokeIdentitySessionUseCase.test.ts`
+- `src/infrastructure/config/tests/IdentitySessionPolicyConfig.test.ts`
+- `src/infrastructure/config/tests/IdentitySessionTrustPolicyConfig.test.ts`
+- `src/infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`
 - `src/infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
-- `application/identity/tests/TrustedDeviceSessionTrustService.test.ts`
+- `src/application/identity/tests/TrustedDeviceSessionTrustService.test.ts`
 

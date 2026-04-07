@@ -32,7 +32,7 @@ This keeps the default `npm run dev` workflow stable on Windows hosts where pare
 
 ### Server integration harness startup now runs through host assembly entrypoint
 
-`hosts/server/tests/IdentityServerHost.test.ts` now starts runtime hosts via a dedicated helper that composes startup through `startAuthoritativeServerHostAssembly(...)`.
+`src/hosts/server/tests/IdentityServerHost.test.ts` now starts runtime hosts via a dedicated helper that composes startup through `startAuthoritativeServerHostAssembly(...)`.
 
 The helper preserves existing test ergonomics (`address`, `secretService`, and `close`) while routing startup and shutdown through host lifecycle coordination. This keeps the test harness aligned with production host composition without rewriting integration assertions.
 

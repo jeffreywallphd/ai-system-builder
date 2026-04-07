@@ -36,14 +36,14 @@ Responsibilities:
 
 ### Application
 
-- `application/identity/services/IdentitySessionLifecycleService.ts`
-- `application/identity/services/IdentityAuthenticatedSessionService.ts`
+- `src/application/identity/services/IdentitySessionLifecycleService.ts`
+- `src/application/identity/services/IdentityAuthenticatedSessionService.ts`
 - `src/application/identity/use-cases/LogoutIdentitySessionUseCase.ts`
 - `src/application/identity/use-cases/RevokeIdentitySessionUseCase.ts`
-- `application/identity/ports/IIdentitySessionRepository.ts`
-- `application/identity/ports/IIdentitySessionTokenMaterialRepository.ts`
-- `application/identity/ports/IIdentitySessionTokenService.ts`
-- `application/identity/ports/IIdentitySessionTrustEvaluator.ts`
+- `src/application/identity/ports/IIdentitySessionRepository.ts`
+- `src/application/identity/ports/IIdentitySessionTokenMaterialRepository.ts`
+- `src/application/identity/ports/IIdentitySessionTokenService.ts`
+- `src/application/identity/ports/IIdentitySessionTrustEvaluator.ts`
 
 Responsibilities:
 
@@ -55,10 +55,10 @@ Responsibilities:
 
 ### Infrastructure and host
 
-- `infrastructure/security/identity/OpaqueIdentitySessionTokenService.ts`
-- `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
+- `src/infrastructure/security/identity/OpaqueIdentitySessionTokenService.ts`
+- `src/infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
 - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
-- `infrastructure/config/IdentitySessionPolicyConfig.ts`
+- `src/infrastructure/config/IdentitySessionPolicyConfig.ts`
 - `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/hosts/server/IdentityServerHost.ts`
@@ -73,12 +73,12 @@ Responsibilities:
 
 ### UI/runtime integration
 
-- `ui/shared/identity/IdentityAuthClient.ts`
-- `ui/services/IdentityAuthService.ts`
-- `ui/shared/identity/IdentityAuthEnvironment.ts`
-- `ui/shared/identity/IdentityAuthSessionStore.ts`
-- `ui/shared/identity/IdentityAuthSessionCoordinator.ts`
-- `ui/App.tsx`
+- `src/ui/shared/identity/IdentityAuthClient.ts`
+- `src/ui/services/IdentityAuthService.ts`
+- `src/ui/shared/identity/IdentityAuthEnvironment.ts`
+- `src/ui/shared/identity/IdentityAuthSessionStore.ts`
+- `src/ui/shared/identity/IdentityAuthSessionCoordinator.ts`
+- `src/ui/App.tsx`
 
 Responsibilities:
 
@@ -177,7 +177,7 @@ Operational expectation:
 
 Environment-backed policy source:
 
-- `infrastructure/config/IdentitySessionPolicyConfig.ts`
+- `src/infrastructure/config/IdentitySessionPolicyConfig.ts`
 
 Variables:
 
@@ -311,15 +311,15 @@ IdentityHttpServer --> Client: 200 revoked metadata
 
 Primary tests for this subsystem:
 
-- `application/identity/tests/IdentitySessionLifecycleService.test.ts`
-- `application/identity/tests/IdentityAuthenticatedSessionService.test.ts`
-- `application/identity/tests/LogoutIdentitySessionUseCase.test.ts`
-- `application/identity/tests/RevokeIdentitySessionUseCase.test.ts`
-- `infrastructure/config/tests/IdentitySessionPolicyConfig.test.ts`
-- `infrastructure/config/tests/IdentitySessionTrustPolicyConfig.test.ts`
-- `infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`
+- `src/application/identity/tests/IdentitySessionLifecycleService.test.ts`
+- `src/application/identity/tests/IdentityAuthenticatedSessionService.test.ts`
+- `src/application/identity/tests/LogoutIdentitySessionUseCase.test.ts`
+- `src/application/identity/tests/RevokeIdentitySessionUseCase.test.ts`
+- `src/infrastructure/config/tests/IdentitySessionPolicyConfig.test.ts`
+- `src/infrastructure/config/tests/IdentitySessionTrustPolicyConfig.test.ts`
+- `src/infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`
 - `src/infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
-- `application/identity/tests/TrustedDeviceSessionTrustService.test.ts`
+- `src/application/identity/tests/TrustedDeviceSessionTrustService.test.ts`
 - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
 

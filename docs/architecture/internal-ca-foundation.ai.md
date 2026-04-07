@@ -5,7 +5,7 @@
 - Defines a production-grade internal CA domain contract set in `src/domain/security/CertificateAuthorityDomain.ts`.
 - Defines application ports for CA root persistence, certificate persistence, trust-material persistence, issuer crypto seams, and trust-bundle distribution seams.
 - Adds shared DTO/schema contracts for CA and certificate records.
-- Adds focused domain/port/DTO/schema tests for the new contract surface.
+- Adds focused src/domain/port/DTO/schema tests for the new contract surface.
 - Adds secure CA startup bootstrap validation seams (Story 6.1.3) for authoritative-host startup.
 - Adds protected secret storage/loading seams for CA root and signing assets (Story 6.1.4).
 - Adds first-time CA initialization orchestration with guarded idempotency and host invocation seam (Story 6.1.5).
@@ -76,7 +76,7 @@
 - `src/application/nodes/tests/ResolveApprovedNodeRuntimeTrustMaterialUseCase.test.ts`
 - `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
 - `src/infrastructure/security/certificates/tests/RuntimeTrustMaterialDistributionService.test.ts`
-- `hosts/server/tests/IdentityServerHost.test.ts`
+- `src/hosts/server/tests/IdentityServerHost.test.ts`
 - `src/infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 - `src/shared/dto/security/CertificateAuthorityDtos.ts`
@@ -398,7 +398,7 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - Port contract assumptions: `src/application/security/tests/CertificateAuthorityPortsContracts.test.ts`
 - Bootstrap startup state coverage: `src/application/security/tests/ResolveCertificateAuthorityStartupStateUseCase.test.ts`
 - Environment adapter coverage: `src/infrastructure/security/tests/InternalCertificateAuthorityBootstrapEnvironmentAdapter.test.ts`
-- Host fail-closed startup coverage (including managed TLS runtime trust startup outcomes): `hosts/server/tests/IdentityServerHost.test.ts`
+- Host fail-closed startup coverage (including managed TLS runtime trust startup outcomes): `src/hosts/server/tests/IdentityServerHost.test.ts`
 - DTO helper coverage: `src/shared/dto/security/tests/CertificateAuthorityDtos.test.ts`
 - schema parse/validation behavior: `src/shared/schemas/security/tests/CertificateAuthoritySchemaContracts.test.ts`
 - protected-secret store coverage: `src/infrastructure/security/secrets/tests/FileSystemProtectedSecretStore.test.ts`
@@ -415,7 +415,7 @@ Structured diagnostics emitted by the startup use case are designed for future o
 - renewal/replacement success + failure coverage: `src/application/security/tests/RenewIssuedCertificateUseCase.test.ts`
 - approved-node runtime trust retrieval trust-gating coverage: `src/application/nodes/tests/ResolveApprovedNodeRuntimeTrustMaterialUseCase.test.ts`
 - concrete issuer signing pipeline coverage: `src/infrastructure/security/ca/tests/InternalCertificateAuthorityIssuer.test.ts`
-- host initialization seam coverage: `hosts/server/tests/IdentityServerHost.test.ts`
+- host initialization seam coverage: `src/hosts/server/tests/IdentityServerHost.test.ts`
 - node backend + HTTP transport retrieval coverage: `src/infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts` and `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 
 ## Follow-on note

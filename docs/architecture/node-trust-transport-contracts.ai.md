@@ -154,7 +154,7 @@ Quick baseline for Story 5.1.5 shared node trust transport DTOs and schema valid
 
 ## Story 7.3.3 additions (node-peer seam, default deny)
 
-No public node-peer HTTP API is added in this slice. The story introduces an explicit application/infrastructure seam that future node-peer transport handlers must consume:
+No public node-peer HTTP API is added in this slice. The story introduces an explicit src/application/infrastructure seam that future node-peer transport handlers must consume:
 
 - `src/application/security/ports/NodePeerCommunicationPolicyPorts.ts`
 - `src/application/security/use-cases/AuthorizeNodePeerCommunicationUseCase.ts`
@@ -192,9 +192,9 @@ Behavior highlights:
   - `src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
   - `src/infrastructure/api/nodes/NodeTrustBackendApi.ts`
 - Renderer wiring expanded:
-  - `ui/shared/nodes/NodeInventoryClient.ts`
-  - `ui/services/NodeInventoryService.ts`
-  - `ui/pages/NodeInventoryPage.tsx`
+  - `src/ui/shared/nodes/NodeInventoryClient.ts`
+  - `src/ui/services/NodeInventoryService.ts`
+  - `src/ui/pages/NodeInventoryPage.tsx`
 - Admin inventory detail now provides production revoke flow with:
   - revocation reason + optional note,
   - explicit node-id confirmation safeguard,

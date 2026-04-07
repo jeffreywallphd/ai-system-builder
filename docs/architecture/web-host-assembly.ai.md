@@ -2,7 +2,7 @@
 
 ## Purpose
 - Define the production web host assembly as an explicit executable boundary for thin-client delivery.
-- Keep browser runtime startup orchestration in host composition while application/domain logic stays in inner layers.
+- Keep browser runtime startup orchestration in host composition while src/application/domain logic stays in inner layers.
 
 ## Main implementation seams
 - Composition root: `src/hosts/web/WebHostCompositionRoot.ts`

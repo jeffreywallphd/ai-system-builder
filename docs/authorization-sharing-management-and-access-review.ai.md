@@ -39,6 +39,6 @@ Concise operations handoff for Feature 4 / Epic 4.4 sharing management, access i
 
 - `src/infrastructure/api/authorization/AuthorizationManagementBackendApi.ts`
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `ui/components/authorization/AuthorizationSharingManagementPanel.tsx`
-- `ui/pages/AuthorizationReportingPage.tsx`
+- `src/ui/components/authorization/AuthorizationSharingManagementPanel.tsx`
+- `src/ui/pages/AuthorizationReportingPage.tsx`
 - `docs/architecture/authorization-feature-4-final-baseline.md`

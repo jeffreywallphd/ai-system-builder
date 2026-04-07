@@ -48,21 +48,21 @@ Implemented capability areas:
 
 - `src/infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter.ts`
 - `src/infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter.ts`
-- `infrastructure/transport/authorization/AuthorizationTransportPolicyGuard.ts`
-- `infrastructure/transport/authorization/AuthorizationTransportAdapters.ts`
+- `src/infrastructure/transport/authorization/AuthorizationTransportPolicyGuard.ts`
+- `src/infrastructure/transport/authorization/AuthorizationTransportAdapters.ts`
 - `src/infrastructure/api/authorization/AuthorizationManagementBackendApi.ts`
 - `src/infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract.ts`
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 
 ### Desktop and thin-client management surfaces
 
-- `ui/components/authorization/AuthorizationSharingManagementPanel.tsx`
-- `ui/pages/AuthorizationSharingManagementPage.tsx`
-- `ui/pages/AuthorizationSharingThinClientPage.tsx`
-- `ui/pages/AuthorizationReportingPage.tsx`
-- `ui/shared/authorization/AuthorizationManagementClient.ts`
-- `ui/services/AuthorizationManagementService.ts`
-- `ui/web/authorization/AuthorizationSharingRoutes.ts`
+- `src/ui/components/authorization/AuthorizationSharingManagementPanel.tsx`
+- `src/ui/pages/AuthorizationSharingManagementPage.tsx`
+- `src/ui/pages/AuthorizationSharingThinClientPage.tsx`
+- `src/ui/pages/AuthorizationReportingPage.tsx`
+- `src/ui/shared/authorization/AuthorizationManagementClient.ts`
+- `src/ui/services/AuthorizationManagementService.ts`
+- `src/ui/web/authorization/AuthorizationSharingRoutes.ts`
 
 ## Authoritative policy model
 
@@ -177,14 +177,14 @@ Core test suites validating Feature 4 contracts and integration:
 - `src/application/authorization/tests/EffectivePermissionResolutionService.test.ts`
 - `src/application/authorization/tests/AuthorizationPolicyDecisionEvaluator.test.ts`
 - `src/application/authorization/tests/AuthorizationAdministrationUseCases.test.ts`
-- `infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
+- `src/infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
 - `src/infrastructure/api/authorization/tests/AuthorizationManagementBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthorizationManagement.test.ts`
-- `ui/shared/authorization/tests/AuthorizationManagementClient.test.ts`
-- `ui/web/authorization/tests/AuthorizationSharingRoutes.test.ts`
-- `ui/pages/tests/AuthorizationSharingManagementPage.test.tsx`
-- `ui/pages/tests/AuthorizationSharingThinClientPage.test.tsx`
-- `ui/pages/tests/AuthorizationReportingPage.test.tsx`
+- `src/ui/shared/authorization/tests/AuthorizationManagementClient.test.ts`
+- `src/ui/web/authorization/tests/AuthorizationSharingRoutes.test.ts`
+- `src/ui/pages/tests/AuthorizationSharingManagementPage.test.tsx`
+- `src/ui/pages/tests/AuthorizationSharingThinClientPage.test.tsx`
+- `src/ui/pages/tests/AuthorizationReportingPage.test.tsx`
 
 ## Related docs
 

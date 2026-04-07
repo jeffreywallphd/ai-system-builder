@@ -7,7 +7,7 @@ This note records the runtime-entrypoint migration completed for Story 12.4.1 so
 - `electron/main/main.ts`
   - Before: started the local identity/control-plane server directly with `startIdentityServerHost(...)`.
   - After: starts the control-plane runtime through `startAuthoritativeServerHostAssembly(...)`.
-- `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts`
+- `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts`
   - Before: started the browser-development identity server directly with `startIdentityServerHost(...)`.
   - After: starts the server through `startAuthoritativeServerHostAssembly(...)`.
 

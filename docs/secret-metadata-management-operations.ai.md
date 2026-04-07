@@ -24,8 +24,8 @@
 
 ## Key artifacts
 
-- `ui/pages/SecretMetadataManagementPage.tsx`
-- `ui/services/SecretMetadataManagementService.ts`
-- `ui/shared/security/SecretMetadataManagementClient.ts`
-- `ui/shared/security/tests/SecretMetadataManagementClient.test.ts`
-- `ui/pages/tests/SecretMetadataManagementPage.test.tsx`
+- `src/ui/pages/SecretMetadataManagementPage.tsx`
+- `src/ui/services/SecretMetadataManagementService.ts`
+- `src/ui/shared/security/SecretMetadataManagementClient.ts`
+- `src/ui/shared/security/tests/SecretMetadataManagementClient.test.ts`
+- `src/ui/pages/tests/SecretMetadataManagementPage.test.tsx`
