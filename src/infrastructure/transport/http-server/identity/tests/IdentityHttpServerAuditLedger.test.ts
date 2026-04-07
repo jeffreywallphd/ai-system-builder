@@ -313,6 +313,18 @@ describe("IdentityHttpServer audit ledger routes", () => {
     expect(memberListBody.data.events).toHaveLength(1);
     expect(memberListBody.data.events[0].category).toBe("administrative");
 
+    const governanceList = await fetch(
+      `${baseUrl}/api/v1/audit/governance/events?workspaceId=workspace-alpha`,
+      {
+        headers: { authorization: `Bearer ${member.sessionToken}` },
+      },
+    );
+    expect(governanceList.status).toBe(200);
+    const governanceListBody = await governanceList.json();
+    expect(governanceListBody.ok).toBe(true);
+    expect(governanceListBody.data.events).toHaveLength(1);
+    expect(governanceListBody.data.facets.some((facet: { key: string }) => facet.key === "eventType")).toBeTrue();
+
     const adminDetail = await fetch(
       `${baseUrl}/api/v1/audit/events/audit%3Aevent%3Aprotected?workspaceId=workspace-alpha`,
       {
@@ -335,6 +347,25 @@ describe("IdentityHttpServer audit ledger routes", () => {
     const memberProtectedDetailBody = await memberProtectedDetail.json();
     expect(memberProtectedDetailBody.ok).toBe(false);
     expect(memberProtectedDetailBody.error.code).toBe("not-found");
+
+    const governanceAdminDetail = await fetch(
+      `${baseUrl}/api/v1/audit/governance/events/audit%3Aevent%3Aprotected?workspaceId=workspace-alpha`,
+      {
+        headers: { authorization: `Bearer ${admin.sessionToken}` },
+      },
+    );
+    expect(governanceAdminDetail.status).toBe(200);
+    const governanceAdminDetailBody = await governanceAdminDetail.json();
+    expect(governanceAdminDetailBody.ok).toBe(true);
+    expect(governanceAdminDetailBody.data.event.visibility).toBe("admin");
+
+    const governanceMemberDetail = await fetch(
+      `${baseUrl}/api/v1/audit/governance/events/audit%3Aevent%3Aprotected?workspaceId=workspace-alpha`,
+      {
+        headers: { authorization: `Bearer ${member.sessionToken}` },
+      },
+    );
+    expect(governanceMemberDetail.status).toBe(404);
   });
 
   it("maps permission denial and invalid query semantics to canonical status codes", async () => {

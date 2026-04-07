@@ -33,16 +33,15 @@ Route: `src/ui/routes/RouteConfig.ts` -> `ROUTE_PATHS.governanceReviewThin` (`/s
 
 ## Event coverage
 
-The governance review surface aggregates prioritized governance and security events from existing services:
+The governance review surface consumes authoritative audit-ledger projections (not UI-side event synthesis), including:
 
-- login/session lifecycle events
-- trusted-device revocation events
-- node approval events
+- identity/session lifecycle events
+- trusted-device governance events
+- node trust/approval events
 - permission/share mutation events
-- storage metadata/policy/lifecycle governance events
-- protected asset download access events
-- secret access-decision and secret-operation governance events
-- runtime run governance events
+- storage policy/lifecycle governance events
+- protected-data and secret governance events
+- runtime orchestration and scheduling governance events
 
 ## Shared review behavior
 
@@ -52,16 +51,29 @@ The governance review surface aggregates prioritized governance and security eve
   - `src/ui/shared/admin/GovernanceAuditReviewPanels.tsx`
 - Shared redaction utility:
   - `src/ui/shared/admin/GovernanceAuditRedaction.ts`
-- Aggregation service:
+- UI service and client:
   - `src/ui/services/GovernanceAuditReviewService.ts`
+- Application projection/query seam:
+  - `src/application/audit/use-cases/AuditGovernanceProjectionQueryService.ts`
 - Authoritative audit API seam for converged admin/governance surfaces:
   - `GET /api/v1/audit/events`
   - `GET /api/v1/audit/events/:eventId`
+  - `GET /api/v1/audit/governance/events`
+  - `GET /api/v1/audit/governance/events/:eventId`
   - backend entrypoint: `src/infrastructure/api/audit/AuditLedgerBackendApi.ts`
 
 Filtering and pagination align to shared list query conventions (`workspaceId`, `search`, `limit`, `offset`, `sortBy`, `sortDirection`) with event/outcome filters layered on top.
 Linkage-aware filters are supported at the API contract level (`correlationId`, `requestId`, `eventGroupId`, `rootEventId`, `parentEventId`, `workflowId`, `sessionRef`, `runId`, `governanceActionId`) to follow multi-step governance workflows.
 Retention/lifecycle selectors are also available for governance review workflows (`retentionPosture`, `lifecycleState`, `retentionPolicyKey`, `retainUntilAfter`, `retainUntilBefore`) so future archival policy rollouts can reuse the same retrieval path.
+Purpose-built projection responses also provide queryable facet metadata (`eventType`, `outcome`, `category`) plus safe explanatory notes for role-sensitive detail behavior.
+
+## Example usage notes
+
+- List governance projection events with filter facets:
+  - `GET /api/v1/audit/governance/events?workspaceId=<workspace>&limit=25&offset=0&sortBy=occurredAt&sortDirection=desc&eventType=<event-type>&outcome=<outcome>&includeThinSafeOnly=true`
+- Fetch a role-sensitive governance projection detail:
+  - `GET /api/v1/audit/governance/events/<eventId>?workspaceId=<workspace>`
+- Canonical query semantics remain shared with the base audit list API, so linkage and retention selectors can be passed through the same query contract keys.
 
 ## Redaction posture
 

@@ -17,6 +17,7 @@ For canonical audit taxonomy/capture extension guidance, also reference:
 - `src/ui/shared/admin/GovernanceAuditReviewModel.ts`
 - `src/ui/shared/admin/GovernanceAuditReviewPanels.tsx`
 - `src/ui/shared/admin/GovernanceAuditRedaction.ts`
+- `src/application/audit/use-cases/AuditGovernanceProjectionQueryService.ts`
 - `src/ui/routes/RouteConfig.ts`
 - `src/ui/routes/SurfaceRouteMetadataCatalog.ts`
 - `src/ui/routes/AppRouter.tsx`
@@ -32,7 +33,9 @@ For canonical audit taxonomy/capture extension guidance, also reference:
 - Thin route is compact and filtered to thin-safe event classes
 - Event detail always displays redacted payload values
 - Coverage includes identity/trust events, authorization mutation events, storage configuration events, protected asset access events, and secret governance events
-- Authoritative retrieval seam for converged admin/governance consumers is `/api/v1/audit/events*` (list + detail).
+- Authoritative retrieval seams for converged admin/governance consumers are:
+  - `/api/v1/audit/events*` (canonical list + detail)
+  - `/api/v1/audit/governance/events*` (purpose-built governance projection list + detail)
 
 ## Access control contract
 
@@ -56,9 +59,21 @@ For canonical audit taxonomy/capture extension guidance, also reference:
   - `eventTypes[]`
   - `outcomes[]`
   - `includeThinSafeOnly`
+- Governance projection list responses also include filter facets:
+  - `eventType`
+  - `outcome`
+  - `category`
 - Linkage selectors are also supported by the audit API contract (`correlationId`, `requestId`, `eventGroupId`, `rootEventId`, `parentEventId`, `workflowId`, `sessionRef`, `runId`, `governanceActionId`).
 - Retention/lifecycle selectors are supported for policy-ready review paths (`retentionPosture`, `lifecycleState`, `retentionPolicyKey`, `retainUntilAfter`, `retainUntilBefore`).
 - Query normalization enforces bounded pagination/search and supported sorting fields.
+
+## Example usage reminders
+
+- Projection list:
+  - `GET /api/v1/audit/governance/events?workspaceId=<workspace>&limit=25&offset=0&sortBy=occurredAt&sortDirection=desc&eventType=<event-type>&outcome=<outcome>&includeThinSafeOnly=true`
+- Projection detail:
+  - `GET /api/v1/audit/governance/events/<eventId>?workspaceId=<workspace>`
+- Linkage and retention selectors remain available via the same canonical audit query contract keys.
 
 ## Redaction contract
 

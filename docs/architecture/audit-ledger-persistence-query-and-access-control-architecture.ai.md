@@ -19,6 +19,8 @@ Canonical human doc: `docs/architecture/audit-ledger-persistence-query-and-acces
 - Query and authorization:
   - `src/application/audit/use-cases/AuditLedgerQueryService.ts`
   - `src/application/audit/use-cases/WorkspaceAuditLedgerReadAuthorizer.ts`
+- Governance/admin projection shaping:
+  - `src/application/audit/use-cases/AuditGovernanceProjectionQueryService.ts`
 - Authoritative retrieval APIs:
   - `src/infrastructure/api/audit/AuditLedgerBackendApi.ts`
   - `src/infrastructure/transport/http-server/authoritative-route-families/AuditAuthoritativeApiRoutes.ts`
@@ -34,6 +36,7 @@ Canonical human doc: `docs/architecture/audit-ledger-persistence-query-and-acces
 - Keep `operationKey` replay/idempotency behavior intact.
 - Preserve immutable-enough safeguards: no `UPDATE`/`DELETE`, hash-chain continuity enforcement.
 - Keep read authorization and scope intersection in `AuditLedgerQueryService` + `WorkspaceAuditLedgerReadAuthorizer`.
+- Keep governance/admin projection shaping in `AuditGovernanceProjectionQueryService` (application boundary), not UI pages/services.
 - Keep non-admin detail responses `user-safe`; only admin scope may receive `adminOnlyDetails`.
 - Keep linkage/correlation and retention/lifecycle filters in query contract/repository mapping.
 - Retention remains `metadata-only`; destructive actions stay disabled.

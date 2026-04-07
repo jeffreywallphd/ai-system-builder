@@ -29,6 +29,7 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
    - `src/application/audit/ports/AuditLedgerPersistencePorts.ts`
 4. Add/update audit query retrieval service and authorization scoping:
    - `src/application/audit/use-cases/AuditLedgerQueryService.ts`
+   - `src/application/audit/use-cases/AuditGovernanceProjectionQueryService.ts`
    - `src/application/audit/use-cases/WorkspaceAuditLedgerReadAuthorizer.ts`
 5. Add/update durable ledger persistence implementation:
    - `src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts`
@@ -63,7 +64,7 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
 
 ## Audit ledger query/access extension guardrails
 
-- Keep list/detail retrieval routed through `AuditLedgerQueryService`; do not re-implement authorization intersections in transport/UI layers.
+- Keep canonical list/detail retrieval routed through `AuditLedgerQueryService`, and governance/admin UI shaping routed through `AuditGovernanceProjectionQueryService`; do not re-implement authorization intersections or projection logic in transport/UI layers.
 - Keep workspace/role-derived scope decisions in `WorkspaceAuditLedgerReadAuthorizer`.
 - Keep detail visibility projection delegated to shared DTO contracts (`toAuditEventDetailView(...)`) so admin-only payloads are not leaked.
 - Keep retention/lifecycle behavior metadata-only until a dedicated retention workflow story introduces destructive policy operations.

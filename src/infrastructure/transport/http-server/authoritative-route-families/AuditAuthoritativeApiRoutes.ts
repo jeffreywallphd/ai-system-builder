@@ -7,7 +7,7 @@ import {
 export const AuditLedgerAuthoritativeApiRouteFamily = Object.freeze({
   routeFamilyId: "audit-ledger",
   domain: AuthoritativeApiRouteDomains.audit,
-  description: "Authoritative governance and administrative audit ledger query/detail endpoints.",
+  description: "Authoritative audit ledger query/detail and governance projection endpoints.",
   routePrefixes: Object.freeze([
     "/api/v1/audit",
   ]),

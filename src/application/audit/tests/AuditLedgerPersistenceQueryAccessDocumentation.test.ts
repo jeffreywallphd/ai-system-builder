@@ -71,6 +71,7 @@ describe("audit ledger persistence/query/access architecture documentation", () 
       "src/application/audit/ports/AuditLedgerPersistencePorts.ts",
       "src/application/audit/use-cases/AuthoritativeAuditRecordingService.ts",
       "src/application/audit/use-cases/AuditLedgerQueryService.ts",
+      "src/application/audit/use-cases/AuditGovernanceProjectionQueryService.ts",
       "src/application/audit/use-cases/WorkspaceAuditLedgerReadAuthorizer.ts",
       "src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts",
       "src/infrastructure/persistence/audit/SqliteAuditLedgerPersistenceMigrations.ts",

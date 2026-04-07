@@ -2,22 +2,37 @@ import {
   AuditLedgerQueryErrorCodes,
   type AuditLedgerQueryService,
 } from "@application/audit/use-cases/AuditLedgerQueryService";
+import { AuditGovernanceProjectionQueryService } from "@application/audit/use-cases/AuditGovernanceProjectionQueryService";
 import {
   AuditLedgerApiErrorCodes,
   type AuditLedgerApiError,
   type AuditLedgerApiResponse,
+  type GetGovernanceAuditEventDetailApiRequest,
+  type GetGovernanceAuditEventDetailApiResponse,
   type GetAuditLedgerEventDetailApiRequest,
   type GetAuditLedgerEventDetailApiResponse,
+  type ListGovernanceAuditEventsApiRequest,
+  type ListGovernanceAuditEventsApiResponse,
   type ListAuditLedgerEventsApiRequest,
   type ListAuditLedgerEventsApiResponse,
 } from "./sdk/PublicAuditLedgerApiContract";
 
 export interface AuditLedgerBackendApiDependencies {
   readonly auditLedgerQueryService: AuditLedgerQueryService;
+  readonly governanceProjectionQueryService?: AuditGovernanceProjectionQueryService;
 }
 
 export class AuditLedgerBackendApi {
-  public constructor(private readonly dependencies: AuditLedgerBackendApiDependencies) {}
+  private readonly governanceProjectionQueryService: AuditGovernanceProjectionQueryService;
+  private readonly dependencies: AuditLedgerBackendApiDependencies;
+
+  public constructor(dependencies: AuditLedgerBackendApiDependencies) {
+    this.dependencies = dependencies;
+    this.governanceProjectionQueryService = dependencies.governanceProjectionQueryService
+      ?? new AuditGovernanceProjectionQueryService({
+        auditLedgerQueryService: dependencies.auditLedgerQueryService,
+      });
+  }
 
   public async listAuditEvents(
     request: ListAuditLedgerEventsApiRequest,
@@ -87,6 +102,80 @@ export class AuditLedgerBackendApi {
       ok: true,
       data: Object.freeze({
         event: outcome.value.event,
+      }),
+    });
+  }
+
+  public async listGovernanceAuditEvents(
+    request: ListGovernanceAuditEventsApiRequest,
+  ): Promise<AuditLedgerApiResponse<ListGovernanceAuditEventsApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    const workspaceId = normalizeRequired(request.workspaceId);
+    if (!actorUserIdentityId || !workspaceId) {
+      return this.failed(
+        AuditLedgerApiErrorCodes.invalidRequest,
+        "actorUserIdentityId and workspaceId are required.",
+      );
+    }
+
+    const outcome = await this.governanceProjectionQueryService.listGovernanceAuditEvents({
+      requesterId: actorUserIdentityId,
+      query: Object.freeze({
+        ...(request.query ?? {}),
+        workspaceId,
+      }),
+    });
+    if (!outcome.ok) {
+      return this.failedFromQueryOutcome(
+        outcome.error.code,
+        outcome.error.message,
+        outcome.error.details,
+      );
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        events: outcome.value.events,
+        facets: outcome.value.facets,
+        totalCount: outcome.value.totalCount,
+        query: outcome.value.query,
+        pagination: outcome.value.pagination,
+        explanatory: outcome.value.explanatory,
+      }),
+    });
+  }
+
+  public async getGovernanceAuditEventDetail(
+    request: GetGovernanceAuditEventDetailApiRequest,
+  ): Promise<AuditLedgerApiResponse<GetGovernanceAuditEventDetailApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    const workspaceId = normalizeRequired(request.workspaceId);
+    const eventId = normalizeRequired(request.eventId);
+    if (!actorUserIdentityId || !workspaceId || !eventId) {
+      return this.failed(
+        AuditLedgerApiErrorCodes.invalidRequest,
+        "actorUserIdentityId, workspaceId, and eventId are required.",
+      );
+    }
+
+    const outcome = await this.governanceProjectionQueryService.getGovernanceAuditEventDetail({
+      requesterId: actorUserIdentityId,
+      workspaceId,
+      eventId,
+    });
+    if (!outcome.ok) {
+      return this.failedFromQueryOutcome(
+        outcome.error.code,
+        outcome.error.message,
+        outcome.error.details,
+      );
+    }
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        event: outcome.value,
       }),
     });
   }

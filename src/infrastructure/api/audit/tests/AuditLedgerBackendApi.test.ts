@@ -172,5 +172,64 @@ describe("AuditLedgerBackendApi", () => {
     expect(detailResponse.ok).toBeFalse();
     expect(detailResponse.error?.code).toBe("invalid-request");
   });
+
+  it("returns governance projection list with facets and explanatory metadata", async () => {
+    const repository = new InMemoryAuditLedgerRepository([
+      createAuditEvent("audit:event:1"),
+      createAuditEvent("audit:event:2"),
+    ]);
+    const api = new AuditLedgerBackendApi({
+      auditLedgerQueryService: new AuditLedgerQueryService({
+        repository,
+        authorizer: new StaticAuthorizer({
+          workspaceIds: ["workspace-alpha"],
+          detailVisibility: "admin",
+          canReadProtectedData: true,
+        }),
+      }),
+    });
+
+    const response = await api.listGovernanceAuditEvents({
+      actorUserIdentityId: "user:admin",
+      workspaceId: "workspace-alpha",
+      query: {
+        pagination: {
+          limit: 1,
+          offset: 0,
+        },
+      },
+    });
+
+    expect(response.ok).toBeTrue();
+    expect(response.data?.events).toHaveLength(1);
+    expect(response.data?.facets.some((facet) => facet.key === "eventType")).toBeTrue();
+    expect(response.data?.explanatory.detailVisibility).toBe("user-safe");
+  });
+
+  it("returns governance projection detail with role-sensitive visibility", async () => {
+    const repository = new InMemoryAuditLedgerRepository([
+      createAuditEvent("audit:event:1"),
+    ]);
+    const api = new AuditLedgerBackendApi({
+      auditLedgerQueryService: new AuditLedgerQueryService({
+        repository,
+        authorizer: new StaticAuthorizer({
+          workspaceIds: ["workspace-alpha"],
+          detailVisibility: "admin",
+          canReadProtectedData: true,
+        }),
+      }),
+    });
+
+    const response = await api.getGovernanceAuditEventDetail({
+      actorUserIdentityId: "user:admin",
+      workspaceId: "workspace-alpha",
+      eventId: "audit:event:1",
+    });
+
+    expect(response.ok).toBeTrue();
+    expect(response.data?.event.visibility).toBe("admin");
+    expect(response.data?.event.explanatory.roleSensitivity).toBe("workspace-admin");
+  });
 });
 
