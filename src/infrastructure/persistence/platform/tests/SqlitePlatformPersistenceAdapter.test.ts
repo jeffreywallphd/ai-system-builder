@@ -49,7 +49,7 @@ describe("SqlitePlatformPersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM platform_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(5);
+    expect(versionRow.version).toBe(6);
 
     const tables = database.prepare(`
       SELECT name
@@ -445,7 +445,7 @@ describe("SqlitePlatformPersistenceAdapter", () => {
       enteredAt: "2026-04-06T12:03:00.000Z",
       orderKey: "2026-04-06T12:03:00.000Z:run-queue-3",
       eligibilityMarker: "deferred",
-      eligibleAt: "2026-04-06T12:01:00.000Z",
+      eligibleAt: "2026-04-06T12:10:00.000Z",
       updatedAt: "2026-04-06T12:03:00.000Z",
     }, {
       operationKey: "op-run-queue-3-enqueue",
@@ -500,6 +500,90 @@ describe("SqlitePlatformPersistenceAdapter", () => {
       limit: 10,
     });
     expect(readyAfterRelease.map((entry) => entry.runId)).toEqual(["run-queue-2"]);
+
+    adapter.dispose();
+  });
+
+  it("defers claimed runs with backoff metadata and reconsiders deferred entries when eligible", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-platform-queue-defer-"));
+    createdRoots.push(root);
+    const adapter = new SqlitePlatformPersistenceAdapter(path.join(root, "platform.sqlite"));
+
+    await adapter.createRun({
+      runId: "run-queue-defer-1",
+      runKind: "workflow",
+      status: "pending",
+      workspaceId: "workspace-alpha",
+      userIdentityId: "user-owner",
+      sourceAggregateRef: "workflow:queue",
+      initiatedAt: "2026-04-06T12:00:00.000Z",
+      metadata: {},
+      revision: 0,
+    }, {
+      operationKey: "op-run-queue-defer-1-create",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:00:00.000Z",
+    });
+
+    await adapter.enqueueRunForAssignment({
+      runId: "run-queue-defer-1",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      lifecycleState: "queued",
+      enteredAt: "2026-04-06T12:00:00.000Z",
+      orderKey: "2026-04-06T12:00:00.000Z:run-queue-defer-1",
+      eligibilityMarker: "ready",
+      eligibleAt: "2026-04-06T12:00:00.000Z",
+      updatedAt: "2026-04-06T12:00:00.000Z",
+    }, {
+      operationKey: "op-run-queue-defer-1-enqueue",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:00:00.000Z",
+    });
+
+    const claimed = await adapter.claimAssignmentReadyRuns({
+      asOf: "2026-04-06T12:01:00.000Z",
+      reservationOwner: "orchestrator:alpha",
+      reservationTtlSeconds: 30,
+      limit: 1,
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+    });
+    expect(claimed).toHaveLength(1);
+
+    const deferred = await adapter.deferRunClaimForNoPlacement?.({
+      runId: "run-queue-defer-1",
+      claimToken: claimed[0]?.claimToken ?? "missing",
+      deferredAt: "2026-04-06T12:01:00.000Z",
+      reasonCategory: "capability-coverage-missing",
+      reasonCodes: ["node-missing-capability"],
+      reasonMessage: "No node supports required capabilities.",
+      decisionId: "decision:no-placement",
+      requiresAdministrativeAttention: true,
+      initialDelaySeconds: 30,
+      maxDelaySeconds: 600,
+      multiplier: 2,
+    });
+    expect(deferred?.record.eligibilityMarker).toBe("deferred");
+    expect(deferred?.record.deferCount).toBe(1);
+    expect(deferred?.record.lastNoPlacementReasonCodes).toEqual(["node-missing-capability"]);
+    expect(deferred?.record.lastNoPlacementRequiresAdministrativeAttention).toBeTrue();
+
+    const beforeEligible = await adapter.listAssignmentReadyRuns({
+      asOf: "2026-04-06T12:01:20.000Z",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      limit: 10,
+    });
+    expect(beforeEligible).toEqual([]);
+
+    const afterEligible = await adapter.listAssignmentReadyRuns({
+      asOf: "2026-04-06T12:01:30.000Z",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      limit: 10,
+    });
+    expect(afterEligible.map((entry) => entry.runId)).toEqual(["run-queue-defer-1"]);
 
     adapter.dispose();
   });

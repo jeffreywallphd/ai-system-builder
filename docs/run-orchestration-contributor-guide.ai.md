@@ -18,6 +18,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - `docs/architecture/run-orchestration-scheduling-authoritative-queue-selection-and-assignment-integration.md`
 - `docs/architecture/run-orchestration-scheduling-reservation-aware-node-arbitration-and-placement-holds.md`
 - `docs/architecture/run-orchestration-scheduling-deterministic-candidate-arbitration.md`
+- `docs/architecture/run-orchestration-scheduling-unschedulable-defer-backoff-and-no-placement-handling.md`
 
 ## Required workflow
 - Update shared run contracts/schemas first.

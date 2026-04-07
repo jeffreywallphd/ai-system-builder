@@ -62,6 +62,13 @@ export interface AuthoritativeRunQueueEntryRecord {
   readonly dequeuedAt?: string;
   readonly updatedAt: string;
   readonly revision: number;
+  readonly deferCount?: number;
+  readonly lastNoPlacementCategory?: string;
+  readonly lastNoPlacementReasonCodes?: ReadonlyArray<string>;
+  readonly lastNoPlacementReasonMessage?: string;
+  readonly lastNoPlacementDecisionId?: string;
+  readonly lastNoPlacementRecordedAt?: string;
+  readonly lastNoPlacementRequiresAdministrativeAttention?: boolean;
 }
 
 export interface AuthoritativeRunQueueMutationResult {
@@ -238,6 +245,19 @@ export interface IRunOrchestrationQueuePersistenceRepository {
     readonly claimToken: string;
     readonly releasedAt: string;
   }): Promise<boolean>;
+  deferRunClaimForNoPlacement?(input: {
+    readonly runId: string;
+    readonly claimToken: string;
+    readonly deferredAt: string;
+    readonly reasonCategory: string;
+    readonly reasonCodes: ReadonlyArray<string>;
+    readonly reasonMessage: string;
+    readonly decisionId?: string;
+    readonly requiresAdministrativeAttention?: boolean;
+    readonly initialDelaySeconds?: number;
+    readonly maxDelaySeconds?: number;
+    readonly multiplier?: number;
+  }): Promise<AuthoritativeRunQueueMutationResult | undefined>;
   claimQueuedRunForNodeDispatch(input: {
     readonly runId: string;
     readonly nodeId: string;

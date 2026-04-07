@@ -23,6 +23,8 @@ export type SchedulingPolicyEvaluationContractVersion =
 export const SchedulingPolicyEvaluationReasonCodes = Object.freeze({
   queueEmpty: "queue-empty",
   noEligibleCandidates: "no-eligible-candidates",
+  noPlacement: "no-placement",
+  rolePriorityPreempted: "role-priority-preempted",
   deferredByPolicy: "deferred-by-policy",
   deniedByPolicy: "denied-by-policy",
   capacityUnavailable: "capacity-unavailable",

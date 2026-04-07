@@ -24,6 +24,8 @@ describe("SchedulingPolicyEvaluationContracts", () => {
     expect(SchedulingPolicyEvaluationContractVersions.v1).toBe("scheduling-policy-evaluation/v1");
     expect(SchedulingPolicyEvaluationReasonCodes.queueEmpty).toBe("queue-empty");
     expect(SchedulingPolicyEvaluationReasonCodes.noEligibleCandidates).toBe("no-eligible-candidates");
+    expect(SchedulingPolicyEvaluationReasonCodes.noPlacement).toBe("no-placement");
+    expect(SchedulingPolicyEvaluationReasonCodes.rolePriorityPreempted).toBe("role-priority-preempted");
   });
 
   it("projects policy decisions into explainable scheduling evaluation results", () => {
@@ -139,6 +141,7 @@ describe("SchedulingPolicyEvaluationContracts", () => {
     expect(isSchedulingTerminalOutcome("assignment-recommended")).toBeTrue();
     expect(isSchedulingTerminalOutcome("denied")).toBeTrue();
     expect(isSchedulingTerminalOutcome("deferred")).toBeFalse();
+    expect(isSchedulingTerminalOutcome("no-placement")).toBeFalse();
 
     expect(normalizeSchedulingPriorityBand("high")).toBe("high");
     expect(normalizeSchedulingPriorityBand("")).toBe("normal");

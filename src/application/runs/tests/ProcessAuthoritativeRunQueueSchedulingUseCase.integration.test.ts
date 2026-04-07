@@ -136,7 +136,7 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
     const limit = Math.max(1, query.limit ?? 10);
     const items = [...this.entries.values()]
       .filter((entry) => !entry.dequeuedAt)
-      .filter((entry) => entry.eligibilityMarker === "ready")
+      .filter((entry) => entry.eligibilityMarker === "ready" || entry.eligibilityMarker === "deferred")
       .filter((entry) => entry.eligibleAt <= asOf)
       .filter((entry) => !entry.claimExpiresAt || entry.claimExpiresAt <= asOf)
       .filter((entry) => !query.queueId || query.queueId === entry.queueId)
@@ -197,6 +197,55 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
       revision: existing.revision + 1,
     }));
     return true;
+  }
+
+  public async deferRunClaimForNoPlacement(input: {
+    readonly runId: string;
+    readonly claimToken: string;
+    readonly deferredAt: string;
+    readonly reasonCategory: string;
+    readonly reasonCodes: ReadonlyArray<string>;
+    readonly reasonMessage: string;
+    readonly decisionId?: string;
+    readonly requiresAdministrativeAttention?: boolean;
+    readonly initialDelaySeconds?: number;
+    readonly maxDelaySeconds?: number;
+    readonly multiplier?: number;
+  }) {
+    const existing = this.entries.get(input.runId);
+    if (!existing || existing.claimToken !== input.claimToken) {
+      return undefined;
+    }
+
+    const deferCount = (existing.deferCount ?? 0) + 1;
+    const initialDelaySeconds = Math.max(1, Math.floor(input.initialDelaySeconds ?? 15));
+    const multiplier = Math.max(1, input.multiplier ?? 2);
+    const maxDelaySeconds = Math.max(initialDelaySeconds, Math.floor(input.maxDelaySeconds ?? 300));
+    const delaySeconds = Math.min(maxDelaySeconds, Math.floor(initialDelaySeconds * Math.pow(multiplier, deferCount - 1)));
+    const nextEligibleAt = new Date(Date.parse(input.deferredAt) + (delaySeconds * 1000)).toISOString();
+    const next = Object.freeze({
+      ...existing,
+      eligibilityMarker: "deferred" as const,
+      eligibleAt: nextEligibleAt,
+      claimToken: undefined,
+      claimedBy: undefined,
+      claimedAt: undefined,
+      claimExpiresAt: undefined,
+      deferCount,
+      lastNoPlacementCategory: input.reasonCategory,
+      lastNoPlacementReasonCodes: Object.freeze([...input.reasonCodes]),
+      lastNoPlacementReasonMessage: input.reasonMessage,
+      lastNoPlacementDecisionId: input.decisionId,
+      lastNoPlacementRecordedAt: input.deferredAt,
+      lastNoPlacementRequiresAdministrativeAttention: Boolean(input.requiresAdministrativeAttention),
+      updatedAt: input.deferredAt,
+      revision: existing.revision + 1,
+    });
+    this.entries.set(input.runId, next);
+    return Object.freeze({
+      changed: true,
+      record: next,
+    });
   }
 
   public async acquireNodePlacementHold(input: {
@@ -603,5 +652,94 @@ describe("ProcessAuthoritativeRunQueueSchedulingUseCase integration", () => {
     expect(ownerQueueEntry?.assignmentNodeId).toBe("node:compute:1");
     expect(viewerQueueEntry?.lifecycleState).toBe("queued");
     expect(viewerQueueEntry?.claimToken).toBeUndefined();
+  });
+
+  it("defers unschedulable runs with backoff metadata to avoid repeated claim thrash", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryIntentRepository();
+    const idGenerator = new SequenceIdGenerator();
+
+    const createRun = new CreateAuthoritativeRunUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      idGenerator,
+    });
+    const run = await createRun.execute({
+      command: buildSubmissionCommand({
+        actorUserIdentityId: "user:member",
+        idempotencyKey: "run:unschedulable",
+        occurredAt: "2026-04-07T12:00:00.000Z",
+      }),
+    });
+
+    const selectAssignmentReadyRunsUseCase = new SelectAssignmentReadyRunsUseCase({
+      runRepository,
+      queueRepository,
+      now: () => new Date("2026-04-07T12:01:00.000Z"),
+    });
+    const schedulingInputAssembler = new AssembleAuthoritativeSchedulingInputUseCase({
+      selectAssignmentReadyRunsUseCase,
+      runRepository,
+      nodeRepository: new InMemoryNodeRepository(Object.freeze([
+        createNode("node:compute:no-executor"),
+      ]).map((node) => Object.freeze({
+        ...node,
+        capabilityProfile: Object.freeze({
+          enabledCapabilities: Object.freeze([]),
+          supportsRemoteScheduling: true,
+        }),
+      }))),
+      roleAssignmentRepository: new InMemoryRoleAssignmentRepository(),
+    });
+    const schedulingPolicyEvaluator = new EvaluateAuthoritativeSchedulingPolicyUseCase({
+      now: () => new Date("2026-04-07T12:01:00.000Z"),
+      decisionIdFactory: () => "decision:no-placement",
+    });
+    const schedulingDecisionPipeline = new EvaluateAuthoritativeSchedulingDecisionPipelineUseCase({
+      inputAssembler: schedulingInputAssembler,
+      policyEvaluator: schedulingPolicyEvaluator,
+      now: () => new Date("2026-04-07T12:01:00.000Z"),
+    });
+    const claimUseCase = new ClaimRunForNodeDispatchPreparationUseCase({
+      runRepository,
+      queueRepository,
+      idGenerator,
+    });
+    const schedulingAssignmentGateway = new MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase({
+      queueRepository,
+      placementHoldRepository: queueRepository,
+      claimRunForNodeDispatchPreparationUseCase: claimUseCase,
+      now: () => new Date("2026-04-07T12:01:00.000Z"),
+    });
+    const processUseCase = new ProcessAuthoritativeRunQueueSchedulingUseCase({
+      schedulingDecisionPipeline,
+      schedulingAssignmentGateway,
+    });
+
+    const first = await processUseCase.execute({
+      reservationOwner: "scheduler:alpha",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      limit: 1,
+    });
+    expect(first.decisionBundle.decision.outcome).toBe("no-placement");
+    expect(first.materializedAssignmentIntents).toEqual([]);
+
+    const queueAfterFirst = await queueRepository.getQueueEntryByRunId(run.run.runId);
+    expect(queueAfterFirst?.eligibilityMarker).toBe("deferred");
+    expect(queueAfterFirst?.deferCount).toBe(1);
+    expect(queueAfterFirst?.lastNoPlacementReasonCodes).toContain("node-missing-capability");
+    expect(queueAfterFirst?.claimToken).toBeUndefined();
+
+    const second = await processUseCase.execute({
+      reservationOwner: "scheduler:alpha",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      limit: 1,
+    });
+    expect(second.decisionBundle.snapshot.queueLeases).toEqual([]);
+    expect(second.materializedAssignmentIntents).toEqual([]);
   });
 });

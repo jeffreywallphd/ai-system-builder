@@ -54,6 +54,7 @@ const SchedulingRunPriorityBandSchema = z.enum([
 const SchedulingDecisionOutcomeSchema = z.enum([
   SchedulingDecisionOutcomes.assignmentRecommended,
   SchedulingDecisionOutcomes.deferred,
+  SchedulingDecisionOutcomes.noPlacement,
   SchedulingDecisionOutcomes.denied,
 ]);
 
@@ -347,6 +348,8 @@ const SchedulingDecisionBundleSchema: z.ZodType<SchedulingDecisionBundle> = z.ob
 export const SchedulingPolicyEvaluationReasonCodeSchema = z.enum([
   SchedulingPolicyEvaluationReasonCodes.queueEmpty,
   SchedulingPolicyEvaluationReasonCodes.noEligibleCandidates,
+  SchedulingPolicyEvaluationReasonCodes.noPlacement,
+  SchedulingPolicyEvaluationReasonCodes.rolePriorityPreempted,
   SchedulingPolicyEvaluationReasonCodes.deferredByPolicy,
   SchedulingPolicyEvaluationReasonCodes.deniedByPolicy,
   SchedulingPolicyEvaluationReasonCodes.capacityUnavailable,

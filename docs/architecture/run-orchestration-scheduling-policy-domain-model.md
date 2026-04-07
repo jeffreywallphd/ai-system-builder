@@ -60,7 +60,7 @@ This story introduces an explicit scheduling domain language and an application-
 - Authoritative policy output for one evaluation pass.
 - Includes:
   - deterministic decision identity/time
-  - outcome (`assignment-recommended` | `deferred` | `denied`)
+  - outcome (`assignment-recommended` | `deferred` | `no-placement` | `denied`)
   - optional selected run/node/claim pair
   - full evaluated candidate set
   - policy source traceability

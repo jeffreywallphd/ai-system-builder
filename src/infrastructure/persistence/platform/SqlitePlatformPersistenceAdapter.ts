@@ -74,6 +74,13 @@ interface PlatformRunQueueRow {
   readonly dispatch_prepared_at: string | null;
   readonly last_dispatch_attempt_id: string | null;
   readonly dequeued_at: string | null;
+  readonly defer_count: number;
+  readonly last_no_placement_category: string | null;
+  readonly last_no_placement_reason_codes_json: string | null;
+  readonly last_no_placement_reason_message: string | null;
+  readonly last_no_placement_decision_id: string | null;
+  readonly last_no_placement_recorded_at: string | null;
+  readonly last_no_placement_admin_attention: number;
   readonly updated_at: string;
   readonly revision: number;
 }
@@ -263,6 +270,13 @@ export class SqlitePlatformPersistenceAdapter
         dispatch_prepared_at,
         last_dispatch_attempt_id,
         dequeued_at,
+        defer_count,
+        last_no_placement_category,
+        last_no_placement_reason_codes_json,
+        last_no_placement_reason_message,
+        last_no_placement_decision_id,
+        last_no_placement_recorded_at,
+        last_no_placement_admin_attention,
         updated_at,
         revision
       FROM platform_run_orchestration_queue
@@ -312,6 +326,13 @@ export class SqlitePlatformPersistenceAdapter
       dispatch_prepared_at: null,
       last_dispatch_attempt_id: null,
       dequeued_at: null,
+      defer_count: 0,
+      last_no_placement_category: null,
+      last_no_placement_reason_codes_json: null,
+      last_no_placement_reason_message: null,
+      last_no_placement_decision_id: null,
+      last_no_placement_recorded_at: null,
+      last_no_placement_admin_attention: 0,
       updated_at: record.updatedAt.trim(),
       revision: 1,
     });
@@ -335,9 +356,16 @@ export class SqlitePlatformPersistenceAdapter
           dispatch_prepared_at,
           last_dispatch_attempt_id,
           dequeued_at,
+          defer_count,
+          last_no_placement_category,
+          last_no_placement_reason_codes_json,
+          last_no_placement_reason_message,
+          last_no_placement_decision_id,
+          last_no_placement_recorded_at,
+          last_no_placement_admin_attention,
           updated_at,
           revision
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
       persistedRow.run_id,
       persistedRow.queue_id,
@@ -356,6 +384,13 @@ export class SqlitePlatformPersistenceAdapter
       persistedRow.dispatch_prepared_at,
       persistedRow.last_dispatch_attempt_id,
       persistedRow.dequeued_at,
+      persistedRow.defer_count,
+      persistedRow.last_no_placement_category,
+      persistedRow.last_no_placement_reason_codes_json,
+      persistedRow.last_no_placement_reason_message,
+      persistedRow.last_no_placement_decision_id,
+      persistedRow.last_no_placement_recorded_at,
+      persistedRow.last_no_placement_admin_attention,
       persistedRow.updated_at,
       persistedRow.revision,
     ));
@@ -398,11 +433,18 @@ export class SqlitePlatformPersistenceAdapter
         dispatch_prepared_at,
         last_dispatch_attempt_id,
         dequeued_at,
+        defer_count,
+        last_no_placement_category,
+        last_no_placement_reason_codes_json,
+        last_no_placement_reason_message,
+        last_no_placement_decision_id,
+        last_no_placement_recorded_at,
+        last_no_placement_admin_attention,
         updated_at,
         revision
       FROM platform_run_orchestration_queue
       WHERE dequeued_at IS NULL
-        AND eligibility_marker = 'ready'
+        AND eligibility_marker IN ('ready', 'deferred')
         AND eligible_at <= ?
         AND (? IS NULL OR queue_id = ?)
         AND (? IS NULL OR workspace_id = ?)
@@ -446,7 +488,7 @@ export class SqlitePlatformPersistenceAdapter
         SELECT run_id
         FROM platform_run_orchestration_queue
         WHERE dequeued_at IS NULL
-          AND eligibility_marker = 'ready'
+          AND eligibility_marker IN ('ready', 'deferred')
           AND eligible_at <= ?
           AND (? IS NULL OR queue_id = ?)
           AND (? IS NULL OR workspace_id = ?)
@@ -477,7 +519,7 @@ export class SqlitePlatformPersistenceAdapter
             revision = revision + 1
           WHERE run_id = ?
             AND dequeued_at IS NULL
-            AND eligibility_marker = 'ready'
+            AND eligibility_marker IN ('ready', 'deferred')
             AND eligible_at <= ?
             AND (claim_token IS NULL OR claim_expires_at <= ?)
         `).run(
@@ -522,6 +564,13 @@ export class SqlitePlatformPersistenceAdapter
         dispatch_prepared_at,
         last_dispatch_attempt_id,
         dequeued_at,
+        defer_count,
+        last_no_placement_category,
+        last_no_placement_reason_codes_json,
+        last_no_placement_reason_message,
+        last_no_placement_decision_id,
+        last_no_placement_recorded_at,
+        last_no_placement_admin_attention,
         updated_at,
         revision
       FROM platform_run_orchestration_queue
@@ -563,6 +612,103 @@ export class SqlitePlatformPersistenceAdapter
     ));
 
     return mutationResult.changes === 1;
+  }
+
+  public async deferRunClaimForNoPlacement(input: {
+    readonly runId: string;
+    readonly claimToken: string;
+    readonly deferredAt: string;
+    readonly reasonCategory: string;
+    readonly reasonCodes: ReadonlyArray<string>;
+    readonly reasonMessage: string;
+    readonly decisionId?: string;
+    readonly requiresAdministrativeAttention?: boolean;
+    readonly initialDelaySeconds?: number;
+    readonly maxDelaySeconds?: number;
+    readonly multiplier?: number;
+  }): Promise<AuthoritativeRunQueueMutationResult | undefined> {
+    const runId = normalizePlatformLookup(input.runId);
+    const claimToken = normalizePlatformLookup(input.claimToken);
+    if (!runId || !claimToken) {
+      return undefined;
+    }
+
+    const deferredAt = input.deferredAt.trim();
+    if (!deferredAt || Number.isNaN(Date.parse(deferredAt))) {
+      return undefined;
+    }
+    const existing = this.getQueueRowByRunId(runId);
+    if (!existing || existing.claim_token !== claimToken || existing.dequeued_at) {
+      return undefined;
+    }
+
+    const nextDeferCount = Math.max(0, existing.defer_count) + 1;
+    const initialDelaySeconds = Math.max(1, Math.floor(input.initialDelaySeconds ?? 15));
+    const multiplier = Math.max(1, input.multiplier ?? 2);
+    const maxDelaySeconds = Math.max(initialDelaySeconds, Math.floor(input.maxDelaySeconds ?? 600));
+    const rawDelaySeconds = initialDelaySeconds * Math.pow(multiplier, Math.max(0, nextDeferCount - 1));
+    const delaySeconds = Math.max(1, Math.min(maxDelaySeconds, Math.floor(rawDelaySeconds)));
+    const nextEligibleAt = new Date(Date.parse(deferredAt) + (delaySeconds * 1000)).toISOString();
+
+    const reasonCategory = (normalizePlatformLookup(input.reasonCategory) ?? "policy-deferred");
+    const reasonCodes = [...new Set(
+      input.reasonCodes
+        .map((code) => code.trim())
+        .filter((code) => code.length > 0),
+    )];
+    const reasonCodesJson = reasonCodes.length > 0
+      ? JSON.stringify(reasonCodes)
+      : JSON.stringify(["unspecified-no-placement"]);
+    const reasonMessage = input.reasonMessage.trim().slice(0, 512);
+    const decisionId = normalizePlatformLookup(input.decisionId ?? "") ?? null;
+    const adminAttention = input.requiresAdministrativeAttention ? 1 : 0;
+
+    const mutationResult = this.executeMutation("defer run claim for no placement", () => this.getDatabase().prepare(`
+        UPDATE platform_run_orchestration_queue
+        SET
+          eligibility_marker = 'deferred',
+          eligible_at = ?,
+          claim_token = NULL,
+          claimed_by = NULL,
+          claimed_at = NULL,
+          claim_expires_at = NULL,
+          defer_count = ?,
+          last_no_placement_category = ?,
+          last_no_placement_reason_codes_json = ?,
+          last_no_placement_reason_message = ?,
+          last_no_placement_decision_id = ?,
+          last_no_placement_recorded_at = ?,
+          last_no_placement_admin_attention = ?,
+          updated_at = ?,
+          revision = revision + 1
+        WHERE run_id = ?
+          AND claim_token = ?
+          AND dequeued_at IS NULL
+      `).run(
+      nextEligibleAt,
+      nextDeferCount,
+      reasonCategory,
+      reasonCodesJson,
+      reasonMessage || "Run could not be placed and was deferred for re-evaluation.",
+      decisionId,
+      deferredAt,
+      adminAttention,
+      deferredAt,
+      runId,
+      claimToken,
+    ));
+    if (mutationResult.changes !== 1) {
+      return undefined;
+    }
+
+    const nextRow = this.getQueueRowByRunId(runId);
+    if (!nextRow) {
+      return undefined;
+    }
+    return Object.freeze({
+      changed: true,
+      record: this.mapQueueRowToRecord(nextRow),
+    });
   }
 
   public async acquireNodePlacementHold(input: {
@@ -797,11 +943,18 @@ export class SqlitePlatformPersistenceAdapter
             lifecycle_state = 'assigned',
             assignment_node_id = ?,
             assignment_claimed_at = ?,
-            dispatch_prepared_at = ?,
-            last_dispatch_attempt_id = ?,
-            dequeued_at = ?,
-            updated_at = ?,
-            revision = revision + 1
+          dispatch_prepared_at = ?,
+          last_dispatch_attempt_id = ?,
+          dequeued_at = ?,
+          defer_count = 0,
+          last_no_placement_category = NULL,
+          last_no_placement_reason_codes_json = NULL,
+          last_no_placement_reason_message = NULL,
+          last_no_placement_decision_id = NULL,
+          last_no_placement_recorded_at = NULL,
+          last_no_placement_admin_attention = 0,
+          updated_at = ?,
+          revision = revision + 1
           WHERE run_id = ?
             AND claim_token = ?
             AND claimed_by = ?
@@ -926,6 +1079,13 @@ export class SqlitePlatformPersistenceAdapter
           dispatch_prepared_at = NULL,
           last_dispatch_attempt_id = NULL,
           dequeued_at = NULL,
+          defer_count = 0,
+          last_no_placement_category = NULL,
+          last_no_placement_reason_codes_json = NULL,
+          last_no_placement_reason_message = NULL,
+          last_no_placement_decision_id = NULL,
+          last_no_placement_recorded_at = NULL,
+          last_no_placement_admin_attention = 0,
           updated_at = ?,
           revision = revision + 1
         WHERE run_id = ?
@@ -1444,6 +1604,13 @@ export class SqlitePlatformPersistenceAdapter
         dispatch_prepared_at,
         last_dispatch_attempt_id,
         dequeued_at,
+        defer_count,
+        last_no_placement_category,
+        last_no_placement_reason_codes_json,
+        last_no_placement_reason_message,
+        last_no_placement_decision_id,
+        last_no_placement_recorded_at,
+        last_no_placement_admin_attention,
         updated_at,
         revision
       FROM platform_run_orchestration_queue
@@ -1491,6 +1658,13 @@ export class SqlitePlatformPersistenceAdapter
       dispatchPreparedAt: normalizePlatformLookup(row.dispatch_prepared_at ?? ""),
       lastDispatchAttemptId: normalizePlatformLookup(row.last_dispatch_attempt_id ?? ""),
       dequeuedAt: normalizePlatformLookup(row.dequeued_at ?? ""),
+      deferCount: row.defer_count,
+      lastNoPlacementCategory: normalizePlatformLookup(row.last_no_placement_category ?? ""),
+      lastNoPlacementReasonCodes: parseStringArrayJson(row.last_no_placement_reason_codes_json),
+      lastNoPlacementReasonMessage: normalizePlatformLookup(row.last_no_placement_reason_message ?? ""),
+      lastNoPlacementDecisionId: normalizePlatformLookup(row.last_no_placement_decision_id ?? ""),
+      lastNoPlacementRecordedAt: normalizePlatformLookup(row.last_no_placement_recorded_at ?? ""),
+      lastNoPlacementRequiresAdministrativeAttention: row.last_no_placement_admin_attention === 1,
       updatedAt: row.updated_at,
       revision: row.revision,
     });
@@ -1544,5 +1718,24 @@ export class SqlitePlatformPersistenceAdapter
     }
   }
 
+}
+
+function parseStringArrayJson(payload: string | null): ReadonlyArray<string> | undefined {
+  const normalized = normalizePlatformLookup(payload ?? "");
+  if (!normalized) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(normalized);
+    if (!Array.isArray(parsed)) {
+      return undefined;
+    }
+    const values = parsed
+      .map((value) => typeof value === "string" ? value.trim() : "")
+      .filter((value) => value.length > 0);
+    return values.length > 0 ? Object.freeze(values) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 

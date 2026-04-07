@@ -27,6 +27,7 @@ export type SchedulingPolicySourceKind =
 export const SchedulingDecisionOutcomes = Object.freeze({
   assignmentRecommended: "assignment-recommended",
   deferred: "deferred",
+  noPlacement: "no-placement",
   denied: "denied",
 });
 
