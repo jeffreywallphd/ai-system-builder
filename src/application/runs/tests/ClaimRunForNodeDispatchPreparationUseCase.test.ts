@@ -18,6 +18,7 @@ import {
 import {
   RunLifecycleStates,
   RunSubmissionSources,
+  type RunLifecycleState,
   createCanonicalRunRecord,
 } from "@domain/runs/RunDomain";
 import { mapLifecycleStateToPlatformRunStatus, type RunAuthoritativeMetadata } from "../use-cases/RunCreationPersistenceMapper";
@@ -225,6 +226,14 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
       dispatchResult: input.result,
     }));
     return true;
+  }
+
+  public async finalizeRunQueueEntry(_input: {
+    readonly runId: string;
+    readonly finalizedAt: string;
+    readonly lifecycleState: RunLifecycleState;
+  }): Promise<boolean> {
+    return false;
   }
 
   public async listDispatchAttemptsByRunId(runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>> {

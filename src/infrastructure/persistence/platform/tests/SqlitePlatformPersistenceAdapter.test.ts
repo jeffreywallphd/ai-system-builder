@@ -646,6 +646,17 @@ describe("SqlitePlatformPersistenceAdapter", () => {
     expect(updatedAttempts[0]?.dispatchResult?.dispatchId).toBe("dispatch:run-dispatch-1");
     expect((updatedAttempts[0]?.dispatchResult?.metadata as { lane?: string } | undefined)?.lane).toBe("standard");
 
+    const finalized = await adapter.finalizeRunQueueEntry({
+      runId: "run-dispatch-1",
+      finalizedAt: "2026-04-06T12:05:00.000Z",
+      lifecycleState: "completed",
+    });
+    expect(finalized).toBeTrue();
+
+    const queueAfterFinalization = await adapter.getQueueEntryByRunId("run-dispatch-1");
+    expect(queueAfterFinalization?.lifecycleState).toBe("completed");
+    expect(queueAfterFinalization?.claimToken).toBeUndefined();
+
     adapter.dispose();
   });
 });

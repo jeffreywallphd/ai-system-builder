@@ -13,6 +13,13 @@ import {
   type PlatformRunStatus,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type { CanonicalRunSubmissionCommand } from "./RunSubmissionValidationContracts";
+import {
+  toRunDetail,
+  toRunStatusEnvelope,
+  type RunDetail,
+  type RunStatusEnvelope,
+  type RunResultSummary,
+} from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 
 export const RunAuthoritativeMetadataSchemaVersion = 1;
 
@@ -41,7 +48,13 @@ export interface RunAuthoritativeMetadata {
       readonly queueId: string;
       readonly recordedAt: string;
     };
+    readonly finalization?: RunAuthoritativeFinalizationSnapshot;
   };
+}
+
+export interface RunAuthoritativeFinalizationSnapshot extends RunResultSummary {
+  readonly finalizedAt: string;
+  readonly outcome: "completed" | "failed";
 }
 
 function normalizeOptional(value?: string): string | undefined {
@@ -200,6 +213,41 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function toFinalizationSnapshot(value: unknown): RunAuthoritativeFinalizationSnapshot | undefined {
+  if (!isObject(value)) {
+    return undefined;
+  }
+
+  const finalizedAt = typeof value.finalizedAt === "string" ? value.finalizedAt.trim() : "";
+  const outcome = value.outcome === "completed" || value.outcome === "failed"
+    ? value.outcome
+    : undefined;
+  const outputs = Array.isArray(value.outputs) ? value.outputs : [];
+  if (!finalizedAt || !outcome) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    finalizedAt,
+    outcome,
+    summary: typeof value.summary === "string" ? value.summary : undefined,
+    externalResultId: typeof value.externalResultId === "string" ? value.externalResultId : undefined,
+    outputs: Object.freeze(outputs.map((entry) => Object.freeze({ ...(entry as Record<string, unknown>) }))),
+    metrics: isObject(value.metrics) ? Object.freeze({ ...value.metrics }) : undefined,
+  }) as RunAuthoritativeFinalizationSnapshot;
+}
+
+export function extractRunFinalizationSnapshot(metadata: unknown): RunAuthoritativeFinalizationSnapshot | undefined {
+  if (!isObject(metadata)) {
+    return undefined;
+  }
+  const orchestration = metadata.orchestration;
+  if (!isObject(orchestration)) {
+    return undefined;
+  }
+  return toFinalizationSnapshot(orchestration.finalization);
+}
+
 export function mapPlatformRunRecordToCanonicalRun(record: PlatformRunRecord): CanonicalRunRecord {
   const metadata = record.metadata;
   if (isObject(metadata) && "canonicalRun" in metadata) {
@@ -283,5 +331,31 @@ export function updatePlatformRunRecordCanonicalState(
           ? "succeeded"
           : undefined,
     metadata: Object.freeze(metadata),
+  });
+}
+
+export function toRunDetailFromPlatformRecord(record: PlatformRunRecord): RunDetail {
+  const detail = toRunDetail(mapPlatformRunRecordToCanonicalRun(record));
+  const finalization = extractRunFinalizationSnapshot(record.metadata);
+  if (!finalization) {
+    return detail;
+  }
+
+  return Object.freeze({
+    ...detail,
+    finalization,
+  });
+}
+
+export function toRunStatusEnvelopeFromPlatformRecord(record: PlatformRunRecord): RunStatusEnvelope {
+  const status = toRunStatusEnvelope(mapPlatformRunRecordToCanonicalRun(record));
+  const finalization = extractRunFinalizationSnapshot(record.metadata);
+  if (!finalization) {
+    return status;
+  }
+
+  return Object.freeze({
+    ...status,
+    finalization,
   });
 }

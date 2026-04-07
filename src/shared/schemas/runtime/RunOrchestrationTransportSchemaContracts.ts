@@ -3,6 +3,7 @@ import {
   RunLifecycleEventKinds,
   RunMutationActions,
   RunOrchestrationTransportContractVersions,
+  RunResultOutputReferenceKinds,
   resolveRunSubmissionSource,
   type RunSubmissionRequest,
 } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
@@ -175,6 +176,30 @@ const RunExecutionSchema = z.object({
   }).strict().optional(),
 }).strict();
 
+const RunResultOutputReferenceSchema = z.object({
+  outputId: IdentifierSchema,
+  kind: z.enum([
+    RunResultOutputReferenceKinds.asset,
+    RunResultOutputReferenceKinds.storageObject,
+    RunResultOutputReferenceKinds.url,
+    RunResultOutputReferenceKinds.inline,
+  ]),
+  label: z.string().trim().min(1).max(256).optional(),
+  assetId: IdentifierSchema.optional(),
+  storageInstanceId: IdentifierSchema.optional(),
+  objectKey: z.string().trim().min(1).max(2048).optional(),
+  objectVersionId: z.string().trim().min(1).max(512).optional(),
+  uri: z.string().trim().min(1).max(4096).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+}).strict();
+
+const RunResultSummarySchema = z.object({
+  summary: z.string().trim().min(1).max(2000).optional(),
+  externalResultId: IdentifierSchema.optional(),
+  outputs: z.array(RunResultOutputReferenceSchema),
+  metrics: z.record(z.string(), z.unknown()).optional(),
+}).strict();
+
 const RunCancellationSchema = z.object({
   requestedAt: TimestampSchema,
   requestedByActorId: IdentifierSchema.optional(),
@@ -196,6 +221,10 @@ export const RunDetailSchema = RunSummarySchema.extend({
   execution: RunExecutionSchema,
   cancellation: RunCancellationSchema.optional(),
   retry: RunRetrySchema,
+  finalization: RunResultSummarySchema.extend({
+    finalizedAt: TimestampSchema,
+    outcome: z.enum(["completed", "failed"]),
+  }).strict().optional(),
 }).strict();
 
 export const RunListReadRequestSchema = z.object({
@@ -255,6 +284,10 @@ export const RunStatusEnvelopeSchema = z.object({
     maxAttempts: z.number().int().min(1),
     queuedAt: TimestampSchema.optional(),
   }).strict(),
+  finalization: RunResultSummarySchema.extend({
+    finalizedAt: TimestampSchema,
+    outcome: z.enum(["completed", "failed"]),
+  }).strict().optional(),
 }).strict();
 
 export const RunQueueStatusReadRequestSchema = z.object({
@@ -313,6 +346,12 @@ export const RunLifecycleUpdateRequestSchema = z.object({
     percent: z.number().min(0).max(100).optional(),
     stage: z.string().trim().min(1).max(256).optional(),
     message: z.string().trim().min(1).max(1024).optional(),
+  }).strict().optional(),
+  result: z.object({
+    summary: z.string().trim().min(1).max(2000).optional(),
+    externalResultId: IdentifierSchema.optional(),
+    outputs: z.array(RunResultOutputReferenceSchema).max(512).optional(),
+    metrics: z.record(z.string(), z.unknown()).optional(),
   }).strict().optional(),
   internalDiagnostics: z.record(z.string(), z.unknown()).optional(),
   queue: RunQueueStatusSnapshotSchema.optional(),

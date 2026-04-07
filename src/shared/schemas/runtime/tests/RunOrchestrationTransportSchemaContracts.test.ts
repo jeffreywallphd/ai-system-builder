@@ -133,6 +133,15 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
         outcome: "none",
         heartbeatAt: "2026-04-07T12:04:00.000Z",
       },
+      result: {
+        summary: "Generated outputs persisted.",
+        externalResultId: "result:run-1",
+        outputs: [{
+          outputId: "output-1",
+          kind: "asset",
+          assetId: "asset:1",
+        }],
+      },
       internalDiagnostics: {
         workerPid: 4142,
       },
@@ -140,6 +149,7 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
 
     expect(parsed.senderNodeId).toBe("node:trusted-1");
     expect(parsed.progress?.percent).toBe(65);
+    expect(parsed.result?.outputs?.[0]?.kind).toBe("asset");
     expect(parsed.toState).toBeUndefined();
   });
 
@@ -162,9 +172,20 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
         attempt: 1,
         maxAttempts: 3,
       },
+      finalization: {
+        finalizedAt: "2026-04-07T12:05:00.000Z",
+        outcome: "completed",
+        summary: "Generated 4 outputs.",
+        outputs: [{
+          outputId: "output-1",
+          kind: "asset",
+          assetId: "asset:1",
+        }],
+      },
     });
 
     expect(status.execution?.progress?.percent).toBe(65);
+    expect(status.finalization?.outcome).toBe("completed");
   });
 
   it("rejects malformed run payloads", () => {

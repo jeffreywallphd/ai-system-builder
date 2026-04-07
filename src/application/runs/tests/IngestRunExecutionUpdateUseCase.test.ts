@@ -7,7 +7,13 @@ import type {
   PlatformRunRecord,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type {
+  AuthoritativeRunDispatchAttemptRecord,
+  AuthoritativeRunDispatchAttemptResult,
+  AuthoritativeRunNodeClaimResult,
+  AuthoritativeRunQueueEntryRecord,
+  AuthoritativeRunQueueMutationResult,
   IAuthoritativeRunPersistenceRepository,
+  IRunOrchestrationQueuePersistenceRepository,
   IRunOrchestrationIntentRepository,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import {
@@ -23,6 +29,7 @@ import {
   RunExecutionOutcomeKinds,
   RunLifecycleStates,
   RunSubmissionSources,
+  type RunLifecycleState,
   createCanonicalRunRecord,
 } from "@domain/runs/RunDomain";
 
@@ -91,6 +98,79 @@ class InMemoryOrchestrationIntentRepository implements IRunOrchestrationIntentRe
       wasReplay: false,
       record: event,
     });
+  }
+}
+
+class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceRepository {
+  public async getQueueEntryByRunId(_runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined> {
+    return undefined;
+  }
+
+  public async enqueueRunForAssignment(
+    _record: Omit<AuthoritativeRunQueueEntryRecord, "claimToken" | "claimedBy" | "claimedAt" | "claimExpiresAt" | "dequeuedAt" | "revision">,
+    _mutation: PlatformPersistenceMutationContext,
+  ): Promise<AuthoritativeRunQueueMutationResult> {
+    throw new Error("Not implemented.");
+  }
+
+  public async listAssignmentReadyRuns(_query: {
+    readonly asOf: string;
+    readonly queueId?: string;
+    readonly workspaceId?: string;
+    readonly limit?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    return Object.freeze([]);
+  }
+
+  public async claimAssignmentReadyRuns(_input: {
+    readonly asOf: string;
+    readonly reservationOwner: string;
+    readonly reservationTtlSeconds: number;
+    readonly limit: number;
+    readonly queueId?: string;
+    readonly workspaceId?: string;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    return Object.freeze([]);
+  }
+
+  public async releaseRunClaim(_input: {
+    readonly runId: string;
+    readonly claimToken: string;
+    readonly releasedAt: string;
+  }): Promise<boolean> {
+    return false;
+  }
+
+  public async claimQueuedRunForNodeDispatch(_input: {
+    readonly runId: string;
+    readonly nodeId: string;
+    readonly reservationOwner: string;
+    readonly claimToken: string;
+    readonly dispatchAttemptId: string;
+    readonly preparedAt: string;
+    readonly dispatchMetadata: Readonly<Record<string, unknown>>;
+  }): Promise<AuthoritativeRunNodeClaimResult> {
+    throw new Error("Not implemented.");
+  }
+
+  public async recordDispatchAttemptResult(_input: {
+    readonly runId: string;
+    readonly attemptId: string;
+    readonly result: AuthoritativeRunDispatchAttemptResult;
+  }): Promise<boolean> {
+    return false;
+  }
+
+  public async finalizeRunQueueEntry(_input: {
+    readonly runId: string;
+    readonly finalizedAt: string;
+    readonly lifecycleState: RunLifecycleState;
+  }): Promise<boolean> {
+    return true;
+  }
+
+  public async listDispatchAttemptsByRunId(_runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>> {
+    return Object.freeze([]);
   }
 }
 
@@ -183,10 +263,12 @@ function seedRun(runRepository: InMemoryRunRepository): void {
 describe("IngestRunExecutionUpdateUseCase", () => {
   it("accepts authorized node progress/heartbeat updates and persists canonical state", async () => {
     const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
     const intentRepository = new InMemoryOrchestrationIntentRepository();
     seedRun(runRepository);
     const useCase = new IngestRunExecutionUpdateUseCase({
       runRepository,
+      queueRepository,
       orchestrationIntentRepository: intentRepository,
       now: () => new Date("2026-04-07T12:01:00.000Z"),
       idGenerator: {
@@ -223,10 +305,12 @@ describe("IngestRunExecutionUpdateUseCase", () => {
 
   it("rejects execution updates from nodes that are not assigned to the run", async () => {
     const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
     const intentRepository = new InMemoryOrchestrationIntentRepository();
     seedRun(runRepository);
     const useCase = new IngestRunExecutionUpdateUseCase({
       runRepository,
+      queueRepository,
       orchestrationIntentRepository: intentRepository,
     });
 
@@ -239,5 +323,52 @@ describe("IngestRunExecutionUpdateUseCase", () => {
         heartbeatAt: "2026-04-07T12:01:00.000Z",
       }),
     })).rejects.toThrow(RunExecutionUpdateForbiddenError);
+  });
+
+  it("finalizes completed runs with durable result metadata and released assignment state", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryOrchestrationIntentRepository();
+    seedRun(runRepository);
+    const useCase = new IngestRunExecutionUpdateUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+    });
+
+    const result = await useCase.execute({
+      runId: "run:1",
+      senderNodeId: "node:trusted-1",
+      update: Object.freeze({
+        runId: "run:1",
+        senderNodeId: "node:trusted-1",
+        senderBackendKind: "local-worker",
+        senderBackendRunId: "backend-run-1",
+        occurredAt: "2026-04-07T12:02:00.000Z",
+        toState: "completed",
+        execution: Object.freeze({
+          outcome: "succeeded",
+          finishedAt: "2026-04-07T12:02:00.000Z",
+        }),
+        result: Object.freeze({
+          summary: "Rendered 4 images.",
+          externalResultId: "result:run:1",
+          outputs: Object.freeze([Object.freeze({
+            outputId: "output-1",
+            kind: "asset",
+            assetId: "asset:generated:1",
+          })]),
+          metrics: Object.freeze({
+            outputCount: 4,
+          }),
+        }),
+      }),
+    });
+
+    expect(result.mutation.run.state).toBe("completed");
+    expect(result.mutation.run.assignment.status).toBe("released");
+    expect(result.mutation.run.finalization?.summary).toBe("Rendered 4 images.");
+    expect(result.mutation.run.finalization?.outputs[0]?.assetId).toBe("asset:generated:1");
+    expect(result.status.finalization?.externalResultId).toBe("result:run:1");
   });
 });

@@ -1,6 +1,6 @@
 import type { IAuthoritativeRunPersistenceRepository } from "@application/runs/ports/RunOrchestrationPersistencePorts";
-import { toRunDetail, type RunDetail } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
-import { mapPlatformRunRecordToCanonicalRun } from "./RunCreationPersistenceMapper";
+import type { RunDetail } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
+import { toRunDetailFromPlatformRecord } from "./RunCreationPersistenceMapper";
 
 export interface GetAuthoritativeRunRequest {
   readonly runId: string;
@@ -25,6 +25,6 @@ export class GetAuthoritativeRunUseCase {
       return undefined;
     }
 
-    return toRunDetail(mapPlatformRunRecordToCanonicalRun(record));
+    return toRunDetailFromPlatformRecord(record);
   }
 }

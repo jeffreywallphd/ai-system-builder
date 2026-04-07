@@ -7,6 +7,7 @@ import type {
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type { RunExecutionBackendKind } from "@application/runs/ports/RunExecutionDispatchPorts";
 import type { RunLifecycleState } from "@domain/runs/RunDomain";
+import type { RunResultRegistrationInput, RunResultSummary } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 
 export type AuthoritativeRunPersistenceMutationContext = PlatformPersistenceMutationContext;
 
@@ -184,6 +185,44 @@ export interface IRunOrchestrationQueuePersistenceRepository {
     readonly attemptId: string;
     readonly result: AuthoritativeRunDispatchAttemptResult;
   }): Promise<boolean>;
+  finalizeRunQueueEntry(input: {
+    readonly runId: string;
+    readonly finalizedAt: string;
+    readonly lifecycleState: RunLifecycleState;
+  }): Promise<boolean>;
   listDispatchAttemptsByRunId(runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>>;
+}
+
+export const RunFinalizationOutcomeStatuses = Object.freeze({
+  completed: "completed",
+  failed: "failed",
+});
+
+export type RunFinalizationOutcomeStatus =
+  typeof RunFinalizationOutcomeStatuses[keyof typeof RunFinalizationOutcomeStatuses];
+
+export interface AuthoritativeRunFinalizationRecord extends RunResultSummary {
+  readonly finalizedAt: string;
+  readonly outcome: RunFinalizationOutcomeStatus;
+}
+
+export interface RunFinalizationRegistrationRequest {
+  readonly runId: string;
+  readonly workflowId: string;
+  readonly workspaceId?: string;
+  readonly finalizedAt: string;
+  readonly outcome: RunFinalizationOutcomeStatus;
+  readonly result?: RunResultRegistrationInput;
+  readonly safeFailureCode?: string;
+  readonly safeFailureMessage?: string;
+}
+
+export interface RunFinalizationRegistrationResult {
+  readonly summary: AuthoritativeRunFinalizationRecord;
+  readonly internalDiagnostics?: Readonly<Record<string, unknown>>;
+}
+
+export interface IRunFinalizationResultRegistrationPort {
+  registerFinalizationResult(request: RunFinalizationRegistrationRequest): Promise<RunFinalizationRegistrationResult>;
 }
 
