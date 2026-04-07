@@ -118,7 +118,7 @@ export function OperationalRunListPanel({
         <SurfaceStateBoundary state={listState}>
           <SurfaceResponsiveTableContainer responsiveProfile={responsiveProfile}>
             <div className="ui-table-wrapper">
-              <table className="ui-table">
+              <table className="ui-table ui-responsive-table__table">
                 <thead>
                   <tr>
                     <th scope="col">Execution</th>
@@ -143,35 +143,40 @@ export function OperationalRunListPanel({
                         key={row.executionId}
                         className={row.executionId === selectedExecutionId ? "ui-operational-run-list__row--selected" : undefined}
                       >
-                        <td>
+                        <td data-label="Execution">
                           <button
                             type="button"
                             className="ui-button ui-button--ghost ui-button--sm ui-operational-run-list__inspect"
                             onClick={() => onInspectRun(row.executionId)}
+                            title={row.executionId}
                           >
-                            {row.executionId}
+                            <span className="ui-operational-truncate">{row.executionId}</span>
                           </button>
-                          <div className="ui-text-secondary ui-text-small">
+                          <div className="ui-text-secondary ui-text-small ui-operational-truncate" title={row.queueItem?.systemId ?? row.recentRun?.executionPathLabel ?? "run detail only"}>
                             {row.queueItem?.systemId ?? row.recentRun?.executionPathLabel ?? "run detail only"}
                           </div>
                         </td>
-                        <td>
+                        <td data-label="Queue">
                           {row.queueItem ? (
                             <span className={`ui-badge ui-badge--${mapQueueStatusToTone(row.queueItem.status)}`}>{row.queueItem.status}</span>
                           ) : (
                             <span className="ui-text-secondary ui-text-small">not queued</span>
                           )}
                         </td>
-                        <td>
+                        <td data-label="Run status">
                           {row.recentRun ? (
                             <span className={`ui-badge ui-badge--${mapRunStatusTone(row.recentRun.statusTone)}`}>{row.recentRun.statusLabel}</span>
                           ) : (
                             <span className="ui-text-secondary ui-text-small">status pending detail lookup</span>
                           )}
                         </td>
-                        <td>{row.recentRun?.progressLabel ?? "-"}</td>
-                        <td>{formatOperationalTimestamp(row.recentRun?.updatedAt ?? row.queueItem?.startedAt ?? row.queueItem?.enqueuedAt)}</td>
-                        <td>
+                        <td data-label="Progress">
+                          <span className="ui-operational-truncate" title={row.recentRun?.progressLabel ?? "-"}>
+                            {row.recentRun?.progressLabel ?? "-"}
+                          </span>
+                        </td>
+                        <td data-label="Updated">{formatOperationalTimestamp(row.recentRun?.updatedAt ?? row.queueItem?.startedAt ?? row.queueItem?.enqueuedAt)}</td>
+                        <td data-label="Actions">
                           <SurfaceResponsiveActionMenuContainer responsiveProfile={responsiveProfile}>
                             <SurfaceActionMenu
                               triggerLabel="Row actions"

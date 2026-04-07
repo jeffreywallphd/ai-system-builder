@@ -186,6 +186,11 @@ export function OperationalApprovedRunLaunchPanel({
       <div className="ui-card__body ui-stack ui-stack--sm">
         <SurfaceResponsiveFormLayout responsiveProfile={responsiveProfile}>
           <div className="ui-responsive-form__grid">
+            {surface === "thin-client" ? (
+              <p className="ui-text-small ui-text-secondary ui-operational-approved-run-launch__step">
+                Step 1: Provide approved run identifiers and bounded parameters.
+              </p>
+            ) : null}
             <label className="ui-field">
               <span className="ui-field__label">System id</span>
               <input
@@ -256,7 +261,12 @@ export function OperationalApprovedRunLaunchPanel({
             </label>
           </div>
         </SurfaceResponsiveFormLayout>
-        <div className="ui-page__actions">
+        {surface === "thin-client" ? (
+          <p className="ui-text-small ui-text-secondary ui-operational-approved-run-launch__step">
+            Step 2: Launch the approved run and review validation feedback.
+          </p>
+        ) : null}
+        <div className="ui-page__actions ui-operational-approved-run-launch__actions">
           <button
             type="button"
             className="ui-button ui-button--secondary ui-button--small"

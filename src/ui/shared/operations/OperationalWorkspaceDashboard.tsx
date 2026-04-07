@@ -154,10 +154,10 @@ export default function OperationalWorkspaceDashboard({
                 {queueItems.map((item) => (
                   <article key={item.queueItemId} className="ui-operational-dashboard__item">
                     <div className="ui-row ui-row--between ui-row--wrap">
-                      <strong>{item.executionId}</strong>
+                      <strong className="ui-operational-truncate" title={item.executionId}>{item.executionId}</strong>
                       <span className="ui-badge ui-badge--neutral">{item.status}</span>
                     </div>
-                    <p className="ui-text-small ui-text-secondary">{item.systemId}</p>
+                    <p className="ui-text-small ui-text-secondary ui-operational-truncate" title={item.systemId}>{item.systemId}</p>
                     <div className="ui-page__actions">
                       <button type="button" className="ui-button ui-button--ghost ui-button--small" onClick={() => onInspectRun(item.executionId)}>
                         Inspect
@@ -189,11 +189,11 @@ export default function OperationalWorkspaceDashboard({
                 {recentRuns.map((run) => (
                   <article key={run.runId} className="ui-operational-dashboard__item">
                     <div className="ui-row ui-row--between ui-row--wrap">
-                      <strong>{run.runId}</strong>
+                      <strong className="ui-operational-truncate" title={run.runId}>{run.runId}</strong>
                       <span className={`ui-badge ui-badge--${statusToneToBadgeTone(run.statusTone)}`}>{run.statusLabel}</span>
                     </div>
                     <p className="ui-text-small ui-text-secondary">{run.progressLabel}</p>
-                    <p className="ui-text-small ui-text-secondary">{run.executionPathLabel}</p>
+                    <p className="ui-text-small ui-text-secondary ui-operational-truncate" title={run.executionPathLabel}>{run.executionPathLabel}</p>
                   </article>
                 ))}
               </div>
@@ -217,13 +217,15 @@ export default function OperationalWorkspaceDashboard({
                 {recentOutputs.map((output) => (
                   <article key={output.executionId} className="ui-operational-dashboard__item">
                     <div className="ui-row ui-row--between ui-row--wrap">
-                      <strong>{output.executionId}</strong>
+                      <strong className="ui-operational-truncate" title={output.executionId}>{output.executionId}</strong>
                       <span className="ui-badge ui-badge--neutral">{output.status ?? "unknown"}</span>
                     </div>
                     <p className="ui-text-small ui-text-secondary">
                       {output.outputFieldCount} output fields, {output.outputContractIds.length} contract ids
                     </p>
-                    <p className="ui-text-small ui-text-secondary">{output.outputContractIds.join(", ") || "No output contract ids."}</p>
+                    <p className="ui-text-small ui-text-secondary ui-operational-truncate" title={output.outputContractIds.join(", ") || "No output contract ids."}>
+                      {output.outputContractIds.join(", ") || "No output contract ids."}
+                    </p>
                   </article>
                 ))}
               </div>

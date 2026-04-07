@@ -107,3 +107,11 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
 - `RunPage` now keeps reconnect orchestration centralized at page/service integration level (single reconnect trigger over `RuntimeRealtimeSubscriptionService`) instead of per-panel websocket/reconnect logic.
 - Dashboard/run/queue operational surfaces now consume the same indicator seam (`OperationalWorkspaceDashboard`, run monitoring panels, queue monitoring panels) so connection-state rendering is consistent across desktop and thin-client layouts.
 - Connectivity-state regression coverage now includes shared indicator rendering assertions (`src/ui/shared/tests/OperationalRealtimeIndicators.test.tsx`) plus updated dashboard/run/queue shared-surface tests.
+
+## Story 15.2.7 update
+- Mobile/tablet usability refinement remains shared-first in `src/ui/shared/operations/*` and avoids new page-level breakpoint logic in `src/ui/pages/RunPage.tsx`.
+- Thin-client operational monitor/review/launch flows now enforce practical small-screen composition:
+  - run-list tables now consistently emit responsive card semantics (`ui-responsive-table__table` and per-cell `data-label`),
+  - queue visibility and approved launch controls now expose sticky mobile wrappers in shared operational styling,
+  - result review now includes explicit two-step mobile guidance while preserving desktop/tablet component reuse.
+- Long identifier readability/truncation behavior is now centralized in shared operational presentation classes so narrow surfaces and desktop remain architecture-aligned.

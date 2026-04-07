@@ -65,6 +65,7 @@ describe("Operational queue visibility and action flows", () => {
     expect(html).toContain("Live updates: Connected");
     expect(html).toContain("data-label=\"Execution\"");
     expect(html).toContain("Visible queue items: 2");
+    expect(html).toContain("ui-operational-queue-visibility__controls");
   });
 
   it("enforces permission and queue-state guards while invoking shared queue row actions", async () => {

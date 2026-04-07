@@ -118,14 +118,16 @@ export function OperationalQueueVisibilityPanel({
         </p>
       </div>
       <div className="ui-card__body ui-stack ui-stack--sm">
-        <OperationalQueueFiltersPanel filters={filters} totalCount={totalCount} onFiltersChanged={onFiltersChanged} />
-        <SurfaceActionButtonStrip
-          actions={pageActions}
-          context={pageActionContext}
-          scope="page"
-          responsiveProfile={responsiveProfile}
-          className="ui-page__actions"
-        />
+        <div className="ui-operational-queue-visibility__controls">
+          <OperationalQueueFiltersPanel filters={filters} totalCount={totalCount} onFiltersChanged={onFiltersChanged} />
+          <SurfaceActionButtonStrip
+            actions={pageActions}
+            context={pageActionContext}
+            scope="page"
+            responsiveProfile={responsiveProfile}
+            className="ui-page__actions"
+          />
+        </div>
         <SurfaceStateBoundary state={listState}>
           <SurfaceResponsiveTableContainer responsiveProfile={responsiveProfile}>
             <div className="ui-table-wrapper">
@@ -160,12 +162,15 @@ export function OperationalQueueVisibilityPanel({
                               onSelectQueueItem(row.queueItem.queueItemId);
                               onInspectRun(row.queueItem.executionId);
                             }}
+                            title={row.queueItem.executionId}
                           >
-                            {row.queueItem.executionId}
+                            <span className="ui-operational-truncate">{row.queueItem.executionId}</span>
                           </button>
                         </td>
                         <td data-label="System">
-                          <span className="ui-text-secondary ui-text-small">{row.queueItem.systemId}</span>
+                          <span className="ui-text-secondary ui-text-small ui-operational-truncate" title={row.queueItem.systemId}>
+                            {row.queueItem.systemId}
+                          </span>
                         </td>
                         <td data-label="Status">
                           <span className={`ui-badge ui-badge--${mapQueueStatusToTone(row.queueItem.status)}`}>{row.queueItem.status}</span>

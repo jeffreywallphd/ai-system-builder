@@ -101,5 +101,6 @@ describe("OperationalWorkspaceDashboard", () => {
     expect(html).toContain("Live updates: Connected");
     expect(html).toContain("Recent outputs");
     expect(html).toContain("Node availability");
+    expect(html).toContain("ui-operational-truncate");
   });
 });
