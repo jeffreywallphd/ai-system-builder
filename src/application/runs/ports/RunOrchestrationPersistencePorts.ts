@@ -217,6 +217,10 @@ export interface IRunNodePlacementHoldRepository {
     readonly holdToken: string;
     readonly releasedAt: string;
   }): Promise<boolean>;
+  releaseExpiredNodePlacementHolds?(input: {
+    readonly asOf: string;
+    readonly limit?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunNodePlacementHoldRecord>>;
 }
 
 export interface IRunOrchestrationQueuePersistenceRepository {

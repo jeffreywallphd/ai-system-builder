@@ -9,6 +9,7 @@ import type {
 import type {
   AuthoritativeRunDispatchAttemptRecord,
   AuthoritativeRunDispatchAttemptResult,
+  AuthoritativeRunNodePlacementHoldRecord,
   AuthoritativeRunNodeClaimResult,
   AuthoritativeRunQueueEntryRecord,
   AuthoritativeRunQueueMutationResult,
@@ -87,7 +88,9 @@ class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
 class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceRepository {
   public readonly entries = new Map<string, AuthoritativeRunQueueEntryRecord>();
   public readonly attempts = new Map<string, AuthoritativeRunDispatchAttemptRecord>();
+  public readonly placementHolds = new Map<string, AuthoritativeRunNodePlacementHoldRecord>();
   public allowRecoveryRequeue = true;
+  public readonly releaseClaimFailures = new Set<string>();
 
   public async getQueueEntryByRunId(runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined> {
     return this.entries.get(runId);
@@ -144,6 +147,9 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
     readonly claimToken: string;
     readonly releasedAt: string;
   }): Promise<boolean> {
+    if (this.releaseClaimFailures.has(input.runId)) {
+      return false;
+    }
     const entry = this.entries.get(input.runId);
     if (!entry || entry.claimToken !== input.claimToken) {
       return false;
@@ -239,6 +245,21 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
         .filter((entry) => entry.runId === runId)
         .sort((left, right) => right.preparedAt.localeCompare(left.preparedAt) || left.attemptId.localeCompare(right.attemptId)),
     );
+  }
+
+  public async releaseExpiredNodePlacementHolds(input: {
+    readonly asOf: string;
+    readonly limit?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunNodePlacementHoldRecord>> {
+    const limit = Math.max(1, input.limit ?? Number.MAX_SAFE_INTEGER);
+    const expired = [...this.placementHolds.values()]
+      .filter((record) => record.expiresAt <= input.asOf)
+      .sort((left, right) => left.expiresAt.localeCompare(right.expiresAt) || left.nodeId.localeCompare(right.nodeId))
+      .slice(0, limit);
+    for (const record of expired) {
+      this.placementHolds.delete(record.nodeId);
+    }
+    return Object.freeze(expired);
   }
 }
 
@@ -530,6 +551,99 @@ describe("RecoverRunOrchestrationStartupStateUseCase", () => {
     expect(result.actions.some((entry) => entry.kind === RunOrchestrationRecoveryActionKinds.dispatchFailedToStartReconciled)).toBe(true);
     const recovered = runRepository.runs.get("run:dispatching-failed");
     expect((recovered?.metadata as RunAuthoritativeMetadata).canonicalRun.state).toBe("failed");
+  });
+
+  it("releases expired placement holds and clears deferred intermediary reservations", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryIntentRepository();
+    seedRun({
+      runRepository,
+      queueRepository,
+      runId: "run:deferred-with-claim",
+      state: RunLifecycleStates.queued,
+    });
+
+    const deferredEntry = queueRepository.entries.get("run:deferred-with-claim");
+    if (!deferredEntry) {
+      throw new Error("Expected seeded queue entry.");
+    }
+    queueRepository.entries.set("run:deferred-with-claim", Object.freeze({
+      ...deferredEntry,
+      eligibilityMarker: "deferred",
+      claimToken: "claim:deferred",
+      claimedBy: "orchestrator:alpha",
+      claimedAt: "2026-04-07T10:08:00.000Z",
+      claimExpiresAt: "2026-04-07T10:30:00.000Z",
+      updatedAt: "2026-04-07T10:08:00.000Z",
+      revision: deferredEntry.revision + 1,
+    }));
+    queueRepository.placementHolds.set("node:trusted-z", Object.freeze({
+      holdToken: "node-hold:expired",
+      runId: "run:deferred-with-claim",
+      queueId: "queue:default",
+      nodeId: "node:trusted-z",
+      reservationOwner: "orchestrator:alpha",
+      claimToken: "claim:deferred",
+      heldAt: "2026-04-07T10:04:00.000Z",
+      expiresAt: "2026-04-07T10:05:00.000Z",
+    }));
+
+    const useCase = new RecoverRunOrchestrationStartupStateUseCase({
+      runRepository,
+      queueRepository,
+      placementHoldRepository: queueRepository,
+      orchestrationIntentRepository: intentRepository,
+    });
+    const result = await useCase.execute({
+      asOf: "2026-04-07T10:20:00.000Z",
+    });
+
+    expect(result.actions.some((entry) => entry.kind === RunOrchestrationRecoveryActionKinds.expiredPlacementHoldReleased)).toBe(true);
+    expect(result.actions.some((entry) => entry.kind === RunOrchestrationRecoveryActionKinds.deferredReservationReleased)).toBe(true);
+    expect(queueRepository.placementHolds.size).toBe(0);
+    expect(queueRepository.entries.get("run:deferred-with-claim")?.claimToken).toBeUndefined();
+  });
+
+  it("records manual follow-up when deferred intermediary reservation cannot be released", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryIntentRepository();
+    seedRun({
+      runRepository,
+      queueRepository,
+      runId: "run:deferred-release-conflict",
+      state: RunLifecycleStates.queued,
+    });
+
+    const deferredEntry = queueRepository.entries.get("run:deferred-release-conflict");
+    if (!deferredEntry) {
+      throw new Error("Expected seeded queue entry.");
+    }
+    queueRepository.entries.set("run:deferred-release-conflict", Object.freeze({
+      ...deferredEntry,
+      eligibilityMarker: "deferred",
+      claimToken: "claim:deferred-conflict",
+      claimedBy: "orchestrator:alpha",
+      claimedAt: "2026-04-07T10:08:00.000Z",
+      claimExpiresAt: "2026-04-07T10:09:00.000Z",
+      updatedAt: "2026-04-07T10:08:00.000Z",
+      revision: deferredEntry.revision + 1,
+    }));
+    queueRepository.releaseClaimFailures.add("run:deferred-release-conflict");
+
+    const useCase = new RecoverRunOrchestrationStartupStateUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+    });
+    const result = await useCase.execute({
+      asOf: "2026-04-07T10:20:00.000Z",
+    });
+
+    expect(result.actions.some((entry) => entry.kind === RunOrchestrationRecoveryActionKinds.manualFollowUpRequired)).toBe(true);
+    const manualEvents = intentRepository.events.filter((event) => event.details?.recoveryStatus === "manual-follow-up");
+    expect(manualEvents.length).toBeGreaterThan(0);
   });
 
   it("fails stale running runs and marks unresolved requeue gaps as manual follow-up", async () => {

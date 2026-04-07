@@ -11,6 +11,7 @@ import {
 } from "@application/common/ports/PlatformTransactionPorts";
 import type {
   IAuthoritativeRunPersistenceRepository,
+  IRunNodePlacementHoldRepository,
   IRunOrchestrationIntentRepository,
   IRunOrchestrationQueuePersistenceRepository,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
@@ -27,7 +28,9 @@ import {
 import { FinalizeRunExecutionOutcomeUseCase } from "./FinalizeRunExecutionOutcomeUseCase";
 
 export const RunOrchestrationRecoveryActionKinds = Object.freeze({
+  expiredPlacementHoldReleased: "expired-placement-hold-released",
   expiredClaimReleased: "expired-claim-released",
+  deferredReservationReleased: "deferred-reservation-released",
   staleAssignmentRequeued: "stale-assignment-requeued",
   orphanedAssignmentFailed: "orphaned-assignment-failed",
   assignmentMismatchFailed: "assignment-mismatch-failed",
@@ -76,6 +79,7 @@ export interface RecoverRunOrchestrationStartupStateResult {
 interface RecoverRunOrchestrationStartupStateUseCaseDependencies {
   readonly runRepository: IAuthoritativeRunPersistenceRepository;
   readonly queueRepository: IRunOrchestrationQueuePersistenceRepository;
+  readonly placementHoldRepository?: Pick<IRunNodePlacementHoldRepository, "releaseExpiredNodePlacementHolds">;
   readonly orchestrationIntentRepository: IRunOrchestrationIntentRepository;
   readonly transactionManager?: IPlatformTransactionManager;
   readonly now?: () => Date;
@@ -146,7 +150,18 @@ export class RecoverRunOrchestrationStartupStateUseCase {
         includeDequeued: true,
       })
       : Object.freeze([]);
-    const queueByRunId = new Map(queueEntries.map((entry) => [entry.runId, entry]));
+    const queueByRunId = new Map(queueEntries.map((entry) => [entry.runId, entry] as const));
+
+    await this.reconcileExpiredPlacementHolds({
+      asOf,
+      actions,
+    });
+
+    await this.reconcileDeferredQueueIntermediaryState({
+      asOf,
+      queueEntries,
+      actions,
+    });
 
     await this.reconcileExpiredUnassignedClaims({
       asOf,
@@ -251,6 +266,89 @@ export class RecoverRunOrchestrationStartupStateUseCase {
         occurredAt: input.asOf,
         actions: input.actions,
         message: "Released expired queue claim so assignment-ready selection can safely re-claim the run.",
+      });
+    }
+  }
+
+  private async reconcileExpiredPlacementHolds(input: {
+    readonly asOf: string;
+    readonly actions: RunOrchestrationRecoveryAction[];
+  }): Promise<void> {
+    if (!this.dependencies.placementHoldRepository?.releaseExpiredNodePlacementHolds) {
+      return;
+    }
+
+    const released = await this.dependencies.placementHoldRepository.releaseExpiredNodePlacementHolds({
+      asOf: input.asOf,
+      limit: 500,
+    });
+    for (const hold of released) {
+      await this.recordAppliedRecovery({
+        runId: hold.runId,
+        kind: RunOrchestrationRecoveryActionKinds.expiredPlacementHoldReleased,
+        occurredAt: input.asOf,
+        actions: input.actions,
+        message: `Released expired node placement hold '${hold.holdToken}' for node '${hold.nodeId}'.`,
+      });
+    }
+  }
+
+  private async reconcileDeferredQueueIntermediaryState(input: {
+    readonly asOf: string;
+    readonly queueEntries: ReadonlyArray<{
+      readonly runId: string;
+      readonly eligibilityMarker: string;
+      readonly claimToken?: string;
+      readonly assignmentNodeId?: string;
+      readonly assignmentClaimedAt?: string;
+      readonly dispatchPreparedAt?: string;
+      readonly dequeuedAt?: string;
+    }>;
+    readonly actions: RunOrchestrationRecoveryAction[];
+  }): Promise<void> {
+    for (const queueEntry of input.queueEntries) {
+      if (queueEntry.eligibilityMarker !== "deferred") {
+        continue;
+      }
+
+      const hasIntermediaryAssignmentSignals = Boolean(
+        queueEntry.dequeuedAt || queueEntry.assignmentNodeId || queueEntry.assignmentClaimedAt || queueEntry.dispatchPreparedAt,
+      );
+      if (hasIntermediaryAssignmentSignals) {
+        await this.recordManualFollowUp({
+          runId: queueEntry.runId,
+          occurredAt: input.asOf,
+          actions: input.actions,
+          message: "Deferred queue entry retained assignment/dequeue intermediary markers and requires manual reconciliation.",
+        });
+        continue;
+      }
+
+      if (!queueEntry.claimToken) {
+        continue;
+      }
+
+      const released = await this.dependencies.queueRepository.releaseRunClaim({
+        runId: queueEntry.runId,
+        claimToken: queueEntry.claimToken,
+        releasedAt: input.asOf,
+      });
+      if (!released) {
+        await this.recordManualFollowUp({
+          runId: queueEntry.runId,
+          occurredAt: input.asOf,
+          actions: input.actions,
+          message: "Deferred queue entry retained reservation claim that could not be released during startup recovery.",
+        });
+        continue;
+      }
+
+      await this.recordAppliedRecovery({
+        runId: queueEntry.runId,
+        kind: RunOrchestrationRecoveryActionKinds.deferredReservationReleased,
+        occurredAt: input.asOf,
+        actions: input.actions,
+        message: "Released stale reservation claim from deferred queue entry to clear interrupted no-placement defer state.",
       });
     }
   }
