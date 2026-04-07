@@ -95,7 +95,7 @@ export class HttpRuntimeControlClient implements RuntimeControlClient {
     const { workspaceId } = request;
     return await this.sharedApiClient.requestJson({
       method: "POST",
-      path: `${SystemRuntimeTransportRoutes.cancelRun.replace(":executionId", encodeURIComponent(request.executionId))}?workspaceId=${encodeURIComponent(workspaceId)}`,
+      path: `${SystemRuntimeTransportRoutes.cancelRun.replace(/:executionId|:runId/g, encodeURIComponent(request.executionId))}?workspaceId=${encodeURIComponent(workspaceId)}`,
       body: {
         reason: request.reason,
         cancelledAt: request.cancelledAt,
@@ -113,7 +113,7 @@ export class HttpRuntimeControlClient implements RuntimeControlClient {
     const { workspaceId, executionId } = request;
     return await this.sharedApiClient.requestJson({
       method: "GET",
-      path: `${SystemRuntimeTransportRoutes.getRunStatus.replace(":executionId", encodeURIComponent(executionId ?? ""))}?workspaceId=${encodeURIComponent(workspaceId)}`,
+      path: `${SystemRuntimeTransportRoutes.getRunStatus.replace(/:executionId|:runId/g, encodeURIComponent(executionId ?? ""))}?workspaceId=${encodeURIComponent(workspaceId)}`,
       sessionToken,
       parseResponse: (payload) => parseSharedApiEnvelope(payload) as SharedApiEnvelope<RuntimeSdkExecutionStatusResponse>,
     }) as RuntimeSdkResponse<RuntimeSdkExecutionStatusResponse>;
@@ -130,7 +130,7 @@ export class HttpRuntimeControlClient implements RuntimeControlClient {
     appendSharedApiQueryValue(query, "diagnosticsLimit", diagnosticsLimit?.toString());
     return await this.sharedApiClient.requestJson({
       method: "GET",
-      path: `${SystemRuntimeTransportRoutes.getRunResult.replace(":executionId", encodeURIComponent(executionId))}${toSharedApiQuerySuffix(query)}`,
+      path: `${SystemRuntimeTransportRoutes.getRunResult.replace(/:executionId|:runId/g, encodeURIComponent(executionId))}${toSharedApiQuerySuffix(query)}`,
       sessionToken,
       parseResponse: (payload) => parseSharedApiEnvelope(payload) as SharedApiEnvelope<RuntimeSdkExecutionResultResponse>,
     }) as RuntimeSdkResponse<RuntimeSdkExecutionResultResponse>;
@@ -147,7 +147,7 @@ export class HttpRuntimeControlClient implements RuntimeControlClient {
     appendSharedApiQueryValue(query, "logLimit", logLimit?.toString());
     return await this.sharedApiClient.requestJson({
       method: "GET",
-      path: `${SystemRuntimeTransportRoutes.getRunTrace.replace(":executionId", encodeURIComponent(executionId))}${toSharedApiQuerySuffix(query)}`,
+      path: `${SystemRuntimeTransportRoutes.getRunTrace.replace(/:executionId|:runId/g, encodeURIComponent(executionId))}${toSharedApiQuerySuffix(query)}`,
       sessionToken,
       parseResponse: (payload) => parseSharedApiEnvelope(payload) as SharedApiEnvelope<RuntimeSdkExecutionTraceResponse>,
     }) as RuntimeSdkResponse<RuntimeSdkExecutionTraceResponse>;

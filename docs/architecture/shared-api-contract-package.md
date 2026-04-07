@@ -32,6 +32,8 @@ Provide a canonical shared transport package so desktop, browser, and responsive
   - Workspace administration and invitation transport contracts.
 - `src/shared/contracts/runtime/SystemRuntimeTransportContracts.ts`
   - Runtime run lifecycle and queue transport contracts.
+- `src/shared/contracts/runtime/RunOrchestrationTransportContracts.ts`
+  - Canonical run submission/mutation/status contracts for authoritative run lifecycle orchestration.
 - `src/shared/contracts/runtime/SystemRuntimeRealtimeEventContracts.ts`
   - Runtime real-time envelope, topic, and subscription contracts for converged desktop/thin-client event handling.
 - `src/shared/contracts/deployment/DeploymentTransportContracts.ts`
@@ -39,6 +41,7 @@ Provide a canonical shared transport package so desktop, browser, and responsive
 - `src/shared/schemas/identity/IdentityTransportSchemaContracts.ts`
 - `src/shared/schemas/workspaces/WorkspaceTransportSchemaContracts.ts`
 - `src/shared/schemas/runtime/SystemRuntimeTransportSchemaContracts.ts`
+- `src/shared/schemas/runtime/RunOrchestrationTransportSchemaContracts.ts`
 - `src/shared/schemas/runtime/SystemRuntimeRealtimeEventSchemaContracts.ts`
 - `src/shared/schemas/deployment/DeploymentTransportSchemaContracts.ts`
   - Schema-backed payload parsers and validation error shaping for shared contracts.

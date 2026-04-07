@@ -1,5 +1,11 @@
 import { z } from "zod";
 import { RuntimeQueueItemStatuses } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
+import {
+  RunOrchestrationTransportSchemaValidationError,
+  parseRunCancellationRequest,
+  parseRunSubmissionRequest,
+  toLegacyRuntimeStartRunRequest,
+} from "@shared/schemas/runtime/RunOrchestrationTransportSchemaContracts";
 
 export interface SystemRuntimeTransportSchemaValidationIssue {
   readonly path: string;
@@ -159,11 +165,56 @@ function parseRuntimeSchema<T>(schemaName: string, schema: z.ZodSchema<T>, paylo
 }
 
 export function parseRuntimeStartRunRequest(payload: unknown): RuntimeStartRunRequestPayload {
-  return parseRuntimeSchema("RuntimeStartRunRequest", RuntimeStartRunRequestSchema, payload);
+  try {
+    const parsed = parseRunSubmissionRequest(payload);
+    return toLegacyRuntimeStartRunRequest(parsed);
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      throw new SystemRuntimeTransportSchemaValidationError(
+        "RuntimeStartRunRequest",
+        error.issues,
+      );
+    }
+    throw error;
+  }
 }
 
 export function parseRuntimeCancelRunRequest(payload: unknown): RuntimeCancelRunRequestPayload {
-  return parseRuntimeSchema("RuntimeCancelRunRequest", RuntimeCancelRunRequestSchema, payload);
+  try {
+    const body = typeof payload === "object" && payload
+      ? payload as Record<string, unknown>
+      : {};
+    const normalized = Object.freeze({
+      runId: typeof body.runId === "string"
+        ? body.runId
+        : typeof body.executionId === "string"
+          ? body.executionId
+          : undefined,
+      reason: body.reason,
+      requestedByActorId: body.requestedByActorId,
+      requestedAt: typeof body.requestedAt === "string"
+        ? body.requestedAt
+        : typeof body.cancelledAt === "string"
+          ? body.cancelledAt
+          : undefined,
+      idempotencyKey: body.idempotencyKey,
+    });
+    const parsed = parseRunCancellationRequest(normalized);
+    return Object.freeze({
+      executionId: parsed.runId,
+      reason: parsed.reason,
+      cancelledAt: parsed.requestedAt,
+      idempotencyKey: parsed.idempotencyKey,
+    });
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      throw new SystemRuntimeTransportSchemaValidationError(
+        "RuntimeCancelRunRequest",
+        error.issues,
+      );
+    }
+    throw error;
+  }
 }
 
 export function parseRuntimeQueueListRequest(payload: unknown): RuntimeQueueListRequestPayload {
