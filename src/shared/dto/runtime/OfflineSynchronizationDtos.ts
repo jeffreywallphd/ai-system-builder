@@ -1,4 +1,6 @@
 import type {
+  OfflineLocalExecutionRecord,
+  OfflineLocalExecutionRegistrationEnvelope,
   OfflineQueuedMutationEnvelope,
 } from "@domain/platform/OfflineLocalModeBoundaries";
 import type {
@@ -14,6 +16,8 @@ import {
   type OfflineConnectivitySurfaceStateDto,
   type OfflineConflictIndicatorDto,
   type OfflineDraftStateDto,
+  type OfflineLocalExecutionRegistrationEnvelopeDto,
+  type OfflineLocalExecutionRecordDto,
   type OfflinePendingOperationEnvelopeDto,
   type OfflineReconciliationOutcomeDto,
   type OfflineSynchronizationStateSnapshotDto,
@@ -62,6 +66,56 @@ export function toOfflinePendingOperationEnvelopeDto(
     localMutationRevision: envelope.localMutationRevision,
     queuedAt: envelope.queuedAt,
     userVisibleSyncStatus: envelope.userVisibleSyncStatus,
+    divergenceDisclosureToken: envelope.divergenceDisclosureToken,
+    replayDescriptor,
+    retryCount: Math.max(0, Math.floor(options?.retryCount ?? 0)),
+    lastAttemptedAt: options?.lastAttemptedAt,
+  });
+}
+
+export function toOfflineLocalExecutionRecordDto(record: OfflineLocalExecutionRecord): OfflineLocalExecutionRecordDto {
+  return Object.freeze({
+    executionId: record.executionId,
+    executionClass: record.executionClass,
+    resourceClass: record.resourceClass,
+    resourceId: record.resourceId,
+    startedAt: record.startedAt,
+    completedAt: record.completedAt,
+    executedByActorUserIdentityId: record.executedByActorUserIdentityId,
+    nodeOperationalMode: record.nodeOperationalMode,
+    workstationMode: record.workstationMode,
+    outcome: record.outcome,
+    inputDigest: record.inputDigest,
+    outputs: Object.freeze(record.outputs.map((output) => Object.freeze({
+      outputId: output.outputId,
+      outputClass: output.outputClass,
+      contentDigest: output.contentDigest,
+      sizeBytes: output.sizeBytes,
+    }))),
+    historyScope: record.historyScope,
+  });
+}
+
+export function toOfflineLocalExecutionRegistrationEnvelopeDto(
+  envelope: OfflineLocalExecutionRegistrationEnvelope,
+  options?: {
+    readonly retryCount?: number;
+    readonly lastAttemptedAt?: string;
+  },
+): OfflineLocalExecutionRegistrationEnvelopeDto {
+  const replayDescriptor: OfflinePendingOperationReplayDescriptorDto = Object.freeze({
+    method: envelope.replayDescriptor.method,
+    path: envelope.replayDescriptor.path,
+    idempotencyKey: envelope.replayDescriptor.idempotencyKey,
+    payload: Object.freeze({ ...envelope.replayDescriptor.payload }),
+    payloadContentType: envelope.replayDescriptor.payloadContentType,
+  });
+
+  return Object.freeze({
+    registrationId: envelope.registrationId,
+    execution: toOfflineLocalExecutionRecordDto(envelope.execution),
+    queuedAt: envelope.queuedAt,
+    userVisibleRegistrationStatus: envelope.userVisibleRegistrationStatus,
     divergenceDisclosureToken: envelope.divergenceDisclosureToken,
     replayDescriptor,
     retryCount: Math.max(0, Math.floor(options?.retryCount ?? 0)),
@@ -143,6 +197,7 @@ export function toOfflineConnectivitySurfaceStateDto(
 export function toOfflineSyncQueueStateDto(input: {
   readonly queueId: string;
   readonly operations: ReadonlyArray<OfflinePendingOperationEnvelopeDto>;
+  readonly localExecutionRegistrations?: ReadonlyArray<OfflineLocalExecutionRegistrationEnvelopeDto>;
   readonly pendingRunSubmissions?: ReadonlyArray<{
     readonly submissionId: string;
     readonly operationId: string;
@@ -157,6 +212,7 @@ export function toOfflineSyncQueueStateDto(input: {
   return Object.freeze({
     queueId: input.queueId,
     operations: Object.freeze([...input.operations]),
+    localExecutionRegistrations: Object.freeze([...(input.localExecutionRegistrations ?? [])]),
     pendingRunSubmissions: Object.freeze([...(input.pendingRunSubmissions ?? [])]),
     outcomes: Object.freeze([...(input.outcomes ?? [])]),
     updatedAt: input.updatedAt ?? new Date().toISOString(),

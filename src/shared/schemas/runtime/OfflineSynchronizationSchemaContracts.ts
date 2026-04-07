@@ -1,14 +1,21 @@
 import { z } from "zod";
 import {
   OfflineCacheFreshnessStates,
+  OfflineExecutionClasses,
   OfflineConflictClasses,
   OfflineConflictSeverities,
   OfflineConnectivityStates,
   OfflineDraftSyncStatuses,
+  OfflineLocalExecutionHistoryScopes,
+  OfflineLocalExecutionOutcomes,
+  OfflineLocalExecutionOutputClasses,
+  OfflineLocalExecutionRegistrationStatuses,
+  OfflineNodeOperationalModes,
   OfflinePendingOperationIntents,
   OfflinePendingOperationStatuses,
   OfflineReplayHttpMethods,
   OfflineReconciliationActions,
+  OfflineWorkstationModes,
   OfflineSyncResourceClasses,
   OfflineSynchronizationContractVersions,
   OfflineSynchronizationStates,
@@ -101,6 +108,48 @@ const OfflineReplayHttpMethodSchema = z.enum([
   OfflineReplayHttpMethods.put,
   OfflineReplayHttpMethods.patch,
   OfflineReplayHttpMethods.delete,
+]);
+
+const OfflineExecutionClassSchema = z.enum([
+  OfflineExecutionClasses.localWorkflowPreview,
+  OfflineExecutionClasses.localWorkflowValidation,
+]);
+
+const OfflineNodeOperationalModeSchema = z.enum([
+  OfflineNodeOperationalModes.workstationClient,
+  OfflineNodeOperationalModes.managedWorkstationClient,
+  OfflineNodeOperationalModes.dedicatedExecutor,
+  OfflineNodeOperationalModes.authoritativeControlPlane,
+]);
+
+const OfflineWorkstationModeSchema = z.enum([
+  OfflineWorkstationModes.interactiveUserSession,
+  OfflineWorkstationModes.managedBackgroundAgent,
+  OfflineWorkstationModes.sharedKioskSession,
+  OfflineWorkstationModes.headlessService,
+]);
+
+const OfflineLocalExecutionOutcomeSchema = z.enum([
+  OfflineLocalExecutionOutcomes.succeeded,
+  OfflineLocalExecutionOutcomes.failed,
+  OfflineLocalExecutionOutcomes.cancelled,
+]);
+
+const OfflineLocalExecutionHistoryScopeSchema = z.enum([
+  OfflineLocalExecutionHistoryScopes.explicitLocalActivity,
+]);
+
+const OfflineLocalExecutionOutputClassSchema = z.enum([
+  OfflineLocalExecutionOutputClasses.logBundle,
+  OfflineLocalExecutionOutputClasses.previewArtifact,
+  OfflineLocalExecutionOutputClasses.metricsSnapshot,
+]);
+
+const OfflineLocalExecutionRegistrationStatusSchema = z.enum([
+  OfflineLocalExecutionRegistrationStatuses.queuedPendingRegistration,
+  OfflineLocalExecutionRegistrationStatuses.registrationConflict,
+  OfflineLocalExecutionRegistrationStatuses.registrationRejected,
+  OfflineLocalExecutionRegistrationStatuses.registrationApplied,
 ]);
 
 const OfflineConflictSeveritySchema = z.enum([
@@ -209,6 +258,63 @@ const OfflinePendingOperationReplayDescriptorDtoSchema = z.object({
   payloadContentType: RequiredStringSchema.optional(),
 }).strict();
 
+const OfflineLocalExecutionOutputDtoSchema = z.object({
+  outputId: RequiredStringSchema,
+  outputClass: OfflineLocalExecutionOutputClassSchema,
+  contentDigest: RequiredStringSchema,
+  sizeBytes: z.number().int().min(0).optional(),
+}).strict();
+
+const OfflineLocalExecutionRecordDtoSchema = z.object({
+  executionId: RequiredStringSchema,
+  executionClass: OfflineExecutionClassSchema,
+  resourceClass: OfflineSyncResourceClassSchema,
+  resourceId: RequiredStringSchema,
+  startedAt: TimestampSchema,
+  completedAt: TimestampSchema,
+  executedByActorUserIdentityId: RequiredStringSchema,
+  nodeOperationalMode: OfflineNodeOperationalModeSchema,
+  workstationMode: OfflineWorkstationModeSchema,
+  outcome: OfflineLocalExecutionOutcomeSchema,
+  inputDigest: RequiredStringSchema,
+  outputs: z.array(OfflineLocalExecutionOutputDtoSchema),
+  historyScope: OfflineLocalExecutionHistoryScopeSchema,
+}).strict().superRefine((value, context) => {
+  if (new Date(value.completedAt).getTime() < new Date(value.startedAt).getTime()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["completedAt"],
+      message: "Local execution completedAt cannot be earlier than startedAt.",
+    });
+  }
+});
+
+const OfflineLocalExecutionRegistrationEnvelopeDtoSchema = z.object({
+  registrationId: RequiredStringSchema,
+  execution: OfflineLocalExecutionRecordDtoSchema,
+  queuedAt: TimestampSchema,
+  userVisibleRegistrationStatus: OfflineLocalExecutionRegistrationStatusSchema,
+  divergenceDisclosureToken: RequiredStringSchema,
+  replayDescriptor: OfflinePendingOperationReplayDescriptorDtoSchema,
+  retryCount: z.number().int().min(0),
+  lastAttemptedAt: TimestampSchema.optional(),
+}).strict().superRefine((value, context) => {
+  if (value.userVisibleRegistrationStatus === OfflineLocalExecutionRegistrationStatuses.registrationApplied) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["userVisibleRegistrationStatus"],
+      message: "Queue local execution registrations cannot retain registration-applied entries; move them to outcomes.",
+    });
+  }
+  if (value.execution.historyScope !== OfflineLocalExecutionHistoryScopes.explicitLocalActivity) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["execution", "historyScope"],
+      message: "Local execution registrations must preserve explicit-local-activity history scope.",
+    });
+  }
+});
+
 export const OfflinePendingOperationEnvelopeDtoSchema: z.ZodType<OfflinePendingOperationEnvelopeDto> = z.object({
   operationId: RequiredStringSchema,
   targetResourceClass: OfflineSyncResourceClassSchema,
@@ -295,6 +401,7 @@ export const OfflineReconciliationOutcomeDtoSchema: z.ZodType<OfflineReconciliat
 export const OfflineSyncQueueStateDtoSchema: z.ZodType<OfflineSyncQueueStateDto> = z.object({
   queueId: RequiredStringSchema,
   operations: z.array(OfflinePendingOperationEnvelopeDtoSchema),
+  localExecutionRegistrations: z.array(OfflineLocalExecutionRegistrationEnvelopeDtoSchema),
   pendingRunSubmissions: z.array(OfflinePendingRunSubmissionDtoSchema),
   outcomes: z.array(OfflineReconciliationOutcomeDtoSchema),
   updatedAt: TimestampSchema,
@@ -319,6 +426,19 @@ export const OfflineSyncQueueStateDtoSchema: z.ZodType<OfflineSyncQueueStateDto>
       });
       break;
     }
+  }
+
+  const localExecutionRegistrationIds = new Set<string>();
+  for (const registration of value.localExecutionRegistrations) {
+    if (localExecutionRegistrationIds.has(registration.registrationId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["localExecutionRegistrations"],
+        message: "Local execution registrations must use unique registrationId values.",
+      });
+      break;
+    }
+    localExecutionRegistrationIds.add(registration.registrationId);
   }
 
   for (const pendingRunSubmission of value.pendingRunSubmissions) {
@@ -373,28 +493,50 @@ export const OfflineSynchronizationStateSnapshotDtoSchema: z.ZodType<OfflineSync
   const pendingOperationCount = value.queue.operations
     .filter((operation) => operation.userVisibleSyncStatus === OfflinePendingOperationStatuses.queuedPendingSync)
     .length;
+  const pendingRegistrationCount = value.queue.localExecutionRegistrations
+    .filter((registration) => (
+      registration.userVisibleRegistrationStatus
+      === OfflineLocalExecutionRegistrationStatuses.queuedPendingRegistration
+    ))
+    .length;
   const conflictCount = value.queue.operations
     .filter((operation) => operation.userVisibleSyncStatus === OfflinePendingOperationStatuses.syncConflict)
+    .length;
+  const registrationConflictCount = value.queue.localExecutionRegistrations
+    .filter((registration) => (
+      registration.userVisibleRegistrationStatus
+      === OfflineLocalExecutionRegistrationStatuses.registrationConflict
+    ))
     .length;
   const rejectedCount = value.queue.operations
     .filter((operation) => operation.userVisibleSyncStatus === OfflinePendingOperationStatuses.syncRejected)
     .length;
+  const registrationRejectedCount = value.queue.localExecutionRegistrations
+    .filter((registration) => (
+      registration.userVisibleRegistrationStatus
+      === OfflineLocalExecutionRegistrationStatuses.registrationRejected
+    ))
+    .length;
 
-  if (value.status.pendingOperationCount !== pendingOperationCount) {
+  const pendingTotalCount = pendingOperationCount + pendingRegistrationCount;
+  const conflictTotalCount = conflictCount + registrationConflictCount;
+  const rejectedTotalCount = rejectedCount + registrationRejectedCount;
+
+  if (value.status.pendingOperationCount !== pendingTotalCount) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["status", "pendingOperationCount"],
       message: "status.pendingOperationCount must match queued operation status counts.",
     });
   }
-  if (value.status.conflictCount !== conflictCount) {
+  if (value.status.conflictCount !== conflictTotalCount) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["status", "conflictCount"],
       message: "status.conflictCount must match queued operation status counts.",
     });
   }
-  if (value.status.rejectedCount !== rejectedCount) {
+  if (value.status.rejectedCount !== rejectedTotalCount) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["status", "rejectedCount"],

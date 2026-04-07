@@ -1,6 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import {
+  OfflineLocalExecutionClasses,
+  OfflineLocalExecutionOutcomes,
+  OfflineLocalExecutionOutputClasses,
+  OfflineNodeOperationalModes,
+  OfflineWorkstationModes,
   OfflineResourceClasses,
+  createOfflineLocalExecutionRecord,
+  createOfflineLocalExecutionRegistrationEnvelope,
   createOfflineQueuedMutationEnvelope,
 } from "@domain/platform/OfflineLocalModeBoundaries";
 import {
@@ -15,6 +22,7 @@ import {
 } from "../../../contracts/runtime/OfflineSynchronizationContracts";
 import {
   toOfflineConnectivitySurfaceStateDto,
+  toOfflineLocalExecutionRegistrationEnvelopeDto,
   toOfflinePendingOperationEnvelopeDto,
   toOfflineReconciliationOutcomeDto,
   toOfflineSynchronizationStateSnapshotDto,
@@ -93,6 +101,7 @@ describe("OfflineSynchronizationDtos", () => {
     const queue = toOfflineSyncQueueStateDto({
       queueId: "offline-sync:workspace-alpha",
       operations: [],
+      localExecutionRegistrations: [],
       updatedAt: "2026-04-07T10:04:01.000Z",
     });
 
@@ -107,5 +116,50 @@ describe("OfflineSynchronizationDtos", () => {
     expect(snapshot.connectivity.state).toBe("disconnected");
     expect(snapshot.status.state).toBe("idle");
     expect(snapshot.contractVersion).toBe("offline-sync/v1");
+  });
+
+  it("maps local execution registrations as explicit local activity", () => {
+    const execution = createOfflineLocalExecutionRecord({
+      executionId: "execution:local:1",
+      executionClass: OfflineLocalExecutionClasses.localWorkflowPreview,
+      resourceClass: OfflineResourceClasses.localRuntimeSession,
+      resourceId: "runtime:session:local:1",
+      startedAt: "2026-04-07T10:05:00.000Z",
+      completedAt: "2026-04-07T10:05:20.000Z",
+      executedByActorUserIdentityId: "user:author-1",
+      nodeOperationalMode: OfflineNodeOperationalModes.workstationClient,
+      workstationMode: OfflineWorkstationModes.interactiveUserSession,
+      outcome: OfflineLocalExecutionOutcomes.succeeded,
+      inputDigest: "sha256:input:local:1",
+      outputs: [{
+        outputId: "output:local:1",
+        outputClass: OfflineLocalExecutionOutputClasses.previewArtifact,
+        contentDigest: "sha256:output:local:1",
+        sizeBytes: 256,
+      }],
+    });
+
+    const registration = createOfflineLocalExecutionRegistrationEnvelope({
+      registrationId: "registration:local:1",
+      execution,
+      queuedAt: "2026-04-07T10:05:25.000Z",
+      divergenceDisclosureToken: "offline-warning:execution:local:1",
+      replayDescriptor: {
+        method: "POST",
+        path: "/v1/offline/local-executions/execution:local:1/register",
+        idempotencyKey: "idem:registration:local:1",
+        payload: { executionId: "execution:local:1" },
+      },
+    });
+
+    const dto = toOfflineLocalExecutionRegistrationEnvelopeDto(registration, {
+      retryCount: 2,
+      lastAttemptedAt: "2026-04-07T10:06:00.000Z",
+    });
+
+    expect(dto.execution.historyScope).toBe("explicit-local-activity");
+    expect(dto.userVisibleRegistrationStatus).toBe("queued-pending-registration");
+    expect(dto.retryCount).toBe(2);
+    expect(dto.replayDescriptor.path).toContain("/offline/local-executions/");
   });
 });

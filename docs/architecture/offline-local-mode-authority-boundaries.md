@@ -163,11 +163,62 @@ Unsafe/impossible auto-merge cases are intentionally deferred:
 - missing authoritative snapshot state;
 - any scenario where deterministic merge safety cannot be proven from bounded reconnect metadata.
 
+## Offline local execution posture (Story 19.1.6)
+
+First production offline execution support is intentionally narrow and explicit.
+
+Eligibility is computed with:
+- resource classification policy (`evaluateOfflineResourcePolicy`)
+- device trust posture
+- node operational mode
+- workstation mode
+- policy flags for local execution + reconnect registration
+
+Canonical evaluator:
+- `evaluateOfflineLocalExecutionEligibility(...)`
+
+Desktop host binding:
+- `DesktopOfflineSupportedExecutionClasses`
+- `evaluateDesktopOfflineLocalExecutionEligibility(...)`
+
+Supported first-production execution classes:
+- `local-workflow-preview`
+- `local-workflow-validation`
+
+Explicitly out-of-scope execution classes for first production:
+- `remote-orchestrated-run-replay`
+- `distributed-cluster-run`
+- `secret-materialized-execution`
+
+### Local execution metadata and registration path
+
+Offline execution is modeled as explicit local activity, not authoritative orchestration success:
+- local record: `createOfflineLocalExecutionRecord(...)`
+- reconnect registration envelope: `createOfflineLocalExecutionRegistrationEnvelope(...)`
+
+Captured metadata includes:
+- execution identity/class/resource linkage
+- actor identity
+- start/completion timestamps
+- input digest
+- output digests/artifact classes
+- node operational mode + workstation mode
+- explicit history scope (`explicit-local-activity`)
+
+Later sync behavior:
+- local execution records are queued as explicit registration envelopes
+- envelopes carry divergence disclosure + replay descriptor
+- pre-marking registration as applied is rejected
+- replay endpoints are scoped to offline local-execution registration paths
+
+This prevents silent blending of local offline execution into authoritative remote orchestration run history.
+
 ## Prohibited patterns
 
 - `silent-global-divergence`: local state appears globally authoritative without explicit sync outcome.
 - `local-cache-as-global-authority`: cached snapshots treated as write authority.
 - `unsignaled-authoritative-overwrite`: reconnect path overwrites server state without explicit divergence disclosure/review.
+- silent local-execution history blur: offline local execution cannot claim authoritative run-orchestration success before explicit registration outcome.
 
 ## Contributor extension rules
 

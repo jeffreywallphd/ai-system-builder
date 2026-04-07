@@ -61,6 +61,39 @@ describe("OfflineSynchronizationSchemaContracts", () => {
           },
           retryCount: 0,
         }],
+        localExecutionRegistrations: [{
+          registrationId: "registration:execution:1",
+          execution: {
+            executionId: "execution:1",
+            executionClass: "local-workflow-preview",
+            resourceClass: "local-runtime-session",
+            resourceId: "runtime:session:1",
+            startedAt: "2026-04-07T10:01:30.000Z",
+            completedAt: "2026-04-07T10:01:50.000Z",
+            executedByActorUserIdentityId: "user:author-1",
+            nodeOperationalMode: "workstation-client",
+            workstationMode: "interactive-user-session",
+            outcome: "succeeded",
+            inputDigest: "sha256:execution:input:1",
+            outputs: [{
+              outputId: "output:execution:1",
+              outputClass: "preview-artifact",
+              contentDigest: "sha256:execution:output:1",
+              sizeBytes: 64,
+            }],
+            historyScope: "explicit-local-activity",
+          },
+          queuedAt: "2026-04-07T10:02:10.000Z",
+          userVisibleRegistrationStatus: "queued-pending-registration",
+          divergenceDisclosureToken: "offline-warning:execution:1",
+          replayDescriptor: {
+            method: "POST",
+            path: "/v1/offline/local-executions/execution:1/register",
+            idempotencyKey: "idem:registration:execution:1",
+            payload: { executionId: "execution:1" },
+          },
+          retryCount: 0,
+        }],
         pendingRunSubmissions: [{
           submissionId: "submission:1",
           operationId: "operation:1",
@@ -74,7 +107,7 @@ describe("OfflineSynchronizationSchemaContracts", () => {
       },
       status: {
         state: "synchronizing",
-        pendingOperationCount: 1,
+        pendingOperationCount: 2,
         conflictCount: 0,
         rejectedCount: 0,
         lastAttemptedAt: "2026-04-07T10:02:02.000Z",
@@ -90,7 +123,7 @@ describe("OfflineSynchronizationSchemaContracts", () => {
     });
 
     expect(parsed.workspaceId).toBe("workspace:alpha");
-    expect(parsed.status.pendingOperationCount).toBe(1);
+    expect(parsed.status.pendingOperationCount).toBe(2);
   });
 
   it("rejects disconnected connectivity snapshots that still claim canResynchronize=true", () => {
@@ -130,6 +163,7 @@ describe("OfflineSynchronizationSchemaContracts", () => {
           },
           retryCount: 0,
         }],
+        localExecutionRegistrations: [],
         pendingRunSubmissions: [],
         outcomes: [],
         updatedAt: "2026-04-07T10:03:01.000Z",
@@ -177,6 +211,7 @@ describe("OfflineSynchronizationSchemaContracts", () => {
           },
           retryCount: 1,
         }],
+        localExecutionRegistrations: [],
         pendingRunSubmissions: [],
         outcomes: [{
           operationId: "operation:conflict:1",
@@ -228,6 +263,7 @@ describe("OfflineSynchronizationSchemaContracts", () => {
         queue: {
           queueId: "offline-sync:workspace-alpha",
           operations: [],
+          localExecutionRegistrations: [],
           pendingRunSubmissions: [],
           outcomes: [],
           updatedAt: "2026-04-07T10:04:00.000Z",
@@ -246,6 +282,64 @@ describe("OfflineSynchronizationSchemaContracts", () => {
           canQueueOperations: true,
           canResynchronize: false,
         },
+      },
+    })).toThrow(OfflineSynchronizationSchemaValidationError);
+  });
+
+  it("rejects local execution registrations that are already marked registration-applied in queue", () => {
+    expect(() => parseOfflineSynchronizationStateSnapshotDto({
+      contractVersion: "offline-sync/v1",
+      workspaceId: "workspace:alpha",
+      cachedResources: [],
+      drafts: [],
+      queue: {
+        queueId: "offline-sync:workspace-alpha",
+        operations: [],
+        localExecutionRegistrations: [{
+          registrationId: "registration:applied:1",
+          execution: {
+            executionId: "execution:applied:1",
+            executionClass: "local-workflow-preview",
+            resourceClass: "local-runtime-session",
+            resourceId: "runtime:session:applied:1",
+            startedAt: "2026-04-07T10:05:00.000Z",
+            completedAt: "2026-04-07T10:05:05.000Z",
+            executedByActorUserIdentityId: "user:author-1",
+            nodeOperationalMode: "workstation-client",
+            workstationMode: "interactive-user-session",
+            outcome: "succeeded",
+            inputDigest: "sha256:execution:applied:1",
+            outputs: [],
+            historyScope: "explicit-local-activity",
+          },
+          queuedAt: "2026-04-07T10:05:06.000Z",
+          userVisibleRegistrationStatus: "registration-applied",
+          divergenceDisclosureToken: "offline-warning:execution:applied:1",
+          replayDescriptor: {
+            method: "POST",
+            path: "/v1/offline/local-executions/execution:applied:1/register",
+            idempotencyKey: "idem:registration:applied:1",
+            payload: { executionId: "execution:applied:1" },
+          },
+          retryCount: 0,
+        }],
+        pendingRunSubmissions: [],
+        outcomes: [],
+        updatedAt: "2026-04-07T10:05:07.000Z",
+      },
+      status: {
+        state: "idle",
+        pendingOperationCount: 0,
+        conflictCount: 0,
+        rejectedCount: 0,
+      },
+      connectivity: {
+        state: "connected",
+        stale: false,
+        localModeActive: false,
+        lastChangedAt: "2026-04-07T10:05:08.000Z",
+        canQueueOperations: true,
+        canResynchronize: true,
       },
     })).toThrow(OfflineSynchronizationSchemaValidationError);
   });

@@ -673,6 +673,470 @@ export function evaluateOfflineResourcePolicy(
   });
 }
 
+export const OfflineLocalExecutionClasses = Object.freeze({
+  localWorkflowPreview: "local-workflow-preview",
+  localWorkflowValidation: "local-workflow-validation",
+  remoteOrchestratedRunReplay: "remote-orchestrated-run-replay",
+  distributedClusterRun: "distributed-cluster-run",
+  secretMaterializedExecution: "secret-materialized-execution",
+});
+
+export type OfflineLocalExecutionClass =
+  typeof OfflineLocalExecutionClasses[keyof typeof OfflineLocalExecutionClasses];
+
+export const OfflineNodeOperationalModes = Object.freeze({
+  workstationClient: "workstation-client",
+  managedWorkstationClient: "managed-workstation-client",
+  dedicatedExecutor: "dedicated-executor",
+  authoritativeControlPlane: "authoritative-control-plane",
+});
+
+export type OfflineNodeOperationalMode =
+  typeof OfflineNodeOperationalModes[keyof typeof OfflineNodeOperationalModes];
+
+export const OfflineWorkstationModes = Object.freeze({
+  interactiveUserSession: "interactive-user-session",
+  managedBackgroundAgent: "managed-background-agent",
+  sharedKioskSession: "shared-kiosk-session",
+  headlessService: "headless-service",
+});
+
+export type OfflineWorkstationMode =
+  typeof OfflineWorkstationModes[keyof typeof OfflineWorkstationModes];
+
+export const OfflineLocalExecutionHistoryScopes = Object.freeze({
+  explicitLocalActivity: "explicit-local-activity",
+  outOfScopeNoRegistration: "out-of-scope-no-registration",
+});
+
+export type OfflineLocalExecutionHistoryScope =
+  typeof OfflineLocalExecutionHistoryScopes[keyof typeof OfflineLocalExecutionHistoryScopes];
+
+export interface OfflineLocalExecutionPolicyInput {
+  readonly executionClass: OfflineLocalExecutionClass | string;
+  readonly resourceClass: OfflineResourceClass | string;
+  readonly resourcePolicy: OfflineResourcePolicyEvaluationInput;
+  readonly nodeOperationalMode: OfflineNodeOperationalMode;
+  readonly workstationMode: OfflineWorkstationMode;
+  readonly allowOfflineExecutionByPolicy: boolean;
+  readonly allowAuthoritativeRegistrationByPolicy: boolean;
+}
+
+export interface OfflineLocalExecutionEligibilityEvaluation {
+  readonly executionClass: string;
+  readonly supportedExecutionClass: boolean;
+  readonly resourceClass: string;
+  readonly allowed: boolean;
+  readonly historyScope: OfflineLocalExecutionHistoryScope;
+  readonly requiresMetadataCapture: boolean;
+  readonly requiresLaterAuthoritativeRegistration: boolean;
+  readonly exclusionReasons: ReadonlyArray<string>;
+}
+
+export interface OfflineLocalExecutionClassPolicy {
+  readonly executionClass: OfflineLocalExecutionClass;
+  readonly supportedInProductionScope: boolean;
+  readonly requiredResourceClass?: OfflineResourceClass;
+  readonly allowedNodeOperationalModes: ReadonlyArray<OfflineNodeOperationalMode>;
+  readonly allowedWorkstationModes: ReadonlyArray<OfflineWorkstationMode>;
+  readonly requiresTrustedDevice: boolean;
+  readonly requiresAuthoritativeRegistration: boolean;
+  readonly outOfScopeReason?: string;
+}
+
+const OfflineLocalExecutionClassPolicyCatalog: Readonly<
+  Record<OfflineLocalExecutionClass, OfflineLocalExecutionClassPolicy>
+> = Object.freeze({
+  [OfflineLocalExecutionClasses.localWorkflowPreview]: Object.freeze({
+    executionClass: OfflineLocalExecutionClasses.localWorkflowPreview,
+    supportedInProductionScope: true,
+    requiredResourceClass: OfflineResourceClasses.localRuntimeSession,
+    allowedNodeOperationalModes: Object.freeze([
+      OfflineNodeOperationalModes.workstationClient,
+      OfflineNodeOperationalModes.managedWorkstationClient,
+    ]),
+    allowedWorkstationModes: Object.freeze([
+      OfflineWorkstationModes.interactiveUserSession,
+      OfflineWorkstationModes.managedBackgroundAgent,
+    ]),
+    requiresTrustedDevice: true,
+    requiresAuthoritativeRegistration: true,
+  }),
+  [OfflineLocalExecutionClasses.localWorkflowValidation]: Object.freeze({
+    executionClass: OfflineLocalExecutionClasses.localWorkflowValidation,
+    supportedInProductionScope: true,
+    requiredResourceClass: OfflineResourceClasses.localRuntimeSession,
+    allowedNodeOperationalModes: Object.freeze([
+      OfflineNodeOperationalModes.workstationClient,
+      OfflineNodeOperationalModes.managedWorkstationClient,
+    ]),
+    allowedWorkstationModes: Object.freeze([
+      OfflineWorkstationModes.interactiveUserSession,
+      OfflineWorkstationModes.managedBackgroundAgent,
+    ]),
+    requiresTrustedDevice: true,
+    requiresAuthoritativeRegistration: true,
+  }),
+  [OfflineLocalExecutionClasses.remoteOrchestratedRunReplay]: Object.freeze({
+    executionClass: OfflineLocalExecutionClasses.remoteOrchestratedRunReplay,
+    supportedInProductionScope: false,
+    allowedNodeOperationalModes: Object.freeze([]),
+    allowedWorkstationModes: Object.freeze([]),
+    requiresTrustedDevice: true,
+    requiresAuthoritativeRegistration: false,
+    outOfScopeReason:
+      "Remote orchestrated replay is out of scope for first production offline execution posture.",
+  }),
+  [OfflineLocalExecutionClasses.distributedClusterRun]: Object.freeze({
+    executionClass: OfflineLocalExecutionClasses.distributedClusterRun,
+    supportedInProductionScope: false,
+    allowedNodeOperationalModes: Object.freeze([]),
+    allowedWorkstationModes: Object.freeze([]),
+    requiresTrustedDevice: true,
+    requiresAuthoritativeRegistration: false,
+    outOfScopeReason:
+      "Distributed cluster execution is out of scope for first production offline execution posture.",
+  }),
+  [OfflineLocalExecutionClasses.secretMaterializedExecution]: Object.freeze({
+    executionClass: OfflineLocalExecutionClasses.secretMaterializedExecution,
+    supportedInProductionScope: false,
+    allowedNodeOperationalModes: Object.freeze([]),
+    allowedWorkstationModes: Object.freeze([]),
+    requiresTrustedDevice: true,
+    requiresAuthoritativeRegistration: false,
+    outOfScopeReason:
+      "Secret-materialized offline execution is out of scope for first production offline execution posture.",
+  }),
+});
+
+function resolveOfflineLocalExecutionClassPolicyIfSupported(
+  executionClass: string,
+): OfflineLocalExecutionClassPolicy | undefined {
+  const byClass = OfflineLocalExecutionClassPolicyCatalog as Record<string, OfflineLocalExecutionClassPolicy | undefined>;
+  return byClass[executionClass];
+}
+
+function normalizeOfflineNodeOperationalMode(value: OfflineNodeOperationalMode): OfflineNodeOperationalMode {
+  if (!Object.values(OfflineNodeOperationalModes).includes(value)) {
+    throw new OfflineLocalModeDomainError(`Offline node operational mode '${String(value)}' is invalid.`);
+  }
+  return value;
+}
+
+function normalizeOfflineWorkstationMode(value: OfflineWorkstationMode): OfflineWorkstationMode {
+  if (!Object.values(OfflineWorkstationModes).includes(value)) {
+    throw new OfflineLocalModeDomainError(`Offline workstation mode '${String(value)}' is invalid.`);
+  }
+  return value;
+}
+
+export function listOfflineLocalExecutionClassPolicies(): ReadonlyArray<OfflineLocalExecutionClassPolicy> {
+  return Object.freeze(Object.values(OfflineLocalExecutionClassPolicyCatalog));
+}
+
+export function evaluateOfflineLocalExecutionEligibility(
+  input: OfflineLocalExecutionPolicyInput,
+): OfflineLocalExecutionEligibilityEvaluation {
+  const nodeOperationalMode = normalizeOfflineNodeOperationalMode(input.nodeOperationalMode);
+  const workstationMode = normalizeOfflineWorkstationMode(input.workstationMode);
+  const classPolicy = resolveOfflineLocalExecutionClassPolicyIfSupported(input.executionClass);
+  if (!classPolicy) {
+    return Object.freeze({
+      executionClass: input.executionClass,
+      supportedExecutionClass: false,
+      resourceClass: input.resourceClass,
+      allowed: false,
+      historyScope: OfflineLocalExecutionHistoryScopes.outOfScopeNoRegistration,
+      requiresMetadataCapture: false,
+      requiresLaterAuthoritativeRegistration: false,
+      exclusionReasons: Object.freeze([
+        "Execution class is not in the registered offline local-execution eligibility catalog.",
+      ]),
+    });
+  }
+
+  if (!classPolicy.supportedInProductionScope) {
+    return Object.freeze({
+      executionClass: input.executionClass,
+      supportedExecutionClass: true,
+      resourceClass: input.resourceClass,
+      allowed: false,
+      historyScope: OfflineLocalExecutionHistoryScopes.outOfScopeNoRegistration,
+      requiresMetadataCapture: false,
+      requiresLaterAuthoritativeRegistration: false,
+      exclusionReasons: Object.freeze([classPolicy.outOfScopeReason ?? "Execution class is out of scope."]),
+    });
+  }
+
+  const exclusionReasons: string[] = [];
+  const resourcePolicy = evaluateOfflineResourcePolicy(input.resourceClass, input.resourcePolicy);
+  if (!resourcePolicy.supportedResourceClass) {
+    exclusionReasons.push("Resource class is not registered for offline policy evaluation.");
+  } else if (!resourcePolicy.posture.execute.allowed) {
+    exclusionReasons.push(resourcePolicy.posture.execute.reason);
+  }
+
+  if (classPolicy.requiredResourceClass && input.resourceClass !== classPolicy.requiredResourceClass) {
+    exclusionReasons.push(
+      `Execution class '${classPolicy.executionClass}' requires resource class '${classPolicy.requiredResourceClass}'.`,
+    );
+  }
+
+  if (!classPolicy.allowedNodeOperationalModes.includes(nodeOperationalMode)) {
+    exclusionReasons.push(
+      `Node operational mode '${nodeOperationalMode}' is not eligible for execution class '${classPolicy.executionClass}'.`,
+    );
+  }
+
+  if (!classPolicy.allowedWorkstationModes.includes(workstationMode)) {
+    exclusionReasons.push(
+      `Workstation mode '${workstationMode}' is not eligible for execution class '${classPolicy.executionClass}'.`,
+    );
+  }
+
+  if (!input.allowOfflineExecutionByPolicy) {
+    exclusionReasons.push("Policy input disallows offline local execution for this workspace context.");
+  }
+
+  if (classPolicy.requiresAuthoritativeRegistration && !input.allowAuthoritativeRegistrationByPolicy) {
+    exclusionReasons.push("Policy input disallows reconnect registration of local execution activity.");
+  }
+
+  return Object.freeze({
+    executionClass: input.executionClass,
+    supportedExecutionClass: true,
+    resourceClass: input.resourceClass,
+    allowed: exclusionReasons.length < 1,
+    historyScope: OfflineLocalExecutionHistoryScopes.explicitLocalActivity,
+    requiresMetadataCapture: true,
+    requiresLaterAuthoritativeRegistration: classPolicy.requiresAuthoritativeRegistration,
+    exclusionReasons: Object.freeze([...new Set(exclusionReasons)]),
+  });
+}
+
+export const OfflineLocalExecutionOutcomes = Object.freeze({
+  succeeded: "succeeded",
+  failed: "failed",
+  cancelled: "cancelled",
+});
+
+export type OfflineLocalExecutionOutcome =
+  typeof OfflineLocalExecutionOutcomes[keyof typeof OfflineLocalExecutionOutcomes];
+
+export const OfflineLocalExecutionOutputClasses = Object.freeze({
+  logBundle: "log-bundle",
+  previewArtifact: "preview-artifact",
+  metricsSnapshot: "metrics-snapshot",
+});
+
+export type OfflineLocalExecutionOutputClass =
+  typeof OfflineLocalExecutionOutputClasses[keyof typeof OfflineLocalExecutionOutputClasses];
+
+export interface OfflineLocalExecutionOutputRecord {
+  readonly outputId: string;
+  readonly outputClass: OfflineLocalExecutionOutputClass;
+  readonly contentDigest: string;
+  readonly sizeBytes?: number;
+}
+
+export interface OfflineLocalExecutionRecord {
+  readonly executionId: string;
+  readonly executionClass: OfflineLocalExecutionClass;
+  readonly resourceClass: OfflineResourceClass;
+  readonly resourceId: string;
+  readonly startedAt: string;
+  readonly completedAt: string;
+  readonly executedByActorUserIdentityId: string;
+  readonly nodeOperationalMode: OfflineNodeOperationalMode;
+  readonly workstationMode: OfflineWorkstationMode;
+  readonly outcome: OfflineLocalExecutionOutcome;
+  readonly inputDigest: string;
+  readonly outputs: ReadonlyArray<OfflineLocalExecutionOutputRecord>;
+  readonly historyScope: OfflineLocalExecutionHistoryScope;
+}
+
+export function createOfflineLocalExecutionRecord(input: {
+  readonly executionId: string;
+  readonly executionClass: OfflineLocalExecutionClass;
+  readonly resourceClass: OfflineResourceClass;
+  readonly resourceId: string;
+  readonly startedAt?: string;
+  readonly completedAt?: string;
+  readonly executedByActorUserIdentityId: string;
+  readonly nodeOperationalMode: OfflineNodeOperationalMode;
+  readonly workstationMode: OfflineWorkstationMode;
+  readonly outcome: OfflineLocalExecutionOutcome;
+  readonly inputDigest: string;
+  readonly outputs: ReadonlyArray<OfflineLocalExecutionOutputRecord>;
+  readonly historyScope?: OfflineLocalExecutionHistoryScope;
+}): OfflineLocalExecutionRecord {
+  const classPolicy = resolveOfflineLocalExecutionClassPolicyIfSupported(input.executionClass);
+  if (!classPolicy || !classPolicy.supportedInProductionScope) {
+    throw new OfflineLocalModeDomainError(
+      `Execution class '${input.executionClass}' is out of production offline local-execution scope.`,
+    );
+  }
+  if (classPolicy.requiredResourceClass && input.resourceClass !== classPolicy.requiredResourceClass) {
+    throw new OfflineLocalModeDomainError(
+      `Execution class '${input.executionClass}' requires resource class '${classPolicy.requiredResourceClass}'.`,
+    );
+  }
+  if (!classPolicy.allowedNodeOperationalModes.includes(input.nodeOperationalMode)) {
+    throw new OfflineLocalModeDomainError(
+      `Execution class '${input.executionClass}' is not eligible for node operational mode '${input.nodeOperationalMode}'.`,
+    );
+  }
+  if (!classPolicy.allowedWorkstationModes.includes(input.workstationMode)) {
+    throw new OfflineLocalModeDomainError(
+      `Execution class '${input.executionClass}' is not eligible for workstation mode '${input.workstationMode}'.`,
+    );
+  }
+
+  if (!Object.values(OfflineLocalExecutionOutcomes).includes(input.outcome)) {
+    throw new OfflineLocalModeDomainError(`Offline local execution outcome '${String(input.outcome)}' is invalid.`);
+  }
+
+  const historyScope = input.historyScope ?? OfflineLocalExecutionHistoryScopes.explicitLocalActivity;
+  if (historyScope !== OfflineLocalExecutionHistoryScopes.explicitLocalActivity) {
+    throw new OfflineLocalModeDomainError(
+      "Offline local execution records must remain explicit local activity until authoritative registration.",
+    );
+  }
+
+  const startedAt = normalizeIsoTimestamp(input.startedAt ?? new Date().toISOString(), "Local execution startedAt");
+  const completedAt = normalizeIsoTimestamp(
+    input.completedAt ?? input.startedAt ?? new Date().toISOString(),
+    "Local execution completedAt",
+  );
+  if (new Date(completedAt).getTime() < new Date(startedAt).getTime()) {
+    throw new OfflineLocalModeDomainError("Local execution completedAt cannot be earlier than startedAt.");
+  }
+
+  const normalizedOutputs = Object.freeze(input.outputs.map((output) => {
+    if (!Object.values(OfflineLocalExecutionOutputClasses).includes(output.outputClass)) {
+      throw new OfflineLocalModeDomainError(
+        `Offline local execution outputClass '${String(output.outputClass)}' is invalid.`,
+      );
+    }
+    const sizeBytes = output.sizeBytes;
+    if (sizeBytes !== undefined && (!Number.isInteger(sizeBytes) || sizeBytes < 0)) {
+      throw new OfflineLocalModeDomainError("Offline local execution output sizeBytes must be an integer >= 0.");
+    }
+    return Object.freeze({
+      outputId: normalizeRequired(output.outputId, "Local execution outputId"),
+      outputClass: output.outputClass,
+      contentDigest: normalizeRequired(output.contentDigest, "Local execution output contentDigest"),
+      sizeBytes,
+    });
+  }));
+
+  return Object.freeze({
+    executionId: normalizeRequired(input.executionId, "Local execution executionId"),
+    executionClass: input.executionClass,
+    resourceClass: input.resourceClass,
+    resourceId: normalizeRequired(input.resourceId, "Local execution resourceId"),
+    startedAt,
+    completedAt,
+    executedByActorUserIdentityId: normalizeRequired(
+      input.executedByActorUserIdentityId,
+      "Local execution executedByActorUserIdentityId",
+    ),
+    nodeOperationalMode: normalizeOfflineNodeOperationalMode(input.nodeOperationalMode),
+    workstationMode: normalizeOfflineWorkstationMode(input.workstationMode),
+    outcome: input.outcome,
+    inputDigest: normalizeRequired(input.inputDigest, "Local execution inputDigest"),
+    outputs: normalizedOutputs,
+    historyScope,
+  });
+}
+
+export const OfflineLocalExecutionRegistrationStatuses = Object.freeze({
+  queuedPendingRegistration: "queued-pending-registration",
+  registrationConflict: "registration-conflict",
+  registrationRejected: "registration-rejected",
+  registrationApplied: "registration-applied",
+});
+
+export type OfflineLocalExecutionRegistrationStatus =
+  typeof OfflineLocalExecutionRegistrationStatuses[keyof typeof OfflineLocalExecutionRegistrationStatuses];
+
+export interface OfflineLocalExecutionRegistrationReplayDescriptor {
+  readonly method: OfflineMutationReplayHttpMethod;
+  readonly path: string;
+  readonly idempotencyKey: string;
+  readonly payload: Readonly<Record<string, unknown>>;
+  readonly payloadContentType?: string;
+}
+
+export interface OfflineLocalExecutionRegistrationEnvelope {
+  readonly registrationId: string;
+  readonly execution: OfflineLocalExecutionRecord;
+  readonly executionId: string;
+  readonly executionClass: OfflineLocalExecutionClass;
+  readonly resourceClass: OfflineResourceClass;
+  readonly resourceId: string;
+  readonly queuedAt: string;
+  readonly userVisibleRegistrationStatus: OfflineLocalExecutionRegistrationStatus;
+  readonly divergenceDisclosureToken: string;
+  readonly replayDescriptor: OfflineLocalExecutionRegistrationReplayDescriptor;
+}
+
+export function createOfflineLocalExecutionRegistrationEnvelope(input: {
+  readonly registrationId: string;
+  readonly execution: OfflineLocalExecutionRecord;
+  readonly queuedAt?: string;
+  readonly userVisibleRegistrationStatus?: OfflineLocalExecutionRegistrationStatus;
+  readonly divergenceDisclosureToken: string;
+  readonly replayDescriptor: OfflineLocalExecutionRegistrationReplayDescriptor;
+}): OfflineLocalExecutionRegistrationEnvelope {
+  if (input.execution.historyScope !== OfflineLocalExecutionHistoryScopes.explicitLocalActivity) {
+    throw new OfflineLocalModeDomainError(
+      "Only explicit local execution records can be queued for authoritative registration.",
+    );
+  }
+
+  const status = input.userVisibleRegistrationStatus
+    ?? OfflineLocalExecutionRegistrationStatuses.queuedPendingRegistration;
+  if (!Object.values(OfflineLocalExecutionRegistrationStatuses).includes(status)) {
+    throw new OfflineLocalModeDomainError(
+      `Local execution registration status '${String(status)}' is invalid.`,
+    );
+  }
+  if (status === OfflineLocalExecutionRegistrationStatuses.registrationApplied) {
+    throw new OfflineLocalModeDomainError(
+      "Local execution registration cannot be pre-marked as registration-applied before authoritative acceptance.",
+    );
+  }
+
+  const replayDescriptor = normalizeOfflineQueuedMutationReplayDescriptor(input.replayDescriptor);
+  if (!replayDescriptor.path.includes("/offline/local-executions/")) {
+    throw new OfflineLocalModeDomainError(
+      "Local execution registration replay path must target offline local execution registration endpoints.",
+    );
+  }
+
+  const divergenceDisclosureToken = normalizeRequired(
+    input.divergenceDisclosureToken,
+    "Local execution registration divergenceDisclosureToken",
+  );
+
+  return Object.freeze({
+    registrationId: normalizeRequired(input.registrationId, "Local execution registrationId"),
+    execution: input.execution,
+    executionId: input.execution.executionId,
+    executionClass: input.execution.executionClass,
+    resourceClass: input.execution.resourceClass,
+    resourceId: input.execution.resourceId,
+    queuedAt: normalizeIsoTimestamp(
+      input.queuedAt ?? new Date().toISOString(),
+      "Local execution registration queuedAt",
+    ),
+    userVisibleRegistrationStatus: status,
+    divergenceDisclosureToken,
+    replayDescriptor,
+  });
+}
+
 export const OfflineDraftSynchronizationStatuses = Object.freeze({
   localOnly: "local-only",
   queuedPendingSync: "queued-pending-sync",

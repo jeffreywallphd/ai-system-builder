@@ -3,19 +3,30 @@ import {
   OfflineDraftSynchronizationStatuses,
   OfflineAuthorityScopes,
   OfflineDeviceTrustPostures,
+  OfflineLocalExecutionClasses,
+  OfflineLocalExecutionHistoryScopes,
+  OfflineLocalExecutionOutcomes,
+  OfflineLocalExecutionOutputClasses,
+  OfflineLocalExecutionRegistrationStatuses,
+  OfflineNodeOperationalModes,
   OfflineLocalModeDomainError,
   OfflineProhibitedPatterns,
   OfflineQueuedMutationStatuses,
   OfflineResourceClasses,
   OfflineSensitivityMarkings,
   OfflineStorageRules,
+  OfflineWorkstationModes,
   OfflineWorkspaceAccessRoles,
   OfflineWorkspaceSharingPostures,
   appendOfflineLocalDraftChange,
+  createOfflineLocalExecutionRecord,
+  createOfflineLocalExecutionRegistrationEnvelope,
   createOfflineLocalDraftDocument,
   createOfflinePendingRunSubmissionRecord,
   createOfflineQueuedMutationEnvelope,
+  evaluateOfflineLocalExecutionEligibility,
   evaluateOfflineResourcePolicy,
+  listOfflineLocalExecutionClassPolicies,
   listOfflineResourceEligibilityPolicies,
   listOfflineResourceAuthorityBoundaries,
   resolveOfflineResourceAuthorityBoundary,
@@ -119,6 +130,84 @@ describe("OfflineLocalModeBoundaries", () => {
     expect(restrictedAndExternal.posture.read.allowed).toBeFalse();
     expect(restrictedAndExternal.posture.edit.allowed).toBeFalse();
     expect(restrictedAndExternal.posture.queueMutation.allowed).toBeFalse();
+  });
+
+  it("publishes explicit supported and out-of-scope offline local execution classes", () => {
+    const catalog = listOfflineLocalExecutionClassPolicies();
+    expect(catalog.some((entry) => (
+      entry.executionClass === OfflineLocalExecutionClasses.localWorkflowPreview
+      && entry.supportedInProductionScope
+    ))).toBeTrue();
+    expect(catalog.some((entry) => (
+      entry.executionClass === OfflineLocalExecutionClasses.remoteOrchestratedRunReplay
+      && !entry.supportedInProductionScope
+    ))).toBeTrue();
+  });
+
+  it("evaluates local execution eligibility using resource policy, trust posture, and node/workstation mode", () => {
+    const allowed = evaluateOfflineLocalExecutionEligibility({
+      executionClass: OfflineLocalExecutionClasses.localWorkflowPreview,
+      resourceClass: OfflineResourceClasses.localRuntimeSession,
+      resourcePolicy: {
+        workspaceVisibility: WorkspaceVisibilities.private,
+        workspaceAccessRole: OfflineWorkspaceAccessRoles.owner,
+        workspaceSharingPosture: OfflineWorkspaceSharingPostures.workspaceOnly,
+        sensitivityMarking: OfflineSensitivityMarkings.sensitive,
+        storageRule: OfflineStorageRules.requireEncryptedOfflineCache,
+        deviceTrustPosture: OfflineDeviceTrustPostures.trusted,
+      },
+      nodeOperationalMode: OfflineNodeOperationalModes.workstationClient,
+      workstationMode: OfflineWorkstationModes.interactiveUserSession,
+      allowOfflineExecutionByPolicy: true,
+      allowAuthoritativeRegistrationByPolicy: true,
+    });
+    expect(allowed.allowed).toBeTrue();
+    expect(allowed.historyScope).toBe(OfflineLocalExecutionHistoryScopes.explicitLocalActivity);
+    expect(allowed.requiresMetadataCapture).toBeTrue();
+    expect(allowed.requiresLaterAuthoritativeRegistration).toBeTrue();
+
+    const blockedByMode = evaluateOfflineLocalExecutionEligibility({
+      executionClass: OfflineLocalExecutionClasses.localWorkflowPreview,
+      resourceClass: OfflineResourceClasses.localRuntimeSession,
+      resourcePolicy: {
+        workspaceVisibility: WorkspaceVisibilities.private,
+        workspaceAccessRole: OfflineWorkspaceAccessRoles.owner,
+        workspaceSharingPosture: OfflineWorkspaceSharingPostures.workspaceOnly,
+        sensitivityMarking: OfflineSensitivityMarkings.sensitive,
+        storageRule: OfflineStorageRules.requireEncryptedOfflineCache,
+        deviceTrustPosture: OfflineDeviceTrustPostures.trusted,
+      },
+      nodeOperationalMode: OfflineNodeOperationalModes.authoritativeControlPlane,
+      workstationMode: OfflineWorkstationModes.interactiveUserSession,
+      allowOfflineExecutionByPolicy: true,
+      allowAuthoritativeRegistrationByPolicy: true,
+    });
+
+    expect(blockedByMode.allowed).toBeFalse();
+    expect(blockedByMode.exclusionReasons.some((reason) => reason.includes("Node operational mode"))).toBeTrue();
+  });
+
+  it("excludes out-of-scope execution classes from first production implementation", () => {
+    const evaluation = evaluateOfflineLocalExecutionEligibility({
+      executionClass: OfflineLocalExecutionClasses.distributedClusterRun,
+      resourceClass: OfflineResourceClasses.localRuntimeSession,
+      resourcePolicy: {
+        workspaceVisibility: WorkspaceVisibilities.private,
+        workspaceAccessRole: OfflineWorkspaceAccessRoles.owner,
+        workspaceSharingPosture: OfflineWorkspaceSharingPostures.workspaceOnly,
+        sensitivityMarking: OfflineSensitivityMarkings.standard,
+        storageRule: OfflineStorageRules.allowOfflineCache,
+        deviceTrustPosture: OfflineDeviceTrustPostures.trusted,
+      },
+      nodeOperationalMode: OfflineNodeOperationalModes.workstationClient,
+      workstationMode: OfflineWorkstationModes.interactiveUserSession,
+      allowOfflineExecutionByPolicy: true,
+      allowAuthoritativeRegistrationByPolicy: true,
+    });
+
+    expect(evaluation.allowed).toBeFalse();
+    expect(evaluation.historyScope).toBe(OfflineLocalExecutionHistoryScopes.outOfScopeNoRegistration);
+    expect(evaluation.exclusionReasons[0]).toContain("out of scope");
   });
 
   it("rejects queued mutation envelopes for resource classes that do not allow queueing", () => {
@@ -259,5 +348,44 @@ describe("OfflineLocalModeBoundaries", () => {
 
     expect(runSubmission.queuedMutation.targetResourceClass).toBe(OfflineResourceClasses.runSubmissionIntent);
     expect(runSubmission.queuedMutation.replayDescriptor.path).toBe("/v1/runs/intents/run:intent:22");
+  });
+
+  it("captures local execution metadata and queues explicit registration without blurring authoritative history", () => {
+    const execution = createOfflineLocalExecutionRecord({
+      executionId: "execution:offline:1",
+      executionClass: OfflineLocalExecutionClasses.localWorkflowValidation,
+      resourceClass: OfflineResourceClasses.localRuntimeSession,
+      resourceId: "runtime:session:1",
+      startedAt: "2026-04-07T11:00:00.000Z",
+      completedAt: "2026-04-07T11:00:20.000Z",
+      executedByActorUserIdentityId: "user:author-1",
+      nodeOperationalMode: OfflineNodeOperationalModes.workstationClient,
+      workstationMode: OfflineWorkstationModes.interactiveUserSession,
+      outcome: OfflineLocalExecutionOutcomes.succeeded,
+      inputDigest: "sha256:input:offline:1",
+      outputs: [{
+        outputId: "output:offline:1",
+        outputClass: OfflineLocalExecutionOutputClasses.metricsSnapshot,
+        contentDigest: "sha256:output:offline:1",
+        sizeBytes: 128,
+      }],
+    });
+
+    const registration = createOfflineLocalExecutionRegistrationEnvelope({
+      registrationId: "registration:offline:1",
+      execution,
+      userVisibleRegistrationStatus: OfflineLocalExecutionRegistrationStatuses.registrationConflict,
+      divergenceDisclosureToken: "offline-warning:execution:offline:1",
+      replayDescriptor: {
+        method: "POST",
+        path: "/v1/offline/local-executions/execution:offline:1/register",
+        idempotencyKey: "idem:registration:offline:1",
+        payload: { executionId: "execution:offline:1" },
+      },
+    });
+
+    expect(execution.historyScope).toBe(OfflineLocalExecutionHistoryScopes.explicitLocalActivity);
+    expect(registration.execution.executionId).toBe("execution:offline:1");
+    expect(registration.userVisibleRegistrationStatus).toBe("registration-conflict");
   });
 });
