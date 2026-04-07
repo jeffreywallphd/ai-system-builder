@@ -124,6 +124,13 @@ export class SqliteAuditLedgerRepository extends SafeSqliteRepositoryBase implem
             integrity_event_digest,
             integrity_previous_event_digest,
             retention,
+            retention_policy_key,
+            retention_policy_version,
+            retention_anchor,
+            retention_retain_until,
+            retention_archive_after,
+            lifecycle_state,
+            lifecycle_updated_at,
             immutability,
             correlation_id,
             request_id,
@@ -137,7 +144,7 @@ export class SqliteAuditLedgerRepository extends SafeSqliteRepositoryBase implem
             linkage_related_resources_json,
             event_json,
             created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(...mapCanonicalAuditEventToRowValues(event)));
 
       const inserted = this.getAuditEventRowByEventId(event.eventId);
@@ -387,6 +394,9 @@ export class SqliteAuditLedgerRepository extends SafeSqliteRepositoryBase implem
     where.addEquals("linkage_session_ref", query.sessionRef);
     where.addEquals("linkage_run_id", query.runId);
     where.addEquals("linkage_governance_action_id", query.governanceActionId);
+    where.addEquals("retention", query.retentionPosture);
+    where.addEquals("lifecycle_state", query.lifecycleState);
+    where.addEquals("retention_policy_key", query.retentionPolicyKey);
 
     const normalizedActionPrefix = normalizeOptional(query.actionPrefix) ?? normalizeOptional(normalizedFilters?.actionPrefix);
     if (normalizedActionPrefix) {
@@ -473,8 +483,29 @@ export class SqliteAuditLedgerRepository extends SafeSqliteRepositoryBase implem
       where.addIn("linkage_governance_action_id", normalizedFilters.governanceActionIds);
     }
 
+    if (normalizedFilters?.retentionPostures && normalizedFilters.retentionPostures.length > 0) {
+      where.addIn("retention", normalizedFilters.retentionPostures);
+    }
+
+    if (normalizedFilters?.lifecycleStates && normalizedFilters.lifecycleStates.length > 0) {
+      where.addIn("lifecycle_state", normalizedFilters.lifecycleStates);
+    }
+
+    if (normalizedFilters?.retentionPolicyKeys && normalizedFilters.retentionPolicyKeys.length > 0) {
+      where.addIn("retention_policy_key", normalizedFilters.retentionPolicyKeys);
+    }
+
     if (typeof normalizedFilters?.hasProtectedData === "boolean") {
       where.add("payload_has_protected_data = ?", normalizedFilters.hasProtectedData ? 1 : 0);
+    }
+
+    const retainUntilAfter = normalizeOptional(query.retainUntilAfter) ?? normalizeOptional(normalizedFilters?.retainUntilAfter);
+    const retainUntilBefore = normalizeOptional(query.retainUntilBefore) ?? normalizeOptional(normalizedFilters?.retainUntilBefore);
+    if (retainUntilAfter) {
+      where.add("retention_retain_until >= ?", retainUntilAfter);
+    }
+    if (retainUntilBefore) {
+      where.add("retention_retain_until <= ?", retainUntilBefore);
     }
 
     const occurredAfter = normalizeOptional(query.occurredAfter) ?? normalizeOptional(normalizedFilters?.occurredAfter);

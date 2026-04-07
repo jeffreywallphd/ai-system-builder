@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Story 18.2.1, Story 18.2.2, Story 18.2.3, Story 18.2.4, and Story 18.2.5 provide durable canonical audit-ledger storage plus permission-aware application query/detail retrieval workflows with immutable-enough baseline safeguards and authoritative server APIs.
+Story 18.2.1, Story 18.2.2, Story 18.2.3, Story 18.2.4, Story 18.2.5, and Story 18.2.7 provide durable canonical audit-ledger storage plus permission-aware application query/detail retrieval workflows with immutable-enough baseline safeguards, retention/lifecycle policy seams, and authoritative server APIs.
 
 Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-repositories.md`
 
@@ -22,6 +22,8 @@ Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-rep
 - `src/infrastructure/persistence/audit/AuditLedgerPersistenceMapper.ts`
 - `src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts`
 - `src/infrastructure/persistence/audit/tests/SqliteAuditLedgerRepository.test.ts`
+- `src/infrastructure/config/AuditRetentionLifecycleConfig.ts`
+- `src/infrastructure/config/tests/AuditRetentionLifecycleConfig.test.ts`
 - `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 - `src/hosts/server/IdentityServerHost.ts`
 
@@ -48,17 +50,25 @@ Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-rep
   - `GET /api/v1/audit/events`
   - `GET /api/v1/audit/events/:eventId`
   - request parsing from shared audit query contracts/schemas and canonical status mapping for invalid/forbidden/not-found outcomes.
+- Added retention/lifecycle policy seams without destructive behavior:
+  - canonical `retentionMetadata` fields in domain/shared contracts/schemas,
+  - indexed retention columns in SQLite persistence,
+  - retention/lifecycle list filters (`retentionPostures`, `lifecycleStates`, `retentionPolicyKeys`, `retainUntilAfter`, `retainUntilBefore`),
+  - environment-backed metadata defaults for authoritative recording (`AI_LOOM_AUDIT_RETENTION_*`),
+  - explicit guardrail that destructive retention actions are rejected by configuration.
 
 ## Behavior summary
 
 - Canonical events are appended, not updated in place.
 - Mutation replay metadata is append-maintenance only and does not mutate persisted event truth.
 - Query filters support category/action/eventType/actor/workspace/resource/occurred windows and thin-safe category mode.
+- Query filters also support retention/lifecycle selection and retain-until windows for future archival control surfaces.
 - Query filters also support correlation/request and linkage selectors for related workflow/event traversal.
 - Query service merges authorization scope limits (workspace/actor/resource/protected-data/thin-safe) with caller filters before repository reads.
 - Detail retrieval applies the same authorization scope and returns non-leaky `notFound` when events are outside workspace/sensitivity visibility.
 - The same canonical event can render as `user-safe` detail for general actors and `admin` detail for administrative actors.
 - Trust boundary is explicit: this is immutable-enough within runtime/SQLite controls, not a full cryptographic immutability/notarization system.
+- Retention/lifecycle policy seams are metadata-only in this slice; no delete/purge worker is shipped.
 
 ## Tests
 

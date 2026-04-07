@@ -49,6 +49,27 @@ Optional but supported:
 - `correlationId`
 - `requestId`
 - `linkage`
+- `retentionMetadata`
+
+## Retention lifecycle metadata seam
+
+Canonical events may include `retentionMetadata` so future governance policies can be modeled without redesigning core event shape.
+
+Supported metadata fields:
+
+- `policyKey`
+- `policyVersion`
+- `retentionAnchor` (`occurred-at` or `recorded-at`)
+- `retainUntil`
+- `archiveAfter`
+- `lifecycleState` (`active`, `retention-hold`, `archive-candidate`, `archived`)
+- `lifecycleUpdatedAt`
+
+Current behavior:
+
+- metadata is descriptive only (used for capture/query posture, not enforcement or deletion);
+- when `retention=legal-hold`, default lifecycle posture is `retention-hold`;
+- invalid lifecycle timelines (for example `archiveAfter < retainUntil`) are rejected at domain validation.
 
 ## Linkage metadata model
 

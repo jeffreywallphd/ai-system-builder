@@ -42,6 +42,13 @@ describe("AuditEventSchemaContracts", () => {
         redactionReasons: ["personal-data"],
       },
       retention: "governance",
+      retentionMetadata: {
+        policyKey: "retention-policy:workspace-default",
+        policyVersion: "2026-04-07",
+        retentionAnchor: "occurred-at",
+        retainUntil: "2027-04-07T00:00:00.000Z",
+        lifecycleState: "active",
+      },
       immutability: "append-only",
       schemaVersion: "1.0",
       hashAlgorithm: "sha-256",
@@ -120,6 +127,10 @@ describe("AuditEventSchemaContracts", () => {
       + "&correlationId=corr%3Aworkflow%3A1"
       + "&eventGroupId=group%3Aworkflow%3A1"
       + "&runId=run%3A1"
+      + "&retentionPosture=governance"
+      + "&lifecycleState=active"
+      + "&retentionPolicyKey=retention-policy%3Aworkspace-default"
+      + "&retainUntilAfter=2027-04-01T00%3A00%3A00.000Z"
       + "&includeThinSafeOnly=true",
     ));
 
@@ -130,9 +141,17 @@ describe("AuditEventSchemaContracts", () => {
     expect(parsed.filters?.correlationIds).toEqual(["corr:workflow:1"]);
     expect(parsed.filters?.eventGroupIds).toEqual(["group:workflow:1"]);
     expect(parsed.filters?.runIds).toEqual(["run:1"]);
+    expect(parsed.filters?.retentionPostures).toEqual(["governance"]);
+    expect(parsed.filters?.lifecycleStates).toEqual(["active"]);
+    expect(parsed.filters?.retentionPolicyKeys).toEqual(["retention-policy:workspace-default"]);
+    expect(parsed.filters?.retainUntilAfter).toBe("2027-04-01T00:00:00.000Z");
 
     expect(() => parseAuditEventListQueryFromSearchParams(new URLSearchParams(
       "category=protected-data&includeThinSafeOnly=true",
+    ))).toThrow(AuditEventSchemaValidationError);
+
+    expect(() => parseAuditEventListQueryFromSearchParams(new URLSearchParams(
+      "retainUntilAfter=2027-04-02T00:00:00.000Z&retainUntilBefore=2027-04-01T00:00:00.000Z",
     ))).toThrow(AuditEventSchemaValidationError);
   });
 });

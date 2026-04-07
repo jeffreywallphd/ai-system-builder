@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { CanonicalAuditEvent } from "@domain/audit/AuditDomain";
+import type { AuditRetentionAnchorKind, CanonicalAuditEvent } from "@domain/audit/AuditDomain";
 import {
   AuditDomainError,
   AuditRedactionReasons,
@@ -44,9 +44,20 @@ export class AuthoritativeAuditRecordingService implements AuthoritativeAuditRec
 
   private readonly idGenerator: () => string;
 
+  private readonly retentionLifecycleDefaults: Readonly<{
+    readonly policyKey?: string;
+    readonly policyVersion?: string;
+    readonly retentionAnchor?: AuditRetentionAnchorKind;
+  }>;
+
   public constructor(private readonly dependencies: AuthoritativeAuditRecordingServiceDependencies) {
     this.now = dependencies.now ?? (() => new Date());
     this.idGenerator = dependencies.idGenerator ?? (() => randomUUID());
+    this.retentionLifecycleDefaults = Object.freeze({
+      policyKey: normalizeOptional(dependencies.retentionLifecycleDefaults?.policyKey),
+      policyVersion: normalizeOptional(dependencies.retentionLifecycleDefaults?.policyVersion),
+      retentionAnchor: dependencies.retentionLifecycleDefaults?.retentionAnchor,
+    });
   }
 
   public async recordIdentityEvent(input: AuthoritativeAuditRecordEventInput): Promise<AuditLedgerAppendResult> {
@@ -97,6 +108,7 @@ export class AuthoritativeAuditRecordingService implements AuthoritativeAuditRec
       actionContext: input.actionContext,
       linkage: input.linkage,
     });
+    const retentionMetadata = this.buildRetentionMetadata(input);
 
     const event = createCanonicalAuditEvent({
       eventId: `audit:${source}:${this.idGenerator()}`,
@@ -117,6 +129,7 @@ export class AuthoritativeAuditRecordingService implements AuthoritativeAuditRec
         previousEventDigest: normalizeOptional(input.integrity?.previousEventDigest),
       },
       retention: input.retention,
+      retentionMetadata,
       immutability: input.immutability,
       correlationId: normalizedReferences.correlationId,
       requestId: normalizedReferences.requestId,
@@ -187,6 +200,31 @@ export class AuthoritativeAuditRecordingService implements AuthoritativeAuditRec
       adminOnlyDetails: adminOnlyResult.record,
       hasProtectedData,
       redactionReasons: Object.freeze([...providedReasons]),
+    });
+  }
+
+  private buildRetentionMetadata(input: AuthoritativeAuditRecordEventInput):
+    AuthoritativeAuditRecordEventInput["retentionMetadata"] | undefined {
+    const policyKey = normalizeOptional(input.retentionMetadata?.policyKey) ?? this.retentionLifecycleDefaults.policyKey;
+    const policyVersion = normalizeOptional(input.retentionMetadata?.policyVersion) ?? this.retentionLifecycleDefaults.policyVersion;
+    const retentionAnchor = input.retentionMetadata?.retentionAnchor ?? this.retentionLifecycleDefaults.retentionAnchor;
+    const retainUntil = normalizeOptional(input.retentionMetadata?.retainUntil);
+    const archiveAfter = normalizeOptional(input.retentionMetadata?.archiveAfter);
+    const lifecycleState = input.retentionMetadata?.lifecycleState;
+    const lifecycleUpdatedAt = normalizeOptional(input.retentionMetadata?.lifecycleUpdatedAt);
+
+    if (!policyKey && !policyVersion && !retentionAnchor && !retainUntil && !archiveAfter && !lifecycleState && !lifecycleUpdatedAt) {
+      return undefined;
+    }
+
+    return Object.freeze({
+      policyKey,
+      policyVersion,
+      retentionAnchor,
+      retainUntil,
+      archiveAfter,
+      lifecycleState,
+      lifecycleUpdatedAt,
     });
   }
 }
@@ -347,6 +385,9 @@ export function toCanonicalAuthoritativeAuditEvent(event: CanonicalAuditEvent): 
       redactionReasons: Object.freeze([...event.payload.redactionReasons]),
     }),
     integrity: Object.freeze({ ...event.integrity }),
+    retentionMetadata: event.retentionMetadata
+      ? Object.freeze({ ...event.retentionMetadata })
+      : undefined,
     linkage: event.linkage
       ? Object.freeze({
         ...event.linkage,

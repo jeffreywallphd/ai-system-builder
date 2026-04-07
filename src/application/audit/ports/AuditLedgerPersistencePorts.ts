@@ -1,6 +1,8 @@
 import type {
   CanonicalAuditEvent,
   AuditEventCategory,
+  AuditLifecycleState,
+  AuditRetentionPosture,
 } from "@domain/audit/AuditDomain";
 import type { AuditLedgerListQueryDto, AuditLedgerAppendMutationDto } from "@shared/dto/audit/AuditEventDtos";
 
@@ -27,6 +29,11 @@ export interface AuditLedgerQuery extends AuditLedgerListQueryDto {
   readonly sessionRef?: string;
   readonly runId?: string;
   readonly governanceActionId?: string;
+  readonly retentionPosture?: AuditRetentionPosture;
+  readonly lifecycleState?: AuditLifecycleState;
+  readonly retentionPolicyKey?: string;
+  readonly retainUntilAfter?: string;
+  readonly retainUntilBefore?: string;
   readonly occurredAfter?: string;
   readonly occurredBefore?: string;
   readonly limit?: number;

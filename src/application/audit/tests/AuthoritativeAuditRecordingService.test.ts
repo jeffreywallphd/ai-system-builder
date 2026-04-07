@@ -244,6 +244,31 @@ describe("AuthoritativeAuditRecordingService", () => {
     }))).rejects.toThrow("not valid for 'storage' source");
   });
 
+  it("applies retention lifecycle default seams when configured", async () => {
+    const repository = new InMemoryAuditLedgerRepository();
+    const service = new AuthoritativeAuditRecordingService({
+      repository,
+      now: () => new Date("2026-04-07T16:18:00.000Z"),
+      idGenerator: () => "event-retention-defaults",
+      retentionLifecycleDefaults: {
+        policyKey: "retention-policy:workspace-default",
+        policyVersion: "2026-04-07",
+        retentionAnchor: "recorded-at",
+      },
+    });
+
+    await service.recordPolicyEvent(buildInput({
+      operationKey: "retention:policy:updated:1",
+      eventType: "retention-policy-updated",
+      action: "retention.policy.updated",
+    }));
+
+    expect(repository.events).toHaveLength(1);
+    expect(repository.events[0]?.retentionMetadata?.policyKey).toBe("retention-policy:workspace-default");
+    expect(repository.events[0]?.retentionMetadata?.policyVersion).toBe("2026-04-07");
+    expect(repository.events[0]?.retentionMetadata?.retentionAnchor).toBe("recorded-at");
+  });
+
   it("returns canonical immutable-safe event snapshots", () => {
     const event = toCanonicalAuthoritativeAuditEvent({
       recordKind: "audit-record",

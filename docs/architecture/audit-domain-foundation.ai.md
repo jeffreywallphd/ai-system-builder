@@ -26,6 +26,23 @@
 - `retention`, `immutability`
 
 Optional: `protectedResource`, `correlationId`, `requestId`.
+Also supported: `retentionMetadata` for future policy lifecycle seams.
+
+## Retention/lifecycle seam
+
+Canonical events may carry retention metadata:
+
+- `policyKey`, `policyVersion`
+- `retentionAnchor` (`occurred-at` or `recorded-at`)
+- `retainUntil`, `archiveAfter`
+- `lifecycleState` (`active`, `retention-hold`, `archive-candidate`, `archived`)
+- `lifecycleUpdatedAt`
+
+Current posture is metadata-only:
+
+- no destructive retention behavior is implied by these fields;
+- `retention=legal-hold` defaults lifecycle posture to `retention-hold`;
+- invalid metadata timelines are rejected during domain validation.
 
 ## Linkage metadata
 

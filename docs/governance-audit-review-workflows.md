@@ -60,6 +60,7 @@ The governance review surface aggregates prioritized governance and security eve
 
 Filtering and pagination align to shared list query conventions (`workspaceId`, `search`, `limit`, `offset`, `sortBy`, `sortDirection`) with event/outcome filters layered on top.
 Linkage-aware filters are supported at the API contract level (`correlationId`, `requestId`, `eventGroupId`, `rootEventId`, `parentEventId`, `workflowId`, `sessionRef`, `runId`, `governanceActionId`) to follow multi-step governance workflows.
+Retention/lifecycle selectors are also available for governance review workflows (`retentionPosture`, `lifecycleState`, `retentionPolicyKey`, `retainUntilAfter`, `retainUntilBefore`) so future archival policy rollouts can reuse the same retrieval path.
 
 ## Redaction posture
 

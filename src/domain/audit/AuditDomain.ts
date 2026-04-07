@@ -64,6 +64,22 @@ export const AuditRetentionPostures = Object.freeze({
 
 export type AuditRetentionPosture = typeof AuditRetentionPostures[keyof typeof AuditRetentionPostures];
 
+export const AuditRetentionAnchorKinds = Object.freeze({
+  occurredAt: "occurred-at",
+  recordedAt: "recorded-at",
+});
+
+export type AuditRetentionAnchorKind = typeof AuditRetentionAnchorKinds[keyof typeof AuditRetentionAnchorKinds];
+
+export const AuditLifecycleStates = Object.freeze({
+  active: "active",
+  retentionHold: "retention-hold",
+  archiveCandidate: "archive-candidate",
+  archived: "archived",
+});
+
+export type AuditLifecycleState = typeof AuditLifecycleStates[keyof typeof AuditLifecycleStates];
+
 export const AuditImmutabilityPostures = Object.freeze({
   appendOnly: "append-only",
   appendOnlyHashChained: "append-only-hash-chained",
@@ -136,6 +152,16 @@ export interface AuditEventPayloadBoundary {
   readonly redactionReasons: ReadonlyArray<AuditRedactionReason>;
 }
 
+export interface AuditRetentionLifecycleMetadata {
+  readonly policyKey?: string;
+  readonly policyVersion?: string;
+  readonly retentionAnchor: AuditRetentionAnchorKind;
+  readonly retainUntil?: string;
+  readonly archiveAfter?: string;
+  readonly lifecycleState: AuditLifecycleState;
+  readonly lifecycleUpdatedAt?: string;
+}
+
 export interface CanonicalAuditEvent {
   readonly recordKind: typeof AuditRecordKinds.auditRecord;
   readonly eventId: string;
@@ -151,6 +177,7 @@ export interface CanonicalAuditEvent {
   readonly payload: AuditEventPayloadBoundary;
   readonly integrity: AuditIntegrityEvidence;
   readonly retention: AuditRetentionPosture;
+  readonly retentionMetadata?: AuditRetentionLifecycleMetadata;
   readonly immutability: AuditImmutabilityPosture;
   readonly correlationId?: string;
   readonly requestId?: string;
@@ -170,6 +197,7 @@ export interface UserSafeAuditEventView {
   readonly scope: AuditScope;
   readonly protectedResource?: AuditProtectedResourceReference;
   readonly linkage?: AuditEventLinkageMetadata;
+  readonly retentionMetadata?: AuditRetentionLifecycleMetadata;
   readonly details?: Readonly<Record<string, unknown>>;
 }
 
@@ -193,6 +221,13 @@ function normalizeTimestamp(value: string | Date, field: string): string {
     throw new AuditDomainError(`${field} must be a valid timestamp.`);
   }
   return date.toISOString();
+}
+
+function normalizeOptionalTimestamp(value: string | Date | undefined, field: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  return normalizeTimestamp(value, field);
 }
 
 function freezeRecord(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
@@ -409,6 +444,66 @@ export function createAuditEventPayloadBoundary(input?: {
   });
 }
 
+export function createAuditRetentionLifecycleMetadata(input: {
+  readonly policyKey?: string;
+  readonly policyVersion?: string;
+  readonly retentionAnchor?: AuditRetentionAnchorKind;
+  readonly retainUntil?: string | Date;
+  readonly archiveAfter?: string | Date;
+  readonly lifecycleState?: AuditLifecycleState;
+  readonly lifecycleUpdatedAt?: string | Date;
+  readonly retentionPosture?: AuditRetentionPosture;
+  readonly occurredAt?: string | Date;
+  readonly recordedAt?: string | Date;
+}): AuditRetentionLifecycleMetadata | undefined {
+  const policyKey = normalizeOptional(input.policyKey);
+  const policyVersion = normalizeOptional(input.policyVersion);
+  const retentionAnchor = input.retentionAnchor ?? AuditRetentionAnchorKinds.occurredAt;
+  if (!isKnownValue(AuditRetentionAnchorKinds, retentionAnchor)) {
+    throw new AuditDomainError(`Audit retention anchor '${String(retentionAnchor)}' is invalid.`);
+  }
+
+  const retainUntil = normalizeOptionalTimestamp(input.retainUntil, "Audit retentionMetadata.retainUntil");
+  const archiveAfter = normalizeOptionalTimestamp(input.archiveAfter, "Audit retentionMetadata.archiveAfter");
+  if (retainUntil && archiveAfter && Date.parse(archiveAfter) < Date.parse(retainUntil)) {
+    throw new AuditDomainError("Audit retentionMetadata.archiveAfter cannot be earlier than retainUntil.");
+  }
+
+  const defaultLifecycleState = input.retentionPosture === AuditRetentionPostures.legalHold
+    ? AuditLifecycleStates.retentionHold
+    : AuditLifecycleStates.active;
+  const lifecycleState = input.lifecycleState ?? defaultLifecycleState;
+  if (!isKnownValue(AuditLifecycleStates, lifecycleState)) {
+    throw new AuditDomainError(`Audit lifecycle state '${String(lifecycleState)}' is invalid.`);
+  }
+
+  const lifecycleUpdatedAt = normalizeOptionalTimestamp(
+    input.lifecycleUpdatedAt,
+    "Audit retentionMetadata.lifecycleUpdatedAt",
+  );
+
+  if (!policyKey && !policyVersion && !retainUntil && !archiveAfter && !lifecycleUpdatedAt) {
+    if (
+      lifecycleState === defaultLifecycleState
+      && (input.retentionAnchor === undefined || retentionAnchor === AuditRetentionAnchorKinds.occurredAt)
+    ) {
+      return undefined;
+    }
+  }
+
+  return Object.freeze({
+    policyKey,
+    policyVersion,
+    retentionAnchor,
+    retainUntil,
+    archiveAfter,
+    lifecycleState,
+    lifecycleUpdatedAt: lifecycleUpdatedAt
+      ?? normalizeOptionalTimestamp(input.recordedAt, "Audit recordedAt")
+      ?? normalizeOptionalTimestamp(input.occurredAt, "Audit occurredAt"),
+  });
+}
+
 export function createCanonicalAuditEvent(input: {
   readonly eventId: string;
   readonly eventType: string;
@@ -428,6 +523,15 @@ export function createCanonicalAuditEvent(input: {
   };
   readonly integrity: AuditIntegrityEvidence;
   readonly retention?: AuditRetentionPosture;
+  readonly retentionMetadata?: {
+    readonly policyKey?: string;
+    readonly policyVersion?: string;
+    readonly retentionAnchor?: AuditRetentionAnchorKind;
+    readonly retainUntil?: string | Date;
+    readonly archiveAfter?: string | Date;
+    readonly lifecycleState?: AuditLifecycleState;
+    readonly lifecycleUpdatedAt?: string | Date;
+  };
   readonly immutability?: AuditImmutabilityPosture;
   readonly correlationId?: string;
   readonly requestId?: string;
@@ -471,6 +575,12 @@ export function createCanonicalAuditEvent(input: {
   if (!isKnownValue(AuditRetentionPostures, retention)) {
     throw new AuditDomainError(`Audit retention posture '${String(retention)}' is invalid.`);
   }
+  const retentionMetadata = createAuditRetentionLifecycleMetadata({
+    ...input.retentionMetadata,
+    retentionPosture: retention,
+    occurredAt,
+    recordedAt,
+  });
 
   const immutability = input.immutability ?? AuditImmutabilityPostures.appendOnly;
   if (!isKnownValue(AuditImmutabilityPostures, immutability)) {
@@ -492,6 +602,7 @@ export function createCanonicalAuditEvent(input: {
     payload,
     integrity,
     retention,
+    retentionMetadata,
     immutability,
     correlationId: normalizeOptional(input.correlationId),
     requestId: normalizeOptional(input.requestId),
@@ -513,6 +624,7 @@ export function toUserSafeAuditEventView(event: CanonicalAuditEvent): UserSafeAu
     scope: event.scope,
     protectedResource: event.protectedResource,
     linkage: event.linkage,
+    retentionMetadata: event.retentionMetadata,
     details: event.payload.userSafeDetails,
   });
 }
