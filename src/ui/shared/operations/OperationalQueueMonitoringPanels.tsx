@@ -1,4 +1,5 @@
 import type { RuntimeQueueItem, RuntimeQueueItemStatus } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
+import type { RuntimeRealtimeConnectionStateSnapshot } from "@shared/runtime/RuntimeRealtimeSubscriptionService";
 import {
   SurfaceActionButtonStrip,
   SurfaceActionList,
@@ -18,6 +19,7 @@ import {
   type SurfacePresentationState,
 } from "../components/presentation-state";
 import type { SurfaceResponsiveProfile } from "../responsive";
+import { OperationalRealtimeStatusPill } from "./OperationalRealtimeIndicators";
 
 export const QueueVisibilityScopes = Object.freeze({
   active: "active",
@@ -48,6 +50,7 @@ export interface OperationalQueueVisibilityPanelProps {
   readonly filters: OperationalQueueFilters;
   readonly isLoading: boolean;
   readonly error?: string;
+  readonly realtimeConnectionState: RuntimeRealtimeConnectionStateSnapshot;
   readonly responsiveProfile: SurfaceResponsiveProfile;
   readonly actorPermissionIds: ReadonlyArray<string>;
   readonly surface: SurfaceActionSurface;
@@ -66,6 +69,7 @@ export function OperationalQueueVisibilityPanel({
   filters,
   isLoading,
   error,
+  realtimeConnectionState,
   responsiveProfile,
   actorPermissionIds,
   surface,
@@ -107,7 +111,11 @@ export function OperationalQueueVisibilityPanel({
     <section className="ui-card ui-operational-queue-visibility" data-testid="operational-queue-visibility">
       <div className="ui-card__header">
         <h2 className="ui-card__title">Queue visibility</h2>
-        <p className="ui-card__subtitle">Authorized queue state with priority and order metadata across desktop and thin-client surfaces.</p>
+        <p className="ui-card__subtitle">
+          Authorized queue state with priority and order metadata across desktop and thin-client surfaces.
+          {" "}
+          <OperationalRealtimeStatusPill connectionState={realtimeConnectionState} />
+        </p>
       </div>
       <div className="ui-card__body ui-stack ui-stack--sm">
         <OperationalQueueFiltersPanel filters={filters} totalCount={totalCount} onFiltersChanged={onFiltersChanged} />
@@ -222,6 +230,7 @@ export interface OperationalQueueDetailPanelProps {
   readonly surface: SurfaceActionSurface;
   readonly isLoading: boolean;
   readonly error?: string;
+  readonly realtimeConnectionState: RuntimeRealtimeConnectionStateSnapshot;
   readonly onRefreshQueue: () => void;
   readonly onInspectRun: (executionId: string) => void;
   readonly onCancelRun: (executionId: string) => void;
@@ -236,6 +245,7 @@ export function OperationalQueueDetailPanel({
   surface,
   isLoading,
   error,
+  realtimeConnectionState,
   onRefreshQueue,
   onInspectRun,
   onCancelRun,
@@ -335,7 +345,11 @@ export function OperationalQueueDetailPanel({
     <section className="ui-card ui-operational-queue-detail" data-testid="operational-queue-detail">
       <div className="ui-card__header">
         <h2 className="ui-card__title">Queue detail</h2>
-        <p className="ui-card__subtitle">Selected queue item timing, priority/order detail, and lightweight queue controls.</p>
+        <p className="ui-card__subtitle">
+          Selected queue item timing, priority/order detail, and lightweight queue controls.
+          {" "}
+          <OperationalRealtimeStatusPill connectionState={realtimeConnectionState} />
+        </p>
       </div>
       <div className="ui-card__body ui-stack ui-stack--sm">
         <SurfaceActionButtonStrip

@@ -1,6 +1,7 @@
 import type { ExecutionRunDetailProjection } from "@application/execution/ExecutionRunDetailProjectionService";
 import type { ExecutionRunProjection } from "@application/execution/ExecutionRunProjectionService";
 import type { RuntimeQueueItem } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
+import type { RuntimeRealtimeConnectionStateSnapshot } from "@shared/runtime/RuntimeRealtimeSubscriptionService";
 import {
   SurfaceActionButtonStrip,
   SurfaceActionMenu,
@@ -19,6 +20,7 @@ import {
   type SurfacePresentationState,
 } from "../components/presentation-state";
 import type { SurfaceResponsiveProfile } from "../responsive";
+import { OperationalRealtimeStatusPill } from "./OperationalRealtimeIndicators";
 
 export interface OperationalRunInspectionState {
   readonly executionId?: string;
@@ -43,6 +45,7 @@ export interface OperationalRunListPanelProps {
   readonly selectedExecutionId?: string;
   readonly isQueueLoading: boolean;
   readonly queueError?: string;
+  readonly realtimeConnectionState: RuntimeRealtimeConnectionStateSnapshot;
   readonly responsiveProfile: SurfaceResponsiveProfile;
   readonly actorPermissionIds: ReadonlyArray<string>;
   readonly surface: SurfaceActionSurface;
@@ -58,6 +61,7 @@ export function OperationalRunListPanel({
   selectedExecutionId,
   isQueueLoading,
   queueError,
+  realtimeConnectionState,
   responsiveProfile,
   actorPermissionIds,
   surface,
@@ -97,7 +101,11 @@ export function OperationalRunListPanel({
     <section className="ui-card ui-operational-run-list" data-testid="operational-run-list">
       <div className="ui-card__header">
         <h2 className="ui-card__title">Run list</h2>
-        <p className="ui-card__subtitle">Workspace-visible queued, running, and recent persisted runs for operational monitoring.</p>
+        <p className="ui-card__subtitle">
+          Workspace-visible queued, running, and recent persisted runs for operational monitoring.
+          {" "}
+          <OperationalRealtimeStatusPill connectionState={realtimeConnectionState} />
+        </p>
       </div>
       <div className="ui-card__body ui-stack ui-stack--sm">
         <SurfaceActionButtonStrip
@@ -198,6 +206,7 @@ export interface OperationalRunDetailStatusPanelProps {
   readonly runDetail?: ExecutionRunDetailProjection;
   readonly isLoading: boolean;
   readonly error?: string;
+  readonly realtimeConnectionState: RuntimeRealtimeConnectionStateSnapshot;
   readonly responsiveProfile: SurfaceResponsiveProfile;
   readonly actorPermissionIds: ReadonlyArray<string>;
   readonly surface: SurfaceActionSurface;
@@ -211,6 +220,7 @@ export function OperationalRunDetailStatusPanel({
   runDetail,
   isLoading,
   error,
+  realtimeConnectionState,
   responsiveProfile,
   actorPermissionIds,
   surface,
@@ -281,7 +291,11 @@ export function OperationalRunDetailStatusPanel({
     <section className="ui-card ui-operational-run-detail" data-testid="operational-run-detail">
       <div className="ui-card__header">
         <h2 className="ui-card__title">Run detail and status</h2>
-        <p className="ui-card__subtitle">Execution state, diagnostics, and persisted run detail for the selected run.</p>
+        <p className="ui-card__subtitle">
+          Execution state, diagnostics, and persisted run detail for the selected run.
+          {" "}
+          <OperationalRealtimeStatusPill connectionState={realtimeConnectionState} />
+        </p>
       </div>
       <div className="ui-card__body ui-stack ui-stack--sm">
         <SurfaceActionButtonStrip

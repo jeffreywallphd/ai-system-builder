@@ -45,6 +45,7 @@ describe("Operational queue visibility and action flows", () => {
           queryFilter: "",
         }),
         isLoading: false,
+        realtimeConnectionState: Object.freeze({ state: "connected", stale: false }),
         responsiveProfile: createSurfaceResponsiveProfile({ viewportWidthPx: 420 }),
         actorPermissionIds: Object.freeze(["runtime.queue.refresh", "runtime.run.inspect", "runtime.run.cancel", "runtime.queue.manage"]),
         surface: "thin-client",
@@ -61,6 +62,7 @@ describe("Operational queue visibility and action flows", () => {
     expect(html).toContain("Visibility");
     expect(html).toContain("Priority");
     expect(html).toContain("Order");
+    expect(html).toContain("Live updates: Connected");
     expect(html).toContain("data-label=\"Execution\"");
     expect(html).toContain("Visible queue items: 2");
   });

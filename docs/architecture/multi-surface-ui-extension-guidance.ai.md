@@ -28,6 +28,11 @@ Story 15.1.8 baseline for Feature 15 / Epic 15.1: define durable contributor rul
 - Route composition belongs in `src/ui/pages`.
 - Desktop/web folders are for host/runtime adapters only, not shared feature logic.
 
+## Realtime contributor rule
+
+- For operational dashboard/run/queue surfaces, use shared connectivity indicators from `src/ui/shared/operations/OperationalRealtimeIndicators.tsx` for live/stale/reconnecting/disconnected messaging and refresh/reconnect affordances.
+- Keep websocket/reconnect orchestration centralized in shared service/page-state seams (for example `RuntimeRealtimeSubscriptionService` + page orchestration), never in individual panel components.
+
 ## Prohibited patterns
 
 1. Host/runtime bypass logic in page components.
@@ -45,3 +50,7 @@ Required justification: bypassed seam, impact, convergence plan, and traceable P
 ## Canonical doc
 
 See `docs/architecture/multi-surface-ui-extension-guidance.md`.
+
+## Connectivity-state tests
+
+- Add or update connectivity-state rendering coverage in shared operational UI suites and include `src/ui/shared/tests/OperationalRealtimeIndicators.test.tsx` when extending operational realtime behavior.

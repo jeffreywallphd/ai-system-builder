@@ -85,6 +85,7 @@ describe("OperationalWorkspaceDashboard", () => {
         ]),
         isQueueLoading: false,
         isRecentOutputsLoading: false,
+        realtimeConnectionState: Object.freeze({ state: "connected", stale: false }),
         responsiveProfile: createSurfaceResponsiveProfile({ viewportWidthPx: 1200 }),
         onRefreshQueue: () => undefined,
         onInspectRun: () => undefined,
@@ -97,6 +98,7 @@ describe("OperationalWorkspaceDashboard", () => {
     expect(html).toContain("operational-workspace-dashboard");
     expect(html).toContain("Actionable alerts");
     expect(html).toContain("Queue state");
+    expect(html).toContain("Live updates: Connected");
     expect(html).toContain("Recent outputs");
     expect(html).toContain("Node availability");
   });

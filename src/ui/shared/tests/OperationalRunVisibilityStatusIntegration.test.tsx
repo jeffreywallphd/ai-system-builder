@@ -63,6 +63,7 @@ describe("Operational run visibility and status rendering", () => {
         ]),
         selectedExecutionId: "run:running",
         isQueueLoading: false,
+        realtimeConnectionState: Object.freeze({ state: "connected", stale: false }),
         responsiveProfile,
         actorPermissionIds: Object.freeze(["runtime.run.inspect", "runtime.queue.refresh", "runtime.run.cancel", "runtime.queue.manage"]),
         surface: "desktop",
@@ -77,6 +78,7 @@ describe("Operational run visibility and status rendering", () => {
     expect(html).toContain("run:queued");
     expect(html).toContain("run:running");
     expect(html).toContain("run:completed");
+    expect(html).toContain("Live updates: Connected");
     expect(html).toContain("Row actions");
   });
 
@@ -98,6 +100,7 @@ describe("Operational run visibility and status rendering", () => {
         }),
         runDetail: createRunDetailProjection("running", "Running", "info"),
         isLoading: false,
+        realtimeConnectionState: Object.freeze({ state: "connected", stale: false }),
         responsiveProfile,
         actorPermissionIds: Object.freeze(["runtime.run.inspect", "runtime.run.cancel"]),
         surface: "thin-client",
@@ -121,6 +124,7 @@ describe("Operational run visibility and status rendering", () => {
         }),
         runDetail: createRunDetailProjection("failed", "Failed", "danger"),
         isLoading: false,
+        realtimeConnectionState: Object.freeze({ state: "degraded", stale: true, detail: "Reconnecting." }),
         responsiveProfile,
         actorPermissionIds: Object.freeze(["runtime.run.inspect", "runtime.run.cancel"]),
         surface: "thin-client",
@@ -132,7 +136,9 @@ describe("Operational run visibility and status rendering", () => {
     expect(runningHtml).toContain("Run detail and status");
     expect(runningHtml).toContain("2/5 nodes");
     expect(runningHtml).toContain("running");
+    expect(runningHtml).toContain("Live updates: Connected");
     expect(failedHtml).toContain("failed");
+    expect(failedHtml).toContain("Live updates: Degraded (stale)");
     expect(failedHtml).toContain("Execution timeline");
   });
 });

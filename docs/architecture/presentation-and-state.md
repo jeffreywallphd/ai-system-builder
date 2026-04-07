@@ -1086,3 +1086,9 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Allowed parameter handling is now bounded through explicit field definitions and deterministic validation (`validateOperationalApprovedRunLaunchDraft`) before API submission, while authoritative API responses remain source-of-truth for validation/denial outcomes.
 - Submission feedback now maps authoritative runtime response semantics into converged launch states (`accepted`, `validation-error`, `denied`, `failed`) through `mapRuntimeStartResponseToSubmissionState`.
 - Desktop and thin-client layouts now share this same launch component using responsive form conventions (`SurfaceResponsiveFormLayout`) with surface-appropriate copy and behavior.
+
+## Realtime operational indicators update (story 15.2.6)
+
+- Shared operational realtime indicator components now live in `src/ui/shared/operations/OperationalRealtimeIndicators.tsx` and are reused across dashboard/run/queue surfaces.
+- `RunPage` now keeps reconnect handling centralized as page-level orchestration around `RuntimeRealtimeSubscriptionService` and shared panel props, rather than panel-local websocket behavior.
+- Dashboard/run/queue components now consume one consistent connection snapshot model for live vs stale marker rendering and refresh/reconnect affordances.

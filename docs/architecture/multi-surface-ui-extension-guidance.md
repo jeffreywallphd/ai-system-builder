@@ -82,6 +82,11 @@ Do not place cross-surface business logic or shared state orchestration in `src/
 - Use shared `SurfaceStateBoundary` and `SurfaceStatePanel` seams for loading, empty, not-found, disconnected, error, and permission-denied rendering.
 - Use `toSurfacePresentationStateFromApiError` for API error to presentation-state mapping.
 - Use shared action descriptors and wrappers (`SurfaceActionButtonStrip`, `SurfaceActionMenu`, `SurfaceActionList`) for page/row/bulk actions.
+- For realtime operational surfaces, use shared connectivity seams from `src/ui/shared/operations/OperationalRealtimeIndicators.tsx` for:
+  - live vs stale marker rendering,
+  - reconnect/disconnected visibility language,
+  - refresh/reconnect affordances.
+- Keep websocket/reconnect orchestration in shared service/page-state seams (for example `RuntimeRealtimeSubscriptionService` + page-level orchestration), not in individual panel components.
 - Keep page components focused on composition and intent delegation. Keep business semantics in services/state/presenters/backends.
 
 For converged areas, bypassing shared presentation/state patterns is prohibited without documented justification.
@@ -141,6 +146,9 @@ When extending admin/operational screens, keep these suites updated as relevant:
   - `src/ui/shared/tests/SurfaceShellPrimitives.test.tsx`
 - representative page-level integration:
   - update or add `src/ui/pages/tests/*` suites for affected surfaces
+- realtime operational connectivity:
+  - `src/ui/shared/tests/OperationalRealtimeIndicators.test.tsx`
+  - update affected dashboard/run/queue shared-surface suites to assert live/stale/reconnecting/disconnected rendering behavior
 
 ## Related docs
 
