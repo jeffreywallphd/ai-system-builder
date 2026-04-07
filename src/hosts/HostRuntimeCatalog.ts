@@ -55,6 +55,7 @@ export const DesktopHostRuntime = createHostRuntimeIdentity({
   responsibilities: [
     "Compose desktop shell runtime and preload bridge boundaries.",
     "Render user interfaces and relay host capabilities through typed contracts.",
+    "Persist bounded offline cache, draft, and queued sync state without claiming control-plane authority.",
     "Consume authoritative control-plane APIs as a client runtime.",
   ],
   startupDependencies: [{

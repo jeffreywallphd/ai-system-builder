@@ -60,6 +60,19 @@ The preload bridge uses synchronous IPC and exposes storage/workflow/model-file 
 ## TODO
 - When discussing security or performance, mention the sync IPC tradeoff explicitly.
 
+## Offline local-mode update (Feature 19 / Story 19.1.1)
+
+- Desktop offline/local-mode authority boundaries are now explicit and versioned through:
+  - `src/domain/platform/OfflineLocalModeBoundaries.ts`
+  - `src/application/common/OfflineLocalModeResynchronization.ts`
+  - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+- Canonical architecture note for this slice:
+  - `docs/architecture/offline-local-mode-authority-boundaries.md`
+- Boundary stance:
+  - desktop remains control-plane client only,
+  - offline cache/draft/queued mutation/ephemeral local state are explicitly separated,
+  - reconnect decisions are explicit (`apply`, `conflict`, `reject`) and no-silent-divergence is enforced.
+
 ## AI Loom image manipulation update: runtime launch window contract and host flow (stories 8.1-8.2)
 
 - Desktop Studio Shell bridge now includes a dedicated runtime-window launch IPC seam (`ai-loom-desktop-studio-shell:runtime-window:launch`) that accepts only validated runtime launch contracts.

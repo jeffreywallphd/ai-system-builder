@@ -181,6 +181,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For the executable authoritative server host assembly, startup entrypoint, and startup lifecycle expectations, read [`authoritative-server-host-assembly.md`](./authoritative-server-host-assembly.md).
 - For shared SQLite persistence bootstrap/runtime configuration, lifecycle cleanup behavior, and migration-hook coordination in authoritative startup, read [`persistence-bootstrap-and-lifecycle.md`](./persistence-bootstrap-and-lifecycle.md).
 - For the executable desktop host assembly, startup entrypoint, and desktop-specific composition/lifecycle boundaries, read [`desktop-host-assembly.md`](./desktop-host-assembly.md).
+- For canonical offline local-mode authority boundaries, offline-capable resource classes, queued mutation invariants, and reconnect reconciliation rules, read [`offline-local-mode-authority-boundaries.md`](./offline-local-mode-authority-boundaries.md).
 - For the executable hybrid host assembly, capability-composition rules, and authoritative delegation mode, read [`hybrid-host-assembly.md`](./hybrid-host-assembly.md).
 - For the executable web host assembly, thin-client delivery composition boundaries, and startup entrypoint expectations, read [`web-host-assembly.md`](./web-host-assembly.md).
 - For the executable worker host assembly, runtime execution composition boundaries, and startup entrypoint expectations, read [`worker-host-assembly.md`](./worker-host-assembly.md).

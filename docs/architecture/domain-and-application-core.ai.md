@@ -1802,3 +1802,17 @@ Explicitly later than this scope:
 - Added focused contract/invariant tests in:
   - `src/domain/security/tests/SecretDomain.test.ts`,
   - `src/application/security/tests/SecretServiceContracts.test.ts`.
+
+## Direction 19 note: Offline local-mode authority boundaries (story 19.1.1)
+- Added canonical offline authority contracts in `src/domain/platform/OfflineLocalModeBoundaries.ts`:
+  - explicit offline-capable resource classes,
+  - authoritative vs local-draft vs local-ephemeral ownership scopes,
+  - cache/view/edit/queue/execute capability matrix per class,
+  - storage bucket boundaries (`offline-cache`, `local-draft-state`, `mutation-queue`, `local-ephemeral-state`, `server-authoritative-only`),
+  - prohibited divergence patterns and queued mutation envelope invariants.
+- Added reconnect reconciliation policy in `src/application/common/OfflineLocalModeResynchronization.ts` with deterministic outcomes (`apply-to-authoritative`, `conflict-requires-review`, `reject-not-allowed`) and explicit no-silent-divergence guardrails.
+- Added desktop host profile binding in `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts` so desktop offline behavior stays control-plane-client and cannot claim authoritative control-plane posture.
+- Added focused tests:
+  - `src/domain/platform/tests/OfflineLocalModeBoundaries.test.ts`
+  - `src/application/common/tests/OfflineLocalModeResynchronization.test.ts`
+  - `src/hosts/desktop/tests/DesktopOfflineLocalModeProfile.test.ts`
