@@ -156,10 +156,12 @@ export class HybridNodeLocalUseProtectionPolicyRule implements ISchedulingPolicy
 
   public evaluate(input: SchedulingPolicyRuleContext) {
     const protection = evaluateHybridNodeLocalInteractiveProtection({
+      asOf: input.asOf,
       nodeType: input.node.nodeType,
       nodeUsageMode: input.node.usageMode,
       localInteractiveOwnerUserIdentityId: input.node.localInteractiveOwnerUserIdentityId,
       runSubmittedByUserIdentityId: input.run.submittedByUserIdentityId,
+      hybridLocalUseProtection: input.node.hybridLocalUseProtection,
     });
 
     return Object.freeze({

@@ -301,4 +301,82 @@ describe("EvaluateAuthoritativeSchedulingPolicyUseCase", () => {
     expect(bundle.decision.selected?.runId).toBe("run:a");
     expect(bundle.decision.selected?.nodeId).toBe("node:a");
   });
+
+  it("defers hybrid-node remote assignments when reserved local capacity and local-user windows are active", async () => {
+    const useCase = new EvaluateAuthoritativeSchedulingPolicyUseCase({
+      now: () => new Date("2026-04-07T20:30:01.000Z"),
+      decisionIdFactory: () => "decision:hybrid-local-protection",
+    });
+    const bundle = await useCase.evaluate(Object.freeze({
+      asOf: "2026-04-07T20:30:00.000Z",
+      queueLeases: Object.freeze([Object.freeze({
+        runId: "run:member",
+        queueId: "queue:default",
+        enteredAt: "2026-04-07T20:20:00.000Z",
+        eligibleAt: "2026-04-07T20:20:00.000Z",
+        claimToken: "claim:member",
+        claimOwner: "scheduler:alpha",
+        claimExpiresAt: "2026-04-07T20:32:00.000Z",
+      })]),
+      runs: Object.freeze([Object.freeze({
+        runId: "run:member",
+        workspaceId: "workspace:1",
+        submittedByUserIdentityId: "user:member",
+        workspaceRoleKeys: Object.freeze([WorkspaceAuthorizationRoleKeys.member]),
+        requirements: Object.freeze({
+          requiredCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+          requiresRemoteScheduling: true,
+        }),
+        queue: Object.freeze({
+          queueId: "queue:default",
+          enteredAt: "2026-04-07T20:20:00.000Z",
+          eligibleAt: "2026-04-07T20:20:00.000Z",
+          claimToken: "claim:member",
+          claimOwner: "scheduler:alpha",
+        }),
+      })]),
+      nodes: Object.freeze([
+        Object.freeze({
+          nodeId: "node:hybrid:capacity",
+          nodeType: NodeTypes.hybrid,
+          schedulable: true,
+          supportsRemoteScheduling: true,
+          enabledCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+          usageMode: SchedulingNodeUsageModes.idle,
+          hybridLocalUseProtection: Object.freeze({
+            reservedLocalCapacityUnits: 1,
+            activeRemoteAssignmentCount: 1,
+          }),
+        }),
+        Object.freeze({
+          nodeId: "node:hybrid:window",
+          nodeType: NodeTypes.hybrid,
+          schedulable: true,
+          supportsRemoteScheduling: true,
+          enabledCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+          usageMode: SchedulingNodeUsageModes.idle,
+          hybridLocalUseProtection: Object.freeze({
+            protectedLocalUserWindow: Object.freeze({
+              startsAt: "2026-04-07T20:00:00.000Z",
+              endsAt: "2026-04-07T21:00:00.000Z",
+              protectedUserIdentityId: "user:desktop-owner",
+            }),
+          }),
+        }),
+      ]),
+    }));
+
+    expect(bundle.decision.outcome).toBe("deferred");
+    expect(bundle.decision.selected).toBeUndefined();
+    expect(bundle.decision.reasons.some((reason) => reason.code === "no-eligible-candidates")).toBeTrue();
+    expect(bundle.decision.evaluatedCandidates.every((candidate) => !candidate.eligible)).toBeTrue();
+    expect(
+      bundle.decision.evaluatedCandidates.flatMap((candidate) => candidate.denialReasons)
+        .map((reason) => reason.details?.protectionKind),
+    ).toContain("reserved-local-capacity");
+    expect(
+      bundle.decision.evaluatedCandidates.flatMap((candidate) => candidate.denialReasons)
+        .map((reason) => reason.details?.protectionKind),
+    ).toContain("protected-local-user-window");
+  });
 });

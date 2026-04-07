@@ -34,6 +34,7 @@ describe("SchedulingDomain", () => {
 
     expect(blocked.allowed).toBeFalse();
     expect(blocked.reason?.code).toBe("hybrid-local-interactive-protection");
+    expect(blocked.reason?.details?.protectionKind).toBe("interactive-local-session");
 
     const sameUserAllowed = evaluateHybridNodeLocalInteractiveProtection({
       nodeType: NodeTypes.hybrid,
@@ -50,6 +51,64 @@ describe("SchedulingDomain", () => {
     });
 
     expect(nonHybridAllowed.allowed).toBeTrue();
+  });
+
+  it("enforces hybrid reserved-local-capacity and protected local-user windows", () => {
+    const reservedCapacityBlocked = evaluateHybridNodeLocalInteractiveProtection({
+      asOf: "2026-04-07T10:00:00.000Z",
+      nodeType: NodeTypes.hybrid,
+      nodeUsageMode: SchedulingNodeUsageModes.idle,
+      runSubmittedByUserIdentityId: "user:remote-operator",
+      hybridLocalUseProtection: {
+        reservedLocalCapacityUnits: 1,
+        activeRemoteAssignmentCount: 1,
+      },
+    });
+    expect(reservedCapacityBlocked.allowed).toBeFalse();
+    expect(reservedCapacityBlocked.reason?.details?.protectionKind).toBe("reserved-local-capacity");
+
+    const reservedCapacityAllowed = evaluateHybridNodeLocalInteractiveProtection({
+      asOf: "2026-04-07T10:00:00.000Z",
+      nodeType: NodeTypes.hybrid,
+      nodeUsageMode: SchedulingNodeUsageModes.idle,
+      runSubmittedByUserIdentityId: "user:remote-operator",
+      hybridLocalUseProtection: {
+        reservedLocalCapacityUnits: 2,
+        activeRemoteAssignmentCount: 1,
+      },
+    });
+    expect(reservedCapacityAllowed.allowed).toBeTrue();
+
+    const protectedWindowBlocked = evaluateHybridNodeLocalInteractiveProtection({
+      asOf: "2026-04-07T10:10:00.000Z",
+      nodeType: NodeTypes.hybrid,
+      nodeUsageMode: SchedulingNodeUsageModes.idle,
+      runSubmittedByUserIdentityId: "user:remote-operator",
+      hybridLocalUseProtection: {
+        protectedLocalUserWindow: {
+          startsAt: "2026-04-07T10:00:00.000Z",
+          endsAt: "2026-04-07T11:00:00.000Z",
+          protectedUserIdentityId: "user:desktop-owner",
+        },
+      },
+    });
+    expect(protectedWindowBlocked.allowed).toBeFalse();
+    expect(protectedWindowBlocked.reason?.details?.protectionKind).toBe("protected-local-user-window");
+
+    const protectedWindowAllowedForOwner = evaluateHybridNodeLocalInteractiveProtection({
+      asOf: "2026-04-07T10:10:00.000Z",
+      nodeType: NodeTypes.hybrid,
+      nodeUsageMode: SchedulingNodeUsageModes.idle,
+      runSubmittedByUserIdentityId: "user:desktop-owner",
+      hybridLocalUseProtection: {
+        protectedLocalUserWindow: {
+          startsAt: "2026-04-07T10:00:00.000Z",
+          endsAt: "2026-04-07T11:00:00.000Z",
+          protectedUserIdentityId: "user:desktop-owner",
+        },
+      },
+    });
+    expect(protectedWindowAllowedForOwner.allowed).toBeTrue();
   });
 
   it("evaluates assignment candidates with explicit denial reasons and scorecards", () => {

@@ -97,6 +97,15 @@ export interface SchedulingNodePolicyInput {
   readonly enabledCapabilities: ReadonlyArray<NodeRoleCapability>;
   readonly usageMode: SchedulingNodeUsageMode;
   readonly localInteractiveOwnerUserIdentityId?: string;
+  readonly hybridLocalUseProtection?: Readonly<{
+    readonly reservedLocalCapacityUnits?: number;
+    readonly activeRemoteAssignmentCount?: number;
+    readonly protectedLocalUserWindow?: Readonly<{
+      readonly startsAt: string;
+      readonly endsAt: string;
+      readonly protectedUserIdentityId?: string;
+    }>;
+  }>;
   readonly reservationOwner?: string;
   readonly deploymentProfileId?: string;
 }
@@ -228,39 +237,114 @@ export function deriveSchedulingRunPriorityBand(
 }
 
 export function evaluateHybridNodeLocalInteractiveProtection(input: {
+  readonly asOf?: string;
   readonly nodeType: NodeType;
   readonly nodeUsageMode: SchedulingNodeUsageMode;
   readonly localInteractiveOwnerUserIdentityId?: string;
   readonly runSubmittedByUserIdentityId?: string;
+  readonly hybridLocalUseProtection?: Readonly<{
+    readonly reservedLocalCapacityUnits?: number;
+    readonly activeRemoteAssignmentCount?: number;
+    readonly protectedLocalUserWindow?: Readonly<{
+      readonly startsAt: string;
+      readonly endsAt: string;
+      readonly protectedUserIdentityId?: string;
+    }>;
+  }>;
 }): Readonly<{ allowed: boolean; reason?: SchedulingPolicyReason }> {
   const nodeUsageMode = normalizeUsageMode(input.nodeUsageMode);
 
   if (input.nodeType !== NodeTypes.hybrid) {
     return Object.freeze({ allowed: true });
   }
-  if (nodeUsageMode !== SchedulingNodeUsageModes.interactiveLocalSession) {
-    return Object.freeze({ allowed: true });
-  }
-
   const interactiveOwner = normalizeOptional(input.localInteractiveOwnerUserIdentityId);
   const runActor = normalizeOptional(input.runSubmittedByUserIdentityId);
+  const hybridProtection = input.hybridLocalUseProtection;
+  const sameInteractiveUser = Boolean(interactiveOwner && runActor && interactiveOwner === runActor);
 
-  if (interactiveOwner && runActor && interactiveOwner === runActor) {
-    return Object.freeze({ allowed: true });
+  if (nodeUsageMode === SchedulingNodeUsageModes.interactiveLocalSession && !sameInteractiveUser) {
+    return Object.freeze({
+      allowed: false,
+      reason: toPolicyReason(
+        SchedulingCandidateDenialCodes.hybridLocalInteractiveProtection,
+        "Hybrid node is reserved for a local interactive session and is not eligible for remote assignment.",
+        Object.freeze({
+          protectionKind: "interactive-local-session",
+          nodeType: input.nodeType,
+          usageMode: nodeUsageMode,
+          localInteractiveOwnerUserIdentityId: interactiveOwner,
+        }),
+      ),
+    });
   }
 
-  return Object.freeze({
-    allowed: false,
-    reason: toPolicyReason(
-      SchedulingCandidateDenialCodes.hybridLocalInteractiveProtection,
-      "Hybrid node is reserved for a local interactive session and is not eligible for remote assignment.",
-      Object.freeze({
-        nodeType: input.nodeType,
-        usageMode: nodeUsageMode,
-        localInteractiveOwnerUserIdentityId: interactiveOwner,
-      }),
-    ),
-  });
+  const reservedLocalCapacityUnits = hybridProtection?.reservedLocalCapacityUnits;
+  const activeRemoteAssignmentCount = hybridProtection?.activeRemoteAssignmentCount;
+  if (
+    typeof reservedLocalCapacityUnits === "number"
+    && Number.isFinite(reservedLocalCapacityUnits)
+    && reservedLocalCapacityUnits > 0
+    && typeof activeRemoteAssignmentCount === "number"
+    && Number.isFinite(activeRemoteAssignmentCount)
+    && activeRemoteAssignmentCount >= reservedLocalCapacityUnits
+    && !sameInteractiveUser
+  ) {
+    return Object.freeze({
+      allowed: false,
+      reason: toPolicyReason(
+        SchedulingCandidateDenialCodes.hybridLocalInteractiveProtection,
+        "Hybrid node remote-assignment capacity is constrained to preserve local interactive availability.",
+        Object.freeze({
+          protectionKind: "reserved-local-capacity",
+          nodeType: input.nodeType,
+          usageMode: nodeUsageMode,
+          reservedLocalCapacityUnits,
+          activeRemoteAssignmentCount,
+        }),
+      ),
+    });
+  }
+
+  const protectedWindow = hybridProtection?.protectedLocalUserWindow;
+  if (protectedWindow) {
+    if (!input.asOf) {
+      throw new SchedulingDomainError("Scheduling asOf is required when hybrid protected local-user windows are evaluated.");
+    }
+    const asOf = normalizeIsoTimestamp(input.asOf, "Scheduling asOf");
+    const startsAt = normalizeIsoTimestamp(protectedWindow.startsAt, "Hybrid local protection startsAt");
+    const endsAt = normalizeIsoTimestamp(protectedWindow.endsAt, "Hybrid local protection endsAt");
+    if (Date.parse(startsAt) >= Date.parse(endsAt)) {
+      throw new SchedulingDomainError("Hybrid local protection endsAt must be after startsAt.");
+    }
+
+    const protectedUserIdentityId = normalizeOptional(protectedWindow.protectedUserIdentityId);
+    const inProtectedWindow = Date.parse(asOf) >= Date.parse(startsAt) && Date.parse(asOf) < Date.parse(endsAt);
+    const protectedUserMatch = Boolean(
+      protectedUserIdentityId
+      && runActor
+      && protectedUserIdentityId === runActor,
+    );
+
+    if (inProtectedWindow && !protectedUserMatch) {
+      return Object.freeze({
+        allowed: false,
+        reason: toPolicyReason(
+          SchedulingCandidateDenialCodes.hybridLocalInteractiveProtection,
+          "Hybrid node is in a protected local-user window and is not eligible for remote assignment.",
+          Object.freeze({
+            protectionKind: "protected-local-user-window",
+            nodeType: input.nodeType,
+            usageMode: nodeUsageMode,
+            protectedUserIdentityId,
+            startsAt,
+            endsAt,
+          }),
+        ),
+      });
+    }
+  }
+
+  return Object.freeze({ allowed: true });
 }
 
 export function evaluateSchedulingCandidate(input: {
@@ -301,10 +385,12 @@ export function evaluateSchedulingCandidate(input: {
   }
 
   const localProtection = evaluateHybridNodeLocalInteractiveProtection({
+    asOf,
     nodeType: input.node.nodeType,
     nodeUsageMode: input.node.usageMode,
     localInteractiveOwnerUserIdentityId: input.node.localInteractiveOwnerUserIdentityId,
     runSubmittedByUserIdentityId: input.run.submittedByUserIdentityId,
+    hybridLocalUseProtection: input.node.hybridLocalUseProtection,
   });
   if (!localProtection.allowed && localProtection.reason) {
     denialReasons.push(localProtection.reason);

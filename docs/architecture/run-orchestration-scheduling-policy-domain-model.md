@@ -93,9 +93,12 @@ This behavior is intentionally isolated so future deployment-profile overrides a
 
 `evaluateHybridNodeLocalInteractiveProtection` establishes the first hybrid arbitration guardrail:
 
-- Applies only to `hybrid` nodes in `interactive-local-session` mode.
-- Denies remote assignment by default while an interactive local session is active.
-- Allows same-user reuse when the queued run actor matches local interactive owner identity.
+- Applies to `hybrid` nodes only.
+- Denies remote assignment when:
+  - interactive local session mode is active (with same-user exception), or
+  - reserved local capacity is exhausted, or
+  - a protected local-user window is active for another (or unspecified) remote actor.
+- Supports explicit telemetry-backed policy signals under `SchedulingNodePolicyInput.hybridLocalUseProtection`.
 
 This is an authoritative policy denial reason (`hybrid-local-interactive-protection`), not an adapter heuristic.
 
