@@ -34,7 +34,7 @@ export class DesktopServiceSupervisor {
 
     const entrypoint = this.options.isPackaged
       ? path.join(this.options.resourcesPath, "service-supervisor.js")
-      : path.join(this.options.repoRoot, "infrastructure", "runtime", "service-supervisor.js");
+      : path.join(this.options.repoRoot, "src", "infrastructure", "runtime", "service-supervisor.js");
 
     const env = {
       ...process.env,

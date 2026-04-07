@@ -21,7 +21,7 @@ export default defineConfig(async ({ mode }) => {
 
   if (runtimeProfile.distributionTarget === AppDistributionTargets.viteBrowser) {
     const { createBrowserDevelopmentVitePlugin } = await import(
-      "./infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin"
+      "./src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin"
     );
     plugins.push(createBrowserDevelopmentVitePlugin());
   }

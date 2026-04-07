@@ -89,7 +89,7 @@ describe("Host composition architecture guardrails", () => {
   it("avoids deprecated root architecture imports for authoritative host composition paths", async () => {
     const filesToScan = [
       path.resolve(projectRoot, "electron/main/main.ts"),
-      path.resolve(projectRoot, "infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts"),
+      path.resolve(projectRoot, "src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts"),
       path.resolve(projectRoot, "src/hosts/server/AuthoritativeServerCompositionRoot.ts"),
       path.resolve(projectRoot, "src/hosts/server/AuthoritativeServerHostEntrypoint.ts"),
     ] as const;

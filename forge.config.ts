@@ -11,7 +11,7 @@ const config: ForgeConfig = {
     extraResource: [
       "python-runtime",
       "runtime-assets",
-      "infrastructure/runtime/service-supervisor.js",
+      "src/infrastructure/runtime/service-supervisor.js",
       "README.md",
     ],
   },
@@ -47,3 +47,4 @@ const config: ForgeConfig = {
 };
 
 export default config;
+
