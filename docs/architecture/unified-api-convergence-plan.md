@@ -174,3 +174,20 @@ These can remain implementation details as long as protected business actions fl
   - validates Run screen wiring includes shared realtime subscription service usage and runtime connectivity/stale-state presentation.
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerRuntimeRealtimeWebSocket.test.ts`
   - validates websocket upgrade authentication supports runtime auth subprotocol token flow and preserves canonical realtime subscribe/ack behavior.
+
+## Story 14.3.6 migration note: thin-client realtime lifecycle resilience on shared subscriptions
+
+- Thin-client run and queue monitoring now relies on lifecycle-aware behavior centralized in `src/ui/shared/runtime/RuntimeRealtimeSubscriptionService.ts`.
+- Shared runtime subscription handling now applies browser/mobile-responsive lifecycle recovery concerns without embedding them in `RunPage`:
+  - tab visibility resume (`visibilitychange`) revalidates stale realtime connections,
+  - window lifecycle resume (`online`, `focus`, `pageshow`) triggers immediate reconnect attempts when the channel is stale/reconnecting/degraded,
+  - fallback refresh work remains lightweight and queued while refresh is already in-flight to avoid duplicate burst fetches.
+- Run/queue UI remains presentation-first and action-focused while authoritative websocket reconnect and fallback behavior are enforced in shared runtime layers.
+- Thin-client UX now explicitly documents lifecycle-aware realtime behavior on the run monitoring panel.
+
+### Story 14.3.6 tests
+
+- `src/ui/shared/runtime/tests/RuntimeRealtimeSubscriptionService.test.ts`
+  - validates lifecycle-resume reconnect behavior and queued fallback refresh execution for stale thin-client subscription states.
+- `src/ui/pages/tests/RunPage.test.ts`
+  - validates run monitoring UX includes lifecycle-aware realtime behavior notes while continuing to rely on shared subscription abstractions.

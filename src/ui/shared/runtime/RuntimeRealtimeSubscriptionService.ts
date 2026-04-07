@@ -90,19 +90,38 @@ export type RuntimeRealtimeSocketFactory = (
 export interface RuntimeRealtimeSubscriptionServiceOptions {
   readonly sessionStore?: Pick<IdentityAuthSessionStore, "getSession" | "isSessionExpired">;
   readonly socketFactory?: RuntimeRealtimeSocketFactory;
+  readonly lifecycleBindings?: RuntimeRealtimeLifecycleBindings;
   readonly reconnectDelayMs?: number;
   readonly fallbackRefreshIntervalMs?: number;
+}
+
+export interface RuntimeRealtimeDocumentLifecycleTarget {
+  readonly visibilityState?: "hidden" | "visible" | "prerender";
+  addEventListener(type: "visibilitychange", listener: () => void): void;
+  removeEventListener(type: "visibilitychange", listener: () => void): void;
+}
+
+export interface RuntimeRealtimeWindowLifecycleTarget {
+  addEventListener(type: "online" | "focus" | "pageshow", listener: () => void): void;
+  removeEventListener(type: "online" | "focus" | "pageshow", listener: () => void): void;
+}
+
+export interface RuntimeRealtimeLifecycleBindings {
+  readonly document?: RuntimeRealtimeDocumentLifecycleTarget;
+  readonly window?: RuntimeRealtimeWindowLifecycleTarget;
 }
 
 export class RuntimeRealtimeSubscriptionService {
   private readonly sessionStore: Pick<IdentityAuthSessionStore, "getSession" | "isSessionExpired">;
   private readonly socketFactory: RuntimeRealtimeSocketFactory;
+  private readonly lifecycleBindings: RuntimeRealtimeLifecycleBindings;
   private readonly reconnectDelayMs: number;
   private readonly fallbackRefreshIntervalMs: number;
 
   public constructor(options?: RuntimeRealtimeSubscriptionServiceOptions) {
     this.sessionStore = options?.sessionStore ?? new IdentityAuthSessionStore();
     this.socketFactory = options?.socketFactory ?? defaultRuntimeRealtimeSocketFactory;
+    this.lifecycleBindings = options?.lifecycleBindings ?? resolveDefaultRuntimeRealtimeLifecycleBindings();
     this.reconnectDelayMs = Math.max(0, options?.reconnectDelayMs ?? DEFAULT_RECONNECT_DELAY_MS);
     this.fallbackRefreshIntervalMs = Math.max(0, options?.fallbackRefreshIntervalMs ?? DEFAULT_FALLBACK_REFRESH_INTERVAL_MS);
   }
@@ -129,6 +148,7 @@ export class RuntimeRealtimeSubscriptionService {
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let fallbackRefreshTimer: ReturnType<typeof setInterval> | undefined;
     let refreshInFlight = false;
+    let lifecycleRefreshQueued = false;
     let currentConnectionState: RuntimeRealtimeConnectionStateSnapshot = Object.freeze({
       state: "connecting",
       stale: false,
@@ -151,7 +171,22 @@ export class RuntimeRealtimeSubscriptionService {
         options.onError?.("Failed to refresh runtime operational data after realtime changes.");
       } finally {
         refreshInFlight = false;
+        if (lifecycleRefreshQueued) {
+          lifecycleRefreshQueued = false;
+          void runFallbackRefresh();
+        }
       }
+    };
+
+    const queueFallbackRefresh = (): void => {
+      if (!options.fallbackRefresh || disposed) {
+        return;
+      }
+      if (refreshInFlight) {
+        lifecycleRefreshQueued = true;
+        return;
+      }
+      void runFallbackRefresh();
     };
 
     const clearReconnect = (): void => {
@@ -186,6 +221,35 @@ export class RuntimeRealtimeSubscriptionService {
         reconnectTimer = undefined;
         connect();
       }, this.reconnectDelayMs);
+    };
+
+    const closeSocketSilently = (reason: string): void => {
+      const active = socket;
+      socket = undefined;
+      if (!active) {
+        return;
+      }
+      active.onopen = null;
+      active.onmessage = null;
+      active.onclose = null;
+      active.onerror = null;
+      active.close(1000, reason);
+    };
+
+    const restartConnectionForLifecycleResume = (): void => {
+      if (disposed) {
+        return;
+      }
+      clearReconnect();
+      closeSocketSilently("client-reconnect");
+      publishConnectionState(Object.freeze({
+        state: "connecting",
+        stale: true,
+        detail: "Revalidating realtime channel after lifecycle resume.",
+      }));
+      startFallbackRefreshLoop();
+      queueFallbackRefresh();
+      connect();
     };
 
     const handleEventEnvelope = (event: RuntimeRealtimeEventEnvelope): void => {
@@ -292,7 +356,7 @@ export class RuntimeRealtimeSubscriptionService {
             if (currentConnectionState.state !== "connected" || currentConnectionState.stale) {
               publishConnectionState(Object.freeze({ state: "connected", stale: false }));
               stopFallbackRefreshLoop();
-              void runFallbackRefresh();
+              queueFallbackRefresh();
             }
             handleEventEnvelope(parsedEvent.event);
             return;
@@ -344,6 +408,24 @@ export class RuntimeRealtimeSubscriptionService {
       };
     };
 
+    const releaseLifecycleListeners = bindLifecycleResumeListeners(this.lifecycleBindings, () => {
+      if (disposed) {
+        return;
+      }
+
+      const isVisible = this.lifecycleBindings.document?.visibilityState !== "hidden";
+      if (!isVisible) {
+        return;
+      }
+
+      if (currentConnectionState.state === "connected" && !currentConnectionState.stale) {
+        queueFallbackRefresh();
+        return;
+      }
+
+      restartConnectionForLifecycleResume();
+    });
+
     connect();
 
     return Object.freeze({
@@ -354,15 +436,8 @@ export class RuntimeRealtimeSubscriptionService {
         disposed = true;
         clearReconnect();
         stopFallbackRefreshLoop();
-        const active = socket;
-        socket = undefined;
-        if (active) {
-          active.onopen = null;
-          active.onmessage = null;
-          active.onclose = null;
-          active.onerror = null;
-          active.close(1000, "client-disposed");
-        }
+        releaseLifecycleListeners();
+        closeSocketSilently("client-disposed");
       },
     });
   }
@@ -453,6 +528,56 @@ function buildRuntimeRealtimeWebSocketUrl(workspaceId: string): string {
 function defaultRuntimeRealtimeSocketFactory(url: string, protocols: ReadonlyArray<string>): RuntimeRealtimeSocket {
   const socket = new WebSocket(url, [...protocols]);
   return socket as unknown as RuntimeRealtimeSocket;
+}
+
+function resolveDefaultRuntimeRealtimeLifecycleBindings(): RuntimeRealtimeLifecycleBindings {
+  const scope = globalThis as unknown as {
+    readonly document?: RuntimeRealtimeDocumentLifecycleTarget;
+    readonly window?: RuntimeRealtimeWindowLifecycleTarget;
+  };
+  return Object.freeze({
+    document: scope.document,
+    window: scope.window,
+  });
+}
+
+function bindLifecycleResumeListeners(
+  lifecycleBindings: RuntimeRealtimeLifecycleBindings,
+  onResume: () => void,
+): () => void {
+  const releaseCallbacks: Array<() => void> = [];
+
+  if (lifecycleBindings.document) {
+    const onVisibilityChanged = () => {
+      if (lifecycleBindings.document?.visibilityState === "visible") {
+        onResume();
+      }
+    };
+    lifecycleBindings.document.addEventListener("visibilitychange", onVisibilityChanged);
+    releaseCallbacks.push(() => {
+      lifecycleBindings.document?.removeEventListener("visibilitychange", onVisibilityChanged);
+    });
+  }
+
+  if (lifecycleBindings.window) {
+    const onWindowResume = () => {
+      onResume();
+    };
+    lifecycleBindings.window.addEventListener("online", onWindowResume);
+    lifecycleBindings.window.addEventListener("focus", onWindowResume);
+    lifecycleBindings.window.addEventListener("pageshow", onWindowResume);
+    releaseCallbacks.push(() => {
+      lifecycleBindings.window?.removeEventListener("online", onWindowResume);
+      lifecycleBindings.window?.removeEventListener("focus", onWindowResume);
+      lifecycleBindings.window?.removeEventListener("pageshow", onWindowResume);
+    });
+  }
+
+  return () => {
+    for (const release of releaseCallbacks) {
+      release();
+    }
+  };
 }
 
 function buildRuntimeRealtimeSocketProtocols(sessionToken: string): ReadonlyArray<string> {

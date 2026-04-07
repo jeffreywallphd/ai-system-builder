@@ -443,6 +443,9 @@ export default function RunPage(props: RunPageProps): JSX.Element {
             {runtimeRealtimeConnectionState.stale ? " (stale data fallback active)" : ""}
             {runtimeRealtimeConnectionState.detail ? ` - ${runtimeRealtimeConnectionState.detail}` : ""}
           </p>
+          <p className="ui-text-small ui-text-secondary">
+            Thin-client lifecycle resume handling (tab focus, visibility restore, and network return) is applied through shared realtime subscription behavior.
+          </p>
           <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
             <button className="ui-button ui-button--ghost ui-button--small" onClick={() => void refreshRuntimeQueue()}>
               {isRuntimeQueueLoading ? "Refreshing queue..." : "Refresh queue"}
