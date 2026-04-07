@@ -129,6 +129,9 @@ describe("AuditDomain", () => {
       immutability: AuditImmutabilityPostures.appendOnly,
       correlationId: "corr:1",
       requestId: "request:1",
+      linkage: {
+        eventGroupId: "group:trust-change:1",
+      },
     });
 
     expect(event.recordKind).toBe("audit-record");
@@ -140,6 +143,7 @@ describe("AuditDomain", () => {
       roleKey: "admin",
       targetUserIdentityId: "user:member:9",
     });
+    expect(userSafe.linkage?.eventGroupId).toBe("group:trust-change:1");
 
     expect(() => createCanonicalAuditEvent({
       ...event,
@@ -149,6 +153,64 @@ describe("AuditDomain", () => {
       integrity: {
         schemaVersion: "1.0",
         hashAlgorithm: "sha-256",
+      },
+    })).toThrow(AuditDomainError);
+  });
+
+  it("normalizes and validates linkage metadata", () => {
+    const event = createCanonicalAuditEvent({
+      eventId: "audit:event:linkage:1",
+      eventType: "run-governance-updated",
+      category: AuditEventCategories.orchestration,
+      action: "run.governance.updated",
+      outcome: "succeeded",
+      occurredAt: "2026-04-07T12:10:00.000Z",
+      actor: {
+        actorId: "service:orchestrator",
+        actorKind: AuditActorKinds.service,
+        actorServiceId: "service:orchestrator",
+      },
+      scope: {
+        kind: AuditScopeKinds.workspace,
+        workspaceId: "workspace:1",
+      },
+      payload: {
+        hasProtectedData: false,
+        redactionReasons: [],
+      },
+      integrity: {
+        schemaVersion: "1.0",
+        hashAlgorithm: "sha-256",
+      },
+      linkage: {
+        eventGroupId: " group:run-governance:1 ",
+        parentEventId: " audit:event:linkage:0 ",
+        rootEventId: " audit:event:linkage:root ",
+        workflowId: " workflow:queue-arbitration ",
+        sessionRef: " session:runtime:1 ",
+        runId: " run:123 ",
+        governanceActionId: " governance:change:7 ",
+        relatedResources: [
+          {
+            resourceType: "run",
+            resourceId: "run:123",
+            resourceRef: "run:123",
+            relationship: "subject",
+          },
+        ],
+      },
+    });
+
+    expect(event.linkage?.eventGroupId).toBe("group:run-governance:1");
+    expect(event.linkage?.runId).toBe("run:123");
+    expect(event.linkage?.relatedResources?.[0]?.relationship).toBe("subject");
+
+    expect(() => createCanonicalAuditEvent({
+      ...event,
+      eventId: "audit:event:linkage:2",
+      linkage: {
+        rootEventId: "audit:event:same",
+        parentEventId: "audit:event:same",
       },
     })).toThrow(AuditDomainError);
   });

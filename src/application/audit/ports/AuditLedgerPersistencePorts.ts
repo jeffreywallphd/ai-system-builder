@@ -18,6 +18,15 @@ export interface AuditLedgerQuery extends AuditLedgerListQueryDto {
   readonly category?: AuditEventCategory;
   readonly actionPrefix?: string;
   readonly eventType?: string;
+  readonly correlationId?: string;
+  readonly requestId?: string;
+  readonly eventGroupId?: string;
+  readonly rootEventId?: string;
+  readonly parentEventId?: string;
+  readonly workflowId?: string;
+  readonly sessionRef?: string;
+  readonly runId?: string;
+  readonly governanceActionId?: string;
   readonly occurredAfter?: string;
   readonly occurredBefore?: string;
   readonly limit?: number;

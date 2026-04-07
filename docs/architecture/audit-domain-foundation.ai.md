@@ -27,6 +27,17 @@
 
 Optional: `protectedResource`, `correlationId`, `requestId`.
 
+## Linkage metadata
+
+Canonical events now optionally support `linkage` metadata for workflow/event/resource investigation:
+
+- event grouping/chain identifiers (`eventGroupId`, `parentEventId`, `rootEventId`)
+- workflow/run/governance refs (`workflowId`, `runId`, `governanceActionId`)
+- session linkage (`sessionRef`)
+- related resources (`relatedResources[]`) with typed bounded refs
+
+Guardrail: `rootEventId` and `parentEventId` cannot be the same value.
+
 ## Taxonomy categories
 
 - `security-sensitive`

@@ -41,6 +41,11 @@ describe("AuditEventDtos", () => {
     immutability: "append-only",
     schemaVersion: "1.0",
     hashAlgorithm: "sha-256",
+    correlationId: "corr:run:1",
+    linkage: {
+      eventGroupId: "group:run:1",
+      runId: "run:1",
+    },
   } as const);
 
   it("maps append responses to summary views", () => {
@@ -54,6 +59,7 @@ describe("AuditEventDtos", () => {
     expect(response.sequence).toBe(10);
     expect(response.event.eventId).toBe("audit:event:dto:1");
     expect(response.event.actorId).toBe("service:run-orchestrator");
+    expect(response.event.linkage?.eventGroupId).toBe("group:run:1");
   });
 
   it("builds normalized list responses with total fallback", () => {

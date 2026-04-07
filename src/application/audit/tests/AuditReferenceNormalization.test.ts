@@ -9,6 +9,7 @@ import {
   normalizeAuditActorReference,
   normalizeAuditProtectedResourceReference,
   normalizeAuditScopeReference,
+  normalizeAuditLinkageReference,
   normalizeAuthoritativeAuditReferences,
 } from "../shared/AuditReferenceNormalization";
 
@@ -62,6 +63,17 @@ describe("AuditReferenceNormalization", () => {
         deviceId: " device/workstation ",
         nodeId: " node/gpu-west ",
       },
+      linkage: {
+        eventGroupId: " group/runtime/1 ",
+        runId: " run/runtime/1 ",
+        relatedResources: [
+          {
+            resourceType: " runtime queue ",
+            resourceId: " queue/main ",
+            relationship: "affected",
+          },
+        ],
+      },
     });
 
     expect(normalized.correlationId).toBe("corr:runtime:1");
@@ -69,6 +81,10 @@ describe("AuditReferenceNormalization", () => {
     expect(normalized.actionContext?.sessionRef).toBe("session:runtime:session-1");
     expect(normalized.actionContext?.deviceRef).toBe("device:workstation");
     expect(normalized.actionContext?.nodeRef).toBe("node:gpu-west");
+    expect(normalized.linkage?.eventGroupId).toBe("group:runtime:1");
+    expect(normalized.linkage?.runId).toBe("run:runtime:1");
+    expect(normalized.linkage?.relatedResources?.[0]?.resourceType).toBe("runtime-queue");
+    expect(normalized.linkage?.relatedResources?.[0]?.resourceId).toBe("queue:main");
   });
 
   it("returns undefined action context when no session, device, or node reference exists", () => {
@@ -85,5 +101,18 @@ describe("AuditReferenceNormalization", () => {
       kind: AuditScopeKinds.global,
       workspaceId: "workspace:1",
     })).toThrow("Global audit scope cannot include workspaceId.");
+  });
+
+  it("fills linkage sessionRef from normalized action context when not explicitly set", () => {
+    const linkage = normalizeAuditLinkageReference(
+      {
+        eventGroupId: "group:1",
+      },
+      {
+        sessionRef: "session:actor:1",
+      },
+      "workspace:1",
+    );
+    expect(linkage?.sessionRef).toBe("session:actor:1");
   });
 });

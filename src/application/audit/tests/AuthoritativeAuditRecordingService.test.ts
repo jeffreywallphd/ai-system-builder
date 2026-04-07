@@ -169,6 +169,19 @@ describe("AuthoritativeAuditRecordingService", () => {
         nodeId: " node/gpu-west-1 ",
         deviceId: " workstation/ci-runner-1 ",
       },
+      linkage: {
+        eventGroupId: " group/runtime/dispatch-1 ",
+        workflowId: " workflow/dispatch ",
+        runId: " run/42 ",
+        governanceActionId: " governance/action/dispatch ",
+        relatedResources: [
+          {
+            resourceType: " runtime queue ",
+            resourceId: " queue/main ",
+            relationship: "subject",
+          },
+        ],
+      },
     }));
 
     const event = repository.events[0];
@@ -181,6 +194,11 @@ describe("AuthoritativeAuditRecordingService", () => {
     expect(event?.protectedResource?.resourceRef).not.toContain("sqlite://internal/queue_row_1");
     expect(event?.correlationId).toBe("corr:runtime:dispatch-1");
     expect(event?.requestId).toBe("req:runtime:dispatch-1");
+    expect(event?.linkage?.eventGroupId).toBe("group:runtime:dispatch-1");
+    expect(event?.linkage?.workflowId).toBe("workflow:dispatch");
+    expect(event?.linkage?.runId).toBe("run:42");
+    expect(event?.linkage?.governanceActionId).toBe("governance:action:dispatch");
+    expect(event?.linkage?.relatedResources?.[0]?.resourceRef).toBe("runtime-queue:queue:main");
     expect(
       (event?.payload.userSafeDetails?.referenceContext as Record<string, unknown>)?.nodeRef,
     ).toBe("node:gpu-west-1");

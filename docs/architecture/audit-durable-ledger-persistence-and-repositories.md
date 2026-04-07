@@ -39,6 +39,7 @@ SQLite schema additions (`authoritative_audit_ledger_events`) persist:
 - normalized actor/scope/resource references
 - immutable event timing (`occurredAt`, `recordedAt`) and integrity/retention/immutability fields
 - payload boundary metadata (`hasProtectedData`, redaction reasons, safe/admin JSON)
+- linkage metadata for event/resource/workflow traversal (`event_group`, `root/parent`, `workflow/run/session`, governance action, related-resource refs JSON)
 - full canonical event JSON snapshot for deterministic rehydration
 
 Secondary indexes support common governance query paths:
@@ -47,6 +48,7 @@ Secondary indexes support common governance query paths:
 - taxonomy (`category`, `action`, `event_type`)
 - actor/workspace/resource references
 - correlation/request lookups
+- linkage lookups (event group, root/parent, workflow, run, session, governance action)
 - protected-data posture filters
 
 ## Story 18.2.3 query service workflows
@@ -59,6 +61,7 @@ Key behavior:
 - validates and normalizes list query input using shared audit query contracts/schemas;
 - enforces requester authorization decisions before repository access;
 - applies logical scope constraints consistently across workspace, actor, and resource filters;
+- supports linkage-aware filtering over correlation/request and linkage metadata selectors;
 - enforces thin-safe and protected-data read posture constraints from authorization scope;
 - provides deterministic paging/sort defaults (`occurredAt desc`) and stable pagination metadata (`hasMore`, bounded page window);
 - keeps retrieval logic in the application layer and out of UI state services.

@@ -45,6 +45,18 @@ describe("AuditEventSchemaContracts", () => {
       immutability: "append-only",
       schemaVersion: "1.0",
       hashAlgorithm: "sha-256",
+      linkage: {
+        eventGroupId: "group:workflow:1",
+        runId: "run:1",
+        relatedResources: [
+          {
+            resourceType: "run",
+            resourceId: "run:1",
+            resourceRef: "run:1",
+            relationship: "subject",
+          },
+        ],
+      },
     });
 
     const append = parseAuditLedgerAppendRequestDto({
@@ -105,6 +117,9 @@ describe("AuditEventSchemaContracts", () => {
       + "&category=sharing"
       + "&outcome=succeeded"
       + "&eventType=workspace-role-reassigned"
+      + "&correlationId=corr%3Aworkflow%3A1"
+      + "&eventGroupId=group%3Aworkflow%3A1"
+      + "&runId=run%3A1"
       + "&includeThinSafeOnly=true",
     ));
 
@@ -112,6 +127,9 @@ describe("AuditEventSchemaContracts", () => {
       AuditEventCategories.administrative,
       AuditEventCategories.sharing,
     ]);
+    expect(parsed.filters?.correlationIds).toEqual(["corr:workflow:1"]);
+    expect(parsed.filters?.eventGroupIds).toEqual(["group:workflow:1"]);
+    expect(parsed.filters?.runIds).toEqual(["run:1"]);
 
     expect(() => parseAuditEventListQueryFromSearchParams(new URLSearchParams(
       "category=protected-data&includeThinSafeOnly=true",

@@ -61,6 +61,14 @@ export function mapCanonicalAuditEventToRowValues(event: CanonicalAuditEvent): R
     event.immutability,
     normalizeOptional(event.correlationId),
     normalizeOptional(event.requestId),
+    normalizeOptional(event.linkage?.eventGroupId),
+    normalizeOptional(event.linkage?.parentEventId),
+    normalizeOptional(event.linkage?.rootEventId),
+    normalizeOptional(event.linkage?.workflowId),
+    normalizeOptional(event.linkage?.sessionRef),
+    normalizeOptional(event.linkage?.runId),
+    normalizeOptional(event.linkage?.governanceActionId),
+    event.linkage?.relatedResources ? JSON.stringify(event.linkage.relatedResources) : null,
     JSON.stringify(event),
     new Date().toISOString(),
   ]);
@@ -85,5 +93,6 @@ export function parseCanonicalAuditEventRow(row: Pick<AuditLedgerEventRow, "even
     immutability: parsed.immutability,
     correlationId: parsed.correlationId,
     requestId: parsed.requestId,
+    linkage: parsed.linkage,
   });
 }

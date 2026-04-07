@@ -56,6 +56,25 @@ export interface AuditEventScopeReferenceDto extends AuditScope {}
 
 export interface AuditEventResourceReferenceDto extends AuditProtectedResourceReference {}
 
+export interface AuditEventRelatedResourceReferenceDto {
+  readonly resourceType: string;
+  readonly resourceId: string;
+  readonly resourceRef: string;
+  readonly relationship: string;
+  readonly workspaceId?: string;
+}
+
+export interface AuditEventLinkageDto {
+  readonly eventGroupId?: string;
+  readonly parentEventId?: string;
+  readonly rootEventId?: string;
+  readonly workflowId?: string;
+  readonly sessionRef?: string;
+  readonly runId?: string;
+  readonly governanceActionId?: string;
+  readonly relatedResources?: ReadonlyArray<AuditEventRelatedResourceReferenceDto>;
+}
+
 export interface SecuritySensitiveAuditCategoryPayloadDto {
   readonly category: typeof AuditEventCategories.securitySensitive;
   readonly principalRef?: string;
@@ -136,6 +155,7 @@ export interface AuditEventEnvelopeDto {
   readonly previousEventDigest?: string;
   readonly correlationId?: string;
   readonly requestId?: string;
+  readonly linkage?: AuditEventLinkageDto;
 }
 
 export interface AuditEventSummaryViewDto {
@@ -150,6 +170,9 @@ export interface AuditEventSummaryViewDto {
   readonly actorKind: AuditActorKind;
   readonly scope: AuditEventScopeReferenceDto;
   readonly protectedResource?: AuditEventResourceReferenceDto;
+  readonly correlationId?: string;
+  readonly requestId?: string;
+  readonly linkage?: AuditEventLinkageDto;
   readonly categoryPayload?: AuditCategoryPayloadDto;
   readonly details?: Readonly<Record<string, unknown>>;
   readonly hasProtectedData: boolean;
@@ -171,6 +194,15 @@ export interface AuditEventListFiltersDto {
   readonly workspaceIds?: ReadonlyArray<string>;
   readonly resourceTypes?: ReadonlyArray<string>;
   readonly resourceIds?: ReadonlyArray<string>;
+  readonly correlationIds?: ReadonlyArray<string>;
+  readonly requestIds?: ReadonlyArray<string>;
+  readonly eventGroupIds?: ReadonlyArray<string>;
+  readonly rootEventIds?: ReadonlyArray<string>;
+  readonly parentEventIds?: ReadonlyArray<string>;
+  readonly workflowIds?: ReadonlyArray<string>;
+  readonly sessionRefs?: ReadonlyArray<string>;
+  readonly runIds?: ReadonlyArray<string>;
+  readonly governanceActionIds?: ReadonlyArray<string>;
   readonly hasProtectedData?: boolean;
   readonly occurredAfter?: string;
   readonly occurredBefore?: string;
@@ -230,6 +262,15 @@ export function normalizeAuditEventListQuery(
       workspaceIds: toFrozenStringArray(query.filters.workspaceIds),
       resourceTypes: toFrozenStringArray(query.filters.resourceTypes),
       resourceIds: toFrozenStringArray(query.filters.resourceIds),
+      correlationIds: toFrozenStringArray(query.filters.correlationIds),
+      requestIds: toFrozenStringArray(query.filters.requestIds),
+      eventGroupIds: toFrozenStringArray(query.filters.eventGroupIds),
+      rootEventIds: toFrozenStringArray(query.filters.rootEventIds),
+      parentEventIds: toFrozenStringArray(query.filters.parentEventIds),
+      workflowIds: toFrozenStringArray(query.filters.workflowIds),
+      sessionRefs: toFrozenStringArray(query.filters.sessionRefs),
+      runIds: toFrozenStringArray(query.filters.runIds),
+      governanceActionIds: toFrozenStringArray(query.filters.governanceActionIds),
       hasProtectedData: normalizeOptionalBoolean(query.filters.hasProtectedData),
       occurredAfter: normalizeTimestamp(query.filters.occurredAfter),
       occurredBefore: normalizeTimestamp(query.filters.occurredBefore),
@@ -271,6 +312,9 @@ export function toAuditEventSummaryView(event: AuditEventEnvelopeDto): AuditEven
     actorKind: event.actor.actorKind,
     scope: event.scope,
     protectedResource: event.protectedResource,
+    correlationId: event.correlationId,
+    requestId: event.requestId,
+    linkage: event.linkage,
     categoryPayload: event.payload.categoryPayload,
     details: event.payload.userSafeDetails,
     hasProtectedData: event.payload.hasProtectedData,

@@ -29,6 +29,7 @@ Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-rep
 
 - Added explicit audit ledger persistence ports (`IAuditLedgerRepository`) under `src/application/audit/ports`.
 - Added SQLite audit ledger table/migrations with append-oriented event storage and replay metadata table.
+- Added linkage persistence columns/indexes (event-group/root/parent/workflow/session/run/governance-action + related-resources JSON) for investigative joins.
 - Added durable repository adapter with:
   - replay-safe operation-key handling,
   - duplicate-content conflict protection,
@@ -53,6 +54,7 @@ Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-rep
 - Canonical events are appended, not updated in place.
 - Mutation replay metadata is append-maintenance only and does not mutate persisted event truth.
 - Query filters support category/action/eventType/actor/workspace/resource/occurred windows and thin-safe category mode.
+- Query filters also support correlation/request and linkage selectors for related workflow/event traversal.
 - Query service merges authorization scope limits (workspace/actor/resource/protected-data/thin-safe) with caller filters before repository reads.
 - Detail retrieval applies the same authorization scope and returns non-leaky `notFound` when events are outside workspace/sensitivity visibility.
 - The same canonical event can render as `user-safe` detail for general actors and `admin` detail for administrative actors.

@@ -17,10 +17,12 @@ Story 18.1.2 baseline for Feature 18 / Epic 18.1: establish canonical shared aud
 ## Added contract concepts
 
 - canonical event envelope (`AuditEventEnvelopeDto`) for stable audit record exchange
+- optional linkage metadata for event/resource/workflow investigation
 - category-specific payload contracts across all canonical audit categories
 - explicit actor/scope/protected-resource references for portable audit joins
 - redacted summary/detail view contracts with user-safe vs admin visibility boundary
 - admin-ready list filter/query contracts with shared pagination and sort fields
+- linkage filter selectors for correlation/request/event-group/root/parent/workflow/session/run/governance-action ids
 
 ## Validation posture
 

@@ -95,6 +95,7 @@ export class AuthoritativeAuditRecordingService implements AuthoritativeAuditRec
       correlationId: input.correlationId,
       requestId: input.requestId,
       actionContext: input.actionContext,
+      linkage: input.linkage,
     });
 
     const event = createCanonicalAuditEvent({
@@ -119,6 +120,20 @@ export class AuthoritativeAuditRecordingService implements AuthoritativeAuditRec
       immutability: input.immutability,
       correlationId: normalizedReferences.correlationId,
       requestId: normalizedReferences.requestId,
+      linkage: normalizedReferences.linkage
+        ? Object.freeze({
+          ...normalizedReferences.linkage,
+          relatedResources: normalizedReferences.linkage.relatedResources
+            ? Object.freeze(normalizedReferences.linkage.relatedResources.map((resource) => Object.freeze({
+              resourceType: resource.resourceType,
+              resourceId: resource.resourceId,
+              resourceRef: `${resource.resourceType}:${resource.resourceId}`,
+              relationship: resource.relationship,
+              workspaceId: resource.workspaceId,
+            })))
+            : undefined,
+        })
+        : undefined,
     });
 
     return this.dependencies.repository.appendAuditEvent(event, {
@@ -332,5 +347,13 @@ export function toCanonicalAuthoritativeAuditEvent(event: CanonicalAuditEvent): 
       redactionReasons: Object.freeze([...event.payload.redactionReasons]),
     }),
     integrity: Object.freeze({ ...event.integrity }),
+    linkage: event.linkage
+      ? Object.freeze({
+        ...event.linkage,
+        relatedResources: event.linkage.relatedResources
+          ? Object.freeze(event.linkage.relatedResources.map((resource) => Object.freeze({ ...resource })))
+          : undefined,
+      })
+      : undefined,
   });
 }
