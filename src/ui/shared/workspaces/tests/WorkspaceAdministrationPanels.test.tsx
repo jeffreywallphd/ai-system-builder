@@ -107,10 +107,11 @@ describe("WorkspaceAdministrationPanels", () => {
     expect(html).toContain("membership and role management require owner/admin privileges");
   });
 
-  it("renders thin-client membership administration actions and role assignment controls", () => {
+  it("enforces admin-lite thin membership boundaries for lightweight actions", () => {
     const html = renderToStaticMarkup(
       <WorkspaceMembershipAdministrationPanel
         surface="thin-client"
+        actionProfile="admin-lite"
         selectedWorkspaceId="workspace-alpha"
         memberships={Object.freeze([membershipRecord])}
         capabilities={Object.freeze({
@@ -130,9 +131,11 @@ describe("WorkspaceAdministrationPanels", () => {
       />,
     );
 
-    expect(html).toContain("Role assignments");
-    expect(html).toContain("Add member");
+    expect(html).toContain("Admin-lite boundary");
     expect(html).toContain("Save status");
-    expect(html).toContain("Grant admin");
+    expect(html).not.toContain("Role assignments");
+    expect(html).not.toContain("Add member");
+    expect(html).not.toContain("Grant admin");
+    expect(html).not.toContain("Remove");
   });
 });

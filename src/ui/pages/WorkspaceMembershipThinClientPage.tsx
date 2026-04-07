@@ -260,6 +260,7 @@ export default function WorkspaceMembershipThinClientPage(props: WorkspaceMember
           <div className="ui-card__body ui-stack ui-stack--sm">
             <WorkspaceMembershipAdministrationPanel
               surface="thin-client"
+              actionProfile="admin-lite"
               selectedWorkspaceId={selectedWorkspaceId}
               memberships={memberships}
               capabilities={workspaceCapabilities}

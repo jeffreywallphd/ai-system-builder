@@ -84,3 +84,9 @@ Route metadata changes should verify:
   - desktop governance review: `owner|admin`, capability `log.read`, workspace context required
   - thin governance review: `owner|admin|member`, capability `system.read`, workspace context required
 - Route-level strict metadata enforcement in `AppRouter.tsx` now protects both governance review routes from direct URL access by unauthorized sessions.
+
+## Story 15.3.7 update
+
+- Admin-lite navigation remains metadata-first and intentionally bounded to thin-safe routes, with entry composition in `src/ui/pages/AdminLiteEntryPage.tsx` now presenting only lightweight workflow intents (approval, status review, limited membership, policy inspection, trusted-device review).
+- Desktop-only administration capabilities remain excluded from admin-lite route discovery and are now called out explicitly in entry UX escalation guidance (security policy, identity/storage/secret admin, node trust revocation, and full membership role/member mutation flows).
+- Route-level strict gating in `SurfaceProtectedRoute` remains unchanged and authoritative; this update refines workflow clarity and explicit surface boundaries without widening route eligibility.

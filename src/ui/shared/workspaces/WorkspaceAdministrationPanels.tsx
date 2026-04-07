@@ -21,6 +21,7 @@ export const workspaceMembershipStatusOptions = Object.freeze(["pending", "activ
 export type WorkspaceAssignableRole = (typeof workspaceAssignableRoleOptions)[number];
 export type WorkspaceMembershipStatus = (typeof workspaceMembershipStatusOptions)[number];
 export type WorkspaceAdministrationSurface = "desktop" | "thin-client";
+export type WorkspaceAdministrationActionProfile = "full" | "admin-lite";
 
 const WorkspacePermissionIds = Object.freeze({
   manageMembers: "workspace.members.manage",
@@ -184,6 +185,7 @@ export function WorkspaceOperationalContextPanel({
 
 interface WorkspaceMembershipAdministrationPanelProps {
   readonly surface: WorkspaceAdministrationSurface;
+  readonly actionProfile?: WorkspaceAdministrationActionProfile;
   readonly selectedWorkspaceId?: string;
   readonly memberships: ReadonlyArray<WorkspaceMembershipApiRecord>;
   readonly capabilities: WorkspaceAdministrationCapabilityViewModel;
@@ -218,6 +220,7 @@ interface WorkspaceMembershipAdministrationPanelProps {
 
 export function WorkspaceMembershipAdministrationPanel({
   surface,
+  actionProfile = "full",
   selectedWorkspaceId,
   memberships,
   capabilities,
@@ -251,6 +254,9 @@ export function WorkspaceMembershipAdministrationPanel({
     () => toActorPermissionIds(capabilities),
     [capabilities],
   );
+  const supportsMembershipCreation = actionProfile === "full";
+  const supportsMemberRemoval = actionProfile === "full";
+  const supportsRoleManagement = actionProfile === "full";
 
   const addMemberActions = useMemo<ReadonlyArray<SurfaceActionDescriptor>>(
     () => Object.freeze([{
@@ -356,31 +362,40 @@ export function WorkspaceMembershipAdministrationPanel({
 
   return (
     <div className="ui-stack ui-stack--sm">
-      <div className="ui-workspace-admin-page__field-grid">
-        <label className="ui-field">
-          <span className="ui-field__label">User identity ID</span>
-          <input
-            className="ui-input"
-            value={newMemberUserId}
-            onChange={(event) => setNewMemberUserId(event.target.value)}
-            disabled={isMutating}
+      {!supportsMembershipCreation ? (
+        <p className="ui-workspace-admin-shared__admin-lite-note" role="status">
+          Admin-lite boundary: this surface supports member status review only. Use desktop administration for add/remove member and role changes.
+        </p>
+      ) : null}
+      {supportsMembershipCreation ? (
+        <>
+          <div className="ui-workspace-admin-page__field-grid">
+            <label className="ui-field">
+              <span className="ui-field__label">User identity ID</span>
+              <input
+                className="ui-input"
+                value={newMemberUserId}
+                onChange={(event) => setNewMemberUserId(event.target.value)}
+                disabled={isMutating}
+              />
+            </label>
+            <label className="ui-field">
+              <span className="ui-field__label">Roles (CSV)</span>
+              <input
+                className="ui-input"
+                value={newMemberRolesCsv}
+                onChange={(event) => setNewMemberRolesCsv(event.target.value)}
+                disabled={isMutating}
+              />
+            </label>
+          </div>
+          <SurfaceActionButtonStrip
+            actions={addMemberActions}
+            context={roleActionContext}
+            scope="page"
           />
-        </label>
-        <label className="ui-field">
-          <span className="ui-field__label">Roles (CSV)</span>
-          <input
-            className="ui-input"
-            value={newMemberRolesCsv}
-            onChange={(event) => setNewMemberRolesCsv(event.target.value)}
-            disabled={isMutating}
-          />
-        </label>
-      </div>
-      <SurfaceActionButtonStrip
-        actions={addMemberActions}
-        context={roleActionContext}
-        scope="page"
-      />
+        </>
+      ) : null}
 
       {memberships.length < 1 ? <p className="ui-text-secondary">No memberships to review.</p> : null}
       {memberships.length > 0 ? (
@@ -426,6 +441,8 @@ export function WorkspaceMembershipAdministrationPanel({
                             selectedWorkspaceId={selectedWorkspaceId}
                             membership={membership}
                             draftStatus={membershipDrafts[membership.userIdentityId] ?? membership.status}
+                            supportsMemberRemoval={supportsMemberRemoval}
+                            supportsRoleManagement={supportsRoleManagement}
                             onSaveMembershipStatus={onSaveMembershipStatus}
                             onRemoveMember={onRemoveMember}
                             onAssignRole={onAssignRole}
@@ -471,6 +488,8 @@ export function WorkspaceMembershipAdministrationPanel({
                       selectedWorkspaceId={selectedWorkspaceId}
                       membership={membership}
                       draftStatus={membershipDrafts[membership.userIdentityId] ?? membership.status}
+                      supportsMemberRemoval={supportsMemberRemoval}
+                      supportsRoleManagement={supportsRoleManagement}
                       onSaveMembershipStatus={onSaveMembershipStatus}
                       onRemoveMember={onRemoveMember}
                       onAssignRole={onAssignRole}
@@ -483,42 +502,44 @@ export function WorkspaceMembershipAdministrationPanel({
           )
       ) : null}
 
-      <section className="ui-card ui-workspace-admin-shared__role-assignment">
-        <div className="ui-card__header">
-          <h3 className="ui-card__title">Role assignments</h3>
-          <p className="ui-card__subtitle">Assign or revoke roles for the selected workspace membership.</p>
-        </div>
-        <div className="ui-card__body ui-stack ui-stack--sm">
-          <div className="ui-workspace-admin-shared__role-form">
-            <label className="ui-field">
-              <span className="ui-field__label">User identity ID</span>
-              <input
-                className="ui-input"
-                value={roleTargetUserId}
-                onChange={(event) => setRoleTargetUserId(event.target.value)}
-                disabled={isMutating}
-              />
-            </label>
-            <label className="ui-field">
-              <span className="ui-field__label">Role</span>
-              <select
-                className="ui-select"
-                value={roleValue}
-                onChange={(event) => setRoleValue(event.target.value as WorkspaceAssignableRole)}
-                disabled={isMutating}
-              >
-                {workspaceAssignableRoleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
-              </select>
-            </label>
+      {supportsRoleManagement ? (
+        <section className="ui-card ui-workspace-admin-shared__role-assignment">
+          <div className="ui-card__header">
+            <h3 className="ui-card__title">Role assignments</h3>
+            <p className="ui-card__subtitle">Assign or revoke roles for the selected workspace membership.</p>
           </div>
-          <SurfaceActionButtonStrip
-            actions={roleActions}
-            context={roleActionContext}
-            scope="bulk"
-            responsiveProfile={responsiveProfile}
-          />
-        </div>
-      </section>
+          <div className="ui-card__body ui-stack ui-stack--sm">
+            <div className="ui-workspace-admin-shared__role-form">
+              <label className="ui-field">
+                <span className="ui-field__label">User identity ID</span>
+                <input
+                  className="ui-input"
+                  value={roleTargetUserId}
+                  onChange={(event) => setRoleTargetUserId(event.target.value)}
+                  disabled={isMutating}
+                />
+              </label>
+              <label className="ui-field">
+                <span className="ui-field__label">Role</span>
+                <select
+                  className="ui-select"
+                  value={roleValue}
+                  onChange={(event) => setRoleValue(event.target.value as WorkspaceAssignableRole)}
+                  disabled={isMutating}
+                >
+                  {workspaceAssignableRoleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
+                </select>
+              </label>
+            </div>
+            <SurfaceActionButtonStrip
+              actions={roleActions}
+              context={roleActionContext}
+              scope="bulk"
+              responsiveProfile={responsiveProfile}
+            />
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -530,6 +551,8 @@ interface WorkspaceMemberRowActionsProps {
   readonly isMutating: boolean;
   readonly membership: WorkspaceMembershipApiRecord;
   readonly draftStatus: WorkspaceMembershipStatus;
+  readonly supportsMemberRemoval: boolean;
+  readonly supportsRoleManagement: boolean;
   readonly onSaveMembershipStatus: (
     input: {
       readonly targetUserIdentityId: string;
@@ -558,6 +581,8 @@ function WorkspaceMemberRowActions({
   isMutating,
   membership,
   draftStatus,
+  supportsMemberRemoval,
+  supportsRoleManagement,
   onSaveMembershipStatus,
   onRemoveMember,
   onAssignRole,
@@ -576,8 +601,8 @@ function WorkspaceMemberRowActions({
   );
 
   const rowActions = useMemo<ReadonlyArray<SurfaceActionDescriptor>>(
-    () => Object.freeze([
-      {
+    () => {
+      const actions: Array<SurfaceActionDescriptor> = [{
         id: `workspace-members-status-save:${membership.membershipId}`,
         label: "Save status",
         scope: "row",
@@ -601,87 +626,97 @@ function WorkspaceMemberRowActions({
             status: draftStatus,
           });
         },
-      } satisfies SurfaceActionDescriptor,
-      {
-        id: `workspace-members-remove:${membership.membershipId}`,
-        label: "Remove",
-        scope: "row",
-        tone: "danger",
-        requiredPermissions: Object.freeze([WorkspacePermissionIds.manageMembers]),
-        confirmation: Object.freeze({
-          title: "Remove workspace member?",
-          message: `Remove ${membership.userIdentityId} from this workspace.`,
-          confirmLabel: "Remove member",
-          cancelLabel: "Cancel",
+      } satisfies SurfaceActionDescriptor];
+
+      if (supportsMemberRemoval) {
+        actions.push({
+          id: `workspace-members-remove:${membership.membershipId}`,
+          label: "Remove",
+          scope: "row",
           tone: "danger",
-        }),
-        availability: () => {
-          if (isMutating) {
-            return Object.freeze({ disabled: true, disabledReason: "A membership operation is already running." });
-          }
-          if (!selectedWorkspaceId) {
-            return Object.freeze({ disabled: true, disabledReason: "Select a workspace before removing a member." });
-          }
-          return Object.freeze({});
-        },
-        onInvoke: async () => {
-          await onRemoveMember(membership.userIdentityId);
-        },
-      } satisfies SurfaceActionDescriptor,
-      {
-        id: `workspace-members-grant-admin:${membership.membershipId}`,
-        label: "Grant admin",
-        scope: "row",
-        tone: "secondary",
-        requiredPermissions: Object.freeze([WorkspacePermissionIds.manageRoles]),
-        availability: () => {
-          if (isMutating) {
-            return Object.freeze({ disabled: true, disabledReason: "A role operation is already running." });
-          }
-          if (!selectedWorkspaceId) {
-            return Object.freeze({ disabled: true, disabledReason: "Select a workspace before role changes." });
-          }
-          if (membership.activeRoles.includes("admin") || membership.activeRoles.includes("owner")) {
-            return Object.freeze({ disabled: true, disabledReason: "This member already has administrative access." });
-          }
-          return Object.freeze({});
-        },
-        onInvoke: async () => {
-          await onAssignRole({
-            targetUserIdentityId: membership.userIdentityId,
-            role: "admin",
-          });
-        },
-      } satisfies SurfaceActionDescriptor,
-      {
-        id: `workspace-members-revoke-admin:${membership.membershipId}`,
-        label: "Revoke admin",
-        scope: "row",
-        tone: "danger",
-        requiredPermissions: Object.freeze([WorkspacePermissionIds.manageRoles]),
-        availability: () => {
-          if (isMutating) {
-            return Object.freeze({ disabled: true, disabledReason: "A role operation is already running." });
-          }
-          if (!selectedWorkspaceId) {
-            return Object.freeze({ disabled: true, disabledReason: "Select a workspace before role changes." });
-          }
-          if (membership.activeRoles.includes("owner")) {
-            return Object.freeze({ disabled: true, disabledReason: "Owner role mutation requires ownership transfer." });
-          }
-          if (!membership.activeRoles.includes("admin")) {
-            return Object.freeze({ disabled: true, disabledReason: "This member does not have an admin role." });
-          }
-          return Object.freeze({});
-        },
-        onInvoke: async () => {
-          await onRevokeRole({
-            targetUserIdentityId: membership.userIdentityId,
-            role: "admin",
-          });
-        },
-      } satisfies SurfaceActionDescriptor,
-    ]),
+          requiredPermissions: Object.freeze([WorkspacePermissionIds.manageMembers]),
+          confirmation: Object.freeze({
+            title: "Remove workspace member?",
+            message: `Remove ${membership.userIdentityId} from this workspace.`,
+            confirmLabel: "Remove member",
+            cancelLabel: "Cancel",
+            tone: "danger",
+          }),
+          availability: () => {
+            if (isMutating) {
+              return Object.freeze({ disabled: true, disabledReason: "A membership operation is already running." });
+            }
+            if (!selectedWorkspaceId) {
+              return Object.freeze({ disabled: true, disabledReason: "Select a workspace before removing a member." });
+            }
+            return Object.freeze({});
+          },
+          onInvoke: async () => {
+            await onRemoveMember(membership.userIdentityId);
+          },
+        } satisfies SurfaceActionDescriptor);
+      }
+
+      if (supportsRoleManagement) {
+        actions.push(
+          {
+            id: `workspace-members-grant-admin:${membership.membershipId}`,
+            label: "Grant admin",
+            scope: "row",
+            tone: "secondary",
+            requiredPermissions: Object.freeze([WorkspacePermissionIds.manageRoles]),
+            availability: () => {
+              if (isMutating) {
+                return Object.freeze({ disabled: true, disabledReason: "A role operation is already running." });
+              }
+              if (!selectedWorkspaceId) {
+                return Object.freeze({ disabled: true, disabledReason: "Select a workspace before role changes." });
+              }
+              if (membership.activeRoles.includes("admin") || membership.activeRoles.includes("owner")) {
+                return Object.freeze({ disabled: true, disabledReason: "This member already has administrative access." });
+              }
+              return Object.freeze({});
+            },
+            onInvoke: async () => {
+              await onAssignRole({
+                targetUserIdentityId: membership.userIdentityId,
+                role: "admin",
+              });
+            },
+          } satisfies SurfaceActionDescriptor,
+          {
+            id: `workspace-members-revoke-admin:${membership.membershipId}`,
+            label: "Revoke admin",
+            scope: "row",
+            tone: "danger",
+            requiredPermissions: Object.freeze([WorkspacePermissionIds.manageRoles]),
+            availability: () => {
+              if (isMutating) {
+                return Object.freeze({ disabled: true, disabledReason: "A role operation is already running." });
+              }
+              if (!selectedWorkspaceId) {
+                return Object.freeze({ disabled: true, disabledReason: "Select a workspace before role changes." });
+              }
+              if (membership.activeRoles.includes("owner")) {
+                return Object.freeze({ disabled: true, disabledReason: "Owner role mutation requires ownership transfer." });
+              }
+              if (!membership.activeRoles.includes("admin")) {
+                return Object.freeze({ disabled: true, disabledReason: "This member does not have an admin role." });
+              }
+              return Object.freeze({});
+            },
+            onInvoke: async () => {
+              await onRevokeRole({
+                targetUserIdentityId: membership.userIdentityId,
+                role: "admin",
+              });
+            },
+          } satisfies SurfaceActionDescriptor,
+        );
+      }
+
+      return Object.freeze(actions);
+    },
     [
       draftStatus,
       isMutating,
@@ -694,6 +729,8 @@ function WorkspaceMemberRowActions({
       onRevokeRole,
       onSaveMembershipStatus,
       selectedWorkspaceId,
+      supportsMemberRemoval,
+      supportsRoleManagement,
     ],
   );
 

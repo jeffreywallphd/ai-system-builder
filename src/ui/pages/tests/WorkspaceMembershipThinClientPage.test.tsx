@@ -42,5 +42,8 @@ describe("WorkspaceMembershipThinClientPage", () => {
     expect(html).toContain("Workspace memberships");
     expect(html).toContain("Membership management");
     expect(html).toContain("Invitation status");
+    expect(html).toContain("Admin-lite boundary");
+    expect(html).not.toContain("Role assignments");
+    expect(html).not.toContain("Add member");
   });
 });
