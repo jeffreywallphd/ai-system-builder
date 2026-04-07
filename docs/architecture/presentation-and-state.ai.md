@@ -36,6 +36,10 @@ Describe stores as "page-facing state managers" and UI services as "presentation
 ## Important caveat
 `createUiDependencies.ts` is one of the most important architecture files in the repo because it reflects real renderer wiring, even though there is also a generic DI bootstrap elsewhere.
 
+## Multi-surface baseline
+- Canonical desktop/thin-client/tablet/mobile-responsive UI composition rules now live in `docs/architecture/multi-surface-ui-composition-foundation.md`.
+- New UI stories should place shared presentation logic in shared seams and keep host/runtime specialization in `src/ui/desktop/*` and `src/ui/web/*`.
+
 Execution-state wording for the workflow editor is now intentionally projected through `src/ui/presenters/WorkflowExecutionPresenter.ts`, and durable execution history/detail wording is now intentionally projected through the application execution-run list/detail projections plus `src/ui/services/ExecutionHistoryService.ts` instead of being assembled ad hoc inside the page/component tree, including the MCP page's runtime-backed server-operation history surface.
 Workflow Studio observability now also uses the same thin renderer -> backend-service approach: run-history list/detail views are rendered via `WorkflowStudioRunHistoryPanel` and loaded through `src/ui/services/StudioShellService.ts` (`listWorkflowRuns`, `getWorkflowRunDetail`) rather than UI-owned persistence/query logic.
 Workflow Studio run observability now keeps hierarchy and disclosure bounded in that same surface: run-level summary first, step-by-step expandable inspection second, and structured diagnostics/failure-location cues rendered from backend read models (no UI-side diagnostic inference/parsing).
