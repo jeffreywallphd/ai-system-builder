@@ -139,6 +139,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Authorization extension playbook for new route/handler/resource/UI/async surfaces: `docs/architecture/authorization-enforcement-integration-patterns.md`
 - Feature 4 final production baseline and extension checklist: `docs/architecture/authorization-feature-4-final-baseline.md`
 - Admin/user sharing-management and access-review operations guide: `docs/authorization-sharing-management-and-access-review.md`
+- Feature 14 / Epic 14.1 Story 14.1.1 convergence inventory and migration plan across desktop IPC, thin-client HTTP/WSS, and shared contract homes: `docs/architecture/unified-api-convergence-plan.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).
