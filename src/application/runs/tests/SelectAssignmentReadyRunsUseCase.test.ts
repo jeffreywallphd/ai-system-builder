@@ -12,6 +12,10 @@ import type {
   IRunOrchestrationQueuePersistenceRepository,
   RunQueueEligibilityMarker,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import type {
+  IRunNodeAssignmentEligibilityService,
+  RunAssignmentEligibilityDecision,
+} from "@application/runs/ports/RunAssignmentEligibilityPorts";
 import { RunLifecycleStates, RunSubmissionSources, createCanonicalRunRecord } from "@domain/runs/RunDomain";
 import { mapLifecycleStateToPlatformRunStatus, type RunAuthoritativeMetadata } from "../use-cases/RunCreationPersistenceMapper";
 import { SelectAssignmentReadyRunsUseCase } from "../use-cases/SelectAssignmentReadyRunsUseCase";
@@ -42,6 +46,7 @@ class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
 
 class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceRepository {
   public readonly queue = new Map<string, AuthoritativeRunQueueEntryRecord>();
+  public readonly releases: Array<{ readonly runId: string; readonly claimToken: string; readonly releasedAt: string }> = [];
 
   public async getQueueEntryByRunId(runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined> {
     return this.queue.get(runId);
@@ -133,6 +138,7 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
     if (!existing || existing.claimToken !== input.claimToken) {
       return false;
     }
+    this.releases.push(input);
     this.queue.set(input.runId, Object.freeze({
       ...existing,
       claimToken: undefined,
@@ -143,6 +149,36 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
       revision: existing.revision + 1,
     }));
     return true;
+  }
+}
+
+class ConditionalAssignmentEligibilityService implements IRunNodeAssignmentEligibilityService {
+  public constructor(private readonly deniedRunIds = new Set<string>()) {}
+
+  public async evaluateNodeEligibility(input: {
+    readonly asOf: string;
+    readonly run: PlatformRunRecord;
+    readonly queueEntry: AuthoritativeRunQueueEntryRecord;
+    readonly nodeId: string;
+  }): Promise<RunAssignmentEligibilityDecision> {
+    if (this.deniedRunIds.has(input.run.runId)) {
+      return Object.freeze({
+        eligible: false,
+        nodeId: input.nodeId,
+        reasons: Object.freeze([
+          Object.freeze({
+            code: "policy-denied",
+            message: "Test policy denied this run for the selected node.",
+          }),
+        ]),
+      });
+    }
+
+    return Object.freeze({
+      eligible: true,
+      nodeId: input.nodeId,
+      reasons: Object.freeze([]),
+    });
   }
 }
 
@@ -386,5 +422,88 @@ describe("SelectAssignmentReadyRunsUseCase", () => {
 
     expect(result.items).toHaveLength(1);
     expect(result.items[0]?.run.runId).toBe("run-ready");
+  });
+
+  it("releases claimed runs that fail node-assignment eligibility checks", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+
+    for (const runId of ["run-eligible", "run-ineligible"] as const) {
+      await runRepository.createRun(createRunRecord({
+        runId,
+        queueId: "queue:default",
+        lifecycleState: RunLifecycleStates.queued,
+        submittedAt: "2026-04-07T09:00:00.000Z",
+        updatedAt: "2026-04-07T09:00:00.000Z",
+      }), { operationKey: `seed:${runId}`, actorId: "system:test" });
+
+      queueRepository.queue.set(runId, createQueueEntry({
+        runId,
+        queueId: "queue:default",
+        enteredAt: "2026-04-07T09:00:00.000Z",
+        eligibleAt: "2026-04-07T09:00:00.000Z",
+        orderKey: `2026-04-07T09:00:00.000Z:${runId}`,
+      }));
+    }
+
+    const useCase = new SelectAssignmentReadyRunsUseCase({
+      runRepository,
+      queueRepository,
+      assignmentEligibilityService: new ConditionalAssignmentEligibilityService(new Set(["run-ineligible"])),
+      now: () => new Date("2026-04-07T09:01:00.000Z"),
+    });
+
+    const result = await useCase.execute({
+      reservationOwner: "orchestrator:alpha",
+      queueId: "queue:default",
+      nodeId: "node:trusted-alpha",
+      limit: 10,
+    });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.run.runId).toBe("run-eligible");
+    expect(queueRepository.releases).toEqual([
+      Object.freeze({
+        runId: "run-ineligible",
+        claimToken: "claim:run-ineligible",
+        releasedAt: "2026-04-07T09:01:00.000Z",
+      }),
+    ]);
+  });
+
+  it("returns no items for node-targeted selection when assignment matching is unavailable", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+
+    await runRepository.createRun(createRunRecord({
+      runId: "run-a",
+      queueId: "queue:default",
+      lifecycleState: RunLifecycleStates.queued,
+      submittedAt: "2026-04-07T09:00:00.000Z",
+      updatedAt: "2026-04-07T09:00:00.000Z",
+    }), { operationKey: "seed:run-a", actorId: "system:test" });
+
+    queueRepository.queue.set("run-a", createQueueEntry({
+      runId: "run-a",
+      queueId: "queue:default",
+      enteredAt: "2026-04-07T09:00:00.000Z",
+      eligibleAt: "2026-04-07T09:00:00.000Z",
+      orderKey: "2026-04-07T09:00:00.000Z:run-a",
+    }));
+
+    const useCase = new SelectAssignmentReadyRunsUseCase({
+      runRepository,
+      queueRepository,
+      now: () => new Date("2026-04-07T09:01:00.000Z"),
+    });
+
+    const result = await useCase.execute({
+      reservationOwner: "orchestrator:alpha",
+      nodeId: "node:trusted-alpha",
+      limit: 10,
+    });
+
+    expect(result.items).toEqual([]);
+    expect(queueRepository.releases).toEqual([]);
   });
 });
