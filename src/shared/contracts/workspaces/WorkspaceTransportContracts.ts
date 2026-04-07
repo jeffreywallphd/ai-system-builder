@@ -40,6 +40,12 @@ import type {
 } from "@infrastructure/api/workspaces/sdk/PublicWorkspaceInvitationApiContract";
 export type * from "@infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 export type * from "@infrastructure/api/workspaces/sdk/PublicWorkspaceInvitationApiContract";
+export {
+  WorkspaceAdministrationApiErrorCodes,
+} from "@infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
+export {
+  WorkspaceInvitationApiErrorCodes,
+} from "@infrastructure/api/workspaces/sdk/PublicWorkspaceInvitationApiContract";
 
 export const WorkspaceTransportRoutes = Object.freeze({
   listWorkspaces: "/api/v1/workspaces",

@@ -56,7 +56,7 @@
 - Client imports now target shared contracts for identity and workspaces.
 - Identity and workspace thin/desktop HTTP clients now compose `SharedApiClient` instead of duplicating raw `fetch` transport logic.
 - Server backend API imports now target shared contracts for identity and workspaces.
-- Identity shared transport contracts re-export stable runtime constants from compatibility SDK contracts (for example, `IdentityAuthApiErrorCodes`) so backend and client imports can stay anchored to `src/shared/contracts/*`.
+- Identity and workspace shared transport contracts re-export stable runtime constants from compatibility SDK contracts (for example, `IdentityAuthApiErrorCodes`, `WorkspaceAdministrationApiErrorCodes`, and `WorkspaceInvitationApiErrorCodes`) so backend and client imports can stay anchored to `src/shared/contracts/*`.
 - Legacy infrastructure SDK contracts are marked as compatibility shims for migration.
 
 ## Shared client behavior baseline (Story 14.1.5)

@@ -26,7 +26,7 @@ import {
   appendSharedApiQueryValue,
   toSharedApiQuerySuffix,
 } from "@shared/contracts/api/SharedApiQueryConventions";
-import { SharedApiClient } from "../api/SharedApiClient";
+import { SharedApiClient } from "@ui/shared/api/SharedApiClient";
 
 /* MIGRATION NOTE: request DTOs in this client still include inline compatibility shapes.
  * New features should consume request/response contracts directly from src/shared/contracts/workspaces.
