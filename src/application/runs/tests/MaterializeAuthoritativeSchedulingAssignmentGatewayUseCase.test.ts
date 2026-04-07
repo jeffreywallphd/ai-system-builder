@@ -8,6 +8,10 @@ import type {
 import { RunNodeClaimConflictReasons } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import { RunNodeDispatchClaimConflictError } from "@application/runs/use-cases/ClaimRunForNodeDispatchPreparationUseCase";
 import { MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase } from "@application/runs/use-cases/MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase";
+import type {
+  ISchedulingGovernanceEventSink,
+  SchedulingGovernanceEvent,
+} from "@application/scheduling/ports/SchedulingGovernanceEventPorts";
 import {
   createSchedulingDecisionBundle,
   createSchedulingOutcomeReason,
@@ -123,6 +127,14 @@ class RecordingPlacementHoldRepository implements IRunNodePlacementHoldRepositor
   }): Promise<boolean> {
     this.releases.push(input);
     return true;
+  }
+}
+
+class RecordingGovernanceEventSink implements ISchedulingGovernanceEventSink {
+  public readonly events: SchedulingGovernanceEvent[] = [];
+
+  public async recordSchedulingGovernanceEvent(event: SchedulingGovernanceEvent): Promise<void> {
+    this.events.push(event);
   }
 }
 
@@ -245,6 +257,7 @@ describe("MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase", () => {
   it("releases queue claim and skips claim materialization when node hold acquisition conflicts", async () => {
     const queueRepository = new RecordingQueueRepository();
     const placementHoldRepository = new RecordingPlacementHoldRepository();
+    const governanceSink = new RecordingGovernanceEventSink();
     const claimed: string[] = [];
     placementHoldRepository.nextAcquireResult = Object.freeze({
       outcome: "conflict",
@@ -268,6 +281,7 @@ describe("MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase", () => {
     const useCase = new MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase({
       queueRepository,
       placementHoldRepository,
+      governanceEventSink: governanceSink,
       claimRunForNodeDispatchPreparationUseCase: {
         execute: async (input) => {
           claimed.push(`${input.runId}:${input.nodeId}`);
@@ -289,6 +303,9 @@ describe("MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase", () => {
     expect(queueRepository.releases).toHaveLength(1);
     expect(queueRepository.releases[0]?.runId).toBe("run:1");
     expect(placementHoldRepository.releases).toHaveLength(0);
+    expect(governanceSink.events).toHaveLength(2);
+    expect(governanceSink.events.every((event) => event.type === "scheduling-reservation-conflict")).toBeTrue();
+    expect(governanceSink.events.map((event) => event.channel).sort()).toEqual(["audit", "operational"]);
   });
 
   it("releases node hold even when claim use case reports a reservation conflict", async () => {
@@ -325,9 +342,11 @@ describe("MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase", () => {
   it("defers non-selected queue leases with no-placement metadata instead of immediate release", async () => {
     const queueRepository = new RecordingQueueRepository();
     const placementHoldRepository = new RecordingPlacementHoldRepository();
+    const governanceSink = new RecordingGovernanceEventSink();
     const useCase = new MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase({
       queueRepository,
       placementHoldRepository,
+      governanceEventSink: governanceSink,
       claimRunForNodeDispatchPreparationUseCase: {
         execute: async () => Promise.resolve(undefined as never),
       },
@@ -343,5 +362,8 @@ describe("MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase", () => {
     expect(queueRepository.deferred).toHaveLength(1);
     expect(queueRepository.deferred[0]?.runId).toBe("run:2");
     expect(queueRepository.deferred[0]?.reasonCodes).toContain("no-placement");
+    expect(governanceSink.events).toHaveLength(2);
+    expect(governanceSink.events.every((event) => event.type === "scheduling-deferred-no-placement")).toBeTrue();
+    expect(governanceSink.events[0]?.runId).toBe("run:2");
   });
 });

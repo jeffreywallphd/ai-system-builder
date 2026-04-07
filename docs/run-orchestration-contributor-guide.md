@@ -17,6 +17,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/run-orchestration-scheduling-hybrid-node-local-interactive-protection.md`
 - `docs/architecture/run-orchestration-scheduling-required-capability-affinity-eligibility.md`
 - `docs/architecture/run-orchestration-scheduling-decision-reason-capture.md`
+- `docs/architecture/run-orchestration-scheduling-audit-operational-hooks.md`
 - `docs/architecture/run-orchestration-scheduling-architecture-extension-guidance.md`
 - `docs/architecture/run-orchestration-scheduling-authoritative-queue-selection-and-assignment-integration.md`
 - `docs/architecture/run-orchestration-scheduling-reservation-aware-node-arbitration-and-placement-holds.md`
